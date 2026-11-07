@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -26,7 +28,7 @@ func TestCompareWorktreeMaps(t *testing.T) {
 		TotalFiles: 3, TotalAdded: 4, TotalDeleted: 5,
 		Base:    project.ResolvedSource{Kind: project.SourceMergeBase, Label: "origin/main", SHA: "aaa"},
 		Head:    project.ResolvedSource{Kind: project.SourceWorkingTree, Label: "Working tree"},
-		BaseRef: "origin/main", MergeBase: "aaa",
+		BaseRef: "origin/main", MergeBase: "aaa", SkippedNames: 6,
 	}, project.CompareSides{Old: project.FileVersion{Present: true, Submodule: true, Contents: []byte("x")}, Status: "D"})
 
 	res, err := c.CompareWorktree(ctx, connect.NewRequest(&v1.CompareWorktreeRequest{ProjectId: id, Path: "/code/proj"}))
@@ -38,7 +40,7 @@ func TestCompareWorktreeMaps(t *testing.T) {
 	if f.GetPath() != "b" || f.GetOldPath() != "a" || f.GetStatus() != "R" || f.GetAdded() != 2 || f.GetDeleted() != 1 || !f.GetBinary() || !f.GetSubmodule() {
 		t.Errorf("file = %v", f)
 	}
-	if !m.GetTruncated() || m.GetTotalFiles() != 3 || m.GetTotalAdded() != 4 || m.GetTotalDeleted() != 5 {
+	if !m.GetTruncated() || m.GetTotalFiles() != 3 || m.GetTotalAdded() != 4 || m.GetTotalDeleted() != 5 || m.GetSkippedNames() != 6 {
 		t.Errorf("totals = %v", m)
 	}
 	if b := m.GetBase(); b.GetKind() != v1.DiffSourceKind_DIFF_SOURCE_KIND_MERGE_BASE || b.GetLabel() != "origin/main" || b.GetSha() != "aaa" {
@@ -116,6 +118,44 @@ func TestCompareRefusalCodes(t *testing.T) {
 			file := &v1.GetWorktreeCompareFileRequest{ProjectId: tt.req.GetProjectId(), Path: tt.req.GetPath(), Base: tt.req.GetBase(), File: "a"}
 			if _, err := c.GetWorktreeCompareFile(ctx, connect.NewRequest(file)); connect.CodeOf(err) != tt.want {
 				t.Errorf("GetWorktreeCompareFile err = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+// TestReadErrorHidesGit: a caller gets what it sent back, and never the command or
+// directory of a git that failed.
+func TestReadErrorHidesGit(t *testing.T) {
+	gitErr := &project.GitError{Dir: "/Users/someone/repo", Args: []string{"cat-file", "blob", "^abc"}, ExitCode: 128, Stderr: "fatal: not valid"}
+	tests := []struct {
+		name string
+		err  error
+		code connect.Code
+		want string // in the message
+		hide []string
+	}{
+		{"git failed", gitErr, connect.CodeInternal, "git could not read", []string{"cat-file", "/Users/someone", "^abc", "fatal"}},
+		{"git failed, wrapped", fmt.Errorf("reading: %w", gitErr), connect.CodeInternal, "git could not read", []string{"cat-file", "/Users/someone"}},
+		{"an os error", fmt.Errorf("project: read /Users/someone/repo: %w", os.ErrPermission), connect.CodeInternal, "git could not read", []string{"/Users/someone"}},
+		{"timed out", fmt.Errorf("%w: %w", context.DeadlineExceeded, gitErr), connect.CodeDeadlineExceeded, "git could not read", []string{"cat-file"}},
+		{"cancelled", fmt.Errorf("%w: %w", context.Canceled, gitErr), connect.CodeCanceled, "git could not read", []string{"cat-file"}},
+		{"a refusal", fmt.Errorf("%w: ref %q cannot start with ^", project.ErrInvalidArgument, "^HEAD"), connect.CodeInvalidArgument, "cannot start with ^", nil},
+		{"unknown", fmt.Errorf("%w: worktree", project.ErrNotFound), connect.CodeNotFound, "worktree", nil},
+		{"not git", fmt.Errorf("%w: %w", project.ErrFailedPrecondition, project.ErrNotGit), connect.CodeFailedPrecondition, "", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := readError(context.Background(), tt.err)
+			if c := connect.CodeOf(got); c != tt.code {
+				t.Errorf("code = %v, want %v", c, tt.code)
+			}
+			if !strings.Contains(got.Error(), tt.want) {
+				t.Errorf("message %q, want %q", got, tt.want)
+			}
+			for _, h := range tt.hide {
+				if strings.Contains(got.Error(), h) {
+					t.Errorf("message %q holds %q", got, h)
+				}
 			}
 		})
 	}

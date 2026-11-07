@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Comparing any two sources of a checkout (docs/notes/diff-viewer-1.md):
@@ -24,7 +25,11 @@ import (
 // is checked (checkRef) and resolved to a sha behind --end-of-options, and only the sha
 // reaches any later command. Paths never reach `git diff`: the whole diff is listed and
 // matched here (which also keeps a rename whole when one of its paths is asked for).
-// A read names its path behind `--literal-pathspecs … --`, or opens it under an os.Root.
+// A read names its path behind `--literal-pathspecs … --`, or opens it under an os.Root,
+// and .git is refused both as a caller writes it and where its links lead.
+//
+// Every command runs under guarded: what a checkout's config can still start is in
+// docs/notes/diff-viewer-1.md.
 
 const (
 	// CompareFilesMax caps WorktreeCompare.Files; the totals still count every file.
@@ -40,6 +45,9 @@ const (
 	untrackedCountMax = 64 << 20
 	// submoduleMode is a gitlink's mode, in `git diff --raw` and `git ls-files -s`.
 	submoduleMode = "160000"
+	// objectsMissing is the answer for a partial clone without an object it needs: guarded
+	// fetches nothing.
+	objectsMissing = "this comparison needs objects that are not on this machine: this is a partial clone, and a comparison does not fetch"
 )
 
 // DiffSourceKind is what a comparison's side is.
@@ -97,6 +105,7 @@ type CompareFileRequest struct {
 
 // CompareChange is one file of a comparison, base to head.
 type CompareChange struct {
+	// Path is as git names it: an embedded repository (Submodule, not yet added) ends in /.
 	Path    string
 	OldPath string // renames and copies
 	// Status is a git letter (A M D R C T), U for an unmerged path, ? for an untracked
@@ -113,7 +122,10 @@ type WorktreeCompare struct {
 	Truncated bool
 	// TotalFiles, TotalAdded and TotalDeleted count every file, listed or not.
 	TotalFiles, TotalAdded, TotalDeleted int
-	Base, Head                           ResolvedSource
+	// SkippedNames counts the files left out of all of the above: a name that is not UTF-8,
+	// possible in a tree, cannot travel in a response.
+	SkippedNames int
+	Base, Head   ResolvedSource
 	// BaseRef and MergeBase are as in WorktreeDetail.
 	BaseRef, MergeBase string
 	// Error says why a source could not be resolved; the list is then empty.
@@ -141,6 +153,8 @@ func checkRef(ref string) error {
 		return fmt.Errorf("%w: ref is %d bytes, at most %d", ErrInvalidArgument, len(ref), refMax)
 	case strings.HasPrefix(ref, "-"):
 		return refuse("cannot start with -")
+	case strings.HasPrefix(ref, "^"): // an exclusion: rev-parse echoes it, ^ and all
+		return refuse("cannot start with ^")
 	case strings.Contains(ref, ".."):
 		return refuse("cannot be a range")
 	case strings.ContainsAny(ref, ":?*[\\"):
@@ -161,8 +175,20 @@ func checkSource(s DiffSource) error {
 	return nil
 }
 
+// insideGit reports whether a slash-separated path is .git or below one, in any case as
+// APFS has it.
+func insideGit(p string) bool {
+	for part := range strings.SplitSeq(p, "/") {
+		if strings.EqualFold(part, ".git") {
+			return true
+		}
+	}
+	return false
+}
+
 // comparePath validates a worktree-relative path as worktreeRelative does and refuses
-// .git, in any case as APFS has it: the repository's own files are never a side.
+// .git: the repository's own files are never a side. That is the path as written;
+// readWorktreeFile refuses one that gets there through a link.
 func comparePath(p string) (string, error) {
 	if len(p) > comparePathMax {
 		return "", fmt.Errorf("%w: path is %d bytes, at most %d", ErrInvalidArgument, len(p), comparePathMax)
@@ -174,10 +200,8 @@ func comparePath(p string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for part := range strings.SplitSeq(c, "/") {
-		if strings.EqualFold(part, ".git") {
-			return "", fmt.Errorf("%w: file %q is inside .git", ErrInvalidArgument, p)
-		}
+	if insideGit(c) {
+		return "", fmt.Errorf("%w: file %q is inside .git", ErrInvalidArgument, p)
 	}
 	return c, nil
 }
@@ -241,7 +265,11 @@ func (c *comparison) resolve(s DiffSource, b currentBase) (_ ResolvedSource, why
 		case err != nil:
 			return r, "", err
 		}
-		r.SHA = string(trimNL(out))
+		// A bare sha or nothing: what comes back goes on every later command line.
+		if r.SHA = string(trimNL(out)); !isSHA(r.SHA) {
+			r.SHA = ""
+			return r, fmt.Sprintf("%s does not name a commit in this checkout", s.Ref), nil
+		}
 	default:
 		r.Label = "HEAD"
 		if b.mergeBase != "" {
@@ -252,6 +280,14 @@ func (c *comparison) resolve(s DiffSource, b currentBase) (_ ResolvedSource, why
 	return r, "", nil
 }
 
+// isSHA reports whether s is a full object name, SHA-1 or SHA-256.
+func isSHA(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	return strings.IndexFunc(s, func(r rune) bool { return !('0' <= r && r <= '9' || 'a' <= r && r <= 'f') }) < 0
+}
+
 // noSuchCommit reports `rev-parse --verify --quiet` answering that nothing is there: exit
 // 1, or 128 and silence for a reflog entry past the end (HEAD@{99}). A repository that
 // cannot be read is 128 too, and says why.
@@ -260,10 +296,22 @@ func noSuchCommit(err error) bool {
 	return errors.As(err, &ge) && (ge.ExitCode == 1 || ge.ExitCode == 128 && strings.TrimSpace(ge.Stderr) == "")
 }
 
+// isMissingObject reports git stopping at an object a partial clone does not have.
+// `ls-tree --long` does not stop; parseLsTree has that case.
+func isMissingObject(err error) bool {
+	var ge *GitError
+	if !errors.As(err, &ge) {
+		return false
+	}
+	msg := strings.TrimSpace(ge.Stderr)
+	return strings.Contains(msg, "from promisor remote") || strings.HasSuffix(msg, ": bad file") ||
+		strings.Contains(msg, "could not get object info")
+}
+
 // compareArgs is the `git diff` between two sources, whichever way round. Git has no
 // form with the working tree or index as the old side, so those are reversed (-R).
 func compareArgs(base, head ResolvedSource) []string {
-	args := []string{"--raw", "--numstat", "--no-abbrev", "--no-textconv", "--ignore-submodules=dirty"}
+	args := []string{"--raw", "--numstat", "--no-abbrev", "--no-textconv", "--ignore-submodules=none"}
 	switch {
 	case base.SHA != "" && head.SHA != "":
 		args = append(args, base.SHA, head.SHA)
@@ -401,7 +449,8 @@ func markUnmerged(list []CompareChange, unmerged []string) []CompareChange {
 // addUntracked adds the untracked files, counting their lines up to untrackedCountMax in
 // all: added on the head side, deleted with the working tree as base (reversed). One the
 // diff already lists (`git rm --cached` leaves D and the file on disk) is on both sides.
-// An embedded repository is listed as "dir/": it is not a file.
+// An embedded repository comes as "dir/" and stays so, as the detail lists it: a row with
+// nothing to count.
 func addUntracked(dir string, list []CompareChange, untracked []string, reversed bool) []CompareChange {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -414,19 +463,18 @@ func addUntracked(dir string, list []CompareChange, untracked []string, reversed
 	}
 	budget := int64(untrackedCountMax)
 	for _, p := range untracked {
-		if strings.HasSuffix(p, "/") {
-			continue
-		}
-		if i, ok := listed[p]; ok {
+		if i, ok := listed[strings.TrimSuffix(p, "/")]; ok {
 			list[i].Status, list[i].Added, list[i].Deleted = "M", 0, 0
 			continue
 		}
-		c := CompareChange{Path: p, Status: "?"}
-		lines, binary, read := countRootLines(root, p, budget)
-		budget -= read
-		c.Added, c.Binary = lines, binary
+		c := CompareChange{Path: p, Status: "?", Submodule: strings.HasSuffix(p, "/")}
+		if !c.Submodule {
+			lines, binary, read := countRootLines(root, p, budget)
+			budget -= read
+			c.Added, c.Binary = lines, binary
+		}
 		if reversed {
-			c.Status, c.Added, c.Deleted = "D", 0, lines
+			c.Status, c.Added, c.Deleted = "D", 0, c.Added
 		}
 		list = append(list, c)
 	}
@@ -483,6 +531,7 @@ func matchesPath(file string, paths []string) bool {
 
 // CompareWorktree implements Store.
 func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (WorktreeCompare, error) {
+	ctx = guarded(ctx)
 	if len(req.Paths) > comparePathsMax {
 		return WorktreeCompare{}, fmt.Errorf("%w: %d paths, at most %d", ErrInvalidArgument, len(req.Paths), comparePathsMax)
 	}
@@ -503,6 +552,10 @@ func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (Worktree
 		return res, nil
 	}
 	list, err := c.changes()
+	if isMissingObject(err) {
+		res.Error = objectsMissing
+		return res, nil
+	}
 	if err != nil {
 		return WorktreeCompare{}, err
 	}
@@ -511,13 +564,21 @@ func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (Worktree
 }
 
 // fill keeps what paths ask for (all of it without any), sorted, totals every file and
-// lists at most limit. A rename stays when either of its paths is asked for.
+// lists at most limit. A rename stays when either of its paths is asked for. A name that
+// is not UTF-8 is counted apart (SkippedNames): one would fail the whole response.
 func (w *WorktreeCompare) fill(list []CompareChange, paths []string, limit int) {
 	if len(paths) > 0 {
 		list = slices.DeleteFunc(list, func(f CompareChange) bool {
 			return !matchesPath(f.Path, paths) && (f.OldPath == "" || !matchesPath(f.OldPath, paths))
 		})
 	}
+	list = slices.DeleteFunc(list, func(f CompareChange) bool {
+		skip := !utf8.ValidString(f.Path) || !utf8.ValidString(f.OldPath)
+		if skip {
+			w.SkippedNames++
+		}
+		return skip
+	})
 	slices.SortFunc(list, func(a, b CompareChange) int { return cmp.Compare(a.Path, b.Path) })
 	w.TotalFiles = len(list)
 	for _, f := range list {
@@ -532,6 +593,7 @@ func (w *WorktreeCompare) fill(list []CompareChange, paths []string, limit int) 
 
 // CompareFile implements Store.
 func (g *Git) CompareFile(ctx context.Context, req CompareFileRequest) (CompareSides, error) {
+	ctx = guarded(ctx)
 	file, err := comparePath(req.File)
 	if err != nil {
 		return CompareSides{}, err
@@ -550,10 +612,13 @@ func (g *Git) CompareFile(ctx context.Context, req CompareFileRequest) (CompareS
 		return CompareSides{Error: c.err}, nil
 	}
 	var res CompareSides
-	if res.Old, err = g.readSide(ctx, c, c.base, oldPath); err != nil {
-		return CompareSides{}, err
+	if res.Old, err = g.readSide(ctx, c, c.base, oldPath); err == nil {
+		res.New, err = g.readSide(ctx, c, c.head, file)
 	}
-	if res.New, err = g.readSide(ctx, c, c.head, file); err != nil {
+	if isMissingObject(err) {
+		return CompareSides{Error: objectsMissing}, nil
+	}
+	if err != nil {
 		return CompareSides{}, err
 	}
 	res.Status = diffStatus(res.Old, res.New, oldPath != file)
@@ -602,25 +667,40 @@ func (g *Git) readRevSide(ctx context.Context, dir, rev, file string) (FileVersi
 	return FileVersion{}, nil
 }
 
-// readWorkingSide is readWorktreeFile, with a directory that is a submodule in the index
-// as the commit it has checked out.
+// readWorkingSide is readWorktreeFile, with a directory that is a repository, a submodule
+// in the index or one embedded and not yet added, as the commit it has checked out: with
+// git's "-dirty" for a submodule with changes of its own, the only difference a dirty
+// submodule may have.
 func (g *Git) readWorkingSide(ctx context.Context, dir, file string) (FileVersion, error) {
 	v, err := readWorktreeFile(dir, file)
 	if err != nil || v.Present {
 		return v, err
 	}
-	e, ok, err := g.indexEntry(ctx, dir, file)
-	if err != nil || !ok || e.mode != submoduleMode {
+	e, tracked, err := g.indexEntry(ctx, dir, file)
+	if err != nil || tracked && e.mode != submoduleMode {
 		return FileVersion{}, err
 	}
-	if !hasGitDir(dir, file) { // not initialized: git counts it as unchanged
-		return submoduleVersion(e.oid), nil
+	if !hasGitDir(dir, file) {
+		if tracked { // not initialized: git counts it as unchanged
+			return submoduleVersion(e.oid), nil
+		}
+		return FileVersion{}, nil
 	}
-	out, err := g.runner.Run(ctx, dir+"/"+file, "rev-parse", "--verify", "--quiet", "HEAD^{commit}")
+	head := cmp.Or(e.oid, "(no commits)")
+	if out, err := g.runner.Run(ctx, dir+"/"+file, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"); err == nil {
+		head = string(trimNL(out))
+	}
+	if !tracked {
+		return submoduleVersion(head), nil
+	}
+	out, err := g.runner.Run(ctx, dir, "--literal-pathspecs", "diff", "--no-ext-diff", "--no-color", "--no-textconv", "--ignore-submodules=none", "--", file)
 	if err != nil {
-		return submoduleVersion(e.oid), nil
+		return FileVersion{}, err
 	}
-	return submoduleVersion(string(trimNL(out))), nil
+	if bytes.Contains(out, []byte("-dirty\n")) {
+		head += "-dirty"
+	}
+	return submoduleVersion(head), nil
 }
 
 // hasGitDir reports whether file under dir is a real directory holding .git. Without one
