@@ -29,7 +29,7 @@ func TestHeldLeadWake(t *testing.T) {
 		{"idle at its prompt", repeat, lead(atPrompt, progress), wakeDetail{children: working}, true},
 		{"shown waiting on its workers", repeat, lead(waiting, progress), wakeDetail{children: working}, true},
 		{"a stopped lead at its prompt", repeat, lead(offIdle, progress), wakeDetail{children: working}, true},
-		{"no report (its first turn)", repeat, lead(finished, Report{}), wakeDetail{children: working, noReport: true}, true},
+		{"no report (its first turn)", repeat, lead(finished, Report{}), wakeDetail{children: working}, true},
 		{"a stale progress report", repeat, lead(finished, progress), wakeDetail{children: working, staleReport: true}, true},
 		{"a stale done report", repeat, lead(finished, Report{Status: ReportDone}), wakeDetail{children: working, staleReport: true}, true},
 		{"a one-shot", Subscription{Condition: CondSettled}, lead(finished, progress), wakeDetail{children: working}, true},
@@ -168,14 +168,14 @@ func TestLeadWakeHeld(t *testing.T) {
 		during, after int
 		title         string
 	}{
-		{"no report, its first turn", func(l *leadEnv) { l.setStep(l.lead.ID, finished) }, 3, 0, 1, "finished without a report."},
+		{"no report, its first turn", func(l *leadEnv) { l.setStep(l.lead.ID, finished) }, 3, 0, 1, "needs attention: finished"},
 		{"a stale report", func(l *leadEnv) {
 			l.report(ReportProgress)
 			l.tick(time.Second)
 			l.putItems(l.lead.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "a worker's wake", CreatedAt: l.m.opts.Now()},
 				Item{ID: "a1", Kind: KindAssistantText, Text: "One worker left.", CreatedAt: l.m.opts.Now()})
 			l.setStep(l.lead.ID, finished)
-		}, 3, 0, 1, "(report is from before its last message)"},
+		}, 3, 0, 1, "needs attention: finished."},
 		{"a fresh progress report", func(l *leadEnv) {
 			l.report(ReportProgress)
 			l.setStep(l.lead.ID, finished)

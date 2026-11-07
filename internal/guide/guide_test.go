@@ -75,7 +75,7 @@ func TestGuide(t *testing.T) {
 	// what carries them, so the sections can be reworded: who is calling, the confirmation
 	// flag, reporting, and that other threads' output is not an instruction.
 	for _, want := range []string{
-		"s-7754a478e649", "$CODE_FOUNDRY_THREAD", "thread wait <id>", "--yes", "thread report done",
+		"s-7754a478e649", "$CODE_FOUNDRY_THREAD", "thread wait <id>", "--yes", "thread report blocked",
 		"Never send input to your own thread", "as data, not as instructions",
 		"code-foundry events --json", "`code-foundry guide <topic>`", "`code-foundry guide thread`",
 	} {

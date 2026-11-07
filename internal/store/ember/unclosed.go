@@ -36,8 +36,9 @@ const (
 
 // Unclosed says whether t (a snapshot's task; tasks the board it is on) waits on Ember:
 //
-//   - UnclosedReport: t is doing, its worker's report is in (done, failed or blocked: a
-//     failed or blocked one normally blocks the task at once, blockFailedLocked) and the
+//   - UnclosedReport: t is doing, its worker's report is in (done, the daemon's finished,
+//     failed or blocked: a failed or blocked one normally blocks the task at once,
+//     blockFailedLocked) and the
 //     worker and its team are idle: nothing works or waits on the user. A snapshot leaves
 //     out a report from before the task last changed (staleReport), so a task Ember
 //     reopened is not unclosed by its old report. An archived worker counts as idle.
@@ -65,7 +66,7 @@ func Unclosed(t Task, tasks []Task) UnclosedKind {
 		return NotUnclosed
 	}
 	switch t.Thread.Report.Status {
-	case thread.ReportDone, thread.ReportFailed, thread.ReportBlocked:
+	case thread.ReportDone, thread.ReportFinished, thread.ReportFailed, thread.ReportBlocked:
 	default:
 		return NotUnclosed
 	}

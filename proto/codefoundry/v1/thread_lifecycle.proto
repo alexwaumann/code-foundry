@@ -564,6 +564,9 @@ enum ThreadReportStatus {
   THREAD_REPORT_STATUS_FAILED = 3;
   // Work in progress: an intermediate report.
   THREAD_REPORT_STATUS_PROGRESS = 4;
+  // The daemon's, not the agent's: a created thread's turn ended normally with no report
+  // of its own for it. The summary is the head of its last message.
+  THREAD_REPORT_STATUS_FINISHED = 5;
 }
 
 // ApiRetry is a thread's pending API retry: Claude's system/api_retry frame.

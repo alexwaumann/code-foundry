@@ -11,13 +11,16 @@ From a wake turn, follow up with `thread send --id <child>` WITHOUT `--wait` and
 turn (`send --wait` there holds back your other children's wakes); the subscription
 fires again on its next settle.
 
-## Finished, or a stale report
+## Finished
 
-`needs attention (finished)` is a turn that ended normally. "said more after its
-report" with a fresh report is the child's closing recap: nothing to read. A wake with
-`report_stale: true` (no report, or one older than its last message) has
-`last_message`: the child may be asking you something in prose; read it, answer with
-`thread send --id <child>`.
+`needs attention (finished)` is a turn that ended normally. `last_message` is the child's
+own last message, whole: its result, and maybe a question asked in prose (answer with
+`thread send --id <child>`). You need no `thread read` for it. `Report: blocked` or `failed`
+in the header is the child's own word that it could not finish.
+
+`checkouts` is what git says, read by the app, not the child's claim: `branch`, `head`,
+`pushed` (`unpushed` commits otherwise), `uncommitted` files, and `files`, `added`, `deleted`
+against `base`. Check the child's claims against it; run git only for what it does not say.
 
 ## Pending prompts and questions
 

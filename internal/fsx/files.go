@@ -44,6 +44,9 @@ const (
 // gitFilesTimeout bounds one git ls-files.
 const gitFilesTimeout = 15 * time.Second
 
+// GitEnv is gitEnv, for the stores that run git themselves.
+func GitEnv(base []string) []string { return gitEnv(base) }
+
 // gitEnv is base without the variables that would point git at another repository
 // (a daemon started from a git hook inherits them), plus GIT_OPTIONAL_LOCKS=0 so
 // listing never rewrites the index (which would fire the project store's watcher) and

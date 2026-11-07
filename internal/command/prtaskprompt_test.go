@@ -305,9 +305,9 @@ func TestPRTaskPromptForwarded(t *testing.T) {
 	}{
 		{name: "not forwarded", o: PRTaskOptions{FollowUp: true}},
 		{name: "by the user", o: PRTaskOptions{FollowUp: true, ForwardedFrom: "Lead (s-1)", ForwardedByUser: true},
-			want: "The user sent this task from thread `Lead (s-1)`, which has this PR through you; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."},
+			want: "The user sent this task from thread `Lead (s-1)`, which has this PR through you; it is woken with your last message when you finish."},
 		{name: "by an agent, a name with backticks", o: PRTaskOptions{FollowUp: true, ForwardedFrom: "Fix `x` @here (s-1)"},
-			want: "This task was sent from thread `Fix 'x' ＠here (s-1)`, which has this PR through you; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."},
+			want: "This task was sent from thread `Fix 'x' ＠here (s-1)`, which has this PR through you; it is woken with your last message when you finish."},
 		{name: "to a thread that cannot be woken", o: PRTaskOptions{FollowUp: true, ForwardedFrom: "Lead (s-1)", ForwardedByUser: true, ForwardedNoWake: true},
 			want: "The user sent this task from thread `Lead (s-1)`, which has this PR through you."},
 	}

@@ -25,7 +25,7 @@ import (
 // at or after the last top-level user message in items: the turn it ended had done its
 // work. False without a user message.
 func reportCoversTurn(rep Report, items []Item) bool {
-	if rep.Status == ReportNone || rep.Status == ReportProgress {
+	if !rep.Status.final() {
 		return false
 	}
 	last, ok := lastUserMessage(items)
@@ -46,7 +46,7 @@ func lastUserMessage(items []Item) (Item, bool) {
 // had filed its final report after its last message: New loads it finished, not
 // interrupted. Its items are read only when the report could qualify.
 func reportedAtLoad(ctx context.Context, m *Manager, s Thread) bool {
-	if s.Report.Status == ReportNone || s.Report.Status == ReportProgress || s.Status != StatusBusy {
+	if !s.Report.Status.final() || s.Status != StatusBusy {
 		return false
 	}
 	items, err := loadItems(ctx, m.opts.DB, s.ID)

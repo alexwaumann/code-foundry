@@ -47,7 +47,7 @@ func forwardedLine(o PRTaskOptions) string {
 	if o.ForwardedNoWake {
 		return line + "."
 	}
-	return line + "; it is woken with your report when you finish, so end with `code-foundry thread report` as usual."
+	return line + "; it is woken with your last message when you finish."
 }
 
 // prTaskHeader is the lines every pr.task prompt starts with: what to do and which pull

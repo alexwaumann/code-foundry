@@ -42,6 +42,9 @@ const (
 	ReportBlocked
 	ReportFailed
 	ReportProgress
+	// ReportFinished is the daemon's own (turnreport.go): a created thread's turn ended
+	// normally and it filed nothing for that turn.
+	ReportFinished
 )
 
 func (s ReportStatus) String() string {
@@ -54,12 +57,14 @@ func (s ReportStatus) String() string {
 		return "failed"
 	case ReportProgress:
 		return "progress"
+	case ReportFinished:
+		return "finished"
 	default:
 		return "none"
 	}
 }
 
-func (s ReportStatus) valid() bool { return s >= ReportNone && s <= ReportProgress }
+func (s ReportStatus) valid() bool { return s >= ReportNone && s <= ReportFinished }
 
 // Report is a thread's latest report (Store.Report). Data is a compacted JSON object,
 // "" for none. At is when it was made; zero when the thread never reported.

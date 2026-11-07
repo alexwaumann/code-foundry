@@ -35,6 +35,8 @@ var threadReportStatuses = map[string]v1.ThreadReportStatus{
 	"blocked":  v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED,
 	"failed":   v1.ThreadReportStatus_THREAD_REPORT_STATUS_FAILED,
 	"progress": v1.ThreadReportStatus_THREAD_REPORT_STATUS_PROGRESS,
+	// The daemon's own: read back, never filed (not in ThreadReportStatuses).
+	"finished": v1.ThreadReportStatus_THREAD_REPORT_STATUS_FINISHED,
 }
 
 // reportStatusName is a report status as thread.report spells it; "" for none.

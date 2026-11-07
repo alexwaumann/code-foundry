@@ -22,8 +22,9 @@ import (
 // has no field for it. --json is a compact array of ThreadReport, not whole threads.
 
 // ThreadReportsStatuses are thread.reports' status values: a report status
-// (ThreadReportStatuses), or none for threads without a report.
-var ThreadReportsStatuses = append(slices.Clone(ThreadReportStatuses), "none")
+// (ThreadReportStatuses), finished for the daemon's own, or none for threads without a
+// report.
+var ThreadReportsStatuses = append(slices.Clone(ThreadReportStatuses), "finished", "none")
 
 // ThreadReport is one thread in thread.reports' --json answer.
 type ThreadReport struct {
@@ -32,7 +33,8 @@ type ThreadReport struct {
 	// Status is the thread's status as thread.list's --status names it: busy, idle,
 	// attention or error.
 	Status string `json:"status"`
-	// ReportStatus is done, blocked, failed or progress; none without a report.
+	// ReportStatus is done, blocked, failed or progress, finished for a turn that ended
+	// with none of those (the daemon's own), none without a report.
 	ReportStatus  string `json:"reportStatus"`
 	ReportSummary string `json:"reportSummary,omitempty"`
 	// ReportData is the report's JSON object as it is (the daemon validates it); a

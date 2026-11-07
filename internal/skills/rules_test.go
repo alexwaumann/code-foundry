@@ -106,23 +106,27 @@ var rules = []rule{
 	{note: "control-2-skill-provenance", file: sourceRef, says: []string{"never answer that from memory", `daemon\.version --json`, "dev build", `docs/architecture\.md`}},
 	// Round 3: rules read late or not at all from a reference earned their inline place.
 	{note: "orch-skill-v4", file: orchFile, says: []string{`git merge-tree --write-tree`, `git diff origin/<default> --stat`, "--descendants-of", "project branch delete"}},
-	{note: "orch-skill-v4", file: orchFile, says: []string{"distinct anchor", `git add -a`, "after any later message", "one line", "from the child's report"}},
-	{note: "orch-skill-v4", file: wakesFile, says: []string{"without --wait", "report_stale"}},
+	{note: "orch-skill-v4", file: orchFile, says: []string{"distinct anchor", `git add -a`, "one line", "from the child's wake"}},
+	{note: "orch-skill-v4", file: wakesFile, says: []string{"without --wait"}},
+	// A child's last message reaches its parent whole, with git's word on the branch.
+	{note: "wake-final-message", file: wakesFile, says: []string{"last_message", "checkouts"}, never: []string{"report_stale", "said more"}},
+	{note: "wake-final-message", file: orchFile, says: []string{"no closing report", "thread report blocked"}, never: []string{"after any later message", "report_stale"}},
+	{note: "wake-final-message", file: emberFile, says: []string{"no closing report", "checkouts"}, never: []string{"after any later message", "report_stale"}},
 	{note: "orch-skill-v4", file: leadsFile, says: []string{"thread report progress"}},
 	// Ember stopped loading the orchestrate skill each epoch: what it took from there lives here.
-	{note: "orch-skill-v4", file: emberFile, says: []string{"distinct anchor", "only as many spots", `git add -a`, `git diff origin/<default> --stat`, "after any later message", "one line", "take it from its report", "report_stale"}},
+	{note: "orch-skill-v4", file: emberFile, says: []string{"distinct anchor", "only as many spots", `git add -a`, `git diff origin/<default> --stat`, "one line", "take it from its wake"}},
 	// Prompts in double quotes ran their backticks in Ember's shell; the worker checklist.
 	{note: "ember-fixes-2-skill", file: emberFile, says: []string{
 		"--prompt - <<'eof'", "never in double quotes", "--budget", `merge-tree --write-tree`, `"no text`, "ember task cancel", "thread unsubscribe",
 		"project branch delete", "pr merge", "thread subscribe --at", `git -c <worktree> log origin/<branch>`, "--branch <branch>",
-		"1000 characters", "no new errors", "blocked, not done"},
+		"no new errors", "blocked, not done"},
 		never: []string{`--prompt "`, "every caveat", `ember task update <task id> --thread`}},
 	// The first battle test: steering a worker, its questions, the task loop (S1 to S6).
 	{note: "ember-fixes-1-skill-cli", file: emberFile, says: []string{
 		"ember task add", "ember task start", "--notify", "--labels ember,<task id>", "never pass --model", "cf-task://", `reference/leads\.md`,
 		"ember remember", "ember board", "skill tool", "never progress", "thread send --id <worker>", "thread respond --id <worker>"}},
 	// Ember ran whole investigations itself: a question about code is a research task.
-	{note: "ember-research-tasks", file: emberFile, says: []string{"never answer it yourself", "research task", `--new-worktree=false`, "touches nothing", `"findings"`, `no --branch`}},
+	{note: "ember-research-tasks", file: emberFile, says: []string{"never answer it yourself", "research task", `--new-worktree=false`, "touches nothing", "its findings", `no --branch`}},
 	// Only a turn's last text shows, and edits only on an explicit ask.
 	{note: "ember-rules-reply", file: emberFile, says: []string{"last text", "tells you to do yourself"}, never: []string{"you never edit files"}},
 }

@@ -8,16 +8,13 @@ import (
 	"time"
 )
 
-// What a thread wake says beyond the row (docs/notes/wake-detail.md): a missing or
-// stale report with the turn's last message, the pending request, the children.
+// What a thread wake says beyond the row (docs/notes/wake-detail.md,
+// wake-final-message.md): the turn's last message whole, the pending request, the children.
 func TestWakeDetailOf(t *testing.T) {
 	t0 := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
 	user := func(at time.Time) Item { return Item{Kind: KindUserMessage, Text: "do it", CreatedAt: at} }
 	said := func(text string) Item { return Item{Kind: KindAssistantText, Text: text} }
 	saidAt := func(text string, at time.Time) Item { return Item{Kind: KindAssistantText, Text: text, CreatedAt: at} }
-	toolAt := func(at time.Time) Item { return Item{Kind: KindToolCall, CreatedAt: at} }
-	closing := strings.Repeat("Done. ", maxClosingWords/6)
-	longer := strings.Repeat("Note: ", maxClosingWords/6+2)
 	perm := func(id, desc, input string, state RequestState) Item {
 		return Item{ID: "perm-" + id, Kind: KindPermission, Request: &Request{RequestID: id, ToolName: "Bash", Description: desc, InputJSON: input, State: state}}
 	}
@@ -32,13 +29,12 @@ func TestWakeDetailOf(t *testing.T) {
 	asking := func(reason, id string) Thread {
 		return Thread{State: StateConnected, Status: StatusNeedsAttention, StatusReason: reason, PendingRequestID: id}
 	}
-	long := strings.Repeat("word ", 200)
+	long := strings.Repeat("word ", maxLastMessage/5+10)
 	tests := []struct {
 		name               string
 		t                  Thread
 		items              []Item
-		noReport, stale    bool
-		saidMore           bool
+		stale, silent      bool
 		last               string
 		pendingID          string
 		pendingQ           string
@@ -46,39 +42,21 @@ func TestWakeDetailOf(t *testing.T) {
 		pendingQuestions   int
 		pendingInputString bool
 	}{
-		{name: "a prose question, no report", t: finished,
-			items:    []Item{user(t0), said("Looking."), said("Which formats should I accept:\nJSON, text or CSV?")},
-			noReport: true, last: "Which formats should I accept: JSON, text or CSV?"},
-		{name: "a current report", t: reported(finished, t0.Add(time.Minute)), items: []Item{user(t0), said("Done.")}},
+		{name: "a prose question keeps its lines, no report", t: finished,
+			items: []Item{user(t0), said("Looking."), said("Which formats should I accept:\nJSON, text or CSV?")},
+			last:  "Which formats should I accept:\nJSON, text or CSV?"},
+		{name: "a current report: the last message still comes", t: reported(finished, t0.Add(time.Minute)),
+			items: []Item{user(t0), said("Done.")}, last: "Done."},
 		{name: "a report from before the last message", t: reported(finished, t0.Add(time.Minute)),
 			items: []Item{user(t0), said("Done."), user(t0.Add(2 * time.Minute)), said("Rebased.")}, stale: true, last: "Rebased."},
-		// Work after a current report: a caveat the parent should see (A3). A short
-		// closing paragraph with no tool call after the report is the turn's sign-off.
-		{name: "said more after its report: a tool call after it", t: reported(finished, t0.Add(time.Minute)),
-			items: []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), toolAt(t0.Add(90 * time.Second)),
-				saidAt("Note: the benchmark\nmeasures nothing.", t0.Add(2*time.Minute))},
-			saidMore: true, last: "Note: the benchmark measures nothing."},
-		{name: "said more after its report: long text", t: reported(finished, t0.Add(time.Minute)),
-			items:    []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), saidAt(longer, t0.Add(2*time.Minute))},
-			saidMore: true, last: strings.TrimSpace(longer)},
-		{name: "a closing paragraph after its report says nothing", t: reported(finished, t0.Add(time.Minute)),
-			items: []Item{user(t0), saidAt("Reporting.", t0.Add(30*time.Second)), saidAt("Note: the benchmark\nmeasures nothing.", t0.Add(2*time.Minute))}},
-		{name: "a closing paragraph at the cap says nothing", t: reported(finished, t0.Add(time.Minute)),
-			items: []Item{user(t0), toolAt(t0.Add(30 * time.Second)), saidAt(closing, t0.Add(2*time.Minute))}},
-		{name: "tool calls before the report are not after it", t: reported(finished, t0.Add(time.Minute)),
-			items: []Item{user(t0), toolAt(t0.Add(10 * time.Second)), toolAt(t0.Add(50 * time.Second)), saidAt("All done.", t0.Add(2*time.Minute))}},
-		{name: "the report came last", t: reported(finished, t0.Add(time.Minute)),
-			items: []Item{user(t0), saidAt("Done, reporting.", t0.Add(30*time.Second))}},
-		{name: "text after the report while still working says nothing", t: reported(Thread{State: StateConnected, Status: StatusBusy}, t0.Add(time.Minute)),
+		{name: "text while still working says nothing", t: reported(Thread{State: StateConnected, Status: StatusBusy}, t0.Add(time.Minute)),
 			items: []Item{user(t0), saidAt("More.", t0.Add(2*time.Minute))}},
-		{name: "a stale report is not said more", t: reported(finished, t0.Add(time.Minute)),
-			items: []Item{user(t0), user(t0.Add(2 * time.Minute)), saidAt("Again.", t0.Add(3*time.Minute))}, stale: true, last: "Again."},
-		{name: "a turn with no text says nothing", t: finished, items: []Item{said("Old."), user(t0)}, noReport: true},
+		{name: "a turn with no text is silent", t: finished, items: []Item{said("Old."), user(t0)}, silent: true},
+		{name: "no message at all is not silent", t: finished},
 		{name: "a subagent's text is not the thread's",
-			t: finished, items: []Item{user(t0), said("Mine."), {Kind: KindAssistantText, Text: "Agent's.", ParentToolUseID: "tu1"}},
-			noReport: true, last: "Mine."},
-		{name: "the last message is cut", t: finished, items: []Item{user(t0), said(long)}, noReport: true,
-			last: oneLine(long, maxLastMessage)},
+			t: finished, items: []Item{user(t0), said("Mine."), {Kind: KindAssistantText, Text: "Agent's.", ParentToolUseID: "tu1"}}, last: "Mine."},
+		{name: "a message past the safety net is cut, with where the rest is", t: finished, items: []Item{user(t0), said(long)},
+			last: cutMessage(strings.TrimSpace(long))},
 		{name: "a prompt by id", t: asking("permission: Bash Commit", "r2"),
 			items:     []Item{user(t0), perm("r1", "Commit", `{"command":"git commit"}`, RequestAllowed), perm("r2", "Commit", `{"command":"git push"}`, RequestPending)},
 			pendingID: "r2"},
@@ -99,9 +77,8 @@ func TestWakeDetailOf(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := wakeDetailOf(tt.t, tt.items, wakeChildren{})
-			if d.noReport != tt.noReport || d.staleReport != tt.stale || d.saidMore != tt.saidMore || d.lastMessage != tt.last {
-				t.Errorf("noReport %v stale %v saidMore %v last %q, want %v %v %v %q", d.noReport, d.staleReport, d.saidMore, d.lastMessage,
-					tt.noReport, tt.stale, tt.saidMore, tt.last)
+			if d.staleReport != tt.stale || d.silent != tt.silent || d.lastMessage != tt.last {
+				t.Errorf("stale %v silent %v last %.80q, want %v %v %.80q", d.staleReport, d.silent, d.lastMessage, tt.stale, tt.silent, tt.last)
 			}
 			var id string
 			if d.pending != nil {
@@ -133,10 +110,11 @@ func TestThreadWakeTitleDetail(t *testing.T) {
 	named := func(status Status, reason string) Thread {
 		return Thread{ID: "s-1", Name: "Add LICENSE", State: StateConnected, Status: status, StatusReason: reason}
 	}
-	withReport := func(th Thread) Thread {
-		th.Report = Report{Status: ReportProgress, Summary: "2 workers started", At: at}
+	reporting := func(st ReportStatus, th Thread) Thread {
+		th.Report = Report{Status: st, Summary: "2 workers started", At: at}
 		return th
 	}
+	withReport := func(th Thread) Thread { return reporting(ReportProgress, th) }
 	tests := []struct {
 		name string
 		c    Condition
@@ -144,22 +122,30 @@ func TestThreadWakeTitleDetail(t *testing.T) {
 		d    wakeDetail
 		want string
 	}{
-		{"finished, no report", CondSettled, named(StatusNeedsAttention, "finished"), wakeDetail{noReport: true},
-			`Thread "Add LICENSE" (s-1) needs attention: finished without a report.`},
-		{"idle at prompt, no report", CondIdle, named(StatusIdle, "at prompt"), wakeDetail{noReport: true},
-			`Thread "Add LICENSE" (s-1) is idle: at prompt (no report).`},
-		{"an interrupted turn", CondSettled, named(StatusError, ReasonInterrupted), wakeDetail{noReport: true},
-			`Thread "Add LICENSE" (s-1) has an error: interrupted (no report).`},
-		{"a crashed turn", CondSettled, named(StatusError, ReasonCrashed), wakeDetail{noReport: true},
+		{"finished, no report", CondSettled, named(StatusNeedsAttention, "finished"), wakeDetail{lastMessage: "Done."},
+			`Thread "Add LICENSE" (s-1) needs attention: finished.`},
+		{"finished without a word", CondSettled, named(StatusNeedsAttention, "finished"), wakeDetail{silent: true},
+			`Thread "Add LICENSE" (s-1) needs attention: finished without a word.`},
+		{"idle at prompt", CondIdle, named(StatusIdle, "at prompt"), wakeDetail{},
+			`Thread "Add LICENSE" (s-1) is idle: at prompt.`},
+		{"an interrupted turn", CondSettled, named(StatusError, ReasonInterrupted), wakeDetail{},
+			`Thread "Add LICENSE" (s-1) has an error: interrupted.`},
+		{"done beside its own last message is not quoted", CondSettled, reporting(ReportDone, named(StatusNeedsAttention, "finished")), wakeDetail{lastMessage: "Done."},
+			`Thread "Add LICENSE" (s-1) needs attention: finished.`},
+		{"done with no last message is quoted", CondSettled, reporting(ReportDone, named(StatusNeedsAttention, "finished")), wakeDetail{},
+			`Thread "Add LICENSE" (s-1) needs attention: finished. Report: done — 2 workers started.`},
+		{"blocked is quoted beside the last message", CondSettled, reporting(ReportBlocked, named(StatusNeedsAttention, "finished")), wakeDetail{lastMessage: "Stuck."},
+			`Thread "Add LICENSE" (s-1) needs attention: finished. Report: blocked — 2 workers started.`},
+		{"the daemon's own is never quoted", CondSettled, reporting(ReportFinished, named(StatusNeedsAttention, "finished")), wakeDetail{},
+			`Thread "Add LICENSE" (s-1) needs attention: finished.`},
+		{"a crashed turn", CondSettled, named(StatusError, ReasonCrashed), wakeDetail{},
 			`Thread "Add LICENSE" (s-1) crashed: its process died (not stopped by anyone).`},
 		{"a crashed turn, error subscription, current report", CondError, withReport(named(StatusError, ReasonCrashed)), wakeDetail{},
 			`Thread "Add LICENSE" (s-1) crashed: its process died (not stopped by anyone). Report: progress — 2 workers started.`},
 		{"a stale report is not quoted", CondSettled, withReport(named(StatusNeedsAttention, "finished")), wakeDetail{staleReport: true},
-			`Thread "Add LICENSE" (s-1) needs attention: finished (report is from before its last message).`},
+			`Thread "Add LICENSE" (s-1) needs attention: finished.`},
 		{"a current report", CondSettled, withReport(named(StatusNeedsAttention, "finished")), wakeDetail{},
 			`Thread "Add LICENSE" (s-1) needs attention: finished. Report: progress — 2 workers started.`},
-		{"said more after its report", CondSettled, withReport(named(StatusNeedsAttention, "finished")), wakeDetail{saidMore: true},
-			`Thread "Add LICENSE" (s-1) needs attention: finished, said more after its report. Report: progress — 2 workers started.`},
 		{"siblings are not the title's (threadWake adds them)", CondSettled, named(StatusIdle, "at prompt"),
 			wakeDetail{siblings: &wakeSiblings{Settled: 1, Total: 2}},
 			`Thread "Add LICENSE" (s-1) is idle: at prompt.`},
@@ -167,11 +153,11 @@ func TestThreadWakeTitleDetail(t *testing.T) {
 			wakeDetail{children: wakeChildren{Working: 2, Reported: 1, Total: 3}},
 			`Thread "Add LICENSE" (s-1) needs attention: finished; 2 of its 3 child threads still working. Report: progress — 2 workers started.`},
 		{"its one child working", CondSettled, named(StatusNeedsAttention, "finished"),
-			wakeDetail{noReport: true, children: wakeChildren{Working: 1, Total: 1}},
-			`Thread "Add LICENSE" (s-1) needs attention: finished without a report; its child thread is still working.`},
+			wakeDetail{children: wakeChildren{Working: 1, Total: 1}},
+			`Thread "Add LICENSE" (s-1) needs attention: finished; its child thread is still working.`},
 		{"children all settled say nothing", CondSettled, named(StatusNeedsAttention, "finished"),
-			wakeDetail{noReport: true, children: wakeChildren{Reported: 3, Total: 3}},
-			`Thread "Add LICENSE" (s-1) needs attention: finished without a report.`},
+			wakeDetail{children: wakeChildren{Reported: 3, Total: 3}},
+			`Thread "Add LICENSE" (s-1) needs attention: finished.`},
 		{"a prompt keeps its reason; a stale report is not quoted", CondSettled,
 			withReport(named(StatusNeedsAttention, "permission: Bash Stage, commit, and push.")), wakeDetail{staleReport: true},
 			`Thread "Add LICENSE" (s-1) needs attention: permission: Bash Stage, commit, and push.`},
@@ -194,11 +180,10 @@ func TestThreadWakeTitleDetail(t *testing.T) {
 func TestThreadWakeDetailJSON(t *testing.T) {
 	at := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
 	th := Thread{ID: "s-1", State: StateConnected, Status: StatusNeedsAttention, StatusReason: "permission: Bash Push", CreatedBy: "s-p"}
-	d := wakeDetail{noReport: true, lastMessage: "Shall I push?", children: wakeChildren{Working: 1, Reported: 2, Total: 3},
+	d := wakeDetail{lastMessage: "Shall I push?", children: wakeChildren{Working: 1, Reported: 2, Total: 3},
 		pending: wakePendingOf(Item{Kind: KindPermission, Request: &Request{RequestID: "r1", ToolName: "Bash", InputJSON: `{"command":"git push"}`}})}
 	var p struct {
 		Thread struct {
-			ReportStale bool   `json:"report_stale"`
 			LastMessage string `json:"last_message"`
 			Pending     struct {
 				Kind      string          `json:"kind"`
@@ -214,13 +199,13 @@ func TestThreadWakeDetailJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := p.Thread
-	if !got.ReportStale || got.LastMessage != "Shall I push?" || got.Pending.Kind != "permission" || got.Pending.RequestID != "r1" ||
+	if got.LastMessage != "Shall I push?" || got.Pending.Kind != "permission" || got.Pending.RequestID != "r1" ||
 		got.Pending.Tool != "Bash" || !strings.Contains(string(got.Pending.Input), `"command": "git push"`) || got.Children != (wakeChildren{1, 2, 3}) {
 		t.Errorf("payload:\n%s", msg.WakeJSON)
 	}
 	// None of it when there is nothing to say.
 	plain := threadWake(Subscription{ID: "sub-1", Condition: CondSettled}, th, at, wakeDetail{})
-	for _, key := range []string{"report_stale", "last_message", "pending", "children"} {
+	for _, key := range []string{"last_message", "pending", "children"} {
 		if strings.Contains(plain.WakeJSON, `"`+key+`"`) {
 			t.Errorf("plain JSON has %s:\n%s", key, plain.WakeJSON)
 		}
@@ -309,9 +294,9 @@ func TestThreadWakeDetailDelivered(t *testing.T) {
 	e.setStep(lead.ID, finished)
 	items := e.waitItems(top.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
-	want := `Thread "lead" (` + lead.ID + `) needs attention: finished without a report; 2 of its 3 child threads still working.`
+	want := `Thread "lead" (` + lead.ID + `) needs attention: finished; 2 of its 3 child threads still working.`
 	if w.WakeTitle != want || !strings.Contains(w.WakeJSON, `"last_message": "Started w1-w3; waiting."`) ||
-		!strings.Contains(w.WakeJSON, `"report_stale": true`) || !strings.Contains(w.WakeJSON, `"working": 2`) {
+		!strings.Contains(w.WakeJSON, `"working": 2`) {
 		t.Errorf("wake:\n%s\n%s", w.WakeTitle, w.WakeJSON)
 	}
 	// An archived child is not counted.

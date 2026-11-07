@@ -118,9 +118,11 @@ func (e *env) open(mutate ...func(*Options)) {
 		StatusDebounce: 10 * time.Millisecond,
 		// Each wake alone and at once (the tests count them); batching has its own
 		// (subscriptions_batch_test.go).
-		WakeBatch:    -1,
-		StartTimeout: 5 * time.Second,
-		CloseTimeout: 2 * time.Second,
+		WakeBatch: -1,
+		// Real git in a wake's delivery would reorder it against the rest: TestGitCheckoutFacts has it.
+		CheckoutFacts: func(context.Context, string, string) (CheckoutFacts, bool) { return CheckoutFacts{}, false },
+		StartTimeout:  5 * time.Second,
+		CloseTimeout:  2 * time.Second,
 		Namer: func(_ context.Context, req NamingRequest) (Naming, error) {
 			e.mu.Lock()
 			e.named = append(e.named, req.Message)

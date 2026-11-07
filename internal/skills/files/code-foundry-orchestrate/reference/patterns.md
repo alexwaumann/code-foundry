@@ -33,15 +33,13 @@ The prompt is all the child knows. Every child prompt says:
   ignore-scripts, `--no-verify`) to get past an error; it reports `blocked` with the
   error. Done means usable: when the goal cannot be met or checked (a missing key,
   account or service), it builds what it can, pushes, and reports `blocked`, not done.
-- Before reporting: `git diff origin/<default> --stat` and the diff of each file it
+- Before it finishes: `git diff origin/<default> --stat` and the diff of each file it
   names must match what it claims (a scripted edit can match nothing and still "pass").
-- Its LAST step: `code-foundry thread report done "<summary>" --data '{"branch":
-  "<branch>", "files": [every file the branch changes]}'` (or `blocked`/`failed`), as its
-  own command after the push succeeded (never after `;`). The summary is at most 1000
-  characters: its caveats first (not done, not verified, found
-  but not fixed), one line each; details go in `--data` (`"caveats": [...]`). A later
-  report replaces the earlier one, so it restates the whole branch. After any later
-  message from you or the user, it reports again.
+- Its last message is its result: the app tells it that it reaches you whole, with its
+  branch, push state and diffstat read from git, after every turn, so no closing report and
+  no `--data`. Say what the result must hold (its caveats first: not done, not verified,
+  found but not fixed). Blocked or failed: `code-foundry thread report blocked "<why>"` (or
+  `failed`), as its own command (never after `;`).
 - The shell is zsh on macOS: BSD `sed -i ''`, quote variables.
 
 ## 1. One child, and wait for it
@@ -100,15 +98,14 @@ needs them; otherwise end the turn with one short line:
 ```
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018
 # s-0c1d2e3f4a5b  -     Fix the docs typos
-# s-9a8b7c6d5e4f  done  Fix the lint warnings  23 warnings fixed; PR #88
-# s-1a2b3c4d5e6f  done  Bump the router        7.4.0, two call sites changed; PR #87
-code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018 --status none
+# s-9a8b7c6d5e4f  finished  Fix the lint warnings  23 warnings fixed; PR #88
+# s-1a2b3c4d5e6f  finished  Bump the router        7.4.0, two call sites changed; PR #87
 ```
 
-A child without a report that is no longer working needs a look (its wake's
-`last_message`, or `thread read <id> --full`): it may be asking you something in prose. Answer with `thread send --id <id> "..."`
-without `--wait` and end the turn; its subscription wakes you again.
-When every child has reported, check which branches touch the same files
+`-` is a child still working. A finished child's last message may ask you something in
+prose (its wake's `last_message`). Answer with `thread send --id <id> "..."` without `--wait`
+and end the turn; its subscription wakes you again.
+When every child has finished, check which branches touch the same files
 (`git diff --name-only origin/main...<branch>` per branch) and summarise for the user
 (one line per child with its PR and any overlap). Leave the threads open: the user may
 review or steer them. Archive them in one call once the user accepts the work (`--yes`
@@ -328,8 +325,8 @@ Pairwise, not cumulative: merging branches one after another into one tree gives
 results that depend on the order and hides pairs. For each pair that touches the same
 file, read both diffs of it (`git diff origin/<default>...origin/<branch> -- <file>`) and
 say whether they fit together (same flag parsing, same types), not only whether git
-merges them. Then read each branch's diff against its report: a report can name a
-change the diff does not have. Redo the check whenever a branch changes after the last
+merges them. Then read each branch's diff against the child's last message: it can
+name a change the diff does not have. Redo the check whenever a branch changes after the last
 roll-up. No clones or temporary worktrees inside the project's repository; if you must
 clone, `git clone <origin url> "$(mktemp -d)"`. Tell the user what overlaps or
 conflicts, per pair.

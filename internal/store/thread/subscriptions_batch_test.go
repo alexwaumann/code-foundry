@@ -148,7 +148,7 @@ func TestWakeBatchMessage(t *testing.T) {
 	k := b.kids
 	want := `3 threads settled: Thread "c0" (` + k[0].ID + `) needs attention: finished. Report: done — ok. ` +
 		`Thread "c1" (` + k[1].ID + `) needs attention: permission: Bash ls. ` +
-		`Thread "c2" (` + k[2].ID + `) needs attention: finished without a report. ` +
+		`Thread "c2" (` + k[2].ID + `) needs attention: finished. ` +
 		`3 of your 4 child threads settled; still working: "c3" (` + k[3].ID + `).`
 	if w.WakeTitle != want {
 		t.Errorf("title =\n%s\nwant\n%s", w.WakeTitle, want)
