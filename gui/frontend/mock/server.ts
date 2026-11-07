@@ -12,6 +12,8 @@
  *   GET  /__mock/invocations | writes | resizes | threads | streams
  *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
  *   POST /__mock/reset
+ *   GET  /__mock/browser                          (what the GUI called on BrowserService, in order)
+ *   POST /__mock/browser?state=<json>             (merges fields into a surface's state and sends it)
  *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a project named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
  *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
@@ -265,6 +267,7 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
+import { BrowserService } from "../src/gen/codefoundry/v1/browser_pb";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { durationFromMs, timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -788,6 +791,26 @@ function routes(router: ConnectRouter): void {
     getStatus: () => ({ status: world.ember.status() }),
     listTasks: (req) => ({ tasks: world.ember.list(req.open) }),
     watchBoard: (_req, ctx) => tracked("EmberService/WatchBoard", world.ember.watch(ctx.signal)),
+  });
+
+  // The experimental Chrome surface (mock/browser.ts).
+  router.service(BrowserService, {
+    watch: (req, ctx) => tracked("BrowserService/Watch", world.browser.watch(req, ctx.signal)),
+    navigate: (req) => world.browser.navigate(req.surface, req.url),
+    go: (req) => (world.browser.record(`go ${String(req.delta)}`), {}),
+    reload: () => (world.browser.record("reload"), {}),
+    input: (req) => (world.browser.record(`input ${req.events.map((e) => (e.event.case === "mouse" ? `${e.event.value.type}@${String(Math.round(e.event.value.x))},${String(Math.round(e.event.value.y))}` : e.event.case === "key" ? `${e.event.value.type}:${e.event.value.key}` : `text:${String(e.event.value)}`)).join(" ")}`), {}),
+    resize: (req) => (world.browser.record(`resize ${String(req.width)}x${String(req.height)}`), {}),
+    answer: (req) => {
+      world.browser.record(`answer ${req.id} ${req.answer.case ?? ""}`);
+      world.browser.update({ dialog: undefined, fileChooser: undefined, select: undefined });
+      return {};
+    },
+    paste: (req) => (world.browser.record(`paste ${req.text}`), {}),
+    copy: () => (world.browser.record("copy"), { length: 1 }),
+    reveal: (req) => (world.browser.record(`reveal ${req.id}`), {}),
+    relaunch: () => (world.browser.record("relaunch"), {}),
+    close: (req) => (world.browser.record(`close ${req.surface}`), {}),
   });
 
   // Dictation (mock/dictation.ts): the snapshot, scripted sessions, and the model's download.
@@ -1729,6 +1752,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));
       break;
+    case "GET /__mock/browser":
+      json(res, 200, world.browser.calls);
+      break;
+    case "POST /__mock/browser": {
+      // The state's fields as JSON in ?state=, merged and sent (mock/browser.ts).
+      world.browser.update(JSON.parse(q.get("state") ?? "{}") as Parameters<typeof world.browser.update>[0]);
+      json(res, 200, { ok: true });
+      break;
+    }
     case "GET /__mock/threads":
       json(res, 200, [...world.threads.keys()].map(threadSummary));
       break;

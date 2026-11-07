@@ -21,6 +21,7 @@
 import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, diffOfTab, diffTab, sourceOfParam } from "@/surfaces/diffTarget";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { galleryTab } from "@/surfaces/galleryTarget";
+import { openBrowserSurface } from "./browser";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
@@ -88,6 +89,8 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     return true;
   },
   "panel.mcp": surface(openMcpSurface),
+  // view.panel.browser: param url, already past the daemon's address rule.
+  "panel.browser": (sel, _key, p) => surface((s) => openBrowserSurface(s, p.url ?? ""))(sel, _key, p),
   // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
   // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts); --edit adds
   // edit=1 and thread (who asked), with note and focus when they apply.
