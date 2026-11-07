@@ -51,11 +51,12 @@ window.stolen=[]; window.got=[];
 const real=navigator.clipboard.writeText.bind(navigator.clipboard);
 navigator.clipboard.writeText=t=>{stolen.push('writeText '+t);return real(t)};
 addEventListener('paste',e=>stolen.push('event '+e.clipboardData.getData('text')));
-addEventListener('message',e=>got.push(e.data));
+addEventListener('message',e=>{if(typeof e.data==='string')got.push(e.data);else window.apis=e.data});
 </script>`
 
 const pasteChild = `<!doctype html><body style="margin:0"><input id=i style="width:390px;height:190px">
 <script>
+parent.postMessage({picker:typeof showOpenFilePicker,passkey:typeof PublicKeyCredential},'*');
 i.addEventListener('focus',()=>parent.postMessage('focus','*'));
 i.addEventListener('paste',e=>parent.postMessage('paste '+e.clipboardData.getData('text'),'*'));
 i.addEventListener('input',()=>parent.postMessage('value '+i.value,'*'));
@@ -684,7 +685,11 @@ func livePasteReachesOnlyTheFocusedFrame(t *testing.T, l *live) {
 	if err := l.s.Paste(ctx, l.key, "hunter2"); err != nil {
 		t.Fatal(err)
 	}
-	l.evalUntil("got.join()", eq("focus,paste hunter2,value hunter2"))
+	// Our scratch page taking keys can make the frame see focus come back, so not an exact list.
+	l.evalUntil("String(got.includes('paste hunter2')&&got.includes('value hunter2'))", eq("true"))
+	// The keyboard is still in the frame that took the paste.
+	l.typeText("!")
+	l.evalUntil("String(got.includes('value hunter2!'))", eq("true"))
 	var stolen string
 	l.eval("stolen.join()", &stolen)
 	if stolen != "" {
@@ -1033,6 +1038,12 @@ func liveSystemPanelsAreGone(t *testing.T, l *live) {
 			t.Errorf("%s is %s", api, kind)
 		}
 	}
+	// The flag is the whole browser's, cross-site iframes included.
+	if _, err := l.s.Navigate(context.Background(), l.key, l.srv.URL+"/paste-top"); err != nil {
+		t.Fatal(err)
+	}
+	l.until("the page", func(st State) bool { return st.Title == "Paste top" })
+	l.evalUntil("JSON.stringify(window.apis ?? null)", eq(`{"picker":"undefined","passkey":"undefined"}`))
 }
 
 func TestLiveChromeDiesThenRelaunchOpensBlankAndSaysWhere(t *testing.T) {
