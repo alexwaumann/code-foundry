@@ -20,10 +20,15 @@ import (
 // wakeBatchHold windows after the first, and every thread wake queued meanwhile (or
 // while an earlier delivery was in flight) joins it. One joined is one message:
 //
-//	[code-foundry wake] 2 threads settled: Thread "A" (s-1) is idle: finished. Report: done — ok. Thread "B" (s-2) needs attention: permission: Bash ls. 3 of your 4 child threads settled; still working: "Tests" (s-3).
-//	```json
-//	{ "kind": "batch", "wakes": [ { "kind": "thread", … }, { "kind": "thread", … } ] }
-//	```
+//	[code-foundry wake] 2 threads settled: Thread "A" (s-1) is idle: finished. Thread "B" (s-2) needs attention: permission: Bash ls. 3 of your 4 child threads settled; still working: "Tests" (s-3).
+//
+//	From "A" (s-1):
+//	…
+//
+//	From "B" (s-2):
+//	…
+//
+// (waketext.go). Its WakeJSON is { "kind": "batch", "wakes": [ { "kind": "thread", … }, … ] }.
 //
 // A batch takes one slot of the wake limit (fireLaterLocked). Run, pull request, plugin
 // and removed wakes are not batched.
@@ -410,7 +415,7 @@ func batchWake(parts []threadWakePart) Message {
 		p.Wakes = append(p.Wakes, threadWakePayload(part.sub, part.t, part.at, part.d))
 	}
 	head, sib := batchHeader(parts)
-	return wakeMessage(joinSentences(head, siblingsSentence(sib)), p)
+	return wakeTextMessage(joinSentences(head, siblingsSentence(sib)), p, batchBody(parts))
 }
 
 // batchHeader is several thread wakes' header without the siblings sentence: "3

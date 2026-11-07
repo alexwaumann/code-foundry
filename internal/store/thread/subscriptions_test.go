@@ -86,7 +86,7 @@ func TestThreadWakeMessage(t *testing.T) {
 	if msg.WakeTitle != wantTitle || msg.Origin != OriginWake {
 		t.Errorf("title = %q (origin %q), want %q", msg.WakeTitle, msg.Origin, wantTitle)
 	}
-	if !strings.HasPrefix(msg.Text, "[code-foundry wake] "+wantTitle+"\n```json\n{") || !strings.HasSuffix(msg.Text, "}\n```") {
+	if !strings.HasPrefix(msg.Text, "[code-foundry wake] "+wantTitle) || strings.Contains(msg.Text, "```") || !strings.Contains(msg.Text, `Report data: {"n":6}`) {
 		t.Errorf("text = %q", msg.Text)
 	}
 	var p struct {
@@ -324,7 +324,7 @@ func TestSubscribeFiresAtOnce(t *testing.T) {
 	items := e.waitItems(parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
 	wantTitle := `Thread "child" (` + child.ID + `) needs attention: finished. Report: done — all good.`
-	if w.WakeTitle != wantTitle || w.Text != "[code-foundry wake] "+wantTitle+"\n```json\n"+w.WakeJSON+"\n```" ||
+	if w.WakeTitle != wantTitle || !strings.HasPrefix(w.Text, "[code-foundry wake] "+wantTitle) ||
 		!strings.Contains(w.WakeJSON, `"subscription_id": "`+res.Subscription.ID+`"`) {
 		t.Errorf("wake = %+v", w)
 	}

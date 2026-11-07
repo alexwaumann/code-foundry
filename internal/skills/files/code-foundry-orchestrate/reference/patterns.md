@@ -103,7 +103,7 @@ code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018
 ```
 
 `-` is a child still working. A finished child's last message may ask you something in
-prose (its wake's `last_message`). Answer with `thread send --id <id> "..."` without `--wait`
+prose (its wake quotes it). Answer with `thread send --id <id> "..."` without `--wait`
 and end the turn; its subscription wakes you again.
 When every child has finished, check which branches touch the same files
 (`git diff --name-only origin/main...<branch>` per branch) and summarise for the user
@@ -251,7 +251,7 @@ code-foundry thread new --project 8c3d5e7f9a1b --new-worktree --permission super
   --prompt "... You are supervised: every edit and command needs approval. Use Edit/Write for files (no heredocs, sed or scripts), and keep git commit and git push in separate commands. ..."
 ```
 
-On a wake whose `pending` is a permission, judge the tool `input` against the task and
+On a wake about a permission, judge the tool `input` against the task and
 answer with `code-foundry thread respond --id <child> allow --request <request_id>` (or
 `deny --message "<why>"`). Approvals are routine: approve and end the turn with no text
 to the user; tell them about a denial or something you found, once. Add to the prompt

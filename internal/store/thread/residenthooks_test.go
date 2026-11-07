@@ -127,7 +127,7 @@ func TestResidentWakeNote(t *testing.T) {
 	})
 	kid := e.create(CreateOptions{Name: "Worker", InitialPrompt: "go", CreatedBy: r.ID, Notify: true})
 	items := e.waitItems(r.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
-	if w := wakes(items)[0]; !strings.HasSuffix(w.Text, "```\n\n"+note) || w.WakeTitle == "" {
+	if w := wakes(items)[0]; !strings.HasSuffix(w.Text, "\n\n"+note) || w.WakeTitle == "" {
 		t.Errorf("the resident's wake = %q", w.Text)
 	}
 	mu.Lock()

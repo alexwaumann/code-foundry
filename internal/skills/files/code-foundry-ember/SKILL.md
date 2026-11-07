@@ -118,14 +118,13 @@ listing each worker." Never ask a lead for conflict-free branches.
 A `[code-foundry wake]` message says a worker
 settled or a timer fired; tasks under its "Unclosed on your board" get steps 2-4 too.
 While siblings still work, a wake turn checks and closes what landed, then ends silently
-or with one line: no analysis of a partial batch, no promised check. A wake's
-`last_message` is the worker's whole last message: it may ask you something in prose;
-answer with `thread send --id <worker>`. Its `checkouts` is what git says about the branch.
+or with one line: no analysis of a partial batch, no promised check. A wake quotes the worker's whole last message: it may ask you something in prose; answer
+with `thread send --id <worker>`. Below it is what git says about the branch.
 
 1. Read what happened: the wake has it; `code-foundry thread reports --created-by
    $CODE_FOUNDRY_THREAD` (one line per worker), `ember task list` (the board).
 2. **Check before you believe.** A worker's last message is a claim: hold it against
-   `checkouts`, and for what that does not say, look at the branch in the
+   what git says in the wake, and for what that does not say, look at the branch in the
    worker's worktree (`git -C <worktree> log origin/<branch>`, `git -C <worktree> diff
    origin/main...origin/<branch> --stat`), not in the project's checkout, and read its
    caveats. A result whose caveats say the goal was not met or checked, or that the
@@ -170,7 +169,7 @@ worker's thread (they do not see it) or say a worker waits "in its own thread".
   (`ember task update <task id> --state doing`), never a new task or worktree. When the
   goal changed, rename the worker (`thread rename --id <worker> --name "..."`) and the
   task (`ember task update <task id> --title "..."`, the parent's too).
-- **A worker's permission or question.** Its wake carries a `pending` request. Answer it
+- **A worker's permission or question.** Its wake says what it asks, with the command. Answer it
   yourself only when the answer is clearly within what the user asked for. Otherwise
   relay it: the question and its options, in a line or two. Send the user's answer
   back whole, tweaks included, as one: `code-foundry thread respond --id <worker>

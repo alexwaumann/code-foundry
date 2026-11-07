@@ -692,7 +692,7 @@ func pendingInput(in string) any {
 
 // threadWake is the wake message of sub about thread t, fired at, with detail d.
 func threadWake(sub Subscription, t Thread, at time.Time, d wakeDetail) Message {
-	return wakeMessage(joinSentences(threadWakeTitle(sub.Condition, t, d), siblingsSentence(d.siblings)), threadWakePayload(sub, t, at, d))
+	return wakeTextMessage(joinSentences(threadWakeTitle(sub.Condition, t, d), siblingsSentence(d.siblings)), threadWakePayload(sub, t, at, d), wakeBody(sub, t, d))
 }
 
 // threadWakePayload is the JSON of sub's wake about thread t, fired at, with detail d.

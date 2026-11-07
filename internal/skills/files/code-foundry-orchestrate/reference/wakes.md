@@ -13,20 +13,20 @@ fires again on its next settle.
 
 ## Finished
 
-`needs attention (finished)` is a turn that ended normally. `last_message` is the child's
+`needs attention (finished)` is a turn that ended normally. Under "It said" is the child's
 own last message, whole: its result, and maybe a question asked in prose (answer with
 `thread send --id <child>`). You need no `thread read` for it. `Report: blocked` or `failed`
-in the header is the child's own word that it could not finish.
+is the child's own word that it could not finish.
 
-`checkouts` is what git says, read by the app, not the child's claim: `branch`, `head`,
-`pushed` (`unpushed` commits otherwise), `uncommitted` files, and `files`, `added`, `deleted`
-against `base`. Check the child's claims against it; run git only for what it does not say.
+Under "From the app, not the thread" is what git says, not the child's claim: the branch and
+commit, pushed or not, uncommitted files, the diffstat against the base. Check the child's
+claims against it; run git only for what it does not say.
 
 ## Pending prompts and questions
 
-Each permission prompt or question wakes you on its own; its `pending` has the
-`request_id`, the tool `input` (judge that, not the child's description) and a
-question's `options` (what `thread respond --answer` takes). Answer every pending
+Each permission prompt or question wakes you on its own, with the tool's input (judge
+that, not the child's description), a question's options and the `thread respond` line
+that answers it. Answer every pending
 request you can before relaying a child's question to the user as plain text at the end
 of your turn (the child still asks with its own question tool; a blocking question tool
 in YOUR turn holds back your other children). Supervised children:

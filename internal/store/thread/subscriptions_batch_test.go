@@ -153,7 +153,7 @@ func TestWakeBatchMessage(t *testing.T) {
 	if w.WakeTitle != want {
 		t.Errorf("title =\n%s\nwant\n%s", w.WakeTitle, want)
 	}
-	if !strings.HasPrefix(w.Text, wakePrefix+want+"\n```json\n") {
+	if !strings.HasPrefix(w.Text, wakePrefix+want) || strings.Contains(w.Text, "```") {
 		t.Errorf("text = %q", w.Text)
 	}
 	var p struct {
