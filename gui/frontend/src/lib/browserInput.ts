@@ -89,7 +89,8 @@ type KeyFields = Pick<KeyboardEvent, "key" | "code" | "keyCode" | "location" | "
 function keyText(e: KeyFields): string {
   if (e.metaKey || e.ctrlKey) return "";
   if (e.key === "Enter") return "\r";
-  return [...e.key].length === 1 ? e.key : "";
+  const first = e.key.codePointAt(0);
+  return first !== undefined && String.fromCodePoint(first).length === e.key.length ? e.key : "";
 }
 
 export function keyDown(e: KeyFields): BrowserKeyView {

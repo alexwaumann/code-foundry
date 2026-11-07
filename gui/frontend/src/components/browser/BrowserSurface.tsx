@@ -21,18 +21,15 @@ export function BrowserSurface() {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const sink = useRef<HTMLTextAreaElement>(null);
-  const page = useBrowserStream(surface, box, canvas);
+  const { page, scale } = useBrowserStream(surface, box, canvas);
   const clicks = useMemo(() => new ClickCounter(), []);
   const queue = useMemo(() => new InputQueue((events) => sendBrowserInput(surface, events)), [surface]);
   const pressed = useRef(0);
 
-  const at = useCallback(
-    (e: { clientX: number; clientY: number }) => {
-      const r = canvas.current?.getBoundingClientRect() ?? { left: 0, top: 0, width: 0, height: 0 };
-      return toPage(e.clientX, e.clientY, r, page.current);
-    },
-    [page],
-  );
+  const at = (e: { clientX: number; clientY: number }) => {
+    const r = canvas.current?.getBoundingClientRect() ?? { left: 0, top: 0, width: 0, height: 0 };
+    return toPage(e.clientX, e.clientY, r, page.current);
+  };
 
   const mouse = (e: PointerEvent, type: "mousePressed" | "mouseReleased" | "mouseMoved", clickCount: number) => {
     queue.push({ kind: "mouse", type, button: type === "mouseMoved" ? heldButton(e.buttons) : buttonName(e.button), ...at(e), buttons: e.buttons, clickCount, modifiers: modifiersOf(e), deltaX: 0, deltaY: 0 });
@@ -80,8 +77,6 @@ export function BrowserSurface() {
   const leave = useCallback(() => {
     sink.current?.focus({ preventScroll: true });
   }, []);
-
-  const scale = page.current.width > 0 && box.current ? { x: box.current.clientWidth / page.current.width, y: box.current.clientHeight / page.current.height } : { x: 1, y: 1 };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="browser-surface">

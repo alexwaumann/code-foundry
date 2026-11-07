@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft, ArrowRight, LoaderCircle, RotateCw, X } from "lucide-react";
 import { navigateBrowser, type BrowserStateView } from "@/api/browser";
 import { Button } from "@/components/ui/button";
@@ -6,17 +6,19 @@ import { Tip } from "@/components/ui/tooltip";
 import { goBack, goForward, reload, setBrowserError } from "@/stores/browser";
 
 /** The page's address as the bar shows it: nothing for the blank page a surface starts on. */
-export function shownAddress(url: string): string {
+function shownAddress(url: string): string {
   return url === "about:blank" ? "" : url;
 }
 
 /** Back, forward, reload and the address bar. */
 export function BrowserToolbar({ surface, state, onLeave }: { surface: string; state: BrowserStateView; onLeave: () => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
+  // What was typed, on the page it was typed over: moving to another page drops it.
+  const [typed, setTyped] = useState<{ text: string; over: string } | null>(null);
+  const draft = typed?.over === state.url ? typed.text : null;
+  const setDraft = (text: string | null) => {
+    setTyped(text === null ? null : { text, over: state.url });
+  };
   const address = draft ?? shownAddress(state.url);
-  useEffect(() => {
-    setDraft(null);
-  }, [state.url]);
 
   const go = () => {
     if (draft === null || draft.trim() === "") return;

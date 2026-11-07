@@ -76,12 +76,18 @@ function useBoxSize(box: RefObject<HTMLElement | null>): PageSize {
 /**
  * Holds one BrowserService.Watch while the view can be seen: mounted, the window visible and
  * the view with a size. Out of those there is no stream, and with it the daemon's screencast
- * stops. Returns the size the page was last told, which input coordinates scale from.
+ * stops. Returns the page's size for input coordinates, read per event, and the view's scale
+ * over the page, for what is drawn over it.
  */
-export function useBrowserStream(surface: string, box: RefObject<HTMLElement | null>, canvas: RefObject<HTMLCanvasElement | null>): RefObject<PageSize> {
+export function useBrowserStream(
+  surface: string,
+  box: RefObject<HTMLElement | null>,
+  canvas: RefObject<HTMLCanvasElement | null>,
+): { page: RefObject<PageSize>; scale: { x: number; y: number } } {
   const visible = usePageVisible();
   const size = useBoxSize(box);
   const page = useRef<PageSize>({ width: 0, height: 0 });
+  const [shown, setShown] = useState<PageSize>({ width: 0, height: 0 });
   const sent = useRef<PageSize>({ width: 0, height: 0 });
   const shows = visible && size.width > 0 && size.height > 0;
 
@@ -101,6 +107,8 @@ export function useBrowserStream(surface: string, box: RefObject<HTMLElement | n
           return;
         }
         page.current = { width: ev.frame.width, height: ev.frame.height };
+        // Only a new size renders: this runs for every frame.
+        setShown((p) => (p.width === ev.frame.width && p.height === ev.frame.height ? p : page.current));
         paint(ev.frame);
       },
       onStatus: (status) => {
@@ -127,5 +135,5 @@ export function useBrowserStream(surface: string, box: RefObject<HTMLElement | n
     };
   }, [surface, shows, size]);
 
-  return page;
+  return { page, scale: shown.width > 0 && shown.height > 0 ? { x: size.width / shown.width, y: size.height / shown.height } : { x: 1, y: 1 } };
 }
