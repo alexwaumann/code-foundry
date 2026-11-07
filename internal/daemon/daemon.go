@@ -323,6 +323,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return fmt.Errorf("register commands: %w", err)
 	}
 	applySettings(st.settings, commands, logLevel, opts.Dev)
+	if err := applyBrowserCommands(st.settings, commands, threadAPI, command.BusEmitter{Bus: events, CountWindows: clients.Windows}); err != nil {
+		return fmt.Errorf("register commands: %w", err)
+	}
 	if err := plugins.Start(ctx); err != nil {
 		log.Error("plugins did not start", "err", err)
 	}
@@ -356,6 +359,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		api.NewTheme(st.themes, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
 		dictationAPI.Route(),
+		api.NewBrowser(st.browser).Route(browserOrigins(pagesPort, opts.DevOrigins)),
 		searchAPI.Route(),
 		filesystemAPI.Route(),
 		eventsAPI.Route(),

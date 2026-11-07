@@ -42,6 +42,14 @@ type Settings struct {
 	Ember       Ember
 	Dictation   Dictation
 	Advanced    Advanced
+	// Experimental is what may change or go without notice.
+	Experimental Experimental
+}
+
+// Experimental configures experiments.
+type Experimental struct {
+	// ChromeSurface turns on the Browser surface (internal/store/browser).
+	ChromeSurface bool
 }
 
 // Dictation configures voice dictation (internal/store/dictation).
