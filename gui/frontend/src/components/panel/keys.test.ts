@@ -131,6 +131,6 @@ describe("surface registry", () => {
     for (const k of ["l", "u", "m", "a", "h", "t"]) expect(surfaceByHotkey(k)).toBeUndefined();
     // s-1 is unknown here: no pull request, not a known thread.
     // The Board is Ember's chat's only; Changes, MCP and Gallery are never listed.
-    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden", "hidden"]);
+    expect(surfaces.map((s) => s.available(ctx))).toEqual(["hidden", "disabled", "disabled", "disabled", "hidden", "hidden", "hidden", "hidden"]);
   });
 });
