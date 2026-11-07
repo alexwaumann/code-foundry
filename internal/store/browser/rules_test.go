@@ -526,27 +526,27 @@ func TestTheSizeLimitStopsADownload(t *testing.T) {
 	}
 }
 
-func TestADownloadNothingCanPlaceOnlyEverAsks(t *testing.T) {
-	f, v, dir := surfaceFixture(t)
+func TestADownloadNothingCanPlaceAsksNobody(t *testing.T) {
+	f, v, _ := surfaceFixture(t)
 	committed(f.c, page, "https://page.example/")
-	click(t, f) // a click here says nothing about a frame nobody can name
+	click(t, f)
 	f.c.Emit("Browser.downloadWillBegin", "", map[string]any{"frameId": "deep-in-an-iframe", "guid": "g", "url": "https://iframe.example/a.bin", "suggestedFilename": "a.bin"})
-	st := next(t, v, "the question", func(st browser.State) bool { return states(st)[browser.DownloadAsking] == 1 })
-	if st.Downloads[0].Site != "iframe.example" {
-		t.Fatalf("site %q", st.Downloads[0].Site)
-	}
-	finished(t, f.c, dir, "g")
-	time.Sleep(30 * time.Millisecond)
-	if got := downloaded(t, dir); len(got) != 0 {
-		t.Fatalf("folder %v", got)
+	eventually(t, "the cancel", func() bool { return len(f.c.Calls("Browser.cancelDownload")) == 1 })
+	if st := latest(f, v); len(st.Downloads) != 0 {
+		t.Fatalf("a surface was asked: %+v", st.Downloads)
 	}
 }
 
-func TestADownloadNothingCanPlaceWithNothingOnScreenIsBlocked(t *testing.T) {
-	f, v, _ := surfaceFixture(t)
-	v.Close()
-	f.c.Emit("Browser.downloadWillBegin", "", map[string]any{"frameId": "x", "guid": "g", "suggestedFilename": "a.bin"})
-	eventually(t, "the cancel", func() bool { return len(f.c.Calls("Browser.cancelDownload")) == 1 })
+// latest is the viewer's state after whatever is in flight has landed.
+func latest(f *fixture, v *browser.Viewer) browser.State {
+	f.t.Helper()
+	var last browser.State
+	for deadline := time.Now().Add(150 * time.Millisecond); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		if st, _, _ := v.Take(); st != nil {
+			last = *st
+		}
+	}
+	return last
 }
 
 func TestTheListStaysBoundedAndCountsWhatDidNotFit(t *testing.T) {

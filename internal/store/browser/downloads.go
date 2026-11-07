@@ -18,16 +18,18 @@ import (
 // says yes. So a page that starts forty downloads with no gesture gets forty questions at most,
 // and refusing one deletes it.
 //
-//   - A click or Enter in the surface lets one download through, within gestureWindow.
+//   - A click, or Enter on a link, lets one download through, within gestureWindow, on the page
+//     it was made on: a navigation takes it away.
 //   - With no gesture the surface asks, a few at a time. The file waits in incoming meanwhile,
 //     up to maxAskBytes: there is no way to pause it, and no way to fetch it again later.
 //   - A page nobody can see downloads nothing.
 //   - A surface takes at most maxDownloadsPerPage files and maxDownloadBytesPerPage until the
 //     user goes somewhere or reloads. A page cannot reset that by navigating itself.
 //
-// Page.downloadWillBegin names the session, so a subframe's download is its page's. A frame in
-// a cross-site iframe sends only the browser's event, which says nothing a surface can be found
-// by: nothing passes on a gesture then, and the surface on screen asks.
+// Page.downloadWillBegin names the session, so a subframe's download is its page's, on that page's
+// surface. Every cross-site iframe has a session of its own (frames.go), so one of those is its
+// page's too, only it passes on no gesture: the click was on the page, not on what a third party
+// embedded in it, so the surface asks. A download nothing can place is blocked, and asks nobody.
 
 // The limits, per surface until the user next navigates or reloads.
 const (
@@ -49,7 +51,7 @@ const (
 
 // download is one of Chrome's downloads, by guid. Its fields need Store.mu.
 type download struct {
-	sf       *surface // nil: nothing on screen to ask, so it was blocked
+	sf       *surface // nil: nothing could place it, so it was blocked
 	allowed  bool
 	blocked  bool
 	staged   string // where it finished in incoming, once it did
@@ -83,43 +85,51 @@ type downloadParams struct {
 func onPageDownload(s *Store, in *instance, t *target, params json.RawMessage) {
 	var p downloadParams
 	if json.Unmarshal(params, &p) == nil {
-		s.beginDownload(in, t, p)
+		s.beginDownload(in, t, p, t.shownOrigin(), true)
 	}
 }
 
-// onBrowserDownload is every download. It comes after the page's, so one still unknown here has
-// no session: a frame in a cross-site iframe, or a popup not attached yet. Should Chrome ever
-// send these the other way round, every download only asks.
+// onSubframeDownload is a cross-site iframe's: its page's surface, in the frame's name.
+func onSubframeDownload(s *Store, in *instance, f *frame, params json.RawMessage) {
+	var p downloadParams
+	if json.Unmarshal(params, &p) == nil {
+		s.beginDownload(in, f.owner, p, f.shownOrigin(), false)
+	}
+}
+
+// onBrowserDownload is every download. It comes after the session's, so one still unknown here is
+// a popup not attached yet, or something no session reported. Should Chrome ever send these the
+// other way round, every download only asks.
 func onBrowserDownload(s *Store, in *instance, params json.RawMessage) {
 	var p downloadParams
 	if json.Unmarshal(params, &p) != nil || in.downloads[p.GUID] != nil {
 		return
 	}
-	s.beginDownload(in, in.targets[p.FrameID], p)
-}
-
-// beginDownload decides what becomes of a download Chrome has started. t is nil when nothing says
-// whose it is. Needs Store.mu.
-func (s *Store) beginDownload(in *instance, t *target, p downloadParams) {
-	if p.GUID == "" || in.downloads[p.GUID] != nil {
-		return
-	}
-	d := &download{}
-	in.downloads[p.GUID] = d
-	site := siteOf(p.URL)
-	if t != nil {
-		d.sf = t.surface
-		site = siteOf(t.url)
-	} else {
-		d.sf = s.surfaceOnScreen()
-	}
-	if d.sf == nil {
-		s.log.Debug("a download with no surface to ask was blocked")
+	t := in.targets[p.FrameID]
+	if t == nil {
+		s.log.Debug("a download nothing can place was blocked")
+		d := &download{}
+		in.downloads[p.GUID] = d
 		s.cancelDownload(in, p.GUID, d)
 		return
 	}
-	sf := d.sf
-	state := sf.verdict(t, time.Now())
+	s.beginDownload(in, t, p, t.shownOrigin(), true)
+}
+
+// beginDownload decides what becomes of a download Chrome has started on t's surface, in origin's
+// name. gesture says the user's last click may pass it. Needs Store.mu.
+func (s *Store) beginDownload(in *instance, t *target, p downloadParams, origin string, gesture bool) {
+	if p.GUID == "" || in.downloads[p.GUID] != nil {
+		return
+	}
+	sf := t.surface
+	d := &download{sf: sf}
+	in.downloads[p.GUID] = d
+	site := siteOf(origin)
+	if site == "" {
+		site = siteOf(p.URL)
+	}
+	state := sf.verdict(t, gesture, time.Now())
 	switch state {
 	case DownloadBlocked:
 		s.cancelDownload(in, p.GUID, d)
@@ -129,18 +139,18 @@ func (s *Store) beginDownload(in *instance, t *target, p downloadParams) {
 	case DownloadAsking:
 		sf.budget.files++
 	}
-	sf.addDownload(Download{ID: p.GUID, Name: safeName(p.Name), Site: clip(site, maxLabel), State: state})
+	sf.addDownload(Download{ID: p.GUID, Name: safeName(p.Name), Site: clipHost(site), State: state})
 	sf.publish()
 }
 
 // verdict is the rule at the top of this file. Needs Store.mu.
-func (sf *surface) verdict(t *target, now time.Time) string {
+func (sf *surface) verdict(t *target, gesture bool, now time.Time) string {
 	switch {
-	case t != nil && !sf.onScreen(t):
+	case !sf.onScreen(t):
 		return DownloadBlocked
 	case sf.budget.files >= maxDownloadsPerPage || sf.budget.bytes >= maxDownloadBytesPerPage:
 		return DownloadBlocked
-	case t != nil && sf.takeGesture(now):
+	case gesture && sf.takeGesture(now):
 		return DownloadInProgress
 	case sf.countDownloads(DownloadAsking) < maxAsking:
 		return DownloadAsking
@@ -161,18 +171,6 @@ func (sf *surface) takeGesture(now time.Time) bool {
 	}
 	sf.gesture = time.Time{}
 	return true
-}
-
-// surfaceOnScreen is the surface a download nobody can place asks on: of those with a viewer, the
-// one the user touched last. Nil with nothing on screen. Needs Store.mu.
-func (s *Store) surfaceOnScreen() *surface {
-	var best *surface
-	for _, sf := range s.surfaces {
-		if len(sf.viewers) > 0 && (best == nil || sf.gesture.After(best.gesture)) {
-			best = sf
-		}
-	}
-	return best
 }
 
 func (sf *surface) countDownloads(state string) int {

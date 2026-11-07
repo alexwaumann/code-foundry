@@ -247,7 +247,7 @@ func browserStateToProto(s *browser.State) *v1.BrowserState {
 	out := &v1.BrowserState{
 		Phase: browserPhases[s.Phase], Message: s.Message, Url: s.URL, Title: s.Title, Loading: s.Loading,
 		CanGoBack: s.CanGoBack, CanGoForward: s.CanGoForward, Popup: s.Popup, Notice: s.Notice, Copied: s.Copied,
-		Site: s.Site, Security: s.Security, DownloadsBlocked: uint32(s.DownloadsBlocked), //nolint:gosec // a count
+		Origin: s.Origin, Site: s.Site, Security: s.Security, DownloadsBlocked: uint32(s.DownloadsBlocked), //nolint:gosec // a count
 	}
 	if d := s.Dialog; d != nil {
 		out.Dialog = &v1.BrowserDialog{Id: d.ID, Kind: d.Kind, Message: d.Message, DefaultPrompt: d.DefaultPrompt, Origin: d.Origin, Site: d.Site}

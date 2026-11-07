@@ -2,6 +2,7 @@ package browser
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -106,5 +107,51 @@ func TestAllowedPage(t *testing.T) {
 		if got := allowedPage(u); got != want {
 			t.Errorf("allowedPage(%q) = %v", u, got)
 		}
+	}
+}
+
+func TestWhoAPageIsSurvivesWhatAParserRefuses(t *testing.T) {
+	tests := []struct{ raw, origin, site string }{
+		{"https://a.bank.example.co.uk/x", "https://a.bank.example.co.uk", "example.co.uk"},
+		{"http://evil.test:8080/%zz", "http://evil.test:8080", "evil.test"},
+		{"http://evil.test/%zz?a#b", "http://evil.test", "evil.test"},
+		{"http://a{b.evil.test/", "http://a{b.evil.test", "evil.test"},
+		{"http://a`b.evil.test:9/", "http://a`b.evil.test:9", "evil.test"},
+		{"https://me:pw@bank.example%2Flogin@evil.test/", "https://evil.test", "evil.test"},
+		{"http://[::1]:8080/x", "http://[::1]:8080", "::1"},
+		{"http://127.0.0.1:9/", "http://127.0.0.1:9", "127.0.0.1"},
+		{"http://localhost:9/", "http://localhost:9", "localhost"},
+		{`http://evil.test\@bank.example/`, "http://evil.test", "evil.test"},
+		{"about:blank", "", ""},
+		{"blob:https://evil.test/1", "", ""},
+		{"data:text/html,x", "", ""},
+		{"", "", ""},
+	}
+	for _, tt := range tests {
+		if got := originOf(tt.raw); got != tt.origin {
+			t.Errorf("originOf(%q) = %q", tt.raw, got)
+		}
+		if got := siteOf(tt.raw); got != tt.site {
+			t.Errorf("siteOf(%q) = %q", tt.raw, got)
+		}
+	}
+}
+
+func TestChromesOriginSaysNothingWhenOpaque(t *testing.T) {
+	for in, want := range map[string]string{"://": "", "null": "", "": "", "http://evil.test": "http://evil.test"} {
+		if got := chromeOrigin(in); got != want {
+			t.Errorf("chromeOrigin(%q) = %q", in, got)
+		}
+	}
+}
+
+func TestALongHostKeepsItsEnd(t *testing.T) {
+	long := "http://" + strings.Repeat("a.", 1000) + "evil.test"
+	got := clipHost(long)
+	if !strings.HasSuffix(got, ".evil.test") || len(got) > maxHost+4 {
+		t.Fatalf("clipped to %q", got)
+	}
+	if clipHost("http://evil.test") != "http://evil.test" {
+		t.Fatal("a short one changed")
 	}
 }

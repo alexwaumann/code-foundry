@@ -46,6 +46,7 @@ func New() *Chrome {
 		return map[string]string{"sessionId": "session-" + fmt.Sprint(call.Params["targetId"])}, nil
 	})
 	c.Reply("Browser.getVersion", func(Call) (any, error) { return map[string]string{"product": "Fake/1"}, nil })
+	c.Reply("Page.createIsolatedWorld", func(Call) (any, error) { return map[string]int{"executionContextId": 7}, nil })
 	c.Reply("Page.getNavigationHistory", func(Call) (any, error) {
 		return map[string]any{"currentIndex": 0, "entries": []map[string]any{{"id": 1}}}, nil
 	})

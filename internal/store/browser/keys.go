@@ -165,7 +165,7 @@ func (s *Store) Input(ctx context.Context, key string, events []InputEvent) erro
 			return err
 		}
 		// Before the event goes: the page's answer to it is what a download comes from.
-		if e.gesture() {
+		if e.clicks() || (e.entersKey() && s.onLink(ctx, in, t)) {
 			s.mu.Lock()
 			sf.gesture = time.Now()
 			s.mu.Unlock()
@@ -179,23 +179,41 @@ func (s *Store) Input(ctx context.Context, key string, events []InputEvent) erro
 			return err
 		}
 		clicked = clicked || (e.Mouse != nil && e.Mouse.Type == "mouseReleased")
+		if e.mayOpenSelect() {
+			s.afterPress(in, t, e.Mouse)
+		}
 	}
 	if clicked {
-		time.AfterFunc(copySettle, func() { s.noticeCopied(context.Background(), key) })
+		s.mu.Lock()
+		sf.clicks++
+		click := sf.clicks
+		s.mu.Unlock()
+		time.AfterFunc(copySettle, func() { s.noticeCopied(context.Background(), key, click) })
 	}
 	return nil
 }
 
-// gesture is a click or an Enter: what a person does to mean "do that", where a page can have
-// been waiting for any key at all. Space presses a focused button or link too.
-func (e InputEvent) gesture() bool {
+// clicks is what a person does to mean "do that", where a page can have been waiting for any key
+// at all: typing is no gesture, and neither is Space, which comes with every word.
+func (e InputEvent) clicks() bool {
+	m := e.Mouse
+	return m != nil && m.Type == "mouseReleased" && m.Button == "left"
+}
+
+// entersKey is an Enter going down, which is a gesture only on a link (onLink): anywhere else it
+// is the end of a line of typing.
+func (e InputEvent) entersKey() bool {
+	k := e.Key
+	return k != nil && k.Type != "keyUp" && !k.AutoRepeat && k.Key == "Enter"
+}
+
+// mayOpenSelect is a press the page's select may have taken (helper.go).
+func (e InputEvent) mayOpenSelect() bool {
 	if m := e.Mouse; m != nil {
-		return m.Type == "mouseReleased" && m.Button == "left"
+		return m.Type == "mousePressed" && m.Button == "left"
 	}
-	if k := e.Key; k != nil {
-		return k.Type != "keyUp" && (k.Key == "Enter" || k.Key == " ")
-	}
-	return false
+	k := e.Key
+	return k != nil && k.Type != "keyUp" && slices.Contains(selectKeys, k.Key)
 }
 
 // copies is a cmd+c or cmd+x going to the page.
