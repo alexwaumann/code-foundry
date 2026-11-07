@@ -4,6 +4,7 @@ import { BROWSER_STARTING, type BrowserStateView } from "@/api/browser";
 
 const api = vi.hoisted(() => ({
   dialog: vi.fn(() => Promise.resolve()),
+  download: vi.fn(() => Promise.resolve()),
   files: vi.fn(() => Promise.resolve()),
   select: vi.fn(() => Promise.resolve()),
   copy: vi.fn(() => Promise.resolve(3)),
@@ -14,6 +15,7 @@ const api = vi.hoisted(() => ({
 vi.mock("@/api/browser", async (orig) => ({
   ...(await orig<typeof import("@/api/browser")>()),
   answerBrowserDialog: api.dialog,
+  answerBrowserDownload: api.download,
   answerBrowserFiles: api.files,
   answerBrowserSelect: api.select,
   copyFromBrowser: api.copy,
@@ -26,9 +28,13 @@ const { BrowserOverlays } = await import("./BrowserOverlays");
 
 const ready: BrowserStateView = { ...BROWSER_STARTING, phase: "ready", url: "https://example.com/" };
 
+function overlays(state: BrowserStateView, error = "", onLeave = vi.fn()) {
+  return <BrowserOverlays surface="thread:t1" state={state} error={error} scale={{ x: 1, y: 1 }} onLeave={onLeave} onDismissError={vi.fn()} />;
+}
+
 function show(state: BrowserStateView, error = "") {
   const dismiss = vi.fn();
-  const out = render(<BrowserOverlays surface="thread:t1" state={state} error={error} scale={{ x: 1, y: 1 }} onDismissError={dismiss} />);
+  const out = render(<BrowserOverlays surface="thread:t1" state={state} error={error} scale={{ x: 1, y: 1 }} onLeave={vi.fn()} onDismissError={dismiss} />);
   return { ...out, dismiss };
 }
 
@@ -63,13 +69,20 @@ describe("phases", () => {
 });
 
 describe("dialogs", () => {
-  const dialog = (kind: string, over = {}) => ({ id: "7", kind, message: "<b>hello</b>", defaultPrompt: "", origin: "https://example.com", ...over });
+  const dialog = (kind: string, over = {}) => ({ id: "7", kind, message: "<b>hello</b>", defaultPrompt: "", origin: "https://example.com", site: "example.com", ...over });
 
   it("names the origin and shows the page's words as text", () => {
     show({ ...ready, dialog: dialog("alert") });
-    expect(screen.getByRole("dialog").textContent).toContain("https://example.com says");
+    expect(screen.getByRole("dialog").textContent).toContain("example.com says");
     expect(screen.getByTestId("browser-dialog-message").textContent).toBe("<b>hello</b>");
     expect(screen.getByTestId("browser-dialog-message").querySelector("b")).toBeNull();
+  });
+
+  it("keeps the registrable domain readable however long the host", () => {
+    const origin = `https://login.bank.example.com.${"a.".repeat(40)}evil.co`;
+    show({ ...ready, dialog: dialog("alert", { origin, site: "evil.co" }) });
+    expect(screen.getByRole("dialog").textContent).toContain("evil.co says");
+    expect(screen.getByText(origin)).toBeTruthy();
   });
 
   it("an alert has only OK", () => {
@@ -103,11 +116,11 @@ describe("dialogs", () => {
 });
 
 describe("file choosers", () => {
-  const chooser = { id: "8", multiple: false, origin: "https://example.com" };
+  const chooser = { id: "8", multiple: false, origin: "https://example.com", site: "example.com" };
 
   it("says who asks, and that the files go to the site", () => {
     show({ ...ready, fileChooser: chooser });
-    expect(screen.getByRole("dialog").textContent).toContain("https://example.com asks for a file");
+    expect(screen.getByRole("dialog").textContent).toContain("example.com asks for a file");
     expect(screen.getByRole("dialog").textContent).toContain("goes to the site");
   });
 
@@ -196,7 +209,7 @@ describe("strips", () => {
   });
 
   it("says when the stream is lost, so a stale frame does not pass for the page", () => {
-    render(<BrowserOverlays surface="thread:t1" state={ready} error="" offline scale={{ x: 1, y: 1 }} onDismissError={vi.fn()} />);
+    render(<BrowserOverlays surface="thread:t1" state={ready} error="" offline scale={{ x: 1, y: 1 }} onLeave={vi.fn()} onDismissError={vi.fn()} />);
     expect(screen.getByTestId("browser-strip").textContent).toContain("Reconnecting");
   });
 
@@ -208,23 +221,128 @@ describe("strips", () => {
   it("says when a page copied text, and moves it only when asked", async () => {
     const { rerender } = show(ready);
     expect(screen.queryByText("The page copied text.")).toBeNull();
-    rerender(<BrowserOverlays surface="thread:t1" state={{ ...ready, copied: 1 }} error="" scale={{ x: 1, y: 1 }} onDismissError={vi.fn()} />);
+    rerender(overlays({ ...ready, copied: 1 }));
     expect(api.copy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Copy to clipboard" }));
-    expect(api.copy).toHaveBeenCalledWith("thread:t1");
+    expect(api.copy).toHaveBeenCalledWith("thread:t1", true);
     await vi.waitFor(() => {
       expect(screen.queryByText("The page copied text.")).toBeNull();
     });
   });
 
   it("follows a download and offers Finder when it is done", () => {
-    const { rerender } = show({ ...ready, downloads: [{ id: "g", name: "report.pdf", state: "inProgress" }] });
+    const { rerender } = show({ ...ready, downloads: [{ id: "g", name: "report.pdf", state: "inProgress", site: "example.com" }] });
     expect(screen.getByText("report.pdf")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Show in Finder" })).toBeNull();
-    rerender(<BrowserOverlays surface="thread:t1" state={{ ...ready, downloads: [{ id: "g", name: "report.pdf", state: "completed" }] }} error="" scale={{ x: 1, y: 1 }} onDismissError={vi.fn()} />);
+    rerender(overlays({ ...ready, downloads: [{ id: "g", name: "report.pdf", state: "completed", site: "example.com" }] }));
     fireEvent.click(screen.getByRole("button", { name: "Show in Finder" }));
     expect(api.reveal).toHaveBeenCalledWith("thread:t1", "g");
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     expect(screen.queryByText("report.pdf")).toBeNull();
+  });
+
+  it("asks for a download nobody clicked for, and answers", () => {
+    show({ ...ready, downloads: [{ id: "g", name: "evil.command", state: "asking", site: "evil.co" }] });
+    expect(screen.getByTestId("browser-downloads").textContent).toContain("evil.co wants to download evil.command");
+    fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+    expect(api.download).toHaveBeenCalledWith("thread:t1", "g", true);
+    fireEvent.click(screen.getByRole("button", { name: "Block" }));
+    expect(api.download).toHaveBeenCalledWith("thread:t1", "g", false);
+  });
+
+  it("shows every file, and says how many more were refused", () => {
+    const downloads = Array.from({ length: 47 }, (_, i) => ({ id: `g${String(i)}`, name: `bulk${String(i)}.bin`, state: "blocked", site: "" }));
+    show({ ...ready, downloads, downloadsBlocked: 3 });
+    const list = screen.getByTestId("browser-downloads");
+    for (const d of downloads) expect(list.textContent).toContain(d.name);
+    expect(list.textContent).toContain("3 more downloads blocked");
+  });
+
+  it("clears only what is over, and a new one shows again", () => {
+    const old = { id: "a", name: "old.bin", state: "completed", site: "" };
+    const open = { id: "b", name: "open.bin", state: "asking", site: "" };
+    const { rerender } = show({ ...ready, downloads: [old, open] });
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.queryByText("old.bin")).toBeNull();
+    expect(screen.getByTestId("browser-downloads").textContent).toContain("open.bin");
+    rerender(overlays({ ...ready, downloads: [old, open, { id: "c", name: "new.bin", state: "inProgress", site: "" }] }));
+    expect(screen.getByText("new.bin")).toBeTruthy();
+    expect(screen.queryByText("old.bin")).toBeNull();
+  });
+});
+
+describe("focus: a page's overlay never takes the keyboard by itself", () => {
+  const prompt = { id: "7", kind: "prompt", message: "", defaultPrompt: "", origin: "https://evil.co", site: "evil.co" };
+  const confirm = { ...prompt, kind: "confirm" };
+  const beforeunload = { ...prompt, kind: "beforeunload" };
+  const chooser = { id: "8", multiple: false, origin: "https://evil.co", site: "evil.co" };
+  const select = { id: "9", options: [{ label: "one", disabled: false }], selected: 0, x: 1, y: 2, width: 3 };
+  const cases: [string, BrowserStateView][] = [
+    ["prompt", { ...ready, dialog: prompt }],
+    ["confirm", { ...ready, dialog: confirm }],
+    ["beforeunload", { ...ready, dialog: beforeunload }],
+    ["file chooser", { ...ready, fileChooser: chooser }],
+    ["select", { ...ready, select }],
+    ["download question", { ...ready, downloads: [{ id: "g", name: "a", state: "asking", site: "evil.co" }] }],
+  ];
+
+  /** A composer outside the surface, and the page's input sink inside it. */
+  function layout(state: BrowserStateView, onLeave = vi.fn()) {
+    return (
+      <div>
+        <textarea data-testid="elsewhere" />
+        <div data-browser-surface="">
+          <textarea data-testid="sink" />
+          {overlays(state, "", onLeave)}
+        </div>
+      </div>
+    );
+  }
+
+  it.each(cases)("%s leaves the keyboard where it is outside the surface", (_, state) => {
+    const { rerender } = render(layout(ready));
+    const composer = screen.getByTestId("elsewhere");
+    composer.focus();
+    rerender(layout(state));
+    expect(document.activeElement).toBe(composer);
+  });
+
+  it.each(cases)("%s leaves it alone with nothing focused", (_, state) => {
+    const { rerender } = render(layout(ready));
+    rerender(layout(state));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("a prompt takes it from the page the user is in", () => {
+    const { rerender } = render(layout(ready));
+    screen.getByTestId("sink").focus();
+    rerender(layout({ ...ready, dialog: prompt }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Answer" }));
+  });
+
+  it("the select list takes it from the page the user is in", () => {
+    const { rerender } = render(layout(ready));
+    screen.getByTestId("sink").focus();
+    rerender(layout({ ...ready, select }));
+    expect(document.activeElement).toBe(screen.getByTestId("browser-select"));
+  });
+
+  it("gives it back to the page as the overlay goes", () => {
+    const onLeave = vi.fn();
+    const { rerender } = render(layout(ready, onLeave));
+    screen.getByTestId("sink").focus();
+    rerender(layout({ ...ready, dialog: prompt }, onLeave));
+    rerender(layout(ready, onLeave));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not touch the keyboard when it goes from elsewhere", () => {
+    const onLeave = vi.fn();
+    const { rerender } = render(layout(ready, onLeave));
+    screen.getByTestId("elsewhere").focus();
+    rerender(layout({ ...ready, dialog: prompt }, onLeave));
+    rerender(layout(ready, onLeave));
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByTestId("elsewhere"));
   });
 });

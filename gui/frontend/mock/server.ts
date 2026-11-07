@@ -807,7 +807,7 @@ function routes(router: ConnectRouter): void {
       return {};
     },
     paste: (req) => (world.browser.record(`paste ${req.text}`), {}),
-    copy: () => (world.browser.record("copy"), { length: 1 }),
+    copy: (req) => (world.browser.record(req.pageCopy ? "copy page" : "copy"), { length: 1 }),
     reveal: (req) => (world.browser.record(`reveal ${req.id}`), {}),
     relaunch: () => (world.browser.record("relaunch"), {}),
     close: (req) => (world.browser.record(`close ${req.surface}`), {}),

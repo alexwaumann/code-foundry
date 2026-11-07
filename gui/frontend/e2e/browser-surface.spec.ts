@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, mockPost, mockUrl, openApp, openStreams, resetMock, row } from "./fixtures";
+import { emit, mockPost, mockUrl, openApp, openStreams, resetMock, row, threadPrompt } from "./fixtures";
 
 /**
  * The experimental Chrome surface against the mock's BrowserService (docs/notes/chrome-surface.md):
@@ -26,6 +26,14 @@ async function openSurface(page: Page): Promise<void> {
   // The cover over a starting surface takes clicks, as it should.
   await expect(page.getByTestId("browser-starting")).toBeHidden();
 }
+
+/** What a page's script causes in the daemon: fields of the surface's state, sent to the window. */
+async function pageDoes(state: object): Promise<void> {
+  await mockPost(`browser?state=${encodeURIComponent(JSON.stringify(state))}`);
+}
+
+const prompt = { dialog: { id: "1", kind: "prompt", message: "", defaultPrompt: "", origin: "https://evil.co", site: "evil.co" } };
+const answer = (page: Page) => page.getByRole("textbox", { name: "Answer" });
 
 test.beforeEach(resetMock);
 
@@ -101,4 +109,76 @@ test("a resize reaches the page once it settles", async ({ page }) => {
   expect(last).toBe(`resize ${String(Math.round(after?.width ?? 0))}x${String(Math.round(after?.height ?? 0))}`);
   // No second stream for a new size.
   expect((await openStreams())[WATCH]).toBe(1);
+});
+
+test("a page's prompt does not take the keyboard from the composer", async ({ page }) => {
+  await openSurface(page);
+  await threadPrompt(page).click();
+  await expect(threadPrompt(page)).toBeFocused();
+  await page.keyboard.type("hello ");
+  await pageDoes(prompt);
+  await expect(answer(page)).toBeVisible();
+  await page.keyboard.type("my secret");
+  await expect(threadPrompt(page)).toBeFocused();
+  await expect(threadPrompt(page)).toContainText("hello my secret");
+  await expect(answer(page)).toHaveValue("");
+  // Clicking it is the user's way in.
+  await answer(page).click();
+  await expect(answer(page)).toBeFocused();
+  await page.keyboard.type("yes");
+  await expect(answer(page)).toHaveValue("yes");
+});
+
+test("a page's prompt does not take the keyboard from the bottom terminal", async ({ page }) => {
+  await openSurface(page);
+  await page.keyboard.press("Meta+j");
+  const terminal = page.getByTestId("bottom-terminal-host");
+  await expect(terminal).toBeVisible();
+  await terminal.click();
+  const inTerminal = () => page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') !== null);
+  await expect.poll(inTerminal).toBe(true);
+  await pageDoes(prompt);
+  await expect(answer(page)).toBeVisible();
+  await page.keyboard.type("typed for the shell");
+  expect(await inTerminal()).toBe(true);
+  await expect(answer(page)).toHaveValue("");
+});
+
+test("a page's select list does not take the keyboard from the composer", async ({ page }) => {
+  await openSurface(page);
+  await threadPrompt(page).click();
+  await expect(threadPrompt(page)).toBeFocused();
+  await pageDoes({ select: { id: "2", options: [{ label: "one", disabled: false }], selected: 0, x: 1, y: 2, width: 100 } });
+  await expect(page.getByTestId("browser-select")).toBeVisible();
+  await expect(threadPrompt(page)).toBeFocused();
+});
+
+test("in the page, a prompt takes the keyboard and hands it back", async ({ page }) => {
+  await openSurface(page);
+  const box = await canvas(page).boundingBox();
+  if (!box) throw new Error("no canvas");
+  await page.mouse.click(box.x + 40, box.y + 30);
+  await expect(page.getByTestId("browser-input")).toBeFocused();
+  await pageDoes(prompt);
+  await expect(answer(page)).toBeFocused();
+  await page.keyboard.type("yes");
+  await page.keyboard.press("Enter");
+  await expect(answer(page)).toBeHidden();
+  await expect(page.getByTestId("browser-input")).toBeFocused();
+});
+
+test("a long host keeps its registrable domain in view, in a narrow bar", async ({ page }) => {
+  await openSurface(page);
+  await page.setViewportSize({ width: 1000, height: 700 });
+  const host = `login.bank.example.com.${"secure.".repeat(30)}evil.co`;
+  await pageDoes({ url: `https://${host}/${"path/".repeat(50)}`, site: "evil.co", security: "insecure" });
+  const site = page.getByTestId("browser-address-site");
+  await expect(site).toHaveText("evil.co");
+  const bar = await page.getByTestId("browser-address").boundingBox();
+  const shown = await site.boundingBox();
+  if (!bar || !shown) throw new Error("no address");
+  expect(shown.x).toBeGreaterThanOrEqual(bar.x);
+  expect(shown.x + shown.width).toBeLessThanOrEqual(bar.x + bar.width);
+  await expect(page.getByTestId("browser-security")).toHaveText("Not secure");
+  await expect(page.getByTestId("browser-security")).toBeInViewport();
 });
