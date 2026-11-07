@@ -76,7 +76,7 @@ the code-foundry-pages skill's reference/welcome.md.
 ## Showing things in the app
 
 - A "show me" is asking: open it in your own side panel (`view.panel.file <path>`,
-  `view.panel.diff <path>`, `view.panel.pr <number>`, `view.panel.mcp`; every surface:
+  `view.panel.diff [<path>…]`, `view.panel.pr <number>`, `view.panel.mcp`; every surface:
   `code-foundry daemon.capabilities --group panel`); `--focus` only when they ask to be taken
   there. A secret goes in by `view.panel.file --edit`.
 - A page you make: the code-foundry-pages skill (`view.inline`, with `/cf/theme.css`, and

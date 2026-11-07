@@ -239,13 +239,22 @@ func takesValue(fs *flag.FlagSet, tok string) bool {
 }
 
 // assignPositionals gives each word to the next positional arg not already set by its
-// flag, in declaration order. Words left over are an error, which names the id flag
-// they were probably meant for (idFlagHint).
+// flag, in declaration order; a repeatable one takes every word left, after what its flag
+// set. Words left over are an error, which names the id flag they were probably meant for
+// (idFlagHint).
 func (cl *cli) assignPositionals(fs *flag.FlagSet, flags []*argFlag, words []string) error {
 	var took []*argFlag // the positionals given a word
 	for _, f := range flags {
 		if len(words) == 0 {
 			return nil
+		}
+		if f.spec.GetPositional() && f.spec.GetRepeatable() {
+			for _, w := range words {
+				_ = f.Set(w)
+			}
+			words = nil
+			took = append(took, f)
+			continue
 		}
 		if f.spec.GetPositional() && !f.set {
 			n := 1

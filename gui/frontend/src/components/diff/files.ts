@@ -145,6 +145,8 @@ export function shortRef(ref: string, remotes: readonly string[]): string {
 /** What the tab's strip calls it: "feat/sidebar vs main", and with another project's name first, so a thread's checkouts stay apart. */
 export function diffTitle(view: Pick<CompareView, "base" | "head">, o: { branch: string; remotes: readonly string[]; project: string; own: boolean }): string {
   const head = view.head.source.kind === "working" && o.branch ? o.branch : shortRef(view.head.label, o.remotes);
-  const title = `${head} vs ${shortRef(view.base.label, o.remotes)}`;
+  const short = shortRef(view.base.label, o.remotes);
+  // On the default branch the two would read the same: "main vs origin/main".
+  const title = `${head} vs ${short === head ? view.base.label : short}`;
   return o.own ? title : `${o.project} · ${title}`;
 }

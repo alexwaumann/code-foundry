@@ -134,3 +134,58 @@ func TestAssignPositionalsHint(t *testing.T) {
 		})
 	}
 }
+
+// A repeatable positional (view.panel.diff's path) takes every bare word, after its flag's.
+func TestAssignPositionalsRepeatable(t *testing.T) {
+	path := func() *v1.ArgSpec {
+		return &v1.ArgSpec{Name: "path", Type: v1.ArgType_ARG_TYPE_PATH, Positional: true, Repeatable: true}
+	}
+	tests := []struct {
+		name  string
+		flag  []string
+		words []string
+		want  string
+	}{
+		{name: "one word", words: []string{"a.go"}, want: "a.go"},
+		{name: "several words", words: []string{"a.go", "b.go"}, want: "a.go\nb.go"},
+		{name: "after the flag", flag: []string{"a.go"}, words: []string{"b.go", "c.go"}, want: "a.go\nb.go\nc.go"},
+		{name: "the flag alone", flag: []string{"a.go", "b.go"}, want: "a.go\nb.go"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stderr bytes.Buffer
+			cl := &cli{stderr: &stderr}
+			f := &argFlag{spec: path()}
+			for _, v := range tt.flag {
+				_ = f.Set(v)
+			}
+			if err := cl.assignPositionals(cl.newFlagSet("x"), []*argFlag{f}, tt.words); err != nil {
+				t.Fatalf("err %v, stderr %q", err, stderr.String())
+			}
+			if f.value != tt.want {
+				t.Errorf("value = %q, want %q", f.value, tt.want)
+			}
+		})
+	}
+}
+
+// Each of a repeatable path's values resolves against the CLI's cwd; a single path, with a
+// newline in its name, stays one path.
+func TestAbsPaths(t *testing.T) {
+	cl := &cli{getwd: func() (string, error) { return "/repo", nil }}
+	tests := []struct {
+		in         string
+		repeatable bool
+		want       string
+	}{
+		{"a.go", true, "/repo/a.go"},
+		{"a.go\nsub/b.go\n/abs/c.go", true, "/repo/a.go\n/repo/sub/b.go\n/abs/c.go"},
+		{"a\nb", false, "/repo/a\nb"},
+	}
+	for _, tt := range tests {
+		got, err := cl.absPaths(tt.in, tt.repeatable)
+		if err != nil || got != tt.want {
+			t.Errorf("absPaths(%q, %t) = %q, %v; want %q", tt.in, tt.repeatable, got, err, tt.want)
+		}
+	}
+}

@@ -93,7 +93,8 @@ type ArgSpec struct {
 	// and hands Run the full ids joined by commas (blanks dropped). Not context-bound.
 	IDList bool
 	// Repeatable lets the CLI take the flag more than once; it sends the values joined
-	// by newlines (thread.subscribe's --arg k=v). String args only, not positional.
+	// by newlines (thread.subscribe's --arg k=v). String and path args only; a path's
+	// values each resolve as one would. A positional one takes every bare word too.
 	Repeatable bool
 	// Rest makes the last positional arg take every bare word left on the CLI, joined
 	// by spaces: `memory add always open PRs as drafts` needs no quotes. String
@@ -140,8 +141,8 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a string arg can be an id, of a known kind")
 	case s.IDList && (s.ID == NoID || s.Context != NoContext):
 		return errors.New("an id list needs an id kind and no context")
-	case s.Repeatable && (s.Type != String || s.Positional || s.Context != NoContext):
-		return errors.New("only a string flag without a context can be repeated")
+	case s.Repeatable && ((s.Type != String && s.Type != Path) || s.Context != NoContext || (s.Positional && s.Type != Path)):
+		return errors.New("only a string flag or a path arg without a context can be repeated")
 	case s.Rest && (s.Type != String || !s.Positional):
 		return errors.New("only a string positional arg can take the rest of the words")
 	}
@@ -341,7 +342,18 @@ func (s ArgSpec) parse(v string) (any, error) {
 		}
 		return v, nil
 	case Path:
-		return ExpandPath(v)
+		if !s.Repeatable {
+			return ExpandPath(v)
+		}
+		paths := strings.Split(v, "\n")
+		for i, p := range paths {
+			e, err := ExpandPath(p)
+			if err != nil {
+				return nil, err
+			}
+			paths[i] = e
+		}
+		return strings.Join(paths, "\n"), nil
 	default:
 		return v, nil
 	}
