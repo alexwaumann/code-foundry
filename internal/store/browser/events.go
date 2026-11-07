@@ -107,6 +107,7 @@ type frameParams struct {
 		ID       string `json:"id"`
 		ParentID string `json:"parentId"`
 		URL      string `json:"url"`
+		MimeType string `json:"mimeType"`
 	} `json:"frame"`
 }
 
@@ -123,6 +124,11 @@ func onFrameNavigated(s *Store, in *instance, t *target, params json.RawMessage)
 		go func() {
 			_ = in.call(context.Background(), t.session, "Page.navigate", map[string]any{"url": "about:blank"}, nil)
 		}()
+	}
+	if p.Frame.MimeType == "application/pdf" {
+		// Headless Chrome paints nothing for a PDF, so the last frame would stay up under
+		// the new address.
+		t.surface.state.Notice = "This surface cannot show PDFs."
 	}
 	t.surface.state.Select = nil
 	t.surface.publish()

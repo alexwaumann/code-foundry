@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BrowserInputView, BrowserMouseView } from "@/api/browser";
-import { buttonName, ClickCounter, InputQueue, isCopyChord, isPasteChord, keyDown, keyForPage, keyUp, modifiersOf, toPage, wheelPixels } from "./browserInput";
+import { buttonName, ClickCounter, heldButton, InputQueue, isCopyChord, isPasteChord, keyDown, keyForPage, keyUp, modifiersOf, toPage, wheelPixels } from "./browserInput";
 
 const key = (over: Partial<Parameters<typeof keyDown>[0]> = {}) => ({ key: "a", code: "KeyA", keyCode: 65, location: 0, repeat: false, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...over });
 
@@ -25,6 +25,18 @@ describe("buttonName", () => {
     [9, "none"],
   ])("%i is %s", (n, name) => {
     expect(buttonName(n)).toBe(name);
+  });
+});
+
+describe("heldButton", () => {
+  it.each([
+    [0, "none"],
+    [1, "left"],
+    [2, "right"],
+    [4, "middle"],
+    [3, "left"],
+  ])("%i is %s", (n, name) => {
+    expect(heldButton(n)).toBe(name);
   });
 });
 

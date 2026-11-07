@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -280,11 +281,14 @@ func TestStoppingWithFramesInFlightDoesNotHang(t *testing.T) {
 
 func TestBadAddressesNeverReachChrome(t *testing.T) {
 	f := newFixture(t, time.Hour)
-	if _, err := f.s.Watch("thread:a", 640, 480, "file:///etc/hosts"); !errors.Is(err, browser.ErrBadURL) {
-		t.Fatalf("Watch: %v", err)
+	v, err := f.s.Watch("thread:a", 640, 480, "file:///etc/hosts")
+	if err != nil {
+		t.Fatalf("a refused address must not end the view: %v", err)
 	}
-	v, _ := f.s.Watch("thread:a", 640, 480, "")
-	next(t, v, "ready", ready)
+	st := next(t, v, "ready", ready)
+	if st.Notice == "" {
+		t.Fatal("the surface does not say so")
+	}
 	for _, u := range []string{"javascript:alert(1)", "chrome://settings", "devtools://x", "data:text/html,x", "file:///x"} {
 		if _, err := f.s.Navigate(context.Background(), "thread:a", u); !errors.Is(err, browser.ErrBadURL) {
 			t.Fatalf("Navigate(%s): %v", u, err)
@@ -332,6 +336,48 @@ func TestPageLandingOnAForbiddenSchemeIsSentAway(t *testing.T) {
 		calls := f.c.Calls("Page.navigate")
 		return len(calls) == 1 && calls[0].Params["url"] == "about:blank"
 	})
+}
+
+func TestWhatCannotShowSaysSo(t *testing.T) {
+	f := newFixture(t, time.Hour)
+	v, _ := f.s.Watch("thread:a", 640, 480, "")
+	next(t, v, "ready", ready)
+	f.c.Emit("Page.frameNavigated", "session-target-1", map[string]any{"frame": map[string]any{"url": "https://example.com/a.pdf", "mimeType": "application/pdf"}})
+	next(t, v, "the notice", func(st browser.State) bool { return strings.Contains(st.Notice, "PDF") })
+}
+
+func TestAFailedNavigationSaysWhy(t *testing.T) {
+	tests := []struct{ code, want string }{
+		{"net::ERR_NAME_NOT_RESOLVED", "net::ERR_NAME_NOT_RESOLVED"},
+		{"net::ERR_INVALID_AUTH_CREDENTIALS", "user name and password"},
+	}
+	for _, tt := range tests {
+		f := newFixture(t, time.Hour)
+		f.c.Reply("Page.navigate", func(browsertest.Call) (any, error) { return map[string]string{"errorText": tt.code}, nil })
+		v, _ := f.s.Watch("thread:a", 640, 480, "")
+		next(t, v, "ready", ready)
+		if _, err := f.s.Navigate(context.Background(), "thread:a", "https://example.com"); err != nil {
+			t.Fatal(err)
+		}
+		next(t, v, "the notice", func(st browser.State) bool { return strings.Contains(st.Notice, tt.want) })
+	}
+}
+
+func TestADownloadIsNotAFailure(t *testing.T) {
+	f := newFixture(t, time.Hour)
+	f.c.Reply("Page.navigate", func(browsertest.Call) (any, error) { return map[string]string{"errorText": "net::ERR_ABORTED"}, nil })
+	v, _ := f.s.Watch("thread:a", 640, 480, "")
+	next(t, v, "ready", ready)
+	if _, err := f.s.Navigate(context.Background(), "thread:a", "https://example.com/a.zip"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := v.Take(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(30 * time.Millisecond)
+	if st, _, _ := v.Take(); st != nil && st.Notice != "" {
+		t.Fatalf("notice %q", st.Notice)
+	}
 }
 
 func TestWhatAPageSaysIsBounded(t *testing.T) {

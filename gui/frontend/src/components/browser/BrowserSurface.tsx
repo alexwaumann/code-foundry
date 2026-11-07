@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from "react";
 import { copyFromBrowser, pasteToBrowser, sendBrowserInput } from "@/api/browser";
 import { usePanelKey } from "@/components/panel/panelKeyContext";
-import { buttonName, ClickCounter, InputQueue, isCopyChord, isPasteChord, keyDown, keyForPage, keyUp, modifiersOf, toPage, wheelPixels } from "@/lib/browserInput";
+import { buttonName, ClickCounter, heldButton, InputQueue, isCopyChord, isPasteChord, keyDown, keyForPage, keyUp, modifiersOf, toPage, wheelPixels } from "@/lib/browserInput";
 import { setBrowserError, useBrowserState, useBrowserStore } from "@/stores/browser";
 import { BrowserOverlays } from "./BrowserOverlays";
 import { BrowserToolbar } from "./BrowserToolbar";
@@ -17,6 +17,7 @@ export function BrowserSurface() {
   const surface = usePanelKey();
   const state = useBrowserState(surface);
   const error = useBrowserStore((s) => s.errors[surface] ?? "");
+  const offline = useBrowserStore((s) => s.offline[surface] ?? false);
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const sink = useRef<HTMLTextAreaElement>(null);
@@ -34,7 +35,7 @@ export function BrowserSurface() {
   );
 
   const mouse = (e: PointerEvent, type: "mousePressed" | "mouseReleased" | "mouseMoved", clickCount: number) => {
-    queue.push({ kind: "mouse", type, button: type === "mouseMoved" ? "none" : buttonName(e.button), ...at(e), buttons: e.buttons, clickCount, modifiers: modifiersOf(e), deltaX: 0, deltaY: 0 });
+    queue.push({ kind: "mouse", type, button: type === "mouseMoved" ? heldButton(e.buttons) : buttonName(e.button), ...at(e), buttons: e.buttons, clickCount, modifiers: modifiersOf(e), deltaX: 0, deltaY: 0 });
   };
 
   const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -132,6 +133,7 @@ export function BrowserSurface() {
           surface={surface}
           state={state}
           error={error}
+          offline={offline}
           scale={scale}
           onDismissError={() => {
             setBrowserError(surface, null);

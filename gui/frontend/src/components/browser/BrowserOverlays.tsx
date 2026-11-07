@@ -269,7 +269,21 @@ function PhaseCover({ surface, state }: { surface: string; state: BrowserStateVi
 }
 
 /** Everything over the frames. */
-export function BrowserOverlays({ surface, state, error, scale, onDismissError }: { surface: string; state: BrowserStateView; error: string; scale: { x: number; y: number }; onDismissError: () => void }) {
+export function BrowserOverlays({
+  surface,
+  state,
+  error,
+  offline = false,
+  scale,
+  onDismissError,
+}: {
+  surface: string;
+  state: BrowserStateView;
+  error: string;
+  offline?: boolean;
+  scale: { x: number; y: number };
+  onDismissError: () => void;
+}) {
   const [seenCopied, setSeenCopied] = useState(state.copied);
   const finished = state.downloads.filter((d) => d.state !== "inProgress").length;
   const [cleared, setCleared] = useState(0);
@@ -281,6 +295,11 @@ export function BrowserOverlays({ surface, state, error, scale, onDismissError }
       {state.fileChooser && <PageFileChooser key={state.fileChooser.id} surface={surface} f={state.fileChooser} />}
       {state.select && <PageSelect key={state.select.id} surface={surface} s={state.select} scale={scale} />}
       <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1 [&>*]:pointer-events-auto">
+        {offline && (
+          <Strip tone="warn">
+            <span className="min-w-0 break-words">Lost the connection to the daemon. Reconnecting…</span>
+          </Strip>
+        )}
         {error && (
           <Strip tone="warn" onClose={onDismissError}>
             <span className="min-w-0 break-words">{error}</span>

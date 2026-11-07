@@ -31,6 +31,13 @@ const scratchRead = `(() => { const c = document.getElementById("c"); const v = 
 
 const scratchFocus = `document.getElementById("c").focus(); 1`
 
+// clipboardEmpty is what Chrome's clipboard holds once its text has moved on. There is no way to
+// empty it, and a cmd+c with nothing selected leaves it as it was, which must not then put an
+// old text on the Mac's clipboard over what the user has there now.
+const clipboardEmpty = "\u2060"
+
+var scratchMark = `(() => { const c = document.getElementById("c"); c.value = ` + jsString(clipboardEmpty) + `; c.focus(); c.select(); return 1; })()`
+
 // scratch attaches to a page of our own, once per Chrome.
 func (in *instance) scratch(ctx context.Context) (string, error) {
 	if in.clip.session != "" {
@@ -105,8 +112,36 @@ func (in *instance) readClipboard(ctx context.Context) (string, error) {
 		}
 	}
 	var text string
-	err = evaluate(ctx, in, session, scratchRead, &text)
-	return text, err
+	if err := evaluate(ctx, in, session, scratchRead, &text); err != nil {
+		return "", err
+	}
+	if text == clipboardEmpty {
+		return "", nil
+	}
+	return text, nil
+}
+
+// emptyClipboard marks Chrome's clipboard as read: see clipboardEmpty.
+func (in *instance) emptyClipboard(ctx context.Context) error {
+	in.clip.mu.Lock()
+	defer in.clip.mu.Unlock()
+	session, err := in.scratch(ctx)
+	if err != nil {
+		return err
+	}
+	if err := evaluate(ctx, in, session, scratchMark, nil); err != nil {
+		return err
+	}
+	for _, typ := range []string{"rawKeyDown", "keyUp"} {
+		p := map[string]any{"type": typ, "key": "c", "code": "KeyC", "windowsVirtualKeyCode": 67, "modifiers": modMeta}
+		if typ != "keyUp" {
+			p["commands"] = []string{"copy"}
+		}
+		if err := in.call(ctx, session, "Input.dispatchKeyEvent", p, nil); err != nil {
+			return err
+		}
+	}
+	return evaluate(ctx, in, session, scratchRead, nil)
 }
 
 // Copy moves Chrome's clipboard to the Mac's, for the user's own cmd+c or Copy button. It
@@ -121,12 +156,15 @@ func (s *Store) Copy(ctx context.Context, key string) (int, error) {
 		return 0, err
 	}
 	in.clip.mu.Lock()
-	in.clip.last = text
+	in.clip.last = ""
 	in.clip.mu.Unlock()
 	if text == "" {
 		return 0, nil
 	}
 	if err := s.opts.SetClipboard(ctx, text); err != nil {
+		return 0, err
+	}
+	if err := in.emptyClipboard(ctx); err != nil {
 		return 0, err
 	}
 	return utf8.RuneCountInString(text), nil

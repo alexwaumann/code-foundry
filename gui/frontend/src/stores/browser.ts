@@ -27,9 +27,11 @@ interface BrowserStore {
   pending: Readonly<Record<string, string>>;
   /** What failed last, by surface: a refused address, a call the daemon turned down. */
   errors: Readonly<Record<string, string>>;
+  /** Surfaces whose stream is retrying: what they show may be stale. */
+  offline: Readonly<Record<string, boolean>>;
 }
 
-export const useBrowserStore = create<BrowserStore>()(() => ({ states: {}, pending: {}, errors: {} }));
+export const useBrowserStore = create<BrowserStore>()(() => ({ states: {}, pending: {}, errors: {}, offline: {} }));
 
 export function setBrowserState(surface: string, state: BrowserStateView): void {
   useBrowserStore.setState((s) => ({ states: { ...s.states, [surface]: state } }));
@@ -41,6 +43,11 @@ export function useBrowserState(surface: string): BrowserStateView {
 
 export function setBrowserError(surface: string, err: unknown): void {
   useBrowserStore.setState((s) => ({ errors: { ...s.errors, [surface]: err === null ? "" : errorMessage(err) } }));
+}
+
+export function setBrowserOffline(surface: string, offline: boolean): void {
+  if ((useBrowserStore.getState().offline[surface] ?? false) === offline) return;
+  useBrowserStore.setState((s) => ({ offline: { ...s.offline, [surface]: offline } }));
 }
 
 /** Takes the address waiting for a surface: it goes with the view's Watch, once. */
@@ -139,5 +146,5 @@ function closeAllTabs(): void {
 useSettingsStore.subscribe((s, prev) => {
   if (s.snapshot === prev.snapshot || s.snapshot === null || browserEnabled()) return;
   closeAllTabs();
-  useBrowserStore.setState({ states: {}, pending: {}, errors: {} });
+  useBrowserStore.setState({ states: {}, pending: {}, errors: {}, offline: {} });
 });

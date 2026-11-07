@@ -30,6 +30,9 @@ const startTimeout = 20 * time.Second
 // callTimeout bounds one protocol call that is not a navigation.
 const callTimeout = 10 * time.Second
 
+// navigateTimeout bounds a navigation up to the first byte of the page.
+const navigateTimeout = time.Minute
+
 // closeTimeout bounds asking Chrome to exit.
 const closeTimeout = 2 * time.Second
 
@@ -64,7 +67,7 @@ type Options struct {
 	Reveal func(path string) error
 	// SetClipboard writes the Mac's clipboard.
 	SetClipboard func(ctx context.Context, text string) error
-	Log    *slog.Logger
+	Log          *slog.Logger
 }
 
 // Store owns the one Chrome and its surfaces.
