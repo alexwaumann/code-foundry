@@ -210,7 +210,8 @@ func (sf *surface) top() *target {
 func (sf *surface) publish() {
 	t := sf.top()
 	if t != nil {
-		sf.state.URL, sf.state.Title, sf.state.Loading = t.url, t.title, t.loading
+		// Both are the page's to make as long as it likes: a data: URL can be megabytes.
+		sf.state.URL, sf.state.Title, sf.state.Loading = clip(t.url, maxURL), clip(t.title, maxTitle), t.loading
 		sf.state.CanGoBack = t.canBack || len(sf.stack) > 1
 		sf.state.CanGoForward = t.canForward
 		sf.state.Popup = len(sf.stack) > 1

@@ -398,6 +398,11 @@ func TestWhatAPageSaysIsBounded(t *testing.T) {
 	if st.Dialog.Origin != "https://example.com" {
 		t.Fatalf("origin %q", st.Dialog.Origin)
 	}
+	f.c.Emit("Page.frameNavigated", "session-target-1", map[string]any{"frame": map[string]any{"url": "data:text/html," + string(long)}})
+	st = next(t, v, "the long address", func(st browser.State) bool { return strings.HasPrefix(st.URL, "data:") })
+	if len(st.URL) > 9<<10 {
+		t.Fatalf("address of %d bytes", len(st.URL))
+	}
 }
 
 func TestAnAnswerMustMatchWhatIsAsked(t *testing.T) {

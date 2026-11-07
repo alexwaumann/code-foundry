@@ -191,6 +191,7 @@ func onLoading(loading bool) func(*Store, *instance, *target, json.RawMessage) {
 // Limits on what a page's words may cost a viewer.
 const (
 	maxDialogText = 4 << 10
+	maxTitle      = 1 << 10
 	maxLabel      = 200
 	maxOptions    = 500
 )
