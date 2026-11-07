@@ -141,7 +141,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           const head = args.scope === "branch" ? "ref:HEAD" : source(args.head);
           const base = source(args.base);
           // Like the daemon: anything but choosing a file gets a tab of its own, the checkout's being the user's.
-          const framed = rels.length > 1 || args.title || args.note || args.hide;
+          const framed = rels.length > 1 || args.base || args.head || args.scope || args.title || args.note || args.hide;
           return {
             project: t.projectId,
             worktree: t.worktreePath,

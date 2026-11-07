@@ -109,9 +109,10 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     return true;
   }),
   // view.panel.diff: params project and worktree, then what the call set (commands_view_diff.go).
-  // An older daemon, until it restarts, sends scope and always a path. The checkout's own tab
-  // is the user's: a call that names no sources only picks its file, and what they compare,
-  // filter and fold stays. A thread's own tab (thread) is the call's.
+  // The checkout's own tab is the user's: a call without `thread` only picks its file, and what
+  // they compare, filter and fold stays. The daemon gives a call that names a side a tab of its
+  // own; an older one, until it restarts, sends scope and no thread, which stays a file pick here.
+  // A thread's own tab (thread) is the call's.
   "panel.diff": item((key, p) => {
     if (!p.project || !p.worktree) return false;
     const fromScope = p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD;
@@ -125,7 +126,7 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     };
     const fresh = diffTab(asked);
     const open = allTabs(getPanel(key)).find((t) => t.id === fresh.id);
-    const was = open && !p.thread && !p.base && !p.head && !p.scope ? diffOfTab(open) : null;
+    const was = open && !p.thread ? diffOfTab(open) : null;
     if (open && was) return openDiffInPanel(key, { ...was, own: asked.own, ...(asked.file ? { file: asked.file, oldPath: asked.oldPath } : {}) }, open.title);
     return openDiffInPanel(key, asked);
   }),

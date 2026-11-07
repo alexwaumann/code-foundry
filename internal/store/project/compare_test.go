@@ -309,6 +309,38 @@ func TestWorktreeCompareFillCaps(t *testing.T) {
 	}
 }
 
+// fill says which paths match nothing from the whole list, not what is left of it: a path whose
+// file is past the cap, or has a name that cannot be listed, did match.
+func TestWorktreeCompareFillUnmatched(t *testing.T) {
+	tests := []struct {
+		name  string
+		list  []CompareChange
+		paths []string
+		limit int
+		want  []string
+	}{
+		{name: "no paths, nothing to say", list: []CompareChange{{Path: "a"}}, limit: 9},
+		{name: "every path matches", list: []CompareChange{{Path: "a"}, {Path: "b"}}, paths: []string{"a", "b"}, limit: 9},
+		{name: "one does not", list: []CompareChange{{Path: "a"}}, paths: []string{"a", "gone"}, limit: 9, want: []string{"gone"}},
+		{name: "none does", list: []CompareChange{{Path: "a"}}, paths: []string{"x", "y"}, limit: 9, want: []string{"x", "y"}},
+		{name: "a directory matches what is below it, and no more", list: []CompareChange{{Path: "src/a"}}, paths: []string{"src", "sr"}, limit: 9, want: []string{"sr"}},
+		{name: "a rename matches by its source", list: []CompareChange{{Path: "new", OldPath: "old"}}, paths: []string{"old"}, limit: 9},
+		{name: "a rename matches by its name", list: []CompareChange{{Path: "new", OldPath: "old"}}, paths: []string{"new"}, limit: 9},
+		{name: "past the cap is still a match", list: []CompareChange{{Path: "a"}, {Path: "b"}, {Path: "c"}}, paths: []string{"a", "c"}, limit: 1},
+		{name: "a capped list still names what matched nothing", list: []CompareChange{{Path: "a"}, {Path: "b"}}, paths: []string{"a", "b", "gone"}, limit: 1, want: []string{"gone"}},
+		{name: "a name that cannot be listed is still a match", list: []CompareChange{{Path: "src/caf\xe9"}, {Path: "a"}}, paths: []string{"src", "a", "gone"}, limit: 9, want: []string{"gone"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var w WorktreeCompare
+			w.fill(tt.list, tt.paths, tt.limit)
+			if !slices.Equal(w.UnmatchedPaths, tt.want) {
+				t.Errorf("unmatched = %q, want %q", w.UnmatchedPaths, tt.want)
+			}
+		})
+	}
+}
+
 // TestCompareSubmodule: a submodule moved in the working tree is one row, its sides the
 // commits; recorded in a commit, and not initialized, it still reads as the recorded one.
 func TestCompareSubmodule(t *testing.T) {

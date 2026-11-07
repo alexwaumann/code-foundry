@@ -19,6 +19,12 @@ func twoCheckouts() *v1.Thread {
 	return t
 }
 
+// unmatched is res answering that none of paths matched.
+func unmatched(res *commandtest.FileDiffs, paths ...string) *commandtest.FileDiffs {
+	res.Res.UnmatchedPaths = paths
+	return res
+}
+
 func noFiles() *commandtest.FileDiffs {
 	return &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{
 		BaseRef: "origin/main", MergeBase: "abc",
@@ -71,10 +77,10 @@ func TestPanelDiff(t *testing.T) {
 		// Calls that worked before keep working.
 		{name: "a changed file", args: map[string]string{"path": "/wt/internal/a.go"},
 			wantParams: own(map[string]string{"path": "internal/a.go"}), wantPaths: []string{"internal/a.go"}},
-		{name: "branch scope", args: map[string]string{"path": "/wt/a.go", "scope": "branch"},
-			wantParams: own(map[string]string{"path": "a.go", "head": "ref:HEAD"}), wantHead: &v1.DiffSource{Kind: ref, Ref: "HEAD"}, wantPaths: []string{"a.go"}},
-		{name: "working scope said aloud", args: map[string]string{"path": "/wt/a.go", "scope": "working"},
-			wantParams: own(map[string]string{"path": "a.go"}), wantPaths: []string{"a.go"}},
+		{name: "branch scope gets a tab of its own", args: map[string]string{"path": "/wt/a.go", "scope": "branch"},
+			wantParams: apart(map[string]string{"path": "a.go", "head": "ref:HEAD"}), wantHead: &v1.DiffSource{Kind: ref, Ref: "HEAD"}, wantPaths: []string{"a.go"}},
+		{name: "working scope said aloud gets one too", args: map[string]string{"path": "/wt/a.go", "scope": "working"},
+			wantParams: apart(map[string]string{"path": "a.go"}), wantPaths: []string{"a.go"}},
 
 		// What is new.
 		{name: "no path: the whole checkout", args: map[string]string{}, wantParams: own(map[string]string{})},
@@ -94,29 +100,31 @@ func TestPanelDiff(t *testing.T) {
 		{name: "a sibling's root is its every file", thread: twoCheckouts(), args: map[string]string{"path": "/api"},
 			wantParams: map[string]string{"project": "r2", "worktree": "/api"}, wantProj: "r2", wantRoot: "/api"},
 		{name: "a path with nothing to show is named", args: map[string]string{"path": "/wt/a.go\n/wt/missing.go", "title": "X"},
-			diffs:      oneFile("a.go"),
+			diffs:      unmatched(oneFile("a.go"), "missing.go"),
 			wantParams: apart(map[string]string{"paths": "a.go", "title": "X"}), wantPaths: []string{"a.go", "missing.go"},
 			wantWarn: []string{"missing.go has no changes here (origin/main against Working tree), so it is not listed"}},
-		{name: "a directory matches what is below it, and no more", args: map[string]string{"path": "/wt/src\n/wt/sr"},
-			diffs:      oneFile("src/a.go"),
-			wantParams: apart(map[string]string{"paths": "src"}), wantPaths: []string{"src", "sr"},
-			wantWarn: []string{"sr has no changes here (origin/main against Working tree), so it is not listed"}},
-		{name: "a rename matches by its source", args: map[string]string{"path": "/wt/old.go\n/wt/b.go"},
-			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "new.go", OldPath: "old.go"}, {Path: "b.go"}}}},
-			wantParams: apart(map[string]string{"paths": "old.go\nb.go"}), wantPaths: []string{"old.go", "b.go"}},
-		{name: "a list cut short cannot tell", args: map[string]string{"path": "/wt/a.go\n/wt/b.go"},
+		{name: "a path past the cap still counts", args: map[string]string{"path": "/wt/a.go\n/wt/z.go"},
 			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Truncated: true, Files: []*v1.CompareFile{{Path: "a.go"}}}},
-			wantParams: apart(map[string]string{"paths": "a.go\nb.go"}), wantPaths: []string{"a.go", "b.go"}},
+			wantParams: apart(map[string]string{"paths": "a.go\nz.go"}), wantPaths: []string{"a.go", "z.go"}},
+		{name: "a capped list still names what matched nothing", args: map[string]string{"path": "/wt/a.go\n/wt/missing.go"},
+			diffs: &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Truncated: true, Files: []*v1.CompareFile{{Path: "a.go"}}, UnmatchedPaths: []string{"missing.go"},
+				Base: &v1.ResolvedDiffSource{Label: "origin/main"}, Head: &v1.ResolvedDiffSource{Label: "Working tree"}}},
+			wantParams: apart(map[string]string{"paths": "a.go"}), wantPaths: []string{"a.go", "missing.go"},
+			wantWarn: []string{"missing.go has no changes here (origin/main against Working tree), so it is not listed"}},
 		{name: "a rename keeps its source", args: map[string]string{"path": "/wt/new.go"},
 			diffs:      &commandtest.FileDiffs{Res: &v1.CompareWorktreeResponse{Files: []*v1.CompareFile{{Path: "new.go", OldPath: "old.go", Status: "R"}}}},
 			wantParams: own(map[string]string{"path": "new.go", "oldPath": "old.go"}), wantPaths: []string{"new.go"}},
-		{name: "a ref as base", args: map[string]string{"base": "v1.2"},
-			wantParams: own(map[string]string{"base": "ref:v1.2"}), wantBase: &v1.DiffSource{Kind: ref, Ref: "v1.2"}},
+		{name: "a ref as base gets a tab of its own", args: map[string]string{"base": "v1.2"},
+			wantParams: apart(map[string]string{"base": "ref:v1.2"}), wantBase: &v1.DiffSource{Kind: ref, Ref: "v1.2"}},
+		{name: "a head alone gets a tab of its own", args: map[string]string{"head": "staged"},
+			wantParams: apart(map[string]string{"head": "staged"}), wantHead: &v1.DiffSource{Kind: staged}},
 		{name: "staged against a sha", args: map[string]string{"base": "4c1e02aa", "head": "staged"},
-			wantParams: own(map[string]string{"base": "ref:4c1e02aa", "head": "staged"}), wantBase: &v1.DiffSource{Kind: ref, Ref: "4c1e02aa"}, wantHead: &v1.DiffSource{Kind: staged}},
-		{name: "the defaults said aloud stay out of the params", args: map[string]string{"base": "merge-base", "head": "working"}, wantParams: own(map[string]string{})},
+			wantParams: apart(map[string]string{"base": "ref:4c1e02aa", "head": "staged"}), wantBase: &v1.DiffSource{Kind: ref, Ref: "4c1e02aa"}, wantHead: &v1.DiffSource{Kind: staged}},
+		{name: "the defaults said aloud are given all the same", args: map[string]string{"base": "merge-base", "head": "working"}, wantParams: apart(map[string]string{})},
+		{name: "one default said aloud is too", args: map[string]string{"head": "working"}, wantParams: apart(map[string]string{})},
+		{name: "a side left blank is no side", args: map[string]string{"base": "", "path": "/wt/a.go"}, wantParams: own(map[string]string{"path": "a.go"}), wantPaths: []string{"a.go"}},
 		{name: "the working tree as base", args: map[string]string{"base": "working", "head": "HEAD"},
-			wantParams: own(map[string]string{"base": "working", "head": "ref:HEAD"}), wantBase: &v1.DiffSource{Kind: working}, wantHead: &v1.DiffSource{Kind: ref, Ref: "HEAD"}},
+			wantParams: apart(map[string]string{"base": "working", "head": "ref:HEAD"}), wantBase: &v1.DiffSource{Kind: working}, wantHead: &v1.DiffSource{Kind: ref, Ref: "HEAD"}},
 		{name: "title, note and hide", args: map[string]string{"title": "The two files", "note": "Row height now comes from one place.", "hide": "compare\nfiles"},
 			wantParams: apart(map[string]string{"title": "The two files", "note": "Row height now comes from one place.", "hide": "compare,files"})},
 		{name: "a title and note are plain text", args: map[string]string{"title": "two\n  lines\x07", "note": "a\tb"},

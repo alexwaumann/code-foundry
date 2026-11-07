@@ -1,7 +1,8 @@
 # Diff viewer 3: view.panel.diff frames the tab
 
 `view.panel.diff` gains `--base`, `--head`, repeatable `--path`, `--title`, `--note` and `--hide`
-(`internal/command/commands_view_diff.go`). Calls with `--path` and `--scope` work as before.
+(`internal/command/commands_view_diff.go`). Calls with `--path` work as before, and `--scope` still
+compares what it did, in a tab of its own.
 
 ## Decisions
 
@@ -9,15 +10,22 @@
   controls, and `ModelBand` always offers Show controls, which stays shown once pressed. With
   everything hidden and no title or note the band still shows, so the way back never goes.
 - **The checkout's own tab is the user's.** A thread may pick a file there, nothing more. Any
-  call with a title, a note, `--hide`, several paths or a directory gets a tab of its own: the
-  daemon sends a `thread` param, the asking thread, and the id includes it. The next untitled call
-  updates that tab, and the same title updates its tab, as Gallery's does. A review found the
-  first version writing `paths` to the own tab: "2 files" under the normal title, in a checkout
-  with 7 changed.
+  call with `--base`, `--head`, `--scope`, a title, a note, `--hide`, several paths or a directory
+  gets a tab of its own: the daemon sends a `thread` param, the asking thread, and the id includes
+  it. The next untitled call updates that tab, and the same title updates its tab, as Gallery's
+  does. A review found the first version writing `paths` to the own tab: "2 files" under the normal
+  title, in a checkout with 7 changed. A second found `--base` and `--head` doing the same, which
+  retitled the tab, changed its list and dropped its fold and commit state, with no band and no way
+  back. So `--scope branch` moved too, and is the one old call that now opens a new tab.
 - **A call with no sources only picks a file.** The intent keeps what the own tab compares,
-  filters and folds, or a one-path call would have reset them. `--base` and `--head` still set
-  the sides on the own tab, untitled: the compare bar shows them and the user can change them,
-  and `--scope branch` calls have always done that.
+  filters and folds, or a one-path call would have reset them. Anything without `thread` is that
+  call in the intent, so a daemon from before this change, which sends `scope`, cannot move the
+  user's tab either: until it restarts, its `--scope branch` picks the file and no more.
+- **A side said aloud is a side.** `--base merge-base --head working` used to reach the tab as
+  nothing, because a default stays out of the params, and returned success with the user's tab
+  showing something else. It is `Given` that decides, so the call gets its tab, comparing what it
+  said. A blank `--base=` is no side. The `From thread · …` title says whose it is; with no title,
+  note, list or hide there is no band, as there is nothing to take back.
 - **A tab says what happened and has a way back.** The band names the thread, and a narrowed list
   says "Listing only 2 paths" (the count: the list's totals are only of what was asked for).
   Show controls, or Show all files with nothing hidden, gives back the controls and the list; the
@@ -32,9 +40,11 @@
 - **A path with nothing to show is a warning, and all of them a refusal.** Each one that matches
   no listed file is named on stderr and left out of `paths`, so "2 paths" stays true. The tab is
   still decided by what was asked: `a.go missing.go` is a narrowed list of one, not one file picked
-  in the whole list. A list cut by the cap or by a name it could not list says nothing, as it cannot
-  tell. A `--title` that cleans down to nothing (or `--title ""`) is refused: it meant a tab of its
-  own, and would have landed on the user's.
+  in the whole list. The daemon decides, not the verb: `fill` notes `unmatched_paths` while it has
+  the whole list, before the cap and with the names it cannot list, since a capped list cannot tell
+  "past the cap" from "no such file" and used to report a partial success. A `--title` that cleans
+  down to nothing (or `--title ""`) is refused: it meant a tab of its own, and would have landed on
+  the user's.
 - **A title leads with the project on another checkout,** as untitled tabs do, so one title on two
   checkouts is two names. The band keeps the plain title.
 - **The check is the tab's own read.** It moved from `GetWorktreeFileDiff` to `CompareWorktree`,

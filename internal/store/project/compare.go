@@ -131,7 +131,10 @@ type WorktreeCompare struct {
 	// SkippedNames counts the files left out of all of the above: a name that is not UTF-8,
 	// possible in a tree, cannot travel in a response.
 	SkippedNames int
-	Base, Head   ResolvedSource
+	// UnmatchedPaths are the CompareRequest.Paths nothing in the comparison matches. Files
+	// cannot say: it is cut at CompareFilesMax, and leaves out what SkippedNames counts.
+	UnmatchedPaths []string
+	Base, Head     ResolvedSource
 	// BaseRef and MergeBase are as in WorktreeDetail.
 	BaseRef, MergeBase string
 	// Error says why a source could not be resolved; the list is then empty.
@@ -591,11 +594,9 @@ func openRegular(root *os.Root, file string) (*os.File, error) {
 	return f, nil
 }
 
-// matchesPath reports whether file is one of paths, or below one.
-func matchesPath(file string, paths []string) bool {
-	return slices.ContainsFunc(paths, func(p string) bool {
-		return p == "." || file == p || strings.HasPrefix(file, p+"/")
-	})
+// matchesPath reports whether file is path, or below it.
+func matchesPath(file, path string) bool {
+	return path == "." || file == path || strings.HasPrefix(file, path+"/")
 }
 
 // CompareWorktree implements Store.
@@ -633,13 +634,26 @@ func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (Worktree
 }
 
 // fill keeps what paths ask for (all of it without any), sorted, totals every file and
-// lists at most limit. A rename stays when either of its paths is asked for. A name that
-// is not UTF-8 is counted apart (SkippedNames): one would fail the whole response.
+// lists at most limit. A rename stays when either of its paths is asked for, and a path that
+// matches nothing is noted first, while the whole list is here. A name that is not UTF-8 is
+// counted apart (SkippedNames): one would fail the whole response.
 func (w *WorktreeCompare) fill(list []CompareChange, paths []string, limit int) {
 	if len(paths) > 0 {
+		matched := make(map[string]bool, len(paths))
 		list = slices.DeleteFunc(list, func(f CompareChange) bool {
-			return !matchesPath(f.Path, paths) && (f.OldPath == "" || !matchesPath(f.OldPath, paths))
+			keep := false
+			for _, p := range paths {
+				if matchesPath(f.Path, p) || (f.OldPath != "" && matchesPath(f.OldPath, p)) {
+					matched[p], keep = true, true
+				}
+			}
+			return !keep
 		})
+		for _, p := range paths {
+			if !matched[p] {
+				w.UnmatchedPaths = append(w.UnmatchedPaths, p)
+			}
+		}
 	}
 	list = slices.DeleteFunc(list, func(f CompareChange) bool {
 		skip := !utf8.ValidString(f.Path) || !utf8.ValidString(f.OldPath)

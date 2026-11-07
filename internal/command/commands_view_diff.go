@@ -15,8 +15,8 @@ import (
 
 // view.panel.diff (docs/notes/diff-viewer-3.md): what a thread shows in a Diff tab. Its
 // check is the tab's own read (ProjectService.CompareWorktree), so a call that would show
-// nothing fails instead. The checkout's own tab is the user's: a call that narrows the list,
-// says something or hides a control gets a tab of its own (the "thread" param).
+// nothing fails instead. The checkout's own tab is the user's: a call that names a side,
+// narrows the list, says something or hides a control gets a tab of its own (the "thread" param).
 
 const (
 	// maxDiffTitle is the longest --title, in characters: it is a tab's name.
@@ -39,7 +39,7 @@ func diffArgs() []ArgSpec {
 		{Name: "head", Type: String, Description: "The newer side: " + diffSourceHelp + " (default: working, the files on disk)"},
 		{Name: "scope", Type: Enum, Enum: []string{"working", "branch"}, Default: "working",
 			Description: "working: the base against the file on disk, uncommitted changes included; branch: against the last commit. Not with --base or --head"},
-		{Name: "title", Type: String, Description: fmt.Sprintf("Name a tab of your own with this; the same title updates the same tab. Without one, --note, --hide or a narrowed list still get a tab of their own, and the rest use the checkout's. At most %d characters", maxDiffTitle)},
+		{Name: "title", Type: String, Description: fmt.Sprintf("Name a tab of your own with this; the same title updates the same tab. Without one, a side (--base, --head, --scope), --note, --hide or a narrowed list still get a tab of their own, and the rest pick a file in the checkout's. At most %d characters", maxDiffTitle)},
 		{Name: "note", Type: String, Description: fmt.Sprintf("Why you are showing this: one plain paragraph, quoted as yours, which the user can dismiss; at most %d characters", maxEditNote)},
 		{Name: "hide", Type: String, Repeatable: true, Description: "Take away a part of the tab: compare (the bar choosing the two sides) or files (the file list). The tab offers the user a way to show them again"},
 	}
@@ -173,26 +173,14 @@ func diffTitle(a Args) (string, error) {
 	return s, err
 }
 
-// diffListed reports whether a file of the comparison is rel or below it, as the daemon's
-// list matches: a rename by either of its names.
-func diffListed(files []*v1.CompareFile, rel string) bool {
-	return slices.ContainsFunc(files, func(f *v1.CompareFile) bool {
-		return f.GetPath() == rel || strings.HasPrefix(f.GetPath(), rel+"/") ||
-			(f.GetOldPath() != "" && (f.GetOldPath() == rel || strings.HasPrefix(f.GetOldPath(), rel+"/")))
-	})
-}
-
 // diffMatches splits the call's paths into those with something to show and a warning for each
-// of the others. A list cut short by the cap (or by a name it could not list) cannot say so.
+// of the others, as the daemon found them: only it saw the list before its cap.
 func diffMatches(m *v1.CompareWorktreeResponse, rels []string) (listed, warnings []string) {
-	if m.GetTruncated() || m.GetSkippedNames() > 0 {
-		return rels, nil
-	}
 	for _, rel := range rels {
-		if diffListed(m.GetFiles(), rel) {
-			listed = append(listed, rel)
-		} else {
+		if slices.Contains(m.GetUnmatchedPaths(), rel) {
 			warnings = append(warnings, fmt.Sprintf("%s has no changes here (%s against %s), so it is not listed", rel, m.GetBase().GetLabel(), m.GetHead().GetLabel()))
+		} else {
+			listed = append(listed, rel)
 		}
 	}
 	return listed, warnings
@@ -309,8 +297,9 @@ func (d ViewDeps) diffCheck(ctx context.Context, t *v1.Thread, a Args, asker str
 	} else if len(c.rels) > 0 {
 		params["paths"] = strings.Join(listed, "\n")
 	}
-	// Anything but choosing a file is the thread's, in a tab of its own: the checkout's is the user's.
-	if title != "" || note != "" || hide != "" || params["paths"] != "" {
+	// Anything but choosing a file is the thread's, in a tab of its own: the checkout's is the
+	// user's. A side counts as given, default or not: the own tab may compare something else.
+	if a.Given("base") || a.Given("head") || a.Given("scope") || title != "" || note != "" || hide != "" || params["paths"] != "" {
 		params["thread"] = asker
 	}
 	return params, warnings, nil

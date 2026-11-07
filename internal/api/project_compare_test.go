@@ -28,7 +28,7 @@ func TestCompareWorktreeMaps(t *testing.T) {
 		TotalFiles: 3, TotalAdded: 4, TotalDeleted: 5,
 		Base:    project.ResolvedSource{Kind: project.SourceMergeBase, Label: "origin/main", SHA: "aaa"},
 		Head:    project.ResolvedSource{Kind: project.SourceWorkingTree, Label: "Working tree"},
-		BaseRef: "origin/main", MergeBase: "aaa", SkippedNames: 6,
+		BaseRef: "origin/main", MergeBase: "aaa", SkippedNames: 6, UnmatchedPaths: []string{"gone.go"},
 	}, project.CompareSides{Old: project.FileVersion{Present: true, Submodule: true, Contents: []byte("x")}, Status: "D"})
 
 	res, err := c.CompareWorktree(ctx, connect.NewRequest(&v1.CompareWorktreeRequest{ProjectId: id, Path: "/code/proj"}))
@@ -42,6 +42,9 @@ func TestCompareWorktreeMaps(t *testing.T) {
 	}
 	if !m.GetTruncated() || m.GetTotalFiles() != 3 || m.GetTotalAdded() != 4 || m.GetTotalDeleted() != 5 || m.GetSkippedNames() != 6 {
 		t.Errorf("totals = %v", m)
+	}
+	if !slices.Equal(m.GetUnmatchedPaths(), []string{"gone.go"}) {
+		t.Errorf("unmatched = %q", m.GetUnmatchedPaths())
 	}
 	if b := m.GetBase(); b.GetKind() != v1.DiffSourceKind_DIFF_SOURCE_KIND_MERGE_BASE || b.GetLabel() != "origin/main" || b.GetSha() != "aaa" {
 		t.Errorf("base = %v", b)

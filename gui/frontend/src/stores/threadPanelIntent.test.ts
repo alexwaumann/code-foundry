@@ -300,11 +300,30 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params.path).toBe("src/main.go");
     });
 
-    it("panel.diff with sources sets them, on the user's own tab too", () => {
+    it("panel.diff with sources and a thread opens that thread's tab, the user's own unchanged", () => {
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
-      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:v1.2" });
-      expect(tabIds("thread:b")).toHaveLength(1);
-      expect(active("thread:b")?.params.base).toBe("ref:v1.2");
+      const own = tabIds("thread:b")[0] ?? "";
+      setPanelTabParams("thread:b", own, { project: "web", worktree: WEB_FEAT, own: "1", filter: "go", fold: "1", path: "other.go" });
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:v1.2", thread: "b" });
+      expect(tabIds("thread:b")).toHaveLength(2);
+      expect(active("thread:b")).toMatchObject({ title: "From thread", params: { base: "ref:v1.2", thread: "b" } });
+      const tabs = allTabs(getPanel("thread:b"));
+      expect(tabs.find((t) => t.id === own)?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", filter: "go", fold: "1", path: "other.go" });
+    });
+
+    it.each([
+      ["a base", { base: "ref:v1.2" }],
+      ["a head", { head: "staged" }],
+      ["an older daemon's scope", { scope: "branch" }],
+    ])("panel.diff without a thread never changes what the user's tab compares: %s", (_name, sides) => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      const own = tabIds("thread:b")[0] ?? "";
+      setPanelTabParams("thread:b", own, { project: "web", worktree: WEB_FEAT, own: "1", head: "staged", filter: "go", fold: "1", path: "other.go" });
+      const title = active("thread:b")?.title;
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go", ...sides });
+      expect(tabIds("thread:b")).toEqual([own]);
+      expect(active("thread:b")?.title).toBe(title);
+      expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", filter: "go", fold: "1", path: "src/main.go" });
     });
 
     it("panel.diff with no path opens the checkout's tab; without a checkout, nothing", () => {

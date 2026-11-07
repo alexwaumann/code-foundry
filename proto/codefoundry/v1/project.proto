@@ -663,6 +663,9 @@ message CompareWorktreeResponse {
   // Files left out of `files` and the totals: a name that is not UTF-8, possible in a tree,
   // cannot travel in a response.
   int32 skipped_names = 11;
+  // Which of the request's paths match no file that differs. Decided before the list is cut, and
+  // with the names `skipped_names` counts, so what is not in `files` is not necessarily here.
+  repeated string unmatched_paths = 12;
 }
 
 message GetWorktreeCompareFileRequest {
