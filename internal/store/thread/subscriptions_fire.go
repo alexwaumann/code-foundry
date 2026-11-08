@@ -458,8 +458,8 @@ type wakeThread struct {
 	// Siblings counts the subscriber's own children when this thread is one of them
 	// (subscriptions_batch.go); nil otherwise.
 	Siblings *wakeSiblings `json:"siblings,omitempty"`
-	// StartedAt is the thread's last user message (its brief, a follow-up or a wake):
-	// when the turn the wake is about started. RanFor is how long it ran from then to
+	// StartedAt is the first user message of the turn the wake is about (its brief, a
+	// follow-up or a wake; not a message read mid-turn): when that turn started. RanFor is how long it ran from then to
 	// its end (a turn still going, or waiting on a prompt: to the fire), "2m 22s"; both
 	// left out for a thread that never got a message.
 	StartedAt string `json:"started_at,omitempty"`
@@ -558,7 +558,7 @@ type wakeDetail struct {
 	// afterRestart: sent by a restart (subscriptions_restart.go); appStopped: the
 	// target's turn was cut by the stop.
 	afterRestart, appStopped bool
-	// startedAt is the last top-level user message's time; endedAt the turn end after
+	// startedAt is when the turn started (lastTurn); endedAt the turn end after
 	// it when the thread is idle (zero while it works or waits on a prompt).
 	startedAt, endedAt time.Time
 }
@@ -580,23 +580,33 @@ func cutMessage(s string) string {
 	return string([]rune(s)[:maxLastMessage]) + "… [" + strconv.Itoa(n-maxLastMessage) + " more characters; thread read --full has it all]"
 }
 
-// lastTurn is what t's items say about its latest turn: when it started (the last
-// top-level user message of any origin), when it ended (zero while it runs) and its last
-// assistant text. Subagents' items are skipped.
+// lastTurn is what t's items say about its latest turn: when it started (the first
+// top-level user message of any origin after the turn before it ended), when it ended
+// (zero while it runs) and its last assistant text (after the last user message).
+// Subagents' items are skipped. A message Claude read mid-turn (a steer, the answer to a
+// thread ask: queued.go places it there) is no new turn: the turn's start stays, or
+// "Ran for" would count from it and a report filed earlier in the turn would read stale.
 func lastTurn(items []Item) (started, ended time.Time, text string) {
+	inTurn := false
 	for _, it := range items {
 		if it.ParentToolUseID != "" {
 			continue
 		}
 		switch it.Kind {
 		case KindUserMessage:
-			started, ended, text = it.CreatedAt, time.Time{}, ""
+			if it.Queued {
+				continue // not read yet: no part of a turn
+			}
+			if !inTurn {
+				started, ended, inTurn = it.CreatedAt, time.Time{}, true
+			}
+			text = ""
 		case KindAssistantText:
 			if s := strings.TrimSpace(it.Text); s != "" {
 				text = s
 			}
 		case KindTurnEnd:
-			ended = it.CreatedAt
+			ended, inTurn = it.CreatedAt, false
 		}
 	}
 	return started, ended, text
@@ -614,7 +624,7 @@ func itemsUntil(items []Item, at time.Time) []Item {
 }
 
 // wakeDetailOf reads a thread wake's detail from t's items: whether the report is older
-// than the last user message (any origin: a follow-up or a wake), the ended turn's last
+// than the turn's start (lastTurn: a follow-up or a wake, not a steer), the ended turn's last
 // assistant text, and the request a "permission: …" or "question: …" reason describes.
 func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 	d := wakeDetail{children: kids}
