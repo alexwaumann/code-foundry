@@ -1415,6 +1415,7 @@ func (m *Manager) setRemoving(id string, on bool) error {
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
 	m.closed = true
+	m.suppressHeldLocked() // held wakes go at the next start (subscriptions_restart.go)
 	var runners []*runner
 	for _, rec := range m.recs {
 		if rec.run != nil {

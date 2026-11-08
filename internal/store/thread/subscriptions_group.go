@@ -16,8 +16,8 @@ import (
 //
 // Nothing that needs the parent waits: a prompt, a question, an error, or a current blocked or
 // failed report goes at once, and a thread ask is no settle at all. Work that feeds other
-// work wants plain --notify. Held wakes are in memory, like a lead's: a restart drops them and
-// its notice wakes the subscriber.
+// work wants plain --notify. Held wakes are in memory, like a lead's: the stop records them
+// (suppressHeldLocked) and the next start sends them with its notice.
 
 // groupArg holds a subscription's group in its args: no column, and the args persist.
 const groupArg = "group"
