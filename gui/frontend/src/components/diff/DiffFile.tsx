@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { openFileInPanel } from "@/stores/filePanel";
 import { useCodeViewStore } from "@/stores/codeView";
 import { sourceParam } from "@/surfaces/diffTarget";
-import type { FileRow } from "./files";
+import { sameSides, type FileRow } from "./files";
 import { useIndexChanges, useStatusChanges } from "./useStatusChanges";
 
 /** The sides' parse (for the first change and its length) and what CodeDiff takes. */
@@ -69,7 +69,15 @@ function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareF
 export function DiffFile({ target, row, listed, compared, onRefresh, live = true }: { target: CompareTarget; row: FileRow; listed: boolean; compared: string; onRefresh: () => void; live?: boolean }) {
   const { projectId, worktree, base, head } = target;
   const key = [projectId, worktree, sourceParam(base), sourceParam(head), row.path, row.oldPath].join("\u0000");
-  const read = useTabRead<CompareFileSidesView>(key, (signal) => getCompareFile(target, row.path, row.oldPath, undefined, signal));
+  // A read that answers what the last one did keeps its answer, so nothing is parsed or drawn
+  // again: a lockfile's parse and render block the window for seconds, on every unrelated save.
+  const last = useRef<CompareFileSidesView | null>(null);
+  const read = useTabRead<CompareFileSidesView>(key, async (signal) => {
+    const next = await getCompareFile(target, row.path, row.oldPath, undefined, signal);
+    if (last.current && sameSides(last.current, next)) return last.current;
+    last.current = next;
+    return next;
+  });
   const { reload } = read;
   const throttled = useThrottled(reload, undefined, read.loading);
   const later = useCallback(() => {

@@ -1,4 +1,4 @@
-import type { CompareFileView, CompareSource, CompareView } from "@/api/compare";
+import type { CompareFileSidesView, CompareFileView, CompareSideView, CompareSource, CompareView } from "@/api/compare";
 import { REFRESH_DEBOUNCE_MS } from "@/components/files/useTabRead";
 import { plainPath } from "@/lib/plainText";
 
@@ -73,6 +73,15 @@ function unlistedRow(path: string, oldPath: string): FileRow {
 export function pickRow(rows: readonly FileRow[], file: string, oldPath = ""): FileRow | null {
   if (!file) return rows[0] ?? null;
   return rows.find((r) => r.path === file) ?? unlistedRow(file, oldPath);
+}
+
+function sameSide(a: CompareSideView, b: CompareSideView): boolean {
+  return a.present === b.present && a.binary === b.binary && a.submodule === b.submodule && a.truncated === b.truncated && a.text === b.text;
+}
+
+/** Two reads of a file answered the same: nothing to parse or draw again. A MiB's compare is about a millisecond. */
+export function sameSides(a: CompareFileSidesView, b: CompareFileSidesView): boolean {
+  return a.status === b.status && a.error === b.error && sameSide(a.old, b.old) && sameSide(a.new, b.new);
 }
 
 /** What a side is called before the comparison has answered, or when it could not: never another side's failure. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CompareFileView } from "@/api/compare";
-import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, inProject, listPace, narrowedTo, pickRow, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
+import type { CompareFileSidesView, CompareFileView, CompareSideView } from "@/api/compare";
+import { buildFileRows, CODE_MIN, diffTitle, fileTotals, filterRows, inProject, listPace, narrowedTo, pickRow, sameSides, shortRef, sourceLabel, splitPath, stepRow, TOP_ROWS, topListFit } from "./files";
 import { refChoices, REF_CHOICES_MAX } from "./sources";
 
 const file = (path: string, o: Partial<CompareFileView> = {}): CompareFileView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, submodule: false, ...o });
@@ -206,5 +206,23 @@ describe("topListFit", () => {
       const fit = topListFit(height, ROW, 100, filter);
       if (!fit.fold) expect(height - CHROME - 32 - fit.rows * ROW).toBeGreaterThanOrEqual(CODE_MIN);
     }
+  });
+});
+
+describe("sameSides", () => {
+  const side = (o: Partial<CompareSideView> = {}): CompareSideView => ({ present: true, text: "a\n", truncated: false, binary: false, submodule: false, ...o });
+  const sides = (o: Partial<CompareFileSidesView> = {}): CompareFileSidesView => ({ old: side(), new: side({ text: "b\n" }), status: "M", error: "", ...o });
+  it.each<[string, CompareFileSidesView, boolean]>([
+    ["the same answer, another object", sides(), true],
+    ["the new side's text", sides({ new: side({ text: "c\n" }) }), false],
+    ["the old side's text", sides({ old: side({ text: "z\n" }) }), false],
+    ["a side gone", sides({ new: side({ present: false, text: "" }), status: "D" }), false],
+    ["binary", sides({ old: side({ binary: true }) }), false],
+    ["truncated", sides({ new: side({ text: "b\n", truncated: true }) }), false],
+    ["a submodule", sides({ old: side({ submodule: true }) }), false],
+    ["the status", sides({ status: "R" }), false],
+    ["an error", sides({ error: "gone" }), false],
+  ])("%s", (_name, b, same) => {
+    expect(sameSides(sides(), b)).toBe(same);
   });
 });

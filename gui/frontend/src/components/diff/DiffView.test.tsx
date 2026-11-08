@@ -22,6 +22,10 @@ const api = vi.hoisted(() => ({
   compares: [] as string[],
   paths: [] as (readonly string[])[],
   reads: [] as string[],
+  /** Each read's rename source, in order. */
+  oldPaths: [] as string[],
+  /** How many times a file's sides were parsed. */
+  parses: 0,
   log: null as Partial<CompareLogView> | Error | null,
   logs: [] as string[],
   /** What ProjectService.GetCompareCommit answers, by sha. */
@@ -65,8 +69,9 @@ vi.mock("@/api/compare", () => ({
     const body = api.bodies.get(sha) ?? "";
     return body instanceof Error ? Promise.reject(body) : Promise.resolve({ body, error: "" });
   },
-  getCompareFile: (_t: CompareTarget, file: string) => {
+  getCompareFile: (_t: CompareTarget, file: string, oldPath: string) => {
     api.reads.push(file);
+    api.oldPaths.push(oldPath);
     return Promise.resolve({ old: side(), new: side(), status: "M", error: "", ...api.sides.get(file) });
   },
 }));
@@ -83,7 +88,16 @@ vi.mock("@/components/code/CodeDiff", () => ({
   CodeDiff: ({ oldFile, newFile }: { oldFile: { name: string } | null; newFile: { name: string } }) => <div data-testid="code-diff" data-old={oldFile?.name ?? ""} data-new={newFile.name} />,
   CodeScroll: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("@pierre/diffs", async (orig) => ({ ...(await orig<typeof import("@pierre/diffs")>()) }));
+vi.mock("@pierre/diffs", async (orig) => {
+  const real = await orig<typeof import("@pierre/diffs")>();
+  return {
+    ...real,
+    parseDiffFromFile: (...args: Parameters<typeof real.parseDiffFromFile>) => {
+      api.parses += 1;
+      return real.parseDiffFromFile(...args);
+    },
+  };
+});
 
 const { DiffView, RAIL_MIN } = await import("./DiffView");
 
@@ -146,6 +160,8 @@ beforeEach(() => {
   api.compares.length = 0;
   api.paths.length = 0;
   api.reads.length = 0;
+  api.oldPaths.length = 0;
+  api.parses = 0;
   api.log = null;
   api.logs.length = 0;
   api.bodies.clear();
@@ -435,6 +451,21 @@ describe("the open file follows the list", () => {
     list([file("a.ts")]);
     await show(target({ base: { kind: "ref", ref: "main" }, head: { kind: "ref", ref: "HEAD" }, file: "a.ts" }));
     expect([...api.watched.keys()]).toEqual([]);
+  });
+
+  it("a read that answers the same parses and draws nothing again", async () => {
+    list([file("package-lock.json")]);
+    api.sides.set("package-lock.json", changed("a\n".repeat(50), "b\n".repeat(50)));
+    await show(target({ file: "package-lock.json" }));
+    const drawn = screen.getByTestId("code-diff");
+    expect(api.parses).toBe(1);
+    await written(`${W}/package-lock.json`);
+    expect(api.reads).toEqual(["package-lock.json", "package-lock.json"]);
+    expect(api.parses).toBe(1);
+    expect(screen.getByTestId("code-diff")).toBe(drawn);
+    api.sides.set("package-lock.json", changed("a\n".repeat(50), "c\n".repeat(50)));
+    await written(`${W}/package-lock.json`);
+    expect(api.parses).toBe(2);
   });
 
   it("the row's counts changing reads the file again, whatever said so", async () => {
