@@ -91,7 +91,7 @@ stylesheets, keep `/cf/bridge.js`, and read `reference/react.md`.
   refuse it). Leave `cf.thread.id` out of lists of threads to act on: archiving it closes the page.
 - **Threads a page starts** (`thread.new`) are this thread's hidden children (`"created-by": ""` and a `project` id: the user's own,
   in their sidebar); pass a `prompt`, and a `request-id` per row: a second click then resolves with the same thread, a success.
-- **Errors**: catch every `cf.run` and show `e.message` where it happened (that row, that button).
+- **Errors**: catch every `cf.run` and show `e.message` where it happened (that row, that button), never in `alert()`: it shows nothing in the app.
   `e.code` says what to do (`reference/errors-and-limits.md`); `declined` is the user saying no, not an error.
 
 ## Live data: cf.on, never polling
