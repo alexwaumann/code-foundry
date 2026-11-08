@@ -4,7 +4,8 @@
  * from the payload the daemon sent with it. A batch of thread wakes sent as one message
  * (`{"kind": "batch", "wakes": [...]}`, docs/notes/orch-wakes-content.md) is one line per
  * wake. A daemon restart's notice (`{"kind": "restart", ...}`, alone or first in a batch,
- * docs/notes/orch-restart-wakes.md) is a line of its own. Pure.
+ * docs/notes/orch-restart-wakes.md) is a line of its own, and so is a child's question
+ * (`{"kind": "ask", ...}`, `thread ask`). Pure.
  */
 import type { WakeView } from "@/api/thread";
 
@@ -17,9 +18,12 @@ export interface WakeLine {
   threadId: string;
   /** Its name in the payload (the thread's id when unnamed then), or the action's name; "" when unknown. */
   name: string;
-  /** "idle, finished", "needs attention, permission: Bash", "exit 3"; "" when unknown. */
+  /** "idle, finished", "needs attention, permission: Bash", "exit 3", "asks"; "" when unknown. */
   detail: string;
-  /** The report's summary, a run's last output line, or (unreadable payload) the header line. */
+  /**
+   * The report's summary, else the first line of the thread's last message; a run's last
+   * output line; an ask's question; or (unreadable payload) the header line.
+   */
   summary: string;
   /** The payload pretty-printed for the expandable body (the raw text when it does not parse). */
   json: string;
@@ -35,22 +39,40 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+/** The first non-blank line of s, trimmed; "" for none. */
+function firstLine(s: string): string {
+  return (
+    s
+      .split("\n")
+      .map((l) => l.trim())
+      .find(Boolean) ?? ""
+  );
+}
+
 function threadLine(t: Obj, json: string): WakeLine {
   const id = str(t.id);
   const status = str(t.status);
   const reason = str(t.status_reason);
   const report = obj(t.report);
   const failed = status === "error" || reason.startsWith("error") || str(report?.status) === "failed";
-  const waits = status === "needs_attention" && reason !== "finished" && reason !== "";
+  // A blocked report waits on someone, as a prompt does.
+  const waits = (status === "needs_attention" && reason !== "finished" && reason !== "") || str(report?.status) === "blocked";
   return {
     tone: failed ? "fail" : waits ? "attention" : "ok",
     threadId: id,
     name: str(t.name) || id,
     // A finished turn is idle at its prompt, as the wake's header says ("is idle: finished").
     detail: [reason === "finished" ? "idle" : status.replace(/_/g, " "), reason].filter(Boolean).join(", "),
-    summary: str(report?.summary),
+    // The daemon's own finished report carries no summary in the wake: the last message says it.
+    summary: str(report?.summary) || firstLine(str(t.last_message)),
     json,
   };
+}
+
+/** A child's question (`thread ask`): it keeps working meanwhile, and waits on an answer. */
+function askLine(p: Obj, json: string): WakeLine {
+  const id = str(p.thread);
+  return { tone: "attention", threadId: id, name: str(p.name) || id, detail: "asks", summary: firstLine(str(p.question)), json };
 }
 
 function runLine(r: Obj, json: string): WakeLine {
@@ -111,5 +133,6 @@ function lineOf(p: Obj | null, w: WakeView): WakeLine {
   const run = obj(p?.run);
   if (run) return runLine(run, json);
   if (p?.kind === "restart") return restartLine(p, json);
+  if (p?.kind === "ask") return askLine(p, json);
   return { tone: "ok", threadId: "", name: "", detail: "", summary: w.title, json };
 }

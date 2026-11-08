@@ -136,3 +136,24 @@ for (const scheme of ["dark", "light"] as const) {
     await page.screenshot({ path: `${String(shots)}/lineage-mock-${scheme}.png` });
   });
 }
+
+/** SHOTS=<dir>: the creator's wake notes (a report, a child's question, a finished child with no report), dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`wake notes screenshot (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openApp(page);
+    await open(page, P);
+    const notes = page.getByTestId("thread-wake-note");
+    await expect(notes).toHaveCount(3);
+    await notes.last().scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    const box = await page.getByTestId("thread-pane").boundingBox();
+    const first = await notes.first().boundingBox();
+    const last = await notes.last().boundingBox();
+    if (!box || !first || !last) throw new Error("no layout");
+    await page.screenshot({ path: `${String(shots)}/wake-notes-${scheme}.png`, clip: { x: box.x, y: first.y - 16, width: box.width, height: last.y + last.height - first.y + 32 } });
+  });
+}
