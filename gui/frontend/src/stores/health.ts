@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { ping, type HealthView } from "@/api/health";
+import { wakeAllStreams } from "@/api/stream";
 
 export type HealthStatus = "connecting" | "ok" | "error";
 
@@ -10,14 +11,18 @@ interface HealthState {
   refresh: () => Promise<void>;
 }
 
-export const useHealthStore = create<HealthState>()((set) => ({
+export const useHealthStore = create<HealthState>()((set, get) => ({
   status: "connecting",
   health: null,
   error: null,
   refresh: async () => {
     try {
       const health = await ping();
+      const back = get().status !== "ok";
       set({ status: "ok", health, error: null });
+      // The daemon answers again: streams waiting out a backoff reconnect now, not when
+      // their own timers run out (docs/notes/streams-wake-on-health.md).
+      if (back) wakeAllStreams();
     } catch (err) {
       set({ status: "error", error: err instanceof Error ? err.message : String(err) });
     }

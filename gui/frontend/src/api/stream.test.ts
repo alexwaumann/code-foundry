@@ -1,6 +1,6 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import { describe, expect, it, vi } from "vitest";
-import { backoffDelay, errorMessage, HEARTBEAT, isUnreachable, runStream, sendErrorMessage, type StreamStatus } from "./stream";
+import { backoffDelay, errorMessage, HEARTBEAT, isUnreachable, runStream, sendErrorMessage, wakeAllStreams, type StreamStatus } from "./stream";
 
 /** A controllable server stream: push events, end, or fail it from the test. */
 function fakeStream<T>() {
@@ -307,5 +307,118 @@ describe("transport failures", () => {
     expect(isUnreachable(err)).toBe(unreachable);
     expect(errorMessage(err)).toBe(message);
     expect(sendErrorMessage(err)).toBe(unreachable ? "Code Foundry's daemon is not reachable; your message is kept. Retry when it is back." : message);
+  });
+});
+
+describe("wakeAllStreams", () => {
+  /** A sleep that only an abort ends, as a 10 s backoff would look to the test; it records each delay. */
+  function longSleep(delays: number[]) {
+    return (ms: number, signal: AbortSignal) =>
+      new Promise<void>((resolve) => {
+        delays.push(ms);
+        signal.addEventListener("abort", () => {
+          resolve();
+        });
+      });
+  }
+
+  it("starts a runner sleeping out its backoff on a new attempt at once", async () => {
+    const delays: number[] = [];
+    let opens = 0;
+    const statuses: StreamStatus[] = [];
+    const stop = runStream<string>({
+      open: async function* () {
+        opens++;
+        if (opens <= 3) throw new TypeError("Load failed");
+        yield "snapshot";
+        await new Promise(() => undefined);
+      },
+      onEvent: () => undefined,
+      onStatus: (st) => statuses.push(st),
+      backoff: { initialMs: 10_000, maxMs: 10_000, factor: 2 },
+      sleep: longSleep(delays),
+    });
+    await vi.waitFor(() => {
+      expect(delays).toHaveLength(1);
+    });
+    expect(opens).toBe(1);
+    expect(delays[0]).toBeGreaterThanOrEqual(8_000);
+
+    wakeAllStreams();
+    await vi.waitFor(() => {
+      expect(opens).toBe(2);
+    });
+    // That attempt failed too: the runner sleeps again, and another wake cuts that sleep short as well.
+    await vi.waitFor(() => {
+      expect(delays).toHaveLength(2);
+    });
+    wakeAllStreams();
+    await vi.waitFor(() => {
+      expect(opens).toBe(3);
+    });
+    wakeAllStreams();
+    await vi.waitFor(() => {
+      expect(statuses.at(-1)).toBe("open");
+    });
+    expect(opens).toBe(4);
+    stop();
+  });
+
+  it("leaves an open runner and a connecting one alone", async () => {
+    const live = fakeStream<string>();
+    const openSignals: AbortSignal[] = [];
+    const stopOpen = runStream<string>({
+      open: (signal) => {
+        openSignals.push(signal);
+        return live.open(signal);
+      },
+      onEvent: () => undefined,
+      sleep: longSleep([]),
+    });
+    live.push("snapshot");
+    // A request that hangs: the attempt is connecting, not sleeping.
+    const hangingSignals: AbortSignal[] = [];
+    const stopHanging = runStream<string>({
+      open: (signal) => {
+        hangingSignals.push(signal);
+        return { [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<string>>(() => undefined) }) };
+      },
+      onEvent: () => undefined,
+      sleep: longSleep([]),
+    });
+    await tick();
+    expect(openSignals).toHaveLength(1);
+    expect(hangingSignals).toHaveLength(1);
+
+    wakeAllStreams();
+    await tick();
+    expect(openSignals).toHaveLength(1);
+    expect(openSignals[0]?.aborted).toBe(false);
+    expect(hangingSignals).toHaveLength(1);
+    expect(hangingSignals[0]?.aborted).toBe(false);
+    stopOpen();
+    stopHanging();
+  });
+
+  it("does not wake a stopped runner", async () => {
+    let opens = 0;
+    const delays: number[] = [];
+    const stop = runStream<string>({
+      open: async function* () {
+        opens++;
+        await Promise.resolve();
+        if (opens > 0) throw new TypeError("Load failed");
+        yield "never";
+      },
+      onEvent: () => undefined,
+      sleep: longSleep(delays),
+    });
+    await vi.waitFor(() => {
+      expect(delays).toHaveLength(1);
+    });
+    stop();
+    wakeAllStreams();
+    await tick();
+    expect(opens).toBe(1);
   });
 });
