@@ -5,6 +5,20 @@ import type { ThreadView } from "@/api/threads";
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { info: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("@/api/app", () => ({ playAlertSound: vi.fn(() => Promise.resolve()) }));
+/** What the user's own Diff tab lists when a thread's pick asks (ProjectService.CompareWorktree), and each ask. */
+const compare = vi.hoisted(() => ({ listed: [] as { path: string; oldPath: string }[] | Error, asked: [] as string[] }));
+vi.mock("@/api/compare", async (orig) => ({
+  ...(await orig<typeof import("@/api/compare")>()),
+  compareWorktree: (t: { base: { kind: string; ref?: string }; head: { kind: string; ref?: string } }, paths: readonly string[]) => {
+    const side = (s: { kind: string; ref?: string }) => (s.kind === "ref" ? `ref:${s.ref ?? ""}` : s.kind);
+    compare.asked.push(`${side(t.base)} ${side(t.head)} ${paths.join(",")}`);
+    if (compare.listed instanceof Error) return Promise.reject(compare.listed);
+    const files = compare.listed.filter((f) => paths.includes(f.path)).map((f) => ({ ...f, status: "M", added: 1, deleted: 0, binary: false, submodule: false }));
+    return Promise.resolve({ files });
+  },
+}));
+/** A thread's pick into a tab comparing other sides waits for that comparison's answer. */
+const answered = () => new Promise((r) => setTimeout(r, 0));
 
 const { applyIntent, clearPendingFocus } = await import("./intents");
 const { allTabs, getPanel, makeTab, setPanelTabParams, usePanelStore } = await import("./panel");
@@ -34,6 +48,8 @@ const tabIds = (key: string) => getPanel(key).groups.flatMap((g) => g.tabs.map((
 
 beforeEach(() => {
   vi.clearAllMocks();
+  compare.listed = [];
+  compare.asked = [];
   clearPendingFocus();
   usePanelStore.setState({ byKey: {} });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
@@ -289,11 +305,14 @@ describe("a ShowView scoped to a thread", () => {
       expect(allTabs(getPanel("thread:b")).find((t) => t.id === mine?.id)).toEqual(mine);
     });
 
-    it("panel.diff with one path only picks the file in the user's own tab: what it compares, filters and folds stays", () => {
+    it("panel.diff with one path only picks the file in the user's own tab: what it compares, filters and folds stays", async () => {
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const id = active("thread:b")?.id ?? "";
       setPanelTabParams("thread:b", id, { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:v1.2", head: "staged", filter: "go", fold: "1", path: "other.go" });
+      compare.listed = [{ path: "src/main.go", oldPath: "" }];
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
+      await answered();
+      expect(compare.asked).toEqual(["ref:v1.2 staged src/main.go"]);
       expect(tabIds("thread:b")).toHaveLength(1);
       expect(active("thread:b")?.params).toMatchObject({ base: "ref:v1.2", head: "staged", filter: "go", fold: "1", path: "src/main.go" });
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
@@ -315,26 +334,70 @@ describe("a ShowView scoped to a thread", () => {
       ["a base", { base: "ref:v1.2" }],
       ["a head", { head: "staged" }],
       ["an older daemon's scope", { scope: "branch" }],
-    ])("panel.diff without a thread never changes what the user's tab compares: %s", (_name, sides) => {
+    ])("panel.diff without a thread never changes what the user's tab compares: %s", async (_name, sides) => {
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const own = tabIds("thread:b")[0] ?? "";
       setPanelTabParams("thread:b", own, { project: "web", worktree: WEB_FEAT, own: "1", head: "staged", filter: "go", fold: "1", path: "other.go" });
       const title = active("thread:b")?.title;
+      compare.listed = [{ path: "src/main.go", oldPath: "" }];
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go", ...sides });
+      await answered();
       expect(tabIds("thread:b")).toEqual([own]);
       expect(active("thread:b")?.title).toBe(title);
       expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", filter: "go", fold: "1", path: "src/main.go" });
     });
 
-    it("panel.diff picking a file leaves a commit the user was in, and a call with no file does not", () => {
+    it("panel.diff picking a file leaves a commit the user was in, and a call with no file does not", async () => {
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const own = tabIds("thread:b")[0] ?? "";
       const inCommit = { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:p1", head: "ref:c1", path: "other.go", commit: "c1", backBase: "merge-base", backHead: "staged", backPath: "was.go", commits: "1" };
       setPanelTabParams("thread:b", own, inCommit);
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       expect(active("thread:b")?.params).toEqual(inCommit);
+      compare.listed = [{ path: "src/main.go", oldPath: "" }];
       showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
+      await answered();
+      // Asked of the sides the commit came from, not of the commit.
+      expect(compare.asked).toEqual(["merge-base staged src/main.go"]);
       expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", path: "src/main.go", commits: "1" });
+    });
+
+    it("panel.diff picks at once, asking nothing, when the user's tab compares what the daemon checked", () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      const own = tabIds("thread:b")[0] ?? "";
+      setPanelTabParams("thread:b", own, { project: "web", worktree: WEB_FEAT, own: "1", filter: "go", path: "other.go" });
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
+      expect(compare.asked).toEqual([]);
+      expect(tabIds("thread:b")).toEqual([own]);
+      expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", filter: "go", path: "src/main.go" });
+    });
+
+    it("panel.diff picks a rename under the name the user's sides list it by", async () => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      const own = tabIds("thread:b")[0] ?? "";
+      setPanelTabParams("thread:b", own, { project: "web", worktree: WEB_FEAT, own: "1", base: "staged" });
+      compare.listed = [{ path: "src/new.go", oldPath: "src/staged-name.go" }];
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/new.go", oldPath: "src/old.go" });
+      await answered();
+      expect(active("thread:b")?.params).toMatchObject({ base: "staged", path: "src/new.go", oldPath: "src/staged-name.go" });
+    });
+
+    it.each([
+      ["not in what the user compares", () => [] as { path: string; oldPath: string }[]],
+      ["the user's comparison cannot say", () => new Error("unavailable")],
+    ])("panel.diff opens a file %s in a tab of the thread's own, comparing where the daemon found it", async (_name, listed) => {
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
+      const own = tabIds("thread:b")[0] ?? "";
+      const mine = { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:HEAD", filter: "go", path: "other.go" };
+      setPanelTabParams("thread:b", own, mine);
+      compare.listed = listed();
+      showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/committed.go", oldPath: "src/was.go" });
+      await answered();
+      expect(compare.asked).toEqual(["ref:HEAD working src/committed.go"]);
+      expect(tabIds("thread:b")).toHaveLength(2);
+      expect(active("thread:b")).toMatchObject({ kind: "diff", title: "From thread", params: { project: "web", worktree: WEB_FEAT, own: "1", path: "src/committed.go", oldPath: "src/was.go", thread: "b" } });
+      expect(active("thread:b")?.params.base).toBeUndefined();
+      expect(allTabs(getPanel("thread:b")).find((t) => t.id === own)?.params).toEqual(mine);
     });
 
     it("panel.diff with no path opens the checkout's tab; without a checkout, nothing", () => {

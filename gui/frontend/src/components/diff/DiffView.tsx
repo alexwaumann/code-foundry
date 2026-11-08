@@ -69,7 +69,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   if (view && view !== lastView) setLastView(view);
   const listView = view ?? (inCommit && !read.error ? lastView : null);
   const rows = useMemo(() => buildFileRows(listView?.files ?? []), [listView]);
-  const current = view ? pickRow(rows, target.file, target.oldPath) : null;
+  const current = view ? pickRow(rows, target.file) : null;
   const listed = current !== null && rows.includes(current);
   const remotes = useProjectsStore((s) => s.byId[project]?.remotes) ?? NO_REMOTES;
   const slug = useProjectsStore((s) => s.byId[project]?.githubSlug);

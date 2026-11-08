@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { openFileInPanel } from "@/stores/filePanel";
 import { useCodeViewStore } from "@/stores/codeView";
 import { sourceParam } from "@/surfaces/diffTarget";
-import type { FileRow } from "./files";
+import { sameSides, type FileRow } from "./files";
 import { useIndexChanges, useStatusChanges } from "./useStatusChanges";
 
 /** The sides' parse (for the first change and its length) and what CodeDiff takes. */
@@ -69,7 +69,15 @@ function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareF
 export function DiffFile({ target, row, listed, compared, onRefresh, live = true }: { target: CompareTarget; row: FileRow; listed: boolean; compared: string; onRefresh: () => void; live?: boolean }) {
   const { projectId, worktree, base, head } = target;
   const key = [projectId, worktree, sourceParam(base), sourceParam(head), row.path, row.oldPath].join("\u0000");
-  const read = useTabRead<CompareFileSidesView>(key, (signal) => getCompareFile(target, row.path, row.oldPath, undefined, signal));
+  // A read that answers what the last one did keeps its answer, so nothing is parsed or drawn
+  // again: a lockfile's parse and render block the window for seconds, on every unrelated save.
+  const last = useRef<CompareFileSidesView | null>(null);
+  const read = useTabRead<CompareFileSidesView>(key, async (signal) => {
+    const next = await getCompareFile(target, row.path, row.oldPath, undefined, signal);
+    if (last.current && sameSides(last.current, next)) return last.current;
+    last.current = next;
+    return next;
+  });
   const { reload } = read;
   const throttled = useThrottled(reload, undefined, read.loading);
   const later = useCallback(() => {
@@ -125,6 +133,7 @@ export function DiffFile({ target, row, listed, compared, onRefresh, live = true
       <FileHeader icon={FileDiff} name={row.name} dir={row.dir} fullPath={row.oldPath ? `${abs}\nrenamed from ${row.oldPath}` : abs} actions={actions} />
       {d && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {d && (d.old.truncated || d.new.truncated) && <NoticeBar testId="diff-truncated">Over 1 MiB: the diff covers the first MiB of each side</NoticeBar>}
+      {d && !listed && parsed && parsed.lines > 0 && <NoticeBar testId="diff-unlisted-notice">Not in this comparison's file list</NoticeBar>}
       <Body d={d} error={read.error} reload={reload} parsed={parsed} row={row} listed={listed} compared={compared} />
     </div>
   );

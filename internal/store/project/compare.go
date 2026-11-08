@@ -120,6 +120,9 @@ type CompareChange struct {
 	// unread is the stored oid of a row git listed without reading the file: only its
 	// stat changed, perhaps nothing else. dropUnchanged settles it.
 	unread string
+	// untracked: from ls-files --others, whatever its Status says (D with the working tree
+	// as base). It is the first to go past the cap.
+	untracked bool
 }
 
 // WorktreeCompare is what differs between two sources.
@@ -544,7 +547,7 @@ func addUntracked(dir string, list []CompareChange, untracked []string, reversed
 			list[i].Status, list[i].Added, list[i].Deleted = "M", 0, 0
 			continue
 		}
-		c := CompareChange{Path: p, Status: "?", Submodule: strings.HasSuffix(p, "/")}
+		c := CompareChange{Path: p, Status: "?", Submodule: strings.HasSuffix(p, "/"), untracked: true}
 		if !c.Submodule {
 			lines, binary, read := countRootLines(root, p, budget)
 			budget -= read
@@ -639,7 +642,7 @@ func (g *Git) CompareWorktree(ctx context.Context, req CompareRequest) (Worktree
 }
 
 // fill keeps what paths ask for (all of it without any), sorted, totals every file and
-// lists at most limit. A rename stays when either of its paths is asked for, and a path that
+// lists at most limit, cutting untracked files first (capRank). A rename stays when either of its paths is asked for, and a path that
 // matches nothing is noted first, while the whole list is here. A name that is not UTF-8 is
 // counted apart (SkippedNames): one would fail the whole response.
 func (w *WorktreeCompare) fill(list []CompareChange, paths []string, limit int) {
@@ -667,16 +670,32 @@ func (w *WorktreeCompare) fill(list []CompareChange, paths []string, limit int) 
 		}
 		return skip
 	})
-	slices.SortFunc(list, func(a, b CompareChange) int { return cmp.Compare(a.Path, b.Path) })
 	w.TotalFiles = len(list)
 	for _, f := range list {
 		w.TotalAdded += f.Added
 		w.TotalDeleted += f.Deleted
 	}
 	if len(list) > limit {
+		// What goes past the cap is what matters least: untracked bulk (a node_modules not yet
+		// ignored) before a tracked change, and a conflict never before either.
+		slices.SortFunc(list, func(a, b CompareChange) int {
+			return cmp.Or(cmp.Compare(capRank(a), capRank(b)), cmp.Compare(a.Path, b.Path))
+		})
 		list, w.Truncated = list[:limit], true
 	}
+	slices.SortFunc(list, func(a, b CompareChange) int { return cmp.Compare(a.Path, b.Path) })
 	w.Files = list
+}
+
+// capRank orders a list for the cap: conflicts, then tracked changes, then untracked files.
+func capRank(f CompareChange) int {
+	switch {
+	case f.Status == "U":
+		return 0
+	case f.untracked:
+		return 2
+	}
+	return 1
 }
 
 // CompareFile implements Store.
