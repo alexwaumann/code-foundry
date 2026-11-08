@@ -73,6 +73,8 @@
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/print?id=t-top   (the request's body as program output on it)
+ *   POST /__mock/terminal/flood?id=t-top   (the request's body, a line, printed as fast as `yes`
+ *                                                 does until the shell reads ^C)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
  *                                                 fails with that reason; reset: at once, no failure)
  *   POST /__mock/daemon/restart                   (every shell goes without a removed event and the
@@ -1284,12 +1286,16 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
-    case "POST /__mock/terminal/print": {
+    case "POST /__mock/terminal/print":
+    case "POST /__mock/terminal/flood": {
+      const flood = path.endsWith("/flood");
       const chunks: Buffer[] = [];
       req.on("data", (c: Buffer) => chunks.push(c));
       req.on("end", () => {
         try {
-          world.print(q.get("id") ?? "", Buffer.concat(chunks).toString("utf8"));
+          const text = Buffer.concat(chunks).toString("utf8");
+          if (flood) world.flood(q.get("id") ?? "", text);
+          else world.print(q.get("id") ?? "", text);
           json(res, 200, { ok: true });
         } catch (err) {
           json(res, 404, { error: err instanceof Error ? err.message : String(err) });

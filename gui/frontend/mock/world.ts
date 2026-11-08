@@ -406,6 +406,8 @@ interface MockTerm {
   line: string;
   tick: number;
   attach: Hub<AttachItem>;
+  /** A flood printing until ^C (flood()), else null. */
+  flood: ReturnType<typeof setInterval> | null;
 }
 
 interface MockWorktree {
@@ -2998,6 +3000,7 @@ export class World {
       line: "",
       tick: 0,
       attach: new Hub<AttachItem>(),
+      flood: null,
     };
     switch (o.kind) {
       case "top":
@@ -3064,6 +3067,27 @@ export class World {
   /** Program output on a terminal, as if its process printed it (mock-only). */
   print(id: string, text: string): void {
     this.output(this.term(id), text);
+  }
+
+  /**
+   * A program printing `line` as fast as it can (`yes`), until the shell reads ^C (mock-only):
+   * 256 KiB a millisecond, more than xterm parses, so the GUI falls behind as it does on a real
+   * flood (docs/notes/terminal-find-flood.md).
+   */
+  flood(id: string, line: string): void {
+    const t = this.term(id);
+    if (t.flood || !line) return;
+    const chunk = line.repeat(Math.ceil((256 << 10) / line.length));
+    const gen = this.generation;
+    t.flood = setInterval(() => {
+      if (gen !== this.generation || this.terms.get(t.id) !== t || t.state !== TerminalState.RUNNING) this.stopFlood(t);
+      else this.output(t, chunk);
+    }, 1);
+  }
+
+  private stopFlood(t: MockTerm): void {
+    if (t.flood) clearInterval(t.flood);
+    t.flood = null;
   }
 
   private publishTerm(t: MockTerm): void {
@@ -3144,6 +3168,7 @@ export class World {
           out += "\b \b";
         }
       } else if (ch === "\x03") {
+        this.stopFlood(t);
         t.line = "";
         out += `^C\r\n${prompt(t.cwd)}`;
       } else if (ch >= " ") {

@@ -280,3 +280,31 @@ test.describe("screenshots", () => {
     });
   }
 });
+
+test("Ctrl-C reaches the prompt within seconds of a flood with the bar open on a word on every line", async ({ page }) => {
+  // Each highlight is a marker that hears every line a full scrollback drops: kept through a
+  // flood, they slowed xterm's parse to KB/s and Ctrl-C waited minutes behind it. Only a browser
+  // parses at the real rate (the rules are vitest: src/terminal/find.test.ts).
+  test.setTimeout(40_000);
+  const id = await shell(page);
+  await printed(page, id, "GET /api/items 200\r\n".repeat(31_000), "GET /api/items 200");
+  await page.keyboard.press("Meta+f");
+  await page.keyboard.type("GET");
+  await expect(count(page)).toHaveText("20000+", { timeout: 10_000 });
+  await host(page).locator(".xterm-screen").click();
+  await expect.poll(() => inXterm(page)).toBe(true);
+  const res = await fetch(`${mockUrl}/__mock/terminal/flood?id=${id}`, { method: "POST", body: "GET flood line\r\n" });
+  expect(res.ok).toBe(true);
+  // Long enough for the old way to pile up megabytes behind the highlights.
+  await page.waitForTimeout(6000);
+  const cursorLine = () =>
+    page.evaluate(() => {
+      const term = (window as unknown as { __cfTerminal: { renderer: { term: { buffer: { active: { baseY: number; cursorY: number; getLine(y: number): { translateToString(trim: boolean): string } | undefined } } } } } }).__cfTerminal.renderer.term;
+      const buf = term.buffer.active;
+      return buf.getLine(buf.baseY + buf.cursorY)?.translateToString(true).trim() ?? "";
+    });
+  expect(await cursorLine()).not.toBe("❯");
+  await page.keyboard.press("Control+c");
+  await expect.poll(cursorLine, { timeout: 4000 }).toBe("❯");
+  await expect(bar(page)).toBeVisible();
+});
