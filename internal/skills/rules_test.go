@@ -33,6 +33,7 @@ const (
 	orchFile   = skills.Orchestrate + "/SKILL.md"
 	wakesFile  = skills.Orchestrate + "/reference/wakes.md"
 	leadsFile  = skills.Orchestrate + "/reference/leads.md"
+	patternsFile = skills.Orchestrate + "/reference/patterns.md"
 	pagesFile  = skills.Pages + "/SKILL.md"
 	sourcesRef = skills.Pages + "/reference/sources.md"
 	reactRef   = skills.Pages + "/reference/react.md"
@@ -115,6 +116,11 @@ var rules = []rule{
 	{note: "wake-final-message", file: orchFile, says: []string{"no closing report", "thread report blocked"}, never: []string{"after any later message", "report_stale"}},
 	{note: "wake-final-message", file: emberFile, says: []string{"no closing report", "what git says"}, never: []string{"after any later message", "report_stale"}},
 	{note: "orch-skill-v4", file: leadsFile, says: []string{"thread report progress"}},
+	// A repo with no remote: committing is done, and blocked is only for work that cannot be
+	// finished (children reported blocked for a push with no origin).
+	{note: "wakes-fuzz-fixes", file: orchFile, says: []string{"when the repo has a remote", "with none, committing is done", "only if the work itself cannot be finished"},
+		never: []string{"if it is blocked or failed"}},
+	{note: "wakes-fuzz-fixes", file: patternsFile, says: []string{"with none, the commit is done", "never for a push or PR step"}},
 	// Ember stopped loading the orchestrate skill each epoch: what it took from there lives here.
 	{note: "orch-skill-v4", file: emberFile, says: []string{"distinct anchor", "only as many spots", `git add -a`, `git diff origin/<default> --stat`, "one line", "take it from its wake"}},
 	// Prompts in double quotes ran their backticks in Ember's shell; the worker checklist.

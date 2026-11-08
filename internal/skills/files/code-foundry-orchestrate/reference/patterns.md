@@ -21,9 +21,11 @@ The prompt is all the child knows. Every child prompt says:
   design you write into both prompts. A README or changelog has one owner, or you after
   the merge.
 - `git add <the files you changed>` (never `-A` or `.`: build output such as a compiled
-  binary would be committed), `git push origin HEAD` (not `-u`), never `git stash`
-  (sibling worktrees share one stash), build output inside the worktree, a PR only if
-  `origin` is on GitHub (else the pushed branch is done, not blocked).
+  binary would be committed), `git push origin HEAD` (not `-u`) when the repo has a
+  remote (with none, the commit is done, not blocked), never `git stash` (sibling
+  worktrees share one stash), build output inside the worktree, a PR only if `origin` is
+  on GitHub (else the pushed branch is done, not blocked). `blocked` is for work that
+  cannot be finished, never for a push or PR step that does not apply.
 - How to verify: tests for new logic when the project has a test runner; for lint,
   types and existing tests "no new errors against the base: run them before and after
   your change", never "must pass" (the base may already be red). Name the project's
