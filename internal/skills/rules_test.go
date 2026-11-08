@@ -25,19 +25,19 @@ type rule struct {
 }
 
 const (
-	entryFile  = skills.Entry + "/SKILL.md"
-	themeRef   = skills.Entry + "/reference/making-a-theme.md"
-	scopesRef  = skills.Entry + "/reference/scopes.md"
-	helpFile   = skills.Help + "/SKILL.md"
-	sourceRef  = skills.Help + "/reference/reading-the-source.md"
-	orchFile   = skills.Orchestrate + "/SKILL.md"
-	wakesFile  = skills.Orchestrate + "/reference/wakes.md"
-	leadsFile  = skills.Orchestrate + "/reference/leads.md"
+	entryFile    = skills.Entry + "/SKILL.md"
+	themeRef     = skills.Entry + "/reference/making-a-theme.md"
+	scopesRef    = skills.Entry + "/reference/scopes.md"
+	helpFile     = skills.Help + "/SKILL.md"
+	sourceRef    = skills.Help + "/reference/reading-the-source.md"
+	orchFile     = skills.Orchestrate + "/SKILL.md"
+	wakesFile    = skills.Orchestrate + "/reference/wakes.md"
+	leadsFile    = skills.Orchestrate + "/reference/leads.md"
 	patternsFile = skills.Orchestrate + "/reference/patterns.md"
-	pagesFile  = skills.Pages + "/SKILL.md"
-	sourcesRef = skills.Pages + "/reference/sources.md"
-	reactRef   = skills.Pages + "/reference/react.md"
-	emberFile  = skills.Ember + "/SKILL.md"
+	pagesFile    = skills.Pages + "/SKILL.md"
+	sourcesRef   = skills.Pages + "/reference/sources.md"
+	reactRef     = skills.Pages + "/reference/react.md"
+	emberFile    = skills.Ember + "/SKILL.md"
 )
 
 var rules = []rule{
