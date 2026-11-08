@@ -18,7 +18,8 @@
  * sends focus=1 only then, and only because the user asked to be taken there. Without it, a
  * request that would replace the editor the user is typing in joins the strip behind it.
  */
-import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, diffOfTab, diffTab, sourceOfParam } from "@/surfaces/diffTarget";
+import { compareWorktree, type CompareFileView } from "@/api/compare";
+import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, diffOfTab, diffTab, sameSource, sourceOfParam, type DiffTarget } from "@/surfaces/diffTarget";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { galleryTab } from "@/surfaces/galleryTarget";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
@@ -46,9 +47,9 @@ function surface(open: (sel: Selection) => string | null): ThreadPanelAction {
 }
 
 /** Opens an item's tab with `open` (false: the params name none) and shows the panel, without focus. */
-function item(open: (key: string, params: Params) => boolean): ThreadPanelAction {
-  return (_sel, key, params) => {
-    if (!open(key, params)) return false;
+function item(open: (key: string, params: Params, sel: Selection) => boolean): ThreadPanelAction {
+  return (sel, key, params) => {
+    if (!open(key, params, sel)) return false;
     togglePanel(key, true, { focus: false });
     return true;
   };
@@ -66,6 +67,26 @@ function nextAskId(): string {
 function positive(v: string | undefined): number | undefined {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
+/** `file`'s row in what `t` compares; null when it is not listed there, or the comparison cannot say. */
+async function rowIn(t: DiffTarget, file: string): Promise<CompareFileView | null> {
+  try {
+    const view = await compareWorktree({ projectId: t.project, worktree: t.worktree, base: t.base, head: t.head }, [file]);
+    return view.files.find((f) => f.path === file) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The checkout's own tab `id` in `key`'s panel with `file` picked (null: none), as it is now: the user may have moved since. */
+function pickIn(key: string, id: string, file: string, oldPath: string, own: boolean): boolean {
+  const open = allTabs(getPanel(key)).find((t) => t.id === id);
+  const was = open ? diffOfTab(open) : null;
+  if (!open || !was) return false;
+  // The file was found in the sides the tab came from, not in a commit the user was looking at.
+  const back = was.commit ? { base: was.commit.base, head: was.commit.head, commit: undefined } : {};
+  return openDiffInPanel(key, { ...was, ...back, own, file, oldPath }, open.title);
 }
 
 /** The panel actions by ShowView name: the view.panel.* verbs' (internal/command/commands_view.go). */
@@ -112,8 +133,12 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   // The checkout's own tab is the user's: a call without `thread` only picks its file, and what
   // they compare, filter and fold stays. The daemon gives a call that names a side a tab of its
   // own; an older one, until it restarts, sends scope and no thread, which stays a file pick here.
-  // A thread's own tab (thread) is the call's.
-  "panel.diff": item((key, p) => {
+  // A thread's own tab (thread) is the call's. The daemon found a picked file in the sides the
+  // call names (the default ones); when the user's tab compares others, the file is picked there
+  // only if they list it too, and otherwise opens in a tab of the thread's own, as a call naming
+  // those sides would: "no longer in this comparison" about a file that never was would leave
+  // the thread thinking the user sees its change (docs/notes/diff-fuzz-fixes.md).
+  "panel.diff": item((key, p, sel) => {
     if (!p.project || !p.worktree) return false;
     const fromScope = p.scope === "branch" ? COMMITTED_HEAD : DEFAULT_HEAD;
     const shown = diffOfTab({ params: p });
@@ -127,10 +152,15 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     const fresh = diffTab(asked);
     const open = allTabs(getPanel(key)).find((t) => t.id === fresh.id);
     const was = open && !p.thread ? diffOfTab(open) : null;
-    // The file was found in the sides the tab came from, not in a commit the user was looking at.
-    const back = was?.commit && asked.file ? { base: was.commit.base, head: was.commit.head, commit: undefined } : {};
-    if (open && was) return openDiffInPanel(key, { ...was, ...back, own: asked.own, ...(asked.file ? { file: asked.file, oldPath: asked.oldPath } : {}) }, open.title);
-    return openDiffInPanel(key, asked);
+    if (!open || !was) return openDiffInPanel(key, asked);
+    if (!asked.file) return openDiffInPanel(key, { ...was, own: asked.own }, open.title);
+    const sides = was.commit ?? was;
+    if (sameSource(sides.base, asked.base) && sameSource(sides.head, asked.head)) return pickIn(key, open.id, asked.file, asked.oldPath, asked.own);
+    void rowIn({ ...was, base: sides.base, head: sides.head }, asked.file).then((row) => {
+      if (row) pickIn(key, open.id, row.path, row.oldPath, asked.own);
+      else openDiffInPanel(key, { ...asked, ...(sel.kind === "thread" ? { thread: sel.id } : {}) });
+    });
+    return true;
   }),
   // view.panel.pr: params slug and number.
   "panel.pr": item((key, p) => {
