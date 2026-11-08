@@ -133,6 +133,7 @@ export function DiffFile({ target, row, listed, compared, onRefresh, live = true
       <FileHeader icon={FileDiff} name={row.name} dir={row.dir} fullPath={row.oldPath ? `${abs}\nrenamed from ${row.oldPath}` : abs} actions={actions} />
       {d && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {d && (d.old.truncated || d.new.truncated) && <NoticeBar testId="diff-truncated">Over 1 MiB: the diff covers the first MiB of each side</NoticeBar>}
+      {d && !listed && parsed && parsed.lines > 0 && <NoticeBar testId="diff-unlisted-notice">Not in this comparison's file list</NoticeBar>}
       <Body d={d} error={read.error} reload={reload} parsed={parsed} row={row} listed={listed} compared={compared} />
     </div>
   );

@@ -61,11 +61,16 @@ describe("pickRow and stepRow", () => {
   it("the tab's file, listed or not; the first only without one; nothing with neither", () => {
     expect(pickRow(rows, "b")?.path).toBe("b");
     expect(pickRow(rows, "")?.path).toBe("a");
-    const gone = pickRow(rows, "x/gone.ts", "x/was.ts");
-    expect(gone).toMatchObject({ path: "x/gone.ts", oldPath: "x/was.ts", dir: "x/", name: "gone.ts", status: "" });
+    const gone = pickRow(rows, "x/gone.ts");
+    expect(gone).toMatchObject({ path: "x/gone.ts", oldPath: "", dir: "x/", name: "gone.ts", status: "" });
     expect(rows.includes(gone as never)).toBe(false);
     expect(pickRow([], "")).toBeNull();
     expect(pickRow([], "a")?.path).toBe("a");
+  });
+  it("a listed rename brings its own source; the tab's is not asked for", () => {
+    const renamed = buildFileRows([file("src/renamed.ts", { status: "R", oldPath: "src/f3.ts" })]);
+    expect(pickRow(renamed, "src/renamed.ts")?.oldPath).toBe("src/f3.ts");
+    expect(pickRow(rows, "src/renamed.ts")?.oldPath).toBe("");
   });
   it("steps, and stops at the ends", () => {
     expect(stepRow(rows, rows[1] ?? null, 1)?.path).toBe("c");

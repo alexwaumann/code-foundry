@@ -61,18 +61,21 @@ export function filterRows(rows: readonly FileRow[], query: string): readonly Fi
 }
 
 /** A row for a file that is not in the list, which `status ""` says. */
-function unlistedRow(path: string, oldPath: string): FileRow {
+function unlistedRow(path: string): FileRow {
   const [dir, name] = splitPath(path);
-  return { key: `f:${path}`, dir, name, path, status: "", added: 0, deleted: 0, binary: false, submodule: false, conflict: false, oldPath };
+  return { key: `f:${path}`, dir, name, path, status: "", added: 0, deleted: 0, binary: false, submodule: false, conflict: false, oldPath: "" };
 }
 
 /**
  * The row to show: the tab's file, whether or not it is still listed, as the file being read
- * stays until the reader moves; the first only while the tab has none.
+ * stays until the reader moves; the first only while the tab has none. A file no longer listed
+ * reads under its own name: the rename the tab remembers was another comparison's, and its
+ * source read as this one's old side made every line an addition. A rename this comparison
+ * still has is listed, with its own source.
  */
-export function pickRow(rows: readonly FileRow[], file: string, oldPath = ""): FileRow | null {
+export function pickRow(rows: readonly FileRow[], file: string): FileRow | null {
   if (!file) return rows[0] ?? null;
-  return rows.find((r) => r.path === file) ?? unlistedRow(file, oldPath);
+  return rows.find((r) => r.path === file) ?? unlistedRow(file);
 }
 
 function sameSide(a: CompareSideView, b: CompareSideView): boolean {

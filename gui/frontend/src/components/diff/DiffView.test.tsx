@@ -770,6 +770,35 @@ describe("the compare bar", () => {
     expect(tabNow()?.params).toMatchObject({ path: "new.ts", oldPath: "old.ts" });
   });
 
+  it("a rename that another side no longer lists reads under its own name, and says it is not in the comparison", async () => {
+    list([file("src/renamed.ts", { status: "R", oldPath: "src/f3.ts" }), file("src/f1.ts")]);
+    await show(target({ file: "src/renamed.ts", oldPath: "src/f3.ts" }));
+    expect(api.oldPaths).toEqual(["src/f3.ts"]);
+    // The rename is committed: HEAD → working tree lists only the edit, and the file reads the same on both sides.
+    list([file("src/f1.ts")]);
+    api.sides.set("src/renamed.ts", { old: side({ text: "same\n" }), new: side({ text: "same\n" }), status: "" });
+    fireEvent.click(screen.getByTestId("diff-base"));
+    fireEvent.click(await screen.findByTestId("diff-source-ref:HEAD"));
+    await waitFor(() => {
+      expect(screen.getByTestId("diff-unlisted").textContent).toContain("src/renamed.ts is no longer in this comparison");
+    });
+    expect(api.reads.at(-1)).toBe("src/renamed.ts");
+    expect(api.oldPaths.at(-1)).toBe("");
+  });
+
+  it("a file not listed that still differs shows its lines under a notice", async () => {
+    list([file("a.ts")]);
+    api.sides.set("past-the-cap.js", { old: side({ present: false }), new: side({ text: "n\n" }), status: "A" });
+    await show(target({ file: "past-the-cap.js" }));
+    expect(screen.getByTestId("code-diff")).toBeTruthy();
+    expect(screen.getByTestId("diff-unlisted-notice").textContent).toBe("Not in this comparison's file list");
+    cleanup();
+    api.sides.set("a.ts", changed());
+    await show(target({ file: "a.ts" }));
+    expect(screen.getByTestId("code-diff")).toBeTruthy();
+    expect(screen.queryByTestId("diff-unlisted-notice")).toBeNull();
+  });
+
   it("Unified | Split shows wide; narrow it hides behind ⋯", async () => {
     list([file("a.ts")]);
     api.width = RAIL_MIN - 1;
