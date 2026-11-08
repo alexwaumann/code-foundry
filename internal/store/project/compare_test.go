@@ -309,6 +309,65 @@ func TestWorktreeCompareFillCaps(t *testing.T) {
 	}
 }
 
+// The cap cuts untracked files before tracked changes, and conflicts last: a node_modules not yet
+// ignored, sorting first, used to push every real change out of the list.
+func TestWorktreeCompareFillCapsByPriority(t *testing.T) {
+	bulk := func(n int) []CompareChange {
+		var l []CompareChange
+		for i := range n {
+			l = append(l, CompareChange{Path: fmt.Sprintf("node_modules/m%03d.js", i), Status: "?", Added: 1, untracked: true})
+		}
+		return l
+	}
+	tests := []struct {
+		name  string
+		list  []CompareChange
+		limit int
+		want  []string
+	}{
+		{
+			name:  "tracked changes stay, untracked bulk goes",
+			list:  append(bulk(5), CompareChange{Path: "src/a.ts", Status: "M"}, CompareChange{Path: "src/b.ts", Status: "A"}, CompareChange{Path: "README.md", Status: "D"}),
+			limit: 4,
+			want:  []string{"README.md", "node_modules/m000.js", "src/a.ts", "src/b.ts"},
+		},
+		{
+			name:  "a conflict outranks a tracked change",
+			list:  []CompareChange{{Path: "a", Status: "M"}, {Path: "b", Status: "M"}, {Path: "z", Status: "U"}},
+			limit: 2,
+			want:  []string{"a", "z"},
+		},
+		{
+			name:  "untracked with the working tree as base is still untracked",
+			list:  []CompareChange{{Path: "a", Status: "D", untracked: true}, {Path: "b", Status: "D"}},
+			limit: 1,
+			want:  []string{"b"},
+		},
+		{
+			name:  "under the cap nothing is cut, all by path",
+			list:  []CompareChange{{Path: "c", Status: "U"}, {Path: "b", Status: "?", untracked: true}, {Path: "a", Status: "M"}},
+			limit: 9,
+			want:  []string{"a", "b", "c"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var w WorktreeCompare
+			w.fill(tt.list, nil, tt.limit)
+			var got []string
+			for _, f := range w.Files {
+				got = append(got, f.Path)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("files = %q, want %q", got, tt.want)
+			}
+			if w.TotalFiles != len(tt.list) || w.Truncated != (len(tt.list) > tt.limit) {
+				t.Errorf("total %d truncated %t", w.TotalFiles, w.Truncated)
+			}
+		})
+	}
+}
+
 // fill says which paths match nothing from the whole list, not what is left of it: a path whose
 // file is past the cap, or has a name that cannot be listed, did match.
 func TestWorktreeCompareFillUnmatched(t *testing.T) {
