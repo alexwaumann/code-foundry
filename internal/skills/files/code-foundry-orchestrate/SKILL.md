@@ -52,10 +52,11 @@ ones you create stay out of it: they are yours to answer.
    of one file conflict: new code and its tests go in the child's own new files, each child
    gets a distinct anchor in a shared switch or list, and a README or changelog has one owner
    (or you, after the merge). Tell it to stage only the files it changed (never `git add
-   -A`), to push with `git push origin HEAD` (not `-u`), never `git stash`, to open a PR only
-   if `origin` is on GitHub (else pushing is done), to check `git diff origin/<default>
-   --stat` against what it claims, and if it is blocked or failed, to run `code-foundry thread
-   report blocked "<why>"` (or `failed`). No closing report: the last message of each of its
+   -A`), never `git stash`, to push with `git push origin HEAD` (not `-u`) when the repo has a
+   remote (with none, committing is done), to open a PR only if `origin` is on GitHub (else
+   pushing is done), to check `git diff origin/<default> --stat` (`<default>` with no remote)
+   against what it claims, and only if the work itself cannot be finished, to run
+   `code-foundry thread report blocked "<why>"` (or `failed`). No closing report: the last message of each of its
    turns reaches you whole, and the app tells it so. Work built on a sibling's branch: `--base origin/<its branch>`
    once pushed, else `--base <its branch> --base-from-origin no` (§2b).
 2. **Wait; do not poll** (no loops of `thread get` or `sleep`). One of:

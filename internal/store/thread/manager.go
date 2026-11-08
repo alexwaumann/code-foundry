@@ -416,6 +416,9 @@ type record struct {
 	// away is set while an archive or a snooze closes the thread (putaway.go
 	// markPuttingAway): the close's end publishes a cut-off turn as idle at once.
 	away *awayClose
+	// archiving is set while an archive closes the thread, before ArchivedAt
+	// (archive_group.go): wake counts leave it out.
+	archiving bool
 	// putAway is what the thread asked of itself mid-turn, carried out when the turn
 	// ends (putaway.go). In memory only: a daemon restart loses the turn anyway.
 	putAway *PutAway
@@ -1415,6 +1418,7 @@ func (m *Manager) setRemoving(id string, on bool) error {
 func (m *Manager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
 	m.closed = true
+	m.suppressHeldLocked() // held wakes go at the next start (subscriptions_restart.go)
 	var runners []*runner
 	for _, rec := range m.recs {
 		if rec.run != nil {

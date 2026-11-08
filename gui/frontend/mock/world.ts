@@ -1612,7 +1612,33 @@ export class World {
           reply: "Started seven threads; I'll pick up their reports as they finish.",
           minutesAgo: min,
           end: "done",
-          wakes: [{ title: `Thread "${CN}" (${C}) is idle: finished. Report: done — Retry added around exchangeToken, 3 attempts; PR opened.`, json: JSON.stringify(payload, null, 2) }],
+          wakes: [
+            { title: `Thread "${CN}" (${C}) is idle: finished. Report: done — Retry added around exchangeToken, 3 attempts; PR opened.`, json: JSON.stringify(payload, null, 2) },
+            // A child's question (thread ask): it keeps working on its assumption meanwhile.
+            {
+              title: `Thread "Update redirect e2e tests" (s-l-e2e) asks you something and keeps working: Should the e2e suite cover the third retry attempt, or stop at two?`,
+              json: JSON.stringify(
+                { kind: "ask", thread: "s-l-e2e", name: "Update redirect e2e tests", question: "Should the e2e suite cover the third retry attempt, or stop at two?", assuming: "three attempts, as the fix does", asked_at: ago(min - 22).toISOString() },
+                null,
+                2,
+              ),
+            },
+            // A child that finished with no report of its own: its last message says it.
+            {
+              title: `Thread "Tidy redirect logging" (s-l-logs) is idle: finished.`,
+              json: JSON.stringify(
+                {
+                  kind: "thread",
+                  subscription_id: "sub-l-2",
+                  condition: "settled",
+                  fired_at: ago(min - 24).toISOString(),
+                  thread: { id: "s-l-logs", name: "Tidy redirect logging", state: "connected", status: "needs_attention", status_reason: "finished", project_id: "repo-cf", worktree_path: CF, created_by: P, labels: [], report: null, last_message: "Dropped the four debug logs around the redirect.\n\nCommitted on cf/tidy-redirect-logging; no remote, so nothing to push." },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         });
       }
       if (s.createdBy) {

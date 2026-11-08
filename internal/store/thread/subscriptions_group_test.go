@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -184,5 +185,140 @@ func TestGroupRefusals(t *testing.T) {
 				t.Errorf("err = %v", err)
 			}
 		})
+	}
+}
+
+// A wake held for its group, or for a lead's workers, is in memory only: the stop records
+// it, and the next start sends it with its notice, the held thread's last message in it
+// (the busy sibling interrupted, or the idle one waiting on its shell; a lead whose
+// workers the stop cut).
+func TestHeldWakesSurviveARestart(t *testing.T) {
+	batch := func(o *Options) { o.WakeBatch = 20 * time.Millisecond }
+	tests := []struct {
+		name string
+		// hold holds a wake to the returned subscriber about the returned thread, whose
+		// last message is "HELD-DONE"; restart is what the reopen needs.
+		hold    func(t *testing.T) (e *env, subscriber, held string, restart []func(*Options))
+		inTitle string
+	}{
+		{"group, its sibling busy", func(t *testing.T) (*env, string, string, []func(*Options)) {
+			b := newGroupEnv(t, 2)
+			b.finishWith(b.kids[0].ID, "HELD-DONE")
+			if n := b.quiet(); n != 0 {
+				t.Fatalf("%d wakes while one works", n)
+			}
+			// As the stop leaves them (these threads have no runner to stop).
+			b.leftByStop(b.kids[0].ID, offIdle)
+			b.leftByStop(b.kids[1].ID, crashed)
+			return b.env, b.parent.ID, b.kids[0].ID, []func(*Options){batch}
+		}, "1 of your child threads was interrupted"},
+		{"group, its sibling waiting on a shell", func(t *testing.T) (*env, string, string, []func(*Options)) {
+			b := newGroupEnv(t, 2)
+			b.finishWith(b.kids[0].ID, "HELD-DONE")
+			b.setStep(b.kids[1].ID, step{StateConnected, StatusIdle, Waiting{Shells: 1}.Reason(), ""})
+			if n := b.quiet(); n != 0 {
+				t.Fatalf("%d wakes while one waits on its shell", n)
+			}
+			b.leftByStop(b.kids[0].ID, offIdle)
+			b.leftByStop(b.kids[1].ID, offIdle)
+			return b.env, b.parent.ID, b.kids[0].ID, []func(*Options){batch}
+		}, "none of your child threads were interrupted"},
+		{"a lead, its workers busy", func(t *testing.T) (*env, string, string, []func(*Options)) {
+			l := newLeadEnv(t)
+			l.putItems(l.lead.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "lead it", CreatedAt: l.m.opts.Now()},
+				Item{ID: "a1", Kind: KindAssistantText, Text: "HELD-DONE", CreatedAt: l.m.opts.Now()})
+			l.setStep(l.lead.ID, finished)
+			l.settled(1)
+			if !l.held() {
+				t.Fatal("the lead's wake was not held")
+			}
+			l.leftByStop(l.lead.ID, offIdle)
+			for _, w := range l.workers {
+				l.leftByStop(w.ID, crashed)
+			}
+			clock := l.clock
+			return l.env, l.top.ID, l.lead.ID, []func(*Options){func(o *Options) { o.Now = func() time.Time { return time.Unix(0, clock.Load()).UTC() } }}
+		}, "none of your child threads were interrupted"},
+		{"a lead's one-shot, gone when it fired", func(t *testing.T) (*env, string, string, []func(*Options)) {
+			l := newLeadEnv(t)
+			if _, err := l.m.Unsubscribe(l.ctx(), UnsubscribeOptions{ID: l.sub}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := l.m.Subscribe(l.ctx(), SubscribeOptions{SubscriberID: l.top.ID, TargetThreadID: l.lead.ID}); err != nil {
+				t.Fatal(err)
+			}
+			l.putItems(l.lead.ID, Item{ID: "u1", Kind: KindUserMessage, Text: "lead it", CreatedAt: l.m.opts.Now()},
+				Item{ID: "a1", Kind: KindAssistantText, Text: "HELD-DONE", CreatedAt: l.m.opts.Now()})
+			l.setStep(l.lead.ID, finished)
+			deadline := time.Now().Add(5 * time.Second)
+			for !l.held() {
+				if time.Now().After(deadline) {
+					t.Fatal("the lead's wake was not held")
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			l.leftByStop(l.lead.ID, offIdle)
+			for _, w := range l.workers {
+				l.leftByStop(w.ID, crashed)
+			}
+			clock := l.clock
+			return l.env, l.top.ID, l.lead.ID, []func(*Options){func(o *Options) { o.Now = func() time.Time { return time.Unix(0, clock.Load()).UTC() } }}
+		}, "none of your child threads were interrupted"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, subscriber, held, restart := tt.hold(t)
+			e.restart(restart...)
+			e.m.DeliverRestartWakes()
+			items := e.waitItems(subscriber, "the restart wake", func(items []Item) bool { return len(wakes(items)) > 0 })
+			time.Sleep(100 * time.Millisecond) // nothing more comes
+			ws := wakes(e.items(subscriber).Items)
+			if len(ws) != 1 {
+				t.Fatalf("wakes = %d, want 1:\n%s", len(ws), describeItems(items))
+			}
+			w := ws[0]
+			if !strings.HasPrefix(w.WakeTitle, "The app restarted at ") || !strings.Contains(w.WakeTitle, tt.inTitle) ||
+				!strings.Contains(w.WakeTitle, held) {
+				t.Errorf("title = %s", w.WakeTitle)
+			}
+			if !strings.Contains(w.WakeJSON, `"last_message": "HELD-DONE"`) {
+				t.Errorf("the held thread's last message is not in the wake:\n%s", w.WakeJSON)
+			}
+			// The fire took a one-shot; a repeat one stays, nothing suppressed.
+			subs, err := e.m.Subscriptions(e.ctx(), subscriber)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sub := range subs {
+				if !sub.Repeat || !sub.SuppressedAt.IsZero() {
+					t.Errorf("after delivery: %+v", sub)
+				}
+			}
+		})
+	}
+}
+
+// finishWith ends thread id's turn with text as its last message.
+func (b *batchEnv) finishWith(id, text string) {
+	b.t.Helper()
+	now := time.Now()
+	b.putItems(id, Item{ID: "u-" + id, Kind: KindUserMessage, Text: "go", CreatedAt: now},
+		Item{ID: "a-" + id, Kind: KindAssistantText, Text: text, CreatedAt: now})
+	b.setStep(id, finished)
+}
+
+// leftByStop saves thread id as a daemon stop leaves it: disconnected "daemon stopped",
+// reading s. Only the row: a commit now would fire, and the stop's fires come after
+// Shutdown closed the Manager.
+func (e *env) leftByStop(id string, s step) {
+	e.t.Helper()
+	th, ok := e.m.Snapshot().Thread(id)
+	if !ok {
+		e.t.Fatalf("no thread %s", id)
+	}
+	th.State, th.Status, th.StatusReason, th.DisconnectReason = s.st, s.status, s.reason, ReasonDaemonStopped
+	th.StatusChangedAt = time.Now()
+	if err := saveThread(context.Background(), e.m.opts.DB, th); err != nil {
+		e.t.Fatal(err)
 	}
 }

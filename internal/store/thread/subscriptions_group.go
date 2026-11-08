@@ -16,8 +16,8 @@ import (
 //
 // Nothing that needs the parent waits: a prompt, a question, an error, or a current blocked or
 // failed report goes at once, and a thread ask is no settle at all. Work that feeds other
-// work wants plain --notify. Held wakes are in memory, like a lead's: a restart drops them and
-// its notice wakes the subscriber.
+// work wants plain --notify. Held wakes are in memory, like a lead's: the stop records them
+// (suppressHeldLocked) and the next start sends them with its notice.
 
 // groupArg holds a subscription's group in its args: no column, and the args persist.
 const groupArg = "group"
@@ -113,23 +113,29 @@ func (m *Manager) releaseGroupsLocked(subscriber string) {
 			continue
 		}
 		delete(s.groups[subscriber], group)
+		gone := s.groupArchived[subscriber][group]
+		delete(s.groupArchived[subscriber], group)
 		ids := make([]string, 0, len(held))
 		for id := range held {
 			ids = append(ids, id)
 		}
 		slices.Sort(ids)
 		for _, id := range ids {
-			m.releaseGroupWakeLocked(held[id], group)
+			m.releaseGroupWakeLocked(held[id], group, gone)
 		}
 	}
 	if len(s.groups[subscriber]) == 0 {
 		delete(s.groups, subscriber)
 	}
+	if len(s.groupArchived[subscriber]) == 0 {
+		delete(s.groupArchived, subscriber)
+	}
 }
 
-// releaseGroupWakeLocked queues one held wake about its target as it is now; the batch
-// window joins it to the others. Callers hold m.mu and m.subs.mu.
-func (m *Manager) releaseGroupWakeLocked(w groupWake, group string) {
+// releaseGroupWakeLocked queues one held wake about its target as it is now, naming the
+// members archived meanwhile (gone); the batch window joins it to the others. Callers
+// hold m.mu and m.subs.mu.
+func (m *Manager) releaseGroupWakeLocked(w groupWake, group string, gone []wakeSibling) {
 	s, sub := m.subs, w.sub
 	rec, ok := m.recs[w.target]
 	if !ok {
@@ -144,7 +150,7 @@ func (m *Manager) releaseGroupWakeLocked(w groupWake, group string) {
 	kids := m.childrenLocked(t.ID)
 	d := delivery{sub: sub.ID, of: sub, queued: time.Now(), thread: func(ctx context.Context) threadWakePart {
 		p := m.threadPart(ctx, sub, t, now, kids)
-		p.released = true
+		p.released, p.d.archived = true, gone
 		return p
 	}}
 	if !joins {
@@ -172,6 +178,7 @@ func (s *subscriptions) ungroupLocked(sub Subscription) {
 // ids. Callers hold m.subs.mu.
 func (s *subscriptions) forgetGroupsLocked(id string, ids []string) {
 	delete(s.groups, id)
+	delete(s.groupArchived, id)
 	for who, groups := range s.groups {
 		for group, held := range groups {
 			for sid, w := range held {

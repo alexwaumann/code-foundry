@@ -294,7 +294,7 @@ func TestSiblingsOf(t *testing.T) {
 			for _, th := range tt.parts {
 				parts = append(parts, threadWakePart{t: th})
 			}
-			got := siblingsOf(&Snapshot{Threads: tt.threads}, "p", parts, tt.since)
+			got := siblingsOf(&Snapshot{Threads: tt.threads}, "p", parts, tt.since, nil)
 			gj, _ := json.Marshal(got)
 			wj, _ := json.Marshal(tt.want)
 			if string(gj) != string(wj) {

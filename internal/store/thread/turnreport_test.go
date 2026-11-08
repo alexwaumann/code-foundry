@@ -40,6 +40,68 @@ func TestTurnReport(t *testing.T) {
 	}
 }
 
+// lastTurn: the turn starts at the first top-level user message after the turn before it
+// ended; a message Claude read mid-turn (a steer, an ask's answer) does not restart it.
+func TestLastTurn(t *testing.T) {
+	t0 := time.Date(2026, 11, 8, 8, 58, 34, 0, time.UTC)
+	at := func(s int) time.Time { return t0.Add(time.Duration(s) * time.Second) }
+	user := func(s int) Item { return Item{Kind: KindUserMessage, Text: "m", CreatedAt: at(s)} }
+	said := func(text string, s int) Item { return Item{Kind: KindAssistantText, Text: text, CreatedAt: at(s)} }
+	end := func(s int) Item { return Item{Kind: KindTurnEnd, CreatedAt: at(s)} }
+	tests := []struct {
+		name           string
+		items          []Item
+		started, ended time.Time
+		text           string
+	}{
+		{"none", nil, time.Time{}, time.Time{}, ""},
+		{"one turn", []Item{user(0), said("Done.", 5), end(6)}, at(0), at(6), "Done."},
+		{"a steer mid-turn keeps the start", []Item{user(0), said("Asked.", 3), user(9), said("Answered.", 12), end(15)}, at(0), at(15), "Answered."},
+		{"a steer, no text after it", []Item{user(0), said("Asked.", 3), user(9), end(15)}, at(0), at(15), ""},
+		{"a follow-up after the end is a new turn", []Item{user(0), said("A.", 3), end(4), user(20), said("B.", 25), end(26)}, at(20), at(26), "B."},
+		{"the next turn still running", []Item{user(0), end(4), user(20), said("B.", 25)}, at(20), time.Time{}, "B."},
+		{"a queued message not read yet", []Item{user(0), said("Working.", 3), {Kind: KindUserMessage, CreatedAt: at(9), Queued: true}}, at(0), time.Time{}, "Working."},
+		{"a subagent's message", []Item{user(0), {Kind: KindUserMessage, CreatedAt: at(9), ParentToolUseID: "tu"}, said("Done.", 12), end(13)}, at(0), at(13), "Done."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			started, ended, text := lastTurn(tt.items)
+			if !started.Equal(tt.started) || !ended.Equal(tt.ended) || text != tt.text {
+				t.Errorf("lastTurn = %v, %v, %q; want %v, %v, %q", started, ended, text, tt.started, tt.ended, tt.text)
+			}
+		})
+	}
+}
+
+// An explicit report filed before a steer in the same turn stays the turn's report: the
+// daemon's finished does not replace it.
+func TestTurnReportAcrossASteer(t *testing.T) {
+	t0 := time.Date(2026, 11, 8, 8, 58, 34, 0, time.UTC)
+	blocked := Report{Status: ReportBlocked, Summary: "no key", At: t0.Add(5 * time.Second)}
+	tests := []struct {
+		name  string
+		items []Item
+		want  ReportStatus
+	}{
+		{"a steer after the report", []Item{
+			{Kind: KindUserMessage, CreatedAt: t0}, {Kind: KindUserMessage, CreatedAt: t0.Add(9 * time.Second)},
+			{Kind: KindAssistantText, Text: "Stopped.", CreatedAt: t0.Add(12 * time.Second)}, {Kind: KindTurnEnd, CreatedAt: t0.Add(15 * time.Second)},
+		}, ReportBlocked},
+		{"a follow-up turn after the report", []Item{
+			{Kind: KindUserMessage, CreatedAt: t0}, {Kind: KindTurnEnd, CreatedAt: t0.Add(6 * time.Second)},
+			{Kind: KindUserMessage, CreatedAt: t0.Add(9 * time.Second)}, {Kind: KindAssistantText, Text: "Fixed.", CreatedAt: t0.Add(12 * time.Second)},
+		}, ReportFinished},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			started, _, text := lastTurn(tt.items)
+			if got := turnReport(blocked, started, text, t0.Add(20*time.Second)); got.Status != tt.want {
+				t.Errorf("report = %+v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // The lead hold and Ember read final() and must not take the daemon's word for the end of
 // a task: a lead that ends a turn with workers running files finished too.
 func TestReportFinal(t *testing.T) {

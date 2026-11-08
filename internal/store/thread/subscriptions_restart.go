@@ -19,6 +19,8 @@ import (
 //
 //   - a thread wake the stop suppressed is recorded on its subscription (SuppressedAt,
 //     suppressLocked), and DeliverRestartWakes sends it once the daemon is up;
+//   - so is a wake held for its group or its lead's workers (suppressHeldLocked): the
+//     settle it stands for fired before the stop, and only memory had it;
 //   - a subscription whose target the stop (or a crash: "daemon restarted") left
 //     interrupted, and that has not fired since, fires then too; a crash records
 //     nothing at its stop;
@@ -115,6 +117,50 @@ func (m *Manager) suppressLocked(r *subRec, now time.Time) {
 	}
 	m.log.Info("wake not fired: the daemon is stopping; it goes at the next start", "thread", r.s.SubscriberID,
 		"subscription", r.s.ID, "target", r.s.TargetID, "condition", r.s.Condition)
+}
+
+// suppressHeldLocked records the wakes held for a group or a lead (subscriptions_group.go,
+// subscriptions_hold.go) as the stop suppressed them: they are in memory, and the settle
+// they stand for fired already, so nothing at the next start would send them. A held
+// one-shot's subscription went when it fired: it is saved again, and the restart's fire
+// takes it. Shutdown calls it once m.closed is set, so nothing releases them meanwhile.
+// Callers hold m.mu.
+func (m *Manager) suppressHeldLocked() {
+	s := m.subs
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
+	held := map[string]Subscription{}
+	for _, h := range s.held {
+		for id, sub := range h {
+			held[id] = sub
+		}
+	}
+	for _, groups := range s.groups {
+		for _, g := range groups {
+			for id, w := range g {
+				held[id] = w.sub
+			}
+		}
+	}
+	ids := make([]string, 0, len(held))
+	for id := range held {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		r, ok := s.byID[id]
+		if !ok {
+			sub := held[id]
+			sub.wakeExtra = nil
+			r = &subRec{s: sub}
+		}
+		m.suppressLocked(r, now)
+	}
+	s.held, s.groups, s.groupArchived = nil, nil, nil
 }
 
 // restartFire is one thread wake a restart sends: subscription sub about target t, as

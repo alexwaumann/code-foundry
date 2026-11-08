@@ -21,7 +21,9 @@ func TestDetailOf(t *testing.T) {
 	}{
 		{name: "report after the last message", t: Thread{Status: StatusIdle, Report: report}, items: []Item{user(t0)}},
 		{name: "a follow-up after the report, still working", t: Thread{Status: StatusBusy, Report: report},
-			items: []Item{user(t0), user(t0.Add(2 * time.Minute))}, stale: true},
+			items: []Item{user(t0), {Kind: KindTurnEnd, CreatedAt: t0.Add(time.Minute)}, user(t0.Add(2 * time.Minute))}, stale: true},
+		{name: "a message read mid-turn after the report: the same turn", t: Thread{Status: StatusBusy, Report: report},
+			items: []Item{user(t0), user(t0.Add(2 * time.Minute))}},
 		{name: "a subagent's message does not count", t: Thread{Status: StatusIdle, Report: report},
 			items: []Item{user(t0), {Kind: KindUserMessage, CreatedAt: t0.Add(2 * time.Minute), ParentToolUseID: "tool-1"}}},
 		{name: "no report is not stale", t: Thread{Status: StatusIdle}, items: []Item{user(t0)}},

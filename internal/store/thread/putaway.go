@@ -187,7 +187,7 @@ func (r *runner) putAwayAtTurnEnd(e *claudestream.Result) {
 		return
 	}
 	if p.Kind == PutAwayArchive {
-		r.m.unwatchForArchive(r.id) // before the close: its settle must wake no one
+		r.m.unwatchForArchive(r.id, r.id) // before the close: its settle must wake no one
 	}
 	r.acknowledge()
 	r.puttingAway = true
@@ -205,6 +205,7 @@ func (m *Manager) finishPutAway(r *runner, p PutAway) {
 		if _, err := m.applyPutAway(m.ctx, r.id, p, r); err != nil {
 			m.log.Warn("put a thread away at its turn's end", "thread", r.id, "what", p.Kind.String(), "err", err)
 		}
+		m.endArchiving(r.id) // a failure before the archive's own end left the mark (archive_group.go)
 	}()
 }
 

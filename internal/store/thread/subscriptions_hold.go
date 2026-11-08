@@ -31,7 +31,8 @@ import (
 // same subscription replaces it: a lead subscribed to its workers is woken by the last
 // one and its next settle wakes the parent the ordinary way. A lead's own pending
 // request, error, budget stop or current done/failed/blocked report is never held.
-// Held wakes are in memory: a restart drops them (its notice wakes every subscriber).
+// Held wakes are in memory: the stop records them (suppressHeldLocked), and the next
+// start sends them with its notice.
 
 // teamWorking counts thread id's working children; kids lists a thread's children that
 // are not archived.
@@ -69,11 +70,14 @@ func childIndex(threads []Thread) map[string][]Thread {
 	return kids
 }
 
-// kidsLocked is childIndex of the records. Callers hold m.mu.
+// kidsLocked is childIndex of the records, those being archived left out
+// (archive_group.go). Callers hold m.mu.
 func (m *Manager) kidsLocked() map[string][]Thread {
 	threads := make([]Thread, 0, len(m.recs))
 	for _, rec := range m.recs {
-		threads = append(threads, rec.s)
+		if !rec.archiving {
+			threads = append(threads, rec.s)
+		}
 	}
 	return childIndex(threads)
 }

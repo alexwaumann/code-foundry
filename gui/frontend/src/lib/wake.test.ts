@@ -12,6 +12,9 @@ describe("wakeLine", () => {
     ["an error status", thread({ status: "error", status_reason: "interrupted" }), { tone: "fail", detail: "error, interrupted" }],
     ["a Claude error at the prompt", thread({ status: "needs_attention", status_reason: "error: overloaded" }), { tone: "fail" }],
     ["a failed report", thread({ status: "needs_attention", status_reason: "finished", report: { status: "failed", summary: "lock timeout" } }), { tone: "fail", summary: "lock timeout" }],
+    ["a blocked report waits on someone", thread({ status: "needs_attention", status_reason: "finished", report: { status: "blocked", summary: "no API key" } }), { tone: "attention", detail: "idle, finished", summary: "no API key" }],
+    ["finished, no report: the last message's first line", thread({ status: "needs_attention", status_reason: "finished", report: null, last_message: "\n  Added the MIT LICENSE.  \n\nCommitted on feat/license." }), { tone: "ok", detail: "idle, finished", summary: "Added the MIT LICENSE." }],
+    ["a report's summary wins over the last message", thread({ status: "idle", status_reason: "at prompt", report: { status: "done", summary: "6 tests" }, last_message: "Done." }), { summary: "6 tests" }],
     ["an unnamed thread: its id", thread({ name: "", status: "idle" }), { name: "s-c", detail: "idle" }],
     ["a run that exited 0", run({ exit_code: 0, output_tail: "built 42 files\n\n" }), { tone: "ok", threadId: "", name: "Slow", detail: "exit 0", summary: "built 42 files" }],
     ["a run that failed", run({ exit_code: 3, output_tail: "a\nb\n" }), { tone: "fail", detail: "exit 3", summary: "b" }],
@@ -66,6 +69,18 @@ describe("wakeLine", () => {
     ]);
     expect(wakeLines({ title: "t", json: JSON.stringify({ ...notice, interrupted: [], own_turn_interrupted: true }) })).toMatchObject([{ tone: "attention", detail: "own turn interrupted", summary: "" }]);
     expect(wakeLines({ title: "t", json: JSON.stringify({ ...notice, interrupted: [] }) })).toMatchObject([{ tone: "ok", detail: "", summary: "" }]);
+  });
+
+  it("an ask: its own line, waiting on an answer, the question as the summary", () => {
+    const ask = { kind: "ask", thread: "s-g", name: "greeter", question: "Which language should the greeting use?\nEnglish or Spanish?", assuming: "English", asked_at: "2026-11-08T08:58:40.000Z" };
+    expect(wakeLine({ title: 'Thread "greeter" (s-g) asks you something and keeps working: …', json: JSON.stringify(ask) })).toMatchObject({
+      tone: "attention",
+      threadId: "s-g",
+      name: "greeter",
+      detail: "asks",
+      summary: "Which language should the greeting use?",
+    });
+    expect(wakeLine({ title: "t", json: JSON.stringify({ ...ask, name: "" }) })).toMatchObject({ name: "s-g" });
   });
 
   it("a single wake is one line", () => {

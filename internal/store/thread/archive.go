@@ -50,6 +50,7 @@ func (m *Manager) archive(ctx context.Context, id string, archived bool, closing
 			return Thread{}, err
 		}
 	}
+	by := archivedBy(ctx)
 	tried := map[string]bool{}
 	var failed []CascadeFailure
 	cascaded := 0
@@ -62,7 +63,7 @@ func (m *Manager) archive(ctx context.Context, id string, archived bool, closing
 		for i, t := range targets {
 			tried[t.ID] = true
 			was[i], _ = m.interrupted(t.ID) // gone meanwhile: archiveFrom says so
-			m.unwatchForArchive(t.ID)       // before its close: its settle must wake no one
+			m.unwatchForArchive(t.ID, by)   // before its close: its settle must wake no one
 			m.markPuttingAway(t.ID, was[i], ReasonArchived)
 		}
 		for _, t := range targets {
@@ -82,7 +83,7 @@ func (m *Manager) archive(ctx context.Context, id string, archived bool, closing
 		}
 	}
 	cascade()
-	s, changed, err := m.archiveOne(ctx, id, closing)
+	s, changed, err := m.archiveOne(ctx, id, by, closing)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -158,12 +159,12 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 // the close cut off leaves the thread idle ReasonArchived instead of error
 // ReasonInterrupted. A Reconnect that wins the race between the close and that last
 // step makes it fail rather than archive a live thread.
-func (m *Manager) archiveOne(ctx context.Context, id string, closing *runner) (Thread, bool, error) {
+func (m *Manager) archiveOne(ctx context.Context, id, by string, closing *runner) (Thread, bool, error) {
 	wasInterrupted, err := m.interrupted(id)
 	if err != nil {
 		return Thread{}, false, err
 	}
-	m.unwatchForArchive(id) // before the close: its settle must wake no one
+	m.unwatchForArchive(id, by) // before the close: its settle must wake no one
 	m.markPuttingAway(id, wasInterrupted, ReasonArchived)
 	return m.archiveFrom(ctx, id, wasInterrupted, closing)
 }
@@ -171,7 +172,7 @@ func (m *Manager) archiveOne(ctx context.Context, id string, closing *runner) (T
 // archiveFrom is archiveOne with whether the thread was interrupted before its close
 // began (interrupted) read already, and its wakes forgotten (unwatchForArchive).
 func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted bool, closing *runner) (_ Thread, _ bool, err error) {
-	defer func() { m.endPuttingAway(id, err != nil) }() // after m.mu's unlock below
+	defer func() { m.endPuttingAway(id, err != nil); m.endArchiving(id) }() // after m.mu's unlock below
 	// A setup under way ends first, either way: then there is a process to close, or none.
 	if err := m.endSetupToArchive(ctx, id); err != nil {
 		return Thread{}, false, err
