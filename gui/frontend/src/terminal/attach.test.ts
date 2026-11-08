@@ -28,8 +28,11 @@ class FakeRenderer implements TerminalRenderer {
     if (this.deferParse) this.deferParse.push(parsed);
     else parsed();
   }
-  reset(): void {
+  /** Each reset's sameTerminal, in order (calls has "reset" for both). */
+  sameTerminal: boolean[] = [];
+  reset(sameTerminal = false): void {
     this.calls.push("reset");
+    this.sameTerminal.push(sameTerminal);
   }
   hideCursor(): void {
     this.calls.push("hideCursor");
@@ -157,6 +160,20 @@ describe("AttachController", () => {
     expect(ctl.current.phase).toBe("live");
     await vi.advanceTimersByTimeAsync(0);
     expect(resizes).toEqual([["t1", 100, 30]]);
+  });
+
+  it("resets for another terminal on attach, and for the same one again on each snapshot", async () => {
+    ctl.attach("t1");
+    await flush();
+    s.push("t1", { kind: "snapshot", data: enc("one"), cols: 100, rows: 30, altScreen: false });
+    await flush();
+    s.push("t1", { kind: "snapshot", data: enc("again"), cols: 100, rows: 30, altScreen: false });
+    await flush();
+    ctl.attach("t2");
+    await flush();
+    s.push("t2", { kind: "snapshot", data: enc("two"), cols: 100, rows: 30, altScreen: false });
+    await flush();
+    expect(r.sameTerminal).toEqual([false, true, true, false, true]);
   });
 
   it("holds output and resizes that arrive while the snapshot is parsed, then applies them in order", async () => {

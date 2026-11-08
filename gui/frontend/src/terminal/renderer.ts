@@ -28,8 +28,12 @@ export interface TerminalRenderer {
    * it may write. Throws, with nothing of `data` taken, when the renderer holds too much.
    */
   write(data: Uint8Array, parsed?: () => void): void;
-  /** Full reset (RIS) plus cleared scrollback, cursor showing; used before a snapshot. */
-  reset(): void;
+  /**
+   * Full reset (RIS) plus cleared scrollback, cursor showing; used before a snapshot.
+   * `sameTerminal`: the snapshot is the same terminal's again (a reconnect), so the find keeps
+   * its count and current match until it has searched the replay; else they start over.
+   */
+  reset(sameTerminal?: boolean): void;
   /**
    * Hides the cursor (DECTCEM off, as a program would), after any output already written.
    * An exited terminal takes no input, so its block cursor would be a false prompt.

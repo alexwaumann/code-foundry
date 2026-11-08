@@ -63,6 +63,12 @@ export class XtermRenderer implements TerminalRenderer {
   /** Kitty keyboard / modifyOtherKeys state the program asked for (see keyboard.ts). */
   readonly keyboardModes = new KeyboardModes();
   private readonly search: TerminalFind;
+  /**
+   * Writes xterm has not parsed yet: the find drops its highlights while there are any. A reset
+   * counts as one until it returns: xterm parses the first write after a key at once, inside
+   * reset(), so without it the find would take the reset screen for the snapshot's replay.
+   */
+  private pending = 0;
   kind: RendererKind = "dom";
 
   constructor(private readonly opts: XtermRendererOptions) {
@@ -85,7 +91,7 @@ export class XtermRenderer implements TerminalRenderer {
     );
     this.search = new TerminalFind(this.term, (color) => {
       this.applyTheme(terminalTheme(), color);
-    }, opts.findLimit);
+    }, { limit: opts.findLimit, busy: () => this.pending > 0 });
     // The palette is the document's CSS variables (theme.ts); follow them when the scheme
     // (or, later, the theme) on <html> changes.
     const stopTheme = watchTerminalTheme((theme) => {
@@ -252,11 +258,34 @@ export class XtermRenderer implements TerminalRenderer {
     // counts as pending, so a write from there can pass its 50 MB limit with nothing queued, and
     // a throw there ends the loop for good. That loop is synchronous on every path through its
     // write buffer, so no microtask can run until it has returned and the count is right.
-    this.term.write(clampCounts(data, this.term), parsed && (() => { queueMicrotask(parsed); }));
+    this.send(clampCounts(data, this.term), parsed && (() => { queueMicrotask(parsed); }));
   }
 
-  reset(): void {
-    this.search.reset();
+  /** term.write, counted in `pending` until xterm has parsed it: its callback runs inside the parse loop, before onWriteParsed. */
+  private send(data: string | Uint8Array, parsed?: () => void): void {
+    this.pending++;
+    try {
+      this.term.write(data, () => {
+        this.pending--;
+        parsed?.();
+      });
+    } catch (err) {
+      this.pending--;
+      throw err;
+    }
+  }
+
+  reset(sameTerminal = false): void {
+    this.pending++;
+    try {
+      this.resetTerm(sameTerminal);
+    } finally {
+      this.pending--;
+    }
+  }
+
+  private resetTerm(sameTerminal: boolean): void {
+    this.search.reset(sameTerminal);
     this.term.reset();
     this.term.clear();
     // xterm's reset leaves the cursor as it was, and a snapshot only restores what differs
@@ -264,7 +293,7 @@ export class XtermRenderer implements TerminalRenderer {
     // not a flag: it has to land after a hide still queued (hideCursor, program output)
     // and before the snapshot, which hides it again if its program did.
     try {
-      this.term.write("\x1b[?25h");
+      this.send("\x1b[?25h");
     } catch {
       // Behind 50 MB of unparsed writes (a huge snapshot, then a tab switch) xterm refuses
       // any write. reset() runs in a React effect and must not throw; the next snapshot waits
@@ -276,7 +305,7 @@ export class XtermRenderer implements TerminalRenderer {
   hideCursor(): void {
     // Queued behind earlier writes, like program output, so a snapshot cannot show it again.
     try {
-      this.term.write("\x1b[?25l");
+      this.send("\x1b[?25l");
     } catch {
       // Refused, as in reset(): a cursor left showing must not stop the exit being shown.
     }

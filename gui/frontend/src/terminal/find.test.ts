@@ -1,4 +1,6 @@
+import { Terminal } from "@xterm/xterm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TerminalFind } from "./find";
 import type { FindResults } from "./renderer";
 import { terminalCountLabel } from "./results";
 import { XtermRenderer } from "./xterm";
@@ -179,5 +181,152 @@ describe("the renderer's find", () => {
     expect(t.last()).toMatchObject({ total: 50, capped: true });
     t.r.find("xx");
     expect(t.last()).toMatchObject({ total: 0, capped: false });
+  });
+});
+
+/** TerminalFind on a real xterm and addon, with xterm's backlog scripted: `behind` is what the renderer reports. */
+function bare() {
+  const term = new Terminal({ allowProposedApi: true, scrollback: 1000 });
+  const el = document.createElement("div");
+  document.body.append(el);
+  term.open(el);
+  const state = { behind: false };
+  const find = new TerminalFind(term, () => undefined, { busy: () => state.behind });
+  const seen: FindResults[] = [];
+  find.onResults((x) => seen.push(x));
+  const write = (s: string) =>
+    new Promise<void>((resolve) => {
+      term.write(s, resolve);
+    });
+  /** After onWriteParsed, which xterm fires once the write's callback has returned. xterm parses on a timer. */
+  const parsed = async (s: string) => {
+    const done = write(s);
+    if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(0);
+    await done;
+    await Promise.resolve();
+  };
+  return { term, find, state, seen, last: () => seen.at(-1), write, parsed, dispose: () => { find.dispose(); term.dispose(); } };
+}
+
+describe("the find under a flood", () => {
+  let t: ReturnType<typeof bare>;
+  beforeEach(() => {
+    t = bare();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    t.dispose();
+  });
+
+  it("drops its highlights while xterm is behind and keeps the count; they come back once output pauses", async () => {
+    await t.write(LINES);
+    t.find.search("resize");
+    expect(t.term.markers.length).toBeGreaterThan(0);
+    vi.useFakeTimers();
+    t.state.behind = true;
+    const n = t.seen.length;
+    await t.parsed("resize four\r\n");
+    // No markers: every line a full scrollback drops would go past each of them.
+    expect(t.term.markers).toHaveLength(0);
+    expect(t.seen).toHaveLength(n);
+    expect(t.last()).toEqual({ index: 2, total: 3, capped: false });
+    t.state.behind = false;
+    await vi.advanceTimersByTimeAsync(250);
+    expect(t.last()).toEqual({ index: 2, total: 4, capped: false });
+    expect(t.term.markers.length).toBeGreaterThan(0);
+  });
+
+  it("counts a flood that never pauses within a second, without keeping a highlight", async () => {
+    await t.write(LINES);
+    t.find.search("resize");
+    vi.useFakeTimers();
+    t.state.behind = true;
+    for (let i = 0; i < 12; i++) {
+      await t.parsed("resize again\r\n");
+      expect(t.term.markers).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    expect(t.last()?.total).toBeGreaterThan(3);
+  });
+
+  it("searches before a step taken while dropped, so the step counts what is there", async () => {
+    await t.write(LINES);
+    t.find.search("resize");
+    t.state.behind = true;
+    await t.parsed("resize four\r\n");
+    t.find.step(-1);
+    expect(t.last()).toEqual({ index: 1, total: 4, capped: false });
+  });
+
+  describe("a replay of the same terminal", () => {
+    it("keeps the count and the current match until the replay is parsed, then counts it from there", async () => {
+      await t.write(LINES);
+      t.find.search("resize");
+      t.find.step(1); // the first line's
+      expect(t.last()).toEqual({ index: 0, total: 3, capped: false });
+      const n = t.seen.length;
+      t.find.reset(true);
+      t.term.reset();
+      t.state.behind = true;
+      await t.parsed(LINES.slice(0, 22));
+      expect(t.seen).toHaveLength(n);
+      // The rest of it, and output from after the reset below it.
+      t.state.behind = false;
+      await t.parsed(`${LINES.slice(22)}resize four\r\n`);
+      expect(t.last()).toEqual({ index: 0, total: 4, capped: false });
+      expect(t.term.getSelectionPosition()?.start.y).toBe(0);
+    });
+
+    it("puts the viewport back where the user had scrolled to the match", async () => {
+      await t.write(`${"filler\r\n".repeat(60)}resize here\r\n${"filler\r\n".repeat(60)}`);
+      t.find.search("resize");
+      t.term.scrollToLine(50);
+      const row = 60 - t.term.buffer.active.viewportY;
+      t.find.reset(true);
+      t.term.reset();
+      await t.parsed(`${"filler\r\n".repeat(60)}resize here\r\n${"filler\r\n".repeat(60)}`);
+      expect(t.term.getSelectionPosition()?.start.y).toBe(60);
+      expect(60 - t.term.buffer.active.viewportY).toBe(row);
+    });
+
+    it("starts from the newest match when the replay no longer has the current one", async () => {
+      await t.write(LINES);
+      t.find.search("resize");
+      t.find.step(1);
+      t.find.reset(true);
+      t.term.reset();
+      await t.parsed("resize five\r\nresize six\r\n");
+      expect(t.last()).toEqual({ index: 1, total: 2, capped: false });
+    });
+
+    it("counts another terminal's from nothing", async () => {
+      await t.write(LINES);
+      t.find.search("resize");
+      t.find.reset();
+      expect(t.last()).toEqual({ index: -1, total: 0, capped: false });
+    });
+  });
+});
+
+describe("the renderer's reset right after a key", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // xterm parses the first write after user input at once, so reset()'s own write is parsed
+  // inside it, before the snapshot is written.
+  it("waits for the snapshot before it counts: the reset screen is not the replay", async () => {
+    const { r, seen, write } = setup();
+    await write(LINES);
+    r.find("resize");
+    r.term.input("x");
+    const n = seen.length;
+    r.reset(true);
+    expect(seen).toHaveLength(n);
+    await new Promise<void>((resolve) => {
+      r.write(new TextEncoder().encode(LINES), resolve);
+    });
+    expect(seen.slice(n)).toEqual([{ index: 2, total: 3, capped: false }]);
+    r.dispose();
   });
 });

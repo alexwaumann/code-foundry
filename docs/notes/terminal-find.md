@@ -59,7 +59,8 @@ two siblings (`command.SharedChords` is the one allowed exception to unique chor
   full scrollback. Measured in WebKit on 10,000 lines: 65 ms for 5,000 matches, 260 ms for
   20,000. The count then says `20000+`, or `4 of 20000+`. A flood at full scrollback with
   20,000 matches parsed about 3,000 lines in 1 to 2 s, because each marker hears each trim.
-  Only with the bar open on such a query.
+  So while xterm is behind the highlights go and searches only count
+  (docs/notes/terminal-find-flood.md).
 - `clearDecorations(true)` and `findPrevious`'s `noScroll` are not in the addon's typings.
   The pin is exact; check `AddonInternals` when bumping it.
 
@@ -68,9 +69,9 @@ two siblings (`command.SharedChords` is the one allowed exception to unique chor
 One `TerminalHost` serves every tab of a panel, so a tab switch resets the same renderer.
 `reset()` drops the matches at once and keeps the addon's query, which re-searches once the
 snapshot is parsed. The host's effect, after the attach effect, then sets that tab's query
-or clears. After a reconnect the current match is the newest again: the selection went with
-the buffer. Results always publish (the store drops duplicates), or a tab coming back to no
-matches would keep its old count.
+or clears. A reconnect to the same terminal keeps the count and the current match
+(docs/notes/terminal-find-flood.md). Results always publish (the store drops duplicates),
+or a tab coming back to no matches would keep its old count.
 
 Hiding the panel unmounts the host: renderer, addon and decorations go, the Attach stream
 ends, the query stays. It comes back highlighted without taking the keyboard, which is why

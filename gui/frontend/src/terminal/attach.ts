@@ -195,7 +195,7 @@ export class AttachController {
     this.dropHeld();
     this.held = [];
     this.whenParsed(() => {
-      this.renderer.reset();
+      this.renderer.reset(true);
       if (ev.cols > 0 && ev.rows > 0) this.renderer.resize(ev.cols, ev.rows);
       const { cols, rows } = this.renderer.size;
       this.write(ev.data, () => {
