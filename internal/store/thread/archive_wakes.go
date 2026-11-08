@@ -15,10 +15,12 @@ import (
 // still queued for other subscribers; a thread wake whose target was archived by the
 // time it is sent is dropped too (archivedTargets: one a batch window held already).
 
-// unwatchForArchive is unwatchForArchiveLocked, taking m.mu.
-func (m *Manager) unwatchForArchive(id string) {
+// unwatchForArchive marks thread id archiving for by (markArchivingLocked; "" for the
+// user) and unwatches it (unwatchForArchiveLocked), taking m.mu.
+func (m *Manager) unwatchForArchive(id, by string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.markArchivingLocked(id, by)
 	m.unwatchForArchiveLocked(id)
 }
 

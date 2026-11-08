@@ -160,7 +160,7 @@ func (m *Manager) suppressHeldLocked() {
 		}
 		m.suppressLocked(r, now)
 	}
-	s.held, s.groups = nil, nil
+	s.held, s.groups, s.groupArchived = nil, nil, nil
 }
 
 // restartFire is one thread wake a restart sends: subscription sub about target t, as

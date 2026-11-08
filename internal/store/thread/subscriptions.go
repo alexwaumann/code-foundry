@@ -307,6 +307,9 @@ type subscriptions struct {
 	// groups are wakes held for their group, by subscriber, group, then subscription id
 	// (subscriptions_group.go). In memory only.
 	groups map[string]map[string]map[string]groupWake
+	// groupArchived are the members archived while their group waited, by subscriber
+	// then group: its released wakes name them (archive_group.go). In memory only.
+	groupArchived map[string]map[string][]wakeSibling
 }
 
 // subRec is a subscription, whether its target met the condition when last seen, and

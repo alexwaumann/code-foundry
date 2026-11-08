@@ -552,6 +552,9 @@ type wakeDetail struct {
 	// siblings counts the subscriber's children when the target is one of them; set
 	// when the wake is sent (subscriptions_batch.go).
 	siblings *wakeSiblings
+	// archived are the subscriber's group members archived while the group waited
+	// (archive_group.go): they go in siblings.
+	archived []wakeSibling
 	// afterRestart: sent by a restart (subscriptions_restart.go); appStopped: the
 	// target's turn was cut by the stop.
 	afterRestart, appStopped bool

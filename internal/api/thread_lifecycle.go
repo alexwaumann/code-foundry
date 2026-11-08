@@ -159,7 +159,8 @@ func (h *Thread) Archive(ctx context.Context, req *connect.Request[v1.ArchiveThr
 		}
 		return connect.NewResponse(&v1.ArchiveThreadResponse{Thread: threadToProto(s), Deferred: deferred}), nil
 	}
-	s, err := h.store.Archive(ctx, req.Msg.GetId(), req.Msg.GetArchived())
+	// Who asks: a group's wake names a member archived by anyone but its subscriber.
+	s, err := h.store.Archive(thread.ArchivedBy(ctx, req.Msg.GetByThreadId()), req.Msg.GetId(), req.Msg.GetArchived())
 	if err != nil {
 		return nil, threadError(err)
 	}

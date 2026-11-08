@@ -70,11 +70,14 @@ func childIndex(threads []Thread) map[string][]Thread {
 	return kids
 }
 
-// kidsLocked is childIndex of the records. Callers hold m.mu.
+// kidsLocked is childIndex of the records, those being archived left out
+// (archive_group.go). Callers hold m.mu.
 func (m *Manager) kidsLocked() map[string][]Thread {
 	threads := make([]Thread, 0, len(m.recs))
 	for _, rec := range m.recs {
-		threads = append(threads, rec.s)
+		if !rec.archiving {
+			threads = append(threads, rec.s)
+		}
 	}
 	return childIndex(threads)
 }

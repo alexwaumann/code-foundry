@@ -71,6 +71,9 @@ type wakeSiblings struct {
 	Total   int                  `json:"total"`
 	Working []wakeSibling        `json:"working"`
 	Pending []wakeSiblingPending `json:"pending"`
+	// Archived are children archived while their group waited, by someone other than
+	// the subscriber (archive_group.go); not counted.
+	Archived []wakeSibling `json:"archived,omitempty"`
 }
 
 type wakeSibling struct {
@@ -250,7 +253,10 @@ func (m *Manager) deliverThreadWakes(subscriber string, batch []delivery) {
 		m.log.Info("wake not delivered: the subscriber is gone or archived", "thread", subscriber, "subscriptions", subs)
 		return
 	}
-	if sib := siblingsOf(snap, subscriber, parts, m.requestStart(ctx, subscriber, parts)); sib != nil {
+	m.mu.Lock()
+	archiving := m.archivingLocked()
+	m.mu.Unlock()
+	if sib := siblingsOf(snap, subscriber, parts, m.requestStart(ctx, subscriber, parts), archiving); sib != nil {
 		for i := range parts {
 			if parts[i].t.CreatedBy == subscriber {
 				parts[i].d.siblings = sib
@@ -321,18 +327,26 @@ func (m *Manager) requestStart(ctx context.Context, subscriber string, parts []t
 // whose own children still work (teamWorking), a target included, counts as working.
 // Only the current batch counts: a child settled whose last activity and creation are
 // both before since (requestStart; zero: every child) settled for an earlier request
-// and is left out, unless a wake is about it.
-func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart, since time.Time) *wakeSiblings {
+// and is left out, unless a wake is about it. A thread being archived (archiving) is
+// left out; the members parts name as archived are listed.
+func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart, since time.Time, archiving map[string]bool) *wakeSiblings {
 	fired := map[string]Thread{}
+	var gone []wakeSibling
 	for _, p := range parts {
 		if p.t.CreatedBy == subscriber {
 			fired[p.t.ID] = p.t
+		}
+		for _, g := range p.d.archived {
+			if !slices.Contains(gone, g) {
+				gone = append(gone, g)
+			}
 		}
 	}
 	if len(fired) == 0 {
 		return nil
 	}
-	all := childIndex(snap.Threads)
+	threads := slices.DeleteFunc(slices.Clone(snap.Threads), func(t Thread) bool { return archiving[t.ID] })
+	all := childIndex(threads)
 	kids := make([]Thread, 0, len(all[subscriber]))
 	for _, k := range all[subscriber] {
 		if !k.Removing {
@@ -340,7 +354,7 @@ func siblingsOf(snap *Snapshot, subscriber string, parts []threadWakePart, since
 		}
 	}
 	slices.SortFunc(kids, func(a, b Thread) int { return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID)) })
-	s := &wakeSiblings{Working: []wakeSibling{}, Pending: []wakeSiblingPending{}}
+	s := &wakeSiblings{Working: []wakeSibling{}, Pending: []wakeSiblingPending{}, Archived: gone}
 	for _, k := range kids {
 		f, isTarget := fired[k.ID]
 		if isTarget {
@@ -375,10 +389,23 @@ const (
 
 // siblingsSentence is the header's sentence about the subscriber's children: "3 of your
 // 4 child threads settled; still working: "Tests" (s-3)." or "All 4 of your child
-// threads settled.", with "; waiting on an answer: …" for prompts; "" for nil or a
-// single child.
+// threads settled.", with "; waiting on an answer: …" for prompts, then who was archived
+// while the group waited (archivedSentence); "" for nil, or a single child and no one
+// archived.
 func siblingsSentence(s *wakeSiblings) string {
-	if s == nil || s.Total < 2 {
+	if s == nil {
+		return ""
+	}
+	count, gone := countSentence(s), archivedSentence(s.Archived)
+	if count == "" {
+		return gone
+	}
+	return joinSentences(count, gone)
+}
+
+// countSentence is siblingsSentence's count; "" for a single child.
+func countSentence(s *wakeSiblings) string {
+	if s.Total < 2 {
 		return ""
 	}
 	if s.Settled == s.Total && len(s.Pending) == 0 {
