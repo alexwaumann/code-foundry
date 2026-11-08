@@ -27,9 +27,11 @@
  * `gesture`. A run that has to ask the user tells the page (`cf:pending`) as its question
  * is queued, so the page's clock stops until the answer (`cf:resume`); a page that gives up
  * (`cf:cancel`), or goes, takes its question with it, declined, and the command never runs.
- * A question is guarded (stores/confirm.ts). A frame has one open at a time, the next waits
- * PAGE_ASKS.gapMs after the last one ended, and PAGE_ASKS.perMinute is the most it opens:
- * past those a call is refused `invalid`. These last across its documents.
+ * A question is guarded (stores/confirm.ts). A frame has one open at a time. A question the
+ * user did not say yes to (a no, a dismiss, the page giving up) holds the next back
+ * PAGE_ASKS.gapMs, and PAGE_ASKS.perMinute of those in a minute hold it back until the
+ * oldest is a minute old: past those a call is refused `invalid`, with the seconds to wait.
+ * A yes holds nothing back. These last across its documents.
  *
  * A `cf:fetch` (docs/notes/bridge-fetch.md) goes to ThreadService.ProxyFetch under the
  * page's thread: the daemon makes the request, so the API's CORS rules do not apply. It
@@ -93,8 +95,10 @@ const dev = import.meta.env.DEV ? (window.__cfBridge ??= { hosts: 0, subscriptio
 export const BRIDGE_DEBOUNCE_MS = 50;
 
 /**
- * How often a frame may ask the user. The gap outlasts the press that answered the last
- * question, so that press does not count for the next one.
+ * How often a frame may ask the user after questions it got no yes to: the gap after one,
+ * and how many in a minute before it waits for the oldest to age out. A yes holds nothing
+ * back, so a page's second button works right after the first one's yes; the dialog's own
+ * guards (ConfirmDialog) keep the press that gave that yes from answering the next.
  */
 export const PAGE_ASKS = { gapMs: 5000, perMinute: 3 };
 
@@ -169,8 +173,9 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   let disposed = false;
   const subs = new Map<CallId, () => void>();
   let commands: Promise<readonly CommandView[]> | null = null;
-  /** The frame's questions so far, in all its documents: PAGE_ASKS holds them to. */
-  const asks = { open: false, endedAt: Number.NEGATIVE_INFINITY, opened: [] as number[] };
+  /** The frame's questions, in all its documents: whether one is open, and when each one that
+   * ended without a yes in the last minute ended (PAGE_ASKS holds the next back by those). */
+  const asks = { open: false, unanswered: [] as number[] };
   /** The runs whose question is open or queued, by call id: cancel declines it. */
   const asking = new Map<CallId, { cancelled: boolean; req: ConfirmRequest }>();
   /** The document's runs in flight, by call id: cancel and a new document abort them. */
@@ -277,9 +282,12 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
   /** Why this frame may not open a new question now, or null. */
   const askRefusal = (): string | null => {
     const now = Date.now();
-    asks.opened = asks.opened.filter((at) => now - at < 60_000);
+    const noes = (asks.unanswered = asks.unanswered.filter((at) => now - at < 60_000));
     if (asks.open) return "this page already has a question open; wait for the answer";
-    if (now - asks.endedAt < PAGE_ASKS.gapMs || asks.opened.length >= PAGE_ASKS.perMinute) return "this page is asking too often; ask again later";
+    const last = noes.at(-1);
+    const capped = noes.length >= PAGE_ASKS.perMinute ? noes[noes.length - PAGE_ASKS.perMinute] : undefined;
+    const wait = Math.max(last === undefined ? 0 : last + PAGE_ASKS.gapMs - now, capped === undefined ? 0 : capped + 60_000 - now);
+    if (wait > 0) return `this page is asking too often; ask again in ${String(Math.ceil(wait / 1000))} s`;
     return null;
   };
 
@@ -288,14 +296,15 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
     const call = { cancelled: false, req };
     asking.set(id, call);
     asks.open = true;
-    asks.opened.push(Date.now());
     post(forDoc, { type: "cf:pending", id, reason: "confirm" });
+    let yes = false;
     try {
-      const yes = await requestConfirm(req);
-      return yes && !call.cancelled;
+      yes = (await requestConfirm(req)) && !call.cancelled;
+      return yes;
     } finally {
       asks.open = false;
-      asks.endedAt = Date.now();
+      // Only a question the user did not say yes to is the spam the gap and the cap are for.
+      if (!yes) asks.unanswered.push(Date.now());
       if (asking.get(id) === call) asking.delete(id);
     }
   };

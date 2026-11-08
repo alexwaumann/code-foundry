@@ -76,13 +76,29 @@ func pageAsks(ctx context.Context, uctx Context, command, title, label, ask stri
 	return nil
 }
 
-// settingChange is whether uctx's caller may change f. A user-only setting refuses
-// everyone but the user, confirmed or not; any other asks a page's user first (pageAsks).
-func settingChange(ctx context.Context, uctx Context, f *v1.SettingField, command, title, label, ask string) error {
+// settingChange is whether uctx's caller may change f, which the settings page shows on
+// pages. A user-only setting refuses everyone but the user, confirmed or not (userOnlyRefusal);
+// any other asks a page's user first (pageAsks).
+func settingChange(ctx context.Context, uctx Context, f *v1.SettingField, pages []*v1.SettingPage, command, title, label, ask string) error {
 	if f.GetUserOnly() && !uctx.FromUser() {
-		return Failed(fmt.Errorf("%s can only be changed by the user; they can change it in Settings", f.GetKey()))
+		return Failed(userOnlyRefusal(f, pages))
 	}
 	return pageAsks(ctx, uctx, command, title, label, ask)
+}
+
+// userOnlyRefusal is why a user-only setting was not changed, and where it can be. One text
+// for every reader: a model in a thread passes the place on to the user, and the user, in
+// a thread's terminal or behind a page, learns why that does not count and where to go. So
+// no pronoun: "you" would tell a model it may, "the user" talks past the person reading.
+func userOnlyRefusal(f *v1.SettingField, pages []*v1.SettingPage) error {
+	place := "Settings"
+	if i := slices.IndexFunc(pages, func(p *v1.SettingPage) bool { return p.GetId() == f.GetPage() }); i >= 0 {
+		place += " → " + pages[i].GetTitle()
+	}
+	if t := f.GetTitle(); t != "" {
+		place += " → " + t
+	}
+	return fmt.Errorf("%s can only be changed by hand, in %s; a command from a thread (its terminal too), a page or a plugin cannot change it", f.GetKey(), place)
 }
 
 // askValueChars is the most of a value a dialog shows.
@@ -140,7 +156,8 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 	}
 	keyArg := ArgSpec{Name: "key", Type: String, Required: true, Positional: true, Description: `Setting key, e.g. "appearance.font_size"`}
 	// field looks a key up in the schema so typos are reported as such.
-	field := func(ctx context.Context, key string) (*v1.SettingField, []*v1.SettingField, error) {
+	// field is key's field ("" for none) and the schema it is in.
+	field := func(ctx context.Context, key string) (*v1.SettingField, *v1.GetSettingsSchemaResponse, error) {
 		res, err := b.GetSchema(ctx, connect.NewRequest(&v1.GetSettingsSchemaRequest{}))
 		if err != nil {
 			return nil, nil, err
@@ -148,12 +165,12 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 		fields := res.Msg.GetFields()
 		i := slices.IndexFunc(fields, func(f *v1.SettingField) bool { return f.GetKey() == key })
 		if key != "" && i < 0 {
-			return nil, fields, InvalidArg("key", "unknown setting %q (run `code-foundry settings get` to list them)", key)
+			return nil, res.Msg, InvalidArg("key", "unknown setting %q (run `code-foundry settings get` to list them)", key)
 		}
 		if i < 0 {
-			return nil, fields, nil
+			return nil, res.Msg, nil
 		}
-		return fields[i], fields, nil
+		return fields[i], res.Msg, nil
 	}
 	restartNote := func(f *v1.SettingField) string {
 		if f.GetRestartRequired() {
@@ -173,10 +190,11 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 			Args:         []ArgSpec{{Name: "key", Type: String, Positional: true, Description: "Setting key (default: all)"}},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				key := a.String("key")
-				f, fields, err := field(ctx, key)
+				f, schema, err := field(ctx, key)
 				if err != nil {
 					return Result{}, err
 				}
+				fields := schema.GetFields()
 				res, err := b.Get(ctx, connect.NewRequest(&v1.GetSettingsRequest{}))
 				if err != nil {
 					return Result{}, err
@@ -210,12 +228,12 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 				Description: `New value (bool: true/false; keybinding: a chord such as "cmd+shift+n", or "none")`}},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				key := a.String("key")
-				f, _, err := field(ctx, key)
+				f, schema, err := field(ctx, key)
 				if err != nil {
 					return Result{}, err
 				}
 				ask := fmt.Sprintf("Change %s to %s?", key, askValue(a.String("value")))
-				if err := settingChange(ctx, uctx, f, "settings.set", "Change Setting", "Change", ask); err != nil {
+				if err := settingChange(ctx, uctx, f, schema.GetPages(), "settings.set", "Change Setting", "Change", ask); err != nil {
 					return Result{}, err
 				}
 				res, err := b.Update(ctx, connect.NewRequest(&v1.UpdateSettingsRequest{Values: map[string]string{key: a.String("value")}}))
@@ -238,12 +256,12 @@ func RegisterSettings(r *Registry, b SettingsBackend, reveal RevealFunc) error {
 			Args:         []ArgSpec{keyArg},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				key := a.String("key")
-				f, _, err := field(ctx, key)
+				f, schema, err := field(ctx, key)
 				if err != nil {
 					return Result{}, err
 				}
 				ask := fmt.Sprintf("Reset %s to its default, %s?", key, askValue(f.GetDefaultValue()))
-				if err := settingChange(ctx, uctx, f, "settings.reset", "Reset Setting", "Reset", ask); err != nil {
+				if err := settingChange(ctx, uctx, f, schema.GetPages(), "settings.reset", "Reset Setting", "Reset", ask); err != nil {
 					return Result{}, err
 				}
 				res, err := b.Update(ctx, connect.NewRequest(&v1.UpdateSettingsRequest{Values: map[string]string{key: ""}}))
