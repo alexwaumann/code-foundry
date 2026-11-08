@@ -216,6 +216,21 @@ function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** The wake-ups of runners now sleeping out a backoff (none while their attempt runs). */
+const napping = new Set<() => void>();
+
+/**
+ * Cuts short the backoff sleep of every stream runner waiting to retry, so each starts its
+ * next attempt at once. The health store calls it when the daemon answers again after it
+ * did not: the streams would otherwise each sleep out their own backoff (up to
+ * defaultBackoff.maxMs plus jitter) against a daemon that is already back. A runner whose
+ * attempt is running (open, or connecting) is left alone. The wake does not reset the
+ * backoff: an attempt that still fails waits longer next time, as before.
+ */
+export function wakeAllStreams(): void {
+  for (const wake of [...napping]) wake();
+}
+
 /**
  * Keeps a server stream open: reconnects with exponential backoff (plus jitter) after
  * errors, a clean end or a silent stream (livenessMs), until the returned stop function
@@ -353,7 +368,9 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
       };
       outer.signal.addEventListener("abort", cut);
       wake.signal.addEventListener("abort", cut);
+      napping.add(cut);
       await sleep(delay, nap.signal);
+      napping.delete(cut);
       outer.signal.removeEventListener("abort", cut);
       wake.signal.removeEventListener("abort", cut);
     }
