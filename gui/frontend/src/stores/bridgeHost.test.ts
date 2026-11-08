@@ -276,13 +276,13 @@ describe("bridge host", () => {
     expect(useConfirmStore.getState().pending).toBeNull();
   });
 
-  it("holds a frame's next question back after the last, however it ended, past a reload too", async () => {
+  it("holds a frame's next question back after one it got no yes to, saying how long, past a reload too", async () => {
     invokeCommand.mockRejectedValue(archiveConfirm);
     const { h, posts } = host();
-    const refused = async (id: string) => {
+    const refused = async (id: string, wait: string) => {
       h.receive(run(id, "thread.archive"));
       await vi.waitFor(() => {
-        expect(posts.find((p) => p.id === id && p.type === "cf:result")).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringMatching(/asking too often/) as unknown } });
+        expect(posts.find((p) => p.id === id && p.type === "cf:result")).toMatchObject({ ok: false, error: { code: "invalid", message: `this page is asking too often; ask again in ${wait}` } });
       });
       expect(useConfirmStore.getState().pending).toBeNull();
     };
@@ -292,32 +292,67 @@ describe("bridge host", () => {
         expect(useConfirmStore.getState().pending).not.toBeNull();
       });
     };
+    vi.setSystemTime(new Date(2026, 10, 8, 12));
     await opens("a");
     answerConfirm(false);
     await vi.waitFor(() => {
       expect(posts.at(-1)).toMatchObject({ id: "a", error: { code: "declined" } });
     });
-    await refused("b");
+    later(1000);
+    await refused("b", "4 s");
     later(PAGE_ASKS.gapMs);
     await opens("c");
+    // The page giving up on its question is no yes either.
     h.receive({ cf: 1, type: "cf:cancel", id: "c" });
     await vi.waitFor(() => {
       expect(posts.at(-1)).toMatchObject({ id: "c", ok: false });
     });
-    await refused("d");
+    await refused("d", "5 s");
     h.receive(hello);
-    await refused("e");
+    await refused("e", "5 s");
     later(PAGE_ASKS.gapMs);
     await opens("f");
     answerConfirm(false);
     await vi.waitFor(() => {
       expect(posts.find((p) => p.id === "f" && p.type === "cf:result")).toMatchObject({ error: { code: "declined" } });
     });
-    // Three in the minute: the gap alone no longer lets a fourth through.
+    // Three noes in the minute: the gap alone no longer lets a fourth through; the first no ages out at 60 s.
     later(PAGE_ASKS.gapMs);
-    await refused("g");
+    await refused("g", "44 s");
     later(60_000);
     await opens("h");
+  });
+
+  it("holds nothing back after a yes: a page's next button asks at once, however many times", async () => {
+    invokeCommand.mockImplementation((_n: string, _c: unknown, _a: unknown, _conn: unknown, opts?: { confirmed?: boolean }) =>
+      opts?.confirmed ? Promise.resolve({ message: "archived", resultJson: "" }) : Promise.reject(archiveConfirm),
+    );
+    const { h, posts } = host();
+    for (const id of ["a", "b", "c", "d", "e"]) {
+      h.receive(run(id, "thread.archive"));
+      await vi.waitFor(() => {
+        expect(useConfirmStore.getState().pending).not.toBeNull();
+      });
+      answerConfirm(true);
+      await vi.waitFor(() => {
+        expect(posts.at(-1)).toMatchObject({ type: "cf:result", id, ok: true });
+      });
+      later(1000);
+    }
+    // A no after them starts the gap as before.
+    h.receive(run("f", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(useConfirmStore.getState().pending).not.toBeNull();
+    });
+    answerConfirm(false);
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ id: "f", error: { code: "declined" } });
+    });
+    later(1000);
+    h.receive(run("g", "thread.archive"));
+    await vi.waitFor(() => {
+      expect(posts.at(-1)).toMatchObject({ id: "g", ok: false, error: { code: "invalid", message: "this page is asking too often; ask again in 4 s" } });
+    });
   });
 
   it("does not hold back a later stage of the same call", async () => {

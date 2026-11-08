@@ -86,14 +86,15 @@ describe("a page changing a setting", () => {
     expect(invokeCommand).toHaveBeenCalledTimes(1);
   });
 
-  it("hears a user-only refusal as it is, with no dialog", async () => {
-    const refusal = "advanced.claude_path can only be changed by the user; they can change it in Settings";
+  it("hears a user-only refusal as it is, failed, with no dialog", async () => {
+    const refusal = "advanced.claude_path can only be changed by you, in Settings → Advanced → Claude path";
     const { Code, ConnectError } = await import("@connectrpc/connect");
-    invokeCommand.mockRejectedValue(new ConnectError(refusal, Code.FailedPrecondition));
+    const { CommandFailedSchema } = await import("@/gen/codefoundry/v1/command_pb");
+    invokeCommand.mockRejectedValue(new ConnectError(refusal, Code.FailedPrecondition, undefined, [{ desc: CommandFailedSchema, value: { command: "settings.set" } }]));
     render(<ConfirmDialog />);
     const posts = page();
     await vi.waitFor(() => {
-      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: false, error: { code: "unavailable", message: expect.stringContaining(refusal) as unknown } });
+      expect(posts.at(-1)).toMatchObject({ type: "cf:result", id: "a", ok: false, error: { code: "failed", message: expect.stringContaining(refusal) as unknown } });
     });
     expect(screen.queryByTestId("confirm-dialog")).toBeNull();
   });

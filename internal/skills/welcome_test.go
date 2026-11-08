@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -74,5 +75,17 @@ func TestPlaceWelcome(t *testing.T) {
 	}
 	if _, err := PlaceWelcome(""); err == nil {
 		t.Error("PlaceWelcome(\"\") = nil error, want one")
+	}
+}
+
+// The welcome page shows its failures in the page: alert() is a no-op in the app's window
+// (Wails' WKWebView has no UI delegate for it), so a failure behind one is silent.
+func TestWelcomeHasNoAlert(t *testing.T) {
+	page, err := static.ReadFile(welcomeSource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i := strings.Index(string(page), "alert("); i >= 0 {
+		t.Errorf("welcome.html calls alert( at byte %d; show the message in the page instead", i)
 	}
 }

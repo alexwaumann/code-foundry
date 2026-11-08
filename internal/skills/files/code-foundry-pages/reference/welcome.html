@@ -15,7 +15,13 @@
 
   // Progress lives in the thread's page storage, so it survives reloads and restarts.
   const store = cf.storage("welcome");
-  const say = (e: any) => alert(e?.message ?? String(e));
+  // A failure shows in a line under the control that made it: a browser alert box shows
+  // nothing in the app's window. A no (`declined`) is the user's answer, not an error.
+  function useProblem() {
+    const [text, setText] = useState("");
+    return { text, clear: () => setText(""), say: (e: any) => { if (e?.code !== "declined") setText(e?.message ?? String(e)); } };
+  }
+  const Problem = ({ text }: { text: string }) => text ? <p role="alert" className="mt-1 text-caption text-cf-error-text">{text}</p> : null;
 
   type Chip = { text: string; send?: boolean; note?: string };
   type After = { label: string; verb: string; args?: Record<string, string>; once?: string }[];
@@ -30,31 +36,34 @@
   const demoSentence = (p: any) => `start three threads on the project ${p.name} (id ${p.id}), each read-only and not in the sidebar: what it is in two paragraphs; the ten most-changed files; anything unfinished or risky. The welcome page in the panel shows them, so do not build another board; reply in one line when they are started.`;
 
   function Chips({ items, dim, onSend }: { items: Chip[]; dim?: boolean; onSend?: (t: string) => void }) {
+    const { text, clear, say } = useProblem();
     return (
-      <div className="mt-2 flex flex-wrap gap-2">
+      <><div className="mt-2 flex flex-wrap gap-2">
         {items.map((c) => {
           const Icon = c.send ? Send : Pencil;
           return (
             <button key={c.text} type="button" disabled={dim}
-              onClick={() => { if (c.send) onSend?.(c.text); cf.run(c.send ? "thread.send" : "composer.stage", { text: c.text }).catch(say); }}
+              onClick={() => { clear(); if (c.send) onSend?.(c.text); cf.run(c.send ? "thread.send" : "composer.stage", { text: c.text }).catch(say); }}
               className="group flex items-start gap-2 rounded-2xl border border-cf-border bg-cf-surface-raised px-3 py-1.5 text-left text-body-sm text-cf-text hover:border-cf-border-strong hover:bg-cf-control-hover disabled:opacity-60">
               <span className="min-w-0">“{c.text}”{c.note && <span className="ml-2 inline-block whitespace-nowrap text-caption text-cf-text-muted">{c.note}</span>}</span>
               <Icon className="mt-0.5 size-3.5 shrink-0 text-cf-text-muted group-hover:text-cf-accent" />
             </button>
           );
         })}
-      </div>
+      </div><Problem text={text} /></>
     );
   }
   function SentChip({ c, after }: { c: Chip; after: After }) {
     const [used, setUsed] = useState<Record<string, boolean>>(() => Object.fromEntries(after.filter((a) => a.once).map((a) => [a.label, store.get("used:" + a.label) === true])));
-    const run = (a: After[number]) => cf.run(a.verb, a.args ?? {}).then(() => { if (a.once) { setUsed((m) => ({ ...m, [a.label]: true })); store.set("used:" + a.label, true).catch(() => {}); } }).catch(say);
+    const { text, clear, say } = useProblem();
+    const run = (a: After[number]) => { clear(); cf.run(a.verb, a.args ?? {}).then(() => { if (a.once) { setUsed((m) => ({ ...m, [a.label]: true })); store.set("used:" + a.label, true).catch(() => {}); } }).catch(say); };
     return (
       <div className="mt-2 rounded-lg border border-cf-border bg-cf-surface-raised px-3 py-2">
         <div className="flex items-center gap-2 text-body-sm"><Check className="size-3.5 text-cf-success-text" /><span className="text-cf-text-muted">Sent:</span><span>“{c.text}”</span></div>
         <div className="mt-2 flex flex-wrap gap-2">
           {after.map((a) => <Button key={a.label} size="xs" variant="outline" disabled={!!used[a.label]} onClick={() => run(a)}>{used[a.label] ? a.once : a.label}</Button>)}
         </div>
+        <Problem text={text} />
       </div>
     );
   }
@@ -62,6 +71,7 @@
   /** The thread's children (the demo's threads), with the app's words for their state. */
   function Board({ live, ran, onRun, project }: { live: boolean; ran: boolean; onRun: () => void; project: any }) {
     const [threads, setThreads] = useState<any[]>([]);
+    const { text, clear, say } = useProblem();
     useEffect(() => cf.on("thread-list", (list: any[]) => setThreads(list ?? []), () => {}), []);
     // The app's states: busy; error; attention with a reason ("finished", "permission: …",
     // "question: …", "snooze ended"); idle ("at prompt"). Finished is done, not a request.
@@ -82,15 +92,16 @@
       <div className="mt-3 rounded-lg border border-cf-border bg-cf-surface-sunken p-3">
         <div className="flex items-center justify-between">
           <p className="text-overline">Your agents, live · click one to open it</p>
-          <Button size="xs" disabled={!live || ran} onClick={() => { onRun(); cf.run("thread.send", { text: demoSentence(project) }).catch(say); }}><Play /> {ran ? "Demo started" : "Run the demo"}</Button>
+          <Button size="xs" disabled={!live || ran} onClick={() => { clear(); onRun(); cf.run("thread.send", { text: demoSentence(project) }).catch(say); }}><Play /> {ran ? "Demo started" : "Run the demo"}</Button>
         </div>
         {rows.length === 0
           ? <p className="mt-2 text-body-sm text-cf-text-muted">Three agents read your folder at the same time and report back here. Nothing is changed.</p>
           : rows.map((t) => { const [word, tone] = label(t); return (
-              <button key={t.id} type="button" onClick={() => cf.run("thread.focus", { id: t.id }).catch(say)}
+              <button key={t.id} type="button" onClick={() => { clear(); cf.run("thread.focus", { id: t.id }).catch(say); }}
                 className="mt-1 flex w-full items-center justify-between rounded-md px-2 py-1 text-left text-body-sm hover:bg-cf-control-hover">
                 <span className="truncate text-link">{t.name}</span><span className={tone}>{word}</span>
               </button>); })}
+        <Problem text={text} />
       </div>
     );
   }
@@ -99,22 +110,25 @@
   function Dictation({ onOn }: { onOn: () => void }) {
     const [snap, setSnap] = useState<any>(null);
     const [note, setNote] = useState("");
+    const { text, clear, say } = useProblem();
     const refresh = () => cf.run("dictation.status", {}).then((r) => setSnap(r.json)).catch(() => setSnap({}));
     useEffect(() => { refresh(); const id = setInterval(refresh, 5000); return () => clearInterval(id); }, []);
     const on = !!snap?.enabled;
     const downloading = !!snap?.model?.download;
     const toggle = (next: boolean) => {
+      clear();
       if (next && !snap?.model?.downloaded) {
         cf.run("dictation.download", {}).then((r) => { setNote(r.text); refresh(); }).catch(say);
         return;
       }
-      cf.run("settings.set", { key: "dictation.enabled", value: String(next) }).then(() => { if (next) onOn(); refresh(); }).catch((e) => { if (e?.code !== "declined") say(e); });
+      cf.run("settings.set", { key: "dictation.enabled", value: String(next) }).then(() => { if (next) onOn(); refresh(); }).catch(say);
     };
     return (
       <div>
         <div className="flex items-center gap-2"><Switch id="d" checked={on} disabled={snap === null || downloading} onCheckedChange={toggle} /><Label htmlFor="d" className="flex items-center gap-1"><Mic className="size-3.5" /> Dictation</Label>
           <span className="text-body-sm text-cf-text-muted">{downloading ? "downloading the model; it turns on when that finishes" : on ? "on: ⇧⌘M in any composer" : "talk instead of typing; audio stays on this Mac"}</span></div>
         {note && !downloading && <p className="mt-1 text-caption text-cf-text-muted">{note}</p>}
+        <Problem text={text} />
       </div>
     );
   }
@@ -147,7 +161,9 @@
     const markSent = (t: string) => { setSent((m) => ({ ...m, [t]: true })); store.set("sent:" + t, true).catch(() => {}); };
     const markRan = () => { setRan(true); store.set("demo", true).catch(() => {}); };
     const markDictated = () => { setDictated(true); store.set("dictation", true).catch(() => {}); };
-    const addProject = () => cf.run("project.add", {}).then((r) => { if (r.text && /hint|code-foundry project add/i.test(r.text)) alert(r.text); }).catch(say);
+    const [hint, setHint] = useState("");
+    const added = useProblem();
+    const addProject = () => { setHint(""); added.clear(); cf.run("project.add", {}).then((r) => { if (r.text && /hint|code-foundry project add/i.test(r.text)) setHint(r.text); }).catch(added.say); };
     const now = !step1 ? 1 : !hasProject ? 2 : !ran ? 3 : 4;
     const st = (n: number, done: boolean, locked = false): "done" | "now" | "next" | "locked" => done ? "done" : locked ? "locked" : now === n ? "now" : "next";
     const here = <Badge>start here</Badge>;
@@ -165,6 +181,8 @@
             {hasProject
               ? <p className="mt-2 text-body-sm"><span className="font-medium text-cf-text">{first.name}</span> is added. This thread stays where it is; new threads can work in it, and the demo below runs there. <button className="text-link" onClick={addProject}>Add another</button></p>
               : <div className="mt-2"><Button size="sm" onClick={addProject}><FolderPlus /> Add a project…</Button></div>}
+            {hint && <p className="mt-1 text-caption text-cf-text-muted">{hint}</p>}
+            <Problem text={added.text} />
           </Step>
           <Step title="Put several agents on it" state={st(3, ran, !hasProject)} badge={!hasProject ? <Badge variant="outline">after step 2</Badge> : now === 3 && here}>
             <p className="text-body-sm text-cf-text-muted">One sentence can start several threads at once, each on its own copy of your work. You watch them from here.</p>

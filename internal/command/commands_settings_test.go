@@ -225,16 +225,17 @@ func TestSettingChangeCallers(t *testing.T) {
 		userOnly bool
 		want     string // what a page's dialog says
 		label    string
+		place    string // where a user-only setting's refusal sends the reader
 	}{
 		{name: "set", cmd: "settings.set", key: "appearance.font_size", value: "15", want: `Change appearance.font_size to "15"?`, label: "Change"},
 		{name: "reset", cmd: "settings.reset", key: "appearance.font_size", want: `Reset appearance.font_size to its default, "13"?`, label: "Reset"},
-		{name: "set the claude path", cmd: "settings.set", key: "advanced.claude_path", value: exe, userOnly: true},
-		{name: "reset the claude path", cmd: "settings.reset", key: "advanced.claude_path", userOnly: true},
-		{name: "set the gh path", cmd: "settings.set", key: "advanced.gh_path", value: exe, userOnly: true},
-		{name: "set the editor", cmd: "settings.set", key: "gitops.editor_command", value: "other {path}", userOnly: true},
-		{name: "reset the editor", cmd: "settings.reset", key: "gitops.editor_command", userOnly: true},
-		{name: "set the registries", cmd: "settings.set", key: "plugins.registries", value: "https://github.com/o/r", userOnly: true},
-		{name: "set the channel", cmd: "settings.set", key: "update.channel", value: "tip", userOnly: true},
+		{name: "set the claude path", cmd: "settings.set", key: "advanced.claude_path", value: exe, userOnly: true, place: "Settings → Advanced → claude executable"},
+		{name: "reset the claude path", cmd: "settings.reset", key: "advanced.claude_path", userOnly: true, place: "Settings → Advanced → claude executable"},
+		{name: "set the gh path", cmd: "settings.set", key: "advanced.gh_path", value: exe, userOnly: true, place: "Settings → Advanced → gh executable"},
+		{name: "set the editor", cmd: "settings.set", key: "gitops.editor_command", value: "other {path}", userOnly: true, place: "Settings → Source control → Editor command"},
+		{name: "reset the editor", cmd: "settings.reset", key: "gitops.editor_command", userOnly: true, place: "Settings → Source control → Editor command"},
+		{name: "set the registries", cmd: "settings.set", key: "plugins.registries", value: "https://github.com/o/r", userOnly: true, place: "Settings → Plugins → Plugin registries"},
+		{name: "set the channel", cmd: "settings.set", key: "update.channel", value: "tip", userOnly: true, place: "Settings → General → Channel"},
 	}
 	for _, c := range callers {
 		for _, s := range settings {
@@ -274,7 +275,9 @@ func TestSettingChangeCallers(t *testing.T) {
 						t.Errorf("changed before the answer: %q -> %q", before, after)
 					}
 				case refused:
-					want := s.key + " can only be changed by the user; they can change it in Settings"
+					// One text for a model in a thread and a person at a page or a thread's
+					// terminal: no pronoun, the page and row to go to, and why this caller cannot.
+					want := s.key + " can only be changed by hand, in " + s.place + "; a command from a thread (its terminal too), a page or a plugin cannot change it"
 					if errors.As(err, &ce) {
 						t.Fatalf("asked %q: a user-only setting is refused, not asked", ce.Message)
 					}
