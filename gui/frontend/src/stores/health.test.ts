@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { HealthView } from "@/api/health";
 
-const ping = vi.fn();
-const wakeAllStreams = vi.fn();
+const ping = vi.fn<() => Promise<HealthView>>();
+const wakeAllStreams = vi.fn<() => void>();
 
 vi.mock("@/api/health", () => ({ ping: () => ping() }));
-vi.mock("@/api/stream", () => ({ wakeAllStreams: () => wakeAllStreams() }));
+vi.mock("@/api/stream", () => ({
+  wakeAllStreams: () => {
+    wakeAllStreams();
+  },
+}));
 
 const { useHealthStore } = await import("./health");
 
-const view = { pid: 1, version: "dev", uptimeSeconds: 1 };
+const view: HealthView = { pid: 1, version: "dev", uptimeSeconds: 1 };
 
 describe("health store", () => {
   beforeEach(() => {

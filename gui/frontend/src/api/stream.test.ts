@@ -379,9 +379,9 @@ describe("wakeAllStreams", () => {
     // A request that hangs: the attempt is connecting, not sleeping.
     const hangingSignals: AbortSignal[] = [];
     const stopHanging = runStream<string>({
-      open: async function* (signal) {
+      open: (signal) => {
         hangingSignals.push(signal);
-        await new Promise(() => undefined);
+        return { [Symbol.asyncIterator]: () => ({ next: () => new Promise<IteratorResult<string>>(() => undefined) }) };
       },
       onEvent: () => undefined,
       sleep: longSleep([]),
@@ -407,7 +407,8 @@ describe("wakeAllStreams", () => {
       open: async function* () {
         opens++;
         await Promise.resolve();
-        throw new TypeError("Load failed");
+        if (opens > 0) throw new TypeError("Load failed");
+        yield "never";
       },
       onEvent: () => undefined,
       sleep: longSleep(delays),
