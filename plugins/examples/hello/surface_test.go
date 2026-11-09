@@ -87,7 +87,7 @@ func TestDemoSurface(t *testing.T) {
 	for _, l := range view(t, h).NodeLists() {
 		walk(l)
 	}
-	for _, k := range []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs"} {
+	for _, k := range []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs", "stats", "bars"} {
 		if !kinds[k] {
 			t.Errorf("the demo has no %s node", k)
 		}
