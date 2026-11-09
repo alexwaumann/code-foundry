@@ -68,7 +68,7 @@ export const SLOT_USES: Readonly<Record<string, string>> = {
   "--cf-diff-deletion": "−N counts, deleted files' D, deleted bars",
   "--cf-diff-deletion-surface": "the diff view's deleted lines, striped markers and − markers",
   "--cf-diff-modified": "modified files' M",
-  ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((i) => [`--cf-chart-${String(i)}`, PAGES_ONLY])),
+  ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((i) => [`--cf-chart-${String(i)}`, "a page's chart series; a plugin picker option's avatar"])),
   "--terminal-fg": "terminal text",
   "--terminal-cursor": "the terminal cursor",
   "--terminal-cursor-accent": "the character under the terminal cursor",
