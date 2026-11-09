@@ -42,6 +42,7 @@ import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
 import { MockRegistry, type InstallSpec } from "./pluginRegistry";
 import { applyToCustom, rowOpOf, TodoState, type RowOp } from "./pluginRows";
+import { sortTable, sortValue, tableParts } from "./pluginTable";
 import type { UiIntentInit } from "./world";
 
 export type PluginEventInit = MessageInitShape<typeof PluginEventSchema>;
@@ -164,7 +165,7 @@ function patchNode(nodes: Node[], key: string, f: (n: Node) => void): boolean {
 
 interface Element {
   key: string;
-  kind: "click" | "submit" | "change" | "tab" | "select" | "search" | "host" | RowOp["kind"];
+  kind: "click" | "submit" | "change" | "tab" | "select" | "search" | "sort" | "host" | RowOp["kind"];
   event: string;
   /** The event's data (a chip's status, a row's id). */
   data?: string;
@@ -172,6 +173,8 @@ interface Element {
   node?: string;
   /** A list's row act (mock/pluginRows.ts), shaped and checked as the daemon does. */
   op?: RowOp;
+  /** A sort's direction when the act names none (mock/pluginTable.ts). */
+  next?: "asc" | "desc";
 }
 
 /** The node with `key` (at any depth), or undefined. */
@@ -259,6 +262,15 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
       md?.emptyDetail?.actions?.forEach((b) => {
         button(b);
       });
+      const table = tableParts(n);
+      for (const s of table.sorts) out.set(s.key, { key: s.key, kind: "sort", event: "sort", node: s.node, next: s.next });
+      for (const r of table.rows) {
+        action(r.key, r.action, "click");
+        r.actions?.forEach((b) => {
+          button(b);
+        });
+        menu(r.menu);
+      }
       (n.tabs as { items?: { key: string }[] } | undefined)?.items?.forEach((t) => out.set(t.key, { key: t.key, kind: "tab", event: "tab", node: n.key }));
       if (any.form) {
         if (any.form.submit) button(any.form.submit, "submit");
@@ -433,6 +445,8 @@ class DemoInstance {
   peopleQuery = "";
   /** The Overview's Failing card narrows its chart to the failed builds (charts.go). */
   failedOnly = false;
+  /** The Runs tab's Builds table order (the real plugin's buildsState; mock/pluginTable.ts). */
+  buildsSort: { column: string; dir: "asc" | "desc" } = { column: "b-num", dir: "desc" };
   /** The Todo tab's tasks (the real plugin's todoState; mock/pluginRows.ts). */
   readonly todo = new TodoState();
   /** The Runs tab's state (the real plugin's runsState): the chosen run, the detail's tab, notes by run. */
@@ -531,6 +545,8 @@ class DemoInstance {
       this.patchLayoutFilter(v);
     } else if (this.tab === "run-list") {
       patchRuns(nodes, this.runs);
+      const builds = findNode(nodes, "builds");
+      if (builds) sortTable(builds, this.buildsSort.column, this.buildsSort.dir);
     } else if (this.tab === "todo") {
       this.todo.patch(nodes, findNode);
     } else if (this.tab === "shell") {
@@ -633,6 +649,10 @@ class DemoInstance {
       else if (el.kind === "select" && el.node) this.custom.selected[el.node] = el.key;
       else if (el.kind === "tab" && el.node) this.custom.active[el.node] = el.key;
       else if (el.kind === "tab") this.custom.viewTab = el.key;
+      else if (el.kind === "sort" && el.node) {
+        const t = findNode(viewListsOf(this.custom.view).flat(), el.node);
+        if (t) sortTable(t, el.key, sortValue(value, el.next ?? "asc"));
+      }
       this.render();
       return;
     }
@@ -745,6 +765,13 @@ class DemoInstance {
       case "click:rerun-run":
         toast(`build #${el.data ?? ""} queued again`);
         return;
+      case "click:abort-build":
+        toast(`build #${el.data ?? ""} aborted`);
+        return;
+      case "sort:sort":
+        if (!["b-num", "b-branch", "b-dur"].includes(el.key)) throw new ConnectError(`plugin refused: the builds table does not sort by "${el.key}"`, Code.Aborted);
+        this.buildsSort = { column: el.key, dir: sortValue(value, el.next ?? "asc") };
+        break;
       case "change:project-changed":
       case "click:stage":
       case "click:open-run":
