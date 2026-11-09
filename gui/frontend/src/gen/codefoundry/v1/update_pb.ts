@@ -495,8 +495,10 @@ export const UpdateService: GenService<{
   },
   /**
    * Check asks GitHub for the latest release now and returns the resulting status. A
-   * failed check keeps the previous state and sets last_check_error. FailedPrecondition
-   * when updates are disabled.
+   * newer release starts downloading at once (DOWNLOADING); one newer than a download
+   * already staged downloads in the background while the state stays DOWNLOADED, and
+   * replaces it when done. A failed check keeps the previous state and sets
+   * last_check_error. FailedPrecondition when updates are disabled.
    *
    * @generated from rpc codefoundry.v1.UpdateService.Check
    */
@@ -506,10 +508,11 @@ export const UpdateService: GenService<{
     output: typeof CheckForUpdateResponseSchema;
   },
   /**
-   * Download starts downloading and staging the available version and returns at once
-   * with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
-   * Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
-   * unless the state is AVAILABLE or FAILED.
+   * Download checks for the latest release, then starts downloading and staging the
+   * version that check offers and returns with state DOWNLOADING; progress and the
+   * outcome (DOWNLOADED or FAILED) arrive on Watch. Nothing on disk changes outside the
+   * staging directory. FailedPrecondition unless the state after the check is AVAILABLE
+   * or FAILED. (Checks download by themselves; this is the retry after a failure.)
    *
    * @generated from rpc codefoundry.v1.UpdateService.Download
    */

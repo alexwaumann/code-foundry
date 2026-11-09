@@ -686,6 +686,8 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 		wantErr  bool
 		wantNew  bool   // app.new exists afterwards
 		wantOnly string // a second fragment of the output
+		// wantStaged is app.new's version afterwards, when wantNew.
+		wantStaged string
 	}{
 		{
 			name:    "already installed: nothing staged",
@@ -704,7 +706,7 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "a failed download removes an older stage",
+			name: "a failed download keeps an older stage",
 			prepare: func(t *testing.T, e installEnv) {
 				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
 				if out, err := e.run(t, "--stage-only"); err != nil {
@@ -713,9 +715,41 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 				tgz := fakeRelease(t, e.rel, "v0.3.0", "v0.3.0")
 				_ = os.WriteFile(tgz, []byte("tampered"), 0o644)
 			},
-			args:    []string{"--stage-only"},
-			want:    "checksum mismatch",
-			wantErr: true,
+			args:       []string{"--stage-only"},
+			want:       "checksum mismatch",
+			wantErr:    true,
+			wantNew:    true,
+			wantStaged: "v0.2.0",
+		},
+		{
+			name: "an unpack failure keeps an older stage",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				if out, err := e.run(t, "--stage-only"); err != nil {
+					t.Fatalf("%v\n%s", err, out)
+				}
+				// The archive unpacks but reports another version.
+				fakeRelease(t, e.rel, "v0.3.0", "v0.2.9")
+			},
+			args:       []string{"--stage-only"},
+			want:       "the archive contains version 'v0.2.9', expected v0.3.0",
+			wantErr:    true,
+			wantNew:    true,
+			wantStaged: "v0.2.0",
+		},
+		{
+			name: "a newer download replaces an older stage",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				if out, err := e.run(t, "--stage-only"); err != nil {
+					t.Fatalf("%v\n%s", err, out)
+				}
+				fakeRelease(t, e.rel, "v0.3.0", "v0.3.0")
+			},
+			args:       []string{"--stage-only"},
+			want:       "downloaded v0.3.0 to ",
+			wantNew:    true,
+			wantStaged: "v0.3.0",
 		},
 		{
 			name:    "apply with nothing staged",
@@ -770,6 +804,15 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 			}
 			if _, err := os.Stat(e.app() + ".new"); (err == nil) != tt.wantNew {
 				t.Fatalf("app.new exists = %v, want %v", err == nil, tt.wantNew)
+			}
+			if tt.wantStaged != "" {
+				b, err := os.ReadFile(filepath.Join(e.app()+".new", "VERSION"))
+				if err != nil || strings.TrimSpace(string(b)) != tt.wantStaged {
+					t.Fatalf("app.new holds %q (%v), want %s", b, err, tt.wantStaged)
+				}
+			}
+			if _, err := os.Stat(e.app() + ".new.partial"); err == nil {
+				t.Fatal("app.new.partial left behind")
 			}
 		})
 	}

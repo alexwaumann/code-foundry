@@ -1,9 +1,12 @@
 /**
  * Mock updater: the daemon's UpdateService state machine (internal/store/update) with
  * timers instead of gh and the installer. Driven by the app.* commands and by test
- * controls (see server.ts /__mock/update/*). Download (app.update) stages the release:
- * Available → Downloading → Downloaded (or Failed); Install, which app.restart runs
- * first, swaps it in: Downloaded → Installed.
+ * controls (see server.ts /__mock/update/*). A check that finds a newer release downloads
+ * it at once (Available → Downloading → Downloaded); an automatic download that fails goes
+ * back to Available, and Download (app.update) retries by hand (failing → Failed). A
+ * newer release while Downloaded downloads in the background and replaces the target
+ * when done, staying Downloaded throughout. Install, which app.restart runs first, swaps
+ * it in: Downloaded → Installed.
  *
  * Initial state: v0.1.0, up to date, latest release v0.1.0. POST
  * /__mock/update/latest?version=v0.2.0 publishes a newer release for the next check.
@@ -183,19 +186,41 @@ export class MockUpdater {
       return s;
     }
     const newer = this.latest !== s.currentVersion && this.latest > s.currentVersion;
-    // A download or an install of the latest stays; a newer release is offered over it.
+    // A download or an install of the latest stays; a newer release is downloaded over it.
     const installedTarget = s.state === UpdateState.DOWNLOADED || s.state === UpdateState.INSTALLED || s.state === UpdateState.RESTART_REQUIRED ? s.targetVersion : "";
-    if (newer && this.latest !== installedTarget) this.set(UpdateState.AVAILABLE, this.latest);
-    else if (!installedTarget) this.set(UpdateState.IDLE, "");
+    if (newer && s.state === UpdateState.DOWNLOADED && this.latest > s.targetVersion) {
+      this.emit();
+      this.replace(this.latest);
+    } else if (newer && this.latest !== installedTarget) {
+      this.set(UpdateState.AVAILABLE, this.latest);
+      this.startDownload(true);
+    } else if (!installedTarget) this.set(UpdateState.IDLE, "");
     else this.emit();
     return this.status;
+  }
+
+  /** The background replacement of a download by a newer release: Downloaded stays until it is done. */
+  private replace(target: string): void {
+    this.timers.push(
+      setTimeout(
+        () => {
+          if (this.status.state === UpdateState.DOWNLOADED) this.set(UpdateState.DOWNLOADED, target);
+        },
+        this.stepMs * (PROGRESS.length + 1),
+      ),
+    );
   }
 
   /** UpdateService.Download: stages the target in the background (app.update). */
   download(): string {
     const s = this.status;
     if (s.state !== UpdateState.AVAILABLE && s.state !== UpdateState.FAILED) throw new Error("no update available");
-    const target = s.targetVersion;
+    return this.startDownload(false);
+  }
+
+  /** Downloads the target; auto: a check started it, so a failure goes back to Available. */
+  private startDownload(auto: boolean): string {
+    const target = this.status.targetVersion;
     this.set(UpdateState.DOWNLOADING, target, { progress: "starting installer" });
     PROGRESS.forEach((line, i) => {
       this.timers.push(
@@ -215,7 +240,8 @@ export class MockUpdater {
           if (this.failNext) {
             const reason = this.failNext;
             this.failNext = "";
-            this.set(UpdateState.FAILED, target, { failureReason: reason });
+            if (auto) this.set(UpdateState.AVAILABLE, target);
+            else this.set(UpdateState.FAILED, target, { failureReason: reason });
           } else {
             this.set(UpdateState.DOWNLOADED, target);
           }

@@ -33,6 +33,8 @@ func newUpdateFixture(t *testing.T, current string) *updateFixture {
 	opts := update.Options{
 		Current: current, Repo: "o/n", Source: f.source, Installer: f.installer,
 		InstalledVersion: disk.Version, StagedVersion: f.installer.Staged().Version, Bus: b, InitialDelay: time.Hour,
+		// The flow drives Download over the RPC; automatic downloads are the store's tests.
+		ManualDownload: true,
 	}
 	if !update.IsSemver(current) {
 		opts.DisabledReason = "dev build"

@@ -296,7 +296,7 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 			Name:        "app.update.check",
 			Page:        PageState,
 			Title:       "Check for Updates",
-			Description: "Ask GitHub for the latest release now (the daemon also checks every 24 hours).",
+			Description: "Ask GitHub for the latest release now and download it if it is newer (the daemon also checks every hour).",
 			Category:    "App",
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
 				res, err := d.Update.Check(ctx, connect.NewRequest(&v1.CheckForUpdateRequest{}))

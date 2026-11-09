@@ -55,13 +55,16 @@ type UpdateServiceClient interface {
 	// Get returns the current update status.
 	Get(context.Context, *connect.Request[v1.GetUpdateStatusRequest]) (*connect.Response[v1.GetUpdateStatusResponse], error)
 	// Check asks GitHub for the latest release now and returns the resulting status. A
-	// failed check keeps the previous state and sets last_check_error. FailedPrecondition
-	// when updates are disabled.
+	// newer release starts downloading at once (DOWNLOADING); one newer than a download
+	// already staged downloads in the background while the state stays DOWNLOADED, and
+	// replaces it when done. A failed check keeps the previous state and sets
+	// last_check_error. FailedPrecondition when updates are disabled.
 	Check(context.Context, *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error)
-	// Download starts downloading and staging the available version and returns at once
-	// with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
-	// Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
-	// unless the state is AVAILABLE or FAILED.
+	// Download checks for the latest release, then starts downloading and staging the
+	// version that check offers and returns with state DOWNLOADING; progress and the
+	// outcome (DOWNLOADED or FAILED) arrive on Watch. Nothing on disk changes outside the
+	// staging directory. FailedPrecondition unless the state after the check is AVAILABLE
+	// or FAILED. (Checks download by themselves; this is the retry after a failure.)
 	Download(context.Context, *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error)
 	// Install installs the downloaded version into the app directory and returns when done
 	// (fast: no network) with state INSTALLED, or an error and state FAILED.
@@ -189,13 +192,16 @@ type UpdateServiceHandler interface {
 	// Get returns the current update status.
 	Get(context.Context, *connect.Request[v1.GetUpdateStatusRequest]) (*connect.Response[v1.GetUpdateStatusResponse], error)
 	// Check asks GitHub for the latest release now and returns the resulting status. A
-	// failed check keeps the previous state and sets last_check_error. FailedPrecondition
-	// when updates are disabled.
+	// newer release starts downloading at once (DOWNLOADING); one newer than a download
+	// already staged downloads in the background while the state stays DOWNLOADED, and
+	// replaces it when done. A failed check keeps the previous state and sets
+	// last_check_error. FailedPrecondition when updates are disabled.
 	Check(context.Context, *connect.Request[v1.CheckForUpdateRequest]) (*connect.Response[v1.CheckForUpdateResponse], error)
-	// Download starts downloading and staging the available version and returns at once
-	// with state DOWNLOADING; progress and the outcome (DOWNLOADED or FAILED) arrive on
-	// Watch. Nothing on disk changes outside the staging directory. FailedPrecondition
-	// unless the state is AVAILABLE or FAILED.
+	// Download checks for the latest release, then starts downloading and staging the
+	// version that check offers and returns with state DOWNLOADING; progress and the
+	// outcome (DOWNLOADED or FAILED) arrive on Watch. Nothing on disk changes outside the
+	// staging directory. FailedPrecondition unless the state after the check is AVAILABLE
+	// or FAILED. (Checks download by themselves; this is the retry after a failure.)
 	Download(context.Context, *connect.Request[v1.DownloadUpdateRequest]) (*connect.Response[v1.DownloadUpdateResponse], error)
 	// Install installs the downloaded version into the app directory and returns when done
 	// (fast: no network) with state INSTALLED, or an error and state FAILED.

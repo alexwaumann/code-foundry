@@ -1,8 +1,8 @@
 // Package update is the in-app updater: it checks the latest GitHub release of the
 // build's release repository on the configured channel (30s after daemon start, then
-// every 24h, on request, and at once when the channel changes), downloads it on request
-// and installs it as part of the restart, by running the installer embedded in the
-// binary. Newer is the only rule on both channels: switching from tip to stable never
+// every hour, on request, and at once when the channel changes), downloads a newer
+// release as soon as a check finds it, and installs it as part of the restart, by
+// running the installer embedded in the binary. Newer is the only rule on both channels: switching from tip to stable never
 // offers a downgrade, it waits for the next stable release above the running build.
 //
 // State machine (Status.State):
@@ -18,6 +18,17 @@
 // Download checks first and downloads whatever is newest then, and a failed download
 // checks again at once: a release offered earlier may have been deleted (tip releases
 // beyond the newest five are), and retrying it would fail the same way every time.
+//
+// Automatic downloads: a scheduled or requested check that moves to Available starts the
+// download itself, so the user is offered "Install and Restart Now" without a Download
+// click. An automatic download that fails goes back to Available (the Download button
+// stays as the fallback) instead of Failed, and the next check tries again; the check
+// right after the failure does not retry the version that just failed. A check that
+// finds a release newer than the one downloaded keeps Downloaded and downloads the newer
+// one in the background (replacing); the installer unpacks it beside the stage and swaps
+// it in only once complete, so the older download stays installable throughout, and
+// Install cancels the replacement and installs what is staged. At most three copies
+// exist at once: the install, the download, and the replacement in progress.
 //
 // Download only stages the release beside the app directory (<app>.new); the install on
 // disk does not change, so a window closed and reopened meanwhile still finds the
@@ -38,6 +49,7 @@
 package update
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -180,10 +192,13 @@ type Options struct {
 	// ("" when none). Defaults to re-reading VERSION in StageDir of the running
 	// executable's directory.
 	StagedVersion func() (string, error)
-	Bus           *bus.Bus
-	Log           *slog.Logger
-	InitialDelay  time.Duration
-	Interval      time.Duration
+	// ManualDownload turns automatic downloads off: checks only offer a release, and
+	// Download fetches it. Not a user setting; for tests of the manual path.
+	ManualDownload bool
+	Bus            *bus.Bus
+	Log            *slog.Logger
+	InitialDelay   time.Duration
+	Interval       time.Duration
 	// Tick is how often the loop compares the wall clock against Interval (so an
 	// overdue check runs this soon after wake from sleep). Default the smaller of a
 	// minute and Interval.
@@ -235,6 +250,14 @@ type Store struct {
 	status Status
 	// installing is set while Install runs the installer (outside mu).
 	installing bool
+	// failedTag is the version whose download failed last; the check right after a
+	// failure does not start it again automatically.
+	failedTag string
+	// replacing is the newer version downloading in the background while Downloaded
+	// ("" when none); replaceCancel stops it and replaceDone closes when it has ended.
+	replacing     string
+	replaceCancel context.CancelFunc
+	replaceDone   chan struct{}
 
 	// recheck asks the loop for an immediate check (a channel change); buffered 1.
 	recheck chan struct{}
@@ -366,9 +389,27 @@ func (s *Store) SetChannel(ch Channel) {
 	}
 }
 
+// autoMode is what a check may start by itself once it has seen the latest release.
+type autoMode int
+
+const (
+	// autoNone: Download's own check; Download starts the download.
+	autoNone autoMode = iota
+	// autoNew: the check after a failed download; it starts a download, but not of the
+	// version that just failed.
+	autoNew
+	// autoAll: scheduled and requested checks.
+	autoAll
+)
+
 // Check asks the source for the latest release and updates the state. A failed check
-// leaves the state as it was and records LastCheckError.
+// leaves the state as it was and records LastCheckError. A newer release starts
+// downloading at once (see the package doc).
 func (s *Store) Check(ctx context.Context) (Status, error) {
+	return s.check(ctx, autoAll)
+}
+
+func (s *Store) check(ctx context.Context, mode autoMode) (Status, error) {
 	if !s.Snapshot().Enabled {
 		return s.Snapshot(), fmt.Errorf("%w: %s", ErrDisabled, s.opts.DisabledReason)
 	}
@@ -407,6 +448,7 @@ func (s *Store) Check(ctx context.Context) (Status, error) {
 		st.LastCheckError = ""
 		st.Latest = tag
 		s.applyLatest(tag)
+		s.autoLocked(mode)
 	}
 	s.publishLocked()
 	out = s.status
@@ -424,8 +466,36 @@ func (s *Store) applyLatest(tag string) {
 	if s.installing {
 		return // Install decides
 	}
-	next, target := decide(st.State, st.Target, s.opts.Current, s.onDisk(), s.staged(), tag)
+	staged := s.staged()
+	next, target := decide(st.State, st.Target, s.opts.Current, s.onDisk(), staged, tag)
+	if st.State == Downloaded && next == Available && staged == st.Target {
+		// Keep the download installable; autoLocked replaces it in the background.
+		return
+	}
 	s.moveTo(next, target)
+}
+
+// autoLocked starts what a check may start by itself (see autoMode): the download of an
+// available version, or the replacement of a download by a newer release. Caller holds
+// mu.
+func (s *Store) autoLocked(mode autoMode) {
+	st := &s.status
+	if mode == autoNone || s.opts.ManualDownload || s.installing || s.ctx.Err() != nil {
+		return
+	}
+	switch st.State {
+	case Available:
+		if mode == autoNew && st.Target == s.failedTag {
+			return
+		}
+		s.log.Info("downloading update automatically", "version", st.Target)
+		s.startDownloadLocked(st.Target, true)
+	case Downloaded:
+		if s.replacing != "" || !Newer(st.Latest, st.Target) || (mode == autoNew && st.Latest == s.failedTag) {
+			return
+		}
+		s.startReplaceLocked(st.Latest)
+	}
 }
 
 // applyDisk notices, at start, a newer download staged or a newer install on disk: a
@@ -520,7 +590,7 @@ func (s *Store) Download(ctx context.Context) (Status, error) {
 	// new channel rather than download the old channel's release.
 	for range 2 {
 		ch := s.Snapshot().Channel
-		if _, err := s.Check(ctx); err != nil && ctx.Err() == nil {
+		if _, err := s.check(ctx, autoNone); err != nil && ctx.Err() == nil {
 			s.log.Warn("update check before download failed; downloading the version offered", "err", err)
 		}
 		if s.Snapshot().Channel == ch {
@@ -547,15 +617,20 @@ func (s *Store) Download(ctx context.Context) (Status, error) {
 		}
 		return *st, ErrNotAvailable
 	}
-	target := st.Target
-	s.moveTo(Downloading, target)
-	st.Progress = "starting download"
-	s.publishLocked()
-	s.wg.Go(func() { s.runDownload(target) })
+	s.startDownloadLocked(st.Target, false)
 	return *st, nil
 }
 
-func (s *Store) runDownload(target string) {
+// startDownloadLocked moves to Downloading and downloads target in the background. auto
+// marks a download no one asked for: its failure goes back to Available. Caller holds mu.
+func (s *Store) startDownloadLocked(target string, auto bool) {
+	s.moveTo(Downloading, target)
+	s.status.Progress = "starting download"
+	s.publishLocked()
+	s.wg.Go(func() { s.runDownload(target, auto) })
+}
+
+func (s *Store) runDownload(target string, auto bool) {
 	s.log.Info("downloading update", "version", target)
 	err := s.opts.Installer.Download(s.ctx, target, func(line string) {
 		s.set(func(st *Status) {
@@ -573,13 +648,23 @@ func (s *Store) runDownload(target string) {
 		}
 	}
 	s.mu.Lock()
-	if err != nil {
+	switch {
+	case err != nil && auto:
+		// Nobody asked for it: offer it as before automatic downloads (the Download
+		// button) and try again at the next check.
+		s.log.Warn("automatic update download failed; trying again at the next check", "version", target, "err", err)
+		s.failedTag = target
+		s.moveTo(Available, target)
+	case err != nil:
 		s.log.Warn("update download failed", "version", target, "err", err)
+		s.failedTag = target
 		s.moveTo(Failed, target)
 		s.status.FailureReason = err.Error()
-	} else {
+	default:
 		s.log.Info("update downloaded; restart Code Foundry to install it", "version", target)
 		s.moveTo(Downloaded, target)
+		// A newer release seen while this one downloaded replaces it at once.
+		s.autoLocked(autoNew)
 	}
 	s.publishLocked()
 	s.mu.Unlock()
@@ -589,9 +674,60 @@ func (s *Store) runDownload(target string) {
 	// The release may have been deleted since it was offered (a pruned tip): check at
 	// once, so a newer release replaces the failure instead of waiting for the next
 	// scheduled check. The failure stays when the same version is still the latest.
-	if _, cerr := s.Check(s.ctx); cerr != nil && s.ctx.Err() == nil {
+	if _, cerr := s.check(s.ctx, autoNew); cerr != nil && s.ctx.Err() == nil {
 		s.log.Warn("update check after a failed download failed", "err", cerr)
 	}
+}
+
+// startReplaceLocked downloads tag in the background while Downloaded stays installable;
+// the installer swaps it into the stage only once complete. Caller holds mu.
+func (s *Store) startReplaceLocked(tag string) {
+	ctx, cancel := context.WithCancel(s.ctx)
+	done := make(chan struct{})
+	s.replacing, s.replaceCancel, s.replaceDone = tag, cancel, done
+	s.log.Info("downloading a newer update to replace the downloaded one", "version", tag, "downloaded", s.status.Target)
+	s.wg.Go(func() {
+		defer close(done)
+		defer cancel()
+		s.runReplace(ctx, tag)
+	})
+}
+
+func (s *Store) runReplace(ctx context.Context, tag string) {
+	err := s.opts.Installer.Download(ctx, tag, func(string) {})
+	staged := s.staged()
+	if err == nil && staged != tag {
+		err = fmt.Errorf("%w: found %s", errStagedMismatch, cmp.Or(staged, "nothing"))
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.replacing, s.replaceCancel, s.replaceDone = "", nil, nil
+	if s.installing {
+		return // Install cancelled it and decides
+	}
+	st := &s.status
+	if err != nil {
+		if s.ctx.Err() == nil {
+			s.log.Warn("replacing the downloaded update failed; keeping it", "version", tag, "downloaded", st.Target, "err", err)
+		}
+		s.failedTag = tag
+		if staged != st.Target && st.State == Downloaded {
+			// The stage changed anyway (by hand, or a swap that half happened): describe
+			// what is there now.
+			next, target := decide(Idle, "", s.opts.Current, s.onDisk(), staged, st.Latest)
+			s.moveTo(next, target)
+			s.publishLocked()
+		}
+		return
+	}
+	if st.State != Downloaded {
+		return
+	}
+	s.log.Info("newer update downloaded; restart Code Foundry to install it", "version", tag, "replaced", st.Target)
+	s.moveTo(Downloaded, tag)
+	s.publishLocked()
+	// An even newer release seen meanwhile replaces it in turn.
+	s.autoLocked(autoNew)
 }
 
 // Install swaps the downloaded version into the app directory and returns when done:
@@ -614,7 +750,19 @@ func (s *Store) Install(ctx context.Context) (Status, error) {
 	}
 	target := st.Target
 	s.installing = true
+	cancelReplace, replaceDone := s.replaceCancel, s.replaceDone
 	s.mu.Unlock()
+
+	if replaceDone != nil {
+		// Restart Now does not wait for a newer download: install the one staged.
+		s.log.Info("cancelling the newer download to install the downloaded update", "version", target)
+		cancelReplace()
+		<-replaceDone
+		// It may have finished first; then the newer version is what is staged.
+		if v := s.staged(); Newer(v, target) {
+			target = v
+		}
+	}
 
 	var err error
 	// Someone may have installed it already (install.sh by hand removes the stage too).
