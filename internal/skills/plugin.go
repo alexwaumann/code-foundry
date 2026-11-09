@@ -133,6 +133,7 @@ func viewLimits() string {
 		{"Tabs in a tabs node: least / most", n(ui.MinNodeTabs, ui.MaxTabs)},
 		{"Header title / tab title / section title (characters)", n(ui.MaxHeaderTitle, ui.MaxTabTitle, ui.MaxSectionTitle)},
 		{"Labels, row titles, one-line inline text (characters)", n(ui.MaxLabel)},
+		{"A list's add or a row's edit: its text (characters)", n(ui.MaxRowText)},
 		{"Pair label / chip label (characters)", n(ui.MaxPairLabel, ui.MaxChipLabel)},
 		{"Menu: entries in a menu or a submenu (separators too) / an item's label (characters)", n(ui.MaxMenuItems, ui.MaxMenuLabel)},
 		{"Text content / markdown (bytes)", n(ui.MaxTextContent, ui.MaxMarkdown)},

@@ -93,6 +93,23 @@ shows them in its ⋯ instead, first, then a separator, then its menu; an expand
 or a page shows the buttons. A row with buttons and no menu gets a ⋯ only while folded.
 `h.HasCapability("view.menu")`: an older host drops menus.
 
+**Interactive rows** (a to-do list; capability `view.list.rows`):
+
+```go
+ui.NewList("todo", ui.NewRow("t1", "Write the notes").AsEditable(), ui.NewRow("t2", "Ship it").AsChecked(true)).
+	AsCheckable().AsReorderable().WithAddRow("Add a task", false) // true: the input under the rows
+```
+
+`checkable` puts a checkbox in every row's glyph slot (rows have no `glyph`; `checked`
+ticks one, its title struck through); `reorderable` shows a grip on hover or focus, to
+drag a row or move it with alt+↑/↓; `add` is a one-line input (Enter sends, empty sends
+nothing, cleared once you take it, kept when you refuse); an `editable` row's title is
+renamed in place (double-click it or F2; Enter too on a row without an `action`, which
+Enter runs otherwise; Enter or leaving commits, Escape cancels, an empty or unchanged
+title sends nothing). Each sends an act (`primitives.md`, "Acts") that the host shows at
+once and undoes if you return an error: answer with the view that has the change. Not on
+a `masterDetail`'s list. At 360 px nothing is hidden: grip and checkbox take 36 px.
+
 ## chips
 
 ```go

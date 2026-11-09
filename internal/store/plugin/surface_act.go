@@ -314,6 +314,8 @@ func (e element) actionName() string {
 		return "tab"
 	case e.kind == pluginsdk.ActSelect:
 		return "select"
+	case isRowOp(e.kind):
+		return e.kind
 	case e.action == nil:
 		return ""
 	case e.action.Event != "":
@@ -339,6 +341,9 @@ type actionIndex struct {
 	elements map[string]element
 	order    []string
 	fields   []fieldInfo
+	// ops are the list row acts (list_rows.go), by kind and key, in opOrder.
+	ops     map[string]rowOp
+	opOrder []string
 	// replaced is when a newer version came (zero for the current one).
 	replaced time.Time
 }
@@ -489,6 +494,7 @@ func buildIndex(v *ui.View) *actionIndex {
 			buttons(n.Form.Secondary, n.Key)
 		}
 	})
+	idx.indexRowOps(v)
 	return idx
 }
 
@@ -565,6 +571,10 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		act.Data = el.action.Data
 	case pluginsdk.ActTab, pluginsdk.ActSelect:
 		act.Value = el.key
+	case pluginsdk.ActCheck, pluginsdk.ActMove, pluginsdk.ActAdd, pluginsdk.ActEdit:
+		if act.Value, err = idx.rowOpValue(el, req.Value); err != nil {
+			return 0, err
+		}
 	default:
 		return 0, fmt.Errorf("%w: %s is a %s action: the host runs it, not the plugin", ErrInvalidArgument, el.key, el.kind)
 	}
@@ -578,9 +588,10 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		}
 		req.Value = &q
 	}
-	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect {
-		// The host sets a tab's or select's value (its key) and it carries no form's values
-		// (the GUI sends none): a client's are dropped.
+	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect || isRowOp(el.kind) {
+		// The host sets a tab's or select's value (its key), and a row act's from the
+		// client's (checked above); they carry no form's values (the GUI sends none): a
+		// client's are dropped.
 		req.Value, req.Values = nil, nil
 	}
 	if req.Value != nil {
@@ -664,6 +675,9 @@ func (m *Manager) storeSecret(ctx context.Context, plugin, key, value string) er
 // key, by its action name.
 func (idx *actionIndex) find(key, action string) (element, error) {
 	if key != "" {
+		if op, ok := idx.rowOp(key, action); ok {
+			return op.element, nil
+		}
 		el, ok := idx.elements[key]
 		if !ok {
 			return element{}, fmt.Errorf("%w: no acting element %q in the view", ErrInvalidArgument, key)

@@ -13,11 +13,12 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// The demo surface shows every v1 node kind across seven tabs (Overview with a stats row
+// The demo surface shows every v1 node kind across eight tabs (Overview with a stats row
 // and a bar chart, charts.go, Form, Log,
 // Assistant and Shell with the plugin's own thread and terminal, owned.go, Layout
 // with columns, panes, a grid, dividers, spacers, groups, a container, a toolbar and a
-// footer, layout.go, and Runs with a master-detail whose detail has its own tabs, runs.go):
+// footer, layout.go, Runs with a master-detail whose detail has its own tabs, runs.go, and
+// Todo with a list's interactive rows, todo.go):
 // what the GUI's renderer and the mock daemon's fixtures are built against
 // (internal/store/plugin/testdata/hello-demo/). The pinned surface appears only on the
 // threads the demo's Pin button marked (a context fact, hello.pinned). The checks
@@ -49,13 +50,14 @@ type demo struct {
 	failed      bool // the Overview's Failing card narrows its chart (charts.go)
 	// priority is Build #2's priority ("low", "normal", "high"), picked in its row's menu.
 	priority string
+	todo     todoState
 }
 
 // demoFactory opens demo instances sharing own.
 func demoFactory(own *owned) pluginsdk.SurfaceFactory {
 	return func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
 		ctx, stop := context.WithCancel(context.Background())
-		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, tab: "overview", started: time.Now(), priority: "normal"}
+		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, tab: "overview", started: time.Now(), priority: "normal", todo: newTodo()}
 		h.Log().Debug("demo opened", "instance", open.Instance, "thread", open.Context.ThreadID)
 		return d, d.render()
 	}
@@ -107,7 +109,8 @@ func (d *demo) viewLocked() ui.View {
 		Menu: headerMenu(),
 	}
 	tabs := ui.NewTabs(d.tab, ui.NewTab("overview", "Overview"), ui.NewTab("form", "Form"), ui.NewTab("log", "Log"),
-		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"), ui.NewTab("layout", "Layout"), ui.NewTab("run-list", "Runs"))
+		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"), ui.NewTab("layout", "Layout"), ui.NewTab("run-list", "Runs"),
+		ui.NewTab("todo", "Todo"))
 	tabs.Items[2].Badge = ui.NewPill("live", ui.ToneAttention)
 	if !d.running {
 		tabs.Items[2].Badge = nil
@@ -130,6 +133,8 @@ func (d *demo) viewLocked() ui.View {
 		toolbar, footer = layoutChrome(d.filter)
 	case "run-list":
 		nodes = runsNodes(d.runs)
+	case "todo":
+		nodes = todoNodes(d.todo)
 	default:
 		nodes = d.overviewNodes(pin)
 	}
@@ -312,6 +317,11 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		d.mu.Unlock()
 		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "note saved")
 		return d.render()
+	case "check:check", "move:move", "add:add", "edit:edit":
+		if err := d.todo.act(act); err != nil {
+			d.mu.Unlock()
+			return err
+		}
 	case "click:click", "click:refresh":
 		d.clicks++
 	case "click:reset-clicks":

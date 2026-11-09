@@ -2,8 +2,8 @@
  * The hello demo's captured views (internal/store/plugin/testdata/hello-demo, written by
  * PR 6's end to end): every node kind, tabs, a fieldset, an options source, both log forms,
  * the plugin's own thread (assistant) and terminal (shell), columns and panes (layout,
- * captured by plugins-layout-1), and a master-detail with nothing chosen (run-list,
- * plugins-layout-4).
+ * captured by plugins-layout-1), a master-detail with nothing chosen (run-list,
+ * plugins-layout-4), and a list's interactive rows (todo, plugin-list-rows).
  * Imported from the repository so the GUI's tests and the daemon's tests share them.
  */
 import { parseView, type PluginViewModel } from "@/api/plugin";
@@ -14,10 +14,11 @@ import log from "../../../../internal/store/plugin/testdata/hello-demo/log.json?
 import overview from "../../../../internal/store/plugin/testdata/hello-demo/overview.json?raw";
 import shell from "../../../../internal/store/plugin/testdata/hello-demo/shell.json?raw";
 import runList from "../../../../internal/store/plugin/testdata/hello-demo/run-list.json?raw";
+import todo from "../../../../internal/store/plugin/testdata/hello-demo/todo.json?raw";
 
-export type DemoTab = "overview" | "form" | "log" | "assistant" | "shell" | "layout" | "run-list";
+export type DemoTab = "overview" | "form" | "log" | "assistant" | "shell" | "layout" | "run-list" | "todo";
 
-const json: Record<DemoTab, string> = { overview, form, log, assistant, shell, layout, "run-list": runList };
+const json: Record<DemoTab, string> = { overview, form, log, assistant, shell, layout, "run-list": runList, todo };
 
 export function demoJson(tab: DemoTab): string {
   return json[tab];

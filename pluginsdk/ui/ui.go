@@ -405,6 +405,10 @@ type List struct {
 	// not shown (icon-only buttons and trailing are). For steps, env vars, short names.
 	Dense     bool   `json:"dense,omitempty"`
 	EmptyText string `json:"emptyText,omitempty"`
+	// Interactive rows (list_rows.go): a checkbox per row, drag to reorder, an add input.
+	Checkable   bool     `json:"checkable,omitempty"`
+	Reorderable bool     `json:"reorderable,omitempty"`
+	Add         *ListAdd `json:"add,omitempty"`
 }
 
 // Row is one list row.
@@ -422,6 +426,9 @@ type Row struct {
 	// Menu is the row's ⋯ (shown on hover and focus) and right-click menu; a narrow row
 	// folds its Actions into it (see Menu).
 	Menu *Menu `json:"menu,omitempty"`
+	// Interactive rows (list_rows.go): the checkbox's state, a title renamed in place.
+	Checked  bool `json:"checked,omitempty"`
+	Editable bool `json:"editable,omitempty"`
 }
 
 // Chips is a strip of stages or steps.

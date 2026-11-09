@@ -167,6 +167,7 @@ func surfacePlugin() pluginsdk.Plugin {
 			"silent": func(context.Context, *pluginsdk.Host, pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
 				return still{}, nil
 			},
+			"rows": newRowsSurface, // list_rows_test.go
 		},
 	}
 }
@@ -188,6 +189,7 @@ func surfaceManifest() pluginsdk.Manifest {
 			{ID: "broken", Title: "Broken"},
 			{ID: "silent", Title: "Silent", Scope: pluginsdk.ScopeGlobal},
 			{ID: "proj", Title: "Project", Scope: pluginsdk.ScopeProject},
+			{ID: "rows", Title: "Rows"},
 		},
 	}
 }

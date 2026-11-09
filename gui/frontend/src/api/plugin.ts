@@ -201,6 +201,10 @@ export interface Row {
   selected?: boolean;
   /** The row's ⋯ (on hover and focus) and right-click menu; a narrow row folds its actions into it. */
   menu?: ViewMenu;
+  /** A checkable list's row is ticked (components/plugin/rows.ts). */
+  checked?: boolean;
+  /** The title can be renamed in place. */
+  editable?: boolean;
 }
 
 export interface ListData {
@@ -208,6 +212,16 @@ export interface ListData {
   glyphStyle?: "dot" | "icon";
   dense?: boolean;
   emptyText?: string;
+  /** Interactive rows (components/plugin/rows.ts): a checkbox per row, drag to reorder, an add input. */
+  checkable?: boolean;
+  reorderable?: boolean;
+  add?: ListAdd;
+}
+
+/** A list's add-row input: above the rows unless `bottom`. */
+export interface ListAdd {
+  placeholder?: string;
+  bottom?: boolean;
 }
 
 export interface Chip {
@@ -977,6 +991,8 @@ export interface ActRequestView {
   version: number;
   /** The element's key. */
   key: string;
+  /** The act's kind for a list row's act (check, move, add, edit): the row (or list) has several. */
+  action?: string;
   /** A change's value. */
   value?: string;
   values?: Readonly<Record<string, FieldValue>>;
@@ -992,6 +1008,7 @@ export async function actOnSurface(req: ActRequestView, conn: DaemonConnection =
     instance: req.instance,
     version: BigInt(req.version),
     key: req.key,
+    ...(req.action ? { action: req.action } : {}),
     ...(req.value !== undefined ? { value: req.value } : {}),
     ...(values ? { values } : {}),
     ...(req.context ? { context: toUiContext(req.context) } : {}),

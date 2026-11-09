@@ -197,11 +197,15 @@ A node sits inside at most 4 containers: `section` and the layout containers (`u
 | `click` | a button, row, chip, stat card, bar or menu item with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
+| `search` | the user typed into a picker (`forms.md`) | `Action` (the search's event), `Key` (the search's key), `Field`, `act.Query()` the query, `Values` |
 | `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs); no `Values` |
 | `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key (`Value` too: use `Key`), `Node` the master-detail's key; no `Values` |
-| `search` | the user typed into a picker (`forms.md`) | `Action` (the search's event), `Key` (the search's key), `Field`, `act.Query()` the query, `Values` |
+| `check` | a `checkable` list's checkbox was toggled | `Key` the row's, `act.Checked()` the new state, `Node` the list's |
+| `move` | a `reorderable` list's row was dragged | `Key` the row's, `act.After()` the row now right above it ("" = first; in a filtered list place it after that row), `Node` the list's |
+| `add` | a list's `add` input was entered | `Key` and `Node` the list's, `act.Text()` the trimmed one-line text (200 characters) |
+| `edit` | an `editable` row was renamed | `Key` the row's, `act.Text()` the new title, `Node` the list's |
 
-**Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
+For the last six, `Action` is the kind. **Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
 `select` (it arrives as `kind: click, action: select`), so `switch act.Action` alone
 mistakes it for a master-detail choice. `switch act.Kind { case pluginsdk.ActSelect: …;
 case pluginsdk.ActTab: …; case pluginsdk.ActClick: switch act.Action { … } }`.

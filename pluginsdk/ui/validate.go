@@ -596,6 +596,7 @@ func (c *checker) node(path string, n Node, outer []string) {
 // detail's elements would still act from the CLI.
 func (c *checker) masterDetail(path string, md *MasterDetail, outer []string) {
 	c.list(path+".list", &md.List)
+	c.noListRows(path+".list", &md.List)
 	for i, r := range md.List.Rows {
 		if r.Selected {
 			c.bad(fmt.Sprintf("%s.list.rows[%d].selected", path, i), "a master-detail's rows are not selected by themselves: set the node's selected")
@@ -768,6 +769,7 @@ func (c *checker) list(path string, l *List) {
 		c.action(p+".action", r.Action)
 		c.menu(p+".menu", r.Menu)
 	}
+	c.listRows(path, l)
 }
 
 func (c *checker) log(path string, l *Log) {

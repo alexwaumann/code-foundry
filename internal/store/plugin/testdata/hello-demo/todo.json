@@ -1,0 +1,230 @@
+{
+  "header": {
+    "icon": "sparkles",
+    "title": "Hello demo",
+    "trailing": {
+      "spans": [
+        {
+          "text": "0 clicks",
+          "tone": "muted"
+        }
+      ]
+    },
+    "pill": {
+      "label": "demo",
+      "tone": "ok"
+    },
+    "subline": {
+      "spans": [
+        {
+          "text": "opened "
+        },
+        {
+          "time": {
+            "at": "2026-10-18T09:02:16.311761-05:00",
+            "style": "relative"
+          }
+        },
+        {
+          "text": " · thread "
+        },
+        {
+          "text": "s-f20aac336477",
+          "mono": true
+        }
+      ]
+    },
+    "actions": [
+      {
+        "key": "hdr-refresh",
+        "label": "Refresh",
+        "icon": "refresh-cw",
+        "action": {
+          "event": "refresh"
+        },
+        "iconOnly": true
+      },
+      {
+        "key": "hdr-docs",
+        "label": "Open the plugin docs",
+        "icon": "external-link",
+        "action": {
+          "openUrl": "https://github.com/alexwaumann/code-foundry"
+        },
+        "iconOnly": true
+      }
+    ],
+    "tabTitle": "Hello",
+    "menu": {
+      "items": [
+        {
+          "key": "hdr-reset",
+          "label": "Reset the click count",
+          "action": {
+            "event": "reset-clicks"
+          }
+        },
+        {
+          "key": "hdr-form",
+          "label": "Go to the form",
+          "action": {
+            "event": "goto-form"
+          }
+        },
+        {
+          "separator": true
+        },
+        {
+          "key": "hdr-sdk",
+          "label": "Open the SDK reference",
+          "action": {
+            "openUrl": "https://github.com/alexwaumann/code-foundry/tree/main/pluginsdk"
+          }
+        }
+      ]
+    }
+  },
+  "tabs": {
+    "items": [
+      {
+        "key": "overview",
+        "label": "Overview"
+      },
+      {
+        "key": "form",
+        "label": "Form"
+      },
+      {
+        "key": "log",
+        "label": "Log"
+      },
+      {
+        "key": "assistant",
+        "label": "Assistant"
+      },
+      {
+        "key": "shell",
+        "label": "Shell"
+      },
+      {
+        "key": "layout",
+        "label": "Layout"
+      },
+      {
+        "key": "run-list",
+        "label": "Runs"
+      },
+      {
+        "key": "todo",
+        "label": "Todo"
+      }
+    ],
+    "active": "todo"
+  },
+  "nodes": [
+    {
+      "key": "todo-intro",
+      "text": {
+        "content": "2 of 7 done. Drag a task by its grip (or alt+↑/↓) to reorder; double-click a title or press F2 to rename."
+      }
+    },
+    {
+      "key": "todo-open",
+      "list": {
+        "rows": [
+          {
+            "key": "todo-1",
+            "title": "Answer the plugin menus sketch",
+            "trailing": {
+              "spans": [
+                {
+                  "text": "Today",
+                  "tone": "attention"
+                }
+              ]
+            },
+            "editable": true
+          },
+          {
+            "key": "todo-2",
+            "title": "Review #616 terminal find under a flood",
+            "line2": "from thread · Terminal find flood",
+            "trailing": {
+              "spans": [
+                {
+                  "text": "Fri"
+                }
+              ]
+            },
+            "editable": true
+          },
+          {
+            "key": "todo-3",
+            "title": "Write the release notes for v0.22",
+            "trailing": {
+              "spans": [
+                {
+                  "text": "Mon"
+                }
+              ]
+            },
+            "editable": true
+          },
+          {
+            "key": "todo-4",
+            "title": "Rename CF-412 after the search lands",
+            "editable": true
+          },
+          {
+            "key": "todo-5",
+            "title": "Try the surface on a second Mac",
+            "trailing": {
+              "spans": [
+                {
+                  "text": "Nov 14"
+                }
+              ]
+            },
+            "editable": true
+          }
+        ],
+        "emptyText": "Nothing left to do",
+        "checkable": true,
+        "reorderable": true,
+        "add": {
+          "placeholder": "Add a task"
+        }
+      }
+    },
+    {
+      "key": "todo-done-sec",
+      "section": {
+        "title": "Done",
+        "meta": "2",
+        "collapsible": true,
+        "children": [
+          {
+            "key": "todo-done",
+            "list": {
+              "rows": [
+                {
+                  "key": "todo-6",
+                  "title": "Promote v0.21.6 to stable",
+                  "checked": true,
+                  "editable": true
+                },
+                {
+                  "key": "todo-7",
+                  "title": "Reply to the packaging ticket",
+                  "checked": true,
+                  "editable": true
+                }
+              ],
+              "checkable": true
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
