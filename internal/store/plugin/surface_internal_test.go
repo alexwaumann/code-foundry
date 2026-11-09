@@ -75,7 +75,13 @@ const every = `{
       "list": {"rows": [{"key": "md1", "title": "Run 1"}, {"key": "md2", "title": "Run 2", "action": {"event": "open", "data": "2"}}]},
       "emptyDetail": {"title": "None", "actions": [{"key": "mde", "label": "New", "action": {"event": "new"}}]},
       "detail": [{"key": "tn", "tabs": {"active": "tn1", "items": [{"key": "tn1", "label": "One"}, {"key": "tn2", "label": "Two"}],
-        "children": [{"key": "tnt", "text": {"content": "in a tab"}}]}}]}}
+        "children": [{"key": "tnt", "text": {"content": "in a tab"}}]}}]}},
+    {"key": "st", "stats": {"cards": [{"key": "st1", "label": "Pass rate", "value": "86%", "tone": "ok", "subtitle": "last 30"},
+      {"key": "st2", "label": "Failing", "value": "2", "tone": "error", "pressed": true, "action": {"event": "filter", "data": "failed"}},
+      {"key": "st3", "label": "Queue", "value": "1", "action": {"command": {"name": "plugin.p.queue"}}}]}},
+    {"key": "bc", "bars": {"title": "Build time", "subtitle": "last 2", "startLabel": "#1", "endLabel": "#2", "reference": {"value": 2, "label": "median 2s"},
+      "bars": [{"key": "bc1", "value": 1, "status": "ok", "title": "#1", "meta": "main"},
+        {"key": "bc2", "value": 3, "series": 2, "title": "#2", "action": {"openUrl": "https://x.example"}}]}}
   ]
 }`
 
@@ -86,7 +92,7 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	if len(errs) > 0 {
 		t.Fatalf("errors: %v", errs)
 	}
-	if len(v.Nodes) != 23 || len(v.Toolbar) != 2 || len(v.Footer) != 2 || !json.Valid(canon) {
+	if len(v.Nodes) != 25 || len(v.Toolbar) != 2 || len(v.Footer) != 2 || !json.Valid(canon) {
 		t.Fatalf("nodes %d, canon %s", len(v.Nodes), canon)
 	}
 	idx := buildIndex(v)
@@ -97,7 +103,8 @@ func TestValidateViewAcceptsEveryKind(t *testing.T) {
 	want := map[string]string{"h1": "click", "ta": "tab", "tb": "tab", "r1": "click", "r1b": "click", "c1": "click", "b1": "click",
 		"b2": "command", "b3": "command", "b4": "open_url", "b5": "copy", "f3": "change", "fs": "submit", "fr": "click", "cb": "click",
 		"gb": "click", "gc": "click", "gpb": "click",
-		"tqs": "submit", "tc1": "click", "fb": "command", "md1": "select", "md2": "click", "mde": "click", "tn1": "tab", "tn2": "tab"}
+		"tqs": "submit", "tc1": "click", "fb": "command", "md1": "select", "md2": "click", "mde": "click", "tn1": "tab", "tn2": "tab",
+		"st2": "click", "st3": "command", "bc2": "open_url"}
 	if fmt.Sprint(kinds) != fmt.Sprint(want) {
 		t.Errorf("elements\n got %v\nwant %v", kinds, want)
 	}
