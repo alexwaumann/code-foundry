@@ -248,7 +248,8 @@ export function PickerControl(props: PickerProps) {
         align="start"
         collisionBoundary={boundary}
         collisionPadding={POPUP_COLLISION_PADDING}
-        className={cn("w-72 overflow-hidden p-0", POPUP_FIT)}
+        // In a strip 288 px under the compact trigger; in a form as wide as its full-width trigger.
+        className={cn("overflow-hidden p-0", strip ? "w-72" : "w-[calc(var(--radix-popover-trigger-width)/var(--cf-zoom))]", POPUP_FIT)}
         data-testid="plugin-picker"
         onKeyDown={stopPlainKeys}
       >

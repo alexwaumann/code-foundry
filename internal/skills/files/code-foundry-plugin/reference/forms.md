@@ -93,7 +93,8 @@ who := ui.PickerField("f-who", "assignee", "Assignee", "search-people", // the s
   picked value in `options` (a "Selected" group) so a later view still names it.
 - In the body the trigger is the dropdown's. In a toolbar it is compact, the label then the
   picks ("Assignee  Me, Kim"); a toolbar form of only pickers is as wide as its triggers.
-  The popover is 288 px wide and fits the 360 px panel.
+  The popover is the trigger's width in the body, 288 px from a toolbar; both fit the
+  360 px panel.
 
 **Drafts.** The host keeps what the user typed (per instance and tab) across new views,
 so re-rendering does not wipe a half-filled form. A submit the plugin takes drops the
