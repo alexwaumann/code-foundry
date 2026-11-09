@@ -1228,3 +1228,65 @@ describe("a thread's setup", () => {
     expect(screen.queryByTestId("row-branch")).toBeNull();
   });
 });
+
+describe("SidebarRow card activity (docs/notes/sidebar-card-activity.md)", () => {
+  const step = (kind: "worktree" | "fetch", status: "running" | "pending", ref = "") => ({ kind, projectId: "cf", projectName: "code-foundry", ref, branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null, existing: false });
+  function openCard(o: Partial<ThreadView>): HTMLElement {
+    vi.useFakeTimers();
+    try {
+      renderRow(o);
+      fireEvent.pointerMove(screen.getByRole("option"), { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    return screen.getAllByTestId("thread-tooltip")[0] as HTMLElement;
+  }
+
+  it("working on a tool: Working in the info tone, then the tool as code, under the name", () => {
+    const card = openCard({ status: "busy", busyTool: "Bash make check", statusChangedAtMs: Date.now() - 12 * MIN });
+    const a = within(card).getByTestId("tip-activity");
+    expect(a.textContent).toBe("Working · Bash make check");
+    expect(a.getAttribute("data-kind")).toBe("working");
+    expect(a.querySelector("svg")?.getAttribute("class")).toEqual(expect.stringContaining("lucide-circle-dashed"));
+    expect(a.querySelector("svg")?.getAttribute("class")).toContain("text-cf-info-text");
+    expect(within(a).getByText("Working").className).toContain("text-cf-info-text");
+    expect(within(card).getByTestId("tip-activity-detail").className).toContain("text-code");
+    expect(a.querySelector(".line-clamp-3")).toBeTruthy();
+    // Right under the name, before where it works.
+    expect(a.previousElementSibling?.getAttribute("data-testid")).toBe("tip-name");
+    expect(within(card).queryByTestId("tip-status")).toBeNull();
+  });
+
+  it("compacting: plain text, not code", () => {
+    const card = openCard({ status: "busy", statusReason: "compacting" });
+    expect(within(card).getByTestId("tip-activity").textContent).toBe("Working · compacting");
+    expect(within(card).getByTestId("tip-activity-detail").className).not.toContain("text-code");
+  });
+
+  it("setting up: the step it is on, plain text", () => {
+    const card = openCard({
+      worktreePath: "",
+      state: "starting",
+      status: "busy",
+      statusReason: "setting up",
+      setup: { phase: "running", startedAtMs: Date.now(), endedAtMs: null, steps: [step("fetch", "running", "origin/main"), step("worktree", "pending")], error: "", background: true },
+    });
+    const a = within(card).getByTestId("tip-activity");
+    expect(a.textContent).toBe("Setting up · Fetching origin/main");
+    expect(a.getAttribute("data-kind")).toBe("settingUp");
+    expect(within(card).getByTestId("tip-activity-detail").className).not.toContain("text-code");
+  });
+
+  it.each<[string, Partial<ThreadView>]>([
+    ["working with no tool yet: Working alone would repeat the row", { status: "busy" }],
+    ["idle", {}],
+    ["a question: its own status line", { status: "attention", statusReason: "question: Which one?" }],
+    ["waiting on children: TipWaiting says it", { status: "idle", statusReason: "waiting on 2 child threads" }],
+  ])("%s: no activity line", (_name, o) => {
+    const card = openCard(o);
+    expect(within(card).queryByTestId("tip-activity")).toBeNull();
+  });
+});

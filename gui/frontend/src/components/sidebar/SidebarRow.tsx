@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
-import { AlarmClock, ArrowRightLeft, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CircleDashed, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { statusLine, statusText, tipStatusTone, type StatusLineKind, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
-import { statusBadge, statusTimeAt } from "@/lib/statusRegistry";
+import { statusBadge, statusDetail, statusTimeAt } from "@/lib/statusRegistry";
 import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
@@ -451,6 +451,32 @@ function TipStatus({ id }: { id: string }) {
 }
 
 /**
+ * What a running thread is doing, which the row no longer says (docs/notes/sidebar-card-activity.md):
+ * "Working · <the tool it runs>" (lib/statusRegistry statusDetail: busyTool, in the code role;
+ * "compacting" in plain text) or "Setting up · <the step it is on>", the word in the info tone
+ * after a dashed circle, cut after three lines. Nothing for any other status, nor for a turn with
+ * no tool yet: "Working" alone would only repeat the row's icon.
+ */
+function TipActivity({ id }: { id: string }) {
+  const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
+  const detail = useThreadsStore((st) => statusDetail(line, st.byId[id]));
+  if ((line.kind !== "working" && line.kind !== "settingUp") || detail === "") return null;
+  const code = line.kind === "working" && detail !== "compacting";
+  return (
+    <div className="mb-[3px] flex items-start gap-2 leading-5" data-testid="tip-activity" data-kind={line.kind}>
+      <CircleDashed className="mt-[3px] size-3.5 shrink-0 text-cf-info-text" aria-hidden />
+      <span className="line-clamp-3 min-w-0 break-words">
+        <span className="text-cf-info-text">{statusBadge(line).word}</span>
+        <span className="text-cf-text-muted"> · </span>
+        <span className={code ? "text-code" : undefined} data-testid="tip-activity-detail">
+          {detail}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
  * "↳ Created by <name>" for a thread an agent created (the creator's current name); a
  * removed creator keeps the name it had then, muted and marked so. Nothing for the user's
  * threads.
@@ -485,8 +511,8 @@ function TipMoving({ id }: { id: string }) {
 }
 
 /**
- * The tooltip's body: name, status (attention or error only; a thread waiting on its child
- * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
+ * The tooltip's body: name, status (attention or error only; a running thread what it is doing,
+ * TipActivity; a thread waiting on its child threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
  * where it works (ThreadPlaceRows), model, and the linked pull requests (TipLinkedPrs).
  * Mounted only while open (docs/notes/sidebar-thread-card.md).
  */
@@ -501,6 +527,7 @@ function ThreadTipBody({ id }: { id: string }) {
         {name || id}
       </div>
       <TipStatus id={id} />
+      <TipActivity id={id} />
       <TipWaiting id={id} />
       <TipCreatedBy id={id} />
       <TipMoving id={id} />
