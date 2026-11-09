@@ -62,7 +62,7 @@ func checkGeneratedInDaemon(t *testing.T, seed uint64) bool {
 	for _, k := range idx.order {
 		el := idx.elements[k]
 		got = append(got, fmt.Sprintf("%s %s %s", k, el.kind, el.node))
-		if (el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect) != (el.action == nil) {
+		if (el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect || el.kind == pluginsdk.ActSort) != (el.action == nil) {
 			t.Errorf("seed %d: %s is a %s with action %v", seed, k, el.kind, el.action)
 		}
 	}
@@ -107,7 +107,7 @@ func nullListOf(view []byte, required []string) string {
 // expectedElements lists "key kind node" for every acting element of a valid view,
 // found by reflection (not by the host's walk): every button, row and chip with an
 // action, menu items with an action (a submenu's too), a master-detail's rows without one
-// (select, naming it), the view's tabs and a tabs node's (tab, naming it), fields with a
+// (select, naming it), a table's rows with an action and sortable columns (sort, naming it), the view's tabs and a tabs node's (tab, naming it), fields with a
 // change event, and pickers' searches.
 func expectedElements(v *ui.View) []string {
 	var out []string
@@ -205,8 +205,24 @@ func expectedElements(v *ui.View) []string {
 			walk(reflect.ValueOf(x.Submit), "", true)
 			walk(reflect.ValueOf(x.Secondary), "", false)
 			return
+		case ui.TableRow:
+			if x.Action != nil {
+				add(x.Key, kind(x.Action, pluginsdk.ActClick), "")
+			}
+			walk(reflect.ValueOf(x.Actions), "", false)
+			walk(reflect.ValueOf(x.Menu), "", false)
+			return
 		case ui.Node:
 			switch {
+			case x.Table != nil:
+				for _, c := range x.Table.Columns {
+					if c.Sortable {
+						add(c.Key, pluginsdk.ActSort, x.Key)
+					}
+				}
+				walk(reflect.ValueOf(x.Table.Rows), "", false)
+				walk(reflect.ValueOf(x.Table.Groups), "", false)
+				return
 			case x.MasterDetail != nil:
 				walk(reflect.ValueOf(x.MasterDetail.List.Rows), x.Key, false)
 				walk(reflect.ValueOf(x.MasterDetail.EmptyDetail), "", false)
