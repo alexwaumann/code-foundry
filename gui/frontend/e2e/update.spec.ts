@@ -53,14 +53,18 @@ test("up to date: no chip, and the update source rides the one events stream", a
 
 // Downloading, the busy-thread list (live), Install and Restart Now: unit-tested in src/components/update/UpdateDialog.test.tsx.
 
-test("available → Download → downloading → downloaded → Install and Restart Now", async ({ page }) => {
+test("a check downloads at once; a failed automatic download falls back to Download; Install and Restart Now", async ({ page }) => {
   await openApp(page);
   await settleThreads(0);
   await mockPost("thread/stop?id=s-2&reason=idle&code=0");
   await mockPost("update/latest?version=v0.2.0");
+  // The automatic download fails: back to available, with the Download button.
+  await mockPost("update/fail?reason=download%20failed");
   await paletteRun(page, "app.update.check");
   const d = dialog(page);
-  await expect(d).toHaveAttribute("data-variant", "available");
+  await expect(d).toHaveAttribute("data-variant", "downloading");
+  expect((await invocations()).map((i) => i.name)).not.toContain("app.update");
+  await expect(d).toHaveAttribute("data-variant", "available", { timeout: 8000 });
   await d.getByTestId("update-download").click();
   expect((await invocations()).at(-1)?.name).toBe("app.update");
 

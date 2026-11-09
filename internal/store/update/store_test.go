@@ -43,6 +43,8 @@ func newRig(t *testing.T, latest string, edit func(*update.Options)) *rig {
 		StagedVersion:    r.installer.Staged().Version,
 		Bus:              b,
 		InitialDelay:     time.Hour,
+		// Most tests drive the manual path; automatic downloads have their own tests.
+		ManualDownload: true,
 	}
 	if edit != nil {
 		edit(&opts)

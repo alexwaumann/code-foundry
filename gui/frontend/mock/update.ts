@@ -1,9 +1,12 @@
 /**
  * Mock updater: the daemon's UpdateService state machine (internal/store/update) with
  * timers instead of gh and the installer. Driven by the app.* commands and by test
- * controls (see server.ts /__mock/update/*). Download (app.update) stages the release:
- * Available → Downloading → Downloaded (or Failed); Install, which app.restart runs
- * first, swaps it in: Downloaded → Installed.
+ * controls (see server.ts /__mock/update/*). A check that finds a newer release downloads
+ * it at once (Available → Downloading → Downloaded); an automatic download that fails goes
+ * back to Available, and Download (app.update) retries by hand (failing → Failed). A
+ * newer release while Downloaded downloads in the background and replaces the target
+ * when done, staying Downloaded throughout. Install, which app.restart runs first, swaps
+ * it in: Downloaded → Installed.
  *
  * Initial state: v0.1.0, up to date, latest release v0.1.0. POST
  * /__mock/update/latest?version=v0.2.0 publishes a newer release for the next check.
@@ -117,6 +120,8 @@ export class MockUpdater {
   /** app.restart runs (Restart Now). */
   restarts = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
+  /** A newer release is replacing the download (one at a time). */
+  private replacing = false;
 
   constructor(
     private readonly publish: (e: UpdateEventInit) => number,
@@ -129,6 +134,7 @@ export class MockUpdater {
   reset(): void {
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
+    this.replacing = false;
     this.latest = "v0.1.0";
     this.failNext = "";
     this.relaunches = 0;
@@ -178,24 +184,50 @@ export class MockUpdater {
     s.lastCheckedAt = new Date();
     s.latestVersion = this.latest;
     s.lastCheckError = "";
-    if (s.state === UpdateState.DOWNLOADING) {
+    // A download running decides; a failure of the latest stays (Try Again).
+    if (s.state === UpdateState.DOWNLOADING || (s.state === UpdateState.FAILED && s.targetVersion === this.latest)) {
       this.emit();
       return s;
     }
     const newer = this.latest !== s.currentVersion && this.latest > s.currentVersion;
-    // A download or an install of the latest stays; a newer release is offered over it.
+    // A download or an install of the latest stays; a newer release is downloaded over it.
     const installedTarget = s.state === UpdateState.DOWNLOADED || s.state === UpdateState.INSTALLED || s.state === UpdateState.RESTART_REQUIRED ? s.targetVersion : "";
-    if (newer && this.latest !== installedTarget) this.set(UpdateState.AVAILABLE, this.latest);
-    else if (!installedTarget) this.set(UpdateState.IDLE, "");
+    if (newer && s.state === UpdateState.DOWNLOADED && this.latest > s.targetVersion) {
+      this.emit();
+      this.replace(this.latest);
+    } else if (newer && this.latest !== installedTarget) {
+      this.set(UpdateState.AVAILABLE, this.latest);
+      this.startDownload(true);
+    } else if (!installedTarget) this.set(UpdateState.IDLE, "");
     else this.emit();
     return this.status;
+  }
+
+  /** The background replacement of a download by a newer release: Downloaded stays until it is done. */
+  private replace(target: string): void {
+    if (this.replacing) return;
+    this.replacing = true;
+    this.timers.push(
+      setTimeout(
+        () => {
+          this.replacing = false;
+          if (this.status.state === UpdateState.DOWNLOADED) this.set(UpdateState.DOWNLOADED, target);
+        },
+        this.stepMs * (PROGRESS.length + 1),
+      ),
+    );
   }
 
   /** UpdateService.Download: stages the target in the background (app.update). */
   download(): string {
     const s = this.status;
     if (s.state !== UpdateState.AVAILABLE && s.state !== UpdateState.FAILED) throw new Error("no update available");
-    const target = s.targetVersion;
+    return this.startDownload(false);
+  }
+
+  /** Downloads the target; auto: a check started it, so a failure goes back to Available. */
+  private startDownload(auto: boolean): string {
+    const target = this.status.targetVersion;
     this.set(UpdateState.DOWNLOADING, target, { progress: "starting installer" });
     PROGRESS.forEach((line, i) => {
       this.timers.push(
@@ -215,7 +247,8 @@ export class MockUpdater {
           if (this.failNext) {
             const reason = this.failNext;
             this.failNext = "";
-            this.set(UpdateState.FAILED, target, { failureReason: reason });
+            if (auto) this.set(UpdateState.AVAILABLE, target, { failureReason: reason });
+            else this.set(UpdateState.FAILED, target, { failureReason: reason });
           } else {
             this.set(UpdateState.DOWNLOADED, target);
           }
@@ -245,10 +278,15 @@ export class MockUpdater {
 
   /**
    * daemon.restart: the mock keeps running but comes back as the installed version. It
-   * installs nothing: a download survives (the new daemon starts in Downloaded).
+   * installs nothing: a download survives (the new daemon starts in Downloaded), and one
+   * still running is cut off (the real daemon downloads again at its first check).
    */
   restart(): string {
-    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is downloading; restart when it finishes");
+    if (this.status.state === UpdateState.DOWNLOADING) {
+      for (const t of this.timers) clearTimeout(t);
+      this.timers = [];
+    }
+    this.replacing = false;
     const n = this.restartCost();
     const installed = this.status.state === UpdateState.INSTALLED || this.status.state === UpdateState.RESTART_REQUIRED;
     if (installed) this.status.currentVersion = this.status.targetVersion;
@@ -259,7 +297,6 @@ export class MockUpdater {
 
   /** app.restart: installs a download first (a failed install restarts nothing), then restarts. */
   restartApp(): string {
-    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is downloading; restart when it finishes");
     const installed = this.downloadedTarget() ? this.install() : "";
     this.restarts++;
     const msg = this.restart().replace("restarting the daemon", "restarting Code Foundry").replace("the next client starts the installed version", "the app relaunches once the daemon has stopped");

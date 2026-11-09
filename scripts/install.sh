@@ -20,7 +20,9 @@
 # The in-app updater splits an upgrade in two so nothing on disk changes while the old
 # daemon and window still run: --stage-only downloads, verifies and unpacks into app.new
 # and stops there; --apply-staged (run by `app.restart` right before the restart) only
-# does the two renames.
+# does the two renames. A download unpacks into app.new.partial and replaces app.new only
+# once complete and checked, so a download that fails or is cancelled leaves an earlier
+# app.new as it was (the updater keeps offering it while a newer one downloads).
 #
 # Uninstall: rm -rf ~/.code-foundry/app ~/.local/bin/code-foundry
 #
@@ -304,6 +306,8 @@ case "$APP_DIR" in
 esac
 while [ "${APP_DIR%/}" != "$APP_DIR" ] && [ "$APP_DIR" != "/" ]; do APP_DIR="${APP_DIR%/}"; done
 STAGE="$APP_DIR.new"
+PARTIAL="$APP_DIR.new.partial"
+PREV="$APP_DIR.new.prev"
 OLD="$APP_DIR.old"
 
 # A previous run killed between its two renames left only the backup: put it back.
@@ -408,11 +412,19 @@ fi
 
 TMP=""
 SWAPPED=0
-# KEEP_STAGE: app.new survives the exit (a finished --stage-only, or --apply-staged,
-# whose stage is not ours to delete when the swap fails).
-KEEP_STAGE="$APPLY_STAGED"
+# KEEP_STAGE: app.new survives the exit (--stage-only, whose app.new is either an earlier
+# download it did not touch or the finished new one, or --apply-staged, whose stage is
+# not ours to delete when the swap fails). app.new.partial never survives.
+KEEP_STAGE=0
+[ "$APPLY_STAGED" = 0 ] && [ "$STAGE_ONLY" = 0 ] || KEEP_STAGE=1
 cleanup() {
 	[ -z "$TMP" ] || rm -rf "$TMP"
+	if [ "$APPLY_STAGED" = 0 ]; then
+		rm -rf "$PARTIAL"
+		# Interrupted between the stage swap's renames: put the earlier download back.
+		if [ ! -e "$STAGE" ] && [ -d "$PREV" ]; then mv "$PREV" "$STAGE"; fi
+		rm -rf "$PREV"
+	fi
 	[ "$KEEP_STAGE" = 1 ] || rm -rf "$STAGE"
 	if [ "$SWAPPED" = 1 ]; then
 		rm -rf "$OLD"
@@ -434,7 +446,8 @@ check_staged() {
 	say "applying the download staged in $STAGE"
 }
 
-# stage_download: download TAG, verify its checksum and unpack it into app.new.
+# stage_download: download TAG, verify its checksum and unpack it into app.new.partial,
+# then put that in place of app.new.
 stage_download() {
 	TMP="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-install.XXXXXX")"
 	if [ -n "$RELEASE_DIR" ]; then
@@ -457,21 +470,29 @@ stage_download() {
 
 	# Unpack beside APP_DIR so the swap is two renames on one filesystem.
 	mkdir -p "$(dirname "$APP_DIR")"
-	rm -rf "$STAGE"
-	mkdir "$STAGE"
+	rm -rf "$PARTIAL"
+	mkdir "$PARTIAL"
 	say "unpacking"
-	/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$STAGE" || die "could not unpack $ARCHIVE"
-	[ -f "$STAGE/code-foundry" ] && [ -x "$STAGE/code-foundry" ] || die "the archive has no code-foundry executable"
-	[ -f "$STAGE/Code Foundry" ] && [ -x "$STAGE/Code Foundry" ] || die "the archive has no Code Foundry executable"
+	/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$PARTIAL" || die "could not unpack $ARCHIVE"
+	[ -f "$PARTIAL/code-foundry" ] && [ -x "$PARTIAL/code-foundry" ] || die "the archive has no code-foundry executable"
+	[ -f "$PARTIAL/Code Foundry" ] && [ -x "$PARTIAL/Code Foundry" ] || die "the archive has no Code Foundry executable"
 	# Optional: older releases do not have it. When there, it must be an executable.
-	if [ -e "$STAGE/code-foundry-dictate" ] || [ -L "$STAGE/code-foundry-dictate" ]; then
-		[ -f "$STAGE/code-foundry-dictate" ] && [ -x "$STAGE/code-foundry-dictate" ] || die "the archive's code-foundry-dictate is not an executable"
+	if [ -e "$PARTIAL/code-foundry-dictate" ] || [ -L "$PARTIAL/code-foundry-dictate" ]; then
+		[ -f "$PARTIAL/code-foundry-dictate" ] && [ -x "$PARTIAL/code-foundry-dictate" ] || die "the archive's code-foundry-dictate is not an executable"
 	fi
-	got="$(installed_version "$STAGE")"
+	got="$(installed_version "$PARTIAL")"
 	[ "$got" = "$TAG" ] || die "the archive contains version '$got', expected $TAG"
 	# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and
 	# tar propagates the attribute to what it extracts.
-	/usr/bin/xattr -dr com.apple.quarantine "$STAGE" 2>/dev/null || true
+	/usr/bin/xattr -dr com.apple.quarantine "$PARTIAL" 2>/dev/null || true
+	# Complete and checked: replace an earlier download with two renames, so a signal at
+	# any point leaves either download whole (the EXIT trap restores PREV).
+	rm -rf "$PREV"
+	if [ -e "$STAGE" ]; then
+		mv "$STAGE" "$PREV" || die "could not move the earlier download aside"
+	fi
+	mv "$PARTIAL" "$STAGE" || die "could not move the download into $STAGE"
+	rm -rf "$PREV"
 }
 
 if [ "$APPLY_STAGED" = 1 ]; then
@@ -480,7 +501,6 @@ else
 	stage_download
 fi
 if [ "$STAGE_ONLY" = 1 ]; then
-	KEEP_STAGE=1
 	say "downloaded $TAG to $STAGE"
 	exit 0
 fi

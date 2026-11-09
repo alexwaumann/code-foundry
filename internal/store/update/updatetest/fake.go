@@ -115,8 +115,10 @@ func (s *Source) NotesURL(tag string) string { return "https://example.test/rele
 
 // Installer is a fake update.Installer over two fake directories: the install on disk
 // (OnDisk, may be nil) and the staged download (Staged). Download reports the Progress
-// lines, blocks until Release (when Hold is set), then returns DownloadErr or stages the
-// tag. Install returns InstallErr, fails when the tag is not staged (like
+// lines, blocks until Release (when Hold is set) or until the release func HoldTag
+// returned for its tag, then returns DownloadErr (or the FailTag error for its tag) or
+// stages the tag. A failed download leaves the stage as it was, like
+// install.sh --stage-only, which unpacks beside it and swaps only once complete. Install returns InstallErr, fails when the tag is not staged (like
 // install.sh --apply-staged), else moves the staged version onto disk. Point
 // update.Options.StagedVersion at Staged().Version.
 type Installer struct {
@@ -132,7 +134,10 @@ type Installer struct {
 	InstallAs string
 
 	mu        sync.Mutex
+	holds     map[string]chan struct{}
+	fails     map[string]error
 	downloads []string
+	cancels   int
 	installs  []string
 	release   chan struct{}
 	onDisk    *OnDisk
@@ -153,11 +158,48 @@ func (i *Installer) Staged() *OnDisk { return i.staged }
 // Release lets a held Download finish.
 func (i *Installer) Release() { close(i.release) }
 
+// HoldTag makes downloads of tag wait until the returned func is called (or their
+// context ends).
+func (i *Installer) HoldTag(tag string) (release func()) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.holds == nil {
+		i.holds = map[string]chan struct{}{}
+	}
+	ch := make(chan struct{})
+	i.holds[tag] = ch
+	return sync.OnceFunc(func() { close(ch) })
+}
+
+// FailTag makes downloads of tag fail with err (nil clears it).
+func (i *Installer) FailTag(tag string, err error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.fails == nil {
+		i.fails = map[string]error{}
+	}
+	i.fails[tag] = err
+}
+
 // Calls returns the tags Download was called with.
 func (i *Installer) Calls() []string {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	return append([]string(nil), i.downloads...)
+}
+
+// Cancels returns how many downloads ended because their context did.
+func (i *Installer) Cancels() int {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.cancels
+}
+
+func (i *Installer) cancelled(ctx context.Context) error {
+	i.mu.Lock()
+	i.cancels++
+	i.mu.Unlock()
+	return ctx.Err()
 }
 
 // Installs returns the tags Install was called with.
@@ -171,6 +213,7 @@ func (i *Installer) Installs() []string {
 func (i *Installer) Download(ctx context.Context, tag string, progress func(string)) error {
 	i.mu.Lock()
 	i.downloads = append(i.downloads, tag)
+	hold, failErr := i.holds[tag], i.fails[tag]
 	i.mu.Unlock()
 	for _, l := range i.Progress {
 		progress(l)
@@ -179,12 +222,21 @@ func (i *Installer) Download(ctx context.Context, tag string, progress func(stri
 		select {
 		case <-i.release:
 		case <-ctx.Done():
-			return ctx.Err()
+			return i.cancelled(ctx)
+		}
+	}
+	if hold != nil {
+		select {
+		case <-hold:
+		case <-ctx.Done():
+			return i.cancelled(ctx)
 		}
 	}
 	if i.DownloadErr != nil {
-		i.staged.Set("") // install.sh removes the stage on failure
 		return i.DownloadErr
+	}
+	if failErr != nil {
+		return failErr
 	}
 	v := tag
 	if i.DownloadAs != "" {
