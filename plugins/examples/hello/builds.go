@@ -74,7 +74,7 @@ func buildsNodes(s buildsState) []ui.Node {
 		ui.TableCol("b-branch", "Branch").WithWeight(2, 96).WithStyle(ui.CellMono).WithPriority(6).AsSortable(ui.SortAsc),
 		ui.TableCol("b-cause", "Cause").WithWeight(3, 140).WithPriority(1),
 		ui.TableCol("b-by", "Started by").WithWidth(88).WithStyle(ui.CellMuted).WithPriority(2),
-		ui.TableCol("b-dur", "Duration").WithWidth(76).AlignEnd().WithStyle(ui.CellMono).WithPriority(7).AsSortable(ui.SortDesc),
+		ui.TableCol("b-dur", "Duration").WithWidth(64).AlignEnd().WithStyle(ui.CellMono).WithPriority(7).AsSortable(ui.SortDesc),
 		ui.TableCol("b-age", "Age").WithWidth(40).AlignEnd().WithStyle(ui.CellCaption).WithPriority(5),
 	}
 	rows := make([]ui.TableRow, len(builds))

@@ -542,7 +542,7 @@ export function usePending(watchKey: string, key: string): boolean {
 }
 
 export interface ActOptions {
-  /** A list row's act kind (check, move, add, edit), sent as the act's action. */
+  /** A list row's act kind (check, move, add, edit) or a table's sort, sent as the act's action. */
   action?: string;
   value?: string;
   values?: Readonly<Record<string, FieldValue>>;

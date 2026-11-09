@@ -32,6 +32,7 @@ import {
 } from "@/gen/codefoundry/v1/plugin_pb";
 import { toUiContext, type UiContextView } from "./command";
 import type { BarsData, StatsData } from "./pluginCharts";
+import type { TableData } from "./pluginTable";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 
@@ -532,12 +533,13 @@ export interface NodeData {
   tabs: TabsNodeData;
   stats: StatsData;
   bars: BarsData;
+  table: TableData;
 }
 
 export type NodeKind = keyof NodeData;
 
 /** The kinds this GUI knows, in pluginsdk/ui's order. */
-export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs", "stats", "bars"];
+export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs", "stats", "bars", "table"];
 
 /** A body node: a key unique in the view and exactly one kind field. */
 export type ViewNode = { key: string } & Partial<NodeData>;
@@ -991,7 +993,7 @@ export interface ActRequestView {
   version: number;
   /** The element's key. */
   key: string;
-  /** The act's kind for a list row's act (check, move, add, edit): the row (or list) has several. */
+  /** The act's kind for a list row's act (check, move, add, edit), the row (or list) having several, or a table's sort. */
   action?: string;
   /** A change's value. */
   value?: string;

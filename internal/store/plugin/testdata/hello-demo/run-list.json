@@ -337,7 +337,7 @@
             "key": "b-dur",
             "label": "Duration",
             "align": "end",
-            "width": 76,
+            "width": 64,
             "priority": 7,
             "style": "mono",
             "sortable": true,
