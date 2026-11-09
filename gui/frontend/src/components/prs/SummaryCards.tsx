@@ -1,3 +1,4 @@
+import { FigureCard } from "@/components/charts/FigureCard";
 import { cn } from "@/lib/utils";
 import type { Card, Section } from "./pageModel";
 
@@ -14,31 +15,23 @@ export function SummaryCards({ cards, filter, rows, onToggle }: { cards: readonl
           const empty = rows(c.section) === 0;
           const selected = filter === c.section;
           return (
-            <button
+            <FigureCard
               key={c.section}
-              type="button"
-              disabled={empty}
-              aria-pressed={selected}
-              onClick={() => {
+              label={c.label}
+              figure={c.count}
+              subtitle={c.subtitle}
+              figureClassName={cn("text-display-sm", c.warn ? "text-cf-warning-text" : empty && "text-cf-text-muted")}
+              pressed={selected}
+              dimmed={filter !== null}
+              empty={empty}
+              onPress={() => {
                 onToggle(c.section);
               }}
-              className={cn(
-                "flex min-w-0 flex-col items-start rounded-lg border px-3.5 py-3 text-left transition-[opacity,border-color]",
-                selected ? "border-cf-text ring-1 ring-cf-text" : "enabled:hover:border-cf-border-strong",
-                filter !== null && !selected && "opacity-50 enabled:hover:opacity-100",
-                empty && "opacity-60",
-              )}
               data-testid={`prs-card-${c.section}`}
               data-selected={selected || undefined}
-            >
-              <span className="w-full truncate text-label font-normal text-cf-text-muted">{c.label}</span>
-              <span className={cn("text-display-sm", c.warn ? "text-cf-warning-text" : empty && "text-cf-text-muted")} data-testid="prs-card-count">
-                {c.count}
-              </span>
-              <span className="w-full truncate text-caption" data-testid="prs-card-subtitle">
-                {c.subtitle}
-              </span>
-            </button>
+              figureProps={{ "data-testid": "prs-card-count" }}
+              subtitleProps={{ "data-testid": "prs-card-subtitle" }}
+            />
           );
         })}
       </div>

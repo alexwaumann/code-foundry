@@ -83,10 +83,8 @@ export function countScale(max: number): CountScale {
   return { step, top, ticks };
 }
 
-/** Which side of the crosshair the tooltip goes: the side of the card with more room. */
-export function tooltipSide(index: number, n: number): "left" | "right" {
-  return index >= n / 2 ? "left" : "right";
-}
+/** Which side of the crosshair the tooltip goes (components/charts/tooltip.ts). */
+export { tooltipSide } from "@/components/charts/tooltip";
 
 /** "2026-10" -> "OCT"; the partial month gets " ·". */
 export function axisLabel(m: Pick<ActivityMonth, "month" | "partial">): string {
