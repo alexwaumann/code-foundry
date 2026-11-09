@@ -144,3 +144,54 @@ the user's toggle wins), `stale` dims last-known data while the backend is unrea
 Up to 2 buttons sit at the end of the title row, after the pill. A node sits inside at
 most 4 containers (`primitives.md`, "Which node").
 
+
+## stats
+
+```go
+failing := ui.NewStat("failing", "Failing", "2").WithTone(ui.ToneError).
+	WithSubtitle(ui.Plain("integration · e2e")).WithAction(ui.EventAction("filter", "failed"))
+if onlyFailed {
+	failing = failing.AsPressed() // the filter is on: the card shows pressed, the others dim
+}
+ui.NewStats("figures",
+	ui.NewStat("pass", "Pass rate", "86%").WithTone(ui.ToneOK).WithSubtitle(ui.Plain("last 30 builds")),
+	ui.NewStat("median", "Median time", "4m 12s").WithSubtitle(ui.Spans(ui.T("p90 "), ui.For(361*time.Second))),
+	failing)
+```
+
+A row of 1 to 6 figure cards, the app's Pull Requests counts: a label (40 characters),
+the figure (`value`, a string you format: `"86%"`, `"4m 12s"`, `"1,288"`; 24 characters,
+one line) and a one-line `subtitle`. `tone` colours the figure: `ok` emerald, `attention`
+amber, `error` red, `muted`. A card with an `action` is a toggle (a filter): set `pressed`
+when its filter is on and render again. In the side panel the cards wrap onto balanced
+rows rather than shrink below 100 px (three fit; four go two by two) and the figure drops
+to a smaller type size so it never wraps; on a wide page one row of large figures. Use
+stats for the few numbers someone checks first; for many facts about one thing, `pairs`.
+
+## bars
+
+```go
+bars := make([]ui.Bar, len(builds))
+for i, b := range builds {
+	bars[i] = ui.NewBar("build-"+b.ID, "#"+b.ID+" · "+b.Took, b.Seconds).WithStatus(b.Status).
+		WithMeta(ui.Spans(ui.T(b.Branch+" · "), ui.At(b.Started, ui.TimeRelative))).
+		WithAction(ui.EventAction("open-build", b.ID))
+}
+chart := ui.NewBars("times", "Build time", bars...)
+chart.Bars.Subtitle = ui.Plain("last 30 builds")
+chart.Bars.Reference = &ui.BarsReference{Value: median, Label: "median 4m 12s"}
+chart.Bars.StartLabel, chart.Bars.EndLabel = "#1259", "#1288"
+```
+
+A small bar chart in a card: up to 120 bars, oldest first, each a finite `value` ≥ 0
+(any unit: only the ratios show; the top is the highest bar or the reference). Colour a
+bar by `status` (`ok` emerald, `failed` red, `attention` amber, `running` a hollow blue
+bar, `pending`/`skipped`/`off` muted) or by `series` 1..5 (the app's chart palette), not
+both. `title` (required) and `meta` are the tooltip the host draws on hover or arrow keys;
+`action` acts on a click or Enter. The reference line's label shows in the card's top
+right; `startLabel`/`endLabel` under the first and last bar. Bars share the width (120 in
+the side panel are a few px each, a bar is at most 40 px wide). For one operation's
+progress use `progress`; for a run of results over time, bars.
+
+Check `h.HasCapability("view.node.stats")` / `"view.node.bars"` before sending them: an
+older host refuses the view. Neither goes in a toolbar, footer or group.

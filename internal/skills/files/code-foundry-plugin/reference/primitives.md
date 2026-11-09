@@ -31,7 +31,7 @@ err := h.UpdateView(open.Instance, v)
   outline); everything else is the default `muted`, `outline` for a little weight, or
   `link`. The `primary` style does not exist; the host refuses it.
 - Colour means status: `attention` (amber) needs the user, `error` (red) failed, `ok`
-  (emerald) only in pills and glyphs. Choose a status or tone, never a colour.
+  (emerald) only in pills, glyphs, stat figures and bars. Choose a status or tone, never a colour.
 - Give a stop button the `destructive` style, also when its command needs no confirm.
 - **Flags**: until-seen for one-off events; sticky for conditions the plugin clears, with a
   visible way out, never re-raised after a user's clear (`host-api.md`).
@@ -110,7 +110,7 @@ the problem (`nodes[2].list.rows[0].title: required`; the first 50 problems are 
 
 | Type | JSON | Go | Rules |
 |---|---|---|---|
-| tone | `""` (neutral), `"muted"`, `"attention"`, `"error"`, `"ok"` | `ui.ToneNeutral`, `ToneMuted`, `ToneAttention`, `ToneError`, `ToneOK` | amber = needs the user, red = failed; `ok` (emerald) only in pills and status glyphs, elsewhere neutral |
+| tone | `""` (neutral), `"muted"`, `"attention"`, `"error"`, `"ok"` | `ui.ToneNeutral`, `ToneMuted`, `ToneAttention`, `ToneError`, `ToneOK` | amber = needs the user, red = failed; `ok` (emerald) only in pills, status glyphs, stat figures and bars, elsewhere neutral |
 | status | `"ok"`, `"failed"`, `"attention"`, `"running"` (spinner), `"pending"` (queued), `"skipped"`, `"off"` (aborted, disabled) | `ui.StatusOK`, … | rows, chips, glyphs; the host picks the dot or icon |
 | inline | `"plain text"` or `{"spans": [...]}` | `ui.Plain("…")`, `ui.Spans(...)` | text that may mix tones, links, times |
 | span | `{"text", "tone", "mono", "strong", "url", "hint"}`, `{"time": {"at", "style"}}` or `{"duration": {"ms"}}` | `ui.T("x").WithTone(ui.ToneError).AsMono().AsStrong().Link(url).WithHint("…")`, `ui.At(t, ui.TimeElapsed)`, `ui.For(d)` | one of text, time, duration; `url` http(s) only, opened by the host |
@@ -175,6 +175,8 @@ the active tab's like `nodes`: `reference/ui-layout.md`.
 | Streaming output | `log` | `nodes.md` |
 | A bar of buttons | `actions` | `nodes.md` |
 | One operation's progress | `progress` | `nodes.md` |
+| The few figures checked first (pass rate, median), as cards; a filter card | `stats` | `nodes.md` |
+| Results over time (build times, sizes), as a small bar chart | `bars` | `nodes.md` |
 | A state the user should know about | `notice` | `nodes.md` |
 | Nothing yet | `empty` | `nodes.md` |
 | A titled group, a card, a collapsible | `section` | `nodes.md` |
@@ -190,7 +192,7 @@ A node sits inside at most 4 containers: `section` and the layout containers (`u
 
 | Kind | When | Fields |
 |---|---|---|
-| `click` | a button, row or chip with an event | `Action` (event name), `Key` (element key), `Data` |
+| `click` | a button, row, chip, stat card or bar with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
 | `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs); no `Values` |

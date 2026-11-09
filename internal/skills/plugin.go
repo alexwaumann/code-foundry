@@ -124,6 +124,8 @@ func viewLimits() string {
 		{"A container's widest: narrow / wide (px)", n(ui.ContainerNarrowWidth, ui.ContainerWideWidth)},
 		{"Nodes in the toolbar / in the footer", n(ui.MaxStripNodes, ui.MaxStripNodes)},
 		{"Master-detail list width: least / default / most; the detail's least beside it (px)", n(ui.MinListWidth, ui.MasterDetailListWidth, ui.MaxListWidth) + "; " + n(ui.MasterDetailMinDetail)},
+		{"Stats: cards least / most; a card's label / value (characters); a card's least width (px)", n(ui.MinStatCards, ui.MaxStatCards) + "; " + n(ui.MaxStatLabel, ui.MaxStatValue) + "; " + n(ui.StatCardMinWidth)},
+		{"Bars: bars / series (palette colours) / an axis or reference label (characters) / a bar's widest (px)", n(ui.MaxBars, ui.MaxBarSeries, ui.MaxAxisLabel, ui.BarMaxWidth)},
 		{"Encoded view without log text (bytes)", n(ui.MaxViewBytes)},
 		{"Log nodes per view", n(ui.MaxLogNodes)},
 		{"Log text per render or per append (bytes)", n(ui.MaxLogText)},
