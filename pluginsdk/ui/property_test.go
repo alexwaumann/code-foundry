@@ -43,7 +43,7 @@ func TestGeneratedViews(t *testing.T) {
 		}
 	}
 	t.Logf("%d of %d generated views accepted; deepest node inside %d containers; kinds in accepted views: %v", accepted, n, deepest, kinds)
-	for _, k := range []string{"columns", "pane", "grid", "group", "container", "masterDetail", "tabs", "divider", "spacer"} {
+	for _, k := range []string{"columns", "pane", "grid", "group", "container", "masterDetail", "tabs", "divider", "spacer", "stats", "bars"} {
 		if kinds[k] == 0 {
 			t.Errorf("no accepted view has a %s node", k)
 		}
@@ -343,6 +343,10 @@ func nodeElements(x ui.Node) int {
 		n += nodesElements(x.MasterDetail.Detail)
 	case x.Tabs != nil:
 		n += len(x.Tabs.Items) + nodesElements(x.Tabs.Children)
+	case x.Stats != nil:
+		n += len(x.Stats.Cards)
+	case x.Bars != nil:
+		n += len(x.Bars.Bars)
 	}
 	return n
 }
