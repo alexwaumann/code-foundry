@@ -130,13 +130,13 @@ app itself paints with, so an override shows in the app:
   `--cf-code-foreground`, `--cf-quote-border`
 - Diff: `--cf-diff-addition`, `--cf-diff-addition-surface`, `--cf-diff-deletion`,
   `--cf-diff-deletion-surface`, `--cf-diff-modified`
+- Charts: `--cf-chart-1`, `--cf-chart-2`, `--cf-chart-3`, `--cf-chart-4`, `--cf-chart-5`,
+  `--cf-chart-6` (a plugin picker option's avatar; pages' chart series)
 - Terminal and syntax: all 31
 
 Pages only (the app has no place for them yet; a page the model writes may use them):
 
-- `--cf-info-foreground`, `--cf-highlight-foreground`,
-  `--cf-update-foreground`, `--cf-chart-1`, `--cf-chart-2`, `--cf-chart-3`, `--cf-chart-4`,
-  `--cf-chart-5`, `--cf-chart-6`
+- `--cf-info-foreground`, `--cf-highlight-foreground`, `--cf-update-foreground`
 
 ## Checking a theme
 

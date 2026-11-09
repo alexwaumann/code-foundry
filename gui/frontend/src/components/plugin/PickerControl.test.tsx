@@ -55,7 +55,12 @@ function view(field: Field, strip = false) {
 
 function show(field: Field, strip = false) {
   const r = render(view(field, strip));
-  return { ...r, update: (f: Field) => r.rerender(view(f, strip)) };
+  return {
+    ...r,
+    update: (f: Field) => {
+      r.rerender(view(f, strip));
+    },
+  };
 }
 
 const trigger = () => screen.getByTestId("plugin-select");
