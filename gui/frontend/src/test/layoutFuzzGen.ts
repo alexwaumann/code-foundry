@@ -180,7 +180,7 @@ export class Gen {
         const rows = (n: number) =>
           Array.from({ length: n }, () => ({
             key: this.key("tr"),
-            cells: Object.fromEntries(cols.filter(() => this.chance(0.8)).map((c) => [c.key, this.chance(0.3) ? { value: "#1288", glyph: { status: "running" as const }, pill: { label: "running" } } : "x".repeat(this.int(1, 60))])),
+            cells: Object.fromEntries(cols.filter(() => this.chance(0.8)).map((c) => [c.key, this.chance(0.3) ? { value: "Build 1288", glyph: { status: "running" as const }, pill: { label: "running" } } : "x".repeat(this.int(1, 60))])),
             ...(this.chance(0.3) ? { action: { event: "open" } } : {}),
             ...(this.chance(0.2) ? { actions: [this.button()] } : {}),
             ...(this.chance(0.2) ? { menu: { items: [{ key: this.key("tm"), label: "Open", action: { event: "open" } }] } } : {}),
