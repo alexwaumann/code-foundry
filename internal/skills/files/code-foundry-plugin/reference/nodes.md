@@ -76,12 +76,22 @@ ui.Node{Key: "out", Log: &ui.Log{Title: "test (ubuntu)", Rows: 12, Wrap: true, T
 ui.Node{Key: "lint", Log: &ui.Log{Lines: []ui.LogLine{{Text: "checking 42 files"}, {Text: "warning: unused x", Tone: ui.ToneAttention}}}}
 h.AppendLog(instance, "out", "ok   pkg/c\n")
 h.AppendLogLines(instance, "lint", pluginsdk.AppendLine{Text: "error: x", Tone: "error"})
+ui.NewANSILog("console", consoleText) // Log{Text, ANSI: true}: the text's own colours
 ```
 
 A monospace tail that follows new output (`noFollow` stops that), `rows` 4..40 (default
 16), `wrap` long lines, `truncated` to say the head was cut. `text` or `lines` (each with
-a tone), not both; ANSI colour codes are not interpreted (strip them). Up to 64 KB per
-render and 4 log nodes per view; stream more with the append calls.
+a tone), not both. Up to 64 KB per render (escapes count) and 4 log nodes per view; stream
+more with the append calls.
+
+`ansi: true` (capability `view.log.ansi`) reads the text's SGR escapes: the 16 colours,
+their bright and background forms, bold, dim, italic, underline and reset, drawn in the
+theme's terminal palette (they follow light, dark and user themes); 256-colour and
+truecolor become the nearest of the 16. Every other escape (cursor moves, erases, titles,
+links) is dropped, a carriage return inside a line keeps what follows it (a progress line
+redrawn), and a style carries to the next line as in a terminal. A colour beats the line's
+tone where it is set; Copy copies the text without escapes. Without `ansi`, or on an older
+host, escapes show raw: send `ui.StripANSI(s)` there.
 
 ## actions
 

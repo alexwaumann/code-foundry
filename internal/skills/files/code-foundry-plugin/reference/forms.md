@@ -28,8 +28,16 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
   (`ui.MultilineField(key, name, label, rows)`; `rows` 2..12, default 4) is a box where
   Enter adds a line and cmd+Enter submits (not in a toolbar or footer), `kind: "number"`
   (`ui.NumberField`) takes a number that still arrives as a string, so parse it. Check
-  `h.HasCapability("view.input.multiline")` (`view.input.number`) first: an older host
-  refuses the kind. `value` (never for a secret),
+  `h.HasCapability("view.input.multiline")` (`view.input.number`, `view.input.date`)
+  first: an older host refuses the kind. `kind: "date"` (`ui.DateField(key, name, label)`)
+  is a day picked from a month calendar (the week starts where the user's locale starts it;
+  quick picks Today, Tomorrow, next Monday, Clear): `value` is an ISO date
+  (`time.DateOnly`, `ui.Date(t)`), "" for none; `.WithDateRange(min, max)` (ISO dates,
+  either "") bounds the days offered. Validate refuses a value that is not an ISO date or
+  lies outside the bounds, and the host refuses such a submit or change, so a non-empty
+  value always parses with `time.Parse(time.DateOnly, v)`. A date has no `pattern`,
+  `maxLength` or `mono`; it fits a toolbar or footer at its own width, and in the panel's
+  column it is as wide as the form. `value` (never for a secret),
   `placeholder`, `maxLength`, `pattern` (a regular expression, at most 256 characters,
   no quantified group holding a quantifier such as `(a+)+` or `(-[a-z]+)*`: the GUI's
   JavaScript could take exponential time on it) with `patternMessage`, `mono`.
@@ -47,7 +55,7 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
   pair of related inputs). Fieldsets do not nest.
 
 A field with `change: {"event": "…"}` sends a `change` act when the user commits an edit
-(a text field on leaving it, a select or toggle on each pick; never per keystroke):
+(a text field on leaving it, a select, toggle or date on each pick; never per keystroke):
 `act.Field` its name, `act.Value` the new value, for dependent fields; never for a
 secret. `live: true` (`.WithChange("filter").AsLive()`, capability `view.input.live`; without
 it the host sends the event on blur) sends it as the user types instead, once they pause
