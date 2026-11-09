@@ -542,6 +542,8 @@ export function usePending(watchKey: string, key: string): boolean {
 }
 
 export interface ActOptions {
+  /** A list row's act kind (check, move, add, edit), sent as the act's action. */
+  action?: string;
   value?: string;
   values?: Readonly<Record<string, FieldValue>>;
   /**
@@ -564,6 +566,7 @@ export async function actOnElement(watchKey: string, key: string, opts: ActOptio
       instance: e.instance,
       version: e.version,
       key,
+      ...(opts.action ? { action: opts.action } : {}),
       ...(opts.value !== undefined ? { value: opts.value } : {}),
       ...(opts.values ? { values: opts.values } : {}),
       ...(e.context ? { context: e.context } : {}),
