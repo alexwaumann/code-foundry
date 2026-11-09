@@ -906,9 +906,6 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 	case f.Select != nil:
 		s := f.Select
 		p := path + ".select"
-		if len(s.Options) > MaxOptions {
-			c.bad(p+".options", "%d options, at most %d", len(s.Options), MaxOptions)
-		}
 		if !slices.Contains([]SelectStyle{"", SelectDropdown, SelectList}, s.Style) {
 			c.bad(p+".style", "unknown style %q", s.Style)
 		}
@@ -922,13 +919,9 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 			c.bad(p+".value", "one value unless multiple")
 		}
 		c.str(p+".placeholder", s.Placeholder, MaxLabel)
-		for i, o := range s.Options {
-			op := fmt.Sprintf("%s.options[%d]", p, i)
-			c.key(op, o.Key)
-			c.required(op+".label", o.Label)
-			c.str(op+".label", o.Label, MaxLabel)
-			c.str(op+".value", o.Value, MaxLabel)
-			c.inline(op+".description", o.Description, MaxLabel)
+		c.options(p+".options", s.Options, s.Search != nil)
+		if s.Search != nil {
+			c.search(p+".search", f) // picker.go
 		}
 	}
 	return false

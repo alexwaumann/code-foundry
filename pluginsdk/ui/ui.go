@@ -133,7 +133,7 @@ const (
 // Toolbar and Footer are strips pinned around the scrolling body: the toolbar under the
 // header and tabs, the footer at the bottom of the surface; the body scrolls between them.
 // Each holds at most MaxStripNodes nodes of StripKinds (text, chips, actions, progress, a
-// form of inputs, dropdown selects and toggles: a search field, filters; a divider without
+// form of inputs, dropdown selects (pickers too) and toggles: a search field, filters; a divider without
 // a label, a vertical hairline; a spacer, space across, or with Flex the row's free width;
 // a group), laid out in a row that wraps; they count toward MaxElements and share the
 // view's keys.
@@ -557,6 +557,9 @@ type Select struct {
 	Style         SelectStyle   `json:"style,omitempty"` // with Multiple: a checkbox menu or checkbox rows
 	Placeholder   string        `json:"placeholder,omitempty"`
 	OptionsSource OptionsSource `json:"optionsSource,omitempty"` // host-filled options
+	// Search makes a dropdown a picker the plugin searches (picker.go): Options are what
+	// it lists before the user types, Search.Results the plugin's answer to a query.
+	Search *Search `json:"search,omitempty"`
 }
 
 // Option is one select option.
@@ -566,6 +569,13 @@ type Option struct {
 	Label       string  `json:"label"`
 	Description *Inline `json:"description,omitempty"` // list style only
 	Disabled    bool    `json:"disabled,omitempty"`
+	// A searched select's (Select.Search) options also take a Group (the heading they are
+	// listed under), a Detail (muted text at the row's end), and an Avatar (initials on a
+	// colour the host picks from the value) or an Icon (a lucide name).
+	Group  string `json:"group,omitempty"`
+	Detail string `json:"detail,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
+	Icon   string `json:"icon,omitempty"`
 }
 
 // Toggle is a switch.
