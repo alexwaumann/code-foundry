@@ -98,6 +98,8 @@ These draw inside the page's card, never over the app: give the page room for a 
 - `DropdownMenuContent`: the menu; `align` start, center or end.
 - `DropdownMenuItem`: an entry; `onSelect`; `variant` destructive; `disabled`.
 - `DropdownMenuCheckboxItem`: a ticked entry; `checked` + `onCheckedChange`.
+- `DropdownMenuRadioGroup`: one-pick entries; `value` (the picked one's) + `onValueChange`.
+- `DropdownMenuRadioItem`: one of them, a check at the picked one; `value`.
 - `DropdownMenuLabel`: a heading in the menu.
 - `DropdownMenuSeparator`: a line.
 - `DropdownMenuShortcut`: a key hint at an entry's right.
@@ -108,6 +110,8 @@ These draw inside the page's card, never over the app: give the page room for a 
 - `ContextMenuTrigger`: the area.
 - `ContextMenuContent`: the menu.
 - `ContextMenuItem`: an entry; `onSelect`; `variant` destructive.
+- `ContextMenuRadioGroup`: one-pick entries; `value` + `onValueChange`.
+- `ContextMenuRadioItem`: one of them, a check at the picked one; `value`.
 - `ContextMenuSub`: a submenu.
 - `ContextMenuSubTrigger`: the entry that opens it.
 - `ContextMenuSubContent`: its menu.

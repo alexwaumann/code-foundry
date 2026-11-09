@@ -4,7 +4,8 @@
 // sources, thread, terminal, the layout containers columns, pane, grid, container,
 // masterDetail and tabs,
 // divider, spacer and the inline group; stats cards and a bar chart; the view's pinned
-// toolbar and footer; inline spans with times and durations), builders, and
+// toolbar and footer; menus on rows, the header and buttons; inline spans with times and
+// durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
 // the plugin. The code-foundry-plugin skill's reference/primitives.md is the guide, with
 // an index of every node.
@@ -168,6 +169,8 @@ type Header struct {
 	SublineIcon string   `json:"sublineIcon,omitempty"`
 	Actions     []Button `json:"actions,omitempty"` // icon-only, at most 2
 	TabTitle    string   `json:"tabTitle,omitempty"`
+	// Menu is the header's overflow: a ⋯ after its actions (see Menu).
+	Menu *Menu `json:"menu,omitempty"`
 }
 
 // Tabs are navigation tabs inside the surface (styled like the PR view's). The host
@@ -294,6 +297,9 @@ type Button struct {
 	// MaxLabel characters. Never one that repeats the label; an icon-only button shows it
 	// under its label.
 	Hint string `json:"hint,omitempty"`
+	// Menu makes the button open a menu instead of acting (a "Rebuild ▾"): set Action or
+	// Menu, not both. Not on a header's, row's or form's buttons (Header.Menu, Row.Menu).
+	Menu *Menu `json:"menu,omitempty"`
 }
 
 // Node is one body element: a key unique in the view and exactly one kind.
@@ -413,6 +419,9 @@ type Row struct {
 	Actions   []Button `json:"actions,omitempty"` // at most 3
 	Action    *Action  `json:"action,omitempty"`  // the whole row
 	Selected  bool     `json:"selected,omitempty"`
+	// Menu is the row's ⋯ (shown on hover and focus) and right-click menu; a narrow row
+	// folds its Actions into it (see Menu).
+	Menu *Menu `json:"menu,omitempty"`
 }
 
 // Chips is a strip of stages or steps.

@@ -2,15 +2,16 @@ import type { ViewHeader } from "@/api/plugin";
 import { inlineSpans, inlineText } from "@/api/plugin";
 import { Tip } from "@/components/ui/tooltip";
 import { InlineView, PillView, PluginButton, PluginIcon } from "./parts";
+import { MoreMenu } from "./PluginMenu";
 
 /**
  * The surface's identity and freshness line (MCP's header): the icon (neutral for every
  * plugin), title, trailing count and pill on the first line; the subline (up to two lines,
- * the rest in a tooltip) and at most two icon-only actions under it. Before the first view it is the manifest's icon and
+ * the rest in a tooltip) and at most two icon-only actions under it, then its menu's ⋯. Before the first view it is the manifest's icon and
  * title over "Loading…".
  */
 export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: ViewHeader | undefined; fallbackTitle: string; icon: string; note?: string }) {
-  const hasSubline = inlineSpans(header?.subline).length > 0 || (header?.actions?.length ?? 0) > 0 || Boolean(note);
+  const hasSubline = inlineSpans(header?.subline).length > 0 || (header?.actions?.length ?? 0) > 0 || header?.menu !== undefined || Boolean(note);
   return (
     <header className="flex min-w-0 flex-col gap-0.5 border-b border-cf-divider px-4 pt-2 pb-2.5 @max-[340px]:px-3" data-testid="plugin-header">
       <h2 className="flex min-w-0 items-center gap-1.5 text-heading">
@@ -43,11 +44,12 @@ export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: V
               </Tip>
             )
           )}
-          {header?.actions && header.actions.length > 0 && (
+          {((header?.actions?.length ?? 0) > 0 || header?.menu) && (
             <span className="ml-auto flex shrink-0 items-center gap-0.5">
-              {header.actions.slice(0, 2).map((b) => (
+              {header?.actions?.slice(0, 2).map((b) => (
                 <PluginButton key={b.key} button={{ ...b, iconOnly: true }} />
               ))}
+              {header?.menu && <MoreMenu items={header.menu.items} testId="plugin-header-more" />}
             </span>
           )}
         </div>

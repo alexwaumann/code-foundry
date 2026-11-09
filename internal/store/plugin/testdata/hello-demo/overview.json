@@ -54,7 +54,35 @@
         "iconOnly": true
       }
     ],
-    "tabTitle": "Hello"
+    "tabTitle": "Hello",
+    "menu": {
+      "items": [
+        {
+          "key": "hdr-reset",
+          "label": "Reset the click count",
+          "action": {
+            "event": "reset-clicks"
+          }
+        },
+        {
+          "key": "hdr-form",
+          "label": "Go to the form",
+          "action": {
+            "event": "goto-form"
+          }
+        },
+        {
+          "separator": true
+        },
+        {
+          "key": "hdr-sdk",
+          "label": "Open the SDK reference",
+          "action": {
+            "openUrl": "https://github.com/alexwaumann/code-foundry/tree/main/pluginsdk"
+          }
+        }
+      ]
+    }
   },
   "tabs": {
     "items": [
@@ -660,9 +688,111 @@
                 }
               ]
             },
+            "actions": [
+              {
+                "key": "run-2-rerun",
+                "label": "Rerun",
+                "icon": "rotate-ccw",
+                "action": {
+                  "event": "rerun-run",
+                  "data": "2"
+                }
+              },
+              {
+                "key": "run-2-log",
+                "label": "Open log",
+                "action": {
+                  "event": "open-log",
+                  "data": "2"
+                }
+              },
+              {
+                "key": "run-2-copy-error",
+                "label": "Copy error",
+                "action": {
+                  "copy": "deploy failed: exit status 1"
+                }
+              }
+            ],
             "action": {
               "event": "open-run",
               "data": "2"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "run-2-rerun-clean",
+                  "label": "Rerun without the cache",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "2"
+                  }
+                },
+                {
+                  "key": "run-2-priority",
+                  "label": "Priority",
+                  "submenu": [
+                    {
+                      "key": "run-2-p-low",
+                      "label": "Low",
+                      "action": {
+                        "event": "set-priority",
+                        "data": "low"
+                      },
+                      "group": "priority"
+                    },
+                    {
+                      "key": "run-2-p-normal",
+                      "label": "Normal",
+                      "action": {
+                        "event": "set-priority",
+                        "data": "normal"
+                      },
+                      "group": "priority",
+                      "checked": true
+                    },
+                    {
+                      "key": "run-2-p-high",
+                      "label": "High",
+                      "action": {
+                        "event": "set-priority",
+                        "data": "high"
+                      },
+                      "group": "priority"
+                    }
+                  ]
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "run-2-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "run-2-copy-link",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "run-2-delete",
+                  "label": "Delete run",
+                  "action": {
+                    "event": "delete-run",
+                    "data": "2"
+                  },
+                  "disabled": true,
+                  "danger": true
+                }
+              ]
             }
           },
           {
@@ -908,10 +1038,26 @@
             }
           },
           {
-            "key": "copy",
-            "label": "Copy greeting",
-            "action": {
-              "copy": "Hello from the demo surface"
+            "key": "bar-more",
+            "label": "More",
+            "style": "outline",
+            "menu": {
+              "items": [
+                {
+                  "key": "copy",
+                  "label": "Copy greeting",
+                  "action": {
+                    "copy": "Hello from the demo surface"
+                  }
+                },
+                {
+                  "key": "bar-reset",
+                  "label": "Reset the click count",
+                  "action": {
+                    "event": "reset-clicks"
+                  }
+                }
+              ]
             }
           }
         ],

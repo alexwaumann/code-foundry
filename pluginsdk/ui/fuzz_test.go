@@ -111,10 +111,30 @@ const masterDetailSeed = `{"nodes":[{"key":"s","section":{"title":"Runs","childr
         {"key":"rf","form":{"fields":[{"key":"rf-n","name":"note","input":{}}],"submit":{"key":"rf-s","label":"Save","action":{"event":"note"}}}}]}}]}}]}},
   {"key":"t2","tabs":{"active":"t2-a","items":[{"key":"t2-a","label":"A"},{"key":"t2-b","label":"B"}],"children":[]}}]}`
 
+// menuSeed has menus everywhere they go: a header's, a list row's beside its actions, a
+// master-detail row's, and a menu button in the toolbar and in a section, with every item
+// kind (event, command, URL, copy), separators, disabled and danger items, and a submenu
+// holding a one-pick group.
+const menuSeed = `{"header":{"title":"Jira","menu":{"items":[{"key":"h-refresh","label":"Refresh","action":{"event":"refresh"}},
+  {"separator":true},{"key":"h-docs","label":"Open in Jira","action":{"openUrl":"https://jira.example.com"}}]}},
+ "toolbar":[{"key":"tb","actions":{"buttons":[{"key":"tb-rebuild","label":"Rebuild","menu":{"items":[
+  {"key":"tb-r1","label":"Rebuild","action":{"event":"rebuild","data":"1287"}},
+  {"key":"tb-r2","label":"Rebuild with parameters","action":{"command":{"name":"plugin.ci.rebuild","args":{"id":"1287"}}}}]}}]}}],
+ "nodes":[{"key":"l","list":{"rows":[{"key":"CF-407","title":"Plugin menus","actions":[{"key":"CF-407-start","label":"Start","action":{"event":"start","data":"CF-407"}}],
+  "menu":{"items":[{"key":"CF-407-send","label":"Send to this thread","action":{"event":"send","data":"CF-407"}},{"separator":true},
+   {"key":"CF-407-move","label":"Move to","submenu":[
+    {"key":"CF-407-todo","label":"To do","group":"status","action":{"event":"move","data":"todo"}},
+    {"key":"CF-407-review","label":"In review","group":"status","checked":true,"action":{"event":"move","data":"review"}},
+    {"separator":true},{"key":"CF-407-wont","label":"Won't do","action":{"event":"move","data":"wont"},"disabled":true}]},
+   {"key":"CF-407-copy","label":"Copy key","action":{"copy":"CF-407"}},{"separator":true},
+   {"key":"CF-407-del","label":"Delete","danger":true,"action":{"command":{"name":"plugin.jira.delete","args":{"key":"CF-407"}}}}]}}]}},
+  {"key":"md","masterDetail":{"list":{"rows":[{"key":"r1","title":"Run 1","menu":{"items":[{"key":"r1-log","label":"Open log","action":{"event":"log","data":"1"}}]}}]},"detail":[]}},
+  {"key":"s","section":{"title":"S","actions":[{"key":"s-more","label":"More","icon":"ellipsis","iconOnly":true,"menu":{"items":[{"key":"s-a","label":"A","action":{"event":"a"}}]}}],"children":[]}}]}`
+
 type viewSeed struct{ view, corrupt []byte }
 
 // viewSeeds are FuzzView's seeds: the hello demo's captured views, the walkthrough, a log,
-// a thread, and the layout, grid, master-detail and charts seeds.
+// a thread, and the layout, grid, master-detail, charts, picker and menu seeds.
 func viewSeeds() []viewSeed {
 	var out []viewSeed
 	files, _ := filepath.Glob(filepath.FromSlash("../../internal/store/plugin/testdata/hello-demo/*.json"))
@@ -133,6 +153,7 @@ func viewSeeds() []viewSeed {
 		viewSeed{[]byte(masterDetailSeed), []byte{0, 1, 0, 0, 2}},
 		viewSeed{[]byte(chartsSeed), []byte{0, 0, 1, 0, 0, 3}},
 		viewSeed{[]byte(pickerSeed), []byte{0, 0, 1, 0, 2}},
+		viewSeed{[]byte(menuSeed), []byte{0, 0, 0, 1}},
 	)
 }
 

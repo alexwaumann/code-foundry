@@ -54,7 +54,35 @@
         "iconOnly": true
       }
     ],
-    "tabTitle": "Hello"
+    "tabTitle": "Hello",
+    "menu": {
+      "items": [
+        {
+          "key": "hdr-reset",
+          "label": "Reset the click count",
+          "action": {
+            "event": "reset-clicks"
+          }
+        },
+        {
+          "key": "hdr-form",
+          "label": "Go to the form",
+          "action": {
+            "event": "goto-form"
+          }
+        },
+        {
+          "separator": true
+        },
+        {
+          "key": "hdr-sdk",
+          "label": "Open the SDK reference",
+          "action": {
+            "openUrl": "https://github.com/alexwaumann/code-foundry/tree/main/pluginsdk"
+          }
+        }
+      ]
+    }
   },
   "tabs": {
     "items": [

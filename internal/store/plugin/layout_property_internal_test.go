@@ -106,8 +106,9 @@ func nullListOf(view []byte, required []string) string {
 
 // expectedElements lists "key kind node" for every acting element of a valid view,
 // found by reflection (not by the host's walk): every button, row and chip with an
-// action, a master-detail's rows without one (select, naming it), the view's tabs and a
-// tabs node's (tab, naming it), fields with a change event, and pickers' searches.
+// action, menu items with an action (a submenu's too), a master-detail's rows without one
+// (select, naming it), the view's tabs and a tabs node's (tab, naming it), fields with a
+// change event, and pickers' searches.
 func expectedElements(v *ui.View) []string {
 	var out []string
 	kind := func(a *ui.Action, event string) string {
@@ -148,6 +149,13 @@ func expectedElements(v *ui.View) []string {
 				}
 				add(x.Key, kind(x.Action, ev), "")
 			}
+			walk(reflect.ValueOf(x.Menu), "", false)
+			return
+		case ui.MenuItem:
+			if x.Action != nil {
+				add(x.Key, kind(x.Action, pluginsdk.ActClick), "")
+			}
+			walk(reflect.ValueOf(x.Submenu), "", false)
 			return
 		case ui.Chip:
 			if x.Action != nil {
@@ -172,6 +180,7 @@ func expectedElements(v *ui.View) []string {
 				add(x.Key, pluginsdk.ActSelect, owner)
 			}
 			walk(reflect.ValueOf(x.Actions), "", false)
+			walk(reflect.ValueOf(x.Menu), "", false)
 			return
 		case ui.Field:
 			// A fieldset's change is accepted by Validate but never acts (sdk.md: a

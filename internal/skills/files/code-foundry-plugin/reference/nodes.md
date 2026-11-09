@@ -53,9 +53,45 @@ A row: glyph, title (required), `titleMeta`, pill, `line2`, `trailing`, up to 3 
 an `action` for the whole row, `selected`. Icon-only buttons sit at the end of the first
 line beside `trailing`; labelled ones go on a line of their own under the row (a cancel
 or open is icon-only, a "Send to Claude" labelled). `glyphStyle`: `dot` (default) or `icon`;
-`dense` draws 24 px single-line rows: `line2` and labelled buttons are **not shown**
-(icon-only buttons and `trailing` are), so leave it off when line 2 carries something
-the user needs. `emptyText` shows when there are no rows.
+`dense` draws 24 px single-line rows: `line2` is **not shown** and labelled buttons fold
+into the row's ⋯ (icon-only buttons and `trailing` stay), so leave it off when line 2
+carries something the user needs. `emptyText` shows when there are no rows. A row's
+`menu` is below.
+
+## menus
+
+```go
+row.Menu = ui.NewMenu(
+	ui.EventItem("CF-407-start", "Start a thread on this", "start", "CF-407"), // act.Key, act.Data
+	ui.Separator(),
+	ui.Submenu("CF-407-move", "Move to", ui.PickGroup("status", "CF-407-review", // the checked key
+		ui.EventItem("CF-407-todo", "To do", "move", "todo"),
+		ui.EventItem("CF-407-review", "In review", "move", "review"))...),
+	ui.URLItem("CF-407-open", "Open in Jira", url), ui.CopyItem("CF-407-copy", "Copy key", "CF-407"),
+	ui.Separator(),
+	ui.CommandItem("CF-407-del", "Delete", "plugin.jira.delete", map[string]string{"key": "CF-407"}).AsDanger())
+header.Menu = ui.NewMenu(ui.EventItem("rebuild-all", "Rebuild all", "rebuild-all", ""))
+ui.Button{Key: "rebuild", Label: "Rebuild", Style: ui.ButtonOutline}.WithMenu(ui.NewMenu(...)) // "Rebuild ▾"
+```
+
+A menu holds the less frequent actions; keep the one or two a user does most as buttons.
+It goes on a list row (`Row.Menu`, a master-detail's too: a ⋯ "More options" on hover and
+focus, and the same menu on a right-click or Shift+F10), the header (`Header.Menu`, a ⋯
+after its 2 icon actions) or a button in an actions bar, section, notice, empty state or
+terminal (`Button.Menu`, a chevron after its label; set `action` or `menu`, not both). Not
+on a header's, row's or form's buttons: give the header or row a menu. Items are text
+only (no icons, no shortcuts) and each is one of an action, a one-level submenu or a
+separator (never first, last or doubled). `AsDisabled()` dims an item; `AsDanger()` draws
+it red. `PickGroup` makes adjacent items one-pick (a check at the `checked` one, at most
+one): the pick is a click like any item's, and the plugin answers with the check moved.
+Picking runs the item's action as a button's (a `click` act with the item's key and data;
+commands confirm, URLs and copies stay in the host). 24 entries per menu or submenu,
+labels 60 characters; items count as elements and share the view's keys
+(`plugintest.Host.PickItem` picks one in a test). **The fold:** a row narrower than its
+buttons need beside about 200 px of title (three buttons in the 400 px panel, not two)
+shows them in its ⋯ instead, first, then a separator, then its menu; an expanded panel
+or a page shows the buttons. A row with buttons and no menu gets a ⋯ only while folded.
+`h.HasCapability("view.menu")`: an older host drops menus.
 
 ## chips
 

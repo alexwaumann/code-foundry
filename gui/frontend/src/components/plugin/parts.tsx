@@ -3,10 +3,11 @@
  * ticking times), pills, status glyphs and buttons (PRIMITIVES.md §A, shared value types).
  */
 import { createElement } from "react";
-import { Check, Circle, Copy, ExternalLink, LoaderCircle } from "lucide-react";
+import { Check, ChevronDown, Circle, Copy, ExternalLink, LoaderCircle } from "lucide-react";
 import type { Glyph as GlyphValue, Inline, Pill as PillValue, Span, ViewButton } from "@/api/plugin";
 import { inlineSpans, inlineText } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { useCopied } from "@/lib/useCopied";
@@ -17,6 +18,8 @@ import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
 import { formatFixedDuration, formatTime } from "./format";
 import { iconByName } from "./icons";
+import { useMenuPending } from "./menuPending";
+import { MenuButtonMenu } from "./PluginMenu";
 import { statusDot, statusIcon, statusWord, toneText, tonePill } from "./tones";
 
 /** A lucide icon by kebab name (a circle for any other name; `fallback` when there is none). */
@@ -150,13 +153,16 @@ const buttonStyle: Record<NonNullable<ViewButton["style"]>, string> = {
  * confirm dialog carries the weight) or link. Pending from the click until the plugin
  * answers (or the command returns), `busy` while the plugin says so. An icon-only button
  * gets its label as a tooltip (the label is otherwise hidden), then the plugin's hint;
- * any other button shows the hint, or its label when that is cut.
+ * any other button shows the hint, or its label when that is cut. A button with a menu
+ * opens it (a chevron after its label; PluginMenu.tsx MenuButtonMenu) and spins while one
+ * of its items' acts is in flight.
  */
 export function PluginButton({ button, values, onClick, submit }: { button: ViewButton; values?: () => Readonly<Record<string, string | boolean | string[]>>; onClick?: () => void; submit?: boolean }) {
   const { watchKey, inert } = useViewCtx();
   const form = useFormCtx();
   const run = useRunAction();
-  const pending = usePending(watchKey, button.key) || (button.busy ?? false);
+  const menuPending = useMenuPending(button.menu?.items);
+  const pending = usePending(watchKey, button.key) || (button.busy ?? false) || menuPending;
   const style = button.style ?? "muted";
   const icon = pending ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden /> : button.icon ? <PluginIcon name={button.icon} /> : null;
   const disabled = (button.disabled ?? false) || pending || inert || (form?.locked ?? false);
@@ -182,21 +188,34 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
       {icon}
       {!button.iconOnly && <span className="min-w-0 truncate">{button.label}</span>}
       {external && <ExternalLink className="size-3" aria-hidden />}
+      {button.menu && !button.iconOnly && <ChevronDown className="size-3 opacity-70" aria-hidden data-testid="plugin-button-chevron" />}
     </Button>
   );
+  const trigger = button.menu ? (
+    <DropdownMenuTrigger asChild disabled={disabled}>
+      {el}
+    </DropdownMenuTrigger>
+  ) : (
+    el
+  );
   // A label wider than the panel truncates; the tooltip then shows it whole.
-  if (!button.iconOnly && !button.hint) {
-    return (
+  const tipped =
+    !button.iconOnly && !button.hint ? (
       <Tip label={button.label} whenTruncated>
-        {el}
+        {trigger}
+      </Tip>
+    ) : (
+      // The span carries the tooltip while the button is disabled (no pointer events).
+      <Tip label={button.iconOnly ? [button.label, button.hint].filter(Boolean).join("\n") : button.hint}>
+        <span className={cn("inline-flex", button.iconOnly ? "shrink-0" : "max-w-full min-w-0")}>{trigger}</span>
       </Tip>
     );
-  }
-  // The span carries the tooltip while the button is disabled (no pointer events).
-  return (
-    <Tip label={button.iconOnly ? [button.label, button.hint].filter(Boolean).join("\n") : button.hint}>
-      <span className={cn("inline-flex", button.iconOnly ? "shrink-0" : "max-w-full min-w-0")}>{el}</span>
-    </Tip>
+  return button.menu ? (
+    <MenuButtonMenu items={button.menu.items} testId={`plugin-button-${button.key}`}>
+      {tipped}
+    </MenuButtonMenu>
+  ) : (
+    tipped
   );
 }
 

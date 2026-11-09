@@ -179,14 +179,27 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
     if (!act) return;
     out.set(key, { key, kind: act.event ? kind : "host", event: act.event ?? "", ...(act.data ? { data: act.data } : {}) });
   };
-  const button = (b: unknown, kind: Element["kind"] = "click") => {
-    const x = b as { key: string; action?: unknown };
-    action(x.key, x.action, kind);
+  // A menu's items act as buttons do (a submenu's too; separators and submenus do not).
+  type MenuItem = { key?: string; action?: unknown; submenu?: MenuItem[] };
+  const menu = (m: unknown) => {
+    const walkItems = (items: MenuItem[] | undefined) => {
+      for (const it of items ?? []) {
+        if (it.key && it.action) action(it.key, it.action, "click");
+        walkItems(it.submenu);
+      }
+    };
+    walkItems((m as { items?: MenuItem[] } | undefined)?.items);
   };
-  const header = view.header as { actions?: unknown[] } | undefined;
+  const button = (b: unknown, kind: Element["kind"] = "click") => {
+    const x = b as { key: string; action?: unknown; menu?: unknown };
+    action(x.key, x.action, kind);
+    menu(x.menu);
+  };
+  const header = view.header as { actions?: unknown[]; menu?: unknown } | undefined;
   header?.actions?.forEach((b) => {
     button(b);
   });
+  menu(header?.menu);
   const tabs = view.tabs as { items?: { key: string }[] } | undefined;
   tabs?.items?.forEach((t) => out.set(t.key, { key: t.key, kind: "tab", event: "tab" }));
   const fields = (fs: { key: string; change?: unknown; fieldset?: { fields: unknown[] }; select?: { search?: { key: string; event: string } } }[]) => {
@@ -199,7 +212,7 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
   };
   const walk = (nodes: Node[]) => {
     for (const n of nodes) {
-      const any = n as Record<string, { buttons?: unknown[]; actions?: unknown[]; rows?: { key: string; action?: unknown; actions?: unknown[] }[]; chips?: { key: string; action?: unknown }[]; children?: Node[]; submit?: unknown; secondary?: unknown[]; fields?: unknown[] }>;
+      const any = n as Record<string, { buttons?: unknown[]; actions?: unknown[]; rows?: { key: string; action?: unknown; actions?: unknown[]; menu?: unknown }[]; chips?: { key: string; action?: unknown }[]; children?: Node[]; submit?: unknown; secondary?: unknown[]; fields?: unknown[] }>;
       any.actions?.buttons?.forEach((b) => {
         button(b);
       });
@@ -211,6 +224,7 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
         r.actions?.forEach((b) => {
           button(b);
         });
+        menu(r.menu);
       });
       any.chips?.chips?.forEach((c) => {
         action(c.key, c.action, "click");
@@ -221,13 +235,14 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
       (n.bars as { bars?: { key: string; action?: unknown }[] } | undefined)?.bars?.forEach((b) => {
         action(b.key, b.action, "click");
       });
-      const md = n.masterDetail as { list?: { rows?: { key: string; action?: unknown; actions?: unknown[] }[] }; emptyDetail?: { actions?: unknown[] } } | undefined;
+      const md = n.masterDetail as { list?: { rows?: { key: string; action?: unknown; actions?: unknown[]; menu?: unknown }[] }; emptyDetail?: { actions?: unknown[] } } | undefined;
       md?.list?.rows?.forEach((r) => {
         if (r.action) action(r.key, r.action, "click");
         else out.set(r.key, { key: r.key, kind: "select", event: "select", node: n.key });
         r.actions?.forEach((b) => {
           button(b);
         });
+        menu(r.menu);
       });
       md?.emptyDetail?.actions?.forEach((b) => {
         button(b);
@@ -398,6 +413,8 @@ class DemoInstance {
   resetToken = 0;
   build = 0;
   running = false;
+  /** Build #2's priority on the Overview tab, picked in its row's menu (the real plugin's demo.priority). */
+  priority = "normal";
   /** The Layout tab's toolbar filter (the real plugin's layoutFilter). */
   layoutFilter = { status: "", query: "", resets: 0, branches: [] as string[], branchQuery: "" };
   /** The Form tab's reviewers picker's last search (the real plugin's peopleQuery). */
@@ -470,6 +487,13 @@ class DemoInstance {
         if (pin) pin.label = this.pinned ? "Unpin from this thread" : "Pin to this thread";
       });
       if (this.failedOnly) patchFailedOnly(nodes);
+      patchNode(nodes, "runs", (n) => {
+        const row = (n.list as { rows: { key: string; menu?: { items: { key: string; submenu?: { key: string; checked?: boolean }[] }[] } }[] }).rows.find((r) => r.key === "run-2");
+        for (const it of row?.menu?.items.find((x) => x.key === "run-2-priority")?.submenu ?? []) {
+          if (it.key === `run-2-p-${this.priority}`) it.checked = true;
+          else delete it.checked;
+        }
+      });
     } else if (this.tab === "form") {
       patchNode(nodes, "form-intro", (n) => {
         n.text = { content: this.saved ? `Saved: ${JSON.stringify(this.saved)}` : "Nothing saved yet." };
@@ -685,6 +709,18 @@ class DemoInstance {
         break;
       case "click:open-build":
         toast(`build #${el.data ?? ""}`);
+        return;
+      case "click:reset-clicks":
+        this.clicks = 0;
+        break;
+      case "click:set-priority":
+        this.priority = el.data ?? "normal";
+        break;
+      case "click:open-log":
+        this.tab = "log";
+        break;
+      case "click:rerun-run":
+        toast(`build #${el.data ?? ""} queued again`);
         return;
       case "change:project-changed":
       case "click:stage":

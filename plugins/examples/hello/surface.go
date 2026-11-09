@@ -47,13 +47,15 @@ type demo struct {
 	peopleQuery string
 	runs        runsState
 	failed      bool // the Overview's Failing card narrows its chart (charts.go)
+	// priority is Build #2's priority ("low", "normal", "high"), picked in its row's menu.
+	priority string
 }
 
 // demoFactory opens demo instances sharing own.
 func demoFactory(own *owned) pluginsdk.SurfaceFactory {
 	return func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
 		ctx, stop := context.WithCancel(context.Background())
-		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, tab: "overview", started: time.Now()}
+		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, tab: "overview", started: time.Now(), priority: "normal"}
 		h.Log().Debug("demo opened", "instance", open.Instance, "thread", open.Context.ThreadID)
 		return d, d.render()
 	}
@@ -102,6 +104,7 @@ func (d *demo) viewLocked() ui.View {
 			ui.EventButton("hdr-refresh", "Refresh", "refresh").WithIcon("refresh-cw").AsIconOnly(),
 			ui.URLButton("hdr-docs", "Open the plugin docs", "https://github.com/alexwaumann/code-foundry").WithIcon("external-link").AsIconOnly(),
 		},
+		Menu: headerMenu(),
 	}
 	tabs := ui.NewTabs(d.tab, ui.NewTab("overview", "Overview"), ui.NewTab("form", "Form"), ui.NewTab("log", "Log"),
 		ui.NewTab("assistant", "Assistant"), ui.NewTab("shell", "Shell"), ui.NewTab("layout", "Layout"), ui.NewTab("run-list", "Runs"))
@@ -153,7 +156,8 @@ func (d *demo) overviewNodes(pin string) []ui.Node {
 			Action:  ui.EventAction("open-run", "3"),
 			Actions: []ui.Button{ui.EventButton("run-3-cancel", "Cancel", "cancel-run").WithIcon("square").AsIconOnly()}},
 		{Key: "run-2", Glyph: ui.StatusGlyph(ui.StatusFailed), Title: "Build #2", Pill: ui.NewPill("failed", ui.ToneError),
-			Line2: ui.Spans(ui.T("deploy failed").WithTone(ui.ToneError)), Trailing: ui.Spans(ui.For(95 * time.Second)), Action: ui.EventAction("open-run", "2")},
+			Line2: ui.Spans(ui.T("deploy failed").WithTone(ui.ToneError)), Trailing: ui.Spans(ui.For(95 * time.Second)), Action: ui.EventAction("open-run", "2"),
+			Actions: runActions(), Menu: runMenu(d.priority)},
 		{Key: "run-1", Glyph: ui.IconGlyph("check", ui.ToneNeutral), Title: "Build #1", Trailing: ui.Spans(ui.At(now.Add(-time.Hour), ui.TimeRelative)), Selected: true},
 	}}}
 	chips := ui.NewChips("stages",
@@ -187,7 +191,7 @@ func (d *demo) overviewNodes(pin string) []ui.Node {
 		ui.CommandButton("greet", "Greet via command", "plugin.hello.greet", map[string]string{"name": "panel"}),
 		ui.CommandButton("forget", "Forget the word", "plugin.hello.forget", nil).WithStyle(ui.ButtonDestructive),
 		ui.URLButton("docs", "Docs", "https://github.com/alexwaumann/code-foundry").WithStyle(ui.ButtonLink),
-		ui.CopyButton("copy", "Copy greeting", "Hello from the demo surface"),
+		barMenuButton(),
 	}}}
 	return append(append([]ui.Node{text}, chartNodes(d.failed)...), small, md, pairs, list, chips, progress, spinner, notice, section, empty, bar)
 }
@@ -310,6 +314,16 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		return d.render()
 	case "click:click", "click:refresh":
 		d.clicks++
+	case "click:reset-clicks":
+		d.clicks = 0
+	case "click:set-priority":
+		d.priority = act.Data
+	case "click:open-log":
+		d.tab = "log"
+	case "click:rerun-run":
+		d.mu.Unlock()
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #"+act.Data+" queued again")
+		return nil
 	case "click:goto-form":
 		d.tab = "form"
 	case "click:pin":
