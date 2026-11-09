@@ -63,18 +63,3 @@ export function Freshness({ fetchedAtMs, lastError, staleAfterMs, testId }: { fe
     </Tip>
   );
 }
-
-export function SectionTitle({ children, count, caption }: { children: React.ReactNode; count?: number; /** Muted, after the count: "open, waiting on the author". */ caption?: React.ReactNode }) {
-  return (
-    // One line however narrow: the title and count keep their width, the caption truncates.
-    <h2 className="mb-1.5 flex min-w-0 items-baseline gap-2 text-heading">
-      <span className="shrink-0 whitespace-nowrap">{children}</span>
-      {count !== undefined && <span className="shrink-0 text-caption tabular-nums">({count})</span>}
-      {caption && (
-        <span className="truncate text-caption" data-testid="prs-section-caption">
-          {caption}
-        </span>
-      )}
-    </h2>
-  );
-}

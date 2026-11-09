@@ -18,6 +18,7 @@ import {
 import { createContext, Fragment, useContext, useMemo, type ReactNode } from "react";
 import type { PullRequestView } from "@/api/gh";
 import { statusPill, toneText } from "@/components/pr/tones";
+import { GroupLabel, RowGrid, TABLE_BODY, TABLE_BOX, TABLE_ROW, TABLE_ROW_H, TableHead } from "@/components/table/TableParts";
 import { Tip } from "@/components/ui/tooltip";
 import { NavRow } from "@/lib/NavRow";
 import { QUIET } from "@/lib/quiet";
@@ -32,8 +33,6 @@ import { capKey, tableItems, type Cap, type MergedRowModel, type OtherRow, type 
 import { Age, ChecksBadge, Diff, PrStateIcon } from "./PrBits";
 import { needsLabel, verdictLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
 import { RowList, VIRTUALIZE_OVER } from "./RowList";
-
-const ROW_H = 28;
 
 /** The columns a table shows and their grid template, from its own width (PrTable); rows read it. */
 interface Shown {
@@ -140,13 +139,13 @@ function Row({ section, pr, className, cells }: { section: Section; pr: PullRequ
       activateOnClick
       onCmdClick={() => void openUrl(pr.url)}
       {...warm}
-      className={cn("h-full rounded-md px-2 text-body", className)}
+      className={cn(TABLE_ROW, className)}
     >
-      <div className="grid h-full items-center gap-3" style={{ gridTemplateColumns: shown?.template ?? gridTemplate(cols) }}>
+      <RowGrid template={shown?.template ?? gridTemplate(cols)}>
         {cols.map((c) => (
           <Fragment key={c}>{cells[c]}</Fragment>
         ))}
-      </div>
+      </RowGrid>
     </NavRow>
   );
 }
@@ -287,17 +286,6 @@ function CapFooter({ section, cap }: { section: Section; cap: Cap }) {
 /** The sections whose rows are grouped by repository (pageModel's groupByRepo order) under a label row each. */
 const GROUPED: ReadonlySet<Section> = new Set<Section>(["else", "merged"]);
 
-/** A repository's label in a grouped table: its name, its row count, and a hairline to the edge. Not an option. */
-function GroupLabel({ name, count }: { name: string; count: number }) {
-  return (
-    <div className="flex h-full items-center gap-2 px-2 pt-1.5 text-label text-cf-text-muted" data-testid="prs-group">
-      <span className="truncate font-medium text-cf-text">{name}</span>
-      <span className="shrink-0 tabular-nums">{count}</span>
-      <span className="h-px flex-1 bg-cf-border" aria-hidden />
-    </div>
-  );
-}
-
 /**
  * A bordered table: the column header row, the rows (under repository labels in a
  * grouped section), and the cap footer when GitHub matched more. It measures its own
@@ -311,22 +299,22 @@ export function PrTable<T extends { pr: PullRequestView }>({ section, rows, rend
   const items = useMemo(() => tableItems(rows, GROUPED.has(section)), [rows, section]);
   return (
     <ShownColumns value={shown}>
-      <div ref={ref} className={cn("rounded-lg border", className)} data-columns={cols.join(",")}>
-        <div className="grid gap-3 border-b px-2.5 py-1 text-overline" style={{ gridTemplateColumns: shown.template }}>
+      <div ref={ref} className={cn(TABLE_BOX, className)} data-columns={cols.join(",")}>
+        <TableHead template={shown.template}>
           {cols.map((h) => (
             <span key={h} className={cn(RIGHT.has(h) && "text-right")}>
               {h}
             </span>
           ))}
-        </div>
-        <div className="p-0.5">
+        </TableHead>
+        <div className={TABLE_BODY}>
           <RowList
             rows={items}
             // The label lines do not make a list long: only its pull requests count.
             virtualize={rows.length > VIRTUALIZE_OVER}
             rowKey={(it) => (it.kind === "group" ? `group:${section}:${it.slug.toLowerCase()}` : prKey(section, it.row.pr))}
-            rowHeight={ROW_H}
-            render={(it) => (it.kind === "group" ? <GroupLabel name={it.name} count={it.count} /> : render(it.row))}
+            rowHeight={TABLE_ROW_H}
+            render={(it) => (it.kind === "group" ? <GroupLabel name={it.name} count={it.count} testId="prs-group" /> : render(it.row))}
           />
         </div>
         {cap && <CapFooter section={section} cap={cap} />}

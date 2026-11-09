@@ -3,6 +3,7 @@
  * shows the columns it has room for, dropping the least important first as it narrows.
  * Pure.
  */
+import { fitColumns } from "@/components/table/fit";
 import type { Section } from "./pageModel";
 
 export type Column = "Repository" | "#" | "Author" | "Title" | "Why" | "Your review" | "Status" | "Checks" | "Comments" | "Diff" | "Age" | "Merged";
@@ -51,10 +52,6 @@ export const IMPORTANCE: Record<Section, readonly Column[]> = {
 /** The right-aligned columns. */
 export const RIGHT: ReadonlySet<Column> = new Set<Column>(["Diff", "Age", "Merged"]);
 
-/** The gap between columns (gap-3) and a row's horizontal padding (px-2 each side, inside the list's p-0.5), in rem. */
-const GAP = 0.75;
-const INSET = 1 + 0.25;
-
 /**
  * A rem in the table's own px. Page zoom is CSS zoom on <html>, which scales px and rem
  * alike, so a measured clientWidth and a rem stay in this ratio.
@@ -63,19 +60,12 @@ const REM_PX = 16;
 
 /**
  * The columns a section's table shows at `width` px (its clientWidth: inside the border),
- * in display order: the longest prefix of IMPORTANCE whose floors and gaps fit. Title
- * and the next two always show, however narrow.
+ * in display order: the longest prefix of IMPORTANCE whose floors and gaps fit
+ * (components/table/fit.ts). Title and the next two always show, however narrow.
  */
 export function visibleColumns(section: Section, width: number): Column[] {
-  const room = width / REM_PX - INSET;
-  const keep = new Set<Column>();
-  let used = 0;
-  for (const [i, c] of IMPORTANCE[section].entries()) {
-    const need = TRACKS[c].min + (keep.size > 0 ? GAP : 0);
-    if (i >= 3 && used + need > room) break;
-    keep.add(c);
-    used += need;
-  }
+  const ranking = IMPORTANCE[section];
+  const keep = new Set(ranking.slice(0, fitColumns(ranking.map((c) => TRACKS[c].min * REM_PX), width, 3)));
   return COLUMNS[section].filter((c) => keep.has(c));
 }
 

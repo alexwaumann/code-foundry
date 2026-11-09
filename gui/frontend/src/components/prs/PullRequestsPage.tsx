@@ -16,7 +16,8 @@ import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
 import { prKey } from "./format";
 import { capKey, cards, dashboardLoad, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
-import { Freshness, SectionTitle } from "./PrBits";
+import { SectionTitle } from "@/components/table/TableParts";
+import { Freshness } from "./PrBits";
 import { AuthoredPrRow, MergedRow, NeedsReviewRow, OtherPrRow, PrTable, ReviewedByYouRow } from "./PrRows";
 import { needsReviewCount } from "./reviewQueue";
 import { SummaryCards } from "./SummaryCards";
@@ -145,7 +146,7 @@ function Body({ d }: { d: DashboardView }) {
           )}
           {has("reviewed") && (
             <section data-testid="prs-reviewed">
-              <SectionTitle count={m.counts.reviewed} caption="open, waiting on the author">
+              <SectionTitle count={m.counts.reviewed} captionTestId="prs-section-caption" caption="open, waiting on the author">
                 Reviewed by you
               </SectionTitle>
               <PrTable section="reviewed" rows={m.reviewed} render={(r) => <ReviewedByYouRow row={r} viewer={viewer} />} />
@@ -159,7 +160,7 @@ function Body({ d }: { d: DashboardView }) {
           )}
           {has("else") && (
             <section data-testid="prs-else">
-              <SectionTitle count={m.counts.else} caption="not yours, not waiting on you · updated in the last month">
+              <SectionTitle count={m.counts.else} captionTestId="prs-section-caption" caption="not yours, not waiting on you · updated in the last month">
                 Everything else open in your projects
               </SectionTitle>
               <PrTable section="else" rows={m.others} cap={m.othersCap} render={(r) => <OtherPrRow row={r} viewer={viewer} />} />
@@ -167,7 +168,7 @@ function Body({ d }: { d: DashboardView }) {
           )}
           {has("merged") && (
             <section data-testid="prs-merged">
-              <SectionTitle count={m.counts.merged} caption={mergedSubtitle(m.mergedInvolved, m.mergedMore, true)}>
+              <SectionTitle count={m.counts.merged} captionTestId="prs-section-caption" caption={mergedSubtitle(m.mergedInvolved, m.mergedMore, true)}>
                 Merged in the last 7 days
               </SectionTitle>
               <PrTable section="merged" rows={m.merged} cap={m.mergedCap} render={(r) => <MergedRow row={r} viewer={viewer} />} />
