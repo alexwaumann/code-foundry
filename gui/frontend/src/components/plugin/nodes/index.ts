@@ -1,6 +1,7 @@
 /** Every node kind's renderer (registry.ts). */
 import type { NodeRenderers } from "../registry";
 import { ActionsNode } from "./ActionsNode";
+import { BarsNode } from "./BarsNode";
 import { ChipsNode } from "./ChipsNode";
 import { ColumnsNode } from "./ColumnsNode";
 import { ContainerNode } from "./ContainerNode";
@@ -19,6 +20,7 @@ import { PaneNode } from "./PaneNode";
 import { ProgressNode } from "./ProgressNode";
 import { SectionNode } from "./SectionNode";
 import { SpacerNode } from "./SpacerNode";
+import { StatsNode } from "./StatsNode";
 import { TabsNode } from "./TabsNode";
 import { TerminalNode } from "./TerminalNode";
 import { TextNode } from "./TextNode";
@@ -48,4 +50,6 @@ export const renderers: NodeRenderers = {
   container: ContainerNode,
   masterDetail: MasterDetailNode,
   tabs: TabsNode,
+  stats: StatsNode,
+  bars: BarsNode,
 };

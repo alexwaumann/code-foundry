@@ -212,6 +212,12 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
       any.chips?.chips?.forEach((c) => {
         action(c.key, c.action, "click");
       });
+      (n.stats as { cards?: { key: string; action?: unknown }[] } | undefined)?.cards?.forEach((c) => {
+        action(c.key, c.action, "click");
+      });
+      (n.bars as { bars?: { key: string; action?: unknown }[] } | undefined)?.bars?.forEach((b) => {
+        action(b.key, b.action, "click");
+      });
       const md = n.masterDetail as { list?: { rows?: { key: string; action?: unknown; actions?: unknown[] }[] }; emptyDetail?: { actions?: unknown[] } } | undefined;
       md?.list?.rows?.forEach((r) => {
         if (r.action) action(r.key, r.action, "click");
@@ -236,6 +242,26 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
   };
   for (const nodes of viewListsOf(view)) walk(nodes);
   return out;
+}
+
+/**
+ * The Overview with its Failing card pressed, as the real plugin renders it
+ * (plugins/examples/hello/charts.go): the card pressed, the chart only the failed builds
+ * with their first and last labels. The captured view is unfiltered.
+ */
+function patchFailedOnly(nodes: Node[]): void {
+  patchNode(nodes, "build-stats", (n) => {
+    const card = (n.stats as { cards: { key: string; pressed?: boolean }[] }).cards.find((c) => c.key === "stat-failing");
+    if (card) card.pressed = true;
+  });
+  patchNode(nodes, "build-times", (n) => {
+    const chart = n.bars as { subtitle?: unknown; startLabel?: string; endLabel?: string; bars: { key: string; status?: string }[] };
+    chart.bars = chart.bars.filter((b) => b.status === "failed");
+    chart.subtitle = "failed builds";
+    const label = (b: { key: string } | undefined) => (b ? `#${b.key.replace("build-", "")}` : "");
+    chart.startLabel = label(chart.bars[0]);
+    chart.endLabel = label(chart.bars[chart.bars.length - 1]);
+  });
 }
 
 /** The Runs tab's runs (the real plugin's layoutRuns) and how long each took (runs.go runTook). */
@@ -371,6 +397,8 @@ class DemoInstance {
   running = false;
   /** The Layout tab's toolbar filter (the real plugin's layoutFilter). */
   layoutFilter = { status: "", query: "", resets: 0 };
+  /** The Overview's Failing card narrows its chart to the failed builds (charts.go). */
+  failedOnly = false;
   /** The Runs tab's state (the real plugin's runsState): the chosen run, the detail's tab, notes by run. */
   runs: { selected: string; tab: string; notes: Record<string, string> } = { selected: "", tab: "", notes: {} };
   buildLog = "";
@@ -436,6 +464,7 @@ class DemoInstance {
         const pin = buttons.find((b) => b.key === "pin");
         if (pin) pin.label = this.pinned ? "Unpin from this thread" : "Pin to this thread";
       });
+      if (this.failedOnly) patchFailedOnly(nodes);
     } else if (this.tab === "form") {
       patchNode(nodes, "form-intro", (n) => {
         n.text = { content: this.saved ? `Saved: ${JSON.stringify(this.saved)}` : "Nothing saved yet." };
@@ -624,6 +653,12 @@ class DemoInstance {
         break;
       case "click:layout-rerun":
         toast("build #6 queued again");
+        return;
+      case "click:stat-filter":
+        this.failedOnly = !this.failedOnly;
+        break;
+      case "click:open-build":
+        toast(`build #${el.data ?? ""}`);
         return;
       case "change:project-changed":
       case "click:stage":

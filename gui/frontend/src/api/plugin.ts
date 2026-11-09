@@ -31,13 +31,14 @@ import {
   type SurfaceUpdate,
 } from "@/gen/codefoundry/v1/plugin_pb";
 import { toUiContext, type UiContextView } from "./command";
+import type { BarsData, StatsData } from "./pluginCharts";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 
 // ---------------------------------------------------------------------------------------
 // The view model (pluginsdk/ui)
 
-/** Text, pill and notice colour. "" is neutral; "ok" (emerald) shows in pills and status glyphs only. */
+/** Text, pill and notice colour. "" is neutral; "ok" (emerald) shows in pills, status glyphs and stat figures only. */
 export type Tone = "" | "muted" | "attention" | "error" | "ok";
 /** A step's or a row's state, drawn as a dot or an icon. */
 export type Status = "" | "ok" | "failed" | "attention" | "running" | "pending" | "skipped" | "off";
@@ -462,12 +463,14 @@ export interface NodeData {
   container: ContainerData;
   masterDetail: MasterDetailData;
   tabs: TabsNodeData;
+  stats: StatsData;
+  bars: BarsData;
 }
 
 export type NodeKind = keyof NodeData;
 
 /** The kinds this GUI knows, in pluginsdk/ui's order. */
-export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs"];
+export const NODE_KINDS: readonly NodeKind[] = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid", "divider", "spacer", "group", "container", "masterDetail", "tabs", "stats", "bars"];
 
 /** A body node: a key unique in the view and exactly one kind field. */
 export type ViewNode = { key: string } & Partial<NodeData>;
