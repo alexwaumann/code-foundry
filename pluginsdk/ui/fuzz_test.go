@@ -114,7 +114,7 @@ const masterDetailSeed = `{"nodes":[{"key":"s","section":{"title":"Runs","childr
 type viewSeed struct{ view, corrupt []byte }
 
 // viewSeeds are FuzzView's seeds: the hello demo's captured views, the walkthrough, a log,
-// a thread, and the layout, grid and master-detail seeds.
+// a thread, and the layout, grid, master-detail and charts seeds.
 func viewSeeds() []viewSeed {
 	var out []viewSeed
 	files, _ := filepath.Glob(filepath.FromSlash("../../internal/store/plugin/testdata/hello-demo/*.json"))
@@ -130,6 +130,7 @@ func viewSeeds() []viewSeed {
 		viewSeed{[]byte(layoutSeed), []byte{0, 0, 0, 2}},
 		viewSeed{[]byte(gridSeed), []byte{0, 0, 1}},
 		viewSeed{[]byte(masterDetailSeed), []byte{0, 1, 0, 0, 2}},
+		viewSeed{[]byte(chartsSeed), []byte{0, 0, 1, 0, 0, 3}},
 	)
 }
 

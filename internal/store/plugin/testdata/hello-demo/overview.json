@@ -147,6 +147,388 @@
       }
     },
     {
+      "key": "build-stats",
+      "stats": {
+        "cards": [
+          {
+            "key": "stat-pass",
+            "label": "Pass rate",
+            "value": "86%",
+            "tone": "ok",
+            "subtitle": "last 30 builds"
+          },
+          {
+            "key": "stat-median",
+            "label": "Median time",
+            "value": "4m 12s",
+            "subtitle": "p90 5m 33s"
+          },
+          {
+            "key": "stat-failing",
+            "label": "Failing",
+            "value": "4",
+            "tone": "error",
+            "subtitle": "integration · e2e",
+            "action": {
+              "event": "stat-filter",
+              "data": "failed"
+            }
+          },
+          {
+            "key": "stat-queue",
+            "label": "Queue",
+            "value": "1",
+            "subtitle": "waiting for a runner"
+          }
+        ]
+      }
+    },
+    {
+      "key": "build-times",
+      "bars": {
+        "title": "Build time",
+        "subtitle": "last 30 builds",
+        "bars": [
+          {
+            "key": "build-1259",
+            "value": 229,
+            "status": "ok",
+            "title": "#1259 · 3m 49s",
+            "meta": "main · 29h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1259"
+            }
+          },
+          {
+            "key": "build-1260",
+            "value": 266,
+            "status": "ok",
+            "title": "#1260 · 4m 26s",
+            "meta": "main · 28h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1260"
+            }
+          },
+          {
+            "key": "build-1261",
+            "value": 262,
+            "status": "ok",
+            "title": "#1261 · 4m 22s",
+            "meta": "main · 27h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1261"
+            }
+          },
+          {
+            "key": "build-1262",
+            "value": 258,
+            "status": "ok",
+            "title": "#1262 · 4m 18s",
+            "meta": "cf/sidebar · 26h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1262"
+            }
+          },
+          {
+            "key": "build-1263",
+            "value": 254,
+            "status": "ok",
+            "title": "#1263 · 4m 14s",
+            "meta": "main · 25h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1263"
+            }
+          },
+          {
+            "key": "build-1264",
+            "value": 333,
+            "status": "failed",
+            "title": "#1264 · 5m 33s",
+            "meta": "main · 24h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1264"
+            }
+          },
+          {
+            "key": "build-1265",
+            "value": 246,
+            "status": "ok",
+            "title": "#1265 · 4m 06s",
+            "meta": "main · 23h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1265"
+            }
+          },
+          {
+            "key": "build-1266",
+            "value": 242,
+            "status": "ok",
+            "title": "#1266 · 4m 02s",
+            "meta": "main · 22h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1266"
+            }
+          },
+          {
+            "key": "build-1267",
+            "value": 238,
+            "status": "ok",
+            "title": "#1267 · 3m 58s",
+            "meta": "main · 21h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1267"
+            }
+          },
+          {
+            "key": "build-1268",
+            "value": 234,
+            "status": "ok",
+            "title": "#1268 · 3m 54s",
+            "meta": "main · 20h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1268"
+            }
+          },
+          {
+            "key": "build-1269",
+            "value": 230,
+            "status": "ok",
+            "title": "#1269 · 3m 50s",
+            "meta": "cf/sidebar · 19h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1269"
+            }
+          },
+          {
+            "key": "build-1270",
+            "value": 48,
+            "status": "off",
+            "title": "#1270 · aborted",
+            "meta": "main · 18h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1270"
+            }
+          },
+          {
+            "key": "build-1271",
+            "value": 263,
+            "status": "ok",
+            "title": "#1271 · 4m 23s",
+            "meta": "main · 17h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1271"
+            }
+          },
+          {
+            "key": "build-1272",
+            "value": 259,
+            "status": "ok",
+            "title": "#1272 · 4m 19s",
+            "meta": "main · 16h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1272"
+            }
+          },
+          {
+            "key": "build-1273",
+            "value": 357,
+            "status": "failed",
+            "title": "#1273 · 5m 57s",
+            "meta": "main · 15h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1273"
+            }
+          },
+          {
+            "key": "build-1274",
+            "value": 251,
+            "status": "ok",
+            "title": "#1274 · 4m 11s",
+            "meta": "main · 14h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1274"
+            }
+          },
+          {
+            "key": "build-1275",
+            "value": 247,
+            "status": "ok",
+            "title": "#1275 · 4m 07s",
+            "meta": "main · 13h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1275"
+            }
+          },
+          {
+            "key": "build-1276",
+            "value": 243,
+            "status": "ok",
+            "title": "#1276 · 4m 03s",
+            "meta": "cf/sidebar · 12h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1276"
+            }
+          },
+          {
+            "key": "build-1277",
+            "value": 239,
+            "status": "ok",
+            "title": "#1277 · 3m 59s",
+            "meta": "main · 11h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1277"
+            }
+          },
+          {
+            "key": "build-1278",
+            "value": 235,
+            "status": "ok",
+            "title": "#1278 · 3m 55s",
+            "meta": "main · 10h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1278"
+            }
+          },
+          {
+            "key": "build-1279",
+            "value": 231,
+            "status": "ok",
+            "title": "#1279 · 3m 51s",
+            "meta": "main · 9h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1279"
+            }
+          },
+          {
+            "key": "build-1280",
+            "value": 355,
+            "status": "failed",
+            "title": "#1280 · 5m 55s",
+            "meta": "main · 8h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1280"
+            }
+          },
+          {
+            "key": "build-1281",
+            "value": 264,
+            "status": "ok",
+            "title": "#1281 · 4m 24s",
+            "meta": "main · 7h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1281"
+            }
+          },
+          {
+            "key": "build-1282",
+            "value": 260,
+            "status": "ok",
+            "title": "#1282 · 4m 20s",
+            "meta": "main · 6h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1282"
+            }
+          },
+          {
+            "key": "build-1283",
+            "value": 256,
+            "status": "ok",
+            "title": "#1283 · 4m 16s",
+            "meta": "cf/sidebar · 5h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1283"
+            }
+          },
+          {
+            "key": "build-1284",
+            "value": 252,
+            "status": "ok",
+            "title": "#1284 · 4m 12s",
+            "meta": "main · 4h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1284"
+            }
+          },
+          {
+            "key": "build-1285",
+            "value": 358,
+            "status": "failed",
+            "title": "#1285 · 5m 58s",
+            "meta": "main · 3h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1285"
+            }
+          },
+          {
+            "key": "build-1286",
+            "value": 244,
+            "status": "ok",
+            "title": "#1286 · 4m 04s",
+            "meta": "main · 2h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1286"
+            }
+          },
+          {
+            "key": "build-1287",
+            "value": 240,
+            "status": "ok",
+            "title": "#1287 · 4m 00s",
+            "meta": "main · 1h ago",
+            "action": {
+              "event": "open-build",
+              "data": "1287"
+            }
+          },
+          {
+            "key": "build-1288",
+            "value": 130,
+            "status": "running",
+            "title": "#1288 · running 2m 10s",
+            "meta": "main · now",
+            "action": {
+              "event": "open-build",
+              "data": "1288"
+            }
+          }
+        ],
+        "reference": {
+          "value": 252,
+          "label": "median 4m 12s"
+        },
+        "startLabel": "#1259",
+        "endLabel": "#1288"
+      }
+    },
+    {
       "key": "code",
       "text": {
         "content": "HELLO-4821",

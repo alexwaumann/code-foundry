@@ -43,7 +43,7 @@ func newViewGen(seed uint64) *viewGen {
 // genKinds are the node kinds the generator picks from (its JSON names).
 var genKinds = []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress",
 	"notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid",
-	"divider", "spacer", "group", "container", "masterDetail", "tabs"}
+	"divider", "spacer", "group", "container", "masterDetail", "tabs", "stats", "bars"}
 
 // genContainers hold nodes (group too: it is no level, but it nests).
 var genContainers = map[string]bool{"section": true, "columns": true, "pane": true, "grid": true,
@@ -485,6 +485,39 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		n.MasterDetail = md
 	case "tabs":
 		n.Tabs = &ui.TabsNode{Tabs: g.tabs(ui.MinNodeTabs), Children: g.kids(depth, 3)}
+	case "stats":
+		n.Stats = &ui.Stats{}
+		for range g.count(ui.MinStatCards, ui.MaxStatCards) {
+			c := ui.StatCard{Key: g.key(), Label: "L", Value: "4m 12s"}
+			if g.chance(0.4) {
+				c.Action = g.action()
+				c.Pressed = g.chance(0.5)
+			}
+			if g.bad() {
+				c.Pressed, c.Action = true, nil
+			}
+			n.Stats.Cards = append(n.Stats.Cards, c)
+		}
+	case "bars":
+		n.Bars = &ui.Bars{Title: "t"}
+		for range g.count(0, 4) {
+			b := ui.Bar{Key: g.key(), Title: "b", Value: g.r.Float64() * 100}
+			switch {
+			case g.bad():
+				b.Value = []float64{-1, math.NaN(), math.Inf(1)}[g.r.IntN(3)]
+			case g.chance(0.3):
+				b.Status = ui.StatusFailed
+			case g.chance(0.3):
+				b.Series = g.num(1, ui.MaxBarSeries, true)
+			}
+			if g.chance(0.3) {
+				b.Action = g.action()
+			}
+			n.Bars.Bars = append(n.Bars.Bars, b)
+		}
+		if g.chance(0.3) {
+			n.Bars.Reference = &ui.BarsReference{Value: 50, Label: "median"}
+		}
 	}
 	if g.bad() && g.chance(0.1) { // a second kind
 		n.Markdown = &ui.Markdown{Source: "two"}

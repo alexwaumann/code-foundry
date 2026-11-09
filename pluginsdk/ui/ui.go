@@ -3,8 +3,8 @@
 // chips, log, actions, progress, notice, empty, section, form with fieldsets and option
 // sources, thread, terminal, the layout containers columns, pane, grid, container,
 // masterDetail and tabs,
-// divider, spacer and the inline group; the view's pinned toolbar and footer; inline
-// spans with times and durations), builders, and
+// divider, spacer and the inline group; stats cards and a bar chart; the view's pinned
+// toolbar and footer; inline spans with times and durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
 // the plugin. The code-foundry-plugin skill's reference/primitives.md is the guide, with
 // an index of every node.
@@ -16,8 +16,8 @@
 //	{"key": "stages", "chips": {"chips": [{"key": "c1", "label": "Build", "status": "ok"}]}}
 //
 // The host never renders a filled button (no "primary" style; the main action is
-// ButtonAttention), shows emerald only for ToneOK in pills and status glyphs, and sends
-// destructive commands through its own confirm dialog.
+// ButtonAttention), shows emerald only for ToneOK in pills, status glyphs, stat figures
+// and bars, and sends destructive commands through its own confirm dialog.
 package ui
 
 import (
@@ -321,6 +321,10 @@ type Node struct {
 	// tab strip over the active tab's nodes (docs: reference/ui-layout.md).
 	MasterDetail *MasterDetail `json:"masterDetail,omitempty"`
 	Tabs         *TabsNode     `json:"tabs,omitempty"`
+	// Stats and Bars are a row of figure cards and a small bar chart in a card (docs:
+	// reference/nodes.md; charts.go).
+	Stats *Stats `json:"stats,omitempty"`
+	Bars  *Bars  `json:"bars,omitempty"`
 }
 
 // Children returns the node lists a node holds (a section's children, each column's, a

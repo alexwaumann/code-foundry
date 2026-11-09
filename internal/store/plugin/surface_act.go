@@ -38,7 +38,7 @@ var surfaceCapabilities = []string{
 	"view.node.text", "view.node.markdown", "view.node.pairs", "view.node.list", "view.node.chips",
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
-	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
+	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.node.stats", "view.node.bars", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
 	"view.hint", "view.input.multiline", "view.input.number", "view.input.live",
 }
 
@@ -266,6 +266,10 @@ func fillLists(v *ui.View) {
 			if n.MasterDetail.Detail == nil {
 				n.MasterDetail.Detail = []ui.Node{}
 			}
+		case n.Stats != nil && n.Stats.Cards == nil:
+			n.Stats.Cards = []ui.StatCard{}
+		case n.Bars != nil && n.Bars.Bars == nil:
+			n.Bars.Bars = []ui.Bar{}
 		case n.Tabs != nil:
 			if n.Tabs.Items == nil {
 				n.Tabs.Items = []ui.Tab{}
@@ -434,6 +438,18 @@ func buildIndex(v *ui.View) *actionIndex {
 				c := &n.Chips.Chips[i]
 				if c.Action != nil {
 					add(element{key: c.Key, kind: kindOf(c.Action, pluginsdk.ActClick), label: c.Label, action: c.Action})
+				}
+			}
+		case n.Stats != nil:
+			for _, c := range n.Stats.Cards {
+				if c.Action != nil {
+					add(element{key: c.Key, kind: kindOf(c.Action, pluginsdk.ActClick), label: c.Label, action: c.Action})
+				}
+			}
+		case n.Bars != nil:
+			for _, b := range n.Bars.Bars {
+				if b.Action != nil {
+					add(element{key: b.Key, kind: kindOf(b.Action, pluginsdk.ActClick), label: b.Title, action: b.Action})
 				}
 			}
 		case n.Actions != nil:

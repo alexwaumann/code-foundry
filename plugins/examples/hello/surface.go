@@ -13,7 +13,8 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// The demo surface shows every v1 node kind across seven tabs (Overview, Form, Log,
+// The demo surface shows every v1 node kind across seven tabs (Overview with a stats row
+// and a bar chart, charts.go, Form, Log,
 // Assistant and Shell with the plugin's own thread and terminal, owned.go, Layout
 // with columns, panes, a grid, dividers, spacers, groups, a container, a toolbar and a
 // footer, layout.go, and Runs with a master-detail whose detail has its own tabs, runs.go):
@@ -43,6 +44,7 @@ type demo struct {
 	ownErr  error // why the Assistant or Shell tab has nothing to show
 	filter  layoutFilter
 	runs    runsState
+	failed  bool // the Overview's Failing card narrows its chart (charts.go)
 }
 
 // demoFactory opens demo instances sharing own.
@@ -185,7 +187,7 @@ func (d *demo) overviewNodes(pin string) []ui.Node {
 		ui.URLButton("docs", "Docs", "https://github.com/alexwaumann/code-foundry").WithStyle(ui.ButtonLink),
 		ui.CopyButton("copy", "Copy greeting", "Hello from the demo surface"),
 	}}}
-	return []ui.Node{text, small, md, pairs, list, chips, progress, spinner, notice, section, empty, bar}
+	return append(append([]ui.Node{text}, chartNodes(d.failed)...), small, md, pairs, list, chips, progress, spinner, notice, section, empty, bar)
 }
 
 func (d *demo) formNodes() []ui.Node {
@@ -319,6 +321,12 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	case "click:layout-rerun":
 		d.mu.Unlock()
 		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #6 queued again")
+		return nil
+	case "click:stat-filter":
+		d.failed = !d.failed
+	case "click:open-build":
+		d.mu.Unlock()
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #"+act.Data)
 		return nil
 	case "click:start-log":
 		if !d.running {

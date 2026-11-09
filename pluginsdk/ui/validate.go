@@ -444,13 +444,14 @@ func (c *checker) node(path string, n Node, outer []string) {
 	for _, set := range []bool{n.Text != nil, n.Markdown != nil, n.Pairs != nil, n.List != nil, n.Chips != nil,
 		n.Log != nil, n.Actions != nil, n.Progress != nil, n.Notice != nil, n.Empty != nil, n.Section != nil,
 		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil, n.Grid != nil,
-		n.Divider != nil, n.Spacer != nil, n.Group != nil, n.Container != nil, n.MasterDetail != nil, n.Tabs != nil} {
+		n.Divider != nil, n.Spacer != nil, n.Group != nil, n.Container != nil, n.MasterDetail != nil, n.Tabs != nil,
+		n.Stats != nil, n.Bars != nil} {
 		if set {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container, masterDetail, tabs); this one has %d", kinds)
+		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container, masterDetail, tabs, stats, bars); this one has %d", kinds)
 		return
 	}
 	switch {
@@ -574,6 +575,10 @@ func (c *checker) node(path string, n Node, outer []string) {
 		c.masterDetail(path+".masterDetail", n.MasterDetail, outer)
 	case n.Tabs != nil:
 		c.tabsNode(path+".tabs", n.Tabs, outer)
+	case n.Stats != nil:
+		c.stats(path+".stats", n.Stats)
+	case n.Bars != nil:
+		c.bars(path+".bars", n.Bars)
 	}
 }
 

@@ -154,6 +154,16 @@ func expectedElements(v *ui.View) []string {
 				add(x.Key, kind(x.Action, pluginsdk.ActClick), "")
 			}
 			return
+		case ui.StatCard:
+			if x.Action != nil {
+				add(x.Key, kind(x.Action, pluginsdk.ActClick), "")
+			}
+			return
+		case ui.Bar:
+			if x.Action != nil {
+				add(x.Key, kind(x.Action, pluginsdk.ActClick), "")
+			}
+			return
 		case ui.Row:
 			switch {
 			case x.Action != nil:

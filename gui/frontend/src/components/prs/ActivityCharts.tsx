@@ -1,10 +1,12 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import type { MonthView } from "@/api/gh";
+import { ChartCard } from "@/components/charts/ChartCard";
+import { ChartTooltip } from "@/components/charts/ChartTooltip";
 import { useNow } from "@/lib/clock";
 import { slotColorVars, SWATCH_BG } from "@/lib/usage";
 import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
-import { axisLabel, chartMonths, countScale, labelledIndexes, labelledTicks, tickLabel, tooltipSide, type ActivityMonth } from "./activity";
+import { axisLabel, chartMonths, countScale, labelledIndexes, labelledTicks, tickLabel, type ActivityMonth } from "./activity";
 import { monthName } from "./format";
 
 type SeriesKey = "merged" | "commits";
@@ -98,12 +100,13 @@ function ActivityCard({
   const showTip = hover?.card === series && hovered !== undefined && hi !== null;
 
   return (
-    <section className="min-w-0 rounded-lg border px-4 py-3" data-testid={`activity-${series}`} aria-label={`${s.label}, last six months`}>
-      <div className="mb-1.5 flex items-center">
-        <LineKey series={series} className="mr-2 w-3.5" />
-        <h2 className="text-label font-medium">{s.label}</h2>
-        <span className="ml-2 text-label font-normal text-cf-text-muted">last six months</span>
-      </div>
+    <ChartCard
+      heading={s.label}
+      subtitle="last six months"
+      lead={<LineKey series={series} className="mr-2 w-3.5" />}
+      data-testid={`activity-${series}`}
+      aria-label={`${s.label}, last six months`}
+    >
       <div className="relative" ref={ref}>
         <svg width={width} height={H} className="block overflow-visible" role="img" aria-label={`${s.label} per month`} style={s.style}>
           <g>
@@ -196,13 +199,7 @@ function ActivityCard({
           </div>
         )}
         {showTip && (
-          <div
-            className="pointer-events-none absolute z-10 min-w-40 rounded-lg border border-cf-border bg-cf-surface-overlay px-2.5 py-2 text-caption-sm text-cf-text shadow-lg"
-            style={tooltipSide(hi, n) === "left" ? { right: width - x(hi) + 14, top: TOP + 10 } : { left: x(hi) + 14, top: TOP + 10 }}
-            data-testid="activity-tooltip"
-            data-month={hovered.month}
-            data-side={tooltipSide(hi, n)}
-          >
+          <ChartTooltip index={hi} n={n} x={x(hi)} width={width} top={TOP + 10} data-testid="activity-tooltip" data-month={hovered.month}>
             <div className="mb-1 text-cf-text-muted">
               {monthName(hovered.month, now)}
               {hovered.partial ? " (so far)" : ""}
@@ -214,9 +211,9 @@ function ActivityCard({
                 <span className="text-cf-text-muted">{SERIES[k].unit}</span>
               </div>
             ))}
-          </div>
+          </ChartTooltip>
         )}
       </div>
-    </section>
+    </ChartCard>
   );
 }
