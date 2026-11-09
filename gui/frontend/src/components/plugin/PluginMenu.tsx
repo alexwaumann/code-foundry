@@ -187,7 +187,7 @@ export function MoreMenu({ items, label = "More options", testId = "plugin-more"
           </button>
         </DropdownMenuTrigger>
       </Tip>
-      <DropdownMenuContent align="end" className={CONTENT} data-testid={`${testId}-menu`} onKeyDown={stop} onClick={stop} onCloseAutoFocus={flush}>
+      <DropdownMenuContent align="end" className={CONTENT} data-testid={`${testId}-menu`} onKeyDown={stop} onClick={stop} collisionPadding={8} onCloseAutoFocus={flush}>
         <Blocks blocks={menuBlocks(items)} kit={DROPDOWN} onPick={pick} inert={inert} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -204,7 +204,7 @@ export function MenuButtonMenu({ items, testId, children }: { items: readonly Vi
   return (
     <DropdownMenu modal={false}>
       {children}
-      <DropdownMenuContent align="start" className={CONTENT} data-testid={`${testId}-menu`} onKeyDown={stop} onClick={stop} onCloseAutoFocus={flush}>
+      <DropdownMenuContent align="start" className={CONTENT} data-testid={`${testId}-menu`} onKeyDown={stop} onClick={stop} collisionPadding={8} onCloseAutoFocus={flush}>
         <Blocks blocks={menuBlocks(items)} kit={DROPDOWN} onPick={pick} inert={inert} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -226,7 +226,7 @@ export function RowContextMenu({ items, children }: { items: readonly ViewMenuIt
       <ContextMenuTrigger asChild disabled={inert}>
         {children}
       </ContextMenuTrigger>
-      <ContextMenuContent className={CONTENT} data-testid="plugin-row-menu" onKeyDown={stop} onClick={stop} onCloseAutoFocus={flush}>
+      <ContextMenuContent className={CONTENT} data-testid="plugin-row-menu" onKeyDown={stop} onClick={stop} collisionPadding={8} onCloseAutoFocus={flush}>
         <Blocks blocks={menuBlocks(items)} kit={CONTEXT} onPick={pick} inert={inert} />
       </ContextMenuContent>
     </ContextMenu>

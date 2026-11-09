@@ -125,19 +125,19 @@ describe("the fold rule (sketch C)", () => {
   const three = [btn("rerun", "Rerun", { icon: "rotate-ccw" }), btn("log", "Open log"), btn("send", "Send to thread")];
   it("estimates a button's width as PluginButton draws it", () => {
     expect(buttonWidth(btn("x", "Rerun", { icon: "x", iconOnly: true }))).toBe(24);
-    expect(buttonWidth(btn("x", "Rerun"))).toBe(Math.ceil(16 + 5 * 6.5));
-    expect(buttonWidth(btn("x", "Rerun", { icon: "rotate-ccw" }))).toBe(Math.ceil(16 + 14 + 5 * 6.5));
+    expect(buttonWidth(btn("x", "Rerun"))).toBe(16 + 5 * 7);
+    expect(buttonWidth(btn("x", "Rerun", { icon: "rotate-ccw" }))).toBe(16 + 14 + 5 * 7);
     expect(buttonsWidth([btn("a", "Rerun"), btn("b", "Log")])).toBe(buttonWidth(btn("a", "Rerun")) + buttonWidth(btn("b", "Log")) + 6);
   });
 
   it.each([
     ["no buttons", null, [], false, false],
     ["not measured yet", null, three, false, false],
-    ["a side panel row", 330, three, false, true],
+    ["a side panel row", 400, three, false, true],
     ["an expanded panel's row", 700, three, false, false],
     ["just wide enough", ROW_TITLE_MIN + buttonsWidth(three), three, false, false],
     ["one px short", ROW_TITLE_MIN + buttonsWidth(three) - 1, three, false, true],
-    ["two short buttons in the panel", 330, three.slice(0, 2), false, false],
+    ["two short buttons in the panel", 400, three.slice(0, 2), false, false],
     ["a dense row's labelled buttons", null, three, true, true],
     ["a dense row's icon buttons", 700, [btn("x", "Cancel", { icon: "square", iconOnly: true })], true, false],
   ] as const)("%s", (_, width, actions, dense, want) => {
@@ -305,7 +305,7 @@ describe("folding a row's buttons (sketch C)", () => {
   });
 
   it("folds them into the ⋯ of a narrow row: buttons first, a separator, the menu", async () => {
-    rowWidth(330);
+    rowWidth(400);
     inView(<NodeList nodes={[list([row])]} />);
     expect(screen.getByTestId("plugin-row").hasAttribute("data-folded")).toBe(true);
     expect(screen.queryAllByTestId("plugin-button")).toEqual([]);
@@ -316,7 +316,7 @@ describe("folding a row's buttons (sketch C)", () => {
   });
 
   it("gives a narrow row with buttons and no menu a ⋯ of its buttons", () => {
-    rowWidth(330);
+    rowWidth(400);
     inView(<NodeList nodes={[list([{ ...row, menu: undefined }])]} />);
     expect(entries(openMore())).toEqual(["Rerun", "Open log", "Send to thread"]);
   });

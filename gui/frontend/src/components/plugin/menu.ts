@@ -6,16 +6,20 @@
 import type { KeyboardEvent } from "react";
 import type { Row, ViewButton, ViewMenuItem } from "@/api/plugin";
 
-/** The least width (px) a row keeps for its title beside its buttons before they fold. */
-export const ROW_TITLE_MIN = 160;
+/**
+ * The least width (px) a row keeps beside its buttons before they fold: its padding, glyph
+ * and a title of about 20 characters. The side panel's row (about 400 px) keeps two short
+ * buttons and folds three; an expanded panel's keeps three.
+ */
+export const ROW_TITLE_MIN = 200;
 
 // PluginButton's size "xs" (components/ui/button.tsx): 24 px tall, 8 px padding each side
 // (6 px beside an icon), a 12 px icon 4 px from its label, 12 px medium text; buttons sit
-// 6 px apart. A character of the label is about 6.5 px wide.
+// 6 px apart. A character of the label is about 7 px wide (WebKit draws 6.6 to 7).
 const ICON_BUTTON = 24;
 const BUTTON_PAD = 16;
 const BUTTON_ICON = 14;
-const LABEL_CHAR = 6.5;
+const LABEL_CHAR = 7;
 const BUTTON_GAP = 6;
 
 /** About how wide (px) PluginButton draws `b`. */
@@ -31,8 +35,7 @@ export function buttonsWidth(buttons: readonly ViewButton[]): number {
 
 /**
  * Whether a row `width` px wide folds its action buttons into its ⋯ menu instead of
- * squeezing them: when it is narrower than the buttons need on one line beside a
- * ROW_TITLE_MIN title. A dense row always folds its labelled buttons (it has no second line
+ * squeezing them: when it is narrower than the buttons need on one line plus ROW_TITLE_MIN. A dense row always folds its labelled buttons (it has no second line
  * to show them on). All of a row's buttons fold, or none. Not measured yet (null): no fold.
  */
 export function foldRowActions(width: number | null, actions: readonly ViewButton[] | undefined, dense: boolean): boolean {
