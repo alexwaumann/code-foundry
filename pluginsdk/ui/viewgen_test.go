@@ -159,6 +159,54 @@ func (g *viewGen) buttons(max int) []ui.Button {
 	return out
 }
 
+// menu returns a menu of a few items: actions, separators, a one-level submenu with a
+// one-pick group; broken, an empty or oversized list, stray separators, a second level,
+// two checked items or a split group.
+func (g *viewGen) menu() *ui.Menu {
+	item := func() ui.MenuItem {
+		it := ui.MenuItem{Key: g.key(), Label: g.label(), Action: g.action()}
+		it.Disabled, it.Danger = g.chance(0.1), g.chance(0.1)
+		return it
+	}
+	var items []ui.MenuItem
+	for i := range g.count(1, 5) {
+		if i > 0 && g.chance(0.2) {
+			items = append(items, ui.MenuItem{Separator: true})
+		}
+		items = append(items, item())
+	}
+	if g.chance(0.3) {
+		sub := ui.MenuItem{Key: g.key(), Label: g.label()}
+		for j := range g.count(1, 4) {
+			it := item()
+			it.Group, it.Checked = "status", j == 0
+			sub.Submenu = append(sub.Submenu, it)
+		}
+		items = append(items, sub)
+	}
+	if g.bad() {
+		switch g.r.IntN(6) {
+		case 0:
+			items = nil
+		case 1:
+			items = append(items, ui.MenuItem{Separator: true})
+		case 2:
+			items = append([]ui.MenuItem{{Separator: true}}, items...)
+		case 3:
+			items = append(items, ui.MenuItem{Key: g.key(), Label: "Deep", Submenu: []ui.MenuItem{{Key: g.key(), Label: "x", Submenu: []ui.MenuItem{item()}}}})
+		case 4:
+			a, b := item(), item()
+			a.Group, a.Checked, b.Group, b.Checked = "g", true, "g", true
+			items = append(items, a, b)
+		default:
+			for range ui.MaxMenuItems + 1 {
+				items = append(items, ui.MenuItem{Key: g.key(), Label: "x", Action: &ui.Action{Copy: "x"}})
+			}
+		}
+	}
+	return &ui.Menu{Items: items}
+}
+
 func (g *viewGen) row() ui.Row {
 	r := ui.Row{Key: g.key(), Title: g.label()}
 	if r.Title == "" && !g.bad() {
@@ -172,6 +220,9 @@ func (g *viewGen) row() ui.Row {
 	}
 	if g.chance(0.1) {
 		r.Selected = true
+	}
+	if g.chance(0.2) {
+		r.Menu = g.menu()
 	}
 	return r
 }
@@ -353,6 +404,12 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		n.Log = &ui.Log{Text: "line\n", ANSI: g.chance(0.3)}
 	case "actions":
 		n.Actions = &ui.Actions{Buttons: g.buttons(ui.MaxBarButtons)}
+		if bs := n.Actions.Buttons; len(bs) > 0 && g.chance(0.3) {
+			bs[0].Menu = g.menu()
+			if !g.bad() {
+				bs[0].Action = nil
+			}
+		}
 		if g.bad() {
 			n.Actions.Align = ui.AlignBetween
 		}
@@ -565,6 +622,9 @@ func (g *viewGen) view() ui.View {
 	v := ui.View{}
 	if g.chance(0.5) {
 		v.Header = &ui.Header{Title: "H", Actions: g.buttons(ui.MaxHeaderButtons)}
+		if g.chance(0.3) {
+			v.Header.Menu = g.menu()
+		}
 	}
 	if g.chance(0.3) {
 		t := g.tabs(1)

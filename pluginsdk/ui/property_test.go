@@ -29,11 +29,14 @@ func TestGeneratedViews(t *testing.T) {
 	if testing.Short() {
 		n = 2000
 	}
-	accepted, kinds, deepest := 0, map[string]int{}, 0
+	accepted, kinds, deepest, menus := 0, map[string]int{}, 0, 0
 	for seed := range uint64(n) {
 		if checkGenerated(t, seed) {
 			accepted++
 			v := genView(seed)
+			if b, _ := json.Marshal(v); bytes.Contains(b, []byte(`"submenu":`)) {
+				menus++
+			}
 			for _, l := range v.NodeLists() {
 				countKinds(l, 0, kinds, &deepest)
 			}
@@ -47,6 +50,9 @@ func TestGeneratedViews(t *testing.T) {
 		if kinds[k] == 0 {
 			t.Errorf("no accepted view has a %s node", k)
 		}
+	}
+	if menus == 0 {
+		t.Error("no accepted view has a menu with a submenu")
 	}
 	if accepted < n/50 {
 		t.Errorf("only %d of %d generated views are valid: the generator is too hostile to test acceptance", accepted, n)
@@ -236,14 +242,14 @@ func child(v reflect.Value, name string) (reflect.Value, bool) {
 
 // elementsOf counts a view's elements as the notes and the GUI describe them: nodes
 // (strip nodes and group items too), columns, grid items, rows (a list's and a
-// master-detail's), chips, pairs, fields, options, buttons, tabs (the view's and a tabs
-// node's). Like Validate it does not look inside a node that has not exactly one kind, a
+// master-detail's), chips, pairs, fields, options, buttons, menu items (separators too),
+// tabs (the view's and a tabs node's). Like Validate it does not look inside a node that has not exactly one kind, a
 // group item of a kind a group does not hold, a field without exactly one control or a
 // fieldset inside a fieldset.
 func elementsOf(v ui.View) int {
 	n := 0
 	if v.Header != nil {
-		n += len(v.Header.Actions)
+		n += buttonsElements(v.Header.Actions) + menuElements(v.Header.Menu)
 	}
 	if v.Tabs != nil {
 		n += len(v.Tabs.Items)
@@ -271,7 +277,36 @@ func kindsOf(n ui.Node) []string {
 func rowsElements(rs []ui.Row) int {
 	n := 0
 	for _, r := range rs {
-		n += 1 + len(r.Actions)
+		n += 1 + buttonsElements(r.Actions) + menuElements(r.Menu)
+	}
+	return n
+}
+
+// buttonsElements counts buttons and the items of their menus.
+func buttonsElements(bs []ui.Button) int {
+	n := 0
+	for _, b := range bs {
+		n += 1 + menuElements(b.Menu)
+	}
+	return n
+}
+
+// menuElements counts a menu's items, separators too, and a submenu's items (one level:
+// Validate does not look inside a second).
+func menuElements(m *ui.Menu) int {
+	if m == nil {
+		return 0
+	}
+	return menuItemsElements(m.Items, false)
+}
+
+func menuItemsElements(its []ui.MenuItem, inSub bool) int {
+	n := 0
+	for _, it := range its {
+		n++
+		if !it.Separator && it.Submenu != nil && !inSub {
+			n += menuItemsElements(it.Submenu, true)
+		}
 	}
 	return n
 }
@@ -297,23 +332,23 @@ func nodeElements(x ui.Node) int {
 	case x.Chips != nil:
 		n += len(x.Chips.Chips)
 	case x.Actions != nil:
-		n += len(x.Actions.Buttons)
+		n += buttonsElements(x.Actions.Buttons)
 	case x.Notice != nil:
-		n += len(x.Notice.Actions)
+		n += buttonsElements(x.Notice.Actions)
 	case x.Empty != nil:
-		n += len(x.Empty.Actions)
+		n += buttonsElements(x.Empty.Actions)
 	case x.Section != nil:
-		n += len(x.Section.Actions) + nodesElements(x.Section.Children)
+		n += buttonsElements(x.Section.Actions) + nodesElements(x.Section.Children)
 	case x.Form != nil:
 		for _, f := range x.Form.Fields {
 			n += fieldElements(f, false)
 		}
 		if x.Form.Submit != nil {
-			n++
+			n += buttonsElements([]ui.Button{*x.Form.Submit})
 		}
-		n += len(x.Form.Secondary)
+		n += buttonsElements(x.Form.Secondary)
 	case x.Terminal != nil:
-		n += len(x.Terminal.Actions)
+		n += buttonsElements(x.Terminal.Actions)
 	case x.Columns != nil:
 		for _, c := range x.Columns.Items {
 			n += 1 + nodesElements(c.Children)
@@ -338,7 +373,7 @@ func nodeElements(x ui.Node) int {
 	case x.MasterDetail != nil:
 		n += rowsElements(x.MasterDetail.List.Rows)
 		if x.MasterDetail.EmptyDetail != nil {
-			n += len(x.MasterDetail.EmptyDetail.Actions)
+			n += buttonsElements(x.MasterDetail.EmptyDetail.Actions)
 		}
 		n += nodesElements(x.MasterDetail.Detail)
 	case x.Tabs != nil:

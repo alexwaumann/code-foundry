@@ -16,7 +16,7 @@ import (
 // Limits every view must respect. The host refuses a view
 // that breaks one and keeps the previous one.
 const (
-	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs (a tabs node's too)
+	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, menu items (separators too), tabs (a tabs node's too)
 	// MaxDepth is how many containers (section, columns, pane, grid, container,
 	// masterDetail, tabs) a node may sit inside: section > columns > pane > section > node.
 	// A column is part of its columns node, a grid item of its grid; a group is not a
@@ -346,10 +346,14 @@ func (c *checker) button(path string, b *Button) {
 	default:
 		c.bad(path+".style", "unknown style %q", b.Style)
 	}
-	if b.Action == nil {
-		c.bad(path+".action", "required")
+	switch {
+	case b.Action == nil && b.Menu == nil:
+		c.bad(path+".action", "required (or a menu)")
+	case b.Action != nil && b.Menu != nil:
+		c.bad(path, "a button acts or opens a menu, not both")
 	}
 	c.action(path+".action", b.Action)
+	c.menu(path+".menu", b.Menu)
 }
 
 func (c *checker) header(path string, h *Header) {
@@ -360,7 +364,9 @@ func (c *checker) header(path string, h *Header) {
 	c.inline(path+".subline", h.Subline, MaxLabel)
 	c.icon(path+".sublineIcon", h.SublineIcon)
 	c.buttons(path+".actions", h.Actions, MaxHeaderButtons)
+	c.noMenus(path+".actions", h.Actions, "give the header a menu")
 	c.str(path+".tabTitle", h.TabTitle, MaxTabTitle)
+	c.menu(path+".menu", h.Menu)
 }
 
 func (c *checker) tabs(path string, t *Tabs) {
@@ -758,7 +764,9 @@ func (c *checker) list(path string, l *List) {
 		c.inline(p+".line2", r.Line2, MaxTextContent)
 		c.inline(p+".trailing", r.Trailing, MaxLabel)
 		c.buttons(p+".actions", r.Actions, MaxRowButtons)
+		c.noMenus(p+".actions", r.Actions, "give the row a menu")
 		c.action(p+".action", r.Action)
+		c.menu(p+".menu", r.Menu)
 	}
 }
 
@@ -792,11 +800,15 @@ func (c *checker) form(path string, f *Form) {
 	}
 	if f.Submit != nil {
 		c.button(path+".submit", f.Submit)
+		if f.Submit.Menu != nil {
+			c.bad(path+".submit.menu", "a form's submit acts: it opens no menu")
+		}
 		if secret && f.Submit.Action != nil && f.Submit.Action.Event == "" {
 			c.bad(path+".submit.action", "a form with a secret field submits through an event, never a command (args reach argv and logs)")
 		}
 	}
 	c.buttons(path+".secondary", f.Secondary, MaxBarButtons)
+	c.noMenus(path+".secondary", f.Secondary, "a form's buttons act (put the menu button in an actions bar beside the form)")
 	c.str(path+".error", f.Error, MaxLabel)
 }
 

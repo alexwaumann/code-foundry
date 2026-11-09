@@ -40,7 +40,7 @@ var surfaceCapabilities = []string{
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
 	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.node.stats", "view.node.bars", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
 	"view.hint", "view.input.multiline", "view.input.number", "view.input.live", "view.select.search",
-	"view.input.date", "view.log.ansi",
+	"view.input.date", "view.log.ansi", "view.menu",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -366,12 +366,22 @@ func buildIndex(v *ui.View) *actionIndex {
 		}
 		return "copy"
 	}
+	// A menu's items act as buttons do (a click with the item's key and data); its
+	// submenus and separators do not.
+	menu := func(m *ui.Menu) {
+		for _, it := range m.AllItems() {
+			if it.Action != nil {
+				add(element{key: it.Key, kind: kindOf(it.Action, pluginsdk.ActClick), label: it.Label, action: it.Action})
+			}
+		}
+	}
 	buttons := func(bs []ui.Button, form string) {
 		for i := range bs {
 			b := &bs[i]
 			if b.Action != nil {
 				add(element{key: b.Key, kind: kindOf(b.Action, pluginsdk.ActClick), label: b.Label, form: form, action: b.Action})
 			}
+			menu(b.Menu)
 		}
 	}
 	var fields func(fs []ui.Field, form string)
@@ -408,6 +418,7 @@ func buildIndex(v *ui.View) *actionIndex {
 	}
 	if v.Header != nil {
 		buttons(v.Header.Actions, "")
+		menu(v.Header.Menu)
 	}
 	if v.Tabs != nil {
 		for _, t := range v.Tabs.Items {
@@ -425,6 +436,7 @@ func buildIndex(v *ui.View) *actionIndex {
 				add(element{key: r.Key, kind: pluginsdk.ActSelect, label: r.Title, node: selectIn})
 			}
 			buttons(r.Actions, "")
+			menu(r.Menu)
 		}
 	}
 	walkView(v, func(n *ui.Node) {
