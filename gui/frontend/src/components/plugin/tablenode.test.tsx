@@ -154,7 +154,7 @@ describe("the columns a table shows", () => {
 
   it("shows a cut cell whole in its tooltip, and an uncut one has none", () => {
     nodes([table({ rows: [{ key: "r1", cells: { "c-name": "A rather long name for a narrow column" } }, { key: "r2", cells: { "c-name": "Short" } }] })]);
-    const [long, short] = [...document.querySelectorAll<HTMLElement>("[data-col=c-name] .truncate")];
+    const [long, short] = [...document.querySelectorAll<HTMLElement>("[data-testid=plugin-table-row] [data-col=c-name] .truncate")];
     if (!long || !short) throw new Error("no cells");
     for (const [el, w] of [[long, 180], [short, 100]] as const) {
       Object.defineProperty(el, "clientWidth", { configurable: true, value: 100 });
@@ -193,7 +193,7 @@ describe("sorting", () => {
     const num = () => screen.getByTestId("plugin-table-box").querySelector("[data-col=b-num]") as HTMLElement;
     const dur = () => screen.getByTestId("plugin-table-box").querySelector("[data-col=b-dur]") as HTMLElement;
     expect([num().dataset.sort, dur().dataset.sort]).toEqual(["desc", undefined]);
-    fireEvent.click(dur());
+    fireEvent.click(within(dur()).getByRole("button"));
     expect([num().dataset.sort, dur().dataset.sort]).toEqual([undefined, "desc"]);
     await settle();
     // The plugin's view sorted by duration.
@@ -206,7 +206,7 @@ describe("sorting", () => {
     expect([num().dataset.sort, dur().dataset.sort]).toEqual([undefined, "desc"]);
     expect(dur().querySelector("svg")).not.toBeNull();
     host.refuse = true;
-    fireEvent.click(num());
+    fireEvent.click(within(num()).getByRole("button"));
     expect(num().dataset.sort).toBe("desc");
     await settle();
     expect([num().dataset.sort, dur().dataset.sort]).toEqual([undefined, "desc"]);

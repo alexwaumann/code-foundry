@@ -103,43 +103,40 @@ function useAskedSort(sort: TableSort | undefined): { shown: TableSort | undefin
   return { shown: asked !== null && same(asked.from, sort) ? asked.sort : sort, ask };
 }
 
-/** A column's header: its label, or for a sortable column a button with the sorted direction's arrow (on the inner side of the label). */
+/** A column's header (its grid cell): its label, or for a sortable column a button with the sorted direction's arrow (on the inner side of the label). */
 function HeaderCell({ col, sort, onSort, inert }: { col: TableColumn; sort: TableSort | undefined; onSort: (dir: SortDir) => void; inert: boolean }) {
   const end = col.align === "end";
   const label = col.label ?? "";
-  if (!col.sortable) {
-    return (
-      <Tip label={label} whenTruncated>
-        <span className={cn("min-w-0 truncate", end && "text-right")} data-col={col.key}>
-          {label}
-        </span>
-      </Tip>
-    );
-  }
-  const dir = sort?.column === col.key ? sort.dir : undefined;
+  const dir = col.sortable && sort?.column === col.key ? sort.dir : undefined;
   const Arrow = dir === "asc" ? ArrowUp : ArrowDown;
   const arrow = dir && <Arrow className="size-3 shrink-0" aria-hidden />;
   const name = label || col.key;
   return (
-    <button
-      type="button"
-      disabled={inert}
-      aria-label={dir ? `${name}, sorted ${dir === "asc" ? "ascending" : "descending"}` : `Sort by ${name}`}
-      className={cn(
-        "-mx-1 flex min-w-0 items-center gap-1 rounded-sm px-1 text-overline outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus disabled:pointer-events-none",
-        end && "justify-end",
-        dir && "text-cf-text",
+    <div className={cn("flex min-w-0", end && "justify-end")} data-col={col.key} data-sort={dir}>
+      {col.sortable ? (
+        <button
+          type="button"
+          disabled={inert}
+          aria-label={dir ? `${name}, sorted ${dir === "asc" ? "ascending" : "descending"}` : `Sort by ${name}`}
+          className={cn(
+            // The padding is for the focus ring and hover; the label stays on the column's edge.
+            "-mx-1 flex min-w-0 items-center gap-1 rounded-sm px-1 text-overline outline-none hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus disabled:pointer-events-none",
+            dir && "text-cf-text",
+          )}
+          onClick={() => {
+            onSort(nextSort(col, sort));
+          }}
+        >
+          {end && arrow}
+          <span className="truncate">{label}</span>
+          {!end && arrow}
+        </button>
+      ) : (
+        <Tip label={label} whenTruncated>
+          <span className="min-w-0 truncate">{label}</span>
+        </Tip>
       )}
-      data-col={col.key}
-      data-sort={dir}
-      onClick={() => {
-        onSort(nextSort(col, sort));
-      }}
-    >
-      {end && arrow}
-      <span className="truncate">{label}</span>
-      {!end && arrow}
-    </button>
+    </div>
   );
 }
 

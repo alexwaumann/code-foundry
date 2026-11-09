@@ -314,7 +314,7 @@
             "key": "b-branch",
             "label": "Branch",
             "weight": 2,
-            "minWidth": 96,
+            "minWidth": 84,
             "priority": 6,
             "style": "mono",
             "sortable": true
@@ -337,7 +337,7 @@
             "key": "b-dur",
             "label": "Duration",
             "align": "end",
-            "width": 64,
+            "width": 80,
             "priority": 7,
             "style": "mono",
             "sortable": true,

@@ -4,7 +4,7 @@ import type { TableColumn, TableData, TableRow } from "@/api/pluginTable";
 import { demoView } from "@/test/pluginFixtures";
 import { cellParts, columnTrack, nextSort, rankColumns, tableItems, tableLayout } from "./table";
 
-// The demo's Builds table's columns (plugins/examples/hello/builds.go).
+// Columns like the demo's Builds table's (plugins/examples/hello/builds.go).
 const cols: TableColumn[] = [
   { key: "num", label: "#", width: 72, priority: 9, sortable: true, sortFirst: "desc" },
   { key: "status", label: "Status", width: 72, priority: 3 },
