@@ -48,9 +48,10 @@ const NOW = Date.now();
 const MIN = 60_000;
 const flag = (level: "attention" | "error", reason: string, pluginName = "Lint") => ({ plugin: pluginName.toLowerCase(), pluginName, level, reason, setAtMs: null, untilSeen: false });
 const line1 = () => screen.getByTestId("row-line-1");
+const line2 = () => screen.getByTestId("row-line-2");
 const line3 = () => screen.getByTestId("row-line-3");
-/** Line 1 as it reads at rest: the hover actions' "Archive" is in the DOM but hidden. */
-const line1Text = () => line1().textContent.replace(screen.getByTestId("row-actions").textContent, "");
+/** Text as it reads at rest: the hover actions' "Archive" is in the DOM but hidden. */
+const atRest = (el: HTMLElement) => el.textContent.replace(screen.getByTestId("row-actions").textContent, "");
 /** How many row cards are open, under fake timers: Radix opens one on a timer even at delay 0. */
 const cardOpen = () => {
   act(() => {
@@ -59,17 +60,21 @@ const cardOpen = () => {
   return screen.queryAllByTestId("thread-tooltip").filter((e) => e.getAttribute("data-state") !== "closed").length;
 };
 
-describe("SidebarRow three lines", () => {
-  it("project and status, then the name, then the detail or branch, in the 60px box", () => {
+describe("SidebarRow title first", () => {
+  it("the name and status, then the project, then the branch, in the 60px box", () => {
     renderRow({ name: "Pick a palette", status: "attention", statusReason: "question: Which color?" });
     const body = screen.getByTestId("thread-body");
-    expect(Array.from(body.children).map((c) => c.getAttribute("data-testid") ?? "name")).toEqual(["row-line-1", "name", "row-line-3"]);
+    expect(Array.from(body.children).map((c) => c.getAttribute("data-testid"))).toEqual(["row-line-1", "row-line-2", "row-line-3"]);
     expect(body.className.split(" ")).not.toContain("gap-0.5");
-    expect(line1().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
+    expect(line1().className).toContain("h-[22px]");
+    expect(line2().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
     expect(line3().className.split(" ")).toEqual(expect.arrayContaining(["h-4", "text-caption-sm"]));
-    expect(screen.getByTestId("thread-name").parentElement?.className).toContain("h-[22px]");
-    expect(line1Text()).toBe("code-foundryQuestion");
-    expect(line3().textContent).toBe("Which color?");
+    expect(screen.getByTestId("thread-name").parentElement).toBe(line1());
+    // The word is for screen readers only; what the thread needs is on the card, never the row.
+    expect(line1().textContent).toBe("Pick a paletteQuestion");
+    expect(screen.getByTestId("row-status-word").className).toContain("sr-only");
+    expect(atRest(line2())).toBe("code-foundry");
+    expect(atRest(line3())).toBe("main");
   });
 
   it.each<[string, Partial<ThreadView>, string, string, string, string]>([
@@ -86,18 +91,19 @@ describe("SidebarRow three lines", () => {
     ["done", { status: "attention", statusReason: "finished", statusChangedAtMs: NOW - 12 * MIN }, "finished", "lucide-circle-check", "Done", "text-cf-success-text"],
     ["working", { status: "busy", statusChangedAtMs: NOW - 4 * MIN }, "working", "lucide-circle-dashed", "Working", "text-cf-info-text"],
     ["waiting", { status: "idle", statusReason: "waiting on 2 child threads", statusChangedAtMs: NOW - 5 * MIN }, "waiting", "lucide-circle-dashed", "Waiting", "text-cf-sidebar-muted-foreground"],
-  ])("%s: its icon and word in its tone", (_name, o, kind, icon, word, tone) => {
+  ])("%s: its icon in its tone, the word for screen readers", (_name, o, kind, icon, word, tone) => {
     renderRow(o);
     expect(screen.getByTestId("thread-body").getAttribute("data-status-line")).toBe(kind);
     const status = screen.getByTestId("row-status");
     expect(status.getAttribute("data-kind")).toBe(kind);
     expect(status.className.split(" ")).toEqual(expect.arrayContaining([tone, "font-medium"]));
     expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain(icon);
-    expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("size-3");
+    expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("size-3.5");
     expect(screen.getByTestId("row-status-word").textContent).toBe(word);
+    expect(screen.getByTestId("row-status-word").className).toContain("sr-only");
   });
 
-  it("a plugin's flag arriving over the stream: its name on line 1 in amber, its reason on line 3; an error turns it red; cleared, the status goes", () => {
+  it("a plugin's flag arriving over the stream: its flag in amber, the plugin's name for screen readers; an error turns it red; cleared, the status goes; the branch stays", () => {
     renderRow({});
     expect(screen.queryByTestId("row-status")).toBeNull();
     const set = (flags: ThreadView["flags"]) => {
@@ -108,11 +114,11 @@ describe("SidebarRow three lines", () => {
     set([flag("attention", "deploy needs approval", "GitHub Actions")]);
     expect(screen.getByTestId("row-status-word").textContent).toBe("GitHub Actions");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-warning-text");
-    expect(screen.getByTestId("row-detail").textContent).toBe("deploy needs approval");
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
     set([flag("error", "tests failed", "Test Watcher")]);
     expect(screen.getByTestId("row-status-word").textContent).toBe("Test Watcher");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
-    expect(screen.getByTestId("row-detail").textContent).toBe("tests failed");
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
     set([]);
     expect(screen.queryByTestId("row-status")).toBeNull();
   });
@@ -122,20 +128,20 @@ describe("SidebarRow three lines", () => {
     expect(screen.queryByTestId("row-status")).toBeNull();
     const time = screen.getByTestId("row-time");
     expect(time.textContent).toBe("9m");
-    expect(time.className.split(" ")).toEqual(expect.arrayContaining(["text-cf-sidebar-muted-foreground", "tabular-nums"]));
-    expect(line1Text()).toBe("code-foundry9m");
+    expect(time.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "text-cf-sidebar-muted-foreground", "tabular-nums"]));
+    expect(line1().textContent).toBe("t9m");
     expect(screen.getByTestId("thread-body").getAttribute("data-status-line")).toBe("place");
   });
 
   it("idle without a known activity: nothing on the right", () => {
     renderRow({ status: "idle", lastActivityAtMs: null });
-    expect(line1Text()).toBe("code-foundry");
+    expect(line1().textContent).toBe("t");
   });
 
   it.each<[string, Partial<ThreadView>, string]>([
-    ["working: the word, a space, the time since the status changed", { status: "busy", statusChangedAtMs: NOW - (60 + 4) * MIN }, "Working 1h 4m"],
-    ["waiting: the same", { status: "idle", statusReason: "waiting on 1 child thread", statusChangedAtMs: NOW - 5 * MIN }, "Waiting 5m"],
-    ["under a minute: seconds", { status: "busy", statusChangedAtMs: NOW - 4_000 }, "Working 4s"],
+    ["working: the icon, then the time since the status changed", { status: "busy", statusChangedAtMs: NOW - (60 + 4) * MIN }, "Working1h 4m"],
+    ["waiting: the same", { status: "idle", statusReason: "waiting on 1 child thread", statusChangedAtMs: NOW - 5 * MIN }, "Waiting5m"],
+    ["under a minute: seconds", { status: "busy", statusChangedAtMs: NOW - 4_000 }, "Working4s"],
   ])("%s", (_name, o, text) => {
     // The clock held at NOW: under load a real second passes between loading the file and
     // rendering, and the seconds case read "5s".
@@ -178,32 +184,56 @@ describe("SidebarRow three lines", () => {
   });
 });
 
-describe("SidebarRow line 1: the project", () => {
-  it("the project, muted, no icon", () => {
+describe("SidebarRow line 2: the project", () => {
+  it("the project after its kind's glyph, muted", () => {
     renderRow({});
     const p = screen.getByTestId("row-project");
     expect(p.textContent).toBe("code-foundry");
     expect(p.className).toContain("text-cf-sidebar-muted-foreground");
-    expect(p.querySelector("svg")).toBeNull();
+    expect(screen.getByTestId("row-place-icon").getAttribute("data-project-kind")).toBe("git");
   });
 
-  it("no project: plain No project text, no icon", () => {
+  it.each<[string, Record<string, unknown>, string]>([
+    ["a GitHub repository: the GitHub mark", { githubSlug: "o/cf", remotes: [{ name: "origin", url: "https://github.com/o/cf.git" }] }, "github"],
+    ["a git repository without GitHub: the git folder", {}, "git"],
+  ])("%s", (_name, over, kind) => {
+    useProjectsStore.setState((st) => ({ byId: { ...st.byId, cf: { ...(st.byId.cf as object), ...over } } }) as never);
+    renderRow({});
+    expect(screen.getByTestId("row-place-icon").getAttribute("data-project-kind")).toBe(kind);
+  });
+
+  it("no git: the plain folder, and no branch line: a two-line row", () => {
+    renderRow({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
+    expect(screen.getByTestId("row-project").textContent).toBe("writing");
+    expect(screen.getByTestId("row-place-icon").getAttribute("data-project-kind")).toBe("nogit");
+    expect(screen.queryByTestId("row-line-3")).toBeNull();
+    expect(screen.queryByTestId("no-git-badge")).toBeNull();
+  });
+
+  it("no project: a house and No project, and no branch line", () => {
     renderRow({ projectId: "", projectIds: [], worktreePath: "/Users/dev" });
     const p = screen.getByTestId("row-project");
     expect(p.textContent).toBe("No project");
     expect(p.getAttribute("data-no-project")).toBe("true");
-    expect(p.querySelector("svg")).toBeNull();
+    expect(screen.getByTestId("row-place-icon").getAttribute("class")).toContain("lucide-house");
+    expect(screen.queryByTestId("row-line-3")).toBeNull();
   });
 
-  it("a thread in its workspace's folder: the workspace's name, never its w-<id> (composer-fixes.spec.ts)", () => {
+  it("a thread in its workspace's folder: Layers and the workspace's name, never its w-<id> (composer-fixes.spec.ts)", () => {
     useWorkspacesStore.setState({ byId: { "w-000000000001": { id: "w-000000000001", name: "shop", branch: "", members: [{ projectId: "cf", worktreePath: "" }], createdAtMs: null } }, order: ["w-000000000001"] });
     renderRow({ projectId: "", projectIds: ["cf", "gp"], workspaceId: "w-000000000001", worktreePath: "/home/.code-foundry/workspaces/w-000000000001" });
     expect(screen.getByTestId("row-project").textContent).toBe("shop");
+    expect(screen.getByTestId("row-workspace").getAttribute("class")).toContain("lucide-layers");
   });
+});
 
-  it("pinned: the pin glyph right after the project", () => {
+describe("SidebarRow pin", () => {
+  it("pinned: the muted pin glyph before the name", () => {
     renderRow({ pinned: true });
-    expect(screen.getByTestId("row-project").nextElementSibling?.getAttribute("data-testid")).toBe("row-pinned");
+    const pin = screen.getByTestId("row-pinned");
+    expect(pin.parentElement).toBe(line1());
+    expect(pin.nextElementSibling?.getAttribute("data-testid")).toBe("thread-name");
+    expect(pin.getAttribute("class")).toContain("text-cf-icon-muted");
   });
 
   it("not pinned: no pin", () => {
@@ -212,52 +242,33 @@ describe("SidebarRow line 1: the project", () => {
   });
 });
 
-describe("SidebarRow line 3: detail or branch", () => {
-  it.each<[string, Partial<ThreadView>, string]>([
-    ["working on a tool: the tool", { status: "busy", busyTool: "Bash make check" }, "Bash make check"],
-    ["compacting", { status: "busy", statusReason: "compacting" }, "compacting"],
-    ["a question: its text", { status: "attention", statusReason: "question: Which one?" }, "Which one?"],
-    ["a permission: the tool", { status: "attention", statusReason: "permission: Bash zig build" }, "Bash zig build"],
-    ["a plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "ready for review"],
-    ["a flag: its reason", { flags: [flag("attention", "3 warnings in main.go")] }, "3 warnings in main.go"],
-    ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted" }, "resend to continue"],
-  ])("%s: the detail, muted and truncated, no branch", (_name, o, text) => {
-    renderRow(o);
-    const d = screen.getByTestId("row-detail");
-    expect(d.textContent).toBe(text);
-    expect(d.className.split(" ")).toEqual(expect.arrayContaining(["truncate", "text-cf-sidebar-muted-foreground"]));
-    expect(screen.queryByTestId("row-branch")).toBeNull();
-  });
-
+describe("SidebarRow line 3: the branch", () => {
   it.each<[string, Partial<ThreadView>]>([
     ["idle", {}],
     ["done", { status: "attention", statusReason: "finished" }],
-    ["working with no tool yet", { status: "busy" }],
-    // Waiting: the badge carries the count (lib/liveCount), line 3 the branch.
+    ["working on a tool", { status: "busy", busyTool: "Bash make check" }],
+    ["compacting", { status: "busy", statusReason: "compacting" }],
+    ["a question", { status: "attention", statusReason: "question: Which one?" }],
+    ["a permission", { status: "attention", statusReason: "permission: Bash zig build" }],
+    ["a plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }],
+    ["a flag", { flags: [flag("attention", "3 warnings in main.go")] }],
+    ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted" }],
     ["waiting on child threads", { status: "idle", statusReason: "waiting on 2 child threads" }],
-    ["waiting on children and a subagent", { status: "idle", statusReason: "waiting on 2 child threads and 1 subagent" }],
     ["waiting on a wake", { status: "idle", statusReason: "waiting" }],
-  ])("%s: the branch glyph and the branch in mono", (_name, o) => {
+  ])("%s: the branch glyph and the branch in mono, never what it does or needs", (_name, o) => {
     renderRow(o);
     expect(screen.queryByTestId("row-detail")).toBeNull();
     expect(screen.getByTestId("row-branch").textContent).toBe("main");
     expect(screen.getByTestId("row-branch").className).toContain("font-mono");
     expect(screen.getByTestId("row-branch-icon").getAttribute("class")).toContain("lucide-git-branch");
-    expect(line3().textContent).toBe("main");
+    expect(atRest(line3())).toBe("main");
   });
 
-  it("no project: an empty line that keeps its height", () => {
-    renderRow({ projectId: "", projectIds: [], worktreePath: "/Users/dev" });
-    expect(line3().textContent).toBe("");
-    expect(line3().className).toContain("h-4");
-  });
-
-  it("no git: the No git badge instead of a branch", () => {
-    renderRow({ projectId: "notes", projectIds: ["notes"], worktreePath: "/src/notes" });
-    expect(screen.queryByTestId("row-branch")).toBeNull();
-    expect(line3().textContent).toBe("No git");
-    expect(screen.getByTestId("no-git-badge")).toBeTruthy();
-    expect(screen.getByTestId("row-project").textContent).toBe("writing");
+  it("a queued move does not replace the branch (the card says it)", () => {
+    useProjectsStore.setState((st) => ({ byId: { ...st.byId, cf: { ...(st.byId.cf as object), worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }, { path: "/src/cf-2", branch: "next", head: "b", isMain: false }] } } }) as never);
+    renderRow({ pendingWorktreePath: "/src/cf-2" });
+    expect(screen.queryByTestId("row-moving")).toBeNull();
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
   });
 
   it("background agents (info, a bot) and shells (muted, a terminal), only when running", () => {
@@ -315,7 +326,7 @@ describe("SidebarRow line 3: detail or branch", () => {
 });
 
 describe("SidebarRow hover actions", () => {
-  it("Snooze is the alarm clock, Archive a check and the word; labelled, muted, no background, over the status", () => {
+  it("Snooze is the alarm clock, Archive a check and the word; labelled, muted, no background, on the right of the branch line", () => {
     renderRow({ status: "attention", statusReason: "question: Which one?" });
     const actions = screen.getByTestId("row-actions");
     expect(actions.className.split(" ")).toEqual(expect.arrayContaining(["opacity-0", "group-hover/row:opacity-100"]));
@@ -335,7 +346,24 @@ describe("SidebarRow hover actions", () => {
     const archive = screen.getByTestId("row-archive");
     expect(archive.textContent).toBe("Archive");
     expect(archive.className.split(" ")).toEqual(expect.arrayContaining(["text-caption-sm", "font-medium", "hover:text-cf-success-text"]));
-    expect(screen.getByTestId("row-status").parentElement?.className).toContain("group-hover/row:invisible");
+    expect(screen.getByTestId("row-hover-slot").parentElement).toBe(line3());
+    expect(actions.parentElement).toBe(screen.getByTestId("row-hover-slot"));
+    // The status never gives way: the name and status stay put on hover.
+    expect(screen.getByTestId("row-status").parentElement?.className).not.toContain("invisible");
+  });
+
+  it("a two-line row: the actions take the counts' place on the project line", () => {
+    renderRow({ projectId: "", projectIds: [], worktreePath: "/Users/dev", backgroundShellsRunning: 2 });
+    const slot = screen.getByTestId("row-hover-slot");
+    expect(slot.parentElement).toBe(line2());
+    expect(within(slot).getByTestId("row-actions")).toBeTruthy();
+    expect(screen.getByTestId("row-bg-shells").parentElement?.className).toContain("group-hover/row:invisible");
+  });
+
+  it("a three-line row keeps its counts on line 2 while hovered", () => {
+    renderRow({ backgroundShellsRunning: 2 });
+    expect(screen.getByTestId("row-bg-shells").parentElement?.className ?? "").not.toContain("invisible");
+    expect(within(line2()).queryByTestId("row-actions")).toBeNull();
   });
 
   it("tab stops only on the cursor's row", () => {
@@ -1138,20 +1166,20 @@ describe("SidebarRow line 1 of a multi-project thread: the run-in project only",
 });
 
 describe("SidebarRow: a claude that did not start", () => {
-  it("says Error in red, and why on line 3", () => {
+  it("says Error in red; the branch stays on line 3", () => {
     renderRow({ state: "disconnected", status: "error", statusReason: "did not start", statusChangedAtMs: NOW - MIN });
     expect(screen.getByTestId("row-status").textContent).toBe("Error");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
-    expect(screen.getByTestId("row-detail").textContent).toBe("did not start");
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
   });
 });
 
 describe("SidebarRow: a thread whose transcript Claude Code deleted", () => {
-  it("says Error in red, and why on line 3", () => {
+  it("says Error in red; the branch stays on line 3", () => {
     renderRow({ state: "disconnected", transcriptMissing: true });
     expect(screen.getByTestId("row-status").textContent).toBe("Error");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
-    expect(screen.getByTestId("row-detail").textContent).toBe("transcript deleted");
+    expect(screen.getByTestId("row-branch").textContent).toBe("main");
   });
 });
 
@@ -1159,7 +1187,7 @@ describe("a thread's setup", () => {
   const step = (kind: "worktree" | "fetch", status: "running" | "failed" | "pending", ref = "") => ({ kind, projectId: "cf", projectName: "code-foundry", ref, branch: "", status, startedAtMs: null, endedAtMs: null, error: "", warning: "", refAtMs: null, existing: false });
   const setup = (phase: "running" | "failed" | "cancelled", steps: ReturnType<typeof step>[] = []) => ({ phase, startedAtMs: NOW, endedAtMs: null, steps, error: "", background: true });
 
-  it("running: Setting up in Working's place, the step on line 3 instead of a branch", () => {
+  it("running: Setting up in Working's place; line 3 waits, empty, for the branch (the step is on the card)", () => {
     // The clock held at NOW, as for Working's time: under load the file takes long enough to reach this that the time moved on.
     vi.useFakeTimers({ now: NOW });
     try {
@@ -1169,8 +1197,9 @@ describe("a thread's setup", () => {
       expect(screen.getByTestId("row-status-word").textContent).toBe("Setting up");
       expect(screen.getByTestId("row-status").className).toContain("text-cf-info-text");
       expect(screen.getByTestId("row-time").textContent).toBe("12s");
-      expect(screen.getByTestId("row-detail").textContent).toBe("Fetching origin/main");
+      expect(screen.queryByTestId("row-detail")).toBeNull();
       expect(screen.queryByTestId("row-branch")).toBeNull();
+      expect(atRest(line3())).toBe("");
     } finally {
       vi.useRealTimers();
     }
@@ -1182,14 +1211,12 @@ describe("a thread's setup", () => {
     expect(screen.getByTestId("row-archive")).toBeTruthy();
   });
 
-  it("failed: Setup failed in the error colour, the reason on line 3, truncated", () => {
+  it("failed: Setup failed in the error colour, the reason only on the card", () => {
     renderRow({ worktreePath: "", state: "disconnected", status: "error", statusReason: "setup failed", setup: setup("failed", [step("worktree", "failed")]) });
     expect(screen.getByTestId("row-status-word").textContent).toBe("Setup failed");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
     expect(screen.queryByTestId("row-time")).toBeNull();
-    const detail = screen.getByTestId("row-detail");
-    expect(detail.textContent).toBe("Could not create the worktree");
-    expect(detail.className).toContain("truncate");
+    expect(screen.queryByTestId("row-detail")).toBeNull();
     expect(screen.getByTestId("row-snooze")).toBeTruthy();
   });
 

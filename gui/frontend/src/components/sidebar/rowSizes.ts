@@ -3,12 +3,15 @@ import type { Row, Section } from "@/lib/tree";
 /**
  * The thread list's row sizes in layout px (docs/notes/sidebar-row-emphasis.md).
  *
- * A thread row in the inbox layout (docs/notes/sidebar-inbox-2-libs.md): three lines with no
- * gap between them, a text-caption-sm project and status line (16px), the text-body name
- * (22px) and a text-caption-sm detail or branch line (16px), with 3px above and below. Every
- * thread row but a snoozed or archived one (ONE_LINE_ROW) has it.
+ * A thread row, title first (docs/notes/sidebar-title-first.md): three lines with no gap
+ * between them, the text-body name and status (22px), a text-caption-sm project line (16px)
+ * and a text-caption-sm branch line (16px), with 3px above and below. Every live thread row
+ * of a project with git has it; one without a project or without git is TWO_LINE_ROW.
  */
 export const THREE_LINE_ROW = 60;
+
+/** A thread row without a branch line (no project, no git): the name line and the project line, 3px above and below. */
+export const TWO_LINE_ROW = 44;
 
 /**
  * A snoozed or archived row: one text-body line (22px) with 1px above and below, so with
@@ -40,10 +43,12 @@ export function rowGap(section: Section): number {
 }
 
 /**
- * A row's height: a footer header's, a one-line snoozed or archived row's (ONE_LINE_ROW), or
- * a three-line thread row's (THREE_LINE_ROW; also for a row out of range).
+ * A row's height: a footer header's, a one-line snoozed or archived row's (ONE_LINE_ROW), a
+ * live thread row without a branch line's (TWO_LINE_ROW, `branchless`), or a three-line
+ * thread row's (THREE_LINE_ROW; also for a row out of range).
  */
-export function rowSize(row: Row | undefined): number {
+export function rowSize(row: Row | undefined, branchless = false): number {
   if (row?.kind === "header") return HEADER_HEIGHT;
-  return isQuiet(row?.section) ? ONE_LINE_ROW : THREE_LINE_ROW;
+  if (isQuiet(row?.section)) return ONE_LINE_ROW;
+  return branchless ? TWO_LINE_ROW : THREE_LINE_ROW;
 }

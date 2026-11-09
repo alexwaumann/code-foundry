@@ -93,7 +93,7 @@ describe("Run in", () => {
     });
   });
 
-  it("the row shows the queued move until it happens, then the project it runs in", () => {
+  it("the row keeps its place while a move is queued (the card says it), then shows the project it runs in", () => {
     // The checkout the daemon makes for the move (code-foundry on the thread's branch).
     act(() => {
       addWorktrees("repo-cf", worktree("repo-cf", LOGIN, "cf/login"));
@@ -102,7 +102,7 @@ describe("Run in", () => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-drv": { ...(s.byId["s-drv"] as ThreadView), pendingWorktreePath: LOGIN } } }));
     });
     render(<SidebarRow row={{ key: "s:s-drv", kind: "thread", section: "idle", threadId: "s-drv" }} selected={false} cursor={false} onActivate={() => undefined} />);
-    expect(screen.getByTestId("row-moving").textContent).toBe("moving to code-foundry…");
+    expect(screen.queryByTestId("row-moving")).toBeNull();
     act(() => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-drv": { ...(s.byId["s-drv"] as ThreadView), projectId: "repo-cf", worktreePath: LOGIN, pendingWorktreePath: "" } } }));
     });

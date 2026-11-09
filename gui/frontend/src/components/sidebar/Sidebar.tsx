@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
 import { HistoryButtons } from "@/components/sidebar/HistoryButtons";
+import { useBranchlessRows } from "@/components/thread/useThreadPlace";
 import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
@@ -132,7 +133,6 @@ type ScrollTo = (index: number) => void;
 
 interface PanelRowsProps {
   rows: readonly Row[];
-  /** Size of one row (header, snoozed or archived, or two-line thread row). */
   selectedKey: string | null;
   cursorKey: string | null;
   onActivate: (row: Row) => void;
@@ -154,11 +154,18 @@ interface PanelRowsProps {
  */
 function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, gap, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
   const ref = useRef<HTMLDivElement>(null);
+  // The thread rows without a branch line (no project, no git) are two lines tall.
+  const threadIds = useMemo(() => rows.flatMap((r) => (isThreadRow(r) ? [r.threadId] : [])), [rows]);
+  const branchless = useBranchlessRows(threadIds);
+  const twoLine = useMemo(() => new Set(branchless.split("\n")), [branchless]);
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => ref.current,
-    estimateSize: (i) => rowSize(rows[i]),
+    estimateSize: (i) => {
+      const row = rows[i];
+      return rowSize(row, row !== undefined && isThreadRow(row) && twoLine.has(row.threadId));
+    },
     getItemKey: (i) => rows[i]?.key ?? i,
     overscan: 10,
     // Space between rows, outside each row's box (rowSizes.ts). A panel holds thread rows
@@ -167,10 +174,10 @@ function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeig
     paddingStart,
     paddingEnd,
   });
-  // Rows move between panels; drop the cached sizes.
+  // Rows move between panels, or gain or lose their branch line; drop the cached sizes.
   useEffect(() => {
     virtualizer.measure();
-  }, [virtualizer, rows]);
+  }, [virtualizer, rows, twoLine]);
   useImperativeHandle(scrollTo, () => (i) => {
     virtualizer.scrollToIndex(i, { align: "auto" });
   }, [virtualizer]);
