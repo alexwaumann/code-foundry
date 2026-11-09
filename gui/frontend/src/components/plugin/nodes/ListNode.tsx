@@ -43,7 +43,7 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown, o
   }, []);
   const width = useElementWidth((row.actions?.length ?? 0) > 0 ? el : null);
   const folded = foldRowActions(width, row.actions, dense);
-  const menu = lifted ? undefined : rowMenuItems(row, folded);
+  const menu = lifted ? null : rowMenuItems(row, folded);
   const shownActions = folded ? [] : (row.actions ?? []);
   const iconOnly = shownActions.filter((b) => b.iconOnly);
   const labelled = shownActions.filter((b) => !b.iconOnly);
