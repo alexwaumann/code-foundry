@@ -62,19 +62,19 @@ export function RowGrip({ row, ops, dense }: { row: Row; ops: RowOps; dense: boo
  * nothing), Escape cancels; `done` ends the editing (refocus: Enter and Escape give the
  * focus back to the row).
  */
-export function TitleEditor({ title, onCommit, done }: { title: string; onCommit: (text: string) => void; done: (refocus: boolean) => void }) {
+export function TitleEditor({ current, onCommit, done }: { current: string; onCommit: (text: string) => void; done: (refocus: boolean) => void }) {
   const ended = useRef(false);
   const finish = (commit: boolean, text: string, refocus: boolean) => {
     if (ended.current) return;
     ended.current = true;
-    const t = commit ? editCommit(title, text) : null;
+    const t = commit ? editCommit(current, text) : null;
     done(refocus);
     if (t !== null) onCommit(t);
   };
   return (
     <Input
       autoFocus
-      defaultValue={title}
+      defaultValue={current}
       maxLength={200}
       aria-label="Title"
       data-testid="plugin-row-edit"

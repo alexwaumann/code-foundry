@@ -120,7 +120,7 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown, o
           <div className="flex min-w-0 items-center gap-2 text-body-sm">
             {editing ? (
               <TitleEditor
-                title={row.title}
+                current={row.title}
                 onCommit={(t) => {
                   ops?.edit(row.key, t);
                 }}
