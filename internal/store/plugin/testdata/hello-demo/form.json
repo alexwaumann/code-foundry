@@ -136,6 +136,16 @@
             }
           },
           {
+            "key": "f-due",
+            "name": "due",
+            "label": "Due",
+            "description": "Picked from a calendar; the value is an ISO date.",
+            "input": {
+              "kind": "date",
+              "placeholder": "No due date"
+            }
+          },
+          {
             "key": "f-env",
             "name": "env",
             "label": "Environment",

@@ -145,6 +145,15 @@
         "rows": 6,
         "title": "lint"
       }
+    },
+    {
+      "key": "test-log",
+      "log": {
+        "text": "\u001b[2K\u001b[1G\u001b[36m[INFO]\u001b[0m Running integration shards\n\u001b[32m✓\u001b[0m api/auth        \u001b[1m142 passed\u001b[22m\n\u001b[31m✗ store/project\u001b[0m  \u001b[1;31mTestCleanupKeepsDirty\u001b[0m\n\u001b[2m    project_test.go:212: worktree removed while dirty\u001b[0m\n\u001b[33;1mWARN\u001b[0m \u001b[3mslow test\u001b[23m: \u001b[4mTestSync\u001b[24m took 9.2s\n\u001b[38;5;208m256-colour orange\u001b[0m, \u001b[38;2;80;120;255mtruecolor blue\u001b[0m, \u001b[97;41m bright on red \u001b[0m\n\u001b[90m1 failed, 1 passed in 41.3s\u001b[0m\n",
+        "rows": 8,
+        "title": "tests (ANSI)",
+        "ansi": true
+      }
     }
   ]
 }

@@ -52,12 +52,13 @@ describe("node renderer registry", () => {
     expect(section?.getAttribute("data-collapsed")).toBe("true");
   });
 
-  it("renders the form: inputs, a secret, selects in three styles and a picker, a fieldset of toggles", () => {
+  it("renders the form: inputs, a secret, a date, selects in three styles and a picker, a fieldset of toggles", () => {
     inView(<NodeList nodes={demoView("form").nodes} />, { viewTab: "form" });
     expect(screen.getAllByTestId("plugin-input").map((i) => [i.getAttribute("data-name"), i.getAttribute("type")])).toEqual([
       ["name", "text"],
       ["token", "password"],
     ]);
+    expect(screen.getAllByTestId("plugin-date").map((d) => [d.getAttribute("data-name"), d.textContent])).toEqual([["due", "No due date"]]);
     expect(screen.getAllByTestId("plugin-select").map((s) => [s.getAttribute("data-name"), s.getAttribute("data-style")])).toEqual([
       ["project", "dropdown"],
       ["env", "radios"],
@@ -76,9 +77,9 @@ describe("node renderer registry", () => {
     expect(usePluginSurfacesStore.getState().drafts[`${ctx.instance}\u0000form\u0000settings`]).toEqual({ name: "Ada" });
   });
 
-  it("renders the log tab: logs with tones", () => {
+  it("renders the log tab: logs with tones, one with ANSI colours", () => {
     inView(<NodeList nodes={demoView("log").nodes} />, { viewTab: "log" });
-    expect(screen.getAllByTestId("plugin-log")).toHaveLength(2);
+    expect(screen.getAllByTestId("plugin-log")).toHaveLength(3);
     expect(document.querySelector('[data-tone="error"]')?.textContent).toBe("error: missing return");
   });
 

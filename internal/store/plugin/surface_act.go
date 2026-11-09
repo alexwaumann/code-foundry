@@ -40,6 +40,7 @@ var surfaceCapabilities = []string{
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
 	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.node.stats", "view.node.bars", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
 	"view.hint", "view.input.multiline", "view.input.number", "view.input.live", "view.select.search",
+	"view.input.date", "view.log.ansi",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -328,8 +329,9 @@ func (e element) actionName() string {
 // fieldInfo is one form field.
 type fieldInfo struct {
 	key, name, form string
-	control         string // text, secret, select, multiselect, toggle
+	control         string // text, secret, date, select, multiselect, toggle
 	store           string
+	min, max        string // a date's bounds
 }
 
 // actionIndex is what Act needs of one view version.
@@ -384,6 +386,8 @@ func buildIndex(v *ui.View) *actionIndex {
 			switch {
 			case f.Input != nil && f.Input.Kind == ui.InputSecret:
 				fi.control, fi.store = "secret", f.Input.Store
+			case f.Input != nil && f.Input.Kind == ui.InputDate:
+				fi.control, fi.min, fi.max = "date", f.Input.Min, f.Input.Max
 			case f.Input != nil:
 				fi.control = "text"
 			case f.Select != nil && f.Select.Multiple:
@@ -704,7 +708,7 @@ func (idx *actionIndex) values(el element, in map[string]any) (map[string]any, m
 		if !ok {
 			return nil, nil, fmt.Errorf("%w: %q is not a field this action sends", ErrInvalidArgument, name)
 		}
-		cv, err := coerceValue(f.control, v)
+		cv, err := coerceField(f, v)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%w: field %q: %v", ErrInvalidArgument, name, err)
 		}
@@ -731,7 +735,7 @@ func (idx *actionIndex) withChange(el element, value string, vals map[string]any
 		if f.name != el.field || f.form != el.form || f.control == "secret" {
 			continue
 		}
-		cv, err := coerceValue(f.control, value)
+		cv, err := coerceField(f, value)
 		if err != nil {
 			return nil, fmt.Errorf("%w: field %q: %v", ErrInvalidArgument, el.field, err)
 		}

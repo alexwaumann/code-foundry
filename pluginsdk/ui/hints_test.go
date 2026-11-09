@@ -35,7 +35,7 @@ func TestHintsAndInputKinds(t *testing.T) {
 		{name: "too many rows", view: View{Nodes: []Node{form(MultilineField("f", "n", "Notes", MaxInputRows+1))}}, want: ".rows"},
 		{name: "rows on a text input", view: View{Nodes: []Node{form(Field{Key: "f", Name: "n", Input: &Input{Rows: 4}})}}, want: "rows are for multiline"},
 		{name: "a number", view: View{Nodes: []Node{form(NumberField("f", "n", "Port").WithValue("8080"))}}},
-		{name: "an unknown kind", view: View{Nodes: []Node{form(Field{Key: "f", Name: "n", Input: &Input{Kind: "date"}})}}, want: "unknown kind"},
+		{name: "an unknown kind", view: View{Nodes: []Node{form(Field{Key: "f", Name: "n", Input: &Input{Kind: "color"}})}}, want: "unknown kind"},
 		{name: "live with a change event", view: View{Toolbar: []Node{form(live)}, Nodes: []Node{}}},
 		{name: "live without one", view: View{Nodes: []Node{form(TextField("f", "n", "Q").AsLive())}}, want: "needs a change event"},
 		{name: "multiline in a toolbar", view: View{Toolbar: []Node{form(MultilineField("f", "n", "Notes", 0))}, Nodes: []Node{}}, want: "one line, not multiline"},

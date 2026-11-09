@@ -97,6 +97,9 @@ const (
 	InputSecret    InputKind = "secret"
 	InputMultiline InputKind = "multiline" // Enter adds a line, cmd+Enter submits; not in a toolbar or footer
 	InputNumber    InputKind = "number"    // the value still travels as a string
+	// InputDate is a day picked from a calendar: the value is an ISO date ("2026-11-14",
+	// time.DateOnly; "" for none), optionally between Min and Max.
+	InputDate InputKind = "date"
 )
 
 // SelectStyle is how a select renders.
@@ -438,9 +441,15 @@ type Log struct {
 	Wrap      bool      `json:"wrap,omitempty"`
 	Truncated bool      `json:"truncated,omitempty"`
 	Title     string    `json:"title,omitempty"`
+	// ANSI has the host read the text's SGR escapes (colours, bold, dim, italic, underline,
+	// reset) in the theme's terminal colours; every other escape sequence is dropped. Off,
+	// the text shows as it is. An older host (no view.log.ansi) shows escapes raw: strip
+	// them there with StripANSI.
+	ANSI bool `json:"ansi,omitempty"`
 }
 
-// LogLine is a log line with a tone (warnings amber, errors red). ANSI is not parsed.
+// LogLine is a log line with a tone (warnings amber, errors red). With Log.ANSI the text's
+// own colours win over the tone where they are set.
 type LogLine struct {
 	Text string `json:"text"`
 	Tone Tone   `json:"tone,omitempty"`
@@ -519,7 +528,7 @@ type Field struct {
 	Fieldset    *Fieldset `json:"fieldset,omitempty"`
 }
 
-// Input is a text input: one line, secret, multi-line or a number.
+// Input is a text input: one line, secret, multi-line, a number or a date.
 type Input struct {
 	Kind           InputKind `json:"kind,omitempty"`
 	Value          string    `json:"value,omitempty"` // never for a secret
@@ -538,8 +547,13 @@ type Input struct {
 	Rows int `json:"rows,omitempty"`
 	// Live sends the field's change event as the user types, once they pause, for a filter
 	// that follows the text. It needs a change event. The host sends one at a time, the
-	// latest text last.
+	// latest text last. A date sends its change event on each pick either way; Live adds
+	// the one-at-a-time order.
 	Live bool `json:"live,omitempty"`
+	// Min and Max (date) bound the days the calendar offers, as ISO dates; either may be
+	// "" (no bound).
+	Min string `json:"min,omitempty"`
+	Max string `json:"max,omitempty"`
 }
 
 // A multi-line input's rows.

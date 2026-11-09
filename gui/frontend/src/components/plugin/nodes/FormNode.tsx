@@ -15,6 +15,7 @@ import { actOnElement, clearDrafts, draftKeyOf, revertDraft, runCommandElement, 
 import { FormContext, useFormCtx, useViewCtx } from "../context";
 import { fieldValue, formValues, isSecret, liveSender, pluginValue, validateField, validateForm, valueString, type LiveSender } from "../form";
 import { useSourceOptions } from "../options";
+import { DateControl } from "../DateControl";
 import { PickerControl } from "../PickerControl";
 import { InlineView, PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
@@ -103,6 +104,29 @@ function InputControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: st
     },
     onKeyDown: onKey,
   };
+  if (input.kind === "date") {
+    // A pick is a committed change, as a select's is; a live date sends it through the live sender (one at a time).
+    return (
+      <DateControl
+        id={id}
+        value={value}
+        min={input.min}
+        max={input.max}
+        placeholder={input.placeholder}
+        disabled={(f.disabled ?? false) || locked}
+        invalid={invalid}
+        required={f.required}
+        name={name}
+        onPick={(v) => {
+          api.change(f, v, !isLive);
+          if (isLive) {
+            live.current?.push(v);
+            live.current?.flush();
+          }
+        }}
+      />
+    );
+  }
   if (multiline) {
     return <Textarea {...shared} rows={input.rows || DEFAULT_INPUT_ROWS} maxLength={input.maxLength || undefined} className={cn("min-h-0 resize-y px-2 py-1 text-body-sm", input.mono && "font-mono")} />;
   }
@@ -364,7 +388,7 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
   return (
     // In a strip the control is the field (a search box): its label names it for screen readers only.
     // A picker's compact trigger is as wide as its label and picks.
-    <div className={cn("flex min-w-0 flex-col gap-1.5", strip && (f.input ? "min-w-32 flex-[2_1_0%]" : f.select?.search ? "shrink" : "min-w-28 flex-1"))} data-testid="plugin-field" data-name={name}>
+    <div className={cn("flex min-w-0 flex-col gap-1.5", strip && (f.input?.kind === "date" ? "shrink-0" : f.input ? "min-w-32 flex-[2_1_0%]" : f.select?.search ? "shrink" : "min-w-28 flex-1"))} data-testid="plugin-field" data-name={name}>
       {f.label && (
         <Label id={`${id}-label`} htmlFor={id} className={cn("gap-1 text-body-sm font-medium", strip && "sr-only")}>
           {f.label}

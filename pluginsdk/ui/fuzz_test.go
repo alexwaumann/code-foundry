@@ -126,6 +126,7 @@ func viewSeeds() []viewSeed {
 	return append(out,
 		viewSeed{[]byte(jenkinsFailed), []byte{0, 0, 3}},
 		viewSeed{[]byte(`{"nodes":[{"key":"l","log":{"text":"x"}}]}`), []byte{0, 1}},
+		viewSeed{[]byte(`{"toolbar":[{"key":"tb","form":{"fields":[{"key":"d","name":"since","input":{"kind":"date","value":"2026-11-14","min":"2026-01-01","max":"2026-12-31"},"change":{"event":"since"}}]}}],"nodes":[{"key":"l","log":{"ansi":true,"text":"\u001b[1;31mFAIL\u001b[0m x\n"}}]}`), []byte{0, 1}},
 		viewSeed{[]byte(`{"nodes":[{"key":"t","thread":{"threadId":"x","height":""}}]}`), []byte{}},
 		viewSeed{[]byte(layoutSeed), []byte{0, 0, 0, 2}},
 		viewSeed{[]byte(gridSeed), []byte{0, 0, 1}},

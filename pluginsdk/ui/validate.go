@@ -858,9 +858,10 @@ func (c *checker) field(path string, f Field, inFieldset bool) bool {
 	case f.Input != nil:
 		in := f.Input
 		p := path + ".input"
-		if !slices.Contains([]InputKind{"", InputText, InputSecret, InputMultiline, InputNumber}, in.Kind) {
+		if !slices.Contains([]InputKind{"", InputText, InputSecret, InputMultiline, InputNumber, InputDate}, in.Kind) {
 			c.bad(p+".kind", "unknown kind %q", in.Kind)
 		}
+		c.dateInput(p, in)
 		if in.Kind == InputMultiline {
 			if in.Rows != 0 && (in.Rows < MinInputRows || in.Rows > MaxInputRows) {
 				c.bad(p+".rows", "%d, want %d to %d", in.Rows, MinInputRows, MaxInputRows)

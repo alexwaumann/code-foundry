@@ -3,6 +3,8 @@ import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { parseAnsi } from "../ansi";
+import { AnsiText } from "../AnsiText";
 import { logLines } from "../log";
 import { CopyIconButton } from "../parts";
 import type { NodeProps } from "../registry";
@@ -19,7 +21,8 @@ const MIN_ROWS = 4;
  * A monospace tail the plugin streams (view/append): per-line tone, wrapped with a hanging
  * indent or scrolling sideways inside its box, `rows` lines tall. It follows the end while
  * the user is at the bottom; scrolling up stops that and shows "Jump to end". Copy copies
- * the whole buffer; selection survives appends. Alone in a sized pane shorter than that
+ * the whole buffer; selection survives appends. With `ansi` the text's SGR colours show in
+ * the theme's terminal palette and other escapes are dropped (ansi.ts). Alone in a sized pane shorter than that
  * (PaneNode), it shrinks to the pane, down to MIN_ROWS lines, rather than the pane
  * scrolling and hiding its newest lines; anywhere else nothing around it is that short.
  */
@@ -34,7 +37,9 @@ export function LogNode({ data }: NodeProps<"log">) {
     const el = box.current;
     if (el && follow && atEnd) el.scrollTop = el.scrollHeight;
   }, [lines, follow, atEnd]);
-  const text = useMemo(() => lines.map((l) => l.text).join("\n"), [lines]);
+  // With ansi, each line's SGR spans (the style carries across lines); Copy copies the text without escapes.
+  const ansi = useMemo(() => (data.ansi ? parseAnsi(lines.map((l) => l.text)) : null), [lines, data.ansi]);
+  const text = useMemo(() => (ansi ?? lines).map((l) => l.text).join("\n"), [ansi, lines]);
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-1" data-testid="plugin-log">
       {(data.title || lines.length > 0) && (
@@ -63,7 +68,7 @@ export function LogNode({ data }: NodeProps<"log">) {
           {data.truncated && <div className="text-cf-text-muted italic">earlier output not shown</div>}
           {lines.map((l, i) => (
             <div key={i} className={cn(data.wrap && "pl-[2ch] -indent-[2ch] break-words whitespace-pre-wrap", toneText[l.tone ?? ""])} data-tone={l.tone || undefined}>
-              {l.text || " "}
+              {ansi?.[i] ? <AnsiText line={ansi[i]} /> : l.text || " "}
             </div>
           ))}
         </div>

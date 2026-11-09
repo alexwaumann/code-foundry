@@ -215,6 +215,10 @@ func (d *demo) formNodes() []ui.Node {
 	env.Select.Options[1].Description = ui.Plain("Careful: real users.")
 	tags := ui.SelectField("f-tags", "tags", "Tags", ui.Opt("o-a", "a", "Alpha"), ui.Opt("o-b", "b", "Beta"), ui.Opt("o-c", "c", "Gamma"))
 	tags.Select.Multiple, tags.Select.Value = true, []string{"a"}
+	due := ui.DateField("f-due", "due", "Due").WithPlaceholder("No due date").WithHint("Picked from a calendar; the value is an ISO date.")
+	if v, ok := d.saved["due"].(string); ok {
+		due.Input.Value = v
+	}
 	notify := ui.NewFieldset("f-notify", "Notify me",
 		ui.ToggleField("f-notify-fail", "notifyFail", "When a build fails", true),
 		ui.ToggleField("f-notify-done", "notifyDone", "When a build finishes", false),
@@ -222,7 +226,7 @@ func (d *demo) formNodes() []ui.Node {
 	notify.Fieldset.Hint = ui.Plain("A fieldset groups related inputs.")
 	submit := ui.EventButton("f-save", "Save", "save").WithStyle(ui.ButtonAttention)
 	reviewers := reviewersField(stringsOf(d.saved["reviewers"]), d.peopleQuery)
-	form := ui.NewForm("settings", &submit, name, token, project, env, tags, reviewers, notify)
+	form := ui.NewForm("settings", &submit, name, token, project, due, env, tags, reviewers, notify)
 	form.Form.Secondary = []ui.Button{ui.EventButton("f-reset", "Reset", "reset")}
 	form.Form.ResetToken = fmt.Sprint(len(d.saved))
 	return []ui.Node{ui.NewText("form-intro", ui.Plain(saved)), form}
@@ -244,8 +248,19 @@ func (d *demo) logNodes() []ui.Node {
 		{Key: "lint-log", Log: &ui.Log{Title: "lint", Rows: 6, Lines: []ui.LogLine{
 			{Text: "checking 42 files"}, {Text: "warning: unused variable x", Tone: ui.ToneAttention}, {Text: "error: missing return", Tone: ui.ToneError},
 		}}},
+		{Key: "test-log", Log: &ui.Log{Title: "tests (ANSI)", Rows: 8, ANSI: true, Text: testLog}},
 	}
 }
+
+// testLog is console output with SGR colours and a cursor escape the host drops: the
+// coloured log (Log.ANSI).
+const testLog = "\x1b[2K\x1b[1G\x1b[36m[INFO]\x1b[0m Running integration shards\n" +
+	"\x1b[32m✓\x1b[0m api/auth        \x1b[1m142 passed\x1b[22m\n" +
+	"\x1b[31m✗ store/project\x1b[0m  \x1b[1;31mTestCleanupKeepsDirty\x1b[0m\n" +
+	"\x1b[2m    project_test.go:212: worktree removed while dirty\x1b[0m\n" +
+	"\x1b[33;1mWARN\x1b[0m \x1b[3mslow test\x1b[23m: \x1b[4mTestSync\x1b[24m took 9.2s\n" +
+	"\x1b[38;5;208m256-colour orange\x1b[0m, \x1b[38;2;80;120;255mtruecolor blue\x1b[0m, \x1b[97;41m bright on red \x1b[0m\n" +
+	"\x1b[90m1 failed, 1 passed in 41.3s\x1b[0m\n"
 
 // Act handles the demo's events.
 func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
