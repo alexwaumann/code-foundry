@@ -911,7 +911,7 @@ func (m *Manager) SurfaceElements(key string, version uint64) []SurfaceElement {
 		}
 		out = append(out, se)
 	}
-	return out
+	return append(out, idx.rowOpElements()...)
 }
 
 // surfLog writes one of the daemon's lines about a plugin's surfaces into its log.
