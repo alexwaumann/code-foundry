@@ -10,10 +10,14 @@
 //	Idle ──check finds newer──► Available ──Download──► Downloading ──ok──► Downloaded
 //	  ▲                            ▲                         │                  │
 //	  └──check finds nothing───────┘                       error      Install (app.restart)
-//	                                                         ▼                  │
-//	                                  (Download retries)   Failed ◄───error─────┤
+//	                               ▲                         ▼                  │
+//	                               └─check finds newer──   Failed ◄───error─────┤
 //	                                                                            ▼ ok
 //	                                             RestartRequired ◄──Relaunch── Installed
+//
+// Download checks first and downloads whatever is newest then, and a failed download
+// checks again at once: a release offered earlier may have been deleted (tip releases
+// beyond the newest five are), and retrying it would fail the same way every time.
 //
 // Download only stages the release beside the app directory (<app>.new); the install on
 // disk does not change, so a window closed and reopened meanwhile still finds the
@@ -393,6 +397,8 @@ func (s *Store) Check(ctx context.Context) (Status, error) {
 		// The channel changed while checking: drop the old channel's answer; the
 		// re-check SetChannel queued follows.
 		err = nil
+	case err != nil && ctx.Err() != nil:
+		// The caller gave up (or the daemon is stopping): not a failed check.
 	case err != nil:
 		st.LastCheckedAt = now
 		st.LastCheckError = err.Error()
@@ -500,9 +506,32 @@ func decide(state State, target, current, onDisk, staged, latest string) (State,
 	}
 }
 
-// Download starts downloading and staging the available version and returns at once.
-// Allowed from Available and Failed (a retry).
-func (s *Store) Download(context.Context) (Status, error) {
+// Download checks for the latest release, then starts downloading and staging the
+// version it offers and returns at once. Allowed from Available and Failed (a retry).
+// The check comes first because the release an earlier check saw may be gone: tip
+// releases beyond the newest five are deleted, so retrying the old version would fail
+// the same way every time while a newer one is out. A failed check does not stop the
+// download; it uses the version already offered.
+func (s *Store) Download(ctx context.Context) (Status, error) {
+	if !s.Snapshot().Enabled {
+		return s.Snapshot(), fmt.Errorf("%w: %s", ErrDisabled, s.opts.DisabledReason)
+	}
+	// A channel switched during the check makes it drop its answer: check again for the
+	// new channel rather than download the old channel's release.
+	for range 2 {
+		ch := s.Snapshot().Channel
+		if _, err := s.Check(ctx); err != nil && ctx.Err() == nil {
+			s.log.Warn("update check before download failed; downloading the version offered", "err", err)
+		}
+		if s.Snapshot().Channel == ch {
+			break
+		}
+	}
+	// The caller gave up while the check ran (Ctrl-C in `code-foundry update`): start
+	// nothing it is not waiting for.
+	if err := ctx.Err(); err != nil {
+		return s.Snapshot(), err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	st := &s.status
@@ -544,7 +573,6 @@ func (s *Store) runDownload(target string) {
 		}
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err != nil {
 		s.log.Warn("update download failed", "version", target, "err", err)
 		s.moveTo(Failed, target)
@@ -554,6 +582,16 @@ func (s *Store) runDownload(target string) {
 		s.moveTo(Downloaded, target)
 	}
 	s.publishLocked()
+	s.mu.Unlock()
+	if err == nil {
+		return
+	}
+	// The release may have been deleted since it was offered (a pruned tip): check at
+	// once, so a newer release replaces the failure instead of waiting for the next
+	// scheduled check. The failure stays when the same version is still the latest.
+	if _, cerr := s.Check(s.ctx); cerr != nil && s.ctx.Err() == nil {
+		s.log.Warn("update check after a failed download failed", "err", cerr)
+	}
 }
 
 // Install swaps the downloaded version into the app directory and returns when done:
