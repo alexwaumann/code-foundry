@@ -238,6 +238,19 @@ func TestProgressIsPublished(t *testing.T) {
 	}
 }
 
+// waitSourceCalls waits until the source has answered n lookups and no check runs (a
+// failed download checks again in the background).
+func (r *rig) waitSourceCalls(t *testing.T, n int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for r.source.Calls() < n || r.store.Snapshot().Checking {
+		if time.Now().After(deadline) {
+			t.Fatalf("source calls %d, want %d; status %+v", r.source.Calls(), n, r.store.Snapshot())
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // downloaded checks for v0.2.0 and downloads it.
 func (r *rig) downloaded(t *testing.T) {
 	t.Helper()
@@ -274,6 +287,90 @@ func TestDownloadFailureAndRetry(t *testing.T) {
 	}
 	if st := r.waitState(t, update.Downloaded); st.FailureReason != "" {
 		t.Fatalf("retry %+v", st)
+	}
+}
+
+// TestDownloadChecksFirst: Download asks for the latest release before downloading, so
+// a version offered earlier and deleted since (a pruned tip) is not retried while a
+// newer one is out.
+func TestDownloadChecksFirst(t *testing.T) {
+	tests := []struct {
+		name string
+		// failFirst makes the first download fail, so Download is a retry from Failed.
+		failFirst bool
+		latest    string // what the source reports when Download runs
+		checkErr  error
+		want      string // the version downloaded; "" when Download refuses
+	}{
+		{name: "newer since the offer", latest: "v0.3.0", want: "v0.3.0"},
+		{name: "retry after a failure downloads the newer", failFirst: true, latest: "v0.3.0", want: "v0.3.0"},
+		{name: "retry of the same version", failFirst: true, latest: "v0.2.0", want: "v0.2.0"},
+		{name: "check fails: downloads the offered version", latest: "v0.3.0", checkErr: errors.New("gh: network down"), want: "v0.2.0"},
+		{name: "offered release gone, nothing newer", latest: "v0.1.0", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newRig(t, "v0.2.0", nil)
+			ctx := context.Background()
+			if _, err := r.store.Check(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if tt.failFirst {
+				r.installer.DownloadErr = errors.New("installer: exit status 1: download failed")
+				calls := r.source.Calls()
+				if _, err := r.store.Download(ctx); err != nil {
+					t.Fatal(err)
+				}
+				r.waitState(t, update.Failed)
+				r.waitSourceCalls(t, calls+2) // the check before and the one after
+				r.installer.DownloadErr = nil
+			}
+			r.source.Set(tt.latest, tt.checkErr)
+			st, err := r.store.Download(ctx)
+			if tt.want == "" {
+				if !errors.Is(err, update.ErrNotAvailable) || st.State != update.Idle {
+					t.Fatalf("Download = %+v, %v; want ErrNotAvailable from Idle", st, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st := r.waitState(t, update.Downloaded); st.Target != tt.want {
+				t.Fatalf("downloaded %s, want %s", st.Target, tt.want)
+			}
+			calls := r.installer.Calls()
+			if got := calls[len(calls)-1]; got != tt.want {
+				t.Fatalf("installer downloaded %s, want %s (calls %v)", got, tt.want, calls)
+			}
+		})
+	}
+}
+
+// TestFailedDownloadChecksAgain: a download that fails checks for the latest release at
+// once, so a newer one replaces the failure without waiting for the next scheduled check.
+func TestFailedDownloadChecksAgain(t *testing.T) {
+	r := newRig(t, "v0.2.0", nil)
+	ctx := context.Background()
+	if _, err := r.store.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.installer.Hold = true
+	r.installer.DownloadErr = errors.New("installer: exit status 1: release not found")
+	if _, err := r.store.Download(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// v0.2.0 is deleted and v0.3.0 published while it downloads.
+	r.source.Set("v0.3.0", nil)
+	calls := r.source.Calls()
+	r.installer.Release()
+	r.waitState(t, update.Failed)
+	st := r.waitState(t, update.Available)
+	if st.Target != "v0.3.0" || st.FailureReason != "" {
+		t.Fatalf("after the failure %+v", st)
+	}
+	if got := r.source.Calls(); got != calls+1 {
+		t.Fatalf("source calls after the failure = %d, want %d", got, calls+1)
 	}
 }
 

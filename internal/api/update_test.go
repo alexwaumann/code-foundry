@@ -74,10 +74,8 @@ func TestUpdateServiceFlow(t *testing.T) {
 		t.Fatalf("snapshot %v", st)
 	}
 
-	// Before a check: nothing to download or install.
-	if _, err := f.update.Download(ctx, connect.NewRequest(&v1.DownloadUpdateRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("Download err = %v", err)
-	}
+	// Before a download: nothing to install. (Download checks first, so it is not refused
+	// before a check; the store tests cover it.)
 	if _, err := f.update.Install(ctx, connect.NewRequest(&v1.InstallUpdateRequest{})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("Install err = %v", err)
 	}
