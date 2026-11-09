@@ -18,6 +18,12 @@ import (
 // both act on a click and be checked, moved and renamed. An act names one with its key
 // and its kind as the action (the GUI always sends both).
 
+// The host renders them: plugins may ask before using them (initialize's capabilities).
+func init() { hostCapabilities = append(hostCapabilities, ListRowsCapability) }
+
+// ListRowsCapability is the capability of a list's interactive rows.
+const ListRowsCapability = "view.list.rows"
+
 // rowOpKinds are the kinds of a list's row acts.
 var rowOpKinds = []string{pluginsdk.ActCheck, pluginsdk.ActMove, pluginsdk.ActAdd, pluginsdk.ActEdit}
 

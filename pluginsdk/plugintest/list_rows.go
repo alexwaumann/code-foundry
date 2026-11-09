@@ -18,6 +18,9 @@ import (
 // the host refuses it, when the view's list does not have it or the value is one the host
 // does not send.
 
+// The real host announces them (internal/store/plugin's list_rows.go).
+func init() { HostCapabilities = append(HostCapabilities, "view.list.rows") }
+
 // Check ticks (on) or unticks the checkbox of row key (pluginsdk.ActCheck).
 func (h *Host) Check(ctx context.Context, instance, key string, on bool) error {
 	list, _, err := h.rowList(instance, key, pluginsdk.ActCheck)
