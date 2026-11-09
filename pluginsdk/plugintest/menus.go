@@ -64,6 +64,10 @@ func findMenuItem(v ui.View, key string) (it ui.MenuItem, disabled, found bool) 
 				rows(n.List.Rows)
 			case n.MasterDetail != nil:
 				rows(n.MasterDetail.List.Rows)
+			case n.Table != nil:
+				for _, r := range n.Table.AllRows() {
+					menus = append(menus, r.Menu)
+				}
 			case n.Actions != nil:
 				buttons(n.Actions.Buttons)
 			case n.Section != nil:

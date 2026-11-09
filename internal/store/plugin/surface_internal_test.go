@@ -128,7 +128,7 @@ func TestValidateViewRefuses(t *testing.T) {
 		{"not an object", `[1]`, nil, "must be a JSON object"},
 		{"not json", `{"nodes": [`, nil, "view:"},
 		{"too big", `{"nodes": [], "x": "` + strings.Repeat("a", maxRawView) + `"}`, nil, "at most"},
-		{"unknown node kind", `{"nodes": [{"key": "x", "table": {}}]}`, nil, "exactly one kind"},
+		{"unknown node kind", `{"nodes": [{"key": "x", "calendar": {}}]}`, nil, "exactly one kind"},
 		{"two kinds", `{"nodes": [{"key": "x", "text": {"content": "a"}, "markdown": {"source": "b"}}]}`, nil, "exactly one kind"},
 		{"missing key", `{"nodes": [{"text": {"content": "a"}}]}`, nil, "must match"},
 		{"duplicate key", mod(`"key": "m"`, `"key": "t"`), nil, "already used"},

@@ -45,6 +45,7 @@ Drive it like the host:
 | `h.PickDate(ctx, instance, key, "2026-11-14")` | a date field's `change` act as the host sends it on a pick ("" is Clear): the field's event, `Field`, `Value` the day, `Values` its form's; refuses a field without a change event, a non-ISO day or one outside min..max (for a submit, put the day in `Values`) |
 | `h.PickItem(ctx, instance, key)` | picks a menu item (a row's, the header's or a button's, in a submenu too) from the latest view as the GUI does: a `click` with its event and data; refuses a disabled item, a submenu, and a command, URL or copy item (the host's) |
 | `h.Check(ctx, inst, row, true)`, `h.Move(ctx, inst, row, after)`, `h.AddRow(ctx, inst, list, text)`, `h.EditRow(ctx, inst, row, text)` | a list's interactive rows, shaped from the latest view as the host does; refused when the list or row lacks it or the value is one the host never sends |
+| `h.Sort(ctx, inst, column, dir)`, `h.TableRows(inst, table)` | a table header's `sort` act as the host sends it (`dir` "" asks for what a click would: the sorted column's other direction, else its first); the table's row keys in the latest view, in order |
 | `h.Visibility(instance, false)`, `h.CloseSurface(instance)`, `h.CloseSurfaceFor(instance, pluginsdk.CloseContextGone)` | visibility and close notifications (`CloseSurface` says `idle`) |
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |

@@ -172,6 +172,7 @@ the active tab's like `nodes`: `reference/ui-layout.md`.
 | Explanatory copy | `markdown` | `nodes.md` |
 | Facts about one thing | `pairs` | `nodes.md` |
 | A list of things | `list` | `nodes.md` |
+| Rows of the same few facts, compared down columns; sortable, grouped | `table` | `nodes.md` |
 | A row's or the view's less frequent actions | a menu (`menu` on a row, the header, a button) | `nodes.md` |
 | Stages or steps | `chips` | `nodes.md` |
 | Streaming output | `log` | `nodes.md` |
@@ -204,8 +205,9 @@ A node sits inside at most 4 containers: `section` and the layout containers (`u
 | `move` | a `reorderable` list's row was dragged | `Key` the row's, `act.After()` the row now right above it ("" = first; in a filtered list place it after that row), `Node` the list's |
 | `add` | a list's `add` input was entered | `Key` and `Node` the list's, `act.Text()` the trimmed one-line text (200 characters) |
 | `edit` | an `editable` row was renamed | `Key` the row's, `act.Text()` the new title, `Node` the list's |
+| `sort` | a table's sortable header was clicked | `Key` the column's, `act.Descending()` the direction asked for, `Node` the table's |
 
-For the last six, `Action` is the kind. **Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
+For the last seven, `Action` is the kind. **Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
 `select` (it arrives as `kind: click, action: select`), so `switch act.Action` alone
 mistakes it for a master-detail choice. `switch act.Kind { case pluginsdk.ActSelect: …;
 case pluginsdk.ActTab: …; case pluginsdk.ActClick: switch act.Action { … } }`.

@@ -258,3 +258,42 @@ progress use `progress`; for a run of results over time, bars.
 
 Check `h.HasCapability("view.node.stats")` / `"view.node.bars"` before sending them: an
 older host refuses the view. Neither goes in a toolbar, footer or group.
+
+## table
+
+```go
+cols := []ui.TableColumn{
+	ui.TableCol("b-num", "#").WithWidth(72).WithPriority(9).AsSortable(ui.SortDesc),
+	ui.TableCol("b-branch", "Branch").WithWeight(2, 84).WithStyle(ui.CellMono).WithPriority(6).AsSortable(ui.SortAsc),
+	ui.TableCol("b-cause", "Cause").WithWeight(3, 140).WithPriority(1),
+	ui.TableCol("b-dur", "Duration").WithWidth(80).AlignEnd().WithStyle(ui.CellMono).WithPriority(7),
+}
+rows := []ui.TableRow{ui.NewTableRow("b-1288", map[string]ui.Cell{ // cells by column key
+	"b-num":    ui.StatusCell(ui.StatusRunning, "#1288"),
+	"b-branch": ui.TextCell("main"),
+	"b-dur":    ui.InlineCell(ui.Spans(ui.For(130 * time.Second))),
+}).WithAction(ui.EventAction("open-build", "1288")).WithMenu(buildMenu("1288"))}
+t := ui.NewTable("builds", cols, rows...)
+t.Table.Title, t.Table.Count = "Builds", &total // "Builds (1288)"
+t.Table.Sort = &ui.TableSort{Column: "b-num", Dir: ui.SortDesc}
+```
+
+Rows of short facts compared down columns, drawn like the app's Pull Requests tables: 1 to
+10 columns, 300 rows. Column keys share the view's keys (prefix them) and name each row's
+`cells`; a cell is an Inline (spans, times, durations, links) with an optional `Glyph`
+before it and `Pill` after it (`PillCell` alone). A column is `WithWidth(px)` (16..480) or
+`WithWeight(w, minPx)` (the free width, never under minPx, 80 by default); `AlignEnd` for
+numbers; `Style` `CellMuted`, `CellMono`, `CellCaption`; `label` may be "" (an icon column).
+**Narrow** (always the side panel), columns drop instead of squeezing: the lowest
+`priority` first, among equals the rightmost; the highest never drops. Rank the column that
+names the row highest and give the side panel 3 or 4 columns that fit (about 310 px).
+Rows take a row `action`, `menu` (⋯ and right-click, as a list row's), `selected` and up to 3
+buttons, which fold into the ⋯ before any column drops. A cut cell shows whole in its
+tooltip. **Sorting is yours**: a `Sortable` header's click sends a `sort` act (`Key` the
+column, `Node` the table, `act.Descending()`); send the rows in that order with `Sort` set,
+and the host draws the arrow. `NewGroupedTable(key, cols, ui.NewTableGroup("g-done", "Done",
+rows...).WithCount(14).AsCollapsed())` puts rows under collapsible labels (the user's toggle
+wins; send a collapsed group's rows too). `Dense` draws 24 px rows; `EmptyText` shows
+without rows. A list reads as sentences (a title over a second line); a table when every
+row has the same few facts. Check `h.HasCapability("view.node.table")`; not in a toolbar,
+footer or group.

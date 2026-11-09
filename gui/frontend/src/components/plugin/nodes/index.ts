@@ -21,6 +21,7 @@ import { ProgressNode } from "./ProgressNode";
 import { SectionNode } from "./SectionNode";
 import { SpacerNode } from "./SpacerNode";
 import { StatsNode } from "./StatsNode";
+import { TableNode } from "./TableNode";
 import { TabsNode } from "./TabsNode";
 import { TerminalNode } from "./TerminalNode";
 import { TextNode } from "./TextNode";
@@ -52,4 +53,5 @@ export const renderers: NodeRenderers = {
   tabs: TabsNode,
   stats: StatsNode,
   bars: BarsNode,
+  table: TableNode,
 };

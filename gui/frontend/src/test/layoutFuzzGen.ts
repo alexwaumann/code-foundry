@@ -30,7 +30,7 @@ export const FUZZ_THREADS = ["s-f1", "s-f2", "s-f3", "s-f4"] as const;
 export const FUZZ_TERMINALS = ["t-f1", "t-f2"] as const;
 
 const CONTAINERS = ["section", "columns", "pane", "grid", "container", "masterDetail", "tabs"] as const;
-const LEAVES = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "form", "thread", "terminal", "divider", "spacer", "group", "stats", "bars"] as const;
+const LEAVES = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "form", "thread", "terminal", "divider", "spacer", "group", "stats", "bars", "table"] as const;
 const GROUP_KINDS = ["text", "chips", "actions", "progress"] as const;
 const STRIP_KINDS = ["text", "chips", "actions", "progress", "form", "divider", "spacer", "group"] as const;
 export const MAX_DEPTH = 4;
@@ -167,6 +167,39 @@ export class Gen {
             ...(this.chance(0.5) ? { reference: { value: 150, label: "median 2m 30s" }, startLabel: "#1", endLabel: "#30" } : {}),
           },
         };
+      case "table": {
+        const cols = Array.from({ length: this.int(1, 10) }, (_, i) => ({
+          key: this.key("tc"),
+          label: this.chance(0.1) ? "" : this.pick(["#", "Branch", "A rather long column label"]),
+          ...(this.chance(0.4) ? { width: this.pick([16, 72, 480]) } : { weight: this.int(1, 6), ...(this.chance(0.3) ? { minWidth: this.pick([16, 120, 480]) } : {}) }),
+          ...(this.chance(0.4) ? { priority: this.int(0, 9) } : {}),
+          ...(this.chance(0.3) ? { align: "end" as const } : {}),
+          ...(this.chance(0.3) ? { style: this.pick(["muted", "mono", "caption"] as const) } : {}),
+          ...(i === 0 || this.chance(0.3) ? { sortable: true } : {}),
+        }));
+        const rows = (n: number) =>
+          Array.from({ length: n }, () => ({
+            key: this.key("tr"),
+            cells: Object.fromEntries(cols.filter(() => this.chance(0.8)).map((c) => [c.key, this.chance(0.3) ? { value: "Build 1288", glyph: { status: "running" as const }, pill: { label: "running" } } : "x".repeat(this.int(1, 60))])),
+            ...(this.chance(0.3) ? { action: { event: "open" } } : {}),
+            ...(this.chance(0.2) ? { actions: [this.button()] } : {}),
+            ...(this.chance(0.2) ? { menu: { items: [{ key: this.key("tm"), label: "Open", action: { event: "open" } }] } } : {}),
+          }));
+        const grouped = this.chance(0.3);
+        return {
+          key,
+          table: {
+            columns: cols,
+            ...(grouped
+              ? { groups: Array.from({ length: this.int(1, 3) }, () => ({ key: this.key("tg"), label: "Group", rows: rows(this.int(0, 4)), ...(this.chance(0.4) ? { collapsed: true } : {}) })) }
+              : { rows: rows(this.chance(0.1) ? 60 : this.int(0, 6)) }),
+            ...(this.chance(0.4) ? { sort: { column: cols[0]?.key ?? "", dir: this.pick(["asc", "desc"] as const) } } : {}),
+            ...(this.chance(0.3) ? { title: "Builds", count: 1288 } : {}),
+            ...(this.chance(0.3) ? { dense: true } : {}),
+            ...(this.chance(0.3) ? { emptyText: "No builds" } : {}),
+          },
+        };
+      }
       case "group":
         return {
           key,

@@ -134,7 +134,7 @@ const menuSeed = `{"header":{"title":"Jira","menu":{"items":[{"key":"h-refresh",
 type viewSeed struct{ view, corrupt []byte }
 
 // viewSeeds are FuzzView's seeds: the hello demo's captured views, the walkthrough, a log,
-// a thread, and the layout, grid, master-detail, charts, picker and menu seeds.
+// a thread, and the layout, grid, master-detail, charts, picker, menu and table seeds.
 func viewSeeds() []viewSeed {
 	var out []viewSeed
 	files, _ := filepath.Glob(filepath.FromSlash("../../internal/store/plugin/testdata/hello-demo/*.json"))
@@ -154,6 +154,7 @@ func viewSeeds() []viewSeed {
 		viewSeed{[]byte(chartsSeed), []byte{0, 0, 1, 0, 0, 3}},
 		viewSeed{[]byte(pickerSeed), []byte{0, 0, 1, 0, 2}},
 		viewSeed{[]byte(menuSeed), []byte{0, 0, 0, 1}},
+		viewSeed{[]byte(tableSeed), []byte{0, 0, 1, 0, 0, 2}},
 	)
 }
 

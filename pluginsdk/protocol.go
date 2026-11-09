@@ -443,21 +443,24 @@ type SurfaceAct struct {
 	Context UiContext `json:"context"`
 	// Version is the view version the user acted on (it may be older than the latest).
 	Version uint64 `json:"version"`
-	// Kind is ActClick, ActSubmit, ActChange, ActTab, ActSelect or ActSearch, or a list row's
-	// ActCheck, ActMove, ActAdd or ActEdit (list_acts.go).
+	// Kind is ActClick, ActSubmit, ActChange, ActTab, ActSelect or ActSearch, a list row's
+	// ActCheck, ActMove, ActAdd or ActEdit (list_acts.go), or a table's ActSort
+	// (table_acts.go).
 	Kind string `json:"kind"`
 	// Action is the element's event name ("tab" for a tab, "select" for a select, the
-	// kind's name for a list row's act).
+	// kind's name for a list row's act or a sort).
 	Action string `json:"action"`
-	// Node is the tabs node a tab act is on, the master-detail a select is on, or the list
-	// a list row's act is on; "" for the view's own tabs and every other act.
+	// Node is the tabs node a tab act is on, the master-detail a select is on, the list a
+	// list row's act is on, or the table a sort is on; "" for the view's own tabs and every
+	// other act.
 	Node string `json:"node,omitempty"`
 	// Key is the element's key; Data the event's data, as the view declared it.
 	Key  string `json:"key,omitempty"`
 	Data string `json:"data,omitempty"`
 	// Field is the name of the field a change or a search is about.
 	Field string `json:"field,omitempty"`
-	// Value is a change's new value, a tab's key, a selected row's key or a search's query.
+	// Value is a change's new value, a tab's key, a selected row's key, a search's query or
+	// a sort's direction.
 	Value any `json:"value,omitempty"`
 	// Values are the enclosing form's fields by name (strings, booleans, string lists);
 	// a secret input with store arrives as StoredSecret, and a secret never arrives in a

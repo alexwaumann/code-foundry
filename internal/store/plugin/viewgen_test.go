@@ -43,7 +43,7 @@ func newViewGen(seed uint64) *viewGen {
 // genKinds are the node kinds the generator picks from (its JSON names).
 var genKinds = []string{"text", "markdown", "pairs", "list", "chips", "log", "actions", "progress",
 	"notice", "empty", "section", "form", "thread", "terminal", "columns", "pane", "grid",
-	"divider", "spacer", "group", "container", "masterDetail", "tabs"}
+	"divider", "spacer", "group", "container", "masterDetail", "tabs", "stats", "bars", "table"}
 
 // genContainers hold nodes (group too: it is no level, but it nests).
 var genContainers = map[string]bool{"section": true, "columns": true, "pane": true, "grid": true,
@@ -227,6 +227,112 @@ func (g *viewGen) row() ui.Row {
 	return r
 }
 
+// table returns a table: columns with every width, priority, style and sort option, rows
+// or groups whose cells are of its columns (glyphs, pills, spans), and a sort; broken, a
+// width with a weight, a cell of no column, rows and groups, a sort of no column.
+func (g *viewGen) table() *ui.Table {
+	t := &ui.Table{Dense: g.chance(0.3)}
+	var sortable []string
+	for range g.count(1, ui.MaxTableColumns) {
+		c := ui.TableColumn{Key: g.key(), Label: g.pick("#", "Branch", "", "Duration")}
+		switch g.r.IntN(3) {
+		case 0:
+			c.Width = g.num(ui.MinTableColumnWidth, ui.MaxTableColumnWidth, false)
+		case 1:
+			c.Weight = g.num(1, ui.MaxColumnWeight, true)
+			if g.chance(0.3) {
+				c.MinWidth = g.num(ui.MinTableColumnWidth, ui.MaxTableColumnWidth, true)
+			}
+		}
+		if g.chance(0.4) {
+			c.Priority = g.num(0, ui.MaxColumnPriority, true)
+		}
+		if g.chance(0.3) {
+			c.Align = ui.AlignEnd
+		}
+		if g.chance(0.3) {
+			c.Style = ui.CellStyle(g.pick("muted", "mono", "caption"))
+		}
+		if g.chance(0.4) {
+			c.Sortable = true
+			sortable = append(sortable, c.Key)
+			if g.chance(0.5) {
+				c.SortFirst = ui.SortDesc
+			}
+		}
+		if g.bad() {
+			c.Width, c.Weight = 40, 2
+		}
+		t.Columns = append(t.Columns, c)
+	}
+	row := func() ui.TableRow {
+		r := ui.TableRow{Key: g.key(), Cells: map[string]ui.Cell{}}
+		for _, c := range t.Columns {
+			if !g.chance(0.7) {
+				continue
+			}
+			cell := ui.Cell{Value: ui.Plain(g.label())}
+			switch g.r.IntN(5) {
+			case 0:
+				cell.Glyph = &ui.Glyph{Status: ui.StatusFailed}
+			case 1:
+				cell = ui.Cell{Pill: &ui.Pill{Label: "failed", Tone: ui.ToneError}}
+			case 2:
+				cell.Value = ui.Spans(ui.T("p90 ").AsMono(), ui.Span{Duration: &ui.Duration{Ms: 252000}})
+			}
+			r.Cells[c.Key] = cell
+		}
+		if g.bad() {
+			r.Cells["not-a-column"] = ui.Cell{Value: ui.Plain("x")}
+		}
+		if g.chance(0.3) {
+			r.Action = g.action()
+		}
+		if g.chance(0.15) {
+			r.Actions = g.buttons(ui.MaxRowButtons)
+		}
+		if g.chance(0.2) {
+			r.Menu = g.menu()
+		}
+		r.Selected = g.chance(0.1)
+		return r
+	}
+	rows := func() []ui.TableRow {
+		var out []ui.TableRow
+		for range g.count(0, 5) {
+			out = append(out, row())
+		}
+		return out
+	}
+	if g.chance(0.4) || g.bad() {
+		for range g.count(1, 3) {
+			gr := ui.TableGroup{Key: g.key(), Label: g.label(), Rows: rows(), Collapsed: g.chance(0.3)}
+			if g.chance(0.3) {
+				n := g.num(0, 2000, true)
+				gr.Count = &n
+			}
+			t.Groups = append(t.Groups, gr)
+		}
+	}
+	if len(t.Groups) == 0 || g.bad() {
+		t.Rows = rows()
+	}
+	switch {
+	case g.bad():
+		t.Sort = &ui.TableSort{Column: "not-a-column", Dir: "up"}
+	case len(sortable) > 0 && g.chance(0.6):
+		t.Sort = &ui.TableSort{Column: sortable[g.r.IntN(len(sortable))], Dir: ui.SortDir(g.pick("asc", "desc"))}
+	}
+	if g.chance(0.3) {
+		n := g.num(0, 2000, true)
+		t.Title, t.Count = "Builds", &n
+	}
+	if g.chance(0.2) {
+		t.EmptyText = "No builds"
+	}
+	return t
+}
+
 func (g *viewGen) list() ui.List {
 	n := g.count(0, 5)
 	if g.bad() && g.chance(0.1) {
@@ -321,6 +427,9 @@ func (g *viewGen) field(inStrip bool, depth int) ui.Field {
 		f.Input = &ui.Input{}
 	default:
 		f.Input = &ui.Input{Placeholder: "p"}
+		if g.chance(0.2) {
+			f.Input = &ui.Input{Kind: ui.InputDate, Value: "2026-11-14", Min: "2026-11-01"}
+		}
 	}
 	if g.chance(0.1) {
 		f.Change = &ui.Action{Event: "changed"}
@@ -417,7 +526,7 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		}
 	case "log":
 		g.logs++
-		n.Log = &ui.Log{Text: "line\n"}
+		n.Log = &ui.Log{Text: "line\n", ANSI: g.chance(0.3)}
 	case "actions":
 		n.Actions = &ui.Actions{Buttons: g.buttons(ui.MaxBarButtons)}
 		if bs := n.Actions.Buttons; len(bs) > 0 && g.chance(0.3) {
@@ -564,6 +673,41 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		n.MasterDetail = md
 	case "tabs":
 		n.Tabs = &ui.TabsNode{Tabs: g.tabs(ui.MinNodeTabs), Children: g.kids(depth, 3)}
+	case "stats":
+		n.Stats = &ui.Stats{}
+		for range g.count(ui.MinStatCards, ui.MaxStatCards) {
+			c := ui.StatCard{Key: g.key(), Label: "L", Value: "4m 12s"}
+			if g.chance(0.4) {
+				c.Action = g.action()
+				c.Pressed = g.chance(0.5)
+			}
+			if g.bad() {
+				c.Pressed, c.Action = true, nil
+			}
+			n.Stats.Cards = append(n.Stats.Cards, c)
+		}
+	case "bars":
+		n.Bars = &ui.Bars{Title: "t"}
+		for range g.count(0, 4) {
+			b := ui.Bar{Key: g.key(), Title: "b", Value: g.r.Float64() * 100}
+			switch {
+			case g.bad():
+				b.Value = []float64{-1, math.NaN(), math.Inf(1)}[g.r.IntN(3)]
+			case g.chance(0.3):
+				b.Status = ui.StatusFailed
+			case g.chance(0.3):
+				b.Series = g.num(1, ui.MaxBarSeries, true)
+			}
+			if g.chance(0.3) {
+				b.Action = g.action()
+			}
+			n.Bars.Bars = append(n.Bars.Bars, b)
+		}
+		if g.chance(0.3) {
+			n.Bars.Reference = &ui.BarsReference{Value: 50, Label: "median"}
+		}
+	case "table":
+		n.Table = g.table()
 	}
 	if g.bad() && g.chance(0.1) { // a second kind
 		n.Markdown = &ui.Markdown{Source: "two"}

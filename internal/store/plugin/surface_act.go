@@ -40,7 +40,7 @@ var surfaceCapabilities = []string{
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
 	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.node.stats", "view.node.bars", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
 	"view.hint", "view.input.multiline", "view.input.number", "view.input.live", "view.select.search",
-	"view.input.date", "view.log.ansi", "view.menu",
+	"view.input.date", "view.log.ansi", "view.menu", "view.node.table",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -271,6 +271,15 @@ func fillLists(v *ui.View) {
 			n.Stats.Cards = []ui.StatCard{}
 		case n.Bars != nil && n.Bars.Bars == nil:
 			n.Bars.Bars = []ui.Bar{}
+		case n.Table != nil:
+			if n.Table.Columns == nil {
+				n.Table.Columns = []ui.TableColumn{}
+			}
+			for i := range n.Table.Groups {
+				if n.Table.Groups[i].Rows == nil {
+					n.Table.Groups[i].Rows = []ui.TableRow{}
+				}
+			}
 		case n.Tabs != nil:
 			if n.Tabs.Items == nil {
 				n.Tabs.Items = []ui.Tab{}
@@ -305,7 +314,8 @@ type element struct {
 	form             string     // the enclosing form's key
 	action           *ui.Action // nil for a tab or a select
 	field            string     // a change's field name
-	node             string     // a node tab's tabs node, a select's master-detail
+	node             string     // a node tab's tabs node, a select's master-detail, a sort's table
+	sort             string     // a sort's direction when the act names none (surface_table.go)
 }
 
 func (e element) actionName() string {
@@ -316,6 +326,8 @@ func (e element) actionName() string {
 		return "select"
 	case isRowOp(e.kind):
 		return e.kind
+	case e.kind == pluginsdk.ActSort:
+		return "sort"
 	case e.action == nil:
 		return ""
 	case e.action.Event != "":
@@ -476,6 +488,17 @@ func buildIndex(v *ui.View) *actionIndex {
 					add(element{key: b.Key, kind: kindOf(b.Action, pluginsdk.ActClick), label: b.Title, action: b.Action})
 				}
 			}
+		case n.Table != nil:
+			for _, el := range sortElements(n) { // surface_table.go
+				add(el)
+			}
+			for _, r := range n.Table.AllRows() {
+				if r.Action != nil {
+					add(element{key: r.Key, kind: kindOf(r.Action, pluginsdk.ActClick), label: tableRowLabel(n.Table, r), action: r.Action})
+				}
+				buttons(r.Actions, "")
+				menu(r.Menu)
+			}
 		case n.Actions != nil:
 			buttons(n.Actions.Buttons, "")
 		case n.Notice != nil:
@@ -575,6 +598,12 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		if act.Value, err = idx.rowOpValue(el, req.Value); err != nil {
 			return 0, err
 		}
+	case pluginsdk.ActSort:
+		dir, err := sortValue(el, req.Value) // surface_table.go
+		if err != nil {
+			return 0, err
+		}
+		act.Value = dir
 	default:
 		return 0, fmt.Errorf("%w: %s is a %s action: the host runs it, not the plugin", ErrInvalidArgument, el.key, el.kind)
 	}
@@ -588,9 +617,9 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		}
 		req.Value = &q
 	}
-	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect || isRowOp(el.kind) {
-		// The host sets a tab's or select's value (its key), and a row act's from the
-		// client's (checked above); they carry no form's values (the GUI sends none): a
+	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect || isRowOp(el.kind) || el.kind == pluginsdk.ActSort {
+		// The host sets a tab's or select's value (its key), and a row act's or a sort's from
+		// the client's (checked above); they carry no form's values (the GUI sends none): a
 		// client's are dropped.
 		req.Value, req.Values = nil, nil
 	}
@@ -692,7 +721,7 @@ func (idx *actionIndex) find(key, action string) (element, error) {
 	}
 	var found []element
 	for _, k := range idx.order {
-		if el := idx.elements[k]; el.actionName() == action && el.kind != pluginsdk.ActTab && el.kind != pluginsdk.ActSelect {
+		if el := idx.elements[k]; el.actionName() == action && el.kind != pluginsdk.ActTab && el.kind != pluginsdk.ActSelect && el.kind != pluginsdk.ActSort {
 			found = append(found, el)
 		}
 	}

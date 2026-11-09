@@ -43,6 +43,7 @@ type panel struct {
 	mu   sync.Mutex
 	n    int
 	got  string
+	sort ui.TableSort // the table's (table_acts_test.go)
 }
 
 func (p *panel) view() ui.View {
@@ -61,16 +62,37 @@ func (p *panel) view() ui.View {
 		ui.NewMasterDetail("pmd", ui.List{Rows: []ui.Row{ui.NewRow("pr1", "Run 1"), ui.NewRow("pr2", "Run 2")}}, "pr1",
 			ui.NewTabsNode("ptabs", ui.NewTabs("pt1", ui.NewTab("pt1", "One"), ui.NewTab("pt2", "Two")))),
 		ui.NewForm("pick", nil, ui.PickerField("who", "who", "Who", "people").AsMultiple(), ui.TextField("note", "note", "Note")),
+		p.table(),
 	}}
+}
+
+// table is a table ptable sorted by p.sort: columns pt-num (sortable, descending first),
+// pt-name (sortable) and pt-age, rows ptr1 (an action) and ptr2.
+func (p *panel) table() ui.Node {
+	t := ui.NewTable("ptable", []ui.TableColumn{
+		ui.TableCol("pt-num", "#").AsSortable(ui.SortDesc), ui.TableCol("pt-name", "Name").AsSortable(ui.SortAsc), ui.TableCol("pt-age", "Age")},
+		ui.NewTableRow("ptr1", map[string]ui.Cell{"pt-num": ui.TextCell("#1"), "pt-name": ui.TextCell("One")}).WithAction(ui.EventAction("open-row", "1")),
+		ui.NewTableRow("ptr2", map[string]ui.Cell{"pt-num": ui.TextCell("#2")}))
+	if p.sort.Column != "" {
+		s := p.sort
+		t.Table.Sort = &s
+	}
+	return t
 }
 
 func (p *panel) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	if act.Context.ThreadID != "" {
 		p.h.Log().Info("act", "viewer", act.Context.ThreadID)
 	}
-	if act.Kind == pluginsdk.ActSelect || act.Kind == pluginsdk.ActTab || act.Kind == pluginsdk.ActSearch {
+	if act.Kind == pluginsdk.ActSelect || act.Kind == pluginsdk.ActTab || act.Kind == pluginsdk.ActSearch || act.Kind == pluginsdk.ActSort {
 		// Dispatch on the kind: a click's event may be named "select" or "tab" too.
 		p.mu.Lock()
+		if act.Kind == pluginsdk.ActSort {
+			p.sort = ui.TableSort{Column: act.Key, Dir: ui.SortAsc}
+			if act.Descending() {
+				p.sort.Dir = ui.SortDesc
+			}
+		}
 		vals, _ := json.Marshal(act.Values)
 		p.got = fmt.Sprintf("%s:%s key=%s value=%v node=%q values=%s version=%d", act.Kind, act.Action, act.Key, act.Value, act.Node, vals, act.Version)
 		p.mu.Unlock()
@@ -94,7 +116,7 @@ func (p *panel) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		}
 		return nil
 	case "bad":
-		return p.h.UpdateView(p.inst, map[string]any{"nodes": []any{map[string]any{"key": "x", "table": map[string]any{}}}})
+		return p.h.UpdateView(p.inst, map[string]any{"nodes": []any{map[string]any{"key": "x", "calendar": map[string]any{}}}})
 	case "flood":
 		for i := range 100 {
 			p.mu.Lock()
@@ -456,7 +478,7 @@ func TestSurfaceActs(t *testing.T) {
 		t.Errorf("unknown instance: %v", err)
 	}
 	elements := e.m.SurfaceElements(w.key, 0)
-	if len(elements) != 14 || elements[0].Key != "inc" || elements[8].Kind != "submit" || elements[8].Form != "form" || elements[9].Kind != "select" {
+	if len(elements) != 17 || elements[0].Key != "inc" || elements[8].Kind != "submit" || elements[8].Form != "form" || elements[9].Kind != "select" {
 		t.Errorf("elements %+v", elements)
 	}
 }
