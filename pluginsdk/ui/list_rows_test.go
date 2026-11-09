@@ -70,7 +70,6 @@ func TestListAddCountsAsElement(t *testing.T) {
 	}
 }
 
-
 func TestListRowBuilders(t *testing.T) {
 	n := NewList("todo", NewRow("a", "A").AsChecked(true).AsEditable(), NewRow("b", "B")).
 		AsCheckable().AsReorderable().WithAddRow("Add a task", true)
