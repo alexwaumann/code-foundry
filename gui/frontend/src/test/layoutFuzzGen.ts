@@ -30,7 +30,7 @@ export const FUZZ_THREADS = ["s-f1", "s-f2", "s-f3", "s-f4"] as const;
 export const FUZZ_TERMINALS = ["t-f1", "t-f2"] as const;
 
 const CONTAINERS = ["section", "columns", "pane", "grid", "container", "masterDetail", "tabs"] as const;
-const LEAVES = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "form", "thread", "terminal", "divider", "spacer", "group"] as const;
+const LEAVES = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "form", "thread", "terminal", "divider", "spacer", "group", "stats", "bars"] as const;
 const GROUP_KINDS = ["text", "chips", "actions", "progress"] as const;
 const STRIP_KINDS = ["text", "chips", "actions", "progress", "form", "divider", "spacer", "group"] as const;
 export const MAX_DEPTH = 4;
@@ -145,6 +145,28 @@ export class Gen {
         return { key, divider: strip || this.chance(0.5) ? {} : { label: this.chance(0.2) ? "L".repeat(200) : "Checks" } };
       case "spacer":
         return { key, spacer: { ...(this.chance(0.5) ? { size: this.pick([4, 12, 64]) } : {}), ...(this.chance(0.4) ? { flex: true } : {}) } };
+      case "stats":
+        return {
+          key,
+          stats: {
+            cards: Array.from({ length: this.int(1, 6) }, () => ({
+              key: this.key("sc"),
+              label: this.chance(0.2) ? "A label that is long".repeat(2) : "Pass rate",
+              value: this.pick(["86%", "4m 12s", "1,288", "9".repeat(24)]),
+              ...(this.chance(0.4) ? { action: { event: "filter" }, ...(this.chance(0.5) ? { pressed: true } : {}) } : {}),
+              ...(this.chance(0.5) ? { subtitle: "last 30 builds" } : {}),
+            })),
+          },
+        };
+      case "bars":
+        return {
+          key,
+          bars: {
+            title: "Build time",
+            bars: Array.from({ length: this.chance(0.1) ? 120 : this.int(0, 30) }, () => ({ key: this.key("ba"), value: this.rand() * 300, title: "#1 · 4m 12s", ...(this.chance(0.3) ? { action: { event: "open" } } : {}) })),
+            ...(this.chance(0.5) ? { reference: { value: 150, label: "median 2m 30s" }, startLabel: "#1", endLabel: "#30" } : {}),
+          },
+        };
       case "group":
         return {
           key,
