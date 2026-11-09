@@ -3,8 +3,9 @@
  * plugin's next view, the pointer drag and the keyboard move that reorder. ListNode puts
  * them together with ListRows.tsx's parts; rows.ts has the arithmetic.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import type { Row } from "@/api/plugin";
+import { VirtualScrollRoot } from "@/components/pr/virtualRoot";
 import { actOnElement, CHOICE_HOLD_MS, usePluginSurfacesStore, useSurfaceEntry } from "@/stores/pluginSurfaces";
 import { useViewCtx } from "./context";
 import { addPending, applyChanges, dropAt, edgeScroll, keyMove, keysOf, settle, type PendingChange, type RowChange } from "./rows";
@@ -79,7 +80,10 @@ export function useRowChanges(rows: readonly Row[]): { rows: readonly Row[]; cha
   return { rows: shown, change };
 }
 
-/** The nearest box that scrolls the list: the marked scroll root (the panel's body), else the nearest overflow. */
+/**
+ * The box that scrolls the list where no VirtualScrollRoot is provided (as VirtualStack
+ * finds it): the marked scroll root (the surface's body), else the nearest overflow.
+ */
 function scrollerOf(el: HTMLElement): HTMLElement | null {
   const marked = el.closest<HTMLElement>("[data-scroll-root]");
   if (marked) return marked;
@@ -104,13 +108,14 @@ const DRAG_DISTANCE = 4;
 /**
  * The pointer drag that reorders a list (`box` holds its rows): a press on a grip lifts the
  * row once the pointer moves DRAG_DISTANCE px; the drop line follows the pointer between
- * the rows drawn (a virtualized list draws those around the pointer), the scroll box
- * scrolls while the pointer is near its top or bottom, and the release moves the row
+ * the rows drawn (a virtualized list draws those around the pointer), the box the list
+ * scrolls in (a sized pane's, else the surface's body: VirtualScrollRoot) scrolls while the pointer is near its top or bottom, and the release moves the row
  * there (`onMove`, its new upper neighbour). Escape, a cancel, or a release where it was
  * moves nothing.
  */
 export function useRowDrag(keys: readonly string[], box: RefObject<HTMLElement | null>, onMove: (key: string, after: string) => void): { grab: RowOps["grab"]; drag: DragView | null } {
   const [drag, setDrag] = useState<DragView | null>(null);
+  const provided = useContext(VirtualScrollRoot);
   const keysRef = useRef(keys);
   const onMoveRef = useRef(onMove);
   useLayoutEffect(() => {
@@ -130,7 +135,7 @@ export function useRowDrag(keys: readonly string[], box: RefObject<HTMLElement |
       const startY = e.clientY;
       const r = row.getBoundingClientRect();
       const offset = startY - r.top;
-      const scroller = scrollerOf(box.current);
+      const scroller = provided ?? scrollerOf(box.current);
       let y = startY;
       let started = false;
       let after: string | null = null;
@@ -201,7 +206,7 @@ export function useRowDrag(keys: readonly string[], box: RefObject<HTMLElement |
         setDrag(null);
       };
     },
-    [box],
+    [box, provided],
   );
   return { grab, drag };
 }

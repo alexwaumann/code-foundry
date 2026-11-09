@@ -32,7 +32,10 @@ export function RowCheck({ row, ops, dense }: { row: Row; ops: RowOps; dense: bo
   );
 }
 
-/** A reorderable row's grip: shown while the row is hovered or has focus; a press starts a drag. */
+/**
+ * A reorderable row's grip: its column is kept on every row (a sized pane clips the row's
+ * gutter), shown while the row is hovered or has focus; a press starts a drag.
+ */
 export function RowGrip({ row, ops, dense }: { row: Row; ops: RowOps; dense: boolean }) {
   return (
     <span
@@ -75,7 +78,7 @@ export function TitleEditor({ title, onCommit, done }: { title: string; onCommit
       maxLength={200}
       aria-label="Title"
       data-testid="plugin-row-edit"
-      className="-mx-1 h-6 rounded-sm px-1 text-body-sm"
+      className="-mx-1 h-5 rounded-sm px-1 py-0 text-body-sm"
       onFocus={(e) => {
         e.currentTarget.select();
       }}

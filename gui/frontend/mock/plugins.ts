@@ -41,6 +41,7 @@ import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
 import { MockRegistry, type InstallSpec } from "./pluginRegistry";
+import { applyToCustom, rowOpOf, TodoState, type RowOp } from "./pluginRows";
 import type { UiIntentInit } from "./world";
 
 export type PluginEventInit = MessageInitShape<typeof PluginEventSchema>;
@@ -163,12 +164,23 @@ function patchNode(nodes: Node[], key: string, f: (n: Node) => void): boolean {
 
 interface Element {
   key: string;
-  kind: "click" | "submit" | "change" | "tab" | "select" | "search" | "host";
+  kind: "click" | "submit" | "change" | "tab" | "select" | "search" | "host" | RowOp["kind"];
   event: string;
   /** The event's data (a chip's status, a row's id). */
   data?: string;
   /** A node tab's tabs node, a select's master-detail (SurfaceAct.node). */
   node?: string;
+  /** A list's row act (mock/pluginRows.ts), shaped and checked as the daemon does. */
+  op?: RowOp;
+}
+
+/** The node with `key` (at any depth), or undefined. */
+function findNode(nodes: Node[], key: string): Node | undefined {
+  let out: Node | undefined;
+  patchNode(nodes, key, (n) => {
+    out = n;
+  });
+  return out;
 }
 
 /** The elements of a view that act, by key (like the daemon's actionIndex). */
@@ -421,6 +433,8 @@ class DemoInstance {
   peopleQuery = "";
   /** The Overview's Failing card narrows its chart to the failed builds (charts.go). */
   failedOnly = false;
+  /** The Todo tab's tasks (the real plugin's todoState; mock/pluginRows.ts). */
+  readonly todo = new TodoState();
   /** The Runs tab's state (the real plugin's runsState): the chosen run, the detail's tab, notes by run. */
   runs: { selected: string; tab: string; notes: Record<string, string> } = { selected: "", tab: "", notes: {} };
   buildLog = "";
@@ -517,6 +531,8 @@ class DemoInstance {
       this.patchLayoutFilter(v);
     } else if (this.tab === "run-list") {
       patchRuns(nodes, this.runs);
+    } else if (this.tab === "todo") {
+      this.todo.patch(nodes, findNode);
     } else if (this.tab === "shell") {
       patchNode(nodes, "clock", (n) => {
         (n.terminal as { terminalId: string }).terminalId = HELLO_TERMINAL;
@@ -613,7 +629,8 @@ class DemoInstance {
   act(el: Element, values: Record<string, unknown>, toast: (text: string) => void, viewer = "", value = ""): void {
     if (fuzzControl.failNext.delete(el.key)) throw new ConnectError(`plugin refused: ${el.key} (failnext)`, Code.Aborted);
     if (this.tab === "custom" && this.custom) {
-      if (el.kind === "select" && el.node) this.custom.selected[el.node] = el.key;
+      if (el.op) applyToCustom(this.custom.view, el.op, childListsOf, viewListsOf);
+      else if (el.kind === "select" && el.node) this.custom.selected[el.node] = el.key;
       else if (el.kind === "tab" && el.node) this.custom.active[el.node] = el.key;
       else if (el.kind === "tab") this.custom.viewTab = el.key;
       this.render();
@@ -643,6 +660,12 @@ class DemoInstance {
         if (!this.runs.selected) throw new ConnectError("plugin refused: no run chosen", Code.Aborted);
         this.runs = { ...this.runs, notes: { ...this.runs.notes, [this.runs.selected]: typeof values.note === "string" ? values.note.trim() : "" } };
         toast("note saved");
+        break;
+      case "check:check":
+      case "move:move":
+      case "add:add":
+      case "edit:edit":
+        if (el.op && this.view) this.todo.act(el.op, this.view.nodes as Node[], findNode);
         break;
       case "click:click":
       case "click:refresh":
@@ -1267,12 +1290,13 @@ export class MockPlugins {
   act(req: SurfaceActRequest): bigint | Promise<bigint> {
     const inst = this.instances.get(req.instance);
     if (!inst?.view) throw new ConnectError(`${req.instance} is not open (watch it first)`, Code.FailedPrecondition);
-    const el = elementsOf(inst.view).get(req.key);
+    const op = rowOpOf(inst.view, req.key, req.action, req.value, childListsOf, viewListsOf);
+    const el: Element | undefined = op ? { key: op.key, kind: op.kind, event: op.kind, node: op.node, op } : elementsOf(inst.view).get(req.key);
     if (!el) throw new ConnectError(`no acting element "${req.key}" in the view`, Code.InvalidArgument);
     if (el.kind === "host") throw new ConnectError(`${req.key} is a host action: the host runs it, not the plugin`, Code.InvalidArgument);
     const values = (req.values ?? {}) as Record<string, unknown>;
     const viewer = req.context?.activeThreadId ?? "";
-    this.acts.push(`${req.instance} ${req.key}${viewer ? ` viewer=${viewer}` : ""} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}`);
+    this.acts.push(`${req.instance} ${req.key}${viewer ? ` viewer=${viewer}` : ""} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}${op ? ` action=${op.kind}` : ""}`);
     const version = req.version || BigInt(inst.version);
     const run = () => {
       inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer, req.value ?? "");

@@ -246,7 +246,7 @@ function InteractiveList({ data, listKey }: { data: ListData; listKey: string })
   const lifted = drag ? rows.find((r) => r.key === drag.key) : undefined;
   const add = data.add && <AddRowInput listKey={listKey} add={data.add} />;
   return (
-    <div className="flex min-w-0 flex-col gap-1.5" data-testid="plugin-list-rows">
+    <div className="flex min-w-0 flex-col gap-1.5" data-testid="plugin-list-rows" data-key={listKey}>
       {add && !data.add?.bottom && add}
       {rows.length === 0 ? (
         <EmptyText data={data} />
