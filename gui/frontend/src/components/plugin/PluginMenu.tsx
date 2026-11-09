@@ -171,7 +171,7 @@ export function MoreMenu({ items, label = "More options", testId = "plugin-more"
   return (
     <DropdownMenu modal={false}>
       <Tip label={label}>
-        <DropdownMenuTrigger asChild>
+        <DropdownMenuTrigger asChild disabled={inert}>
           <button
             type="button"
             aria-label={label}

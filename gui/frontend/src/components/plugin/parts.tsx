@@ -191,7 +191,13 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
       {button.menu && !button.iconOnly && <ChevronDown className="size-3 opacity-70" aria-hidden data-testid="plugin-button-chevron" />}
     </Button>
   );
-  const trigger = button.menu ? <DropdownMenuTrigger asChild>{el}</DropdownMenuTrigger> : el;
+  const trigger = button.menu ? (
+    <DropdownMenuTrigger asChild disabled={disabled}>
+      {el}
+    </DropdownMenuTrigger>
+  ) : (
+    el
+  );
   // A label wider than the panel truncates; the tooltip then shows it whole.
   const tipped =
     !button.iconOnly && !button.hint ? (
