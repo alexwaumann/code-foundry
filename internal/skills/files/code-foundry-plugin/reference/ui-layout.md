@@ -221,8 +221,8 @@ v := ui.View{Header: h, Toolbar: []ui.Node{search, statusChips}, Nodes: body,
   bottom of the surface; the body scrolls between them and never under them. Each has a
   hairline toward the body and the panel's padding.
 - **Up to 6 nodes each**, of these kinds only: `text`, `chips`, `actions`, `progress`,
-  `form` whose fields are inputs, toggles and dropdown selects (no fieldsets, no
-  `"style": "list"` selects), `divider` without a label (a vertical hairline between
+  `form` whose fields are inputs, toggles and dropdown selects or pickers (no fieldsets,
+  no `"style": "list"` selects; a form of only pickers takes no free width: `forms.md`), `divider` without a label (a vertical hairline between
   neighbours in the row), `spacer` (`size` px across; `flex: true` pushes what follows to
   the row's end: it takes the free width when nothing else in the row grows, and next to
   none beside a form, a progress bar or a group not aligned to the start, which keep it)
