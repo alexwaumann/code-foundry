@@ -57,7 +57,7 @@ test("a pointer drag lifts the row, draws the drop line and moves it on release"
   if (!first) throw new Error("no first row");
   await page.mouse.move(from.x, first.y + 4, { steps: 8 });
   await expect(page.getByTestId("plugin-row-lifted")).toBeVisible();
-  const line = await surface(page).getByTestId("plugin-row-drop").boundingBox();
+  const line = await page.getByTestId("plugin-row-drop").boundingBox();
   expect(Math.abs((line?.y ?? 0) + 1 - first.y)).toBeLessThanOrEqual(2);
   await expect(rowEl(page, "todo-5")).toHaveClass(/opacity-35/);
   await page.mouse.up();
@@ -84,7 +84,7 @@ test("dragging to a scrolled pane's edge scrolls it, and a virtualized list take
   await expect.poll(() => pane.evaluate((el) => el.scrollTop), { timeout: 5000 }).toBeGreaterThan(600);
   // Back to the middle (the scroll stops) and dropped between two drawn rows.
   await page.mouse.move(from.x, box.y + box.height / 2, { steps: 4 });
-  const line = surface(page).getByTestId("plugin-row-drop");
+  const line = page.getByTestId("plugin-row-drop");
   await expect(line).toBeVisible();
   await page.mouse.up();
   const moved = (await acts()).filter((a) => a.includes(" r1 ") && a.includes("action=move"));

@@ -67,8 +67,9 @@ No proto change: `SurfaceActRequest.action` already existed; the GUI now sends i
   pointer (which are always mounted) and names the gap by the list's order, so it works
   the same over a plain or a virtualized list. 4 px before a press becomes a drag (the
   panel tabs' distance); the row stays in place at 35% and a copy follows the pointer
-  (portaled to `body`: the virtual rows' transforms would capture `position: fixed`); the
-  drop line is drawn in the list's own box. Escape cancels; a release where it was moves
+  (portaled to `body`: the virtual rows' transforms would capture `position: fixed`). The
+  drop line is portaled too and drawn over that copy: the copy sits under the pointer, so it
+  always covers the gap it is about to drop into, and a line under it never showed. Escape cancels; a release where it was moves
   nothing; the grip swallows its click, so a drag never runs the row's action.
 * **Edge scroll** while dragging within 40 px of the scroll box's top or bottom, up to
   14 px a frame. The box is the list's `VirtualScrollRoot` (a sized pane, else the
@@ -80,11 +81,15 @@ No proto change: `SurfaceActRequest.action` already existed; the GUI now sends i
 
 ## How it degrades at panel width
 
-Nothing is hidden at ~360 px: the grip column (14 px, kept on every row of a reorderable
-list, shown on hover or focus) and the checkbox (16 px) take about 36 px with their gaps;
-the add input is the list's width. A reorderable list's rows therefore start 22 px further
-in than a plain list's; the grip could not go in the row's gutter instead because a sized
-pane clips its content horizontally (tried: the grip vanished in a pane).
+Nothing is hidden at ~360 px: the checkbox (16 px) takes the glyph's slot and the add input
+is the list's width. The grip takes no column: it is drawn in the row's own 8 px left
+padding (absolute; the icon overflows its 8 px box but its dots stay inside the row), so a
+reorderable list's content lines up with a plain list's beside it (a first version kept a
+14 px grip column and the Todo tab's open and done lists were 22 px apart). The press
+target reaches 8 px further into the gutter. A sized pane clips (overflow hidden/auto), which
+cut off the rows' 8 px bleed (`-mx-2`) and with it the grip, so a sized pane's box now
+bleeds 8 px into the gutter on each side (`-mx-2 px-2`; its content does not move): rows in
+a pane keep their full hover and their grip. Every plugin e2e spec passes with it.
 
 ## Gotchas
 

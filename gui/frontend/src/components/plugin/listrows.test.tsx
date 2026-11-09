@@ -294,7 +294,8 @@ describe("pointer drag", () => {
     fireEvent.pointerMove(window, { clientY: 170 });
     expect(screen.getByTestId("plugin-row-lifted").getAttribute("data-key")).toBe("a");
     expect(row("a").className).toContain("opacity-35");
-    expect(screen.getByTestId("plugin-row-drop").style.top).toBe("60px");
+    // The line is placed in the viewport over the lifted copy: the box's top (100) plus 60.
+    expect(screen.getByTestId("plugin-row-drop").style.top).toBe("160px");
     fireEvent.pointerUp(window, { clientY: 170 });
     expect(acts.calls).toMatchObject([{ key: "a", action: "move", value: "b" }]);
     expect(rowsShown()).toBe("b✓ a c");

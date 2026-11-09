@@ -33,15 +33,19 @@ export function RowCheck({ row, ops, dense }: { row: Row; ops: RowOps; dense: bo
 }
 
 /**
- * A reorderable row's grip: its column is kept on every row (a sized pane clips the row's
- * gutter), shown while the row is hovered or has focus; a press starts a drag.
+ * A reorderable row's grip: drawn in the row's own left padding (absolute, so a reorderable
+ * list's content lines up with a plain list's), shown while the row is hovered or has focus;
+ * a press starts a drag. The icon overflows its 8 px box but its dots stay inside the row,
+ * and the press target reaches into the gutter beside the row (a sized pane clipping that
+ * part only shrinks the target).
  */
 export function RowGrip({ row, ops, dense }: { row: Row; ops: RowOps; dense: boolean }) {
   return (
     <span
       className={cn(
-        "-ml-1 flex w-3.5 shrink-0 cursor-grab touch-none items-center justify-center text-cf-text-muted opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100",
-        dense ? "h-4" : "h-5",
+        "absolute left-0 flex w-2 cursor-grab touch-none items-center justify-center text-cf-text-muted opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100",
+        "before:absolute before:inset-y-0 before:-left-2 before:right-0 before:content-['']",
+        dense ? "top-1 h-4" : "top-1.5 h-5",
         ops.dragging === row.key && "opacity-100",
         ops.inert && "pointer-events-none",
       )}
@@ -52,7 +56,7 @@ export function RowGrip({ row, ops, dense }: { row: Row; ops: RowOps; dense: boo
       }}
       onClick={(e) => { e.stopPropagation(); }}
     >
-      <GripVertical className="size-3.5" />
+      <GripVertical className="size-3.5 shrink-0" />
     </span>
   );
 }

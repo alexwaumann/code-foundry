@@ -39,7 +39,9 @@ export function PaneNode({ node, data }: NodeProps<"pane">) {
   return (
     <div
       ref={setRef}
-      className={cn("flex min-w-0 shrink-0 flex-col", sized && (scroll ? "overflow-x-hidden overflow-y-auto overscroll-contain" : "overflow-hidden"))}
+      // A sized pane clips, so its box bleeds 8 px into the gutter on each side (content stays
+      // put): list rows reach 8 px past the content (-mx-2) for their hover and grip.
+      className={cn("flex min-w-0 shrink-0 flex-col", sized && "-mx-2 px-2", sized && (scroll ? "overflow-x-hidden overflow-y-auto overscroll-contain" : "overflow-hidden"))}
       style={{ height, minHeight: mode === "auto" ? data.minHeight : undefined }}
       data-testid="plugin-pane"
       data-key={node.key}

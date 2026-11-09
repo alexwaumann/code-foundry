@@ -93,13 +93,16 @@ function scrollerOf(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
-/** A drag in progress, as drawn: the lifted row's box and the drop line's y in the list (null: no line). */
+/**
+ * A drag in progress, as drawn: the lifted row's box and the drop line (null: none), both in
+ * the viewport (the line is drawn over the lifted copy, which covers the gap).
+ */
 export interface DragView {
   key: string;
   top: number;
   left: number;
   width: number;
-  lineY: number | null;
+  line: { top: number; left: number; width: number } | null;
 }
 
 /** How far the pointer moves before a press on a grip becomes a drag (the panel tabs' distance). */
@@ -149,8 +152,15 @@ export function useRowDrag(keys: readonly string[], box: RefObject<HTMLElement |
         });
         const at = dropAt(keysRef.current, boxes, key, y);
         after = at?.after ?? null;
-        const top = list.getBoundingClientRect().top;
-        setDrag({ key, top: y - offset, left: r.left, width: r.width, lineY: at && at.after !== null ? at.lineY - top : null });
+        const lr = list.getBoundingClientRect();
+        const shown = at !== null && at.after !== null;
+        setDrag({
+          key,
+          top: y - offset,
+          left: r.left,
+          width: r.width,
+          line: shown ? { top: at.lineY, left: lr.left - 2, width: lr.width + 4 } : null,
+        });
       };
       const tick = () => {
         if (scroller) {

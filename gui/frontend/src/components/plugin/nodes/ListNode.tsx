@@ -72,7 +72,7 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown, o
         aria-current={(!clickable || onActivate) && selected ? "true" : undefined}
         aria-keyshortcuts={[editable && "F2", reorderable && "Alt+ArrowUp Alt+ArrowDown"].filter(Boolean).join(" ") || undefined}
         className={cn(
-          "group/row -mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
+          "group/row relative -mx-2 flex min-w-0 gap-2 rounded-md px-2 outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
           dense ? "h-6 items-center" : "items-start py-1.5",
           clickable && "cursor-default hover:bg-cf-control-hover dark:hover:bg-cf-control-hover/50",
           selected && "bg-cf-control-hover dark:bg-cf-control-hover/50",
@@ -260,23 +260,38 @@ function InteractiveList({ data, listKey }: { data: ListData; listKey: string })
             testId="plugin-list"
             render={(r) => <RowView row={r} glyphStyle={glyphStyle} dense={dense} ops={ops} />}
           />
-          {drag?.lineY != null && (
-            <div className="pointer-events-none absolute -inset-x-0.5 z-10 h-0.5 -translate-y-1/2 rounded-full bg-cf-focus" style={{ top: drag.lineY }} data-testid="plugin-row-drop" />
-          )}
         </div>
       )}
       {add && data.add?.bottom && add}
       {drag &&
         lifted &&
         createPortal(
-          <div
-            className="pointer-events-none fixed z-50 rounded-md border border-cf-border-strong bg-cf-surface-raised px-2 shadow-lg"
-            style={{ top: drag.top, left: drag.left, width: drag.width }}
-          >
-            <RowView row={lifted} glyphStyle={glyphStyle} dense={dense} ops={ops} lifted />
-          </div>,
+          <>
+            <div
+              className="pointer-events-none fixed z-50 rounded-md border border-cf-border-strong bg-cf-surface-raised px-2 shadow-lg"
+              style={{ top: drag.top, left: drag.left, width: drag.width }}
+            >
+              <RowView row={lifted} glyphStyle={glyphStyle} dense={dense} ops={ops} lifted />
+            </div>
+            {drag.line && <DropLine line={drag.line} />}
+          </>,
           document.body,
         )}
     </div>
+  );
+}
+
+/**
+ * Where a dragged row lands: a line in the gap, drawn over the lifted copy (which sits
+ * under the pointer, so it always covers the gap it is about to drop into), placed in the
+ * viewport like the lifted copy.
+ */
+function DropLine({ line }: { line: { top: number; left: number; width: number } }) {
+  return (
+    <div
+      className="pointer-events-none fixed z-50 h-0.5 -translate-y-1/2 rounded-full bg-cf-focus"
+      style={{ top: line.top, left: line.left, width: line.width }}
+      data-testid="plugin-row-drop"
+    />
   );
 }
