@@ -234,41 +234,41 @@ test("a real pointer keeps the card open over the row's actions and PR tag", asy
   }
 });
 
-test("at the narrowest sidebar the actions never cover the project, on a selected row too, and the status under them is hidden", async ({ page }) => {
+test("at the narrowest sidebar the actions never cover the branch, on a selected row too, and the name and status stay", async ({ page }) => {
   await openApp(page);
   // The default width is the minimum (SIDEBAR_MIN).
   expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(260);
   for (const select of [false, true]) {
     const r = row(page, "s:s-3");
     if (select) await r.click();
-    // A name long enough to reach the actions: the project gives way, not the actions.
-    await r.getByTestId("row-project").evaluate((el) => {
-      el.textContent = "a-project-name-long-enough-to-run-under-the-actions";
+    // A branch long enough to reach the actions: the branch gives way, not the actions.
+    await r.getByTestId("row-branch").evaluate((el) => {
+      el.textContent = "cf/a-branch-name-long-enough-to-run-under-the-actions";
     });
     await r.getByTestId("thread-name").hover();
     await expect(r.getByTestId("row-actions")).toHaveCSS("opacity", "1");
-    const [project, actions] = [await r.getByTestId("row-project").boundingBox(), await r.getByTestId("row-actions").boundingBox()];
-    expect((project?.x ?? 0) + (project?.width ?? 0)).toBeLessThanOrEqual(actions?.x ?? 0);
-    await expect(r.getByTestId("row-time")).toHaveCSS("visibility", "hidden");
+    const [branch, actions, line3] = [await r.getByTestId("row-branch").boundingBox(), await r.getByTestId("row-actions").boundingBox(), await r.getByTestId("row-line-3").boundingBox()];
+    expect((branch?.x ?? 0) + (branch?.width ?? 0)).toBeLessThanOrEqual(actions?.x ?? 0);
+    // On the last line, inside it: the actions never reach up into the project line.
+    expect(Math.abs((actions?.y ?? 0) + (actions?.height ?? 0) / 2 - ((line3?.y ?? 0) + (line3?.height ?? 0) / 2))).toBeLessThanOrEqual(1);
+    await expect(r.getByTestId("row-time")).toHaveCSS("visibility", "visible");
   }
-  // A status word and its icon, not only a time.
   await row(page, "s:s-2").getByTestId("thread-name").hover();
-  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveCSS("visibility", "hidden");
+  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveCSS("visibility", "visible");
 });
 
 // A multi-project thread's card (workspace or N projects, the run-in project and where it runs, branch, model) and line 1: src/components/sidebar/SidebarRow.test.tsx ("a workspace thread…", "an unnamed set…", "a thread in its workspace's folder…", "line 1 of a multi-project thread").
 
 // The status line's words, tones and times for every kind, and none for working or idle:
 // src/components/sidebar/SidebarRow.test.tsx ("SidebarRow card status time").
-test("a long permission prompt: line 3 cuts it off; the card wraps all of it between the name and the project", async ({ page }) => {
+test("a long permission prompt: the row keeps its branch; the card wraps all of it between the name and the project", async ({ page }) => {
   await mockPost("status-kinds");
   const long = "Do you want to create hello.txt in the scratch repository and then run the whole test suite?";
   await mockPost(`thread/status?id=s-k-approval&status=attention&reason=${encodeURIComponent(`permission: ${long}`)}`);
   await openApp(page);
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
   const approval = row(page, "s:s-k-approval");
-  await expect(approval.getByTestId("row-detail")).toHaveText(long);
-  expect(await approval.getByTestId("row-detail").evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await expect(approval.getByTestId("row-detail")).toHaveCount(0);
   await approval.hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-k-approval");
   const status = tip.getByTestId("tip-status");

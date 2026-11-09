@@ -1,8 +1,9 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
-import { AlarmClock, ArrowRightLeft, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
-import { NoGitBadge } from "@/components/projects/NoGitBadge";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
+import { useProjectKind } from "@/components/icons/projectKind";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { statusLine, statusText, tipStatusTone, type StatusLineKind, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
-import { statusBadge, statusDetail, statusTimeAt } from "@/lib/statusRegistry";
+import { statusBadge, statusTimeAt } from "@/lib/statusRegistry";
 import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
@@ -23,7 +24,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { ThreadPlaceRows, TipRow } from "@/components/thread/ThreadPlaceRows";
-import { useThreadPlace } from "@/components/thread/useThreadPlace";
+import { rowHasBranchLine, useThreadPlace } from "@/components/thread/useThreadPlace";
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
 import { LinkedPrsBadge } from "./LinkedPrsBadge";
@@ -115,10 +116,11 @@ function Elapsed({ at, className }: { at: number; className?: string }) {
 }
 
 /**
- * Line 1's right side (lib/statusRegistry statusBadge): `<icon> <word>` in the kind's tone,
- * then for working and waiting a plain space and the time since the status changed in the
- * same tone; for an idle thread only the time since its last activity, muted; for the
- * attention, error and done kinds nothing after the word (the hover card has the time).
+ * Line 1's right side (lib/statusRegistry statusBadge): the status's icon in its tone, then
+ * for working, waiting and setting up a plain space and the time since the status changed in
+ * the same tone; for an idle thread only the time since its last activity, muted. The word
+ * is not shown (the hover card says it, docs/notes/sidebar-title-first.md); it stays for
+ * screen readers.
  */
 function RowStatus({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
@@ -126,20 +128,15 @@ function RowStatus({ id }: { id: string }) {
   const badge = statusBadge(line);
   const Icon = badge.icon;
   if (Icon === null) {
-    return at === null ? null : <Elapsed at={at} className="text-cf-sidebar-muted-foreground" />;
+    return at === null ? null : <Elapsed at={at} className="text-caption-sm text-cf-sidebar-muted-foreground" />;
   }
   return (
-    <span className={cn("flex min-w-0 items-center gap-[3px] font-medium", badge.toneClass)} data-testid="row-status" data-kind={line.kind}>
-      <Icon className="size-3 shrink-0" aria-hidden data-testid="row-status-icon" />
-      <span className="whitespace-nowrap">
-        <span data-testid="row-status-word">{badge.word}</span>
-        {at !== null && (
-          <>
-            {" "}
-            <Elapsed at={at} />
-          </>
-        )}
+    <span className={cn("flex min-w-0 items-center gap-[3px] text-caption-sm font-medium", badge.toneClass)} data-testid="row-status" data-kind={line.kind}>
+      <Icon className="size-3.5 shrink-0" aria-hidden data-testid="row-status-icon" />
+      <span className="sr-only" data-testid="row-status-word">
+        {badge.word}
       </span>
+      {at !== null && <Elapsed at={at} className="whitespace-nowrap" />}
     </span>
   );
 }
@@ -153,7 +150,7 @@ const stop = (e: SyntheticEvent) => {
 };
 
 /**
- * The row's hover actions, over line 1's status: Snooze (the preset menu, SnoozePresetItems)
+ * The row's hover actions, on the right of its last line (HoverSlot): Snooze (the preset menu, SnoozePresetItems)
  * and Archive (at once, thread.archive). Shown while the row is hovered, while one of them
  * has the keyboard, and while the snooze menu is open. They are tab stops only on the
  * keyboard cursor's row (`cursor`), so Tab leaves the list after one row's actions rather
@@ -217,35 +214,21 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
 }
 
 /**
- * Line 1 (text-caption-sm, muted): where the thread runs and, on the right, its status.
- * The project it runs in, after a Layers glyph when the thread spans several projects
- * (its workspace's name is on the hover card; a thread in its workspace's folder, which has
- * no project, shows the workspace's name); plain "No project" for a thread without one; the pin after it.
- * On hover the status gives way to the row's actions (RowActions), which keep at least
- * their own width so they never cover the project name.
+ * The right end of a row's last line: what `children` shows at rest, and on hover the row's
+ * actions (RowActions) in its place, keeping at least their own width so they never cover the
+ * text before them. They stay while one of them has the keyboard or the snooze menu is open.
  */
-function LineProject({ id, cursor }: { id: string; cursor: boolean }) {
-  const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
-  const { project, noProject, set, inFolder } = useThreadPlace(id);
+function HoverSlot({ id, cursor, children }: { id: string; cursor: boolean; children?: ReactNode }) {
   const [actionsShown, setActionsShown] = useState(false);
   return (
-    <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-1">
-      <span className="min-w-0 truncate text-cf-sidebar-muted-foreground" data-testid="row-project" data-no-project={noProject || undefined} data-set={set !== null || undefined}>
-        {set !== null && <Layers className="mr-1 inline size-3 align-[-2px] text-cf-icon-muted" aria-label="workspace" data-testid="row-workspace" />}
-        {inFolder ? set : project}
-      </span>
-      {pinned && <Pin className="ml-1 size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />}
-      <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[97px]", actionsShown && "min-w-[97px]")}>
-        <span className={cn("flex min-w-0 items-center group-hover/row:invisible", actionsShown && "invisible")}>
-          <RowStatus id={id} />
-        </span>
-        <RowActions id={id} cursor={cursor} onShownChange={setActionsShown} />
-      </span>
+    <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[97px]", actionsShown && "min-w-[97px]")} data-testid="row-hover-slot">
+      <span className={cn("flex min-w-0 items-center gap-2 group-hover/row:invisible", actionsShown && "invisible")}>{children}</span>
+      <RowActions id={id} cursor={cursor} onShownChange={setActionsShown} />
     </span>
   );
 }
 
-/** A count on line 3's right: an icon and a number. */
+/** A count on line 2's right: an icon and a number. */
 function Count({ icon: Icon, n, className, label, testId }: { icon: LucideIcon; n: number; className: string; label: string; testId: string }) {
   if (n <= 0) return null;
   return (
@@ -257,54 +240,81 @@ function Count({ icon: Icon, n, className, label, testId }: { icon: LucideIcon; 
 }
 
 /**
- * Line 3 (text-caption-sm): the status's detail (lib/statusRegistry statusDetail: the tool
- * a working turn runs, the question, the error…), muted and truncated, or else the branch
- * (a GitBranch glyph and the name in mono; the No git badge for a project without git;
- * nothing for a thread without a project, the line keeps its height). A queued "Run in…"
- * move replaces both until the thread's worktree changes. On the right the live count
- * (info tone; lib/liveCount: background subagents plus live child threads, one number
- * whatever the model started), the background shells (muted), then the linked PR tag.
+ * Line 2's right side: the live count (info tone; lib/liveCount: background subagents plus
+ * live child threads, one number whatever the model started), the background shells (muted),
+ * then the linked PR tag.
  */
-function LineMeta({ id }: { id: string }) {
-  const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
-  const detail = useThreadsStore((st) => statusDetail(line, st.byId[id]));
+function RowCounts({ id }: { id: string }) {
   const agents = useLiveCount(id);
   const shells = useThreadsStore((s) => s.byId[id]?.backgroundShellsRunning ?? 0);
-  const { branch, noGit, noProject, movingTo } = useThreadPlace(id);
-  let left: ReactNode = null;
-  if (movingTo !== null) {
-    left = (
-      <span className="flex min-w-0 items-center gap-1 text-cf-warning-text" data-testid="row-moving">
-        <ArrowRightLeft className="size-3 shrink-0" aria-hidden />
-        <span className="truncate">moving to {movingTo}…</span>
+  return (
+    <>
+      <Count icon={Bot} n={agents} className="text-cf-info-text" label={agentsLabel(agents)} testId="row-bg-agents" />
+      <Count icon={SquareTerminal} n={shells} className="text-cf-sidebar-muted-foreground" label={shells === 1 ? "1 shell" : `${String(shells)} shells`} testId="row-bg-shells" />
+      <LinkedPrsBadge id={id} />
+    </>
+  );
+}
+
+/**
+ * The glyph before the project: the project's kind (ProjectKindIcon, as on the Projects page),
+ * Layers for a thread across a workspace's projects or in its workspace's folder, House for a
+ * thread without a project.
+ */
+function PlaceIcon({ id, noProject, set }: { id: string; noProject: boolean; set: boolean }) {
+  const projectId = useThreadsStore((s) => s.byId[id]?.projectId ?? "");
+  const kind = useProjectKind(projectId);
+  if (noProject) return <House className="size-3 shrink-0" aria-hidden data-testid="row-place-icon" data-place="none" />;
+  if (set) return <Layers className="size-3 shrink-0" aria-label="workspace" data-testid="row-workspace" />;
+  return <ProjectKindIcon kind={kind} className="size-3 shrink-0" data-testid="row-place-icon" />;
+}
+
+/**
+ * Line 2 (text-caption-sm, muted): the project the thread runs in after its kind's glyph (a
+ * thread in its workspace's folder, which has no project, shows the workspace's name; plain
+ * "No project" for a thread without one), and on the right the counts (RowCounts). On a
+ * two-line row (no branch line) this is the last line, so the counts give way to the row's
+ * actions on hover.
+ */
+function LineProject({ id, cursor, last }: { id: string; cursor: boolean; last: boolean }) {
+  const { project, noProject, set, inFolder } = useThreadPlace(id);
+  return (
+    <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-2">
+      <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground" data-testid="row-project" data-no-project={noProject || undefined} data-set={set !== null || undefined}>
+        <PlaceIcon id={id} noProject={noProject} set={set !== null} />
+        <span className="truncate">{inFolder ? set : project}</span>
       </span>
-    );
-  } else if (detail) {
-    left = (
-      <span className="min-w-0 truncate text-cf-sidebar-muted-foreground" data-testid="row-detail">
-        {detail}
-      </span>
-    );
-  } else if (noGit) {
-    left = <NoGitBadge tip={false} />;
-  } else if (!noProject && branch) {
-    left = (
-      <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground">
-        <GitBranch className="size-3 shrink-0" aria-hidden data-testid="row-branch-icon" />
-        <span className="truncate font-mono" data-testid="row-branch">
-          {branch}
+      {last ? (
+        <HoverSlot id={id} cursor={cursor}>
+          <RowCounts id={id} />
+        </HoverSlot>
+      ) : (
+        <span className="ml-auto flex shrink-0 items-center gap-2 pl-1.5">
+          <RowCounts id={id} />
         </span>
-      </span>
-    );
-  }
+      )}
+    </span>
+  );
+}
+
+/**
+ * Line 3 (text-caption-sm, muted): the branch, a GitBranch glyph and the name in mono, with
+ * the row's actions on its right on hover. Only on a row of a thread with a project with git
+ * (rowHasBranchLine); empty but for the actions until the branch is known (a thread being set
+ * up). What the thread is doing or needs is on the hover card, never here.
+ */
+function LineBranch({ id, cursor, branch }: { id: string; cursor: boolean; branch: string }) {
   return (
     <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-3">
-      {left}
-      <span className="ml-auto flex shrink-0 items-center gap-2 pl-1.5">
-        <Count icon={Bot} n={agents} className="text-cf-info-text" label={agentsLabel(agents)} testId="row-bg-agents" />
-        <Count icon={SquareTerminal} n={shells} className="text-cf-sidebar-muted-foreground" label={shells === 1 ? "1 shell" : `${String(shells)} shells`} testId="row-bg-shells" />
-        <LinkedPrsBadge id={id} />
-      </span>
+      {branch !== "" && (
+        <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground">
+          <GitBranch className="size-3 shrink-0" aria-hidden data-testid="row-branch-icon" />
+          <span className="truncate font-mono" data-testid="row-branch">
+            {branch}
+          </span>
+        </span>
+      )}
+      <HoverSlot id={id} cursor={cursor} />
     </span>
   );
 }
@@ -341,12 +351,20 @@ function nameClass(name: string, provisional: boolean, quiet = false): string {
   );
 }
 
+/** The muted pin before a pinned thread's name; nothing for the rest. */
+function PinGlyph({ id }: { id: string }) {
+  const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
+  if (!pinned) return null;
+  return <Pin className="-mr-px size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />;
+}
+
 /**
- * A thread row in the inbox layout (docs/notes/sidebar-inbox-3-row.md): three lines with
- * no gap, filling the row's THREE_LINE_ROW box (rowSizes.ts). Line 1 the project and the
- * status (LineProject), line 2 the name (text-body, medium; the made-by-thread glyph for a
- * thread an agent created), line 3 the detail or branch and the counts (LineMeta). The
- * status kind and the thread badge are on the body as data attributes for tests.
+ * A thread row, title first (docs/notes/sidebar-title-first.md): line 1 the name (text-body,
+ * medium; the pin and made-by-thread glyphs before it) and the status icon (RowStatus), line 2
+ * the project and the counts (LineProject), line 3 the branch (LineBranch). A thread without a
+ * project or without git has no line 3: its row is TWO_LINE_ROW (rowSizes.ts).
+ * The row's actions sit on the right of its last line on hover. The status kind and the thread
+ * badge are on the body as data attributes for tests.
  */
 function ThreadLabel({ id, cursor }: { id: string; cursor: boolean }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
@@ -356,23 +374,29 @@ function ThreadLabel({ id, cursor }: { id: string; cursor: boolean }) {
   const kind = useThreadsStore((s) => statusLine(s.byId[id]).kind);
   const badge = useThreadsStore((s) => threadBadge(s.byId[id]));
   const renaming = useUiStore((s) => s.renamingThreadId === id);
+  const place = useThreadPlace(id);
+  const branchLine = rowHasBranchLine(place);
   return (
     // Whether Claude runs for the thread never shows: a stopped thread looks like any other.
     <span className="flex min-w-0 flex-1 flex-col" data-testid="thread-body" data-status-line={kind} data-thread-badge={badge}>
-      <LineProject id={id} cursor={cursor} />
-      <span className="flex h-[22px] min-w-0 items-center gap-1.5">
+      <span className="flex h-[22px] min-w-0 items-center gap-1.5" data-testid="row-line-1">
         {renaming ? (
           <RenameField id={id} name={name} />
         ) : (
           <>
+            <PinGlyph id={id} />
             <MadeByThreadGlyph id={id} />
             <span className={nameClass(name, provisional)} data-testid="thread-name" data-provisional={provisional || undefined}>
               {name || id}
             </span>
           </>
         )}
+        <span className="ml-auto flex shrink-0 items-center pl-1">
+          <RowStatus id={id} />
+        </span>
       </span>
-      <LineMeta id={id} />
+      <LineProject id={id} cursor={cursor} last={!branchLine} />
+      {branchLine && <LineBranch id={id} cursor={cursor} branch={place.branch} />}
     </span>
   );
 }

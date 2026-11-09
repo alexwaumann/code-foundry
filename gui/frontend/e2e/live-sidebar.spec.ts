@@ -109,11 +109,11 @@ test("flat sidebar, Projects page and Run in… with real threads", async ({ pag
       await wsRow.click({ button: "right" });
       await page.getByTestId("menu-run-in").click();
       await page.getByTestId("menu-run-in-members").locator(`[data-member="${second.projectId}"]`).click();
-      await expect(wsRow.getByTestId("row-moving")).toHaveText(`moving to ${second.projectName}…`, { timeout: 5000 });
+      // The row keeps its place while the move is queued (the card says it); the place is the daemon's.
       await shot(page, "live-sidebar-moving");
-      await expect(wsRow.getByTestId("row-moving")).toHaveCount(0, { timeout: 60_000 });
-      // Line 3 may be the status's detail now; the place is the daemon's.
+      await expect.poll(() => threadInfo(wsThread)?.worktreePath, { timeout: 60_000 }).toBe(second.worktreePath);
       expect(threadInfo(wsThread)).toMatchObject({ projectId: second.projectId, worktreePath: second.worktreePath, workspaceId: ws.workspace.id });
+      await expect(wsRow.getByTestId("row-project")).toHaveText(second.projectName);
       await page.waitForTimeout(300);
       await shot(page, "live-sidebar-moved");
     });

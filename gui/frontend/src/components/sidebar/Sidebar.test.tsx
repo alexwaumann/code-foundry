@@ -110,19 +110,19 @@ describe("Sidebar: the thread list", () => {
     const badge = (id: string) => rowOf(`s:${id}`)?.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge");
     expect(["s-1", "s-2", "s-3", "s-4", "s-5", "s-6"].map(badge)).toEqual(["busy", "attention", "idle", "idle", "busy", "idle"]);
     expect(rowOf("s:s-5")?.getAttribute("data-section")).toBe("working");
-    expect(within(rowOf("s:s-5") as HTMLElement).getByTestId("row-status").textContent).toMatch(/^Working \d+[smhd]/);
+    expect(within(rowOf("s:s-5") as HTMLElement).getByTestId("row-status").textContent).toMatch(/^Working\d+[smhd]/);
     for (const id of ["s-3", "s-4", "s-6"]) expect(within(rowOf(`s:${id}`) as HTMLElement).getByTestId("thread-body").hasAttribute("data-offline")).toBe(false);
     expect(list().textContent).not.toMatch(/disconnected|starting|closing/i);
   });
 
-  it("a stopped thread keeps its status: busy ends interrupted; a prompt stays on top, waiting, with its word and detail", () => {
+  it("a stopped thread keeps its status: busy ends interrupted; a prompt stays on top, waiting, with its word; the branch stays on line 3", () => {
     render(<Sidebar />);
     // The daemon's stop of a busy thread (internal/store/thread): error, interrupted.
     setThread("s-1", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: Date.now() });
     const s1 = rowOf("s:s-1") as HTMLElement;
     expect(s1.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("error");
     expect(within(s1).getByTestId("row-status").textContent).toBe("Interrupted");
-    expect(within(s1).getByTestId("row-detail").textContent).toBe("resend to continue");
+    expect(within(s1).queryByTestId("row-detail")).toBeNull();
     // In the main list's waiting band (as after an Unsnooze of an interrupted thread).
     expect(s1.getAttribute("data-section")).toBe("attention");
     setThread("s-2", { state: "disconnected", status: "attention", statusReason: "permission: Bash zig build -Doptimize=ReleaseFast" });
@@ -130,7 +130,8 @@ describe("Sidebar: the thread list", () => {
     const s2 = rowOf("s:s-2") as HTMLElement;
     expect(s2.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("attention");
     expect(within(s2).getByTestId("row-status").textContent).toBe("Permission");
-    expect(within(s2).getByTestId("row-detail").textContent).toBe("Bash zig build -Doptimize=ReleaseFast");
+    expect(within(s2).queryByTestId("row-detail")).toBeNull();
+    expect(within(s2).getByTestId("row-branch").textContent).not.toBe("");
   });
 
   it("empty once loaded: the list is simply empty, no placeholder", () => {
@@ -242,7 +243,7 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     expect(rowOf("s:s-8")?.getAttribute("data-section")).toBe("done");
   });
 
-  it("a wake brings the thread back to the top of the main list: Woke in amber, snooze ended", () => {
+  it("a wake brings the thread back to the top of the main list: Woke in amber", () => {
     render(<Sidebar />);
     setThread("s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() });
     expect(screen.getByTestId("snoozed-count").textContent).toBe("1");
@@ -251,7 +252,7 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     expect(s8.getAttribute("data-section")).toBe("attention");
     expect(within(s8).getByTestId("row-status").textContent).toBe("Woke");
     expect(within(s8).getByTestId("row-status").className).toContain("text-cf-warning-text");
-    expect(within(s8).getByTestId("row-detail").textContent).toBe("snooze ended");
+    expect(within(s8).queryByTestId("row-detail")).toBeNull();
   });
 
   it("Archived: collapsed by default with its count, last; expanded, the one-line row with its age; gone with no archived thread, back with one", () => {
