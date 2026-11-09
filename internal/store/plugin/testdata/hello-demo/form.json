@@ -113,6 +113,10 @@
       {
         "key": "run-list",
         "label": "Runs"
+      },
+      {
+        "key": "todo",
+        "label": "Todo"
       }
     ],
     "active": "form"
