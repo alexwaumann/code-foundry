@@ -16,7 +16,7 @@ import (
 // Limits every view must respect. The host refuses a view
 // that breaks one and keeps the previous one.
 const (
-	MaxElements = 400 // nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, menu items (separators too), tabs (a tabs node's too)
+	MaxElements = 400 // nodes, columns (a table's too), grid items, rows (a table's and its groups too), chips, pairs, fields, options, buttons, menu items (separators too), tabs (a tabs node's too)
 	// MaxDepth is how many containers (section, columns, pane, grid, container,
 	// masterDetail, tabs) a node may sit inside: section > columns > pane > section > node.
 	// A column is part of its columns node, a grid item of its grid; a group is not a
@@ -451,13 +451,13 @@ func (c *checker) node(path string, n Node, outer []string) {
 		n.Log != nil, n.Actions != nil, n.Progress != nil, n.Notice != nil, n.Empty != nil, n.Section != nil,
 		n.Form != nil, n.Thread != nil, n.Terminal != nil, n.Columns != nil, n.Pane != nil, n.Grid != nil,
 		n.Divider != nil, n.Spacer != nil, n.Group != nil, n.Container != nil, n.MasterDetail != nil, n.Tabs != nil,
-		n.Stats != nil, n.Bars != nil} {
+		n.Stats != nil, n.Bars != nil, n.Table != nil} {
 		if set {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container, masterDetail, tabs, stats, bars); this one has %d", kinds)
+		c.bad(path, "a node has exactly one kind (text, markdown, pairs, list, chips, log, actions, progress, notice, empty, section, form, thread, terminal, columns, pane, grid, divider, spacer, group, container, masterDetail, tabs, stats, bars, table); this one has %d", kinds)
 		return
 	}
 	switch {
@@ -585,6 +585,8 @@ func (c *checker) node(path string, n Node, outer []string) {
 		c.stats(path+".stats", n.Stats)
 	case n.Bars != nil:
 		c.bars(path+".bars", n.Bars)
+	case n.Table != nil:
+		c.table(path+".table", n.Table) // table.go
 	}
 }
 

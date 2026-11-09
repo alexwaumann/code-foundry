@@ -46,7 +46,7 @@ func TestGeneratedViews(t *testing.T) {
 		}
 	}
 	t.Logf("%d of %d generated views accepted; deepest node inside %d containers; kinds in accepted views: %v", accepted, n, deepest, kinds)
-	for _, k := range []string{"columns", "pane", "grid", "group", "container", "masterDetail", "tabs", "divider", "spacer", "stats", "bars"} {
+	for _, k := range []string{"columns", "pane", "grid", "group", "container", "masterDetail", "tabs", "divider", "spacer", "stats", "bars", "table"} {
 		if kinds[k] == 0 {
 			t.Errorf("no accepted view has a %s node", k)
 		}
@@ -179,7 +179,23 @@ func pathExists(v ui.View, path string) bool {
 		return true
 	}
 	cur := reflect.ValueOf(v)
-	for _, seg := range strings.Split(path, ".") {
+	segs := strings.Split(path, ".")
+	for i := 0; i < len(segs); i++ {
+		seg := segs[i]
+		// A map's keys are any text, dots too (a table row's cells, by column key "x.y"): the
+		// longest run of segments that is one of its keys.
+		if mv := reflect.Indirect(cur); mv.Kind() == reflect.Map {
+			found := false
+			for j := len(segs); j > i && !found; j-- {
+				if e := mv.MapIndex(reflect.ValueOf(strings.Join(segs[i:j], "."))); e.IsValid() {
+					cur, i, found = e, j-1, true
+				}
+			}
+			if !found {
+				return false
+			}
+			continue
+		}
 		m := segRe.FindStringSubmatch(seg)
 		if m == nil {
 			return false
@@ -242,7 +258,8 @@ func child(v reflect.Value, name string) (reflect.Value, bool) {
 
 // elementsOf counts a view's elements as the notes and the GUI describe them: nodes
 // (strip nodes and group items too), columns, grid items, rows (a list's and a
-// master-detail's), chips, pairs, fields, options, buttons, menu items (separators too),
+// master-detail's and a table's), a table's columns and groups, chips, pairs, fields,
+// options, buttons, menu items (separators too),
 // tabs (the view's and a tabs node's). Like Validate it does not look inside a node that has not exactly one kind, a
 // group item of a kind a group does not hold, a field without exactly one control or a
 // fieldset inside a fieldset.
@@ -382,6 +399,22 @@ func nodeElements(x ui.Node) int {
 		n += len(x.Stats.Cards)
 	case x.Bars != nil:
 		n += len(x.Bars.Bars)
+	case x.Table != nil:
+		// Validate counts both when a table has rows and groups (it is refused).
+		n += len(x.Table.Columns) + len(x.Table.Groups) + tableRowsElements(x.Table.Rows)
+		for _, g := range x.Table.Groups {
+			n += tableRowsElements(g.Rows)
+		}
+	}
+	return n
+}
+
+// tableRowsElements counts a table's rows, their buttons and their menus' items (cells are
+// not elements).
+func tableRowsElements(rs []ui.TableRow) int {
+	n := 0
+	for _, r := range rs {
+		n += 1 + buttonsElements(r.Actions) + menuElements(r.Menu)
 	}
 	return n
 }

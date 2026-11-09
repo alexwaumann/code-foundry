@@ -51,7 +51,7 @@ func withKind(key, k string) Node {
 // pass as a second kind, or fail alone.
 func TestEveryKindIsOneKind(t *testing.T) {
 	kinds := nodeKinds()
-	if len(kinds) != 25 {
+	if len(kinds) != 26 {
 		t.Errorf("%d kinds: %v (a new kind needs its validation, GUI renderer and docs)", len(kinds), kinds)
 	}
 	for _, k := range kinds {

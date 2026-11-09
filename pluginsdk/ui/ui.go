@@ -4,7 +4,7 @@
 // sources, thread, terminal, the layout containers columns, pane, grid, container,
 // masterDetail and tabs,
 // divider, spacer and the inline group; stats cards and a bar chart; the view's pinned
-// toolbar and footer; menus on rows, the header and buttons; inline spans with times and
+// toolbar and footer; menus on rows, the header and buttons; a table; inline spans with times and
 // durations), builders, and
 // Validate, which checks a view against the host's rules and limits before it leaves
 // the plugin. The code-foundry-plugin skill's reference/primitives.md is the guide, with
@@ -334,6 +334,9 @@ type Node struct {
 	// reference/nodes.md; charts.go).
 	Stats *Stats `json:"stats,omitempty"`
 	Bars  *Bars  `json:"bars,omitempty"`
+	// Table is rows under column headers that drop as the table narrows (docs:
+	// reference/nodes.md; table.go).
+	Table *Table `json:"table,omitempty"`
 }
 
 // Children returns the node lists a node holds (a section's children, each column's, a
