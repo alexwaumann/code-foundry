@@ -8,29 +8,31 @@ import { cn } from "@/lib/utils";
  * plot.
  */
 export function ChartCard({
-  title,
+  heading,
   subtitle,
   lead,
   trailing,
-  heading: Heading = "h2",
+  as: Heading = "h2",
   className,
   children,
   ...rest
 }: {
-  title?: ReactNode;
+  /** The chart's name (not `title`: that is an element's native tooltip). */
+  heading?: ReactNode;
   subtitle?: ReactNode;
   lead?: ReactNode;
   trailing?: ReactNode;
-  heading?: "h2" | "h3";
+  /** The heading's element. */
+  as?: "h2" | "h3";
 } & ComponentProps<"section">) {
-  const header = title !== undefined || subtitle !== undefined || trailing !== undefined || lead !== undefined;
+  const header = heading !== undefined || subtitle !== undefined || trailing !== undefined || lead !== undefined;
   return (
     <section className={cn("min-w-0 rounded-lg border px-4 py-3", className)} {...rest}>
       {header && (
         <div className="mb-1.5 flex min-w-0 items-center">
           {lead}
-          {title !== undefined && <Heading className="shrink-0 text-label font-medium">{title}</Heading>}
-          {subtitle !== undefined && <span className={cn("min-w-0 truncate text-label font-normal text-cf-text-muted", title !== undefined && "ml-2")}>{subtitle}</span>}
+          {heading !== undefined && <Heading className="shrink-0 text-label font-medium">{heading}</Heading>}
+          {subtitle !== undefined && <span className={cn("min-w-0 truncate text-label font-normal text-cf-text-muted", heading !== undefined && "ml-2")}>{subtitle}</span>}
           {trailing !== undefined && <span className="ml-auto shrink-0 pl-3 text-caption tabular-nums">{trailing}</span>}
         </div>
       )}

@@ -101,7 +101,7 @@ function ActivityCard({
 
   return (
     <ChartCard
-      title={s.label}
+      heading={s.label}
       subtitle="last six months"
       lead={<LineKey series={series} className="mr-2 w-3.5" />}
       data-testid={`activity-${series}`}

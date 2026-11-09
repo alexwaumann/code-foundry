@@ -83,8 +83,8 @@ export function BarsNode({ node, data }: NodeProps<"bars">) {
   const subtitle = data.subtitle === undefined ? undefined : inlineText(data.subtitle);
   return (
     <ChartCard
-      heading="h3"
-      title={title || undefined}
+      as="h3"
+      heading={title || undefined}
       subtitle={
         data.subtitle === undefined ? undefined : (
           <Tip label={subtitle ?? ""} whenTruncated>
