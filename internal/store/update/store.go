@@ -22,8 +22,10 @@
 // Automatic downloads: a scheduled or requested check that moves to Available starts the
 // download itself, so the user is offered "Install and Restart Now" without a Download
 // click. An automatic download that fails goes back to Available (the Download button
-// stays as the fallback) instead of Failed, and the next check tries again; the check
-// right after the failure does not retry the version that just failed. A check that
+// stays as the fallback, FailureReason says why) and the next check tries again; the
+// check right after the failure does not retry the version that just failed. After
+// MaxAutoAttempts failures of the same version it is Failed (Try Again), and checks stop
+// downloading it until a newer release or a download by hand. A check that
 // finds a release newer than the one downloaded keeps Downloaded and downloads the newer
 // one in the background (replacing); the installer unpacks it beside the stage and swaps
 // it in only once complete, so the older download stays installable throughout, and
@@ -250,9 +252,11 @@ type Store struct {
 	status Status
 	// installing is set while Install runs the installer (outside mu).
 	installing bool
-	// failedTag is the version whose download failed last; the check right after a
-	// failure does not start it again automatically.
+	// failedTag is the version whose download failed last and failCount how many times
+	// in a row; the check right after a failure does not start it again automatically,
+	// and none does after MaxAutoAttempts.
 	failedTag string
+	failCount int
 	// replacing is the newer version downloading in the background while Downloaded
 	// ("" when none); replaceCancel stops it and replaceDone closes when it has ended.
 	replacing     string
@@ -376,6 +380,11 @@ func (s *Store) SetChannel(ch Channel) {
 	}
 	s.log.Info("update channel changed", "from", s.status.Channel, "to", ch)
 	s.status.Channel = ch
+	if s.replaceCancel != nil {
+		// A newer release of the old channel must not land as the download; the re-check
+		// below decides for the new one.
+		s.replaceCancel()
+	}
 	s.status.Latest = ""
 	s.publishLocked()
 	enabled := s.status.Enabled
@@ -387,6 +396,25 @@ func (s *Store) SetChannel(ch Channel) {
 	case s.recheck <- struct{}{}:
 	default: // a re-check is already queued; it reads the channel when it runs
 	}
+}
+
+// MaxAutoAttempts is how many times in a row checks download a version that keeps
+// failing (a broken release asset) before they stop and show Failed.
+const MaxAutoAttempts = 3
+
+// noteFailureLocked counts a failed download of tag. Caller holds mu.
+func (s *Store) noteFailureLocked(tag string) {
+	if s.failedTag == tag {
+		s.failCount++
+	} else {
+		s.failedTag, s.failCount = tag, 1
+	}
+}
+
+// skipAutoLocked reports whether a check of mode must not download tag by itself: it
+// just failed (autoNew) or failed MaxAutoAttempts times. Caller holds mu.
+func (s *Store) skipAutoLocked(mode autoMode, tag string) bool {
+	return tag == s.failedTag && (mode == autoNew || s.failCount >= MaxAutoAttempts)
 }
 
 // autoMode is what a check may start by itself once it has seen the latest release.
@@ -485,13 +513,15 @@ func (s *Store) autoLocked(mode autoMode) {
 	}
 	switch st.State {
 	case Available:
-		if mode == autoNew && st.Target == s.failedTag {
+		// A replacement whose stage swap is in progress can leave nothing staged for a
+		// moment; it decides.
+		if s.replacing != "" || s.skipAutoLocked(mode, st.Target) {
 			return
 		}
 		s.log.Info("downloading update automatically", "version", st.Target)
 		s.startDownloadLocked(st.Target, true)
 	case Downloaded:
-		if s.replacing != "" || !Newer(st.Latest, st.Target) || (mode == autoNew && st.Latest == s.failedTag) {
+		if s.replacing != "" || !Newer(st.Latest, st.Target) || s.skipAutoLocked(mode, st.Latest) {
 			return
 		}
 		s.startReplaceLocked(st.Latest)
@@ -648,20 +678,29 @@ func (s *Store) runDownload(target string, auto bool) {
 		}
 	}
 	s.mu.Lock()
+	if err != nil {
+		s.noteFailureLocked(target)
+	}
 	switch {
-	case err != nil && auto:
+	case err != nil && auto && s.failCount < MaxAutoAttempts:
 		// Nobody asked for it: offer it as before automatic downloads (the Download
 		// button) and try again at the next check.
-		s.log.Warn("automatic update download failed; trying again at the next check", "version", target, "err", err)
-		s.failedTag = target
+		s.log.Warn("automatic update download failed; trying again at the next check", "version", target, "attempt", s.failCount, "err", err)
 		s.moveTo(Available, target)
+		s.status.FailureReason = err.Error()
 	case err != nil:
-		s.log.Warn("update download failed", "version", target, "err", err)
-		s.failedTag = target
+		if auto {
+			s.log.Warn("automatic update download failed again; not retrying it automatically", "version", target, "attempts", s.failCount, "err", err)
+		} else {
+			s.log.Warn("update download failed", "version", target, "err", err)
+		}
 		s.moveTo(Failed, target)
 		s.status.FailureReason = err.Error()
 	default:
 		s.log.Info("update downloaded; restart Code Foundry to install it", "version", target)
+		if s.failedTag == target {
+			s.failedTag, s.failCount = "", 0
+		}
 		s.moveTo(Downloaded, target)
 		// A newer release seen while this one downloaded replaces it at once.
 		s.autoLocked(autoNew)
@@ -707,10 +746,14 @@ func (s *Store) runReplace(ctx context.Context, tag string) {
 	}
 	st := &s.status
 	if err != nil {
-		if s.ctx.Err() == nil {
+		switch {
+		case s.ctx.Err() != nil: // stopping
+		case ctx.Err() != nil:
+			s.log.Info("replacing the downloaded update cancelled; keeping it", "version", tag, "downloaded", st.Target)
+		default:
 			s.log.Warn("replacing the downloaded update failed; keeping it", "version", tag, "downloaded", st.Target, "err", err)
+			s.noteFailureLocked(tag)
 		}
-		s.failedTag = tag
 		if staged != st.Target && st.State == Downloaded {
 			// The stage changed anyway (by hand, or a swap that half happened): describe
 			// what is there now.
@@ -724,6 +767,9 @@ func (s *Store) runReplace(ctx context.Context, tag string) {
 		return
 	}
 	s.log.Info("newer update downloaded; restart Code Foundry to install it", "version", tag, "replaced", st.Target)
+	if s.failedTag == tag {
+		s.failedTag, s.failCount = "", 0
+	}
 	s.moveTo(Downloaded, tag)
 	s.publishLocked()
 	// An even newer release seen meanwhile replaces it in turn.

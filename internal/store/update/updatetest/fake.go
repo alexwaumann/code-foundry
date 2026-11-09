@@ -137,6 +137,7 @@ type Installer struct {
 	holds     map[string]chan struct{}
 	fails     map[string]error
 	downloads []string
+	cancels   int
 	installs  []string
 	release   chan struct{}
 	onDisk    *OnDisk
@@ -187,6 +188,20 @@ func (i *Installer) Calls() []string {
 	return append([]string(nil), i.downloads...)
 }
 
+// Cancels returns how many downloads ended because their context did.
+func (i *Installer) Cancels() int {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.cancels
+}
+
+func (i *Installer) cancelled(ctx context.Context) error {
+	i.mu.Lock()
+	i.cancels++
+	i.mu.Unlock()
+	return ctx.Err()
+}
+
 // Installs returns the tags Install was called with.
 func (i *Installer) Installs() []string {
 	i.mu.Lock()
@@ -207,14 +222,14 @@ func (i *Installer) Download(ctx context.Context, tag string, progress func(stri
 		select {
 		case <-i.release:
 		case <-ctx.Done():
-			return ctx.Err()
+			return i.cancelled(ctx)
 		}
 	}
 	if hold != nil {
 		select {
 		case <-hold:
 		case <-ctx.Done():
-			return ctx.Err()
+			return i.cancelled(ctx)
 		}
 	}
 	if i.DownloadErr != nil {

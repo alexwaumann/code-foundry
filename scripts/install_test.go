@@ -738,6 +738,26 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 			wantStaged: "v0.2.0",
 		},
 		{
+			name: "a swap interrupted between its renames gets the earlier stage back",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
+				if out, err := e.run(t, "--stage-only"); err != nil {
+					t.Fatalf("%v\n%s", err, out)
+				}
+				// Killed after moving app.new aside, before moving the new one in.
+				if err := os.Rename(e.app()+".new", e.app()+".new.prev"); err != nil {
+					t.Fatal(err)
+				}
+				tgz := fakeRelease(t, e.rel, "v0.3.0", "v0.3.0")
+				_ = os.WriteFile(tgz, []byte("tampered"), 0o644)
+			},
+			args:       []string{"--stage-only"},
+			want:       "checksum mismatch",
+			wantErr:    true,
+			wantNew:    true,
+			wantStaged: "v0.2.0",
+		},
+		{
 			name: "a newer download replaces an older stage",
 			prepare: func(t *testing.T, e installEnv) {
 				fakeRelease(t, e.rel, "v0.2.0", "v0.2.0")
@@ -811,8 +831,10 @@ func TestInstallStageAndApplyErrors(t *testing.T) {
 					t.Fatalf("app.new holds %q (%v), want %s", b, err, tt.wantStaged)
 				}
 			}
-			if _, err := os.Stat(e.app() + ".new.partial"); err == nil {
-				t.Fatal("app.new.partial left behind")
+			for _, left := range []string{".new.partial", ".new.prev"} {
+				if _, err := os.Stat(e.app() + left); err == nil {
+					t.Fatalf("app%s left behind", left)
+				}
 			}
 		})
 	}

@@ -83,11 +83,11 @@ describe("runUpdateAction('restart')", () => {
 
   it("other failures land in the dialog and do not restart", async () => {
     useCommandsStore.setState({ commands: [cmd("app.restart")] });
-    invokeCommand.mockRejectedValueOnce(new ConnectError("an update is downloading; restart when it finishes", Code.FailedPrecondition));
+    invokeCommand.mockRejectedValueOnce(new ConnectError("install v0.2.0: installer: exit status 1", Code.FailedPrecondition));
     await expect(runUpdateAction("restart")).resolves.toBe(false);
     expect(calls()).toEqual([["app.restart", true]]);
     expect(relaunchApp).not.toHaveBeenCalled();
-    expect(useUpdateStore.getState()).toMatchObject({ restarting: null, error: "an update is downloading; restart when it finishes" });
+    expect(useUpdateStore.getState()).toMatchObject({ restarting: null, error: "install v0.2.0: installer: exit status 1" });
   });
 });
 

@@ -120,6 +120,8 @@ export class MockUpdater {
   /** app.restart runs (Restart Now). */
   restarts = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
+  /** A newer release is replacing the download (one at a time). */
+  private replacing = false;
 
   constructor(
     private readonly publish: (e: UpdateEventInit) => number,
@@ -132,6 +134,7 @@ export class MockUpdater {
   reset(): void {
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
+    this.replacing = false;
     this.latest = "v0.1.0";
     this.failNext = "";
     this.relaunches = 0;
@@ -181,7 +184,8 @@ export class MockUpdater {
     s.lastCheckedAt = new Date();
     s.latestVersion = this.latest;
     s.lastCheckError = "";
-    if (s.state === UpdateState.DOWNLOADING) {
+    // A download running decides; a failure of the latest stays (Try Again).
+    if (s.state === UpdateState.DOWNLOADING || (s.state === UpdateState.FAILED && s.targetVersion === this.latest)) {
       this.emit();
       return s;
     }
@@ -201,9 +205,12 @@ export class MockUpdater {
 
   /** The background replacement of a download by a newer release: Downloaded stays until it is done. */
   private replace(target: string): void {
+    if (this.replacing) return;
+    this.replacing = true;
     this.timers.push(
       setTimeout(
         () => {
+          this.replacing = false;
           if (this.status.state === UpdateState.DOWNLOADED) this.set(UpdateState.DOWNLOADED, target);
         },
         this.stepMs * (PROGRESS.length + 1),
@@ -240,7 +247,7 @@ export class MockUpdater {
           if (this.failNext) {
             const reason = this.failNext;
             this.failNext = "";
-            if (auto) this.set(UpdateState.AVAILABLE, target);
+            if (auto) this.set(UpdateState.AVAILABLE, target, { failureReason: reason });
             else this.set(UpdateState.FAILED, target, { failureReason: reason });
           } else {
             this.set(UpdateState.DOWNLOADED, target);
@@ -271,10 +278,15 @@ export class MockUpdater {
 
   /**
    * daemon.restart: the mock keeps running but comes back as the installed version. It
-   * installs nothing: a download survives (the new daemon starts in Downloaded).
+   * installs nothing: a download survives (the new daemon starts in Downloaded), and one
+   * still running is cut off (the real daemon downloads again at its first check).
    */
   restart(): string {
-    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is downloading; restart when it finishes");
+    if (this.status.state === UpdateState.DOWNLOADING) {
+      for (const t of this.timers) clearTimeout(t);
+      this.timers = [];
+    }
+    this.replacing = false;
     const n = this.restartCost();
     const installed = this.status.state === UpdateState.INSTALLED || this.status.state === UpdateState.RESTART_REQUIRED;
     if (installed) this.status.currentVersion = this.status.targetVersion;
@@ -285,7 +297,6 @@ export class MockUpdater {
 
   /** app.restart: installs a download first (a failed install restarts nothing), then restarts. */
   restartApp(): string {
-    if (this.status.state === UpdateState.DOWNLOADING) throw new Error("an update is downloading; restart when it finishes");
     const installed = this.downloadedTarget() ? this.install() : "";
     this.restarts++;
     const msg = this.restart().replace("restarting the daemon", "restarting Code Foundry").replace("the next client starts the installed version", "the app relaunches once the daemon has stopped");

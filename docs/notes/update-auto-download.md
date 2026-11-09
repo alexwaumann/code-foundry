@@ -17,11 +17,18 @@ again).
   Available to Downloading.
 - **An automatic download that fails goes back to Available, not Failed.** The user sees
   "vX available · Download", the same as before automatic downloads, so the Download
-  button is the fallback. The next scheduled or requested check tries again. The check
-  right after the failure (from the previous PR) does not retry the version that just
-  failed (`autoNew`, `failedTag`), so a checksum mismatch cannot loop. It still downloads
-  a different, newer release. A download the user started (Download / Try Again) still
-  fails to Failed with the reason.
+  button is the fallback. `FailureReason` stays set, so `code-foundry update`, which
+  follows the download, prints why. The next scheduled or requested check tries again.
+  The check right after the failure (from the previous PR) does not retry the version
+  that just failed (`autoNew`, `failedTag`). It still downloads a different, newer
+  release. A download the user started (Download / Try Again) still fails to Failed with
+  the reason.
+- **After `MaxAutoAttempts` (3) failures of the same version in a row, it is Failed**
+  (Try Again), and checks stop downloading it until a newer release comes out or a
+  download by hand succeeds. Otherwise a broken release asset would be downloaded in
+  full every hour, with nothing shown. Transient failures still heal quietly within an
+  hour or two. Failed replacements count the same way and stop being retried; the older
+  download stays.
 - **Download's own check starts nothing** (`autoNone`). Otherwise Download would find its
   own automatic download running and refuse with "already downloading".
 - **A newer release while one is downloaded replaces it in the background.** The state stays
@@ -38,6 +45,21 @@ again).
   `app.new.partial`. `/bin/bash` 3.2 runs the EXIT trap on the SIGTERM that cancellation
   sends to the installer's process group. A full install (no flags) still removes a stale
   stage on failure, as before.
+- **Restarts no longer refuse while a download runs.** `app.restart` and
+  `daemon.restart` used to fail with "an update is downloading; restart when it
+  finishes". With checks downloading by themselves, that would block a restart for as
+  long as a download takes, including 30 s after every daemon start. The download is cut
+  off (the daemon's Close cancels the installer, which keeps an earlier stage and removes
+  the partial), and the restarted daemon downloads again at its first check.
+- **The stage swap is two renames** (`app.new` → `app.new.prev`, `app.new.partial` →
+  `app.new`, then remove `.prev`), not delete-then-rename. A signal between them leaves
+  `.prev`, which the EXIT trap moves back. A signal during a delete can no longer leave a
+  half-deleted `app.new` that passes `check_staged`.
+- **A channel switch cancels a replacement in progress**, so a newer tip cannot land as
+  the download after the user chose stable. The cancelled replacement does not count as
+  a failure.
+- **No automatic download starts while a replacement runs**, even if a check sees
+  nothing staged for an instant.
 - **Restart Now during a replacement cancels it** and installs what is staged. Install
   cancels, waits for the installer to exit, then installs the staged version. If the
   replacement finished first, that is the newer one.
@@ -47,7 +69,12 @@ again).
 - The `app.update.check` description and the proto comments for `Check` and `Download`
   now say a check downloads. The description also said "every 24 hours", which has been
   hourly since `update-check-hourly.md`.
-- The mock updater mirrors all of this. A check that finds a release starts downloading,
+- Review follow-ups not taken: during a replacement, `code-foundry update` reports the
+  staged version and says to restart, which installs that version (by design: Restart
+  Now works throughout). `code-foundry update --version` for a version the daemon does
+  not offer still falls back to a full install while the daemon runs. That was already
+  true before.
+- The mock updater mirrors all of this (not the three-attempt cap). A check that finds a release starts downloading,
   a failed automatic download goes back to Available, and a newer release while
   Downloaded swaps the target after a delay.
 
@@ -58,10 +85,14 @@ again).
   the re-check does not retry, the next check does), `TestAutomaticFailureThenNewer`,
   `TestNewerReplacesDownload` (stays Downloaded and staged throughout, one replacement at
   a time), `TestNewerDuringDownload`, `TestInstallDuringReplacement` (still downloading
-  and failed), and `TestPeriodicCheckDownloads`. `-race -count=10` green. Script:
+  and failed), `TestPeriodicCheckDownloads`, `TestAutomaticDownloadGivesUp` (Failed after
+  three, then no download until a newer release), and
+  `TestChannelSwitchCancelsReplacement`. Command tests: `app.restart` and
+  `daemon.restart` restart while downloading. `-race -count=10` green. Script:
   `TestInstallStageAndApplyErrors` gains "a failed download keeps an older stage", "an
-  unpack failure keeps an older stage", "a newer download replaces an older stage", and
-  no `app.new.partial` left behind in any row.
+  unpack failure keeps an older stage", "a newer download replaces an older stage", "a
+  swap interrupted between its renames gets the earlier stage back", and no
+  `app.new.partial` or `app.new.prev` left behind in any row.
 - e2e: `e2e/update.spec.ts`. A check downloads at once without `app.update`, a failed
   automatic download falls back to the Download button, then Install and Restart Now.
 - End to end, isolated (`CODE_FOUNDRY_HOME` on a short /tmp symlink,
@@ -80,3 +111,7 @@ again).
     replacement hung in `install.sh`. `app restart --yes` → log "cancelling the newer
     download to install the downloaded update", "installed v0.93.0". Afterwards
     `app/VERSION` v0.93.0, no `app.new` or `app.new.partial`, no leftover `cp`/`sleep`.
+  - Restart while downloading (after the review follow-ups, v0.95.0 → v0.96.0, with the
+    slow `cp` shim holding the download): `daemon restart --yes` → "restarting the daemon;
+    the next client starts the installed version", no `app.new` or `app.new.partial`, no
+    leftover `cp`/`sleep`. The next check (normal `cp`) downloaded v0.96.0 again.

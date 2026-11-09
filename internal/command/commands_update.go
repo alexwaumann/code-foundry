@@ -252,10 +252,6 @@ func restartWhat(st *v1.UpdateStatus) string {
 	return "Restart Code Foundry"
 }
 
-// errDownloading refuses a restart while a download runs: the new daemon would start
-// without it.
-var errDownloading = fmt.Errorf("%w: an update is downloading; restart when it finishes", ErrUnavailable)
-
 func plural(n int, word string) string {
 	if n == 1 {
 		return fmt.Sprintf("1 %s", word)
@@ -375,10 +371,10 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 				if d.Restart == nil {
 					return Result{}, errors.New("this daemon cannot restart itself")
 				}
+				// A download still running is cut off (an earlier one staged stays) and the
+				// restarted daemon downloads again at its first check: checks download by
+				// themselves, so refusing would block restarts for as long as a download takes.
 				st := updateStatus(ctx, d.Update)
-				if st.GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
-					return Result{}, errDownloading
-				}
 				// Install the download now, while both processes are about to go down
 				// together: the window relaunched below and the daemon started after this
 				// one exits run the same new version. A failed install restarts nothing.
@@ -422,10 +418,8 @@ func RegisterUpdate(r *Registry, d UpdateDeps) error {
 					return Result{}, errors.New("this daemon cannot restart itself")
 				}
 				// It does not install a download: the daemon alone would then run a version
-				// the open window does not (`app.restart` changes both).
-				if updateStatus(ctx, d.Update).GetState() == v1.UpdateState_UPDATE_STATE_DOWNLOADING {
-					return Result{}, errDownloading
-				}
+				// the open window does not (`app.restart` changes both). A download still
+				// running is cut off, as for app.restart.
 				n := restartCost(ctx, d.Thread)
 				d.Restart()
 				return Result{

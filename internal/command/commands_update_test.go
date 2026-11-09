@@ -223,8 +223,11 @@ func TestAppRestart(t *testing.T) {
 			wantConfirm: quiet,
 		},
 		{
-			name: "refused while downloading", threads: []*v1.Thread{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true,
-			wantErr:     command.ErrUnavailable,
+			// The download is cut off; the restarted daemon downloads again.
+			name: "restarts while downloading", threads: []*v1.Thread{busy}, status: v1.UpdateState_UPDATE_STATE_DOWNLOADING, restart: true, windows: 1,
+			wantMsg:     "restarting Code Foundry (cuts off 1 thread working or waiting on you); the app relaunches once the daemon has stopped",
+			wantJSON:    command.AppRestart{ThreadsInterrupted: 1, GUINotified: 1},
+			restarts:    1,
 			wantConfirm: "1 thread working or waiting on you will be cut off. Restart Code Foundry anyway?",
 		},
 		{
@@ -385,7 +388,7 @@ func TestDaemonRestart(t *testing.T) {
 			"1 background shell will be cut off. Restart the daemon anyway?"},
 		{"an idle running thread does not count", idle, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
 		{"stopped threads do not count", dead, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
-		{"refused while downloading", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "", command.ErrUnavailable, 0, one},
+		{"restarts while downloading", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "restarting the daemon (cuts off 1 thread working or waiting on you); the next client starts the installed version", nil, 1, one},
 		{"a download is not installed", idle, v1.UpdateState_UPDATE_STATE_DOWNLOADED, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
 		{"no restart hook", live, v1.UpdateState_UPDATE_STATE_IDLE, false, "", nil, 0, one},
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,8 +80,8 @@ func TestAutomaticDownloadFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := r.waitTarget(t, update.Available, "v0.2.0")
-	if st.FailureReason != "" {
-		t.Fatalf("available after an automatic failure %+v", st)
+	if !strings.Contains(st.FailureReason, "download failed") {
+		t.Fatalf("available after an automatic failure %+v, want the reason", st)
 	}
 	r.waitSourceCalls(t, calls+2) // the check and the one after the failure
 	if st := r.store.Snapshot(); st.State != update.Available {
@@ -224,4 +225,74 @@ func TestPeriodicCheckDownloads(t *testing.T) {
 		o.InitialDelay = time.Millisecond
 	})
 	r.waitTarget(t, update.Downloaded, "v0.2.0")
+}
+
+// TestAutomaticDownloadGivesUp: a version whose download keeps failing (a broken
+// release asset) is Failed after MaxAutoAttempts, and checks stop downloading it until a
+// newer release.
+func TestAutomaticDownloadGivesUp(t *testing.T) {
+	r := newAutoRig(t, "v0.2.0")
+	ctx := context.Background()
+	r.installer.FailTag("v0.2.0", errors.New("installer: exit status 1: checksum mismatch"))
+	for attempt := 1; attempt <= update.MaxAutoAttempts; attempt++ {
+		if _, err := r.store.Check(ctx); err != nil {
+			t.Fatal(err)
+		}
+		want := update.Available
+		if attempt == update.MaxAutoAttempts {
+			want = update.Failed
+		}
+		st := r.waitTarget(t, want, "v0.2.0")
+		if !strings.Contains(st.FailureReason, "checksum mismatch") {
+			t.Fatalf("attempt %d: %+v", attempt, st)
+		}
+		r.waitSourceCalls(t, 2*attempt) // each check and the one after its failure
+	}
+	if st, _ := r.store.Check(ctx); st.State != update.Failed {
+		t.Fatalf("check after giving up %+v", st)
+	}
+	if got := r.installer.Calls(); len(got) != update.MaxAutoAttempts {
+		t.Fatalf("downloads %v, want %d", got, update.MaxAutoAttempts)
+	}
+	r.source.Set("v0.3.0", nil)
+	if _, err := r.store.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.waitTarget(t, update.Downloaded, "v0.3.0")
+}
+
+// TestChannelSwitchCancelsReplacement: switching channel stops a replacement of the old
+// channel, so its release does not land as the download.
+func TestChannelSwitchCancelsReplacement(t *testing.T) {
+	r := newRig(t, "v0.1.0", func(o *update.Options) {
+		o.ManualDownload = false
+		o.Channel = update.ChannelTip
+	})
+	ctx := context.Background()
+	r.source.SetTip("v0.2.0-tip.1")
+	if _, err := r.store.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.waitTarget(t, update.Downloaded, "v0.2.0-tip.1")
+	release := r.installer.HoldTag("v0.2.0-tip.2")
+	defer release()
+	r.source.SetTip("v0.2.0-tip.2")
+	if _, err := r.store.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r.waitDownloads(t, 2)
+	r.store.SetChannel(update.ChannelStable)
+	deadline := time.Now().Add(5 * time.Second)
+	for r.installer.Cancels() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the replacement was not cancelled")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if st, _ := r.store.Check(ctx); st.State != update.Downloaded || st.Target != "v0.2.0-tip.1" {
+		t.Fatalf("after the switch %+v", st)
+	}
+	if v, _ := r.installer.Staged().Version(); v != "v0.2.0-tip.1" {
+		t.Fatalf("staged %s", v)
+	}
 }

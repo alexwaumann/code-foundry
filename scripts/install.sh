@@ -307,6 +307,7 @@ esac
 while [ "${APP_DIR%/}" != "$APP_DIR" ] && [ "$APP_DIR" != "/" ]; do APP_DIR="${APP_DIR%/}"; done
 STAGE="$APP_DIR.new"
 PARTIAL="$APP_DIR.new.partial"
+PREV="$APP_DIR.new.prev"
 OLD="$APP_DIR.old"
 
 # A previous run killed between its two renames left only the backup: put it back.
@@ -418,7 +419,12 @@ KEEP_STAGE=0
 [ "$APPLY_STAGED" = 0 ] && [ "$STAGE_ONLY" = 0 ] || KEEP_STAGE=1
 cleanup() {
 	[ -z "$TMP" ] || rm -rf "$TMP"
-	[ "$APPLY_STAGED" = 1 ] || rm -rf "$PARTIAL"
+	if [ "$APPLY_STAGED" = 0 ]; then
+		rm -rf "$PARTIAL"
+		# Interrupted between the stage swap's renames: put the earlier download back.
+		if [ ! -e "$STAGE" ] && [ -d "$PREV" ]; then mv "$PREV" "$STAGE"; fi
+		rm -rf "$PREV"
+	fi
 	[ "$KEEP_STAGE" = 1 ] || rm -rf "$STAGE"
 	if [ "$SWAPPED" = 1 ]; then
 		rm -rf "$OLD"
@@ -479,9 +485,14 @@ stage_download() {
 	# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and
 	# tar propagates the attribute to what it extracts.
 	/usr/bin/xattr -dr com.apple.quarantine "$PARTIAL" 2>/dev/null || true
-	# Complete and checked: replace an earlier download.
-	rm -rf "$STAGE"
+	# Complete and checked: replace an earlier download with two renames, so a signal at
+	# any point leaves either download whole (the EXIT trap restores PREV).
+	rm -rf "$PREV"
+	if [ -e "$STAGE" ]; then
+		mv "$STAGE" "$PREV" || die "could not move the earlier download aside"
+	fi
 	mv "$PARTIAL" "$STAGE" || die "could not move the download into $STAGE"
+	rm -rf "$PREV"
 }
 
 if [ "$APPLY_STAGED" = 1 ]; then
