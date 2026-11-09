@@ -30,7 +30,7 @@ describe("view model", () => {
     expect([...kinds, "tabs"].sort()).toEqual([...NODE_KINDS].sort());
     // Layout has a toolbar and a footer; the other tabs neither.
     const layout = demoView("layout");
-    expect([layout.toolbar?.map((n) => n.key), layout.footer?.map((n) => n.key)]).toEqual([["layout-search-form", "layout-status"], ["layout-count", "layout-footer-bar"]]);
+    expect([layout.toolbar?.map((n) => n.key), layout.footer?.map((n) => n.key)]).toEqual([["layout-search-form", "layout-branch-form", "layout-status"], ["layout-count", "layout-footer-bar"]]);
     expect(demoView("overview").toolbar).toBeUndefined();
   });
 
