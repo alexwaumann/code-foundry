@@ -52,7 +52,7 @@ describe("node renderer registry", () => {
     expect(section?.getAttribute("data-collapsed")).toBe("true");
   });
 
-  it("renders the form: inputs, a secret, selects in three styles, a fieldset of toggles", () => {
+  it("renders the form: inputs, a secret, selects in three styles and a picker, a fieldset of toggles", () => {
     inView(<NodeList nodes={demoView("form").nodes} />, { viewTab: "form" });
     expect(screen.getAllByTestId("plugin-input").map((i) => [i.getAttribute("data-name"), i.getAttribute("type")])).toEqual([
       ["name", "text"],
@@ -63,6 +63,7 @@ describe("node renderer registry", () => {
       ["env", "radios"],
       // Multiple without a style is the dropdown's (pluginsdk/ui SelectDropdown is the default).
       ["tags", "multi-dropdown"],
+      ["reviewers", "picker"],
     ]);
     expect(screen.getByTestId("plugin-fieldset").querySelectorAll('[data-testid="plugin-toggle"]')).toHaveLength(2);
   });

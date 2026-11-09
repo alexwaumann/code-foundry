@@ -7,7 +7,7 @@ import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { ViewContext, type ViewCtx } from "./context";
 import { NodeList } from "./NodeList";
 import { PICKER_DEBOUNCE_MS, PICKER_MAX_PICKED } from "./picker";
-import { InStrip } from "./strip";
+import { InStrip, stripItemClass } from "./strip";
 
 const acts: ActRequestView[] = [];
 let refuse = false;
@@ -254,5 +254,16 @@ describe("a picker in a toolbar", () => {
   it("shows only the label (and a placeholder when given) with nothing picked", () => {
     show(picker({}, { value: [], placeholder: undefined }), true);
     expect(trigger().textContent).toBe("Assignee");
+  });
+
+  it("takes no free width in a form of only pickers; beside an input the form still grows", () => {
+    const only: ViewNode = { key: "f", form: { fields: [picker()] } };
+    const mixed: ViewNode = { key: "f", form: { fields: [picker(), { key: "q", name: "q", input: {} }] } };
+    const submitted: ViewNode = { key: "f", form: { fields: [picker()], submit: { key: "go", label: "Go", action: { event: "go" } } } };
+    expect(stripItemClass(only)).toBe("min-w-0");
+    expect(stripItemClass(mixed)).toContain("flex-1");
+    expect(stripItemClass(submitted)).toContain("flex-1");
+    const sp: ViewNode = { key: "s", spacer: { flex: true } };
+    expect(stripItemClass(sp, [only, sp])).toBe("flex-1");
   });
 });

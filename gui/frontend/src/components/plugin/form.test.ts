@@ -7,11 +7,11 @@ const form = demoView("form").nodes.find((n) => n.form)?.form as FormNodeData;
 
 describe("form values", () => {
   it("flattens fieldsets", () => {
-    expect(flatFields(form.fields).map((f) => f.name)).toEqual(["name", "token", "project", "env", "tags", "notifyFail", "notifyDone"]);
+    expect(flatFields(form.fields).map((f) => f.name)).toEqual(["name", "token", "project", "env", "tags", "reviewers", "notifyFail", "notifyDone"]);
   });
 
   it("sends the plugin's values for pristine fields and drafts for changed ones; secrets only typed and only in a submit", () => {
-    expect(formValues(form, undefined, true)).toEqual({ name: "", project: "", env: "dev", tags: ["a"], notifyFail: true, notifyDone: false });
+    expect(formValues(form, undefined, true)).toEqual({ name: "", project: "", env: "dev", tags: ["a"], reviewers: [], notifyFail: true, notifyDone: false });
     const drafts = { name: "Ada", token: "tok", tags: ["a", "c"] };
     expect(formValues(form, drafts, true)).toMatchObject({ name: "Ada", token: "tok", tags: ["a", "c"] });
     expect(formValues(form, drafts, false)).not.toHaveProperty("token");

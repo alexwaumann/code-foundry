@@ -21,6 +21,7 @@
  * /__mock/plugin/terminals?count=N (the plugin owns terminals t-wall-0..), GET /__mock/plugin/acts.
  */
 import { readFileSync } from "node:fs";
+import { branchField, reviewersField, stringsOf } from "./pluginPickers";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
@@ -162,7 +163,7 @@ function patchNode(nodes: Node[], key: string, f: (n: Node) => void): boolean {
 
 interface Element {
   key: string;
-  kind: "click" | "submit" | "change" | "tab" | "select" | "host";
+  kind: "click" | "submit" | "change" | "tab" | "select" | "search" | "host";
   event: string;
   /** The event's data (a chip's status, a row's id). */
   data?: string;
@@ -188,9 +189,11 @@ function elementsOf(view: Record<string, unknown>): Map<string, Element> {
   });
   const tabs = view.tabs as { items?: { key: string }[] } | undefined;
   tabs?.items?.forEach((t) => out.set(t.key, { key: t.key, kind: "tab", event: "tab" }));
-  const fields = (fs: { key: string; change?: unknown; fieldset?: { fields: unknown[] } }[]) => {
+  const fields = (fs: { key: string; change?: unknown; fieldset?: { fields: unknown[] }; select?: { search?: { key: string; event: string } } }[]) => {
     for (const f of fs) {
       if (f.change) action(f.key, f.change, "change");
+      const s = f.select?.search;
+      if (s) out.set(s.key, { key: s.key, kind: "search", event: s.event });
       if (f.fieldset) fields(f.fieldset.fields as typeof fs);
     }
   };
@@ -396,7 +399,9 @@ class DemoInstance {
   build = 0;
   running = false;
   /** The Layout tab's toolbar filter (the real plugin's layoutFilter). */
-  layoutFilter = { status: "", query: "", resets: 0 };
+  layoutFilter = { status: "", query: "", resets: 0, branches: [] as string[], branchQuery: "" };
+  /** The Form tab's reviewers picker's last search (the real plugin's peopleQuery). */
+  peopleQuery = "";
   /** The Overview's Failing card narrows its chart to the failed builds (charts.go). */
   failedOnly = false;
   /** The Runs tab's state (the real plugin's runsState): the chosen run, the detail's tab, notes by run. */
@@ -474,6 +479,8 @@ class DemoInstance {
         form.resetToken = String(this.resetToken);
         const token = form.fields.find((f) => f.key === "f-token");
         if (token?.input && this.tokenStored) token.input.hasValue = true;
+        const rev = form.fields.findIndex((f) => f.key === "f-reviewers");
+        if (rev >= 0) form.fields[rev] = reviewersField(stringsOf(this.saved?.reviewers), this.peopleQuery) as (typeof form.fields)[number];
       });
     } else if (this.tab === "assistant") {
       patchNode(nodes, "assistant-thread", (n) => {
@@ -539,7 +546,12 @@ class DemoInstance {
     patchNode(v.nodes as Node[], "layout-runs", (n) => {
       const list = n.list as { rows: Row[] };
       total = list.rows.length;
-      list.rows = list.rows.filter((r) => (status === "all" || states[r.glyph?.status ?? ""] === status) && (q === "" || `${r.title} ${r.trailing ?? ""}`.toLowerCase().includes(q)));
+      list.rows = list.rows.filter(
+        (r) =>
+          (status === "all" || states[r.glyph?.status ?? ""] === status) &&
+          (q === "" || `${r.title} ${r.trailing ?? ""}`.toLowerCase().includes(q)) &&
+          (f.branches.length === 0 || f.branches.includes(r.trailing ?? "")),
+      );
       shown = list.rows.length;
     });
     const toolbar = (v.toolbar ?? []) as Node[];
@@ -553,6 +565,11 @@ class DemoInstance {
         else delete input.value;
       }
     });
+    patchNode(toolbar, "layout-branch-form", (n) => {
+      const form = n.form as { resetToken?: string; fields: unknown[] };
+      form.resetToken = String(f.resets);
+      form.fields = [branchField(f.branches, f.branchQuery)];
+    });
     patchNode(toolbar, "layout-status", (n) => {
       for (const c of (n.chips as { chips: { key: string; selected?: boolean }[] }).chips) {
         if (c.key === `layout-st-${status}`) c.selected = true;
@@ -564,12 +581,12 @@ class DemoInstance {
     });
     patchNode(footer, "layout-footer-bar", (n) => {
       const clear = (n.actions as { buttons: { key: string; disabled?: boolean }[] }).buttons.find((b) => b.key === "layout-clear");
-      if (clear) clear.disabled = status === "all" && q === "";
+      if (clear) clear.disabled = status === "all" && q === "" && f.branches.length === 0;
     });
   }
 
   /** The plugin's surface/act. Throws the plugin's refusal as Aborted, like the daemon. */
-  act(el: Element, values: Record<string, unknown>, toast: (text: string) => void, viewer = ""): void {
+  act(el: Element, values: Record<string, unknown>, toast: (text: string) => void, viewer = "", value = ""): void {
     if (fuzzControl.failNext.delete(el.key)) throw new ConnectError(`plugin refused: ${el.key} (failnext)`, Code.Aborted);
     if (this.tab === "custom" && this.custom) {
       if (el.kind === "select" && el.node) this.custom.selected[el.node] = el.key;
@@ -649,7 +666,16 @@ class DemoInstance {
         this.layoutFilter = { ...this.layoutFilter, status: el.data ?? "" };
         break;
       case "click:layout-clear":
-        this.layoutFilter = { status: "", query: "", resets: this.layoutFilter.resets + 1 };
+        this.layoutFilter = { status: "", query: "", resets: this.layoutFilter.resets + 1, branches: [], branchQuery: "" };
+        break;
+      case "change:layout-branch":
+        this.layoutFilter = { ...this.layoutFilter, branches: stringsOf(values.branch) };
+        break;
+      case "search:search-branches":
+        this.layoutFilter = { ...this.layoutFilter, branchQuery: value.trim() };
+        break;
+      case "search:search-people":
+        this.peopleQuery = value.trim();
         break;
       case "click:layout-rerun":
         toast("build #6 queued again");
@@ -1213,7 +1239,7 @@ export class MockPlugins {
     this.acts.push(`${req.instance} ${req.key}${viewer ? ` viewer=${viewer}` : ""} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}`);
     const version = req.version || BigInt(inst.version);
     const run = () => {
-      inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer);
+      inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer, req.value ?? "");
       return version;
     };
     if (fuzzControl.actDelayMs > 0) {

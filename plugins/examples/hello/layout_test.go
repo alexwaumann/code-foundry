@@ -60,7 +60,7 @@ func TestLayoutChrome(t *testing.T) {
 		return ui.Node{}
 	}
 	v := act(pluginsdk.SurfaceAct{Kind: pluginsdk.ActTab, Action: "tab", Key: "layout"})
-	if len(v.Toolbar) != 2 || find(v.Toolbar, "layout-search-form").Form == nil || find(v.Toolbar, "layout-status").Chips == nil {
+	if len(v.Toolbar) != 3 || find(v.Toolbar, "layout-search-form").Form == nil || find(v.Toolbar, "layout-branch-form").Form == nil || find(v.Toolbar, "layout-status").Chips == nil {
 		t.Fatalf("toolbar %+v", v.Toolbar)
 	}
 	if len(v.Footer) != 2 || find(v.Footer, "layout-count").Text.Content.Text != "6 of 6 runs" || !find(v.Footer, "layout-footer-bar").Actions.Buttons[0].Disabled {

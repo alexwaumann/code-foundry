@@ -286,6 +286,7 @@ describe("the strips' row", () => {
     inPanel({ toolbar: v.toolbar ?? [], footer: v.footer ?? [] });
     expect(items("plugin-toolbar")).toEqual([
       ["layout-search-form", "form"],
+      ["layout-branch-form", "form"],
       ["layout-status", "chips"],
     ]);
     expect(items("plugin-footer")).toEqual([

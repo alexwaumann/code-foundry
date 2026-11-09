@@ -24,7 +24,7 @@ export function useInStrip(): StripSlot | null {
 
 /**
  * How a node sits in the strip's row: a form (a search field, filters) and a progress bar
- * take the free width, an end-aligned actions bar goes to the row's end, a flex spacer
+ * take the free width (a form of only pickers is as wide as their compact triggers), an end-aligned actions bar goes to the row's end, a flex spacer
  * pushes what follows to the row's end (it takes the free width when nothing else in the
  * row grows; beside a form, a progress bar or a group that grows it takes next to none,
  * so they keep theirs), a group not aligned to the start takes the free width to align in,
@@ -34,7 +34,7 @@ export function useInStrip(): StripSlot | null {
 export function stripItemClass(n: ViewNode, row: readonly ViewNode[] = [n]): string {
   switch (nodeKind(n)) {
     case "form":
-      return "min-w-40 flex-1";
+      return pickersOnly(n) ? "min-w-0" : "min-w-40 flex-1";
     case "progress":
       return "min-w-24 flex-1";
     case "actions":
@@ -56,6 +56,7 @@ export function stripItemClass(n: ViewNode, row: readonly ViewNode[] = [n]): str
 function grows(n: ViewNode): boolean {
   switch (nodeKind(n)) {
     case "form":
+      return !pickersOnly(n);
     case "progress":
       return true;
     case "group":
@@ -63,4 +64,10 @@ function grows(n: ViewNode): boolean {
     default:
       return false;
   }
+}
+
+/** A form whose fields are all pickers (select.search): compact triggers that take no free width. */
+function pickersOnly(n: ViewNode): boolean {
+  const fields = n.form?.fields ?? [];
+  return fields.length > 0 && fields.every((f) => f.select?.search !== undefined) && !n.form?.submit && (n.form?.secondary?.length ?? 0) === 0;
 }

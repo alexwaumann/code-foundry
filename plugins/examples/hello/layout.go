@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
@@ -24,24 +25,32 @@ var layoutRuns = []layoutRun{
 }
 
 // layoutFilter is what the Layout tab's toolbar filters the runs by: a status ("" or
-// "all" for every run) and text in the title or branch.
+// "all" for every run), text in the title or branch, and the branches picked in its branch
+// picker (none: every branch; branchQuery is that picker's last search).
 type layoutFilter struct {
 	status, query string
 	resets        int // the search form's reset token: Clear filter drops its draft
+	branches      []string
+	branchQuery   string
 }
 
-func (f layoutFilter) active() bool { return (f.status != "" && f.status != "all") || f.query != "" }
+func (f layoutFilter) active() bool {
+	return (f.status != "" && f.status != "all") || f.query != "" || len(f.branches) > 0
+}
 
 func (f layoutFilter) match(r layoutRun) bool {
 	if f.status != "" && f.status != "all" && r.state != f.status {
+		return false
+	}
+	if len(f.branches) > 0 && !slices.Contains(f.branches, r.branch) {
 		return false
 	}
 	q := strings.ToLower(strings.TrimSpace(f.query))
 	return q == "" || strings.Contains(strings.ToLower(fmt.Sprintf("build #%d %s", r.n, r.branch)), q)
 }
 
-// layoutChrome is the Layout tab's toolbar (a search field and status chips that filter
-// the runs) and footer (the count and an actions bar), pinned around its scrolling body.
+// layoutChrome is the Layout tab's toolbar (a search field, a branch picker and status
+// chips that filter the runs) and footer (the count and an actions bar), pinned around its scrolling body.
 func layoutChrome(f layoutFilter) (toolbar, footer []ui.Node) {
 	q := ui.TextField("layout-q", "q", "Filter runs").WithPlaceholder("Filter runs").WithValue(f.query)
 	submit := ui.EventButton("layout-search", "Filter", "layout-filter").WithIcon("search").AsIconOnly()
@@ -71,7 +80,9 @@ func layoutChrome(f layoutFilter) (toolbar, footer []ui.Node) {
 	bar := ui.Node{Key: "layout-footer-bar", Actions: &ui.Actions{Align: ui.AlignEnd, Buttons: []ui.Button{
 		clear, ui.EventButton("layout-rerun", "Run again", "layout-rerun").WithIcon("rotate-ccw").WithStyle(ui.ButtonAttention),
 	}}}
-	return []ui.Node{search, chips}, []ui.Node{summary, bar}
+	branch := ui.NewForm("layout-branch-form", nil, branchField(f.branches, f.branchQuery))
+	branch.Form.ResetToken = search.Form.ResetToken
+	return []ui.Node{search, branch, chips}, []ui.Node{summary, bar}
 }
 
 // layoutNodes is the demo's Layout tab: the layout nodes, in a wide container (a page's
