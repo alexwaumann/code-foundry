@@ -107,7 +107,7 @@ func nullListOf(view []byte, required []string) string {
 // expectedElements lists "key kind node" for every acting element of a valid view,
 // found by reflection (not by the host's walk): every button, row and chip with an
 // action, a master-detail's rows without one (select, naming it), the view's tabs and a
-// tabs node's (tab, naming it), and fields with a change event.
+// tabs node's (tab, naming it), fields with a change event, and pickers' searches.
 func expectedElements(v *ui.View) []string {
 	var out []string
 	kind := func(a *ui.Action, event string) string {
@@ -178,6 +178,9 @@ func expectedElements(v *ui.View) []string {
 			// fieldset with change).
 			if x.Change != nil && x.Change.Event != "" && x.Fieldset == nil {
 				add(x.Key, pluginsdk.ActChange, "")
+			}
+			if x.Select != nil && x.Select.Search != nil {
+				add(x.Select.Search.Key, pluginsdk.ActSearch, "")
 			}
 			if x.Fieldset != nil {
 				walk(reflect.ValueOf(x.Fieldset.Fields), "", false)

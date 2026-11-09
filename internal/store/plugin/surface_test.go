@@ -60,6 +60,7 @@ func (p *panel) view() ui.View {
 		{Key: "out", Log: &ui.Log{}},
 		ui.NewMasterDetail("pmd", ui.List{Rows: []ui.Row{ui.NewRow("pr1", "Run 1"), ui.NewRow("pr2", "Run 2")}}, "pr1",
 			ui.NewTabsNode("ptabs", ui.NewTabs("pt1", ui.NewTab("pt1", "One"), ui.NewTab("pt2", "Two")))),
+		ui.NewForm("pick", nil, ui.PickerField("who", "who", "Who", "people").AsMultiple(), ui.TextField("note", "note", "Note")),
 	}}
 }
 
@@ -67,7 +68,7 @@ func (p *panel) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 	if act.Context.ThreadID != "" {
 		p.h.Log().Info("act", "viewer", act.Context.ThreadID)
 	}
-	if act.Kind == pluginsdk.ActSelect || act.Kind == pluginsdk.ActTab {
+	if act.Kind == pluginsdk.ActSelect || act.Kind == pluginsdk.ActTab || act.Kind == pluginsdk.ActSearch {
 		// Dispatch on the kind: a click's event may be named "select" or "tab" too.
 		p.mu.Lock()
 		vals, _ := json.Marshal(act.Values)
@@ -453,7 +454,7 @@ func TestSurfaceActs(t *testing.T) {
 		t.Errorf("unknown instance: %v", err)
 	}
 	elements := e.m.SurfaceElements(w.key, 0)
-	if len(elements) != 13 || elements[0].Key != "inc" || elements[8].Kind != "submit" || elements[8].Form != "form" || elements[9].Kind != "select" {
+	if len(elements) != 14 || elements[0].Key != "inc" || elements[8].Kind != "submit" || elements[8].Form != "form" || elements[9].Kind != "select" {
 		t.Errorf("elements %+v", elements)
 	}
 }
