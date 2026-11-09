@@ -61,6 +61,8 @@ func TestDemoMenus(t *testing.T) {
 	if err := h.Pick(ctx, inst, "run-2-rerun-clean"); err != nil {
 		t.Fatal(err)
 	}
+	// A toast is a notification: it lands after the act returns.
+	h.WaitFor(5*time.Second, func(h *plugintest.Host) bool { return len(h.Toasts()) > 0 })
 	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1].Text != "build #2 queued again" {
 		t.Errorf("toasts %+v", ts)
 	}
