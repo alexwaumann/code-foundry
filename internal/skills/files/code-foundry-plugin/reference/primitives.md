@@ -149,7 +149,8 @@ v := ui.View{Header: h, Tabs: tabs, Nodes: runsNodes} // NewTabs returns *ui.Tab
 
 The header stays pinned above the scrolling body. Empty `icon` and `title` use the
 manifest's; `tabTitle` (40 characters) renames the panel tab; up to 2 header buttons, drawn
-icon-only (give them an icon) at the end of the sub-line. The title is one line; the
+icon-only (give them an icon) at the end of the sub-line, then the header's `menu` as a ⋯
+(`nodes.md`, menus). The title is one line; the
 sub-line (with `sublineIcon`, a neutral icon from the list, before it) wraps to two lines
 (about 50 characters each at 400 px, 30 at 280 px) and is cut after that, never revealed:
 a sentence of guidance goes in a `text` node. **Tabs** switch views inside one surface: the host draws the strip, sends a
@@ -171,6 +172,7 @@ the active tab's like `nodes`: `reference/ui-layout.md`.
 | Explanatory copy | `markdown` | `nodes.md` |
 | Facts about one thing | `pairs` | `nodes.md` |
 | A list of things | `list` | `nodes.md` |
+| A row's or the view's less frequent actions | a menu (`menu` on a row, the header, a button) | `nodes.md` |
 | Stages or steps | `chips` | `nodes.md` |
 | Streaming output | `log` | `nodes.md` |
 | A bar of buttons | `actions` | `nodes.md` |
@@ -192,7 +194,7 @@ A node sits inside at most 4 containers: `section` and the layout containers (`u
 
 | Kind | When | Fields |
 |---|---|---|
-| `click` | a button, row, chip, stat card or bar with an event | `Action` (event name), `Key` (element key), `Data` |
+| `click` | a button, row, chip, stat card, bar or menu item with an event | `Action` (event name), `Key` (element key), `Data` |
 | `submit` | a form's submit with an event | `Action`, `Key`, `Data`, `Values` (the form's fields by name) |
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
 | `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs); no `Values` |

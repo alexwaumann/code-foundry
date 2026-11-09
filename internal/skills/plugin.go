@@ -114,7 +114,7 @@ func viewLimits() string {
 		return strings.Join(out, " / ")
 	}
 	rows := [][2]string{
-		{"Elements in a view (nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, tabs)", n(ui.MaxElements)},
+		{"Elements in a view (nodes, columns, grid items, rows, chips, pairs, fields, options, buttons, menu items, tabs)", n(ui.MaxElements)},
 		{"Containers (section, columns, pane, grid, container, masterDetail, tabs) a node sits inside", n(ui.MaxDepth)},
 		{"Columns in a columns node: least / most; a column's weight: most; its width: least / most (px)", n(ui.MinColumns, ui.MaxColumns) + "; " + n(ui.MaxColumnWeight) + "; " + n(ui.MinColumnWidth, ui.MaxColumnWidth)},
 		{"A px height (thread, terminal, pane) and a pane's minHeight: least / most (px)", n(ui.MinHeightPx, ui.MaxHeightPx)},
@@ -134,6 +134,7 @@ func viewLimits() string {
 		{"Header title / tab title / section title (characters)", n(ui.MaxHeaderTitle, ui.MaxTabTitle, ui.MaxSectionTitle)},
 		{"Labels, row titles, one-line inline text (characters)", n(ui.MaxLabel)},
 		{"Pair label / chip label (characters)", n(ui.MaxPairLabel, ui.MaxChipLabel)},
+		{"Menu: entries in a menu or a submenu (separators too) / an item's label (characters)", n(ui.MaxMenuItems, ui.MaxMenuLabel)},
 		{"Text content / markdown (bytes)", n(ui.MaxTextContent, ui.MaxMarkdown)},
 		{"Notice detail / event data / copy text (bytes)", n(ui.MaxNoticeDetail, ui.MaxEventData, ui.MaxCopy)},
 		{"Select options", n(ui.MaxOptions)},
