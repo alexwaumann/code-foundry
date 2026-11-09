@@ -23,7 +23,7 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 | Find an icon name (search it, do not read it) | `icons.md` |
 | Draw a view: model, value types, limits, acts, design rules, which node to use | `primitives.md` |
 | Use a display node (list, chips, log, notice, section…) | `nodes.md` |
-| Take input (fields, drafts, secrets in forms) | `forms.md` |
+| Take input (fields, pickers that search, drafts, secrets in forms) | `forms.md` |
 | Lay out: columns, pane, grid, group, master-detail; a toolbar or footer (search, filters) | `ui-layout.md` |
 | Call the host: `h.Log`, `h.DataDir`, Invoke, flags, context facts, session env, secrets, toasts | `host-api.md` |
 | React to daemon events | `events.md` |

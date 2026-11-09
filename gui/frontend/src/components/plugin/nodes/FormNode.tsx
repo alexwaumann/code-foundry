@@ -15,6 +15,7 @@ import { actOnElement, clearDrafts, draftKeyOf, revertDraft, runCommandElement, 
 import { FormContext, useFormCtx, useViewCtx } from "../context";
 import { fieldValue, formValues, isSecret, liveSender, pluginValue, validateField, validateForm, valueString, type LiveSender } from "../form";
 import { useSourceOptions } from "../options";
+import { PickerControl } from "../PickerControl";
 import { InlineView, PluginButton } from "../parts";
 import type { NodeProps } from "../registry";
 import { useInStrip } from "../strip";
@@ -33,6 +34,8 @@ interface FieldApi {
   blur: (f: Field) => void;
   /** Send a live input's change event with this text. */
   live: (f: Field, v: string) => Promise<unknown>;
+  /** Send a picker's search act with this query (PickerControl). */
+  search: (f: Field, term: string) => Promise<boolean>;
   submit: () => void;
 }
 
@@ -134,12 +137,29 @@ function optionLabel(o: SelectOption, list: boolean, control: ReactNode) {
 
 function SelectControl({ f, api, id, invalid }: { f: Field; api: FieldApi; id: string; invalid: boolean }) {
   const { locked } = useFormCtx() ?? { locked: false };
+  const strip = useInStrip() !== null;
   const sel = f.select ?? {};
   const sourced = useSourceOptions(sel.optionsSource);
   const options = sourced ?? sel.options ?? [];
   const v = fieldValue(f, api.drafts);
   const disabled = (f.disabled ?? false) || locked;
   const multiple = sel.multiple ?? false;
+  if (sel.search) {
+    return (
+      <PickerControl
+        f={f}
+        id={id}
+        value={Array.isArray(v) ? v : typeof v === "string" && v !== "" ? [v] : []}
+        invalid={invalid}
+        disabled={disabled}
+        strip={strip}
+        commit={(next) => {
+          api.change(f, multiple ? next : (next[0] ?? ""), true);
+        }}
+        search={(term) => api.search(f, term)}
+      />
+    );
+  }
   if (multiple && sel.style !== "list") {
     return <MultiDropdown f={f} api={api} id={id} invalid={invalid} options={options} disabled={disabled} />;
   }
@@ -343,7 +363,8 @@ function FieldView({ f, api }: { f: Field; api: FieldApi }) {
   }
   return (
     // In a strip the control is the field (a search box): its label names it for screen readers only.
-    <div className={cn("flex min-w-0 flex-col gap-1.5", strip && (f.input ? "min-w-32 flex-[2_1_0%]" : "min-w-28 flex-1"))} data-testid="plugin-field" data-name={name}>
+    // A picker's compact trigger is as wide as its label and picks.
+    <div className={cn("flex min-w-0 flex-col gap-1.5", strip && (f.input ? "min-w-32 flex-[2_1_0%]" : f.select?.search ? "shrink" : "min-w-28 flex-1"))} data-testid="plugin-field" data-name={name}>
       {f.label && (
         <Label id={`${id}-label`} htmlFor={id} className={cn("gap-1 text-body-sm font-medium", strip && "sr-only")}>
           {f.label}
@@ -433,6 +454,11 @@ export function FormNode({ node, data }: NodeProps<"form">) {
     live: (f, v) => {
       const now = { ...usePluginSurfacesStore.getState().drafts[draftKey], [f.name ?? ""]: v };
       return actOnElement(watchKey, f.key, { value: v, values: formValues(data, now, false) });
+    },
+    search: (f, term) => {
+      const key = f.select?.search?.key;
+      if (!key) return Promise.resolve(false);
+      return actOnElement(watchKey, key, { value: term, values: formValues(data, usePluginSurfacesStore.getState().drafts[draftKey], false) });
     },
     submit: () => void send(data),
   };

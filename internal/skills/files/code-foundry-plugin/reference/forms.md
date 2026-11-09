@@ -40,7 +40,8 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
   style, `disabled`), `value` (a list: one value unless `multiple`), `multiple`, `style`
   `dropdown` (default; with `multiple`, a menu of checkboxes) or `list` (radio or
   checkbox rows with descriptions), `placeholder`. `optionsSource: "projects"` or `"threads"` makes the host fill the
-  options (values are ids) and keep them current; `options` must then be empty.
+  options (values are ids) and keep them current; `options` must then be empty. With
+  `search` it is a **picker** the plugin searches (below).
 - `toggle`: a switch, `value` true or false.
 - `fieldset`: a label, `hint` and `error` over a group of fields (a checkbox group, a
   pair of related inputs). Fieldsets do not nest.
@@ -58,6 +59,42 @@ secret field. `secondary` buttons act like any button. `error` shows under the f
 From submit until Act returns, the host disables the form and spins the submit itself;
 for work that outlives the act, render the form with `busy` (every field and button
 disabled) and the submit button with `busy` (its spinner), and drop both when it ends.
+
+**Pickers.** A select with `search` (capability `view.select.search`) is a dropdown whose
+options the plugin looks up as the user types: people, issues, labels.
+
+```go
+who := ui.PickerField("f-who", "assignee", "Assignee", "search-people", // the search act's event
+	ui.Opt("sel-kim", "kim", "Kim Park").WithAvatar("K").InGroup("Selected"),
+	ui.Opt("rec-me", "me", "Me").WithAvatar("A").WithDetail("you").InGroup("Recent"),
+	ui.Opt("rec-bot", "bot", "Release bot").WithIcon("bot").AsDisabled().InGroup("Recent"),
+).AsMultiple().WithValues("kim").WithChange("assignee").WithSearchPlaceholder("Search people").
+	WithResults(query, matches...) // the answer to the last search ("" and none before one)
+```
+
+- Before typing it lists `options` under their `group` headings. From 2 characters
+  (trimmed), once typing pauses for 250 ms, the host sends a `search` act
+  (`pluginsdk.ActSearch`): `act.Key` the search's key (`PickerField` makes it the field's
+  key + `-search`), `act.Action` its event, `act.Field` the field's name, `act.Query()` the
+  query (2..200 characters), `act.Values` the form's values. One search is in flight at a
+  time and the newest goes last; answer each with a view: `WithResults(act.Query(), …)`
+  echoes the query in the search's `query` and lists the matches in its `results` (their
+  own keys: an option in both lists takes two). The host shows results only while its box holds
+  the echoed query, else "Searching…": an answer to an older query never shows. Keep the
+  search fast (an index or a cache; the act times out like any other).
+- An option takes a `group`, a `detail` (muted at the row's end, 40 characters), an
+  `avatar` (one or two initials on a colour the host picks from the value) or an `icon`,
+  and `disabled`; these are a picker's only. Up to 8 groups in `options` and 8 in
+  `results`.
+- A pick sends the field's `change` act like any select's (a multiple picker's value is
+  the whole list, at most 20). A single picker closes on a pick; picking its value again
+  clears it unless `required`. A multiple one stays open, shows the picks as tokens in its
+  box (× or Backspace removes one). The trigger names picks by their labels: keep every
+  picked value in `options` (a "Selected" group) so a later view still names it.
+- In the body the trigger is the dropdown's. In a toolbar it is compact, the label then the
+  picks ("Assignee  Me, Kim"); a toolbar form of only pickers is as wide as its triggers.
+  The popover is the trigger's width in the body, 288 px from a toolbar; both fit the
+  360 px panel.
 
 **Drafts.** The host keeps what the user typed (per instance and tab) across new views,
 so re-rendering does not wipe a half-filled form. A submit the plugin takes drops the

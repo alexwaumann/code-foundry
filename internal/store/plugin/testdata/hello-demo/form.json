@@ -188,6 +188,48 @@
             }
           },
           {
+            "key": "f-reviewers",
+            "name": "reviewers",
+            "label": "Reviewers",
+            "description": "A picker: type 2+ characters and the plugin searches.",
+            "select": {
+              "options": [
+                {
+                  "key": "f-rev-rec-ada",
+                  "value": "ada",
+                  "label": "Ada Lovelace",
+                  "group": "Recent",
+                  "detail": "you",
+                  "avatar": "A"
+                },
+                {
+                  "key": "f-rev-rec-kim",
+                  "value": "kim",
+                  "label": "Kim Park",
+                  "group": "Recent",
+                  "detail": "design",
+                  "avatar": "K"
+                },
+                {
+                  "key": "f-rev-rec-bot",
+                  "value": "bot",
+                  "label": "Release bot",
+                  "disabled": true,
+                  "group": "Recent",
+                  "detail": "cannot review",
+                  "icon": "bot"
+                }
+              ],
+              "multiple": true,
+              "placeholder": "No one yet",
+              "search": {
+                "key": "f-reviewers-search",
+                "event": "search-people",
+                "placeholder": "Search people"
+              }
+            }
+          },
+          {
             "key": "f-notify",
             "fieldset": {
               "label": "Notify me",

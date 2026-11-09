@@ -142,7 +142,7 @@ describe("drafts", () => {
 
   it("finds forms in the toolbar and footer: drafts reset and settle there as in the body", () => {
     const v = demoView("layout");
-    expect(formsOf(viewNodes(v)).map((f) => f.key)).toEqual(["layout-search-form"]);
+    expect(formsOf(viewNodes(v)).map((f) => f.key)).toEqual(["layout-search-form", "layout-branch-form"]);
     const dk = draftKeyOf("i", "layout", "layout-search-form");
     let r = reconcileResets({}, {}, "i", v);
     expect(r.resetTokens[dk]).toBe("0");

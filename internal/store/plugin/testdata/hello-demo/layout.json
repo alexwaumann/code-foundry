@@ -116,6 +116,46 @@
       }
     },
     {
+      "key": "layout-branch-form",
+      "form": {
+        "fields": [
+          {
+            "key": "layout-branch",
+            "name": "branch",
+            "label": "Branch",
+            "change": {
+              "event": "layout-branch"
+            },
+            "select": {
+              "options": [
+                {
+                  "key": "layout-br-rec-main",
+                  "value": "main",
+                  "label": "main",
+                  "group": "Recent",
+                  "icon": "git-branch"
+                },
+                {
+                  "key": "layout-br-rec-cf-fix",
+                  "value": "cf/fix",
+                  "label": "cf/fix",
+                  "group": "Recent",
+                  "icon": "git-branch"
+                }
+              ],
+              "multiple": true,
+              "search": {
+                "key": "layout-branch-search",
+                "event": "search-branches",
+                "placeholder": "Search branches"
+              }
+            }
+          }
+        ],
+        "resetToken": "0"
+      }
+    },
+    {
       "key": "layout-status",
       "chips": {
         "chips": [

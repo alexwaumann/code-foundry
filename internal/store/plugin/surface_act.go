@@ -39,7 +39,7 @@ var surfaceCapabilities = []string{
 	"view.node.log", "view.node.actions", "view.node.progress", "view.node.notice", "view.node.empty",
 	"view.node.section", "view.node.form", "view.node.columns", "view.node.pane", "view.node.container",
 	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs", "view.node.stats", "view.node.bars", "view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
-	"view.hint", "view.input.multiline", "view.input.number", "view.input.live",
+	"view.hint", "view.input.multiline", "view.input.number", "view.input.live", "view.select.search",
 }
 
 // viewUpdate serves view/update: validate, number and install a view.
@@ -397,6 +397,9 @@ func buildIndex(v *ui.View) *actionIndex {
 			if f.Change != nil && f.Change.Event != "" {
 				add(element{key: f.Key, kind: pluginsdk.ActChange, label: f.Label, form: form, action: f.Change, field: f.Name})
 			}
+			if f.Select != nil && f.Select.Search != nil {
+				add(searchElement(f, form)) // surface_search.go
+			}
 		}
 	}
 	if v.Header != nil {
@@ -542,15 +545,22 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	}
 	act := pluginsdk.SurfaceAct{Instance: key, Version: ver, Kind: el.kind, Action: el.actionName(), Key: el.key, Node: el.node, Context: UiContextOf(viewer)}
 	switch el.kind {
-	case pluginsdk.ActClick, pluginsdk.ActSubmit, pluginsdk.ActChange:
+	case pluginsdk.ActClick, pluginsdk.ActSubmit, pluginsdk.ActChange, pluginsdk.ActSearch:
 		act.Data = el.action.Data
 	case pluginsdk.ActTab, pluginsdk.ActSelect:
 		act.Value = el.key
 	default:
 		return 0, fmt.Errorf("%w: %s is a %s action: the host runs it, not the plugin", ErrInvalidArgument, el.key, el.kind)
 	}
-	if el.kind == pluginsdk.ActChange {
+	if el.kind == pluginsdk.ActChange || el.kind == pluginsdk.ActSearch {
 		act.Field = el.field
+	}
+	if el.kind == pluginsdk.ActSearch {
+		q, err := searchQuery(req.Value)
+		if err != nil {
+			return 0, err
+		}
+		req.Value = &q
 	}
 	if el.kind == pluginsdk.ActTab || el.kind == pluginsdk.ActSelect {
 		// The host sets a tab's or select's value (its key) and it carries no form's values

@@ -137,6 +137,7 @@ func viewLimits() string {
 		{"Text content / markdown (bytes)", n(ui.MaxTextContent, ui.MaxMarkdown)},
 		{"Notice detail / event data / copy text (bytes)", n(ui.MaxNoticeDetail, ui.MaxEventData, ui.MaxCopy)},
 		{"Select options", n(ui.MaxOptions)},
+		{"A picker: groups (options, results apart) / picked values / an option's detail and avatar (characters) / a query (characters, from)", n(ui.MaxOptionGroups, ui.MaxPicked, ui.MaxOptionDetail, ui.MaxAvatar, ui.MaxSearchQuery) + " (" + n(ui.SearchMinChars) + ")"},
 		{"Buttons in a header / row / notice / section / empty state / terminal / actions bar", n(ui.MaxHeaderButtons, ui.MaxRowButtons, ui.MaxNoticeButtons, ui.MaxSectionButton, ui.MaxEmptyButtons, ui.MaxTerminalButtons, ui.MaxBarButtons)},
 		{"An input's pattern (characters)", n(ui.MaxPattern)},
 		{"A multi-line input's rows: least / most", n(ui.MinInputRows, ui.MaxInputRows)},

@@ -131,6 +131,7 @@ func viewSeeds() []viewSeed {
 		viewSeed{[]byte(gridSeed), []byte{0, 0, 1}},
 		viewSeed{[]byte(masterDetailSeed), []byte{0, 1, 0, 0, 2}},
 		viewSeed{[]byte(chartsSeed), []byte{0, 0, 1, 0, 0, 3}},
+		viewSeed{[]byte(pickerSeed), []byte{0, 0, 1, 0, 2}},
 	)
 }
 

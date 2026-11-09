@@ -21,7 +21,7 @@ var HostCapabilities = []string{
 	"view.node.grid", "view.node.divider", "view.node.spacer", "view.node.group", "view.node.masterDetail", "view.node.tabs",
 	"view.node.stats", "view.node.bars",
 	"view.tabs", "view.toolbar", "view.footer", "view.fieldset", "view.optionsSource", "view.duration",
-	"view.hint", "view.input.multiline", "view.input.number", "view.input.live",
+	"view.hint", "view.input.multiline", "view.input.number", "view.input.live", "view.select.search",
 	"terminals", "view.node.terminal", "terminal.read", "terminal.exited", "terminal.scrollback",
 	"threads", "view.node.thread", "act.context", "wakes",
 }

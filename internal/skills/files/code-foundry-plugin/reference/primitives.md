@@ -197,6 +197,7 @@ A node sits inside at most 4 containers: `section` and the layout containers (`u
 | `change` | a field with a change event was edited | `Action`, `Key`, `Field`, `Value`, `Values` |
 | `tab` | the user switched tabs | `Action` is `"tab"`, `Key` the new tab's key (`Value` too, as `any`: use `Key`), `Node` the `tabs` node's key ("" for the view's tabs); no `Values` |
 | `select` | a `masterDetail` row without an action was chosen | `Action` is `"select"`, `Key` the row's key (`Value` too: use `Key`), `Node` the master-detail's key; no `Values` |
+| `search` | the user typed into a picker (`forms.md`) | `Action` (the search's event), `Key` (the search's key), `Field`, `act.Query()` the query, `Values` |
 
 **Dispatch on `Kind`** first: a button's or row's event may itself be named `tab` or
 `select` (it arrives as `kind: click, action: select`), so `switch act.Action` alone

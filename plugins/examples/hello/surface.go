@@ -43,8 +43,10 @@ type demo struct {
 	build   int
 	ownErr  error // why the Assistant or Shell tab has nothing to show
 	filter  layoutFilter
-	runs    runsState
-	failed  bool // the Overview's Failing card narrows its chart (charts.go)
+	// peopleQuery is the Form tab's reviewers picker's last search (picker.go).
+	peopleQuery string
+	runs        runsState
+	failed      bool // the Overview's Failing card narrows its chart (charts.go)
 }
 
 // demoFactory opens demo instances sharing own.
@@ -219,7 +221,8 @@ func (d *demo) formNodes() []ui.Node {
 	)
 	notify.Fieldset.Hint = ui.Plain("A fieldset groups related inputs.")
 	submit := ui.EventButton("f-save", "Save", "save").WithStyle(ui.ButtonAttention)
-	form := ui.NewForm("settings", &submit, name, token, project, env, tags, notify)
+	reviewers := reviewersField(stringsOf(d.saved["reviewers"]), d.peopleQuery)
+	form := ui.NewForm("settings", &submit, name, token, project, env, tags, reviewers, notify)
 	form.Form.Secondary = []ui.Button{ui.EventButton("f-reset", "Reset", "reset")}
 	form.Form.ResetToken = fmt.Sprint(len(d.saved))
 	return []ui.Node{ui.NewText("form-intro", ui.Plain(saved)), form}
@@ -318,6 +321,12 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		d.filter.status = act.Data
 	case "click:layout-clear":
 		d.filter = layoutFilter{resets: d.filter.resets + 1}
+	case "change:layout-branch":
+		d.filter.branches = stringsOf(act.Values["branch"])
+	case "search:search-branches":
+		d.filter.branchQuery = act.Query()
+	case "search:search-people":
+		d.peopleQuery = act.Query()
 	case "click:layout-rerun":
 		d.mu.Unlock()
 		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #6 queued again")

@@ -276,6 +276,24 @@ export interface SelectOption {
   label: string;
   description?: Inline;
   disabled?: boolean;
+  /** A picker's: the heading the option is listed under. */
+  group?: string;
+  /** A picker's: muted text at the row's end. */
+  detail?: string;
+  /** A picker's: one or two initials on a colour picked from the value. */
+  avatar?: string;
+  /** A picker's: a lucide icon name. */
+  icon?: string;
+}
+
+/** A picker's search (pluginsdk/ui Search): the act a query goes out with, and the plugin's answer. */
+export interface SelectSearch {
+  key: string;
+  event: string;
+  placeholder?: string;
+  /** The query `results` answer (the plugin echoes the search act's value). */
+  query?: string;
+  results?: SelectOption[];
 }
 
 export type OptionsSource = "projects" | "threads";
@@ -287,6 +305,8 @@ export interface SelectControl {
   style?: "dropdown" | "list";
   placeholder?: string;
   optionsSource?: OptionsSource;
+  /** A picker: options the plugin searches as the user types (components/plugin/picker.ts). */
+  search?: SelectSearch;
 }
 
 export interface ToggleControl {

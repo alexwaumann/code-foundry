@@ -427,6 +427,10 @@ const (
 	// ActSelect: the user chose a row of a master-detail (ui.MasterDetail) that has no
 	// action of its own; Key and Value are the row's key, Node the master-detail's key.
 	ActSelect = "select"
+	// ActSearch: the user typed a query into a picker (ui.Select.Search); Key and Action are
+	// the search's, Field the field's name, Value the query (trimmed, at least
+	// ui.SearchMinChars characters). Answer with a view whose Search echoes it in Query.
+	ActSearch = "search"
 )
 
 // SurfaceAct is surface/act's params: the user acted on a view element.
@@ -439,7 +443,7 @@ type SurfaceAct struct {
 	Context UiContext `json:"context"`
 	// Version is the view version the user acted on (it may be older than the latest).
 	Version uint64 `json:"version"`
-	// Kind is ActClick, ActSubmit, ActChange, ActTab or ActSelect.
+	// Kind is ActClick, ActSubmit, ActChange, ActTab, ActSelect or ActSearch.
 	Kind string `json:"kind"`
 	// Action is the element's event name ("tab" for a tab, "select" for a select).
 	Action string `json:"action"`
@@ -449,9 +453,9 @@ type SurfaceAct struct {
 	// Key is the element's key; Data the event's data, as the view declared it.
 	Key  string `json:"key,omitempty"`
 	Data string `json:"data,omitempty"`
-	// Field is the name of the field a change is about.
+	// Field is the name of the field a change or a search is about.
 	Field string `json:"field,omitempty"`
-	// Value is a change's new value, a tab's key or a selected row's key.
+	// Value is a change's new value, a tab's key, a selected row's key or a search's query.
 	Value any `json:"value,omitempty"`
 	// Values are the enclosing form's fields by name (strings, booleans, string lists);
 	// a secret input with store arrives as StoredSecret, and a secret never arrives in a

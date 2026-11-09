@@ -41,6 +41,7 @@ Drive it like the host:
 | `h.OpenSurface(ctx, instance, "status", uctx)` | `surface/open` + `visibility true` |
 | `h.OpenSurfaceWith(ctx, pluginsdk.SurfaceOpen{Instance, Surface, Context, Facts})` | the same with facts: a `pr` surface's `Facts["pr"]` (`json.RawMessage(`{"repo":"octo/app","number":12,"url":"…"}`)`) and the facts its `when` reads |
 | `h.Act(ctx, pluginsdk.SurfaceAct{Instance, Kind, Action, Key, Data, Value, Values})` | `surface/act` (Version 0 = the latest); a tab or master-detail row's act is shaped from the latest view as the host does (kind, node, `Value` the key, no `Values`; the wrong kind is refused), others go as given |
+| `h.Search(ctx, instance, field, query)`, `h.Results(instance, field, query)`, `h.Pick(ctx, instance, field, values...)` | a picker: send the `search` act as the host does (2+ characters, the form's values); the results the latest view shows for that query (false: "Searching…"); a select's `change` act with values it shows (a disabled one is refused) |
 | `h.Visibility(instance, false)`, `h.CloseSurface(instance)`, `h.CloseSurfaceFor(instance, pluginsdk.CloseContextGone)` | visibility and close notifications (`CloseSurface` says `idle`) |
 | `h.Event(pluginsdk.Event{Subscription: "sub-1", Event: json.RawMessage(...)})` | an `events/event` |
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |
