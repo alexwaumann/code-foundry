@@ -202,7 +202,10 @@ func NewGroupedTable(key string, columns []TableColumn, groups ...TableGroup) No
 func TableCol(key, label string) TableColumn { return TableColumn{Key: key, Label: label} }
 
 // WithWidth returns c fixed at px wide.
-func (c TableColumn) WithWidth(px int) TableColumn { c.Width, c.Weight, c.MinWidth = px, 0, 0; return c }
+func (c TableColumn) WithWidth(px int) TableColumn {
+	c.Width, c.Weight, c.MinWidth = px, 0, 0
+	return c
+}
 
 // WithWeight returns c sharing the free width by weight, never under minWidth px (0 for the
 // default).
@@ -266,7 +269,9 @@ func TextCell(text string) Cell { return Cell{Value: Plain(text)} }
 func InlineCell(in *Inline) Cell { return Cell{Value: in} }
 
 // StatusCell returns a cell of text after a status glyph.
-func StatusCell(s Status, text string) Cell { return Cell{Glyph: &Glyph{Status: s}, Value: Plain(text)} }
+func StatusCell(s Status, text string) Cell {
+	return Cell{Glyph: &Glyph{Status: s}, Value: Plain(text)}
+}
 
 // PillCell returns a cell of a pill alone.
 func PillCell(label string, tone Tone) Cell { return Cell{Pill: &Pill{Label: label, Tone: tone}} }
