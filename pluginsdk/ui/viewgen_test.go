@@ -252,6 +252,9 @@ func (g *viewGen) field(inStrip bool, depth int) ui.Field {
 		f.Input = &ui.Input{}
 	default:
 		f.Input = &ui.Input{Placeholder: "p"}
+		if g.chance(0.2) {
+			f.Input = &ui.Input{Kind: ui.InputDate, Value: "2026-11-14", Min: "2026-11-01"}
+		}
 	}
 	if g.chance(0.1) {
 		f.Change = &ui.Action{Event: "changed"}
@@ -347,7 +350,7 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		}
 	case "log":
 		g.logs++
-		n.Log = &ui.Log{Text: "line\n"}
+		n.Log = &ui.Log{Text: "line\n", ANSI: g.chance(0.3)}
 	case "actions":
 		n.Actions = &ui.Actions{Buttons: g.buttons(ui.MaxBarButtons)}
 		if g.bad() {
