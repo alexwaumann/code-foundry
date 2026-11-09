@@ -166,6 +166,13 @@ plugin sorts, and the host only asks.
     edges).
   - A Duration click comes back sorted from the mock.
   - SHOTS-gated screenshots.
+- End to end, with a dev daemon in a short home (`~/.cftbl`, removed afterwards): `plugin dev`
+  hello, `thread new --no-project` (no messages sent), and `plugin act --key run-list`.
+  - `plugin surface` listed `b-num`, `b-branch` and `b-dur` as `sort` elements on node
+    `builds`, and b-1285's row, Rerun and menu items.
+  - `plugin act --key b-dur` gave Duration descending, and again gave ascending.
+  - `--key b-branch --value desc` gave Branch descending.
+  - `--value up` was refused, and `sort` by action alone was refused.
 
 ## Gotchas
 
