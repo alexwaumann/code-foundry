@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
-import { ChevronRightIcon } from "lucide-react"
+import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { itemLeaveWhileClosing } from "@/components/ui/menuItemLeave"
 import { useZoomFactor, zoomPx } from "@/lib/zoom"
@@ -31,6 +31,24 @@ function ContextMenuContent({ className, alignOffset, collisionPadding, ...props
 
 function ContextMenuItem({ className, variant = "default", onPointerLeave, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Item> & { variant?: "default" | "destructive" }) {
   return <ContextMenuPrimitive.Item data-slot="context-menu-item" data-variant={variant} className={cn(itemClass, className)} onPointerLeave={itemLeaveWhileClosing(onPointerLeave)} {...props} />
+}
+
+function ContextMenuRadioGroup({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.RadioGroup>) {
+  return <ContextMenuPrimitive.RadioGroup data-slot="context-menu-radio-group" {...props} />
+}
+
+/** A one-pick item: a check at the left marks the picked one (its group's value). */
+function ContextMenuRadioItem({ className, children, onPointerLeave, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.RadioItem>) {
+  return (
+    <ContextMenuPrimitive.RadioItem data-slot="context-menu-radio-item" className={cn(itemClass, "pl-7.5", className)} onPointerLeave={itemLeaveWhileClosing(onPointerLeave)} {...props}>
+      <span className="pointer-events-none absolute left-2 flex size-4 items-center justify-center">
+        <ContextMenuPrimitive.ItemIndicator>
+          <CheckIcon className="size-3.5" />
+        </ContextMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </ContextMenuPrimitive.RadioItem>
+  )
 }
 
 function ContextMenuSub({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Sub>) {
@@ -76,6 +94,8 @@ export {
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
   ContextMenuSub,
   ContextMenuSubTrigger,
   ContextMenuSubContent,

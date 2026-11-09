@@ -116,6 +116,30 @@ export interface ViewButton {
   iconOnly?: boolean;
   /** A tooltip with what is not on screen; an icon-only button shows it under its label. */
   hint?: string;
+  /** The button opens this menu instead of acting (a "Rebuild ▾"); never with an action. */
+  menu?: ViewMenu;
+}
+
+/**
+ * One entry of a plugin menu (pluginsdk/ui MenuItem): an action item, a one-level
+ * submenu, or a separator ({separator: true}). Text only. `group` makes an action item
+ * one of a one-pick group (adjacent items), `checked` the picked one.
+ */
+export interface ViewMenuItem {
+  key?: string;
+  label?: string;
+  action?: ViewAction;
+  submenu?: ViewMenuItem[];
+  separator?: boolean;
+  disabled?: boolean;
+  danger?: boolean;
+  group?: string;
+  checked?: boolean;
+}
+
+/** A menu a row's ⋯ and right-click, the header's ⋯ or a menu button opens. */
+export interface ViewMenu {
+  items: ViewMenuItem[];
 }
 
 export interface ViewHeader {
@@ -127,6 +151,8 @@ export interface ViewHeader {
   sublineIcon?: string;
   actions?: ViewButton[];
   tabTitle?: string;
+  /** The header's overflow: a ⋯ after its actions. */
+  menu?: ViewMenu;
 }
 
 export interface ViewTab {
@@ -173,6 +199,8 @@ export interface Row {
   actions?: ViewButton[];
   action?: ViewAction;
   selected?: boolean;
+  /** The row's ⋯ (on hover and focus) and right-click menu; a narrow row folds its actions into it. */
+  menu?: ViewMenu;
 }
 
 export interface ListData {
