@@ -4,6 +4,7 @@
  * never echoed: it submits only what the user typed, and only in a submit.
  */
 import type { Field, FieldValue, FormNodeData } from "@/api/plugin";
+import { dateError } from "./date";
 
 /** The fields that carry values: a fieldset's fields in its place. */
 export function flatFields(fields: readonly Field[]): Field[] {
@@ -114,12 +115,13 @@ function compile(pattern: string): RegExp | null {
   }
 }
 
-/** The host's check of one field (required, max length, pattern); null when it passes. */
+/** The host's check of one field (required, max length, pattern, a date's form and bounds); null when it passes. */
 export function validateField(f: Field, v: FieldValue | undefined): string | null {
   if (f.disabled) return null;
   const empty = v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
   if (f.required && empty && !(isSecret(f) && f.input?.hasValue)) return "Required";
   if (typeof v !== "string" || !f.input || v === "") return null;
+  if (f.input.kind === "date") return dateError(v, f.input.min, f.input.max);
   if (f.input.maxLength && v.length > f.input.maxLength) return `At most ${String(f.input.maxLength)} characters`;
   const re = f.input.pattern ? compile(f.input.pattern) : null;
   if (re && !re.test(v)) return f.input.patternMessage || "Not in the expected form";

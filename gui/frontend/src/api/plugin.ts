@@ -210,6 +210,8 @@ export interface LogData {
   wrap?: boolean;
   truncated?: boolean;
   title?: string;
+  /** Parse SGR escapes (colours, bold, dim, italic, underline); drop every other escape. */
+  ansi?: boolean;
 }
 
 export interface ActionsData {
@@ -255,7 +257,7 @@ export interface SectionData {
 }
 
 export interface InputControl {
-  kind?: "text" | "secret" | "multiline" | "number";
+  kind?: "text" | "secret" | "multiline" | "number" | "date";
   value?: string;
   placeholder?: string;
   maxLength?: number;
@@ -268,6 +270,9 @@ export interface InputControl {
   rows?: number;
   /** Send the change event as the user types, once they pause. */
   live?: boolean;
+  /** A date's bounds, ISO dates. */
+  min?: string;
+  max?: string;
 }
 
 export interface SelectOption {
