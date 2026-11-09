@@ -289,6 +289,2528 @@
           "body": "Choose a run to see its overview and its log."
         }
       }
+    },
+    {
+      "key": "builds",
+      "table": {
+        "title": "Builds",
+        "count": 1288,
+        "columns": [
+          {
+            "key": "b-num",
+            "label": "#",
+            "width": 72,
+            "priority": 9,
+            "sortable": true,
+            "sortFirst": "desc"
+          },
+          {
+            "key": "b-status",
+            "label": "Status",
+            "width": 72,
+            "priority": 3
+          },
+          {
+            "key": "b-branch",
+            "label": "Branch",
+            "weight": 2,
+            "minWidth": 96,
+            "priority": 6,
+            "style": "mono",
+            "sortable": true
+          },
+          {
+            "key": "b-cause",
+            "label": "Cause",
+            "weight": 3,
+            "minWidth": 140,
+            "priority": 1
+          },
+          {
+            "key": "b-by",
+            "label": "Started by",
+            "width": 88,
+            "priority": 2,
+            "style": "muted"
+          },
+          {
+            "key": "b-dur",
+            "label": "Duration",
+            "align": "end",
+            "width": 76,
+            "priority": 7,
+            "style": "mono",
+            "sortable": true,
+            "sortFirst": "desc"
+          },
+          {
+            "key": "b-age",
+            "label": "Age",
+            "align": "end",
+            "width": 40,
+            "priority": 5,
+            "style": "caption"
+          }
+        ],
+        "rows": [
+          {
+            "key": "b-1288",
+            "cells": {
+              "b-age": "now",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 130000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1288",
+                "glyph": {
+                  "status": "running"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "running"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1288"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1288-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1288"
+                  }
+                },
+                {
+                  "key": "b-1288-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1288"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1288-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1288-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1288-abort",
+                  "label": "Abort",
+                  "action": {
+                    "event": "abort-build",
+                    "data": "1288"
+                  },
+                  "danger": true
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1287",
+            "cells": {
+              "b-age": "1h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 240000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1287",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1287"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1287-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1287"
+                  }
+                },
+                {
+                  "key": "b-1287-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1287"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1287-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1287-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1286",
+            "cells": {
+              "b-age": "2h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 244000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1286",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1286"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1286-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1286"
+                  }
+                },
+                {
+                  "key": "b-1286-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1286"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1286-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1286-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1285",
+            "cells": {
+              "b-age": "3h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": {
+                "spans": [
+                  {
+                    "text": "integration · 3 failed",
+                    "tone": "error"
+                  }
+                ]
+              },
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 358000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1285",
+                "glyph": {
+                  "status": "failed"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "failed",
+                  "tone": "error"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1285"
+            },
+            "actions": [
+              {
+                "key": "b-1285-rerun",
+                "label": "Rerun",
+                "icon": "rotate-ccw",
+                "action": {
+                  "event": "rerun-run",
+                  "data": "1285"
+                }
+              }
+            ],
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1285-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1285"
+                  }
+                },
+                {
+                  "key": "b-1285-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1285"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1285-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1285-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1284",
+            "cells": {
+              "b-age": "4h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 252000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1284",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1284"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1284-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1284"
+                  }
+                },
+                {
+                  "key": "b-1284-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1284"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1284-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1284-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1283",
+            "cells": {
+              "b-age": "5h",
+              "b-branch": "cf/sidebar",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 256000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1283",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1283"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1283-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1283"
+                  }
+                },
+                {
+                  "key": "b-1283-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1283"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1283-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1283-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1282",
+            "cells": {
+              "b-age": "6h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 260000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1282",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1282"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1282-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1282"
+                  }
+                },
+                {
+                  "key": "b-1282-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1282"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1282-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1282-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1281",
+            "cells": {
+              "b-age": "7h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 264000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1281",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1281"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1281-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1281"
+                  }
+                },
+                {
+                  "key": "b-1281-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1281"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1281-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1281-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1280",
+            "cells": {
+              "b-age": "8h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": {
+                "spans": [
+                  {
+                    "text": "integration · 3 failed",
+                    "tone": "error"
+                  }
+                ]
+              },
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 355000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1280",
+                "glyph": {
+                  "status": "failed"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "failed",
+                  "tone": "error"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1280"
+            },
+            "actions": [
+              {
+                "key": "b-1280-rerun",
+                "label": "Rerun",
+                "icon": "rotate-ccw",
+                "action": {
+                  "event": "rerun-run",
+                  "data": "1280"
+                }
+              }
+            ],
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1280-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1280"
+                  }
+                },
+                {
+                  "key": "b-1280-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1280"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1280-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1280-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1279",
+            "cells": {
+              "b-age": "9h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 231000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1279",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1279"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1279-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1279"
+                  }
+                },
+                {
+                  "key": "b-1279-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1279"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1279-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1279-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1278",
+            "cells": {
+              "b-age": "10h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 235000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1278",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1278"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1278-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1278"
+                  }
+                },
+                {
+                  "key": "b-1278-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1278"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1278-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1278-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1277",
+            "cells": {
+              "b-age": "11h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 239000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1277",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1277"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1277-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1277"
+                  }
+                },
+                {
+                  "key": "b-1277-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1277"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1277-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1277-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1276",
+            "cells": {
+              "b-age": "12h",
+              "b-branch": "cf/sidebar",
+              "b-by": "kim",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 243000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1276",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1276"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1276-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1276"
+                  }
+                },
+                {
+                  "key": "b-1276-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1276"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1276-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1276-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1275",
+            "cells": {
+              "b-age": "13h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 247000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1275",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1275"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1275-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1275"
+                  }
+                },
+                {
+                  "key": "b-1275-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1275"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1275-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1275-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1274",
+            "cells": {
+              "b-age": "14h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 251000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1274",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1274"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1274-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1274"
+                  }
+                },
+                {
+                  "key": "b-1274-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1274"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1274-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1274-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1273",
+            "cells": {
+              "b-age": "15h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": {
+                "spans": [
+                  {
+                    "text": "integration · 3 failed",
+                    "tone": "error"
+                  }
+                ]
+              },
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 357000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1273",
+                "glyph": {
+                  "status": "failed"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "failed",
+                  "tone": "error"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1273"
+            },
+            "actions": [
+              {
+                "key": "b-1273-rerun",
+                "label": "Rerun",
+                "icon": "rotate-ccw",
+                "action": {
+                  "event": "rerun-run",
+                  "data": "1273"
+                }
+              }
+            ],
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1273-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1273"
+                  }
+                },
+                {
+                  "key": "b-1273-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1273"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1273-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1273-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1272",
+            "cells": {
+              "b-age": "16h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 259000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1272",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1272"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1272-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1272"
+                  }
+                },
+                {
+                  "key": "b-1272-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1272"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1272-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1272-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1271",
+            "cells": {
+              "b-age": "17h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 263000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1271",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1271"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1271-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1271"
+                  }
+                },
+                {
+                  "key": "b-1271-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1271"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1271-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1271-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1270",
+            "cells": {
+              "b-age": "18h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": "aborted by kim",
+              "b-dur": "—",
+              "b-num": {
+                "value": "#1270",
+                "glyph": {
+                  "status": "off"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "aborted",
+                  "tone": "muted"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1270"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1270-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1270"
+                  }
+                },
+                {
+                  "key": "b-1270-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1270"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1270-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1270-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1269",
+            "cells": {
+              "b-age": "19h",
+              "b-branch": "cf/sidebar",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 230000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1269",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1269"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1269-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1269"
+                  }
+                },
+                {
+                  "key": "b-1269-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1269"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1269-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1269-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1268",
+            "cells": {
+              "b-age": "20h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 234000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1268",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1268"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1268-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1268"
+                  }
+                },
+                {
+                  "key": "b-1268-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1268"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1268-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1268-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1267",
+            "cells": {
+              "b-age": "21h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 238000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1267",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1267"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1267-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1267"
+                  }
+                },
+                {
+                  "key": "b-1267-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1267"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1267-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1267-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1266",
+            "cells": {
+              "b-age": "22h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 242000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1266",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1266"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1266-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1266"
+                  }
+                },
+                {
+                  "key": "b-1266-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1266"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1266-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1266-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1265",
+            "cells": {
+              "b-age": "23h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 246000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1265",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1265"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1265-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1265"
+                  }
+                },
+                {
+                  "key": "b-1265-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1265"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1265-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1265-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1264",
+            "cells": {
+              "b-age": "24h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": {
+                "spans": [
+                  {
+                    "text": "integration · 3 failed",
+                    "tone": "error"
+                  }
+                ]
+              },
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 333000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1264",
+                "glyph": {
+                  "status": "failed"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "failed",
+                  "tone": "error"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1264"
+            },
+            "actions": [
+              {
+                "key": "b-1264-rerun",
+                "label": "Rerun",
+                "icon": "rotate-ccw",
+                "action": {
+                  "event": "rerun-run",
+                  "data": "1264"
+                }
+              }
+            ],
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1264-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1264"
+                  }
+                },
+                {
+                  "key": "b-1264-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1264"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1264-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1264-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1263",
+            "cells": {
+              "b-age": "25h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 254000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1263",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1263"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1263-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1263"
+                  }
+                },
+                {
+                  "key": "b-1263-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1263"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1263-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1263-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1262",
+            "cells": {
+              "b-age": "26h",
+              "b-branch": "cf/sidebar",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 258000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1262",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1262"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1262-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1262"
+                  }
+                },
+                {
+                  "key": "b-1262-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1262"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1262-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1262-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1261",
+            "cells": {
+              "b-age": "27h",
+              "b-branch": "main",
+              "b-by": "kim",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 262000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1261",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1261"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1261-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1261"
+                  }
+                },
+                {
+                  "key": "b-1261-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1261"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1261-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1261-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1260",
+            "cells": {
+              "b-age": "28h",
+              "b-branch": "main",
+              "b-by": "timer",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 266000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1260",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1260"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1260-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1260"
+                  }
+                },
+                {
+                  "key": "b-1260-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1260"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1260-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1260-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "key": "b-1259",
+            "cells": {
+              "b-age": "29h",
+              "b-branch": "main",
+              "b-by": "sam",
+              "b-cause": "push · 1 commit",
+              "b-dur": {
+                "spans": [
+                  {
+                    "duration": {
+                      "ms": 229000
+                    }
+                  }
+                ]
+              },
+              "b-num": {
+                "value": "#1259",
+                "glyph": {
+                  "status": "ok"
+                }
+              },
+              "b-status": {
+                "pill": {
+                  "label": "passed",
+                  "tone": "ok"
+                }
+              }
+            },
+            "action": {
+              "event": "open-build",
+              "data": "1259"
+            },
+            "menu": {
+              "items": [
+                {
+                  "key": "b-1259-rebuild",
+                  "label": "Rebuild",
+                  "action": {
+                    "event": "rerun-run",
+                    "data": "1259"
+                  }
+                },
+                {
+                  "key": "b-1259-console",
+                  "label": "Open console",
+                  "action": {
+                    "event": "open-log",
+                    "data": "1259"
+                  }
+                },
+                {
+                  "separator": true
+                },
+                {
+                  "key": "b-1259-open",
+                  "label": "Open in CI",
+                  "action": {
+                    "openUrl": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                },
+                {
+                  "key": "b-1259-copy",
+                  "label": "Copy link",
+                  "action": {
+                    "copy": "https://github.com/alexwaumann/code-foundry/actions"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "sort": {
+          "column": "b-num",
+          "dir": "desc"
+        },
+        "emptyText": "No builds yet"
+      }
+    },
+    {
+      "key": "tests",
+      "table": {
+        "title": "Tests in #1285",
+        "columns": [
+          {
+            "key": "t-name",
+            "label": "Test",
+            "weight": 3,
+            "minWidth": 120,
+            "priority": 9,
+            "style": "mono"
+          },
+          {
+            "key": "t-pkg",
+            "label": "Package",
+            "weight": 2,
+            "minWidth": 96,
+            "priority": 1,
+            "style": "muted"
+          },
+          {
+            "key": "t-time",
+            "label": "Time",
+            "align": "end",
+            "width": 56,
+            "priority": 5,
+            "style": "mono"
+          }
+        ],
+        "groups": [
+          {
+            "key": "tests-failed",
+            "label": "Failed",
+            "rows": [
+              {
+                "key": "t-TestCleanupKeepsDirty",
+                "cells": {
+                  "t-name": {
+                    "value": "TestCleanupKeepsDirty",
+                    "glyph": {
+                      "status": "failed"
+                    }
+                  },
+                  "t-pkg": "store/project",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 2400
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestWorktreeRemoveRace",
+                "cells": {
+                  "t-name": {
+                    "value": "TestWorktreeRemoveRace",
+                    "glyph": {
+                      "status": "failed"
+                    }
+                  },
+                  "t-pkg": "store/project",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 5100
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "key": "tests-flaky",
+            "label": "Flaky",
+            "rows": [
+              {
+                "key": "t-TestWatchReconnects",
+                "cells": {
+                  "t-name": {
+                    "value": "TestWatchReconnects",
+                    "glyph": {
+                      "status": "attention"
+                    }
+                  },
+                  "t-pkg": "api/stream",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 8200
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "key": "tests-passed",
+            "label": "Passed",
+            "count": 142,
+            "collapsed": true,
+            "rows": [
+              {
+                "key": "t-TestAuthLogin",
+                "cells": {
+                  "t-name": "TestAuthLogin",
+                  "t-pkg": "api/auth",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 300
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestAuthRefresh",
+                "cells": {
+                  "t-name": "TestAuthRefresh",
+                  "t-pkg": "api/auth",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 470
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestProjectAdd",
+                "cells": {
+                  "t-name": "TestProjectAdd",
+                  "t-pkg": "store/project",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 640
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestProjectRename",
+                "cells": {
+                  "t-name": "TestProjectRename",
+                  "t-pkg": "store/project",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 810
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestThreadSend",
+                "cells": {
+                  "t-name": "TestThreadSend",
+                  "t-pkg": "store/thread",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 980
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestThreadWait",
+                "cells": {
+                  "t-name": "TestThreadWait",
+                  "t-pkg": "store/thread",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 1150
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestTerminalAttach",
+                "cells": {
+                  "t-name": "TestTerminalAttach",
+                  "t-pkg": "store/plugin",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 1320
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "key": "t-TestPluginAct",
+                "cells": {
+                  "t-name": "TestPluginAct",
+                  "t-pkg": "store/plugin",
+                  "t-time": {
+                    "spans": [
+                      {
+                        "duration": {
+                          "ms": 1490
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "dense": true
+      }
     }
   ]
 }
