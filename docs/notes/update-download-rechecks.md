@@ -22,10 +22,19 @@ latest release is a different version).
 - **A failed check does not stop the download.** It logs a warning and downloads the
   version already offered, so a network or gh hiccup during the check fails no worse than
   before.
+- **A caller that gives up during that check starts nothing.** `Download` used to return
+  at once; now it waits for a lookup (up to 30 s), so a Ctrl-C in `code-foundry update`
+  returns the context error before a download starts. A lookup cancelled by its caller
+  (or by the daemon stopping) is not recorded as `LastCheckError`.
+- **A channel switch during that check checks again** (once): the check drops a stale
+  channel's answer, and downloading the old channel's offer would stage a tip build on
+  stable.
 - **A failed download checks again at once**, in the download goroutine after publishing
   Failed. A newer release turns the failure into Available for it. When the same version
   is still the latest, Failed stays (keepFailed), as before. This does not depend on the
   failure's text: a 404, a checksum mismatch and a network error are all handled the same.
+- Moving on to a newer release clears the failure reason with the Failed state. That is
+  the point (the old failure no longer applies), so it is not kept anywhere.
 - No change to the API, the commands, the CLI or the GUI: Try Again and Download still
   call `app.update`. Each extra check also runs the plugin and skill registry checks that
   ride `LastCheckedAt` (`internal/daemon/update_ticks.go`); that is one more `gh` call per
@@ -35,7 +44,8 @@ latest release is a different version).
 
 - Go: `TestDownloadChecksFirst` (table: newer since the offer, a retry from Failed gets
   the newer release, a retry of the same version, a failed check downloads the offered
-  version, offered release gone with nothing newer refuses from Idle) and
+  version, offered release gone with nothing newer refuses from Idle, Download with no check before
+  it), `TestDownloadCancelledDuringCheck`, `TestDownloadAfterChannelSwitch` and
   `TestFailedDownloadChecksAgain` (the release is deleted mid-download; the failure becomes
   Available for the newer one after exactly one more lookup). Existing store tests
   unchanged; `-race -count=5` green.

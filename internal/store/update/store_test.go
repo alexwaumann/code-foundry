@@ -238,6 +238,22 @@ func TestProgressIsPublished(t *testing.T) {
 	}
 }
 
+// waitTarget waits for a published status in state want for target.
+func (r *rig) waitTarget(t *testing.T, want update.State, target string) update.Status {
+	t.Helper()
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case ev := <-r.events.C():
+			if ev.Status.State == want && ev.Status.Target == target && !ev.Status.Checking {
+				return ev.Status
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for %v %s; now %+v", want, target, r.store.Snapshot())
+		}
+	}
+}
+
 // waitSourceCalls waits until the source has answered n lookups and no check runs (a
 // failed download checks again in the background).
 func (r *rig) waitSourceCalls(t *testing.T, n int) {
@@ -300,20 +316,25 @@ func TestDownloadChecksFirst(t *testing.T) {
 		failFirst bool
 		latest    string // what the source reports when Download runs
 		checkErr  error
-		want      string // the version downloaded; "" when Download refuses
+		// noCheck calls Download from Idle, with no check before it.
+		noCheck bool
+		want    string // the version downloaded; "" when Download refuses
 	}{
 		{name: "newer since the offer", latest: "v0.3.0", want: "v0.3.0"},
 		{name: "retry after a failure downloads the newer", failFirst: true, latest: "v0.3.0", want: "v0.3.0"},
 		{name: "retry of the same version", failFirst: true, latest: "v0.2.0", want: "v0.2.0"},
 		{name: "check fails: downloads the offered version", latest: "v0.3.0", checkErr: errors.New("gh: network down"), want: "v0.2.0"},
 		{name: "offered release gone, nothing newer", latest: "v0.1.0", want: ""},
+		{name: "no check before: Download checks itself", noCheck: true, latest: "v0.2.0", want: "v0.2.0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := newRig(t, "v0.2.0", nil)
 			ctx := context.Background()
-			if _, err := r.store.Check(ctx); err != nil {
-				t.Fatal(err)
+			if !tt.noCheck {
+				if _, err := r.store.Check(ctx); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if tt.failFirst {
 				r.installer.DownloadErr = errors.New("installer: exit status 1: download failed")
@@ -344,6 +365,62 @@ func TestDownloadChecksFirst(t *testing.T) {
 				t.Fatalf("installer downloaded %s, want %s (calls %v)", got, tt.want, calls)
 			}
 		})
+	}
+}
+
+// TestDownloadCancelledDuringCheck: a caller that gives up while Download's check runs
+// starts nothing, and the cancelled lookup is not recorded as a failed check.
+func TestDownloadCancelledDuringCheck(t *testing.T) {
+	r := newRig(t, "v0.2.0", nil)
+	if _, err := r.store.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	r.source.Block()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := r.store.Download(ctx)
+		done <- err
+	}()
+	r.source.WaitBlocked(t)
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Download err = %v, want context.Canceled", err)
+	}
+	r.source.Unblock()
+	st := r.store.Snapshot()
+	if st.State != update.Available || st.LastCheckError != "" || st.Checking {
+		t.Fatalf("after a cancelled Download %+v", st)
+	}
+	if got := r.installer.Calls(); len(got) != 0 {
+		t.Fatalf("downloads %v", got)
+	}
+}
+
+// TestDownloadAfterChannelSwitch: a channel switched while Download's check runs makes
+// it check again, and it downloads the new channel's release.
+func TestDownloadAfterChannelSwitch(t *testing.T) {
+	r := newRig(t, "v0.2.0", func(o *update.Options) { o.Channel = update.ChannelTip })
+	r.source.SetTip("v0.3.0-tip.1")
+	if _, err := r.store.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	r.source.SetTip("v0.3.0-tip.5")
+	r.source.Block()
+	done := make(chan error, 1)
+	go func() {
+		_, err := r.store.Download(context.Background())
+		done <- err
+	}()
+	r.source.WaitBlocked(t)
+	r.store.SetChannel(update.ChannelStable)
+	r.source.Unblock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	r.waitTarget(t, update.Downloaded, "v0.2.0")
+	if got := r.installer.Calls(); len(got) != 1 || got[0] != "v0.2.0" {
+		t.Fatalf("downloads %v, want [v0.2.0]", got)
 	}
 }
 

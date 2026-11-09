@@ -397,6 +397,8 @@ func (s *Store) Check(ctx context.Context) (Status, error) {
 		// The channel changed while checking: drop the old channel's answer; the
 		// re-check SetChannel queued follows.
 		err = nil
+	case err != nil && ctx.Err() != nil:
+		// The caller gave up (or the daemon is stopping): not a failed check.
 	case err != nil:
 		st.LastCheckedAt = now
 		st.LastCheckError = err.Error()
@@ -514,8 +516,21 @@ func (s *Store) Download(ctx context.Context) (Status, error) {
 	if !s.Snapshot().Enabled {
 		return s.Snapshot(), fmt.Errorf("%w: %s", ErrDisabled, s.opts.DisabledReason)
 	}
-	if _, err := s.Check(ctx); err != nil && ctx.Err() == nil {
-		s.log.Warn("update check before download failed; downloading the version offered", "err", err)
+	// A channel switched during the check makes it drop its answer: check again for the
+	// new channel rather than download the old channel's release.
+	for range 2 {
+		ch := s.Snapshot().Channel
+		if _, err := s.Check(ctx); err != nil && ctx.Err() == nil {
+			s.log.Warn("update check before download failed; downloading the version offered", "err", err)
+		}
+		if s.Snapshot().Channel == ch {
+			break
+		}
+	}
+	// The caller gave up while the check ran (Ctrl-C in `code-foundry update`): start
+	// nothing it is not waiting for.
+	if err := ctx.Err(); err != nil {
+		return s.Snapshot(), err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
