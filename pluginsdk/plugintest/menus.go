@@ -9,13 +9,13 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// Pick sends the act the host sends when the user picks the menu item key in instance's
+// PickItem sends the act the host sends when the user picks the menu item key in instance's
 // latest view (a row's, the header's or a menu button's menu, a submenu's item too): a
 // click whose action is the item's event, with its key and data. It refuses what the GUI
 // would not send: a key that is no menu item, a submenu, a disabled item (or one in a
 // disabled submenu), and an item whose action the host runs itself (a command, a URL, a
 // copy).
-func (h *Host) Pick(ctx context.Context, instance, key string) error {
+func (h *Host) PickItem(ctx context.Context, instance, key string) error {
 	raw, ok := h.View(instance)
 	if !ok {
 		return fmt.Errorf("plugintest: instance %q has no view", instance)

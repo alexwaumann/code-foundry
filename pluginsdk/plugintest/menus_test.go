@@ -11,9 +11,9 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// Pick sends a menu item's click (its event, key and data) from a row's, the header's or a
+// PickItem sends a menu item's click (its event, key and data) from a row's, the header's or a
 // menu button's menu, a submenu's too, and refuses what the GUI would not send.
-func TestPick(t *testing.T) {
+func TestPickItem(t *testing.T) {
 	rec := recorder{got: make(chan pluginsdk.SurfaceAct, 1)}
 	p := pluginsdk.Plugin{Surfaces: map[string]pluginsdk.SurfaceFactory{
 		"s": func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
@@ -44,7 +44,7 @@ func TestPick(t *testing.T) {
 	for _, c := range []struct{ key, action, data string }{
 		{"send", "send", "CF-407"}, {"done", "move", "done"}, {"refresh", "refresh", ""}, {"rebuild-1", "rebuild", "1287"},
 	} {
-		if err := h.Pick(ctx, "i", c.key); err != nil {
+		if err := h.PickItem(ctx, "i", c.key); err != nil {
 			t.Fatalf("%s: %v", c.key, err)
 		}
 		got := <-rec.got
@@ -56,11 +56,11 @@ func TestPick(t *testing.T) {
 		"nope": "no menu item", "move": "is a submenu", "del": "is disabled", "later-1": "is disabled",
 		"open": "the host's", "CF-407": "no menu item",
 	} {
-		if err := h.Pick(ctx, "i", key); err == nil || !strings.Contains(err.Error(), want) {
+		if err := h.PickItem(ctx, "i", key); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want %q", key, err, want)
 		}
 	}
-	if err := h.Pick(ctx, "other", "send"); err == nil {
+	if err := h.PickItem(ctx, "other", "send"); err == nil {
 		t.Error("an instance without a view")
 	}
 }

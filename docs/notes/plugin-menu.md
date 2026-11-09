@@ -23,7 +23,7 @@ parts as they are.
 - Builders: `NewMenu`, `EventItem`, `CommandItem`, `URLItem`, `CopyItem`, `Separator`,
   `Submenu`, `PickGroup(group, checkedKey, items...)`, `.AsDanger()`, `.AsDisabled()`,
   `Button.WithMenu`, and `Menu.AllItems()` (walks).
-- Capability `view.menu`. `plugintest.Host.Pick(ctx, instance, key)` sends the click the
+- Capability `view.menu`. `plugintest.Host.PickItem(ctx, instance, key)` sends the click the
   GUI sends for an item. It refuses disabled items, submenus, and the host's own actions
   (command, URL, copy).
 - Fuzz: `menuSeed` in `FuzzView`, and menus in the shared view generator (both copies).
@@ -37,7 +37,7 @@ parts as they are.
   key and data. Command items go through the same permission check as command buttons.
   Submenus, separators and menu buttons do not act.
 - As with buttons, the daemon does not refuse an act on a disabled item (`plugin act --key`
-  reaches the plugin). The GUI keeps them inert, and `Pick` refuses them.
+  reaches the plugin). The GUI keeps them inert, and `PickItem` refuses them.
 
 ## GUI
 

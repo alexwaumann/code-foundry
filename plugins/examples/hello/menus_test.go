@@ -13,7 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
 )
 
-// The demo's menus act as the host sends them (plugintest Pick): Priority moves the check,
+// The demo's menus act as the host sends them (plugintest PickItem): Priority moves the check,
 // Reset the click count zeroes it, Rerun toasts; and the captured fixtures the mock daemon
 // replays hold the same menus as the plugin sends (the header's in every tab's fixture).
 func TestDemoMenus(t *testing.T) {
@@ -48,17 +48,17 @@ func TestDemoMenus(t *testing.T) {
 	matchFixtures(t, view(t, h))
 
 	ver := h.Version(inst)
-	if err := h.Pick(ctx, inst, "run-2-p-high"); err != nil {
+	if err := h.PickItem(ctx, inst, "run-2-p-high"); err != nil {
 		t.Fatal(err)
 	}
 	h.WaitFor(2*time.Second, func(h *plugintest.Host) bool { return h.Version(inst) > ver })
 	if got := checked(); got != "run-2-p-high" {
 		t.Fatalf("after Priority ▸ High: checked %q", got)
 	}
-	if err := h.Pick(ctx, inst, "run-2-delete"); err == nil {
+	if err := h.PickItem(ctx, inst, "run-2-delete"); err == nil {
 		t.Error("picked a disabled item")
 	}
-	if err := h.Pick(ctx, inst, "run-2-rerun-clean"); err != nil {
+	if err := h.PickItem(ctx, inst, "run-2-rerun-clean"); err != nil {
 		t.Fatal(err)
 	}
 	// A toast is a notification: it lands after the act returns.
@@ -67,7 +67,7 @@ func TestDemoMenus(t *testing.T) {
 		t.Errorf("toasts %+v", ts)
 	}
 	ver = h.Version(inst)
-	if err := h.Pick(ctx, inst, "hdr-form"); err != nil {
+	if err := h.PickItem(ctx, inst, "hdr-form"); err != nil {
 		t.Fatal(err)
 	}
 	h.WaitFor(2*time.Second, func(h *plugintest.Host) bool { return h.Version(inst) > ver })

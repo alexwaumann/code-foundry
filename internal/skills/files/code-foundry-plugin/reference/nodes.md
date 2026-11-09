@@ -87,7 +87,7 @@ one): the pick is a click like any item's, and the plugin answers with the check
 Picking runs the item's action as a button's (a `click` act with the item's key and data;
 commands confirm, URLs and copies stay in the host). 24 entries per menu or submenu,
 labels 60 characters; items count as elements and share the view's keys
-(`plugintest.Host.Pick` picks one in a test). **The fold:** a row narrower than its
+(`plugintest.Host.PickItem` picks one in a test). **The fold:** a row narrower than its
 buttons need beside about 200 px of title (three buttons in the 400 px panel, not two)
 shows them in its ⋯ instead, first, then a separator, then its menu; an expanded panel
 or a page shows the buttons. A row with buttons and no menu gets a ⋯ only while folded.
