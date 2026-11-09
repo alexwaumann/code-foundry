@@ -242,6 +242,24 @@ func (g *viewGen) list() ui.List {
 	return l
 }
 
+// listRows makes a list node's rows interactive at random (checkboxes, reorder, an add
+// input, editable titles), or when broken ticks a row of a list without checkboxes or
+// gives a checkable row a glyph.
+func (g *viewGen) listRows(l *ui.List) {
+	l.Checkable, l.Reorderable = g.chance(0.3), g.chance(0.3)
+	if g.chance(0.2) {
+		l.Add = &ui.ListAdd{Placeholder: g.label(), Bottom: g.chance(0.5)}
+	}
+	for i := range l.Rows {
+		r := &l.Rows[i]
+		r.Checked = (l.Checkable && g.chance(0.5)) || g.bad()
+		r.Editable = g.chance(0.2)
+		if l.Checkable && g.bad() {
+			r.Glyph = &ui.Glyph{Status: ui.StatusOK}
+		}
+	}
+}
+
 func (g *viewGen) tabs(minTabs int) ui.Tabs {
 	n := g.count(minTabs, ui.MaxTabs)
 	t := ui.Tabs{}
@@ -386,6 +404,7 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		}
 	case "list":
 		l := g.list()
+		g.listRows(&l)
 		n.List = &l
 	case "chips":
 		n.Chips = &ui.Chips{}
@@ -524,6 +543,9 @@ func (g *viewGen) nodeOf(kind string, depth int) ui.Node {
 		}
 	case "masterDetail":
 		md := &ui.MasterDetail{List: g.list(), Detail: g.kids(depth, 3)}
+		if g.bad() {
+			g.listRows(&md.List) // a master-detail's list has none of them
+		}
 		switch {
 		case g.bad():
 			md.Selected = "not-a-row"

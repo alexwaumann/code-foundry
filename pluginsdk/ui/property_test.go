@@ -328,7 +328,7 @@ func nodeElements(x ui.Node) int {
 	case x.Pairs != nil:
 		n += len(x.Pairs.Items)
 	case x.List != nil:
-		n += rowsElements(x.List.Rows)
+		n += rowsElements(x.List.Rows) + addElements(x.List)
 	case x.Chips != nil:
 		n += len(x.Chips.Chips)
 	case x.Actions != nil:
@@ -371,7 +371,7 @@ func nodeElements(x ui.Node) int {
 			}
 		}
 	case x.MasterDetail != nil:
-		n += rowsElements(x.MasterDetail.List.Rows)
+		n += rowsElements(x.MasterDetail.List.Rows) + addElements(&x.MasterDetail.List)
 		if x.MasterDetail.EmptyDetail != nil {
 			n += buttonsElements(x.MasterDetail.EmptyDetail.Actions)
 		}
@@ -492,4 +492,12 @@ func countKinds(ns []ui.Node, depth int, kinds map[string]int, deepest *int) {
 			countKinds(c, inner, kinds, deepest)
 		}
 	}
+}
+
+// addElements is a list's add input: one element (list_rows.go).
+func addElements(l *ui.List) int {
+	if l.Add != nil {
+		return 1
+	}
+	return 0
 }
