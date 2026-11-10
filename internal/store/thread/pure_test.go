@@ -406,6 +406,7 @@ func TestLineSplitter(t *testing.T) {
 		want   []string
 	}{
 		{"lines across chunks", []string{"a\nb", "c\n\nd", "\n"}, []string{"a", "bc", "d"}},
+		{"blank lines", []string{"a\n \t\n\r\nb\n"}, []string{"a", "b"}},
 		{"long in one chunk", []string{"a\n" + big + big + "\nb\n"}, []string{"a", "b"}},
 		{"long while buffering", []string{"a\n" + big, big, "y\nb\n"}, []string{"a", "b"}},
 		{"long once its end comes", []string{"a\n" + big, big + "\nb\n"}, []string{"a", "b"}},
