@@ -202,12 +202,12 @@ func (m *Manager) resolveWorkspace(ref string) (workspace.Workspace, error) {
 
 // workspaceDir is where a thread whose primary is workspace ref runs (Workspace.Dir):
 // the managed dir is made when missing; a missing root is an error.
-func (m *Manager) workspaceDir(ref string) (workspace.Workspace, error) {
+func (m *Manager) workspaceDir(ctx context.Context, ref string) (workspace.Workspace, error) {
 	w, err := m.resolveWorkspace(ref)
 	if err != nil {
 		return workspace.Workspace{}, err
 	}
-	if err := m.opts.Workspaces.EnsureDirs(context.Background(), w.ID); err != nil {
+	if err := m.opts.Workspaces.EnsureDirs(ctx, w.ID); err != nil {
 		m.log.Warn("workspace managed dir", "workspace", w.ID, "err", err)
 	}
 	if !isDir(w.Dir()) {

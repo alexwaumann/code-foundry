@@ -291,7 +291,7 @@ type madeWorktree struct {
 // placeThread decides and carries out a new thread's placement at once (planThread, then
 // placeWorktrees), for a Move. A failure removes what it made and names the project.
 func (m *Manager) placeThread(ctx context.Context, id, name, creatorID string, o CreateOptions) (placedThread, error) {
-	p, w, err := m.planThread(id, name, creatorID, o)
+	p, w, err := m.planThread(ctx, id, name, creatorID, o)
 	if err != nil || w == nil {
 		return p, err
 	}
@@ -345,7 +345,7 @@ func (w *worktreePlan) baseOf(id string) string { return cmp.Or(w.bases[id], w.b
 // creator) and checks what can be checked. Every refusal that needs neither the namer nor
 // git is here. A placement with no worktree to make is complete; otherwise p has the set,
 // the primary and the workspace, and w what placeWorktrees still has to do.
-func (m *Manager) planThread(id, name, creatorID string, o CreateOptions) (placedThread, *worktreePlan, error) {
+func (m *Manager) planThread(ctx context.Context, id, name, creatorID string, o CreateOptions) (placedThread, *worktreePlan, error) {
 	var p placedThread
 	req, bases, err := m.placeRequest(o)
 	if err != nil {
@@ -397,7 +397,7 @@ func (m *Manager) planThread(id, name, creatorID string, o CreateOptions) (place
 	p.droppedWorktreeMode = pl.droppedWorktreeMode
 	if pl.workspacePrimary {
 		// The workspace's folder: its root, else its managed dir (made by workspaceDir).
-		w, err := m.workspaceDir(pl.workspaceID)
+		w, err := m.workspaceDir(ctx, pl.workspaceID)
 		if err != nil {
 			return p, nil, err
 		}

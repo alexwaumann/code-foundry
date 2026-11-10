@@ -297,7 +297,7 @@ func (m *Manager) replan(j *setupJob, t *setupTracker) error {
 	if err != nil {
 		return err
 	}
-	p, w, err := m.planThread(j.id, name, s.CreatedBy, j.o)
+	p, w, err := m.planThread(j.ctx, j.id, name, s.CreatedBy, j.o)
 	if err != nil {
 		return err
 	}

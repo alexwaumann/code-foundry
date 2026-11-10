@@ -783,7 +783,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 			return Thread{}, err
 		}
 	default:
-		if p, w, err = m.planThread(id, name, creatorID, o); err != nil {
+		if p, w, err = m.planThread(ctx, id, name, creatorID, o); err != nil {
 			return Thread{}, err
 		}
 	}
