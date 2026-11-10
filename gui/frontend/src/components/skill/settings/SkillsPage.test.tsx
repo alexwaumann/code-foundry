@@ -78,7 +78,6 @@ function entry(o: Partial<SkillEntryView> & { name: string }): SkillEntryView {
     description: "",
     by: "",
     version: "20260912",
-    declaredVersion: "",
     lastUpdatedMs: Date.parse("2026-09-12T10:00:00Z"),
     registry: "ai-marketplace",
     path: "",
@@ -157,7 +156,7 @@ function seed(over: Partial<ReturnType<typeof useSkillMarketplaceStore.getState>
       registries: [
         {
           name: "ai-marketplace",
-          repo: "cof-primary/ai-marketplace",
+          repo: "acme/ai-marketplace",
           source: "github",
           url: "",
           ref: "",
@@ -606,7 +605,6 @@ describe("Browse all", () => {
     const hits = useSkillMarketplaceStore.getState().search?.entries ?? [];
     answered("", hits, 1240);
     expect(screen.getByTestId("skill-more").textContent).toBe("Loading more…");
-    expect(document.body.textContent).not.toContain("showing the first");
     answered("", hits);
     expect(screen.queryByTestId("skill-more")).toBeNull();
   });
@@ -708,7 +706,7 @@ describe("the page menu", () => {
     openMenu(screen.getByTestId("skill-menu"));
     fireEvent.click(await screen.findByTestId("skill-registries-open"));
     const dialog = await screen.findByTestId("skill-registries");
-    expect(within(dialog).getByTestId("skill-registry-line").textContent).toContain("3 plugins · 1237 skills");
+    expect(within(dialog).getByTestId("skill-registry-line").textContent).toContain("3 plugins · 1,237 skills");
   });
 
   it.each([

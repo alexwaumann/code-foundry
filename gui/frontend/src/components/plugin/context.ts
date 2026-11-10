@@ -11,7 +11,6 @@ export interface ViewCtx {
   watchKey: string;
   /** The daemon's instance key; drafts and collapsed sections hang off it. */
   instance: string;
-  plugin: string;
   /** The view's active tab ("" without tabs): drafts are per instance and tab. */
   viewTab: string;
   /** The panel's context: command actions run with it. */
@@ -32,7 +31,6 @@ export function useViewCtx(): ViewCtx {
 /** The form a field or button sits in (its draft key and pending flag), or null outside one. */
 export interface FormCtx {
   draftKey: string;
-  formKey: string;
   /** Submitting or busy: every field and button of the form is disabled. */
   locked: boolean;
 }

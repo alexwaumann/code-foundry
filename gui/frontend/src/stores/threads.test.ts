@@ -122,6 +122,17 @@ describe("thread reducers", () => {
     expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { labels: ["x"], report: null }) })).not.toBe(prev);
   });
 
+  it("a pending retry and a pending move compare by content", () => {
+    const retry = (attempt: number) => ({ attempt, maxRetries: 10, retryAtMs: 5000, errorStatus: 529, error: "overloaded" });
+    const move = (branch: string) => ({ projectId: "r2", workspaceId: "", worktreePath: "/wt/r2/x", branch });
+    const prev = replaceThreads(emptyThreads, [thread("a", { retry: retry(1), pendingMove: move("x") })]);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { retry: retry(1), pendingMove: move("x") }) })).toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { retry: retry(2), pendingMove: move("x") }) })).not.toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { retry: retry(1), pendingMove: move("y") }) })).not.toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { retry: null, pendingMove: move("x") }) })).not.toBe(prev);
+    expect(applyThreadListEvent(prev, { kind: "updated", thread: thread("a", { retry: retry(1), pendingMove: null }) })).not.toBe(prev);
+  });
+
   it("usage compares by content; the retired ledger follows snapshots and retiredUsage events", () => {
     const bucket = (requests: number) => ({
       model: "claude-haiku-5-5",

@@ -61,12 +61,16 @@ const REFUSALS: Readonly<Record<string, string>> = {
 };
 const ALIASES: Readonly<Record<string, string>> = { reset: "clear", new: "clear", name: "rename" };
 
-/** Throws the daemon's refusal (InvalidArgument) for a message that starts with a replaced command. */
-export function refuseSlashCommand(text: string): void {
+/**
+ * Throws the daemon's refusal (InvalidArgument) for a message that starts with a replaced
+ * command, or with an alias of one the thread does not offer as its own command (offers).
+ */
+export function refuseSlashCommand(text: string, offers?: (name: string) => boolean): void {
   const first = text.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
   const m = /^\s*\/(\S+)/.exec(first);
   if (!m?.[1]) return;
-  const name = ALIASES[m[1]] ?? m[1];
+  const alias = ALIASES[m[1]];
+  const name = alias && !offers?.(m[1]) ? alias : m[1];
   const refusal = REFUSALS[name];
   if (refusal) throw new CommandError("invalid", refusal);
 }

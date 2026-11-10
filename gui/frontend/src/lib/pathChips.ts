@@ -187,7 +187,6 @@ export function matchPath(token: string, where: PathContext): PathMatch | null {
 const LEAD = /^[([{"'“‘«]+/;
 const TRAIL = /[.,;:!?)\]}"'”’»]+$/;
 
-/** A run of a text node: plain text, or a path chip. */
 /** Whether a markdown link's href is relative (no scheme, not protocol-relative, not a bare #anchor). */
 export function isRelativeHref(href: string): boolean {
   return href !== "" && !href.startsWith("#") && !href.startsWith("//") && !/^[a-z][a-z0-9+.-]*:/i.test(href);
@@ -214,6 +213,7 @@ export function linkPath(href: string): PathMatch | null {
   return matchPath(line && !SUFFIX.test(path) ? `${path}:${line}` : path, "code");
 }
 
+/** A run of a text node: plain text, or a path chip. */
 export type ProsePiece = string | PathMatch;
 
 /** A stretch of a text node that is one chip. */

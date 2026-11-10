@@ -12,12 +12,11 @@ import { emptyContext } from "@/stores/context";
 import { chooserKeyOf, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useThreadsStore } from "@/stores/threads";
-import { useUiStore } from "@/stores/ui";
 import { ViewContext, type ViewCtx } from "./context";
 import { SurfaceHeader } from "./Header";
 import { NodeList } from "./NodeList";
 
-const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", plugin: "showcase", viewTab: "forms", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "showcase/gallery/global", viewTab: "forms", uiContext: emptyContext, inert: false };
 
 function inView(children: ReactNode) {
   return render(<ViewContext.Provider value={ctx}>{children}</ViewContext.Provider>);
@@ -31,12 +30,9 @@ function thread(id: string, archived = false): ThreadView {
   return { id, owner: "plugin:showcase", worktreePath: "/h", state: "disconnected", status: "idle", archivedAtMs: archived ? 1 : null } as ThreadView;
 }
 
-const selection = useUiStore.getState().selection;
-
 afterEach(() => {
   cleanup();
   usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {}, submitted: {}, details: {}, choices: {} });
-  useUiStore.setState({ selection });
   vi.restoreAllMocks();
 });
 

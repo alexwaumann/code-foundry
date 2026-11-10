@@ -297,7 +297,7 @@ function GalleryScope({ shown }: { shown: Theme }) {
     [],
   );
   return (
-    <ThemeScope theme={analysis?.theme ?? shown} className="min-w-[640px] rounded-xl border border-cf-divider">
+    <ThemeScope theme={analysis?.theme ?? shown} className="min-w-[640px] rounded-pane border border-cf-divider">
       {gallery}
     </ThemeScope>
   );
@@ -377,7 +377,7 @@ function ThemeIssues({ issues }: { issues: readonly { file: string; message: str
     <ul className="space-y-0.5 px-2 pb-1" data-testid="themes-issues">
       {issues.map((is) => (
         <li key={is.file} className="flex items-start gap-1" data-testid="themes-issue">
-          <Tip label={`${is.file} did not load: ${is.message}`}>
+          <Tip label={`${is.file} did not load: ${is.message}`} whenTruncated>
             <span className="line-clamp-2 min-w-0 flex-1 text-caption-sm text-cf-warning">
               {is.file} did not load: {is.message}
             </span>

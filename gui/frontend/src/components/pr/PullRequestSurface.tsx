@@ -10,6 +10,7 @@ import { useCurrentPanelKey } from "@/stores/panel";
 import { pullRequestDiffResource, warmPullRequestDiff } from "@/stores/prDiff";
 import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
+import { Banner } from "./Banner";
 import { ago, timeline } from "./model";
 import { PrAskComposer } from "./PrAskComposer";
 import { PrCode } from "./PrCode";
@@ -117,18 +118,9 @@ function Updating() {
 function StaleBanner({ fetchedAtMs, lastError }: { fetchedAtMs: number | null; lastError: string }) {
   const now = useNow(30_000);
   return (
-    <Banner testId="pr-stale">
+    <Banner testId="pr-stale" className="mt-3">
       Showing the copy from {ago(fetchedAtMs, now) || "earlier"}: the last fetch from GitHub failed ({lastError}).
     </Banner>
-  );
-}
-
-function Banner({ children, testId }: { children: ReactNode; testId: string }) {
-  return (
-    <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-cf-warning/30 bg-cf-warning-surface px-3 py-2 text-caption text-cf-warning-text" role="status" data-testid={testId}>
-      <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
-      <span className="min-w-0 break-words">{children}</span>
-    </div>
   );
 }
 
@@ -273,7 +265,7 @@ export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slu
       {/* Ask's composer under the header, where its ⋯ menu is. */}
       {composer === "ask" && <PrAskComposer key="ask" prRef={prRef} focusRequest={composerFocus} onClose={closeComposer} />}
       {d?.fetchFailed && <StaleBanner fetchedAtMs={d.fetchedAtMs} lastError={d.lastError} />}
-      {error && <Banner testId={d ? "pr-refresh-error" : "pr-seed-error"}>{d ? "Could not refresh" : "Could not load the rest of this pull request"}: {error}</Banner>}
+      {error && <Banner testId={d ? "pr-refresh-error" : "pr-seed-error"} className="mt-3">{d ? "Could not refresh" : "Could not load the rest of this pull request"}: {error}</Banner>}
       {d ? (
         <ReadinessBox d={d} prRef={prRef} panelKey={panelKey} tabKey={tabKey} onReview={openComposer} compact={inner === "code"} />
       ) : (

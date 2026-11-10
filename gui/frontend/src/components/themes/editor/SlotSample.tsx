@@ -35,10 +35,10 @@ function sampleKind(slot: string): "sidebar" | "status" | "text" | "generic" {
  * status slots, text on a pane for text slots, and for the rest a block and a line in the
  * slot's colour on a pane.
  */
-export function SlotSample({ theme, slot, className }: { theme: Theme; slot: string; className?: string }) {
+export function SlotSample({ theme, slot }: { theme: Theme; slot: string }) {
   const kind = sampleKind(slot);
   return (
-    <ThemeScope theme={theme} className={cn("overflow-hidden rounded-md border border-cf-divider", className)}>
+    <ThemeScope theme={theme} className="overflow-hidden rounded-md border border-cf-divider">
       {kind === "sidebar" && (
         <div className="space-y-0.5 bg-cf-sidebar p-1.5" data-testid="slot-sample-sidebar">
           <div className="rounded-sm bg-cf-sidebar-row-selected px-2 py-1">

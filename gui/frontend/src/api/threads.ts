@@ -221,7 +221,7 @@ export interface ThreadView {
    * The thread's subagent runs by start time (unknown last); their usage is already in
    * usage. The run count is agentRuns.length (select that, not the array, for a count).
    */
-  agentRuns: AgentRunView[];
+  agentRuns: AgentRunUsageView[];
   /**
    * The thread's context size after its last turn (the last API response's input + cache
    * read + cache write + output tokens); 0 before the first result.
@@ -375,7 +375,7 @@ export interface ApiRetryView {
 }
 
 /** One subagent run of a thread (a Claude Code Agent tool call). */
-export interface AgentRunView {
+export interface AgentRunUsageView {
   /** Claude's agent id. */
   id: string;
   description: string;
@@ -593,7 +593,7 @@ export function toThreadView(s: Thread): ThreadView {
     usage: s.usage.map(toUsageBucketView),
     costUsd: s.costUsd,
     unpriced: s.unpriced,
-    agentRuns: s.agentRuns.map(toAgentRunView),
+    agentRuns: s.agentRuns.map(toAgentRunUsageView),
     contextTokens: Number(s.contextTokens),
     contextWindow: Number(s.contextWindow),
     cacheExpiresAtMs: s.cacheExpiresAt ? timestampMs(s.cacheExpiresAt) : null,
@@ -665,7 +665,7 @@ export function toThreadReportView(s: Thread): ThreadReportView | null {
   return { status, summary: s.reportSummary, data: s.reportData, atMs: s.reportAt ? timestampMs(s.reportAt) : null };
 }
 
-export function toAgentRunView(r: AgentRun): AgentRunView {
+export function toAgentRunUsageView(r: AgentRun): AgentRunUsageView {
   return {
     id: r.id,
     description: r.description,

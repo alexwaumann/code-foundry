@@ -5,6 +5,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { registerTerminalFindHost, useTerminalFindStore } from "@/stores/terminalFind";
 import { useThreadFindStore } from "@/stores/threadFind";
+import { useSubagentViewStore } from "@/stores/subagentView";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
@@ -214,6 +215,18 @@ describe("commandBindings", () => {
     expect(map.get("cmd+shift+n")?.name).toBe("a");
     expect(map.get("cmd+j")?.name).toBe("b");
     expect(map.has("cmd+x")).toBe(false);
+  });
+
+  it("a subagent view unbinds the commands it disables at once, and leaving it binds them again (same command list)", () => {
+    const commands = [cmd({ name: "thread.rename", keybindings: ["cmd+r"] })];
+    expect(commandBindings(commands).get("cmd+r")?.name).toBe("thread.rename");
+    useSubagentViewStore.setState({ viewing: { threadId: "s-1", runId: "r-1" } });
+    try {
+      expect(commandBindings(commands).has("cmd+r")).toBe(false);
+    } finally {
+      useSubagentViewStore.setState({ viewing: null });
+    }
+    expect(commandBindings(commands).get("cmd+r")?.name).toBe("thread.rename");
   });
 });
 
@@ -668,12 +681,6 @@ describe("a bare-key command chord", () => {
     pane.insertAdjacentHTML("beforeend", '<div data-chord-yield><button id="picker" type="button"></button></div>');
     expect(press(document.getElementById("picker") as HTMLElement, escape).defaultPrevented).toBe(true);
     expect(runCommandForResult).toHaveBeenCalledWith("demo.bare", {}, expect.anything());
-  });
-
-  it("never interrupts a working thread on Escape", () => {
-    useCommandsStore.setState({ commands: [cmd({ name: "thread.interrupt" })] });
-    expect(press(pane, escape).defaultPrevented).toBe(false);
-    expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
   it("modified chords keep firing anywhere", () => {

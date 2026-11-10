@@ -28,7 +28,7 @@ function currentPullRequest(sel: Selection): PrRef | null {
  * branch; a project row's main worktree). Enabled when that branch has one; disabled
  * otherwise, including on the Pull Requests page, whose rows open a pull request
  * explicitly (openSurface with pullRequestTab). Hidden for a thread without a project,
- * which has no branch (a pull request it linked opens from Linked PRs). Tabs: params
+ * which has no branch (a pull request it linked opens from the thread info card). Tabs: params
  * { slug, number }, title #N.
  */
 export const pullRequestSurface: SurfaceSpec = {

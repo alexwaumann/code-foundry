@@ -229,4 +229,28 @@ describe("the open page (Expand)", () => {
     expect(screen.getAllByTestId("thread-html")).toHaveLength(2);
     expect(screen.queryByTestId("thread-html-lightbox")).toBeNull();
   });
+
+  it("takes Escape only from the pane it covers: a field outside it (the bottom terminal, the side panel) keeps its own", () => {
+    publish(TURN);
+    const outside = vi.fn<(key: string) => void>();
+    render(
+      <>
+        <Pane items={TURN} working />
+        <textarea
+          data-testid="outside"
+          onKeyDown={(e) => {
+            outside(e.key);
+          }}
+        />
+      </>,
+    );
+    fireEvent.click(within(card("hello.html") as HTMLElement).getByTestId("thread-html-expand"));
+    const field = screen.getByTestId("outside");
+    field.focus();
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(outside).toHaveBeenCalledWith("Escape");
+    expect(screen.getByTestId("thread-html-lightbox")).toBeTruthy();
+    fireEvent.keyDown(within(screen.getByTestId("thread-html-lightbox")).getByTestId("thread-html-close"), { key: "Escape" });
+    expect(screen.queryByTestId("thread-html-lightbox")).toBeNull();
+  });
 });

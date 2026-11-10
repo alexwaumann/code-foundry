@@ -62,7 +62,7 @@ beforeEach(() => {
   gate.waiting.clear();
   gate.aborted = [];
   dashboardResource.set(DASHBOARD_KEY, { data: world.dashboard });
-  getPullRequestDiff.mockImplementation((_slug: string, number: number) => Promise.resolve({ diff: "", headSha: world.detail(number)?.pullRequest.headSha ?? "", baseSha: "", truncated: false, fetchedAtMs: null }));
+  getPullRequestDiff.mockImplementation((_slug: string, number: number) => Promise.resolve({ diff: "", headSha: world.detail(number)?.pullRequest.headSha ?? "", truncated: false, fetchedAtMs: null }));
 });
 
 afterEach(async () => {

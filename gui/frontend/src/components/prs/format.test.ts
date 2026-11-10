@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CheckRollupView } from "@/api/gh";
-import { checksSummary, freshness, monthName, prKey, repoName, reviewLabel, shortAge, updatedAgo } from "./format";
+import { checksSummary, freshness, monthName, prKey, repoName, shortAge, updatedAgo } from "./format";
 
 const NOW = new Date(2026, 9, 8, 12, 0, 0).getTime();
 const S = 1000;
@@ -50,19 +50,17 @@ describe("checksSummary", () => {
     [r({ total: 12, passed: 10, skipped: 2 }), "success", "12/12 passed"],
     [r({ state: "failure", total: 14, passed: 12, failed: 2 }), "failure", "2/14 failing"],
     [r({ state: "pending", total: 13, passed: 9, pending: 4 }), "pending", "4/13 pending"],
-    [r({ state: "error", total: 1, passed: 1 }), "failure", "0/1 failing"],
+    [r({ state: "error", total: 1, passed: 1 }), "failure", "failing"],
   ])("%j", (c, tone, label) => {
     expect(checksSummary(c)).toEqual({ tone, label });
   });
 });
 
 describe("labels", () => {
-  it("formats months, reviews, repos, keys", () => {
+  it("formats months, repos, keys", () => {
     expect(monthName("2026-10", NOW)).toBe("October");
     expect(monthName("2025-12", NOW)).toBe("December 2025");
     expect(monthName("", NOW)).toBe("—");
-    expect(reviewLabel("changes_requested")).toBe("changes requested");
-    expect(reviewLabel(null)).toBe("—");
     expect(repoName("o/name")).toBe("name");
     expect(prKey("merged", { repoSlug: "o/r", number: 7 })).toBe("merged:o/r#7");
   });

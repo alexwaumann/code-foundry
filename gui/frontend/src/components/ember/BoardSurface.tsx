@@ -1,12 +1,11 @@
-import { GitBranch } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AlarmClock, X } from "lucide-react";
+import { AlarmClock, GitBranch, X } from "lucide-react";
 import type { EmberTaskView } from "@/api/ember";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
 import { boardSections, cardMeta, cardProgress, timerRows, unclosed, unclosedWords, updatedAgo, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
-import type { StatusTone } from "@/lib/statusLine";
+import { statusToneText, type StatusTone } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
 import { holdEmberBoard, useBoardCounts, useEmberStore, useEmberTasks, useEmberTimers } from "@/stores/ember";
@@ -24,13 +23,7 @@ const DOT: Readonly<Record<TaskDot, string>> = {
 };
 
 /** The sidebar's status colours, muted for "muted". */
-const TONE: Readonly<Record<StatusTone, string>> = {
-  muted: "text-cf-text-muted",
-  sky: "text-cf-info-text",
-  amber: "text-cf-warning-text",
-  emerald: "text-cf-success-text",
-  red: "text-cf-error-text",
-};
+const toneText = (tone: StatusTone): string => (tone === "muted" ? "text-cf-text-muted" : statusToneText[tone]);
 
 function Dot({ dot, className }: { dot: TaskDot; className?: string }) {
   return <span className={cn("block size-2 shrink-0 rounded-full", DOT[dot], className)} data-dot={dot} aria-hidden />;
@@ -70,7 +63,7 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
       </span>
       {row.meta.text && (
         <Tip label={row.meta.text} whenTruncated>
-          <span className={cn("max-w-[55%] min-w-0 shrink truncate", TONE[row.meta.tone])} data-testid="ember-worker-meta">
+          <span className={cn("max-w-[55%] min-w-0 shrink truncate", toneText(row.meta.tone))} data-testid="ember-worker-meta">
             {row.meta.text}
           </span>
         </Tip>
@@ -161,7 +154,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
   const t = card.task;
   const meta = cardMeta(card);
   const check = unclosedWords(t, card.subtasks);
-  const checkTone = unclosed(t, card.subtasks) === "report" && t.thread?.reportStatus !== "done" && t.thread?.reportStatus !== "finished" ? TONE.amber : TONE.emerald;
+  const checkTone = unclosed(t, card.subtasks) === "report" && t.thread?.reportStatus !== "done" && t.thread?.reportStatus !== "finished" ? statusToneText.amber : statusToneText.emerald;
   const progress = cardProgress(card);
   const rows = workerRows(card);
   return (
@@ -177,7 +170,7 @@ function TaskCard({ card, now, focused }: { card: BoardCard; now: number; focuse
         <span className={cn("min-w-0 flex-1 truncate text-label font-semibold", t.state === "cancelled" && "text-cf-text-muted line-through")} data-testid="ember-task-title">
           {t.title}
         </span>
-        <span className={cn("shrink-0 text-caption tabular-nums", TONE[meta.tone])} data-testid="ember-task-meta">
+        <span className={cn("shrink-0 text-caption tabular-nums", toneText(meta.tone))} data-testid="ember-task-meta">
           {meta.text}
         </span>
       </div>

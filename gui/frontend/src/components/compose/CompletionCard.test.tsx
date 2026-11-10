@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef, type RefObject } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { CompletionCard } from "./CompletionCard";
@@ -47,5 +47,21 @@ describe("CompletionCard while a file search is out or has failed", () => {
     render(<Card source={files({ query: "READM", groups: [] })} />);
     expect(screen.getByTestId("completion-empty").textContent).toBe("No threads or files match");
     expect(hidden("completion-hints")).toBe(true);
+  });
+});
+
+describe("CompletionCard under the pointer", () => {
+  it("a row under a pointer at rest is not selected; a real move selects it", () => {
+    const item = (path: string) => ({ key: path, label: path, detail: "", tag: { tagKind: "file" as const, projectId: "r", path } });
+    render(<Card source={files({ query: "READM", groups: [{ key: "r", heading: null, items: [item("README.md"), item("README.ja.md")] }] })} />);
+    const rows = () => screen.getAllByTestId("completion-item");
+    const second = rows()[1];
+    if (!second) throw new Error("no second row");
+    fireEvent.pointerMove(document.body, { clientX: 200, clientY: 200 });
+    fireEvent.pointerMove(second, { clientX: 200, clientY: 200 });
+    fireEvent.mouseMove(second, { clientX: 200, clientY: 200 });
+    expect(rows()[0]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.pointerMove(second, { clientX: 200, clientY: 201 });
+    expect(rows()[1]?.getAttribute("aria-selected")).toBe("true");
   });
 });

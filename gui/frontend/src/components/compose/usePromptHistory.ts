@@ -9,7 +9,7 @@ import { useDraft } from "@/stores/compose";
 import type { PromptEditorHandle } from "./PromptEditor";
 
 /** The prompts for a scope and filter, as the card and the palette show them. */
-export interface PromptList {
+interface PromptList {
   /** "loading" until the first answer for this scope (a new filter keeps the last answer meanwhile). */
   status: "loading" | "ready" | "error";
   prompts: readonly SentPromptView[];
@@ -32,7 +32,7 @@ export function listStatusText(list: PromptList, query: string): string | null {
 const FILTER_DEBOUNCE_MS = 150;
 
 /** ListPrompts' request for a scope: the composer's thread, its Project source, or every thread. */
-export function promptRequest(scope: PromptScopeView, threadId: string, source: PromptSource, query: string): ListPromptsOptions {
+function promptRequest(scope: PromptScopeView, threadId: string, source: PromptSource, query: string): ListPromptsOptions {
   const base = { query, limit: PROMPT_LIMIT + 1 };
   if (scope === "thread") return { ...base, scope, threadId };
   if (scope === "project") return source.threadId ? { ...base, scope, threadId: source.threadId } : { ...base, scope, projectIds: source.projectIds ?? [] };
@@ -110,7 +110,7 @@ export interface PromptPickerModel {
   show: (index: number) => void;
 }
 
-export interface PromptPicker {
+interface PromptPicker {
   card: PromptPickerModel;
   /** The editor's keys first (PromptEditor onKeyDown): Up opens, then the card's keys. */
   onKeyDown: (e: KeyboardEvent, selectionEmpty: boolean) => boolean;

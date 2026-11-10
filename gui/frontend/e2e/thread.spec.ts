@@ -12,7 +12,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-type State = "permission" | "question" | "streaming" | "idle" | "stopped" | "crashed";
+type State = "permission" | "streaming" | "idle" | "crashed";
 
 async function openThread(page: Page, state: State, scheme: "dark" | "light" = "dark"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });

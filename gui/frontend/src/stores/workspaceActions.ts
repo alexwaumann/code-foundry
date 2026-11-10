@@ -11,7 +11,8 @@ import type { UiContextView } from "@/api/command";
 import type { WorkspaceView } from "@/api/workspace";
 import { createdThreadId } from "@/lib/compose";
 import { threadLabel } from "@/lib/prompt";
-import { editInstructionsPrompt, instructionsStep, PRIMARY_WORKSPACE, workspaceFolder } from "@/lib/workspaceCard";
+import { WORKSPACE_PRIMARY } from "@/lib/projectSet";
+import { editInstructionsPrompt, instructionsStep, workspaceFolder } from "@/lib/workspaceCard";
 import { projectRef } from "@/lib/projects";
 import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand, runCommandForResult } from "./commands";
@@ -39,7 +40,7 @@ export function renameWorkspace(workspaceId: string, name: string): Promise<bool
 
 /**
  * workspace.set-primary: a member project by its id, or the workspace's own folder
- * (PRIMARY_WORKSPACE). Never the project's name: the daemon reads "workspace" in any case
+ * (WORKSPACE_PRIMARY). Never the project's name: the daemon reads "workspace" in any case
  * as the folder, so a project named so would set the folder (ids never collide with it).
  */
 export function setWorkspacePrimary(workspaceId: string, primary: string): Promise<boolean> {
@@ -140,7 +141,7 @@ export async function editWorkspaceInstructions(workspaceId: string): Promise<bo
   }
   const res = await runCommandForResult(
     "thread.new",
-    { workspace: workspaceId, project: PRIMARY_WORKSPACE, "new-worktree": "false", prompt },
+    { workspace: workspaceId, project: WORKSPACE_PRIMARY, "new-worktree": "false", prompt },
     // The composer's context (thread.new is offered there with no project, as for a workspace without one).
     { ctx: { ...emptyContext, activeView: "compose", activeWorkspaceId: workspaceId }, quiet: true },
   );

@@ -11,8 +11,6 @@ import { showProjectOnProjectsPage } from "./projectsPage";
 /** The Add Project dialog's tabs, in display order. */
 export type AddProjectTab = "new" | "local" | "github";
 
-export const addProjectTabs: readonly AddProjectTab[] = ["new", "local", "github"];
-
 interface AddProjectState {
   open: boolean;
   tab: AddProjectTab;

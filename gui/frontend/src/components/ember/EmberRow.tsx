@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { emberStatusWords } from "@/lib/ember";
-import type { StatusTone } from "@/lib/statusLine";
+import { statusToneText } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import {
   holdEmberBoard,
@@ -22,15 +22,6 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { EMBER_VIEW } from "@/surfaces/emberTarget";
 import { Flame } from "./Flame";
-
-/** The sidebar's status colours (SidebarRow toneClasses). */
-const TONE: Readonly<Record<StatusTone, string>> = {
-  muted: "",
-  sky: "text-cf-info-text",
-  amber: "text-cf-warning-text",
-  emerald: "text-cf-success-text",
-  red: "text-cf-error-text",
-};
 
 /** Whether the selection shows Ember's chat (its thread, or the Ember view). */
 function useEmberSelected(threadId: string): boolean {
@@ -62,7 +53,7 @@ function EmberLine({ threadId }: { threadId: string }) {
   const title = useRowTitle();
   return (
     <span className="min-w-0 truncate text-caption-sm" data-testid="ember-row-line">
-      <span className={TONE[words.tone]} data-testid="ember-row-status">
+      <span className={statusToneText[words.tone]} data-testid="ember-row-status">
         {words.text}
       </span>
       {title && (

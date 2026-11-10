@@ -39,8 +39,6 @@ export interface SearchDialogApi {
   recent: RecentApi;
   /** A restored dialog's finished searches it has not shown (the newest, and how many more); null for none. show() picks it. */
   cue: UnseenCue | null;
-  /** When the dialog opened (Recent searches' ages). */
-  now: number;
   /** The Recent searches row selected (the first when none was picked). */
   selectedRecent: SearchEntryView | null;
   dictation: ComposerDictation;

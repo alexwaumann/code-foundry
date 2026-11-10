@@ -33,7 +33,7 @@ vi.mock("@/stores/pluginSurfaces", async (importOriginal) => ({
   }),
 }));
 
-const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/global", plugin: "hello", viewTab: "run-list", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/global", viewTab: "run-list", uiContext: emptyContext, inert: false };
 
 /** The table box's outer width (jsdom has no layout). */
 let boxWidth = 1102;

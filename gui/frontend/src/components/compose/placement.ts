@@ -37,7 +37,7 @@ import type { PickerGroup } from "./ComposerPicker";
 
 const SEP = "\u0001";
 
-export interface WorktreeOption {
+interface WorktreeOption {
   path: string;
   /** "" when detached. */
   branch: string;
@@ -47,7 +47,7 @@ export interface WorktreeOption {
 }
 
 /** The project's worktrees (main first), as a shallow-stable list that follows branch changes live. */
-export function useWorktrees(projectId: string): WorktreeOption[] {
+function useWorktrees(projectId: string): WorktreeOption[] {
   const keys = useProjectsStore(
     useShallow((s) => (s.byId[projectId]?.worktrees ?? []).map((w) => [w.path, w.branch, w.head, w.detached ? "1" : "", w.isMain ? "1" : ""].join(SEP))),
   );
@@ -65,9 +65,9 @@ export function useWorktrees(projectId: string): WorktreeOption[] {
  * A Work in row's value for an existing branch: a prefix no branch name, path or "new" /
  * "current" starts with, and that a search never types.
  */
-export const BRANCH_VALUE = "⎇ ";
+const BRANCH_VALUE = "⎇ ";
 /** Branch from's first row (the default branches; the draft keeps null). */
-export const DEFAULT_BASE_VALUE = "⎇default";
+const DEFAULT_BASE_VALUE = "⎇default";
 
 /**
  * Work in: where a project's thread runs. The option titles are the pill's words
@@ -201,14 +201,14 @@ function useBranchLists(gitIds: readonly string[], many: boolean): { lists: (rea
 }
 
 /** What a Work in or Branch from pill shows and lists. */
-export interface PickerModel {
+interface PickerModel {
   groups: PickerGroup[];
   value: string;
   text: string;
   icon: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>;
 }
 
-export interface PlacementPickers {
+interface PlacementPickers {
   workIn: PickerModel & {
     /** The branch search ("Find existing branch") is there: a git project to list branches of. */
     hasBranchSearch: boolean;
@@ -344,7 +344,7 @@ export function useProjectNames(ids: readonly string[]): (id: string) => string 
 }
 
 /** Each project's kind (projectKind), for the Run in picker's icons; "git" while unknown. */
-export function useProjectKinds(ids: readonly string[]): (id: string) => ProjectKind {
+function useProjectKinds(ids: readonly string[]): (id: string) => ProjectKind {
   const kinds = useProjectsStore(useShallow((s) => ids.map((id) => (s.byId[id] ? projectKind(s.byId[id]).kind : "git"))));
   return useCallback((id: string) => kinds[ids.indexOf(id)] ?? "git", [ids, kinds]);
 }

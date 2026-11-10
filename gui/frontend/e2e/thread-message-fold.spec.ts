@@ -253,7 +253,8 @@ test("Go to source: a quote under the fold opens the message and stays open; a s
   }, itemId);
   await expect(box).toHaveAttribute("data-folded", "false");
   await expect(box.getByText("the quoted words at the end")).toBeInViewport();
-  await page.waitForTimeout(2500);
+  // Past the flash (1600 ms): it stays open.
+  await page.waitForTimeout(2000);
   await expect(box).toHaveAttribute("data-folded", "false");
 });
 

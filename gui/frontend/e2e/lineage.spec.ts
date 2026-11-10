@@ -53,19 +53,17 @@ test.beforeEach(async () => {
   await mockPost("lineage");
 });
 
-test.describe("lineage", () => {
-  // Children out of the sidebar while their creator exists, in it with ↳ once it is gone, the
-  // card's "Created by … (removed)" line: src/lib/inSidebar.test.ts, src/lib/tree.test.ts,
-  // src/components/sidebar/SidebarRow.test.tsx ("SidebarRow created by a thread", "an orphan's card").
-  // The crumb naming and opening the creator, its order, the Created by note:
-  // src/components/thread/ThreadParts.test.tsx, src/components/thread/lineageRows.test.tsx, and the
-  // card's lineage row opening the child: src/components/threadinfo/ThreadInfoCard.test.tsx.
+// Children out of the sidebar while their creator exists, in it with ↳ once it is gone, the
+// card's "Created by … (removed)" line: src/lib/inSidebar.test.ts, src/lib/tree.test.ts,
+// src/components/sidebar/SidebarRow.test.tsx ("SidebarRow created by a thread", "an orphan's card").
+// The crumb naming and opening the creator, its order, the Created by note:
+// src/components/thread/ThreadParts.test.tsx, src/components/thread/lineageRows.test.tsx, and the
+// card's lineage row opening the child: src/components/threadinfo/ThreadInfoCard.test.tsx.
 
-  // Timeline: a wake message as a collapsed Woken by note that expands to its payload and collapses again, its link selecting the thread: src/components/thread/lineageRows.test.tsx ("a wake message: …").
+// Timeline: a wake message as a collapsed Woken by note that expands to its payload and collapses again, its link selecting the thread: src/components/thread/lineageRows.test.tsx ("a wake message: …").
 
-  // A removed creator's inert crumb segment, its recorded name and "Thread removed", the anchor
-  // moving to the orphan: ThreadParts.test.tsx, lineageRows.test.tsx, inSidebar.test.ts (sidebarAnchor).
-});
+// A removed creator's inert crumb segment, its recorded name and "Thread removed", the anchor
+// moving to the orphan: ThreadParts.test.tsx, lineageRows.test.tsx, inSidebar.test.ts (sidebarAnchor).
 
 test.describe("child threads", () => {
   // Not in the attention count while their creator exists, counted once orphaned:

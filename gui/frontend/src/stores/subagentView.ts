@@ -16,8 +16,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { runItems } from "@/lib/subagentView";
-import { timelineKey } from "@/lib/threadTimeline";
-import { structOf, useThreadStore } from "./thread";
+import { itemKeyOf, useThreadStore } from "./thread";
 import { useUiStore } from "./ui";
 
 /** The active view the command context carries while a subagent shows (command.ViewSubagent). */
@@ -72,7 +71,7 @@ export function useRunTimelineKeys(threadId: string, toolUseId: string): string[
       const log = s.logs[threadId];
       if (!log || !toolUseId) return NO_KEYS;
       const items = log.order.flatMap((id) => (log.byId[id] ? [log.byId[id]] : []));
-      return runItems(items, toolUseId).map((it) => timelineKey(structOf(it)));
+      return runItems(items, toolUseId).map((it) => itemKeyOf(it));
     }),
   );
 }

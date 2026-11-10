@@ -144,7 +144,7 @@ describe("openStartedThread", () => {
   it.each([
     ["the Pull Requests page", { kind: "view", name: "pullrequests" }, 1],
     ["another thread", { kind: "thread", id: "s-1" }, 1],
-    // FocusThread got there first: nothing changes (no second terminal focus).
+    // FocusThread got there first: nothing changes (no second prompt focus).
     ["the new thread", { kind: "thread", id: "s-9" }, 0],
   ] as const)("from %s", (_, selection, focusSeq) => {
     useUiStore.setState({ selection, promptFocusSeq: 0 });

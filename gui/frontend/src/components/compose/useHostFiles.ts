@@ -35,7 +35,7 @@ export function useHosted(): boolean {
  * prompt as text at the caret (lib/droppedPaths). Nothing happens while the draft is
  * sending.
  */
-export async function routePaths(draftKey: string, editorRef: RefObject<PromptEditorHandle | null>, paths: readonly string[]): Promise<void> {
+async function routePaths(draftKey: string, editorRef: RefObject<PromptEditorHandle | null>, paths: readonly string[]): Promise<void> {
   if (getDraft(draftKey).phase !== "idle") return;
   const { attach, insert } = splitDroppedPaths(paths);
   if (insert.length > 0) editorRef.current?.insertPlain(pathsAsText(insert));
@@ -44,7 +44,7 @@ export async function routePaths(draftKey: string, editorRef: RefObject<PromptEd
 }
 
 /** The attributes that make an element a native drop target with this id (the Wails runtime reads them). */
-export interface DropTargetProps {
+interface DropTargetProps {
   "data-file-drop-target"?: "";
   "data-drop-id": string;
 }

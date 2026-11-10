@@ -24,18 +24,13 @@ test.beforeEach(async () => {
 // Remembered toast's link: unit-tested in src/components/memory/settings/RememberedSection.test.tsx,
 // src/components/confirm/ConfirmDialog.test.tsx and src/stores/intents.test.ts.
 
-test("the settings search finds Remembered and opens the page there", async ({ page }) => {
+// The hit's text, its keywords and the page it opens: src/components/settings/SettingsPage.test.tsx.
+test("the settings search's Remembered hit scrolls the section into view", async ({ page }) => {
   await openApp(page);
   await page.keyboard.press("Meta+Comma");
   await page.getByRole("searchbox", { name: "Search settings" }).fill("remembered");
-  await expect(page.getByTestId("settings-section-hit")).toHaveText(["Memory › RememberedEvery thread in every project reads these before its first action."]);
-  await page.getByTestId("settings-section-hit").click();
-  await expect(page.getByTestId("settings-body")).toHaveAttribute("data-page", "memory");
+  await page.getByTestId("settings-section-hit").filter({ hasText: "Memory › Remembered" }).click();
   await expect(page.locator('[data-section="remembered"]')).toBeInViewport();
-  for (const word of ["forget", "preferences", "standing"]) {
-    await page.getByRole("searchbox", { name: "Search settings" }).fill(word);
-    await expect(page.getByTestId("settings-section-hit").filter({ hasText: "Memory › Remembered" })).toHaveCount(1);
-  }
 });
 
 /** SHOTS=<dir>: the page with entries and empty, WebKit, 1440x900, dark and light. */

@@ -564,8 +564,8 @@ export const useUiStore = create<UiState>()(
       // 3: the sidebar is a flat thread list (no collapsible projects or worktrees); drop collapsed.
       // The Projects index has no collapsible projects and the workspace page no collapsible
       // card: collapsedProjects and collapsedWorkspaces are ignored (merge).
-      // 4: the default sidebar width fell from 280 to 220; drop the saved width once so every
-      // window starts at the new default, and keep widths dragged after that.
+      // 4: the default sidebar width fell from 280 (it is SIDEBAR_DEFAULT now); drop the saved
+      // width once so every window starts at the default, and keep widths dragged after that.
       version: 4,
       migrate: (persisted, version) => {
         const { panelWidth: _old, collapsed: _gone, ...rest } = persistedRecord(persisted);
@@ -574,8 +574,8 @@ export const useUiStore = create<UiState>()(
       },
       // Only the persisted fields, each checked (stores/persisted.ts): a store another build
       // wrote, or a hand edit, never puts a wrong-typed value in the window's state. Numbers
-      // are clamped: a saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 180, saved before
-      // the minimum rose to 220) renders and drags from a valid width.
+      // are clamped: a saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 220, saved before
+      // the minimum rose to 260) renders and drags from a valid width.
       merge: (persisted, current) => {
         const p = persistedRecord(persisted);
         const num = (v: unknown, lo: number, hi: number, fallback: number): number => {

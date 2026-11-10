@@ -119,7 +119,7 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         setOpen(next);
       }}
     >
-      <Tip label="More actions">
+      <Tip label="Pull request actions">
         <DropdownMenuTrigger asChild>
           <button
             ref={ref}

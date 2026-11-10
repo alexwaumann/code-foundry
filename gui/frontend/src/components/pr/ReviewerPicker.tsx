@@ -13,7 +13,7 @@ import { Avatar } from "./Avatar";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 import { matchesReviewerSearch, REVIEWER_SEARCH_MIN_CHARS, reviewerSearchTerm, useReviewerSearchTerm } from "./reviewerSearch";
 
-export const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
+const WRITE_ACCESS_HINT = "Asking someone to review needs write access on this repository.";
 
 const sameReviewer = (a: { login: string; kind: string }, b: { login: string; kind: string }): boolean =>
   a.kind === b.kind && a.login.toLowerCase() === b.login.toLowerCase();

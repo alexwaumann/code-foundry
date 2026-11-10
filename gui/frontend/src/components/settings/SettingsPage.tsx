@@ -22,9 +22,9 @@ import { SearchResults } from "./SearchResults";
 import { SettingsSection } from "./SectionCard";
 import { sectionRowSearch } from "./sectionLinks";
 
-/** The nav's icon per page id; a page without one gets a generic gear. Ember's is its flame. */
 const NO_FIELDS: readonly SettingFieldView[] = [];
 
+/** The nav's icon per page id; a page without one gets a generic gear. Ember's is its flame. */
 const pageIcons: Readonly<Partial<Record<string, LucideIcon | ComponentType<{ className?: string }>>>> = {
   general: SlidersHorizontal,
   appearance: Palette,
@@ -234,7 +234,7 @@ export function SettingsPage() {
             className="h-7 pl-7 text-body-sm"
           />
         </div>
-        <Tip label={path} side="bottom">
+        <Tip label={path} whenTruncated side="bottom">
           <span className="ml-auto truncate text-caption-sm font-mono" data-testid="settings-path">
             {tildify(path)}
           </span>

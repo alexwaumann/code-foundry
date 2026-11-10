@@ -96,7 +96,7 @@ const handlers: Handlers = {
   settings: applySettingsSnapshot,
   update: applyUpdateEvent,
   action: (ev) => {
-    useActionsStore.setState((s) => ({ ...applyActionEvent(s, ev), loaded: true }));
+    useActionsStore.setState((s) => applyActionEvent(s, ev));
     // A failed worktree-create run toasts (stores/actionActions.ts).
     if (ev.kind === "runFinished") onActionRunFinished(ev.finished);
   },

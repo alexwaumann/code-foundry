@@ -332,7 +332,6 @@ export function SearchDialog({
     report,
     recent,
     cue,
-    now: openedAt,
     selectedRecent,
     dictation,
     inputRef,

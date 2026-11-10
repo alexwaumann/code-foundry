@@ -8,7 +8,8 @@ import { useProjectsStore } from "./projects";
 /**
  * Creating a project (project.create, the Add Project dialog's New tab), publishing one to
  * GitHub (project.github.publish: the New tab's second step, and the publish dialog the
- * overview's Publish to GitHub button and the palette open) and deleting one the New
+ * project page's Publish to GitHub button, the projects index row's link, the project
+ * menus and the palette open) and deleting one the New
  * tab made and then cancelled (project.delete). Errors reject with the daemon's message,
  * which for a refused publish is gh's own words; nothing is toasted here (the dialogs
  * show errors in place).

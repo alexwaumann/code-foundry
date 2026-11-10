@@ -20,7 +20,7 @@ import { applyUpdateToState, emptyEntry, usePluginSurfacesStore } from "@/stores
 
 export const INSTANCE = "fuzz/surface/global";
 
-export interface Box {
+interface Box {
   top: number;
   height: number;
   width: number;
@@ -113,7 +113,7 @@ export function resetSurfaceStore(): void {
 export function Surface() {
   const view = usePluginSurfacesStore((s) => s.watches.w?.view ?? null);
   const viewTab = view?.tabs?.active ?? "";
-  const ctx = useMemo<ViewCtx>(() => ({ watchKey: "w", instance: INSTANCE, plugin: "fuzz", viewTab, uiContext: emptyContext, inert: false }), [viewTab]);
+  const ctx = useMemo<ViewCtx>(() => ({ watchKey: "w", instance: INSTANCE, viewTab, uiContext: emptyContext, inert: false }), [viewTab]);
   if (!view) return null;
   return (
     <ViewContext.Provider value={ctx}>

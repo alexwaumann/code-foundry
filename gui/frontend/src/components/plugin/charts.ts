@@ -12,9 +12,9 @@ import { slotColorVars, type ModelSlot } from "@/lib/usage";
 // ---- Stats ---------------------------------------------------------------------
 
 /** pluginsdk/ui StatCardMinWidth: a card never gets narrower; the row wraps instead. */
-export const STAT_CARD_MIN_WIDTH = 100;
+const STAT_CARD_MIN_WIDTH = 100;
 /** The gap between cards, both ways (the Pull Requests cards' gap-3). */
-export const STAT_GAP = 12;
+const STAT_GAP = 12;
 /** A card's horizontal padding and border (px-3.5, 1 px each side). */
 const STAT_CARD_INSET = 2 * 14 + 2;
 
@@ -34,7 +34,7 @@ export function statsColumns(width: number | null, n: number): number {
 }
 
 /** The figure roles, largest first, with their font size (px; index.css). */
-export const FIGURE_ROLES = [
+const FIGURE_ROLES = [
   { role: "text-display-sm", px: 32 },
   { role: "text-title", px: 22 },
   { role: "text-heading", px: 15 },
@@ -95,7 +95,7 @@ export function statCardWidth(width: number, columns: number): number {
 }
 
 /** A figure's colour per tone: the Pull Requests cards' (amber, red), emerald for ok, muted. */
-export const statTone: Readonly<Record<Tone, string>> = {
+const statTone: Readonly<Record<Tone, string>> = {
   "": "",
   muted: "text-cf-text-muted",
   attention: "text-cf-warning-text",

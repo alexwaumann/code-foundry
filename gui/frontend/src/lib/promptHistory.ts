@@ -4,6 +4,7 @@
  * relative age and the filter's hit ranges.
  */
 import type { PromptScopeView } from "@/api/thread";
+import { startOfDay } from "./snooze";
 
 /** How many prompts the picker lists. It asks for one more to know whether there are more. */
 export const PROMPT_LIMIT = 50;
@@ -90,12 +91,6 @@ export function pickerHeading(state: { count: number; more: boolean; filtering: 
 }
 
 const DAY = 86_400_000;
-
-function startOfDay(ms: number): number {
-  const d = new Date(ms);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
 
 /**
  * A prompt's age beside its thread name: "now", "5m", "2h" within a day, then

@@ -28,8 +28,8 @@ export const PERMISSION_CHOICES: readonly (Choice & { value: ComposePermission; 
   { value: "auto", label: "Auto", hint: "Claude's classifier decides" },
 ];
 
-export const DEFAULT_MODEL = "claude-opus-4-8[1m]";
-export const DEFAULT_EFFORT = "high";
+export const DEFAULT_MODEL = "claude-sonnet-5[1m]";
+export const DEFAULT_EFFORT = "medium";
 export const DEFAULT_PERMISSION: ComposePermission = "auto";
 
 export function choiceLabel(choices: readonly Choice[], value: string): string {
@@ -200,10 +200,6 @@ export function draftKey(t: ComposeTarget): string {
     case "home":
       return HOME_KEY;
   }
-}
-
-export function isWorkspaceKey(key: string): boolean {
-  return key.startsWith(WORKSPACE_KEY);
 }
 
 /** The draft fields a move to another target rewrites (stores/compose.ts Draft has them all). */
@@ -442,17 +438,6 @@ export interface PromptArgsInput {
   model: string;
   effort: string;
   permission: string;
-}
-
-export interface DraftArgsInput extends PromptArgsInput {
-  worktree: ProjectWorktree;
-  /** Base ref for a new worktree; "" lets the daemon pick (the default branch: origin's copy unless the local branch is ahead of it, or projects.base_from_origin is off). */
-  base: string;
-}
-
-/** thread.new's args for a project draft (threadArgs with a project place). */
-export function threadNewArgs(projectId: string, d: DraftArgsInput, attachments: readonly string[]): Record<string, string> {
-  return threadArgs({ kind: "project", projectId, worktree: d.worktree, base: d.base }, d, attachments);
 }
 
 /**

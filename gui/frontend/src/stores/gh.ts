@@ -86,7 +86,8 @@ export const dashboardResource = createResource((_key, signal) => getDashboard(u
 /**
  * Key: the repository's slug, lower case (the daemon's). Its default branch checks, read
  * from the daemon's snapshot (it polls every tracked repository's); re-read on
- * repo_activity_updated. Watched only by the Projects index's rows while shown.
+ * repo_activity_updated. Watched by the Default branch cells (the Projects index's rows,
+ * a project page's title) while shown.
  */
 export const repoActivityResource = createResource((slug, signal) => getRepoActivity(slug, undefined, signal));
 

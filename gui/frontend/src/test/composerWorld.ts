@@ -14,11 +14,11 @@ import { resetComposerDaemon } from "./composerFakes";
 import { resetDaemon } from "./daemonFakes";
 import { seedWorld } from "./projectsWorld";
 
-/** internal/model's registry as the mock's settings schema lists it. */
 /** What every send from the composer adds to thread.new's args: its setup runs in the background, with the draft to undo it (docs/notes/instant-threads-4-composer.md). */
 export const BACKGROUND = { "background-setup": "true", "draft-json": expect.any(String) as string };
 
-export const MODEL_CHOICES = [
+/** internal/model's registry as the mock's settings schema lists it. */
+const MODEL_CHOICES = [
   { value: "claude-opus-5-5[1m]", label: "Opus 5.5" },
   { value: "claude-opus-4-8[1m]", label: "Opus 4.8" },
   { value: "claude-opus-4-7[1m]", label: "Opus 4.7" },

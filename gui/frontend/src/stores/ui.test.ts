@@ -70,7 +70,7 @@ describe("window width", () => {
 });
 
 describe("ui persistence", () => {
-  it("migrating drops the old global panelWidth, the tree's collapsed rows and the pre-220 sidebar width, and keeps the rest", async () => {
+  it("migrating drops the old global panelWidth, the tree's collapsed rows and the sidebar width saved before v4, and keeps the rest", async () => {
     const migrate = useUiStore.persist.getOptions().migrate;
     expect(useUiStore.persist.getOptions().version).toBe(4);
     const v1 = { sidebarVisible: false, sidebarWidth: 300, panelWidth: 600, fontSize: 14, collapsed: { a: true } };

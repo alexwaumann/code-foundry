@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Download, ExternalLink, Loader2, RefreshCw, TriangleAlert, X, type LucideIcon } from "lucide-react";
 import { openExternal } from "@/api/app";
 import type { UpdateStatusView } from "@/api/update";
@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { formatAgo, restartCutsOff } from "@/lib/thread";
 import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
-import { useThreadsStore } from "@/stores/threads";
+import { useThreadsStore, type ThreadsData } from "@/stores/threads";
 import { closeUpdateDialog, runUpdateAction, useCutOffThreadIds, useUpdateStore, type UpdateAction } from "@/stores/update";
 
 const linkTone = "text-link hover:underline";
@@ -116,6 +116,16 @@ function BusyThread({ id }: { id: string }) {
       <span className="ml-auto shrink-0 text-cf-text-muted">{label}</span>
     </div>
   );
+}
+
+/** How many threads a restart would cut off (useCutOffThreadIds' count). */
+function cutOffCount(s: ThreadsData): number {
+  let n = 0;
+  for (const id of s.order) {
+    const x = s.byId[id];
+    if (x && restartCutsOff(x) !== null) n++;
+  }
+  return n;
 }
 
 /** The threads a restart would cut off (the daemon's count: working, waiting on the user, background work). */
@@ -229,7 +239,12 @@ export function UpdateDialog() {
   const guiVersion = useUpdateStore((s) => s.guiVersion);
   const restarting = useUpdateStore((s) => s.restarting);
   const oldDaemon = useUpdateStore((s) => s.oldDaemon);
-  const busy = useCutOffThreadIds().length;
+  // Only an open dialog scans the threads on each threads event; a shut one keeps the last
+  // count, so the closing dialog's text does not change under its exit animation.
+  const live = useThreadsStore((s) => (open ? cutOffCount(s) : -1));
+  const [held, setHeld] = useState(0);
+  if (live >= 0 && live !== held) setHeld(live);
+  const busy = live >= 0 ? live : held;
   const v = useMemo(() => (st ? updateView(st, guiVersion, { busy }, restarting, oldDaemon) : null), [st, guiVersion, busy, restarting, oldDaemon]);
   return (
     <Dialog

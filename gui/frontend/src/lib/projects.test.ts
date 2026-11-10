@@ -10,11 +10,9 @@ import {
   indexColumns,
   checkoutColumns,
   checkoutHasChanges,
-  isCleanable,
   projectActivity,
   projectKind,
   projectNextStep,
-  projectsModel,
   projectRef,
   projectStatusSentence,
   refreshedText,
@@ -38,7 +36,8 @@ import {
   type ProjectsModel,
   type ProjectsSlice,
   type ProjectsSearch,
-  type ProjectsWorkspaces,
+  terminalHolds,
+  threadHolds,
 } from "./projects";
 
 const projects: ProjectsSlice = {
@@ -57,35 +56,6 @@ const projects: ProjectsSlice = {
     dot: { id: "dot", name: "web", worktrees: [{ path: "/src/dot", isMain: true }] },
   },
 };
-const workspaces: ProjectsWorkspaces = {
-  order: ["w-1"],
-  byId: {
-    "w-1": {
-      id: "w-1",
-      members: [
-        { projectId: "api", worktreePath: "" },
-        { projectId: "web", worktreePath: "" },
-      ],
-    },
-  },
-};
-
-describe("projectsModel", () => {
-  it("lists every worktree under its project (a workspace has none of its own)", () => {
-    expect(projectsModel(projects, workspaces)).toEqual({
-      projects: [
-        { projectId: "api", worktrees: ["/src/api", "/wt/api/cf-login"] },
-        { projectId: "dot", worktrees: ["/src/dot"] },
-        { projectId: "web", worktrees: ["/src/web", "/wt/web/feat", "/wt/web/cf-login"] },
-      ],
-      workspaces: ["w-1"],
-    });
-  });
-  it("a workspace the slice does not know is left out", () => {
-    expect(projectsModel(projects, { order: ["w-1", "w-gone"], byId: workspaces.byId }).workspaces).toEqual(["w-1"]);
-  });
-});
-
 describe("projectKind", () => {
   it.each<[string, { git?: boolean; githubSlug: string; remotes: string[] }, ProjectKind, string]>([
     ["a GitHub repository shows its slug", { git: true, githubSlug: "alexwaumann/code-foundry", remotes: ["origin"] }, "github", "alexwaumann/code-foundry"],
@@ -171,45 +141,39 @@ describe("projectNextStep (the header's Publish / Initialize git gate)", () => {
   });
 });
 
-describe("isCleanable", () => {
+describe("threadHolds and terminalHolds", () => {
   const WT = "/wt/cf-a";
   const none = { order: [], byId: {} };
-  type Threads = Parameters<typeof isCleanable>[1];
-  type Terminals = Parameters<typeof isCleanable>[2];
+  type Threads = Parameters<typeof threadHolds>[0];
+  type Terminals = Parameters<typeof terminalHolds>[0];
   const thread = (worktreePath: string, archivedAtMs: number | null = null): Threads => ({ order: ["s"], byId: { s: { archivedAtMs, worktreePath } } });
   const term = (state: "running" | "exited", cwd: string, worktree?: string): Terminals => ({
     order: ["t"],
     byId: { t: { state, cwd, labels: worktree ? { kind: "shell", worktree } : {} } },
   });
-  const merged = { path: WT, mergedClean: true };
-  const cases: { name: string; wt: Parameters<typeof isCleanable>[0]; threads?: Threads; terminals?: Terminals; want: boolean }[] = [
-    { name: "merged, nothing holds it", wt: merged, want: true },
-    { name: "not merged clean", wt: { path: WT, mergedClean: false }, want: false },
-    { name: "an older daemon (no flag)", wt: { path: WT }, want: false },
-    { name: "unknown worktree", wt: undefined, want: false },
-    { name: "a thread on it", wt: merged, threads: thread(WT), want: false },
-    { name: "a thread in a subdirectory", wt: merged, threads: thread(`${WT}/sub`), want: false },
-    { name: "a thread on it holds whatever its state (stopped, snoozed); an archived one does not", wt: merged, threads: thread(WT, 5), want: true },
-    { name: "a thread in a sibling with a common prefix", wt: merged, threads: thread(`${WT}-b`), want: true },
-    { name: "a running shell it owns", wt: merged, terminals: term("running", "/elsewhere", WT), want: false },
-    { name: "a running terminal inside it", wt: merged, terminals: term("running", `${WT}/src`), want: false },
-    { name: "an exited shell does not hold", wt: merged, terminals: term("exited", WT, WT), want: true },
+  const cases: { name: string; threads?: Threads; terminals?: Terminals; held: boolean }[] = [
+    { name: "nothing holds it", held: false },
+    { name: "a thread on it", threads: thread(WT), held: true },
+    { name: "a thread in a subdirectory", threads: thread(`${WT}/sub`), held: true },
+    { name: "a thread on it holds whatever its state (stopped, snoozed); an archived one does not", threads: thread(WT, 5), held: false },
+    { name: "a thread in a sibling with a common prefix", threads: thread(`${WT}-b`), held: false },
+    { name: "a running shell it owns", terminals: term("running", "/elsewhere", WT), held: true },
+    { name: "a running terminal inside it", terminals: term("running", `${WT}/src`), held: true },
+    { name: "an exited shell does not hold", terminals: term("exited", WT, WT), held: false },
     {
       name: "another thread's checkout (a multi-project set's member) holds it, as the daemon's checkoutThreads",
-      wt: merged,
       threads: { order: ["s"], byId: { s: { archivedAtMs: null, worktreePath: "/elsewhere", checkoutPaths: [{ projectId: "p", path: WT }] } } },
-      want: false,
+      held: true,
     },
     {
       name: "an archived thread's checkout does not",
-      wt: merged,
       threads: { order: ["s"], byId: { s: { archivedAtMs: 5, worktreePath: "/elsewhere", checkoutPaths: [{ projectId: "p", path: WT }] } } },
-      want: true,
+      held: false,
     },
   ];
   for (const c of cases) {
     it(c.name, () => {
-      expect(isCleanable(c.wt, c.threads ?? none, c.terminals ?? none)).toBe(c.want);
+      expect(threadHolds(c.threads ?? none, WT) || terminalHolds(c.terminals ?? none, WT)).toBe(c.held);
     });
   }
 });

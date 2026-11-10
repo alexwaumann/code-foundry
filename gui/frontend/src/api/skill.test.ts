@@ -12,7 +12,7 @@ import {
   SkillTier,
 } from "@/gen/codefoundry/v1/skill_pb";
 import { toEventView } from "./events";
-import { skillChanges, skillCommandName, skillItemKey, toInstalledList, toSkillRegistries, toSkillSearch } from "./skill";
+import { skillCommandName, skillItemKey, toInstalledList, toSkillRegistries, toSkillSearch } from "./skill";
 
 describe("skill keys", () => {
   it.each([
@@ -64,7 +64,6 @@ describe("search mapping", () => {
       description: "Query the warehouse.",
       by: "Data Platform",
       version: "1.4.0",
-      declaredVersion: "",
       lastUpdatedMs: 5000,
       registry: "ai-marketplace",
       path: "enterprise/plugins/enterprise-data",
@@ -128,11 +127,11 @@ describe("registries mapping", () => {
         expectedMarketplace: "ai-marketplace",
         epoch: 2n,
         error: "",
-        registries: [{ name: "ai-marketplace", repo: "cof-primary/ai-marketplace", plugins: 3, skills: 40, readAt: timestampFromMs(1000), shallow: true, issues: ["x"] }],
+        registries: [{ name: "ai-marketplace", repo: "acme/ai-marketplace", plugins: 3, skills: 40, readAt: timestampFromMs(1000), shallow: true, issues: ["x"] }],
       }),
     );
     expect(v).toMatchObject({ expectedMarketplace: "ai-marketplace", epoch: 2, error: "" });
-    expect(v.registries[0]).toMatchObject({ name: "ai-marketplace", repo: "cof-primary/ai-marketplace", plugins: 3, skills: 40, readAtMs: 1000, refreshedAtMs: null, shallow: true, issues: ["x"] });
+    expect(v.registries[0]).toMatchObject({ name: "ai-marketplace", repo: "acme/ai-marketplace", plugins: 3, skills: 40, readAtMs: 1000, refreshedAtMs: null, shallow: true, issues: ["x"] });
     expect(toSkillRegistries(create(ListSkillRegistriesResponseSchema, { expectedMarketplace: "ai-marketplace" })).registries).toEqual([]);
   });
 });
@@ -140,19 +139,5 @@ describe("registries mapping", () => {
 describe("skill events", () => {
   it("carries the epoch on the multiplexed stream", () => {
     expect(toEventView(create(EventSchema, { event: { case: "skill", value: { epoch: 12n } } }))).toEqual({ source: "skill", event: { epoch: 12 } });
-  });
-});
-
-describe("skillChanges", () => {
-  it.each([
-    ["one change", JSON.stringify({ op: "install", kind: "skill", name: "pr-review", registry: "ai-marketplace", version: "20260305", needsSetup: true, setupScript: "install.sh" }), [{ op: "install", name: "pr-review", needsSetup: true, setupScript: "install.sh", unchanged: false }]],
-    ["a list (update)", JSON.stringify([{ op: "update", kind: "plugin", name: "a", unchanged: true }, { op: "update", kind: "skill", name: "b", error: "boom" }]), [{ kind: "plugin", unchanged: true }, { kind: "skill", error: "boom" }]],
-    ["not a change (a terminal)", JSON.stringify({ id: "t-1" }), []],
-    ["nothing", "", []],
-    ["garbage", "{", []],
-  ])("%s", (_name, json, want) => {
-    const got = skillChanges(json);
-    expect(got).toHaveLength(want.length);
-    want.forEach((w, i) => { expect(got[i]).toMatchObject(w); });
   });
 });

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import {
   attentionTier,
-  badgeLabels,
   isRunningThread,
   isThreadGroup,
   isWorkingThread,
@@ -147,9 +146,6 @@ describe("threadBadge", () => {
   });
   it("is unknown without a thread", () => {
     expect(threadBadge(undefined)).toBe("unknown");
-  });
-  it("has no lifecycle badges", () => {
-    expect(Object.keys(badgeLabels).sort()).toEqual(["attention", "busy", "error", "idle", "unknown"]);
   });
 });
 

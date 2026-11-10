@@ -76,16 +76,31 @@ export function codeThemeOf(theme: Theme): ThemeRegistration {
   };
 }
 
-const registered = new Set<string>();
+const names = new WeakMap<Theme, string>();
+const byContent = new Map<string, string>();
+const versions = new Map<string, number>();
 
-/** Registers the theme with the library once; returns its name. */
+/**
+ * Registers the theme with the library once per set of colours; returns its name. The
+ * library keeps the first theme registered under a name, so a theme whose colours change
+ * under the same id (a saved user theme) is registered again as `cf-<id>.<n>`.
+ */
 export function ensureCodeTheme(theme: Theme): string {
-  const name = codeThemeName(theme.id);
-  if (!registered.has(name)) {
-    registered.add(name);
-    const t = codeThemeOf(theme);
-    registerCustomTheme(name, () => Promise.resolve(t));
+  const known = names.get(theme);
+  if (known) return known;
+  const t = codeThemeOf(theme);
+  const key = `${theme.id}\n${JSON.stringify(t)}`;
+  let name = byContent.get(key);
+  if (!name) {
+    const n = versions.get(theme.id) ?? 0;
+    versions.set(theme.id, n + 1);
+    const base = codeThemeName(theme.id);
+    name = n === 0 ? base : `${base}.${String(n)}`;
+    byContent.set(key, name);
+    const named = { ...t, name };
+    registerCustomTheme(name, () => Promise.resolve(named));
   }
+  names.set(theme, name);
   return name;
 }
 

@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRunView } from "@/api/agents";
-import type { AgentRunView as ListedRun } from "@/api/threads";
+import type { AgentRunUsageView as ListedRun } from "@/api/threads";
 import { resetDaemon } from "@/test/daemonFakes";
 import { bucket, resetCard, seedSingle, seedWs9, setLog, updateThread } from "@/test/threadInfoWorld";
 import { useProjectsStore } from "@/stores/projects";
@@ -36,7 +36,6 @@ function live(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
     spawnDepth: 1,
     status: "running",
     activity: "",
-    lastTool: "",
     totalTokens: 48_200,
     toolUses: 3,
     durationMs: 0,

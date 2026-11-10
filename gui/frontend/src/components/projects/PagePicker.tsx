@@ -97,26 +97,28 @@ export function PagePicker({ icon, name, currentProject = "", currentWorkspace =
           <ChevronDown className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
         </button>
       </DropdownMenuTrigger>
-      <PickerContent currentProject={currentProject} currentWorkspace={currentWorkspace} />
+      <DropdownMenuContent
+        align="start"
+        className="max-h-[70vh] min-w-72 overflow-y-auto"
+        data-testid="page-picker-menu"
+        onCloseAutoFocus={(e) => {
+          // Back to the page's list, not the trigger (the page's keys live there).
+          e.preventDefault();
+          document.querySelector<HTMLElement>('[data-testid="projects-page"] [data-focus-root]')?.focus({ preventScroll: true });
+        }}
+      >
+        <PickerItems currentProject={currentProject} currentWorkspace={currentWorkspace} />
+      </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
 /** The menu's items, mounted only while it is open (so the closed header subscribes to nothing more). */
-function PickerContent({ currentProject, currentWorkspace }: { currentProject: string; currentWorkspace: string }) {
+function PickerItems({ currentProject, currentWorkspace }: { currentProject: string; currentWorkspace: string }) {
   const projects = useProjectOrder();
   const workspaces = useWorkspaceOrder();
   return (
-    <DropdownMenuContent
-      align="start"
-      className="max-h-[70vh] min-w-72 overflow-y-auto"
-      data-testid="page-picker-menu"
-      onCloseAutoFocus={(e) => {
-        // Back to the page's list, not the trigger (the page's keys live there).
-        e.preventDefault();
-        document.querySelector<HTMLElement>('[data-testid="projects-page"] [data-focus-root]')?.focus({ preventScroll: true });
-      }}
-    >
+    <>
       {projects.map((id) => (
         <ProjectItem key={id} id={id} current={id === currentProject} />
       ))}
@@ -134,6 +136,6 @@ function PickerContent({ currentProject, currentWorkspace }: { currentProject: s
       >
         Add project
       </DropdownMenuItem>
-    </DropdownMenuContent>
+    </>
   );
 }

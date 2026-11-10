@@ -6,7 +6,7 @@
  * both (LIVE_WORKSPACE, its name), and the Vite dev server pointed at it (recipe in
  * docs/notes/phase2-integration.md).
  *
-^ * It starts two Haiku 5.5 threads ("say hi and stop"): one in the workspace's first member,
+ * It starts two Haiku 5.5 threads ("say hi and stop"): one in the workspace's first member,
  * one in the second project's main worktree; moves the workspace thread to the second
  * member with Run in…, and closes both at the end.
  */

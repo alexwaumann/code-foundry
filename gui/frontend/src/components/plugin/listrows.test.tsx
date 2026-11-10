@@ -28,7 +28,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
   }),
 }));
 
-const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", plugin: "hello", viewTab: "todo", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "hello/demo/thread:s-1", viewTab: "todo", uiContext: emptyContext, inert: false };
 
 function setVersion(version: number): void {
   usePluginSurfacesStore.setState((s) => ({ watches: { w: { ...(s.watches.w ?? emptyEntry({ plugin: "hello", surface: "demo" })), instance: ctx.instance, version, phase: "live" } } }));

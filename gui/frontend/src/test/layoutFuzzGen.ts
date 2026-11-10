@@ -33,7 +33,7 @@ const CONTAINERS = ["section", "columns", "pane", "grid", "container", "masterDe
 const LEAVES = ["text", "markdown", "pairs", "list", "chips", "log", "actions", "progress", "notice", "empty", "form", "thread", "terminal", "divider", "spacer", "group", "stats", "bars", "table"] as const;
 const GROUP_KINDS = ["text", "chips", "actions", "progress"] as const;
 const STRIP_KINDS = ["text", "chips", "actions", "progress", "form", "divider", "spacer", "group"] as const;
-export const MAX_DEPTH = 4;
+const MAX_DEPTH = 4;
 
 export class Gen {
   private n = 0;
@@ -300,7 +300,7 @@ export class Gen {
 }
 
 /** Every node list of a view (a toolbar, the body, a footer, every container's lists), for mutation in place. */
-export function nodeListsOf(v: PluginViewModel): ViewNode[][] {
+function nodeListsOf(v: PluginViewModel): ViewNode[][] {
   const out: ViewNode[][] = [];
   const walk = (l: ViewNode[]) => {
     out.push(l);
@@ -321,7 +321,7 @@ export function nodeListsOf(v: PluginViewModel): ViewNode[][] {
   return out;
 }
 
-export function allNodes(v: PluginViewModel): ViewNode[] {
+function allNodes(v: PluginViewModel): ViewNode[] {
   return nodeListsOf(v).flat();
 }
 
@@ -345,8 +345,8 @@ function depthOf(v: PluginViewModel, target: ViewNode): number {
   return found;
 }
 
-export const MUTATIONS = ["reorder", "remove", "swapKind", "deleteSelectedRow", "selectOther", "dropActiveTab", "switchNodeTab", "strips", "resetToken", "viewTab", "toggleCollapsed", "heights"] as const;
-export type Mutation = (typeof MUTATIONS)[number];
+const MUTATIONS = ["reorder", "remove", "swapKind", "deleteSelectedRow", "selectOther", "dropActiveTab", "switchNodeTab", "strips", "resetToken", "viewTab", "toggleCollapsed", "heights"] as const;
+type Mutation = (typeof MUTATIONS)[number];
 
 /** The plugin's next view: a copy of v with one mutation (named in the result). */
 export function mutateView(v: PluginViewModel, g: Gen): { view: PluginViewModel; what: Mutation } {

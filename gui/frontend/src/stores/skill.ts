@@ -431,13 +431,9 @@ export function browseAction(e: Pick<SkillEntryView, "state" | "updateVersion">)
 // ---------------------------------------------------------------------------------------
 // Narrow selectors
 
-export const useSkillQuery = (): SkillQuery => useSkillMarketplaceStore((s) => s.query);
-export const useSkillSearch = (): SkillSearchView | null => useSkillMarketplaceStore((s) => s.search);
 export const useSkillSearching = (): boolean => useSkillMarketplaceStore((s) => s.searching);
 export const useSkillSearchError = (): string => useSkillMarketplaceStore((s) => s.searchError);
-export const useInstalledSkills = (): InstalledListView | null => useSkillMarketplaceStore((s) => s.installed);
 export const useInstalledSkillsError = (): string => useSkillMarketplaceStore((s) => s.installedError);
-export const useSkillRegistries = (): SkillRegistriesView | null => useSkillMarketplaceStore((s) => s.registries);
 export const useSkillRegistriesError = (): string => useSkillMarketplaceStore((s) => s.registriesError);
 export const useSkillRefreshing = (): boolean => useSkillMarketplaceStore((s) => s.refreshing);
 /** What is being done to one row (by skillItemKey), null when nothing. */

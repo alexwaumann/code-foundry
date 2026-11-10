@@ -7,7 +7,6 @@ import {
   dismissCard,
   emphasis,
   fileItems,
-  fileSources,
   findTrigger,
   firstLine,
   groupSkills,
@@ -271,7 +270,7 @@ describe("commandItems", () => {
   });
 });
 
-describe("skillSources and fileSources", () => {
+describe("skillSources", () => {
   it.each<[string, Parameters<typeof skillSources>[0], { projectId: string; path?: string }[]]>([
     ["a project with no known checkout: its main worktree", { projectIds: ["r1"] }, [{ projectId: "r1" }]],
     ["a project in an existing worktree: that one", { projectIds: ["r1"], paths: { r1: "/h/r1-wt" } }, [{ projectId: "r1", path: "/h/r1-wt" }]],
@@ -279,7 +278,6 @@ describe("skillSources and fileSources", () => {
     ["a thread's checkouts: each where it is, the unknown one from its main worktree", { projectIds: ["r2", "r1", "r9"], paths: { r1: "/h/w/r1", r2: "/h/w/r2" } }, [{ projectId: "r2", path: "/h/w/r2" }, { projectId: "r1", path: "/h/w/r1" }, { projectId: "r9" }]],
   ])("%s", (_name, input, want) => {
     expect(skillSources(input)).toEqual(want);
-    expect(fileSources(input)).toEqual(want);
   });
 
   it("keys differ by member and path", () => {

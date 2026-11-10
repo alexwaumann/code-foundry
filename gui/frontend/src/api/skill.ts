@@ -104,8 +104,6 @@ export interface SkillEntryView {
   by: string;
   /** A plugin's index version; a skill's YYYYMMDD of its last commit ("" without history). */
   version: string;
-  /** A skill's frontmatter metadata.version, display only. */
-  declaredVersion: string;
   /** The last commit touching it; null without history. */
   lastUpdatedMs: number | null;
   /** The marketplace's name. */
@@ -134,7 +132,6 @@ export function toSkillEntry(e: SkillEntry): SkillEntryView {
     description: e.description,
     by: e.by,
     version: e.version,
-    declaredVersion: e.declaredVersion,
     lastUpdatedMs: ms(e.lastUpdated),
     registry: e.registry,
     path: e.path,
@@ -349,7 +346,7 @@ export async function listSkillRegistries(signal?: AbortSignal, conn: DaemonConn
 }
 
 // ---------------------------------------------------------------------------------------
-// Events and command results
+// Events
 
 /** The EventService skill source: the daemon read again (epoch moved), so re-read. */
 export interface SkillEventView {
@@ -358,59 +355,4 @@ export interface SkillEventView {
 
 export function toSkillEventView(ev: SkillEvent): SkillEventView {
   return { epoch: Number(ev.epoch) };
-}
-
-/** What a skill.* command did (its result JSON, skill.Change). */
-export interface SkillChangeView {
-  op: string;
-  kind: SkillKindView;
-  name: string;
-  registry: string;
-  message: string;
-  version: string;
-  previousVersion: string;
-  /** Nothing to do (installed already, up to date, disabled already). */
-  unchanged: boolean;
-  dir: string;
-  /** The skill has a setup script that has not run: offer Run setup. */
-  needsSetup: boolean;
-  setupScript: string;
-  /** One update of several failed (skill.update with no name). */
-  error: string;
-}
-
-function str(v: unknown): string {
-  return typeof v === "string" ? v : "";
-}
-
-/** The changes in a skill.* command's result JSON: one Change, or a list (skill.update). */
-export function skillChanges(resultJson: string): SkillChangeView[] {
-  let v: unknown;
-  try {
-    v = JSON.parse(resultJson || "null");
-  } catch {
-    return [];
-  }
-  const list = Array.isArray(v) ? (v as unknown[]) : v && typeof v === "object" ? [v] : [];
-  return list.flatMap((x) => {
-    if (!x || typeof x !== "object") return [];
-    const c = x as Record<string, unknown>;
-    if (typeof c.op !== "string") return [];
-    return [
-      {
-        op: c.op,
-        kind: c.kind === "plugin" ? "plugin" : "skill",
-        name: str(c.name),
-        registry: str(c.registry),
-        message: str(c.message),
-        version: str(c.version),
-        previousVersion: str(c.previousVersion),
-        unchanged: c.unchanged === true,
-        dir: str(c.dir),
-        needsSetup: c.needsSetup === true,
-        setupScript: str(c.setupScript),
-        error: str(c.error),
-      } satisfies SkillChangeView,
-    ];
-  });
 }

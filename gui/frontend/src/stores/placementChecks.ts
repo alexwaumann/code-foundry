@@ -14,6 +14,7 @@ import { useProjectsStore } from "./projects";
 import { createResource } from "./resource";
 
 const SEP = "\u0000";
+const NO_IDS: readonly string[] = [];
 
 /** A worktree-mode check of a set on a branch; key: "<ids,>\0<branch>\0<signature>". */
 export const placementResource = createResource<PlacementView>((key, signal) => {
@@ -56,7 +57,7 @@ export interface RefusalCheck {
  */
 export function useRefusals(checks: readonly RefusalCheck[], enabled = true): Readonly<Record<string, string>> {
   const allIds = useMemo(() => [...new Set(checks.flatMap((c) => c.projectIds))].sort(), [checks]);
-  const projects = useCandidateProjects(allIds);
+  const projects = useCandidateProjects(enabled ? allIds : NO_IDS);
   const keys = useMemo(() => {
     if (!enabled) return [];
     const byId = new Map(projects.map((p) => [p.id, p]));

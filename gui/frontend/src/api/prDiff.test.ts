@@ -9,8 +9,8 @@ import { getPullRequestDiff, isTooLargeMessage, tooLargeText, toPullRequestDiffV
 describe("pull request diff mapping", () => {
   it("maps a diff", () => {
     const r = create(GetPullRequestDiffResponseSchema, { diff: "diff --git a/x b/x\n", headSha: "h", baseSha: "b", truncated: true, fetchedAt: timestampFromMs(5000) });
-    expect(toPullRequestDiffView(r)).toEqual({ diff: "diff --git a/x b/x\n", headSha: "h", baseSha: "b", truncated: true, fetchedAtMs: 5000 });
-    expect(toPullRequestDiffView(create(GetPullRequestDiffResponseSchema, {}))).toEqual({ diff: "", headSha: "", baseSha: "", truncated: false, fetchedAtMs: null });
+    expect(toPullRequestDiffView(r)).toEqual({ diff: "diff --git a/x b/x\n", headSha: "h", truncated: true, fetchedAtMs: 5000 });
+    expect(toPullRequestDiffView(create(GetPullRequestDiffResponseSchema, {}))).toEqual({ diff: "", headSha: "", truncated: false, fetchedAtMs: null });
   });
 
   it("decodes a file as UTF-8 and leaves binary and missing files empty", () => {

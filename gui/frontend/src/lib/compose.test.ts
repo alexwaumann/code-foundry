@@ -15,13 +15,11 @@ import {
   DEFAULT_MODEL,
   draftKey,
   HOME_KEY,
-  isWorkspaceKey,
   movedDraft,
   pickDefault,
   projectHue,
   projectInitials,
   projectSource,
-  threadNewArgs,
   threadArgs,
   threadPlace,
   setWorkIn,
@@ -32,7 +30,7 @@ import {
   mergedBranches,
   defaultWorktree,
   workInText,
-  type DraftArgsInput,
+  type PromptArgsInput,
   type WorktreeChoice,
   type MovableDraft,
   type PlaceEnv,
@@ -113,9 +111,10 @@ describe("inline bytes", () => {
   });
 });
 
-describe("threadNewArgs", () => {
-  const base: DraftArgsInput = { text: "  Add a dark mode toggle \n", model: "opus", effort: "high", permission: "auto", worktree: { kind: "new" }, base: "origin/main" };
-  it.each<[string, Partial<DraftArgsInput>, string[], Record<string, string>]>([
+describe("threadArgs for a project", () => {
+  type ProjectDraft = PromptArgsInput & Pick<Extract<ThreadPlace, { kind: "project" }>, "worktree" | "base">;
+  const base: ProjectDraft = { text: "  Add a dark mode toggle \n", model: "opus", effort: "high", permission: "auto", worktree: { kind: "new" }, base: "origin/main" };
+  it.each<[string, Partial<ProjectDraft>, string[], Record<string, string>]>([
     [
       "new worktree from a base, with attachments",
       {},
@@ -136,7 +135,8 @@ describe("threadNewArgs", () => {
       { project: "r", worktree: "/src/app", permission: "auto" },
     ],
   ])("%s", (_name, over, staged, want) => {
-    expect(threadNewArgs("r", { ...base, ...over }, staged)).toEqual(want);
+    const d = { ...base, ...over };
+    expect(threadArgs({ kind: "project", projectId: "r", worktree: d.worktree, base: d.base }, d, staged)).toEqual(want);
   });
 });
 
@@ -155,10 +155,7 @@ describe("project sets", () => {
     expect(draftKey({ kind: "project", projectId: "web" })).toBe("web");
     expect(draftKey({ kind: "workspace", workspaceId: "w-1" })).toBe("ws:w-1");
     expect(draftKey({ kind: "like", threadId: "s-1" })).toBe("like:s-1");
-    expect(isWorkspaceKey("ws:w-1")).toBe(true);
-    expect(isWorkspaceKey("web")).toBe(false);
     expect(draftKey({ kind: "home" })).toBe(HOME_KEY);
-    expect(isWorkspaceKey(HOME_KEY)).toBe(false);
   });
 
   it.each<[string, PlaceInput, Partial<PlaceEnv>, ThreadPlace | null]>([
@@ -374,8 +371,8 @@ describe("helpers", () => {
   });
 
   it("pickDefault uses a known setting, else the fallback", () => {
-    const choices = [...FALLBACK_MODEL_CHOICES, { value: "claude-sonnet-5[1m]", label: "Sonnet 5" }];
-    expect(pickDefault(choices, "claude-sonnet-5[1m]", DEFAULT_MODEL)).toBe("claude-sonnet-5[1m]");
+    const choices = [...FALLBACK_MODEL_CHOICES, { value: "claude-opus-4-8[1m]", label: "Opus 4.8" }];
+    expect(pickDefault(choices, "claude-opus-4-8[1m]", DEFAULT_MODEL)).toBe("claude-opus-4-8[1m]");
     expect(pickDefault(choices, "", DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
     expect(pickDefault(choices, undefined, DEFAULT_MODEL)).toBe(DEFAULT_MODEL);
     expect(pickDefault(choices, "opus", DEFAULT_MODEL)).toBe(DEFAULT_MODEL);

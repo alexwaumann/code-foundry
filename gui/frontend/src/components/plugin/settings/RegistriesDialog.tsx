@@ -4,6 +4,7 @@ import { focusSetting } from "@/components/settings/focus";
 import { pageSections } from "@/components/settings/model";
 import { SettingsSection } from "@/components/settings/SectionCard";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { usePluginRegistryStore } from "@/stores/pluginRegistry";
 import { REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } from "./registry";
@@ -11,6 +12,7 @@ import { REGISTRIES_SETTING, registryErrorWords, registryLine, shortSource } fro
 /** Each configured registry: when it was read, and a failure in words. */
 function RegistryNotices() {
   const registries = usePluginRegistryStore((s) => s.browse?.registries);
+  const now = useNow(60_000);
   if (!registries || registries.length === 0) return null;
   return (
     <div className="overflow-hidden rounded-lg border border-cf-border">
@@ -18,7 +20,7 @@ function RegistryNotices() {
         <div key={r.url} className={cn("flex min-w-0 flex-col gap-0.5 px-3 py-2.5", i > 0 && "border-t border-cf-border")} data-testid="registry-status" data-error={r.error ? "true" : undefined}>
           <div className="flex min-w-0 items-center gap-2">
             <span className="min-w-0 truncate font-mono text-caption-sm text-cf-text">{shortSource(r.url)}</span>
-            <span className="ml-auto shrink-0 text-caption-sm">{registryLine(r)}</span>
+            <span className="ml-auto shrink-0 text-caption-sm">{registryLine(r, now)}</span>
           </div>
           {r.error && (
             <p className="flex min-w-0 items-start gap-1.5 text-caption-sm text-cf-warning-text" role="alert">

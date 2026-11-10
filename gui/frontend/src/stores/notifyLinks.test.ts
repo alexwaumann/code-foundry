@@ -3,7 +3,8 @@ import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { useViewsStore } from "./views";
 
 const theme = vi.hoisted(() => ({ edit: vi.fn<(id: string) => Promise<boolean>>(), undo: vi.fn<(target: string) => void>() }));
-vi.mock("./themeCards", () => ({ editSavedTheme: theme.edit, undoFromLink: theme.undo }));
+vi.mock("./themeCards", () => ({ undoFromLink: theme.undo }));
+vi.mock("./themePicker", async (orig) => ({ ...(await orig<typeof import("./themePicker")>()), editTheme: theme.edit }));
 
 describe("notifyLinkAction", () => {
   beforeEach(() => {

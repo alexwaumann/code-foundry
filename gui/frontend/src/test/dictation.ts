@@ -109,7 +109,7 @@ function end(reason: DictationEndView = "stopped", sessionId = lastSession()): v
 const calls: string[] = [];
 const composerReports: boolean[] = [];
 
-export interface FakeDictation {
+interface FakeDictation {
   /** "start <client>", "stop <session> <flush>" (and " tail" for a release), in order. */
   readonly calls: readonly string[];
   /** What the store reported with reportComposerTarget, in order. */

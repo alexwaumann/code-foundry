@@ -1,14 +1,13 @@
 import { createElement } from "react";
 import { Plug } from "lucide-react";
 import { McpSurface } from "@/components/mcp/McpSurface";
-import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 import { MCP_KIND, MCP_TITLE, mcpTab, selectionMcpThread } from "./mcpTarget";
 import type { SurfaceSpec } from "./types";
 
 function thread(sel: Selection): string | null {
-  return selectionMcpThread(sel, { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() });
+  return selectionMcpThread(sel, { threads: useThreadsStore.getState() });
 }
 
 /**

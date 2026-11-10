@@ -53,7 +53,7 @@ index 1111111..2222222 100644
 let world: ReturnType<typeof seedPrWorld>;
 
 function diffFor(headSha: string): PullRequestDiffView {
-  return { diff: DIFF, headSha, baseSha: "b".repeat(40), truncated: false, fetchedAtMs: Date.now() };
+  return { diff: DIFF, headSha, truncated: false, fetchedAtMs: Date.now() };
 }
 
 beforeEach(() => {

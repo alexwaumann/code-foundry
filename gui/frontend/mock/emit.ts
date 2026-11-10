@@ -3,7 +3,7 @@
  *
  *   bun run mock:emit focus-terminal t-top
  *   bun run mock:emit focus-thread s-3
- *   bun run mock:emit focus-repo repo-cf [worktreePath]
+ *   bun run mock:emit focus-project repo-cf [worktreePath]
  *   bun run mock:emit palette [query]
  *   bun run mock:emit notify [info|warning|error] <title> [body]
  *
@@ -16,14 +16,14 @@ import { UiIntent_Notify_Level, UiService, type UiIntentSchema } from "../src/ge
 
 type Intent = MessageInitShape<typeof UiIntentSchema>;
 
-const usage = "usage: emit focus-terminal <id> | focus-thread <id> | focus-repo <projectId> [path] | palette [query] | notify [info|warning|error] <title> [body]";
+const usage = "usage: emit focus-terminal <id> | focus-thread <id> | focus-project <projectId> [path] | palette [query] | notify [info|warning|error] <title> [body]";
 
 export function parseIntent(argv: readonly string[]): Intent | null {
   const [verb, ...rest] = argv;
   switch (verb) {
     case "focus-terminal":
       return rest[0] ? { intent: { case: "focusTerminal", value: { terminalId: rest[0] } } } : null;
-    case "focus-repo":
+    case "focus-project":
       return rest[0] ? { intent: { case: "focusProject", value: { projectId: rest[0], worktreePath: rest[1] ?? "" } } } : null;
     case "palette":
       return { intent: { case: "openPalette", value: { query: rest.join(" ") } } };

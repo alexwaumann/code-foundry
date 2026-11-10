@@ -40,7 +40,7 @@ import { UiIntent_Notify_Level } from "../src/gen/codefoundry/v1/ui_pb";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
-import { MockRegistry, type InstallSpec } from "./pluginRegistry";
+import { describePerms, MockRegistry, type InstallSpec } from "./pluginRegistry";
 import { applyToCustom, rowOpOf, TodoState, type RowOp } from "./pluginRows";
 import { sortTable, sortValue, tableParts } from "./pluginTable";
 import type { UiIntentInit } from "./world";
@@ -934,19 +934,9 @@ function seedPlugins(): MockPlugin[] {
   ];
 }
 
-function describe(p: MockPlugin): string[] {
-  const out: string[] = [];
-  if (p.permissions.commands.length > 0) out.push(`run Code Foundry commands: ${p.permissions.commands.join(", ")}`);
-  if (p.permissions.events.length > 0) out.push(`follow these events: ${p.permissions.events.join(", ")}`);
-  if (p.permissions.threadStatus) out.push("flag threads as needing attention");
-  if (p.permissions.sessionEnv) out.push("add environment variables to new Claude threads");
-  if (p.permissions.secrets) out.push("keep secrets in your Keychain (its own, under code-foundry-plugin)");
-  return out;
-}
-
 /** The daemon's plugin.ConsentText. */
 export function consentText(p: MockPlugin): string {
-  const perms = describe(p);
+  const perms = describePerms(p.permissions);
   const head = `Enable ${p.displayName} ${p.version}? It runs bin/${p.name} as you`;
   return perms.length === 0 ? `${head} and asks for no permissions.` : `${head} and may:${perms.map((x) => `\n  - ${x}`).join("")}`;
 }
@@ -1376,7 +1366,7 @@ export class MockPlugins {
         },
       },
       {
-        cmd: { name: "plugin.reload", noPalette: true, title: "Reload Plugins", category: "Plugin", description: "Rescan ~/.code-foundry/plugins for added, changed and removed plugins.", keybindings: [], args: [] },
+        cmd: { name: "plugin.reload", title: "Reload Plugins", category: "Plugin", description: "Rescan ~/.code-foundry/plugins for added, changed and removed plugins.", keybindings: [], args: [] },
         when: () => true,
         run: () => "rescanned the plugins directory",
       },

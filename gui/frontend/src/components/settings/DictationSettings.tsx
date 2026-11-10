@@ -228,7 +228,7 @@ function ModelActions({ snap }: { snap: DictationView | null }) {
           run("dictation.download");
         }}
       >
-        Download · {gigabytes(snap.model.sizeBytes || 874_188_075)}
+        Download · {gigabytes(snap.model.sizeBytes)}
       </Button>
     </div>
   );

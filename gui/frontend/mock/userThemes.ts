@@ -196,6 +196,9 @@ export class MockThemes {
     this.user = seed();
     this.issues = [...SEED_ISSUES];
     this.calls.length = 0;
+    this.reports.clear();
+    this.reportWaiters.clear();
+    this.history.clear();
     this.changed();
   }
 
@@ -398,7 +401,7 @@ export class MockThemes {
   commands(): SkillCommand[] {
     const always = () => true;
     const thread = (c: UiContext | undefined) => (c?.activeView ? "" : (c?.activeThreadId ?? ""));
-    const cmd = (name: string, title: string, description: string, args: SkillCommand["cmd"]["args"]): SkillCommand["cmd"] => ({ name, title, category: "Settings", description, keybindings: [], args });
+    const cmd = (name: string, title: string, description: string, args: SkillCommand["cmd"]["args"], noPalette = true): SkillCommand["cmd"] => ({ name, title, category: "Settings", description, keybindings: [], args, ...(noPalette ? { noPalette } : {}) });
     const allIds = () => [...this.sorted().map((t) => t.id), ...curated.map((t) => t.id)];
     return [
       {
@@ -452,7 +455,7 @@ export class MockThemes {
         cmd: cmd("theme.duplicate", "Duplicate Theme", "Copy a theme (curated or yours) into your themes under a new id (<id>-copy, then -2, ...), recording the theme it came from.", [
           { name: "theme", type: ArgType.ENUM, required: true, description: "The theme to copy (theme list prints the ids)", enumValues: allIds() },
           { name: "name", type: ArgType.STRING, required: false, description: 'The copy\'s name (default: "<name> copy")' },
-        ]),
+        ], false),
         when: always,
         run: async (c, a) => {
           this.calls.push(`theme.duplicate ${a.theme ?? ""}`);
@@ -496,7 +499,7 @@ export class MockThemes {
       {
         cmd: cmd("theme.set-scheme", "Set Color Scheme", "Choose whether the app is dark, light, or follows the Mac (system): the appearance.theme setting.", [
           { name: "scheme", type: ArgType.ENUM, required: true, description: "system (follow the Mac), dark or light", enumValues: ["system", "dark", "light"] },
-        ]),
+        ], false),
         when: always,
         run: (_c, a) => {
           this.calls.push(`theme.set-scheme ${a.scheme ?? ""}`);
@@ -523,7 +526,7 @@ export class MockThemes {
           ...cmd("theme.delete", "Delete Theme", "Delete one of your themes (its file in the themes directory). A slot that used it shows the theme it was copied from, else the default. --file removes a file that did not load.", [
             { name: "theme", type: ArgType.STRING, required: false, description: "One of your themes' ids (theme list marks them)" },
             { name: "file", type: ArgType.STRING, required: false, description: "A file in the themes directory that did not load, by its name" },
-          ]),
+          ], false),
           confirm: (_c, a) => {
             const issue = this.issueOf(a);
             if (issue) return `Delete the file ${issue.file} from the themes directory? It did not load: ${issue.message}.`;

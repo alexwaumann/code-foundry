@@ -10,7 +10,7 @@
 import { toast } from "sonner";
 import { create } from "zustand";
 import { previewCleanup, removedByCleanup, type CleanupRowView } from "@/api/project";
-import { registerConfirmPresenter, requestConfirm, type ConfirmRequest } from "./confirm";
+import { registerConfirmPresenter, registerOwnDialog, requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 
 export const CLEANUP_COMMAND = "project.worktree.cleanup";
@@ -50,6 +50,7 @@ async function present(req: ConfirmRequest): Promise<boolean> {
 }
 
 registerConfirmPresenter(CLEANUP_COMMAND, present);
+registerOwnDialog(useCleanupWorktreesStore, (s) => s.pending !== null);
 
 /** "Removed 4 worktrees" with the branches under it, or "No merged worktrees to remove". */
 export function toastCleanupResult(resultJson: string): void {

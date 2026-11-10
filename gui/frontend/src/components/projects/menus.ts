@@ -110,7 +110,7 @@ export type CheckoutMenuPart =
   | { kind: "actions"; testId: string; projectId: string; path: string };
 
 /** Copies `text`, saying so in a toast (a menu item has no other place to). */
-async function copyWithToast(text: string, what: string): Promise<void> {
+export async function copyWithToast(text: string, what: string): Promise<void> {
   try {
     await copyText(text);
     toast.success(`${what} copied`, { description: text });

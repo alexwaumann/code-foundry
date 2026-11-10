@@ -52,7 +52,7 @@ test("cf:run reads and mutates in the thread's context; the daemon's errors come
   await expect(doc(page).locator("#list-out")).toHaveText(/^\{"threads":\d+\}$/);
   await doc(page).locator("#notify").click();
   await expect(doc(page).locator("#notify-out")).toHaveText("ok");
-  await expect(page.getByText("Test info")).toBeVisible();
+  await expect(page.getByText("Hello from a page")).toBeVisible();
   const notify = (await invocations()).find((i) => i.name === "ui.notify");
   // The CLI's context inside the thread: the thread and nothing else.
   expect(notify?.context).toMatchObject({ activeThreadId: "s-r1", activeView: "", activeProjectId: "", activeWorktreePath: "" });
@@ -60,7 +60,7 @@ test("cf:run reads and mutates in the thread's context; the daemon's errors come
   await doc(page).locator("#missing").click();
   await expect(doc(page).locator("#error-out")).toHaveText(/^unavailable: /);
   await doc(page).locator("#invalid").click();
-  await expect(doc(page).locator("#error-out")).toHaveText(/^invalid: .*level/);
+  await expect(doc(page).locator("#error-out")).toHaveText(/^invalid: .*title/);
   if (shots) {
     for (const scheme of ["dark", "light"] as const) {
       await page.emulateMedia({ colorScheme: scheme });

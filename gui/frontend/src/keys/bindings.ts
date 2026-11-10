@@ -195,11 +195,16 @@ const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-
  */
 const terminalScoped: ReadonlySet<string> = new Set(["terminal.find", "terminal.find.next", "terminal.find.previous"]);
 
-let bindingCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
+let bindingCache: { commands: readonly CommandView[]; inSubagent: boolean; map: Map<string, CommandView> } | null = null;
 
-/** chord -> command, from Command.keybindings. Only startable commands bind; a terminal's own are in terminalCommand. */
+/**
+ * chord -> command, from Command.keybindings. Only startable commands bind; a terminal's own
+ * are in terminalCommand. Cached per list and per subagent view (isStartable reads it, and
+ * the list is re-read a debounce after the view changes).
+ */
 export function commandBindings(commands: readonly CommandView[]): Map<string, CommandView> {
-  if (bindingCache?.commands === commands) return bindingCache.map;
+  const inSubagent = getViewing() !== null;
+  if (bindingCache?.commands === commands && bindingCache.inSubagent === inSubagent) return bindingCache.map;
   const map = new Map<string, CommandView>();
   for (const c of commands) {
     if (!isStartable(c) || terminalScoped.has(c.name)) continue;
@@ -208,7 +213,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
       if (chord && !map.has(chord)) map.set(chord, c);
     }
   }
-  bindingCache = { commands, map };
+  bindingCache = { commands, inSubagent, map };
   return map;
 }
 
@@ -591,7 +596,8 @@ function isEditable(el: Element | null): boolean {
  *     terminalYields); the editor keeps its own (see codeEditorChords). In a terminal its
  *     own commands come first (see terminalCommand).
  *  3. A focused text field (palette input, rename field) consumes everything else, except
- *     view.back and view.forward's cmd chords outside the palette (see fieldYielded).
+ *     the cmd chords of the commands it yields to (back, forward, settings, dictation and
+ *     search; see fieldYielded) outside the palette.
  *  4. F2 renames the selected thread (the cursor row inside the tree); command
  *     keybindings from CommandService.List for the current context.
  */

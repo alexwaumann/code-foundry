@@ -4,6 +4,7 @@ import { Loader2, SearchIcon, Sparkle, X } from "lucide-react";
 import type { SearchEntryView } from "@/api/search";
 import { Tip } from "@/components/ui/tooltip";
 import { recentMeta, resultsWord, type UnseenCue } from "@/lib/agentSearch";
+import { useNow } from "@/lib/clock";
 import { cn } from "@/lib/utils";
 import { AnswerText, HitRow, SectionHeading, SummaryLine } from "./AgentParts";
 
@@ -22,8 +23,18 @@ export interface RecentApi {
   clear: () => void;
 }
 
+/** A Recent searches row's count and age, ticking each second (only this span re-renders). */
+function RecentMeta({ entry }: { entry: SearchEntryView }) {
+  const now = useNow(1000);
+  return (
+    <span className="shrink-0 text-caption text-cf-text-muted tabular-nums" data-testid="search-recent-meta">
+      {recentMeta(entry, now)}
+    </span>
+  );
+}
+
 /** The empty state's history (both modes): agent entries with a sparkle and their result count, Find entries with a search icon and their hit count; × forgets, Clear empties it. */
-export function RecentList({ recent, now }: { recent: RecentApi; now: number }) {
+export function RecentList({ recent }: { recent: RecentApi }) {
   const list = recent.list ?? [];
   const ref = useRef<HTMLDivElement>(null);
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
@@ -93,9 +104,7 @@ export function RecentList({ recent, now }: { recent: RecentApi; now: number }) 
               >
                 {e.mode === "agent" && e.status === "running" ? <Loader2 className="size-3.5 shrink-0 animate-spin text-cf-icon-muted" aria-hidden /> : <Icon className="size-3.5 shrink-0 text-cf-icon-muted" aria-hidden />}
                 <span className="min-w-0 flex-1 truncate text-body-sm text-cf-text">{e.query}</span>
-                <span className="shrink-0 text-caption text-cf-text-muted tabular-nums" data-testid="search-recent-meta">
-                  {recentMeta(e, now)}
-                </span>
+                <RecentMeta entry={e} />
                 <Tip label="Forget">
                   <button
                     type="button"

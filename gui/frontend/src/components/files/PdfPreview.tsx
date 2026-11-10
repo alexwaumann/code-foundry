@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { PDF_MIME } from "@/api/files";
+import { PDF_MIME_TYPE } from "@/api/threads";
 import { PdfPages } from "@/components/compose/PdfPages";
 
 /**
@@ -9,7 +9,7 @@ import { PdfPages } from "@/components/compose/PdfPages";
  */
 export function PdfPreview({ bytes, onPages }: { bytes: Uint8Array; onPages: (pages: number) => void }) {
   // A copy: a Blob wants an ArrayBuffer-backed view, and the response's bytes may sit in a larger buffer.
-  const file = useMemo(() => new Blob([bytes.slice()], { type: PDF_MIME }), [bytes]);
+  const file = useMemo(() => new Blob([bytes.slice()], { type: PDF_MIME_TYPE }), [bytes]);
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="file-pdf">
       <PdfPages file={file} fill onPages={onPages} />

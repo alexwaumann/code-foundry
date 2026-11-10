@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { CF, emit, invocations, mockPost, openApp, resetMock, row, selectWorktree } from "./fixtures";
 
 /**
- * Phase 3a: the Pull Requests page, against the mock daemon (mock/github.ts); the
- * worktree overview is e2e/worktree-panel.spec.ts. Set SHOTS=<dir> to save screenshots.
+ * Phase 3a: the Pull Requests page, against the mock daemon (mock/github.ts). Set SHOTS=<dir>
+ * to save screenshots.
  */
 
 const CFW = `${CF}.worktrees`;

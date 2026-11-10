@@ -97,8 +97,11 @@ export function pairHintFor(id: string, slots: { light: string; dark: string }):
   return { slot: pair.scheme, themeId: pair.id, fromId: t.id };
 }
 
-/** Writes a slot's setting through its command; the window repaints when the snapshot lands. */
-async function setSlot(slot: ThemeSlot, id: string): Promise<boolean> {
+/**
+ * Writes a slot's setting through its command (theme.set-<slot>); the window repaints when
+ * the snapshot lands. False when the command failed (it toasts why).
+ */
+export async function setThemeSlot(slot: ThemeSlot, id: string): Promise<boolean> {
   return (await runCommandForResult(`theme.set-${slot}`, { theme: id }, { quiet: true })) !== null;
 }
 
@@ -112,7 +115,7 @@ export async function applyPreview(): Promise<boolean> {
   if (s.preview === null || s.applying || !themeById.has(s.preview)) return false;
   const id = s.preview;
   useThemePickerStore.setState({ applying: true, hint: null });
-  const ok = await setSlot(s.slot, id);
+  const ok = await setThemeSlot(s.slot, id);
   // The settings snapshot that moves the slot may land after the command returns; the
   // preview is now the applied theme either way.
   useThemePickerStore.setState((cur) => ({
@@ -127,7 +130,7 @@ export async function applyPreview(): Promise<boolean> {
 export async function acceptPairHint(): Promise<boolean> {
   const hint = useThemePickerStore.getState().hint;
   if (!hint) return false;
-  const ok = await setSlot(hint.slot, hint.themeId);
+  const ok = await setThemeSlot(hint.slot, hint.themeId);
   if (ok) useThemePickerStore.setState({ hint: null });
   return ok;
 }

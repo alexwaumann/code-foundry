@@ -89,22 +89,7 @@ test("arrow down + Enter inserts the highlighted pull request; Tab inserts the f
   await expect.poll(newThreads).toBe(0);
 });
 
-test("no false positives: an unknown number, a heading, C# and a bare # stay text; Enter sends", async ({ page }) => {
-  await openApp(page);
-  await compose(page);
-  await page.keyboard.type("# Plan");
-  await page.keyboard.press("Shift+Enter");
-  await page.keyboard.type("## Steps");
-  await page.keyboard.press("Shift+Enter");
-  await page.keyboard.type("port C#13 and fix #999 #");
-  await page.waitForTimeout(300);
-  await expect(card(page)).toHaveCount(0);
-  await expect(tags(page)).toHaveCount(0);
-  await page.keyboard.press("Enter");
-  await expect.poll(newThreads).toBe(1);
-  expect((await invocations()).at(-1)?.args.prompt).toBe("# Plan\n## Steps\nport C#13 and fix #999 #");
-});
-
+// A heading, C#, a bare # and a space stay text: src/lib/completion.test.ts.
 test("by title; typing on to a number nothing has closes the card without a word; Escape keeps the text", async ({ page }) => {
   await openApp(page);
   await compose(page);

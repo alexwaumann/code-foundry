@@ -45,12 +45,6 @@ export function metaParts(s: Pick<McpServerView, "scope" | "transport" | "status
   return parts.filter((p) => p !== "");
 }
 
-/** "N of M connected". */
-export function connectedSummary(servers: readonly Pick<McpServerView, "status">[]): string {
-  const n = servers.filter((s) => s.status === "connected").length;
-  return `${String(n)} of ${String(servers.length)} connected`;
-}
-
 /**
  * The panel's tabs (docs/notes/mcp-panel-tabs.md), always all three in this order:
  * Connected (connecting included), Failed (needs login and an unknown status included:

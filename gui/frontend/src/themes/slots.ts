@@ -12,7 +12,7 @@
  * else derives from the slots that exist. Pure: no DOM, so the converter, the tests and
  * the app all resolve with the same code.
  */
-import { contrast, ensureContrast, flatten, hue, lightness, mix, over, parseHex, shiftL, toHex, withAlpha } from "./color";
+import { contrast, ensureContrast, flatten, hue, lightness, mix, over, shiftL, withAlpha } from "./color";
 
 export type ThemeScheme = "light" | "dark";
 
@@ -664,6 +664,3 @@ export function themeFileJson(t: ThemeFile & { readonly from?: string; readonly 
     ...(t.overrides && Object.keys(t.overrides).length ? { overrides: { ...t.overrides } } : {}),
   };
 }
-
-/** `#rrggbb` lowercase (for literal inputs written in other forms). */
-export const normaliseHex = (hex: string): string => toHex(parseHex(hex).rgb);

@@ -128,11 +128,16 @@ export const staticPages: PageInit[] = [
 
 /** Commands a chord is no use for (command.Command.NoKeybinding): no keybinding field. */
 export const NO_KEYBINDING = new Set([
-  "action.list", "action.runs", "action.wait", "app.version", "daemon.status", "daemon.version", "project.list",
-  "settings.get", "settings.path", "settings.reset", "settings.set", "terminal.list", "theme.list",
-  "thread.agent.open", "thread.agents", "thread.commands", "thread.focus", "thread.items", "thread.list", "thread.mcp", "thread.respond",
-  "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show", "view.open.url",
-  "workspace.list", "thread.checkouts", "thread.new-like",
+  "action.list", "action.runs", "action.stop", "action.wait", "app.version", "daemon.status", "daemon.version", "dictation.status",
+  "memory.add", "memory.clear", "memory.remove", "memory.show", "plugin.browse", "plugin.reload", "project.list",
+  "search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.seen", "search.stop",
+  "settings.get", "settings.path", "settings.reset", "settings.set", "skill.browse", "terminal.list",
+  "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
+  "thread.agent.open", "thread.agents", "thread.checkouts", "thread.commands", "thread.flag.clear", "thread.focus", "thread.items", "thread.list", "thread.mcp",
+  "thread.move.open", "thread.new-like", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop",
+  "thread.stop-waiting", "thread.unsubscribe", "thread.wait",
+  "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show",
+  "view.open.url", "view.panel.gallery", "view.panel.page", "workspace.list",
 ]);
 
 /** A category's keybindings section id ("Pull Request" -> "pull-request"). */
@@ -236,6 +241,17 @@ const staticFields: FieldInit[] = [
   { key: "github.dashboards_enabled", group: "github", page: "source", section: "github", type: S.BOOL, title: "Pull request dashboards", description: "Keep the Pull Requests page up to date with the pull requests you wrote, reviewed or are asked to review. Off still checks default-branch CI and watched branches.", defaultValue: "true" },
   { key: "github.poll_interval_seconds", group: "github", page: "source", section: "github", unit: "s", type: S.INT, title: "Poll interval", description: "How often GitHub is checked for changes while the window is visible. A hidden window checks every 5 minutes and a closed app every 15, or at this interval if longer.", defaultValue: "60", min: 15n, max: 3600n },
   { key: "projects.fetch_interval_seconds", group: "projects", page: "source", section: "projects", unit: "s", type: S.INT, title: "Fetch interval", description: "How often projects with an active thread fetch from origin. Idle projects fetch every 15 minutes, or at this interval if longer. 0 turns background fetching off.", defaultValue: "120", min: 0n, max: 86400n, restartRequired: true },
+  {
+    key: "projects.auto_pull",
+    group: "projects",
+    page: "source",
+    section: "projects",
+    type: S.BOOL,
+    title: "Pull the default branch automatically",
+    description:
+      "After each fetch, fast-forward checkouts that sit on the default branch and are only behind it. A checkout with staged or modified files, a rebase or merge in progress, a working thread or a running action is left alone. Needs background fetching.",
+    defaultValue: "true",
+  },
   {
     key: "projects.branch_naming",
     group: "projects",

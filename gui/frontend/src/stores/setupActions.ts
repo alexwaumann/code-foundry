@@ -48,9 +48,15 @@ export function setupDraftJson(target: ComposeTarget, d: Draft): string {
 /**
  * The composer each thread was sent from in this window, by thread: Edit waits in the right
  * one before the daemon has given the snapshot back, so a set whose primary is not the
- * target, or a like draft, does not pass through another composer on the way.
+ * target, or a like draft, does not pass through another composer on the way. A thread's
+ * entry goes when Edit takes it away or its setup is done (no Edit after that).
  */
 const sentFrom = new Map<string, ComposeTarget>();
+
+useThreadsStore.subscribe((s, prev) => {
+  if (sentFrom.size === 0 || s.byId === prev.byId) return;
+  for (const id of sentFrom.keys()) if (s.byId[id]?.setup?.phase === "done") sentFrom.delete(id);
+});
 
 /** sendDraft's note of where a thread came from. */
 export function noteSentFrom(threadId: string, target: ComposeTarget): void {

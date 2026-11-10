@@ -4,7 +4,7 @@ import { invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, res
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
  * the docked permission and question prompts over the mock's scripted thread
- * (mock/thread.ts), their keyboard, Escape not interrupting and effort changes. Set SHOTS=<dir>
+ * (mock/thread.ts), their keyboard and Escape not interrupting. Set SHOTS=<dir>
  * to save screenshots of the panels in both schemes (the light pass runs only then: the panel
  * tests assert nothing theme-specific).
  */
@@ -13,7 +13,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-type State = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent";
+type State = "permission" | "question" | "streaming" | "multi" | "subagent";
 
 async function openThread(page: Page, state: State, scheme: "dark" | "light" = "dark"): Promise<void> {
   await page.emulateMedia({ colorScheme: scheme });

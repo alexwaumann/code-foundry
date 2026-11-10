@@ -7,16 +7,15 @@ import { daemon, type DaemonConnection } from "./endpoint";
 export interface PullRequestDiffView {
   /** "diff --git a/… b/…" per file; cut at a line boundary when truncated. */
   diff: string;
-  /** The head and base commits the diff was computed for; "" when the daemon had no detail cached. */
+  /** The head commit the diff was computed for; "" when the daemon had no detail cached. */
   headSha: string;
-  baseSha: string;
   /** Over the daemon's 4 MiB cap: diff holds its first whole lines. */
   truncated: boolean;
   fetchedAtMs: number | null;
 }
 
 export function toPullRequestDiffView(r: GetPullRequestDiffResponse): PullRequestDiffView {
-  return { diff: r.diff, headSha: r.headSha, baseSha: r.baseSha, truncated: r.truncated, fetchedAtMs: r.fetchedAt ? timestampMs(r.fetchedAt) : null };
+  return { diff: r.diff, headSha: r.headSha, truncated: r.truncated, fetchedAtMs: r.fetchedAt ? timestampMs(r.fetchedAt) : null };
 }
 
 const TOO_LARGE_PREFIX = "too large: ";

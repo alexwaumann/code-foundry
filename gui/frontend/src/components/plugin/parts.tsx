@@ -23,8 +23,8 @@ import { MenuButtonMenu } from "./PluginMenu";
 import { statusDot, statusIcon, statusWord, toneText, tonePill } from "./tones";
 
 /** A lucide icon by kebab name (a circle for any other name; `fallback` when there is none). */
-export function PluginIcon({ name, fallback = "circle", className, label }: { name: string | undefined; fallback?: string; className?: string; label?: string }) {
-  return createElement(iconByName(name || fallback) ?? Circle, { className, "aria-hidden": label ? undefined : true, "aria-label": label });
+export function PluginIcon({ name, fallback = "circle", className }: { name: string | undefined; fallback?: string; className?: string }) {
+  return createElement(iconByName(name || fallback) ?? Circle, { className, "aria-hidden": true });
 }
 
 /** A time span: its own component on the shared 1 s clock, so only it re-renders. */
@@ -157,7 +157,7 @@ const buttonStyle: Record<NonNullable<ViewButton["style"]>, string> = {
  * opens it (a chevron after its label; PluginMenu.tsx MenuButtonMenu) and spins while one
  * of its items' acts is in flight.
  */
-export function PluginButton({ button, values, onClick, submit }: { button: ViewButton; values?: () => Readonly<Record<string, string | boolean | string[]>>; onClick?: () => void; submit?: boolean }) {
+export function PluginButton({ button, submit }: { button: ViewButton; submit?: boolean }) {
   const { watchKey, inert } = useViewCtx();
   const form = useFormCtx();
   const run = useRunAction();
@@ -168,8 +168,7 @@ export function PluginButton({ button, values, onClick, submit }: { button: View
   const disabled = (button.disabled ?? false) || pending || inert || (form?.locked ?? false);
   const external = button.action?.openUrl && style === "link" && !button.iconOnly;
   const click = () => {
-    if (onClick) onClick();
-    else run(button.key, button.action, values?.());
+    run(button.key, button.action);
   };
   const el = (
     <Button

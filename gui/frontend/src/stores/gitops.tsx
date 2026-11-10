@@ -3,8 +3,8 @@ import type { GitOpView, GitOpsEventView } from "@/api/gitops";
 import { GitOpProgress, GitOpResult } from "@/components/gitops/GitOpToast";
 import { runCommand } from "./commands";
 
-/** What to show for an op: a progress toast while queued/running, then its result. */
-export type GitOpToastAction = { show: "progress" | "result"; op: GitOpView };
+/** What to show for an op: a progress toast while queued/running, then its result; or take its toast down. */
+export type GitOpToastAction = { show: "progress" | "result"; op: GitOpView } | { show: "dismiss"; id: string };
 
 /**
  * Plans the toasts for one gitops event. `shown` holds the ids that have a progress
@@ -12,7 +12,9 @@ export type GitOpToastAction = { show: "progress" | "result"; op: GitOpView };
  *  - queued/started: progress (one toast per op id; sonner updates it in place);
  *  - finished: result, replacing the progress toast (CLI-started ops get one too);
  *  - snapshot (on (re)connect or after drops): progress for active ops, and results only
- *    for ops whose progress toast is still up, so old results are not replayed.
+ *    for ops whose progress toast is still up, so old results are not replayed. A shown
+ *    op the snapshot does not list (the daemon restarted, or forgot it) has its toast
+ *    taken down: its outcome will never arrive.
  */
 export function planGitOpToasts(shown: ReadonlySet<string>, ev: GitOpsEventView): { shown: Set<string>; actions: GitOpToastAction[] } {
   const next = new Set(shown);
@@ -38,6 +40,11 @@ export function planGitOpToasts(shown: ReadonlySet<string>, ev: GitOpsEventView)
         if (op.state === "queued" || op.state === "running") progress(op);
         else if (shown.has(op.id)) result(op);
       }
+      for (const id of shown) {
+        if (ev.ops.some((op) => op.id === id)) continue;
+        next.delete(id);
+        actions.push({ show: "dismiss", id });
+      }
       break;
   }
   return { shown: next, actions };
@@ -46,7 +53,12 @@ export function planGitOpToasts(shown: ReadonlySet<string>, ev: GitOpsEventView)
 /** Success toasts linger briefly; failures stay until dismissed (they may need reading). */
 const SUCCESS_MS = 5000;
 
-function show({ show, op }: GitOpToastAction): void {
+function show(a: GitOpToastAction): void {
+  if (a.show === "dismiss") {
+    toast.dismiss(a.id);
+    return;
+  }
+  const { show, op } = a;
   if (show === "progress") {
     toast.loading(op.title, { id: op.id, description: <GitOpProgress op={op} />, duration: Infinity });
     return;

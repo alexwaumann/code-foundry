@@ -82,7 +82,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         keybindings: [],
         args: [
           { name: "path", type: ArgType.PATH, required: true, description: "The .html or .htm file: absolute, ~/…, or relative to the current directory; under the home directory" },
-          { name: "title", type: ArgType.STRING, required: false, description: "The tab's title (default: the file's name)" },
+          { name: "title", type: ArgType.STRING, required: false, description: "The tab's title (default: the file's name), at most 100 characters" },
           ...panelThreadArgs,
         ],
       },

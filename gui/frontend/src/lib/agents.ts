@@ -1,10 +1,9 @@
 /**
- * Subagent runs' pure helpers (docs/notes/agents-2-gui.md): names, status words, elapsed
+ * Subagent runs' pure helpers (docs/notes/agents-2-gui.md): names, elapsed
  * time, the strip's line above the composer, the daemon's "Agent finished · …" notes, and
  * structural sharing so a progress update re-renders only the row whose run changed.
  */
 import type { AgentRunView } from "@/api/agents";
-import { formatAgo } from "./thread";
 
 /** The run's name: the Agent call's description, else its type. */
 export function agentName(r: Pick<AgentRunView, "description" | "agentType">): string {
@@ -36,15 +35,6 @@ export function agentElapsedMs(r: Pick<AgentRunView, "status" | "startedAtMs" | 
   }
   if (r.durationMs > 0) return r.durationMs;
   return r.startedAtMs !== null && r.endedAtMs !== null ? Math.max(0, r.endedAtMs - r.startedAtMs) : null;
-}
-
-const STATUS_WORD: Readonly<Record<AgentRunView["status"], string>> = { running: "Running", done: "Done", failed: "Failed", unknown: "Unknown" };
-
-/** The right of the row's first line: "Running", "Done · 5 min ago", "Failed · just now". */
-export function agentStatusText(r: Pick<AgentRunView, "status" | "endedAtMs">, now: number): string {
-  const word = STATUS_WORD[r.status];
-  if (r.status === "running" || r.endedAtMs === null) return word;
-  return `${word} · ${formatAgo(r.endedAtMs, now)}`;
 }
 
 /**

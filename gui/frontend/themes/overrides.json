@@ -164,13 +164,14 @@
   "petros-dusk": {
     "name": "Petros Dusk",
     "ghostty": "Petros Dusk",
-    "upstream": "Peter Bybel's Ghostty theme (shared 2026-10-16)",
+    "local": true,
+    "upstream": "a user's Ghostty theme (shared 2026-10-16)",
     "accent": "#eb9b1a",
     "status": {
       "info": 14,
       "warning": 13
     },
-    "why": "Orange on deep purple: the accent is the foreground orange, so primary buttons and the user bubble carry the theme's signature. ANSI blue (#33489c) is 1.9:1 on the purple, so info/link use bright aqua (ANSI 14) instead. Warning (bright yellow #fca503) is close to the body text colour by design. The bright red (3.6:1) and the orange foreground (6.8:1) are lifted by the guards."
+    "why": "Orange on deep purple: the accent is the foreground orange, so primary buttons and the user bubble carry the theme's signature. ANSI blue (#33489c) is 1.9:1 on the purple, so info/link use bright aqua (ANSI 14) instead. Warning takes ANSI 13 (pink #f2a4db): bright yellow (#fca503) is too close to the orange body text. The bright red (3.6:1) and the orange foreground (6.8:1) are lifted by the guards."
   },
   "github-light": {
     "name": "GitHub Light",

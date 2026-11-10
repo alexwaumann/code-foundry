@@ -99,8 +99,8 @@ function showWaiting(): void {
 useConfirmStore.subscribe(showWaiting);
 
 /**
- * A dialog of the app's own that asks in its own store (Remove Worktree, plugin consent): a
- * guarded request waits for it too. Returns the unregister function.
+ * A dialog of the app's own that asks in its own store (Remove Worktree, Cleanup Worktrees,
+ * plugin consent): a guarded request waits for it too. Returns the unregister function.
  */
 export function registerOwnDialog<S>(store: { getState: () => S; subscribe: (fn: () => void) => () => void }, open: (s: S) => boolean): () => void {
   const isOpen = () => open(store.getState());

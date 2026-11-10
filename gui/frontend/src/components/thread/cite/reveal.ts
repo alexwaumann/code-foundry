@@ -32,7 +32,7 @@ export function paneBox(pane: HTMLElement): DOMRect {
 }
 
 /** Whether an item is one of the thread's items (Go to source needs it on screen). */
-export function hasItem(threadId: string, itemId: string): boolean {
+function hasItem(threadId: string, itemId: string): boolean {
   return useThreadStore.getState().logs[threadId]?.byId[itemId] !== undefined;
 }
 

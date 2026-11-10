@@ -92,4 +92,24 @@ describe("MockSearches", () => {
     expect(resize).toMatchObject({ searches: 2, threadsRead: 1 });
     expect(resize?.steps?.at(-1)).toMatchObject({ threadId: "s-3", threadName: "Fix resize race", done: true });
   });
+
+  it("the search commands answer with JSON an entry's 64-bit fields fit in", async () => {
+    const s = world();
+    s.seed();
+    const resize = s.list().find((x) => x.query === "why did the terminal resize race?");
+    const id = resize?.id ?? "";
+    const run = async (name: string, args: Record<string, string>) => {
+      const c = s.commands().find((x) => x.cmd.name === name);
+      const out = await c?.run(undefined, args);
+      return JSON.parse(typeof out === "object" ? out.resultJson : "") as Record<string, unknown>;
+    };
+    expect(await run("search.get", { id })).toMatchObject({ id, query: "why did the terminal resize race?" });
+    expect(await run("search.open-hit", { id, hit: "1" })).toMatchObject({ id });
+    expect(await run("search.seen", { id })).toMatchObject({ id });
+    expect(await run("search.find", { query: "drain", hits: "2" })).toMatchObject({ query: "drain" });
+    expect((await run("search.recent", {})).entries).toHaveLength(s.list().length);
+    s.control(new URLSearchParams("stepMs=1000"));
+    const started = await run("search.agent", { question: "why the race?" });
+    expect(await run("search.stop", { id: String(started.id) })).toMatchObject({ id: started.id });
+  });
 });

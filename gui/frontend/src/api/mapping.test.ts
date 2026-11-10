@@ -29,7 +29,7 @@ import { WorkspaceEventSchema } from "@/gen/codefoundry/v1/workspace_pb";
 import { toCommandView, toUiContext } from "./command";
 import { overrideEndpoint, type DaemonConnection } from "./endpoint";
 import { toEventView } from "./events";
-import { getDashboard, statsMonth, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
+import { getDashboard, toGhEventView, toPullRequestDetailView, toPullRequestView, toReviewerCandidateView, toStatsView } from "./gh";
 import { isRemoteless, toProjectEventView, toProjectView } from "./project";
 import { toThreadListEventView, toThreadView } from "./threads";
 import { toAttachEventView, toTerminalEventView, toTerminalView } from "./terminal";
@@ -340,12 +340,12 @@ describe("gh mapping", () => {
       commits: [{ sha: "0123456789abcdef", shortSha: "0123456", headline: "fix", authorLogin: "octocat", authorName: "Octo", committedAtMs: 1000 }],
       commitCount: 120,
       comments: [
-        { id: "IC_1", kind: "issue_comment", author: "kim", body: "why?", createdAtMs: 2000, url: "u", reviewState: "", reviewId: "" },
+        { id: "IC_1", kind: "issue_comment", author: "kim", body: "why?", createdAtMs: 2000, url: "u", reviewState: "" },
         { id: "PRR_1", kind: "review", reviewState: "approved", createdAtMs: null },
       ],
       commentsTruncated: true,
       reviewThreads: [
-        { id: "T1", path: "main.go", line: 12, side: "left", isResolved: false, isOutdated: true, commentsTruncated: true, comments: [{ kind: "review_comment", authorIsBot: true, path: "main.go", reviewId: "PRR_9" }] },
+        { id: "T1", path: "main.go", line: 12, side: "left", isResolved: false, isOutdated: true, commentsTruncated: true, comments: [{ kind: "review_comment", authorIsBot: true, path: "main.go" }] },
         { id: "T2", side: null, line: 0, comments: [] },
       ],
       reviewThreadsTruncated: false,
@@ -375,6 +375,11 @@ describe("gh mapping", () => {
     });
   });
 
+  it("maps a check conclusion it does not know to none, not a failed read", () => {
+    const d = create(PullRequestDetailSchema, { pullRequest: { number: 7 }, checks: [{ name: "new", status: CheckStatus.COMPLETED, conclusion: 99 as CheckConclusion }] });
+    expect(toPullRequestDetailView(d).checks).toMatchObject([{ name: "new", status: "completed", conclusion: "" }]);
+  });
+
   it("maps reviewer candidates and the detail event", () => {
     expect(toReviewerCandidateView(create(ReviewerCandidateSchema, { id: "T1", kind: ReviewerKind.TEAM, login: "acme/core", name: "Core", isRequested: true }))).toEqual({
       id: "T1",
@@ -389,19 +394,17 @@ describe("gh mapping", () => {
     expect(toGhEventView(ev)).toEqual({ kind: "pullRequestDetail", repoSlug: "o/r", number: 7 });
   });
 
-  it("maps six months of stats newest first; the page reads this month and last", () => {
+  it("maps six months of stats newest first", () => {
     const months = ["2026-10", "2026-09", "2026-08", "2026-07", "2026-06", "2026-05"].map((month, i) => ({ month, commits: 10 * i, merged: i }));
     const s = toStatsView(create(ActivityStatsSchema, { months, commitsSource: "search", fetchedAt: timestampFromMs(5_000) }));
     expect(s.months).toHaveLength(6);
-    expect(statsMonth(s, 0)).toEqual({ month: "2026-10", commits: 0, merged: 0 });
-    expect(statsMonth(s, 1)).toEqual({ month: "2026-09", commits: 10, merged: 1 });
+    expect(s.months[0]).toEqual({ month: "2026-10", commits: 0, merged: 0 });
+    expect(s.months[1]).toEqual({ month: "2026-09", commits: 10, merged: 1 });
     expect(s.months[5]).toEqual({ month: "2026-05", commits: 50, merged: 5 });
     expect(s.commitsSource).toBe("search");
     expect(s.fetchedAtMs).toBe(5_000);
-    // Never fetched: no months, and the tiles read empty ones.
-    const empty = toStatsView(undefined);
-    expect(empty.months).toEqual([]);
-    expect(statsMonth(empty, 1)).toEqual({ month: "", commits: 0, merged: 0 });
+    // Never fetched: no months.
+    expect(toStatsView(undefined).months).toEqual([]);
   });
 });
 

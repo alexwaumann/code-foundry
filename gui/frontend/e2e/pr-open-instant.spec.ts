@@ -55,20 +55,7 @@ test("a pointer resting on a row reads its detail once; a sweep across the table
   expect(await detailReads()).toBe(swept + 1); // warm now
 });
 
-test("rows scrolling under a still pointer read nothing until the list stops", async ({ page }) => {
-  await page.setViewportSize({ width: 1400, height: 420 });
-  await openPage(page);
-  const box = await rowsOf(page).first().boundingBox();
-  if (!box) throw new Error("no rows on screen");
-  await page.mouse.move(box.x + 200, 300);
-  await pastDwell(page);
-  const before = await detailReads();
-  for (let i = 0; i < 12; i++) {
-    await page.mouse.wheel(0, 28);
-    await page.waitForTimeout(60);
-  }
-  expect(await detailReads()).toBe(before);
-});
+// Rows scrolling under a still pointer reading nothing: src/stores/prPrefetch.test.ts ("scrolling").
 
 for (const scheme of ["dark", "light"] as const) {
   test(`seeded screenshots (${scheme})`, async ({ page }, info) => {

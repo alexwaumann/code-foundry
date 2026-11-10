@@ -91,12 +91,7 @@ test("the header toggle shows the empty surface list and hides the panel again",
   await expect(panelToggle).toHaveAttribute("aria-pressed", "true");
   const empty = panel(page).getByTestId("panel-empty");
   await expect(empty.getByRole("heading", { name: "Open a surface" })).toBeVisible();
-  // The built-in surfaces (the mock's hello plugin adds its demo below them: plugins.spec.ts).
-  const entries = empty.locator('[data-surface]:not([data-surface^="plugin."])');
-  // The thread's own surfaces are the thread info card's (docs/notes/thread-header-crumb.md):
-  // Changes and MCP open from its rows, so the list has File, Diff and Pull request.
-  await expect(entries).toHaveCount(3);
-  await expect(entries).toHaveText(["FileF", "DiffD", "Pull requestP"]);
+  // The list of surfaces: src/components/panel/SidePanel.test.tsx.
   for (const kind of ["files", "diff", "pullrequest"]) {
     await expect(empty.locator(`[data-surface="${kind}"]`)).toBeDisabled();
   }
@@ -439,7 +434,7 @@ test("expand fills the content area, keeps the thread mounted, and restores the 
   await page.setViewportSize({ width: 1000, height: 800 });
   await expect.poll(async () => (await box(page, "side-panel-wrapper")).left).toBe(520 + 12);
   await expect(panel(page)).toBeVisible();
-  await setSidebarWidth(page, 220);
+  await setSidebarWidth(page, 260);
   await page.setViewportSize({ width: 1280, height: 800 });
 
   // Restoring brings the split back at the panel's width, and the thread at its width.

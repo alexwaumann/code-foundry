@@ -1,11 +1,11 @@
 /**
  * Ghostty themes -> theme files (docs/notes/theme-slots-1-engine.md). `bun run themes`
  * regenerates src/themes/catalog.json (every curated theme as a theme file: base +
- * overrides) and the daemon's copy internal/theme/catalog.json (ids, names, schemes, pairs
- * and the defaults), plus the frame stylesheet's static part and defaults
+ * overrides) and the daemon's copy internal/theme/catalog.json (the defaults and every
+ * theme file; goCatalogJson), plus the frame stylesheet's static part and defaults
  * (internal/theme/frame.css, frame-defaults.json; themes/frame.ts); all committed.
- * `bun run themes -- --refresh` first re-copies the
- * vendored Ghostty files from /Applications/Ghostty.app. themes/convert.test.ts regenerates
+ * `bun run themes -- --refresh` first re-copies the vendored Ghostty files from
+ * /Applications/Ghostty.app (all but a `local` one, which Ghostty does not bundle). themes/convert.test.ts regenerates
  * in memory and fails on drift.
  *
  * The converter only fills the base tier. Every other colour is derived at load time by
@@ -30,6 +30,8 @@ export interface Override {
   name: string;
   /** Ghostty theme file name (themes/ghostty/<file>). */
   ghostty?: string;
+  /** The Ghostty file is a user's own, not one Ghostty bundles: --refresh leaves it as it is. */
+  local?: boolean;
   /** A theme with no Ghostty file (Graphite): its scheme and base, literally. */
   scheme?: Scheme;
   base?: ThemeBase;
@@ -175,7 +177,7 @@ export function buildCatalog(inputs: Inputs): ThemeFile[] {
       source = o.upstream;
     } else if (o.ghostty) {
       ({ scheme, base } = ghosttyBase(parseGhostty(inputs.ghostty(o.ghostty)), o));
-      source = `${o.upstream}; Ghostty theme "${o.ghostty}" (iTerm2-Color-Schemes, MIT)`;
+      source = o.local ? o.upstream : `${o.upstream}; Ghostty theme "${o.ghostty}" (iTerm2-Color-Schemes, MIT)`;
     } else throw new Error(`${id}: neither ghostty nor a literal scheme and base`);
     // parseThemeFile normalises the hex and refuses an override of a name that is not a slot.
     out.push(parseThemeFile({ id, name: o.name, scheme, ...(o.pair ? { pair: o.pair } : {}), source, base, ...(o.overrides ? { overrides: o.overrides } : {}) }));
@@ -204,7 +206,7 @@ function main(): void {
   const inputs = readInputs();
   if (process.argv.includes("--refresh")) {
     for (const o of Object.values(inputs.overrides)) {
-      if (!o.ghostty) continue;
+      if (!o.ghostty || o.local) continue;
       fs.copyFileSync(path.join(GHOSTTY_APP, o.ghostty), path.join(PATHS.ghostty, o.ghostty));
     }
   }

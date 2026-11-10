@@ -30,7 +30,7 @@ export interface SurfaceSpec {
   /**
    * Single lowercase letter that opens the surface while the panel has focus. None for a
    * surface that is only opened from elsewhere (it is then also "hidden" in the empty
-   * list), e.g. a pull request, opened from a row elsewhere.
+   * list), e.g. MCP, opened from the thread info card.
    */
   hotkey?: string;
   /**

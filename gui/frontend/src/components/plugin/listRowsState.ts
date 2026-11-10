@@ -6,6 +6,7 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import type { Row } from "@/api/plugin";
 import { VirtualScrollRoot } from "@/components/pr/virtualRoot";
+import { zoomFactor } from "@/lib/zoom";
 import { actOnElement, CHOICE_HOLD_MS, usePluginSurfacesStore, useSurfaceEntry } from "@/stores/pluginSurfaces";
 import { useViewCtx } from "./context";
 import { addPending, applyChanges, dropAt, edgeScroll, keyMove, keysOf, settle, type PendingChange, type RowChange } from "./rows";
@@ -94,8 +95,9 @@ function scrollerOf(el: HTMLElement): HTMLElement | null {
 }
 
 /**
- * A drag in progress, as drawn: the lifted row's box and the drop line (null: none), both in
- * the viewport (the line is drawn over the lifted copy, which covers the gap).
+ * A drag in progress, as drawn: the lifted row's box and the drop line (null: none), both
+ * fixed in the viewport, in layout px (the line is drawn over the lifted copy, which covers
+ * the gap).
  */
 export interface DragView {
   key: string;
@@ -154,12 +156,14 @@ export function useRowDrag(keys: readonly string[], box: RefObject<HTMLElement |
         after = at?.after ?? null;
         const lr = list.getBoundingClientRect();
         const shown = at !== null && at.after !== null;
+        // Measured in viewport px; drawn fixed under the zoomed body, in layout px (lib/zoom).
+        const z = zoomFactor();
         setDrag({
           key,
-          top: y - offset,
-          left: r.left,
-          width: r.width,
-          line: shown ? { top: at.lineY, left: lr.left - 2, width: lr.width + 4 } : null,
+          top: (y - offset) / z,
+          left: r.left / z,
+          width: r.width / z,
+          line: shown ? { top: at.lineY / z, left: lr.left / z - 2, width: lr.width / z + 4 } : null,
         });
       };
       const tick = () => {

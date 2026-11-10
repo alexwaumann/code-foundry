@@ -6,7 +6,7 @@ import { McpSurface } from "@/components/mcp/McpSurface";
 import { useFinderCheckouts } from "@/components/palette/useFileFinder";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { canMove } from "@/lib/move";
-import { fileSources } from "@/lib/completion";
+import { skillSources } from "@/lib/completion";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -37,7 +37,7 @@ describe("a thread with no checkout yet", () => {
   it("reads its projects' own checkouts for @ and /, which spawn points at its worktree", () => {
     const { result } = renderHook(() => useThreadCheckouts("s"));
     expect(result.current.paths).toEqual({ web: "/src/web" });
-    expect(fileSources({ projectIds: result.current.projectIds, paths: result.current.paths })).toEqual([{ projectId: "web", path: "/src/web" }]);
+    expect(skillSources({ projectIds: result.current.projectIds, paths: result.current.paths })).toEqual([{ projectId: "web", path: "/src/web" }]);
   });
 
   it("searches them in the file finder, but lists no changes as the thread's", () => {

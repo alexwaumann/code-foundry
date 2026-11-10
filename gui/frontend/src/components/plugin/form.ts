@@ -58,7 +58,7 @@ export interface LiveSender {
   push: (value: string) => void;
   /** Send what is waiting now (focus left, Enter). */
   flush: () => void;
-  /** Forget what is waiting (the field went). */
+  /** Forget what is waiting and what went last (the field went, a picker's box went under its threshold). */
   cancel: () => void;
 }
 
@@ -97,6 +97,7 @@ export function liveSender(send: (value: string) => Promise<unknown>, delay = LI
       clearTimeout(timer);
       timer = undefined;
       waiting = undefined;
+      last = undefined;
     },
   };
 }

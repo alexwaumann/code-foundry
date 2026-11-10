@@ -1,9 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
-import { toast } from "sonner";
 import { ChevronRight, Layers } from "lucide-react";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { RowList } from "@/components/prs/RowList";
-import { copyText } from "@/lib/clipboard";
 import { NavRow } from "@/lib/NavRow";
 import { threadLabel } from "@/lib/prompt";
 import { isWorking } from "@/lib/projects";
@@ -14,6 +12,7 @@ import { openCheckoutDiff } from "@/stores/filePanel";
 import { findWorktree, useProjectsStore, type ProjectsData } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { StatusDot, SectionHeader } from "./bits";
+import { copyWithToast } from "./menus";
 import { checkoutOpenIn, workspaceOpenIn } from "./openIn";
 import { OpenInSplitItem } from "./OpenInMenuItem";
 import { OverflowMenu, type OverflowItem } from "./OverflowMenu";
@@ -81,15 +80,6 @@ function ThreadOpenIn({ entry }: { entry: ThreadOpenInPart }) {
 
 const THREAD_MENU_PARTS: RowMenuParts<ThreadOpenInPart> = { "thread-open-in": ThreadOpenIn };
 
-async function copyPath(path: string): Promise<void> {
-  try {
-    await copyText(path);
-    toast.success("Path copied", { description: path });
-  } catch {
-    toast.error("Copy failed");
-  }
-}
-
 /** A thread's member checkouts as the projects slice has them (a member not in its set, or not made yet, has none). */
 function memberCheckouts(s: ProjectsData, paths: readonly string[], members: readonly string[]) {
   return members.flatMap((projectId, i) => {
@@ -145,7 +135,7 @@ function RowMenu({ workspaceId, threadId, members }: { workspaceId: string; thre
   });
   if (items.length > 0) items.push("separator");
   if (place) items.push({ kind: "thread-open-in", testId: "thread-menu-reveal", place, terminal });
-  items.push({ label: "Copy path", testId: "thread-menu-copy-path", disabled: !cwd, onSelect: () => void copyPath(cwd) });
+  items.push({ label: "Copy path", testId: "thread-menu-copy-path", disabled: !cwd, onSelect: () => void copyWithToast(cwd, "Path") });
   return <OverflowMenu label="More actions" testId="thread-more" items={items} parts={THREAD_MENU_PARTS} />;
 }
 

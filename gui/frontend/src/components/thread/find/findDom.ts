@@ -13,7 +13,7 @@ import { foldHides } from "../foldDom";
  */
 
 /** The attribute an element carries when its text is an item's searchable text (lib/threadFind findDoc): the item id. */
-export const FIND_ITEM_ATTR = "data-find-item";
+const FIND_ITEM_ATTR = "data-find-item";
 
 /**
  * Text find leaves out: inside a user bubble, the tags; in an answer, an unloaded local image's chip (data-find-skip: the data counts no text for

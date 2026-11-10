@@ -37,7 +37,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
 }));
 
 const INSTANCE = "hello/demo/thread:s-1";
-const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, plugin: "hello", viewTab: "run-list", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: INSTANCE, viewTab: "run-list", uiContext: emptyContext, inert: false };
 const DK = draftKeyOf(INSTANCE, "run-list", "md");
 
 let boxes: Record<string, { top: number; height: number; width: number }> = {};

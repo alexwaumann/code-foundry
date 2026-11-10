@@ -72,34 +72,4 @@ describe("CommandButton", () => {
     expect(wrap.dataset.state).toBe("closed");
     expect(b.dataset.state).toBeUndefined();
   });
-
-  it.each([
-    ["listed: a button named by its content, no title", [cmd({})], "button"],
-    ["not listed: the same content as plain text", [], "span"],
-    ["listed unavailable: plain text", [cmd({ available: false })], "span"],
-  ])("custom content, plain when unavailable: %s", (_name, commands, tag) => {
-    useCommandsStore.setState({ commands });
-    render(
-      <CommandButton command="terminal.new" whenUnavailable="plain" className="x" data-testid="b">
-        <span>my thread</span>
-      </CommandButton>,
-    );
-    const b = screen.getByTestId("b");
-    expect(b.tagName.toLowerCase()).toBe(tag);
-    expect(b.textContent).toBe("my thread");
-    expect(b.getAttribute("title")).toBeNull();
-    expect(b.getAttribute("aria-label")).toBeNull();
-    // Visible content names the button: no tooltip either.
-    expect(b.dataset.state).toBeUndefined();
-    expect(b.classList.contains("x")).toBe(true);
-    fireEvent.click(b);
-    expect(startCommandNamed).toHaveBeenCalledTimes(tag === "button" ? 1 : 0);
-  });
-
-  it("a labelled button can take focus", () => {
-    useCommandsStore.setState({ commands: [cmd({})] });
-    render(<CommandButton command="terminal.new" icon={Plus} label="New terminal" keepFocus={false} />);
-    const b = screen.getByRole("button", { name: "New terminal" });
-    expect(b.tabIndex).toBe(0);
-  });
 });

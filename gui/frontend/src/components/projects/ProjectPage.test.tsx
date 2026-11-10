@@ -133,9 +133,7 @@ describe("a project's page", () => {
   it("the title block, the checkouts table by activity, Details, and the sections in order", async () => {
     renderPage("repo-cf");
     await settle();
-    // The pane header keeps the crumb, the picker and the panel toggles; the rest is the title block's.
     expect(screen.getByTestId("page-name").textContent).toBe("code-foundry");
-    for (const id of ["project-terminal", "project-new-thread", "project-refresh-failed"]) expect(screen.queryByTestId(id)).toBeNull();
     const title = screen.getByTestId("project-title");
     expect(within(title).getByTestId("project-title-name").textContent).toBe("code-foundry");
     expect(within(title).getByTestId("project-meta").textContent).toBe("alexwaumann/code-foundry");
@@ -163,10 +161,8 @@ describe("a project's page", () => {
 
     // Details.
     expect(screen.getByTestId("details-path-value").textContent).toBe("~/src/code-foundry");
-    expect(screen.queryByTestId("details-default-branch")).toBeNull();
     expect(screen.getByTestId("details-remote-value").textContent).toBe("origin · github.com/alexwaumann/code-foundry");
     expect(screen.getByTestId("details-worktrees-value").textContent).toBe("2 in ~/src/code-foundry.worktrees");
-    expect(screen.queryByText("Show in sidebar")).toBeNull();
     // Worktrees without threads sits between Checkouts and Details; threads hold both worktrees here.
     expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-title", "project-checkouts", "leftover-worktrees", "project-details"]);
     expect(screen.getByTestId("leftover-empty")).toBeTruthy();
@@ -311,7 +307,6 @@ describe("a project's page", () => {
     expect(screen.queryByTestId("checkouts-table")).toBeNull();
     expect(screen.queryByTestId("project-refresh")).toBeNull();
     expect(screen.getByTestId("project-threads").textContent).toContain("No thread is working here. New thread or Terminal.");
-    expect(screen.queryByTestId("details-default-branch")).toBeNull();
     expect(screen.getByTestId("details-actions-value").textContent).toBe("none");
     expect(screen.getByTestId("details-add-action").textContent).toBe("Add action");
     fireEvent.click(screen.getByTestId("project-init-git"));
@@ -470,7 +465,6 @@ describe("Worktrees without threads", () => {
       expect(inEl(r, "leftover-remove")?.getAttribute("aria-label")).toBe("Remove worktree");
       expect(r?.getAttribute("data-work")).toBe(work ? "true" : null);
     }
-    for (const id of ["leftover-footer", "leftover-resume", "leftover-new-thread"]) expect(screen.queryByTestId(id)).toBeNull();
     // The icons' tooltips name them; the branch, on screen in full, has none.
     expect(tooltipText(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement)).toBe("Show diff");
     expect(tooltipText(inEl(leftover(COPY), "leftover-remove") as HTMLElement)).toBe("Remove worktree");

@@ -11,6 +11,15 @@ import "@/components/thread/thread.css";
 import "@/components/thread/codeActions.css";
 import "./files.css";
 
+/** An image src as a path: percent-decoded, or as typed when it is not valid percent-encoding ("100%.png"). */
+function decodedPath(src: string): string {
+  try {
+    return decodeURI(src);
+  } catch {
+    return src;
+  }
+}
+
 /**
  * An image in a rendered markdown file with a local path: read through ReadFile against
  * the file's directory and shown from an object URL; a chip with the path while it loads,
@@ -20,7 +29,7 @@ function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }
   const [file, setFile] = useState<FileReadView | null | "failed">(null);
   useEffect(() => {
     const ctl = new AbortController();
-    readFile(dir, decodeURI(src), undefined, ctl.signal)
+    readFile(dir, decodedPath(src), undefined, ctl.signal)
       .then((f) => {
         setFile(f.image && !f.truncated ? f : "failed");
       })

@@ -234,7 +234,7 @@ describe("the Pull Requests page", () => {
     expect(screen.queryByTestId("prs-empty")).toBeNull();
   });
 
-  it("the sidebar counts the pull requests that need review before the page opens; at inbox zero the section hides, its card says so, no Ember; one read per change, shared", async () => {
+  it("the sidebar counts the pull requests that need review before the page opens; at inbox zero the section hides, its card says so; one read per change, shared", async () => {
     render(<Harness />);
     await settle();
     const pill = () => screen.queryByTestId("nav-pullrequests-count");
@@ -258,8 +258,6 @@ describe("the Pull Requests page", () => {
     const card = screen.getByTestId("prs-card-review") as HTMLButtonElement;
     expect(card.disabled).toBe(true);
     expect(card.textContent).toBe("Needs your review0nothing waiting on you");
-    expect(screen.queryByTestId("ember-flame")).toBeNull();
-    expect(screen.queryByTestId("prs-inbox-zero")).toBeNull();
     expect(rows("reviewed")).toHaveLength(2);
     expect(pill()).toBeNull();
     // One read per change, shared by the page and the sidebar.

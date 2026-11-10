@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SRC from "../../../../internal/bridge/bridge.js?raw";
+import { BRIDGE_LIMITS, parsePageMessage } from "./bridge";
 
 /*
  * The daemon's page bridge script (internal/bridge/bridge.js, served as /cf/bridge.js),
@@ -464,6 +465,22 @@ describe("bridge.js", () => {
     expect(h.cf.storage().get("k")).toBeNull();
     expect(h.sent("cf:run")).toEqual([]);
     expect(h.sent("cf:store")).toEqual([]);
+  });
+
+  it("counts a call as the app does (type and id too), so what it sends the app hears", async () => {
+    const h = load();
+    h.ready();
+    await h.cf.ready;
+    const max = BRIDGE_LIMITS.messageChars;
+    await expect(h.cf.run("thread.get", { body: "x".repeat(max - "thread.getbody".length) })).rejects.toMatchObject({ code: "invalid", message: /too large/ });
+    await expect(h.cf.storage().set("k", "x".repeat(max - 10))).rejects.toMatchObject({ code: "invalid", message: /too large/ });
+    expect(h.sent("cf:run")).toEqual([]);
+    expect(h.sent("cf:store")).toEqual([]);
+    void h.cf.run("thread.get", { body: "x".repeat(max - 64) });
+    void h.cf.storage().set("k", "x".repeat(max - 64));
+    await flush();
+    expect(h.sent("cf:run").map(parsePageMessage)).toEqual([expect.objectContaining({ kind: "run" })]);
+    expect(h.sent("cf:store").map(parsePageMessage)).toEqual([expect.objectContaining({ kind: "store" })]);
   });
 
   it("applies cf:theme, tells onTheme, and acks it", () => {
