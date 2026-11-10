@@ -151,11 +151,6 @@ works alongside (an OSC 4 set followed by a kitty push).
   multi-line prompt, and Enter submitted all three lines as one message. In a `zsh -il`
   terminal, shift+enter ran the command like Enter.
 
-![Thread visible from launch: no echoed replies](terminal-shift-enter/claude-startup-visible.png)
-![Claude prompt with shift+enter](terminal-shift-enter/claude-shift-enter.png)
-![Enter submits all lines](terminal-shift-enter/claude-enter-submits.png)
-![zsh: shift+enter runs the line](terminal-shift-enter/zsh-shift-enter.png)
-
 ## Gotchas
 
 * **A shared `GOCACHE` across worktrees can link the wrong libghostty.** A throwaway cgo

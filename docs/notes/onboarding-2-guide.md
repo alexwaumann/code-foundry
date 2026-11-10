@@ -78,11 +78,3 @@ the guide; Page Down scrolls the guide right after opening (its body has focus);
 `appearance.theme = light` restyles it live. The contents click was not driven live
 (System Events cannot click inside the web view); e2e/help.spec.ts covers it in WebKit
 and Chromium.
-
-## Screenshots
-
-Guide tab, dark and light:
-
-![Guide, dark](onboarding-2-guide/guide-dark.png)
-
-![Guide, light](onboarding-2-guide/guide-light.png)

@@ -2,9 +2,6 @@
 
 Four small GUI items in one PR (`cf/panel-polish`). No daemon or proto change.
 
-![MCP tab, stale, dark](panel-polish/mcp-stale-dark.png)
-![MCP tab, stale, light](panel-polish/mcp-stale-light.png)
-
 ## 1. Agents tab tooltips stop at five lines
 
 * The shared `Tip` (`components/ui/tooltip.tsx`) takes `maxLines`: the label is wrapped in

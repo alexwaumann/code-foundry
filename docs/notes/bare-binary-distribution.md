@@ -355,4 +355,5 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
 ## Left for a follow-up
 
 * the Wails template's bundle tasks (`package`, `run` builds a `.dev.app` for `wails3
-  dev`), which nothing of ours calls. They can go once nothing needs a bundle.
+  dev`). Nothing of ours calls `package`; `run` is what `wails3 dev` runs
+  (`gui/build/config.yml`). They can go once nothing needs a bundle.

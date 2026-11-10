@@ -12,19 +12,9 @@ failed) open in the content pane as a read-only page: the prompt the parent gave
 run's work log, its report. The thread stays selected; going back up is one click or
 Escape.
 
-The built app against a live daemon (Haiku 5.5, medium, a no-project thread): a run
-while it works, dark and light, then the same kind of run once done, with the report it
-handed back.
-
-![Running, dark](subagent-view/running-dark.png)
-![Running, light](subagent-view/running-light.png)
-![Done, dark](subagent-view/done-dark.png)
-![Done, light](subagent-view/done-light.png)
-
-With the side panel's Agents tab open: the viewed row has the sky bar, tint and `viewing`
-tag (the run had just turned done in place).
-
-![The Agents tab beside the view](subagent-view/agents-tab-dark.png)
+Checked in the built app against a live daemon (Haiku 5.5, medium, a no-project thread):
+a run while it worked, the same kind of run once done with the report it handed back, and
+the Agents tab beside the view, whose viewed row has the sky bar, tint and `viewing` tag.
 
 ## Decisions
 

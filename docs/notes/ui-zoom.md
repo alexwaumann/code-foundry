@@ -69,9 +69,9 @@ The window drags from the sidebar band, the pane headers and the 8 px sheet edge
 top-left 1/zoom of each surface dragged: the runtime's `isDraggableEvent` (drag.ts) keeps
 the press inside the target with `offsetX < clientWidth && offsetY < clientHeight` (to
 skip scrollbars), and under CSS zoom WebKit reports `offsetX/Y` in viewport px while
-`clientWidth/Height` stay layout px (probe-verified). Fixed with a pnpm patch
-(`gui/frontend/patches/@wailsio__runtime@3.0.0-beta.28.patch`, wired in
-pnpm-workspace.yaml `patchedDependencies`): the client box is scaled by the target's
+`clientWidth/Height` stay layout px (probe-verified). Fixed with a patch
+(now `gui/frontend/patches/@wailsio__runtime@3.1.0.patch`, wired in package.json
+`patchedDependencies` for Bun): the client box is scaled by the target's
 effective zoom (`getBoundingClientRect().width / offsetWidth`). The patch is pinned to
 the runtime version, so a Wails upgrade fails install loudly until it is re-applied or
 upstreamed. Verified live with synthesized CGEvent drags (a 20-line Swift tool; cliclick

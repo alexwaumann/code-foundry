@@ -9,8 +9,6 @@ Verified: `make check` green (144 unit tests), `pnpm run e2e` 20/20 (WebKit + Ch
 ~22s, 60/60 over three repeats), and the UI checked visually in the real Wails window
 (`wails3 dev`) and in headless WebKit.
 
-![Wails window, Claude-like session attached](phase1e/wails-terminal.png)
-
 ## How to run
 
 | What | Command |
@@ -281,6 +279,3 @@ The page ships with `class="dark"` (no flash). It then follows the macOS appeara
   `session.new`'s required `model` enum.
 * `phase1e/exited-notify.png`: an exited terminal with its exit overlay, and a `Notify`
   intent toast.
-
-![Palette arg prompt](phase1e/palette-args.png)
-![Exited terminal and Notify toast](phase1e/exited-notify.png)

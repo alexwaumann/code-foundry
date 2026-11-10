@@ -85,8 +85,3 @@ hello.txt?") is usually cut off; the tooltip now carries all of it.
 ## Daemon restart
 
 None needed (frontend only).
-
-![Permission prompt, dark](tooltip-status-reason/permission-dark.png)
-![Interrupted, dark](tooltip-status-reason/interrupted-dark.png)
-![Permission prompt, light](tooltip-status-reason/permission-light.png)
-![Interrupted, light](tooltip-status-reason/interrupted-light.png)

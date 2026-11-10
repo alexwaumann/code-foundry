@@ -1,6 +1,6 @@
 # Repo detail cache: reuse HEAD-only git results
 
-> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. Mentions below are historical.
+> **Superseded (2026-10-10):** `repo.register` (`code-foundry repo register --path`) was removed. Add a folder with `code-foundry repo add <folder>` on the CLI, or the Add Project dialog (`repo.add`) in the app; see `add-project-remove-register.md`. The overview page is gone too. Mentions below are historical.
 
 Status: done. `make check` is green. Verified end to end against a scratch daemon
 (`CODE_FOUNDRY_HOME` in a temp dir) with a scratch repo and a bare origin.
@@ -94,6 +94,8 @@ empty, as before. Only the status job writes `wtSlot.base`.
   With no base (or no merge base) a clean worktree has no files and runs nothing.
 * **Dirty worktree.** The cached head part replaces 4 commands. The 3 working-tree
   commands run every time, because the working tree can change without any key change.
+  (Since `detail-from-status.md`, the uncommitted letters and untracked files come from
+  the last status's entries, so only the numstat runs.)
 * Single writer: `detailState.heads[k]` and `cache[k]` are written only by `jobDetail(k)`.
   The head part is immutable once stored; adding the clean file list stores a copy.
   Cached details share `Log` and clean `Files` slices, which nobody mutates.

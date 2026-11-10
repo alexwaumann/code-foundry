@@ -34,7 +34,7 @@ app icons instead of the hand-drawn FinderMark and a generic code glyph.
   asks for Finder and every editor together). A failed request forgets its ids so a later
   mount retries. The data URL is built in `src/api/gitops.ts`.
 - **An `<svg>` holding an `<image>`, not an `<img>`.** Every slot an icon lands in (Button,
-  DropdownMenuItem, the info card's Row, LinkButton, OverflowMenu, HeaderAction) sizes its
+  DropdownMenuItem, the info card's Row, OverflowMenu, HeaderAction) sizes its
   `svg` children (`[&_svg]:size-…`, some only when the svg has no `size-` class). An `<img>`
   would need each of those selectors extended; an svg gets the same size, shrink and gap as
   the lucide fallback it replaces, so the swap from fallback to icon never moves anything.

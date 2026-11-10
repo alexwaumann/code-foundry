@@ -69,7 +69,7 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('gui/frontend/bun.lock') }}
 
-      # wails3 builds the GUI bundle. Built with the module's toolchain (go1.26), which
+      # wails3 builds the GUI executable. Built with the module's toolchain (go1.26), which
       # setup-go put on PATH via the go.mod toolchain directive.
       - name: Install wails3
         run: |

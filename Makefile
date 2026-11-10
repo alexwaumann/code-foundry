@@ -102,8 +102,11 @@ build: ghostty-vt whisper-cpp
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry-dictate ./cmd/code-foundry-dictate
 
 ## check: everything CI runs. On success it records the working tree's hash so that
-## `make attest` can vouch for it once committed and pushed (scripts/attest.sh).
-check: go-check frontend-check
+## `make attest` can vouch for it once committed and pushed (scripts/attest.sh); a tree
+## edited while the checks ran is not recorded.
+check:
+	@scripts/attest.sh start
+	@$(MAKE) --no-print-directory go-check frontend-check
 	@scripts/attest.sh record
 
 ## attest: post a "local-check" commit status on the pushed HEAD, provided its tree is the
@@ -141,7 +144,7 @@ go-check: go-lint go-test
 # pluginsdk/ is its own module (stdlib only, replaced into this one), so ./... does not
 # reach it: vet, staticcheck and test it from its own directory.
 go-lint: gui-dist-stub ghostty-vt whisper-cpp
-	@unformatted=$$(gofmt -l cmd internal gui/*.go pluginsdk plugins 2>/dev/null); if [ -n "$$unformatted" ]; then echo "gofmt needed:" $$unformatted; exit 1; fi
+	@unformatted=$$(gofmt -l cmd internal gui/*.go pluginsdk plugins scripts docs 2>/dev/null); if [ -n "$$unformatted" ]; then echo "gofmt needed:" $$unformatted; exit 1; fi
 	go vet ./...
 	go tool staticcheck ./...
 	cd pluginsdk && go vet ./... && "$$(cd .. && go tool -n staticcheck)" ./...
@@ -198,10 +201,9 @@ dev: build
 
 ## gui-build: build the Wails GUI as the bare executable "gui/bin/Code Foundry", which is
 ## what `code-foundry gui` launches from a dev CLI. No .app bundle (managed Macs often block
-## unsigned bundles); stale gui/bin/CodeFoundry(.app) from older builds are removed.
+## unsigned bundles).
 gui-build: build
 	cd gui && $(WAILS3) build
-	rm -rf gui/bin/CodeFoundry.app gui/bin/CodeFoundry
 
 ## gui-e2e: Playwright (WebKit, one mock daemon per worker; E2E_WORKERS=4) against the mock
 ## daemon. Not part of `check`: it needs the browser (`bunx --cwd gui/frontend playwright install webkit`).

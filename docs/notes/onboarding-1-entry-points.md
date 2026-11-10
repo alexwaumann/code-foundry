@@ -93,17 +93,3 @@ Project dialog; Add Project… opens the dialog; Rename Thread with nothing sele
 "Rename Thread is not available here"; Next Needing Attention with none toasts "No
 threads need attention"; Help > Keyboard Shortcuts and Help and Open Command Palette open
 the overlay and the palette; Report an Issue… brings the browser to the front.
-
-## Screenshots
-
-Sidebar on the start page, dark and light:
-
-![Sidebar](onboarding-1-entry-points/sidebar.png)
-
-New thread's project picker with "Add a project…":
-
-![Picker](onboarding-1-entry-points/picker.png)
-
-Native menus (Code Foundry, Thread, Help):
-
-![Menus](onboarding-1-entry-points/menus.png)

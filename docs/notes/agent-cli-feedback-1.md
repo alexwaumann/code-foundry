@@ -66,8 +66,9 @@ and multi-id `thread remove` / `thread archive`; it is not part of this one
   registry is not the daemon's: the live daemon adds the settings defaults to `--model`
   and `--effort` (about 50 bytes), so the live guide is larger than the test sees. After
   this step: 28,972 in the test, 28,995 live. To fit, `thread.list`'s description lost
-  "; at most limit threads" (the `--limit` line says it). The next guide addition must
-  trim something first.
+  "; at most limit threads" (the `--limit` line says it). This cap no longer applies: the
+  guide has since been split into topics, each with its own budget in
+  `internal/skills/budget_test.go` (`docs/notes/guide-budgets.md`).
 * **The guide's `thread archive <id>` convention is wrong today**: `thread.archive` takes
   `--id`, and `thread archive s-...` exits 2 with "unexpected arguments". Left as is; the
   second PR's multi-id archive makes ids positional.

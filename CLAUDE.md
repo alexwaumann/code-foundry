@@ -1,21 +1,22 @@
 # code-foundry
 
 macOS desktop app (Go daemon + Wails v3/React GUI + CLI) for running fleets of Claude Code
-threads across git worktrees. Read `docs/ARCHITECTURE.md` before changing structure and
-`docs/PLAN.md` to see which step you are on.
+threads across git worktrees. Read `docs/ARCHITECTURE.md` before changing structure; earlier
+decisions are in `docs/notes/` and git history.
 
 ## Commands
 
 ```
 make gen      # buf generate (Go + TS). Generated code is committed.
-make build    # builds ./bin/code-foundry
+make build    # builds ./bin/code-foundry and ./bin/code-foundry-dictate
 make check    # gofmt, go vet, staticcheck, go test ./..., frontend typecheck + lint + test
 make gui-e2e  # Playwright (WebKit, 4 workers) against the mock daemon; not part of check
 make drive    # mock daemon + Vite for an agent to drive with `playwright cli` (DAEMON=dev: scratch dev daemon); skill .claude/skills/drive-app
 make dev      # daemon in foreground with text logs; the browser dev frontend on :9245 may call it (CODE_FOUNDRY_DEV_ORIGINS for other ports)
-make package VERSION=vX.Y.Z   # release assets in dist/ (tarball of the two executables + VERSION, install.sh)
+make package VERSION=vX.Y.Z   # release assets in dist/ (tarball of the three executables + VERSION, install.sh, checksums.txt)
 make release  # manual release fallback (DRY_RUN=1 prints the commands); releases run on push to main
-cd gui && wails3 dev   # GUI with hot reload (needs a running daemon or auto-starts one)
+make gui-build  # builds the GUI, gui/bin/Code Foundry, which `code-foundry gui` launches from ./bin
+make gui-dev    # make build, then the GUI with hot reload (auto-starts the daemon if needed)
 ```
 
 ## Boundaries

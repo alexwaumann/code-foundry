@@ -120,10 +120,6 @@ keys in `~/.claude.json` are unchanged (14), because the worktree was already tr
 The 13 transcripts these runs wrote under
 `~/.claude/projects/-Users-alex-projects-code-foundry/` were deleted.
 
-![Attached session, idle](phase2-integration/attached.png)
-![Not connected after CLI close](phase2-integration/not-connected.png)
-![cmd+n prompting session.new's model](phase2-integration/new-session-palette.png)
-
 ## What did not work at first, and gotchas
 
 * **`session list` could not show "finished".** The status reason was never on the wire

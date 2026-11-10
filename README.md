@@ -20,11 +20,12 @@ gh release download --repo alexwaumann/code-foundry --pattern install.sh -O - | 
 The installer downloads the latest release, verifies its checksum, and:
 
 * installs the app into `~/.code-foundry/app`: `code-foundry` (the daemon and CLI),
-  `Code Foundry` (the window) and a `VERSION` file
+  `Code Foundry` (the window), `code-foundry-dictate` (the dictation engine) and a
+  `VERSION` file
 * links `~/.local/bin/code-foundry` to the CLI
 * adds `~/.local/bin` to your PATH in `~/.zshrc`, once, if it is not already there
 
-The app is two executables, not an `.app` bundle, because managed Macs often block
+The app is three executables, not an `.app` bundle, because managed Macs often block
 unsigned bundles. So it is not in `~/Applications` or Launchpad. Open a new shell
 afterwards, then launch it with:
 
@@ -45,6 +46,7 @@ bash install.sh --help
 
 | Flag | Effect |
 |---|---|
+| `--channel stable\|tip` | which release is the latest (default `stable`; `tip` includes prereleases) |
 | `--version vX.Y.Z` | install that release instead of the latest |
 | `--yes` | never prompt |
 | `--force` | reinstall even if that version is already installed |
@@ -55,10 +57,10 @@ bash install.sh --help
 
 ## Update
 
-The app checks for new releases on its own and shows an update in the footer. Pick
-**Code Foundry → Check for Updates…** to check now. Installing an update replaces the
-app directory the running daemon was started from; relaunch the app and restart the
-daemon from the update dialog to run it.
+The app checks for new releases on its own, downloads a newer one in the background and
+shows it at the bottom of the sidebar. Pick **Code Foundry → Check for Updates…** to
+check now. **Restart Now** in the update dialog installs it and restarts the daemon and
+the app together.
 
 From a terminal:
 
@@ -75,18 +77,16 @@ rm -rf ~/.code-foundry/app ~/.local/bin/code-foundry
 The rest of `~/.code-foundry` is state (settings, database, logs, and the worktrees it
 created). Remove it too if you want a clean slate.
 
-Installed an earlier version as `CodeFoundry.app`? Quit it and remove
-`~/Applications/CodeFoundry.app`; the installer replaces the old CLI link.
-
 ## Developing
 
 Requirements: an Apple silicon Mac with the Xcode Command Line Tools, Go 1.26 (go.mod's
-toolchain directive fetches it), `pkg-config` (`brew install pkgconf`), Node 24 and Bun
-1.4.3 or newer (`bun check` is the frontend's type checker). The GUI also needs `wails3`
-(`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.28`).
+toolchain directive fetches it), `pkg-config` (`brew install pkgconf`), `cmake`
+(`brew install cmake`), Node 24 and Bun 1.4.3 or newer (`bun check` is the frontend's type
+checker). The GUI also needs `wails3`
+(`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`).
 
 ```sh
-make build       # ./bin/code-foundry
+make build       # ./bin/code-foundry and ./bin/code-foundry-dictate
 make check       # what CI runs
 make gui-build   # "gui/bin/Code Foundry", a bare executable (no .app bundle)
 ```
@@ -97,10 +97,12 @@ builds never check for updates.
 `make build` also builds libghostty-vt from a pinned ghostty commit with a pinned zig on
 first use (about a minute; needs network access to ziglang.org, github.com and
 codeberg.org). The result lives in `~/Library/Caches/code-foundry/ghostty-vt/` and is
-shared by every checkout and worktree; the downloads are deleted after the build.
+shared by every checkout and worktree; the downloads are deleted after the build. It
+builds whisper.cpp, which `code-foundry-dictate` links, the same way from a pinned release
+into `~/Library/Caches/code-foundry/whisper-cpp/`.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PLAN.md](docs/PLAN.md), and
-[CLAUDE.md](CLAUDE.md) for the build commands.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md) for the build
+commands; earlier design decisions are in [docs/notes](docs/notes) and the git history.
 
 ## License
 

@@ -16,9 +16,6 @@ Status: done on this branch.
   * `terminal kill` without a terminal attached printed the prompt plus "Re-run with
     --yes" (exit 2); with `--yes` it reached the store.
 
-![Settings page against the live daemon](phase3b/settings.png)
-![Help overlay](phase3b/help.png)
-
 ## Settings store (`internal/store/settings`)
 
 * **File:** `$CONFIG/settings.toml`. On macOS that is

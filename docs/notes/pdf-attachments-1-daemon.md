@@ -26,9 +26,8 @@ them to Claude Code the way Claude Code sends a pasted PDF.
 - **The count lives in the file name.** A PDF is stored as `<32 hex>-<N>p.pdf` (exact)
   or `<32 hex>-~<N>p.pdf` (estimate); images keep `<32 hex><ext>`. StageAttachment
   writes `<32 hex>.pdf`, settles the count and renames. `messageAttachments` (Create and
-  Send) reads the count back with `stagedPDFPages`; a name without one (staged before
-  this change, within `AttachmentMaxAge`) falls back to `pdfPages`, pdfinfo or the
-  estimate. `checkAttachments` takes any regular file directly in the directory, so
+  Send) reads the count back with `stagedPDFPages`; a name without one (not staged by
+  StageAttachment) is the size estimate. `checkAttachments` takes any regular file directly in the directory, so
   both shapes pass. The prompt line and the inline decision in `sendMessage` use the
   same `[]attachment` on `outgoing`; items still store only paths.
 - **Caps.** Images stay at 10 MiB (`MaxAttachmentBytes`); PDFs may be 20 MiB

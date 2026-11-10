@@ -6,10 +6,8 @@ this, a running foreground Agent call opened by itself and streamed every row of
 the subagent view (`subagent-view.md`) and the Agents tab (`agents-2-gui.md`) already
 show.
 
-The built app against a live daemon (Haiku 5.5, medium), a foreground subagent at work:
-
-![Running, dark](subagent-single-line/running-dark.png)
-![Running, light](subagent-single-line/running-light.png)
+Checked in the built app against a live daemon (Haiku 5.5, medium) with a foreground
+subagent at work.
 
 ## What changed
 

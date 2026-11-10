@@ -46,7 +46,8 @@ Verb counts. The main row is the before side, whose fetches include one on `t4`.
 
 v1 scored best and was worse. `t4` reads a closed PR with no checks. A `checks_passed`
 subscription needs the PR open, so on a closed PR it never fires, stays in place, and says
-nothing. v1 sent the models straight to the verb.
+nothing (at the time: since `subscribe-cannot-fire.md` the daemon refuses it). v1 sent the
+models straight to the verb.
 
 | t4, 3 runs each | Looked at the PR | Told the user it cannot fire | Subscribed |
 |---|---|---|---|
@@ -126,4 +127,5 @@ $1.88, v3 $1.48, probes $1.40.
 - A clause that names the verb also removes the look the model took before acting. Scores rose
   while the answer got worse; only reading the runs showed it.
 - `checks_passed` on a closed PR is silent for good. The daemon could say so at subscribe time,
-  which would fix this for every wording.
+  which would fix this for every wording. It now does: subscribe refuses it as unable to fire
+  (`subscribe-cannot-fire.md`).

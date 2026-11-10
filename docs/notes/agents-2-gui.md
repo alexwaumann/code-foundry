@@ -4,17 +4,6 @@ Status: built on branch `t3code/agents-panel-2-gui`, stacked on PR 1 (`agents-1-
 the daemon). Design: `docs/sketches/agents-panel/` variant **L1** (`DESIGN.md`, `shots/l1-strip-*`).
 `make check` and `make gui-e2e` green; exercised live (built app, isolated daemon, haiku).
 
-The mock's sketch thread (the turn unfolded), dark and light: the strip above the composer,
-the Agents tab, the sidebar's "3 agents", the Agent rows' chips and the failed run's note.
-
-![Thread with the strip and the Agents tab, dark](agents-2-gui/agents-dark.png)
-![Thread with the strip and the Agents tab, light](agents-2-gui/agents-light.png)
-
-The built app against a live daemon (below): one background run left, two "Agent
-finished" notes, the sidebar's "1 agent".
-
-![Live, dark](agents-2-gui/agents-live-dark.png)
-
 ## What was built
 
 * **API** (`src/api/agents.ts`): `ThreadAgentRun` → `AgentRunView` (status `running | done |

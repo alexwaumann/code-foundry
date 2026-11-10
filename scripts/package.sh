@@ -55,7 +55,7 @@ case "$WAILS3" in
 */*) PATH="$(cd "$(dirname "$WAILS3")" && pwd):$PATH" ;;
 esac
 export PATH
-rm -f "gui/bin/$GUI" gui/bin/CodeFoundry
+rm -f "gui/bin/$GUI"
 (cd gui && "$WAILS3" build EXTRA_LDFLAGS="$VERSION_LDFLAGS" VERSION="$VERSION")
 [ -x "gui/bin/$GUI" ] || die "wails3 build did not produce gui/bin/$GUI"
 
@@ -110,7 +110,7 @@ file_version="$(cat "$STAGE/VERSION")"
 
 # 4. Assets. COPYFILE_DISABLE keeps macOS tar from adding ._ AppleDouble entries.
 mkdir -p dist
-rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt dist/CodeFoundry-darwin-arm64.zip dist/code-foundry-darwin-arm64
+rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt
 COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" code-foundry code-foundry-dictate "$GUI" VERSION
 listing="$(tar -tzf "dist/$TARBALL" | LC_ALL=C sort | tr '\n' '|')"
 [ "$listing" = "$GUI|VERSION|code-foundry|code-foundry-dictate|" ] || die "unexpected tarball contents: $listing"

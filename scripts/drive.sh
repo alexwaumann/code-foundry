@@ -84,7 +84,11 @@ case "$mode" in
       exit 1
     fi
     rm -f "$home/daemon.port" "$home/daemon.token"
-    CODE_FOUNDRY_HOME="$home" CODE_FOUNDRY_DEV_ORIGINS="$vite_port" "$root/bin/code-foundry" daemon --dev >"$fe/.playwright/daemon.log" 2>&1 &
+    # Inside a thread the environment names that thread's daemon and the installed CLI:
+    # drop the endpoint, and give the scratch daemon's threads this checkout's CLI.
+    env -u CODE_FOUNDRY_ENDPOINT -u CODE_FOUNDRY_TOKEN -u CODE_FOUNDRY_THREAD -u CODE_FOUNDRY_PAGES \
+      CODE_FOUNDRY_BIN="$root/bin/code-foundry" CODE_FOUNDRY_HOME="$home" CODE_FOUNDRY_DEV_ORIGINS="$vite_port" \
+      "$root/bin/code-foundry" daemon --dev >"$fe/.playwright/daemon.log" 2>&1 &
     pids+=($!)
     wait_for "$home/daemon.port" "the dev daemon"
     wait_for "$home/daemon.token" "the dev daemon's token"
@@ -108,11 +112,11 @@ url="http://127.0.0.1:$vite_port/?daemon=http%3A%2F%2F127.0.0.1%3A$daemon_port&t
   echo "DRIVE_URL='$url'"
   echo "DRIVE_DAEMON_PORT=$daemon_port"
   echo "DRIVE_VITE_PORT=$vite_port"
-  if [ -n "$home" ]; then echo "CODE_FOUNDRY_HOME=$home"; fi
+  if [ -n "$home" ]; then echo "export CODE_FOUNDRY_HOME='$home' CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:$daemon_port CODE_FOUNDRY_TOKEN='$token'"; fi
 } >"$state"
 
 echo "drive: $mode daemon on :$daemon_port, Vite on :$vite_port"
-if [ -n "$home" ]; then echo "drive: CODE_FOUNDRY_HOME=$home (prefix every bin/code-foundry call with it)"; fi
+if [ -n "$home" ]; then echo "drive: export CODE_FOUNDRY_HOME='$home' CODE_FOUNDRY_ENDPOINT=http://127.0.0.1:$daemon_port CODE_FOUNDRY_TOKEN='$token' before every bin/code-foundry call (sourcing drive.env does)"; fi
 echo "drive: cd gui/frontend && ./node_modules/.bin/playwright cli open '$url'"
 echo "drive: state in gui/frontend/.playwright/drive.env; logs in gui/frontend/.playwright/*.log"
 
