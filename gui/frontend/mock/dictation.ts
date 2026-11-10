@@ -17,12 +17,13 @@
  *   POST /__mock/dictation/end?reason=silence|stopped|disabled|error   (the open session ends)
  *   GET  /__mock/dictation                         ({ state, enabled, session, calls })
  */
-import type { MessageInitShape } from "@bufbuild/protobuf";
+import { create, toJsonString, type MessageInitShape } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
-import { DictationEndReason, DictationState, type DictationSessionEventSchema, type DictationSnapshotSchema } from "../src/gen/codefoundry/v1/dictation_pb";
+import { DictationEndReason, DictationSnapshotSchema, DictationState, type DictationSessionEventSchema } from "../src/gen/codefoundry/v1/dictation_pb";
 import { CommandError } from "./errors";
+import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
 
 type SnapshotInit = MessageInitShape<typeof DictationSnapshotSchema>;
@@ -61,7 +62,7 @@ export interface DictationCommandEntry {
     confirmLabel?: string;
   };
   when: (ctx: UiContext | undefined) => boolean;
-  run: (ctx: UiContext | undefined, args: Record<string, string>) => string;
+  run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 }
 
 interface MockSession {
@@ -462,7 +463,8 @@ export class MockDictation {
       {
         cmd: { name: "dictation.status", noPalette: true, title: "Dictation Status", category: "Dictation", description: "Show dictation's state.", keybindings: [], args: [] },
         when: () => true,
-        run: () => `dictation: ${DictationState[this.state()].toLowerCase()}`,
+        // The snapshot as JSON, like the daemon (the welcome page reads the model's download).
+        run: () => Promise.resolve({ message: `dictation: ${DictationState[this.state()].toLowerCase()}`, resultJson: toJsonString(DictationSnapshotSchema, create(DictationSnapshotSchema, this.snapshot())) }),
       },
     ];
   }
