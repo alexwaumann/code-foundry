@@ -20,8 +20,10 @@ func (t *threadLog) noteHandledLocked(it Item) {
 		if !it.Queued {
 			t.taken = max(t.taken, it.Ordinal)
 		}
+		t.turnDirty = true // turn.go
 	case KindTurnEnd:
 		t.handled = max(t.handled, t.taken)
+		t.turnDirty = true
 	}
 }
 

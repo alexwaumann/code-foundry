@@ -26,7 +26,7 @@ func TestThreadReports(t *testing.T) {
 		ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED, ReportSummary: "needs a token"}
 	silent := &v1.Thread{Id: "s-000000000003", Status: v1.ThreadStatus_THREAD_STATUS_BUSY, CreatedBy: "s-7754a478e649"}
 	children := []*v1.Thread{done, blocked, silent}
-	// Get with detail says the report predates the last message (the wake's rule).
+	// The list says the report predates the thread's latest turn (the wake's rule).
 	superseded := &v1.Thread{Id: "s-000000000004", Name: "Alias", Status: v1.ThreadStatus_THREAD_STATUS_BUSY,
 		ReportStatus: v1.ThreadReportStatus_THREAD_REPORT_STATUS_DONE, ReportSummary: "Added --pending-only", ReportStale: true}
 	gone := []*v1.RemovedThread{
@@ -144,9 +144,9 @@ func TestThreadReports(t *testing.T) {
 			if strings.Join(stale, ",") != strings.Join(tt.wantStale, ",") {
 				t.Errorf("JSON stale = %v, want %v", stale, tt.wantStale)
 			}
-			// Only threads with a report are asked for their detail.
+			// The list says it all: no thread is read on its own.
 			for _, r := range b.Requests() {
-				if g, ok := r.(*v1.GetThreadRequest); ok && (!g.GetWithDetail() || g.GetId() == silent.GetId()) {
+				if g, ok := r.(*v1.GetThreadRequest); ok {
 					t.Errorf("Get %v", g)
 				}
 			}

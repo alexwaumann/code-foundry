@@ -22,6 +22,7 @@ func metadataToProto(s thread.Thread, p *v1.Thread) {
 	p.ReportStatus = v1.ThreadReportStatus(s.Report.Status)
 	p.ReportSummary, p.ReportData = s.Report.Summary, s.Report.Data
 	p.ReportAt = timestamp(s.Report.At)
+	p.TurnStartedAt, p.ReportStale = timestamp(s.TurnStartedAt), s.ReportStale()
 	p.BudgetUsd = s.BudgetUSD
 }
 

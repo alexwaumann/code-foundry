@@ -451,10 +451,13 @@ type threadLog struct {
 	// held are the queued messages the row has until Claude does (Setup.Queued): no process
 	// ending stops them being queued (closeUnfinished).
 	held map[string]bool
+	// turnStart is lastTurn's start, read again when turnDirty (turn.go).
+	turnStart time.Time
+	turnDirty bool
 }
 
 func newThreadLog(id string, b *bus.Bus, now func() time.Time, items []Item) *threadLog {
-	t := &threadLog{id: id, bus: b, now: now, byID: map[string]int{}, nextOrd: 1}
+	t := &threadLog{id: id, bus: b, now: now, byID: map[string]int{}, nextOrd: 1, turnDirty: true}
 	t.items = slices.Clone(items)
 	for _, it := range items {
 		if it.Ordinal >= t.nextOrd {
@@ -567,6 +570,7 @@ func (t *threadLog) dropItem(id string) bool {
 	}
 	t.items = slices.Delete(t.items, i, i+1)
 	t.reorderLocked()
+	t.turnDirty = true
 	t.taken, t.handled = 0, 0
 	for _, it := range t.items {
 		t.noteHandledLocked(it)

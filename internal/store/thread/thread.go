@@ -232,6 +232,10 @@ type Thread struct {
 	// that clear SnoozedUntil clear it, and a timed Snooze replaces it. Snoozed reports
 	// either. Persisted.
 	SavedAt time.Time
+	// TurnStartedAt is when the latest turn started: the first top-level message Claude
+	// read after the turn before it ended (lastTurn, turn.go). Zero before any. Published
+	// with the status while the thread runs and when its process ends. Persisted.
+	TurnStartedAt time.Time
 	// LinkedPullRequests are the pull requests Claude linked to the conversation
 	// (pr-link transcript records; prlink.go) and those of the threads it created,
 	// transitively (prlink_children.go), and the pull requests whose head is a branch

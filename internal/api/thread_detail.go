@@ -11,7 +11,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-// addDetail fills p's fields that come from thread s's items (thread.DetailOf, the
+// addDetail fills p's field that comes from thread s's items (thread.DetailOf, the
 // wake's rules): GetThread with with_detail.
 func (h *Thread) addDetail(ctx context.Context, s thread.Thread, p *v1.Thread) error {
 	items, err := h.store.Items(ctx, s.ID)
@@ -19,7 +19,7 @@ func (h *Thread) addDetail(ctx context.Context, s thread.Thread, p *v1.Thread) e
 		return err
 	}
 	d := thread.DetailOf(s, items.Items)
-	p.Pending, p.ReportStale = pendingDetailToProto(d.Pending), d.ReportStale
+	p.Pending = pendingDetailToProto(d.Pending)
 	return nil
 }
 

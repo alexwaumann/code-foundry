@@ -401,9 +401,9 @@ message Thread {
   // The request a "permission: …" or "question: …" status describes; set by
   // ThreadService.Get with with_detail only.
   ThreadPendingDetail pending = 59;
-  // The report was made before the thread's last message (a follow-up or a wake), so it
-  // describes an older turn: the wake's report_stale rule. Set by ThreadService.Get with
-  // with_detail only.
+  // The report was made before turn_started_at (a follow-up or a wake), so it describes
+  // an older turn: the wake's report_stale rule, at millisecond precision. Set on every
+  // thread the daemon sends.
   bool report_stale = 60;
   // How far below ThreadFilter.descendants_of the thread is (0: that thread, 1: a
   // thread it created); set by a List with that filter only.
@@ -482,6 +482,10 @@ message Thread {
   // in worktree mode, no worktree_path yet. FAILED leaves it DISCONNECTED and ERROR
   // ("setup failed"), with no process.
   ThreadSetup setup = 77;
+  // When the thread's latest turn started: the first top-level message Claude read after
+  // the turn before it ended (a follow-up or a wake; a message read mid-turn is no new
+  // turn). Unset before any. Persisted; rows older than it are filled from their items.
+  google.protobuf.Timestamp turn_started_at = 78;
 }
 
 // ThreadMove is a Move under way (Thread.pending_move).
@@ -1005,9 +1009,8 @@ message RemovedThread {
 
 message GetThreadRequest {
   string id = 1;
-  // Also read the thread's items for Thread.pending and report_stale (thread.get,
-  // thread.reports): the detail a wake carries. Unset leaves them empty and reads
-  // nothing.
+  // Also read the thread's items for Thread.pending (thread.get): the detail a wake
+  // carries. Unset leaves it empty and reads nothing.
   bool with_detail = 2;
 }
 

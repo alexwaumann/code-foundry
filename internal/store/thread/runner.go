@@ -106,7 +106,9 @@ type runner struct {
 	tool, pubTool string
 	// handled, pubHandled: the log's handled ordinal (Thread.HandledThrough, handled.go).
 	handled, pubHandled int64
-	debounce            *time.Timer
+	// turn, pubTurn: when the latest turn started (Thread.TurnStartedAt, turn.go).
+	turn, pubTurn time.Time
+	debounce      *time.Timer
 
 	activity, pubActivity, savedActivity time.Time
 
@@ -369,7 +371,7 @@ func (r *runner) rescan(s Thread, cid, path string, limit int64) {
 // changed.
 func (r *runner) checkStatus() {
 	r.readStatus()
-	if (r.status != r.pubStatus || r.reason != r.pubReason || r.ask != r.pubAsk || r.tool != r.pubTool || r.handled != r.pubHandled) && r.debounce == nil {
+	if (r.status != r.pubStatus || r.reason != r.pubReason || r.ask != r.pubAsk || r.tool != r.pubTool || r.handled != r.pubHandled || !r.turn.Equal(r.pubTurn)) && r.debounce == nil {
 		r.debounce = time.NewTimer(r.m.opts.StatusDebounce)
 	}
 }
@@ -379,22 +381,24 @@ func (r *runner) checkStatus() {
 // still say so after the daemon dies without a clean shutdown. A new request that
 // reads like the one before it (the same reason) is a change too: PendingRequestID.
 // The running tool alone (BusyTool, a few per turn) is published without a save: it is
-// not persisted.
+// not persisted. A new turn start is saved.
 func (r *runner) publishStatus() {
 	r.readStatus()
 	if r.status == r.pubStatus && r.reason == r.pubReason && r.ask == r.pubAsk {
-		if r.tool != r.pubTool || r.handled != r.pubHandled {
+		if r.tool != r.pubTool || r.handled != r.pubHandled || !r.turn.Equal(r.pubTurn) {
 			// A turn that ended with the status it had (finished, then finished again)
 			// still publishes its handled ordinal: a forward's wake waits on it.
-			r.pubTool, r.pubHandled = r.tool, r.handled
-			r.m.update(r.id, false, func(rec *record) {
+			save := !r.turn.Equal(r.pubTurn)
+			r.pubTool, r.pubHandled, r.pubTurn = r.tool, r.handled, r.turn
+			r.m.update(r.id, save, func(rec *record) {
 				rec.s.BusyTool = busyToolFor(rec.s.Status, rec.s.StatusReason, r.tool)
 				rec.s.HandledThrough = r.handled
+				rec.s.TurnStartedAt = r.turn
 			})
 		}
 		return
 	}
-	r.pubStatus, r.pubReason, r.pubAsk, r.pubTool, r.pubActivity, r.pubHandled = r.status, r.reason, r.ask, r.tool, r.activity, r.handled
+	r.pubStatus, r.pubReason, r.pubAsk, r.pubTool, r.pubActivity, r.pubHandled, r.pubTurn = r.status, r.reason, r.ask, r.tool, r.activity, r.handled, r.turn
 	now := r.m.opts.Now()
 	r.m.update(r.id, true, func(rec *record) {
 		rec.s.setStatus(r.status, r.reason, now)
@@ -402,6 +406,7 @@ func (r *runner) publishStatus() {
 		rec.s.BusyTool = r.tool
 		rec.s.LastActivityAt = r.activity
 		rec.s.HandledThrough = r.handled
+		rec.s.TurnStartedAt = r.turn
 	})
 }
 
@@ -414,6 +419,7 @@ func (r *runner) readStatus() {
 	r.ask = r.st.sd.asking()
 	r.tool = busyToolFor(r.status, r.reason, r.st.proj.busy.line(r.cwd))
 	r.handled = r.st.proj.w.log.handledThrough()
+	r.turn = r.st.proj.w.log.turnStarted()
 }
 
 // finish detaches the runner, applying the final state. Every disconnect of a live
@@ -474,6 +480,7 @@ func (r *runner) finish(fn func(*Thread)) {
 		s.setStatus(st, reason, now)
 		// The turn the process end closed (closeOpenTurn) is over too.
 		s.HandledThrough = max(s.HandledThrough, r.st.proj.w.log.handledThrough())
+		s.TurnStartedAt = r.st.proj.w.log.turnStarted()
 		if r.activity.After(s.LastActivityAt) {
 			s.LastActivityAt = r.activity
 		}
