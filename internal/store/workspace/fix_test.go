@@ -80,6 +80,7 @@ func TestWorkspaceRootRules(t *testing.T) {
 		{"home", e.home, ErrInvalidArgument, "home directory"},
 		{"a project's checkout", repo, ErrInvalidArgument, "inside project repo"},
 		{"inside a checkout", filepath.Join(repo, "sub"), ErrInvalidArgument, "inside project repo"},
+		{"inside a checkout typed in another case", filepath.Join(e.home, "REPO", "Sub"), ErrInvalidArgument, "inside project repo"},
 		{"a worktree", wt, ErrInvalidArgument, "inside project repo"},
 		{"a folder of projects", filepath.Join(e.home, "product"), nil, ""},
 	} {
