@@ -1,8 +1,8 @@
 import { useState, type CSSProperties } from "react";
-import { fmtTok, fmtUsd, modelColorVars, SWATCH_BG } from "@/lib/usage";
+import { fmtTok, fmtUsd, SWATCH_BG, type SwatchVars } from "@/lib/usage";
 import { useWidth } from "@/lib/useWidth";
 import { cn } from "@/lib/utils";
-import { dayLabel, labelledDays, niceStep, seriesLabel, type DayUsage } from "./usageData";
+import { dayLabel, labelledDays, niceStep, seriesColor, seriesLabel, type DayUsage } from "./usageData";
 
 export type ChartMode = "tokens" | "cost";
 
@@ -15,12 +15,7 @@ const BOTTOM = 24;
 const GAP = 2;
 const RADIUS = 4;
 
-/** A series' colour as --sw-l / --sw-d (lib/usage modelColorVars); OTHER has no slot, so it is grey. */
-function seriesStyle(key: string): CSSProperties {
-  return modelColorVars(key) as CSSProperties;
-}
-
-/** SVG fill reading seriesStyle, following the theme. */
+/** SVG fill reading a series' --sw-l / --sw-d, following the theme. */
 const SERIES_FILL = "fill-(--sw-l) dark:fill-(--sw-d)";
 
 function formatValue(v: number, mode: ChartMode): string {
@@ -47,9 +42,9 @@ interface Hover {
 
 /**
  * Stacked daily bars by model (inline SVG): one slot per day of the range, empty days
- * included, series stacked in slot order from the baseline, a tooltip per day.
+ * included, series stacked in their order from the baseline, a tooltip per day.
  */
-export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]; series: readonly string[]; mode: ChartMode }) {
+export function UsageChart({ daily, series, colors, mode }: { daily: readonly DayUsage[]; series: readonly string[]; colors: ReadonlyMap<string, SwatchVars>; mode: ChartMode }) {
   const [ref, width] = useWidth();
   const [hover, setHover] = useState<Hover | null>(null);
   const values = (d: DayUsage) => (mode === "cost" ? d.cost : d.tokens);
@@ -103,7 +98,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
                     key={k}
                     d={isTop ? topRoundedRect(x, y0, bw, h, RADIUS) : `M${String(x)},${String(y0)}h${String(bw)}v${String(h)}h${String(-bw)}Z`}
                     className={SERIES_FILL}
-                    style={seriesStyle(k)}
+                    style={seriesColor(colors, k) as CSSProperties}
                     data-series={k}
                   />
                 );
@@ -157,7 +152,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
             .map((k) => (
               <div key={k} className="flex justify-between gap-4 leading-relaxed">
                 <span className="flex items-center">
-                  <Swatch model={k} />
+                  <Swatch colors={seriesColor(colors, k)} />
                   {seriesLabel(k)}
                 </span>
                 <span className="tabular-nums">{formatValue(values(hovered)[k] ?? 0, mode)}</span>
@@ -172,7 +167,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
       <div className="mt-2.5 flex flex-wrap gap-3.5 text-caption-sm" data-testid="usage-page-legend">
         {series.map((k) => (
           <span key={k} className="inline-flex items-center" data-series={k}>
-            <Swatch model={k} />
+            <Swatch colors={seriesColor(colors, k)} />
             {seriesLabel(k)}
           </span>
         ))}
@@ -181,7 +176,7 @@ export function UsageChart({ daily, series, mode }: { daily: readonly DayUsage[]
   );
 }
 
-/** A model's (or series') colour square; grey for a model without a slot. */
-export function Swatch({ model }: { model: string }) {
-  return <span aria-hidden className={cn("mr-2 inline-block size-2 shrink-0", SWATCH_BG)} style={seriesStyle(model)} />;
+/** A series' colour square. */
+export function Swatch({ colors }: { colors: SwatchVars }) {
+  return <span aria-hidden className={cn("mr-2 inline-block size-2 shrink-0", SWATCH_BG)} style={colors as CSSProperties} />;
 }

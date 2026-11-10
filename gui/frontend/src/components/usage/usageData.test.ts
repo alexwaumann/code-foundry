@@ -66,15 +66,19 @@ describe("usagePageData", () => {
     expect(d.daily[0]).toEqual({ day: "2026-10-04", tokens: {}, cost: {} });
   });
 
-  it("folds models without a colour slot into Other on the chart, but lists them by id", () => {
+  it("draws each family model as its own series, folds others into Other, and lists every model by id", () => {
     const d = usagePageData(
-      [[bucket({ model: "claude-opus-5", unpriced: true, costUsd: 0, cacheRead: 30 }), bucket({ model: "claude-opus-4-8", cacheRead: 20 }), bucket({ model: "claude-haiku-5-5" })]],
-      [bucket({ model: "claude-fable-5-1" })],
+      [[bucket({ model: "claude-next-1", unpriced: true, costUsd: 0, cacheRead: 30 }), bucket({ model: "claude-opus-4-8[1m]", cacheRead: 20 }), bucket({ model: "claude-haiku-5-5" }), bucket({ model: "<synthetic>", cacheRead: 5 })]],
+      [bucket({ model: "claude-fable-5-1" }), bucket({ model: "claude-opus-4-7" })],
       days,
     );
-    expect(d.series).toEqual(["claude-fable-5-1", "claude-haiku-5-5", OTHER]);
-    expect(d.daily.at(-1)?.tokens[OTHER]).toBe(50);
-    expect(d.models.map((m) => m.model).sort()).toEqual(["claude-fable-5-1", "claude-haiku-5-5", "claude-opus-4-8", "claude-opus-5"]);
+    expect(d.series).toEqual(["claude-opus-4-8", "claude-opus-4-7", "claude-fable-5-1", "claude-haiku-5-5", OTHER]);
+    expect(d.daily.at(-1)?.tokens[OTHER]).toBe(35);
+    expect(d.daily.at(-1)?.tokens["claude-opus-4-8"]).toBe(20);
+    expect(d.colors.get("claude-opus-4-8")?.["--sw-l"]).toBe("#2a78d6");
+    expect(d.colors.get("claude-opus-4-7")?.["--sw-l"]).not.toBe("#2a78d6");
+    expect(d.colors.has(OTHER)).toBe(false);
+    expect(d.models.map((m) => m.model).sort()).toEqual(["<synthetic>", "claude-fable-5-1", "claude-haiku-5-5", "claude-next-1", "claude-opus-4-7", "claude-opus-4-8[1m]"]);
   });
 
   it("is empty for a range without usage", () => {
@@ -90,7 +94,9 @@ describe("seriesOf", () => {
   it.each([
     ["claude-opus-5-5", "claude-opus-5-5"],
     ["claude-haiku-5-5-20261001", "claude-haiku-5-5"],
-    ["claude-opus-5", OTHER],
+    ["claude-opus-5", "claude-opus-5"],
+    ["claude-sonnet-4-6[1m]", "claude-sonnet-4-6"],
+    ["claude-next-1", OTHER],
     ["<synthetic>", OTHER],
   ])("%s → %s", (model, want) => {
     expect(seriesOf(model)).toBe(want);

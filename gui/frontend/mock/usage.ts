@@ -32,6 +32,7 @@ const RATES: Record<string, { input: number; output: number; cacheRead: number; 
   "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite5m: 0.125, cacheWrite1h: 0.2 },
   "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10 },
+  "claude-sonnet-4-6": { input: 3, output: 15, cacheRead: 0.3, cacheWrite5m: 3.75, cacheWrite1h: 6 },
 };
 
 function bucketMsg(u: MockUsage): UsageBucketInit {
@@ -87,9 +88,10 @@ export function sampleUsage(): MockUsage[] {
 }
 
 // ---- The Usage page's fixtures -----------------------------------------------------
-// Two weeks of four models on s-3 and s-4 (s-1 keeps sampleUsage, s-2 stays empty for the
-// panel's "No usage yet"), an empty day, an unpriced model, and a retired ledger reaching
-// past 30 days with a priced model without a colour slot ("Other").
+// Two weeks of models from all four families on s-3 and s-4, two of opus and two of
+// sonnet (s-1 keeps sampleUsage, s-2 stays empty for the panel's "No usage yet"), an
+// empty day, an unpriced model, and a retired ledger reaching past 30 days with a model
+// outside the families ("Other").
 
 /** A bucket of about `millions` million tokens, mostly cache reads (the real mix). */
 function mix(model: string, daysAgo: number, millions: number, requests: number): MockUsage {
@@ -104,20 +106,21 @@ function mix(model: string, daysAgo: number, millions: number, requests: number)
 // Millions of tokens per day, 13 days ago to today; 0 is no bucket (9 days ago is empty for every model).
 const OPUS = [12, 58, 71, 40, 0, 95, 132, 118, 160, 210, 188, 141, 126, 88];
 const FABLE = [4, 19, 22, 9, 0, 31, 48, 37, 52, 71, 64, 55, 49, 37];
-const SONNET = [0, 0.2, 0, 0, 0, 0.1, 0.3, 0.2, 0.1, 0.2, 0.1, 0, 0.2, 0.1];
+const SONNET = [3, 11, 15, 8, 0, 21, 27, 23, 31, 42, 36, 29, 25, 19];
+const NAMING = [0, 0.2, 0, 0, 0, 0.1, 0.3, 0.2, 0.1, 0.2, 0.1, 0, 0.2, 0.1];
 const HAIKU = [0, 0, 0, 0, 0, 0.1, 0.2, 0, 0.3, 0.1, 0.2, 0.1, 0.1, 0.1];
 
 function daily(model: string, values: readonly number[], perRequest: number): MockUsage[] {
   return values.flatMap((m, i) => (m > 0 ? [mix(model, values.length - 1 - i, m, Math.max(1, Math.round(m / perRequest)))] : []));
 }
 
-/** s-3: Opus 5.5 every day, plus claude-opus-5-6 (no rate: "unpriced"). s-4: Fable, Sonnet and Haiku. */
+/** s-3: Opus 5.5 every day, plus claude-opus-4-1 (no rate: "unpriced"). s-4: Fable, Sonnet 5, Sonnet 4.6 and Haiku. */
 export function pageUsage(threadId: string): MockUsage[] {
   switch (threadId) {
     case "s-3":
-      return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-5-6", 2, 18, 9), mix("claude-opus-5-6", 1, 10.4, 5)];
+      return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-4-1", 2, 18, 9), mix("claude-opus-4-1", 1, 10.4, 5)];
     case "s-4":
-      return [...daily("claude-fable-5-1", FABLE, 0.8), ...daily("claude-sonnet-5-5", SONNET, 0.01), ...daily("claude-haiku-5-5", HAIKU, 0.04)];
+      return [...daily("claude-fable-5-1", FABLE, 0.8), ...daily("claude-sonnet-5", SONNET, 0.3), ...daily("claude-sonnet-4-6", NAMING, 0.01), ...daily("claude-haiku-5-5", HAIKU, 0.04)];
     default:
       return [];
   }
@@ -125,5 +128,5 @@ export function pageUsage(threadId: string): MockUsage[] {
 
 /** ThreadListSnapshot.retired_usage / ListThreadsResponse.retired_usage: removed threads' usage. */
 export function retiredUsage(): UsageBucketInit[] {
-  return usageFields([mix("claude-opus-5-5", 20, 64, 70), mix("claude-fable-5-1", 20, 21, 25), mix("claude-opus-5-5", 33, 90, 80), mix("claude-opus-5-5", 60, 45, 40), mix("claude-opus-4-8", 12, 6, 4)]).usage;
+  return usageFields([mix("claude-opus-5-5", 20, 64, 70), mix("claude-fable-5-1", 20, 21, 25), mix("claude-opus-5-5", 33, 90, 80), mix("claude-opus-5-5", 60, 45, 40), mix("claude-opus-4-8", 12, 6, 4), mix("<synthetic>", 5, 0.4, 2)]).usage;
 }

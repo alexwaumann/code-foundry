@@ -54,14 +54,18 @@ describe("UsageSheet", () => {
     expect(screen.getByTestId("usage-page-cache-savings").textContent).toBe("Cache savings$6.90");
   });
 
-  it("folds models without a slot into Other on the chart and legend, but lists them by id", () => {
-    setUsage({ a: [bucket({ model: "claude-opus-4-8", cacheRead: 10, costUsd: 1 }), bucket({ model: "claude-opus-5", cacheRead: 5, unpriced: true }), bucket({ cacheRead: 1, costUsd: 1 })] });
+  it("draws each model of a family as its own series, a lighter shade for the older, and folds others into Other", () => {
+    setUsage({ a: [bucket({ model: "claude-opus-4-8", cacheRead: 10, costUsd: 1 }), bucket({ model: "claude-next-1", cacheRead: 5, unpriced: true }), bucket({ cacheRead: 1, costUsd: 1 })] });
     render(<UsageSheet />);
     const legend = screen.getByTestId("usage-page-legend");
-    expect([...legend.querySelectorAll("[data-series]")].map((e) => e.textContent)).toEqual(["claude-opus-5-5", "Other"]);
+    expect([...legend.querySelectorAll("[data-series]")].map((e) => e.textContent)).toEqual(["claude-opus-5-5", "claude-opus-4-8", "Other"]);
     const today = screen.getByTestId("usage-page-chart").querySelector('g[data-day="2026-10-10"]');
-    expect([...(today?.querySelectorAll("path[data-series]") ?? [])].map((p) => p.getAttribute("data-series"))).toEqual(["claude-opus-5-5", "other"]);
-    expect(rows()).toEqual(["claude-opus-4-8", "claude-opus-5-5", "claude-opus-5"]);
+    const paths = [...(today?.querySelectorAll<SVGPathElement>("path[data-series]") ?? [])];
+    expect(paths.map((p) => p.getAttribute("data-series"))).toEqual(["claude-opus-5-5", "claude-opus-4-8", "other"]);
+    const fills = paths.map((p) => p.style.getPropertyValue("--sw-l"));
+    expect(fills[0]).toBe("#2a78d6");
+    expect(new Set(fills).size).toBe(3);
+    expect(rows()).toEqual(["claude-opus-4-8", "claude-opus-5-5", "claude-next-1"]);
   });
 
   it("has one day slot per day of the range, and the range control filters and persists", () => {
@@ -79,13 +83,14 @@ describe("UsageSheet", () => {
     expect(screen.getByTestId("usage-page-summary").textContent).toBe("1 token · 1 request · 1 thread");
   });
 
-  it("the cache savings and the model rows follow the range; the legend keeps the slots' order with Other last", () => {
+  it("the cache savings and the model rows follow the range; the legend keeps the families' order with Other last", () => {
     setUsage({
       a: [
         bucket({ model: "claude-haiku-5-5", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 1 }),
         bucket({ model: "claude-sonnet-5-5", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 1 }),
         bucket({ model: "claude-fable-5-1", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 1 }),
         bucket({ costUsd: 5, cacheRead: 1, cacheSavingsUsd: 1 }),
+        bucket({ model: "claude-next-1", costUsd: 1, cacheRead: 1 }),
         bucket({ model: "claude-opus-4-8", costUsd: 1, cacheRead: 1, cacheSavingsUsd: 2, day: "2026-09-28" }),
         bucket({ costUsd: 1, cacheRead: 1, cacheSavingsUsd: 4, day: "2026-08-01" }),
       ],
@@ -93,7 +98,7 @@ describe("UsageSheet", () => {
     render(<UsageSheet />);
     const legend = () => [...screen.getByTestId("usage-page-legend").querySelectorAll("[data-series]")].map((e) => e.textContent);
     const savings = () => screen.getByTestId("usage-page-cache-savings").textContent;
-    expect(legend()).toEqual(["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5", "claude-haiku-5-5", "Other"]);
+    expect(legend()).toEqual(["claude-opus-5-5", "claude-opus-4-8", "claude-fable-5-1", "claude-sonnet-5-5", "claude-haiku-5-5", "Other"]);
     expect(rows()[0]).toBe("claude-opus-5-5");
     expect(rows()).toContain("claude-opus-4-8");
     expect(savings()).toBe("Cache savings$6.00");
