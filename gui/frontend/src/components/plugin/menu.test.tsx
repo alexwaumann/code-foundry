@@ -40,7 +40,7 @@ vi.mock("@/stores/pluginSurfaces", async (importOriginal) => ({
   }),
 }));
 
-const ctx: ViewCtx = { watchKey: "w", instance: "jira/board/global", plugin: "jira", viewTab: "", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "jira/board/global", viewTab: "", uiContext: emptyContext, inert: false };
 
 function inView(children: ReactNode, c: ViewCtx = ctx) {
   return render(<ViewContext.Provider value={c}>{children}</ViewContext.Provider>);

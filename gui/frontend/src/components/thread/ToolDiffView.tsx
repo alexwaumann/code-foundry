@@ -2,7 +2,7 @@ import { memo, useMemo } from "react";
 import { Check, Copy } from "lucide-react";
 import { CodeDiff, CodeScroll } from "@/components/code/CodeDiff";
 import { Tip } from "@/components/ui/tooltip";
-import { diffText, splitPath, toolDiffFiles, type ToolDiff } from "@/lib/toolSummary";
+import { diffText, relPath, splitPath, toolDiffFiles, type ToolDiff } from "@/lib/toolSummary";
 import { useCopied } from "@/lib/useCopied";
 
 /** Above this many rendered lines the diff scrolls in a bounded box that lays out only what is visible. */
@@ -49,7 +49,7 @@ export const ToolDiffView = memo(function ToolDiffView({ diff, cwd }: { diff: To
   return (
     <div className="diff selectable" data-testid="thread-diff">
       <div className="dh">
-        <Tip label={diff.path} align="start">
+        <Tip label={diff.path} whenTruncated={relPath(diff.path, cwd) === diff.path} align="start">
           <span className="path">
             {dir && <span className="dir">{dir}/</span>}
             {base}

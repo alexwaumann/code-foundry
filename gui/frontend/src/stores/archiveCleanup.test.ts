@@ -6,7 +6,8 @@ import { newlyArchived, newlyRemoved, newlySnoozed, putAwaySelected, startArchiv
 import { useBottomStore } from "./bottomPanel";
 import { reconcileThreads } from "./events";
 import { fileEditKey, noteDraft, startEdit, useFileEditStore } from "./fileEdit";
-import { allTabs, emptyEntry, makeTab, usePanelStore } from "./panel";
+import { emptyEntry, makeTab, usePanelStore } from "./panel";
+import { useRecentFilesStore } from "./recentFiles";
 import { applyThreadListEvent, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
 
@@ -188,8 +189,6 @@ describe("startArchiveCleanup", () => {
       useThreadsStore.setState((s) => applyThreadListEvent(s, event));
       expect(session()).toBeUndefined();
       expect(dropped).toContain(stateKey);
-      // Its panel entry stays, as it did: only the draft had to go.
-      expect(allTabs(usePanelStore.getState().byKey["thread:a"] ?? emptyEntry).map((t) => t.id)).toContain(file.id);
     });
   });
 
@@ -215,10 +214,11 @@ describe("startArchiveCleanup", () => {
       ["NotFound", new ConnectError("no such service", Code.NotFound)],
       ["Unimplemented", new ConnectError("no such rpc", Code.Unimplemented)],
       ["a 404", new ConnectError("HTTP 404", Code.Unknown)],
-    ])("%s: every thread looks gone, and no draft goes", async (_name, err) => {
+    ])("%s: every thread looks gone, and no draft or panel goes", async (_name, err) => {
       await fails(err);
       expect(useThreadsStore.getState().order).toEqual([]);
       expect(useFileEditStore.getState().sessions[key]?.dirty).toBe(true);
+      expect("thread:a" in usePanelStore.getState().byKey).toBe(true);
     });
 
     it("the list coming back finds the draft where it was", async () => {
@@ -234,6 +234,21 @@ describe("startArchiveCleanup", () => {
       await reconcileThreads(new AbortController().signal);
       expect(useFileEditStore.getState().sessions[key]).toBeUndefined();
     });
+  });
+
+  it.each<[string, Parameters<typeof applyThreadListEvent>[1]]>([
+    ["a removed event", { kind: "removed", id: "a" }],
+    ["a snapshot without the thread", { kind: "snapshot", threads: [thread("b")], retiredUsage: [] }],
+  ])("a removed thread (%s) loses its side panel, bottom panel and recent files entries; others are untouched", (_name, event) => {
+    const recent = { project: "p", base: "/w", path: "/w/a.go" };
+    useRecentFilesStore.setState({ byKey: { "thread:a": [recent], "thread:b": [recent] } });
+    useThreadsStore.setState((s) => applyThreadListEvent(s, event));
+    expect("thread:a" in usePanelStore.getState().byKey).toBe(false);
+    expect("thread:a" in useBottomStore.getState().byKey).toBe(false);
+    expect("thread:a" in useRecentFilesStore.getState().byKey).toBe(false);
+    expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
+    expect(useBottomStore.getState().byKey["thread:b"]?.open).toBe(true);
+    expect(useRecentFilesStore.getState().byKey["thread:b"]).toEqual([recent]);
   });
 
   it("a thread with no stored panels gets no entries", () => {

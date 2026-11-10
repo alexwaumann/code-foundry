@@ -8,8 +8,7 @@ import type { CheckRollupView, DefaultBranchView } from "@/api/gh";
 import { isRemoteless, type GitStatusView, type ProjectView, type WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
-import type { WorkspaceView } from "@/api/workspace";
-import { tildify } from "./path";
+import { isWithin, tildify } from "./path";
 import { threadBadge } from "./thread";
 import { compareByName } from "./workspaceCard";
 
@@ -20,31 +19,10 @@ export interface ProjectsSlice {
   order: readonly string[];
 }
 
-export interface ProjectsWorkspaces {
-  byId: Readonly<Record<string, Pick<WorkspaceView, "id" | "members"> | undefined>>;
-  /** Sorted by name. */
-  order: readonly string[];
-}
-
-export interface ProjectModel {
-  projectId: string;
-  /** Its worktrees, main first (the projects slice's order). */
-  worktrees: string[];
-}
-
 export interface ProjectsModel {
-  projects: ProjectModel[];
+  /** Each project's worktrees, main first (the projects slice's order). */
+  projects: { projectId: string; worktrees: string[] }[];
   workspaces: string[];
-}
-
-export function projectsModel(projects: ProjectsSlice, workspaces: Pick<ProjectsWorkspaces, "order" | "byId">): ProjectsModel {
-  return {
-    projects: projects.order.flatMap((id) => {
-      const r = projects.byId[id];
-      return r ? [{ projectId: id, worktrees: r.worktrees.map((w) => w.path) }] : [];
-    }),
-    workspaces: workspaces.order.filter((id) => workspaces.byId[id] !== undefined),
-  };
 }
 
 /**
@@ -132,15 +110,6 @@ export function projectNextStep(r: Pick<ProjectView, "git" | "remotes" | "worktr
   return isRemoteless(r) ? "publish" : null;
 }
 
-/** A project's git status counts as stale (amber) in its header's freshness after this. */
-export const PROJECT_STALE_MS = 10 * 60_000;
-
-/** p is root or inside it (snapshot paths: cleaned, symlinks resolved). */
-function inside(p: string, root: string): boolean {
-  if (!p || !root) return false;
-  return p === root || p.startsWith(root.endsWith("/") ? root : `${root}/`);
-}
-
 export interface CleanupThreads {
   order: readonly string[];
   /** checkoutPaths absent counts as none (a fixture with only the cwd). */
@@ -161,7 +130,7 @@ export interface CleanupTerminals {
 export function threadHolds(threads: CleanupThreads, path: string): boolean {
   return threads.order.some((id) => {
     const s = threads.byId[id];
-    return s !== undefined && s.archivedAtMs === null && (inside(s.worktreePath, path) || (s.checkoutPaths ?? []).some((c) => inside(c.path, path)));
+    return s !== undefined && s.archivedAtMs === null && (isWithin(s.worktreePath, path) || (s.checkoutPaths ?? []).some((c) => isWithin(c.path, path)));
   });
 }
 
@@ -169,22 +138,9 @@ export function threadHolds(threads: CleanupThreads, path: string): boolean {
 export function terminalHolds(terminals: CleanupTerminals, path: string): boolean {
   return terminals.order.some((id) => {
     const t = terminals.byId[id];
-    return t !== undefined && t.state !== "exited" && (t.labels.worktree === path || inside(t.cwd, path));
+    return t !== undefined && t.state !== "exited" && (t.labels.worktree === path || isWithin(t.cwd, path));
   });
 }
-
-/**
- * Whether project.worktree.cleanup would remove the worktree now: the daemon's git verdict
- * (mergedClean) and nothing holds it, as the daemon's cleanupHold checks (a thread on it,
- * a terminal that has not exited). The daemon also holds a worktree another thread has as
- * a checkout (a multi-project thread's member), which only Checkouts knows: it then keeps
- * the worktree and says why. It checks again after a fetch.
- */
-export function isCleanable(wt: Pick<WorktreeView, "path" | "mergedClean"> | undefined, threads: CleanupThreads, terminals: CleanupTerminals): boolean {
-  if (!wt?.mergedClean) return false;
-  return !threadHolds(threads, wt.path) && !terminalHolds(terminals, wt.path);
-}
-
 
 /** The thread fields the Projects view reads. */
 export type ActivityThread = Pick<

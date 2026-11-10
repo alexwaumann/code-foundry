@@ -1,5 +1,4 @@
-/** The primary keyword (lib/workspaceCard.ts PRIMARY_WORKSPACE; not imported: the mock imports this file and has no @ alias). */
-const PRIMARY_WORKSPACE = "workspace";
+import { WORKSPACE_PRIMARY } from "./projectSet";
 
 /** Another project, for projectRenameError: its id and name. */
 export interface NamedProject {
@@ -18,7 +17,7 @@ export function projectRenameError(name: string, others: readonly NamedProject[]
   if (new TextEncoder().encode(n).length > 100) return "At most 100 bytes.";
   if (hasControl(n)) return "One line.";
   if (/[/,]/.test(n) || n === "~") return "No / or , in a project name.";
-  if (n.toLowerCase() === PRIMARY_WORKSPACE) return "“workspace” is reserved.";
+  if (n.toLowerCase() === WORKSPACE_PRIMARY) return "“workspace” is reserved.";
   const lower = n.toLowerCase();
   for (const o of others) {
     if (o.id.toLowerCase() === lower) return `“${n}” is another project’s id.`;

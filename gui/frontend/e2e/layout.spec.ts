@@ -66,12 +66,12 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
   await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
   await expect.poll(width).toBe(520);
 
-  // Double-click restores the 220 default.
+  // Double-click restores the 260 default.
   await handle.dblclick();
   await expect.poll(width).toBe(260);
 });
 
-/** SHOTS=<dir>: the PR's screenshots of the 220px default, WebKit, 1280x800, dark and light. */
+/** SHOTS=<dir>: the PR's screenshots of the 260px default, WebKit, 1280x800, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`sidebar default screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
@@ -79,9 +79,9 @@ for (const scheme of ["dark", "light"] as const) {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.emulateMedia({ colorScheme: scheme });
     await openApp(page);
-    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(220);
+    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(260);
     await page.mouse.move(640, 400);
-    await page.screenshot({ path: `${String(shots)}/sidebar-220-${scheme}.png` });
+    await page.screenshot({ path: `${String(shots)}/sidebar-260-${scheme}.png` });
   });
 }
 
@@ -129,10 +129,9 @@ test("the sidebar band holds the empty traffic-light gutter, the app name and th
   expect(name.top + name.height / 2).toBe(CENTER);
   expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
 
-  // No toolbar: the menu pane sits right under the band, in the sidebar body's 12px left
+  // The menu pane sits right under the band, in the sidebar body's 12px left
   // gutter (#40: rows, the menu and status run to the sidebar's edges, a shell gap from the
   // window and from the pane); it does not drag.
-  await expect(page.getByTestId("sidebar-toolbar")).toHaveCount(0);
   const menu = await box(page, "sidebar-menu");
   expect([menu.top, menu.left]).toEqual([BAND, GAP]);
   expect(await drag(page, '[data-testid="sidebar-menu"]')).toBe("no-drag");

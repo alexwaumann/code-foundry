@@ -52,8 +52,8 @@ describe("modelName", () => {
   });
 
   it("the fallback is the default model alone", () => {
-    expect(FALLBACK_MODEL_CHOICES).toEqual([{ value: "claude-opus-4-8[1m]", label: "Opus 4.8" }]);
-    expect(modelName(FALLBACK_MODEL_CHOICES, "claude-sonnet-5[1m]")).toBe("claude-sonnet-5[1m]");
+    expect(FALLBACK_MODEL_CHOICES).toEqual([{ value: "claude-sonnet-5[1m]", label: "Sonnet 5" }]);
+    expect(modelName(FALLBACK_MODEL_CHOICES, "claude-opus-4-8[1m]")).toBe("claude-opus-4-8[1m]");
   });
 });
 

@@ -1,6 +1,7 @@
 import { Hourglass } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { isWaiting, waitingOnNames, waitingParts, waitingText } from "@/lib/waiting";
+import { isWaiting } from "@/lib/thread";
+import { waitingOnNames, waitingParts, waitingText } from "@/lib/waiting";
 import { useThreadsStore } from "@/stores/threads";
 
 /**

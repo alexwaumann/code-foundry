@@ -1,4 +1,5 @@
 import { ArrowUpCircle, Check, Download, Loader2, RotateCw, X } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import type { PluginEnvironmentView, PluginView } from "@/api/plugin";
 import { CatalogRow, RowButton, RowSwitch, RowWorking } from "@/components/settings/catalog/CatalogRow";
 import { Button } from "@/components/ui/button";
@@ -21,13 +22,12 @@ import { processLine, scopeWords } from "./state";
  * (docs/notes/plugins-env-restart.md).
  */
 function EnvSummary({ env }: { env: PluginEnvironmentView }) {
-  const projects = useProjectsStore((s) => s.byId);
-  const projectName = (id: string) => projects[id]?.name ?? id;
+  const names = useProjectsStore(useShallow((s) => env.projects.map((id) => s.byId[id]?.name ?? id)));
   const empty = env.env.length === 0 && env.pathPrepend.length === 0 && env.addDirs.length === 0;
   if (empty && env.issues.length === 0) return null;
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-md border border-cf-border px-3 py-2" data-testid="plugin-env">
-      <p className="text-caption-sm">New threads in {scopeWords(env.projects, env.noProject, projectName)} get:</p>
+      <p className="text-caption-sm">New threads in {scopeWords(names, env.noProject)} get:</p>
       <ul className="flex min-w-0 flex-col gap-0.5 font-mono text-caption-sm text-cf-text">
         {env.env.map((k) => (
           <li key={k} className="truncate">
@@ -141,7 +141,7 @@ function PluginDetails({ p, env, secrets }: { p: PluginView; env: PluginEnvironm
         {!p.dev && p.install && (
           <>
             {" · "}
-            <span data-testid="plugin-installed-from">from {p.install.source.replace(/^https?:\/\/(github\.com\/)?/, "")}</span>
+            <span data-testid="plugin-installed-from">from {shortSource(p.install.source)}</span>
           </>
         )}
       </p>

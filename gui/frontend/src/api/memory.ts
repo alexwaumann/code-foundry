@@ -6,7 +6,6 @@
  * uses the generated memory types.
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import { Code, ConnectError } from "@connectrpc/connect";
 import {
   MemoryService,
   type MemoryEntry,
@@ -14,6 +13,7 @@ import {
   type MemorySnapshot,
 } from "@/gen/codefoundry/v1/memory_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { isNotFound } from "./errors";
 
 /** Who added an entry: a thread (and its name then), or the user. */
 export type MemoryOriginView =
@@ -103,7 +103,7 @@ export function toMemoryEventView(ev: MemoryEvent): MemoryEventView {
  * removed or renamed since the list was shown.
  */
 export function isMemoryEntryGone(err: unknown): boolean {
-  return err instanceof ConnectError && err.code === Code.NotFound;
+  return isNotFound(err);
 }
 
 /** Reads the memory now (a hand edit since the last read included). */

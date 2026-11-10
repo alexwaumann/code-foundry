@@ -4,7 +4,8 @@
  *   bun run mock            # http://127.0.0.1:7788, token "dev-mock-token"
  *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
- * Serves Health, Terminal, Project, Filesystem, Thread, Command, Ui, Action and Event over Connect (HTTP/1.1,
+ * Serves Health, Terminal, Project, Filesystem, Gh, Command, Settings, Ui, Thread, Action, GitOps, Update,
+ * Plugin, Skill, Memory, Theme, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
@@ -26,7 +27,7 @@
  *        statuses persist, like the daemon)
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
- *        a question; MOCK_SCENARIO=status-kinds seeds them at startup and on reset)
+ *        a question)
  *   POST /__mock/resident                         (the resident thread s-resident-ember, "Ember": kind
  *        RESIDENT, epoch 2, stopped; hidden from the sidebar and counts; World.addResident)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
@@ -46,7 +47,7 @@
  *     not finish, the synthetic turn end. Scripting another state moves it on, keeping the message,
  *     and watchers get a new snapshot, as for a retry. queued: a message sent during the setup waits there)
  *   POST /__mock/transcript-deleted              (the thread s-transcript-deleted, "Fix sidebar flake":
- *     one exchange, its transcript deleted; MOCK_SCENARIO=transcript-deleted seeds it; World.addTranscriptDeleted)
+ *     one exchange, its transcript deleted; World.addTranscriptDeleted)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives;
  *                                                 child threads go along: World.archiveCascade)
@@ -56,8 +57,8 @@
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
  *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; only tokens: its context, the result's time kept; mock/context.ts)
- *   POST /__mock/thread?state=permission|question|streaming|idle   (the scripted thread s-r1:
- *        mock/thread.ts, also parallel|multi); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
+ *   POST /__mock/thread?state=permission|question|streaming|idle|…   (the scripted thread s-r1:
+ *        mock/thread.ts, every state in its THREAD_STATES); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
  *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
  *        the request first, NotFound); /__mock/thread/fail-turn[?subtype=error_max_turns] (the next
@@ -70,6 +71,10 @@
  *        /__mock/thread/wake-fire?sub=…, /__mock/thread/wake-status?sub=…&status=… (state=waiting's wake rows: mock/wakes.ts) |
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
+ *   POST /__mock/thread/retry?id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit | ?id=…&clear=1
+ *        (Claude Code is retrying an API error: Thread.retry; clear ends it)
+ *   POST /__mock/thread/flag?id=s-1&plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1]
+ *        (a plugin's thread/setFlag; none clears it)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/print?id=t-top   (the request's body as program output on it)
@@ -82,8 +87,9 @@
  *   POST /__mock/thread/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
  *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
  *        e2e's resetMock holds s-1 and s-5.) POST /__mock/thread/release?id=s-5 undoes it.
- *   POST /__mock/link-pr?thread=s-1&slug=owner/name&number=12[&ago=<ms>]   (Claude linked a pull
- *                                                 request ago ms ago; deduplicated by URL like the daemon)
+ *   POST /__mock/link-pr?thread=s-1&slug=owner/name&number=12[&ago=<ms>][&up=1]   (Claude linked a pull
+ *                                                 request ago ms ago; deduplicated by URL like the daemon;
+ *                                                 up=1 copies it up the creator chain)
  *   POST /__mock/usage?thread=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
  *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
  *                                                 thread's (model, day) bucket; s-1 is seeded)
@@ -128,6 +134,7 @@
  *   POST /__mock/workspace-thread?workspace=login[&project=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread that references the workspace, its
  *                                                 members as its set, in project's main worktree)
+ *   POST /__mock/project/rename?id=repo-dot&name=workspace   (the project's name, as project.rename sets it)
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   thread.move (and ThreadService.Move) takes a thread without a project into a project or a
  *   workspace: pending_move and naming for ~600ms, then renamed and placed (World.moveThread).
@@ -146,7 +153,8 @@
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
- *   POST /__mock/compare/commits?count=800         (that many more commits on every comparison's list, older than the rest; reset: none)
+ *   POST /__mock/compare/commits?count=800[&subject=N]   (that many more commits on every comparison's list, older than the rest;
+ *        subject: N more characters on the newest commit's subject; reset: none)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   POST /__mock/fs/remove?path=…                 (the file goes)
  *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
@@ -296,7 +304,7 @@ import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
-import { mockPaint, mockThemeJson, publishMockTheme, themeRoute } from "./theme";
+import { mockPaint, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { serveTunnel } from "./tunnel";
@@ -328,17 +336,6 @@ const mockFiles = new MockFiles((path) => {
   if (!d) return undefined;
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
-
-/**
- * MOCK_SCENARIO=status-kinds: the status-kinds threads (World.addStatusKinds) in the world from
- * the start and after every reset; transcript-deleted: the thread whose transcript Claude
- * Code deleted (World.addTranscriptDeleted).
- */
-function seedScenario(): void {
-  if (process.env.MOCK_SCENARIO === "status-kinds") world.addStatusKinds();
-  if (process.env.MOCK_SCENARIO === "transcript-deleted") world.addTranscriptDeleted();
-}
-seedScenario();
 
 /** False simulates a pre-Phase-2a daemon (see POST /__mock/threads-service). */
 let threadsEnabled = true;
@@ -433,10 +430,10 @@ function routes(router: ConnectRouter): void {
       throw new ConnectError("use the project.unregister command in the mock", Code.Unimplemented);
     },
     createWorktree: () => {
-      throw new ConnectError("use the worktree.create command in the mock", Code.Unimplemented);
+      throw new ConnectError("use the project.worktree.new command in the mock", Code.Unimplemented);
     },
     removeWorktree: () => {
-      throw new ConnectError("use the worktree.remove command in the mock", Code.Unimplemented);
+      throw new ConnectError("use the project.worktree.remove command in the mock", Code.Unimplemented);
     },
     refresh: () => ({}),
     listRefs: (req) => guard(() => world.listRefs(req.projectId)),
@@ -654,7 +651,7 @@ function routes(router: ConnectRouter): void {
     listPrompts: (req) => guard(() => listPrompts(world, req)),
     listSubscriptions: (req) => guard(() => ({ subscriptions: world.logs.listWakes(req.subscriberThreadId) })),
     watchThread: (req, ctx) => tracked("ThreadService/WatchThread", guard(() => world.logs.watch(req.threadId, ctx.signal))),
-    send: (req) => guard(() => (refuseSlashCommand(req.text), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
+    send: (req) => guard(() => (refuseSlashCommand(req.text, (name) => world.logs.offersSlashCommand(req.threadId, name)), { item: world.logs.send(req.threadId, req.text, req.attachments, req.composerText) })),
     slashCommands: (req) => guard(() => ({ commands: world.logs.slashCommandsOf(req.threadId) })),
     // code-foundry view.inline's RPC (docs/notes/inline-html.md).
     showHtml: (req) => guard(() => ({ item: world.logs.showHtml(req.threadId, req.path, req.title) })),
@@ -1835,7 +1832,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       threadsEnabled = true;
       missingRpcs.clear();
       world.reset();
-      seedScenario();
       resetClones();
       resetProjects();
       resetCompletion();
@@ -1843,6 +1839,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       resetPageStorage();
       resetWaits();
       resetFetches();
+      resetMockTheme();
       json(res, 200, { ok: true });
       break;
     case "POST /__mock/files": {

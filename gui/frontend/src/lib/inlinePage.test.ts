@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_HEIGHT, frameHeight, inlinePage } from "./inlinePage";
-import { resizeHeight } from "@/components/files/previewGrant";
 
 describe("frameHeight", () => {
   it.each([
@@ -28,18 +27,5 @@ describe("inlinePage", () => {
   });
   it("a file in the cwd itself has no directory", () => {
     expect(inlinePage({ path: "hello.html", baseDir: "/Users/me/proj", title: "Hi" })).toMatchObject({ abs: "/Users/me/proj/hello.html", dir: "", title: "Hi" });
-  });
-});
-
-describe("resizeHeight", () => {
-  it.each([
-    ["a resize", { type: "cf:resize", height: 300 }, 300],
-    ["another message", { type: "cf:theme", height: 300 }, null],
-    ["a string height", { type: "cf:resize", height: "300" }, null],
-    ["a zero height", { type: "cf:resize", height: 0 }, null],
-    ["not an object", "cf:resize", null],
-    ["null", null, null],
-  ])("%s", (_name, data, want) => {
-    expect(resizeHeight(data)).toBe(want);
   });
 });

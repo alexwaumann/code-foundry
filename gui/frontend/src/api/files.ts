@@ -1,6 +1,7 @@
 import { FilesystemService, type ReadFileResponse } from "@/gen/codefoundry/v1/filesystem_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { PDF_MIME_TYPE } from "./threads";
 
 /**
  * FilesystemService.ReadFile as the File tab shows it (docs/notes/file-viewer-3-tabs.md).
@@ -49,8 +50,6 @@ export interface FileReadView {
  */
 export const READ_MAX_BYTES = 32 * 1024 * 1024;
 
-export const PDF_MIME = "application/pdf";
-
 const utf8 = new TextDecoder("utf-8");
 const encoder = new TextEncoder();
 const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
@@ -89,7 +88,7 @@ export function canEdit(file: FileReadView | null): boolean {
 
 export function toFileReadView(r: ReadFileResponse): FileReadView {
   const image = isImageMime(r.mimeType);
-  const pdf = r.mimeType === PDF_MIME;
+  const pdf = r.mimeType === PDF_MIME_TYPE;
   const present = !r.notFound && !r.isDir;
   const decoded = !r.binary && !r.notFound && !r.isDir ? decodeText(r.contents) : null;
   return {

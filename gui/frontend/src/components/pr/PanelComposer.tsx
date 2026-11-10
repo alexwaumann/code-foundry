@@ -18,7 +18,7 @@ function fitHeight(el: HTMLTextAreaElement): void {
   el.style.height = `${String(el.scrollHeight + el.offsetHeight - el.clientHeight)}px`;
 }
 
-export interface PanelComposerSubmit {
+interface PanelComposerSubmit {
   label: string;
   /** When the visible label alone is ambiguous ("Approve #139"). */
   ariaLabel?: string;
@@ -30,7 +30,7 @@ export interface PanelComposerSubmit {
 }
 
 /** data-testids of the composer's parts (the e2e and unit tests use each composer's own). */
-export interface PanelComposerTestIds {
+interface PanelComposerTestIds {
   root: string;
   label?: string;
   input: string;

@@ -258,14 +258,11 @@ export interface CheckoutSourceInput {
   paths?: Readonly<Record<string, string>>;
 }
 
-/** Back-compat names: the skills' and the files' inputs are the same now. */
-export type SkillSourceInput = CheckoutSourceInput;
-export type FileSourceInput = CheckoutSourceInput;
-
 /**
- * The checkouts to read project skills from, in the given order: each project's checkout
- * when it is known (a chosen existing worktree, a thread's checkouts), else its main
- * worktree (path left out; a new worktree starts from it). The daemon adds the user's.
+ * The checkouts to read project skills from, and the ones "@" searches, in the given order:
+ * each project's checkout when it is known (a chosen existing worktree, a thread's
+ * checkouts), else its main worktree (path left out; a new worktree starts from it). The
+ * daemon adds the user's skills.
  */
 export function skillSources(input: CheckoutSourceInput): SkillSourceView[] {
   return input.projectIds.map((projectId) => {
@@ -274,18 +271,12 @@ export function skillSources(input: CheckoutSourceInput): SkillSourceView[] {
   });
 }
 
-/** A stable key for a source list (the skills cache's key). */
+/** A stable key for a source list (the skills and files caches' key). */
 export function skillSourcesKey(sources: readonly SkillSourceView[]): string {
   return sources.map((s) => `${s.projectId}\u0001${s.path ?? ""}`).join("\u0002");
 }
 
 // ---- files -----------------------------------------------------------------------------
-
-/** The checkouts "@" searches: where the thread will find the files (skillSources' rule). */
-export const fileSources = skillSources;
-
-/** A stable key for a file source list (the files cache's key). */
-export const fileSourcesKey = skillSourcesKey;
 
 /** Positions of `q` as a greedy subsequence of `s` from `start`, or null. */
 function subsequenceAt(s: string, q: string, start: number): number[] | null {

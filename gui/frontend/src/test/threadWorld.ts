@@ -10,12 +10,12 @@ import { buildRows, buildTurns, decodeTimelineKey, timelineKey, type TimelineRow
 import { structOf, useThreadStore } from "@/stores/thread";
 
 export const CF = "/Users/dev/src/code-foundry";
-export const ATTACHMENT = "/mock/attachments/pr-badge-stale.png";
-export const PUSH = "git push --force-with-lease origin cf/pr-badge-stale";
+const ATTACHMENT = "/mock/attachments/pr-badge-stale.png";
+const PUSH = "git push --force-with-lease origin cf/pr-badge-stale";
 
-export const GREP_OUTPUT =
+const GREP_OUTPUT =
   'internal/store/pr/gh/query.graphql:23:      headRefOid\ninternal/store/pr/model.go:31:\tHeadRefOid     string\ninternal/store/pr/decode.go:58:\tpr.HeadRefOid = n.HeadRefOid\ninternal/store/pr/decode_test.go:72:\tHeadRefOid: "9f3c2e1",\ninternal/store/linkedpr/sync.go:104:\tif old.HeadRefOid != pr.HeadRefOid {';
-export const FAIL_OUTPUT =
+const FAIL_OUTPUT =
   "Exit code 1\n--- FAIL: TestFingerprintChangesOnForcePush (0.00s)\n    fingerprint_test.go:41: fingerprint unchanged after the head moved\n        got:  {CheckCount:3 ReviewState:APPROVED}\n        want: a different fingerprint\nFAIL\nFAIL\tgithub.com/alexwaumann/code-foundry/internal/store/pr\t0.412s";
 
 const ANSWER_HEAD = `## Fixed: stale badge after a force-push
@@ -42,7 +42,7 @@ export const ANSWER_STREAMING = `${ANSWER_HEAD}\`\`\`go\nfunc fingerprintOf(pr P
 const EDIT_OLD = "type Fingerprint struct {\n\tCheckCount  int\n\tReviewState string\n}\n\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{CheckCount: len(pr.Checks), ReviewState: pr.ReviewDecision}\n}";
 const EDIT_NEW =
   "type Fingerprint struct {\n\tCheckCount  int\n\tReviewState string\n\tHeadOid     string // moves on every push, force-pushes included\n}\n\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.ReviewDecision,\n\t\tHeadOid:     pr.HeadRefOid,\n\t}\n}";
-export const EDIT_PATCH = [
+const EDIT_PATCH = [
   {
     oldStart: 18,
     oldLines: 9,
@@ -68,7 +68,7 @@ export const EDIT_PATCH = [
   },
 ];
 
-export const QUESTIONS = {
+const QUESTIONS = {
   questions: [
     {
       question: "The branch was rebased onto main, so a plain push will be rejected. How should I push?",
@@ -118,9 +118,9 @@ export type TurnEnd = Extract<ThreadItemView, { kind: "turnEnd" }>;
 /** An item without what every item has (its id, ordinal, parent, times, streaming). */
 type Body<T> = T extends ThreadItemView ? Omit<T, "id" | "ordinal" | "parentToolUseId" | "createdAtMs" | "updatedAtMs" | "streaming"> : never;
 
-export type ThreadWorldState = "idle" | "permission" | "question" | "streaming";
+type ThreadWorldState = "idle" | "permission" | "question" | "streaming";
 
-export interface ThreadWorld {
+interface ThreadWorld {
   items: ThreadItemView[];
   pending: ThreadPendingView[];
 }

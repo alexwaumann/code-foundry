@@ -15,11 +15,6 @@ export interface ActionsData {
   runs: Readonly<Record<string, ActionRunView>>;
 }
 
-interface ActionsState extends ActionsData {
-  /** A snapshot has arrived. */
-  loaded: boolean;
-}
-
 export const emptyActions: ActionsData = { byId: {}, byProject: {}, runs: {} };
 
 const NONE: readonly string[] = [];
@@ -82,7 +77,7 @@ export function applyActionEvent(prev: ActionsData, ev: ActionEventView): Action
   }
 }
 
-export const useActionsStore = create<ActionsState>()(() => ({ ...emptyActions, loaded: false }));
+export const useActionsStore = create<ActionsData>()(() => ({ ...emptyActions }));
 
 /** A project's action ids in list order (a stable empty list for none). */
 export function useProjectActionIds(projectId: string): readonly string[] {
@@ -92,14 +87,4 @@ export function useProjectActionIds(projectId: string): readonly string[] {
 /** One action (a new object only when it changes), or undefined. */
 export function useAction(id: string): ActionView | undefined {
   return useActionsStore((s) => s.byId[id]);
-}
-
-/** One run (a new object only when it changes), or undefined (not known, or forgotten). */
-export function useActionRun(runId: string): ActionRunView | undefined {
-  return useActionsStore((s) => (runId ? s.runs[runId] : undefined));
-}
-
-/** A project's action ids right now (read imperatively). */
-export function getProjectActionIds(projectId: string): readonly string[] {
-  return useActionsStore.getState().byProject[projectId] ?? NONE;
 }

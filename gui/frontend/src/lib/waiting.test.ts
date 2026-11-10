@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
-import { isWaiting, waitingCount, waitingOnNames, waitingParts, waitingText } from "./waiting";
+import { isWaiting } from "./thread";
+import { waitingCount, waitingOnNames, waitingParts, waitingText } from "./waiting";
 
 function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
   return { id, name: id, state: "connected", status: "idle", statusReason: "at prompt", createdBy: "", archivedAtMs: null, ...over } as unknown as ThreadView;

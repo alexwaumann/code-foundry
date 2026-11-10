@@ -32,7 +32,6 @@ const searchView = (names: string[], epoch = 1): SkillSearchView => ({
     description: "",
     by: "",
     version: "20261001",
-    declaredVersion: "",
     lastUpdatedMs: null,
     registry: "ai-marketplace",
     path: `enterprise/skills/${name}`,

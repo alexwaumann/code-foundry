@@ -828,12 +828,6 @@ export function consentLines(text: string): { lead: string; items: string[] } {
   return { lead: lead.join(" "), items };
 }
 
-export async function listPlugins(signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<PluginView[]> {
-  const c = await conn.client(PluginService);
-  const res = await c.list({}, { signal });
-  return res.plugins.map(toPluginView);
-}
-
 export interface PluginLogLineView {
   seq: number;
   timeMs: number | null;

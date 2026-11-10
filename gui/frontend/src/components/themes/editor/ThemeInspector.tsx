@@ -414,7 +414,7 @@ function SlotRow({ slot, analysis }: { slot: Slot; analysis: EditorAnalysis }) {
 }
 
 /** What the daemon would refuse in the draft (draftRefusal), where it applies: Save is held until it goes. */
-export function RefusalLine({ message }: { message: string }) {
+function RefusalLine({ message }: { message: string }) {
   return (
     <p className="mx-1.5 mb-1 rounded-md bg-cf-error-surface px-2 py-1.5 text-caption text-cf-error-text" role="alert" data-testid="editor-refusal">
       {message}

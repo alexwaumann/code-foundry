@@ -5,7 +5,6 @@
  * commands are (docs/notes/plugins-2-surfaces.md, "Show commands").
  */
 import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
 import { pluginDirs, type PluginDirsView, type PluginEventView, type PluginSurfaceView, type PluginView } from "@/api/plugin";
 import { refreshCommands } from "./commands";
 import { onInstallProgress, onRegistryEpoch } from "./pluginRegistry";
@@ -110,14 +109,4 @@ export function usePluginNames(): readonly string[] {
 
 export function usePlugin(name: string): PluginView | undefined {
   return usePluginsStore((s) => s.byName[name]);
-}
-
-/** Every surface's kind, for lists that render one row per surface. */
-export function useSurfaceKinds(): string[] {
-  return usePluginsStore(useShallow((s) => allSurfaces(s).map((x) => x.kind)));
-}
-
-/** A plugin's display name ("" when unknown). */
-export function usePluginDisplayName(name: string): string {
-  return usePluginsStore((s) => s.byName[name]?.displayName ?? "");
 }

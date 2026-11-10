@@ -9,9 +9,9 @@ import type { ThreadItemView, WakeView } from "@/api/thread";
 import type { ThreadReportStatusView, ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusTone } from "./statusLine";
 import { threadBadge } from "./thread";
-import { snoozeTimeShort } from "./snooze";
+import { snoozeTimeShort, startOfDay } from "./snooze";
 import { waitingCount } from "./waiting";
-import { AGENT_TOOLS, EXPLORE_TOOLS, linkRepeatShows, workNodes, type TimelineItem, type TimelineRow, type WorkNode } from "./threadTimeline";
+import { AGENT_TOOLS, EXPLORE_TOOLS, linkRepeatShows, workNodes, type TimelineItem, type TimelineRow } from "./threadTimeline";
 
 // ---------- the flame ----------
 
@@ -160,13 +160,6 @@ export interface BoardSections {
   upNext: BoardCard[];
   /** Done or cancelled since local midnight. */
   doneToday: BoardCard[];
-}
-
-/** Local midnight before `now`. */
-export function startOfDay(now: number): number {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
 }
 
 /** Top-level tasks as cards with their subtasks (a subtask whose parent is not on the board is a card of its own). */
@@ -1297,6 +1290,3 @@ export function toggleModel(list: readonly string[], id: string): string[] {
   if (!list.includes(id)) return [...list, id];
   return list.length > 1 ? list.filter((m) => m !== id) : [...list];
 }
-
-/** The node list type for callers that render a work row's members. */
-export type { WorkNode };

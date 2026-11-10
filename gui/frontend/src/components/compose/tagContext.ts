@@ -5,7 +5,7 @@ import type { PromptTag } from "@/lib/prompt";
 export const TAG_NODE = "promptTag";
 
 /** The node's attributes: kind and every kind's fields (unused ones stay ""). */
-export interface TagAttrs {
+interface TagAttrs {
   kind: PromptTag["tagKind"];
   /** image: the attachment id; thread: the thread id; cite: the citation id. */
   id: string;
@@ -21,7 +21,7 @@ export interface TagAttrs {
   number: string;
 }
 
-export const TAG_ATTR_DEFAULTS: TagAttrs = { kind: "image", id: "", name: "", projectId: "", path: "", slug: "", number: "" };
+const TAG_ATTR_DEFAULTS: TagAttrs = { kind: "image", id: "", name: "", projectId: "", path: "", slug: "", number: "" };
 
 /** The node's attribute spec (TipTap and ProseMirror take the same shape). */
 export const TAG_ATTR_SPEC = {

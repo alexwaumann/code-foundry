@@ -2,11 +2,13 @@
  * Mock updater: the daemon's UpdateService state machine (internal/store/update) with
  * timers instead of gh and the installer. Driven by the app.* commands and by test
  * controls (see server.ts /__mock/update/*). A check that finds a newer release downloads
- * it at once (Available → Downloading → Downloaded); an automatic download that fails goes
- * back to Available, and Download (app.update) retries by hand (failing → Failed). A
- * newer release while Downloaded downloads in the background and replaces the target
- * when done, staying Downloaded throughout. Install, which app.restart runs first, swaps
- * it in: Downloaded → Installed.
+ * it at once (Available → Downloading → Downloaded). An automatic download that fails goes
+ * back to Available with the reason and the next check tries again (not the one the
+ * failure itself runs); after MAX_AUTO_ATTEMPTS failures of the same version it is Failed
+ * and checks stop downloading it. Download (app.update) checks first, then downloads by
+ * hand (failing → Failed). A newer release while Downloaded downloads in the background
+ * and replaces the target when done, staying Downloaded throughout. Install, which
+ * app.restart runs first, swaps it in: Downloaded → Installed.
  *
  * Initial state: v0.1.0, up to date, latest release v0.1.0. POST
  * /__mock/update/latest?version=v0.2.0 publishes a newer release for the next check.
@@ -61,6 +63,16 @@ const PROGRESS = [
   "==> unpacking",
   "==> downloaded {v} to ~/.code-foundry/app.new",
 ];
+
+/** The daemon's update.MaxAutoAttempts: automatic downloads of a version before it is Failed. */
+const MAX_AUTO_ATTEMPTS = 3;
+
+/**
+ * What a check may start by itself (the daemon's autoMode): nothing (Download's own
+ * check), a download but not of the version that just failed (the check right after a
+ * failure), or anything (scheduled and requested checks).
+ */
+type AutoMode = "none" | "new" | "all";
 
 export const updateStateNames: Record<string, UpdateState> = {
   idle: UpdateState.IDLE,
@@ -122,6 +134,9 @@ export class MockUpdater {
   private timers: ReturnType<typeof setTimeout>[] = [];
   /** A newer release is replacing the download (one at a time). */
   private replacing = false;
+  /** The version whose download failed last, and how many times in a row. */
+  private failedTag = "";
+  private failCount = 0;
 
   constructor(
     private readonly publish: (e: UpdateEventInit) => number,
@@ -135,6 +150,8 @@ export class MockUpdater {
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
     this.replacing = false;
+    this.failedTag = "";
+    this.failCount = 0;
     this.latest = "v0.1.0";
     this.failNext = "";
     this.relaunches = 0;
@@ -178,7 +195,12 @@ export class MockUpdater {
     this.emit();
   }
 
-  check(): MockStatus {
+  /** Whether a check of mode must not download tag by itself (the daemon's skipAutoLocked). */
+  private skipAuto(mode: AutoMode, tag: string): boolean {
+    return mode === "none" || (tag === this.failedTag && (mode === "new" || this.failCount >= MAX_AUTO_ATTEMPTS));
+  }
+
+  check(mode: AutoMode = "all"): MockStatus {
     if (!this.status.enabled) throw new Error(`updates are disabled: ${this.status.disabledReason}`);
     const s = this.status;
     s.lastCheckedAt = new Date();
@@ -194,10 +216,12 @@ export class MockUpdater {
     const installedTarget = s.state === UpdateState.DOWNLOADED || s.state === UpdateState.INSTALLED || s.state === UpdateState.RESTART_REQUIRED ? s.targetVersion : "";
     if (newer && s.state === UpdateState.DOWNLOADED && this.latest > s.targetVersion) {
       this.emit();
-      this.replace(this.latest);
+      if (mode !== "none") this.replace(this.latest);
     } else if (newer && this.latest !== installedTarget) {
-      this.set(UpdateState.AVAILABLE, this.latest);
-      this.startDownload(true);
+      // Already offered: the state and its failure reason stay.
+      if (s.state !== UpdateState.AVAILABLE || s.targetVersion !== this.latest) this.set(UpdateState.AVAILABLE, this.latest);
+      else this.emit();
+      if (!this.skipAuto(mode, this.latest)) this.startDownload(true);
     } else if (!installedTarget) this.set(UpdateState.IDLE, "");
     else this.emit();
     return this.status;
@@ -218,14 +242,15 @@ export class MockUpdater {
     );
   }
 
-  /** UpdateService.Download: stages the target in the background (app.update). */
+  /** UpdateService.Download: checks for the latest release, then stages it in the background (app.update). */
   download(): string {
+    this.check("none");
     const s = this.status;
     if (s.state !== UpdateState.AVAILABLE && s.state !== UpdateState.FAILED) throw new Error("no update available");
     return this.startDownload(false);
   }
 
-  /** Downloads the target; auto: a check started it, so a failure goes back to Available. */
+  /** Downloads the target; auto: a check started it, so a failure goes back to Available until MAX_AUTO_ATTEMPTS. */
   private startDownload(auto: boolean): string {
     const target = this.status.targetVersion;
     this.set(UpdateState.DOWNLOADING, target, { progress: "starting installer" });
@@ -247,9 +272,14 @@ export class MockUpdater {
           if (this.failNext) {
             const reason = this.failNext;
             this.failNext = "";
-            if (auto) this.set(UpdateState.AVAILABLE, target, { failureReason: reason });
+            if (this.failedTag === target) this.failCount++;
+            else [this.failedTag, this.failCount] = [target, 1];
+            if (auto && this.failCount < MAX_AUTO_ATTEMPTS) this.set(UpdateState.AVAILABLE, target, { failureReason: reason });
             else this.set(UpdateState.FAILED, target, { failureReason: reason });
+            // The release may be gone since it was offered: check again at once.
+            if (this.status.enabled) this.check("new");
           } else {
+            if (this.failedTag === target) [this.failedTag, this.failCount] = ["", 0];
             this.set(UpdateState.DOWNLOADED, target);
           }
         },
@@ -287,6 +317,8 @@ export class MockUpdater {
       this.timers = [];
     }
     this.replacing = false;
+    this.failedTag = "";
+    this.failCount = 0;
     const n = this.restartCost();
     const installed = this.status.state === UpdateState.INSTALLED || this.status.state === UpdateState.RESTART_REQUIRED;
     if (installed) this.status.currentVersion = this.status.targetVersion;

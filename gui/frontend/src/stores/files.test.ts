@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileSearchRequest, FileSearchView, SkillSourceView } from "@/api/filesystem";
 import { OutdatedDaemonError } from "@/api/errors";
-import { fileSources, fileSourcesKey, type FileSourceInput } from "@/lib/completion";
+import { skillSources, skillSourcesKey, type CheckoutSourceInput } from "@/lib/completion";
 import { cancelFiles, DEBOUNCE_MS, FILE_LIMIT, FRESH_MS, requestFiles, resetFiles, SEARCHING_AFTER_MS, useFilesStore, type SearchFilesFn } from "./files";
 
 beforeEach(() => {
@@ -15,7 +15,7 @@ afterEach(() => {
 
 const R1: SkillSourceView[] = [{ projectId: "r1" }];
 const R12: SkillSourceView[] = [{ projectId: "r1" }, { projectId: "r2", path: "/h/w/r2" }];
-const entry = (sources: readonly SkillSourceView[]) => useFilesStore.getState().byKey[fileSourcesKey(sources)];
+const entry = (sources: readonly SkillSourceView[]) => useFilesStore.getState().byKey[skillSourcesKey(sources)];
 
 /** A fake SearchFiles whose calls resolve when told to. */
 function deferred() {
@@ -213,7 +213,7 @@ describe("files store", () => {
   });
 
   describe("the checkout searched per project", () => {
-    it.each<[string, FileSourceInput, Omit<FileSearchRequest, "query" | "limit">[]]>([
+    it.each<[string, CheckoutSourceInput, Omit<FileSearchRequest, "query" | "limit">[]]>([
       ["a project, new worktree: the main checkout", { projectIds: ["r1"] }, [{ projectId: "r1" }]],
       ["a project, existing worktree: that worktree", { projectIds: ["r1"], paths: { r1: "/h/r1-wt" } }, [{ projectId: "r1", path: "/h/r1-wt" }]],
       ["a set: each main checkout", { projectIds: ["r1", "r3"] }, [{ projectId: "r1" }, { projectId: "r3" }]],
@@ -227,7 +227,7 @@ describe("files store", () => {
       ],
     ])("%s", async (_name, input, want) => {
       const { fn, calls } = deferred();
-      requestFiles(fileSources(input), "q", fn);
+      requestFiles(skillSources(input), "q", fn);
       await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
       expect(calls.map((c) => c.req)).toEqual(want.map((w) => ({ ...w, query: "q", limit: FILE_LIMIT })));
     });

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { wakeLine, wakeLines } from "./wake";
+import { wakeLines } from "./wake";
 
 const thread = (t: Record<string, unknown>) => JSON.stringify({ kind: "thread", subscription_id: "sub-1", condition: "settled", fired_at: "2026-10-17T09:01:08.732Z", thread: { id: "s-c", name: "Child", ...t } });
+const first = (w: Parameters<typeof wakeLines>[0]) => wakeLines(w)[0];
 const run = (r: Record<string, unknown>) => JSON.stringify({ kind: "action_run", subscription_id: "sub-2", condition: "finished", run: { id: "r-1", action_name: "Slow", ...r } });
 
-describe("wakeLine", () => {
+describe("wakeLines", () => {
   it.each([
     ["a finished thread with a report", thread({ status: "needs_attention", status_reason: "finished", report: { status: "done", summary: "6 tests, all passing" } }), { tone: "ok", threadId: "s-c", name: "Child", detail: "idle, finished", summary: "6 tests, all passing" }],
     ["an idle thread, no report", thread({ status: "idle", status_reason: "at prompt", report: null }), { tone: "ok", detail: "idle, at prompt", summary: "" }],
@@ -20,11 +21,11 @@ describe("wakeLine", () => {
     ["a run that failed", run({ exit_code: 3, output_tail: "a\nb\n" }), { tone: "fail", detail: "exit 3", summary: "b" }],
     ["a run without output", run({ exit_code: 1 }), { tone: "fail", summary: "" }],
   ])("%s", (_n, json, want) => {
-    expect(wakeLine({ title: "the header", json })).toMatchObject(want);
+    expect(first({ title: "the header", json })).toMatchObject(want);
   });
 
   it("pretty-prints the payload for the body", () => {
-    expect(wakeLine({ title: "t", json: '{"kind":"thread","thread":{"id":"s"}}' }).json).toBe('{\n  "kind": "thread",\n  "thread": {\n    "id": "s"\n  }\n}');
+    expect(first({ title: "t", json: '{"kind":"thread","thread":{"id":"s"}}' })?.json).toBe('{\n  "kind": "thread",\n  "thread": {\n    "id": "s"\n  }\n}');
   });
 
   it.each([
@@ -32,10 +33,10 @@ describe("wakeLine", () => {
     ["not an object", "[1]"],
     ["a pull request (no note of its own yet)", '{"kind":"pull_request","pull_request":{"number":7}}', '{\n  "kind": "pull_request",\n  "pull_request": {\n    "number": 7\n  }\n}'],
   ])("an unreadable payload (%s): the header as the summary", (_n, json, body = json) => {
-    const l = wakeLine({ title: 'Thread "X" (s-1) is idle: finished.', json });
+    const l = first({ title: 'Thread "X" (s-1) is idle: finished.', json });
     expect(l).toMatchObject({ tone: "ok", threadId: "", name: "", detail: "", summary: 'Thread "X" (s-1) is idle: finished.' });
     // The raw text as the body when it does not parse as an object.
-    expect(l.json).toBe(body);
+    expect(l?.json).toBe(body);
   });
 
   it("a batch: one line per wake, each with its own payload", () => {
@@ -50,7 +51,7 @@ describe("wakeLine", () => {
       { tone: "attention", threadId: "s-b", name: "S-B", detail: "needs attention, permission: Bash" },
     ]);
     expect(JSON.parse(lines[1]?.json ?? "")).toMatchObject({ subscription_id: "sub-s-b" });
-    expect(wakeLine({ title: "t", json })).toMatchObject({ threadId: "s-a" });
+    expect(first({ title: "t", json })).toMatchObject({ threadId: "s-a" });
   });
 
   it.each([
@@ -73,14 +74,14 @@ describe("wakeLine", () => {
 
   it("an ask: its own line, waiting on an answer, the question as the summary", () => {
     const ask = { kind: "ask", thread: "s-g", name: "greeter", question: "Which language should the greeting use?\nEnglish or Spanish?", assuming: "English", asked_at: "2026-11-08T08:58:40.000Z" };
-    expect(wakeLine({ title: 'Thread "greeter" (s-g) asks you something and keeps working: …', json: JSON.stringify(ask) })).toMatchObject({
+    expect(first({ title: 'Thread "greeter" (s-g) asks you something and keeps working: …', json: JSON.stringify(ask) })).toMatchObject({
       tone: "attention",
       threadId: "s-g",
       name: "greeter",
       detail: "asks",
       summary: "Which language should the greeting use?",
     });
-    expect(wakeLine({ title: "t", json: JSON.stringify({ ...ask, name: "" }) })).toMatchObject({ name: "s-g" });
+    expect(first({ title: "t", json: JSON.stringify({ ...ask, name: "" }) })).toMatchObject({ name: "s-g" });
   });
 
   it("a single wake is one line", () => {

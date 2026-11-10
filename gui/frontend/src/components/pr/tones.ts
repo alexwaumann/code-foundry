@@ -2,9 +2,9 @@ import type { PrStateTone } from "@/components/prs/prState";
 import type { Tone } from "./model";
 
 /**
- * The PR surfaces' tone → class tables (the Pull Requests page, the PR panel, the thread
- * header and the worktree overview all read these). Colours are the theme's status
- * tokens (index.css), so one class follows both schemes and any imported theme.
+ * The PR surfaces' tone → class tables (the PR panel, the Pull Requests page, the
+ * sidebar's PR tags and plugin nodes read these). Colours are the theme's status tokens
+ * (index.css), so one class follows both schemes and any imported theme.
  */
 
 /** Text colour per tone, readable on the pane in both schemes. */

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Kbd } from "@/components/ui/kbd";
 import { projectHue } from "@/lib/compose";
+import { pointerMoved } from "@/lib/pointerMotion";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { useProjectsStore } from "@/stores/projects";
@@ -110,8 +111,8 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
                     data-testid="completion-item"
                     data-selected={on || undefined}
                     className={cn("mx-1 flex h-7 cursor-pointer items-center gap-2 rounded-md px-2", on && "bg-cf-control-hover")}
-                    onMouseMove={() => {
-                      select(i);
+                    onPointerMove={() => {
+                      if (pointerMoved()) select(i);
                     }}
                     onClick={() => {
                       insert(i);

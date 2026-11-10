@@ -41,6 +41,9 @@ interface Perms {
   threadStatus: boolean;
   sessionEnv: boolean;
   secrets: boolean;
+  threads?: boolean;
+  terminals?: boolean;
+  api?: boolean;
 }
 
 /** What an install puts in place. */
@@ -181,13 +184,16 @@ function sourceLabel(inst: InstalledInfo): string {
 }
 
 /** The daemon's Permissions.Describe. */
-function describePerms(p: Perms): string[] {
+export function describePerms(p: Perms): string[] {
   const out: string[] = [];
   if (p.commands.length > 0) out.push(`run Code Foundry commands: ${p.commands.join(", ")}`);
   if (p.events.length > 0) out.push(`read events: ${p.events.join(", ")}`);
   if (p.threadStatus) out.push("raise threads to needs-attention or error");
   if (p.sessionEnv) out.push("add environment variables, PATH entries and directories to new Claude sessions");
   if (p.secrets) out.push("keep secrets in your Keychain (its own, under code-foundry-plugin)");
+  if (p.threads) out.push("start and drive its own Claude threads");
+  if (p.terminals) out.push("open its own terminals");
+  if (p.api) out.push("full control of Code Foundry, including managing other plugins and deleting their secrets (it gets the daemon's endpoint and token)");
   return out;
 }
 

@@ -16,9 +16,6 @@ interface ThreadsData {
   order: readonly string[];
 }
 
-/** Whether the thread is waiting on its child threads (lib/thread, where threadGroup needs it). */
-export { isWaiting };
-
 /**
  * What the daemon says the thread waits on, from its reason "waiting on " + the non-zero
  * parts joined by " and ", in this order: "N child thread(s)", "N subagent(s)", "N

@@ -32,6 +32,22 @@ describe("useNow", () => {
     expect(Number(getByTestId("now").textContent)).toBeGreaterThan(first);
     unmount();
   });
+
+  it("a clock that went idle paints the current time on the next mount, not its last tick", () => {
+    vi.useFakeTimers();
+    const painted: number[] = [];
+    function Show() {
+      const now = useNow(45_000);
+      painted.push(now);
+      return null;
+    }
+    render(<Show />).unmount();
+    vi.setSystemTime(Date.now() + 30 * 60_000);
+    const later = Date.now();
+    painted.length = 0;
+    render(<Show />).unmount();
+    expect(painted[0]).toBeGreaterThanOrEqual(later);
+  });
 });
 
 describe("useNowSelect", () => {

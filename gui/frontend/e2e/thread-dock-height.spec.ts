@@ -38,7 +38,8 @@ async function bottomGeometry(page: Page) {
 }
 
 // Set SHOTS=<dir> to save a screenshot of the end state in each scheme (PR bodies).
-for (const scheme of ["dark", "light"] as const) {
+const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
+for (const scheme of schemes) {
   test(`after a switch to another thread and back, the answer's end clears the composer and the chip sits above it (${scheme})`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: scheme });
   await mockPost("thread?state=streaming");

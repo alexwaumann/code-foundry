@@ -106,7 +106,7 @@ interface MockRun {
   output: string;
   outputTruncated: boolean;
   timers: ReturnType<typeof setTimeout>[];
-  waiters: (() => void)[];
+  waiters: ((err?: Error) => void)[];
   /** terminal.kill's SIGHUP does not end it; SIGKILL follows after KILL_GRACE_MS. */
   ignoresHangup: boolean;
   /** The TCP ports it listens on (the daemon's probe), ascending; [] for none. */
@@ -298,7 +298,7 @@ function checkIcon(icon: ActionIcon): ActionIcon {
   return icon;
 }
 
-const noProject = "actions belong to a project: pass --repo, select a thread or a worktree, or run inside a registered project";
+const noProject = "actions belong to a project: pass --project, select a thread or a worktree, or run inside a registered project";
 
 type Command = {
   cmd: {
@@ -375,6 +375,7 @@ export class MockActions {
     for (const r of this.runs) {
       for (const t of r.timers) clearTimeout(t);
       r.timers = [];
+      for (const w of r.waiters.splice(0)) w(new ConnectError(`run ${r.id} is gone`, Code.Canceled));
     }
     this.runs = [];
   }
@@ -566,9 +567,10 @@ export class MockActions {
           reject(new ConnectError("wait cancelled", Code.Canceled));
         };
         signal?.addEventListener("abort", onAbort, { once: true });
-        r.waiters.push(() => {
+        r.waiters.push((err) => {
           signal?.removeEventListener("abort", onAbort);
-          resolve();
+          if (err) reject(err);
+          else resolve();
         });
       });
     }
@@ -903,7 +905,7 @@ export class MockActions {
       name: "here",
       type: ArgType.PATH,
       required: false,
-      description: "Where the CLI runs: without a thread, worktree or --repo, its project is used (CLI default: the working directory)",
+      description: "Where the CLI runs: without a thread, worktree or --project, its project is used (CLI default: the working directory)",
     };
     const refArg = { name: "action", type: ArgType.STRING, required: true, description: "Action name (ignoring case) or id" };
     const iconArg = { name: "icon", type: ArgType.ENUM, required: false, description: "Icon", enumValues: ICONS.map((x) => x.name) };
@@ -911,7 +913,7 @@ export class MockActions {
     const has = (args: Record<string, string>, name: string) => args[name] !== undefined && args[name] !== "";
     const icon = (name: string | undefined) => ICONS.find((x) => x.name === (name || "play"))?.icon ?? ActionIcon.UNSPECIFIED;
     const actionJson = (a: ActionInit) => toJsonString(ActionSchema, create(ActionSchema, a));
-    const cmd = (name: string, title: string, description: string, args: Command["cmd"]["args"]) => ({ name, title, category: "Action", description, keybindings: [], args });
+    const cmd = (name: string, title: string, description: string, args: Command["cmd"]["args"], noPalette = true) => ({ name, title, category: "Action", description, keybindings: [], args, ...(noPalette ? { noPalette } : {}) });
     return [
       {
         cmd: cmd("action.list", "List Actions", "List a project's actions: the commands `action run` starts, in order, with their ids.", [projectArg, hereArg]),
@@ -938,7 +940,7 @@ export class MockActions {
           bool("on-worktree-create", "Also run (in the background) when a new thread creates its worktree", "false"),
           projectArg,
           hereArg,
-        ]),
+        ], false),
         when: canUse,
         run: (ctx, args) => {
           const a = this.create({
@@ -1037,16 +1039,17 @@ export class MockActions {
         run: (_ctx, args) => this.waitMessage(args.run ?? ""),
       },
       {
-        cmd: {
-          ...cmd("action.stop", "Stop Action Run", "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's terminal is killed. A finished run is left as it is.", [
-            { name: "run", type: ArgType.STRING, required: true, description: "Run id (r-...)" },
-          ]),
-          noPalette: true,
-        },
+        cmd: cmd("action.stop", "Stop Action Run", "Stop a running action run: a background run gets SIGTERM, then SIGKILL after a few seconds; a terminal run's terminal is killed. A finished run is left as it is.", [
+          { name: "run", type: ArgType.STRING, required: true, description: "Run id (r-...)" },
+        ]),
         when: () => true,
         run: (_ctx, args) => {
+          const finished = this.runs.find((x) => x.id === args.run)?.state === ActionRunState.EXITED;
           const run = this.stopRun(args.run ?? "");
-          return Promise.resolve({ message: `stopping ${run.actionName ?? ""} (run ${run.id ?? ""})`, resultJson: JSON.stringify(run) });
+          const message = finished
+            ? `${run.actionName ?? ""} had finished already, with code ${String(run.exitCode ?? 0)} (run ${run.id ?? ""})`
+            : `stopping ${run.actionName ?? ""} (run ${run.id ?? ""})`;
+          return Promise.resolve({ message, resultJson: toJsonString(ActionRunSchema, create(ActionRunSchema, run)) });
         },
       },
       {

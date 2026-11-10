@@ -598,7 +598,7 @@
       "id": "petros-dusk",
       "name": "Petros Dusk",
       "scheme": "dark",
-      "source": "Peter Bybel's Ghostty theme (shared 2026-10-16); Ghostty theme \"Petros Dusk\" (iTerm2-Color-Schemes, MIT)",
+      "source": "a user's Ghostty theme (shared 2026-10-16)",
       "base": {
         "canvas": "#240f35",
         "surface": "#301b42",

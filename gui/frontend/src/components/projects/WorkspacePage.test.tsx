@@ -133,12 +133,11 @@ afterEach(() => {
 });
 
 describe("the workspace page's header", () => {
-  it("the title block: name, projects and contents; its ⋯ has the row's items (New thread first), Open in Finder (a split item) is workspace.reveal; the pane header holds no buttons", async () => {
+  it("the title block: name, projects and contents; its ⋯ has the row's items (New thread first), Open in Finder (a split item) is workspace.reveal", async () => {
     const { mono } = twoWorkspaces();
     renderPage(mono);
     await settle();
     expect(screen.getByTestId("page-name").textContent).toBe("mono");
-    for (const id of ["workspace-page-reveal", "workspace-page-new-thread"]) expect(screen.queryByTestId(id)).toBeNull();
     const title = screen.getByTestId("workspace-title");
     expect(within(title).getByTestId("workspace-title-name").textContent).toBe("mono");
     expect(within(title).getByTestId("workspace-meta").textContent).toBe("1 project");

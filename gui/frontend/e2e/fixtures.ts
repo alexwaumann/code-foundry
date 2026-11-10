@@ -14,8 +14,7 @@ export const appPath = `/?daemon=${encodeURIComponent(mockUrl)}&token=${MOCK_TOK
  * Resets the mock to its default world and holds it still: the mock's clock flips s-1
  * busy/idle every 4 s and settles s-5 from starting after 8 s, which would move them in and
  * out of the sidebar's Working section (and every row below them) under a spec's pointer.
- * Held, s-1 stays busy and s-5 starting, so the sidebar shows DEFAULT_ORDER. A spec that
- * needs the clock releases them (`releaseThreads`).
+ * Held, s-1 stays busy and s-5 starting, so the sidebar's order holds still.
  */
 export async function resetMock(): Promise<void> {
   const res = await fetch(`${mockUrl}/__mock/reset`, { method: "POST" });
@@ -74,18 +73,6 @@ export async function freshCopyByDefault(): Promise<void> {
 export async function holdThreads(...ids: string[]): Promise<void> {
   await mockPost(`thread/hold?${ids.map((id) => `id=${id}`).join("&")}`);
 }
-
-/** Lets the mock's clock change these threads again (resetMock holds s-1 and s-5). */
-export async function releaseThreads(...ids: string[]): Promise<void> {
-  await mockPost(`thread/release?${ids.map((id) => `id=${id}`).join("&")}`);
-}
-
-/**
- * The default world's sidebar order after resetMock: s-2 waits, s-6/s-4/s-3 are idle, s-5
- * (starting) and s-1 (busy) work, s-8 and s-9 are snoozed and s-7 is archived (both
- * sections collapsed by default: only the headers).
- */
-export const DEFAULT_ORDER = ["s:s-2", "s:s-6", "s:s-4", "s:s-3", "h:working", "s:s-5", "s:s-1", "h:snoozed", "h:archived"];
 
 /** Long-lived streams the mock has open right now, by RPC (e.g. "EventService/Watch"). */
 export async function openStreams(): Promise<Record<string, number>> {
@@ -187,15 +174,6 @@ export async function selectWorktree(page: Page, projectId: string, path: string
   await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-path", path);
 }
 
-/** Shows a project's main checkout's Diff tab in its page's side panel (opened directly: a checkout row has no click). */
-export async function selectProject(page: Page, projectId: string): Promise<void> {
-  await openProjectPage(page, projectId);
-  await page.evaluate(
-    `Promise.all([__cfModule("/src/stores/filePanel.ts"), __cfModule("/src/stores/projects.ts")]).then(([c, p]) => c.openCheckoutDiff("current", ${JSON.stringify(projectId)}, p.mainWorktreePath(p.useProjectsStore.getState(), ${JSON.stringify(projectId)})))`,
-  );
-  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-project", projectId);
-}
-
 /**
  * Opens the selected thread's own Diff tab in its panel, as the thread info card's
  * Changes row does (stores/filePanel.ts openCheckoutDiff), without the card: tests of
@@ -270,15 +248,6 @@ export async function expectTooltip(page: Page, target: Locator, text: string | 
   await expect(openTooltip(page)).toHaveText(text);
   await page.mouse.move(0, 0);
   await expect(openTooltip(page)).toHaveCount(0);
-}
-
-/** Hovers `target` past the tooltip delay and expects no tooltip (one that would repeat visible text). */
-export async function expectNoTooltip(page: Page, target: Locator): Promise<void> {
-  await page.mouse.move(0, 0);
-  await target.hover();
-  await page.waitForTimeout(800);
-  await expect(openTooltip(page)).toHaveCount(0);
-  await page.mouse.move(0, 0);
 }
 
 /** A minimal valid PDF (mock/pdf.ts, shared with the mock daemon's file fixtures). */

@@ -57,7 +57,6 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
     spawnDepth: 1,
     status: "running",
     activity: "Running go test",
-    lastTool: "Bash",
     totalTokens: 48_200,
     toolUses: 23,
     durationMs: 0,
@@ -132,8 +131,8 @@ describe("SubagentPane", () => {
     show();
     expect(tid("subagent-crumb-parent").textContent).toBe("Agents panel");
     expect(tid("subagent-name").textContent).toBe("PR 1: daemon task frames");
-    // No thread actions: no title menu, no back arrow, no chip, no status; a thread's three toggles.
-    for (const gone of ["thread-title", "subagent-back", "subagent-readonly", "subagent-status", "subagent-lineage-back", "thread-user-label", "subagent-footer", "subagent-plate"]) expect(screen.queryByTestId(gone), gone).toBeNull();
+    // No thread actions: no title menu; a thread's three toggles.
+    expect(screen.queryByTestId("thread-title")).toBeNull();
     expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["thread-info-toggle", "bottom-toggle", "panel-toggle"]);
     expect(tid("subagent-lineage-parent").textContent).toBe("Agents panel");
     expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · Opus · high · launched by turn 1's Agent call, 4 min ago");
@@ -306,7 +305,7 @@ describe("SubagentPane", () => {
 
   it("the crumb takes no move: a no-project thread's place is plain text here", () => {
     show();
-    expect(screen.queryByTestId("thread-move-trigger")).toBeNull();
+    expect(screen.queryByTestId("thread-crumb-move")).toBeNull();
     expect(tid("thread-crumb").querySelectorAll("button")).toHaveLength(1);
   });
 

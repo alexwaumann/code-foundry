@@ -11,7 +11,7 @@ import { DEFAULT_MODEL, type Choice } from "./compose";
 export const MODEL_SETTING_KEY = "threads.default_model";
 
 /** The registry's default model alone, until the schema arrives. */
-export const FALLBACK_MODEL_CHOICES: readonly Choice[] = [{ value: DEFAULT_MODEL, label: "Opus 4.8" }];
+export const FALLBACK_MODEL_CHOICES: readonly Choice[] = [{ value: DEFAULT_MODEL, label: "Sonnet 5" }];
 
 /** An enum value's display name: its label from the schema, else the value itself. */
 export function enumOptionLabel(f: Pick<SettingFieldView, "enumValues" | "enumLabels">, value: string): string {

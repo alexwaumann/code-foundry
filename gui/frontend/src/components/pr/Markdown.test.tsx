@@ -16,6 +16,20 @@ function md(body: string): HTMLElement {
 }
 
 describe("Markdown", () => {
+  it("a link's tooltip says where it goes, except when its text already does", () => {
+    const c = md("[the PR](https://github.com/o/r/pull/42) and https://github.com/o/r/pull/43");
+    const [named, bare] = [...c.querySelectorAll("a")];
+    expect(named?.hasAttribute("data-tip")).toBe(true);
+    expect(bare?.textContent).toBe("https://github.com/o/r/pull/43");
+    expect(bare?.hasAttribute("data-tip")).toBe(false);
+  });
+
+  it("renders GFM task lists and tables", () => {
+    const c = md("- [x] done\n- [ ] todo\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+    expect(c.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
+    expect(c.querySelector("table td")?.textContent).toBe("1");
+  });
+
   it("renders a javascript: link as plain text that opens nothing", () => {
     const c = md("[click](javascript:alert(1)) and <a href=\"javascript:alert(2)\">raw</a>");
     expect(c.querySelectorAll("a")).toHaveLength(0);
@@ -122,7 +136,7 @@ describe("Markdown without raw HTML (a thread)", () => {
   });
 
   it("still renders GFM task lists and tables", () => {
-    const c = md("- [x] done\n- [ ] todo\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+    const c = thread("- [x] done\n- [ ] todo\n\n| a | b |\n|---|---|\n| 1 | 2 |");
     expect(c.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
     expect(c.querySelector("table td")?.textContent).toBe("1");
   });

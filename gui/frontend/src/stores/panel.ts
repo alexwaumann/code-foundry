@@ -7,8 +7,8 @@
  * group with tabs but no active tab is picking: its "+" was clicked and it shows the
  * surface list until a surface (or a tab) is picked; so is an empty group of a split
  * panel. Switching selection shows that selection's panel. All of it is persisted
- * (localStorage "code-foundry.panel"), so it survives a reload. Entries are never
- * pruned: a deleted thread's panel stays stored.
+ * (localStorage "code-foundry.panel"), so it survives a reload. A removed thread's entry
+ * is dropped (stores/archiveCleanup.ts).
  * See docs/notes/side-panel.md and docs/notes/panel-split-1-store.md.
  */
 import { create } from "zustand";

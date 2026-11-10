@@ -3,7 +3,6 @@ import type { AgentRunView } from "@/api/agents";
 import {
   agentElapsedMs,
   agentName,
-  agentStatusText,
   agentsLabel,
   backgroundLabel,
   fmtElapsed,
@@ -27,7 +26,6 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
     spawnDepth: 1,
     status: "running",
     activity: "",
-    lastTool: "",
     totalTokens: 0,
     toolUses: 0,
     durationMs: 0,
@@ -89,18 +87,6 @@ describe("agentElapsedMs", () => {
     ["ended, unknown end", run("a", { status: "done", endedAtMs: null }), null],
   ])("%s", (_n, r, want) => {
     expect(agentElapsedMs(r, now)).toBe(want);
-  });
-});
-
-describe("agentStatusText", () => {
-  const now = 1_000_000;
-  it.each([
-    [run("a"), "Running"],
-    [run("a", { status: "done", endedAtMs: now - 5 * 60_000 }), "Done · 5 min ago"],
-    [run("a", { status: "failed", endedAtMs: now - 10_000 }), "Failed · just now"],
-    [run("a", { status: "done", endedAtMs: null }), "Done"],
-  ])("%#", (r, want) => {
-    expect(agentStatusText(r, now)).toBe(want);
   });
 });
 

@@ -151,16 +151,23 @@ function Layer({ threadId, paneRef }: { threadId: string; paneRef: RefObject<HTM
   const revealed = useRef(-1);
   useEffect(() => {
     const pane = paneRef.current;
-    if (!current || !pane || revealed.current === revealSeq) return;
+    if (!current) {
+      // A pick of no match takes its seq: a match picked in place after it stays in place.
+      revealed.current = revealSeq;
+      return;
+    }
+    if (!pane || revealed.current === revealSeq) return;
     revealed.current = revealSeq;
     let live = true;
+    let settled = false;
     void revealMatch(threadId, pane, current, latest.current.query, () => live).then(() => {
+      settled = true;
       if (live) refresh.current();
     });
     return () => {
       live = false;
       // Cut short: the same seq reveals again when the effect runs next.
-      revealed.current = -1;
+      if (!settled) revealed.current = -1;
     };
   }, [threadId, paneRef, current, revealSeq]);
   // Off screen (a visit to a subagent run): put back; the current match opens again on return.

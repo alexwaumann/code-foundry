@@ -102,7 +102,7 @@ function PublishBody({ projectId }: { projectId: string }) {
   );
 }
 
-/** Publish to GitHub (project.github.publish's presenter, and the overview's button). */
+/** Publish to GitHub (project.github.publish's presenter; the project page's button, the index row's link and the project menus open it too). */
 export function PublishDialog() {
   const open = usePublishDialogStore((s) => s.open);
   const projectId = usePublishDialogStore((s) => s.projectId);

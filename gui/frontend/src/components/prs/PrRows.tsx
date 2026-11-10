@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { createContext, Fragment, useContext, useMemo, type ReactNode } from "react";
 import type { PullRequestView } from "@/api/gh";
+import { YOUR_REVIEW_SPECS } from "@/components/pr/review";
 import { statusPill, toneText } from "@/components/pr/tones";
 import { GroupLabel, RowGrid, TABLE_BODY, TABLE_BOX, TABLE_ROW, TABLE_ROW_H, TableHead } from "@/components/table/TableParts";
 import { Tip } from "@/components/ui/tooltip";
@@ -31,7 +32,7 @@ import { COLUMNS, gridTemplate, RIGHT, visibleColumns, type Column } from "./col
 import { prKey, repoName } from "./format";
 import { capKey, tableItems, type Cap, type MergedRowModel, type OtherRow, type Section } from "./pageModel";
 import { Age, ChecksBadge, Diff, PrStateIcon } from "./PrBits";
-import { needsLabel, verdictLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
+import { needsLabel, type NeedsRow, type NeedsWhy, type ReviewedRow, type Verdict } from "./reviewQueue";
 import { RowList, VIRTUALIZE_OVER } from "./RowList";
 
 /** The columns a table shows and their grid template, from its own width (PrTable); rows read it. */
@@ -114,7 +115,7 @@ function Author({ pr, viewer }: { pr: PullRequestView; viewer: string }) {
 
 function Title({ pr }: { pr: PullRequestView }) {
   return (
-    <Tip label={pr.title}>
+    <Tip label={pr.title} whenTruncated>
       <span className="truncate">
         {pr.draft && <span className="mr-1.5 rounded-sm bg-cf-surface-sunken px-1 text-caption-sm uppercase">draft</span>}
         {pr.title}
@@ -186,7 +187,7 @@ export function ReviewedByYouRow({ row, viewer }: { row: ReviewedRow; viewer: st
         "#": <Num pr={pr} />,
         Author: <Author pr={pr} viewer={viewer} />,
         Title: <Title pr={pr} />,
-        "Your review": <IconLabel icon={look.icon} cls={look.cls} label={verdictLabel[verdict]} testId="prs-verdict" value={verdict} />,
+        "Your review": <IconLabel icon={look.icon} cls={look.cls} label={YOUR_REVIEW_SPECS[verdict].label} testId="prs-verdict" value={verdict} />,
         Checks: <ChecksBadge checks={pr.checks} />,
         Diff: <Diff pr={pr} />,
         Age: <Age ms={pr.updatedAtMs} className="text-right" />,

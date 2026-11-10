@@ -49,6 +49,7 @@ describe("resizeHeight", () => {
     [{ type: "cf:resize", height: 0 }, null],
     [{ type: "cf:resize", height: "240" }, null],
     [{ type: "cf:theme", height: 240 }, null],
+    ["cf:resize", null],
     [null, null],
   ])("%j -> %s", (data, want) => {
     expect(resizeHeight(data)).toBe(want);

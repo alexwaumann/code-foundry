@@ -27,7 +27,9 @@ export interface MockUsage {
 const RATES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite5m: number; cacheWrite1h: number }> = {
   "claude-fable-5-1": { input: 10, output: 50, cacheRead: 0.25, cacheWrite5m: 12.5, cacheWrite1h: 20 },
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite5m: 5, cacheWrite1h: 8 },
+  "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10 },
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2.5, cacheWrite1h: 4 },
+  "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite5m: 0.125, cacheWrite1h: 0.2 },
   "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10 },
 };
@@ -109,11 +111,11 @@ function daily(model: string, values: readonly number[], perRequest: number): Mo
   return values.flatMap((m, i) => (m > 0 ? [mix(model, values.length - 1 - i, m, Math.max(1, Math.round(m / perRequest)))] : []));
 }
 
-/** s-3: Opus 5.5 every day, plus claude-opus-5 (no rate: "unpriced"). s-4: Fable, Sonnet and Haiku. */
+/** s-3: Opus 5.5 every day, plus claude-opus-5-6 (no rate: "unpriced"). s-4: Fable, Sonnet and Haiku. */
 export function pageUsage(threadId: string): MockUsage[] {
   switch (threadId) {
     case "s-3":
-      return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-5", 2, 18, 9), mix("claude-opus-5", 1, 10.4, 5)];
+      return [...daily("claude-opus-5-5", OPUS, 1), mix("claude-opus-5-6", 2, 18, 9), mix("claude-opus-5-6", 1, 10.4, 5)];
     case "s-4":
       return [...daily("claude-fable-5-1", FABLE, 0.8), ...daily("claude-sonnet-5-5", SONNET, 0.01), ...daily("claude-haiku-5-5", HAIKU, 0.04)];
     default:

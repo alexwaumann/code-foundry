@@ -8,6 +8,7 @@
  */
 import { useLayoutEffect, useState, type CSSProperties } from "react";
 import type { ColumnData, ColumnsData, ContainerData, GridData, GridItemData, MasterDetailData, SpacerData } from "@/api/plugin";
+import { zoomFactor } from "@/lib/zoom";
 
 /** The width a weighted column needs side by side; it never gets less. */
 export const COLUMN_MIN_WIDTH = 240;
@@ -135,15 +136,16 @@ export function masterDetailWide(width: number | null, listWidth: number): boole
 }
 
 /**
- * The element's width in px, followed as it resizes (one ResizeObserver); null until it
- * is measured with a width (a hidden element keeps the last).
+ * The element's width in layout px (its rect is in viewport px, which the page zoom
+ * scales: lib/zoom), followed as it resizes (one ResizeObserver); null until it is
+ * measured with a width (a hidden element keeps the last).
  */
 export function useElementWidth(el: HTMLElement | null): number | null {
   const [width, setWidth] = useState<number | null>(null);
   useLayoutEffect(() => {
     if (!el) return;
     const measure = () => {
-      const w = el.getBoundingClientRect().width;
+      const w = el.getBoundingClientRect().width / zoomFactor();
       if (w > 0) setWidth(Math.floor(w));
     };
     measure();

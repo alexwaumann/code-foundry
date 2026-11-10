@@ -96,7 +96,7 @@ export function useOpenFilePaths(panelKey: string): ReadonlySet<string> {
   return useMemo(() => new Set(joined ? joined.split("\n") : []), [joined]);
 }
 
-/** A search's state: the last answer stays while a newer search is out (no flicker). */
+/** A search's state: the last answer stays while a newer search is out (no flicker); a failed search answers with no matches. */
 export interface FinderSearch {
   /** The query `matches` answer; null before the first answer. */
   answered: string | null;
@@ -128,7 +128,7 @@ export function useFinderSearch(sources: readonly FinderSourceView[], query: str
         },
         (err: unknown) => {
           if (ctl.signal.aborted || isAbort(err)) return;
-          setState((s) => ({ ...s, answered: query, error: errorMessage(err) }));
+          setState({ answered: query, matches: [], error: errorMessage(err) });
         },
       );
     }, FINDER_DEBOUNCE_MS);

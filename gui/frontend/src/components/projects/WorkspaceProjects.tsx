@@ -10,7 +10,8 @@ import { NavRow } from "@/lib/NavRow";
 import { tildify } from "@/lib/path";
 import { memberCaption, memberKey } from "@/lib/projects";
 import { cn } from "@/lib/utils";
-import { addableProjects, PRIMARY_WORKSPACE } from "@/lib/workspaceCard";
+import { WORKSPACE_PRIMARY } from "@/lib/projectSet";
+import { addableProjects } from "@/lib/workspaceCard";
 import { useProjectsStore } from "@/stores/projects";
 import { addWorkspaceProject, removeWorkspaceProject, setWorkspacePrimary } from "@/stores/workspaceActions";
 import { closeWorkspaceAddProject, openWorkspaceAddProject, useWorkspaceAddProjectStore } from "@/stores/workspaceAddProject";
@@ -70,18 +71,18 @@ const ROW = "group/m flex h-full items-center gap-2.5 rounded-none border-cf-div
  * while it is the default (its projects otherwise say where threads start). Not a keyboard
  * row (nothing to open); Open in Finder shows it.
  */
-function FolderRow({ workspaceId, first }: { workspaceId: string; first: boolean }) {
+function FolderRow({ workspaceId }: { workspaceId: string }) {
   const root = useWorkspacesStore((s) => s.byId[workspaceId]?.rootPath ?? "");
   const rootMissing = useWorkspacesStore((s) => s.byId[workspaceId]?.rootMissing === true);
-  const isDefault = useWorkspacesStore((s) => s.byId[workspaceId]?.defaultPrimary === PRIMARY_WORKSPACE);
+  const isDefault = useWorkspacesStore((s) => s.byId[workspaceId]?.defaultPrimary === WORKSPACE_PRIMARY);
   if (!root && !isDefault) return null;
   return (
-    <div className={cn(ROW, "h-11", !first && "border-t")} data-testid="workspace-folder" data-default={isDefault || undefined}>
+    <div className={cn(ROW, "h-11")} data-testid="workspace-folder" data-default={isDefault || undefined}>
       <Folder className="size-4 shrink-0 text-cf-text-muted" aria-hidden />
       <span className="shrink-0 font-medium">Workspace folder</span>
       {isDefault && <StartsHere />}
       {root ? (
-        <Tip label={rootMissing ? `${root} is missing (moved or renamed?): workspace set-root points the workspace at its new place` : root}>
+        <Tip label={rootMissing ? `${root} is missing (moved or renamed?): workspace set-root points the workspace at its new place` : root} whenTruncated={!rootMissing}>
           <span className="min-w-0 truncate text-caption text-cf-text-muted" data-testid="workspace-root" data-missing={rootMissing || undefined}>
             {tildify(root)}
           </span>
@@ -96,7 +97,7 @@ function FolderRow({ workspaceId, first }: { workspaceId: string; first: boolean
       )}
       {!isDefault && (
         <RowActions>
-          <HoverAction label="Start here" icon={<MapPin />} testId="member-make-default" onClick={() => void setWorkspacePrimary(workspaceId, PRIMARY_WORKSPACE)} />
+          <HoverAction label="Start here" icon={<MapPin />} testId="member-make-default" onClick={() => void setWorkspacePrimary(workspaceId, WORKSPACE_PRIMARY)} />
         </RowActions>
       )}
     </div>
@@ -184,14 +185,14 @@ function AddMember({ workspaceId }: { workspaceId: string }) {
 export function WorkspaceProjects({ workspaceId, members }: { workspaceId: string; members: readonly string[] }) {
   const folderShown = useWorkspacesStore((s) => {
     const w = s.byId[workspaceId];
-    return Boolean(w?.rootPath) || w?.defaultPrimary === PRIMARY_WORKSPACE;
+    return Boolean(w?.rootPath) || w?.defaultPrimary === WORKSPACE_PRIMARY;
   });
   const empty = members.length === 0 && !folderShown;
   return (
     <div data-testid="workspace-projects">
       <SectionHeader label="Projects" count={members.length} detail="every thread checks these out together on one branch" right={<AddMember workspaceId={workspaceId} />} testId="workspace-projects-title" />
       <div className="overflow-hidden rounded-lg border bg-cf-surface" data-testid="workspace-members" data-workspace={workspaceId}>
-        <FolderRow workspaceId={workspaceId} first />
+        <FolderRow workspaceId={workspaceId} />
         {members.length > 0 && (
           <RowList
             rows={members}

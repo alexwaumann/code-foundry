@@ -109,6 +109,13 @@ describe("revealShell (focusTerminal)", () => {
     expect(usePanelStore.getState().byKey["thread:s1"]?.expanded).toBeUndefined();
   });
 
+  it("closes the Help overlay, whose focus trap would keep the shell from typing", () => {
+    useViewsStore.setState({ helpOpen: true });
+    expect(revealShell("a")).toBe(true);
+    expect(useViewsStore.getState().helpOpen).toBe(false);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
+  });
+
   it("a worktree's shell: the Projects page", () => {
     expect(revealShell("w")).toBe(true);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });

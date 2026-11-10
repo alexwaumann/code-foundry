@@ -322,6 +322,22 @@ describe("the index's filter and keyboard", () => {
     // The project page's list has the keyboard.
     expect(document.activeElement).toBe(list());
   });
+
+  it("Shift+F10 or the ContextMenu key opens the cursor row's menu", async () => {
+    const ws = addWorkspace("login", ["repo-cf"]);
+    renderIndex();
+    await settle();
+    fireEvent.keyDown(list(), { key: "ArrowDown" });
+    fireEvent.keyDown(list(), { key: "F10", shiftKey: true });
+    expect(menuEntries(screen.getByTestId("project-row-menu"))).toContain("Remove project");
+    expect(page().getAttribute("data-page")).toBe("index");
+    fireEvent.keyDown(screen.getByTestId("project-row-menu"), { key: "Escape" });
+    await settle();
+    fireEvent.keyDown(list(), { key: "End" });
+    expect(wsRow(ws.id).getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(list(), { key: "ContextMenu" });
+    expect(screen.getByTestId("workspace-row-menu")).toBeTruthy();
+  });
 });
 
 describe("the page picker", () => {

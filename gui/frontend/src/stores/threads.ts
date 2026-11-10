@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentRunView, BackgroundShellView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
+import type { AgentRunUsageView, BackgroundShellView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
 import { inSidebar } from "@/lib/inSidebar";
 import { isSnoozed } from "@/lib/snooze";
 import { threadBadge } from "@/lib/thread";
@@ -10,8 +10,8 @@ export interface ThreadsData {
   /**
    * The user's threads in display order: creation time, then id. Owned threads (a
    * plugin's, ThreadView.owner, or a resident one, ThreadView.resident) are left out, so
-   * nothing that lists the user's threads (the sidebar, attention counts and the dock, the
-   * Threads panel, lineage, pickers) shows them: their plugin's thread node does
+   * nothing that lists the user's threads (the sidebar, attention counts and the dock,
+   * lineage, pickers) shows them: their plugin's thread node does
    * (docs/notes/plugins-6-thread-terminal.md); a resident's own row is the GUI's to add
    * (docs/notes/ember-1-primitives.md).
    */
@@ -74,6 +74,10 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return sameShells(a[k], b[k]);
       case "setup":
         return sameSetup(a[k], b[k]);
+      case "retry":
+        return sameFields(a[k], b[k]);
+      case "pendingMove":
+        return sameFields(a[k], b[k]);
       default:
         return a[k] === b[k];
     }
@@ -123,19 +127,24 @@ function sameShells(a: readonly BackgroundShellView[], b: readonly BackgroundShe
   );
 }
 
+/** Field-by-field equality of a flat object or null: a retry, a pending move (every Updated event carries a new object). */
+function sameFields<T extends object>(a: T | null, b: T | null): boolean {
+  return a === b || (a !== null && b !== null && (Object.keys(a) as (keyof T)[]).every((k) => a[k] === b[k]));
+}
+
 /** Field-by-field equality of reports (every Updated event carries a new object). */
 function sameReport(a: ThreadView["report"], b: ThreadView["report"]): boolean {
   return a === b || (a !== null && b !== null && a.status === b.status && a.summary === b.summary && a.data === b.data && a.atMs === b.atMs);
 }
 
 /** Field-by-field equality of agent runs, their usage by sameUsage. */
-export function sameAgentRuns(a: readonly AgentRunView[], b: readonly AgentRunView[]): boolean {
+export function sameAgentRuns(a: readonly AgentRunUsageView[], b: readonly AgentRunUsageView[]): boolean {
   return (
     a === b ||
     (a.length === b.length &&
       a.every((x, i) => {
         const y = b[i];
-        return y !== undefined && (Object.keys(x) as (keyof AgentRunView)[]).every((k) => (k === "usage" ? sameUsage(x.usage, y.usage) : x[k] === y[k]));
+        return y !== undefined && (Object.keys(x) as (keyof AgentRunUsageView)[]).every((k) => (k === "usage" ? sameUsage(x.usage, y.usage) : x[k] === y[k]));
       }))
   );
 }

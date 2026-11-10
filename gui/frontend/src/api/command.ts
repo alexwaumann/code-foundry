@@ -1,5 +1,5 @@
 import { create } from "@bufbuild/protobuf";
-import { Code, ConnectError } from "@connectrpc/connect";
+import { ConnectError } from "@connectrpc/connect";
 import {
   ArgType,
   CallOrigin,
@@ -11,6 +11,7 @@ import {
   type UiContext,
 } from "@/gen/codefoundry/v1/command_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { isNotFound } from "./errors";
 
 export type ArgTypeView = "string" | "bool" | "int" | "enum" | "path";
 
@@ -150,7 +151,7 @@ export function confirmationOf(err: unknown): ConfirmationView | null {
 
 /** Invoke failed because the daemon has no such command (an older daemon): NotFound. */
 export function isUnknownCommand(err: unknown): boolean {
-  return err instanceof ConnectError && err.code === Code.NotFound;
+  return isNotFound(err);
 }
 
 export function toUiContext(ctx: UiContextView): UiContext {

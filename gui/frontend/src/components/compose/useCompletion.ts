@@ -5,9 +5,9 @@ import {
   commandItems,
   dismissCard,
   fileItems,
-  fileSourcesKey,
   groupSkills,
   nextCard,
+  skillSourcesKey,
   type CardMemo,
   type CardShow,
   type CompletionGroup,
@@ -33,7 +33,7 @@ export interface CompletionSource {
    * one while an asynchronous source is still looking (null: nothing answered yet).
    */
   query: string | null;
-  /** The answer for the trigger's query is taking long: the card says `searchingText`. */
+  /** The answer for the trigger's query is taking long: the card says "Searching…". */
   searching: boolean;
   /** "No skills match". */
   emptyText: string;
@@ -83,7 +83,7 @@ export function useSkillSource(trigger: EditorTrigger | null, sourcesKey: string
  * their tags, other skills go under "Skills", Claude Code's own under "Claude Code" as
  * plain text. The composer uses it while the list is not empty, useSkillSource otherwise.
  */
-export function useCommandSource(trigger: EditorTrigger | null, commands: readonly SlashCommandView[], sourcesKey: string, members: readonly string[]): CompletionSource {
+function useCommandSource(trigger: EditorTrigger | null, commands: readonly SlashCommandView[], sourcesKey: string, members: readonly string[]): CompletionSource {
   const skills = useSkills(sourcesKey);
   const query = trigger?.char === "/" ? trigger.query : null;
   const groups = useMemo<CompletionGroup[]>(() => (query === null ? [] : commandItems(commands, skills, query, members)), [commands, skills, query, members]);
@@ -107,7 +107,7 @@ export function useSlashSource(trigger: EditorTrigger | null, commands: readonly
  * one project. On an outdated daemon nothing is offered.
  */
 export function useFileSource(trigger: EditorTrigger | null, sources: readonly SkillSourceView[], members: readonly string[], primary: string): CompletionSource {
-  const entry = useFilesEntry(fileSourcesKey(sources));
+  const entry = useFilesEntry(skillSourcesKey(sources));
   const query = trigger?.char === "@" ? trigger.query : null;
   useEffect(() => {
     if (query === null) return;
@@ -134,7 +134,7 @@ export function useFileSource(trigger: EditorTrigger | null, sources: readonly S
 }
 
 /** What the card shows: CardShow, or "searching" while a slow answer is awaited. */
-export type CompletionShow = CardShow | "searching";
+type CompletionShow = CardShow | "searching";
 
 /** What the composer renders and wires: the card's model and the editor's hooks into it. */
 export interface Completion {

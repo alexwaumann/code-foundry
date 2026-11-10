@@ -19,7 +19,7 @@ import { useCompletion, useFileSource, useSlashSource, type CompletionSource } f
 import { useMentionSource, useProjectSlugs, usePrSource } from "@/components/compose/useRefSources";
 import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
-import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
+import { skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { useNow } from "@/lib/clock";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
 import { isSnoozed } from "@/lib/snooze";
@@ -80,9 +80,8 @@ function useThreadSources(threadId: string) {
   const noProject = useNoProjectThread(threadId);
   const { projectIds, paths } = useThreadCheckouts(threadId);
   return useMemo(() => {
-    if (noProject) return { noProject, projectIds: [], skills: [], files: [] };
-    const input = { projectIds, paths };
-    return { noProject, projectIds, skills: skillSources(input), files: fileSources(input) };
+    if (noProject) return { noProject, projectIds: [], checkouts: [] };
+    return { noProject, projectIds, checkouts: skillSources({ projectIds, paths }) };
   }, [noProject, projectIds, paths]);
 }
 
@@ -164,8 +163,8 @@ export function ThreadComposer({
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   // "/": the running process's own list (what "/name" runs); the disk scan while there is
   // none (not running yet, or a daemon that predates the list).
-  const slashSource = useSlashSource(trigger, useSlashCommands(threadId), skillSourcesKey(sources.skills), sources.projectIds);
-  const fileSource = useFileSource(trigger, sources.files, sources.projectIds, sources.projectIds[0] ?? "");
+  const slashSource = useSlashSource(trigger, useSlashCommands(threadId), skillSourcesKey(sources.checkouts), sources.projectIds);
+  const fileSource = useFileSource(trigger, sources.checkouts, sources.projectIds, sources.projectIds[0] ?? "");
   const mentionSource = useMentionSource(trigger, sources.noProject ? null : fileSource, threadId);
   const prSource = usePrSource(trigger, useProjectSlugs(sources.projectIds));
   const bySource: Record<TriggerChar, CompletionSource> = { "/": slashSource, "@": mentionSource, "#": prSource };
@@ -189,8 +188,8 @@ export function ThreadComposer({
   const canSend = !inputOff && !setupBlocks && (text.trim() !== "" || hasAttachments);
 
   useEffect(() => {
-    void loadSkills(sources.skills);
-  }, [sources.skills]);
+    void loadSkills(sources.checkouts);
+  }, [sources.checkouts]);
 
   // The thread's cite layer inserts citations at the prompt's caret (docs/notes/citations.md),
   // the file finder an @ file (⌥⏎).

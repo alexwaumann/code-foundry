@@ -46,8 +46,8 @@ export function workspaceThreadsCaption(c: Pick<WorkspaceThreads, "working" | "i
 }
 
 /**
- * The member's checkout the thread records: its own cwd for its primary, else its
- * checkout_paths entry; "" when the member is not in its set or has none recorded yet.
+ * The member's checkout the thread records: its checkout_paths entry, else its own cwd for
+ * its primary; "" when the member is not in its set or has none recorded yet.
  */
 export function memberCheckoutPath(t: Pick<ActivityThread, "projectId" | "projectIds" | "worktreePath" | "checkoutPaths">, projectId: string): string {
   const recorded = t.checkoutPaths.find((c) => c.projectId === projectId)?.path ?? "";

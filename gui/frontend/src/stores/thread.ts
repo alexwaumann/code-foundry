@@ -79,6 +79,7 @@ export interface ThreadState {
   /**
    * Requests the user answered whose answer is on its way, by thread and request id: their
    * prompt leaves at once (threadActions respondThread) and comes back if the answer fails.
+   * One goes once no pending list has it.
    */
   answering: Readonly<Record<string, Readonly<Record<string, true>>>>;
   /**
@@ -262,11 +263,28 @@ export function applyPendingEvent(prev: Readonly<Record<string, ThreadPendingLis
   }
 }
 
+/**
+ * `answering` without the thread's requests that no pending list has any more (their
+ * answer landed); the same object when nothing went.
+ */
+function withoutAnswered(answering: ThreadState["answering"], threadId: string, ...lists: (readonly ThreadPendingView[] | undefined)[]): ThreadState["answering"] {
+  const cur = answering[threadId];
+  if (!cur) return answering;
+  const ids = Object.keys(cur);
+  const live = ids.filter((id) => lists.some((l) => l?.some((p) => p.requestId === id)));
+  if (live.length === ids.length) return answering;
+  const { [threadId]: _gone, ...rest } = answering;
+  return live.length > 0 ? { ...rest, [threadId]: Object.fromEntries(live.map((id) => [id, true as const])) } : rest;
+}
+
 /** EventService thread source handler (stores/events.ts). */
 export function applyThreadSourceEvent(ev: ThreadEventView): void {
   useThreadStore.setState((s) => {
     const pending = applyPendingEvent(s.pending, ev);
-    return pending === s.pending ? s : { pending };
+    if (pending === s.pending) return s;
+    let answering = s.answering;
+    for (const id of Object.keys(s.answering)) answering = withoutAnswered(answering, id, pending[id]?.pending, s.logs[id]?.pending);
+    return answering === s.answering ? { pending } : { pending, answering };
   });
 }
 
@@ -305,7 +323,8 @@ export function applyWatchBatch(threadId: string, events: readonly ThreadEventVi
     const log = applyThreadEvents(s.logs[threadId], events);
     const sync = snapshot && log && !s.synced[threadId] ? { synced: { ...s.synced, [threadId]: true as const } } : undefined;
     if (log === s.logs[threadId] || !log) return sync ?? s;
-    return { logs: { ...s.logs, [threadId]: log }, ...sync };
+    const answering = withoutAnswered(s.answering, threadId, log.pending, s.pending[threadId]?.pending);
+    return { logs: { ...s.logs, [threadId]: log }, ...sync, ...(answering !== s.answering ? { answering } : undefined) };
   });
 }
 
@@ -696,7 +715,8 @@ export function useThreadItem(threadId: string, id: string): ThreadItemView | un
 /** Items keep their identity while unchanged, so each one's key is built once. */
 const keyCache = new WeakMap<ThreadItemView, string>();
 
-function keyOf(it: ThreadItemView): string {
+/** An item's structural key (lib/threadTimeline timelineKey), cached per item. */
+export function itemKeyOf(it: ThreadItemView): string {
   let k = keyCache.get(it);
   if (k === undefined) {
     k = timelineKey(structOf(it));
@@ -713,7 +733,7 @@ export function useTimelineKeys(threadId: string): string[] {
       if (!log) return [];
       return log.order.flatMap((id) => {
         const it = log.byId[id];
-        return it ? [keyOf(it)] : [];
+        return it ? [itemKeyOf(it)] : [];
       });
     }),
   );

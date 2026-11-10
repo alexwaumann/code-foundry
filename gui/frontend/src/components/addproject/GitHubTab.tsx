@@ -87,11 +87,6 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
     [],
   );
   const running = clone.state === "running";
-  // The input above is locked while a clone runs: a new lookup would replace (and so
-  // cancel) this card.
-  useEffect(() => {
-    onRunning(running);
-  }, [running, onRunning]);
 
   const start = async () => {
     ctl.current?.abort();
@@ -99,6 +94,9 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
     ctl.current = ac;
     let lines: CloneProgressView[] = [];
     setClone({ state: "running", lines });
+    // The input above is locked while a clone runs (a new lookup would replace, and so
+    // cancel, this card), set with the card's own state so both change in one render.
+    onRunning(true);
     try {
       const added = await cloneRepo(
         repo.owner,
@@ -116,6 +114,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
     } catch (err) {
       if (isAbort(err) || ac.signal.aborted) return;
       setClone({ state: "failed", lines, error: errorMessage(err) });
+      onRunning(false);
     }
   };
 

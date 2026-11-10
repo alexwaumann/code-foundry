@@ -7,6 +7,8 @@
  * real rule and the refusal's words; the signature changes when what made a branch a
  * candidate does, so a switch back asks again. Pure.
  */
+import { basename } from "./path";
+
 export interface CandidateWorktree {
   path: string;
   branch: string;
@@ -31,11 +33,6 @@ export function branchFolder(branch: string): string {
   return branch.replaceAll("/", "-");
 }
 
-function lastSegment(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
-  return trimmed.slice(trimmed.lastIndexOf("/") + 1);
-}
-
 export function placementCandidates(projects: readonly CandidateProject[], branches: readonly string[]): PlacementCandidate[] {
   const out: PlacementCandidate[] = [];
   for (const branch of branches) {
@@ -45,7 +42,7 @@ export function placementCandidates(projects: readonly CandidateProject[], branc
       if (!p.git) continue;
       for (const w of p.worktrees) {
         const head = w.detached ? "(detached)" : w.branch;
-        if (w.isMain ? !w.detached && w.branch === branch : lastSegment(w.path) === branchFolder(branch) && (w.detached || w.branch !== branch)) {
+        if (w.isMain ? !w.detached && w.branch === branch : basename(w.path) === branchFolder(branch) && (w.detached || w.branch !== branch)) {
           marks.push(`${p.id}:${w.path}:${head}`);
         }
       }
@@ -62,7 +59,7 @@ export function placementCandidates(projects: readonly CandidateProject[], branc
  * which keeps the daemon's words.
  */
 export function ownMovedText(path: string, createdBranch: string, head: string, detached: boolean): string | null {
-  if (!path || !createdBranch || lastSegment(path) !== branchFolder(createdBranch) || (!detached && head === createdBranch)) return null;
+  if (!path || !createdBranch || basename(path) !== branchFolder(createdBranch) || (!detached && head === createdBranch)) return null;
   const now = detached || !head ? "a detached HEAD" : head;
   return `This checkout moved from ${createdBranch} to ${now}; a new thread on ${createdBranch} would be refused here.`;
 }

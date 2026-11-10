@@ -33,8 +33,6 @@ import { isAttention, useThreadsStore, type ThreadsData } from "./threads";
 export const EMBER_RESIDENT = "ember";
 /** The setting that turns Ember on. */
 export const EMBER_ENABLED = "ember.enabled";
-/** The setting the worker-models chips edit. */
-export const EMBER_WORKER_MODELS = "ember.worker_models";
 
 interface EmberState {
   /** The last board WatchBoard sent; null before the first (or with no stream ever opened). */
@@ -86,7 +84,7 @@ export function holdEmberBoard(): () => void {
   };
 }
 
-/** Whether the board stream is open (tests). */
+/** Whether something on screen holds the board stream (a page's `ember` source is refused otherwise). */
 export function emberBoardHeld(): boolean {
   return stop !== null;
 }

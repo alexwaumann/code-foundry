@@ -1,6 +1,6 @@
 /**
  * Files and directories the composer offers after "@" (FilesystemService.SearchFiles),
- * per source list (lib/completion fileSourcesKey: the draft's projects and the checkouts
+ * per source list (lib/completion skillSourcesKey: the draft's projects and the checkouts
  * to search). The composer asks with `requestFiles` on every change of the query:
  *
  * - debounced (DEBOUNCE_MS), so a burst of keystrokes sends one search, one request per
@@ -19,7 +19,7 @@
 import { create } from "zustand";
 import { searchFiles, type FileSearchRequest, type FileSearchView, type SkillSourceView } from "@/api/filesystem";
 import { isOutdatedDaemon } from "@/api/errors";
-import { fileSourcesKey, type FileResults } from "@/lib/completion";
+import { skillSourcesKey, type FileResults } from "@/lib/completion";
 
 export const DEBOUNCE_MS = 80;
 export const SEARCHING_AFTER_MS = 300;
@@ -111,7 +111,7 @@ function send(key: string, sources: readonly SkillSourceView[], query: string, s
  * nothing.
  */
 export function requestFiles(sources: readonly SkillSourceView[], query: string, search: SearchFilesFn = searchFiles): void {
-  const key = fileSourcesKey(sources);
+  const key = skillSourcesKey(sources);
   if (useFilesStore.getState().byKey[key]?.outdated) return;
   const c = control(key);
   clearTimeout(c.debounce);
@@ -135,7 +135,7 @@ export function requestFiles(sources: readonly SkillSourceView[], query: string,
 
 /** Drops a search still waiting out its debounce (the trigger closed). Requests out stay out. */
 export function cancelFiles(sources: readonly SkillSourceView[]): void {
-  const c = controls.get(fileSourcesKey(sources));
+  const c = controls.get(skillSourcesKey(sources));
   if (!c) return;
   clearTimeout(c.debounce);
   c.debounce = undefined;

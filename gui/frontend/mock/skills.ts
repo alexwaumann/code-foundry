@@ -1,6 +1,6 @@
 /**
  * The Skills marketplace in the mock daemon (docs/notes/skills-3-api.md): one marketplace
- * Claude Code "has", ai-marketplace (cof-primary/ai-marketplace), with three enterprise
+ * Claude Code "has", ai-marketplace (acme/ai-marketplace), with three enterprise
  * plugins and about forty standalone skills in both tiers; what is installed of them and a
  * local skill; SkillService (Search, Installed, Registries) and the skill.* commands, each
  * taking a few 250 ms steps and publishing a new epoch like the daemon's re-read.
@@ -40,7 +40,7 @@ type InstalledInit = MessageInitShape<typeof InstalledSkillSchema>;
 export type SkillEventInit = MessageInitShape<typeof SkillEventSchema>;
 
 export const SKILL_MARKETPLACE = "ai-marketplace";
-export const SKILL_MARKETPLACE_REPO = "cof-primary/ai-marketplace";
+export const SKILL_MARKETPLACE_REPO = "acme/ai-marketplace";
 const CHECKOUT = `/Users/dev/.claude/plugins/marketplaces/${SKILL_MARKETPLACE}`;
 const SKILLS_DIR = "/Users/dev/.claude/skills";
 const DISABLED_DIR = "/Users/dev/.code-foundry/skills/disabled";
@@ -73,7 +73,7 @@ const day = (s: string) => new Date(`${s}T10:00:00Z`);
 const ymd = (d: Date) => d.toISOString().slice(0, 10).replaceAll("-", "");
 
 function plugin(name: string, by: string, version: string, date: string, description: string, keywords: string[], skills: string[]): Entry {
-  return { kind: "plugin", tier: "enterprise", name, description, by, version, declaredVersion: "", lastUpdated: day(date), path: `enterprise/c1-claude-code-marketplace/${name}`, keywords, skills: [...skills].sort(), setupScript: "" };
+  return { kind: "plugin", tier: "enterprise", name, description, by, version, declaredVersion: "", lastUpdated: day(date), path: `enterprise/acme-marketplace/${name}`, keywords, skills: [...skills].sort(), setupScript: "" };
 }
 
 /** A skill under <tier>/skills/[<group>/]<name>; setup is install.sh, setup.sh or scripts/… at its root. */
@@ -484,7 +484,7 @@ export class MockSkills {
     const always = () => true;
     const nameArg: ArgDef = { name: "name", type: ArgType.STRING, required: true, description: "The plugin or skill's name (code-foundry skill browse); <name>@<marketplace> names a plugin" };
     const kindArg: ArgDef = { name: "kind", type: ArgType.ENUM, required: false, description: "plugin or skill, when a plugin and a skill share the name", enumValues: ["plugin", "skill"] };
-    const cmd = (name: string, title: string, description: string, args: ArgDef[], confirm?: SkillCommand["cmd"]["confirm"]): SkillCommand["cmd"] => ({
+    const cmd = (name: string, title: string, description: string, args: ArgDef[], confirm?: SkillCommand["cmd"]["confirm"], noPalette = true): SkillCommand["cmd"] => ({
       name,
       title,
       category: "Skill",
@@ -492,6 +492,7 @@ export class MockSkills {
       keybindings: [],
       args,
       ...(confirm ? { confirm } : {}),
+      ...(noPalette ? { noPalette } : {}),
     });
     return [
       {
@@ -546,7 +547,7 @@ export class MockSkills {
           { ...nameArg, required: false, description: "The plugin or skill (default: every one with an update)" },
           kindArg,
           { name: "check", type: ArgType.BOOL, required: false, description: "Only list the updates" },
-        ]),
+        ], undefined, false),
         when: always,
         run: async (_c, a) => {
           this.record("skill.update", a, ["name", "kind", "check"]);
@@ -638,7 +639,7 @@ export class MockSkills {
         },
       },
       {
-        cmd: cmd("skill.refresh", "Refresh Skill Marketplaces", "Update every marketplace Claude Code has and read them again. It also runs every hour.", []),
+        cmd: cmd("skill.refresh", "Refresh Skill Marketplaces", "Update every marketplace Claude Code has and read them again. It also runs every hour.", [], undefined, false),
         when: always,
         run: async (_c, a) => {
           this.record("skill.refresh", a, []);

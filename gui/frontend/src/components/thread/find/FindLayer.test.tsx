@@ -24,6 +24,8 @@ vi.mock("@/lib/threadFind", async (load) => {
 const T = "s-1";
 const session = () => useThreadFindStore.getState().byThread[T];
 let unregister: () => void = () => undefined;
+// A reveal unpins the list (it stops following the bottom): a re-pick in place must not.
+const unpin = vi.fn();
 
 function Pane() {
   const ref = useRef<HTMLDivElement>(null);
@@ -48,7 +50,7 @@ beforeEach(() => {
   unregister = registerTimeline(T, {
     scroller: document.createElement("div"),
     showRow: () => false,
-    unpin: () => undefined,
+    unpin,
     unfold: (itemId) => {
       const turn = foldingTurn(buildTurns(getThreadItems(T).map(structOf)), itemId);
       if (turn === "") return false;
@@ -68,10 +70,13 @@ afterEach(() => {
   useThreadFindStore.setState({ byThread: {} });
   useThreadStore.setState({ logs: {}, synced: {}, folds: {}, expanded: {} });
   vi.mocked(warmFind).mockClear();
+  unpin.mockClear();
 });
 
 /** Lets timers and idle slices run. */
 const tick = () => act(() => new Promise((r) => setTimeout(r, 5)));
+/** Lets a reveal under way finish (it waits a few frames for a row that never renders here). */
+const settle = () => act(() => new Promise((r) => setTimeout(r, 80)));
 
 /** The items' text with `edit` applied to one text item, published as the log (a streaming change). */
 function editText(itemId: string, edit: (text: string) => string): void {
@@ -137,7 +142,7 @@ describe("FindLayer picks the current match", () => {
     expect(session()?.current).toEqual({ itemId: mid?.itemId, nth: mid?.nth });
   });
 
-  it("matches that arrive for a query with none (text streaming in) make the first at or below the top current, in place", () => {
+  it("matches that arrive for a query with none (text streaming in) make the first at or below the top current, in place", async () => {
     publishThread(T, fixStalePrBadge("idle"));
     openThreadFind(T, "zebra crossing");
     render(<Pane />);
@@ -149,6 +154,8 @@ describe("FindLayer picks the current match", () => {
     });
     expect(session()?.current).toEqual({ itemId: text, nth: 0 });
     expect(session()?.revealSeq).toBe(seq);
+    await settle();
+    expect(unpin).not.toHaveBeenCalled();
   });
 
   it("the idle warm-up runs once the log arrives when the bar opened before it", async () => {
@@ -178,7 +185,7 @@ describe("FindLayer picks the current match", () => {
     expect(session()).toMatchObject({ current: null, aim: null });
   });
 
-  it("a current match its text lost (a streaming answer) moves to the nearest in the same item, without a reveal", () => {
+  it("a current match its text lost (a streaming answer) moves to the nearest in the same item, without a reveal", async () => {
     publishThread(T, fixStalePrBadge("idle"));
     openThreadFind(T, "f");
     render(<Pane />);
@@ -189,6 +196,9 @@ describe("FindLayer picks the current match", () => {
       setThreadFindCurrent(T, { itemId: text, nth: inText.length - 1 });
     });
     const seq = session()?.revealSeq;
+    await settle();
+    expect(unpin).toHaveBeenCalled();
+    unpin.mockClear();
     // The answer's text changes: one "f" fewer at its end.
     act(() => {
       const log = useThreadStore.getState().logs[T];
@@ -200,6 +210,8 @@ describe("FindLayer picks the current match", () => {
     });
     expect(session()?.current).toEqual({ itemId: text, nth: inText.length - 2 });
     expect(session()?.revealSeq).toBe(seq);
+    await settle();
+    expect(unpin).not.toHaveBeenCalled();
   });
 
   it("a current match whose item lost every match goes on to the next item's, not back to the top", () => {

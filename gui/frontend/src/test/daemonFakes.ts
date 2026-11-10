@@ -8,12 +8,11 @@
  *
  * Nothing here imports a store or a mocked module, so the factories may import it.
  */
-import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { CommandView, InvokeResultView, UiContextView } from "@/api/command";
+import { confirmationRequiredError } from "@/api/commandErrors";
 import type { BranchPullRequestsView, RepoActivityView } from "@/api/gh";
 import type { WorktreeDetailView } from "@/api/worktreeDetail";
-import { ConfirmationRequiredSchema } from "@/gen/codefoundry/v1/command_pb";
 
 /** One CommandService.Invoke the GUI made. */
 export interface Invocation {
@@ -24,7 +23,7 @@ export interface Invocation {
 }
 
 /** What a faked command does: return a result, or throw (needsConfirm, a refusal). */
-export type Handler = (inv: Invocation) => InvokeResultView | Promise<InvokeResultView>;
+type Handler = (inv: Invocation) => InvokeResultView | Promise<InvokeResultView>;
 
 const OK: InvokeResultView = { message: "", resultJson: "" };
 
@@ -59,8 +58,7 @@ export function lastInvocation(name: string): Invocation | undefined {
 
 /** How the daemon asks for a confirmation: FailedPrecondition with a ConfirmationRequired detail. */
 export function needsConfirm(c: { command: string; title?: string; message: string; args?: Record<string, string>; confirmLabel?: string }): ConnectError {
-  const detail = create(ConfirmationRequiredSchema, { command: c.command, title: c.title ?? "", message: c.message, args: c.args ?? {}, confirmLabel: c.confirmLabel ?? "" });
-  return new ConnectError(c.message, Code.FailedPrecondition, undefined, [{ desc: ConfirmationRequiredSchema, value: detail }]);
+  return confirmationRequiredError(c);
 }
 
 /** A command that asks once (the daemon's confirm), then runs `after` once confirmed. */

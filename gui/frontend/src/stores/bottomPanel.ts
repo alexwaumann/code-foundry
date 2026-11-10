@@ -7,7 +7,8 @@
  * it owns or that were opened in it (bottomTabIds), in the store's order. Per key this store keeps only whether the
  * panel is open, its height, and which terminal was last active. A terminal that goes
  * away (closed, reaped, the daemon restarted) leaves its tab with it. Persisted
- * (localStorage "code-foundry.bottom"); entries are never pruned.
+ * (localStorage "code-foundry.bottom"); a removed thread's entry is dropped
+ * (stores/archiveCleanup.ts).
  * See docs/notes/bottom-panel-2-gui.md.
  */
 import { create } from "zustand";

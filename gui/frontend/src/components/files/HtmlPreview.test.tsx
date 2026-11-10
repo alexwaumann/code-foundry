@@ -2,8 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setThemePreference, setThemeSlots, startThemePublish } from "@/lib/theme";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
-import { THEME_ACK_MS } from "./HtmlFrame";
-import { HTML_PREVIEW_SANDBOX, HtmlPreview } from "./HtmlPreview";
+import { HTML_PREVIEW_SANDBOX, THEME_ACK_MS } from "./HtmlFrame";
+import { HtmlPreview } from "./HtmlPreview";
 
 const previewFile = vi.fn();
 vi.mock("@/api/files", async (orig) => ({

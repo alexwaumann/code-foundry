@@ -5,8 +5,8 @@
  * that happened (a path chip, the finder, view.panel.file), and stays after its tab
  * closes. A tab that is its thread's page (view.panel.page) does not count. Keyed by the
  * panel's key (stores/panel.ts keyOf), RECENT_FILES_MAX per panel, persisted beside the
- * panel's state (localStorage "code-foundry.recent-files"); panels are never pruned, like
- * the panel store's entries.
+ * panel's state (localStorage "code-foundry.recent-files"); a removed thread's list is
+ * dropped with its panel (stores/archiveCleanup.ts).
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";

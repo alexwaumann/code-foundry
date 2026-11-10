@@ -6,10 +6,7 @@
  */
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
-import { byName } from "./projectSet";
-
-/** The default primary that runs new threads in the workspace's own folder. */
-export const PRIMARY_WORKSPACE = "workspace";
+import { byName, WORKSPACE_PRIMARY } from "./projectSet";
 
 /** Where a thread whose primary is the workspace runs: its root when it has one, else its own (managed) folder. */
 export function workspaceFolder(ws: Pick<WorkspaceView, "rootPath" | "managedDir">): string {
@@ -119,7 +116,7 @@ export function workspaceNameError(name: string, others: readonly string[] = [])
   const n = name.trim();
   if (!n) return "Name it.";
   if (new TextEncoder().encode(n).length > 100) return "At most 100 bytes.";
-  if (n.toLowerCase() === PRIMARY_WORKSPACE) return "“workspace” is reserved.";
+  if (n.toLowerCase() === WORKSPACE_PRIMARY) return "“workspace” is reserved.";
   if (others.some((o) => o.toLowerCase() === n.toLowerCase())) return `A workspace named “${n}” exists.`;
   return "";
 }

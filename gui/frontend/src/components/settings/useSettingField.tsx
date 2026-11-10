@@ -47,7 +47,7 @@ export function useSettingField(field: SettingFieldView) {
   };
 
   const Editor = keyEditors[field.key] ?? editors[field.type];
-  const modified = value !== field.defaultValue && !(field.type === "keybinding" && value === "" && field.defaultValue === "");
+  const modified = value !== field.defaultValue;
   const message = error ?? (fileIssue ? `In the file: ${fileIssue}` : null);
   const editor = <Editor field={field} value={value} pending={pending} invalid={message !== null} commit={commit} setError={setError} />;
   return { value, restartPending, pending, commit, modified, message, editor };

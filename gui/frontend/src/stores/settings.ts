@@ -123,7 +123,7 @@ export function useScrollbackLines(): number {
   return Number.isFinite(v) && v > 0 ? v : 30_000;
 }
 
-/** The models the composer offers and threads are named by: the daemon's registry, else the family aliases. */
+/** The models the composer offers and threads are named by: the daemon's registry, else its default model alone until the schema loads. */
 export function useModelChoices(): readonly Choice[] {
   return useSettingsStore((s) => s.modelChoices) ?? FALLBACK_MODEL_CHOICES;
 }

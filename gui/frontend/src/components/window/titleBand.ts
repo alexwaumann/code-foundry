@@ -1,8 +1,9 @@
 import { SHELL_GAP } from "@/design/tokens";
 
 /**
- * Height in CSS px of a pane's header (PaneHeader, the side panel's PanelHeader, the
- * headerless panes' DragBand). The one source: those components set it as their height.
+ * Height in CSS px of a pane's header (PaneHeader, the side panel's tab strip in TabGroup,
+ * the headerless panes' DragBand, a sheet's SheetHeader). The one source: those components
+ * set it as their height.
  */
 export const PANE_HEADER_HEIGHT = 44;
 

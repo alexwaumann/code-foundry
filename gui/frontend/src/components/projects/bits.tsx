@@ -96,22 +96,3 @@ export function TitleBlock({ icon, name, meta, right, testId }: { icon: React.Re
 
 /** The meta line's separator. */
 export const MetaDot = () => <span aria-hidden>·</span>;
-
-/** A text link that runs an action (no navigation): Details' Open in Finder, Copy, Edit. */
-export function LinkButton({ children, onClick, testId, className }: { children: React.ReactNode; onClick: () => void; testId?: string; className?: string }) {
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      data-testid={testId}
-      className={cn("inline-flex items-center gap-1 text-link hover:underline [&_svg]:size-3.5", className)}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-

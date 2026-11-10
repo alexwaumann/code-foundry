@@ -24,9 +24,9 @@ export function processLine(p: Pick<PluginView, "pid" | "restarts" | "state">): 
   return parts.join(" · ");
 }
 
-/** Who gets a contribution: "every project", "every project and threads without one", or names. */
-export function scopeWords(projects: readonly string[], noProject: boolean, projectName: (id: string) => string): string {
-  const base = projects.length === 0 ? "every project" : projects.map(projectName).join(", ");
+/** Who gets a contribution (`names`: its projects' names): "every project", "every project and threads without one", or the names. */
+export function scopeWords(names: readonly string[], noProject: boolean): string {
+  const base = names.length === 0 ? "every project" : names.join(", ");
   return noProject ? `${base} and threads without a project` : base;
 }
 

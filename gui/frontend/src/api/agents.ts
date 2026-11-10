@@ -32,8 +32,6 @@ export interface AgentRunView {
   status: AgentStatusView;
   /** What it is doing now (Claude's line, "Running go test ./..."); kept once it ends. */
   activity: string;
-  /** Its latest tool's name. */
-  lastTool: string;
   /** The tokens of its latest request. */
   totalTokens: number;
   toolUses: number;
@@ -71,7 +69,6 @@ export function toAgentRunView(r: ThreadAgentRun): AgentRunView {
     spawnDepth: r.spawnDepth,
     status: r.status in statuses ? statuses[r.status] : "unknown", // a newer daemon's value
     activity: r.activity,
-    lastTool: r.lastTool,
     totalTokens: Number(r.totalTokens),
     toolUses: Number(r.toolUses),
     durationMs: Number(r.durationMs),

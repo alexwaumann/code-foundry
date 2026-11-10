@@ -9,7 +9,7 @@ import { NavProvider, NavRow } from "@/lib/NavRow";
 import { cn } from "@/lib/utils";
 import { filterRows, stepRow, statusColor, TOP_ROWS, topListFit, type FileRow } from "./files";
 
-export const ROW_H = 30;
+const ROW_H = 30;
 /** More files than this and the list offers a filter: as many as fit without scrolling. */
 const FILTER_OVER = { rail: 20, top: TOP_ROWS } as const;
 

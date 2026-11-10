@@ -127,6 +127,18 @@ describe("Edit", () => {
     expect(getDraft("repo-a").text).toBe("go");
   });
 
+  it("forgets the composer it was sent from once the setup is done (no Edit after that)", async () => {
+    const set = { projectId: "repo-b", projectIds: ["repo-a", "repo-b"] };
+    useThreadsStore.setState({ byId: { [ID]: thread(set) }, order: [ID] });
+    noteSentFrom(ID, { kind: "project", projectId: "repo-a" });
+    useThreadsStore.setState({ byId: { [ID]: thread({ ...set, setup: { phase: "done", startedAtMs: 1, endedAtMs: 2, steps: [], error: "", background: true } }) } });
+    useThreadsStore.setState({ byId: { [ID]: thread(set) } });
+    discards({});
+    const edit = editSetup(ID);
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-b" });
+    await edit;
+  });
+
   it("a cancel leaves no error", async () => {
     discards({ draftJson: encodeSetupDraft(snapshot()), error: "" });
     await editSetup(ID);

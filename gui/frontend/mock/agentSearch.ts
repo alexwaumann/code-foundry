@@ -17,17 +17,18 @@
  *   POST /__mock/search/seed                       (a history: an agent search 1h old, a Find 1 day old, one 3h old)
  *   GET  /__mock/search                            ({ entries, calls })
  */
-import type { MessageInitShape } from "@bufbuild/protobuf";
+import { create, toJsonString, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import {
   AgentSearchStepKind,
   SearchMode,
+  ListRecentSearchesResponseSchema,
+  SearchEntrySchema,
   SearchStatus,
   type AgentSearchHitSchema,
   type AgentSearchStepSchema,
   type SearchActivitySchema,
-  type SearchEntrySchema,
   type SearchWatchEventSchema,
 } from "../src/gen/codefoundry/v1/search_pb";
 import type { ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
@@ -605,22 +606,23 @@ export class MockSearches {
     const always = () => true;
     const id = { name: "id", type: ArgType.STRING, required: true, description: "The search's id (q-…; search.recent lists them)" };
     const out = (message: string, json: unknown): InvokeOut => ({ message, resultJson: JSON.stringify(json) });
+    const entryOut = (message: string, e: EntryInit): InvokeOut => ({ message, resultJson: toJsonString(SearchEntrySchema, create(SearchEntrySchema, e)) });
     const cmd = (name: string, title: string, description: string, args: { name: string; type: ArgType; required: boolean; description: string }[], noPalette = true) => ({ name, title, category: "Search", description, keybindings: [], args, ...(noPalette ? { noPalette } : {}) });
     return [
       {
         cmd: cmd("search.agent", "Agent Search", "Ask a question about your earlier threads in your own words.", [{ name: "question", type: ArgType.STRING, required: true, description: "The question" }]),
         when: always,
-        run: (_c, a) => Promise.resolve(out("started", this.startAgent(a.question ?? ""))),
+        run: (_c, a) => Promise.resolve(entryOut("started", this.startAgent(a.question ?? ""))),
       },
-      { cmd: cmd("search.stop", "Stop Agent Search", "Stop a running agent search; it keeps the hits it reported.", [id]), when: always, run: (_c, a) => Promise.resolve(out("stopped", this.stop(a.id ?? ""))) },
-      { cmd: cmd("search.recent", "Recent Searches", "List the search history, newest first.", []), when: always, run: () => Promise.resolve(out(`${String(this.entries.size)} searches`, { entries: this.list() })) },
-      { cmd: cmd("search.get", "Show Search", "Show one search of the history.", [id]), when: always, run: (_c, a) => Promise.resolve(out("", this.getMsg(a.id ?? ""))) },
+      { cmd: cmd("search.stop", "Stop Agent Search", "Stop a running agent search; it keeps the hits it reported.", [id]), when: always, run: (_c, a) => Promise.resolve(entryOut("stopped", this.stop(a.id ?? ""))) },
+      { cmd: cmd("search.recent", "Recent Searches", "List the search history, newest first.", []), when: always, run: () => Promise.resolve({ message: `${String(this.entries.size)} searches`, resultJson: toJsonString(ListRecentSearchesResponseSchema, create(ListRecentSearchesResponseSchema, { entries: this.list() })) }) },
+      { cmd: cmd("search.get", "Show Search", "Show one search of the history.", [id]), when: always, run: (_c, a) => Promise.resolve(entryOut("", this.getMsg(a.id ?? ""))) },
       {
         cmd: cmd("search.open-hit", "Mark Search Hit Opened", "Mark an agent search's hit opened.", [id, { name: "hit", type: ArgType.INT, required: true, description: "The hit's number ([n])" }]),
         when: always,
-        run: (_c, a) => Promise.resolve(out(`hit [${a.hit ?? ""}] of ${a.id ?? ""} opened`, this.openHit(a.id ?? "", Number(a.hit)))),
+        run: (_c, a) => Promise.resolve(entryOut(`hit [${a.hit ?? ""}] of ${a.id ?? ""} opened`, this.openHit(a.id ?? "", Number(a.hit)))),
       },
-      { cmd: cmd("search.seen", "Mark Search Seen", "Mark a finished agent search's result seen.", [id]), when: always, run: (_c, a) => Promise.resolve(out(`${a.id ?? ""} seen`, this.markSeen(a.id ?? ""))) },
+      { cmd: cmd("search.seen", "Mark Search Seen", "Mark a finished agent search's result seen.", [id]), when: always, run: (_c, a) => Promise.resolve(entryOut(`${a.id ?? ""} seen`, this.markSeen(a.id ?? ""))) },
       {
         cmd: cmd("search.find", "Record Find Search", "Record a Find search in the history.", [
           { name: "query", type: ArgType.STRING, required: true, description: "The query" },
@@ -629,7 +631,7 @@ export class MockSearches {
         when: always,
         run: (_c, a) => {
           const e = this.recordFind(a.query ?? "", Number(a.hits ?? 0) || 0);
-          return Promise.resolve(out(`recorded ${e.id ?? ""}`, e));
+          return Promise.resolve(entryOut(`recorded ${e.id ?? ""}`, e));
         },
       },
       {

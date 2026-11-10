@@ -4,6 +4,7 @@
  */
 import type { MemoryLeftOut, MemoryOriginView } from "@/api/memory";
 import type { ThreadView } from "@/api/threads";
+import { MONTHS, startOfDay } from "./snooze";
 
 /**
  * Who remembered an entry, resolved by the thread's id (docs/notes/lineage-by-id.md): its
@@ -22,13 +23,6 @@ export function memoryBy(origin: MemoryOriginView, thread: Pick<ThreadView, "nam
   return { kind: "thread", id, name: thread.name || id, state: thread.archivedAtMs === null ? "live" : "archived" };
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function dayStart(ms: number): number {
-  const d = new Date(ms);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
 /**
  * When, after "Remembered": "just now", "5 min ago", "today", "yesterday", "3 days ago",
  * then "on Oct 14" ("on Oct 14, 2025" in another year). Calendar days are local. A time in
@@ -39,7 +33,7 @@ export function rememberedWhen(ms: number | null, now: number): string {
   const minutes = Math.floor((now - ms) / 60_000);
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${String(minutes)} min ago`;
-  const days = Math.round((dayStart(now) - dayStart(ms)) / 86_400_000);
+  const days = Math.round((startOfDay(now) - startOfDay(ms)) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return `${String(days)} days ago`;

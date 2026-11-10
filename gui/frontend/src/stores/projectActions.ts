@@ -43,15 +43,6 @@ export async function resumeWorktree(projectId: string, path: string, archivedTh
 }
 
 /**
- * project.worktree.cleanup for one worktree (confirmed in the cleanup dialog; the daemon
- * fetches, checks again and removes it without touching its branch, or fails saying why it
- * stays). The fetch reports through the gitops toasts, the result as "Removed 1 worktree".
- */
-export async function cleanupWorktree(projectId: string, path: string): Promise<boolean> {
-  return reportCleanup(await runCommandForResult("project.worktree.cleanup", { project: projectId, path }, { ctx: worktreeContext(projectId, path), quiet: true }));
-}
-
-/**
  * project.worktree.cleanup for every merged, clean, unheld worktree of the project
  * (confirmed in the cleanup dialog, which lists them). A worktree with uncommitted work is
  * never part of it. The result toast names only what went.
@@ -75,11 +66,6 @@ export function revealProject(projectId: string): Promise<boolean> {
 /** project.unregister (confirmed). */
 export function unregisterProject(projectId: string): Promise<boolean> {
   return runCommand("project.unregister", {}, projectContext(projectId));
-}
-
-/** project.worktree.new on the project: the palette asks for the branch (base and fetch keep their defaults). */
-export function newWorktreeIn(projectId: string): void {
-  useUiStore.getState().openPalette("", "project.worktree.new", projectContext(projectId));
 }
 
 /** project.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */

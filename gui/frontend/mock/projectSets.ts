@@ -4,7 +4,7 @@
  * (CreateThreadResponse.hints), computed with the GUI's own rule (src/lib/collisionHints)
  * over the mock's threads and projects. The daemon labels the other thread "<name> (<id>)".
  */
-import { collisionHints, threadCheckouts, type Checkout, type HintProjects, type HintThread } from "../src/lib/collisionHints";
+import { collisionHints, threadCheckouts, type HintProjects, type HintThread } from "../src/lib/collisionHints";
 
 /** The parts of a mock project the hints read. */
 export interface SetProject {
@@ -44,11 +44,6 @@ function hintThread(t: SetThread, label: boolean): HintThread {
     branch: t.branch,
     archived: t.archivedAt !== null,
   };
-}
-
-/** A thread's checkouts as the daemon derives them (the GUI's rule; members it cannot place are left out). */
-export function checkoutsOf(t: SetThread, projects: Iterable<SetProject>): Checkout[] {
-  return threadCheckouts(hintThread(t, false), hintProjects(projects));
 }
 
 /** The daemon's CheckoutHints for a new thread: one line per checkout another thread that is not archived also has. */

@@ -32,13 +32,6 @@ async function settleThreads(busy: number): Promise<void> {
   if (busy > 0) await mockPost(`threads?project=repo-cf&count=${String(busy)}&status=busy&prefix=Job`);
 }
 
-async function expectChip(page: Page, kind: string, label: string, cta: string | null) {
-  await expect(indicator(page)).toHaveAttribute("data-kind", kind);
-  await expect(indicator(page).getByTestId("update-indicator-label")).toHaveText(label);
-  if (cta === null) await expect(indicator(page).getByTestId("update-indicator-cta")).toHaveCount(0);
-  else await expect(indicator(page).getByTestId("update-indicator-cta")).toHaveText(cta);
-}
-
 // Up to date (Check Again, Checked just now, the repo, × as the only close): src/components/update/UpdateDialog.test.tsx.
 test("up to date: no chip, and the update source rides the one events stream", async ({ page }) => {
   await openApp(page);
@@ -75,14 +68,8 @@ test("a check downloads at once; a failed automatic download falls back to Downl
 
   await expect(d).toHaveAttribute("data-state-name", "downloaded", { timeout: 8000 });
   await expect(d).toHaveAttribute("data-variant", "readyIdle");
-  await expect(d.getByTestId("update-state")).toHaveText("Code Foundry v0.2.0 is ready");
-  await expect(d).toContainText(
-    "Install and restart to finish updating. The app and the daemon update together, so nothing ends up out of sync. No thread is working or waiting on you, so nothing will be interrupted.",
-  );
-  await expect(d.getByTestId("update-busy-threads")).toHaveCount(0);
-  await expect(d.getByTestId("update-restart")).toHaveText("Install and Restart Now");
-  await expect(d.getByTestId("update-later")).toHaveText("Later");
-  await expectChip(page, "downloaded", "v0.2.0 downloaded", "Restart to apply");
+  // The ready dialog's words, its buttons and the chip: src/components/update/UpdateDialog.test.tsx.
+  await expect(indicator(page)).toHaveAttribute("data-kind", "downloaded");
   // Nothing installed yet: the daemon still runs v0.1.0.
   expect(await (await fetch(`${mockUrl}/__mock/update`)).json()).toMatchObject({ state: "DOWNLOADED", current: "v0.1.0", target: "v0.2.0", restarts: 0 });
 
@@ -93,12 +80,9 @@ test("a check downloads at once; a failed automatic download falls back to Downl
   await page.keyboard.press("Escape");
 
   await indicator(page).click();
+  // Installing and restarting, and app.restart run confirmed: src/components/update/UpdateDialog.test.tsx.
   await d.getByTestId("update-restart").click();
-  await expect(d.getByTestId("update-state")).toHaveText("Installing and restarting…");
-  await expect(d).toContainText("Code Foundry will reopen in a moment on v0.2.0.");
   await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
-  const restarts = (await invocations()).filter((i) => i.name === "app.restart" || i.name === "daemon.restart");
-  expect(restarts.map((i) => [i.name, i.confirmed])).toEqual([["app.restart", true]]);
   // The mock comes back as the installed version.
   await expect(indicator(page)).toHaveCount(0);
   expect(await (await fetch(`${mockUrl}/__mock/update`)).json()).toMatchObject({ state: "IDLE", current: "v0.2.0", restarts: 1 });

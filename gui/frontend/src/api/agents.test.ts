@@ -45,7 +45,6 @@ describe("toAgentRunView", () => {
       spawnDepth: 2,
       status: "running",
       activity: "Running go test",
-      lastTool: "Bash",
       totalTokens: 48_200,
       toolUses: 23,
       durationMs: 9_000,

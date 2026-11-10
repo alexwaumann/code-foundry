@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A small muted chip: the thread tooltip's "Fresh copy", "Project folder" and "no git", the thread header's
- * "worktree" after the branch. Text only, never interactive.
+ * A small muted chip: the thread hover card's "no git"; the theme gallery's sample. Text only,
+ * never interactive.
  */
 export function Chip({ children, className, ...props }: { children: ReactNode; className?: string; "aria-label"?: string; "data-testid"?: string }) {
   return (

@@ -6,6 +6,7 @@
 import type { BackgroundShellView, ThreadView } from "@/api/threads";
 import type { WakeKind, WakeSubscriptionView } from "@/api/wakes";
 import { statusLine, statusText } from "./statusLine";
+import { firstLine } from "./toolSummary";
 import { waitingParts, waitingText } from "./waiting";
 
 /** How many of each the strip counts. */
@@ -109,9 +110,7 @@ export function threadTargetStatus(t: ThreadView | undefined, now: number): stri
 
 /** A shell's row name: its command's first line, else its description. */
 export function shellName(sh: Pick<BackgroundShellView, "command" | "description">): string {
-  const nl = sh.command.indexOf("\n");
-  const first = nl < 0 ? sh.command : `${sh.command.slice(0, nl)} …`;
-  return first || sh.description;
+  return firstLine(sh.command) || sh.description;
 }
 
 /** `next`, or `prev` when it says the same: an unchanged list keeps its identity, so nothing re-renders. */
