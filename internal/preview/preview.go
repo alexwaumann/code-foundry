@@ -151,6 +151,7 @@ func escapeSegment(s string) string {
 // origin: a page reads its own files with fetch(), and a frame that is not same-origin
 // (an older sandbox, a page opened elsewhere) must still be able to. An HTML document asked
 // for with ThemedParam is painted in paint's theme (paint.go); a nil paint paints nothing.
+// One a frame navigates to gets frame.js (frame.go).
 func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Any origin, on errors too, so a page's fetch() sees a 404 rather than a CORS failure.
@@ -187,12 +188,15 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 		if paint != nil && r.URL.Query().Get(ThemedParam) == "1" {
 			tag = paintTag(paint())
 		}
+		if navigated(r) {
+			tag = append(tag, frameTag...)
+		}
 		serve(w, r, f, p, tag)
 	})
 }
 
-// serve writes the open file f, whose real path is p; an HTML document gets tag (paint.go)
-// when tag is not nil.
+// serve writes the open file f, whose real path is p; an HTML document gets tag (paint.go,
+// frame.go) at the start of its head when tag is not nil.
 func serve(w http.ResponseWriter, r *http.Request, f *os.File, p string, tag []byte) {
 	fi, err := f.Stat()
 	if err != nil || !fi.Mode().IsRegular() {

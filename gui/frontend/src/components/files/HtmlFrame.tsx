@@ -7,12 +7,13 @@ import { addPageError, type PageError } from "@/lib/pageErrors";
 import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMessage, useActiveTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
-import { isThemeAck, pageKey, resizeHeight, themedUrl } from "./previewGrant";
+import { openUrl } from "@/stores/gh";
+import { isThemeAck, pageKey, pageOpenUrl, pageUnsupported, resizeHeight, themedUrl } from "./previewGrant";
 
 /**
  * The sandbox of a frame with no owning thread (a File tab on an arbitrary HTML file):
- * scripts, forms, dialogs, downloads and popups (a target=_blank link opens in the
- * browser), and an opaque origin, so it cannot reach another page's frame (a thread's,
+ * scripts, forms, and the dialogs, downloads and popups the frame's script answers for
+ * (a link to another site opens in the browser), and an opaque origin, so it cannot reach another page's frame (a thread's,
  * whose bridge it would otherwise drive through `parent.frames`) nor keep any storage
  * (docs/notes/bridge-fix-frames.md). Never `allow-top-navigation`, so a link cannot
  * replace the app.
@@ -44,6 +45,9 @@ export const THEME_ACK_MS = 300;
  * (a thread's page is painted in the theme from its first byte, so it is not white then).
  */
 export const FRAME_REVEAL_MS = 1000;
+
+/** The least time between two links a frame sends to the browser. */
+export const OPEN_GAP_MS = 500;
 
 /**
  * An HTML page in a sandboxed frame at a granted URL (usePreviewGrant). The File tab's
@@ -89,6 +93,14 @@ export const FRAME_REVEAL_MS = 1000;
  * Escape the page left alone (the lightbox closes on it; docs/notes/page-library-fixes-b.md).
  * `onPageErrors` hears the errors the bridge answered the frame's document with
  * (lib/pageErrors.ts; deduped, the latest few), and [] again on each load and on unmount.
+ *
+ * What a frame cannot do (docs/notes/page-frame-links.md): the daemon writes a script into
+ * every document the frame loads (internal/preview/frame.js), bridge or not. A link to
+ * another site, and `window.open`, arrive as `{ type: "cf:open", url }` and open in the
+ * browser (view.open.url) while the user is in the frame, at most one per OPEN_GAP_MS; an
+ * `alert`, `confirm`, `prompt` or download arrives as `cf:unsupported` and joins the
+ * page's errors. Neither needs the nonce: a page that left for another document of its
+ * own keeps them.
  */
 export function HtmlFrame({
   url,
@@ -190,6 +202,8 @@ export function HtmlFrame({
   const [nonce] = useState(frameNonce);
   const src = useMemo(() => withNonce(opaque ? url : themedUrl(url), nonce), [url, nonce, opaque]);
   const host = useRef<BridgeHost | null>(null);
+  const present = useRef<() => boolean>(() => false);
+  const openedAt = useRef(Number.NEGATIVE_INFINITY);
   const nameRef = useRef(name);
   useEffect(() => {
     nameRef.current = name;
@@ -211,6 +225,7 @@ export function HtmlFrame({
       },
     });
     host.current = h;
+    present.current = attention.present;
     return () => {
       h.dispose();
       attention.stop();
@@ -237,6 +252,19 @@ export function HtmlFrame({
         if (nonceMatches(e.data, nonce, true)) resizeRef.current?.(h / zoomFactor());
         return;
       }
+      const link = pageOpenUrl(e.data);
+      if (link !== null) {
+        const now = performance.now();
+        if (!present.current() || now - openedAt.current < OPEN_GAP_MS) return;
+        openedAt.current = now;
+        void openUrl(link);
+        return;
+      }
+      const cannot = pageUnsupported(e.data);
+      if (cannot !== null) {
+        report(addPageError(errors.current, { ...cannot, code: "unavailable", atMs: Date.now() }));
+        return;
+      }
       const key = pageKey(e.data);
       if (key !== null) {
         if (nonceMatches(e.data, nonce)) keyRef.current?.(key);
@@ -248,7 +276,7 @@ export function HtmlFrame({
     return () => {
       window.removeEventListener("message", onMessage);
     };
-  }, [origin, nonce]);
+  }, [origin, nonce, report]);
   // The frame's load: visible once its `load` came (or FRAME_REVEAL_MS passed). A new grant's
   // URL for the same frame (a daemon restart) keeps it visible: that page is up.
   const frameKey = `${String(load)}:${thread ?? ""}`;

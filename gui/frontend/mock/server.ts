@@ -304,7 +304,8 @@ import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { updateStateNames, type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
-import { mockPaint, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
+import { frameTag, navigated } from "./frame";
+import { insertInHead, mockPaintTag, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { serveTunnel } from "./tunnel";
@@ -1959,9 +1960,13 @@ const server = createServer((req, res) => {
       // origin is not the app's (docs/notes/bridge-2-gui.md).
       "Content-Security-Policy": "sandbox allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads",
     });
-    // A thread's page is painted in the theme from its first byte, as the daemon does.
-    const themed = url.searchParams.get("cf-page") === "1" && e.mime.startsWith("text/html");
-    res.end(themed ? mockPaint(new TextDecoder().decode(e.data)) : e.data);
+    // A thread's page is painted in the theme from its first byte, and a document a frame
+    // navigates to gets the frame's script, as the daemon does.
+    const html = e.mime.startsWith("text/html");
+    const themed = html && url.searchParams.get("cf-page") === "1";
+    const dest = req.headers["sec-fetch-dest"];
+    const tag = (themed ? mockPaintTag() : "") + (html && navigated(typeof dest === "string" ? dest : undefined, themed) ? frameTag : "");
+    res.end(tag ? insertInHead(new TextDecoder().decode(e.data), tag) : e.data);
     return;
   }
   if (req.headers.authorization !== `Bearer ${token}`) {

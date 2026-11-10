@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, TriangleAlert, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, RotateCw, TriangleAlert, X, type LucideIcon } from "lucide-react";
 import type { ThreadItemView } from "@/api/thread";
 import { readFile } from "@/api/files";
 import { CodeBody } from "@/components/files/CodeBody";
@@ -247,13 +247,14 @@ function Strip({ page, children, big }: { page: InlinePage; children: ReactNode;
   );
 }
 
-/** The strip's actions: page errors, open in the side panel, expand (the card's, in a pane with a modal), source, save. */
+/** The strip's actions: page errors, open in the side panel, reload (the page as written, from wherever it went), expand (the card's, in a pane with a modal), source, save. */
 function Actions({
   threadId,
   page,
   errors,
   onAsk,
   onExpand,
+  onReload,
   source,
   onSource,
   failed,
@@ -263,6 +264,7 @@ function Actions({
   errors: readonly PageError[];
   onAsk?: () => void;
   onExpand?: () => void;
+  onReload: () => void;
   source: boolean;
   onSource: () => void;
   failed: boolean;
@@ -280,6 +282,7 @@ function Actions({
         }}
         testId="thread-html-panel"
       />
+      <Action label="Reload page" icon={RotateCw} disabled={failed || source} onClick={onReload} testId="thread-html-reload" />
       {onExpand && <Action label="Expand" icon={Maximize2} onClick={onExpand} testId="thread-html-expand" />}
       <Action label={source ? "Show the page" : "Source"} icon={Code} pressed={source} disabled={failed} onClick={onSource} testId="thread-html-source-toggle" />
       <Action label="Artifacts come in a later release" icon={Bookmark} disabled testId="thread-html-save" />
@@ -356,6 +359,9 @@ function HtmlCard({ threadId, id, page, flash }: { threadId: string; id: string;
           threadId={threadId}
           page={page}
           errors={covered ? NO_ERRORS : errors}
+          onReload={() => {
+            setVersion((v) => v + 1);
+          }}
           source={source}
           onSource={() => {
             setSource((s) => !s);
@@ -423,6 +429,9 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
           page={page}
           errors={errors}
           onAsk={close}
+          onReload={() => {
+            setVersion((v) => v + 1);
+          }}
           source={source}
           onSource={() => {
             setPageModalSource(scope, !source);
