@@ -107,9 +107,10 @@ the other three build on. No commands, proto or GUI here: PR 2 adds the lifecycl
   loop: after each updater check, or for a dev build 30 s after start and then hourly.
   `refreshMu` keeps a slow Refresh from blocking reads; `Load` is serialized on `mu`.
 * **`claude` executable**: `advanced.claude_path`, else `claude` from PATH (the thread
-  store's rule), read on every call so the setting applies live. Each call is bounded
-  at 3 minutes (Claude Code's own git operations time out at 120 s) and gets
-  `NO_COLOR=1`, `GIT_TERMINAL_PROMPT=0`.
+  store's rule). It was read on every call so the setting applied live; it is now the
+  daemon's start-time value, like the other stores (`internal/daemon/skill_registry.go`).
+  Each call is bounded at 3 minutes (Claude Code's own git operations time out at 120 s)
+  and gets `NO_COLOR=1`, `GIT_TERMINAL_PROMPT=0`.
 
 ## Gotchas
 

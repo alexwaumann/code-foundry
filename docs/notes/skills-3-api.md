@@ -67,7 +67,7 @@ on the wire and gives the GUI everything but components: PR 4 writes the page.
 
 ## Mock
 
-`ai-marketplace` (`cof-primary/ai-marketplace`, owner AI Platform): three enterprise
+`ai-marketplace` (`acme/ai-marketplace`, owner AI Platform): three enterprise
 plugins (enterprise-data 1.4.0 with 4 skills, installed 1.3.2 so it offers an update;
 secure-coding 2.1.0 with 3, installed and enabled; release-train 0.9.3 with 5, not
 installed) and 39 skills (22 enterprise, 17 community; fixed dates, YYYYMMDD versions,

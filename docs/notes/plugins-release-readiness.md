@@ -298,38 +298,7 @@ and asks the Wails host). Panel at 420 and 280 px. The only console error is the
   0.1.2 ahead of the real one: "Update from 0.1.1"); the no-registry state ("No registry
   configured. Add one in Registries").
 
-Screenshots, branch `cf/plugins-final-shots` (base `705c44e2`, PNGs only):
-
-![gh runs dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/gh-actions-runs-dark.png)
-![gh runs light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/gh-actions-runs-light.png)
-![gh jobs dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/gh-actions-jobs-dark.png)
-![gh jobs light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/gh-actions-jobs-light.png)
-![gh runs dark 280](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/gh-actions-runs-dark-280.png)
-![gh runs light 280](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/gh-actions-runs-light-280.png)
-![tests failing dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/test-watcher-failing-dark.png)
-![tests failing light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/test-watcher-failing-light.png)
-![tests output dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/test-watcher-output-dark.png)
-![tests output light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/test-watcher-output-light.png)
-![tests failing dark 280](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/test-watcher-failing-dark-280.png)
-![tests failing light 280](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/test-watcher-failing-light-280.png)
-![click-through dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/flag-click-through-dark.png)
-![click-through light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/flag-click-through-light.png)
-![flag chip dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/flag-chip-dark.png)
-![flag chip light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/flag-chip-light.png)
-![owned paused dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/showcase-owned-paused-dark.png)
-![owned paused light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/showcase-owned-paused-light.png)
-![owned attached dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/showcase-owned-attached-dark.png)
-![owned attached light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/showcase-owned-attached-light.png)
-![owned attached dark 280](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/showcase-owned-attached-dark-280.png)
-![owned attached light 280](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/showcase-owned-attached-light-280.png)
-![installed dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-installed-dark.png)
-![installed light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-installed-light.png)
-![browse dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-browse-dark.png)
-![browse light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-browse-light.png)
-![browse update dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-browse-update-dark.png)
-![browse update light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-browse-update-light.png)
-![no registry dark](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-no-registry-dark.png)
-![no registry light](https://raw.githubusercontent.com/alexwaumann/code-foundry/cf/plugins-final-shots/docs/notes/plugins-final/settings-no-registry-light.png)
+Screenshots are on branch `cf/plugins-final-shots` (base `705c44e2`, PNGs only).
 
 ### 6. Security spot-checks: pass
 
@@ -428,7 +397,7 @@ Every gap in `docs/notes/plugins-integration.md`'s "Known gaps" that is now fixe
 | Form patterns run in JavaScript's backtracking `RegExp` (ReDoS) | Restricted instead (#204 #22: no nested quantified groups, 256 characters); a real fix is RE2 in the daemon or a worker with a timeout |
 | Nothing watches `plugins/` or a dev plugin's folder | `plugin reload` / `plugin restart`; FSEvents for it is a nicety |
 | `~/.claude.json` trust writes from isolated homes | Claude Code's file; the daemon pre-trusts thread cwds there whatever the home |
-| No scrollback read for plugin terminals | `terminal/read` is the screen; the scrollback needs an emulator method on the terminal actor; `tee` documented |
+| ~~No scrollback read for plugin terminals~~ | Done since: `terminal/read` with `scrollback` (capability `terminal.scrollback`, `ReadTerminalWith`) returns the scrollback and the screen |
 | Plugin-side event drops (SDK notification cap) are not resynced | Blocking the reader would deadlock handlers that call the host |
 | Duplicate field names across two forms collide on an outside click | Only names within one form are refused; rare |
 | Registry: no search/filter, no manifest preview before install | Three plugins; consent shows the permissions before anything runs |

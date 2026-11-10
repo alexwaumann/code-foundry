@@ -13,9 +13,11 @@ the earlier notes left open.
   the first session: in the real run the prompt was up 17 s and the session lived on.
   A session that never gets audio (a CLI `dictation start` with no GUI) now ends after
   2 min, not 30 s. Table test: `TestSilenceStop` (11 cases on the fake clock).
-* **Hardware changes.** The host observes `AVAudioEngineConfigurationChangeNotification`
-  on its engine (a byte down a non-blocking pipe, like the tap; the observer never enters
-  Go). The watcher then stops the dead capture and opens a new one for the same session
+* **Hardware changes.** The host watches the capture's hardware (since
+  `dictation-auhal.md`, CoreAudio property listeners on the AUHAL unit's device and, when it
+  follows the default, on the default input; this step used AVAudioEngine's configuration
+  change notification) and writes a byte down a non-blocking pipe; the listener never
+  enters Go. The watcher then stops the dead capture and opens a new one for the same session
   and audio stream (3 tries, 300 ms apart). If none opens, it calls Stop so the mic returns
   to idle at once. Frames that end by themselves (capture lost) now stop the session too;
   before, the composer sat listening until the 30 s auto-stop. `TestDictationWatcher`
@@ -101,7 +103,8 @@ executable in `app/`. Testing it costs another prompt answered by hand.
   engine's `unloaded` and the reload on the next press are still covered by unit tests
   only. A real pressure run (`memory_pressure` without `-S` allocates until the level is
   reached) would have squeezed the other sessions on this Mac, so it was not tried.
-* **Hardware change, live:** no Bluetooth device is paired. Switching the system's default
+* **Hardware change, live** (on AVAudioEngine, before `dictation-auhal.md`): no Bluetooth
+  device is paired. Switching the system's default
   input mid-session (to ZoomAudioDevice and back, through CoreAudio) posted no configuration
   change. The running engine stayed on the built-in microphone and the session went on;
   levels did not move. So the reopen path is covered by the watcher's table test with

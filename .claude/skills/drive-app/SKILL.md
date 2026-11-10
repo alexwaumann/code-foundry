@@ -20,7 +20,8 @@ make drive DAEMON=dev    # real `daemon --dev` on a scratch home under /tmp (or 
 ```
 
 It prints the URL and writes `gui/frontend/.playwright/drive.env` (`DRIVE_URL`,
-`DRIVE_DAEMON_PORT`, `DRIVE_VITE_PORT`, and `CODE_FOUNDRY_HOME` in dev mode). Ports are free
+`DRIVE_DAEMON_PORT`, `DRIVE_VITE_PORT`, and in dev mode exports of `CODE_FOUNDRY_HOME`,
+`CODE_FOUNDRY_ENDPOINT` and `CODE_FOUNDRY_TOKEN`). Ports are free
 ones, so other worktrees and the e2e suite are unaffected. Vite is the dev server, so edits
 hot-reload into the open page.
 
@@ -42,8 +43,9 @@ $P cli eval '() => window.__cfModule("/src/stores/ui.ts").then((m) => m.useUiSto
 - Mock mode: script state through the mock's `/__mock/*` endpoints (see `mock/server.ts`),
   e.g. `curl -X POST "http://127.0.0.1:$DRIVE_DAEMON_PORT/__mock/thread/status?id=s-1&status=attention"`
   (the mock checks no token on these).
-- Dev mode: prefix every `bin/code-foundry` call with the printed `CODE_FOUNDRY_HOME`. A bare
-  call starts a daemon on the real home and replaces the user's.
+- Dev mode: run `bin/code-foundry` only in a shell that sourced `drive.env` (or ran the printed
+  `export` line). A bare call reaches the daemon the environment names, which inside a thread
+  is the user's real one, or starts a daemon on the real home and replaces the user's.
 - The GUI speaks binary protobuf. Add `&json=1` to `$DRIVE_URL` to read its RPCs as JSON in network
   captures; the app behaves the same, but do not take timings that way.
 - Sketching inside the real app: inject DOM/CSS with `eval`, using `var(--cf-*)` tokens and

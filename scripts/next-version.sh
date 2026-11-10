@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prints the next release version from conventional commits, or nothing when there is
-# nothing to release. Shared by scripts/release.sh and .github/workflows/release.yml.
+# nothing to release. Called by scripts/release.sh (and so by the release workflow).
 #
 #   scripts/next-version.sh                 # from git: latest v* tag reachable from HEAD
 #   scripts/next-version.sh --tip           # the tip channel's tag, vX.Y.Z-tip.N

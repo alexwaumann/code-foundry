@@ -1,11 +1,11 @@
 # code-foundry — Architecture
 
-A macOS desktop app for running and supervising fleets of Claude Code sessions
+A macOS desktop app for running and supervising fleets of Claude Code threads
 across many git repositories and worktrees. Every user has `git`, `gh` (authenticated),
 and `claude` (authenticated) installed on a recent MacBook Pro running current macOS.
 
 This document is the source of truth for structure and boundaries. Feature-level
-docs live next to the code they describe. The build-out plan is in `PLAN.md`.
+docs, with the decisions behind each change, are in `docs/notes/`; git history has the rest.
 
 ## 1. Shape
 
@@ -65,7 +65,7 @@ Three processes, one protocol.
   window and exits (`gui/singleinstance.go`).
   No business logic lives in the Wails host.
   A home other than the default one gets its own WebKit data store (`gui/webstorage.go`).
-* **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry focus <id>`, …)
+* **CLI** subcommands (`code-foundry thread new --project foo`, `code-foundry thread focus <id>`, …)
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so threads can orchestrate other threads.
 
@@ -101,7 +101,7 @@ proto/codefoundry/v1/      *.proto — the API. buf-managed. Generated code is c
 gen/go/                    generated Go (connect-go + protobuf-go)
 gui/frontend/src/gen/      generated TS (protobuf-es + connect-es)
 internal/
-  daemon/                  bootstrap, listeners (UDS + loopback), token file, lifecycle
+  daemon/                  bootstrap, listeners (UDS, loopback API, loopback pages), token file, lifecycle
   wstunnel/                one Connect server stream over one WebSocket, replayed through
                            the loopback listener's bearer check and handlers
   presence/                whether the user is looking at the app (GUI clients' visibility
@@ -109,10 +109,10 @@ internal/
   api/                     Connect service handlers. Thin. One file per service.
   bus/                     typed in-process event bus (generic pub/sub, bounded, non-blocking)
   command/                 command registry: name, arg schema, when-predicate, handler
+  claudestream/            the stream-json / control protocol client (pure Go)
   store/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
     thread/                threads: claude -p over stream-json, items, naming, status, resume
-    claudestream/          the stream-json / control protocol client (pure Go)
     project/               registered projects, worktrees, git status, FSEvents stream
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
     gitops/                git/gh operations per worktree (fetch, pull, push, PR); editor, Finder, browser
@@ -141,6 +141,9 @@ internal/
     search/                the search dialog's history and Agent search's hidden runs
                            (claude over stream-json, not threads), quote-verified hits, Promote
                            (docs/notes/search-5-agent-daemon.md)
+    settings/              $CONFIG/settings.toml: schema, validation, reload on hand edits
+    skill/                 the Skills marketplace: Claude Code's marketplaces, installs (§10)
+    usertheme/             the user's theme files in <home>/themes (§13)
   capability/              scoped bearer tokens (Agent search's run): the RPCs and commands a
                            scope allows, issue/revoke/expiry; the loopback auth and the
                            command handler check them
@@ -155,8 +158,18 @@ internal/
   paths/                   XDG-ish paths: config dir, socket, token, db, logs, worktrees, projects
   guide/                   the agent guide and the skills' references, rendered from commands and settings
   skills/                  the Claude Code skills written for every thread at daemon start
-                           (orchestrate, help, plugin), and Ember's own (ember)
+                           (the entry skill, orchestrate, help, plugin, pages), and Ember's own (ember)
   fsx/                     the home-directory boundary, directory completion, file reads and writes
+  fuzzy/                   path ranking for `@` completion and the file finder (pure)
+  logfile/                 a size-capped log file with one rotation (daemon and plugin logs)
+  model/                   the one list of Claude models the app offers
+  pricing/                 Claude API token prices for the usage figures
+  termlabel/               the label contract on terminals (kind, owner)
+  tcc/                     which process macOS's privacy checks (TCC) treat as responsible
+  version/                 the build version and provenance
+  bridge/, pagelib/,       what HTML pages the model shows load from /cf/ and the preview
+  preview/, proxyfetch/,   route, cf.fetch, and the daemon's view of the colour themes (§13)
+  theme/
 pluginsdk/                 the plugin SDK, its own module (stdlib only, Go 1.24): manifest, protocol,
                            Serve, Host, ui (view model), plugintest (§10)
 plugins/                   example plugins, built by `make plugins`: hello (every protocol method),
@@ -166,9 +179,10 @@ gui/
   frontend/                Vite + React 19 + TypeScript + Tailwind v4 + shadcn + Zustand
   build/                   Wails build assets; darwin Taskfile builds the bare GUI executable
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
-                           next-version.sh, ghostty-vt.sh, whisper-cpp.sh
-docs/                      this file, PLAN.md, ADRs under docs/adr/, GETTING-STARTED.md (embedded by
-                           embed.go, package docs, for the help skill)
+                           next-version.sh, ghostty-vt.sh, whisper-cpp.sh, attest.sh, drive.sh,
+                           guide-eval/
+docs/                      this file, GETTING-STARTED.md and THEMES.md (embedded by embed.go,
+                           package docs, for the help skill), notes/ (decisions and gotchas, a note per step)
 ```
 
 Module path: `github.com/alexwaumann/code-foundry`.
@@ -186,7 +200,7 @@ Transport:
 |---|---|---|
 | CLI, Wails host | Unix socket `$CONFIG/daemon.sock` | filesystem permissions (0600) |
 | Frontend, unary calls | `http://127.0.0.1:<random port>` | bearer token from `$CONFIG/daemon.token` (0600) |
-| Frontend, every stream (the dictation overlay's too) | `ws://127.0.0.1:<same port>/stream/<procedure>`, one WebSocket per stream through `api/wsFetch.ts`, with no fallback to fetch, never on the Unix socket or the pages listener (`internal/wstunnel`, `docs/notes/ws-tunnel.md`, `docs/notes/ws-transport.md`). A daemon from before the tunnel opens the update dialog (`TUNNEL_SINCE`, `stores/update.ts`) | `allowedOrigin` before the upgrade, then the same bearer token in the first frame; the client counts what it has taken and the daemon stops 8 MiB ahead |
+| Frontend, every stream (the dictation overlay's too) | `ws://127.0.0.1:<same port>/stream/<procedure>`, one WebSocket per stream through `api/wsFetch.ts`, with no fallback to fetch, never on the Unix socket or the pages listener (`internal/wstunnel`, `docs/notes/ws-tunnel.md`, `docs/notes/ws-transport.md`). A daemon from before the tunnel opens the update dialog (`TUNNEL_SINCE`, `lib/update.ts`) | `allowedOrigin` before the upgrade, then the same bearer token in the first frame; the client counts what it has taken and the daemon stops 8 MiB ahead |
 | CLI inside a thread | `CODE_FOUNDRY_ENDPOINT` (the loopback listener) | `CODE_FOUNDRY_TOKEN`; both set in every thread's Claude env, never auto-starts a daemon |
 | CLI inside Agent search's hidden run | `CODE_FOUNDRY_ENDPOINT` | `CODE_FOUNDRY_TOKEN` is a token scoped to that search (`internal/capability`): `thread.search`, `thread.read` and its own `search.report` only, revoked when the run ends (`docs/notes/search-5-agent-daemon.md`) |
 
@@ -196,8 +210,9 @@ lands in its own thread's bottom panel (`docs/notes/actions-1-daemon.md`). The d
 the directory of `CODE_FOUNDRY_BIN` (the CLI it runs as) on the PATH of everything it
 starts, so a thread finds `code-foundry` by name (`docs/notes/orch-small-fixes.md`).
 
-Both listeners serve the same handlers. The port and token are written by the daemon on
-start; the Wails host reads them and injects them into the page before load.
+The Unix socket and the loopback listener serve the same handlers. The port and token are
+written by the daemon on start; the Wails host reads them and injects them into the page
+before load. A third listener, the pages listener, serves no API at all (§13).
 
 Services (v1):
 
@@ -211,7 +226,14 @@ Services (v1):
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
   clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`;
   with `save` the same with no wake time, `saved_at` instead of `snoozed_until`;
-  `docs/notes/save-for-later-1-daemon.md`), Watch (server stream of every thread), Wait (block until a thread settles, by default: idle or needs attention, a pending prompt included; or until it is idle, needs attention, has an error or is disconnected; `thread.wait`, `docs/notes/agents-1-wait-events.md`, `docs/notes/thread-wait-settled.md`), Label, Report and SetBudget (agent metadata: labels, a report, a spending limit whose budget stop interrupts Claude into NEEDS_ATTENTION "budget reached"; with Create's created_by and brief, `docs/notes/agents-2-metadata.md`), Subscribe, Unsubscribe and ListSubscriptions (wake subscriptions: the daemon sends a thread a wake message, a user message with origin WAKE, when a target thread settles or meets another condition, or an action run finishes; persisted, edge-triggered from the thread store's commit and again on each new pending request, 60 per subscriber per hour; `thread.new --notify`; `docs/notes/agents-4-wake.md`, `docs/notes/wake-detail.md` for what a settled wake says; WatchThread carries the watched thread's list; StopWaiting removes its wakes and stops its background shells: `docs/notes/wait-list-daemon.md`), StageAttachment (images and PDFs a message refers to, as bytes or an absolute path the daemon reads; `docs/notes/pdf-attachments-1-daemon.md`, `docs/notes/attach-by-path.md`).
+  `docs/notes/save-for-later-1-daemon.md`), Watch (server stream of every thread), Wait (block until a thread settles, by default: idle or needs attention, a pending prompt included; or until it is idle, needs attention, has an error or is disconnected; `thread.wait`, `docs/notes/agents-1-wait-events.md`, `docs/notes/thread-wait-settled.md`), Label, Report and SetBudget (agent metadata: labels, a report, a spending limit whose budget stop interrupts Claude into NEEDS_ATTENTION "budget reached"; with Create's created_by and brief, `docs/notes/agents-2-metadata.md`), Subscribe, Unsubscribe and ListSubscriptions (wake subscriptions: the daemon sends a thread a wake message, a user message with origin WAKE, when a target thread settles or meets another condition, or an action run finishes; persisted, edge-triggered from the thread store's commit and again on each new pending request, 60 per subscriber per hour; `thread.new --notify`; `docs/notes/agents-4-wake.md`, `docs/notes/wake-detail.md` for what a settled wake says; WatchThread carries the watched thread's list; StopWaiting removes its wakes and stops its background shells: `docs/notes/wait-list-daemon.md`), StageAttachment (images and PDFs a message refers to, as bytes or an absolute path the daemon reads; `docs/notes/pdf-attachments-1-daemon.md`, `docs/notes/attach-by-path.md`) and ReadAttachment (a staged file's bytes).
+  Also RegenerateName (a new name from the last three turns, `docs/notes/regenerate-thread-name.md`),
+  RetrySetup, CancelSetup and DiscardSetup (a background setup's ways out, §6), AddProject and
+  RemoveProject (a thread's project set, `docs/notes/thread-project-set.md`), LinkPullRequest
+  (a link by hand) and PullRequestOwner (the thread a copied link comes from;
+  `docs/notes/pr-daemon-actions.md`, `docs/notes/pr-task-forward.md`), CheckPlacement (where a
+  new thread would go, nothing made; `docs/notes/thread-info-facts.md`) and Ask (a created
+  thread asks its creator, who gets a wake; `docs/notes/thread-ask.md`).
   Close and Reconnect remain in the proto for compatibility; no command calls them: the
   daemon starts a thread's process when a message is sent and stops it once the thread
   has idled at its prompt past its prompt cache expiry
@@ -236,9 +258,9 @@ Services (v1):
   `status` (busy, idle, needs-attention; error when the process ended mid-turn or did
   not start) with `status_reason` and `status_changed_at`,
   persisted (`docs/notes/thread-status-persistence.md`).
-* `ThreadService` — the conversation: ListItems, Watch (server stream: an items
+* `ThreadService` — the conversation: ListItems, WatchThread (server stream: an items
   snapshot, then appended/updated items, text deltas and pending-request changes, all
-  seq-ordered; an open Watch marks the thread's turns seen while a GUI window is
+  seq-ordered; an open WatchThread marks the thread's turns seen while a GUI window is
   visible and key, `docs/notes/alerts-foreground.md`),
   Send (also while busy; a stopped thread starts with the message), Respond (a permission request or AskUserQuestion: allow,
   allow for session, deny with a reason, answers), Interrupt, SetModel,
@@ -248,12 +270,18 @@ Services (v1):
   new process gets the thread's allow-for-session grants again as `--allowedTools` /
   `--add-dir`; a stopped thread's model, mode and effort changes only go to its row), McpStatus and McpReconnect (the thread's MCP servers as Claude last
   reported them, checked at the start of every turn, kept and persisted while the thread
-  is stopped; a refresh or reconnect starts a stopped thread without a prompt; Watch carries
+  is stopped; a refresh or reconnect starts a stopped thread without a prompt; WatchThread carries
   each check; `docs/notes/mcp-panel.md`), SlashCommands (the commands Claude reports in its
   initialize reply and `commands_changed` pushes, minus a daemon-side deny table, kept and
-  persisted while the thread is stopped; the items snapshot and Watch carry them; Send refuses a message starting with
-  a command the app replaces, such as `/clear`; `docs/notes/slash-commands-1-daemon.md`).
-  The items snapshot and Watch also carry the thread's subagent runs (`agents`: every
+  persisted while the thread is stopped; the items snapshot and WatchThread carry them; Send refuses a message starting with
+  a command the app replaces, such as `/clear`; `docs/notes/slash-commands-1-daemon.md`),
+  Compact (`/compact`), Restart (a running process again with `--resume`, to pick up what
+  changed outside the conversation; `docs/notes/plugins-env-restart.md`), StopShell (one of
+  the thread's background shells; `docs/notes/thread-servers.md`), ListPrompts (the user's
+  earlier prompts; `docs/notes/prompt-history-1-daemon.md`), Search (§6) and AddNote (a
+  `note` item, no turn). ShowHtml, ShowTheme, PageStorage, SetPageStorage and ProxyFetch
+  serve the pages the model shows (§13).
+  The items snapshot and WatchThread also carry the thread's subagent runs (`agents`: every
   Agent run, foreground, background and nested, in spawn order, with live status,
   activity and report; `docs/notes/agents-1-daemon.md`).
   See `docs/notes/rendered-threads-1-daemon.md`
@@ -283,9 +311,10 @@ Services (v1):
   chat is its resident thread. A thread Ember or a thread below it creates without a
   model runs on `ember.worker_models` (round robin) at `ember.worker_effort`
   (`CreateThreadRequest.model_defaulted`: the CLI's settings default counts as none).
-* `TerminalService` — Attach (server stream: initial screen snapshot then live output
-  chunks), Write (input bytes), Resize, Detach, Kill, Remove, and Close (kill, wait for
-  the exit, remove; shells only).
+* `TerminalService` — Create, List, Get, Attach (server stream: initial screen snapshot then
+  live output chunks; cancelling it detaches), Write (input bytes), Resize, Kill, Remove,
+  Close (kill, wait for the exit, remove; shells, action runs and skill setups only) and
+  Watch.
 * `ProjectService` — Register (a git repository, or any folder as a project without git;
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
   it directly, the CLI through `project add <folder>`), InspectFolder (what Register would
@@ -293,7 +322,7 @@ Services (v1):
   Project dialog asks first and offers a folder of repos as a rooted workspace through
   the `project.add-workspace` command, which registers each repository and creates the
   workspace with the folder as its root; `docs/notes/workspaces-v2-6-scan.md`),
-  Unregister, List, ListWorktrees, CreateWorktree (optionally fetching the base first),
+  Unregister, List, Get, CreateWorktree (optionally fetching the base first), RemoveWorktree,
   DeleteBranch (a branch no worktree has checked out, `-d` unless forced, origin's on
   request; `docs/notes/orch-cli-batch.md`), CleanupWorktrees (remove worktrees whose work is in origin/<default>: `merged_clean`,
   no thread (archived ones aside; any of its checkouts) or terminal on it; never deletes branches;
@@ -305,7 +334,9 @@ Services (v1):
   reads instead of re-deriving git rules;
   `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`,
   `docs/notes/projects-redesign-2-leftovers.md`),
-  ListRefs, Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a),
+  Refresh (a status reconcile now), Rename (the display name only; nothing on disk), ListRefs,
+  Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a), GetWorktreeFileDiff
+  (one file's two sides),
   InitGit (`git init` and an empty first commit in a project without git;
   `docs/notes/add-project-2-nogit.md`), SearchGitHub and LookupGitHub (GraphQL through
   the gh store, for the Add Project dialog), Clone (server stream: `gh repo clone` into
@@ -315,10 +346,12 @@ Services (v1):
   ListPublishOwners (the viewer and their organizations with the visibilities each
   allows when GitHub says) and Publish (`gh repo create --source --remote origin --push`
   for a git project without origin; gh's error verbatim;
-  `docs/notes/add-project-4-create.md`).
+  `docs/notes/add-project-4-create.md`) and Delete (unregisters a project Create made and
+  removes its folder, for a new project the dialog cancels).
   CompareWorktree lists what differs between any two of a checkout's merge base, working
-  tree, index or a ref, GetWorktreeCompareFile reads one file's two sides on demand, and
-  ListCompareCommits lists the commits between them (`docs/notes/diff-commits.md`);
+  tree, index or a ref, GetWorktreeCompareFile reads one file's two sides on demand,
+  ListCompareCommits lists the commits between them and GetCompareCommit one commit's
+  message (`docs/notes/diff-commits.md`);
   refs and paths from callers never reach git as given (`docs/notes/diff-viewer-1.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, six months of stats (`docs/notes/gh-stats-six-months.md`),
@@ -326,9 +359,12 @@ Services (v1):
   Data events go out only when data changed; `Polled` after every poll carries the
   freshness time. The PR detail panel: GetPullRequestDetail (on demand, cached per PR,
   invalidated by the poll's fingerprints), ListReviewerCandidates, SetReviewRequest,
-  RevertPullRequest (`docs/notes/gh-pr-detail.md`), SubmitPullRequestReview and
+  RevertPullRequest (`docs/notes/gh-pr-detail.md`), MergePullRequest, SetPullRequestDraft,
+  SetPullRequestAutoMerge and SetPullRequestCheckbox (each invalidates the detail),
+  SubmitPullRequestReview and
   AddPullRequestComment (GitHub's refusals relayed as FAILED_PRECONDITION;
-  `docs/notes/pr-review-submit-1-daemon.md`).
+  `docs/notes/pr-review-submit-1-daemon.md`), and GetPullRequestDiff and GetPullRequestFile
+  for the panel's Code tab (§7).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
@@ -342,15 +378,17 @@ Services (v1):
   optionally the result that stands if the user declines; the GUI asks again, the CLI
   prompts again on a terminal, and `--yes` never answers it
   (`docs/notes/dirty-worktree-confirm.md`).
-* `UiService` — WatchIntents (server stream: focus thread, open palette, …); GetTheme (the
-  theme last published, for the dictation overlay's page); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
+* `UiService` — WatchIntents (server stream: focus thread, open palette, …); PublishTheme
+  (the GUI's active theme and its resolved slots, §13) and GetTheme (the theme last
+  published, for the dictation overlay's page); PublishThemeReport (the GUI's contrast
+  report on a user theme, which `theme save` and `theme check` print); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
   changes only that thread's side panel and never a window's selection; `ui.presence`
   tells a thread's model whether the user is looking and whether a window shows its
   thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
   ("settings:<page>"), a button on the toast (`docs/notes/memory-page.md`).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
-  intents (sources project, workspace, terminal, thread list, thread, gh, gitops, settings,
-  update, action, plugin, skill, memory, search, ui; the thread source carries threads' pending requests only, a
+  intents (sources project, workspace, terminal, thread list, thread, gh, gitops, theme,
+  settings, update, action, plugin, skill, memory, search, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass
@@ -372,11 +410,12 @@ Services (v1):
   (`docs/notes/custom-backdrop.md`); Update refuses `custom` unless `appearance.backdrop_file`
   names one of them (`docs/notes/backdrop-custom-guard.md`).
 * `UpdateService` — Get, Check, Download, Install, Relaunch, RequestRestart, Watch. The
-  24h release check on the `update.channel` setting's channel (stable: the newest full
+  hourly release check on the `update.channel` setting's channel (stable: the newest full
   release; tip: the highest release, prereleases included; re-checked at once when the
   setting changes; `Newer` is the only install rule, so no switch offers a downgrade),
-  download progress, and relaunch and restart requests. Download (`app.update`) only
-  stages the release in `app.new`; the install on disk changes inside the restart, so a
+  download progress, and relaunch and restart requests. A check that finds a newer release
+  downloads it at once (`docs/notes/update-auto-download.md`); Download (`app.update`) is
+  the fallback by hand. A download only stages the release in `app.new`; the install on disk changes inside the restart, so a
   window reopened meanwhile still matches its daemon. Nothing restarts automatically.
   `app.restart` (the GUI's "Restart Now"; confirmed, warning about busy threads) installs
   a downloaded update (two renames), publishes `restart_requested`, then the daemon exits
@@ -417,10 +456,11 @@ Services (v1):
   verb refuses what the tab could not edit, nothing from inside the file reaches its answer, and
   the tab's Save and tell thread sends one ordinary message after the write
   (`docs/notes/file-edit-3-agent.md`).
-* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, Watch. Per-project
+* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, LastRun, Watch. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and
-  their runs (in memory, 50 per project). A run belongs to a thread or a worktree like a
+  their runs (in memory, 50 per project; a record of each run, 500 per project, persists
+  for `action list` and LastRun, the action a thread's info card offers). A run belongs to a thread or a worktree like a
   shell, runs `$SHELL -lc <command>` there with `CODE_FOUNDRY_PROJECT_ROOT` and
   `CODE_FOUNDRY_WORKTREE`, in a `kind=action` terminal or as a background process whose
   last 64 KiB of output WaitRun returns; StopRun ends one (`action.stop`, and an
@@ -430,7 +470,8 @@ Services (v1):
   (`docs/notes/actions-1-daemon.md`). The action.* commands are the CLI's surface.
 * `PluginService` — List, Enable (with consent, else the text to consent to), Disable,
   Restart, Dev (link a folder and enable it), Reload, Logs, FollowLogs, ListSecrets,
-  DeleteSecret, Watch. Plugins are executables in `$CONFIG/plugins/<name>` the daemon runs
+  DeleteSecret, Watch, and the registry's Browse, RefreshRegistries, Install, Update and
+  Uninstall (`docs/notes/plugins-7-registry.md`). Plugins are executables in `$CONFIG/plugins/<name>` the daemon runs
   and speaks newline-delimited JSON-RPC 2.0 with over stdio; their manifest commands are
   `plugin.<name>.<command>` (§10; `docs/notes/plugins-1-core.md`; design in
   `docs/sketches/plugins/`).
@@ -456,7 +497,7 @@ Services (v1):
   settings, model and download, this Mac, the open session, mic denied, the host's
   Accessibility report, the window's composer target), Download, CancelDownload, RemoveModel, Start, Stop,
   Session (one session's levels, phrases and end), Audio (the Wails host's microphone
-  client stream), MicDenied, Accessibility, ComposerTarget: voice dictation into the composers
+  client stream), MicDenied, Accessibility, Inputs (the host's input devices), ComposerTarget: voice dictation into the composers
   and, through the host's hold key, any app, transcribed on this Mac by the
   code-foundry-dictate engine the daemon runs (`docs/notes/dictation-2-daemon.md`,
   `docs/notes/dictate-anywhere.md`).
@@ -466,6 +507,12 @@ Services (v1):
   search, a hidden claude -p run on the utility model that searches the user's threads with
   the CLI and reports quote-verified hits; Promote continues it as a thread
   (`docs/notes/search-5-agent-daemon.md`).
+* `ThemeService` — List, Watch: the curated catalog's ids and the user's theme files with
+  their contents (`internal/theme`, `internal/store/usertheme`, files in `<config
+  home>/themes`), read only; the `theme.*` commands save, copy and delete, and the
+  `appearance.theme_dark` / `theme_light` settings pick. The daemon derives no colour: the
+  GUI resolves every theme's slots (`docs/notes/user-themes.md`, `docs/THEMES.md`). The GUI
+  gets it from EventService's `theme` source.
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -480,16 +527,15 @@ One actor per terminal:
 
 ```
 PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (feed)
-                                          ├──► ring buffer (last 1 MiB of raw output)
                                           └──► attached subscribers (bounded channels)
 ```
 
 * The actor is the only goroutine that touches its vt instance. cgo is not thread-safe
   across goroutines without serialization; we serialize by construction.
-* `Attach` sends a **snapshot** built from the vt grid (rows with SGR attributes, cursor,
-  alt-screen flag, scrollback when the binding exposes it), then live chunks. The snapshot
-  is a byte sequence xterm.js can consume after a reset. If the binding cannot serialize
-  scrollback, fall back to replaying the ring buffer for primary-screen history.
+* `Attach` sends a **snapshot** built by libghostty's VT formatter (scrollback, the screen
+  with SGR attributes, cursor, modes, and the primary screen under an alternate one;
+  `snapshot.go`), then live chunks. The snapshot is a byte sequence xterm.js can consume
+  after a reset.
 * Slow subscribers are dropped, not blocked. The PTY reader never stalls on a client.
 * The terminal store is program-agnostic. It spawns argv/env/cwd. Shells are its only
   production use since threads run headless; its Observer and ScreenText hooks remain
@@ -590,11 +636,12 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   same verdict first over every worktree the app made for it
   (`api.Project.WithBeforeUnregister`); a member whose project is no longer registered is
   left out of a start with one timeline note.
-* **Skills**: at every start the daemon writes four Claude Code skills, `code-foundry`
+* **Skills**: at every start the daemon writes five Claude Code skills, `code-foundry`
   (the entry skill: what the app is, the one rule, which skill to read, and
   `daemon.capabilities` for what exists now; `docs/notes/control-4-capabilities.md`),
   `code-foundry-orchestrate` (delegating work to other threads), `code-foundry-help`
-  (how-to questions about the app) and `code-foundry-plugin` (building plugins, §10), to
+  (how-to questions about the app), `code-foundry-plugin` (building plugins, §10) and
+  `code-foundry-pages` (HTML pages that call the app through `/cf/bridge.js`, §13), to
   `<config home>/claude/.claude/skills` (`internal/skills`: static SKILL.md files
   embedded, references rendered from the registry and the settings schema through
   `internal/guide`, `docs/GETTING-STARTED.md` embedded by the `docs` package). Every spawn passes `<config home>/claude` as its first
@@ -731,8 +778,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `ThreadService.Search` (`thread.search`): smart case, all words, names only under three
   characters; the user's threads by default (the sidebar's, archived included), wider with
   include flags; a hit goes to the oldest thread in scope holding the item; at most the
-  5,000 most recently indexed matches are read. `Options.Unindexed` keeps a thread out
-  (`docs/notes/search-3-index.md`).
+  5,000 most recently indexed matches are read (`docs/notes/search-3-index.md`).
 * **Hidden children** (`sidebar.go`): a thread another thread created is its creator's to
   manage and is not shown in the sidebar while its creator exists (removed, not
   archived, shows it); nothing overrides that, and nothing is stored: `InSidebar` is the
@@ -774,7 +820,7 @@ Every user-facing action is a `command.Command`:
 type Command struct {
     Name    string            // "thread.rename"
     Title   string            // "Rename Thread"
-    Args    ArgSchema         // for CLI flags and palette prompts
+    Args    []ArgSpec         // for CLI flags and palette prompts
     When    func(Context) bool // context-aware availability
     Run     func(context.Context, Context, Args) (Result, error)
 }
@@ -848,7 +894,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   them. It also holds the end of a large message in a visible window, so `WatchThread`
   sends two more heartbeats 10 ms and 100 ms after a snapshot, or a thread could take 5 s
   to open (`docs/notes/thread-open-stall.md`). `runStream` reconnects an attempt that heartbeated and then went silent for three
-  intervals, and the thread Watch (`resyncOnVisible`) reopens for a fresh snapshot when
+  intervals, and WatchThread (`resyncOnVisible`) reopens for a fresh snapshot when
   the page becomes visible again (`docs/notes/thread-render-stall.md`).
 * A thread's content pane is `components/thread`: a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
@@ -857,7 +903,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   colours by `lib/codeTheme.ts`; `docs/notes/file-viewer-2-code-foundation.md`),
   lowlight-highlighted markdown in the terminal palette, and the
   follow-up composer with a pending permission or question docked into it. Its items live
-  in `stores/thread.ts`, fed only by that thread's `ThreadService.Watch` (snapshot, then
+  in `stores/thread.ts`, fed only by that thread's `ThreadService.WatchThread` (snapshot, then
   seq-ordered events, batched per frame); the EventService `thread` source only carries
   pending requests. Sending, interrupting (the composer's button only; no keybinding),
   answering (`thread.respond`; every pending request docks, oldest first, answerable by
@@ -881,13 +927,13 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   terminal the same chords are `terminal.find` and its siblings: the same bar over the
   terminal, searching its scrollback, or only the screen in the alternate screen (vim, less)
   (`terminal/find.ts`, `docs/notes/terminal-find.md`).
-* Only visible views are watched or attached: one Watch per thread on screen
+* Only visible views are watched or attached: one WatchThread per thread on screen
   (`stores/thread.ts` `startThreadWatch` counts its holders), one Attach per terminal
   view (a plugin terminal shown in the bottom panel is not attached in its node too).
   Switching threads (or bottom panel tabs) ends the old stream and opens the new one. Background
   threads cost nothing in the frontend. Watching is also how the daemon knows a thread
-  is being looked at: while a thread has a Watch subscriber, finished turns count as
-  seen (`docs/notes/phase2-integration.md` describes the same rule for the old Attach).
+  is being looked at: while a thread has a WatchThread subscriber and a GUI window is
+  visible and key (attended), finished turns count as seen (`docs/notes/alerts-foreground.md`).
 * Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
   Requests and Projects entries, then a flat list of threads and nothing else: pinned
   threads (newest created first), then the ones waiting on the user (prompts, then
@@ -921,8 +967,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   toggle), chips by project id, Work in, a Runs in picker for the primary (a project or
   the workspace's folder), collision hints under the chips, and "New thread on this
   branch" (`thread.new-like`) prefilled from a thread so only the prompt is typed:
-  `docs/notes/workspaces-v2-3-composer.md`; a worktree's overview is a side panel tab, not
-  a page; a shell is never selected), command palette overlay. Under the content pane, a thread and the Projects
+  `docs/notes/workspaces-v2-3-composer.md`; a shell is never selected), command palette overlay. Under the content pane, a thread and the Projects
   page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`; opening a thread's
   empty one starts a shell, and a panel hides when its last shell goes:
   `docs/notes/bottom-panel-autoshell.md`), the only place shells show: tabs for the shells it owns, derived from the terminal list by the owner
@@ -956,7 +1001,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   Usage, Agents and Threads surfaces and their `view.panel.*` verbs are gone: the thread
   info card shows what they did (`docs/notes/thread-info-card.md`). A depth-1 subagent row
   or a strip name above the composer (background runs) shows that run read-only in the
-  content pane in the thread's place, the thread staying selected on its one Watch:
+  content pane in the thread's place, the thread staying selected on its one WatchThread:
   `thread.agent.open`, back up by Escape or `thread.agent.up`;
   `docs/notes/subagent-view.md`. Every
   palette command is reachable without the mouse, and common ones also have buttons that
@@ -986,17 +1031,18 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   Board while any of them shows (inline for the row alone, core with the chat or the
   Board). cmd+shift+a visits Ember's attention first; the window title, the Dock badge
   and lists leave it out.
-* Skills page (`docs/notes/skills-4-gui.md`): Settings → Skills is a GUI page
-  (`components/settings/guiPages.ts`, `components/skill/settings`) over `stores/skill.ts`,
-  held open (`openSkillMarketplace`) while it shows. Installed rows (plugins and skills,
-  "from <marketplace>" or Local, Enabled / Disabled / Needs setup / Missing) carry the
-  actions `installedActions` gives; Browse is the daemon's search (150 ms debounce, tier
-  and kind chips, at most 200 hits in a `VirtualStack` on the page's scroll box);
-  Registries lists Claude Code's marketplaces or says how to add one. Disable, Uninstall
-  and Remove confirm in the page's dialog and answer the daemon's confirm for that call
-  (`stores/skillConfirm.ts`, as `plugin.uninstall` does). A GUI-only page lists its
-  sections in its `SettingPageView`, and the settings search finds them by name
-  (`searchGuiPages`): a hit opens the page at the section.
+* Skills page (`docs/notes/skills-page-redesign.md`, over `docs/notes/skills-4-gui.md`):
+  Settings → Skills is a GUI page (`components/settings/guiPages.ts`,
+  `components/skill/settings`) on the shared catalog layout (`components/settings/catalog`)
+  over `stores/skill.ts`, held open (`openSkillMarketplace`) while it shows. One virtualized
+  list (`VirtualStack`) holds the installed rows, grouped Needs you (an update, setup to run
+  or a missing folder), Enabled and Disabled, then the marketplace's: the installed groups
+  filter in the client, the marketplace is the daemon's search (150 ms debounce, tier and
+  kind chips, at most 200 hits). Registries is a dialog (`RegistriesDialog.tsx`). A row's
+  switch enables or disables at once; Uninstall and Remove confirm in the page's dialog and
+  answer the daemon's confirm for that call (`stores/skillConfirm.ts`). A GUI-only page lists
+  its sections, and the settings search finds them by name (`searchGuiPages`): a hit opens
+  the page at the section.
 
 ## 9. Project and GitHub stores
 
@@ -1047,11 +1093,11 @@ Plugins extend the app without changing it: separate executables, written by use
 mostly by agents, that the daemon runs and that contribute commands, side-panel
 surfaces, thread flags, a share of every new thread's environment, and Claude threads and
 terminals of their own. Design: `docs/sketches/plugins/` (`DECISIONS.md` wins); what was
-built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
+built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
 
 * **Package.** A folder `$CONFIG/plugins/<name>` with a `plugin.json` (name, version,
   protocol, `exec`, permissions, commands, surfaces) and the executable. `plugin dev`
-  links a folder there; registry installs (PR 7) unpack a release tarball there. A
+  links a folder there; registry installs unpack a release tarball there. A
   plugin found on disk is disabled until the user consents to its permissions
   (`commands` globs, `events` sources, `threadStatus`, `sessionEnv`, `secrets`,
   `threads`, `terminals`, `api`: the registry entry's keys); more permissions on an
@@ -1106,23 +1152,24 @@ built: `docs/notes/plugins-1-core.md` through `plugins-6-thread-terminal.md`.
 * **SDK** (`pluginsdk/`, a nested module, stdlib only, Go 1.24, `replace`d into the
   main module): manifest types and validation, the JSON-RPC `Conn`, `Serve` and `Host`;
   `pluginsdk/ui` (typed nodes, builders, `Validate` with the host's rules);
-  `pluginsdk/plugintest` (a fake host). Plugin repositories `go get` it pinned at a
-  commit until it is tagged `pluginsdk/vX.Y.Z`.
-* **GUI** (PR 5): plugin surfaces are a generic surface kind in the side panel
+  `pluginsdk/plugintest` (a fake host). Releases are tagged `pluginsdk/vX.Y.Z`; plugin
+  repositories `go get` the tag on the commit the daemon was built from, else that commit
+  (`skills.SDKPin`).
+* **GUI**: plugin surfaces are a generic surface kind in the side panel
   (`panel.plugin.<name>.<surface>`), available exactly when their show command is; one
   renderer component per node kind, drawn with the app's own components (no HTML from
   plugins, no filled buttons, neutral header icon, emerald only for `ok`); one
   `WatchSurface` per visible surface; host-side `command`, `openUrl` and `copy`; form
   drafts per instance and tab; the consent dialog is `plugin.enable`'s confirm.
 * **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop: copy
-  the template (`plugins/examples/minimal`, embedded), `go get` the SDK at the commit
-  this daemon was built from, `plugin dev`, `plugin logs`, `plugin surface` / `plugin
+  the template (`plugins/examples/minimal`, embedded), `go get` the SDK at this daemon's
+  pin, `plugin dev`, `plugin logs`, `plugin surface` / `plugin
   act`, plugintest, release tarballs (`make release`, one script for `release.yml` on
   the runner the user names and for a release by hand when they have none), the
   registry pull request. Its CLI and host
   command references are rendered from the registry at start; reserved names, event
   sources, host facts and view limits are filled in from the code.
-* **Registry** (PR 7): `alexwaumann/code-foundry-plugins` serves `index.json` built from
+* **Registry**: `alexwaumann/code-foundry-plugins` serves `index.json` built from
   `plugins/<name>.json` entries (release tarball URLs per macOS architecture with
   SHA-256, permissions equal to the manifest's), validated by its CI. No registry is
   configured by default: `plugins.registries` is empty until the user adds one.
@@ -1159,7 +1206,8 @@ on a new epoch while the page is open and runs the `skill.*` commands for every 
   emitter.
 * Pure functions with table tests for anything with branches: stream status, layout,
   command availability, snapshot serialization.
-* Every store has an interface in its own package and a fake in `<store>/<store>test`.
+* A store's fake lives in `<store>/<store>test` (every store but ember, memory, search and
+  usertheme has one).
 * Go 1.26 (required by the libghostty-vt bindings). `context.Context` first, errors wrapped with `%w`, no panics outside `main`.
 * Logging: `log/slog`, JSON to `$CONFIG/logs/daemon.log`, text to stderr in dev.
 * Frontend never imports generated protobuf types outside `src/api/`; it maps to view
@@ -1171,3 +1219,40 @@ on a new epoch while the page is open and runs the `skill.*` commands for every 
 * Keeping PTYs alive across daemon restarts.
 * Remote daemons. The protocol allows it; nothing implements it.
 * A custom terminal renderer. xterm.js is the renderer until measured otherwise.
+
+## 13. Pages
+
+HTML pages the model shows (`view.inline` in the conversation, `view.panel.page` and a File
+tab's preview in the side panel) run in sandboxed frames that never touch the API
+(`docs/notes/bridge-1-daemon.md`).
+
+* **The pages listener** (`internal/daemon/pages.go`): a third loopback listener, its port
+  kept in `pages.port` so a page's origin survives restarts. It serves only what a page loads
+  without a credential: `/preview/<grant>/` (`internal/preview`: a grant from
+  `FilesystemService.PreviewFile`, bound to one directory tree or one file, is the URL's
+  credential) and `/cf/`. Nothing behind the token is served there, and the API listener's
+  CORS refuses the pages origin, so a page holding a leaked token still cannot call the API.
+* **`/cf/bridge.js`** (`internal/bridge`) gives a page `window.cf`: run the registry verbs its
+  thread may run, subscribe to daemon events, read the theme, `cf.storage` and `cf.fetch`.
+  Every call is a `postMessage` to the GUI (`lib/bridge.ts`, `stores/bridgeHost.ts`), which
+  answers only its own frame and invokes the command with its own token
+  (`docs/notes/bridge-2-gui.md`).
+* **The page library** (`internal/pagelib`, `docs/notes/page-library.md`): React as ES
+  modules, `@cf/ui` (the app's `components/ui`), `@cf/icons` (lucide-react), the TSX loader
+  `/cf/jsx.js` and the Tailwind browser runtime with the app's theme, so a page needs no
+  build step. `dist/` is built from the GUI's sources by `make pagelib` (which `make gen`
+  runs) and committed; `make check` rebuilds it and fails on a diff.
+* **The theme**: the GUI publishes its active theme and resolved slots with
+  `UiService.PublishTheme`; the pages listener serves them as `/cf/theme.css` and
+  `/cf/theme.json` (`internal/theme`, `docs/notes/theme-css-route.md`).
+* **Page storage**: WebKit keeps a cross-site frame's localStorage for the session only, so
+  `cf.storage` writes go through the GUI to `ThreadService.SetPageStorage`, one JSON file per
+  thread (at most 256 KiB), handed back to a page as it loads (`PageStorage`;
+  `docs/notes/bridge-fix-storage.md`).
+* **Proxy fetch**: `cf.fetch` is `ThreadService.ProxyFetch` (`internal/proxyfetch`): the daemon
+  makes the request, so a page reaches an API that does not allow the pages origin. No
+  cookies, Origin or Code Foundry token; never to loopback, link-local or the daemon's own
+  ports (`docs/notes/bridge-fetch.md`).
+* `ThreadService.ShowHtml` and `ShowTheme` put a page or a theme card in the conversation
+  (`docs/notes/inline-html.md`, `docs/notes/theme-model-flow.md`); the `code-foundry-pages`
+  skill teaches the model to write pages for the bridge and the library.

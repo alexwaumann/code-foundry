@@ -14,8 +14,6 @@ three repos registered:
 * `/tmp/3a-live/nacho-os`, the viewer's own repo, which has commits this month
 * `/tmp/3a-live/neovim`, a blobless shallow clone whose `master` was failing CI at the time
 
-![Pull Requests page, live](phase3a/prs-page.png)
-
 ## What landed
 
 | Area | Files |
@@ -213,14 +211,11 @@ Observed:
 * **Populated PR page.** The account has no PRs, so the daemon was restarted with
   `CODE_FOUNDRY_GH_SEARCH_AS=mitchellh` (a development knob: the searches, stats, and
   branch filter use that login instead of `@me`) and the page was switched to "all
-  repositories". The screenshot at the top shows real data from that run.
+  repositories". The page then showed real data from that run.
   * Its tiles still show this account's numbers: the stats cache was younger than its
     15-minute interval, so the stats were not refetched after the restart.
   * GitHub does not compute reviewDecision for repos without branch protection, hence
     the "—" entries.
-
-![neovim overview: failing default branch](phase3a/overview-neovim.png)
-![This worktree: files and log vs origin/main](phase3a/overview-worktree.png)
 
 ## Gotchas
 

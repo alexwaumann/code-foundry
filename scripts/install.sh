@@ -530,9 +530,3 @@ if [ -n "$CURRENT" ]; then
 	echo "    A running app keeps its old version until relaunched. A running daemon keeps"
 	echo "    its threads and its old version until: code-foundry daemon restart"
 fi
-for old_app in "$HOME/Applications/CodeFoundry.app" "/Applications/CodeFoundry.app"; do
-	if [ -d "$old_app" ]; then
-		echo "    The old app bundle $old_app is no longer used; quit it and remove it:"
-		echo "      rm -rf \"$old_app\""
-	fi
-done

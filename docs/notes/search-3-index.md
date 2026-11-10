@@ -10,7 +10,7 @@ calls `thread.search`) build on it. Needs a daemon restart (migration 0054, new 
 |---|---|
 | `internal/db/migrations/0054_thread_search.sql` | `search_docs`, `search_fts` (FTS5 trigram, contentless), `thread_items_item_id` index (item id, thread, subagent), the `thread_items_search_gone` trigger, `search_backfill` filled with every thread |
 | `internal/store/thread/search_extract.go` | the registry of indexed kinds (`searchTexts`): user message, assistant text, question |
-| `internal/store/thread/search_index.go` | writing a document on save, the startup backfill, the `Options.Unindexed` hook |
+| `internal/store/thread/search_index.go` | writing a document on save, the startup backfill |
 | `internal/store/thread/search_match.go` | the query language, smart case, match ranges, snippets, hit tiers (pure) |
 | `internal/store/thread/search.go` | `Store.Search`: scope, candidates, fork attribution, groups |
 | `internal/store/thread/items_db.go` | `saveItem`/`saveItems` write the row and its document in one transaction; `decodeItem`, `scanItems` |
@@ -82,11 +82,9 @@ child threads, plugins' threads and forks are indexed; queries filter them.
 
 **Hidden runs (PR 5)**: nothing that is not a thread can be indexed, because only the
 thread store writes `thread_items` and every row references a thread. A run that never
-becomes a thread needs nothing. If PR 5 makes its hidden run a thread, set
-`thread.Options.Unindexed` in the daemon (e.g. by the thread's `Owner`). An unindexed
-thread's saves write no document (`searchIndexFor`), and queries never attribute a hit to
-it (`searchScope`). The predicate is checked against the snapshot on every save, so it
-must be cheap; a thread not in the snapshot yet is indexed.
+becomes a thread needs nothing. PR 5's run is not a thread
+(`docs/notes/search-5-agent-daemon.md`), so the `Options.Unindexed` hook this PR added
+for it was removed unused.
 
 ## Query semantics
 
@@ -113,7 +111,7 @@ must be cheap; a thread not in the snapshot yet is indexed.
   Ember's chat (a top-level thread with no creator), and their own items, not their
   subagents'. `--include children` adds hidden children, `subagents` adds subagent items,
   `owned` adds plugins' threads, and `--all` adds all three. `--project` keeps threads whose
-  project set has one of the projects. An `Unindexed` thread is never in scope.
+  project set has one of the projects.
 * **Forks**: one hit per item id, attributed to the **oldest thread in scope** whose own
   copy matches (`CreatedAt`, then id): each holder is decoded and matched first, so an
   older copy that differs (a question answered only in the fork) does not hide the
@@ -262,10 +260,6 @@ problem.
 
 ## Left for later PRs
 
-* **(PR 5)** A save that races the snapshot indexes a thread that is not in the snapshot
-  yet (`searchIndexFor` cannot see it, so `Unindexed` cannot either). Hidden runs must
-  decide Unindexed from something persisted when the thread is created, not from the
-  snapshot.
 * **(PR 4)** Match ranges are code points; the TS side must convert them to UTF-16 before
   slicing (an emoji or any astral character before a match shifts them).
 * **(PR 4)** The ranges point into the snippet only (one line, tags as labels, a question

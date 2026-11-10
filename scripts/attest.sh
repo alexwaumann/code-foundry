@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Local check attestation (docs/notes/ci-attest.md).
 #
-#   attest.sh record   Called by `make check` on success: remembers the tree hash the
-#                      checks ran against (the working tree, via a temporary index).
+#   attest.sh start    Called by `make check` before the checks: remembers the tree hash
+#                      they are about to run against (the working tree, via a temporary
+#                      index).
+#   attest.sh record   Called by `make check` on success: records that hash as checked,
+#                      provided the working tree still has it. A tree edited while the
+#                      checks ran is not recorded.
 #   attest.sh post     Called by `make attest` after the commit is pushed: if HEAD's tree
 #                      is the recorded one and the working tree is clean, posts a
 #                      "local-check" commit status on HEAD carrying the tree hash. The ci
@@ -14,6 +18,7 @@ set -euo pipefail
 
 CONTEXT=local-check
 record_file="$(git rev-parse --git-dir)/code-foundry-check"
+start_file="$record_file.start"
 
 # Hash of the working tree (tracked files with their current contents, plus untracked
 # files not ignored), not of HEAD: that is what the checks actually saw.
@@ -27,8 +32,21 @@ working_tree_hash() {
 }
 
 case "${1:-}" in
+  start)
+    working_tree_hash >"$start_file"
+    ;;
   record)
+    if [ ! -f "$start_file" ]; then
+      echo "attest: no check start recorded; run \`make check\`" >&2
+      exit 1
+    fi
+    started="$(cat "$start_file")"
+    rm -f "$start_file"
     tree="$(working_tree_hash)"
+    if [ "$tree" != "$started" ]; then
+      echo "attest: the tree changed during the check; not recorded (run \`make check\` again)" >&2
+      exit 1
+    fi
     printf '%s %s\n' "$tree" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$record_file"
     echo "recorded passing check for tree $tree"
     ;;
@@ -59,7 +77,7 @@ case "${1:-}" in
     echo "attested $sha (tree $head_tree, checked $recorded_at)"
     ;;
   *)
-    echo "usage: attest.sh record|post" >&2
+    echo "usage: attest.sh start|record|post" >&2
     exit 2
     ;;
 esac

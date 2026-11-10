@@ -176,9 +176,6 @@ daemon simply sends none: empty usage, cost 0). Restart the daemon after install
 The side panel's **Usage** surface for one thread, per DESIGN.md's session view and
 `session.png`.
 
-![Usage surface, dark](session-usage/panel-dark.png)
-![Usage surface, light](session-usage/panel-light.png)
-
 ## What was built
 
 * `surfaces/usage.ts` + `usageTarget.ts`: kind `usage`, title "Usage", lucide

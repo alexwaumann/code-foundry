@@ -2,7 +2,7 @@
 
 PR 2 of 4 of the theme engine (1: thread.css and `dark:` cleanup, 2: this, 3: Settings
 picker + Wails window background, 4: follow-ups). A theme is one object with a fixed
-scheme; 21 curated ones, generated at build time from Ghostty's theme files plus a small
+scheme; 21 curated ones (22 now), generated at build time from Ghostty's theme files plus a small
 override map, and applied by `data-theme` on `<html>`. Default: Catppuccin Mocha (dark) and
 Catppuccin Latte (light); GitHub Dark and GitHub Light since theme-engine-5. Frontend only.
 
@@ -13,7 +13,7 @@ Catppuccin Latte (light); GitHub Dark and GitHub Light since theme-engine-5. Fro
 | `gui/frontend/themes/ghostty/` | the 19 Ghostty theme files, copied unchanged, plus `LICENSE` (iTerm2-Color-Schemes, MIT). The build never needs Ghostty installed |
 | `gui/frontend/themes/overrides.json` | the curated list: per theme `name`, `ghostty` file (or `graphite`), `pair`, `upstream`, `accent`, `slots`, `status`, `vars`, `why` |
 | `gui/frontend/themes/color.ts` | hand-rolled sRGB/OKLab/OKLCH maths, gamut mapping by chroma, mixes, WCAG contrast (no dependency) |
-| `gui/frontend/themes/convert.ts` | the converter. `pnpm run themes` writes the two generated files; `pnpm run themes -- --refresh` first re-copies the Ghostty files from `/Applications/Ghostty.app` |
+| `gui/frontend/themes/convert.ts` | the converter. `bun run themes` writes the two generated files; `bun run themes -- --refresh` first re-copies the Ghostty files from `/Applications/Ghostty.app` |
 | `gui/frontend/src/themes/catalog.json`, `themes.css` | generated and committed |
 | `gui/frontend/src/themes/index.ts` | the typed registry |
 | `gui/frontend/src/lib/theme.ts` | the slots and the document sync |
@@ -195,7 +195,7 @@ adds the settings and calls `setThemeSlots` from `stores/settings.ts` the way
   highlight and link ≥ 4.5:1 on pane and sheet; primary-foreground ≥ 4.5:1 on primary;
   sheet/pane ΔL ≥ 3%; popover ΔL ≥ 1% from the pane (except a white pane: Graphite Light and
   GitHub Light rely on the shadow and border, as before); terminal fg ≥ 3:1 on the
-  selection; comments ≥ 3:1; the scheme matches the background. Plus: 21 themes, dark
+  selection; comments ≥ 3:1; the scheme matches the background. Plus: 21 themes (22 now), dark
   first, the default first in each (Catppuccin until theme-engine-5, GitHub since), defaults exist with the right scheme.
 - `src/lib/theme.test.ts`: slot validation (table), active theme per preference, and the
   document sync following preference, slots and the macOS appearance.

@@ -9,13 +9,8 @@ was built, so its wake messages render here too, as a collapsed "Woken by …" n
 same component. Frontend only, apart from one command (`view.panel.threads`). Everything
 is derived from the thread list the GUI already has: no new RPC.
 
-The built app against a live daemon (haiku, medium): "Lineage demo" ran `code-foundry
+Checked in the built app against a live daemon (haiku, medium): "Lineage demo" ran `code-foundry
 thread new` twice ("Greet the README" with `--notify`, "Wave at the repo").
-
-![A child: the sidebar glyphs, the from chip, the Created by note](agents-3-lineage-gui/child-dark.png)
-![The Threads tab on the child, dark](agents-3-lineage-gui/child-tab-dark.png)
-![The Threads tab on the child, light](agents-3-lineage-gui/child-tab-light.png)
-![The Threads tab on the creator, with the Woken by note](agents-3-lineage-gui/parent-tab-dark.png)
 
 ## Decisions
 

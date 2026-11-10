@@ -4,7 +4,7 @@ Status: done on `cf/prs-activity-chart` (one PR). `make check` is green; `make g
 for `e2e/prs.spec.ts` passes on WebKit and Chromium. Run end to end on 2026-10-17 with
 the built GUI against an isolated daemon (`CODE_FOUNDRY_HOME=/tmp/cf-chart`, this
 repository registered, real `gh`): the first poll filled six months and the page drew
-them (screenshots below).
+them.
 
 ## What changed
 
@@ -85,8 +85,3 @@ them (screenshots below).
   right. October says "(so far)". Leaving clears both.
 * `e2e/live-prs.spec.ts` reads the current month's commits from the partial marker's
   `data-value` (not run; it needs a live daemon).
-
-## Screenshots (live app, isolated daemon, real GitHub data)
-
-![dark](prs-activity-chart/dark.png)
-![light](prs-activity-chart/light.png)

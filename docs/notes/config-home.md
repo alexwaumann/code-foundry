@@ -35,14 +35,16 @@ Before: `~/Library/Application Support/code-foundry/` for state and
 * **`repo.Options.WorktreeRoot` is required and absolute.** The store stays free of
   `internal/paths`; the daemon passes `p.Worktrees()`. `repotest.Fake` has a matching
   `WorktreeRoot` field (default `/worktrees`).
-* **`repos.worktree_dir` is unchanged.** It still overrides the default and `{repo}`
-  still expands to the repository name.
+* **`repos.worktree_dir` was unchanged here.** It has since been retired (as
+  `projects.worktree_dir`): worktrees always go under `<config home>/worktrees`; a
+  settings file that still sets it is read without an issue, and the next save drops it.
 * **Discovery is unaffected.** Worktrees come from `git worktree list`, so existing
   worktrees at the old sibling paths (or anywhere else) keep showing up. Only new ones
   go to the new root.
-* **No automatic migration.** The owner is the only user, so the old home is moved by
-  hand (below) instead of a startup migration that would have to stop a running daemon
-  at the old socket first.
+* **No automatic migration.** The owner was the only user then, so the old home was
+  moved by hand (below) instead of a startup migration that would have to stop a running
+  daemon at the old socket first. There are other users now, and on-disk changes need a
+  migration.
 
 ## Moving an existing install
 

@@ -56,6 +56,8 @@ Feedback from daily use, decisions confirmed by Alex.
   `cursorAccent` (`src/terminal/theme.ts`) with it, so shells still read as part of the
   pane. `gui/main.go`'s `BackgroundColour` is the sheet (black), not the pane: unchanged.
   The old value stays in the static sketches under `docs/sketches` and in older notes.
+  (Since the theme engine, the pane and the terminal background are the active theme's,
+  from `src/themes/catalog.json`; `index.css` no longer holds a hex.)
 * User bubble: `--t-bubble` and a new `--t-bubble-border` in `components/thread/thread.css`;
   the `.u .bubble` rule only references them. Dark `oklch(1 0 0 / 13%)` with a
   `oklch(1 0 0 / 14%)` 1px border; light `oklch(0 0 0 / 7%)` with `oklch(0 0 0 / 10%)`.

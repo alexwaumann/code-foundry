@@ -9,11 +9,6 @@ the settings schema, and an old daemon neither lists nor accepts
 `sessions.default_worktree`. Until then the composer behaves as before (a fresh copy by
 default) and the per-project memory still works.
 
-| Dark | Light |
-|---|---|
-| ![Work in picker, dark](onboarding-3-work-in/picker-dark.png) | ![Work in picker, light](onboarding-3-work-in/picker-light.png) |
-| ![Settings row, dark](onboarding-3-work-in/settings-dark.png) | ![Settings row, light](onboarding-3-work-in/settings-light.png) |
-
 ## What changed
 
 | Path | What |

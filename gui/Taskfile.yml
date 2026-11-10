@@ -1,8 +1,7 @@
 version: '3'
 
 # Wails v3 task runner config, trimmed from the `wails3 init -t react` template to the
-# macOS targets this project builds. `wails3 build` / `wails3 dev` / `wails3 package`
-# dispatch here.
+# macOS targets this project builds. `wails3 build` and `wails3 dev` dispatch here.
 
 vars:
   # The GUI executable's name, and so the name macOS shows in the Dock, the app menu and the
@@ -23,11 +22,6 @@ tasks:
     summary: Builds the application
     cmds:
       - task: "{{.GOOS}}:build"
-
-  package:
-    summary: Packages a production build of the application
-    cmds:
-      - task: "{{.GOOS}}:package"
 
   run:
     summary: Runs the application
