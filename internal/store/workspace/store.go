@@ -402,11 +402,23 @@ func (m *Manager) EnsureDirs(_ context.Context, id string) error {
 	var errs []error
 	for _, w := range m.Snapshot().Workspaces {
 		if id == "" || w.ID == id {
-			errs = append(errs, ensureDir(m.log, w))
+			errs = append(errs, m.ensureDir(w.ID))
 			m.refreshContents(w.ID)
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// ensureDir makes workspace id's managed dir and links while it still exists: a Remove
+// since the snapshot has deleted them.
+func (m *Manager) ensureDir(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	w, ok := m.byID[id]
+	if !ok {
+		return nil
+	}
+	return ensureDir(m.log, w)
 }
 
 // refreshContents reads workspace id's instructions file and skills again; when they

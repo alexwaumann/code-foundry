@@ -3,11 +3,14 @@ package workspace
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
@@ -292,5 +295,38 @@ func TestWorkspaceContents(t *testing.T) {
 	e.open()
 	if got, _ := e.m.Snapshot().Workspace(rw.ID); got.Instructions == "" || len(got.Skills) != 1 {
 		t.Fatalf("after reopen: %+v", got)
+	}
+}
+
+// EnsureDirs racing Remove never leaves the removed workspace's managed dir behind.
+func TestEnsureDirsRacingRemove(t *testing.T) {
+	e := newStoreEnv(t)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	var done atomic.Bool
+	e.m.opts.InUse = func(w Workspace) error {
+		// Remove has begun: ensure the dirs over and over until it returns.
+		wg.Go(func() {
+			for !done.Load() {
+				_ = e.m.EnsureDirs(ctx, w.ID)
+			}
+		})
+		return nil
+	}
+	for i := range 100 {
+		w, err := e.m.Create(ctx, CreateOptions{Name: fmt.Sprintf("w%d", i), Members: []string{"web"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		done.Store(false)
+		err = e.m.Remove(ctx, w.ID)
+		done.Store(true)
+		wg.Wait()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(w.ManagedDir); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("round %d: the removed workspace's managed dir is back: %v", i, err)
+		}
 	}
 }
