@@ -21,3 +21,14 @@ func DetailOf(t Thread, items []Item) Detail {
 	d := wakeDetailOf(t, items, wakeChildren{})
 	return Detail{Pending: d.pending}
 }
+
+// LastSaid is what a wake on t carries as last_message (wakeDetailOf): its latest turn's
+// last assistant text, cut at maxLastMessage runes. "" unless t meets CondIdle, and when
+// that turn said nothing.
+func LastSaid(t Thread, items []Item) string {
+	if !Meets(CondIdle, t) {
+		return ""
+	}
+	_, _, last := lastTurn(items)
+	return cutMessage(last)
+}

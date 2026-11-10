@@ -67,7 +67,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 				return nil, threadError(err)
 			}
 			if !answered {
-				return connect.NewResponse(&v1.WaitThreadResponse{Thread: p}), nil
+				return connect.NewResponse(&v1.WaitThreadResponse{Thread: p, LastMessage: h.lastSaid(ctx, cur)}), nil
 			}
 			// Its new status follows within the debounce: wait for the update.
 		}
@@ -126,6 +126,19 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 			}
 		}
 	}
+}
+
+// lastSaid is the last message a wake on t would carry (thread.LastSaid); "" when t is
+// not idle or its items cannot be read.
+func (h *Thread) lastSaid(ctx context.Context, t thread.Thread) string {
+	if !thread.Meets(thread.CondIdle, t) {
+		return ""
+	}
+	items, err := h.store.Items(ctx, t.ID)
+	if err != nil {
+		return ""
+	}
+	return thread.LastSaid(t, items.Items)
 }
 
 // askedOf is t's question to by asked after since, nil for none. A wait by t's creator ends

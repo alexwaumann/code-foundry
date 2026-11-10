@@ -4797,7 +4797,12 @@ type WaitThreadResponse struct {
 	Removed *RemovedThread `protobuf:"bytes,3,opt,name=removed,proto3" json:"removed,omitempty"`
 	// A thread by_thread_id created asked it something: the wait ended early, and thread
 	// is the waited-on thread as it is now, its condition not met.
-	Asked         *ThreadAsk `protobuf:"bytes,4,opt,name=asked,proto3" json:"asked,omitempty"`
+	Asked *ThreadAsk `protobuf:"bytes,4,opt,name=asked,proto3" json:"asked,omitempty"`
+	// What the thread said last in its latest turn, as a wake's last_message carries it:
+	// its last top-level assistant text, cut at 16 Ki characters with a note saying where
+	// the rest is. Set only when the condition held and the thread is idle by the IDLE
+	// condition's rule (no pending prompt or question), and that turn said something.
+	LastMessage   string `protobuf:"bytes,5,opt,name=last_message,json=lastMessage,proto3" json:"last_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4858,6 +4863,13 @@ func (x *WaitThreadResponse) GetAsked() *ThreadAsk {
 		return x.Asked
 	}
 	return nil
+}
+
+func (x *WaitThreadResponse) GetLastMessage() string {
+	if x != nil {
+		return x.LastMessage
+	}
+	return ""
 }
 
 type RenameThreadRequest struct {
@@ -8078,12 +8090,13 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
 	"\bquestion\x18\x03 \x01(\tR\bquestion\x12\x1a\n" +
-	"\bassuming\x18\x04 \x01(\tR\bassuming\"\xcb\x01\n" +
+	"\bassuming\x18\x04 \x01(\tR\bassuming\"\xee\x01\n" +
 	"\x12WaitThreadResponse\x12.\n" +
 	"\x06thread\x18\x01 \x01(\v2\x16.codefoundry.v1.ThreadR\x06thread\x12\x1b\n" +
 	"\ttimed_out\x18\x02 \x01(\bR\btimedOut\x127\n" +
 	"\aremoved\x18\x03 \x01(\v2\x1d.codefoundry.v1.RemovedThreadR\aremoved\x12/\n" +
-	"\x05asked\x18\x04 \x01(\v2\x19.codefoundry.v1.ThreadAskR\x05asked\"9\n" +
+	"\x05asked\x18\x04 \x01(\v2\x19.codefoundry.v1.ThreadAskR\x05asked\x12!\n" +
+	"\flast_message\x18\x05 \x01(\tR\vlastMessage\"9\n" +
 	"\x13RenameThreadRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"F\n" +

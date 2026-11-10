@@ -1101,6 +1101,11 @@ message WaitThreadResponse {
   // A thread by_thread_id created asked it something: the wait ended early, and thread
   // is the waited-on thread as it is now, its condition not met.
   ThreadAsk asked = 4;
+  // What the thread said last in its latest turn, as a wake's last_message carries it:
+  // its last top-level assistant text, cut at 16 Ki characters with a note saying where
+  // the rest is. Set only when the condition held and the thread is idle by the IDLE
+  // condition's rule (no pending prompt or question), and that turn said something.
+  string last_message = 5;
 }
 
 message RenameThreadRequest {
