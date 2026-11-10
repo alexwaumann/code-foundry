@@ -395,7 +395,7 @@ export class XtermRenderer implements TerminalRenderer {
     this.fit();
   }
 
-  /** threads.scrollback_lines (rows, despite the key). */
+  /** appearance.scrollback_lines (rows, despite the key). */
   setScrollback(rows: number): void {
     this.term.options.scrollback = rows;
   }

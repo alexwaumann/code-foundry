@@ -128,7 +128,7 @@ func TestSchemaShape(t *testing.T) {
 		}
 	}
 	d := Defaults()
-	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Threads.ScrollbackLines != 30000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
+	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Appearance.ScrollbackLines != 30000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
 		d.Appearance.ThreadWidth != "comfortable" || d.Appearance.PanelKeepOpen ||
 		d.GitHub.PollIntervalSeconds != 60 || d.Projects.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)

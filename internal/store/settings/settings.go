@@ -95,7 +95,9 @@ type Ember struct {
 	EpochMaxHours      int
 }
 
-// Threads are defaults for new Claude Code sessions.
+// Threads configure threads: what a new one starts with (model, effort, worktree,
+// naming), when a thread's prompt cache has expired, and how long a closing one waits for
+// Claude to exit.
 type Threads struct {
 	DefaultModel      string // default model.Default
 	DefaultEffort     string // default "medium"
@@ -103,7 +105,6 @@ type Threads struct {
 	AutoName          bool
 	CacheTTLSeconds   int // the API's prompt cache lifetime; default 3600
 	CloseGraceSeconds int
-	ScrollbackLines   int
 }
 
 // Models are the models Code Foundry runs for its own jobs.
@@ -171,6 +172,9 @@ type Appearance struct {
 	// PanelKeepOpen keeps the side panel open on its new tab page when its last tab
 	// closes, instead of hiding it.
 	PanelKeepOpen bool
+	// ScrollbackLines is the rows of history each terminal (the bottom panel's shells)
+	// keeps; the daemon's emulators read it at start.
+	ScrollbackLines int
 }
 
 // Notifications configure the GUI's Dock badge and attention alerts. A bare executable

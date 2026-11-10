@@ -218,7 +218,6 @@ const (
 	KeyUtilityModel              = "models.utility"
 	KeyCacheTTL                  = "threads.cache_ttl_seconds"
 	KeyCloseGrace                = "threads.close_grace_seconds"
-	KeyScrollback                = "threads.scrollback_lines"
 	KeyGhPollInterval            = "github.poll_interval_seconds"
 	KeyDashboards                = "github.dashboards_enabled"
 	KeyFetchInterval             = "projects.fetch_interval_seconds"
@@ -233,6 +232,7 @@ const (
 	KeyThemeLight                = "appearance.theme_light"
 	KeyFontFamily                = "appearance.font_family"
 	KeyFontSize                  = "appearance.font_size"
+	KeyScrollback                = "appearance.scrollback_lines"
 	KeyZoom                      = "appearance.zoom"
 	KeyDensity                   = "appearance.density"
 	KeyThreadWidth               = "appearance.thread_width"
@@ -546,10 +546,10 @@ var staticFields = []Field{
 		bind: func(s *Settings) any { return &s.Appearance.FontSize },
 	},
 	{
-		Key: KeyScrollback, Group: GroupThreads, Page: PageAppearance, Section: "terminal", Type: Int, Title: "Scrollback rows",
+		Key: KeyScrollback, Group: GroupAppearance, Page: PageAppearance, Section: "terminal", Type: Int, Title: "Scrollback rows",
 		Description: "Rows of history each terminal keeps. A long line takes several, more when the terminal is narrow.",
 		Default:     strconv.Itoa(defaultScrollback), Min: 1000, Max: 100000, Restart: true,
-		bind: func(s *Settings) any { return &s.Threads.ScrollbackLines },
+		bind: func(s *Settings) any { return &s.Appearance.ScrollbackLines },
 	},
 	// Notifications.
 	{

@@ -15,12 +15,12 @@ describe("settings mapping", () => {
     const ev = create(EventSchema, {
       event: {
         case: "settings",
-        value: { event: { case: "snapshot", value: { values: { "appearance.theme": "dark" }, path: "/p", revision: 3n, restartPending: ["threads.scrollback_lines"] } } },
+        value: { event: { case: "snapshot", value: { values: { "appearance.theme": "dark" }, path: "/p", revision: 3n, restartPending: ["appearance.scrollback_lines"] } } },
       },
     });
     expect(toEventView(ev)).toEqual({
       source: "settings",
-      event: { values: { "appearance.theme": "dark" }, path: "/p", revision: 3, loadError: "", issues: [], restartPending: ["threads.scrollback_lines"] },
+      event: { values: { "appearance.theme": "dark" }, path: "/p", revision: 3, loadError: "", issues: [], restartPending: ["appearance.scrollback_lines"] },
     });
   });
 

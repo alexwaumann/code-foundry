@@ -27,7 +27,7 @@ export const KEYS = {
   backdrop: "appearance.backdrop",
   backdropFile: "appearance.backdrop_file",
   panelKeepOpen: "appearance.panel_keep_open",
-  scrollback: "threads.scrollback_lines",
+  scrollback: "appearance.scrollback_lines",
 } as const;
 
 const KEYBINDING_PREFIX = "keybindings.";

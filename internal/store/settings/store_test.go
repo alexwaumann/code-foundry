@@ -222,6 +222,8 @@ func TestExternalEdits(t *testing.T) {
 	waitFor(t, ch, func(s *Snapshot) bool { return s.Values[KeyFontSize] == "13" })
 }
 
+// The value a restart field is pending against is the file's, read under its old key
+// too (movedKeys).
 func TestRestartPending(t *testing.T) {
 	s, _, _ := openTest(t, "[threads]\nscrollback_lines = 5000\n")
 	snap, err := s.Update(context.Background(), map[string]string{KeyScrollback: "20000", KeyFontSize: "15"})

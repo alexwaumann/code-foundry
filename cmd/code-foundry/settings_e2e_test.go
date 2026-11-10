@@ -42,7 +42,7 @@ func TestCLISettings(t *testing.T) {
 		{"get after set", []string{"settings.get", "appearance.font_size"}, nil, "15\n", ""},
 		{"flags still work", []string{"settings", "set", "--key", "appearance.theme", "--value", "dark"}, nil, `appearance.theme = "dark"`, ""},
 		{"flags interleaved", []string{"settings", "get", "--json", "appearance.theme"}, nil, `"value":"dark"`, ""},
-		{"restart note", []string{"settings", "set", "threads.scrollback_lines", "20000"}, nil, "applies after a daemon restart", ""},
+		{"restart note", []string{"settings", "set", "appearance.scrollback_lines", "20000"}, nil, "applies after a daemon restart", ""},
 		{"reset", []string{"settings", "reset", "appearance.theme"}, nil, `appearance.theme = "system" (default)`, ""},
 		{"path", []string{"settings", "path"}, nil, "/settings.toml\n", ""},
 		{"invalid value", []string{"settings", "set", "appearance.font_size", "99"}, errAny, "", ""},

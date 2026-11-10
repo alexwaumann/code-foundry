@@ -60,7 +60,7 @@ func TestSettingsCommands(t *testing.T) {
 		{name: "get unknown", cmd: "settings.get", args: map[string]string{"key": "nope.nope"}, wantErr: command.ErrInvalidArgs},
 		{name: "set", cmd: "settings.set", args: map[string]string{"key": "appearance.font_size", "value": "15"},
 			wantMsg: `appearance.font_size = "15"`, wantJSON: `"value":"15","default":"13","title":"Font size"`},
-		{name: "set restart field notes it", cmd: "settings.set", args: map[string]string{"key": "threads.scrollback_lines", "value": "20000"},
+		{name: "set restart field notes it", cmd: "settings.set", args: map[string]string{"key": "appearance.scrollback_lines", "value": "20000"},
 			wantMsg: "(applies after a daemon restart)"},
 		{name: "set keybinding", cmd: "settings.set", args: map[string]string{"key": "keybindings.thread.new", "value": "Shift+Cmd+N"},
 			wantMsg: `keybindings.thread.new = "cmd+shift+n"`},

@@ -61,7 +61,7 @@ func TestSettingsService(t *testing.T) {
 		t.Errorf("density labels = %v", d.GetEnumLabels())
 	}
 	// Display placement and hints.
-	if f := byKey["threads.scrollback_lines"]; f.GetGroup() != "threads" || f.GetPage() != "appearance" || f.GetSection() != "terminal" {
+	if f := byKey["appearance.scrollback_lines"]; f.GetGroup() != "appearance" || f.GetPage() != "appearance" || f.GetSection() != "terminal" {
 		t.Errorf("scrollback field = %v", f)
 	}
 	if f := byKey["threads.cache_ttl_seconds"]; f.GetUnit() != "s" || f.GetTitle() != "Prompt cache lifetime" {
@@ -95,7 +95,7 @@ func TestSettingsService(t *testing.T) {
 	if th := byKey["appearance.theme_light"]; th.GetDefaultValue() != "github-light" || len(th.GetEnumLabels()) != len(th.GetEnumValues()) || th.GetEnumLabels()[0] != "GitHub Light" {
 		t.Errorf("theme_light field = %v", th)
 	}
-	if !byKey["threads.scrollback_lines"].GetRestartRequired() || len(schema.Msg.GetGroups()) != len(settings.Groups) {
+	if !byKey["appearance.scrollback_lines"].GetRestartRequired() || len(schema.Msg.GetGroups()) != len(settings.Groups) {
 		t.Errorf("restart flag or groups missing")
 	}
 
