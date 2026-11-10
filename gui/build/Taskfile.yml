@@ -1,15 +1,6 @@
 version: '3'
 
 tasks:
-  go:mod:tidy:
-    summary: Runs `go mod tidy`
-    internal: true
-    # build:native and generate:bindings both depend on this; two `go mod tidy`
-    # processes racing on go.mod can corrupt it.
-    run: once
-    cmds:
-      - go mod tidy
-
   install:frontend:deps:
     summary: Install frontend dependencies
     run: once
@@ -73,8 +64,6 @@ tasks:
   generate:bindings:
     summary: Generates bindings for the frontend
     run: once
-    deps:
-      - task: go:mod:tidy
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*
