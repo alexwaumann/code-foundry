@@ -7,9 +7,10 @@
  * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
  * its worktree for a diff, and a GitHub repository for a pull request. It does not read
  * files or diffs, and of view.panel.file --edit's refusals only --note without --edit: they are
- * Go's to test, as is cleaning the note.
+ * Go's to test, as is cleaning the note. A page's or diff's --title is cleaned and capped as there.
  */
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
+import { plainLine } from "../src/lib/plainText";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { panelThreadArgs } from "./panelVerbs";
@@ -30,6 +31,17 @@ type Command = {
 };
 
 const lead = "in a thread's side panel (from a thread: its own; in the app: the selected one): ";
+
+/** The longest --title, in characters (internal/command maxDiffTitle): it is a tab's name. */
+const MAX_TITLE = 100;
+
+/** --title cleaned as the daemon cleans it (plainNote), refused past MAX_TITLE characters. */
+function tabTitle(args: Record<string, string>): string {
+  const title = plainLine(args.title ?? "");
+  const n = Array.from(title).length;
+  if (n > MAX_TITLE) throw new CommandError("invalid", `${String(n)} characters, at most ${String(MAX_TITLE)}`);
+  return title;
+}
 
 /** The item verbs over `lookup`, emitting through `emit`. */
 export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, emit: (i: UiIntentInit) => number): Command[] {
@@ -92,7 +104,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           const path = args.path ?? "";
           if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
           if (!/\.html?$/i.test(path)) throw new CommandError("invalid", `${path} is not an .html or .htm file (view.panel.file shows any file)`);
-          const title = (args.title ?? "").trim();
+          const title = tabTitle(args);
           return { path, project: t.projectId, base: t.worktreePath, page: "1", ...(title ? { title } : {}) };
         }),
     },
@@ -124,7 +136,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           { name: "scope", type: ArgType.ENUM, required: false, description: "working: the base against the file on disk, uncommitted changes included; branch: against the last commit" },
           { name: "base", type: ArgType.STRING, required: false, description: "The older side" },
           { name: "head", type: ArgType.STRING, required: false, description: "The newer side" },
-          { name: "title", type: ArgType.STRING, required: false, description: "The tab's name" },
+          { name: "title", type: ArgType.STRING, required: false, description: "The tab's name, at most 100 characters" },
           { name: "note", type: ArgType.STRING, required: false, description: "A line under the title" },
           { name: "hide", type: ArgType.STRING, required: false, description: "compare or files" },
           ...panelThreadArgs,
@@ -134,6 +146,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
       run: (ctx, args) =>
         show(ctx, args, "panel.diff", (t, id) => {
           if (!t.projectId) throw new CommandError("unavailable", `thread ${id} runs in no project worktree`);
+          const title = tabTitle(args);
           const paths = (args.path ?? "").split("\n").filter(Boolean);
           for (const p of paths) if (!p.startsWith(t.worktreePath + "/")) throw new CommandError("invalid", `${p} is not a file in thread ${id}'s worktree ${t.worktreePath}`);
           const rels = paths.map((p) => p.slice(t.worktreePath.length + 1));
@@ -150,7 +163,7 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
             ...(base ? { base } : {}),
             ...(head ? { head } : {}),
             ...(rels.length === 1 ? { path: rels[0] ?? "" } : rels.length > 1 ? { paths: rels.join("\n") } : {}),
-            ...(args.title ? { title: args.title } : {}),
+            ...(title ? { title } : {}),
             ...(args.note ? { note: args.note } : {}),
             ...(args.hide ? { hide: args.hide.split("\n").join(",") } : {}),
           };
