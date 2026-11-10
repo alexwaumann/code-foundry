@@ -219,12 +219,6 @@ type Predicate struct {
 	facts []string // the facts it reads, sorted, distinct
 }
 
-// String returns the source.
-func (p *Predicate) String() string { return p.src }
-
-// Facts returns the fact names the predicate reads.
-func (p *Predicate) Facts() []string { return p.facts }
-
 // eval evaluates the predicate with lookup resolving facts. A nil predicate is true.
 func (p *Predicate) eval(lookup func(name string) value) tri {
 	if p == nil {

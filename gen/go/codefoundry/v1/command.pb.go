@@ -147,7 +147,7 @@ type UiContext struct {
 	ActiveThreadId     string                 `protobuf:"bytes,2,opt,name=active_thread_id,json=activeThreadId,proto3" json:"active_thread_id,omitempty"`
 	ActiveProjectId    string                 `protobuf:"bytes,3,opt,name=active_project_id,json=activeProjectId,proto3" json:"active_project_id,omitempty"`
 	ActiveWorktreePath string                 `protobuf:"bytes,4,opt,name=active_worktree_path,json=activeWorktreePath,proto3" json:"active_worktree_path,omitempty"`
-	// Logical view name, e.g. "terminal", "project", "dashboard". Empty from the CLI, and
+	// Logical view name, e.g. "thread", "compose", "projects". Empty from the CLI, and
 	// from a page's bridge, which runs a verb as the CLI inside the page's thread would:
 	// active_thread_id that thread, nothing else (docs/notes/bridge-1-daemon.md).
 	ActiveView string `protobuf:"bytes,5,opt,name=active_view,json=activeView,proto3" json:"active_view,omitempty"`

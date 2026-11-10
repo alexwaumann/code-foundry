@@ -110,23 +110,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 	if d.Thread == nil {
 		d.Thread = codefoundryv1connect.UnimplementedThreadServiceHandler{}
 	}
-	userIDs := func() []string {
-		if d.Themes == nil {
-			return nil
-		}
-		snap := d.Themes.Snapshot()
-		ids := make([]string, len(snap.Themes))
-		for i, f := range snap.Themes {
-			ids[i] = f.ID
-		}
-		return ids
-	}
-	set := func() theme.Set {
-		if d.Themes == nil {
-			return theme.Set{}
-		}
-		return d.Themes.Snapshot().Set()
-	}
+	userIDs, set := userThemeIDs(d.Themes), themeSet(d.Themes)
 	return r.Register(Command{
 		Name:  "theme.ask",
 		Page:  PageDrives,

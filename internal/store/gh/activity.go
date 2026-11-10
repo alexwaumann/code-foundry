@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// The viewer's GitHub activity, for the Pull Requests page and the worktree overview:
+// The viewer's GitHub activity, for the Pull Requests page and the worktree panel:
 // the dashboards (open pull requests the viewer authored, is asked to review, or has
 // reviewed; pull requests merged recently involving them), monthly stats, default-branch
 // CI of tracked repositories, and the viewer's pull requests on watched branches. All of

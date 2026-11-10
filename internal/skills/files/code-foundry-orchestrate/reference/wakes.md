@@ -65,8 +65,7 @@ once B is done. Routine approvals of a supervised child: no text at all.
 Do not message a finished child only to inform it: every message starts a turn and a
 wake. A `thread send` to a working child is read at its next tool call, not held: work
 it already pushed stays pushed; `thread interrupt --id <id>` first if it must stop now.
-When a follow-up changes the task, `thread rename --id <id> --name "<new name>"` so the
-user's sidebar matches.
+When a follow-up changes the task, `thread rename --id <id> --name "<new name>"`.
 
 ## Interrupted
 

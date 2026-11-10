@@ -85,9 +85,8 @@ func TestPluginThreadsOnTheWayOut(t *testing.T) {
 				t.Fatal(err)
 			}
 			r.waitState("hello", plugin.StateRunning)
-			list, err := r.m.Threads("hello")
-			if err != nil || len(list) != 2 {
-				t.Errorf("Threads after enabling again = %+v, %v", list, err)
+			if list := r.owned.Owned("plugin:hello"); len(list) != 2 {
+				t.Errorf("threads after enabling again = %+v", list)
 			}
 			for _, id := range helloThreads {
 				if o, ok := r.owned.Owner(id); !ok || o != "plugin:hello" {

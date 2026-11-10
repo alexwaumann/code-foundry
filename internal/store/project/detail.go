@@ -11,12 +11,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
-// Worktree detail (Phase 3a): the files changed and commits on a worktree against its
-// base, computed by git on demand. A worktree someone asked about within DetailWatch is
-// recomputed after each of its status refreshes (fs events, the backstop poll, Refresh), so
-// the overview page stays live; others cost nothing.
+// Worktree detail: the files changed and commits on a worktree against its base, computed
+// by git on demand. A worktree someone asked about within DetailWatch is recomputed after
+// each of its status refreshes (fs events, the backstop poll, Refresh), so the Changes
+// list and the file finder stay live; others cost nothing.
 
 // Detail limits.
 const (
@@ -100,7 +101,7 @@ type detailState struct {
 // paths its last dirty detail listed as untracked. Immutable once stored.
 type lineMemo map[string]lineCount
 
-// lineCount is countLines' result for one file as os.Stat saw it.
+// lineCount is countRootLines' result for one file as Lstat saw it.
 type lineCount struct {
 	size   int64
 	mtime  time.Time
@@ -188,6 +189,41 @@ func (g *Git) detailAfterStatus(projectID, path string) {
 	ds.mu.Unlock()
 	if ok {
 		g.sched.request(jobKey{kind: jobDetail, projectID: projectID, path: path})
+	}
+}
+
+// forgetDetails drops what the detail cache holds for worktrees that are gone: paths of
+// projectID, or without paths every worktree of projectID (unregistered). It requests
+// their detail job, the entries' only writer, which drops them once it finds no slot.
+func (g *Git) forgetDetails(projectID string, paths ...string) {
+	ds := &g.details
+	var keys []jobKey
+	ds.mu.Lock()
+	held := func(k wtKey) bool {
+		_, requested := ds.requested[k]
+		_, cached := ds.cache[k]
+		return requested || cached
+	}
+	if len(paths) == 0 {
+		for k := range ds.requested {
+			if k.projectID == projectID {
+				paths = append(paths, k.path)
+			}
+		}
+		for k := range ds.cache {
+			if k.projectID == projectID && !slices.Contains(paths, k.path) {
+				paths = append(paths, k.path)
+			}
+		}
+	}
+	for _, p := range paths {
+		if held(wtKey{projectID, p}) {
+			keys = append(keys, jobKey{kind: jobDetail, projectID: projectID, path: p})
+		}
+	}
+	ds.mu.Unlock()
+	for _, k := range keys {
+		g.sched.request(k)
 	}
 }
 
@@ -406,24 +442,36 @@ func headToWorktree(e statusEntry) (nameStatus, bool) {
 // prev's count for a file whose size and modification time have not changed. It
 // returns the memo for the next run, holding only the files listed now, and how many
 // files it read. It writes only "?" rows, so a clean worktree's cached (shared) file
-// list, which has none, is never touched.
+// list, which has none, is never touched. It reads nothing outside dir and never through
+// a link (countRootLines), as CompareWorktree counts.
 func countUntracked(dir string, files []FileChange, prev lineMemo) (lineMemo, int) {
 	var next lineMemo
 	reads := 0
+	var root *os.Root
+	defer func() {
+		if root != nil {
+			_ = root.Close()
+		}
+	}()
 	for i := range files {
 		f := &files[i]
 		if f.Status != "?" {
 			continue
 		}
-		p := filepath.Join(dir, f.Path)
-		fi, err := os.Stat(p)
+		if root == nil {
+			var err error
+			if root, err = os.OpenRoot(dir); err != nil {
+				return nil, reads
+			}
+		}
+		fi, err := root.Lstat(f.Path)
 		if err != nil {
 			continue // gone since status ran: no count, nothing to remember
 		}
 		c, ok := prev[f.Path]
 		if !ok || c.size != fi.Size() || !c.mtime.Equal(fi.ModTime()) {
 			c = lineCount{size: fi.Size(), mtime: fi.ModTime()}
-			c.lines, c.binary = countLines(p)
+			c.lines, c.binary, _ = countRootLines(root, f.Path, untrackedReadMax)
 			reads++
 		}
 		f.Added, f.Binary = c.lines, c.binary
@@ -472,7 +520,8 @@ func computeHeadPart(key headKey, run func(...string) ([]byte, error)) (*headPar
 // mergeFiles combines branch and working tree changes into one sorted, capped list.
 // A path in both keeps the working tree's letter. An untracked path that is also a
 // change (`git rm --cached` leaves D in the index and the file on disk) keeps the
-// change.
+// change. A name that is not UTF-8 is left out, as CompareWorktree's fill does: one would
+// fail the whole response.
 func mergeFiles(committed, uncommitted []nameStatus, counts map[string]numstat, untracked []string) ([]FileChange, bool) {
 	byPath := map[string]*FileChange{}
 	put := func(ns nameStatus, unc bool) {
@@ -499,6 +548,9 @@ func mergeFiles(committed, uncommitted []nameStatus, counts map[string]numstat, 
 	}
 	out := make([]FileChange, 0, len(byPath))
 	for _, f := range byPath {
+		if !utf8.ValidString(f.Path) || !utf8.ValidString(f.OldPath) {
+			continue
+		}
 		if c, ok := counts[f.Path]; ok {
 			f.Added, f.Deleted, f.Binary = c.added, c.deleted, c.binary
 		}
@@ -509,18 +561,6 @@ func mergeFiles(committed, uncommitted []nameStatus, counts map[string]numstat, 
 		return out[:DetailFilesMax], true
 	}
 	return out, false
-}
-
-// countLines counts newlines in an untracked file (plus a final unterminated line),
-// reading at most untrackedReadMax. A NUL in the first binarySniff bytes means binary.
-func countLines(path string) (lines int, binary bool) {
-	f, err := os.Open(path)
-	if err != nil {
-		return 0, false
-	}
-	defer func() { _ = f.Close() }()
-	lines, binary, _ = countReader(f, untrackedReadMax)
-	return lines, binary
 }
 
 func sameDetail(a, b WorktreeDetail) bool {
@@ -604,6 +644,10 @@ func parseNumstatZ(out []byte) map[string]numstat {
 // logFormat separates fields with US (0x1f) and records with RS (0x1e).
 const logFormat = "%H%x1f%h%x1f%an%x1f%ae%x1f%at%x1f%s%x1e"
 
+// validUTF8 replaces what is not UTF-8 (a commit with no encoding header passes through
+// raw), which would fail the whole response.
+func validUTF8(s string) string { return strings.ToValidUTF8(s, "\uFFFD") }
+
 func parseLog(out []byte) []LogEntry {
 	var res []LogEntry
 	for rec := range strings.SplitSeq(string(out), "\x1e") {
@@ -615,7 +659,7 @@ func parseLog(out []byte) []LogEntry {
 		if len(f) != 6 {
 			continue
 		}
-		e := LogEntry{SHA: f[0], ShortSHA: f[1], AuthorName: f[2], AuthorEmail: f[3], Subject: f[5]}
+		e := LogEntry{SHA: f[0], ShortSHA: f[1], AuthorName: validUTF8(f[2]), AuthorEmail: validUTF8(f[3]), Subject: validUTF8(f[5])}
 		if sec, err := strconv.ParseInt(f[4], 10, 64); err == nil {
 			e.AuthoredAt = time.Unix(sec, 0)
 		}

@@ -207,7 +207,7 @@ func threadGet(b ThreadBackend, idArg ArgSpec) Command {
 				return Result{}, err
 			}
 			s := res.Msg.GetThread()
-			names, err := threadNames(ctx, b, []*v1.Thread{s})
+			names, err := creatorNames(ctx, b, s)
 			if err != nil {
 				return Result{}, err
 			}

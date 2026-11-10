@@ -366,7 +366,6 @@ type checksEntry struct {
 	// again refetches once the running fetch ends: the entry was invalidated while it
 	// ran, so its answer may predate the change.
 	again bool
-	err   string
 }
 
 // checksCache holds the pull requests' checks the predicates asked for. A miss
@@ -445,10 +444,8 @@ func (c *checksCache) fetch(m *Manager, pr PullRequestRef, k string) {
 		e.again, e.fetching = false, true
 		go c.fetch(m, pr, k)
 	}
-	e.err = ""
 	if err != nil {
 		// Known and empty (unavailable), not unknown forever: tried again once stale.
-		e.err = err.Error()
 		changed = first
 		if first {
 			e.runs = nil

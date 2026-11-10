@@ -22,22 +22,6 @@ func scanBucket(sc interface{ Scan(...any) error }, prefix ...any) (UsageBucket,
 	return b, err
 }
 
-// saveUsage replaces a thread's usage rows with buckets in one transaction.
-func saveUsage(ctx context.Context, db *sql.DB, threadID string, buckets []UsageBucket) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := replaceUsageTx(ctx, tx, threadID, buckets); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
-	}
-	return nil
-}
-
 // replaceUsageTx replaces a thread's thread_usage rows inside tx.
 func replaceUsageTx(ctx context.Context, tx *sql.Tx, threadID string, buckets []UsageBucket) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM thread_usage WHERE thread_id = ?`, threadID); err != nil {

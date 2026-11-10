@@ -100,6 +100,7 @@ func TestCleanReport(t *testing.T) {
 		{"empty object", Report{Status: ReportDone, Data: "{}"}, Report{Status: ReportDone, Data: "{}"}, false},
 		{"no status", Report{Summary: "x"}, Report{}, true},
 		{"unknown status", Report{Status: 9}, Report{}, true},
+		{"the daemon's own status", Report{Status: ReportFinished}, Report{}, true},
 		{"summary too long is cut", Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes+200)},
 			Report{Status: ReportDone, Summary: strings.Repeat("é", MaxReportSummaryRunes-1) + "…"}, false},
 		{"cut drops the space before the ellipsis", Report{Status: ReportDone, Summary: strings.Repeat("a", MaxReportSummaryRunes-2) + "  " + strings.Repeat("b", 5)},

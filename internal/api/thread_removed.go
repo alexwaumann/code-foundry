@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -23,12 +22,8 @@ func removedToProto(r thread.RemovedThread) *v1.RemovedThread {
 		BudgetUsd: r.BudgetUSD,
 	}
 	_, p.CostUsd, p.Unpriced = usageToProto(r.Usage)
-	if !r.RemovedAt.IsZero() {
-		p.RemovedAt = timestamppb.New(r.RemovedAt)
-	}
-	if !r.Report.At.IsZero() {
-		p.ReportAt = timestamppb.New(r.Report.At)
-	}
+	p.RemovedAt = timestamp(r.RemovedAt)
+	p.ReportAt = timestamp(r.Report.At)
 	return p
 }
 

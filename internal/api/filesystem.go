@@ -115,7 +115,7 @@ func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListS
 		}
 	}
 	for _, src := range req.Msg.GetSources() {
-		dir, _, err := h.checkout(src.GetProjectId(), src.GetPath())
+		c, err := h.resolve(src.GetProjectId(), src.GetPath())
 		switch code := connect.CodeOf(err); {
 		case err == nil:
 		case code == connect.CodeInvalidArgument: // a malformed request, not a missing checkout
@@ -124,7 +124,7 @@ func (h *Filesystem) ListSkills(_ context.Context, req *connect.Request[v1.ListS
 			h.log.Warn("skill source skipped", "project", src.GetProjectId(), "path", src.GetPath(), "err", err)
 			continue
 		}
-		add(fsx.ReadSkills(filepath.Join(dir, ".claude"), true, h.log), v1.SkillScope_SKILL_SCOPE_PROJECT, src.GetProjectId())
+		add(fsx.ReadSkills(filepath.Join(c.dir, ".claude"), true, h.log), v1.SkillScope_SKILL_SCOPE_PROJECT, src.GetProjectId())
 	}
 	if req.Msg.GetIncludeUser() {
 		add(fsx.ReadSkills(filepath.Join(h.root, ".claude"), false, h.log), v1.SkillScope_SKILL_SCOPE_USER, "")
@@ -208,12 +208,6 @@ type resolvedCheckout struct {
 	named   string
 	dir     string
 	git     bool
-}
-
-// checkout resolves a request's checkout to its directory (see resolve).
-func (h *Filesystem) checkout(projectID, path string) (dir string, git bool, err error) {
-	c, err := h.resolve(projectID, path)
-	return c.dir, c.git, err
 }
 
 // resolve resolves a request's checkout: path (absolute, symlinks resolved, under

@@ -28,7 +28,8 @@
 //
 // The package has no dependencies outside the standard library, so a plugin repository
 // imports it without the daemon's dependency graph. Subpackages: ui (typed builders for
-// the surface view model) and plugintest (a fake host for unit tests).
+// the surface view model), plugintest (a fake host for unit tests), pack (release
+// tarballs, checksums and registry entries) and cmd/pluginpack (pack's command line).
 //
 // Every Code Foundry thread has the code-foundry-plugin skill, which documents the
 // manifest, the protocol, the view model, the host API, testing and publishing for
@@ -37,7 +38,7 @@
 //
 // The module needs Go 1.24 or newer and nothing outside the standard library:
 //
-//	go get github.com/alexwaumann/code-foundry/pluginsdk@<commit>
+//	go get github.com/alexwaumann/code-foundry/pluginsdk@vX.Y.Z
 //
-// (or @vX.Y.Z once the module has release tags, which are pluginsdk/vX.Y.Z).
+// (its release tags are pluginsdk/vX.Y.Z; @<commit> pins a commit between releases).
 package pluginsdk

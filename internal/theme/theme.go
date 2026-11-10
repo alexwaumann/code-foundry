@@ -100,26 +100,6 @@ func For(scheme string) []Theme {
 	return out
 }
 
-// IDs returns the ids of one scheme's themes, in catalog order.
-func IDs(scheme string) []string {
-	ts := For(scheme)
-	out := make([]string, len(ts))
-	for i, t := range ts {
-		out[i] = t.ID
-	}
-	return out
-}
-
-// Names returns the names of one scheme's themes, parallel to IDs.
-func Names(scheme string) []string {
-	ts := For(scheme)
-	out := make([]string, len(ts))
-	for i, t := range ts {
-		out[i] = t.Name
-	}
-	return out
-}
-
 // ByID returns the theme with id.
 func ByID(id string) (Theme, bool) {
 	i := slices.IndexFunc(catalog.Themes, func(t Theme) bool { return t.ID == id })
@@ -132,24 +112,6 @@ func ByID(id string) (Theme, bool) {
 // Default is the scheme's default theme id (github-dark, github-light), or ""
 // for an unknown scheme.
 func Default(scheme string) string { return catalog.Defaults[scheme] }
-
-// Valid reports whether id is a theme of scheme.
-func Valid(id, scheme string) bool { return Check(id, scheme) == nil }
-
-// Check explains why id cannot fill scheme's slot: an unknown id, or a theme of the
-// other scheme. Nil when it can.
-func Check(id, scheme string) error {
-	t, ok := ByID(id)
-	switch {
-	case scheme != SchemeDark && scheme != SchemeLight:
-		return fmt.Errorf("unknown scheme %q", scheme)
-	case !ok:
-		return fmt.Errorf("unknown theme %q; %s themes are %s", id, scheme, quoted(IDs(scheme)))
-	case t.Scheme != scheme:
-		return fmt.Errorf("%s (%q) is a %s theme; the %s theme must be one of %s", t.Name, id, t.Scheme, scheme, quoted(IDs(scheme)))
-	}
-	return nil
-}
 
 // maxQuoted is how many ids a message lists; with hundreds of user themes the rest are
 // counted (theme list prints them all).

@@ -86,7 +86,8 @@ type Field struct {
 	// Min and Max bound Int fields (inclusive).
 	Min, Max    int
 	Placeholder string
-	// Unit is the suffix shown inside a number input ("s", "pt", "%").
+	// Unit is the suffix shown inside a number input ("s", "pt", "%", "tokens", "h"); the
+	// settings file's comments spell it out (unitWords).
 	Unit string
 	// DependsOn is the key of a Bool field; while it is false the settings page shows
 	// this field indented and dimmed. With DependsOnValue it is an Enum field's.
@@ -940,7 +941,6 @@ func checkExecutable(v string) error {
 	return nil
 }
 
-// checkRegistries validates plugins.registries: every entry a registry URL.
 // checkBackdropFile accepts "" or a plain, non-hidden file name: the backdrops directory
 // is the only place appearance.backdrop_file can point.
 func checkBackdropFile(v string) error {
@@ -1001,6 +1001,7 @@ func checkBackdropChoice(o Options, values map[string]string) error {
 	return nil
 }
 
+// checkRegistries validates plugins.registries: every entry a registry URL.
 func checkRegistries(v string) error {
 	_, err := registry.ParseList(v)
 	return err

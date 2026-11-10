@@ -27,7 +27,8 @@ var schemaSQL string
 // (MonthlyStats.Months).
 const cacheVersion = 3
 
-// cacheRetention is how long on-demand detail rows (PR details, ref checks) are kept.
+// cacheRetention is how long on-demand detail rows (PR details, ref checks, and the
+// branch: and pr_detail: activity rows) are kept.
 const cacheRetention = 7 * 24 * time.Hour
 
 // Migrate creates the gh_* cache tables. It is idempotent and safe to run on every

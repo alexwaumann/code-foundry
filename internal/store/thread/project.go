@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -135,7 +136,7 @@ func (p *projector) event(ev claudestream.Event) {
 	case *claudestream.User:
 		p.user(e)
 	case *claudestream.CompactBoundary:
-		it := p.w.add(Item{ID: "compact-" + nonEmpty(e.UUID, p.nextID("c")), Kind: KindCompaction, Compaction: &Compaction{
+		it := p.w.add(Item{ID: "compact-" + cmp.Or(e.UUID, p.nextID("c")), Kind: KindCompaction, Compaction: &Compaction{
 			Trigger: e.Metadata.Trigger, PreTokens: e.Metadata.PreTokens, PostTokens: e.Metadata.PostTokens,
 		}})
 		p.compaction = it.ID
@@ -143,7 +144,7 @@ func (p *projector) event(ev claudestream.Event) {
 			p.ctx = e.Metadata.PostTokens
 		}
 	case *claudestream.PermissionDenied:
-		p.w.add(Item{ID: "denied-" + nonEmpty(e.ToolUseID, p.nextID("d")), Kind: KindPermission, Request: &Request{
+		p.w.add(Item{ID: "denied-" + cmp.Or(e.ToolUseID, p.nextID("d")), Kind: KindPermission, Request: &Request{
 			ToolName: e.ToolName, ToolUseID: e.ToolUseID, AgentID: e.AgentID, DecisionReason: e.DecisionReason,
 			State: RequestDenied, Decision: DecisionAutoDenied, Message: e.Message,
 		}})
@@ -159,7 +160,7 @@ func (p *projector) event(ev claudestream.Event) {
 		t.Model, t.ProcessOutputTokens = p.model, e.OutputTokens()
 		p.last.tokens, p.last.model = turnContext(p.ctx, e.Usage), p.model
 		p.model, p.ctx, p.partial = "", 0, nil
-		p.w.add(Item{ID: "turn-" + nonEmpty(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: t})
+		p.w.add(Item{ID: "turn-" + cmp.Or(e.UUID, p.nextID("t")), Kind: KindTurnEnd, Turn: t})
 	}
 }
 
@@ -173,9 +174,9 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 		}
 	case "message_delta":
 		// The response's final usage (message_start's has the output so far).
-		p.noteUsage(nonEmpty(e.APIMessageID, p.msg), se.Usage)
+		p.noteUsage(cmp.Or(e.APIMessageID, p.msg), se.Usage)
 	case "content_block_start":
-		msg := nonEmpty(e.APIMessageID, p.msg)
+		msg := cmp.Or(e.APIMessageID, p.msg)
 		cb := se.ContentBlock
 		if cb == nil {
 			return
@@ -196,7 +197,7 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 		it = p.w.add(it)
 		p.open[msg] = append(p.open[msg], openBlock{index: se.Index, id: it.ID, kind: it.Kind})
 	case "content_block_delta":
-		msg := nonEmpty(e.APIMessageID, p.msg)
+		msg := cmp.Or(e.APIMessageID, p.msg)
 		i := slices.IndexFunc(p.open[msg], func(b openBlock) bool { return b.index == se.Index })
 		if i < 0 || se.Delta == nil {
 			return
@@ -213,7 +214,7 @@ func (p *projector) stream(e *claudestream.StreamEvent) {
 	case "content_block_stop":
 		// The assistant frame normally completed the block already; if it did not
 		// arrive, the streamed content is final.
-		msg := nonEmpty(e.APIMessageID, p.msg)
+		msg := cmp.Or(e.APIMessageID, p.msg)
 		i := slices.IndexFunc(p.open[msg], func(b openBlock) bool { return b.index == se.Index })
 		if i >= 0 {
 			p.finish(p.open[msg][i].id, nil)
@@ -429,7 +430,7 @@ func (p *projector) user(e *claudestream.User) {
 	case e.IsReplay:
 		if m := localCommandOutput.FindStringSubmatch(text); m != nil {
 			if out := strings.TrimSpace(m[1]); out != "" {
-				p.w.add(Item{ID: "cmd-" + nonEmpty(e.UUID, p.nextID("o")), Kind: KindCommandOutput, Text: out})
+				p.w.add(Item{ID: "cmd-" + cmp.Or(e.UUID, p.nextID("o")), Kind: KindCommandOutput, Text: out})
 			}
 		}
 	}
@@ -539,11 +540,4 @@ func denyMessage(reason string) string {
 		return rejectWithReason + reason
 	}
 	return rejectStop
-}
-
-func nonEmpty(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
 }

@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -169,9 +168,7 @@ func workspaceToProto(w workspace.Workspace) *v1.Workspace {
 	p := &v1.Workspace{Id: w.ID, Name: w.Name, Members: slices.Clone(w.Members), RootPath: w.RootPath,
 		DefaultPrimary: w.DefaultPrimary, ManagedDir: w.ManagedDir, Instructions: w.Instructions, Skills: slices.Clone(w.Skills),
 		RootMissing: w.RootMissing}
-	if !w.CreatedAt.IsZero() {
-		p.CreatedAt = timestamppb.New(w.CreatedAt)
-	}
+	p.CreatedAt = timestamp(w.CreatedAt)
 	return p
 }
 

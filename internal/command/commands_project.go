@@ -12,10 +12,10 @@ import (
 )
 
 // ProjectBackend is the slice of ProjectService the project.* commands (and the pull request
-// thread commands, which list repositories) need, in generated Connect signatures (see
-// TerminalBackend for why). The repo step's (1b) API handler, any
-// ProjectServiceHandler, and a ProjectServiceClient satisfy it. Until it is wired,
-// codefoundryv1connect.UnimplementedProjectServiceHandler stands in.
+// thread commands, which list projects) need, in generated Connect signatures (see
+// TerminalBackend for why). The daemon's API handler, any ProjectServiceHandler, and a
+// ProjectServiceClient satisfy it. For a nil one, all.Register passes
+// codefoundryv1connect.UnimplementedProjectServiceHandler.
 type ProjectBackend interface {
 	Register(context.Context, *connect.Request[v1.RegisterProjectRequest]) (*connect.Response[v1.RegisterProjectResponse], error)
 	InspectFolder(context.Context, *connect.Request[v1.InspectFolderRequest]) (*connect.Response[v1.InspectFolderResponse], error)

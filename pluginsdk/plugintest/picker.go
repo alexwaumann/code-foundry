@@ -115,32 +115,22 @@ func (h *Host) latest(instance string) (ui.View, error) {
 // findField finds the first field (in a fieldset too) that match accepts, and its form.
 func findField(v ui.View, match func(ui.Field) bool) (ui.Field, *ui.Form, bool) {
 	var found ui.Field
-	var in *ui.Form
-	var walk func(ns []ui.Node) bool
-	walk = func(ns []ui.Node) bool {
-		for _, n := range ns {
-			if n.Form != nil {
-				for _, f := range flatFields(n.Form.Fields) {
-					if match(f) {
-						found, in = f, n.Form
-						return true
-					}
-				}
-			}
-			for _, l := range n.Children() {
-				if walk(l) {
-					return true
-				}
+	n, ok := findNode(v, func(n ui.Node) bool {
+		if n.Form == nil {
+			return false
+		}
+		for _, f := range flatFields(n.Form.Fields) {
+			if match(f) {
+				found = f
+				return true
 			}
 		}
 		return false
+	})
+	if !ok {
+		return ui.Field{}, nil, false
 	}
-	for _, l := range v.NodeLists() {
-		if walk(l) {
-			return found, in, true
-		}
-	}
-	return ui.Field{}, nil, false
+	return found, n.Form, true
 }
 
 func flatFields(fs []ui.Field) []ui.Field {

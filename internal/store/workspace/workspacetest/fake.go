@@ -174,10 +174,7 @@ func (f *Fake) RemoveProject(_ context.Context, ref, project string) (workspace.
 		if !w.Member(project) {
 			return fmt.Errorf("%w: %q is not a member of workspace %s", workspace.ErrNotFound, project, w.Name)
 		}
-		w.Members = slices.DeleteFunc(w.Members, func(id string) bool { return id == project })
-		if w.DefaultPrimary == project {
-			w.DefaultPrimary = workspace.PrimaryWorkspace
-		}
+		workspace.DropMember(w, project)
 		return nil
 	})
 }
@@ -224,8 +221,7 @@ func (f *Fake) Remove(_ context.Context, ref string) error {
 }
 
 // ProjectRemoved implements workspace.Store: the project leaves every workspace, a
-// default primary that was it becomes workspace.PrimaryWorkspace (the fake does not
-// fall back to another member).
+// default primary that was it moving as in the real store (workspace.DropMember).
 func (f *Fake) ProjectRemoved(_ context.Context, project string) error {
 	f.mu.Lock()
 	f.calls = append(f.calls, "ProjectRemoved "+project)
@@ -234,10 +230,8 @@ func (f *Fake) ProjectRemoved(_ context.Context, project string) error {
 		if !w.Member(project) {
 			continue
 		}
-		w.Members = slices.DeleteFunc(slices.Clone(w.Members), func(id string) bool { return id == project })
-		if w.DefaultPrimary == project {
-			w.DefaultPrimary = workspace.PrimaryWorkspace
-		}
+		w.Members = slices.Clone(w.Members)
+		workspace.DropMember(&w, project)
 		changed = append(changed, w)
 	}
 	f.mu.Unlock()

@@ -1,5 +1,5 @@
-// Command code-foundry is the single binary for the daemon, the CLI verbs, and (later)
-// the GUI launcher.
+// Command code-foundry is the single binary for the daemon, the CLI verbs, and the GUI
+// launcher.
 package main
 
 import (
@@ -49,8 +49,11 @@ func (e exitCodeError) Error() string { return fmt.Sprintf("exit status %d", int
 // cli carries the dispatcher's I/O and daemon connection so tests can swap them.
 type cli struct {
 	stdout, stderr io.Writer
-	// connect returns a client for the daemon, starting it if needed.
+	// connect returns a client for the daemon, starting it if needed. Use daemon, which
+	// connects once per run.
 	connect func(context.Context) (*client.Client, error)
+	// conn is the client daemon returns, kept for the rest of the run.
+	conn *client.Client
 	// getwd resolves relative path flags.
 	getwd func() (string, error)
 	// stdin and interactive serve confirmation prompts; without them (or when
@@ -82,6 +85,20 @@ func main() {
 		fmt.Fprintln(os.Stderr, "code-foundry:", err)
 		os.Exit(1)
 	}
+}
+
+// daemon returns the run's daemon client: connect's on first use (which starts the
+// daemon if needed and pings it), the same one after.
+func (cl *cli) daemon(ctx context.Context) (*client.Client, error) {
+	if cl.conn != nil {
+		return cl.conn, nil
+	}
+	c, err := cl.connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cl.conn = c
+	return c, nil
 }
 
 func connectDaemon(ctx context.Context) (*client.Client, error) {

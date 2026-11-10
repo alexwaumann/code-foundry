@@ -3,7 +3,10 @@ package terminal
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
+
+	"github.com/alexwaumann/code-foundry/internal/childproc"
 )
 
 // Spawn extras are what others add to a new terminal's environment by its labels: the
@@ -39,7 +42,7 @@ func (m *Manager) spawnEnv(ctx context.Context, spec Spec) []string {
 	if fn := m.extras.Load(); fn != nil {
 		x = (*fn)(ctx, spec.Labels)
 	}
-	env := mergeEnv(os.Environ(), defaultEnv, x.Env, spec.Env)
+	env := childproc.MergeEnv(os.Environ(), slices.Concat(defaultEnv, x.Env, spec.Env))
 	if len(x.PathPrepend) == 0 {
 		return env
 	}
@@ -47,5 +50,5 @@ func (m *Manager) spawnEnv(ctx context.Context, spec Spec) []string {
 	if cur := envValue(env, "PATH"); cur != "" {
 		path += string(os.PathListSeparator) + cur
 	}
-	return mergeEnv(env, []string{"PATH=" + path})
+	return childproc.MergeEnv(env, []string{"PATH=" + path})
 }

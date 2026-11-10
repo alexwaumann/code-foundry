@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestParseNaming(t *testing.T) {
@@ -197,6 +198,11 @@ func TestBuildNamingPrompt(t *testing.T) {
 				}
 			}
 		})
+	}
+	// A long message is cut on a rune boundary: the argv stays valid UTF-8.
+	long := strings.Repeat("a", maxNamingInput-1) + strings.Repeat("é", 10)
+	if got := buildNamingPrompt(NamingRequest{Message: long}); !utf8.ValidString(got) || !strings.HasSuffix(got, strings.Repeat("a", maxNamingInput-1)) {
+		t.Errorf("long message cut to %q", got[len(got)-10:])
 	}
 }
 

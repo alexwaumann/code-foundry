@@ -112,7 +112,11 @@ func TestSet(t *testing.T) {
 
 	// The zero Set is the catalog.
 	var zero Set
-	if !slices.Equal(zero.IDs(SchemeDark), IDs(SchemeDark)) || zero.Check("ocean-dusk", SchemeDark) == nil {
+	var catalogIDs []string
+	for _, th := range For(SchemeDark) {
+		catalogIDs = append(catalogIDs, th.ID)
+	}
+	if !slices.Equal(zero.IDs(SchemeDark), catalogIDs) || zero.Check("ocean-dusk", SchemeDark) == nil {
 		t.Error("the zero Set is not the catalog")
 	}
 }

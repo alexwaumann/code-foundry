@@ -50,7 +50,7 @@ func TestWorkspaceCommands(t *testing.T) {
 			args: map[string]string{"project": "lib"}, wantCall: "AddProject w-1 lib"},
 		{name: "add a project needs a workspace", cmd: "workspace.add-project", args: map[string]string{"project": "lib"}, wantErr: command.ErrInvalidArgs},
 		{name: "remove a project moves the default", cmd: "workspace.remove-project", args: map[string]string{"project": "api", "workspace": "base"},
-			wantMsg: []string{"1 project (web), starts in workspace"}, wantCall: "RemoveProject base api"},
+			wantMsg: []string{"1 project (web), starts in web"}, wantCall: "RemoveProject base api"},
 		{name: "rename", cmd: "workspace.rename", args: map[string]string{"name": "Store", "workspace": "base"},
 			wantMsg: []string{"renamed workspace Store (w-1)"}, wantCall: "Rename base Store"},
 		{name: "set the default primary", cmd: "workspace.set-primary", args: map[string]string{"primary": "workspace", "workspace": "base"},

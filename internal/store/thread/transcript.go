@@ -200,7 +200,7 @@ func (t *lineSplitter) split(lines [][]byte, data []byte) [][]byte {
 		} else {
 			line := append(t.partial, data[:i]...)
 			t.partial = nil
-			if len(line) > 0 {
+			if len(line) > 0 && len(line) <= maxLineBytes {
 				lines = append(lines, line)
 			}
 		}

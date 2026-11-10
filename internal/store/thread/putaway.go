@@ -202,10 +202,11 @@ func (m *Manager) finishPutAway(r *runner, p PutAway) {
 	m.wg.Add(1) // this runner is still counted: no race with Shutdown's Wait
 	go func() {
 		defer m.wg.Done()
-		if _, err := m.applyPutAway(m.ctx, r.id, p, r); err != nil {
+		_, err := m.applyPutAway(m.ctx, r.id, p, r)
+		if err != nil {
 			m.log.Warn("put a thread away at its turn's end", "thread", r.id, "what", p.Kind.String(), "err", err)
 		}
-		m.endArchiving(r.id) // a failure before the archive's own end left the mark (archive_group.go)
+		m.endArchiving(r.id, err != nil) // a failure before the archive's own end left the mark (archive_group.go)
 	}()
 }
 

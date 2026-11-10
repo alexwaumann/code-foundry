@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -32,7 +33,7 @@ func (d ViewDeps) panelPageCommand() Command {
 		Args: []ArgSpec{
 			{Name: "path", Type: Path, Required: true, Positional: true,
 				Description: "The .html or .htm file: absolute, ~/…, or relative to the current directory; under the home directory"},
-			{Name: "title", Type: String, Description: "The tab's title (default: the file's name)"},
+			{Name: "title", Type: String, Description: fmt.Sprintf("The tab's title (default: the file's name), at most %d characters", maxDiffTitle)},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
 				Description: "Thread whose side panel it opens in, without changing what any window shows " +
 					"(default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app: the selected thread)" + IDHelp},
@@ -78,7 +79,11 @@ func (d ViewDeps) pageCheck(ctx context.Context, t *v1.Thread, a Args) (map[stri
 			"move it there, or show it without the bridge with view.panel.file", a.Path("path"))
 	}
 	params["page"] = "1"
-	if title := strings.TrimSpace(a.String("title")); title != "" {
+	title, err := diffText(a, "title", maxDiffTitle)
+	if err != nil {
+		return nil, err
+	}
+	if title != "" {
 		params["title"] = title
 	}
 	return params, nil

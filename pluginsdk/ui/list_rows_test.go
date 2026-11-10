@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -58,7 +59,7 @@ func TestValidateListRows(t *testing.T) {
 func TestListAddCountsAsElement(t *testing.T) {
 	rows := make([]Row, MaxElements-1)
 	for i := range rows {
-		rows[i] = NewRow("r"+itoa(i), "x")
+		rows[i] = NewRow("r"+strconv.Itoa(i), "x")
 	}
 	n := NewList("l", rows...) // 1 node + 399 rows = 400
 	if err := (View{Nodes: []Node{n}}).Validate(); err != nil {

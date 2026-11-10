@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -124,9 +123,7 @@ func memorySnapshotToProto(snap *memory.Snapshot, dir string) *v1.MemorySnapshot
 			Index: int32(e.Index), Id: e.ID(), Text: e.Text, File: e.File,
 			ThreadId: e.ThreadID, ThreadName: e.ThreadName, Injected: e.Injected, LeftOut: e.LeftOut,
 		}
-		if !e.Created.IsZero() {
-			m.Created = timestamppb.New(e.Created)
-		}
+		m.Created = timestamp(e.Created)
 		out.Entries = append(out.Entries, m)
 	}
 	return out

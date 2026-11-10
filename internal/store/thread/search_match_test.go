@@ -109,7 +109,16 @@ func TestSearchMatchText(t *testing.T) {
 	}
 }
 
-func TestSnippetOf(t *testing.T) {
+func TestCutSnippet(t *testing.T) {
+	// snippetOf is text on one line cut around its first match, as groupHits cuts a hit.
+	snippetOf := func(q searchQuery, text string) (string, []MatchRange) {
+		r := searchLine(text)
+		ranges := q.matchRunes(r)
+		if ranges == nil {
+			return "", nil
+		}
+		return cutSnippet(r, ranges)
+	}
 	long := strings.Repeat("alpha beta gamma ", 20) // 340 characters
 	tests := []struct {
 		name, q, text, want string

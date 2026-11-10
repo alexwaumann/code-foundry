@@ -71,12 +71,17 @@ func TestThreadSlashCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = stream.Close() }()
+	// The heartbeats that flush the snapshot can come before or after the next event.
 	next := func() *v1.ThreadEvent {
 		t.Helper()
-		if !stream.Receive() {
-			t.Fatalf("stream ended: %v", stream.Err())
+		for {
+			if !stream.Receive() {
+				t.Fatalf("stream ended: %v", stream.Err())
+			}
+			if m := stream.Msg(); m.GetHeartbeat() == nil {
+				return m
+			}
 		}
-		return stream.Msg()
 	}
 	snap := next().GetSnapshot()
 	if snap.GetSeq() != 2 || len(snap.GetCommands()) != 2 || snap.GetCommands()[0].GetArgumentHint() == "" || !snap.GetCommands()[0].GetBuiltin() {

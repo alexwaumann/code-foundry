@@ -24,9 +24,6 @@ var guiEditors = map[string]bool{
 // detectOrder is tried on PATH (plus Homebrew's bin dirs) when nothing is configured.
 var detectOrder = []string{"cursor", "code", "zed", "subl", "windsurf"}
 
-// appBundles are the fallback when no CLI is installed: `open -a <app> <path>`.
-var appBundles = []string{"Cursor", "Visual Studio Code", "Zed", "Sublime Text"}
-
 // extraBinDirs are searched after PATH: an app-launched daemon inherits launchd's
 // minimal PATH, which has neither Homebrew prefix.
 var extraBinDirs = []string{"/opt/homebrew/bin", "/usr/local/bin"}
@@ -35,7 +32,9 @@ var extraBinDirs = []string{"/opt/homebrew/bin", "/usr/local/bin"}
 type editorEnv struct {
 	getenv   func(string) string
 	lookPath func(string) (string, error)
-	exists   func(string) bool
+	// apps are the installed editor apps (detectEditorApps), the fallback when no CLI
+	// is found: `open -a <bundle> <path>`. Nil means none.
+	apps func() []EditorApp
 }
 
 func systemEditorEnv() editorEnv {
@@ -53,7 +52,6 @@ func systemEditorEnv() editorEnv {
 			}
 			return "", exec.ErrNotFound
 		},
-		exists: func(p string) bool { _, err := os.Stat(p); return err == nil },
 	}
 }
 
@@ -62,8 +60,8 @@ var errNoEditor = errors.New(`no editor found: set the editor command (for examp
 
 // resolveEditor returns the argv that opens path. configured is the editor setting
 // (shell-style words, may contain PathPlaceholder); empty means detect: $VISUAL or
-// $EDITOR when it names a GUI editor, then the first of detectOrder found, then an
-// installed app bundle.
+// $EDITOR when it names a GUI editor, then the first of detectOrder found, then the
+// first installed editor app.
 func resolveEditor(configured, path string, env editorEnv) ([]string, error) {
 	if strings.TrimSpace(configured) != "" {
 		argv, err := splitWords(configured)
@@ -96,9 +94,9 @@ func resolveEditor(configured, path string, env editorEnv) ([]string, error) {
 			return []string{p, path}, nil
 		}
 	}
-	for _, app := range appBundles {
-		if env.exists("/Applications/" + app + ".app") {
-			return []string{"/usr/bin/open", "-a", app, path}, nil
+	if env.apps != nil {
+		if apps := env.apps(); len(apps) > 0 {
+			return []string{"/usr/bin/open", "-a", apps[0].Path, path}, nil
 		}
 	}
 	return nil, errNoEditor

@@ -38,14 +38,14 @@ type GitOpsDeps struct {
 	// UnimplementedGitOpsServiceHandler.
 	Backend GitOpsBackend
 	// GitHubSlug returns the GitHub "owner/name" of the context's worktree (or project), or
-	// "". pr.* are available only when it is non-empty. Nil means never.
+	// "". pr.create and pr.open are available only when it is non-empty. Nil means never.
 	GitHubSlug func(Context) string
-	// LocalOnly reports whether the context's worktree (or project) belongs to a registered
-	// repository with no git remote. git.fetch, git.pull, git.push and pr.* are
+	// LocalOnly reports whether the context's worktree (or project) belongs to a project
+	// with no git remote. git.fetch, git.pull, git.push, pr.create and pr.open are
 	// unavailable then. Nil means never.
 	LocalOnly func(Context) bool
-	// NotGit reports a project without git: git.fetch, git.pull, git.push and pr.* are
-	// unavailable there, explained as such rather than as a missing remote. Nil means
+	// NotGit reports a project without git: git.fetch, git.pull, git.push, pr.create and
+	// pr.open are unavailable there, explained as such rather than as a missing remote. Nil means
 	// never.
 	NotGit NotGitFunc
 }
@@ -98,7 +98,7 @@ func tailLines(s string, n int) string {
 }
 
 // RegisterGitOps registers git.fetch, git.pull, git.push, pr.create, pr.open,
-// worktree.open.editor, worktree.reveal, and view.open.url.
+// worktree.open.editor, worktree.editors, worktree.reveal, and view.open.url.
 func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 	b := d.Backend
 	if b == nil {
@@ -236,7 +236,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			When: hasActiveWorktree,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if a.Int("line") < 0 {
-					return Result{}, fmt.Errorf("%w: line %d is negative", ErrInvalidArgs, a.Int("line"))
+					return Result{}, InvalidArg("line", "line %d is negative", a.Int("line"))
 				}
 				res, err := b.OpenEditor(ctx, connect.NewRequest(&v1.OpenEditorRequest{
 					WorktreePath: a.Path("worktree"), File: a.Path("file"), Line: uint32(a.Int("line")), App: strings.TrimSpace(a.String("app")),

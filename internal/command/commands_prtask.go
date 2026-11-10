@@ -89,7 +89,6 @@ func prTaskCommand(d PullRequestThreadDeps, slug, number, worktree, model, effor
 					"and this one gets a note and one wake when that thread settles" + IDHelp},
 			worktree, model, effort, createdFocusArg,
 		},
-		When: hasPullRequest,
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			if err := checkPullRequestArgs(a); err != nil {
 				return Result{}, err
@@ -298,7 +297,9 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 	}
 	created, err := d.Thread.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
 		ProjectId: pick.ProjectID, WorktreePath: pick.Path, Model: a.String("model"), Effort: a.String("effort"),
-		InitialPrompt: task.prompt(detail, PRTaskOptions{Checkout: prCheckoutOf(status), OffHead: pick.OffHead}),
+		ModelDefaulted:  a.String("model") != "" && !a.Given("model"),
+		EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
+		InitialPrompt:   task.prompt(detail, PRTaskOptions{Checkout: prCheckoutOf(status), OffHead: pick.OffHead}),
 	}))
 	if err != nil {
 		return Result{}, afterClone(wrapStep("start thread", err))

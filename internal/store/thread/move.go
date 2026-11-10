@@ -452,7 +452,7 @@ func (m *Manager) runMove(ctx context.Context, id string, job *moveJob) (bool, e
 				return false, ctx.Err()
 			}
 		case job.started:
-			return false, fmt.Errorf("%w: Claude did not start to move the thread: %s", ErrFailedPrecondition, nonEmpty(s.LastError, "it ended before answering"))
+			return false, fmt.Errorf("%w: Claude did not start to move the thread: %s", ErrFailedPrecondition, cmp.Or(s.LastError, "it ended before answering"))
 		case !s.needsTranscript():
 			// No conversation yet: nothing for Claude to relocate.
 			if moved, err := m.moveStopped(ctx, id, job); err != nil || moved {

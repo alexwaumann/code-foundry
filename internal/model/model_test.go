@@ -44,8 +44,8 @@ func TestRegistry(t *testing.T) {
 	if got := Values(); !slices.Equal(got, want) {
 		t.Fatalf("Values() = %v, want %v", got, want)
 	}
-	if len(Labels()) != len(Values()) || len(All()) != len(Values()) {
-		t.Fatalf("Labels/All not parallel to Values")
+	if len(Labels()) != len(Values()) {
+		t.Fatalf("Labels not parallel to Values")
 	}
 	for _, v := range []string{Default, UtilityDefault} {
 		if !Known(v) {
@@ -53,7 +53,7 @@ func TestRegistry(t *testing.T) {
 		}
 	}
 	seen := map[string]bool{}
-	for _, m := range All() {
+	for _, m := range registry {
 		if seen[m.Value] {
 			t.Errorf("duplicate value %q", m.Value)
 		}
@@ -61,12 +61,6 @@ func TestRegistry(t *testing.T) {
 		if m.Label == "" || strings.TrimSpace(m.Value) != m.Value || strings.HasPrefix(m.Value, "-") {
 			t.Errorf("bad entry %+v", m)
 		}
-	}
-	// All returns a copy.
-	a := All()
-	a[0].Label = "x"
-	if Label(a[0].Value) == "x" {
-		t.Error("All() shares the registry's backing array")
 	}
 }
 
@@ -92,7 +86,7 @@ func TestContextWindow(t *testing.T) {
 			t.Errorf("ContextWindow(%q) = %d, want %d", tt.value, got, tt.want)
 		}
 	}
-	for _, m := range All() {
+	for _, m := range registry {
 		if m.ContextWindow <= 0 {
 			t.Errorf("%s has no context window", m.Value)
 		}

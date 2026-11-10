@@ -534,6 +534,9 @@ func (s *holdService) finish(counted bool) {
 // runHold is one press: where it goes, the start tone, and the session.
 func (s *holdService) runHold(r *holdRun) {
 	defer close(r.done)
+	// Only this goroutine reads prev; letting go of it keeps a chain of finished runs
+	// from staying reachable through s.last.
+	defer func() { r.prev = nil }()
 	pressed := s.os.frontmost()
 	r.facts.OwnApp = pressed.PID == s.selfPID
 	route := routeHold(r.facts)

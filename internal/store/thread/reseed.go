@@ -18,7 +18,7 @@ import (
 // ReasonReseed) as soon as nothing would be lost: at once when it is idle at its prompt,
 // else once its turn, any pending request and its background work are over
 // (reseedHoldOf; Thread.ReseedPending meanwhile); a message sent before then still goes
-// to the old session. A stop is a stop: what "allow for thread" granted the old
+// to the old session. A stop is a stop: what "allow for session" granted the old
 // process goes with it, as at an idle stop, and the cached MCP status and slash commands
 // stay until the new process reports. An effort change or a user's restart while the
 // reseed waits still restarts the old session; the reseed stops it afterwards.

@@ -77,7 +77,7 @@ func (m *Manager) forkLog(ctx context.Context, parent Thread, newID string) ([]I
 
 // persistForkLog writes the fork's copied items once its thread row exists.
 func (m *Manager) persistForkLog(ctx context.Context, id string, items []Item) {
-	if err := saveItems(context.WithoutCancel(ctx), m.opts.DB, id, items, m.searchIndexFor(id)); err != nil {
+	if err := saveItems(context.WithoutCancel(ctx), m.opts.DB, id, items, searchIndex{}); err != nil {
 		m.log.Error("persist fork history", "thread", id, "items", len(items), "err", err)
 	}
 }

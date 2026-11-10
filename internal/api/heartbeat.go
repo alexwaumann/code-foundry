@@ -2,9 +2,9 @@ package api
 
 import "time"
 
-// HeartbeatInterval is how long a long-lived server stream the GUI holds
-// (ThreadService.Watch, TerminalService.Attach, EventService.Watch) may carry nothing
-// before the daemon sends a StreamHeartbeat. After the Wails window was hidden,
+// HeartbeatInterval is how long every long-lived server stream the GUI holds
+// (ThreadService.WatchThread, TerminalService.Attach, EventService.Watch and the others)
+// may carry nothing before the daemon sends a StreamHeartbeat. After the Wails window was hidden,
 // minimized or covered, WKWebView can hold back a stream's last bytes until more bytes
 // arrive (docs/notes/thread-render-stall.md); a heartbeat releases them within one
 // interval. The GUI's liveness watchdog (gui/frontend/src/api/stream.ts HEARTBEAT_MS)

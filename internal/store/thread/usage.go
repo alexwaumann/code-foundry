@@ -12,7 +12,7 @@ import (
 )
 
 // Thread usage (docs/notes/session-usage.md, design in
-// docs/sketches/thread-usage/DESIGN.md).
+// docs/sketches/session-usage/DESIGN.md).
 //
 // Every API response is one or more "assistant" records in the transcript carrying
 // message.model and message.usage. A streamed response is written as one record per

@@ -40,7 +40,7 @@ type execer interface {
 }
 
 // saveItems saves items and their search documents in one transaction (a fork's copied
-// history: all or none). ix is the thread's searchIndexFor.
+// history: all or none).
 func saveItems(ctx context.Context, db *sql.DB, threadID string, items []Item, ix searchIndex) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

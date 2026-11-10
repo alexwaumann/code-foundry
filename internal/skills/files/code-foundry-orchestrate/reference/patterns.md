@@ -53,7 +53,7 @@ code-foundry thread new --project 4e1f0a7b9c2d --new-worktree \
   --name "Fix the login redirect" \
   --brief "After login users land on / instead of the page they asked for" \
   --labels bug,auth --request-id fix-login-redirect \
-  --prompt "After login, redirect to the page the user first asked for (the next query parameter). You own src/auth/login.ts and its test. Add a test. Run the test suite, commit, git push origin HEAD and open a PR if origin is on GitHub. Your LAST step: code-foundry thread report done \"<one-line summary>\" --data '{\"branch\": \"<branch>\", \"pr\": \"<url>\"}'"
+  --prompt "After login, redirect to the page the user first asked for (the next query parameter). You own src/auth/login.ts and its test. Add a test. Run the test suite, commit, git push origin HEAD and open a PR if origin is on GitHub; your last message is your result."
 # created thread Fix the login redirect (s-3f9a1c2b7d10) in ~/.code-foundry/worktrees/acme/api/fix-login-redirect
 
 code-foundry thread wait 7d10 --for 1h
@@ -64,7 +64,7 @@ code-foundry thread wait 7d10 --for 1h
 # thread s-3f9a1c2b7d10 Fix the login redirect: needs attention (finished)
 
 code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD
-# s-3f9a1c2b7d10  done  Fix the login redirect  Redirect to ?next after login; PR #41 (data)
+# s-3f9a1c2b7d10  finished  Fix the login redirect  Redirect to ?next after login; PR #41
 code-foundry thread read 7d10 --last 5
 ```
 

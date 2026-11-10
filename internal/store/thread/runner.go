@@ -26,7 +26,7 @@ type runner struct {
 
 	// closeReq carries the disconnect reason of a close the daemon asks for ("": closed).
 	closeReq chan string
-	cdReq    chan cdRequest // RunIn; capacity 1, latest wins
+	cdReq    chan cdRequest // RunIn and Move (queueMove); capacity 1, latest wins
 	stopReq  chan struct{}
 	idleReq  chan idleCheck // stopIdle; capacity 1 (lifecycle.go)
 	done     chan struct{}
@@ -47,8 +47,9 @@ type runner struct {
 	tail  *tailer
 	state State
 
-	// pendingCd is a RunIn move waiting for the prompt (runin.go). atPromptSince: when
-	// Claude was last seen arriving at its prompt; zero while it is not there.
+	// pendingCd is a move RunIn or Move queued, waiting for the prompt (runin.go).
+	// atPromptSince: when Claude was last seen arriving at its prompt; zero while it is
+	// not there.
 	pendingCd     *cdRequest
 	atPromptSince time.Time
 	// moveRestart: a queued move waits for this restart (Claude asked for the folder's
@@ -87,13 +88,14 @@ type runner struct {
 	// report (shutdown, reportCoversTurn): the thread ends finished, not interrupted.
 	reportedAtStop bool
 	readyClosed    bool
+	// retrying: Thread.Retry is set (onAPIRetry), so clearRetry has something to clear.
+	retrying bool
 	// closeStatus/closeReason are the status when the close began: the close interrupts
 	// a running turn, so the reading at exit no longer says it was busy (see finish).
 	closeStatus Status
 	closeReason string
 	closeStep   int
 	closeTimer  *time.Timer
-	closeBy     time.Time
 	killed      bool
 
 	status, pubStatus Status
@@ -447,7 +449,8 @@ func (r *runner) finish(fn func(*Thread)) {
 	r.m.detach(r, func(s *Thread) {
 		fn(s)
 		s.TranscriptMissing = gone && s.ClaudeSessionID == cur.ClaudeSessionID && s.needsTranscript()
-		// Under m.mu, which RunIn holds while it queues: nothing can be queued after.
+		// Under m.mu, which RunIn and Move (queueMove) hold while they queue: nothing can
+		// be queued after.
 		if owed := r.unsentCd(); owed != nil && owed.move != nil {
 			// A Move moves only through set_cwd, which relocates the transcript: without
 			// the process it does not happen (move.go).

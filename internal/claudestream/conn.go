@@ -83,7 +83,6 @@ type Conn struct {
 	done   chan struct{} // stdout ended
 	stop   chan struct{} // Close: stop delivering
 	once   sync.Once
-	rerr   error
 }
 
 type controlReply struct {
@@ -121,9 +120,6 @@ func (c *Conn) Events() <-chan Event { return c.events }
 // Done is closed when stdout ends.
 func (c *Conn) Done() <-chan struct{} { return c.done }
 
-// Err is the read error that ended stdout, nil for a clean EOF. Valid after Done.
-func (c *Conn) Err() error { return c.rerr }
-
 // Close stops delivering events and makes pending and future requests fail. It does
 // not close stdin (CloseStdin) or stop the reader, which ends with the process.
 func (c *Conn) Close() {
@@ -131,9 +127,12 @@ func (c *Conn) Close() {
 }
 
 func (c *Conn) read(r io.Reader) {
-	err := ReadLines(r, c.opts.MaxLine, func(line []byte) { c.dispatch(Parse(line)) })
+	// A closed read end (CloseOutput) is an end the caller asked for.
+	if err := ReadLines(r, c.opts.MaxLine, func(line []byte) { c.dispatch(Parse(line)) }); err != nil && !errors.Is(err, os.ErrClosed) {
+		c.log.Warn("claudestream: read stdout", "err", err)
+	}
 	c.mu.Lock()
-	c.rerr, c.ended = err, true
+	c.ended = true
 	waiting := c.waiting
 	c.waiting = map[string]chan controlReply{}
 	c.inbound = map[string]struct{}{} // the process is gone: nothing can be answered

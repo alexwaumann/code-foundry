@@ -33,17 +33,14 @@ var (
 	_ GhBackend = codefoundryv1connect.GhServiceClient(nil)
 )
 
-// hasPullRequest is the pull request commands' When: the pull request is named by its
-// args (the GUI's detail panel passes them, the CLI takes them as flags or words), so
-// it holds in any context once they are given. Without them Invoke fails with
-// ErrInvalidArgs, not ErrUnavailable.
-func hasPullRequest(Context) bool { return true }
-
 // RegisterPullRequest registers pr.revert, pr.merge (commands_pr_merge.go),
 // pr.review.request, pr.refresh, pr.review and pr.comment (commands_pr_review.go), and
 // pr.ready, pr.draft, pr.auto-merge and pr.checkbox (commands_pr_state.go): the pull request detail
 // panel's actions. b nil registers them against
-// UnimplementedGhServiceHandler.
+// UnimplementedGhServiceHandler. They have no When: the pull request is named by its args
+// (the GUI's detail panel passes them, the CLI takes them as flags or words), never by
+// context, so they hold in any context. Without the args Invoke fails with
+// ErrInvalidArgs, not ErrUnavailable.
 func RegisterPullRequest(r *Registry, b GhBackend) error {
 	if b == nil {
 		b = codefoundryv1connect.UnimplementedGhServiceHandler{}
@@ -65,7 +62,6 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 			Description: "Open a pull request that reverses a merged one (GitHub's Revert button).",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number},
-			When:        hasPullRequest,
 			Confirm:     "This opens a new pull request that reverses the changes merged by #{number}.",
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
@@ -94,7 +90,6 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 				{Name: "kind", Type: Enum, Enum: []string{"user", "team"}, Default: "user", Description: "Whether login is a user or a team"},
 				{Name: "requested", Type: Bool, Default: "true", Description: "Request the review (--requested=false withdraws the request)"},
 			},
-			When: hasPullRequest,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err
@@ -129,7 +124,6 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 			Description: "Fetch a pull request's detail from GitHub now instead of from the daemon's cache.",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number},
-			When:        hasPullRequest,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err

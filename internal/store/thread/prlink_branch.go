@@ -13,9 +13,10 @@ import (
 // resolves each thread's branches, matches them against the GitHub store's cached
 // lists, and pushes the matches here, each with the head it matched (Head). They are
 // merged like Claude's records (deduplicated by URL, a URL the thread has keeps its
-// row, never removed) and copied up the CreatedBy chain. The one removal is
-// SettleBranchLinks: a branch link made before heads were recorded whose head turns
-// out to be the default branch.
+// row) and copied up the CreatedBy chain. Two things remove them: SettleBranchLinks, a
+// branch link made before heads were recorded whose head turns out to be the default
+// branch; and a member's removal from the thread's project set, its branch rows
+// (dropBranchLinks, members.go; their child copies up the chain stay).
 
 // LinkBranchPullRequests links pull requests found on thread id's branches
 // (LinkBranch). Links without a time get now. Returns how many were new to the thread;
@@ -32,7 +33,9 @@ func (m *Manager) LinkBranchPullRequests(id string, links []LinkedPullRequest) i
 // SettleBranchLinks resolves thread id's branch links that have no Head (made before
 // heads were recorded). The URLs in drop are removed, and so is each one's child copy
 // up the CreatedBy chain (at each hop the LinkChild row that came through the thread
-// below; the chain stops where no copy is left). The URLs in heads get that head.
+// below; the chain stops where no copy is left). A copy another child of that ancestor
+// still has stays, through that child, and its chain stops there. The URLs in heads
+// get that head.
 // Only LinkBranch rows without a Head are touched. Returns how many rows were removed,
 // copies included; an unknown thread is ignored.
 func (m *Manager) SettleBranchLinks(id string, heads map[string]string, drop []string) int {
@@ -83,14 +86,30 @@ func (m *Manager) SettleBranchLinks(id string, heads map[string]string, drop []s
 			break
 		}
 		var next []string
+		via := map[string]string{}
 		kept := slices.DeleteFunc(slices.Clone(parent.s.LinkedPullRequests), func(l LinkedPullRequest) bool {
 			if l.Source == LinkChild && l.ViaThreadID == child && slices.Contains(dropped, l.URL) {
+				if k := m.otherChildWithLocked(up, child, l.URL); k != "" {
+					via[l.URL] = k
+					return false
+				}
 				next = append(next, l.URL)
 				return true
 			}
 			return false
 		})
+		for i, l := range kept {
+			if k, ok := via[l.URL]; ok {
+				kept[i].ViaThreadID = k
+				if err := saveLinkVia(context.Background(), m.opts.DB, up, l.URL, k); err != nil {
+					m.log.Error("record a child link's new child", "thread", up, "err", err)
+				}
+			}
+		}
 		if len(next) == 0 {
+			if len(via) > 0 {
+				m.removeLinksLocked(parent, kept, nil)
+			}
 			break
 		}
 		m.removeLinksLocked(parent, kept, next)
@@ -98,6 +117,22 @@ func (m *Manager) SettleBranchLinks(id string, heads map[string]string, drop []s
 		child, dropped = up, next
 	}
 	return removed
+}
+
+// otherChildWithLocked is a thread created by parent, other than child, that has a link
+// to url (it or one below it linked it); "" for none. Callers hold m.mu.
+func (m *Manager) otherChildWithLocked(parent, child, url string) string {
+	var ids []string
+	for id, rec := range m.recs {
+		if id != child && id != parent && rec.s.CreatedBy == parent &&
+			slices.ContainsFunc(rec.s.LinkedPullRequests, func(l LinkedPullRequest) bool { return SamePullRequestURL(l.URL, url) }) {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return ""
+	}
+	return slices.Min(ids)
 }
 
 // removeLinksLocked sets rec's links to kept, deletes the rows of urls and publishes

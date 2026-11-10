@@ -38,7 +38,7 @@ func TestThemeSlotsWithUserThemes(t *testing.T) {
 	if dark.Enum[0] != "ocean-dusk" || dark.EnumLabels[0] != "Ocean Dusk" || dark.Enum[1] != theme.Default(theme.SchemeDark) || slices.Contains(dark.Enum, "paper") {
 		t.Errorf("dark enum = %v / %v", dark.Enum, dark.EnumLabels)
 	}
-	if light.Enum[0] != "paper" || len(light.Enum) != len(theme.IDs(theme.SchemeLight))+1 {
+	if light.Enum[0] != "paper" || len(light.Enum) != len(theme.Set{}.IDs(theme.SchemeLight))+1 {
 		t.Errorf("light enum = %v", light.Enum)
 	}
 	// The static list (and so the file's comments) keeps the catalog only.

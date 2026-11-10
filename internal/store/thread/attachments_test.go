@@ -2,7 +2,6 @@ package thread
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -561,8 +560,7 @@ func TestMessageAttachments(t *testing.T) {
 	img1 := file("1.png", pngData, 9*mib)
 	img2 := file("2.png", pngData, 9*mib)
 	img3 := file("3.png", pngData, 9*mib)
-	// Staged before the name carried a count: 30 pages by pdfinfo, about 205 by the
-	// estimate, never inline either way.
+	// No count in the name: the size estimate, about 205 pages, never inline.
 	long := file("long.pdf", testPDF(30, 20*mib-8<<10), 0)
 	short := file("short.pdf", testPDF(2, 0), 0)
 	// The name's count wins over pdfinfo and the size: 150 pages in 900 KB never goes
@@ -588,7 +586,7 @@ func TestMessageAttachments(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := messageAttachments(context.Background(), dir, tt.paths)
+			got, err := messageAttachments(dir, tt.paths)
 			if !tt.ok {
 				if !errors.Is(err, ErrInvalidArgument) {
 					t.Fatalf("err = %v, want invalid argument", err)
@@ -605,11 +603,11 @@ func TestMessageAttachments(t *testing.T) {
 			}
 		})
 	}
-	if got, err := messageAttachments(context.Background(), dir, []string{manyPages, fewPages}); err != nil ||
+	if got, err := messageAttachments(dir, []string{manyPages, fewPages}); err != nil ||
 		got[0].pages != 150 || !got[0].exact || got[1].pages != 3 || got[1].exact {
 		t.Errorf("counts from the names = %+v, %v", got, err)
 	}
-	if _, err := messageAttachments(context.Background(), dir, []string{img1, img2, img3}); err == nil || !strings.Contains(err.Error(), "24 MiB") {
+	if _, err := messageAttachments(dir, []string{img1, img2, img3}); err == nil || !strings.Contains(err.Error(), "24 MiB") {
 		t.Errorf("message limit error %v does not name the limit", err)
 	}
 }

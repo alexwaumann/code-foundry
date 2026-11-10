@@ -250,7 +250,7 @@ func (p *Process) SignalGroup(sig syscall.Signal) (bool, error) {
 func (p *Process) CloseOutput() { _ = p.stdout.Close() }
 
 // MergeEnv applies overrides to base in order. "KEY=VALUE" sets KEY; a bare "KEY"
-// removes it. Later entries win. (Same rule as the terminal store's.)
+// removes it. Later entries win. Order of first appearance is preserved.
 func MergeEnv(base []string, overrides []string) []string {
 	idx := map[string]int{}
 	out := make([]string, 0, len(base)+len(overrides))

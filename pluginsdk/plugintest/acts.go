@@ -1,7 +1,6 @@
 package plugintest
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -34,12 +33,11 @@ var HostCapabilities = []string{
 // (and one on an instance without a view) goes as given, so a test can still send the
 // plugin acts it must refuse itself (a stale key, an unknown action).
 func (h *Host) hostAct(act pluginsdk.SurfaceAct) (pluginsdk.SurfaceAct, error) {
-	raw, ok := h.View(act.Instance)
-	if !ok || act.Key == "" {
+	if act.Key == "" {
 		return act, nil
 	}
-	var v ui.View
-	if json.Unmarshal(raw, &v) != nil {
+	v, err := h.latest(act.Instance)
+	if err != nil {
 		return act, nil
 	}
 	kind, node, found := choiceOf(v, act.Key)
@@ -64,37 +62,24 @@ func choiceOf(v ui.View, key string) (kind, node string, found bool) {
 			}
 		}
 	}
-	var walk func(ns []ui.Node) bool
-	walk = func(ns []ui.Node) bool {
-		for _, n := range ns {
-			switch {
-			case n.Tabs != nil:
-				for _, t := range n.Tabs.Items {
-					if t.Key == key {
-						kind, node = pluginsdk.ActTab, n.Key
-						return true
-					}
-				}
-			case n.MasterDetail != nil:
-				for _, r := range n.MasterDetail.List.Rows {
-					if r.Key == key && r.Action == nil {
-						kind, node = pluginsdk.ActSelect, n.Key
-						return true
-					}
+	_, found = findNode(v, func(n ui.Node) bool {
+		switch {
+		case n.Tabs != nil:
+			for _, t := range n.Tabs.Items {
+				if t.Key == key {
+					kind, node = pluginsdk.ActTab, n.Key
+					return true
 				}
 			}
-			for _, l := range n.Children() {
-				if walk(l) {
+		case n.MasterDetail != nil:
+			for _, r := range n.MasterDetail.List.Rows {
+				if r.Key == key && r.Action == nil {
+					kind, node = pluginsdk.ActSelect, n.Key
 					return true
 				}
 			}
 		}
 		return false
-	}
-	for _, l := range v.NodeLists() {
-		if walk(l) {
-			return kind, node, true
-		}
-	}
-	return "", "", false
+	})
+	return kind, node, found
 }

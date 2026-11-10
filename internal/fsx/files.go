@@ -50,7 +50,7 @@ func GitEnv(base []string) []string { return gitEnv(base) }
 // gitEnv is base without the variables that would point git at another repository
 // (a daemon started from a git hook inherits them), plus GIT_OPTIONAL_LOCKS=0 so
 // listing never rewrites the index (which would fire the project store's watcher) and
-// GIT_TERMINAL_PROMPT=0. The project store's runner does the same for its commands.
+// GIT_TERMINAL_PROMPT=0. The project store's runner builds its git environment on it.
 func gitEnv(base []string) []string {
 	out := make([]string, 0, len(base)+2)
 	for _, kv := range base {
@@ -247,19 +247,6 @@ type Match struct {
 	PathPositions, NamePositions []int
 }
 
-// Search is SearchSources over the one checkout dir.
-func (x *FileIndex) Search(ctx context.Context, dir string, git bool, query string, limit int) (matches []FileEntry, truncated bool, err error) {
-	ms, truncated, err := x.SearchSources(ctx, []Source{{Dir: dir, Git: git}}, query, limit, false)
-	if err != nil {
-		return nil, false, err
-	}
-	matches = make([]FileEntry, len(ms))
-	for i, m := range ms {
-		matches[i] = m.FileEntry
-	}
-	return matches, truncated, nil
-}
-
 // SearchSources fuzzy-matches query against the files and directories (only the files
 // when filesOnly) of every source checkout and ranks them in one list
 // (fuzzy.RankSources: best first, ties to the earlier source). limit is clamped to
@@ -311,7 +298,8 @@ func (x *FileIndex) start(ctx context.Context, dir string, git bool) *listing {
 	now := x.now()
 	x.mu.Lock()
 	defer x.mu.Unlock()
-	if c, ok := x.entries[key]; ok && now.Sub(c.created) < x.ttl {
+	x.dropExpired(now)
+	if c, ok := x.entries[key]; ok {
 		l := &listing{done: make(chan struct{}), c: c}
 		close(l.done)
 		return l
@@ -348,11 +336,7 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, l *list
 	x.mu.Lock()
 	delete(x.inflight, key)
 	if err == nil {
-		for k, e := range x.entries { // drop expired entries; bound the rest
-			if c.created.Sub(e.created) >= x.ttl {
-				delete(x.entries, k)
-			}
-		}
+		x.dropExpired(c.created)
 		if len(x.entries) >= maxCachedCheckouts {
 			oldest := slices.MinFunc(slices.Collect(maps.Values(x.entries)), func(a, b cachedFiles) int {
 				return a.created.Compare(b.created)
@@ -364,6 +348,15 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, l *list
 	x.mu.Unlock()
 	l.c, l.err = c, err
 	close(l.done)
+}
+
+// dropExpired deletes the cached lists that are past the TTL at now. x.mu is held.
+func (x *FileIndex) dropExpired(now time.Time) {
+	for k, e := range x.entries {
+		if now.Sub(e.created) >= x.ttl {
+			delete(x.entries, k)
+		}
+	}
 }
 
 // listFiles lists a checkout's candidates: git's view, else (no git, or git failed)

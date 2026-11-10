@@ -88,7 +88,8 @@ func (m *Manager) RunIn(_ context.Context, id string, t RunInTarget) (Thread, er
 		return rec.s, nil
 	}
 	rec.s.PendingWorktreePath = req.path
-	// Latest wins. Only RunIn sends, under m.mu, so draining then sending never blocks.
+	// Latest wins. Only RunIn and Move (queueMove) send, both under m.mu, so draining then
+	// sending never blocks.
 	select {
 	case <-rec.run.cdReq:
 	default:

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -56,12 +55,8 @@ func subscriptionToProto(s thread.Subscription) *v1.ThreadSubscription {
 			p.Condition = v
 		}
 	}
-	if !s.CreatedAt.IsZero() {
-		p.CreatedAt = timestamppb.New(s.CreatedAt)
-	}
-	if !s.LastFiredAt.IsZero() {
-		p.LastFiredAt = timestamppb.New(s.LastFiredAt)
-	}
+	p.CreatedAt = timestamp(s.CreatedAt)
+	p.LastFiredAt = timestamp(s.LastFiredAt)
 	return p
 }
 

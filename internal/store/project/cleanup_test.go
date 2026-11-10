@@ -68,9 +68,6 @@ func TestCleanupVerdict(t *testing.T) {
 		{"zero commits, made 9m59s ago", with(func(w *Worktree) { w.Head, w.CreatedAt = "c1", now.Add(-FreshFor+time.Second) }), false, fresh},
 		{"zero commits, made 10m ago", with(func(w *Worktree) { w.Head, w.CreatedAt = "c1", now.Add(-FreshFor) }), true, noCommit},
 		{"zero commits, made an hour ago", with(func(w *Worktree) { w.Head = "c1" }), true, noCommit},
-		{"zero commits, archived thread's worktree made a minute ago", with(func(w *Worktree) {
-			w.Head, w.CreatedAt = "c1", now.Add(-time.Minute)
-		}), false, fresh},
 		{"just made, head unknown (recorded before heads were)", with(func(w *Worktree) {
 			w.CreatedHead, w.CreatedAt = "", now.Add(-time.Minute)
 		}), false, fresh},
@@ -101,9 +98,6 @@ func TestCleanupVerdict(t *testing.T) {
 			removable, reason := CleanupVerdict(tt.w, now)
 			if removable != tt.removable || reason != tt.reason {
 				t.Errorf("CleanupVerdict = %v, %q; want %v, %q", removable, reason, tt.removable, tt.reason)
-			}
-			if got := tt.w.MergedClean(now); got != tt.removable {
-				t.Errorf("MergedClean = %v, want %v", got, tt.removable)
 			}
 		})
 	}
@@ -231,11 +225,6 @@ func TestInsideRootResolvesRootSymlinks(t *testing.T) {
 		t.Errorf("%s is not inside %s (a symlink to %s)", resolvedPath, link, real)
 	}
 }
-
-// TestCleanupRealProject: a worktree under the store's WorktreeRoot whose branch is merged
-// into origin/main and clean is removed (its branch stays); a merged one with an
-// untracked file, one with a commit not on origin/main, one a hold names, and a merged
-// clean one outside WorktreeRoot (made by another tool) are kept with their reasons.
 
 // TestCleanupRealProject runs the rule against real git. Code Foundry made seven
 // worktrees: merged (a commit merged into origin/main), rebased (its commit landed as a

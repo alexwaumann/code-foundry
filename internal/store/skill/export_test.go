@@ -1,6 +1,6 @@
 package skill
 
-// Test access to the install records (PR 2's lifecycle writes them).
+// Test access to the install records.
 var (
 	SaveRecord   = saveRecord
 	DeleteRecord = deleteRecord

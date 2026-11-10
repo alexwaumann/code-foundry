@@ -36,11 +36,11 @@ func TestThreadStopWaiting(t *testing.T) {
 			wantMsg: "thread drv (s5) had nothing to stop", wantReqs: []proto.Message{get, stop}},
 		{name: "a shell: it asks, naming it", ctx: command.Context{ActiveThreadID: "s5"}, shells: []*v1.BackgroundShell{shell("npm run dev", "")},
 			wantAsk:  "This stops 1 background shell: npm run dev. Its other wakes go too; child threads keep working.",
-			wantReqs: []proto.Message{get, get}},
+			wantReqs: []proto.Message{get, get, get}},
 		{name: "two shells, one known by its description, one by the first line", ctx: command.Context{ActiveThreadID: "s5"},
 			shells:   []*v1.BackgroundShell{shell("", "Serve the docs"), shell("make\nmake check", "")},
 			wantAsk:  "This stops 2 background shells: Serve the docs, make …. Its other wakes go too; child threads keep working.",
-			wantReqs: []proto.Message{get, get}},
+			wantReqs: []proto.Message{get, get, get}},
 		{name: "confirmed: it runs", ctx: command.Context{ActiveThreadID: "s5"}, shells: []*v1.BackgroundShell{shell("npm run dev", "")}, confirmed: true,
 			wantReqs: []proto.Message{stop}},
 		{name: "unavailable without a thread", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
@@ -75,29 +75,37 @@ func TestThreadStopWaiting(t *testing.T) {
 }
 
 // A yes is tied to the shells it named: one that started since refuses and stops nothing.
-// One that ended is fine, and --yes (no digest) stops what runs.
+// One that ended is fine, and --yes (no list) stops what runs.
 func TestThreadStopWaitingBindsTheYes(t *testing.T) {
 	dev := &v1.BackgroundShell{TaskId: "b1", Command: "npm run dev"}
+	build := &v1.BackgroundShell{TaskId: "b3", Command: "make"}
 	late := &v1.BackgroundShell{TaskId: "b2", Command: "rm -rf build"}
 	stop := &v1.StopThreadWaitingRequest{ThreadId: "s5"}
-	shown := []*v1.BackgroundShell{dev}
 	tests := []struct {
-		name     string
+		name string
+		// shown are the shells asked about (default: dev alone).
+		shown    []*v1.BackgroundShell
 		now      []*v1.BackgroundShell
 		bound    bool
 		wantCode connect.Code
 		wantStop bool
 	}{
-		{name: "the same shells", now: shown, bound: true, wantStop: true},
+		{name: "the same shells", now: []*v1.BackgroundShell{dev}, bound: true, wantStop: true},
 		{name: "another shell started while the question was open", now: []*v1.BackgroundShell{dev, late}, bound: true, wantCode: connect.CodeFailedPrecondition},
 		{name: "a different one in its place", now: []*v1.BackgroundShell{late}, bound: true, wantCode: connect.CodeFailedPrecondition},
 		{name: "the shell ended meanwhile", bound: true, wantStop: true},
+		{name: "one of two shells ended meanwhile", shown: []*v1.BackgroundShell{dev, build}, now: []*v1.BackgroundShell{dev}, bound: true, wantStop: true},
+		{name: "one ended and another started", shown: []*v1.BackgroundShell{dev, build}, now: []*v1.BackgroundShell{dev, late}, bound: true, wantCode: connect.CodeFailedPrecondition},
 		{name: "--yes names no list", now: []*v1.BackgroundShell{dev, late}, wantStop: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, b, _ := newLifecycleRegistry(t)
 			ctx := command.Context{ActiveThreadID: "s5"}
+			shown := tt.shown
+			if shown == nil {
+				shown = []*v1.BackgroundShell{dev}
+			}
 			b.Current = &v1.Thread{Id: "s5", Name: "drv", BackgroundShells: shown}
 			var ce *command.ConfirmError
 			if _, err := reg.Invoke(context.Background(), ctx, "thread.stop-waiting", nil); !errors.As(err, &ce) {
@@ -106,7 +114,7 @@ func TestThreadStopWaitingBindsTheYes(t *testing.T) {
 			args := map[string]string{}
 			if tt.bound {
 				maps.Copy(args, ce.Bind)
-				if args["shown-digest"] != command.ConfirmDigest(ce.Message) {
+				if args["shown-digest"] == "" {
 					t.Fatalf("bind %v", ce.Bind)
 				}
 			}

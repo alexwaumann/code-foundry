@@ -225,11 +225,15 @@ func (s *Store) UpdateTask(ctx context.Context, id string, u TaskUpdate) (Task, 
 // blockFailedLocked blocks every doing task whose worker reported failed or blocked
 // after the task last changed, with the report's summary as its outcome (s.mu held).
 func (s *Store) blockFailedLocked(threads *thread.Snapshot, now time.Time) {
+	var ix *teamIndex
 	for i, t := range s.tasks {
 		if t.State != StateDoing || t.ThreadID == "" {
 			continue
 		}
-		w, ok := threads.Thread(t.ThreadID)
+		if ix == nil {
+			ix = newTeamIndex(threads)
+		}
+		w, ok := ix.byID[t.ThreadID]
 		if !ok || (w.Report.Status != thread.ReportFailed && w.Report.Status != thread.ReportBlocked) || !w.Report.At.After(t.UpdatedAt) {
 			continue
 		}
@@ -318,9 +322,8 @@ func (s *Store) rollupLocked(ctx context.Context, id string, now time.Time) {
 
 // resetOrphansLocked runs at load: every doing task with no worker and no subtask goes
 // back to todo (its ember task start was cut before the worker existed: the app
-// stopped), then every parent is rolled up. Returns the tasks it reset (s.mu held).
-func (s *Store) resetOrphansLocked(ctx context.Context, now time.Time) []Task {
-	var out []Task
+// stopped), then every parent is rolled up (s.mu held).
+func (s *Store) resetOrphansLocked(ctx context.Context, now time.Time) {
 	for i, t := range s.tasks {
 		if t.State != StateDoing || t.ThreadID != "" || slices.ContainsFunc(s.tasks, func(c Task) bool { return c.ParentID == t.ID }) {
 			continue
@@ -332,7 +335,6 @@ func (s *Store) resetOrphansLocked(ctx context.Context, now time.Time) []Task {
 			continue
 		}
 		s.tasks[i] = t
-		out = append(out, t)
 		s.log.Warn("ember: a doing task had no worker; back to todo", "task", t.ID, "title", t.Title)
 	}
 	for _, t := range s.tasks {
@@ -340,16 +342,6 @@ func (s *Store) resetOrphansLocked(ctx context.Context, now time.Time) []Task {
 			s.rollupLocked(ctx, t.ID, now)
 		}
 	}
-	return out
-}
-
-// ResetAtStart are the tasks the store put back to todo when it loaded because their
-// worker never started (resetOrphansLocked), as they were then. Ember's restart notice
-// lists them.
-func (s *Store) ResetAtStart() []Task {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return slices.Clone(s.reset)
 }
 
 // checkThread refuses a worker thread id that names no thread ("" is none).

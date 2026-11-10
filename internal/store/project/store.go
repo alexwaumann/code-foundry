@@ -585,6 +585,7 @@ func (g *Git) Unregister(ctx context.Context, id string) error {
 	if routed {
 		g.fs.sync(ctx) // the stream may drop the project's directories
 	}
+	g.forgetDetails(id)
 	g.log.Info("project unregistered", "id", id)
 	g.commit(func(*Snapshot) []Event { return []Event{ProjectRemoved{ID: id}} })
 	return nil
@@ -1155,6 +1156,9 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	}
 	g.mu.Unlock()
 	g.forgetMade(ctx, listedAt, stale...)
+	if len(removed) > 0 {
+		g.forgetDetails(id, removed...)
+	}
 
 	if routesChanged {
 		g.fs.sync(ctx) // a worktree root may have appeared outside the stream's paths
@@ -1356,8 +1360,8 @@ func (g *Git) publishedBefore(projectID, path string, t time.Time) bool {
 // interval, if shorter), once the initial reconcile has learned each project's origin.
 const firstFetchDelay = 10 * time.Second
 
-// fetch fetches one project; the fetch tier loop (activity.go) calls it, one project
-// at a time.
+// fetch fetches one project; fetchAsync (fetchpool.go) runs it for the fetch tier loop,
+// at most fetchConcurrency at once and never two for one project.
 func (g *Git) fetch(ctx context.Context, id string) {
 	st := g.project(id)
 	if st == nil {

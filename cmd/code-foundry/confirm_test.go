@@ -17,13 +17,13 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
+// fromCLI is the context every CLI call sends (uiContext).
+var fromCLI = &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}
+
 // TestInvokeSecondStage: a command confirmed once may ask again (deleting uncommitted
 // work) with args to merge. On a terminal the user is asked twice and the second yes
 // adds --force; --yes (or no terminal) never answers the second question: the command's
 // declined result stands when it has one, else it fails pointing at --force.
-// fromCLI is the context every CLI call sends (uiContext).
-var fromCLI = &v1.UiContext{Origin: v1.CallOrigin_CALL_ORIGIN_CLI}
-
 func TestInvokeSecondStage(t *testing.T) {
 	var forced []string // the commands that ran with force
 	reg := command.NewRegistry()

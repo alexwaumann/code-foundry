@@ -11,8 +11,9 @@ import (
 	"time"
 )
 
-// fakeGitHub answers the store's GraphQL documents (Poll, PullRequestDetails,
-// DefaultBranchChecks, Checks) from in-memory state, in GitHub's JSON shapes, so store
+// fakeGitHub answers the store's GraphQL documents (the poll's Poll, PollStats,
+// PollProjects, PullRequestDetails and DefaultBranchChecks, plus the detail, write and
+// repository search operations) from in-memory state, in GitHub's JSON shapes, so store
 // tests can change one thing and see what the next poll does. Fixture-based decode
 // tests (poll_decode_test.go) pin the shapes against real responses.
 type fakeGitHub struct {

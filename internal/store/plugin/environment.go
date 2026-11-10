@@ -303,7 +303,6 @@ func (a *actor) setEnvironment(ctx context.Context, params json.RawMessage) (any
 		}
 		a.hostLog("session environment withdrawn")
 		a.envPushed()
-		bus.Publish[Event](m.opts.Bus, EnvironmentChanged{Plugin: a.name})
 		return pluginsdk.EnvironmentResult{Applied: true}, nil
 	}
 	raw, err := json.Marshal(in)

@@ -207,9 +207,7 @@ func terminalToProto(t terminal.Terminal) *v1.Terminal {
 		AltScreen: t.AltScreen,
 		Labels:    t.Labels,
 	}
-	if !t.StartedAt.IsZero() {
-		p.StartedAt = timestamppb.New(t.StartedAt)
-	}
+	p.StartedAt = timestamp(t.StartedAt)
 	switch t.State {
 	case terminal.StateRunning:
 		p.State = v1.TerminalState_TERMINAL_STATE_RUNNING

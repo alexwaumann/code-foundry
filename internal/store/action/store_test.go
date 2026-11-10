@@ -219,6 +219,7 @@ func TestCreateUpdateDelete(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			t.Cleanup(func() { _ = m2.Close(context.Background()) })
 			if got := names(m2.Snapshot().ForProject("web")); !slices.Equal(got, tt.want) {
 				t.Errorf("reloaded = %q, want %q", got, tt.want)
 			}
@@ -310,6 +311,7 @@ func TestProjectRemovedForgetsActionsAndRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = m2.Close(context.Background()) })
 	if got := names(m2.Snapshot().Actions); !slices.Equal(got, []string{"Sleep"}) || m2.Snapshot().Actions[0].ProjectID != "api" {
 		t.Errorf("reloaded = %+v", m2.Snapshot().Actions)
 	}

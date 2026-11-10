@@ -1120,6 +1120,21 @@ func TestHoldWaitsForTheLastFlush(t *testing.T) {
 	}
 }
 
+// A finished run lets go of the one before it, so runs do not pile up for the app's life.
+func TestHoldFinishedRunDropsThePrevious(t *testing.T) {
+	r := newHoldRig(t)
+	r.s.update(holdUpdate{conn: r.conn, snap: holdSnapshot(nil)})
+	r.s.flushWait = 200 * time.Millisecond
+	r.s.event(flagsAt(0, flagLeftAlt))
+	r.s.event(flagsAt(500, 0))
+	r.s.event(flagsAt(600, flagRightAlt))
+	r.s.event(flagsAt(700, 0))
+	r.wait(t)
+	if r.s.last.prev != nil {
+		t.Error("the finished run still holds the run before it")
+	}
+}
+
 // A press during the last hold's tail cuts it, so the new session is not kept waiting, and
 // what that hold said still pastes.
 func TestHoldPressCutsTheTail(t *testing.T) {

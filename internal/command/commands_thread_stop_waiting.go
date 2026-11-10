@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -49,10 +50,24 @@ func StopWaitingMessage(res *v1.StopThreadWaitingResponse) string {
 	return msg
 }
 
-// shownArg binds the yes to the shells the question named (Command.BindConfirm). The
-// CLI's --yes leaves it empty: it asked for no list.
-var shownArg = ArgSpec{Name: "shown-digest", Type: String, Description: "Set by the confirmation: the digest of the shells you were shown; " +
+// shownArg binds the yes to the shells the question named (Command.BindConfirm): their
+// task ids, comma-separated. The CLI's --yes leaves it empty: it asked for no list.
+var shownArg = ArgSpec{Name: "shown-digest", Type: String, Description: "Set by the confirmation: the task ids of the shells you were shown; " +
 	"it refuses if another one runs by then (--yes alone stops what runs)"}
+
+// noShellsShown binds a yes to no shell: the shells changed between the question and its
+// binding, so any that runs refuses.
+const noShellsShown = "-"
+
+// shellIDs are the shells' task ids, sorted and comma-separated.
+func shellIDs(shells []*v1.BackgroundShell) string {
+	ids := make([]string, len(shells))
+	for i, sh := range shells {
+		ids[i] = sh.GetTaskId()
+	}
+	slices.Sort(ids)
+	return strings.Join(ids, ",")
+}
 
 // errShellsChanged refuses a yes given to another list of shells. Nothing was stopped.
 var errShellsChanged = errors.New("the thread's background shells changed since you were asked; nothing was stopped, so ask again")
@@ -84,11 +99,21 @@ func threadStopWaitingCmd(b ThreadBackend, idArg ArgSpec) Command {
 		DynamicConfirm: func(ctx context.Context, _ Context, a Args) string {
 			return stopWaitingConfirm(shells(ctx, a))
 		},
+		ConfirmBind: func(ctx context.Context, _ Context, a Args, asked string) string {
+			now := shells(ctx, a)
+			if stopWaitingConfirm(now) != asked {
+				return noShellsShown
+			}
+			return shellIDs(now)
+		},
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			// A yes covers the shells it named. One that ended is fine; none is killed unnamed.
-			if d := a.String(shownArg.Name); d != "" {
-				if now := shells(ctx, a); len(now) > 0 && ConfirmDigest(stopWaitingConfirm(now)) != d {
-					return Result{}, connect.NewError(connect.CodeFailedPrecondition, errShellsChanged)
+			if shown := a.String(shownArg.Name); shown != "" {
+				ids := strings.Split(shown, ",")
+				for _, sh := range shells(ctx, a) {
+					if !slices.Contains(ids, sh.GetTaskId()) {
+						return Result{}, connect.NewError(connect.CodeFailedPrecondition, errShellsChanged)
+					}
 				}
 			}
 			res, err := b.StopWaiting(ctx, connect.NewRequest(&v1.StopThreadWaitingRequest{ThreadId: a.String("id")}))

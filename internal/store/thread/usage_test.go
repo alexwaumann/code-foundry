@@ -2,6 +2,7 @@ package thread
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -239,7 +240,8 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 		t.Errorf("usage = %+v", got.Usage)
 	}
 
-	// The streamed repeat publishes nothing.
+	// The streamed repeat counts nothing: no update has a second request. (Other updates,
+	// a late status debounce for one, may still come.)
 	for len(e.events.C()) > 0 {
 		<-e.events.C()
 	}
@@ -247,9 +249,8 @@ func TestUsageFromLiveTranscript(t *testing.T) {
 	e.writeTranscript(cid, sentinelLink)
 	e.waitFor(s.ID, "sentinel read", linkedSentinel)
 	for len(e.events.C()) > 0 {
-		// The sentinel's own update is the only one.
-		if u, ok := (<-e.events.C()).(Updated); ok && u.Thread.ID == s.ID && !linkedSentinel(u.Thread) {
-			t.Errorf("repeat published an update: %+v", u.Thread.Usage)
+		if u, ok := (<-e.events.C()).(Updated); ok && u.Thread.ID == s.ID && totalRequests(u.Thread.Usage) != 1 {
+			t.Errorf("the repeat was counted: %+v", u.Thread.Usage)
 		}
 	}
 
@@ -460,4 +461,20 @@ func TestSaveAndLoadUsage(t *testing.T) {
 	if got, err := loadUsage(ctx, db); err != nil || len(got) != 0 {
 		t.Errorf("after saving none = %+v, %v", got, err)
 	}
+}
+
+// saveUsage replaces a thread's usage rows with buckets in one transaction.
+func saveUsage(ctx context.Context, db *sql.DB, threadID string, buckets []UsageBucket) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := replaceUsageTx(ctx, tx, threadID, buckets); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("thread: save usage of %s: %w", threadID, err)
+	}
+	return nil
 }

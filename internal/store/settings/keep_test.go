@@ -55,6 +55,12 @@ func TestUpdateKeepsValuesWithIssues(t *testing.T) {
 			wantRaw:  map[string]string{"later.a.b": "x", "later.c": "1"},
 		},
 		{
+			name:     "unknown sub-table",
+			file:     "[threads.experimental]\nfoo = 1\n[later.deep.er]\nx = \"y\"\n",
+			wantText: []string{"\"experimental.foo\" = 1\n", "\n[later]\n", "\"deep.er.x\" = \"y\"\n"},
+			wantRaw:  map[string]string{"threads.experimental.foo": "1", "later.deep.er.x": "y"},
+		},
+		{
 			name:     "top-level key",
 			file:     "loose = \"yes\"\n",
 			wantText: []string{"loose = \"yes\"\n"},

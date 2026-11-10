@@ -115,7 +115,6 @@ type autoMergeRequestJSON struct {
 }
 
 type pullRequestFullData struct {
-	RateLimit  *rateLimitJSON `json:"rateLimit"`
 	Repository *struct {
 		ViewerPermission string `json:"viewerPermission"`
 		// Pointers: a row decoded from a response without them knows no methods.

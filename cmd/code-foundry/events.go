@@ -46,7 +46,7 @@ func runEvents(ctx context.Context, cl *cli, args []string) error {
 			"starting with snapshots (pass both to resume)\n", *since)
 		*since = 0
 	}
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return err
 	}

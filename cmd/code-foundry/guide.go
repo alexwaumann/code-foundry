@@ -30,7 +30,7 @@ func runGuide(ctx context.Context, cl *cli, args []string) error {
 		fmt.Fprintf(cl.stderr, "guide: unexpected arguments %v (one topic at most)\n", fs.Args()[1:])
 		return quietHelp(errUsage)
 	}
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return err
 	}

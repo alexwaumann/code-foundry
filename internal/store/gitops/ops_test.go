@@ -180,7 +180,6 @@ func TestRevealOpenURLEditor(t *testing.T) {
 	w.m.opts.editorEnv = &editorEnv{
 		getenv:   func(string) string { return "" },
 		lookPath: func(n string) (string, error) { return "/opt/bin/" + n, nil },
-		exists:   func(string) bool { return false },
 	}
 	ctx := context.Background()
 

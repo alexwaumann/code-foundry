@@ -30,7 +30,7 @@ type DaemonEndpoint struct {
 // otherwise spawn a doomed daemon every second or two.
 const startBackoff = 5 * time.Second
 
-// DaemonService is bound to the frontend. It is the only thing the Wails host exposes.
+// DaemonService is bound to the frontend: the daemon's endpoint, starting it when needed.
 type DaemonService struct {
 	paths paths.Paths
 	log   *slog.Logger

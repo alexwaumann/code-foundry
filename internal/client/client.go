@@ -46,25 +46,23 @@ type Client struct {
 	Dictation codefoundryv1connect.DictationServiceClient
 	// Search is for the CLI's `search agent`, which streams a search's progress.
 	Search codefoundryv1connect.SearchServiceClient
-
-	paths paths.Paths
 }
 
 // New returns a client for the daemon at p's Unix socket. It does not touch the
 // network; use Connect to also ensure the daemon is running.
 func New(p paths.Paths) *Client {
-	return newClient(p, unixHTTPClient(p.Socket()), unixBaseURL)
+	return newClient(unixHTTPClient(p.Socket()), unixBaseURL)
 }
 
 // NewLoopback returns a client that talks to the daemon's loopback HTTP listener at
 // baseURL with the given bearer token. The GUI frontend uses the same transport from
-// the browser side; this exists for tests and diagnostics.
+// the browser side; the CLI inside a thread (Connect with an Endpoint) and tests use it.
 func NewLoopback(baseURL, token string) *Client {
 	hc := &http.Client{Transport: &bearerTransport{token: token, next: h2cTransport(nil)}}
-	return newClient(paths.Paths{}, hc, baseURL)
+	return newClient(hc, baseURL)
 }
 
-func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
+func newClient(hc *http.Client, baseURL string) *Client {
 	return &Client{
 		Health:    codefoundryv1connect.NewHealthServiceClient(hc, baseURL),
 		Command:   codefoundryv1connect.NewCommandServiceClient(hc, baseURL),
@@ -75,7 +73,6 @@ func newClient(p paths.Paths, hc *http.Client, baseURL string) *Client {
 		Plugin:    codefoundryv1connect.NewPluginServiceClient(hc, baseURL),
 		Dictation: codefoundryv1connect.NewDictationServiceClient(hc, baseURL),
 		Search:    codefoundryv1connect.NewSearchServiceClient(hc, baseURL),
-		paths:     p,
 	}
 }
 

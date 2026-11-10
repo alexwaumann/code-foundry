@@ -71,7 +71,7 @@ func RegisterProjectCleanup(r *Registry, d ProjectCleanupDeps) error {
 			"work is never cleaned up: remove it with project.worktree.remove.",
 		Category: "Project",
 		Args: []ArgSpec{
-			{Name: "project", Type: String, Required: true, Context: ContextProject, Positional: true, Description: "Project name or id"},
+			{Name: "project", Type: String, Required: true, Context: ContextProject, ID: ProjectID, Positional: true, Description: ProjectRefHelp},
 			{Name: "path", Type: Path, Positional: true, Description: "One worktree (default: every merged one); fails with why when it stays"},
 		},
 		When:           func(c Context) bool { return hasProject(c) && !notGit(c) },

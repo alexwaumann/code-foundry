@@ -5,7 +5,7 @@
 // one set of names. It has no dependencies (in particular no cgo), so any package may
 // import it.
 //
-// Two kinds of terminal carry labels, both shown in the bottom panel of their owner:
+// Three kinds of terminal belong to a thread or worktree, shown in its bottom panel:
 //
 //   - A shell started by terminal.new has Kind = KindShell, Project and Worktree for the
 //     worktree it belongs to, and Thread when it belongs to a thread (Project and
@@ -30,7 +30,7 @@
 package termlabel
 
 const (
-	// Kind says what started the terminal: KindShell or KindAction.
+	// Kind says what started the terminal: KindShell, KindAction, KindSetup or KindPlugin.
 	Kind = "kind"
 	// Thread is the id of the thread the terminal belongs to.
 	Thread = "thread"

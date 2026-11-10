@@ -184,29 +184,14 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 		}
 		return res.Msg.GetSettings().GetValues(), nil
 	}
-	set := func() theme.Set {
-		if themes == nil {
-			return theme.Set{}
-		}
-		return themes.Snapshot().Set()
-	}
+	set := themeSet(themes)
 	needThemes := func() error {
 		if themes == nil {
 			return connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no user themes"))
 		}
 		return nil
 	}
-	userIDs := func() []string {
-		if themes == nil {
-			return nil
-		}
-		snap := themes.Snapshot()
-		ids := make([]string, len(snap.Themes))
-		for i, f := range snap.Themes {
-			ids[i] = f.ID
-		}
-		return ids
-	}
+	userIDs := userThemeIDs(themes)
 	showing := func(vals map[string]string) string { return themeShowing(d, vals) }
 	// setSlot writes a scheme's slot and says what it shows now.
 	setSlot := func(ctx context.Context, scheme, id string) (string, ThemeSet, error) {
@@ -385,7 +370,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 					applied := (a.Bool("apply") && applyErr == nil) || before == saved.File.ID
 					repaint := before != saved.File.ID || !existed || !theme.SameColours(was, saved.File)
 					undo := themeUndoOf(applied, before, was, existed, saved, set())
-					warnings, _ = showThemeCard(ctx, d, by, saved.File, applied, undo, applied && repaint)
+					warnings = showThemeCard(ctx, d, by, saved.File, applied, undo, applied && repaint)
 				}
 				// Last, so the card and the window's repaint do not wait on it. From the
 				// app (its editor) there is no wait: the editor shows the report itself.
@@ -393,7 +378,7 @@ func RegisterTheme(r *Registry, d ThemeDeps) error {
 				lines = slices.Insert(lines, themeContrastAt, out.Contrast.lines(false)...)
 				if applyErr != nil {
 					// Saved, but not applied: both, so a retry is not read as a new save.
-					lines = append(append(lines, warnings...), "not applied: "+strings.TrimPrefix(connectMessage(applyErr), "invalid settings: "))
+					lines = append(append(lines, warnings...), "not applied: "+strings.TrimPrefix(errMessage(applyErr), "invalid settings: "))
 					return Result{}, Failed(errors.New(strings.Join(lines, "\n")))
 				}
 				return Result{Message: strings.Join(lines, "\n"), JSON: out, Warnings: warnings}, nil
@@ -502,6 +487,33 @@ func themeUndoOf(applied bool, before string, was theme.File, existed bool, save
 	return themeUndo{}
 }
 
+// themeSet returns a func reading the themes' set at each call: only the curated
+// catalog when themes is nil.
+func themeSet(themes ThemeBackend) func() theme.Set {
+	return func() theme.Set {
+		if themes == nil {
+			return theme.Set{}
+		}
+		return themes.Snapshot().Set()
+	}
+}
+
+// userThemeIDs returns a func listing the user's theme ids at each call: none when
+// themes is nil.
+func userThemeIDs(themes ThemeBackend) func() []string {
+	return func() []string {
+		if themes == nil {
+			return nil
+		}
+		snap := themes.Snapshot()
+		ids := make([]string, len(snap.Themes))
+		for i, f := range snap.Themes {
+			ids[i] = f.ID
+		}
+		return ids
+	}
+}
+
 // userThemeMiss explains a value that is not one of the user's themes: a curated id to
 // copy first, else an unknown one.
 func userThemeMiss(set func() theme.Set) func(string) error {
@@ -540,15 +552,6 @@ func themeSchemeNote(pref, showing, scheme string) string {
 		return fmt.Sprintf("; the scheme is system, currently %s, so nothing changes on screen until the Mac is %s (theme set-scheme %s switches the app)", showing, scheme, scheme)
 	}
 	return fmt.Sprintf("; the scheme is %s, so nothing changes on screen until it is %s (theme set-scheme %s switches it)", pref, scheme, scheme)
-}
-
-// connectMessage is err's message without connect's code prefix.
-func connectMessage(err error) string {
-	var ce *connect.Error
-	if errors.As(err, &ce) {
-		return ce.Message()
-	}
-	return err.Error()
 }
 
 func withDescription(a ArgSpec, d string) ArgSpec {

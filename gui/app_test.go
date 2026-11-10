@@ -4,9 +4,7 @@ import "testing"
 
 func TestRelaunchCommand(t *testing.T) {
 	tests := []struct {
-		name, exe string
-		args      []string
-		want      string
+		name, exe, want string
 	}{
 		{
 			name: "installed GUI",
@@ -14,15 +12,14 @@ func TestRelaunchCommand(t *testing.T) {
 			want: "while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/Users/a/.code-foundry/app/Code Foundry'",
 		},
 		{
-			name: "arguments and spaces are kept",
-			exe:  "/tmp/cf home/app/Code Foundry",
-			args: []string{"--flag", "it's"},
-			want: `while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/tmp/cf home/app/Code Foundry' '--flag' 'it'\''s'`,
+			name: "spaces and quotes in the path are quoted",
+			exe:  "/tmp/cf home/it's/Code Foundry",
+			want: `while kill -0 42 2>/dev/null; do sleep 0.1; done; exec '/tmp/cf home/it'\''s/Code Foundry'`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := relaunchCommand(42, tt.exe, tt.args); got != tt.want {
+			if got := relaunchCommand(42, tt.exe); got != tt.want {
 				t.Fatalf("got  %s\nwant %s", got, tt.want)
 			}
 		})

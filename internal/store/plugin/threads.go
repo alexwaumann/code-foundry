@@ -305,17 +305,6 @@ func (a *actor) threadList(context.Context, json.RawMessage) (any, error) {
 	return pluginsdk.ThreadListResult{Threads: list}, nil
 }
 
-// Threads returns plugin name's threads (the CLI's plugin threads), archived ones too.
-func (m *Manager) Threads(name string) ([]pluginsdk.PluginThread, error) {
-	if _, ok := m.Snapshot().Plugin(name); !ok && !slices.Contains(m.liveThreadOwners(), name) {
-		return nil, fmt.Errorf("%w: no plugin %q", ErrNotFound, name)
-	}
-	if m.opts.Threads == nil {
-		return nil, nil
-	}
-	return m.opts.Threads.Owned(OwnerOf(name)), nil
-}
-
 // liveThreadOwners names the plugins with a thread that is not archived.
 func (m *Manager) liveThreadOwners() []string {
 	if m.opts.Threads == nil {

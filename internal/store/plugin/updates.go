@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -139,7 +140,7 @@ func offerFor(p Plugin, merged registry.Merged, releases map[string]UpdateOffer)
 	}
 	if fromRepo(p, merged) {
 		r, ok := releases[p.Name]
-		if !ok || !registry.Newer(r.Version, p.Manifest.Version) {
+		if !ok || !strings.EqualFold(r.Registry, "https://github.com/"+p.Installed.Source) || !registry.Newer(r.Version, p.Manifest.Version) {
 			return UpdateOffer{}, false
 		}
 		return r, true
@@ -176,11 +177,13 @@ func (m *Manager) checkReleases(ctx context.Context) {
 		}
 		o := UpdateOffer{Version: version, Registry: "https://github.com/" + repo, Ref: repo + "@" + tag}
 		m.inst.mu.Lock()
-		if m.inst.releases == nil {
-			m.inst.releases = map[string]UpdateOffer{}
-		}
 		old, had := m.inst.releases[p.Name]
-		m.inst.releases[p.Name] = o
+		next := maps.Clone(m.inst.releases)
+		if next == nil {
+			next = map[string]UpdateOffer{}
+		}
+		next[p.Name] = o
+		m.inst.releases = next
 		m.inst.mu.Unlock()
 		if !had || old != o {
 			m.update(p.Name, nil, func(*entry) {})

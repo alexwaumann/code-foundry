@@ -14,7 +14,7 @@ import (
 // The Add Project dialog's New tab and the Publish to GitHub button: Create, Publish and
 // Delete (the project store) and ListPublishOwners (the gh store).
 
-// WithProjects sets what Create, ListPublishOwners, Publish and Delete use, and returns h.
+// WithNewProjects sets what Create, ListPublishOwners, Publish and Delete use, and returns h.
 func (h *Project) WithNewProjects(newProjects newproject.Service, owners gh.Owners) *Project {
 	h.newProjects, h.owners = newProjects, owners
 	return h
@@ -101,7 +101,7 @@ func (h *Project) Publish(ctx context.Context, req *connect.Request[v1.PublishPr
 	return connect.NewResponse(&v1.PublishProjectResponse{Project: projectToProto(r)}), nil
 }
 
-// projectErrorCodes maps project store errors to Connect codes, first match wins.
+// newProjectErrorCodes maps new project store errors to Connect codes, first match wins.
 // Anything else (registering or refreshing failed) maps like the project store's errors.
 var newProjectErrorCodes = []struct {
 	err  error
@@ -117,7 +117,7 @@ var newProjectErrorCodes = []struct {
 	{context.DeadlineExceeded, connect.CodeDeadlineExceeded},
 }
 
-// projectError maps err to a Connect error. A gh failure's message is gh's own words.
+// newProjectError maps err to a Connect error. A gh failure's message is gh's own words.
 func newProjectError(err error) error {
 	for _, m := range newProjectErrorCodes {
 		if errors.Is(err, m.err) {

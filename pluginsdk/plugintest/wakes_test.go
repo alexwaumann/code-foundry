@@ -94,11 +94,14 @@ func TestWakes(t *testing.T) {
 // FireWake checks the payload's size before it leaves the plugin; the fake refuses a
 // title the host would.
 func TestFireWakeLimits(t *testing.T) {
-	errs := make(chan error, 2)
+	errs := make(chan error, 3)
 	p := pluginsdk.Plugin{Init: func(ctx context.Context, h *pluginsdk.Host) error {
 		_, err := h.FireWake(ctx, "tick", nil, "big", strings.Repeat("x", pluginsdk.MaxWakePayload))
 		errs <- err
 		_, err = h.FireWake(ctx, "tick", nil, "two\nlines", nil)
+		errs <- err
+		// The host trims the title before it checks it.
+		_, err = h.FireWake(ctx, "tick", nil, " "+strings.Repeat("x", pluginsdk.MaxWakeTitle)+"\n", nil)
 		errs <- err
 		return nil
 	}}
@@ -108,6 +111,9 @@ func TestFireWakeLimits(t *testing.T) {
 	}
 	if err := <-errs; pluginsdk.ErrorCode(err) != pluginsdk.CodeInvalidParams {
 		t.Errorf("a two-line title: %v", err)
+	}
+	if err := <-errs; err != nil {
+		t.Errorf("a title with a space before and a newline after: %v", err)
 	}
 }
 

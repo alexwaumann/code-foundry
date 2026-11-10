@@ -88,3 +88,14 @@ func TestTodoRows(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A move under a task that is not there (or under itself) is refused and loses nothing.
+func TestTodoRefusedMoveKeepsTheTask(t *testing.T) {
+	for _, after := range []string{"todo-9", "todo-2"} {
+		s := newTodo()
+		err := s.act(pluginsdk.SurfaceAct{Kind: pluginsdk.ActMove, Key: "todo-2", Value: after})
+		if err == nil || len(s.items) != 7 || s.items[1].key != "todo-2" {
+			t.Errorf("move under %s: %v, %d tasks, second %s", after, err, len(s.items), s.items[1].key)
+		}
+	}
+}

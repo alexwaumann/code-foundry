@@ -111,7 +111,7 @@ func TestReviewerLoginPattern(t *testing.T) {
 	}{
 		{"octocat", true},
 		{"mona-lisa", true},
-		{"WMD270_cof", true}, // enterprise managed user: "_shortcode" suffix
+		{"mona_octo", true}, // enterprise managed user: "_shortcode" suffix
 		{"copilot-pull-request-reviewer[bot]", true},
 		{"", false},
 		{"-octocat", false},

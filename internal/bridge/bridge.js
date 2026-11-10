@@ -128,9 +128,14 @@
       : cfError("unavailable", "this page is not shown in Code Foundry");
   }
 
-  // A rough size of what a call sends: the app ignores anything past MAX_CHARS.
-  function tooLarge(verb, args) {
-    var n = verb.length;
+  // Whether the app would ignore msg: it counts the type, id, verb, key, value and each
+  // arg's name and value against MAX_CHARS. The id is not made yet, so its longest.
+  function tooLarge(msg) {
+    var n = msg.type.length + idBase.length + 16;
+    ["verb", "key", "value"].forEach(function (k) {
+      if (typeof msg[k] === "string") n += msg[k].length;
+    });
+    var args = msg.args || {};
     var keys = Object.keys(args);
     for (var i = 0; i < keys.length; i++) n += keys[i].length + args[keys[i]].length;
     return n > MAX_CHARS;
@@ -158,7 +163,7 @@
     try {
       if (typeof verb !== "string" || verb === "") throw cfError("invalid", "verb must be a command name");
       clean = normalizeArgs(args);
-      if (tooLarge(verb, clean)) throw cfError("invalid", verb + ": the args are too large (256 KiB at most)");
+      if (tooLarge({ type: "cf:run", verb: verb, args: clean })) throw cfError("invalid", verb + ": the args are too large (256 KiB at most)");
     } catch (e) {
       return Promise.reject(e);
     }
@@ -475,7 +480,7 @@
       },
       set: function (key, value) {
         var text = JSON.stringify(value);
-        if (text !== undefined && tooLarge(base + key, { v: text })) return Promise.reject(cfError("invalid", "cf.storage: " + key + " is too large (256 KiB at most)"));
+        if (text !== undefined && tooLarge({ type: "cf:store", key: base + key, value: text })) return Promise.reject(cfError("invalid", "cf.storage: " + key + " is too large (256 KiB at most)"));
         return write(base + key, text === undefined ? null : text);
       },
       remove: function (key) {

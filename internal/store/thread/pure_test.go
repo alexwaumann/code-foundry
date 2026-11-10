@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -387,10 +388,47 @@ func TestPidSessionID(t *testing.T) {
 	_ = os.MkdirAll(filepath.Join(dir, "sessions"), 0o755)
 	_ = os.WriteFile(paths.pidFile(42), []byte(`{"pid":42,"sessionId":"s1","cwd":"/x"}`), 0o644)
 	if got := pidSessionID(paths, 42); got != "s1" {
-		t.Errorf("pidThreadID = %q, want s1", got)
+		t.Errorf("pidSessionID = %q, want s1", got)
 	}
 	_ = os.WriteFile(paths.pidFile(43), []byte(`{"pid":7,"sessionId":"s1"}`), 0o644)
 	if got := pidSessionID(paths, 43); got != "" {
 		t.Errorf("mismatched pid = %q", got)
+	}
+}
+
+// Lines over maxLineBytes are skipped whether they come in one chunk or several; the
+// lines around them come whole.
+func TestLineSplitter(t *testing.T) {
+	big := strings.Repeat("x", maxLineBytes/2+1)
+	tests := []struct {
+		name   string
+		chunks []string
+		want   []string
+	}{
+		{"lines across chunks", []string{"a\nb", "c\n\nd", "\n"}, []string{"a", "bc", "d"}},
+		{"long in one chunk", []string{"a\n" + big + big + "\nb\n"}, []string{"a", "b"}},
+		{"long while buffering", []string{"a\n" + big, big, "y\nb\n"}, []string{"a", "b"}},
+		{"long once its end comes", []string{"a\n" + big, big + "\nb\n"}, []string{"a", "b"}},
+		{"at the limit", []string{big[:maxLineBytes/2], big[:maxLineBytes/2] + "\n"}, []string{big[:maxLineBytes/2] + big[:maxLineBytes/2]}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sp lineSplitter
+			var lines [][]byte
+			for _, c := range tt.chunks {
+				lines = sp.split(lines, []byte(c))
+			}
+			got := make([]string, len(lines))
+			for i, l := range lines {
+				got[i] = string(l)
+			}
+			if !slices.Equal(got, tt.want) {
+				short := make([]string, len(got))
+				for i, g := range got {
+					short[i] = g[:min(len(g), 8)] + "… " + strconv.Itoa(len(g))
+				}
+				t.Errorf("lines %q", short)
+			}
+		})
 	}
 }

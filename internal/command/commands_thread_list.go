@@ -187,6 +187,24 @@ func threadNames(ctx context.Context, b ThreadBackend, threads []*v1.Thread) (ma
 	return names, nil
 }
 
+// creatorNames is threadNames for one thread: its creator is looked up alone, and one
+// that is not found (removed) is left out.
+func creatorNames(ctx context.Context, b ThreadBackend, s *v1.Thread) (map[string]string, error) {
+	names := map[string]string{s.GetId(): s.GetName()}
+	by := s.GetCreatedBy()
+	if by == "" || by == s.GetId() {
+		return names, nil
+	}
+	res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: by}))
+	switch {
+	case err == nil:
+		names[by] = res.Msg.GetThread().GetName()
+	case connect.CodeOf(err) != connect.CodeNotFound:
+		return nil, err
+	}
+	return names, nil
+}
+
 // creatorName is the name of the thread that created s, resolved by its id: the
 // creator's current name (its id when unnamed), or, when it is not in names (removed),
 // the name recorded at creation, and exists false.

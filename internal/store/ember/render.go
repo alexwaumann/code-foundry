@@ -12,7 +12,7 @@ import (
 )
 
 // The seed's parts are rendered by the pure functions here (tested on fixtures); the
-// store gathers their input (seed.go).
+// store gathers their input (epoch.go: buildSeed, projectSeeds).
 
 // Seed bounds. The prefix goes on the first message of a fresh session (at most 256 KiB
 // in the thread store); the system prompt append on claude's command line (64 KiB).

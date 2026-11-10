@@ -68,9 +68,10 @@ func (s *Store) SetPoll(p gh.PollState) {
 
 // SetPullRequest sets what PullRequest returns for slug and d.PullRequest.Number.
 func (s *Store) SetPullRequest(slug string, d gh.PullRequestDetail) {
+	key, _ := gh.NormalizeSlug(slug)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.details[fmt.Sprintf("%s#%d", slug, d.PullRequest.Number)] = d
+	s.details[fmt.Sprintf("%s#%d", key, d.PullRequest.Number)] = d
 }
 
 // SetChecks sets what Checks returns for slug and ref.

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/childproc"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
@@ -221,7 +222,7 @@ func (m *Manager) startProcess(rec *runRec, env []string) error {
 	rec.out = newTailBuffer(m.opts.OutputLimit)
 	cmd := exec.Command(m.opts.Shell, "-lc", rec.run.Command)
 	cmd.Dir = rec.run.Worktree
-	cmd.Env = mergeEnv(os.Environ(), env)
+	cmd.Env = childproc.MergeEnv(os.Environ(), env)
 	cmd.Stdout, cmd.Stderr = rec.out, rec.out
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.WaitDelay = waitDelay
@@ -452,20 +453,4 @@ func (m *Manager) waitHook(id string) (Run, error) {
 func lastLines(s string, n int) string {
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	return strings.Join(lines[max(0, len(lines)-n):], "\n")
-}
-
-// mergeEnv returns base with overrides ("KEY=VALUE") applied; later entries win.
-func mergeEnv(base []string, overrides []string) []string {
-	keys := make(map[string]bool, len(overrides))
-	for _, kv := range overrides {
-		k, _, _ := strings.Cut(kv, "=")
-		keys[k] = true
-	}
-	out := make([]string, 0, len(base)+len(overrides))
-	for _, kv := range base {
-		if k, _, _ := strings.Cut(kv, "="); !keys[k] {
-			out = append(out, kv)
-		}
-	}
-	return append(out, overrides...)
 }

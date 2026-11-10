@@ -58,9 +58,10 @@ func (f Field) WithHint(text string) Field {
 func (f Field) AsRequired() Field { f.Required = true; return f }
 
 // WithPattern returns f with a regular expression its text must match (a text input),
-// checked by the panel on submit, and the message shown under it when it does not.
+// checked by the panel on submit, and the message shown under it when it does not. A date
+// input has none (the host writes its value).
 func (f Field) WithPattern(pattern, message string) Field {
-	if f.Input != nil {
+	if f.Input != nil && f.Input.Kind != InputDate {
 		in := *f.Input
 		in.Pattern, in.PatternMessage = pattern, message
 		f.Input = &in

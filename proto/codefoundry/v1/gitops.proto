@@ -12,9 +12,9 @@ import "google/protobuf/timestamp.proto";
 // FAILED with the tool's output. RPC errors mean the request itself was bad
 // (invalid_argument) or the call was cancelled.
 //
-// The GUI does not call this service: user actions go through the command registry
-// (git.*, pr.*, worktree.open_editor, worktree.reveal, view.open_url), and progress
-// arrives on EventService as GitOpsEvent.
+// The GUI calls only ListAppIcons and ListEditorApps here: user actions go through the
+// command registry (git.*, pr.*, worktree.open_editor, worktree.reveal, view.open_url),
+// and progress arrives on EventService as GitOpsEvent.
 service GitOpsService {
   // Fetch runs `git fetch --prune` in the worktree, optionally for one remote or one
   // branch of it.

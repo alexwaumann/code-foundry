@@ -61,7 +61,7 @@ func TestThreadMove(t *testing.T) {
 		{name: "the project twice", args: map[string]string{"id": "s-1", "to": "web", "project": "api"}, wantErr: command.ErrInvalidArgs},
 		{name: "a branch needs new-worktree", args: map[string]string{"id": "s-1", "to": "web", "branch": "feat/x"}, wantErr: command.ErrInvalidArgs},
 		{name: "a base needs new-worktree", args: map[string]string{"id": "s-1", "to": "web", "base": "main", "new-worktree": "false"}, wantErr: command.ErrInvalidArgs},
-		{name: "no thread in the GUI", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"to": "web"}, wantErr: command.ErrUnavailable},
+		{name: "no thread in the GUI", ctx: command.Context{ActiveView: "pullrequests"}, args: map[string]string{"to": "web"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

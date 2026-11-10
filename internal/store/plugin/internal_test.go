@@ -1,14 +1,19 @@
 package plugin
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry/registrytest"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
@@ -142,5 +147,46 @@ func TestCommandDown(t *testing.T) {
 				t.Errorf("pluginDown: %v", err)
 			}
 		})
+	}
+}
+
+// TestInstallRefusedWhileBusyEndsItsProgress: a second install of a name already being
+// installed ends the "resolving" step it published with a failure.
+func TestInstallRefusedWhileBusyEndsItsProgress(t *testing.T) {
+	gh := registrytest.NewGh()
+	asset := "hello-0.2.0-" + strings.ReplaceAll(registry.Platform(), "/", "-") + ".tar.gz"
+	gh.Releases["o/hello@"] = `{"tagName":"v0.2.0","assets":[{"name":"` + asset + `","url":"https://github.com/o/hello/releases/download/v0.2.0/` + asset + `"}]}`
+	dir := t.TempDir()
+	m := &Manager{log: slog.New(slog.DiscardHandler), opts: Options{
+		Dir: dir,
+		Bus: bus.New(),
+		Registry: registry.NewClient(registry.Options{
+			CacheDir: filepath.Join(dir, RegistryCacheDir),
+			Fetcher:  registry.Fetcher{Gh: gh},
+			Log:      slog.New(slog.DiscardHandler),
+		}),
+	}}
+	if !m.inst.begin("hello") {
+		t.Fatal("begin")
+	}
+	sub := bus.Subscribe[Event](m.opts.Bus, 16)
+	defer sub.Close()
+	_, err := m.Install(context.Background(), InstallRequest{Ref: "o/hello"})
+	if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "being installed already") {
+		t.Fatalf("err = %v", err)
+	}
+	var phases []string
+	for len(phases) < 2 {
+		select {
+		case ev := <-sub.C():
+			if p, ok := ev.(InstallProgress); ok && p.Ref == "o/hello" {
+				phases = append(phases, p.Phase.String())
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("phases = %v, want resolving then failed", phases)
+		}
+	}
+	if got := strings.Join(phases, " "); got != "resolving failed" {
+		t.Errorf("phases = %q", got)
 	}
 }

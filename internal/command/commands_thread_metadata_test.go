@@ -27,6 +27,7 @@ func TestThreadMetadataCommands(t *testing.T) {
 		args     map[string]string
 		current  *v1.Thread
 		others   []*v1.Thread // listed after current
+		getErrs  map[string]error
 		wantErr  error
 		wantCode connect.Code
 		wantMsg  string
@@ -87,7 +88,7 @@ func TestThreadMetadataCommands(t *testing.T) {
 			others: []*v1.Thread{{Id: "s-1", Name: "Parent"}},
 			wantMsg: "thread child (s-2)\nstatus: needs attention (budget reached)\nworktree: /wt\ncreated by: Parent (s-1)\nbrief: say hi\n" +
 				"labels: a, b\nreport: done: all good\nreport data: {\"n\":1}\ncost: $1.50 of a $5.00 budget",
-			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s-2", WithDetail: true}, &v1.ListThreadsRequest{Filter: &v1.ThreadFilter{All: true}}}},
+			wantReqs: []proto.Message{&v1.GetThreadRequest{Id: "s-2", WithDetail: true}, &v1.GetThreadRequest{Id: "s-1"}}},
 		// The creator is resolved by its id: its current name, the recorded one only
 		// once it is removed.
 		{name: "get shows a renamed creator's current name", cmd: "thread.get", args: map[string]string{"id": "s-2"},
@@ -100,7 +101,12 @@ func TestThreadMetadataCommands(t *testing.T) {
 			wantMsg: "thread child (s-2)\nstatus: idle\nworktree: /wt\ncreated by: s-1 (s-1)\ncost: $0.00"},
 		{name: "get keeps a removed creator's recorded name", cmd: "thread.get", args: map[string]string{"id": "s-2"},
 			current: &v1.Thread{Name: "child", Status: v1.ThreadStatus_THREAD_STATUS_IDLE, WorktreePath: "/wt", CreatedBy: "s-1", CreatedByName: "Parent"},
+			getErrs: map[string]error{"s-1": connect.NewError(connect.CodeNotFound, errors.New("thread s-1 not found"))},
 			wantMsg: "thread child (s-2)\nstatus: idle\nworktree: /wt\ncreated by: Parent (s-1, removed)\ncost: $0.00"},
+		{name: "get fails when the creator cannot be read", cmd: "thread.get", args: map[string]string{"id": "s-2"},
+			current:  &v1.Thread{Name: "child", CreatedBy: "s-1"},
+			getErrs:  map[string]error{"s-1": connect.NewError(connect.CodeUnavailable, errors.New("down"))},
+			wantCode: connect.CodeUnavailable},
 		{name: "get shows the branch a new worktree was created for", cmd: "thread.get", ctx: inThread,
 			current: &v1.Thread{Status: v1.ThreadStatus_THREAD_STATUS_IDLE, WorktreePath: "/wt/cf-x", CreatedWorktree: true, Branch: "cf/x"},
 			wantMsg: "thread s-me\nstatus: idle\nworktree: /wt/cf-x\ncreated for branch: cf/x\ncost: $0.00"},
@@ -111,7 +117,7 @@ func TestThreadMetadataCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, b, _ := newLifecycleRegistry(t)
-			b.Current, b.Others = tt.current, tt.others
+			b.Current, b.Others, b.GetErrs = tt.current, tt.others, tt.getErrs
 			res, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args, command.Confirmed(true))
 			switch {
 			case tt.wantCode != 0:

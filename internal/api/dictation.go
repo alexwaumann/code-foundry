@@ -66,7 +66,7 @@ func (h *Dictation) Route(opts ...connect.HandlerOption) Route {
 
 // Status is the snapshot now (the dictation.* commands read it).
 func (h *Dictation) Status() *v1.DictationSnapshot {
-	return DictationSnapshotToProto(h.store.Snapshot())
+	return dictationSnapshotToProto(h.store.Snapshot())
 }
 
 // Watch sends the snapshot, then again after every change, and a heartbeat after
@@ -74,7 +74,7 @@ func (h *Dictation) Status() *v1.DictationSnapshot {
 func (h *Dictation) Watch(ctx context.Context, _ *connect.Request[v1.WatchDictationRequest], stream *connect.ServerStream[v1.DictationSnapshot]) error {
 	sub := bus.Subscribe[dictation.Changed](h.bus, watchBuffer)
 	defer sub.Close()
-	if err := stream.Send(DictationSnapshotToProto(h.store.Snapshot())); err != nil {
+	if err := stream.Send(dictationSnapshotToProto(h.store.Snapshot())); err != nil {
 		return err
 	}
 	beat := newHeartbeat(h.beat)
@@ -97,7 +97,7 @@ func (h *Dictation) Watch(ctx context.Context, _ *connect.Request[v1.WatchDictat
 				<-sub.C()
 			}
 			beat.Reset()
-			if err := stream.Send(DictationSnapshotToProto(h.store.Snapshot())); err != nil {
+			if err := stream.Send(dictationSnapshotToProto(h.store.Snapshot())); err != nil {
 				return err
 			}
 		}
@@ -110,12 +110,12 @@ func (h *Dictation) Download(context.Context, *connect.Request[v1.DownloadDictat
 	if err != nil {
 		return nil, dictationError(err)
 	}
-	return connect.NewResponse(&v1.DownloadDictationModelResponse{Snapshot: DictationSnapshotToProto(s)}), nil
+	return connect.NewResponse(&v1.DownloadDictationModelResponse{Snapshot: dictationSnapshotToProto(s)}), nil
 }
 
 // CancelDownload stops a running download.
 func (h *Dictation) CancelDownload(context.Context, *connect.Request[v1.CancelDictationDownloadRequest]) (*connect.Response[v1.CancelDictationDownloadResponse], error) {
-	return connect.NewResponse(&v1.CancelDictationDownloadResponse{Snapshot: DictationSnapshotToProto(h.store.CancelDownload())}), nil
+	return connect.NewResponse(&v1.CancelDictationDownloadResponse{Snapshot: dictationSnapshotToProto(h.store.CancelDownload())}), nil
 }
 
 // RemoveModel deletes the model.
@@ -124,7 +124,7 @@ func (h *Dictation) RemoveModel(context.Context, *connect.Request[v1.RemoveDicta
 	if err != nil {
 		return nil, dictationError(err)
 	}
-	return connect.NewResponse(&v1.RemoveDictationModelResponse{Snapshot: DictationSnapshotToProto(s)}), nil
+	return connect.NewResponse(&v1.RemoveDictationModelResponse{Snapshot: dictationSnapshotToProto(s)}), nil
 }
 
 // Start opens a session for the client.
@@ -288,8 +288,8 @@ var dictationEndReasons = map[dictation.EndReason]v1.DictationEndReason{
 	dictation.EndDiscarded: v1.DictationEndReason_DICTATION_END_REASON_DISCARDED,
 }
 
-// DictationSnapshotToProto converts the store's snapshot.
-func DictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
+// dictationSnapshotToProto converts the store's snapshot.
+func dictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 	out := &v1.DictationSnapshot{
 		Enabled: s.Enabled, State: dictationStates[s.State], Error: s.Error, MicDenied: s.MicDenied,
 		Anywhere: s.Prefs.Anywhere, HoldKey: s.Prefs.HoldKey, Sounds: s.Prefs.Sounds, SoundVolume: int32(s.Prefs.SoundVolume),

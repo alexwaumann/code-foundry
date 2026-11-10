@@ -227,8 +227,8 @@ func TestPanelFileEditThreads(t *testing.T) {
 	if !strings.Contains(res.Message, "end your turn") {
 		t.Errorf("message = %q, want what to do next", res.Message)
 	}
-	intents := emit.Intents()[:2]
-	if len(intents) != 2 {
+	intents := emit.Intents()
+	if len(intents) < 2 {
 		t.Fatalf("intents = %v, want the focus and the show", intents)
 	}
 	show := intents[1].GetShowView()

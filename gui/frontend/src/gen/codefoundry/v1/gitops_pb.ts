@@ -830,9 +830,9 @@ export const GitOpStateSchema: GenEnum<GitOpState> = /*@__PURE__*/
  * FAILED with the tool's output. RPC errors mean the request itself was bad
  * (invalid_argument) or the call was cancelled.
  *
- * The GUI does not call this service: user actions go through the command registry
- * (git.*, pr.*, worktree.open_editor, worktree.reveal, view.open_url), and progress
- * arrives on EventService as GitOpsEvent.
+ * The GUI calls only ListAppIcons and ListEditorApps here: user actions go through the
+ * command registry (git.*, pr.*, worktree.open_editor, worktree.reveal, view.open_url),
+ * and progress arrives on EventService as GitOpsEvent.
  *
  * @generated from service codefoundry.v1.GitOpsService
  */

@@ -172,7 +172,7 @@ func surfacePlugin() pluginsdk.Plugin {
 		Surfaces: map[string]pluginsdk.SurfaceFactory{
 			"panel": func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
 				p := &panel{h: h, inst: open.Instance}
-				h.Log().Info("open", "instance", open.Instance, "thread", open.Context.ThreadID, "facts", len(open.Facts))
+				h.Log().Info("open", "instance", open.Instance, "thread", open.Context.ThreadID, "project", open.Context.ProjectID, "facts", len(open.Facts))
 				return p, h.UpdateView(open.Instance, p.view())
 			},
 			"gated": func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
@@ -374,7 +374,7 @@ func TestSurfaceLifecycle(t *testing.T) {
 	}
 	w.state("live", plugin.PhaseLive)
 	v1v := w.view("first view", contains("count 0"))
-	e.waitLog("log info open facts=0 instance=surf/panel/thread:s-1 thread=s-1")
+	e.waitLog("log info open facts=0 instance=surf/panel/thread:s-1 project=p-1 thread=s-1")
 	e.waitLog("visible=true")
 
 	if _, err := e.act(w.key, plugin.ActRequest{Key: "inc"}); err != nil {
@@ -418,6 +418,10 @@ func TestSurfaceLifecycle(t *testing.T) {
 	}
 	if _, _, err := e.m.WatchSurface(context.Background(), plugin.SurfaceRef{Plugin: "surf", Surface: "nope", Context: s1}); !errors.Is(err, plugin.ErrNotFound) {
 		t.Errorf("unknown surface: %v", err)
+	}
+	// An act by ref on a context nobody watches makes no instance.
+	if _, err := e.m.Act(context.Background(), plugin.ActRequest{Ref: plugin.SurfaceRef{Plugin: "surf", Surface: "proj", Context: command.Context{ActiveThreadID: "s-2"}}, Key: "inc"}); !errors.Is(err, plugin.ErrNotFound) {
+		t.Errorf("act on an unwatched instance: %v", err)
 	}
 	if w5 := e.watch("proj", s1); w5.key != "surf/proj/project:p-1" {
 		t.Errorf("project key from the thread: %s", w5.key)
@@ -544,6 +548,29 @@ func TestSurfaceInvalidViews(t *testing.T) {
 	v := b.view("notice", contains("Invalid view"))
 	if !v.HostRendered || !strings.Contains(string(v.JSON), `"tone":"error"`) || !strings.Contains(string(v.JSON), "code-foundry plugin logs surf") {
 		t.Errorf("notice %s", v.JSON)
+	}
+	e.wait("surf", "the broken surface's issue", func(p plugin.Plugin) bool {
+		return strings.Contains(strings.Join(p.Issues, "\n"), "surface broken: ")
+	})
+
+	// Removed and put back, the plugin starts without its old surface issues.
+	b.cancel()
+	w.cancel()
+	pkg, away := filepath.Join(e.opts.Dir, "surf"), filepath.Join(t.TempDir(), "surf")
+	if err := os.Rename(pkg, away); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.m.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(away, pkg); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.m.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if p, ok := e.m.Snapshot().Plugin("surf"); !ok || strings.Contains(strings.Join(p.Issues, "\n"), "surface ") {
+		t.Errorf("put back: %v, issues %q", ok, p.Issues)
 	}
 }
 
@@ -808,6 +835,26 @@ func TestSurfaceCloseReasons(t *testing.T) {
 	}
 	g.state("reopened", plugin.PhaseLive)
 	e.eventually("a second surface/open", func() bool { return strings.Count(e.logText("surf"), "host  opened surf/gated/thread:s-2") == 2 })
+}
+
+// A thread's surface reopens in the thread's current context: moved to another
+// project, the plugin's surface/open names the new one.
+func TestSurfaceReopensInTheCurrentContext(t *testing.T) {
+	e := newSurfEnv(t, nil)
+	s2 := command.Context{ActiveThreadID: "s-2"}
+	w := e.watch("panel", s2)
+	w.view("first view", contains("count 0"))
+	e.waitLog("instance=surf/panel/thread:s-2 project=p-1 thread=s-2")
+	w.cancel()
+	e.waitLog("host  closed surf/panel/thread:s-2 (no viewer for")
+	e.facts.mu.Lock()
+	t2 := e.facts.threads["s-2"]
+	t2.ProjectID = "p-2"
+	e.facts.threads["s-2"] = t2
+	e.facts.mu.Unlock()
+	w = e.watch("panel", s2)
+	w.state("reopened", plugin.PhaseLive)
+	e.waitLog("instance=surf/panel/thread:s-2 project=p-2 thread=s-2")
 }
 
 // A master-detail's row without an action sends a select act and a tabs node's tab a tab

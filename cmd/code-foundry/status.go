@@ -23,7 +23,7 @@ func runStatus(ctx context.Context, cl *cli, args []string) error {
 	if err != nil {
 		return err
 	}
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return err
 	}

@@ -238,22 +238,15 @@ func permissionsToProto(p pluginsdk.Permissions) *v1.PluginPermissions {
 	}
 }
 
-func optionalTime(t time.Time) *timestamppb.Timestamp {
-	if t.IsZero() {
-		return nil
-	}
-	return timestamppb.New(t)
-}
-
 func pluginToProto(p plugin.Plugin) *v1.Plugin {
 	mf := p.Manifest
 	out := &v1.Plugin{
 		Name: p.Name, DisplayName: p.DisplayName(), Version: mf.Version, Description: mf.Description,
 		State: pluginStates[p.State], Enabled: p.Enabled, DisabledReason: p.DisabledReason,
 		Dev: p.Dev, DevPath: p.DevPath, Dir: p.Dir, LastError: p.LastError, Issues: p.Issues,
-		Permissions: permissionsToProto(mf.Permissions), ConsentedAt: optionalTime(p.ConsentedAt),
-		NeedsConsent: p.NeedsConsent, Pid: int32(p.PID), StartedAt: optionalTime(p.StartedAt),
-		NextRestartAt: optionalTime(p.NextRestartAt), Restarts: int32(p.Restarts), Protocol: int32(p.Protocol),
+		Permissions: permissionsToProto(mf.Permissions), ConsentedAt: timestamp(p.ConsentedAt),
+		NeedsConsent: p.NeedsConsent, Pid: int32(p.PID), StartedAt: timestamp(p.StartedAt),
+		NextRestartAt: timestamp(p.NextRestartAt), Restarts: int32(p.Restarts), Protocol: int32(p.Protocol),
 		Capabilities: p.Capabilities, LogPath: p.LogPath,
 	}
 	if mf.Name != "" {

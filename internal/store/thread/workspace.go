@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
@@ -185,17 +184,6 @@ func (m *Manager) readInstructions(dir string) (text, path string, err error) {
 		return "", path, fmt.Errorf("read %s: %w", path, err)
 	}
 	return string(b), path, nil
-}
-
-// cutUTF8 is s cut to at most n bytes on a rune boundary.
-func cutUTF8(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	for n > 0 && !utf8.RuneStart(s[n]) {
-		n--
-	}
-	return s[:n]
 }
 
 // resolveWorkspace is the workspace ref names (thread new --workspace), whether or not

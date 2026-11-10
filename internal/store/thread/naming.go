@@ -179,10 +179,7 @@ func buildNamingPrompt(req NamingRequest) string {
 	if conv != "" && req.Branch == nil {
 		return regenerateNamingPrompt + conv
 	}
-	msg := req.Message
-	if len(msg) > maxNamingInput {
-		msg = msg[:maxNamingInput]
-	}
+	msg := cutUTF8(req.Message, maxNamingInput)
 	b := req.Branch
 	if b == nil {
 		return namingPrompt + msg

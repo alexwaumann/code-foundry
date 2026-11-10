@@ -51,8 +51,8 @@ func (e *ExitError) Unwrap() error { return e.Err }
 // tailLines is how many final lines an ExitError keeps.
 const tailLines = 8
 
-// ExecRunner runs real processes: stdin is /dev/null, the child gets its own thread
-// (no terminal to prompt on), and gh and git are kept non-interactive.
+// ExecRunner runs real processes: stdin is /dev/null, the child gets its own session
+// (no controlling terminal to prompt on), and gh and git are kept non-interactive.
 type ExecRunner struct{}
 
 // scrubbedEnv would redirect git away from the directory it clones into; a daemon

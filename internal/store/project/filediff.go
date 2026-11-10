@@ -19,7 +19,7 @@ import (
 
 // One file of a worktree, both sides, for the file viewer's diff (GetWorktreeFileDiff).
 // Computed on every call through the runner; the base and merge base are the detail's
-// (detailBase, mergeBaseOf), so the diff agrees with the worktree panel's file list.
+// (detailBase, mergeBaseOf), so the diff agrees with the detail's file list.
 
 const (
 	// FileDiffMax caps each side's contents.

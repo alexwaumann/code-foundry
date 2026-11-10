@@ -39,7 +39,7 @@ export type UiContext = Message<"codefoundry.v1.UiContext"> & {
   activeWorktreePath: string;
 
   /**
-   * Logical view name, e.g. "terminal", "project", "dashboard". Empty from the CLI, and
+   * Logical view name, e.g. "thread", "compose", "projects". Empty from the CLI, and
    * from a page's bridge, which runs a verb as the CLI inside the page's thread would:
    * active_thread_id that thread, nothing else (docs/notes/bridge-1-daemon.md).
    *

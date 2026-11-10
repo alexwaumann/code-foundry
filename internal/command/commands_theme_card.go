@@ -33,15 +33,13 @@ const (
 	// (theme.set-<scheme>), or, with a version, put that version of id back
 	// (theme.restore).
 	ThemeUndoLinkPrefix = "theme-undo:"
-	// ThemesPage is the Themes page's id for Notify.unless_showing: it shows the change.
-	ThemesPage = "themes"
 )
 
 // showThemeCard puts the saved theme's card in thread `by` and, with toast, shows the
 // toast. applied: the slot shows the theme (the card's badge); undo is what the slot
 // showed immediately before the save (themeUndoOf). A card that cannot be added is a
-// warning, not a failure: the theme is saved. shown: the card was added.
-func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, applied bool, undo themeUndo, toast bool) (warnings []string, shown bool) {
+// warning, not a failure: the theme is saved.
+func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, applied bool, undo themeUndo, toast bool) (warnings []string) {
 	if !applied {
 		undo = themeUndo{}
 	}
@@ -52,22 +50,20 @@ func showThemeCard(ctx context.Context, d ThemeDeps, by string, f theme.File, ap
 		if err != nil {
 			slog.Warn("theme: card not shown", "thread", by, "theme", f.ID, "err", err)
 			warnings = append(warnings, fmt.Sprintf("the theme is saved, but its card was not added to thread %s: %v", by, err))
-		} else {
-			shown = true
 		}
 	}
 	if toast && d.Emitter != nil {
 		d.Emitter.Emit(themeAppliedToast(f, undo))
 	}
-	return warnings, shown
+	return warnings
 }
 
 // themeAppliedToast is "<name> applied to <scheme>" with Undo (when there is something
 // to put back) and Edit; a window showing the Themes page skips it.
 func themeAppliedToast(f theme.File, undo themeUndo) *v1.UiIntent {
 	n := &v1.UiIntent_Notify{
-		Level: v1.UiIntent_Notify_LEVEL_INFO, Title: clipText(fmt.Sprintf("%s applied to %s", f.Name, f.Scheme), 120),
-		UnlessShowing: ThemesPage,
+		Level: v1.UiIntent_Notify_LEVEL_INFO, Title: truncateRunes(fmt.Sprintf("%s applied to %s", f.Name, f.Scheme), 120),
+		UnlessShowing: ViewThemes,
 	}
 	edit, editLabel := ThemeEditLinkPrefix+f.ID, "Edit"
 	if undo.id != "" && !undo.gone {

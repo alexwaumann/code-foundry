@@ -189,9 +189,6 @@ func (s *Store) Close() error {
 	return err
 }
 
-// Path is the settings file.
-func (s *Store) Path() string { return s.opts.Path }
-
 // Snapshot returns the current snapshot.
 func (s *Store) Snapshot() *Snapshot { return s.snap.Load() }
 

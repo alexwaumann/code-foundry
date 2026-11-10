@@ -129,7 +129,7 @@ func (q searchQuery) matchRunes(text []rune) []MatchRange {
 	return mergeRanges(out)
 }
 
-// matchText is matchRunes over text on one line (searchLine): what snippetOf matches.
+// matchText is matchRunes over text on one line (searchLine).
 func (q searchQuery) matchText(text string) []MatchRange { return q.matchRunes(searchLine(text)) }
 
 // searchLine is text with every run of white space one space, trimmed, as runes.
@@ -169,17 +169,6 @@ const (
 	snippetLen    = 160
 	snippetBefore = 48
 )
-
-// snippetOf returns text on one line (searchLine) cut around its first match, with an
-// ellipsis where it was cut, and the matches inside it; nil ranges when q does not match.
-func snippetOf(q searchQuery, text string) (string, []MatchRange) {
-	r := searchLine(text)
-	ranges := q.matchRunes(r)
-	if ranges == nil {
-		return "", nil
-	}
-	return cutSnippet(r, ranges)
-}
 
 // cutSnippet cuts r around the first of ranges (its matches, sorted) to snippetLen,
 // starting and ending at words where it can, and returns the ranges inside it.

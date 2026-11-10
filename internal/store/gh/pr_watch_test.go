@@ -63,21 +63,7 @@ func TestWatchPullRequests(t *testing.T) {
 	g.addPR(theirs) // in no section
 	g.setBranch("o/r", "feature-x", "PR_x")
 	f := &fakeRunner{}
-	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
-		if op != "PullRequest" {
-			return g.respond(op, doc, vars)
-		}
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		for _, p := range g.prs {
-			if p.Repo == vars["owner"].(string)+"/"+vars["name"].(string) && float64(p.Number) == toFloat(vars["number"]) {
-				pr := prJSON(p)
-				pr["checks"] = rollupOrNil(p.Checks)
-				return json.Marshal(map[string]any{"repository": map[string]any{"pullRequest": pr}})
-			}
-		}
-		return nil, ErrNotFound
-	})
+	f.setDoc(answerPullRequest(g))
 	b := bus.New()
 	sub := bus.Subscribe[PullRequestChanged](b, 64)
 	s := startStore(t, testOptions(openTestDB(t), f, b))
@@ -168,17 +154,9 @@ func toFloat(v any) float64 {
 	return -1
 }
 
-// watchedWorld is a store polling o/r with someone else's pull request #9 on branch
-// feature-x, in no dashboard, its lookup answered like the rest of the fake.
-func watchedWorld(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, time.Time) {
-	t.Helper()
-	g, t0 := changeDrivenWorld()
-	theirs := fakePR("PR_x", "o/r", 9, t0)
-	theirs.Author, theirs.HeadRef = "someone", "feature-x"
-	g.addPR(theirs)
-	g.setBranch("o/r", "feature-x", "PR_x")
-	f := &fakeRunner{}
-	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+// answerPullRequest answers from g, the PullRequest lookup included.
+func answerPullRequest(g *fakeGitHub) func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+	return func(op, doc string, vars map[string]any) (json.RawMessage, error) {
 		if op != "PullRequest" {
 			return g.respond(op, doc, vars)
 		}
@@ -192,7 +170,20 @@ func watchedWorld(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, time.Time) {
 			}
 		}
 		return nil, ErrNotFound
-	})
+	}
+}
+
+// watchedWorld is a store polling o/r with someone else's pull request #9 on branch
+// feature-x, in no dashboard, its lookup answered like the rest of the fake.
+func watchedWorld(t *testing.T) (*fakeGitHub, *fakeRunner, *Store, time.Time) {
+	t.Helper()
+	g, t0 := changeDrivenWorld()
+	theirs := fakePR("PR_x", "o/r", 9, t0)
+	theirs.Author, theirs.HeadRef = "someone", "feature-x"
+	g.addPR(theirs)
+	g.setBranch("o/r", "feature-x", "PR_x")
+	f := &fakeRunner{}
+	f.setDoc(answerPullRequest(g))
 	s := startStore(t, testOptions(openTestDB(t), f, bus.New()))
 	if err := s.Track("o/r"); err != nil {
 		t.Fatal(err)

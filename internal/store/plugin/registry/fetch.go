@@ -64,9 +64,6 @@ type ExecGh struct {
 	Path string
 }
 
-// ghEnv keeps gh non-interactive and its output plain.
-var ghEnv = []string{"GH_PROMPT_DISABLED=1", "GH_NO_UPDATE_NOTIFIER=1", "GH_SPINNER_DISABLED=1", "NO_COLOR=1", "CLICOLOR=0", "GH_PAGER="}
-
 // Run implements Gh.
 func (g ExecGh) Run(ctx context.Context, args ...string) ([]byte, error) {
 	path := g.Path
@@ -78,7 +75,7 @@ func (g ExecGh) Run(ctx context.Context, args ...string) ([]byte, error) {
 		path = p
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env = append(os.Environ(), ghEnv...)
+	cmd.Env = append(os.Environ(), gh.Env...)
 	cmd.WaitDelay = 2 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/paths"
-	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/skill"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -20,20 +18,18 @@ import (
 // The Skills marketplace (docs/notes/skills-1-registry.md): the store reading the
 // marketplaces Claude Code has, its start-up read and its hourly refresh.
 
-// newSkillStore builds the skill store. claude is advanced.claude_path, else "claude"
-// from PATH (the thread store's rule), read on every call so the setting applies live.
+// newSkillStore builds the skill store. claude is the claude executable the other
+// stores run: advanced.claude_path as of the daemon's start, else "claude" from PATH.
 // Skills install into Claude Code's user skills dir ($CLAUDE_CONFIG_DIR/skills, else
 // ~/.claude/skills); disabled ones wait in <home>/skills/disabled.
-func newSkillStore(p paths.Paths, db *sql.DB, b *bus.Bus, st *settings.Store, log *slog.Logger) (*skill.Store, error) {
+func newSkillStore(p paths.Paths, db *sql.DB, b *bus.Bus, claude string, log *slog.Logger) (*skill.Store, error) {
 	cp, err := thread.DefaultClaudePaths()
 	if err != nil {
 		return nil, fmt.Errorf("skill store: %w", err)
 	}
 	return skill.New(skill.Options{
 		DB: db, Bus: b, Log: log,
-		Claude: skill.ExecClaude{Path: func() string {
-			return cmp.Or(settings.ExpandedPath(st.Settings().Advanced.ClaudePath), "claude")
-		}},
+		Claude:      skill.ExecClaude{Path: func() string { return claude }},
 		SkillsDir:   filepath.Join(cp.Dir, "skills"),
 		DisabledDir: p.DisabledSkills(),
 	})

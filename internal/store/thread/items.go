@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 )
@@ -418,11 +417,8 @@ func capOutput(s string) string {
 	if len(s) <= maxToolOutput {
 		return s
 	}
-	cut := maxToolOutput
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + fmt.Sprintf("\n… [output truncated: %d more bytes]", len(s)-cut)
+	head := cutUTF8(s, maxToolOutput)
+	return head + fmt.Sprintf("\n… [output truncated: %d more bytes]", len(s)-len(head))
 }
 
 // threadLog is one thread's items in memory. Mutations happen on the
@@ -477,6 +473,13 @@ func (t *threadLog) snapshot() ItemsSnapshot {
 	defer t.mu.Unlock()
 	return ItemsSnapshot{ThreadID: t.id, Seq: t.seq, Items: slices.Clone(t.items), Pending: pendingOf(t.items), Mcp: t.mcp.status, Commands: t.commands,
 		Agents: t.agents}
+}
+
+// pending returns the seq and the pending requests, without cloning the items.
+func (t *threadLog) pending() (uint64, []PendingRequest) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.seq, pendingOf(t.items)
 }
 
 // get returns the item with id.
@@ -779,6 +782,16 @@ func (m *Manager) Items(ctx context.Context, id string) (ItemsSnapshot, error) {
 		return ItemsSnapshot{}, err
 	}
 	return t.snapshot(), nil
+}
+
+// Pending implements Store.
+func (m *Manager) Pending(ctx context.Context, id string) (uint64, []PendingRequest, error) {
+	t, err := m.thread(ctx, id)
+	if err != nil {
+		return 0, nil, err
+	}
+	seq, pending := t.pending()
+	return seq, pending, nil
 }
 
 // WatchItems implements Store: it counts a viewer until ctx ends (see

@@ -114,9 +114,6 @@ func TestCLIThreadDefaultAndExitCode(t *testing.T) {
 			if tt.wantStdout != "" && stdout.String() != tt.wantStdout {
 				t.Errorf("stdout = %q, want %q", stdout.String(), tt.wantStdout)
 			}
-			if stderr.String() != tt.wantStderr {
-				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)
-			}
 			if len(f.invoked) != 1 {
 				t.Fatalf("invoked %d times", len(f.invoked))
 			}

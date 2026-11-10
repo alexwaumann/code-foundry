@@ -140,7 +140,7 @@ func TestThemeSaveCardAndToast(t *testing.T) {
 				if err != nil {
 					t.Fatalf("step %d: %v", i, err)
 				}
-				// The card no longer stands in for the contrast line (theme_check_test.go).
+				// The card no longer stands in for the contrast line (commands_theme_check_test.go).
 				if !strings.Contains(res.Message, "\ncontrast: ") {
 					t.Errorf("step %d: no contrast line in %q", i, res.Message)
 				}

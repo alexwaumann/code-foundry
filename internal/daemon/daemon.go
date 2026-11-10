@@ -1,5 +1,5 @@
-// Package daemon bootstraps the code-foundry daemon: single-instance lock, logging, two
-// listeners serving the same Connect handlers, and the pages listener.
+// Package daemon bootstraps the code-foundry daemon: single-instance lock, logging, and
+// three listeners: two serving the same Connect handlers, and the pages listener.
 //
 //   - A Unix socket ($HOME/daemon.sock, 0600) for the CLI and the Wails host. Access is
 //     controlled by filesystem permissions.
@@ -13,8 +13,8 @@
 //
 // The loopback listener also carries the GUI's streams over WebSockets (internal/wstunnel).
 //
-// Both listeners speak HTTP/1.1 and HTTP/2 with prior knowledge (h2c), so Connect
-// streaming works over either.
+// Every listener speaks HTTP/1.1 and HTTP/2 with prior knowledge (h2c), so Connect
+// streaming works over either of the two that serve it.
 package daemon
 
 import (

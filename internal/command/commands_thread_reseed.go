@@ -12,9 +12,9 @@ import (
 
 // thread.reseed (docs/notes/ember-1-primitives.md): give a thread a fresh Claude session
 // with a seed (a system prompt append, add-dirs, a prefix for its first message), the
-// primitive behind the resident agent's epochs. An agent and daemon verb: the GUI's
-// palette does not list it (gui keys/bindings.ts paletteHidden). Also the resident
-// marks of thread.list and thread.get's session line.
+// primitive behind the resident agent's epochs. An agent and daemon verb (NoPalette: the
+// palette does not list it). Also the resident marks of thread.list and thread.get's
+// session line.
 
 // ReseedBackend is the slice of ThreadService thread.reseed needs.
 type ReseedBackend interface {

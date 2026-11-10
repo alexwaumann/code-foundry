@@ -34,35 +34,39 @@ func TestPluginChecksFollowGhEvents(t *testing.T) {
 	r := &recordChecks{}
 	stop := startPluginChecks(context.Background(), b, r)
 	defer stop()
-	changed := func(kinds ...gh.ChangeKind) func() {
+	changed := func(slug string, number int, kinds ...gh.ChangeKind) func() {
 		return func() {
-			e := gh.PullRequestChanged{Slug: "o/r", Number: 1}
+			e := gh.PullRequestChanged{Slug: slug, Number: number}
 			for _, k := range kinds {
 				e.Changes = append(e.Changes, gh.Change{Kind: k})
 			}
 			bus.Publish(b, e)
 		}
 	}
+	// Markers that always invalidate, published on the event's own topic: per-topic
+	// order then proves the event before the marker has been handled.
+	changedMarker := changed("marker", 9, gh.ChangeChecks)
+	detailMarker := func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "marker", Number: 9}) }
 	tests := []struct {
 		name        string
 		publish     func()
+		marker      func()
 		invalidates bool
 	}{
-		{"checks", changed(gh.ChangeChecks), true},
-		{"head pushed", changed(gh.ChangeHeadPushed), true},
-		{"merged with new checks", changed(gh.ChangeMerged, gh.ChangeChecks), true},
-		{"review", changed(gh.ChangeReviews, gh.ChangeReviewDecision), false},
-		{"title", changed(gh.ChangeTitle), false},
-		{"appeared", changed(gh.ChangeAppeared), false},
-		{"detail updated", func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "o/r", Number: 1}) }, true},
-		{"detail fetched, unchanged", func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "o/r", Number: 1, Unchanged: true}) }, false},
+		{"checks", changed("o/r", 1, gh.ChangeChecks), changedMarker, true},
+		{"head pushed", changed("o/r", 1, gh.ChangeHeadPushed), changedMarker, true},
+		{"merged with new checks", changed("o/r", 1, gh.ChangeMerged, gh.ChangeChecks), changedMarker, true},
+		{"review", changed("o/r", 1, gh.ChangeReviews, gh.ChangeReviewDecision), changedMarker, false},
+		{"title", changed("o/r", 1, gh.ChangeTitle), changedMarker, false},
+		{"appeared", changed("o/r", 1, gh.ChangeAppeared), changedMarker, false},
+		{"detail updated", func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "o/r", Number: 1}) }, detailMarker, true},
+		{"detail fetched, unchanged", func() { bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "o/r", Number: 1, Unchanged: true}) }, detailMarker, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			before := len(r.calls())
 			tt.publish()
-			// A marker that always invalidates.
-			bus.Publish(b, gh.PullRequestDetailUpdated{Slug: "marker", Number: 9})
+			tt.marker()
 			want := before + 1
 			if tt.invalidates {
 				want++
@@ -71,11 +75,10 @@ func TestPluginChecksFollowGhEvents(t *testing.T) {
 			for len(r.calls()) < want && time.Now().Before(deadline) {
 				time.Sleep(5 * time.Millisecond)
 			}
-			// The two topics are separate channels: the marker may be handled first.
-			got := slices.Sorted(slices.Values(r.calls()[before:]))
+			got := r.calls()[before:]
 			wantCalls := []string{"marker#9"}
 			if tt.invalidates {
-				wantCalls = []string{"marker#9", "o/r#1"}
+				wantCalls = []string{"o/r#1", "marker#9"}
 			}
 			if !slices.Equal(got, wantCalls) {
 				t.Errorf("calls %v, want %v", got, wantCalls)

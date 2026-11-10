@@ -53,6 +53,10 @@ func TestRelationAndOffer(t *testing.T) {
 		{name: "release, another repo's entry, own release newer", p: installed("0.1.0", KindGitHub, "o/hello"), e: entry("0.2.0", regA, "evil/hello"),
 			releases: map[string]UpdateOffer{"hello": {Version: "0.1.5", Registry: "https://github.com/o/hello", Ref: "o/hello@v0.1.5"}},
 			want:     RelationOtherSource, from: "o/hello", offer: &UpdateOffer{Version: "0.1.5", Registry: "https://github.com/o/hello", Ref: "o/hello@v0.1.5"}},
+		// Kept by name from before another repository took the name over: not its offer.
+		{name: "release, another repo's release under the name", p: installed("0.1.0", KindGitHub, "evil/hello"), e: entry("0.2.0", regA, "o/hello"),
+			releases: map[string]UpdateOffer{"hello": {Version: "0.3.0", Registry: "https://github.com/o/hello", Ref: "o/hello@v0.3.0"}},
+			want:     RelationOtherSource, from: "evil/hello"},
 		{name: "release, entry without a repo", p: installed("0.1.0", KindGitHub, "o/hello"), e: entry("0.2.0", regA, ""),
 			want: RelationOtherSource, from: "o/hello"},
 		{name: "put in plugins/ by hand", p: installed("0.1.0", "", ""), e: entry("0.2.0", regA, "o/hello"),
@@ -97,5 +101,37 @@ func TestShortURL(t *testing.T) {
 		if got := ShortURL(in); got != want {
 			t.Errorf("ShortURL(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// TestRecordChangeDropsAnotherSourcesRelease: a release offer stays while the name is
+// installed from the same repository and goes when it is uninstalled or comes from
+// another source.
+func TestRecordChangeDropsAnotherSourcesRelease(t *testing.T) {
+	offer := UpdateOffer{Version: "0.3.0", Registry: "https://github.com/o/hello", Ref: "o/hello@v0.3.0"}
+	tests := []struct {
+		name string
+		next *InstallRecord
+		kept bool
+	}{
+		{name: "updated from the same repository", next: &InstallRecord{Kind: KindGitHub, Source: "O/Hello", Version: "0.2.0"}, kept: true},
+		{name: "taken over by another repository", next: &InstallRecord{Kind: KindGitHub, Source: "evil/hello", Version: "0.2.0"}},
+		{name: "installed from a registry", next: &InstallRecord{Kind: KindRegistry, Source: "https://github.com/o/reg", Version: "0.2.0"}},
+		{name: "uninstalled"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s installState
+			s.setRecord("hello", &InstallRecord{Kind: KindGitHub, Source: "o/hello", Version: "0.1.0"})
+			before := map[string]UpdateOffer{"hello": offer}
+			s.releases = before
+			s.setRecord("hello", tt.next)
+			if _, ok := s.releases["hello"]; ok != tt.kept {
+				t.Errorf("release kept = %v, want %v", ok, tt.kept)
+			}
+			if _, ok := before["hello"]; !ok {
+				t.Error("the map was written in place")
+			}
+		})
 	}
 }

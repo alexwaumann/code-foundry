@@ -140,7 +140,7 @@ func addFolderAsWorkspace(ctx context.Context, projects FolderBackend, workspace
 	named := func(id string) string { return cmp.Or(names[id], name(id)) }
 	for i, c := range children {
 		if errs[i] != nil {
-			failed = append(failed, c.GetName()+": "+connectMessage(errs[i]))
+			failed = append(failed, c.GetName()+": "+errMessage(errs[i]))
 			firstErr = cmp.Or(firstErr, errs[i])
 			continue
 		}

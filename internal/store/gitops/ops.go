@@ -322,6 +322,8 @@ func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
 	env := systemEditorEnv()
 	if m.opts.editorEnv != nil {
 		env = *m.opts.editorEnv
+	} else {
+		env.apps = func() []EditorApp { return m.EditorApps(ctx, false) }
 	}
 	argv, err := resolveEditor(m.opts.Editor(), PathPlaceholder, env)
 	if errors.Is(err, ErrInvalidArgument) {
@@ -347,10 +349,11 @@ func (m *Manager) OpenEditor(ctx context.Context, o OpenOptions) (Op, error) {
 	})
 }
 
-// editorName is a display name for argv: the app for `open -a App`, else the binary.
+// editorName is a display name for argv: the app for `open -a App` (a name or a
+// bundle's path), else the binary.
 func editorName(argv []string) string {
 	if len(argv) >= 3 && filepath.Base(argv[0]) == "open" && argv[1] == "-a" {
-		return argv[2]
+		return strings.TrimSuffix(filepath.Base(argv[2]), ".app")
 	}
 	return filepath.Base(argv[0])
 }

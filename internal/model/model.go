@@ -62,9 +62,6 @@ const EmberDefault = "claude-opus-4-8[1m]"
 // between when the settings (ember.worker_models) do not pick them.
 const EmberWorkersDefault = "claude-opus-4-7[1m],claude-opus-4-8[1m]"
 
-// All returns the registry in display order.
-func All() []Model { return slices.Clone(registry) }
-
 // Values returns every Value in display order.
 func Values() []string {
 	out := make([]string, len(registry))

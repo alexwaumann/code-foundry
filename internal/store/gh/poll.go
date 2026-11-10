@@ -830,7 +830,7 @@ func (s *Store) fetchFailing(ctx context.Context, reqs []ciRequest, cis map[stri
 			data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": ci.SHA, "after": next.EndCursor})
 			var cp checksPage
 			if err == nil {
-				cp, _, err = decodeChecks(data)
+				cp, err = decodeChecks(data)
 			}
 			if err != nil {
 				s.log.Warn("gh default branch checks page failed", "slug", r.slug, "err", err)
@@ -1120,13 +1120,13 @@ func (s *Store) fetchPullRequest(ctx context.Context, slug string, number int) (
 		if isPartial(err) {
 			// A failure still, beside what came back: a nested "not found" with the pull
 			// request in the answer does not mean the pull request is gone.
-			p, _, _, _ := decodePullRequest(data)
+			p, _, _ := decodePullRequest(data)
 			return PullRequestDetail{PullRequest: p}, err
 		}
 		if err != nil {
 			return PullRequestDetail{}, err
 		}
-		p, page, _, err := decodePullRequest(data)
+		p, page, err := decodePullRequest(data)
 		if err != nil {
 			return PullRequestDetail{}, err
 		}
@@ -1160,7 +1160,7 @@ func (s *Store) fetchChecks(ctx context.Context, slug, ref string) (RefChecks, e
 		if err != nil {
 			return RefChecks{}, err
 		}
-		page, _, err := decodeChecks(data)
+		page, err := decodeChecks(data)
 		if err != nil {
 			return RefChecks{}, err
 		}

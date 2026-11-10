@@ -498,10 +498,13 @@ export type UiIntent_ShowView = Message<"codefoundry.v1.UiIntent.ShowView"> & {
   threadId: string;
 
   /**
-   * What a panel action that opens one item shows: "panel.file" takes path (absolute)
-   * and line, "panel.diff" project, worktree, path and scope ("working" | "branch"),
-   * "panel.pr" slug and number (view.panel.file, view.panel.diff, view.panel.pr;
-   * docs/notes/control-5-fixes.md). Empty for every other name.
+   * What the view shows, for the names that take more than the name: the panel
+   * actions that open one item ("panel.file", "panel.diff", "panel.pr",
+   * "panel.gallery"; docs/notes/control-5-fixes.md), the Projects page (one project's
+   * or workspace's) and search.open (an agent search). Each name's keys are documented
+   * with its name's constant in internal/command (ViewPanelFile, ViewPanelDiff,
+   * ViewPanelPR, ViewPanelGallery, ViewProjects, ViewSearch). Empty for every other
+   * name.
    *
    * @generated from field: map<string, string> params = 3;
    */

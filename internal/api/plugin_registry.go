@@ -111,7 +111,7 @@ func registriesToProto(rs []registry.Status) []*v1.PluginRegistry {
 	out := make([]*v1.PluginRegistry, len(rs))
 	for i, r := range rs {
 		out[i] = &v1.PluginRegistry{
-			Url: r.URL, FetchedAt: optionalTime(r.FetchedAt), Cached: r.Cached, Error: r.Error,
+			Url: r.URL, FetchedAt: timestamp(r.FetchedAt), Cached: r.Cached, Error: r.Error,
 			Plugins: int32(r.Plugins), Issues: r.Issues,
 		}
 	}
@@ -157,7 +157,7 @@ var indexRelations = map[plugin.Relation]v1.PluginIndexRelation{
 func fillInstall(out *v1.Plugin, p plugin.Plugin) {
 	if r := p.Installed; r != nil {
 		out.Install = &v1.PluginInstall{
-			Kind: string(r.Kind), Source: r.Source, Version: r.Version, Sha256: r.SHA256, InstalledAt: optionalTime(r.InstalledAt),
+			Kind: string(r.Kind), Source: r.Source, Version: r.Version, Sha256: r.SHA256, InstalledAt: timestamp(r.InstalledAt),
 		}
 	}
 	if u := p.Update; u != nil {

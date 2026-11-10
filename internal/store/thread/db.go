@@ -241,6 +241,16 @@ func saveLinkSource(ctx context.Context, db *sql.DB, threadID, url string, sourc
 	return nil
 }
 
+// saveLinkVia makes thread threadID's child link to url come through thread via
+// (prlink_branch.go).
+func saveLinkVia(ctx context.Context, db *sql.DB, threadID, url, via string) error {
+	if _, err := db.ExecContext(ctx, `UPDATE thread_pull_requests SET via_thread_id = ? WHERE thread_id = ? AND url = ?`,
+		via, threadID, url); err != nil {
+		return fmt.Errorf("thread: save child of link %s of %s: %w", url, threadID, err)
+	}
+	return nil
+}
+
 // deleteLinks removes thread threadID's links to urls (a member removed: members.go; a
 // default-branch link dropped: prlink_branch.go).
 func deleteLinks(ctx context.Context, db *sql.DB, threadID string, urls []string) error {

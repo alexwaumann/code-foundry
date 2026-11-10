@@ -228,6 +228,30 @@ func TestEnable(t *testing.T) {
 	}
 }
 
+// An enable that failed (its home could not be made) is tried again on the tick.
+func TestEnableRetriesAfterFailure(t *testing.T) {
+	t.Parallel()
+	var blocker string
+	e := newEnv(t, func(e *env) {
+		e.cfg.Enabled = true
+		e.opts.CheckInterval = 10 * time.Millisecond
+		blocker = filepath.Dir(e.dir)
+		if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if st := e.s.Snapshot().Status; !st.Enabled || st.ThreadID != "" {
+		t.Fatalf("status = %+v", st)
+	}
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	e.await("the resident", func(s *Snapshot) bool { return s.Status.ThreadID != "" })
+	if got := e.calls("EnsureResident"); len(got) != 1 {
+		t.Errorf("EnsureResident calls = %q", got)
+	}
+}
+
 // A resident made without Ember's seed (by hand) is seeded when Ember is enabled.
 func TestEnableSeedsAnUnseededResident(t *testing.T) {
 	t.Parallel()

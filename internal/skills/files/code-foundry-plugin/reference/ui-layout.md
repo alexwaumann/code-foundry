@@ -7,9 +7,9 @@ own height and scroll), **grid** (cards in as many columns as fit), **container*
 capped, centred width), **masterDetail** (a list beside its chosen row's detail) and
 **tabs** (a node's own tab strip). **divider**, **spacer** and **group** (leaves on one line) space
 and line up nodes without a container. Two view slots pin nodes around the scrolling
-body: the **toolbar** and the **footer**. A surface shows in the side panel (about 360 px
-wide, the user can widen it) and, later, in pages of the main pane: one view serves both,
-so every container says how it degrades to one column. Check
+body: the **toolbar** and the **footer**. A surface shows in the side panel (420 px wide
+by default, 280 px at the narrowest; the user can widen it) and, later, in pages of the
+main pane: one view serves both, so every container says how it degrades to one column. Check
 `h.HasCapability("view.node.columns")` (`view.node.pane`, `view.node.grid`,
 `view.node.divider`, `view.node.spacer`, `view.node.group`, `view.node.container`,
 `view.node.masterDetail`, `view.node.tabs`, `view.toolbar`, `view.footer`) before

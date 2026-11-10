@@ -1,8 +1,6 @@
 package api
 
 import (
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/pricing"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -52,9 +50,7 @@ func agentRunsToProto(runs []thread.AgentRun) []*v1.AgentRun {
 		if r.Status == thread.AgentRunning || (r.Status == "" && r.Open) {
 			p.Status = v1.AgentRunStatus_AGENT_RUN_STATUS_OPEN
 		}
-		if !r.StartedAt.IsZero() {
-			p.StartedAt = timestamppb.New(r.StartedAt)
-		}
+		p.StartedAt = timestamp(r.StartedAt)
 		p.Usage, p.CostUsd, p.Unpriced = usageToProto(r.Usage)
 		out = append(out, p)
 	}

@@ -1,24 +1,12 @@
 package projecttest
 
-import (
-	"slices"
-	"strings"
-)
+import "strings"
 
-// SetLiveWorktrees implements project.Store: it records the set (LiveWorktrees) and the
-// call ("SetLiveWorktrees a,b").
+// SetLiveWorktrees implements project.Store by recording the call ("SetLiveWorktrees a,b").
 func (f *Fake) SetLiveWorktrees(paths []string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.live = slices.Clone(paths)
 	f.Calls = append(f.Calls, "SetLiveWorktrees "+strings.Join(paths, ","))
-}
-
-// LiveWorktrees returns the paths the last SetLiveWorktrees named.
-func (f *Fake) LiveWorktrees() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return slices.Clone(f.live)
 }
 
 // Touch implements project.Store by recording "Touch <path>".

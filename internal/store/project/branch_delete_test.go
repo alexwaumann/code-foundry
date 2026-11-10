@@ -10,7 +10,8 @@ import (
 )
 
 // DeleteBranch deletes a branch whose worktree is gone, locally and (with Remote) on
-// origin; -d unless Force; the default branch and a checked-out one are refused.
+// origin; an unmerged branch only with Force; the default branch and a checked-out one
+// are refused.
 func TestDeleteBranch(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{})

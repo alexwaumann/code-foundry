@@ -346,24 +346,12 @@ func threadToProto(s thread.Thread) *v1.Thread {
 		CheckoutPaths:       checkoutPathsToProto(s),
 		Setup:               setupToProto(s.Setup),
 	}
-	if !s.CreatedAt.IsZero() {
-		p.CreatedAt = timestamppb.New(s.CreatedAt)
-	}
-	if !s.LastActivityAt.IsZero() {
-		p.LastActivityAt = timestamppb.New(s.LastActivityAt)
-	}
-	if !s.StatusChangedAt.IsZero() {
-		p.StatusChangedAt = timestamppb.New(s.StatusChangedAt)
-	}
-	if !s.ArchivedAt.IsZero() {
-		p.ArchivedAt = timestamppb.New(s.ArchivedAt)
-	}
-	if !s.SnoozedUntil.IsZero() {
-		p.SnoozedUntil = timestamppb.New(s.SnoozedUntil)
-	}
-	if !s.SavedAt.IsZero() {
-		p.SavedAt = timestamppb.New(s.SavedAt)
-	}
+	p.CreatedAt = timestamp(s.CreatedAt)
+	p.LastActivityAt = timestamp(s.LastActivityAt)
+	p.StatusChangedAt = timestamp(s.StatusChangedAt)
+	p.ArchivedAt = timestamp(s.ArchivedAt)
+	p.SnoozedUntil = timestamp(s.SnoozedUntil)
+	p.SavedAt = timestamp(s.SavedAt)
 	for _, l := range s.LinkedPullRequests {
 		p.LinkedPullRequests = append(p.LinkedPullRequests, linkedPullRequestToProto(l))
 	}
@@ -377,9 +365,7 @@ func threadToProto(s thread.Thread) *v1.Thread {
 	p.BusyTool = s.BusyTool // the running tool call, "" unless busy (busytool.go)
 	p.ContextTokens, p.ContextRereadUsd = s.ContextTokens, contextRereadUSD(s)
 	p.ContextWindow = model.ContextWindow(s.Model)
-	if !s.CacheExpiresAt.IsZero() {
-		p.CacheExpiresAt = timestamppb.New(s.CacheExpiresAt)
-	}
+	p.CacheExpiresAt = timestamp(s.CacheExpiresAt)
 	if r := s.Retry; r != nil {
 		p.Retry = &v1.ApiRetry{Attempt: int32(r.Attempt), MaxRetries: int32(r.MaxRetries), RetryAt: timestamppb.New(r.RetryAt), ErrorStatus: int32(r.Status), Error: r.Error}
 	}

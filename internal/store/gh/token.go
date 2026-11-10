@@ -53,8 +53,9 @@ func LookPath() (string, error) {
 	return "", fmt.Errorf("gh: executable not found on $PATH or in %v: %w", ghFallbacks, exec.ErrNotFound)
 }
 
-// ghEnv keeps gh non-interactive and its output machine-readable.
-var ghEnv = []string{
+// Env keeps gh non-interactive and its output machine-readable. Callers append it to
+// os.Environ() for every gh they run.
+var Env = []string{
 	"GH_PROMPT_DISABLED=1",
 	"GH_NO_UPDATE_NOTIFIER=1",
 	"GH_SPINNER_DISABLED=1",
@@ -80,7 +81,7 @@ func (g GhToken) Token(ctx context.Context) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(cctx, path, "auth", "token", "--hostname", "github.com")
-	cmd.Env = append(os.Environ(), ghEnv...)
+	cmd.Env = append(os.Environ(), Env...)
 	cmd.WaitDelay = 2 * time.Second
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb

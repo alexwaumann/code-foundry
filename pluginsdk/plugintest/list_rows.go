@@ -2,7 +2,6 @@ package plugintest
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -44,7 +43,7 @@ func (h *Host) Move(ctx context.Context, instance, key, after string) error {
 
 // AddRow enters text in list's add input and presses Enter (pluginsdk.ActAdd).
 func (h *Host) AddRow(ctx context.Context, instance, list, text string) error {
-	v, err := h.latestView(instance)
+	v, err := h.latest(instance)
 	if err != nil {
 		return err
 	}
@@ -84,23 +83,11 @@ func rowText(s string) (string, error) {
 	return s, nil
 }
 
-func (h *Host) latestView(instance string) (ui.View, error) {
-	raw, ok := h.View(instance)
-	if !ok {
-		return ui.View{}, fmt.Errorf("plugintest: no view of %s yet", instance)
-	}
-	var v ui.View
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return ui.View{}, fmt.Errorf("plugintest: the view of %s: %w", instance, err)
-	}
-	return v, nil
-}
-
 // rowList finds the list node holding row key in the latest view, refusing when the row
 // does not have the act kind (its list is not checkable or reorderable, it is not
 // editable).
 func (h *Host) rowList(instance, key, kind string) (string, *ui.List, error) {
-	v, err := h.latestView(instance)
+	v, err := h.latest(instance)
 	if err != nil {
 		return "", nil, err
 	}
@@ -127,37 +114,12 @@ func (h *Host) rowList(instance, key, kind string) (string, *ui.List, error) {
 }
 
 func findList(v ui.View, key string) *ui.List {
-	var out *ui.List
-	walkLists(v, func(n ui.Node) bool {
-		if n.Key == key {
-			out = n.List
-			return true
-		}
-		return false
-	})
-	return out
+	n, _ := findNode(v, func(n ui.Node) bool { return n.List != nil && n.Key == key })
+	return n.List
 }
 
 // walkLists calls f for each list node of v (a master-detail's list is not one) until it
 // returns true.
 func walkLists(v ui.View, f func(n ui.Node) bool) {
-	var walk func(ns []ui.Node) bool
-	walk = func(ns []ui.Node) bool {
-		for _, n := range ns {
-			if n.List != nil && f(n) {
-				return true
-			}
-			for _, l := range n.Children() {
-				if walk(l) {
-					return true
-				}
-			}
-		}
-		return false
-	}
-	for _, l := range v.NodeLists() {
-		if walk(l) {
-			return
-		}
-	}
+	findNode(v, func(n ui.Node) bool { return n.List != nil && f(n) })
 }

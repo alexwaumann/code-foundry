@@ -17,7 +17,7 @@ import (
 //	--model <model>      alias ("fable", "opus", "sonnet"; "haiku" also works) or full name
 //	--effort <level>     low, medium, high, xhigh, max
 //	--session-id <uuid>  use this session id (the transcript is <uuid>.jsonl)
-//	-r, --resume <id>    resume a conversation by thread id
+//	-r, --resume <id>    resume a conversation by session id
 //	--fork-session       with --resume: continue under a new session id
 //	-p, --print          non-interactive; skips the trust dialog
 //	--no-session-persistence, --tools "" (with -p, for naming)
@@ -149,8 +149,8 @@ func (l launch) argv(claude string, a spawnArgs) []string {
 //
 // The text may carry file references, "@cf-file://<projectId>/<percent-encoded relative
 // path>" (the composer's file tags), which name a file in a worktree that may not
-// exist yet. buildPrompt leaves them alone; Create rewrites them to absolute paths with
-// rewriteFileRefs once the thread's worktrees exist, before claude is spawned. See
+// exist yet. buildPrompt leaves them alone; Create and Send rewrite them to absolute
+// paths with rewriteFileRefs once the thread's worktrees exist, before claude gets them. See
 // filerefs.go for the token format. Thread references ("[Thread "<name>" (id <id>)]")
 // are completed with the thread's transcript the same way (threadrefs.go), in Create and
 // Send.
@@ -276,7 +276,7 @@ func (p ClaudePaths) transcriptPath(cwd, claudeID string) (string, bool) {
 }
 
 // pidFile is Claude's per-process session record: {"pid":..,"sessionId":..,"cwd":..}.
-// It is rewritten when the thread id changes (/clear) and removed on exit.
+// It is rewritten when the session id changes (/clear) and removed on exit.
 func (p ClaudePaths) pidFile(pid int) string {
 	return filepath.Join(p.Dir, "sessions", fmt.Sprintf("%d.json", pid))
 }

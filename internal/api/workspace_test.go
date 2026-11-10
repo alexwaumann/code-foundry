@@ -52,7 +52,7 @@ func TestWorkspaceUnaryAndErrorCodes(t *testing.T) {
 		t.Errorf("AddProject to a missing workspace: %v", err)
 	}
 	rr, err := c.RemoveProject(ctx, connect.NewRequest(&v1.RemoveWorkspaceProjectRequest{Workspace: "shop", Project: "web"}))
-	if err != nil || len(rr.Msg.GetWorkspace().GetMembers()) != 2 || rr.Msg.GetWorkspace().GetDefaultPrimary() != "workspace" {
+	if err != nil || len(rr.Msg.GetWorkspace().GetMembers()) != 2 || rr.Msg.GetWorkspace().GetDefaultPrimary() != "api" {
 		t.Fatalf("RemoveProject = %v, %v", rr, err)
 	}
 	rn, err := c.Rename(ctx, connect.NewRequest(&v1.RenameWorkspaceRequest{Workspace: "w-1", Name: "store"}))

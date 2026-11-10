@@ -101,12 +101,6 @@ func Paths() []string {
 	return out
 }
 
-// Size returns the bytes served at p, and false when nothing is.
-func Size(p string) (int, bool) {
-	f, ok := files[p]
-	return len(f.body), ok
-}
-
 // UIExports returns @cf/ui's export names, sorted (dist/ui-exports.json, written by the
 // build from ui.js itself).
 func UIExports() []string {

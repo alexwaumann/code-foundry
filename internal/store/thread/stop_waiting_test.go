@@ -215,6 +215,28 @@ func TestWakeTakenBackInTheBatchWindow(t *testing.T) {
 	}
 }
 
+// A queued wake the drain has not taken yet gives its wake limit slot back when it is
+// taken back; one of another subscription keeps its own.
+func TestQueuedWakeTakenBackRefundsItsSlot(t *testing.T) {
+	at, other := time.Now(), time.Now().Add(time.Second)
+	s := &subscriptions{
+		sent: map[string][]time.Time{"top": {at, other}},
+		queues: map[string]*wakeQueue{"top": {items: []delivery{
+			{sub: "w-1", of: Subscription{ID: "w-1", SubscriberID: "top"}, slot: at},
+			{sub: "w-2", of: Subscription{ID: "w-2", SubscriberID: "top"}, slot: other},
+		}}},
+	}
+	s.mu.Lock()
+	gone := s.dropWakesLocked("top", []string{"w-1"})
+	s.mu.Unlock()
+	if len(gone) != 1 || gone[0].ID != "w-1" {
+		t.Errorf("took back %v, want w-1", stopSubIDs(gone))
+	}
+	if got := s.sent["top"]; !slices.Equal(got, []time.Time{other}) {
+		t.Errorf("slots %v, want only w-2's", got)
+	}
+}
+
 // Scenario B: the target is a lead with working children, so without the take-back the
 // drain would hold the wake after the stop: the list would go from 0 rows to 1 and the
 // thread be woken once the team settled, maybe hours later.

@@ -73,11 +73,9 @@ func memoryHash(entries []string) string {
 
 // spawnMemory is what a spawn did with the app memory (claudeCommand).
 type spawnMemory struct {
-	// entries were read now (nil when there are none or they could not be read).
-	entries []string
 	// fresh: a new conversation, whose system prompt has entries: the row takes hash.
 	fresh bool
-	// hash is memoryHash(entries); note, when set, is the refresh a resumed
+	// hash is memoryHash of the entries read now; note, when set, is the refresh a resumed
 	// conversation's next message starts with (the row takes hash once it went out).
 	hash, note string
 }
@@ -87,7 +85,7 @@ type spawnMemory struct {
 // hash is had (the row's), so when mem differs its next message carries the new list.
 // A memory that could not be read (ok false) changes nothing on a resumed one.
 func memorySpawned(l launch, had string, mem []string, ok bool) spawnMemory {
-	sm := spawnMemory{entries: mem, fresh: l.resume == "" || l.freshPrompt, hash: memoryHash(mem)}
+	sm := spawnMemory{fresh: l.resume == "" || l.freshPrompt, hash: memoryHash(mem)}
 	if !sm.fresh && ok && sm.hash != had {
 		sm.note = memoryRefresh(mem)
 	}

@@ -39,7 +39,8 @@ import (
 )
 
 // stores is the daemon's shared infrastructure (bus, database) and its stores. Each
-// store gets one field here and one line in openStores and close.
+// store gets one field here and one line in openStores, and one in close when it holds
+// resources.
 type stores struct {
 	bus *bus.Bus
 	// settings is opened first: the other stores take start-time options from it.
@@ -60,7 +61,8 @@ type stores struct {
 	stopGh func()
 	// gitops runs git/gh operations and refreshes project afterwards; closed before project.
 	gitops *gitops.Manager
-	// terminal owns PTYs; closed first so every child gets hung up before the db goes.
+	// terminal owns PTYs; closed after thread and action, before the db, so every child
+	// gets hung up before the db goes.
 	terminal *terminal.Manager
 	// stopShells stops the shell reaper (shells.go): exited shells and the shells of a
 	// removed worktree are removed. Stopped before terminal closes.
@@ -361,7 +363,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings)
-	if s.skills, err = newSkillStore(p, s.db, s.bus, s.settings, log.With("store", "skill")); err != nil {
+	if s.skills, err = newSkillStore(p, s.db, s.bus, claude, log.With("store", "skill")); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -403,10 +405,10 @@ func threadPlace(snap *thread.Snapshot, id string, checkouts func(thread.Thread)
 	return p, true
 }
 
-// worktreeThreads lists the threads that own their cwd, for the cleanup rule and the
-// workspace store's removal guards: every thread but an archived one, whatever its state
-// (a stopped thread looks like any other in the GUI and a message starts it again in the
-// same worktree; a snoozed one comes back to it).
+// worktreeThreads lists the threads that own their cwd, for the cleanup rule: every
+// thread but an archived one, whatever its state (a stopped thread looks like any other
+// in the GUI and a message starts it again in the same worktree; a snoozed one comes
+// back to it).
 func worktreeThreads(snap *thread.Snapshot) []holder {
 	var out []holder
 	if snap == nil {

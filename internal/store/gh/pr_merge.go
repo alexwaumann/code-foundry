@@ -14,7 +14,8 @@ import (
 
 // Merging from the detail panel (MergePullRequest): one GraphQL mutation guarded by the
 // head commit the store last fetched, then optionally a REST delete of the head branch.
-// Both are paced requests on the store's worker; neither is ever retried.
+// Both are paced requests in one job on the store's worker, which finishes the merge
+// even when the caller has gone; neither is ever retried.
 
 const queryMergePullRequest = "merge_pull_request"
 
@@ -83,13 +84,13 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		}
 		head = r.ExpectedHeadSHA
 	}
-	res, err := submitFunc(ctx, s, "merge|"+k.String(), func(ctx context.Context) (MergeResult, error) {
+	return submitFunc(ctx, s, "merge|"+k.String(), func(ctx context.Context) (MergeResult, error) {
 		data, err := s.call(ctx, queryMergePullRequest, map[string]any{"id": pr.ID, "method": string(r.Method), "head": head})
 		var pe *PartialError
 		switch {
 		case errors.As(err, &pe):
 			// GitHub refused the merge (conflicts, protection, head moved): nothing merged.
-			return MergeResult{}, mergeRefused(k, &pr, pe)
+			err = mergeRefused(k, &pr, pe)
 		case outcomeUnknown(err):
 			now := s.opts.Now()
 			err = fmt.Errorf("pull request #%d: GitHub did not confirm the merge, and it may have merged; "+
@@ -100,35 +101,32 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 			// is not there to do it.
 			s.invalidateFull(k)
 			return MergeResult{}, err
-		case err != nil:
+		}
+		if err != nil {
+			if errors.Is(err, ErrFailedPrecondition) {
+				// GitHub knows a state the cache does not: let clients re-read.
+				s.invalidateFull(k)
+			}
 			return MergeResult{}, err
 		}
 		o, err := decodeMerge(data)
 		if err != nil {
 			return MergeResult{}, err
 		}
-		return MergeResult{Merged: o.Merged || o.State == PullRequestMerged, SHA: o.SHA}, nil
-	})
-	if err != nil {
-		if errors.Is(err, ErrFailedPrecondition) {
-			// GitHub knows a state the cache does not: let clients re-read.
-			s.invalidateFull(k)
+		res := s.finishMerge(ctx, k, &d, r, MergeResult{Merged: o.Merged || o.State == PullRequestMerged, SHA: o.SHA})
+		s.log.Info("gh pull request merged", "pr", k.String(), "method", r.Method, "merged", res.Merged,
+			"sha", res.SHA, "branch_deleted", res.BranchDeleted)
+		s.invalidateFull(k)
+		// The dashboards move it to recently merged, and this month's merged count grows:
+		// poll soon, with the current month's stats.
+		if res.Merged {
+			s.statsDueNow("merged", "pr", k.String())
+			// The searches trail the merge: show it now (pr_merged_overlay.go).
+			s.markMerged(k)
 		}
-		return MergeResult{}, err
-	}
-	res = s.finishMerge(ctx, k, &d, r, res)
-	s.log.Info("gh pull request merged", "pr", k.String(), "method", r.Method, "merged", res.Merged,
-		"sha", res.SHA, "branch_deleted", res.BranchDeleted)
-	s.invalidateFull(k)
-	// The dashboards move it to recently merged, and this month's merged count grows:
-	// poll soon, with the current month's stats.
-	if res.Merged {
-		s.statsDueNow("merged", "pr", k.String())
-		// The searches trail the merge: show it now (pr_merged_overlay.go).
-		s.markMerged(k)
-	}
-	s.pollSoon()
-	return res, nil
+		s.pollSoon()
+		return res, nil
+	})
 }
 
 // mergeMemo is a merge's complete result, and whether it was asked to delete the branch.
@@ -150,8 +148,8 @@ func repeatMerge(m writeMemo[mergeMemo], r MergeRequest) (MergeResult, error) {
 	return res, nil
 }
 
-// finishMerge deletes the head branch on GitHub when asked and allowed, writes the
-// message, and remembers the complete result for repeats.
+// finishMerge runs on the worker: it deletes the head branch on GitHub when asked and
+// allowed, writes the message, and remembers the complete result for repeats.
 func (s *Store) finishMerge(ctx context.Context, k fullKey, d *FullPullRequest, r MergeRequest, res MergeResult) MergeResult {
 	pr := d.PullRequest
 	if !res.Merged {
@@ -170,7 +168,7 @@ func (s *Store) finishMerge(ctx context.Context, k fullKey, d *FullPullRequest, 
 		case keepBranch(d) != "":
 			res.Message += fmt.Sprintf("; kept %s: %s", remote, keepBranch(d))
 		default:
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), branchDeleteTimeout)
+			ctx, cancel := context.WithTimeout(ctx, branchDeleteTimeout)
 			err := s.deleteBranch(ctx, k, pr.HeadRef)
 			cancel()
 			if err != nil {
@@ -277,8 +275,9 @@ func (l *keyLocks) lock(ctx context.Context, k fullKey) (unlock func(), err erro
 	}
 }
 
-// deleteBranch deletes a branch of k's repository through REST. A branch GitHub already
-// deleted (the repository deletes head branches on merge) counts as deleted.
+// deleteBranch deletes a branch of k's repository through REST, on the worker. A branch
+// GitHub already deleted (the repository deletes head branches on merge) counts as
+// deleted.
 func (s *Store) deleteBranch(ctx context.Context, k fullKey, branch string) error {
 	rw, ok := s.opts.Runner.(RESTWriter)
 	if !ok {
@@ -290,10 +289,7 @@ func (s *Store) deleteBranch(ctx context.Context, k fullKey, branch string) erro
 		segs[i] = url.PathEscape(seg)
 	}
 	path := fmt.Sprintf(restGitRef, owner, name, strings.Join(segs, "/"))
-	_, err := submitFunc(ctx, s, "delete-branch|"+k.slug+"|"+branch, func(ctx context.Context) (struct{}, error) {
-		_, err := s.restWrite(ctx, rw, http.MethodDelete, path, nil)
-		return struct{}{}, err
-	})
+	_, err := s.restWrite(ctx, rw, http.MethodDelete, path, nil)
 	if errors.Is(err, ErrFailedPrecondition) && strings.Contains(strings.ToLower(err.Error()), "reference does not exist") {
 		return nil
 	}

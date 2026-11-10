@@ -188,7 +188,7 @@ func TestFileIndexSearch(t *testing.T) {
 	x := NewFileIndex(nil)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, truncated, err := x.Search(context.Background(), tt.dir, tt.git, tt.query, tt.limit)
+			got, truncated, err := searchDir(context.Background(), x, tt.dir, tt.git, tt.query, tt.limit)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -215,7 +215,7 @@ func TestFileIndexCache(t *testing.T) {
 	x.now = func() time.Time { return now }
 	search := func() []string {
 		t.Helper()
-		got, _, err := x.Search(context.Background(), dir, true, "new.go", 0)
+		got, _, err := searchDir(context.Background(), x, dir, true, "new.go", 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -232,6 +232,45 @@ func TestFileIndexCache(t *testing.T) {
 	if got := search(); !slices.Equal(got, []string{"new.go"}) {
 		t.Fatalf("after the TTL: %q", got)
 	}
+}
+
+// A lookup drops the lists past their TTL, even when the listing it starts fails, so an
+// expired list is not held until some other listing succeeds.
+func TestFileIndexLookupDropsExpired(t *testing.T) {
+	now := time.Unix(1000, 0)
+	x := NewFileIndex(nil)
+	x.now = func() time.Time { return now }
+	x.list = func(_ context.Context, dir string, _ bool) ([]FileEntry, error) {
+		if dir == "/b" {
+			return nil, errors.New("cannot list")
+		}
+		return []FileEntry{{Path: "a.go"}}, nil
+	}
+	if _, _, err := searchDir(context.Background(), x, "/a", true, "a", 0); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(FileCacheTTL)
+	if _, _, err := searchDir(context.Background(), x, "/b", true, "a", 0); err == nil {
+		t.Fatal("listing /b: want an error")
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if len(x.entries) != 0 {
+		t.Fatalf("cached %d lists after the TTL, want none", len(x.entries))
+	}
+}
+
+// searchDir is SearchSources over the one checkout dir.
+func searchDir(ctx context.Context, x *FileIndex, dir string, git bool, query string, limit int) ([]FileEntry, bool, error) {
+	ms, truncated, err := x.SearchSources(ctx, []Source{{Dir: dir, Git: git}}, query, limit, false)
+	if err != nil {
+		return nil, false, err
+	}
+	matches := make([]FileEntry, len(ms))
+	for i, m := range ms {
+		matches[i] = m.FileEntry
+	}
+	return matches, truncated, nil
 }
 
 // The TTL counts from the end of the listing, so a listing slower than the TTL is
@@ -252,11 +291,11 @@ func TestFileIndexCacheSlowListing(t *testing.T) {
 			return start.Add(FileCacheTTL + 2*time.Second)
 		}
 	}
-	if _, _, err := x.Search(context.Background(), dir, true, "new.go", 0); err != nil {
+	if _, _, err := searchDir(context.Background(), x, dir, true, "new.go", 0); err != nil {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(dir, "new.go"), "package x\n")
-	got, _, err := x.Search(context.Background(), dir, true, "new.go", 0)
+	got, _, err := searchDir(context.Background(), x, dir, true, "new.go", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +319,7 @@ func TestFileIndexListingOutlivesCancelledSearch(t *testing.T) {
 		return []FileEntry{{Path: "a.go"}}, nil
 	}
 	search := func(ctx context.Context) ([]string, error) {
-		got, _, err := x.Search(ctx, "/w", true, "a", 0)
+		got, _, err := searchDir(ctx, x, "/w", true, "a", 0)
 		return paths(got), err
 	}
 
@@ -339,7 +378,7 @@ func TestFileIndexConcurrentMissesShareOneListing(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 16 {
 		wg.Go(func() {
-			if got, _, err := x.Search(context.Background(), "/w", true, "", 0); err != nil || len(got) != 1 {
+			if got, _, err := searchDir(context.Background(), x, "/w", true, "", 0); err != nil || len(got) != 1 {
 				t.Errorf("Search = %v, %v", got, err)
 			}
 		})
@@ -377,7 +416,7 @@ func TestFileIndexConcurrentCheckouts(t *testing.T) {
 			if i%2 == 1 {
 				dir, git, query, want = b, false, "only", "only-in-b.txt"
 			}
-			got, _, err := x.Search(context.Background(), dir, git, query, 0)
+			got, _, err := searchDir(context.Background(), x, dir, git, query, 0)
 			if err != nil {
 				errs <- err
 				return
@@ -386,7 +425,7 @@ func TestFileIndexConcurrentCheckouts(t *testing.T) {
 				errs <- fmt.Errorf("Search(%s, %q) = %q, want [%q]", dir, query, g, want)
 			}
 			if i%2 == 0 { // b's file never shows up in a
-				if other, _, _ := x.Search(context.Background(), dir, git, "only-in-b", 0); len(other) != 0 {
+				if other, _, _ := searchDir(context.Background(), x, dir, git, "only-in-b", 0); len(other) != 0 {
 					errs <- fmt.Errorf("checkout a returned b's file: %q", paths(other))
 				}
 			}

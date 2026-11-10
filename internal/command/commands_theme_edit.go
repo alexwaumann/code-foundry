@@ -21,17 +21,6 @@ const ViewThemeEditPrefix = ViewThemes + ".edit."
 // checks contrast in the GUI; saving is theme.save. A curated theme is copied first
 // (theme.duplicate, or Customise on the page, which then edits the copy).
 func RegisterThemeEdit(r *Registry, e Emitter, themes ThemeBackend) error {
-	userIDs := func() []string {
-		if themes == nil {
-			return nil
-		}
-		snap := themes.Snapshot()
-		ids := make([]string, len(snap.Themes))
-		for i, f := range snap.Themes {
-			ids[i] = f.ID
-		}
-		return ids
-	}
 	return r.Register(Command{
 		Name:  "theme.edit",
 		Page:  PageState,
@@ -39,7 +28,7 @@ func RegisterThemeEdit(r *Registry, e Emitter, themes ThemeBackend) error {
 		Description: "Open one of your themes in the Themes page's editor: change its base colours or pin single slots, with the gallery previewing " +
 			"every change and the contrast checked as you go; Save writes the file. A curated theme is copied first (theme duplicate <id>).",
 		Category: "Settings",
-		Args: []ArgSpec{{Name: "theme", Type: Enum, EnumFunc: userIDs, Required: true, Positional: true,
+		Args: []ArgSpec{{Name: "theme", Type: Enum, EnumFunc: userThemeIDs(themes), Required: true, Positional: true,
 			EnumMiss: func(v string) error {
 				if f, ok := theme.Curated(v); ok {
 					return fmt.Errorf("%s (%q) is a curated theme; copy it first (theme duplicate %s) and edit the copy", f.Name, v, v)

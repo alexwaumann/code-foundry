@@ -67,9 +67,9 @@ export function PlaySound(volume: number): $CancellablePromise<void> {
 /**
  * Relaunch quits the app and starts this executable again once this process has
  * exited, so the new process runs whatever is on disk at this path now (an installed
- * update swaps the app directory in place). It keeps the arguments and the environment
- * (CODE_FOUNDRY_HOME, CODE_FOUNDRY_BIN, the adopted PATH, ...). Threads are unaffected:
- * they live in the daemon.
+ * update swaps the app directory in place). It keeps the environment (CODE_FOUNDRY_HOME,
+ * CODE_FOUNDRY_BIN, the adopted PATH, ...). Threads are unaffected: they live in the
+ * daemon.
  */
 export function Relaunch(): $CancellablePromise<void> {
     return $Call.ByID(3512615560);

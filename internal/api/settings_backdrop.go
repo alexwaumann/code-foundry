@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
@@ -72,9 +71,7 @@ func (h *Settings) ReadBackdrop(ctx context.Context, req *connect.Request[v1.Rea
 
 func backdropToProto(e backdrop.Entry) *v1.Backdrop {
 	out := &v1.Backdrop{Name: e.Name, Size: e.Size, Width: int32(e.Width), Height: int32(e.Height)}
-	if !e.Added.IsZero() {
-		out.AddedAt = timestamppb.New(e.Added)
-	}
+	out.AddedAt = timestamp(e.Added)
 	return out
 }
 

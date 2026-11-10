@@ -177,7 +177,7 @@ func leadingWords(args []string) []string {
 
 // lookup connects to the daemon and resolves args to a command.
 func (cl *cli) lookup(ctx context.Context, args []string) (*v1.Command, []string, error) {
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -185,6 +185,11 @@ func (cl *cli) lookup(ctx context.Context, args []string) (*v1.Command, []string
 	if err != nil {
 		return nil, nil, err
 	}
+	return cl.lookupIn(cmds, args)
+}
+
+// lookupIn resolves args to one of cmds.
+func (cl *cli) lookupIn(cmds []*v1.Command, args []string) (*v1.Command, []string, error) {
 	words := leadingWords(args)
 	cmd, n := resolveCommand(cmds, words)
 	if cmd != nil && cmd.GetName() != strings.Join(words[:n], ".") && wantsHelp(args[n:]) {
@@ -332,7 +337,7 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 
 	if present, ok := cliPresenters[cmd.GetName()]; ok {
-		c, err := cl.connect(ctx)
+		c, err := cl.daemon(ctx)
 		if err != nil {
 			return err
 		}
@@ -370,7 +375,7 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 	}
 	if f, ok := cliFollowers[cmd.GetName()]; ok && !*asJSON && cl.wantsFollow(f, flags) {
 		if name, lines, ok := f.target(vals, res); ok {
-			c, err := cl.connect(ctx)
+			c, err := cl.daemon(ctx)
 			if err != nil {
 				return err
 			}
@@ -499,7 +504,7 @@ func runCommands(ctx context.Context, cl *cli, args []string) error {
 	if err != nil {
 		return err
 	}
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return err
 	}
@@ -522,7 +527,7 @@ func runCommands(ctx context.Context, cl *cli, args []string) error {
 // commandHelp prints help for the daemon command named by words, or the list of a
 // group's commands (`help thread`).
 func (cl *cli) commandHelp(ctx context.Context, words []string) error {
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return err
 	}
@@ -538,7 +543,7 @@ func (cl *cli) commandHelp(ctx context.Context, words []string) error {
 			return nil
 		}
 	}
-	cmd, rest, err := cl.lookup(ctx, words)
+	cmd, rest, err := cl.lookupIn(cmds, words)
 	if err != nil {
 		return err
 	}

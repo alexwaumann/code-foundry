@@ -3,6 +3,7 @@ package command_test
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 
@@ -312,5 +313,49 @@ func TestPullRequestThreadCommands(t *testing.T) {
 				t.Errorf("intents = %v, want FocusThread s1", intents)
 			}
 		})
+	}
+}
+
+// The pull request thread starters mark a model or effort the settings' default filled in
+// as defaulted, like thread.new (commands_thread_defaulted_test.go).
+func TestPullRequestThreadsMarkDefaultedModel(t *testing.T) {
+	commands := []struct {
+		name string
+		args map[string]string
+	}{
+		{"pr.explain", map[string]string{"repo-slug": "o/r", "number": "7"}},
+		{"pr.task", map[string]string{"repo-slug": "o/r", "number": "7", "kind": "conflicts"}},
+	}
+	tests := []struct {
+		name                string
+		args                map[string]string
+		modelDef, effortDef bool
+	}{
+		{"both from the settings", map[string]string{}, true, true},
+		{"explicit model", map[string]string{"model": "claude-haiku-5-5[1m]"}, false, true},
+		{"both explicit", map[string]string{"model": "claude-haiku-5-5[1m]", "effort": "low"}, false, false},
+	}
+	for _, c := range commands {
+		for _, tt := range tests {
+			t.Run(c.name+": "+tt.name, func(t *testing.T) {
+				f := newPRThreadFixture(t)
+				f.reg.SetOverrides(command.Overrides{ArgDefaults: map[string]map[string]string{
+					c.name: {"model": "claude-sonnet-5[1m]", "effort": "medium"},
+				}})
+				args := maps.Clone(c.args)
+				maps.Copy(args, tt.args)
+				if _, err := f.reg.Invoke(context.Background(), command.Context{}, c.name, args); err != nil {
+					t.Fatal(err)
+				}
+				reqs := f.thread.Requests()
+				if len(reqs) != 1 {
+					t.Fatalf("thread requests = %v", reqs)
+				}
+				r, ok := reqs[0].(*v1.CreateThreadRequest)
+				if !ok || r.GetModel() == "" || r.GetEffort() == "" || r.GetModelDefaulted() != tt.modelDef || r.GetEffortDefaulted() != tt.effortDef {
+					t.Errorf("request = %v, want model defaulted %v, effort defaulted %v", reqs[0], tt.modelDef, tt.effortDef)
+				}
+			})
+		}
 	}
 }

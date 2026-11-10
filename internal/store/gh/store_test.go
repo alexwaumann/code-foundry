@@ -406,10 +406,8 @@ func TestStorePullRequestDetail(t *testing.T) {
 	opts := testOptions(openTestDB(t), f, nil)
 	opts.MaxPages = 5
 	opts.DetailTTL = time.Hour
-	var clock sync.Mutex
-	var offset time.Duration
-	opts.Now = func() time.Time { clock.Lock(); defer clock.Unlock(); return time.Now().Add(offset) }
-	advance := func(d time.Duration) { clock.Lock(); offset += d; clock.Unlock() }
+	clk := &testClock{}
+	opts.Now = clk.now
 	s, err := New(context.Background(), opts)
 	if err != nil {
 		t.Fatal(err)
@@ -457,7 +455,7 @@ func TestStorePullRequestDetail(t *testing.T) {
 		t.Errorf("cached read: err=%v requests=%d", err, f.count("PullRequest"))
 	}
 	// Past the TTL with GitHub failing: stale copy with the error.
-	advance(2 * time.Hour)
+	clk.advance(2 * time.Hour)
 	f.set(func(string, map[string]any) (json.RawMessage, error) {
 		return nil, errors.New("github graphql: boom")
 	})

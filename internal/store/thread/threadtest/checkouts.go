@@ -9,18 +9,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-// SetCheckouts makes Checkouts list cos for thread id (otherwise one checkout per
-// project in its set at the path the thread records, the primary at its cwd, the others
-// under /checkouts when none is recorded).
-func (f *Fake) SetCheckouts(id string, cos []thread.Checkout) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.checkouts == nil {
-		f.checkouts = map[string][]thread.Checkout{}
-	}
-	f.checkouts[id] = slices.Clone(cos)
-}
-
 // SetHints makes CheckoutHints return hints for every thread.
 func (f *Fake) SetHints(hints ...string) {
 	f.mu.Lock()
@@ -29,7 +17,9 @@ func (f *Fake) SetHints(hints ...string) {
 }
 
 // Checkouts records "Checkouts <id> <cwd>" and resolves the thread by id, else by the
-// cwd (the thread whose cwd holds it).
+// cwd (the thread whose cwd holds it). It lists one checkout per project in the thread's
+// set at the path the thread records, the primary at its cwd, the others under
+// /checkouts when none is recorded.
 func (f *Fake) Checkouts(_ context.Context, ref thread.CheckoutsRef) (thread.ThreadCheckouts, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -52,22 +42,20 @@ func (f *Fake) Checkouts(_ context.Context, ref thread.CheckoutsRef) (thread.Thr
 	default:
 		return thread.ThreadCheckouts{}, fmt.Errorf("%w: a thread id or a path is required", thread.ErrInvalidArgument)
 	}
-	cos, ok := f.checkouts[s.ID]
-	if !ok {
-		for _, pid := range s.Projects() {
-			c := thread.Checkout{ProjectID: pid, ProjectName: pid, Registered: true, Git: true, Branch: s.Branch, Primary: pid == s.ProjectID,
-				WorktreeMode: s.CreatedWorktree && s.Branch != "", Listed: true}
-			if c.WorktreeMode {
-				c.CreatedBranch = s.Branch
-			}
-			c.Path = "/checkouts/" + pid
-			if p, ok := s.CheckoutPath(pid); ok {
-				c.Path, c.Recorded = p, true
-			}
-			cos = append(cos, c)
+	var cos []thread.Checkout
+	for _, pid := range s.Projects() {
+		c := thread.Checkout{ProjectID: pid, ProjectName: pid, Registered: true, Git: true, Branch: s.Branch, Primary: pid == s.ProjectID,
+			WorktreeMode: s.CreatedWorktree && s.Branch != "", Listed: true}
+		if c.WorktreeMode {
+			c.CreatedBranch = s.Branch
 		}
+		c.Path = "/checkouts/" + pid
+		if p, ok := s.CheckoutPath(pid); ok {
+			c.Path, c.Recorded = p, true
+		}
+		cos = append(cos, c)
 	}
-	out := thread.ThreadCheckouts{Thread: s, Checkouts: slices.Clone(cos), WorkspaceID: s.WorkspaceID, Current: -1}
+	out := thread.ThreadCheckouts{Thread: s, Checkouts: cos, WorkspaceID: s.WorkspaceID, Current: -1}
 	for i, c := range out.Checkouts {
 		if (ref.Cwd != "" && (ref.Cwd == c.Path || strings.HasPrefix(ref.Cwd, c.Path+"/"))) || (ref.Cwd == "" && c.Primary) {
 			out.Current = i

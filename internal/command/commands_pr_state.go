@@ -36,7 +36,6 @@ func draftCommand(b GhBackend, slug, number ArgSpec, draft bool) Command {
 		Description: "Mark a draft pull request ready for review (GitHub's Ready for review button).",
 		Category:    "Pull Request",
 		Args:        []ArgSpec{slug, number},
-		When:        hasPullRequest,
 	}
 	if draft {
 		c.Name, c.Title = "pr.draft", "Convert Pull Request to Draft"
@@ -71,7 +70,6 @@ func autoMergeCommand(b GhBackend, slug, number ArgSpec) Command {
 			{Name: "off", Type: Bool, Description: "Turn auto-merge off instead"},
 			{Name: "head-sha", Type: String, Description: "Turn it on only if the head is still this commit (full SHA): refused when the pull request changed since you looked"},
 		},
-		When:    hasPullRequest,
 		Confirm: "Turn on auto-merge for #{number} in {repo-slug} with {method}?",
 		// Only a request Run would send asks: a bad one is refused without a question.
 		ConfirmIf: func(_ context.Context, _ Context, a Args) bool {

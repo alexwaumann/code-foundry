@@ -168,16 +168,20 @@ func ConsolidationInput(memory string, changes []Task, msgs []Message, since tim
 		}
 		entries[i] = fmt.Sprintf("### %s · %s\n%s\n", m.At.In(loc).Format("2006-01-02 15:04"), who, strings.TrimSpace(m.Text))
 	}
-	for {
-		body := strings.Join(entries, "\n")
-		if len(entries) == 0 {
-			body = "None.\n"
-		}
-		if out := head.String() + body + tail; len(out) <= maxConsolidationInput || len(entries) == 0 {
-			return truncate(out, maxConsolidationInput, tail)
-		}
+	// Drop the oldest messages until the joined body fits (each join adds one "\n").
+	size := head.Len() + len(tail) - 1
+	for _, e := range entries {
+		size += len(e) + 1
+	}
+	for len(entries) > 0 && size > maxConsolidationInput {
+		size -= len(entries[0]) + 1
 		entries = entries[1:]
 	}
+	body := strings.Join(entries, "\n")
+	if len(entries) == 0 {
+		body = "None.\n"
+	}
+	return truncate(head.String()+body+tail, maxConsolidationInput, tail)
 }
 
 // ValidMemory checks a consolidation's output and returns the file to write: trimmed,

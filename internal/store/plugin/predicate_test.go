@@ -119,7 +119,7 @@ func TestPredicateFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(p.Facts(), ","); got != "jenkins.hasPipeline,pr.checks.provider,thread" {
+	if got := strings.Join(p.facts, ","); got != "jenkins.hasPipeline,pr.checks.provider,thread" {
 		t.Errorf("facts = %s", got)
 	}
 	var nilP *Predicate

@@ -395,25 +395,6 @@ func TestSearchForkOfAHiddenChild(t *testing.T) {
 	}
 }
 
-// Options.Unindexed keeps a thread out: no documents, never a holder.
-func TestSearchUnindexed(t *testing.T) {
-	e := newEnv(t, func(o *Options) { o.Unindexed = func(t Thread) bool { return t.Name == "Hidden run" } })
-	hidden := e.connected(CreateOptions{Name: "Hidden run"})
-	shown := e.connected(CreateOptions{Name: "Shown"})
-	e.putItems(hidden.ID, Item{ID: "h1", Kind: KindUserMessage, Text: "the needle, hidden"})
-	if n := e.countDocs(); n != 0 {
-		t.Errorf("documents %d for an unindexed thread, want 0", n)
-	}
-	e.putItems(shown.ID, Item{ID: "s1", Kind: KindUserMessage, Text: "the needle, shown"})
-	e.putItems(hidden.ID, Item{ID: "s1", Kind: KindUserMessage, Text: "the needle, shown"})
-	if got := hitsOf(e.search(SearchQuery{Query: "needle", Children: true, Owned: true})); !slices.Equal(got, []string{"Shown:s1"}) {
-		t.Errorf("hits %q, want the shown thread's only", got)
-	}
-	if res := e.search(SearchQuery{Query: "hidden"}); len(res.Threads) != 0 {
-		t.Errorf("names %+v: an unindexed thread is found by name", res.Threads)
-	}
-}
-
 // Threads from before the index are indexed at startup from search_backfill, and the
 // list empties.
 func TestSearchBackfill(t *testing.T) {

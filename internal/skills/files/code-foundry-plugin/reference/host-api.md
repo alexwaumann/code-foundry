@@ -87,14 +87,14 @@ err = h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagNone}) //
 ```
 
 - A flag puts the thread in the sidebar's attention group with "<display name>: <reason>"
-  on its second line (amber for `attention`, red for `error`), rings the bell and the
-  dock. It never changes the thread's own status.
+  on its second line (amber for `attention`, red for `error`) and rings the dock alert. It
+  never changes the thread's own status.
 - One flag per (thread, plugin): setting another replaces it; `FlagNone` clears it.
   `Reason` is one line of 1..80 characters without the plugin's name. `UntilSeen` clears
   it when the user opens the thread (at once if it is open now: then nothing is stored).
 - At most one flag a second per thread (-32005 `CodeRateLimited`; clearing is never
   limited). An unknown thread is -32004; an archived one -32002.
-- Setting the same level and reason again is a no-op (no bell, the set time stays): to
+- Setting the same level and reason again is a no-op (no new alert, the set time stays): to
   ring again for a new failure, change the reason ("3 tests failed in pkg/api") or clear
   first. `UntilSeen` stays until a viewer opens the thread (the GUI showing it); without
   a GUI it stays.

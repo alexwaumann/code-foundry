@@ -778,6 +778,9 @@ type Store interface {
 	// so a finished turn is seen at once. Subscribe to
 	// ThreadEvent on the bus first; events with Seq <= the snapshot's are in it.
 	WatchItems(ctx context.Context, id string) (ItemsSnapshot, error)
+	// Pending is a thread's pending permission requests and questions (Items' Pending)
+	// and the item seq they are current at, without copying its conversation.
+	Pending(ctx context.Context, id string) (seq uint64, pending []PendingRequest, err error)
 	// ListPrompts lists the prompts the user sent, newest first, in one thread, the
 	// threads sharing a project with it (or with a project set), or every thread
 	// (prompts.go). A THREAD or anchor id that names nothing is ErrNotFound; a missing
