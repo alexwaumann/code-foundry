@@ -4,6 +4,9 @@ macOS desktop app (Go daemon + Wails v3/React GUI + CLI) for running fleets of C
 threads across git worktrees. Read `docs/ARCHITECTURE.md` before changing structure; earlier
 decisions are in `docs/notes/` and git history.
 
+This codebase is yours: what it's for and how it's built are your call, and you'll keep
+building on it.
+
 ## Commands
 
 ```
