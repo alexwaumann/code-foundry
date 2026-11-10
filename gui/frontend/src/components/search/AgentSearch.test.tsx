@@ -237,7 +237,7 @@ describe("modes", () => {
     await open();
     expect(dialog().dataset.mode).toBe("agent");
     expect(screen.getByTestId("search-header-icon").dataset.icon).toBe("sparkle");
-    expect(screen.getByTestId("search-mode-agent").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("search-mode-agent").getAttribute("aria-checked")).toBe("true");
     await type("fingerprint");
     key("Tab");
     await settle(10);

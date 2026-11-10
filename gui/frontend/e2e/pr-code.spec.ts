@@ -82,7 +82,7 @@ test("the Code tab lists the files and renders the diff; split, file rows scroll
   // Unified | Split is the codeView store's, so it applies to every file at once.
   await expect(diff(page).locator("pre[data-diff-type='single']").first()).toBeVisible();
   await page.getByTestId("pr-code-style-split").click();
-  await expect(page.getByTestId("pr-code-style-split")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("pr-code-style-split")).toHaveAttribute("aria-checked", "true");
   await expect(diff(page).locator("pre[data-diff-type='split']").first()).toBeVisible();
   await expect(diff(page).locator("pre[data-diff-type='single']")).toHaveCount(0);
   if (shots) await page.screenshot({ path: `${shots}/pr-code-split.png` });

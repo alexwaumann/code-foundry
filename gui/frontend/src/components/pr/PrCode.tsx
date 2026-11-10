@@ -6,9 +6,9 @@ import { isTooLargeMessage, tooLargeText } from "@/api/prDiff";
 import { statusColor } from "@/components/diff/files";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tip } from "@/components/ui/tooltip";
-import { Segmented } from "@/components/usage/Segmented";
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { setDiffStyle, setWrap, useCodeViewStore, type DiffStyle } from "@/stores/codeView";
@@ -73,7 +73,22 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
         <span className="min-w-0 flex-1" />
       )}
       <span className="ml-auto flex shrink-0 items-center gap-1">
-        <Segmented options={styleOptions} value={diffStyle} onChange={setDiffStyle} aria-label="Diff layout" data-testid="pr-code-style" />
+        <RadioGroup
+          variant="segmented"
+          size="sm"
+          value={diffStyle}
+          onValueChange={(v) => {
+            setDiffStyle(v as DiffStyle);
+          }}
+          aria-label="Diff layout"
+          data-testid="pr-code-style"
+        >
+          {styleOptions.map((o) => (
+            <RadioGroupChoice key={o.value} value={o.value} data-testid={`pr-code-style-${o.value}`}>
+              {o.label}
+            </RadioGroupChoice>
+          ))}
+        </RadioGroup>
         <Tip label={wrap ? "Lines wrap" : "Wrap long lines"}>
           <Button
             type="button"

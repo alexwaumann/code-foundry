@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { Check, Copy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
 import { FinderIcon, type AppIconSlotProps } from "@/components/icons/AppIcon";
-import { Segmented } from "@/components/usage/Segmented";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useCopied } from "@/lib/useCopied";
@@ -119,9 +119,26 @@ export function WrapToggle() {
   );
 }
 
-/** A two-or-more-way switch in row two (the Usage page's segmented control). */
+/** A two-or-more-way switch in row two (a compact segmented radio group). */
 export function ModeSwitch<T extends string>({ options, value, onChange, label, testId }: { options: readonly { value: T; label: string }[]; value: T; onChange: (v: T) => void; label: string; testId: string }) {
-  return <Segmented options={options} value={value} onChange={onChange} aria-label={label} data-testid={testId} className="shrink-0" />;
+  return (
+    <RadioGroup
+      variant="segmented"
+      size="sm"
+      value={value}
+      onValueChange={(v) => {
+        onChange(v as T);
+      }}
+      aria-label={label}
+      data-testid={testId}
+    >
+      {options.map((o) => (
+        <RadioGroupChoice key={o.value} value={o.value} data-testid={`${testId}-${o.value}`}>
+          {o.label}
+        </RadioGroupChoice>
+      ))}
+    </RadioGroup>
+  );
 }
 
 /** Row two's muted meta ("120 lines · 4 KB · TypeScript"), truncating first. */
