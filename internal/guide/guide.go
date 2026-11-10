@@ -103,7 +103,7 @@ func writeThreadConventions(w io.Writer) {
 	p("  `--descendants-of <id>` (list, reports, archive): its whole tree, with costs.")
 	p("- `code-foundry thread archive --id <id>` puts a finished child away; `--archived=false` brings it back.")
 	p("  `--ids a,b,c` acts on several, here and in `thread remove`.")
-	p("- A thread you create (`--created-by`) is hidden from the user's sidebar and archived with you; nothing shows it.")
+	p("- A thread you create (`--created-by`) is hidden from the user's sidebar and archived with you; only your thread's info card lists it.")
 	p("  When the user should take its work, tell them to fork it (`thread fork --id <id>`).")
 }
 

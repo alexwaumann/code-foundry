@@ -440,6 +440,7 @@ func (m *Manager) reloadLocked(ctx context.Context) error {
 		m.stopActor(e, StateDisabled)
 		m.unregister(e.name)
 		m.forget(ctx, e.name, nil, "the plugin was removed")
+		m.surf.dropIssues(e.name)
 		m.mu.Lock()
 		delete(m.entries, e.name)
 		m.rebuildLocked()

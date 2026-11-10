@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -280,9 +279,7 @@ func projectToProto(r project.Project) *v1.Project {
 		GithubSlug: r.GitHubSlug, OriginPath: r.OriginPath, Error: r.Error, Remotes: r.Remotes, Git: r.Git,
 		Worktrees: make([]*v1.Worktree, len(r.Worktrees)),
 	}
-	if !r.RegisteredAt.IsZero() {
-		p.RegisteredAt = timestamppb.New(r.RegisteredAt)
-	}
+	p.RegisteredAt = timestamp(r.RegisteredAt)
 	for i, w := range r.Worktrees {
 		p.Worktrees[i] = worktreeToProto(w)
 	}
@@ -308,8 +305,6 @@ func gitStatusToProto(s project.Status) *v1.GitStatus {
 		Operation: s.Operation, OperationStep: int32(s.OperationStep), OperationTotal: int32(s.OperationTotal),
 		Error: s.Error,
 	}
-	if !s.RefreshedAt.IsZero() {
-		st.RefreshedAt = timestamppb.New(s.RefreshedAt)
-	}
+	st.RefreshedAt = timestamp(s.RefreshedAt)
 	return st
 }

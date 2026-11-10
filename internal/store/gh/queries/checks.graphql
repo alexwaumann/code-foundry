@@ -1,5 +1,6 @@
 # The checks on whatever commit a ref (branch, tag, or SHA) resolves to. Fetched on
-# demand by ListChecks.
+# demand by ListChecks, and for the check pages after the first of a pull request
+# detail (pr_detail.go) and of a failing default-branch CI (poll.go).
 query Checks($owner: String!, $name: String!, $ref: String!, $after: String) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {

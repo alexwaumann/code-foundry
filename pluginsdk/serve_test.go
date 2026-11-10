@@ -110,8 +110,12 @@ func TestServeInitErrorEndsServe(t *testing.T) {
 	defer cancel()
 	// Serve returns; the conn closes and calls fail.
 	for {
-		if err := h.Ping(ctx); err != nil {
+		err := h.Ping(ctx)
+		if errors.Is(err, pluginsdk.ErrClosed) {
 			return
+		}
+		if ctx.Err() != nil {
+			t.Fatalf("Serve did not end after Init failed: %v", err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

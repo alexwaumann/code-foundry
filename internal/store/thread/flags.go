@@ -47,19 +47,6 @@ func (l FlagLevel) String() string {
 	}
 }
 
-// ParseFlagLevel reads "attention", "error" or "none".
-func ParseFlagLevel(s string) (FlagLevel, bool) {
-	switch s {
-	case "attention":
-		return FlagAttention, true
-	case "error":
-		return FlagError, true
-	case "none", "":
-		return FlagNone, true
-	}
-	return FlagNone, false
-}
-
 // MaxFlagReasonRunes bounds a flag's reason.
 const MaxFlagReasonRunes = 80
 

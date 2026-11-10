@@ -22,8 +22,6 @@ type Fake struct {
 	bus *bus.Bus
 	// Now is the clock used for StartedAt/ExitedAt.
 	Now func() time.Time
-	// CreateErr, if set, is returned by Create.
-	CreateErr error
 
 	mu sync.Mutex
 	// obsMu serializes Observer calls. Attach/detach notifications take it before
@@ -35,14 +33,12 @@ type Fake struct {
 }
 
 type fakeTerm struct {
-	info       terminal.Terminal
-	spec       terminal.Spec
-	output     []byte
-	written    []byte
-	screen     *string
-	scrollback *string
-	paste      bool // mode 2004, from the last ESC[?2004h/l emitted
-	subs       map[chan terminal.AttachEvent]struct{}
+	info    terminal.Terminal
+	spec    terminal.Spec
+	output  []byte
+	written []byte
+	paste   bool // mode 2004, from the last ESC[?2004h/l emitted
+	subs    map[chan terminal.AttachEvent]struct{}
 }
 
 var _ terminal.Store = (*Fake)(nil)
@@ -60,9 +56,6 @@ func (f *Fake) Bus() *bus.Bus { return f.bus }
 
 // Create records spec and returns a running terminal with id "fake-N".
 func (f *Fake) Create(_ context.Context, spec terminal.Spec) (terminal.Terminal, error) {
-	if f.CreateErr != nil {
-		return terminal.Terminal{}, f.CreateErr
-	}
 	if len(spec.Argv) == 0 {
 		return terminal.Terminal{}, fmt.Errorf("%w: empty argv", terminal.ErrInvalidSpec)
 	}
@@ -231,7 +224,7 @@ func (f *Fake) Attached(id string) int {
 	return 0
 }
 
-// ScreenText returns the text set with SetScreen, else all output so far.
+// ScreenText returns all output so far.
 func (f *Fake) ScreenText(_ context.Context, id string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -239,22 +232,16 @@ func (f *Fake) ScreenText(_ context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if t.screen != nil {
-		return *t.screen, nil
-	}
 	return string(t.output), nil
 }
 
-// ScrollbackText returns the text set with SetScrollback, else all output so far.
+// ScrollbackText returns all output so far.
 func (f *Fake) ScrollbackText(_ context.Context, id string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	t, err := f.get(id)
 	if err != nil {
 		return "", err
-	}
-	if t.scrollback != nil {
-		return *t.scrollback, nil
 	}
 	return string(t.output), nil
 }
@@ -295,46 +282,12 @@ func (f *Fake) Emit(id string, data []byte) error {
 	return nil
 }
 
-// SetScreen sets what ScreenText returns (instead of all output so far).
-func (f *Fake) SetScreen(id, text string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	t, err := f.get(id)
-	if err != nil {
-		return err
-	}
-	t.screen = &text
-	return nil
-}
-
-// SetScrollback sets what ScrollbackText returns (instead of all output so far).
-func (f *Fake) SetScrollback(id, text string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	t, err := f.get(id)
-	if err != nil {
-		return err
-	}
-	t.scrollback = &text
-	return nil
-}
-
 // SetTitle sets the title, publishes an update, and notifies the Observer.
 func (f *Fake) SetTitle(id, title string) error {
 	if err := f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.Title = title; return nil }); err != nil {
 		return err
 	}
 	f.observe(id, terminal.ObserveEvent{Title: &title})
-	return nil
-}
-
-// SetAltScreen sets the alt-screen flag, publishes an update, and notifies the
-// Observer.
-func (f *Fake) SetAltScreen(id string, alt bool) error {
-	if err := f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.AltScreen = alt; return nil }); err != nil {
-		return err
-	}
-	f.observe(id, terminal.ObserveEvent{AltScreen: &alt})
 	return nil
 }
 

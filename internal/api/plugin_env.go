@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
@@ -35,8 +34,6 @@ func pluginEnvironmentToProto(e plugin.Environment) *v1.PluginEnvironment {
 	for _, k := range slices.Sorted(maps.Keys(e.Env)) {
 		p.Env = append(p.Env, &v1.PluginEnvVar{Key: k})
 	}
-	if !e.UpdatedAt.IsZero() {
-		p.UpdatedAt = timestamppb.New(e.UpdatedAt)
-	}
+	p.UpdatedAt = timestamp(e.UpdatedAt)
 	return p
 }

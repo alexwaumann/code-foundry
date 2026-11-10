@@ -395,6 +395,9 @@ func TestPages(t *testing.T) {
 	prevRow := ""
 	for _, f := range fields {
 		byKey[f.Key] = f
+		if _, ok := unitWords[f.Unit]; f.Unit != "" && !ok {
+			t.Errorf("%s: unit %q has no unitWords entry", f.Key, f.Unit)
+		}
 	}
 	var prev ref
 	seen := map[ref]bool{}

@@ -10,7 +10,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
-// Projects is a fake command.ProjectBackend. Err, when set, is returned by every call.
+// NewProjects is a fake command.NewProjectBackend. Err, when set, is returned by every call.
 // Create answers a git project under /p; Publish answers the project with origin and
 // the owner/name slug; Delete answers nothing.
 type NewProjects struct {

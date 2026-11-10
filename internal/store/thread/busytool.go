@@ -2,6 +2,7 @@ package thread
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -92,7 +93,7 @@ func toolLine(name, input, cwd string) string {
 	case "Bash":
 		arg = firstLineOf(s("command"))
 	case "Read", "Edit", "MultiEdit", "Write", "NotebookEdit":
-		arg = relTo(cwd, nonEmpty(s("file_path"), s("notebook_path")))
+		arg = relTo(cwd, cmp.Or(s("file_path"), s("notebook_path")))
 	case "Grep", "Glob":
 		arg = s("pattern")
 	case "LS":

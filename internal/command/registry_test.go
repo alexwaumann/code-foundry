@@ -93,6 +93,9 @@ func TestRegisterValidation(t *testing.T) {
 		{"bind confirm to a positional", valid(func(c *Command) {
 			c.Confirm, c.BindConfirm, c.Args = "Sure?", "d", []ArgSpec{{Name: "d", Type: String, Positional: true}}
 		}), "BindConfirm"},
+		{"confirm bind without bind confirm", valid(func(c *Command) {
+			c.Confirm, c.ConfirmBind = "Sure?", func(context.Context, Context, Args, string) string { return "" }
+		}), "ConfirmBind"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

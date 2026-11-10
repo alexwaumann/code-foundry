@@ -175,11 +175,6 @@ type fullCache struct {
 	comments   writeMemos[writeKey, PostedComment]
 }
 
-func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {
-	e, ok := c.entry(k)
-	return e.d, e.stale, ok
-}
-
 // entry returns a copy of k's entry.
 func (c *fullCache) entry(k fullKey) (fullEntry, bool) {
 	c.mu.Lock()
@@ -232,18 +227,6 @@ func (c *fullCache) adopt(k fullKey, d FullPullRequest) fullEntry {
 	e := &fullEntry{d: d, stale: true}
 	c.putLocked(k, e)
 	return *e
-}
-
-// markStale marks k stale; it reports whether there was a fresh entry.
-func (c *fullCache) markStale(k fullKey) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	e, ok := c.m[k]
-	if !ok || e.stale {
-		return false
-	}
-	e.stale = true
-	return true
 }
 
 // markWritten marks k stale and known wrong: reads wait for the next fetch.
@@ -490,7 +473,7 @@ func (s *Store) fetchFull(ctx context.Context, k fullKey, announce bool) (FullPu
 		data, err := s.call(ctx, queryChecks, map[string]any{"owner": owner, "name": name, "ref": d.PullRequest.HeadSHA, "after": next.EndCursor})
 		var cp checksPage
 		if err == nil {
-			cp, _, err = decodeChecks(data)
+			cp, err = decodeChecks(data)
 		}
 		if err != nil {
 			s.log.Warn("gh pull request detail checks page failed", "pr", k.String(), "err", err)

@@ -37,7 +37,7 @@ const (
 	ToneMuted     Tone = "muted"
 	ToneAttention Tone = "attention" // amber: needs the user
 	ToneError     Tone = "error"     // red
-	ToneOK        Tone = "ok"        // emerald, in pills and status glyphs only
+	ToneOK        Tone = "ok"        // emerald: pills, status glyphs, stat figures and bars
 )
 
 // Status is a step's or a row's state; the host draws it as a dot or an icon.

@@ -149,16 +149,3 @@ func (g *Gh) Ranges() []string {
 	defer g.mu.Unlock()
 	return slices.Clone(g.ranges)
 }
-
-// Transfers counts the asset downloads asked for.
-func (g *Gh) Transfers() int {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	n := 0
-	for _, c := range g.calls {
-		if strings.Contains(c[len(c)-1], "/releases/assets/") {
-			n++
-		}
-	}
-	return n
-}

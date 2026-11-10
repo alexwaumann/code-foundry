@@ -2,6 +2,7 @@ package gh
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -310,7 +311,13 @@ func TestMergeDeletesBranchREST(t *testing.T) {
 	runner := NewHTTPRunner(HTTPOptions{BaseURL: srv.URL, Tokens: &fakeTokens{tokens: []string{"tok"}}})
 	s := startStore(t, testOptions(openTestDB(t), runner, nil))
 	ctx := context.Background()
-	if err := s.deleteBranch(ctx, fullKey{"o/r", 1}, "feat/a#b"); err != nil {
+	deleteBranch := func() error {
+		_, err := submitFunc(ctx, s, "delete-branch", func(ctx context.Context) (struct{}, error) {
+			return struct{}{}, s.deleteBranch(ctx, fullKey{"o/r", 1}, "feat/a#b")
+		})
+		return err
+	}
+	if err := deleteBranch(); err != nil {
 		t.Fatal(err)
 	}
 	var del []recorded
@@ -323,7 +330,7 @@ func TestMergeDeletesBranchREST(t *testing.T) {
 		t.Fatalf("requests = %+v", del)
 	}
 	gone = true
-	if err := s.deleteBranch(ctx, fullKey{"o/r", 1}, "feat/a#b"); err != nil {
+	if err := deleteBranch(); err != nil {
 		t.Errorf("already deleted: %v", err)
 	}
 }
@@ -434,6 +441,52 @@ func TestMergePullRequestUnknownOutcomeInvalidates(t *testing.T) {
 	}
 	if drain(events) == 0 {
 		t.Error("no detail event after an unconfirmed merge")
+	}
+}
+
+// A caller that stops waiting while the merge mutation is in flight: the merge still
+// deletes the branch, tells clients to re-read, and answers a retry from its memo.
+func TestMergePullRequestCallerLeaves(t *testing.T) {
+	g, w, s, _, events := mergeWorld(t)
+	if _, err := s.FullPullRequest(context.Background(), "o/r", 1, false); err != nil {
+		t.Fatal(err)
+	}
+	started, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	w.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		if op == "MergePullRequest" {
+			once.Do(func() { close(started) })
+			<-release
+		}
+		return g.respond(op, doc, vars)
+	})
+	drain(events)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.MergePullRequest(ctx, "o/r", 1, MergeRequest{Method: MergeSquash, DeleteBranch: true})
+		done <- err
+	}()
+	<-started
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	close(release)
+	// The worker runs one job at a time: this one ends after the merge's.
+	if _, err := submitFunc(context.Background(), s, "after-merge", func(context.Context) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if drain(events) == 0 {
+		t.Error("no detail event after the merge")
+	}
+	if _, stale, ok := s.full.get(fullKey{"o/r", 1}); !ok || !stale {
+		t.Errorf("cached detail stale = %t (cached %t), want stale", stale, ok)
+	}
+	res, err := s.MergePullRequest(context.Background(), "o/r", 1, MergeRequest{Method: MergeSquash, DeleteBranch: true})
+	if err != nil || !res.Merged || !res.BranchDeleted || len(g.merges()) != 1 || len(w.calls()) != 1 {
+		t.Errorf("retry: %+v, %v; mutations %d, branch deletes %d; want the first merge's result, nothing sent",
+			res, err, len(g.merges()), len(w.calls()))
 	}
 }
 

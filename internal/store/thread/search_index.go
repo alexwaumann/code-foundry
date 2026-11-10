@@ -20,25 +20,12 @@ import (
 //
 // What is never indexed: anything that is not a thread. Only the thread store writes
 // thread_items, and only for its threads (the row references threads), so a run that is not
-// a thread has nothing to index. A thread the user should never find (a hidden utility run
-// made as a thread) is kept out by Options.Unindexed: its saves write no document and
-// queries skip it as a holder.
+// a thread has nothing to index.
 
 // searchIndex is how a save indexes an item.
 type searchIndex struct {
-	// off: the thread is not indexed (Options.Unindexed).
+	// off: write no document. Only tests set it, to save rows as before the index.
 	off bool
-}
-
-// searchIndexFor is the index thread id's saves use: off when Options.Unindexed says so.
-// A thread not in the snapshot yet is indexed.
-func (m *Manager) searchIndexFor(id string) searchIndex {
-	if f := m.opts.Unindexed; f != nil {
-		if t, ok := m.Snapshot().Thread(id); ok && f(t) {
-			return searchIndex{off: true}
-		}
-	}
-	return searchIndex{}
 }
 
 // txer is a *sql.Tx: what indexing needs.
@@ -211,7 +198,6 @@ func searchBackfillPending(ctx context.Context, db *sql.DB) ([]string, error) {
 // Only the indexed kinds are read: tool calls hold most of the bytes. On an error nothing
 // of the chunk is kept.
 func (m *Manager) backfillChunk(ctx context.Context, id string) (n, bad int, done bool, err error) {
-	ix := m.searchIndexFor(id)
 	fail := func(err error) (int, int, bool, error) {
 		return 0, 0, false, fmt.Errorf("thread: search backfill of %s: %w", id, err)
 	}
@@ -227,31 +213,26 @@ func (m *Manager) backfillChunk(ctx context.Context, id string) (n, bad int, don
 	case err != nil:
 		return fail(err)
 	}
-	read := 0
-	if !ix.off {
-		args := make([]any, 0, len(searchTexts)+3)
-		args = append(args, id, next)
-		for k := range searchTexts {
-			args = append(args, string(k))
-		}
-		args = append(args, searchBackfillChunk)
-		var items []Item
-		var last int64
-		read, last, items, bad, err = m.backfillRows(ctx, tx, id, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
-			FROM thread_items WHERE thread_id = ? AND ordinal >= ? AND kind IN (?`+strings.Repeat(", ?", len(searchTexts)-1)+`)
-			ORDER BY ordinal LIMIT ?`, args...)
-		if err != nil {
+	args := make([]any, 0, len(searchTexts)+3)
+	args = append(args, id, next)
+	for k := range searchTexts {
+		args = append(args, string(k))
+	}
+	args = append(args, searchBackfillChunk)
+	read, last, items, bad, err := m.backfillRows(ctx, tx, id, `SELECT ordinal, item_id, kind, parent_tool_use_id, created_at, updated_at, data
+		FROM thread_items WHERE thread_id = ? AND ordinal >= ? AND kind IN (?`+strings.Repeat(", ?", len(searchTexts)-1)+`)
+		ORDER BY ordinal LIMIT ?`, args...)
+	if err != nil {
+		return fail(err)
+	}
+	for _, it := range items {
+		if err := indexItem(ctx, tx, it, searchIndex{}); err != nil {
 			return fail(err)
 		}
-		for _, it := range items {
-			if err := indexItem(ctx, tx, it, ix); err != nil {
-				return fail(err)
-			}
-		}
-		n = len(items)
-		if read > 0 {
-			next = last + 1
-		}
+	}
+	n = len(items)
+	if read > 0 {
+		next = last + 1
 	}
 	done = read < searchBackfillChunk
 	if done {

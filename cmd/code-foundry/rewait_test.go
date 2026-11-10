@@ -97,8 +97,8 @@ func TestCLIWaitsAgainAfterADaemonRestart(t *testing.T) {
 			connects := 0
 			cl := &cli{stdout: &stdout, stderr: &stderr,
 				connect: func(context.Context) (*client.Client, error) {
-					// lookup, invoke, then rewait's first reconnect.
-					if connects++; tt.failFirst && connects == 3 {
+					// lookup (invoke reuses its client), then rewait's first reconnect.
+					if connects++; tt.failFirst && connects == 2 {
 						return nil, errors.New("another daemon is already running")
 					}
 					return c, nil
@@ -109,10 +109,21 @@ func TestCLIWaitsAgainAfterADaemonRestart(t *testing.T) {
 				if !errors.Is(err, errConnLost) || !strings.Contains(err.Error(), "daemon connection lost (it stopped or restarted)") || len(f.invoked) != 1 {
 					t.Fatalf("err = %v after %d invokes, want the connection lost once", err, len(f.invoked))
 				}
+				if connects != 1 {
+					t.Errorf("%d connects, want 1", connects)
+				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("err = %v\nstderr: %s", err, stderr.String())
+			}
+			// One for the run, and one per reconnect attempt.
+			want := 2
+			if tt.failFirst {
+				want = 3
+			}
+			if connects != want {
+				t.Errorf("%d connects, want %d", connects, want)
 			}
 			if tt.wantStderr != "" && stderr.String() != tt.wantStderr {
 				t.Errorf("stderr = %q, want %q", stderr.String(), tt.wantStderr)

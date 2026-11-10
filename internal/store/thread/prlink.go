@@ -20,7 +20,8 @@ import (
 // The record is re-emitted at nearly every turn boundary for the rest of the session
 // and tracks the latest pull request seen, so it can flip back to an earlier one. A
 // thread's links are therefore every distinct URL, deduplicated by URL ignoring case
-// (SamePullRequestURL), in first-seen order, and never removed.
+// (SamePullRequestURL), in first-seen order, and never removed, but for some branch
+// links and their child copies (prlink_branch.go).
 //
 // A thread also has every link of the threads it created, transitively
 // (prlink_children.go): a link is copied up the CreatedBy chain as it arrives. And the

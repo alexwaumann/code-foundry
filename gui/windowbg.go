@@ -84,7 +84,7 @@ func parseHexColour(s string) (application.RGBA, error) {
 }
 
 // loadWindowBackground reads the saved state; a missing, unreadable or invalid file is
-// the default (Mocha/Latte), which is what a first launch shows anyway.
+// the default (GitHub Dark/Light), which is what a first launch shows anyway.
 func loadWindowBackground(path string) WindowBackground {
 	data, err := os.ReadFile(path)
 	if err != nil {

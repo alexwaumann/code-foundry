@@ -99,13 +99,16 @@ func (s *todoState) act(act pluginsdk.SurfaceAct) error {
 		}
 		s.items = slices.Insert(s.items, at, it)
 	case pluginsdk.ActMove:
+		// The neighbour is checked before the task leaves the list: a refused move keeps it.
+		after := act.After()
+		if after != "" && (after == act.Key || s.find(after) < 0) {
+			return fmt.Errorf("no task %q", after)
+		}
 		it := s.items[i]
 		s.items = slices.Delete(s.items, i, i+1)
 		at := 0
-		if after := act.After(); after != "" {
-			if at = s.find(after) + 1; at == 0 {
-				return fmt.Errorf("no task %q", after)
-			}
+		if after != "" {
+			at = s.find(after) + 1
 		}
 		s.items = slices.Insert(s.items, at, it)
 	case pluginsdk.ActAdd:

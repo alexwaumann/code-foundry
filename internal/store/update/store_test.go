@@ -732,6 +732,15 @@ func TestDefaultOptions(t *testing.T) {
 	}
 }
 
+// CODE_FOUNDRY_UPDATE_DELAY=0s means the first check runs at once, as the daemon's
+// registry loop for builds that cannot update reads it.
+func TestDelayEnvZeroChecksAtOnce(t *testing.T) {
+	t.Setenv(update.EnvInitialDelay, "0s")
+	delay := update.DefaultOptions("v0.1.0").InitialDelay
+	r := newRig(t, "v0.2.0", func(o *update.Options) { o.InitialDelay = delay })
+	r.waitState(t, update.Available)
+}
+
 // TestCheckAfterSleep: the loop measures the interval on the wall clock, so a check that
 // came due while the machine slept runs on the first tick after wake rather than a full
 // interval later. The fake clock stands still until it jumps past the interval.

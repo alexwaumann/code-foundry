@@ -109,8 +109,8 @@ func (g *Git) InitGit(ctx context.Context, id string) (Project, error) {
 	return r, nil
 }
 
-// InitRepository runs `git init -b <branch>` in dir and makes an empty "Initial
-// commit", returning the branch: `git config --get init.defaultBranch`, else "main".
+// InitRepository runs `git init -b <branch>` in dir and makes an empty commit
+// (initialCommitMessage), returning the branch: `git config --get init.defaultBranch`, else "main".
 // A failed commit is returned after a successful init (dir/.git then exists).
 func InitRepository(ctx context.Context, run Runner, dir string) (string, error) {
 	branch := "main"

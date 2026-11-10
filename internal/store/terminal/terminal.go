@@ -3,8 +3,9 @@
 // fed to the emulator and fanned out to subscribers; Attach starts with a VT snapshot
 // of the emulator (see snapshot.go) followed by live output.
 //
-// The package is program-agnostic: it spawns argv/env/cwd. Knowing that a terminal runs
-// Claude is the thread store's job.
+// The package is program-agnostic: it spawns argv/env/cwd. Its users are the bottom
+// panel's shells, action runs and plugins' terminals; what a terminal runs is theirs to
+// know.
 package terminal
 
 import (
@@ -66,8 +67,8 @@ type Spec struct {
 
 // Observer is called synchronously on the terminal's actor goroutine, in stream order,
 // for every event of one terminal. It is the in-process feed for consumers that must
-// not miss output (status detection), unlike Attach subscribers, which are dropped
-// when they fall behind.
+// not miss an event (an action run waits for its exit), unlike Attach subscribers,
+// which are dropped when they fall behind.
 //
 // An Observer must never block and must not call back into the Store for the same
 // terminal (that would deadlock the actor): hand the event to another goroutine
@@ -82,11 +83,7 @@ type Observer func(id string, ev ObserveEvent)
 // delivered as soon as a change is detected (not throttled like TerminalUpdated).
 // Exited is the last event.
 type ObserveEvent struct {
-	Output []byte
-	// Input is user input queued for the PTY via Write (not replies the emulator sends
-	// itself). Delivered on the actor after the write was queued; ordering relative to
-	// Output is not guaranteed.
-	Input     []byte
+	Output    []byte
 	Title     *string
 	AltScreen *bool
 	// Attached is the number of Attach subscribers right after one attached or went
@@ -182,9 +179,9 @@ type Store interface {
 	// It does not replay current state; call List after subscribing.
 	Watch(ctx context.Context) (<-chan Event, error)
 	// ScreenText returns the active screen (no scrollback) as plain text, one line per
-	// row with trailing whitespace trimmed. It is meant for matching prompts and
-	// dialogs: TUIs position text with cursor movement, so the raw output stream does
-	// not contain the words a user sees. Must not be called from an Observer.
+	// row with trailing whitespace trimmed: what a user sees, which the raw output
+	// stream need not contain (TUIs position text with cursor movement). Plugins read
+	// it (terminal/read). Must not be called from an Observer.
 	ScreenText(ctx context.Context, id string) (string, error)
 	// ScrollbackText returns the scrollback (as far as MaxScrollbackLines kept it) and
 	// the screen below it as plain text, oldest line first: soft-wrapped rows joined into

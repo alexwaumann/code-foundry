@@ -119,7 +119,7 @@ type streamState struct {
 	restart      restartPhase
 	restartTimer *time.Timer
 	held         []threadCmd
-	// grants: what allow-for-thread answers gave this conversation, passed again to a
+	// grants: what allow-for-session answers gave this conversation, passed again to a
 	// restarted process (effort.go).
 	grants grants
 	// swapping (under connMu): a restart is replacing the Conn; Store calls made outside
@@ -230,7 +230,7 @@ func (m *Manager) spawnStream(ctx context.Context, s Thread, r *runner, argv, en
 }
 
 func (m *Manager) saveItem(id string, it Item) {
-	if err := saveItem(context.Background(), m.opts.DB, id, it, m.searchIndexFor(id)); err != nil {
+	if err := saveItem(context.Background(), m.opts.DB, id, it, searchIndex{}); err != nil {
 		m.log.Error("persist thread item", "thread", id, "item", it.ID, "err", err)
 	}
 }
@@ -567,6 +567,7 @@ func (r *runner) onAPIRetry(e *claudestream.APIRetry) {
 	}
 	retry := &APIRetry{Attempt: e.Attempt, MaxRetries: e.MaxRetries, Status: status, Error: e.Error, RetryAt: r.activity.Add(time.Duration(e.RetryDelayMs) * time.Millisecond)}
 	r.log().info("claude retries an API request", "attempt", e.Attempt, "max_retries", e.MaxRetries, "retry_in_ms", e.RetryDelayMs, "status", status, "error", e.Error)
+	r.retrying = true
 	r.m.update(r.id, false, func(rec *record) { rec.s.Retry = retry })
 }
 
@@ -575,12 +576,10 @@ func (r *runner) onAPIRetry(e *claudestream.APIRetry) {
 // is the signal (Claude's own REPL clears its banner the same way). Unknown frames
 // count too: they are Claude's, so the request went through.
 func (r *runner) clearRetry(ev claudestream.Event) {
-	if _, retry := ev.(*claudestream.APIRetry); retry {
+	if _, retry := ev.(*claudestream.APIRetry); retry || !r.retrying {
 		return
 	}
-	if s, ok := r.m.Snapshot().Thread(r.id); !ok || s.Retry == nil {
-		return
-	}
+	r.retrying = false
 	r.m.update(r.id, false, func(rec *record) { rec.s.Retry = nil })
 }
 
@@ -926,7 +925,7 @@ func (r *runner) streamCd(req cdRequest) {
 		r.log().info("claude needs the move's folder trusted; restarting it to read its config again", "path", req.path)
 		return
 	case res.Status != "ok":
-		fail(nonEmpty(res.Message, res.Status))
+		fail(cmp.Or(res.Message, res.Status))
 		return
 	}
 	r.cwd = req.path
@@ -988,7 +987,6 @@ func (r *runner) beginClose() {
 		r.resolveItem(id, func(q *Request) { q.State, q.Message = RequestCancelled, "the thread was closed" })
 	}
 	r.state = StateClosing
-	r.closeBy = time.Now().Add(r.m.opts.CloseTimeout)
 	r.m.update(r.id, true, func(rec *record) { rec.s.State = StateClosing })
 	r.log().info("closing thread")
 	busy := st.sd.busy || st.sd.compacting

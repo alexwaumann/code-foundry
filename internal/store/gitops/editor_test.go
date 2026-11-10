@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func fakeEditorEnv(env map[string]string, onPath []string, apps []string) editorEnv {
+func fakeEditorEnv(env map[string]string, onPath []string, apps []EditorApp) editorEnv {
 	return editorEnv{
 		getenv: func(k string) string { return env[k] },
 		lookPath: func(name string) (string, error) {
@@ -16,7 +16,7 @@ func fakeEditorEnv(env map[string]string, onPath []string, apps []string) editor
 			}
 			return "", exec.ErrNotFound
 		},
-		exists: func(p string) bool { return slices.Contains(apps, p) },
+		apps: func() []EditorApp { return apps },
 	}
 }
 
@@ -27,7 +27,7 @@ func TestResolveEditor(t *testing.T) {
 		configured string
 		env        map[string]string
 		onPath     []string
-		apps       []string
+		apps       []EditorApp
 		want       []string
 		wantErr    error
 	}{
@@ -39,7 +39,12 @@ func TestResolveEditor(t *testing.T) {
 		{"VISUAL gui editor", "", map[string]string{"VISUAL": "zed --wait", "EDITOR": "vim"}, []string{"zed", "code"}, nil, []string{"/bin/zed", "--wait", wt}, nil},
 		{"EDITOR terminal editor ignored", "", map[string]string{"EDITOR": "vim"}, []string{"vim", "code"}, nil, []string{"/bin/code", wt}, nil},
 		{"cursor preferred over code", "", nil, []string{"code", "cursor"}, nil, []string{"/bin/cursor", wt}, nil},
-		{"app bundle fallback", "", nil, nil, []string{"/Applications/Visual Studio Code.app"}, []string{"/usr/bin/open", "-a", "Visual Studio Code", wt}, nil},
+		{"editor app fallback", "", nil, nil, []EditorApp{
+			{Name: "VS Code", BundleID: "com.microsoft.VSCode", Path: "/Users/me/Applications/Visual Studio Code.app"},
+			{Name: "Zed", BundleID: "dev.zed.Zed", Path: "/Applications/Zed.app"},
+		}, []string{"/usr/bin/open", "-a", "/Users/me/Applications/Visual Studio Code.app", wt}, nil},
+		{"CLI before an editor app", "", nil, []string{"zed"}, []EditorApp{{Name: "VS Code", BundleID: "com.microsoft.VSCode", Path: "/Applications/Visual Studio Code.app"}},
+			[]string{"/bin/zed", wt}, nil},
 		{"nothing", "", map[string]string{"EDITOR": "nano"}, nil, nil, nil, errNoEditor},
 		{"blank setting means detect", "   ", nil, []string{"zed"}, nil, []string{"/bin/zed", wt}, nil},
 	}
@@ -115,5 +120,21 @@ func TestEditorArgs(t *testing.T) {
 	got, err := resolveEditor("code -n", PathPlaceholder, fakeEditorEnv(nil, []string{"code"}, nil))
 	if err != nil || !slices.Equal(editorArgs(got, f, 4), []string{"/bin/code", "-n", "-g", f + ":4"}) {
 		t.Errorf("configured template = %q, %v", got, err)
+	}
+}
+
+func TestEditorName(t *testing.T) {
+	tests := []struct {
+		argv []string
+		want string
+	}{
+		{[]string{"/opt/bin/zed", "/w"}, "zed"},
+		{[]string{"open", "-a", "Visual Studio Code", "/w"}, "Visual Studio Code"},
+		{[]string{"/usr/bin/open", "-a", "/Users/me/Applications/Visual Studio Code.app", "/w"}, "Visual Studio Code"},
+	}
+	for _, tt := range tests {
+		if got := editorName(tt.argv); got != tt.want {
+			t.Errorf("editorName(%q) = %q, want %q", tt.argv, got, tt.want)
+		}
 	}
 }

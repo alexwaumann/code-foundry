@@ -99,7 +99,10 @@ func (h *surfaceHub) verdict(in *instance, uctx command.Context) (pluginsdk.Clos
 			return pluginsdk.CloseContextGone, "the project was removed"
 		}
 	}
-	if pid := in.pctx.ProjectID; pid != "" && kind != "project" {
+	in.mu.Lock()
+	pid := in.pctx.ProjectID
+	in.mu.Unlock()
+	if pid != "" && kind != "project" {
 		if _, ok := m.opts.Facts.Project(pid); !ok {
 			return pluginsdk.CloseContextGone, "the project was removed"
 		}

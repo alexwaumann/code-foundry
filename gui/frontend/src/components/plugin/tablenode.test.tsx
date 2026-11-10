@@ -175,15 +175,21 @@ describe("sorting", () => {
   it("a header click sends a sort act with the column and the direction it asks for; the host never sorts", async () => {
     nodes([builds]);
     const before = rowKeys();
-    fireEvent.click(screen.getByRole("button", { name: "Sort by Duration" }));
+    // A header's button by its column and name. A by-role query over the whole table costs
+    // seconds in jsdom, which a slow machine turned into this test's timeout.
+    const header = (col: string, name: string) => {
+      const cell = screen.getByTestId("plugin-table-box").querySelector(`[data-col=${col}]`) as HTMLElement;
+      return within(cell).getByRole("button", { name });
+    };
+    fireEvent.click(header("b-dur", "Sort by Duration"));
     await settle();
     expect(host.acts).toEqual([expect.objectContaining({ key: "b-dur", action: "sort", value: "desc" })]);
     expect(rowKeys()).toEqual(before);
     // The sorted column (the asked one, while the plugin has not answered) asks for its
     // other direction; an unsorted one for its first.
-    fireEvent.click(screen.getByRole("button", { name: "Duration, sorted descending" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sort by Branch" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sort by #" }));
+    fireEvent.click(header("b-dur", "Duration, sorted descending"));
+    fireEvent.click(header("b-branch", "Sort by Branch"));
+    fireEvent.click(header("b-num", "Sort by #"));
     await settle();
     expect(actPairs().slice(1)).toEqual(["b-dur asc", "b-branch asc", "b-num desc"]);
   });

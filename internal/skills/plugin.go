@@ -29,9 +29,6 @@ import (
 // static files as placeholders.
 const Plugin = "code-foundry-plugin"
 
-// SDKModule is the plugin SDK's module path.
-const SDKModule = "github.com/alexwaumann/code-foundry/pluginsdk"
-
 // placeholder is a value filled into static skill files: {{cf.<name>}}.
 var placeholder = regexp.MustCompile(`\{\{cf\.([A-Za-z]+)\}\}`)
 
@@ -173,7 +170,7 @@ var (
 	sdkTagPattern = regexp.MustCompile(`^pluginsdk/(v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$`)
 )
 
-// SDKPin is what a plugin pins the SDK at with `go get <SDKModule>@<pin>`: the version
+// SDKPin is what a plugin pins the SDK at with `go get <the pluginsdk module>@<pin>`: the version
 // of the pluginsdk/vX.Y.Z tag on the commit this build was made from (tag), else that
 // commit (its SDK speaks this daemon's protocol exactly), or "main" for a build without
 // a clean commit (a modified checkout, a test). A modified checkout ignores the tag too.
@@ -285,11 +282,10 @@ Not in the registry, built into the CLI:
 - `+"`code-foundry commands --context-thread <id>`"+` lists every command with whether it is available there: your
   plugin's commands and `+"`show`"+` commands follow their `+"`when`"+` clauses.
 
-Reading the output: an error your plugin returned prints as `+"`code-foundry: plugin.<name>.<command>: <message> (unknown)`"+`
-(exit 1; "unknown" is the transport's code for a plugin's own error). `+"`plugin act`"+` prints only the view version
-it acted on: run `+"`plugin surface`"+` again to see the result. `+"`plugin act`"+` sends events only; a command
-button is run by the host, so exercise it with `+"`code-foundry plugin <name> <command>`"+`. `+"`plugin surface`"+` returns at
-the first view (a surface that loads shows "Loading"): run it again a moment later. `+"`plugin surface --json`"+` carries the view as a JSON
+Reading the output: an error your plugin returned prints as `+"`code-foundry plugin.<name>.<command>: <message>`"+`
+(exit 1). `+"`plugin act`"+` acts as a click: an event goes to your plugin, a command button runs its command; then
+it prints the view once no new one has come for `+"`--settle`"+` (default 500ms). `+"`plugin surface`"+` returns at the
+first view (a surface that loads shows "Loading"): add `+"`--settle 2s`"+` to wait for it. `+"`plugin surface --json`"+` carries the view as a JSON
 string in `+"`view.viewJson`"+` (decode it twice, or use the text output).
 `)
 	var verbs, helpers []*v1.Command

@@ -108,12 +108,6 @@ func (g *Grants) lookup(id string) (entry, bool) {
 	return e, ok
 }
 
-// Dir returns the directory a grant serves (the file's directory for a one-file grant).
-func (g *Grants) Dir(id string) (string, bool) {
-	e, ok := g.lookup(id)
-	return e.dir, ok
-}
-
 // CSP is the sandbox every served file runs in: the frame's own (the GUI's HtmlFrame) can
 // only narrow it. allow-same-origin gives a page the pages origin and its storage; never
 // allow-top-navigation, so a page cannot replace the app.

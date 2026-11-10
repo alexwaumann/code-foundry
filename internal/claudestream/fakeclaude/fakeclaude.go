@@ -34,9 +34,8 @@
 // CF_FAKE_CLAUDE_RESUME_HANG (any value) makes a process started with --resume never
 // answer initialize. CF_FAKE_CLAUDE_ONCE=<path> limits RESUME_EXIT and RESUME_HANG to the
 // first resumed process (the one that creates <path>); later ones start normally.
-// CF_FAKE_CLAUDE_INIT_DELAY (a duration) holds the initialize answer that long, and
-// CF_FAKE_CLAUDE_INIT_GATE=<path> holds it until <path> exists (the lifecycle tests'
-// slow start).
+// CF_FAKE_CLAUDE_INIT_GATE=<path> holds the initialize answer until <path> exists (the
+// lifecycle tests' slow start).
 //
 // set_cwd: answered ok with transcript_relocated (Claude moves the transcript; the fake
 // writes none). With CF_FAKE_CLAUDE_SET_CWD_REFUSE=<message> it is refused with status
@@ -298,9 +297,6 @@ func Run(fixture string) int {
 				if resumeFails && resumeHang {
 					continue // never answers: the daemon's handshake timeout ends it
 				}
-				if d, err := time.ParseDuration(os.Getenv("CF_FAKE_CLAUDE_INIT_DELAY")); err == nil {
-					time.Sleep(d) // a slow start: messages sent meanwhile wait in stdin
-				}
 				if gate := os.Getenv("CF_FAKE_CLAUDE_INIT_GATE"); gate != "" {
 					for {
 						if _, err := os.Stat(gate); err == nil {
@@ -342,10 +338,6 @@ func Run(fixture string) int {
 				name, _ := m.Request["serverName"].(string)
 				if msg := mcp.reconnect(name); msg != "" {
 					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": msg}
-				}
-			case "set_permission_mode":
-				if m.Request["mode"] == "bogus" {
-					resp = map[string]any{"subtype": "error", "request_id": m.RequestID, "error": "Cannot set permission mode"}
 				}
 			case "interrupt":
 				// Claude withdraws what it asked: the capture carries on (its own

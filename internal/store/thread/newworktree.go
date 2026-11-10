@@ -108,8 +108,7 @@ func (m *Manager) waitNaming(ctx context.Context, id, name, prompt string, bc br
 	return sw, nil
 }
 
-// startSlug runs the namer for req in the background, retrying once after
-// NamingRetryDelay when the failure looks like a rate limit. The channel receives
+// startSlug runs the namer for req in the background (callNamer). The channel receives
 // exactly one result.
 func (m *Manager) startSlug(id string, req NamingRequest) (<-chan namingResult, error) {
 	m.mu.Lock()
@@ -124,20 +123,27 @@ func (m *Manager) startSlug(id string, req NamingRequest) (<-chan namingResult, 
 		defer m.wg.Done()
 		ctx, cancel := context.WithTimeout(withNamingThread(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
-		n, err := m.opts.Namer(ctx, req)
-		if isRateLimit(err) {
-			m.log.Info("naming rate limited; retrying once", "thread", id, "err", err)
-			t := time.NewTimer(m.opts.NamingRetryDelay)
-			select {
-			case <-t.C:
-				n, err = m.opts.Namer(ctx, req)
-			case <-ctx.Done():
-				t.Stop()
-			}
-		}
+		n, err := m.callNamer(ctx, id, req)
 		ch <- namingResult{Naming: n, err: err}
 	}()
 	return ch, nil
+}
+
+// callNamer runs the namer for thread id's req, retrying once after NamingRetryDelay
+// when the failure looks like a rate limit.
+func (m *Manager) callNamer(ctx context.Context, id string, req NamingRequest) (Naming, error) {
+	n, err := m.opts.Namer(ctx, req)
+	if isRateLimit(err) {
+		m.log.Info("naming rate limited; retrying once", "thread", id, "err", err)
+		t := time.NewTimer(m.opts.NamingRetryDelay)
+		select {
+		case <-t.C:
+			n, err = m.opts.Namer(ctx, req)
+		case <-ctx.Done():
+			t.Stop()
+		}
+	}
+	return n, err
 }
 
 // applyLateName names thread id from a namer answer that missed SlugTimeout, unless

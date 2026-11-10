@@ -309,7 +309,7 @@ func TestDictationSnapshotPick(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := DictationSnapshotToProto(dictation.Snapshot{Prefs: tt.prefs, Inputs: tt.inputs})
+			got := dictationSnapshotToProto(dictation.Snapshot{Prefs: tt.prefs, Inputs: tt.inputs})
 			if !proto.Equal(got.GetMicrophonePick(), tt.want) {
 				t.Errorf("got %v, want %v", got.GetMicrophonePick(), tt.want)
 			}

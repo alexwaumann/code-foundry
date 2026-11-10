@@ -28,7 +28,7 @@ func TestThemeSlotFields(t *testing.T) {
 			if f.Group != GroupAppearance || f.Type != Enum || f.Default != tt.def {
 				t.Fatalf("field = %+v", f)
 			}
-			if !slices.Equal(f.Enum, theme.IDs(tt.scheme)) || !slices.Equal(f.EnumLabels, theme.Names(tt.scheme)) {
+			if !slices.Equal(f.Enum, theme.Set{}.IDs(tt.scheme)) || !slices.Equal(f.EnumLabels, theme.Set{}.Names(tt.scheme)) {
 				t.Errorf("enum = %v / %v, want the catalog's %s themes", f.Enum, f.EnumLabels, tt.scheme)
 			}
 		})

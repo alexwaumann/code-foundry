@@ -1,6 +1,7 @@
 package search
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -398,7 +399,7 @@ func (l *loop) run(env []string) runEnd {
 			// Fail closed: the run never starts without its hardened flags.
 			return runEnd{status: StatusFailed, note: "Claude refused " + refusedFlag(detail) + ": " + lastLine(detail), err: ferr}
 		}
-		return runEnd{status: StatusFailed, note: "Claude did not start: " + cmpOr(lastLine(detail), err.Error()), err: ferr}
+		return runEnd{status: StatusFailed, note: "Claude did not start: " + cmp.Or(lastLine(detail), err.Error()), err: ferr}
 	}
 	err = l.send(conn, e.Query)
 	if l.r.stopWhy() != 0 {
@@ -458,7 +459,7 @@ func (l *loop) exited(proc *claudestream.Process) runEnd {
 	if l.held != "" {
 		return l.cut(StatusDone, "")
 	}
-	why := cmpOr(lastLine(proc.Stderr()), fmt.Sprintf("exit status %d", proc.ExitCode()))
+	why := cmp.Or(lastLine(proc.Stderr()), fmt.Sprintf("exit status %d", proc.ExitCode()))
 	return runEnd{status: StatusFailed, note: "Claude exited before it answered: " + why, cost: l.cost, err: errors.New(why)}
 }
 
@@ -541,7 +542,7 @@ func (l *loop) event(conn *claudestream.Conn, ev claudestream.Event) (runEnd, bo
 		if ev.IsError && !ev.Interrupted() {
 			why := strings.Join(ev.Errors, "; ")
 			if why == "" {
-				why = cmpOr(strings.TrimSpace(ev.Result), ev.Subtype)
+				why = cmp.Or(strings.TrimSpace(ev.Result), ev.Subtype)
 			}
 			if l.hits() > 0 {
 				return runEnd{status: StatusDone, note: "Claude failed before it answered: " + why, cost: l.cost, err: errors.New(why)}, true

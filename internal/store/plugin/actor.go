@@ -31,7 +31,6 @@ type actor struct {
 	stopCh   chan struct{}
 	stopOnce sync.Once
 	done     chan struct{}
-	hung     chan struct{} // the outbound queue overflowed: the plugin stopped reading
 
 	mu      sync.Mutex
 	conn    *pluginsdk.Conn
@@ -57,7 +56,7 @@ type actor struct {
 }
 
 func newActor(m *Manager, name string) *actor {
-	return &actor{m: m, name: name, stopCh: make(chan struct{}), done: make(chan struct{}), hung: make(chan struct{}, 1),
+	return &actor{m: m, name: name, stopCh: make(chan struct{}), done: make(chan struct{}),
 		envReady: make(chan struct{})}
 }
 
@@ -236,6 +235,8 @@ func (a *actor) once(info spawnInfo) (err error) {
 	if err != nil {
 		return fmt.Errorf("%w: %v", errPermanent, err)
 	}
+	// hung is this run's: the outbound queue overflowed, the plugin stopped reading.
+	hung := make(chan struct{}, 1)
 	conn := pluginsdk.NewConn(proc.Stdout(), proc.Stdin(), pluginsdk.ConnOptions{
 		Handle: a.handle,
 		Notify: a.notify,
@@ -243,7 +244,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 			info.logs.add("host", "", "protocol: "+msg)
 			if strings.Contains(msg, "queue full") {
 				select {
-				case a.hung <- struct{}{}:
+				case hung <- struct{}{}:
 				default:
 				}
 			}
@@ -253,11 +254,13 @@ func (a *actor) once(info spawnInfo) (err error) {
 	a.conn = conn
 	a.mu.Unlock()
 	defer func() {
-		a.disarmWakes()
-		a.closeEvents()
+		// conn goes first, so an events/subscribe still in flight cannot start a pump
+		// for this run after closeEvents.
 		a.mu.Lock()
 		a.conn = nil
 		a.mu.Unlock()
+		a.disarmWakes()
+		a.closeEvents()
 		_ = conn.Close()
 		_ = proc.Signal(syscall.SIGKILL)
 		select {
@@ -320,7 +323,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 				a.shutdown(conn, proc)
 				return nil
 			}
-		case <-a.hung:
+		case <-hung:
 			return errors.New("stopped reading its stdin (the outbound queue is full)")
 		case <-a.stopCh:
 			a.shutdown(conn, proc)

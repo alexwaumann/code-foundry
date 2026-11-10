@@ -9,7 +9,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// ProjectBackend is the slice of ProjectService project.create, project.github.publish and
+// NewProjectBackend is the slice of ProjectService project.create, project.github.publish and
 // project.delete need, in generated Connect signatures. The ProjectService handler, a
 // ProjectServiceClient and codefoundryv1connect.UnimplementedProjectServiceHandler satisfy it.
 type NewProjectBackend interface {
@@ -31,7 +31,7 @@ type HasOriginFunc func(Context) bool
 // directory (made by project.create), so project.delete may remove it. Nil means never.
 type DeletableFunc func(Context) bool
 
-// ProjectDeps are project.create's, project.github.publish's and project.delete's dependencies.
+// NewProjectDeps are project.create's, project.github.publish's and project.delete's dependencies.
 type NewProjectDeps struct {
 	// Backend runs them; nil registers against UnimplementedProjectServiceHandler.
 	Backend NewProjectBackend
@@ -55,7 +55,7 @@ var publishVisibilities = map[string]v1.RepositoryVisibility{
 	"private":  v1.RepositoryVisibility_REPOSITORY_VISIBILITY_PRIVATE,
 }
 
-// RegisterProjects registers project.create, project.github.publish and project.delete. In the
+// RegisterNewProjects registers project.create, project.github.publish and project.delete. In the
 // app, the Add Project dialog's New tab invokes project.create (and project.delete, confirmed,
 // when the new project is cancelled), and project.github.publish opens the publish dialog
 // (its owner and visibility pickers); the CLI runs all three directly.

@@ -82,7 +82,7 @@ func (h prHead) checkedOutIn(wt *v1.Worktree) bool {
 	return ok && remote != "" && remote != "origin"
 }
 
-// clonesOf returns the registered repositories whose github_slug is slug
+// clonesOf returns the registered projects whose github_slug is slug
 // (case-insensitively), in order.
 func clonesOf(projects []*v1.Project, slug string) []*v1.Project {
 	var clones []*v1.Project
@@ -143,7 +143,7 @@ type prWorktreePick struct {
 	OffHead bool
 }
 
-// pickPRWorktree chooses the worktree for a pull request thread. repos are the
+// pickPRWorktree chooses the worktree for a pull request thread. projects are the
 // registered projects in ProjectService.List order; the clones of slug are those
 // whose github_slug matches it (case-insensitively). explicit is the worktree arg,
 // active the caller's active worktree. Errors are FailedPrecondition.
@@ -297,7 +297,9 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 		}
 		created, err := d.Thread.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{
 			ProjectId: pick.ProjectID, WorktreePath: pick.Path, Model: a.String("model"), Effort: a.String("effort"),
-			InitialPrompt: prompt(detail, prCheckoutOf(status)),
+			ModelDefaulted:  a.String("model") != "" && !a.Given("model"),
+			EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
+			InitialPrompt:   prompt(detail, prCheckoutOf(status)),
 		}))
 		if err != nil {
 			return Result{}, wrapStep("start thread", err)
@@ -319,7 +321,6 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 				{Name: "question", Type: String, Required: true, Positional: true, Description: "What to ask"},
 				worktree, model, effort, createdFocusArg,
 			},
-			When: hasPullRequest,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				q := sanitizeQuestion(a.String("question"))
 				if q == "" {
@@ -338,7 +339,6 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			Description: "Start a thread that walks through a pull request for a first-time reviewer.",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number, worktree, model, effort, createdFocusArg},
-			When:        hasPullRequest,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				return start(ctx, uctx, a, prThreadRead, func(d *v1.PullRequestDetail, _ PRCheckout) string {
 					return ExplainPRPrompt(prPromptInfo(d.GetPullRequest()))
@@ -353,7 +353,6 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			Description: "Start a thread on the pull request's branch that fixes its unresolved review comments and failing checks.",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number, worktree, model, effort, createdFocusArg},
-			When:        hasPullRequest,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				return start(ctx, uctx, a, prThreadFix, FixFindingsPRPrompt)
 			},

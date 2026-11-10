@@ -345,12 +345,12 @@ type instance struct {
 	key, plugin, surfaceID string
 	// scope is the instance's scope id ("thread:<id>", "project:<id>", …).
 	scope string
-	pctx  pluginsdk.UiContext
 
 	mu sync.Mutex // guards the fields below
 	// uctx is the context the instance was last opened or acted in: recheck evaluates
-	// the when clause in it.
+	// the when clause in it. pctx is the same context as surface/open sends it.
 	uctx        command.Context
+	pctx        pluginsdk.UiContext
 	facts       map[string]json.RawMessage
 	watchers    map[*watcher]struct{}
 	openConn    *pluginsdk.Conn // surface/open answered on it
@@ -550,8 +550,8 @@ func (m *Manager) SurfaceAvailable(plugin, surface string, uctx command.Context)
 	return Availability{Available: a.ok, Unknown: a.unknown, Reason: a.reason}
 }
 
-// resolve finds (or makes) the instance ref names.
-func (h *surfaceHub) resolve(ref SurfaceRef) (*instance, error) {
+// resolve finds the instance ref names; create makes it when there is none.
+func (h *surfaceHub) resolve(ref SurfaceRef, create bool) (*instance, error) {
 	m := h.m
 	if ref.Instance != "" {
 		if in := h.lookup(ref.Instance); in != nil {
@@ -595,15 +595,18 @@ func (h *surfaceHub) resolve(ref SurfaceRef) (*instance, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	in := h.inst[key]
+	if in == nil && !create {
+		return nil, fmt.Errorf("%w: no surface instance %q (watch it first)", ErrNotFound, key)
+	}
 	if in == nil {
-		in = &instance{h: h, key: key, plugin: ref.Plugin, surfaceID: ref.Surface, scope: scope, pctx: pctx,
+		in = &instance{h: h, key: key, plugin: ref.Plugin, surfaceID: ref.Surface, scope: scope,
 			watchers: map[*watcher]struct{}{}, logs: map[string]*logBuf{}, index: map[uint64]*actionIndex{}}
 		in.state, in.stateSeq = SurfaceState{Instance: key, Phase: PhaseOpening}, 1
 		h.inst[key] = in
 		h.evictLocked()
 	}
 	in.mu.Lock()
-	in.facts, in.uctx = facts, ref.Context
+	in.facts, in.uctx, in.pctx = facts, ref.Context, pctx
 	in.mu.Unlock()
 	return in, nil
 }
@@ -638,7 +641,7 @@ func (m *Manager) WatchSurface(ctx context.Context, ref SurfaceRef) (string, <-c
 	if m.isClosed() {
 		return "", nil, ErrClosed
 	}
-	in, err := m.surf.resolve(ref)
+	in, err := m.surf.resolve(ref, true)
 	if err != nil {
 		return "", nil, err
 	}
@@ -944,6 +947,14 @@ func (h *surfaceHub) setIssue(plugin, surface, msg string) {
 	h.m.update(plugin, nil, func(*entry) {})
 }
 
+// dropIssues forgets a removed plugin's surface issues: one installed again under its
+// name starts without them.
+func (h *surfaceHub) dropIssues(plugin string) {
+	h.issueMu.Lock()
+	defer h.issueMu.Unlock()
+	delete(h.issues, plugin)
+}
+
 // issuesOf lists a plugin's surface issues, sorted.
 func (h *surfaceHub) issuesOf(plugin string) []string {
 	h.issueMu.Lock()
@@ -956,7 +967,7 @@ func (h *surfaceHub) issuesOf(plugin string) []string {
 	return out
 }
 
-// instanceOf returns the plugin's instance key if the host opened it on conn (or is
+// instanceFor returns the plugin's instance key if the host opened it on conn (or is
 // opening it), for view/update and view/append.
 func (h *surfaceHub) instanceFor(a *actor, key string) (*instance, error) {
 	conn := a.running()

@@ -220,7 +220,6 @@ func TestPanelVerbsCheckTheThread(t *testing.T) {
 		verb   string
 		thread *commandtest.Thread
 		code   connect.Code
-		msg    string
 	}{
 		{name: "unknown thread", verb: "view.panel.mcp", thread: notFound, code: connect.CodeNotFound},
 		{name: "unknown thread with --focus", verb: "view.panel.toggle", thread: notFound, code: connect.CodeNotFound},
@@ -229,8 +228,8 @@ func TestPanelVerbsCheckTheThread(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, emit := panelRegistry(t, tt.thread)
 			_, err := reg.Invoke(context.Background(), inThread, tt.verb, map[string]string{"focus": "true"})
-			if connect.CodeOf(err) != tt.code || !strings.Contains(err.Error(), tt.msg) {
-				t.Errorf("err = %v, want code %v with %q", err, tt.code, tt.msg)
+			if connect.CodeOf(err) != tt.code {
+				t.Errorf("err = %v, want code %v", err, tt.code)
 			}
 			if got := emit.Intents(); len(got) != 0 {
 				t.Errorf("intents = %v, want none", got)

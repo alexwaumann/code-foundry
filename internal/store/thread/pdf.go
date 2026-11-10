@@ -31,32 +31,21 @@ const pdfinfoTimeout = 3 * time.Second
 // inherits launchd's minimal PATH, which has no Homebrew directory. Tests clear it.
 var pdfinfoFallbacks = []string{"/opt/homebrew/bin/pdfinfo", "/usr/local/bin/pdfinfo"}
 
-// pdfPages counts a PDF's pages with poppler's pdfinfo when it is installed (exact);
-// otherwise, or when pdfinfo fails, it estimates ceil(size/100 KiB) like Claude Code
-// does (exact false). A file it cannot stat counts as one page. Only for a PDF staged
-// before its file name carried the count (stagedPDFPages).
-func pdfPages(ctx context.Context, path string) (pages int, exact bool) {
-	if n, ok := pdfinfoPages(ctx, path); ok {
-		return n, true
-	}
-	fi, err := os.Stat(path)
-	if err != nil {
-		return 1, false
-	}
-	return estimatePDFPages(fi.Size()), false
-}
+// maxNamedPDFPages is the largest count stagedPDFName reads back (seven digits).
+const maxNamedPDFPages = 9_999_999
 
 // settlePDFPages is the page count StageAttachment records in a PDF's file name:
 // pdfinfo's when it is installed, else the client's hint (the GUI counts with pdf.js;
-// 0 is no hint), both exact, else the size estimate.
+// 0 is no hint), both exact, else ceil(size/100 KiB) like Claude Code does. At most
+// maxNamedPDFPages, so the name always parses.
 func settlePDFPages(ctx context.Context, path string, size int64, hint int) (pages int, exact bool) {
 	if n, ok := pdfinfoPages(ctx, path); ok {
-		return n, true
+		return min(n, maxNamedPDFPages), true
 	}
 	if hint > 0 {
-		return hint, true
+		return min(hint, maxNamedPDFPages), true
 	}
-	return estimatePDFPages(size), false
+	return min(estimatePDFPages(size), maxNamedPDFPages), false
 }
 
 // estimatePDFPages is ceil(size/100 KiB), at least one.
@@ -96,7 +85,7 @@ func pdfFileName(stem string, pages int, exact bool) string {
 }
 
 // stagedPDFPages reads the page count from a staged PDF's file name; ok is false for
-// a name without one (staged before the count was recorded, or not by StageAttachment).
+// a name without one (not staged by StageAttachment).
 func stagedPDFPages(path string) (pages int, exact, ok bool) {
 	m := stagedPDFName.FindStringSubmatch(filepath.Base(path))
 	if m == nil {

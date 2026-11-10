@@ -199,8 +199,10 @@ type Options struct {
 	ManualDownload bool
 	Bus            *bus.Bus
 	Log            *slog.Logger
-	InitialDelay   time.Duration
-	Interval       time.Duration
+	// InitialDelay is how long after Start the first check runs. Default
+	// DefaultInitialDelay.
+	InitialDelay time.Duration
+	Interval     time.Duration
 	// Tick is how often the loop compares the wall clock against Interval (so an
 	// overdue check runs this soon after wake from sleep). Default the smaller of a
 	// minute and Interval.
@@ -235,7 +237,9 @@ func DefaultOptions(current string) Options {
 	}
 	o.Installer = ScriptInstaller{Repo: version.Repo(), ReleaseDir: dir, AppDir: appDir}
 	if d, err := time.ParseDuration(os.Getenv(EnvInitialDelay)); err == nil && d >= 0 {
-		o.InitialDelay = d
+		// A zero InitialDelay means the default, so 0s becomes the shortest delay: at
+		// once, as the daemon's loop for builds that cannot update reads it.
+		o.InitialDelay = max(d, time.Nanosecond)
 	}
 	return o
 }

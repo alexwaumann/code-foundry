@@ -13,17 +13,13 @@ import (
 
 // Gh is a fake command.GhBackend. Every call records its request. Err, when set, is
 // returned instead of a response. Detail is GetPullRequestDetail's answer (default: a
-// pull request titled "t"); Revert is RevertPullRequest's (default: #99); Merge is
-// MergePullRequest's (default: see MergePullRequest); Review and Comment are
-// SubmitPullRequestReview's and AddPullRequestComment's (defaults: see those).
+// pull request titled "t"); Merge is MergePullRequest's (default: see
+// MergePullRequest).
 type Gh struct {
 	Calls
-	Err     error
-	Detail  *v1.PullRequestDetail
-	Revert  *v1.RevertPullRequestResponse
-	Merge   *v1.MergePullRequestResponse
-	Review  *v1.SubmitPullRequestReviewResponse
-	Comment *v1.AddPullRequestCommentResponse
+	Err    error
+	Detail *v1.PullRequestDetail
+	Merge  *v1.MergePullRequestResponse
 	// Draft and AutoMerge are SetPullRequestDraft's and SetPullRequestAutoMerge's
 	// answers (defaults: see those).
 	Draft     *v1.SetPullRequestDraftResponse
@@ -65,11 +61,7 @@ func (f *Gh) RevertPullRequest(_ context.Context, r *connect.Request[v1.RevertPu
 	if f.Err != nil {
 		return nil, f.Err
 	}
-	res := &v1.RevertPullRequestResponse{Number: 99, Url: "https://github.com/o/r/pull/99"}
-	if f.Revert != nil {
-		res = proto.CloneOf(f.Revert)
-	}
-	return connect.NewResponse(res), nil
+	return connect.NewResponse(&v1.RevertPullRequestResponse{Number: 99, Url: "https://github.com/o/r/pull/99"}), nil
 }
 
 // MergePullRequest implements command.GhBackend: merged, sha "5e1f00d…", and the
@@ -92,14 +84,11 @@ func (f *Gh) MergePullRequest(_ context.Context, r *connect.Request[v1.MergePull
 }
 
 // SubmitPullRequestReview implements command.GhBackend: review "PRR_1" by "octocat" in
-// the event's state (Review, when set, replaces the answer).
+// the event's state.
 func (f *Gh) SubmitPullRequestReview(_ context.Context, r *connect.Request[v1.SubmitPullRequestReviewRequest]) (*connect.Response[v1.SubmitPullRequestReviewResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
-	}
-	if f.Review != nil {
-		return connect.NewResponse(proto.CloneOf(f.Review)), nil
 	}
 	state := map[v1.PullRequestReviewEvent]v1.PullRequestReviewState{
 		v1.PullRequestReviewEvent_PULL_REQUEST_REVIEW_EVENT_APPROVE:         v1.PullRequestReviewState_PULL_REQUEST_REVIEW_STATE_APPROVED,
@@ -112,15 +101,11 @@ func (f *Gh) SubmitPullRequestReview(_ context.Context, r *connect.Request[v1.Su
 	}), nil
 }
 
-// AddPullRequestComment implements command.GhBackend: comment "IC_1" (Comment, when
-// set, replaces the answer).
+// AddPullRequestComment implements command.GhBackend: comment "IC_1".
 func (f *Gh) AddPullRequestComment(_ context.Context, r *connect.Request[v1.AddPullRequestCommentRequest]) (*connect.Response[v1.AddPullRequestCommentResponse], error) {
 	f.record(r.Msg)
 	if f.Err != nil {
 		return nil, f.Err
-	}
-	if f.Comment != nil {
-		return connect.NewResponse(proto.CloneOf(f.Comment)), nil
 	}
 	return connect.NewResponse(&v1.AddPullRequestCommentResponse{
 		Id: "IC_1", Url: "https://github.com/o/r/pull/" + strconv.Itoa(int(r.Msg.GetNumber())) + "#issuecomment-1",

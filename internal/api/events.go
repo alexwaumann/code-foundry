@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"log/slog"
 	"slices"
 	"strconv"
 	"sync"
@@ -97,9 +99,6 @@ func newEpoch() string {
 	}
 	return hex.EncodeToString(b[:])
 }
-
-// Epoch is the epoch every event of this handler carries.
-func (h *Events) Epoch() string { return h.deps.Epoch }
 
 // Route mounts the service.
 func (h *Events) Route(opts ...connect.HandlerOption) Route {
@@ -689,11 +688,16 @@ func (s threadSource) snapshot(ctx context.Context) []*v1.Event {
 			if x.State == thread.StateDisconnected {
 				continue
 			}
-			items, err := s.store.Items(ctx, x.ID)
-			if err != nil || len(items.Pending) == 0 {
+			seq, pending, err := s.store.Pending(ctx, x.ID)
+			if err != nil {
+				if !errors.Is(err, thread.ErrNotFound) {
+					slog.WarnContext(ctx, "thread pending requests for the events snapshot", "thread", x.ID, "err", err)
+				}
 				continue
 			}
-			snap.Threads = append(snap.Threads, pendingToProto(x.ID, items.Seq, items.Pending))
+			if len(pending) > 0 {
+				snap.Threads = append(snap.Threads, pendingToProto(x.ID, seq, pending))
+			}
 		}
 	}
 	return []*v1.Event{{Event: &v1.Event_Thread{Thread: &v1.ThreadEvent{Event: &v1.ThreadEvent_PendingSnapshot{PendingSnapshot: snap}}}}}

@@ -303,8 +303,8 @@ func compactTokens(n int64) string {
 	return fmt.Sprint(n)
 }
 
-// noEmber is the backend without an Ember store: everything fails with Unimplemented,
-// so the commands still list.
+// noEmber is the backend without an Ember store: reads are empty and everything else
+// fails with Unimplemented, so the commands still list.
 type noEmber struct{}
 
 var errNoEmber = connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no Ember store"))

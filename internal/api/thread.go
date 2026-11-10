@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -158,6 +157,7 @@ func (h *Thread) WatchThread(ctx context.Context, req *connect.Request[v1.WatchT
 				if err := send(wakes.snapshot(snap)); err != nil {
 					return err
 				}
+				beat.Flush()
 				continue
 			}
 			if msg := threadEventToProto(ev); msg != nil {
@@ -344,12 +344,8 @@ var requestStates = map[thread.RequestState]v1.ThreadRequestState{
 // itemToProto maps an item; an unknown kind maps to an item without a payload.
 func itemToProto(it thread.Item) *v1.ThreadItem {
 	p := &v1.ThreadItem{Id: it.ID, Ordinal: it.Ordinal, ParentToolUseId: it.ParentToolUseID, Streaming: it.Streaming, PlacedAfter: it.PlacedAfter}
-	if !it.CreatedAt.IsZero() {
-		p.CreatedAt = timestamppb.New(it.CreatedAt)
-	}
-	if !it.UpdatedAt.IsZero() {
-		p.UpdatedAt = timestamppb.New(it.UpdatedAt)
-	}
+	p.CreatedAt = timestamp(it.CreatedAt)
+	p.UpdatedAt = timestamp(it.UpdatedAt)
 	switch it.Kind {
 	case thread.KindUserMessage:
 		p.Payload = &v1.ThreadItem_UserMessage{UserMessage: userMessageToProto(it)}

@@ -347,20 +347,8 @@ func TestAgentsPublication(t *testing.T) {
 		}
 		return out
 	}
-	turnEnds := func(n int) func([]Item) bool {
-		return func(items []Item) bool {
-			c := 0
-			for _, it := range items {
-				if it.Kind == KindTurnEnd {
-					c++
-				}
-			}
-			return c >= n
-		}
-	}
-
 	s := e.create(CreateOptions{InitialPrompt: "go"})
-	e.waitItems(s.ID, "first turn", turnEnds(1))
+	e.waitItems(s.ID, "first turn", turnCount(1))
 	if got := agents(); len(got) != 1 || len(got[0].Agents) != 1 || got[0].Agents[0].Status != AgentRunning {
 		t.Fatalf("after start %+v", got)
 	}
@@ -372,7 +360,7 @@ func TestAgentsPublication(t *testing.T) {
 	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "more"}); err != nil {
 		t.Fatal(err)
 	}
-	e.waitItems(s.ID, "second turn", turnEnds(2))
+	e.waitItems(s.ID, "second turn", turnCount(2))
 	time.Sleep(60 * time.Millisecond)
 	if got := agents(); len(got) != 0 {
 		t.Errorf("progress published before the gap: %+v", got)
@@ -392,7 +380,7 @@ func TestAgentsPublication(t *testing.T) {
 	if _, err := e.m.Send(e.ctx(), s.ID, Message{Text: "end"}); err != nil {
 		t.Fatal(err)
 	}
-	items := e.waitItems(s.ID, "third turn", turnEnds(3))
+	items := e.waitItems(s.ID, "third turn", turnCount(3))
 	evs := agents()
 	if len(evs) != 1 || evs[0].Agents[0].Status != AgentDone || evs[0].Agents[0].Summary != "all good" || evs[0].Agents[0].Activity != "Reading" {
 		t.Fatalf("after notification %+v", evs)

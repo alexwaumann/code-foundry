@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,7 +140,8 @@ type installState struct {
 	fp     string
 	epoch  uint64
 	// releases are the latest releases of the plugins installed from a GitHub repository
-	// that no registry lists, by plugin name, as the last update check found them.
+	// that no registry lists, by plugin name, as the last update check found them. The
+	// map is replaced, never written in place: setMerged reads it outside mu.
 	releases map[string]UpdateOffer
 }
 
@@ -156,10 +158,17 @@ func (s *installState) setRecord(name string, r *InstallRecord) {
 	if s.records == nil {
 		s.records = map[string]InstallRecord{}
 	}
+	old, had := s.records[name]
 	if r == nil {
 		delete(s.records, name)
 	} else {
 		s.records[name] = *r
+	}
+	// Another source's release is no offer for the name any more.
+	if _, ok := s.releases[name]; ok && (r == nil || !had || old.Kind != r.Kind || !strings.EqualFold(old.Source, r.Source)) {
+		next := maps.Clone(s.releases)
+		delete(next, name)
+		s.releases = next
 	}
 }
 
@@ -359,11 +368,8 @@ func registryURLs(m registry.Merged) []string {
 
 // registryError maps the registry package's errors onto the store's.
 func registryError(err error) error {
-	switch {
-	case errors.Is(err, registry.ErrNotFound):
+	if errors.Is(err, registry.ErrNotFound) {
 		return fmt.Errorf("%w: %s", ErrNotFound, strings.TrimPrefix(err.Error(), registry.ErrNotFound.Error()+": "))
-	case errors.Is(err, registry.ErrHashMismatch):
-		return fmt.Errorf("%w: %v", ErrFailedPrecondition, err)
 	}
 	return err
 }
@@ -387,7 +393,10 @@ func (m *Manager) Install(ctx context.Context, req InstallRequest) (InstallResul
 		return InstallResult{}, err
 	}
 	if !m.inst.begin(p.name) {
-		return InstallResult{}, fmt.Errorf("%w: plugin %s is being installed already", ErrFailedPrecondition, p.name)
+		err := fmt.Errorf("%w: plugin %s is being installed already", ErrFailedPrecondition, p.name)
+		// By ref only: the running install's steps are keyed by the name.
+		m.progress(InstallProgress{Ref: req.Ref, Phase: InstallFailed, Message: err.Error()})
+		return InstallResult{}, err
 	}
 	defer m.inst.end(p.name)
 	res, err := m.install(ctx, req, p)
@@ -456,7 +465,6 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 			return InstallResult{}, fmt.Errorf("%w: %s %s: %v", ErrFailedPrecondition, p.name, p.version, err)
 		}
 	}
-	sum, _ := registry.SHA256File(tarball)
 	step(InstallExtracting, "unpacking")
 	pkg := filepath.Join(work, "pkg")
 	if err := os.Mkdir(pkg, 0o755); err != nil {
@@ -502,7 +510,7 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 	}
 	rec := InstallRecord{Kind: p.kind, Source: p.source, Version: p.version, InstalledAt: m.opts.Now().Truncate(time.Millisecond)}
 	if p.artifact.SHA256 != "" {
-		rec.SHA256 = sum
+		rec.SHA256 = strings.ToLower(p.artifact.SHA256) // Verify matched it
 	}
 	if err := saveInstallRow(ctx, m.opts.DB, p.name, rec); err != nil {
 		return InstallResult{}, err

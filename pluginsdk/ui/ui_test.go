@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -143,7 +144,7 @@ func TestValidateRejects(t *testing.T) {
 		{"too many command args", func(v *View) {
 			args := map[string]string{}
 			for i := range MaxCommandArgs + 1 {
-				args["a"+itoa(i)] = "x"
+				args["a"+strconv.Itoa(i)] = "x"
 			}
 			v.Nodes = append(v.Nodes, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
 		}, "17 args, at most 16"},
@@ -228,7 +229,7 @@ func TestValidateRejects(t *testing.T) {
 		}, "at most 2"},
 		{"too many elements", func(v *View) {
 			for i := range MaxElements {
-				v.Nodes = append(v.Nodes, NewChips("c"+itoa(i)))
+				v.Nodes = append(v.Nodes, NewChips("c"+strconv.Itoa(i)))
 			}
 		}, "elements"},
 	}
@@ -247,7 +248,7 @@ func TestValidateRejects(t *testing.T) {
 func TestCommandArgsAtTheLimits(t *testing.T) {
 	args := map[string]string{}
 	for i := range MaxCommandArgs {
-		args["a"+itoa(i)] = strings.Repeat("x", MaxCommandArgsBytes/MaxCommandArgs-len("a"+itoa(i)))
+		args["a"+strconv.Itoa(i)] = strings.Repeat("x", MaxCommandArgsBytes/MaxCommandArgs-len("a"+strconv.Itoa(i)))
 	}
 	v := NewView(nil, NewActions("a", CommandButton("b", "B", "plugin.x.go", args)))
 	if err := v.Validate(); err != nil {
@@ -257,11 +258,6 @@ func TestCommandArgsAtTheLimits(t *testing.T) {
 	if err := one.Validate(); err != nil {
 		t.Fatalf("one 2 KiB value: %v", err)
 	}
-}
-
-func itoa(i int) string {
-	b, _ := json.Marshal(i)
-	return string(b)
 }
 
 func TestInlineJSON(t *testing.T) {

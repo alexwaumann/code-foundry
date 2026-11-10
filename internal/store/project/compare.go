@@ -561,8 +561,8 @@ func addUntracked(dir string, list []CompareChange, untracked []string, reversed
 	return list
 }
 
-// countRootLines counts an untracked file's lines as countLines does, reading at most
-// limit bytes and never through a link: a symlink is the one line git would store.
+// countRootLines counts an untracked file's lines (countReader), reading at most limit
+// bytes and never through a link: a symlink is the one line git would store.
 func countRootLines(root *os.Root, file string, limit int64) (lines int, binary bool, read int64) {
 	if limit <= 0 {
 		return 0, false, 0
@@ -856,8 +856,8 @@ func (g *Git) indexEntry(ctx context.Context, dir, file string) (indexRecord, bo
 	return indexRecord{}, false, nil
 }
 
-// countReader counts r's lines, reading at most limit bytes: countLines' body. A NUL in
-// the first binarySniff bytes means binary.
+// countReader counts r's newlines (plus a final unterminated line), reading at most limit
+// bytes. A NUL in the first binarySniff bytes means binary.
 func countReader(r io.Reader, limit int64) (lines int, binary bool, read int64) {
 	buf := make([]byte, 64<<10)
 	last := byte('\n')

@@ -15,7 +15,7 @@ import (
 // while Claude is working or waiting on the user's answer, since it ends that turn, or
 // while the thread's background agents or shells run, since they stop with it, or
 // while a hidden thread below it that the daemon archives with it is working or
-// waiting (commands_thread_sidebar.go); idle, finished, errored and stopped threads
+// waiting (commands_thread_cascade.go); idle, finished, errored and stopped threads
 // archive at once, and unarchiving never asks (nor cascades). A thread archiving itself
 // mid-turn is not asked about its own turn either: nothing is cut off, it is archived
 // when the turn ends (Deferred, docs/notes/self-put-away.md).

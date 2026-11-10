@@ -32,7 +32,7 @@ func TestThreadPRLink(t *testing.T) {
 			wantReq: &v1.LinkThreadPullRequestRequest{Id: "s-c", PullRequest: "O/R#5"}, wantMsg: "thread fix (s-c) already has o/r#5 linked"},
 		{name: "not a pull request passes through", args: map[string]string{"id": "s-c", "pr": "https://github.com/o/r/issues/1"}, current: has,
 			wantCode: connect.CodeInvalidArgument},
-		{name: "no thread in the GUI", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"pr": "o/r#1"}, wantErr: command.ErrUnavailable},
+		{name: "no thread in the GUI", ctx: command.Context{ActiveView: "pullrequests"}, args: map[string]string{"pr": "o/r#1"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

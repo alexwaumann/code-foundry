@@ -20,11 +20,11 @@ func TestInheritedClaudeVars(t *testing.T) {
 	}{
 		{"none", []string{"PATH=/bin", "HOME=/h", "CLAUDE_CONFIG_DIR=/c", "ANTHROPIC_API_KEY=k"}, nil},
 		{"Claude session vars", []string{
-			"CLAUDECODE=1", "CLAUDE_CODE_CHILD_THREAD=1", "CLAUDE_CODE_ENTRYPOINT=sdk-ts", "CLAUDE_CODE_THREAD_ID=x",
+			"CLAUDECODE=1", "CLAUDE_CODE_CHILD_SESSION=1", "CLAUDE_CODE_ENTRYPOINT=sdk-ts", "CLAUDE_CODE_SESSION_ID=x",
 			"CLAUDE_PID=1", "CLAUDE_EFFORT=high", "CLAUDE_AGENT_SDK_VERSION=0.3", "PATH=/bin", "CLAUDE_CODE_MESSAGING_TOKEN=",
 		}, []string{
-			"CLAUDECODE", "CLAUDE_AGENT_SDK_VERSION", "CLAUDE_CODE_CHILD_THREAD", "CLAUDE_CODE_ENTRYPOINT",
-			"CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_THREAD_ID", "CLAUDE_EFFORT", "CLAUDE_PID",
+			"CLAUDECODE", "CLAUDE_AGENT_SDK_VERSION", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_ENTRYPOINT",
+			"CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_SESSION_ID", "CLAUDE_EFFORT", "CLAUDE_PID",
 		}},
 		// User configuration that merely starts with CLAUDE is kept.
 		{"config kept", []string{"CLAUDE_CONFIG_DIR=/c", "CLAUDECODEX=1", "CLAUDE_CODEX=1"}, nil},
@@ -40,12 +40,12 @@ func TestInheritedClaudeVars(t *testing.T) {
 
 func TestScrubClaudeEnv(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
-	t.Setenv("CLAUDE_CODE_CHILD_THREAD", "1")
+	t.Setenv("CLAUDE_CODE_CHILD_SESSION", "1")
 	t.Setenv("CLAUDE_CODE_MESSAGING_TOKEN", "secret-token")
 	t.Setenv("CLAUDE_CONFIG_DIR", "/keep")
 	var buf bytes.Buffer
 	removed := scrubClaudeEnv(slog.New(slog.NewTextHandler(&buf, nil)))
-	for _, k := range []string{"CLAUDECODE", "CLAUDE_CODE_CHILD_THREAD", "CLAUDE_CODE_MESSAGING_TOKEN"} {
+	for _, k := range []string{"CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_MESSAGING_TOKEN"} {
 		if _, ok := os.LookupEnv(k); ok {
 			t.Errorf("%s still set", k)
 		}
@@ -57,7 +57,7 @@ func TestScrubClaudeEnv(t *testing.T) {
 		t.Error("CLAUDE_CONFIG_DIR was removed")
 	}
 	log := buf.String()
-	if !strings.Contains(log, "CLAUDE_CODE_CHILD_THREAD") {
+	if !strings.Contains(log, "CLAUDE_CODE_CHILD_SESSION") {
 		t.Errorf("log does not name the removed vars: %s", log)
 	}
 	if strings.Contains(log, "secret-token") {

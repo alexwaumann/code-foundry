@@ -18,9 +18,6 @@ import (
 // id say it was removed and exit 1, instead of the usage exit 2 of an unknown id, and
 // thread.reports --all and thread.list --all list it.
 
-// removedTimeLayout is how a removal time is printed (the daemon's local time).
-const removedTimeLayout = "2006-01-02 15:04:05"
-
 // removedFrom returns the RemovedThread a NOT_FOUND error carries, when it does.
 func removedFrom(err error) (*v1.RemovedThread, bool) {
 	var ce *connect.Error
@@ -47,7 +44,7 @@ func removedLine(r *v1.RemovedThread) string {
 	}
 	line += " was removed"
 	if at := r.GetRemovedAt(); at != nil {
-		line += " at " + at.AsTime().Local().Format(removedTimeLayout)
+		line += " at " + at.AsTime().Local().Format(time.DateTime)
 	}
 	return line
 }

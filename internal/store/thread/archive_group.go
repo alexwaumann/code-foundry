@@ -73,11 +73,36 @@ func (m *Manager) markArchivingLocked(id, by string) {
 }
 
 // endArchiving clears thread id's archiving mark: its archive is over, stamped or failed.
-func (m *Manager) endArchiving(id string) {
+// A failed one also takes back its notes: the thread stays, and no wake may say it was
+// archived.
+func (m *Manager) endArchiving(id string, failed bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if rec, ok := m.recs[id]; ok {
 		rec.archiving = false
+	}
+	if failed && m.subs != nil {
+		m.subs.unnoteArchived(id)
+	}
+}
+
+// unnoteArchived drops thread id from the members noted archived (markArchivingLocked).
+// Callers hold m.mu, not m.subs.mu.
+func (s *subscriptions) unnoteArchived(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for who, groups := range s.groupArchived {
+		for group, gone := range groups {
+			gone = slices.DeleteFunc(gone, func(w wakeSibling) bool { return w.ID == id })
+			if len(gone) == 0 {
+				delete(groups, group)
+			} else {
+				groups[group] = gone
+			}
+		}
+		if len(groups) == 0 {
+			delete(s.groupArchived, who)
+		}
 	}
 }
 

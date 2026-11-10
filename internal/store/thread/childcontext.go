@@ -30,7 +30,7 @@ var ProtocolAllowedTools = []string{
 }
 
 // allowedTools is a spawn's --allowedTools: the protocol rules, then what the
-// conversation's allow-for-thread answers granted (an effort restart's), without
+// conversation's allow-for-session answers granted (an effort restart's), without
 // repeats.
 func allowedTools(granted []string) []string {
 	out := slices.Clone(ProtocolAllowedTools)

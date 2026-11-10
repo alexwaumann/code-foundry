@@ -60,7 +60,7 @@ const maxConfirmStages = 3
 // args, e.g. deleting uncommitted work): the command's declined result stands when it
 // has one, else it fails pointing at the flag (--force) to pass on purpose.
 func (cl *cli) invoke(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, vals map[string]string, yes bool) (*v1.InvokeCommandResponse, error) {
-	c, err := cl.connect(ctx)
+	c, err := cl.daemon(ctx)
 	if err != nil {
 		return nil, err
 	}

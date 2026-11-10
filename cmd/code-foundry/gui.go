@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
 )
 
@@ -35,7 +36,7 @@ func runGUI(_ context.Context, cl *cli, args []string) error {
 	// Stdio stays nil: /dev/null. Setsid: closing this terminal does not take it down.
 	cmd := exec.Command(bin)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	cmd.Env = append(os.Environ(), "CODE_FOUNDRY_BIN="+exe)
+	cmd.Env = append(os.Environ(), paths.EnvBin+"="+exe)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start %s: %w", bin, err)
 	}

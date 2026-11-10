@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -459,7 +460,7 @@ func walkedKeys(v ui.View) []string {
 	for _, l := range v.NodeLists() {
 		walk(l)
 	}
-	return sortStrings(out)
+	return slices.Sorted(slices.Values(out))
 }
 
 var nodeType = reflect.TypeFor[ui.Node]()
@@ -495,17 +496,7 @@ func reflectedKeys(v reflect.Value) []string {
 		}
 	}
 	walk(v)
-	return sortStrings(out)
-}
-
-func sortStrings(s []string) []string {
-	out := append([]string(nil), s...)
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j] < out[j-1]; j-- {
-			out[j], out[j-1] = out[j-1], out[j]
-		}
-	}
-	return out
+	return slices.Sorted(slices.Values(out))
 }
 
 func slicesEqualSorted(a, b []string) bool { return fmt.Sprint(a) == fmt.Sprint(b) }

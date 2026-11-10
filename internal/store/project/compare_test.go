@@ -752,11 +752,21 @@ func TestCompareSymlinksStayInside(t *testing.T) {
 	if d = f.sides(t, sourceRef("HEAD"), sourceWorking, "leakdir/secret.txt", ""); d.New.Present {
 		t.Errorf("read through a link that leaves: %q", d.New.Contents)
 	}
-	done := make(chan CompareSides, 1)
-	go func() { done <- f.sides(t, sourceRef("HEAD"), sourceWorking, "pipe", "") }()
+	type sidesResult struct {
+		d   CompareSides
+		err error
+	}
+	done := make(chan sidesResult, 1)
+	go func() {
+		d, err := f.h.store.CompareFile(ctx20(t), CompareFileRequest{ProjectID: f.id, Path: f.path, Base: sourceRef("HEAD"), Head: sourceWorking, File: "pipe"})
+		done <- sidesResult{d, err}
+	}()
 	select {
-	case d = <-done:
-		if d.New.Present {
+	case r := <-done:
+		if r.err != nil {
+			t.Fatal(r.err)
+		}
+		if d = r.d; d.New.Present {
 			t.Errorf("a FIFO read as %+v", d.New)
 		}
 	case <-time.After(10 * time.Second):

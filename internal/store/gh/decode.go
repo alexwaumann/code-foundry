@@ -146,14 +146,12 @@ type requestedReviewerJSON struct {
 }
 
 type pullRequestData struct {
-	RateLimit  *rateLimitJSON `json:"rateLimit"`
 	Repository *struct {
 		PullRequest *pullRequestJSON `json:"pullRequest"`
 	} `json:"repository"`
 }
 
 type checksData struct {
-	RateLimit  *rateLimitJSON `json:"rateLimit"`
 	Repository *struct {
 		Object *commitJSON `json:"object"`
 	} `json:"repository"`
@@ -169,30 +167,30 @@ type checksPage struct {
 
 // decodePullRequest maps a PullRequest query page: the PR (from every page) and one
 // page of its head commit's checks.
-func decodePullRequest(data []byte) (PullRequest, checksPage, *rateLimitJSON, error) {
+func decodePullRequest(data []byte) (PullRequest, checksPage, error) {
 	var d pullRequestData
 	if err := json.Unmarshal(data, &d); err != nil {
-		return PullRequest{}, checksPage{}, nil, fmt.Errorf("decode pull request: %w", err)
+		return PullRequest{}, checksPage{}, fmt.Errorf("decode pull request: %w", err)
 	}
 	if d.Repository == nil || d.Repository.PullRequest == nil {
-		return PullRequest{}, checksPage{}, d.RateLimit, fmt.Errorf("decode pull request: %w", ErrNotFound)
+		return PullRequest{}, checksPage{}, fmt.Errorf("decode pull request: %w", ErrNotFound)
 	}
 	p := d.Repository.PullRequest
 	pr := mapPullRequest(p)
-	return pr, mapChecksPage(&commitJSON{Oid: p.HeadRefOid, StatusCheckRollup: p.Checks}), d.RateLimit, nil
+	return pr, mapChecksPage(&commitJSON{Oid: p.HeadRefOid, StatusCheckRollup: p.Checks}), nil
 }
 
 // decodeChecks maps a Checks query page.
-func decodeChecks(data []byte) (checksPage, *rateLimitJSON, error) {
+func decodeChecks(data []byte) (checksPage, error) {
 	var d checksData
 	if err := json.Unmarshal(data, &d); err != nil {
-		return checksPage{}, nil, fmt.Errorf("decode checks: %w", err)
+		return checksPage{}, fmt.Errorf("decode checks: %w", err)
 	}
 	// object is null for an unknown ref, and {} (no oid) when it is not a commit.
 	if d.Repository == nil || d.Repository.Object == nil || d.Repository.Object.Oid == "" {
-		return checksPage{}, d.RateLimit, fmt.Errorf("decode checks: ref: %w", ErrNotFound)
+		return checksPage{}, fmt.Errorf("decode checks: ref: %w", ErrNotFound)
 	}
-	return mapChecksPage(d.Repository.Object), d.RateLimit, nil
+	return mapChecksPage(d.Repository.Object), nil
 }
 
 func mapChecksPage(c *commitJSON) checksPage {

@@ -20,7 +20,7 @@ import (
 // Scope: by default the user's threads, what the sidebar can show: threads no plugin owns
 // that are in the sidebar (InSidebar: no creator, or a creator that is gone), archived and
 // snoozed ones and Ember's chat included, and their own items, not their subagents'.
-// SearchQuery widens it. A thread Options.Unindexed keeps out is never in it.
+// SearchQuery widens it.
 //
 // Forks: a fork's copies of its parent's items keep their ids, and the index has one
 // document per id. A hit is attributed to the oldest thread in scope whose copy of the
@@ -182,8 +182,7 @@ func (m *Manager) searchScope(snap *Snapshot, q SearchQuery) (map[string]Thread,
 		switch {
 		case t.Owner != "" && !q.Owned,
 			!q.Children && !t.InSidebar(exists),
-			len(set) > 0 && !slices.ContainsFunc(t.ProjectIDs, func(id string) bool { return slices.Contains(set, id) }),
-			m.opts.Unindexed != nil && m.opts.Unindexed(t):
+			len(set) > 0 && !slices.ContainsFunc(t.ProjectIDs, func(id string) bool { return slices.Contains(set, id) }):
 			continue
 		}
 		out[t.ID] = t

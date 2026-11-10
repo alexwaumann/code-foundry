@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -162,7 +163,9 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	}
 	prev := rec.s
 	rec.reserve()
+	var before *Thread // the status a failure before the timeline says so puts back
 	if o.first != nil {
+		before = &prev
 		// A message starts a turn: the status the thread saved (a finished turn, a prompt
 		// lost with its process, an interruption) is replaced at once, as a send to a live
 		// thread does, so clients never count it as both working and waiting on the user.
@@ -174,7 +177,7 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	var log *threadLog
 	if o.first != nil {
 		if log, err = m.thread(ctx, id); err != nil {
-			return Item{}, m.failStart(id, nil, err)
+			return Item{}, m.failStart(id, nil, before, err)
 		}
 	}
 	// A conversation whose transcript is gone cannot continue: refused before anything
@@ -236,16 +239,16 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 			// The first message a stop kept goes out first (firstprompt.go): its item too.
 			po := pf.outgoing()
 			if _, err := recordUser(w, po); err != nil {
-				return Item{}, m.failStart(id, nil, err)
+				return Item{}, m.failStart(id, nil, before, err)
 			}
 			m.setPendingFirstItem(id, po.itemID)
 		}
 		if it, err = recordUser(w, o.first); err != nil {
-			return Item{}, m.failStart(id, nil, err)
+			return Item{}, m.failStart(id, nil, before, err)
 		}
 	}
 	if launchErr != nil {
-		return it, m.failStart(id, log, launchErr)
+		return it, m.failStart(id, log, nil, launchErr)
 	}
 	m.update(id, false, func(r *record) {
 		r.s.LastError = lastErr
@@ -264,9 +267,9 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 	})
 	if err := m.spawn(ctx, id, l); errors.Is(err, ErrClosed) {
 		// The daemon is stopping: not a failure to tell in the timeline.
-		return it, m.failStart(id, nil, err)
+		return it, m.failStart(id, nil, before, err)
 	} else if err != nil {
-		return it, m.failStart(id, log, err)
+		return it, m.failStart(id, log, nil, err)
 	}
 	if m.opts.WorktreeCreated != nil {
 		// The project's on-worktree-create actions run again, as after Create.
@@ -282,8 +285,10 @@ func (m *Manager) startStopped(ctx context.Context, id string, o startOpts) (Ite
 
 // failStart ends a reserved start that did not spawn. With log (a message started it)
 // the timeline says so and the status becomes error; the error is swallowed, since the
-// message was accepted. Without, the error is returned and kept in LastError.
-func (m *Manager) failStart(id string, log *threadLog, err error) error {
+// message was accepted. Without, the error is returned and kept in LastError, and the
+// status goes back to before's (the thread as it was before a message set it working),
+// when there is one.
+func (m *Manager) failStart(id string, log *threadLog, before *Thread, err error) error {
 	msg := startFailure(id, err)
 	if log != nil {
 		w := itemWriter{log: log, save: func(it Item) { m.saveItem(id, it) }}
@@ -299,6 +304,9 @@ func (m *Manager) failStart(id string, log *threadLog, err error) error {
 		r.s.State = StateDisconnected
 		if log == nil {
 			r.s.LastError = err.Error()
+			if before != nil {
+				r.s.Status, r.s.StatusReason, r.s.StatusChangedAt = before.Status, before.StatusReason, before.StatusChangedAt
+			}
 			return
 		}
 		r.s.DisconnectReason, r.s.LastError = ReasonSpawnFailed, msg
@@ -405,7 +413,7 @@ func (m *Manager) running(ctx context.Context, id string) (*runner, error) {
 				return nil, ctx.Err()
 			}
 		case started:
-			return nil, fmt.Errorf("%w: Claude did not start: %s", ErrFailedPrecondition, nonEmpty(s.LastError, "it ended before answering"))
+			return nil, fmt.Errorf("%w: Claude did not start: %s", ErrFailedPrecondition, cmp.Or(s.LastError, "it ended before answering"))
 		default:
 			if _, err := m.startStopped(ctx, id, startOpts{}); err != nil && !errors.Is(err, errNotStopped) {
 				return nil, err

@@ -96,21 +96,21 @@ func TestMemorySpawned(t *testing.T) {
 		ok   bool
 		want spawnMemory
 	}{
-		{"fresh", fresh, memoryHash(b), a, true, spawnMemory{entries: a, fresh: true, hash: memoryHash(a)}},
+		{"fresh", fresh, memoryHash(b), a, true, spawnMemory{fresh: true, hash: memoryHash(a)}},
 		{"fresh without memory", fresh, memoryHash(a), nil, true, spawnMemory{fresh: true}},
-		{"resumed, unchanged", resumed, memoryHash(a), a, true, spawnMemory{entries: a, hash: memoryHash(a)}},
+		{"resumed, unchanged", resumed, memoryHash(a), a, true, spawnMemory{hash: memoryHash(a)}},
 		{"resumed, changed", resumed, memoryHash(a), b, true,
-			spawnMemory{entries: b, hash: memoryHash(b), note: MemoryRefreshHeading + "\n- Use spaces"}},
+			spawnMemory{hash: memoryHash(b), note: MemoryRefreshHeading + "\n- Use spaces"}},
 		{"resumed, emptied", resumed, memoryHash(a), nil, true, spawnMemory{note: MemoryRefreshNone}},
 		{"resumed, never had any", resumed, "", a, true,
-			spawnMemory{entries: a, hash: memoryHash(a), note: MemoryRefreshHeading + "\n- Use tabs"}},
+			spawnMemory{hash: memoryHash(a), note: MemoryRefreshHeading + "\n- Use tabs"}},
 		{"resumed, unreadable", resumed, memoryHash(a), nil, false, spawnMemory{}},
 		{"fork, changed", fork, memoryHash(a), b, true,
-			spawnMemory{entries: b, hash: memoryHash(b), note: MemoryRefreshHeading + "\n- Use spaces"}},
+			spawnMemory{hash: memoryHash(b), note: MemoryRefreshHeading + "\n- Use spaces"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got := memorySpawned(tt.l, tt.had, tt.mem, tt.ok)
-			if !slices.Equal(got.entries, tt.want.entries) || got.fresh != tt.want.fresh || got.hash != tt.want.hash || got.note != tt.want.note {
+			if got.fresh != tt.want.fresh || got.hash != tt.want.hash || got.note != tt.want.note {
 				t.Errorf("memorySpawned = %+v, want %+v", got, tt.want)
 			}
 		})

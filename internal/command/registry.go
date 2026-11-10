@@ -198,7 +198,11 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 		}
 		ce := &ConfirmError{Command: name, Title: c.Title, Message: msg, Label: c.ConfirmLabel}
 		if c.BindConfirm != "" {
-			ce.Bind = map[string]string{c.BindConfirm: ConfirmDigest(msg)}
+			bind := ConfirmDigest(msg)
+			if c.ConfirmBind != nil {
+				bind = c.ConfirmBind(ctx, eff, args, msg)
+			}
+			ce.Bind = map[string]string{c.BindConfirm: bind}
 		}
 		if eff.Untrusted() {
 			if ce.Message, err = c.pageConfirm(msg, args); err != nil {
@@ -220,8 +224,9 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 // ReplacePrefix atomically replaces every command whose name starts with prefix with
 // cmds: the plugin store's dynamic commands (plugin.<name>.*), re-registered on enable
 // and on a manifest change, and removed with an empty cmds on disable. prefix must end
-// in "." and every cmd must carry it and pass Register's checks. A name outside the
-// prefix that collides wraps ErrDuplicate. On any error nothing changes.
+// in "." and every cmd must carry it and pass Register's checks: a name outside the
+// prefix wraps ErrInvalidCommand, and a name given twice in cmds wraps ErrDuplicate. On
+// any error nothing changes.
 func (r *Registry) ReplacePrefix(prefix string, cmds []Command) error {
 	if !strings.HasSuffix(prefix, ".") || !NamePattern.MatchString(prefix+"x") {
 		return fmt.Errorf("%w: prefix %q must be dotted segments ending in \".\"", ErrInvalidCommand, prefix)

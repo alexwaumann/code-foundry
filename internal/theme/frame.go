@@ -13,8 +13,9 @@ import (
 	"sync"
 )
 
-// The frame stylesheet (docs/notes/theme-css-route.md): pages the model writes (the File
-// tab's HTML preview today) link GET /cf/theme.css and paint in the user's theme. The GUI
+// The frame stylesheet (docs/notes/theme-css-route.md): pages the model writes (inline
+// cards, panel pages, the File tab's HTML preview) link GET /cf/theme.css and paint in the
+// user's theme. The GUI
 // resolves the slots (gui/frontend/src/themes/slots.ts) and publishes them
 // (UiService.PublishTheme); the daemon only keeps the last one and writes it out. Nothing
 // is derived here: frame.css (the component aliases, radius scale and type roles, every
@@ -239,7 +240,7 @@ func (l *Live) JSON() FrameJSON {
 // /cf/theme.json from live; any other path under
 // /cf/ is 404. It needs no credential (an <iframe>'s stylesheet link sends no header) and
 // reveals only colours. Never cached (a theme change must reach the next load), any origin
-// (the preview's pages are opaque-origin and may fetch the JSON).
+// (the pages it paints may be opaque-origin and may fetch the JSON).
 func FrameHandler(live *Live) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

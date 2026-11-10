@@ -116,7 +116,7 @@ func actionCommandLines(ctx context.Context, b ActionBackend, ref string) (strin
 }
 
 // RegisterAction registers action.list, action.add, action.edit, action.remove,
-// action.run, action.wait, action.runs and action.last.
+// action.run, action.wait, action.runs, action.last and action.stop.
 func RegisterAction(r *Registry, d ActionDeps) error {
 	r.SetIDLister(RunID, runIDs(d.Action))
 	projectArg := ArgSpec{Name: "project", Type: String, Context: ContextProject,

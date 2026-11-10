@@ -260,9 +260,13 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 	)
 }
 
-// pluginState is a state in words.
+// pluginState is a plugin's state in a word ("running"), "unknown" when unspecified.
 func pluginState(s v1.PluginState) string {
-	return strings.ToLower(strings.TrimPrefix(s.String(), "PLUGIN_STATE_"))
+	w := strings.ToLower(strings.TrimPrefix(s.String(), "PLUGIN_STATE_"))
+	if w == "unspecified" {
+		return "unknown"
+	}
+	return w
 }
 
 func enabledMessage(p *v1.Plugin) string {

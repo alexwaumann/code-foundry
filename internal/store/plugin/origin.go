@@ -218,7 +218,8 @@ func (m *Manager) purgeIdentity(ctx context.Context, name string) ([]string, err
 }
 
 // purgeSecretsAndData deletes name's recorded secrets (Keychain item, then row) and its
-// data dir, and says what it deleted.
+// data dir, and says what it deleted. The callers stopped the plugin first, so there is
+// no process to tell.
 func (m *Manager) purgeSecretsAndData(ctx context.Context, name string) ([]string, error) {
 	var purged []string
 	secrets, err := listSecrets(ctx, m.opts.DB, name)
@@ -232,7 +233,6 @@ func (m *Manager) purgeSecretsAndData(ctx context.Context, name string) ([]strin
 		if _, err := dropSecret(ctx, m.opts.DB, name, s.Key); err != nil {
 			return purged, err
 		}
-		m.secretDeleted(name, s.Key) // (the callers stopped it first: nothing to tell)
 	}
 	if len(secrets) > 0 {
 		purged = append(purged, fmt.Sprintf("%d secret(s) from the Keychain", len(secrets)))

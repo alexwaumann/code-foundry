@@ -131,6 +131,31 @@ func TestProjectCleanupArgsAndFlow(t *testing.T) {
 	}
 }
 
+// With project.* registered too, the project arg takes a path inside the project like
+// every other project arg; the cleanup gets its id.
+func TestProjectCleanupTakesAPath(t *testing.T) {
+	project := &commandtest.Project{Projects: []*v1.Project{{Id: "135656834808", Name: "repo", Path: "/src/repo", Worktrees: []*v1.Worktree{{Path: "/src/repo", IsMain: true}}}}}
+	reg := command.NewRegistry()
+	if err := errors.Join(
+		command.RegisterProject(reg, project, nil),
+		command.RegisterProjectCleanup(reg, command.ProjectCleanupDeps{Project: project, GitOps: &commandtest.GitOps{}}),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.Invoke(context.Background(), command.Context{}, "project.worktree.cleanup", map[string]string{"project": "/src/repo/sub"}, command.Confirmed(true)); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, m := range project.Requests() {
+		if c, ok := m.(*v1.CleanupWorktreesRequest); ok {
+			got = append(got, c.GetProject())
+		}
+	}
+	if strings.Join(got, ",") != "135656834808,135656834808" {
+		t.Errorf("cleanup requests named %v, want the project's id twice", got)
+	}
+}
+
 func TestProjectCleanupFetchFailureRemovesNothing(t *testing.T) {
 	reg, shared, _, ops := cleanupFixture(t, &v1.CleanupWorktreesResponse{ProjectId: "r1"}, &v1.CleanupWorktreesResponse{ProjectId: "r1"})
 	ops.Op = &v1.GitOp{Title: "Fetch origin", State: v1.GitOpState_GIT_OP_STATE_FAILED, Summary: "could not read from remote"}

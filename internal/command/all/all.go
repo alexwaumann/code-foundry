@@ -35,8 +35,8 @@ type Deps struct {
 	// Project backs project.*. Nil works like Terminal.
 	Project command.ProjectBackend
 	// NotGit reports a context in a project without git: it gates project.worktree.*,
-	// project.git.init, and (unless GitOps.NotGit is set) git.* and pr.*. Nil: every
-	// project is git.
+	// project.git.init, and (unless GitOps.NotGit is set) git.fetch, git.pull, git.push,
+	// pr.create and pr.open. Nil: every project is git.
 	NotGit command.NotGitFunc
 	// Clone backs project.clone. Nil makes it fail with Unimplemented.
 	Clone command.CloneFunc
@@ -48,9 +48,9 @@ type Deps struct {
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
 	// A nil Backend works like Terminal.
 	GitOps command.GitOpsDeps
-	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review and
-	// pr.comment (the pull request detail panel's actions), and reads the pull request for pr.ask, pr.explain and
-	// pr.fix.findings (which also use Project, Thread, GitOps.Backend and Emitter). Nil
+	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review, pr.comment,
+	// pr.ready, pr.draft, pr.auto-merge and pr.checkbox (the pull request detail panel's
+	// actions), and reads the pull request for pr.ask, pr.explain and pr.fix.findings (which also use Project, Thread, GitOps.Backend and Emitter). Nil
 	// works like Terminal.
 	Gh command.GhBackend
 	// Settings backs settings.*, theme.* and notifications.test (the alert volume). Nil works like
@@ -80,8 +80,9 @@ type Deps struct {
 	// Skills backs skill.* (skill.setup also uses Terminal, Project and Thread). Nil
 	// registers them failing with Unimplemented.
 	Skills command.SkillBackend
-	// Ember backs ember.* (ember.enable and ember.disable also use Settings). Nil
-	// registers them failing with Unimplemented.
+	// Ember backs ember.* (ember.enable and ember.disable also use Settings). Nil:
+	// ember.status and ember.board read empty, ember.enable and ember.disable change only
+	// the setting, and the rest fail with Unimplemented.
 	Ember command.EmberBackend
 	// Dictation backs dictation.*, DictationStatus their snapshot reads (nil: dictation
 	// unavailable).

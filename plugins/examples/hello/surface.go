@@ -39,7 +39,6 @@ type demo struct {
 	clicks  int
 	saved   map[string]any
 	pinned  bool
-	visible bool
 	running bool // the log tab's simulated build
 	started time.Time
 	build   int
@@ -426,12 +425,9 @@ func (d *demo) stream(build int) {
 	_ = d.render()
 }
 
-// Visibility notes whether anyone looks; a real plugin would pause its polling.
-func (d *demo) Visibility(visible bool) {
-	d.mu.Lock()
-	d.visible = visible
-	d.mu.Unlock()
-}
+// Visibility says whether anyone is looking; a plugin that polls pauses while hidden.
+// The demo does not poll.
+func (d *demo) Visibility(bool) {}
 
 // Close ends the instance.
 func (d *demo) Close(pluginsdk.CloseReason) { d.stop() }

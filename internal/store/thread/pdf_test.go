@@ -73,7 +73,7 @@ func TestParsePDFInfoPages(t *testing.T) {
 	}
 }
 
-func TestPDFPagesEstimate(t *testing.T) {
+func TestSettlePDFPagesEstimate(t *testing.T) {
 	noPdfinfo(t)
 	dir := t.TempDir()
 	tests := []struct {
@@ -93,18 +93,23 @@ func TestPDFPagesEstimate(t *testing.T) {
 			if err := os.WriteFile(p, data[:tt.size], 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if n, exact := pdfPages(context.Background(), p); n != tt.pages || exact {
-				t.Errorf("pdfPages = %d, %v; want %d estimated", n, exact, tt.pages)
+			if n, exact := settlePDFPages(context.Background(), p, int64(tt.size), 0); n != tt.pages || exact {
+				t.Errorf("settlePDFPages = %d, %v; want %d estimated", n, exact, tt.pages)
 			}
 		})
 	}
-	if n, exact := pdfPages(context.Background(), filepath.Join(dir, "gone.pdf")); n != 1 || exact {
-		t.Errorf("missing file = %d, %v", n, exact)
+	// A count too large for the file name is cut to the largest it carries.
+	p := filepath.Join(dir, "tiny.pdf")
+	if n, exact := settlePDFPages(context.Background(), p, 10, 10_000_000); n != maxNamedPDFPages || !exact {
+		t.Errorf("huge hint = %d, %v", n, exact)
+	}
+	if n, _, ok := stagedPDFPages(pdfFileName("0123456789abcdef0123456789abcdef", maxNamedPDFPages, true)); !ok || n != maxNamedPDFPages {
+		t.Errorf("the largest count does not parse back: %d, %v", n, ok)
 	}
 }
 
-// TestPDFPagesPdfinfo runs the real pdfinfo when it is installed.
-func TestPDFPagesPdfinfo(t *testing.T) {
+// TestSettlePDFPagesPdfinfo runs the real pdfinfo when it is installed.
+func TestSettlePDFPagesPdfinfo(t *testing.T) {
 	if pdfinfoPath() == "" {
 		t.Skip("pdfinfo not installed")
 	}
@@ -112,22 +117,22 @@ func TestPDFPagesPdfinfo(t *testing.T) {
 	if err := os.WriteFile(p, testPDF(12, 0), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if n, exact := pdfPages(context.Background(), p); n != 12 || !exact {
-		t.Errorf("pdfPages = %d, %v; want 12 exact", n, exact)
+	if n, exact := settlePDFPages(context.Background(), p, 0, 0); n != 12 || !exact {
+		t.Errorf("settlePDFPages = %d, %v; want 12 exact", n, exact)
 	}
 	// The count is the document's, not the size estimate.
 	if err := os.WriteFile(p, testPDF(2, 1<<20), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if n, exact := pdfPages(context.Background(), p); n != 2 || !exact {
-		t.Errorf("padded pdfPages = %d, %v; want 2 exact", n, exact)
+	if n, exact := settlePDFPages(context.Background(), p, 1<<20, 0); n != 2 || !exact {
+		t.Errorf("padded settlePDFPages = %d, %v; want 2 exact", n, exact)
 	}
 	// A file pdfinfo cannot parse falls back to the estimate.
 	bad := filepath.Join(t.TempDir(), "bad.pdf")
 	if err := os.WriteFile(bad, []byte("%PDF-1.4\ngarbage"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if n, exact := pdfPages(context.Background(), bad); n != 1 || exact {
+	if n, exact := settlePDFPages(context.Background(), bad, 16, 0); n != 1 || exact {
 		t.Errorf("unparseable = %d, %v; want 1 estimated", n, exact)
 	}
 }

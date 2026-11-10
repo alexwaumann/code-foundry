@@ -23,10 +23,10 @@ import (
 )
 
 // TerminalBackend is the slice of TerminalService the terminal.* commands need. It is
-// expressed in the generated Connect signatures because terminal.proto is the contract
-// the terminal step (1a) implements: its API handler, any TerminalServiceHandler, and a
-// TerminalServiceClient all satisfy it without an adapter. Until the handler is wired,
-// codefoundryv1connect.UnimplementedTerminalServiceHandler stands in.
+// expressed in the generated Connect signatures because terminal.proto is the contract:
+// the daemon's API handler, any TerminalServiceHandler, and a TerminalServiceClient all
+// satisfy it without an adapter. For a nil one, all.Register passes
+// codefoundryv1connect.UnimplementedTerminalServiceHandler.
 type TerminalBackend interface {
 	Create(context.Context, *connect.Request[v1.CreateTerminalRequest]) (*connect.Response[v1.CreateTerminalResponse], error)
 	Kill(context.Context, *connect.Request[v1.KillTerminalRequest]) (*connect.Response[v1.KillTerminalResponse], error)

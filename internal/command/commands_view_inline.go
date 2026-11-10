@@ -1,6 +1,7 @@
 package command
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"regexp"
@@ -227,8 +228,8 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 		if err != nil {
 			return Result{}, err
 		}
-		id = nonEmptyStr(res.Msg.GetThread().GetId(), id)
-		name = nonEmptyStr(res.Msg.GetThread().GetName(), id)
+		id = cmp.Or(res.Msg.GetThread().GetId(), id)
+		name = cmp.Or(res.Msg.GetThread().GetName(), id)
 	}
 	res, err := d.Inline.ShowHtml(ctx, connect.NewRequest(&v1.ShowThreadHtmlRequest{ThreadId: id, Path: a.Path("path"), Title: a.String("title"),
 		Again: a.Bool("again"), Panel: a.Bool("panel")}))
@@ -236,7 +237,7 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 		return Result{}, err
 	}
 	it := res.Msg.GetItem()
-	out := InlineResult{Thread: id, Item: it.GetId(), Path: nonEmptyStr(it.GetHtml().GetPath(), a.Path("path")), Reused: res.Msg.GetReused()}
+	out := InlineResult{Thread: id, Item: it.GetId(), Path: cmp.Or(it.GetHtml().GetPath(), a.Path("path")), Reused: res.Msg.GetReused()}
 	out.Warnings = d.pageWarnings(ctx, it.GetHtml().GetBaseDir(), a.Path("path"))
 	if e := res.Msg.GetEarlierItemId(); e != "" && !a.Bool("again") {
 		// Shown in an earlier turn: that card reloaded with the edit too, and both run the
@@ -270,11 +271,4 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 		}
 	}
 	return Result{JSON: out, Message: msg, Warnings: out.Warnings}, nil
-}
-
-func nonEmptyStr(s, fallback string) string {
-	if s == "" {
-		return fallback
-	}
-	return s
 }

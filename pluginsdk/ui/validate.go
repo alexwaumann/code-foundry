@@ -474,7 +474,6 @@ func (c *checker) node(path string, n Node, outer []string) {
 		if len(n.Markdown.Source) > MaxMarkdown {
 			c.bad(path+".markdown.source", "%d bytes, at most %d", len(n.Markdown.Source), MaxMarkdown)
 		}
-		c.str(path+".markdown.source", n.Markdown.Source, MaxMarkdown)
 	case n.Pairs != nil:
 		for i, it := range n.Pairs.Items {
 			p := fmt.Sprintf("%s.pairs.items[%d]", path, i)
@@ -1033,15 +1032,16 @@ func (c *checker) utf8(path []string, v reflect.Value) {
 	}
 }
 
-// nestedQuantifier returns the offset of the first group that holds a + or * quantifier
-// and is itself quantified with + or * ("(a+)+", "(x*)*", "(-[a-z]+)*", "((ab)+c)*"), or
-// -1. Backtracking engines (the GUI's JavaScript) can take exponential time on those.
-// The check is syntactic and conservative: escapes and character classes are skipped,
-// and it does not ask whether the repetition is actually ambiguous.
+// nestedQuantifier returns the offset of the first group that holds a repeating
+// quantifier and is itself quantified with one ("(a+)+", "(x*)*", "(-[a-z]+)*",
+// "((ab)+c)*", "(a+){2,}", "(a{1,3})+"), or -1. A repeating quantifier is +, *, {n,} or
+// {n,m} with m > 1. Backtracking engines (the GUI's JavaScript) can take exponential time
+// on those. The check is syntactic and conservative: escapes and character classes are
+// skipped, and it does not ask whether the repetition is actually ambiguous.
 func nestedQuantifier(pattern string) int {
 	type group struct {
 		start      int
-		quantified bool // holds a + or * quantifier
+		quantified bool // holds a repeating quantifier
 	}
 	var stack []group
 	inClass := false
@@ -1067,17 +1067,51 @@ func nestedQuantifier(pattern string) int {
 		case ch == ')' && len(stack) > 0:
 			g := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			if g.quantified && i+1 < len(pattern) && (pattern[i+1] == '+' || pattern[i+1] == '*') {
+			if g.quantified && repeats(pattern, i+1) {
 				return g.start
 			}
 			if len(stack) > 0 && g.quantified {
 				stack[len(stack)-1].quantified = true
 			}
-		case ch == '+' || ch == '*':
+		case repeats(pattern, i):
 			if len(stack) > 0 {
 				stack[len(stack)-1].quantified = true
 			}
 		}
 	}
 	return -1
+}
+
+// repeats reports whether pattern[i:] starts a repeating quantifier: +, *, {n,} or
+// {n,m} with m > 1.
+func repeats(pattern string, i int) bool {
+	if i >= len(pattern) {
+		return false
+	}
+	switch pattern[i] {
+	case '+', '*':
+		return true
+	case '{':
+	default:
+		return false
+	}
+	digits := func(j int) int {
+		for j < len(pattern) && pattern[j] >= '0' && pattern[j] <= '9' {
+			j++
+		}
+		return j
+	}
+	comma := digits(i + 1)
+	if comma == i+1 || comma >= len(pattern) || pattern[comma] != ',' {
+		return false // not a quantifier, or {n}
+	}
+	end := digits(comma + 1)
+	if end >= len(pattern) || pattern[end] != '}' {
+		return false
+	}
+	if end == comma+1 {
+		return true // {n,}
+	}
+	m, err := strconv.Atoi(pattern[comma+1 : end])
+	return err != nil || m > 1
 }

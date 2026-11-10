@@ -55,8 +55,7 @@ type Fake struct {
 	createDefaults thread.CreateDefaultsFunc
 	residentTools  map[string]thread.ResidentTools
 	wakeNotes      map[string]thread.WakeNoteFunc
-	// checkouts and hints back Checkouts and CheckoutHints (checkouts.go).
-	checkouts map[string][]thread.Checkout
+	// hints back CheckoutHints (checkouts.go).
 	hints     []string
 	placement *thread.PlacementReport
 	// prompts back ListPrompts (prompts.go).
@@ -165,15 +164,18 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 	return s, nil
 }
 
-// Create records the call and adds a STARTING thread ("s-N"). With
-// NewWorktree the thread's worktree is /worktrees/cf-<N> on branch cf/<N>, the fallback
-// when naming gives nothing (CreatedWorktree, BaseRef as requested); a NewWorktree.Branch
-// with a slash is the branch, one without is chore/<it> (semantic mode without a model). WorkspaceID is copied as is. With NewWorkspace the thread belongs to
-// workspace "w-new" and runs in /worktrees/<project>, project being ProjectID or the first project.
-// With NoProject it runs in /home. The call reads "Create <project> <path> <model>
-// <effort>", then " perm=<n>", " new-worktree=<base>", " branch=<b>", " workspace=<id>",
-// " new-workspace=<a,b>", " no-project", " prompt=<text>"
-// " composer=<text>" and " attachments=<a,b>" when set.
+// Create records the call and adds a STARTING thread ("s-N"). With NewWorktree the
+// thread's worktree is /worktrees/cf-<N> on branch cf/<N>, the fallback when naming
+// gives nothing (CreatedWorktree, BaseRef as requested); a NewWorktree.Branch with a
+// slash is the branch, one without is chore/<it> (semantic mode without a model).
+// WorkspaceID is copied as is; ProjectIDs ("<id>" or "<id>:<base ref>") make the project
+// set, the first the primary when ProjectID is empty. With NoProject it runs in /home,
+// or in Cwd. The call reads "Create <project> <path> <model> <effort>", then " perm=<n>",
+// " new-worktree=<base>", " branch=<b>", " workspace=<id>", " projects=<a,b>",
+// " like=<id>", " new-branch", " checkout-mode", " no-project", " cwd=<dir>",
+// " owner=<id>", " prompt=<text>", " composer=<text>", " attachments=<a,b>",
+// " created-by=<id>", " brief=<text>", " labels=<a,b>", " budget=<usd>" and " notify"
+// when set.
 func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Thread, error) {
 	f.applyCreateDefaults(ctx, &o)
 	call := fmt.Sprintf("Create %s %s %s %s", o.ProjectID, o.WorktreePath, o.Model, o.Effort)
@@ -506,7 +508,7 @@ func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
 	})
 }
 
-// RunIn records "RunIn <id> <project> <path>". It requires a workspace thread. A
+// RunIn records "RunIn <id> <project> <path>". It requires a thread with a project. A
 // disconnected thread moves at once to the path (else /worktrees/<project>); a live one
 // gets it as PendingWorktreePath.
 func (f *Fake) RunIn(_ context.Context, id string, t thread.RunInTarget) (thread.Thread, error) {
@@ -714,6 +716,17 @@ func (f *Fake) Items(_ context.Context, id string) (thread.ItemsSnapshot, error)
 	return f.itemsLocked(id), nil
 }
 
+// Pending returns Items' Seq and Pending.
+func (f *Fake) Pending(_ context.Context, id string) (uint64, []thread.PendingRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.get(id); err != nil {
+		return 0, nil, err
+	}
+	snap := f.itemsLocked(id)
+	return snap.Seq, snap.Pending, nil
+}
+
 // WatchItems is Items, counting a watcher (Watchers) until ctx ends.
 func (f *Fake) WatchItems(ctx context.Context, id string) (thread.ItemsSnapshot, error) {
 	f.mu.Lock()
@@ -891,19 +904,24 @@ func (f *Fake) CancelSetup(_ context.Context, id string) (thread.Thread, []strin
 	return s, f.KeptWorktrees, err
 }
 
-// DiscardSetup records "DiscardSetup <id>", forgets the thread and returns SetupDraft.
+// DiscardSetup records "DiscardSetup <id>", forgets the thread (Removed) and returns
+// SetupDraft.
 func (f *Fake) DiscardSetup(_ context.Context, id string) (thread.SetupDraft, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	if err := f.record("DiscardSetup " + id); err != nil {
+		f.mu.Unlock()
 		return thread.SetupDraft{}, err
 	}
 	if _, err := f.get(id); err != nil {
+		f.mu.Unlock()
 		return thread.SetupDraft{}, err
 	}
 	delete(f.byID, id)
 	f.rebuild()
-	return f.SetupDraft, nil
+	draft := f.SetupDraft
+	f.mu.Unlock()
+	bus.Publish[thread.Event](f.bus, thread.Removed{ID: id})
+	return draft, nil
 }
 
 // Compact records "Compact <id>" and sends /compact as the thread itself, like the

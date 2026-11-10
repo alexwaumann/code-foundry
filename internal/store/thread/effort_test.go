@@ -452,8 +452,6 @@ func TestRenderedSetEffortGap(t *testing.T) {
 	}
 }
 
-// The respawn's argv is the original launch's but for the conversation (--resume, no
-// --session-id) and the effort, plus what allow for session granted the old process.
 // heldItemThenStarted: an effort restart's new process failed (failText in the
 // timeline); the send it held succeeds, the thread starts again with the message as its
 // first prompt (one delivery, to a resumed process), and the failed restart's effort note
@@ -532,6 +530,8 @@ func TestRenderedSetEffortRespawnExecFails(t *testing.T) {
 	re.waitFor(s.ID, "started", func(s Thread) bool { return s.State == StateConnected })
 }
 
+// The respawn's argv is the original launch's but for the conversation (--resume, no
+// --session-id) and the effort, plus what allow for session granted the old process.
 func TestRenderedSetEffortRespawnArgv(t *testing.T) {
 	re := newFixtureEnv(t, "bash")
 	s := re.create(CreateOptions{Model: "haiku", Effort: "low", PermissionMode: PermissionAcceptEdits, InitialPrompt: "run it"})

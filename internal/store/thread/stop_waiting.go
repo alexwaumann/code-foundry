@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 )
 
 // Stop waiting (docs/notes/wait-list-daemon.md): the user takes back a thread that would
@@ -125,13 +126,18 @@ func (s *subscriptions) dropWakesLocked(subscriber string, ids []string) []Subsc
 		if subscriber != "" && owner != subscriber {
 			continue
 		}
+		var slots []time.Time
 		q.items = slices.DeleteFunc(q.items, func(d delivery) bool {
 			if !hit(d.sub) {
 				return false
 			}
 			note(d.of)
+			if !d.slot.IsZero() {
+				slots = append(slots, d.slot)
+			}
 			return true
 		})
+		s.refundLocked(owner, slots) // never sent: the wake limit does not count them
 		for sub, of := range q.taken {
 			if !hit(sub) {
 				continue

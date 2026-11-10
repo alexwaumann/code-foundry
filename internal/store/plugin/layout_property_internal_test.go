@@ -53,9 +53,6 @@ func checkGeneratedInDaemon(t *testing.T, seed uint64) bool {
 	if len(errs) > 0 {
 		return false
 	}
-	if p := nullListOf(canon, append(slices.Clone(requiredLists), "detail")); p != "" {
-		t.Fatalf("seed %d: null %s in the canonical form\n%s", seed, p, canon)
-	}
 	idx := buildIndex(v)
 	want := expectedElements(v)
 	var got []string
@@ -72,36 +69,6 @@ func checkGeneratedInDaemon(t *testing.T, seed uint64) bool {
 		t.Fatalf("seed %d: the index has\n%q\nthe view's acting elements are\n%q\n%s", seed, got, want, canon)
 	}
 	return true
-}
-
-// nullListOf is nullList with its own list of required keys.
-func nullListOf(view []byte, required []string) string {
-	var tree any
-	if json.Unmarshal(view, &tree) != nil {
-		return ""
-	}
-	var walk func(path string, v any) string
-	walk = func(path string, v any) string {
-		switch x := v.(type) {
-		case map[string]any:
-			for k, c := range x {
-				if c == nil && slices.Contains(required, k) {
-					return path + "." + k
-				}
-				if p := walk(path+"."+k, c); p != "" {
-					return p
-				}
-			}
-		case []any:
-			for i, c := range x {
-				if p := walk(fmt.Sprintf("%s[%d]", path, i), c); p != "" {
-					return p
-				}
-			}
-		}
-		return ""
-	}
-	return walk("", tree)
 }
 
 // expectedElements lists "key kind node" for every acting element of a valid view,

@@ -29,8 +29,6 @@ type Fake struct {
 	snap     *project.Snapshot
 	// details backs WorktreeDetail (detail.go); nil until SetDetail.
 	details map[string]project.WorktreeDetail
-	// fileDiff is what WorktreeFileDiff returns (SetFileDiff).
-	fileDiff project.WorktreeFileDiff
 	// compare and compareSides are what CompareWorktree and CompareFile return (SetCompare).
 	compare       project.WorktreeCompare
 	compareSides  project.CompareSides
@@ -38,8 +36,6 @@ type Fake struct {
 	commitMessage project.CompareCommitMessage
 	// refs backs ListRefs; nil until SetRefs.
 	refs map[string]project.Refs
-	// live is the last SetLiveWorktrees (activity.go).
-	live []string
 
 	// WorktreeRoot is where CreateWorktree puts worktrees without a path, like
 	// project.Options.WorktreeRoot. New sets it to DefaultWorktreeRoot.
@@ -242,7 +238,7 @@ func (f *Fake) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptio
 		f.mu.Unlock()
 		return project.Worktree{}, fmt.Errorf("%w: branch is required", project.ErrInvalidArgument)
 	}
-	slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
+	slug := cmp.Or(r.GitHubSlug, "_local/"+filepath.Base(r.Path))
 	path := filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(o.Branch, "/", "-"))
 	if o.Path != "" {
 		path = filepath.Clean(o.Path)
@@ -300,7 +296,7 @@ func (f *Fake) DefaultWorktreePath(projectID, branch string) string {
 	if !ok || !r.Git || branch == "" {
 		return ""
 	}
-	slug := cmp.Or(r.GitHubSlug, "_local/"+r.Name)
+	slug := cmp.Or(r.GitHubSlug, "_local/"+filepath.Base(r.Path))
 	return filepath.Join(f.WorktreeRoot, filepath.FromSlash(slug), strings.ReplaceAll(branch, "/", "-"))
 }
 
@@ -361,18 +357,28 @@ func (f *Fake) AbandonWorktree(_ context.Context, o project.AbandonWorktreeOptio
 	f.mu.Lock()
 	f.Calls = append(f.Calls, "AbandonWorktree "+o.ProjectID+" "+o.Path+" "+o.Branch)
 	f.Abandons = append(f.Abandons, o)
+	if f.Err != nil {
+		defer f.mu.Unlock()
+		return f.Err
+	}
 	r, ok := f.projects[o.ProjectID]
 	if !ok {
 		f.mu.Unlock()
 		return fmt.Errorf("%w: project %q", project.ErrNotFound, o.ProjectID)
 	}
-	if i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.Path == o.Path }); i >= 0 {
+	i := slices.IndexFunc(r.Worktrees, func(w project.Worktree) bool { return w.Path == o.Path })
+	if i >= 0 {
 		r.Worktrees = slices.Delete(slices.Clone(r.Worktrees), i, i+1)
 		f.projects[r.ID] = r
 		f.rebuild()
 	}
 	f.mu.Unlock()
-	return os.RemoveAll(o.Path)
+	err := os.RemoveAll(o.Path)
+	if i >= 0 {
+		f.publish(project.WorktreeRemoved{ProjectID: r.ID, Path: o.Path})
+		f.publish(project.ProjectUpdated{Project: r})
+	}
+	return err
 }
 
 // Refresh implements project.Store.

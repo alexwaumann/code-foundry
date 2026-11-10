@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -68,6 +69,12 @@ func TestParseLog(t *testing.T) {
 	if got[1].Subject != "subject with \x1f inside" {
 		t.Errorf("entry 1 subject = %q", got[1].Subject)
 	}
+
+	// A commit with no encoding header passes through raw; a response must be UTF-8.
+	got = parseLog([]byte("abc123\x1fabc\x1fJos\xe9\x1fj\xe9@x.org\x1f1700000000\x1fcaf\xe9\x1e\n"))
+	if len(got) != 1 || got[0].AuthorName != "Jos\uFFFD" || got[0].AuthorEmail != "j\uFFFD@x.org" || got[0].Subject != "caf\uFFFD" {
+		t.Errorf("latin-1 entry = %+v", got)
+	}
 }
 
 func TestMergeFiles(t *testing.T) {
@@ -102,6 +109,13 @@ func TestMergeFiles(t *testing.T) {
 		t.Errorf("conflicts: got %+v\nwant %+v", got, want)
 	}
 
+	// A name that is not UTF-8 would fail the whole response: it is left out.
+	latin1 := []nameStatus{{status: "A", path: "caf\xe9.txt"}, {status: "R", oldPath: "\xe9t\xe9", path: "summer"}, {status: "M", path: "ok.go"}}
+	got, _ = mergeFiles(latin1, nil, nil, []string{"na\xefve"})
+	if want := []FileChange{{Path: "ok.go", Status: "M"}}; !slices.Equal(got, want) {
+		t.Errorf("not UTF-8: got %+v\nwant %+v", got, want)
+	}
+
 	many := make([]string, DetailFilesMax+5)
 	for i := range many {
 		many[i] = strings.Repeat("x", 1+i%7) + string(rune('a'+i%26)) + "/" + time.Duration(i).String()
@@ -123,14 +137,19 @@ func TestCountLines(t *testing.T) {
 		{"one\ntwo", 2, false},
 		{"bin\x00ary\n", 0, true},
 	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = root.Close() }()
 	for i, tt := range tests {
-		p := filepath.Join(dir, string(rune('a'+i)))
-		writeFile(t, p, tt.content)
-		if n, bin := countLines(p); n != tt.lines || bin != tt.wantBinary {
+		name := string(rune('a' + i))
+		writeFile(t, filepath.Join(dir, name), tt.content)
+		if n, bin, _ := countRootLines(root, name, untrackedReadMax); n != tt.lines || bin != tt.wantBinary {
 			t.Errorf("%q: lines=%d binary=%v", tt.content, n, bin)
 		}
 	}
-	if n, bin := countLines(filepath.Join(dir, "missing")); n != 0 || bin {
+	if n, bin, _ := countRootLines(root, "missing", untrackedReadMax); n != 0 || bin {
 		t.Error("missing file counted")
 	}
 }
@@ -293,6 +312,68 @@ func TestWorktreeDetailConflicts(t *testing.T) {
 	if got := statuses(d); got["g.txt"] != "A" || slices.Contains(slices.Collect(maps.Values(got)), "U") {
 		t.Errorf("files after the abort = %+v", d.Files)
 	}
+}
+
+// The detail cache forgets a worktree once it is removed, and every worktree of an
+// unregistered project.
+func TestWorktreeDetailForgotten(t *testing.T) {
+	f := newFixture(t)
+	h := startHarness(t, "", Options{})
+	ctx := ctx20(t)
+	r, err := h.store.Register(ctx, f.project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := h.store.CreateWorktree(ctx, CreateWorktreeOptions{ProjectID: r.ID, Branch: "gone-soon"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{f.project, w.Path} {
+		if _, err := h.store.WorktreeDetail(ctx, r.ID, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	held := func() []string {
+		ds := &h.store.details
+		ds.mu.Lock()
+		defer ds.mu.Unlock()
+		var paths []string
+		for _, m := range []map[wtKey]bool{keysOf(ds.requested), keysOf(ds.cache), keysOf(ds.heads), keysOf(ds.lines)} {
+			for k := range m {
+				if !slices.Contains(paths, k.path) {
+					paths = append(paths, k.path)
+				}
+			}
+		}
+		slices.Sort(paths)
+		return paths
+	}
+	settled := func(want ...string) {
+		t.Helper()
+		deadline := time.Now().Add(5 * time.Second)
+		for !slices.Equal(held(), want) {
+			if time.Now().After(deadline) {
+				t.Fatalf("detail cache holds %q, want %q", held(), want)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if err := h.store.RemoveWorktree(ctx, RemoveWorktreeOptions{ProjectID: r.ID, Path: w.Path}); err != nil {
+		t.Fatal(err)
+	}
+	settled(f.project)
+	if err := h.store.Unregister(ctx, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	settled()
+}
+
+func keysOf[V any](m map[wtKey]V) map[wtKey]bool {
+	keys := make(map[wtKey]bool, len(m))
+	for k := range m {
+		keys[k] = true
+	}
+	return keys
 }
 
 // A worktree nobody asked about is not recomputed by status refreshes.
@@ -495,6 +576,49 @@ func TestCountUntrackedMemo(t *testing.T) {
 
 	if memo, reads = countUntracked(dir, files(), memo); memo != nil || reads != 0 {
 		t.Errorf("none untracked: memo %v, reads %d", memo, reads)
+	}
+}
+
+// countUntracked counts an untracked link as one line, as git stores it: never what it
+// leads to, a file outside the checkout or a FIFO an open would block on.
+func TestCountUntrackedLinks(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "wt")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(base, "secret.txt"), "s\ns\ns\n")
+	if err := syscall.Mkfifo(filepath.Join(base, "pipe"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for name, target := range map[string]string{"leak": filepath.Join(base, "secret.txt"), "pipe-link": filepath.Join(base, "pipe")} {
+		if err := os.Symlink(target, filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := syscall.Mkfifo(filepath.Join(dir, "pipe"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fs := []FileChange{{Path: "leak", Status: "?"}, {Path: "pipe", Status: "?"}, {Path: "pipe-link", Status: "?"}}
+	done := make(chan lineMemo, 1)
+	go func() {
+		memo, _ := countUntracked(dir, fs, nil)
+		done <- memo
+	}()
+	select {
+	case memo := <-done:
+		got := map[string]int{}
+		for _, f := range fs {
+			got[f.Path] = f.Added
+		}
+		if want := map[string]int{"leak": 1, "pipe": 0, "pipe-link": 1}; !maps.Equal(got, want) {
+			t.Errorf("counts %v, want %v", got, want)
+		}
+		if memo, reads := countUntracked(dir, fs, memo); reads != 0 || len(memo) != 3 {
+			t.Errorf("unchanged: reads %d, memo %v", reads, memo)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("counting an untracked link to a FIFO blocked")
 	}
 }
 

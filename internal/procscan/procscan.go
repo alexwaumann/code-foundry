@@ -14,10 +14,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -115,14 +113,10 @@ func cwdsOf(ctx context.Context, procs []Proc) (map[int]string, error) {
 	for i, p := range procs {
 		pids[i] = strconv.Itoa(p.PID)
 	}
-	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	// -a: and the selections; -d cwd: only the cwd; -F pn: machine output; -w: no
-	// warnings. lsof exits 1 when some pid is gone meanwhile: what it printed holds.
-	out, err := exec.CommandContext(cctx, "/usr/sbin/lsof", "-w", "-a", "-d", "cwd", "-Fpn", "-p", strings.Join(pids, ",")).Output()
-	var exit *exec.ExitError
-	if err != nil && !errors.As(err, &exit) {
-		return nil, fmt.Errorf("procscan: lsof: %w", err)
+	// -a: and the selections; -d cwd: only the cwd; -F pn: machine output.
+	out, err := lsof(ctx, "-a", "-d", "cwd", "-Fpn", "-p", strings.Join(pids, ","))
+	if err != nil {
+		return nil, err
 	}
 	return parseLsof(out), nil
 }
@@ -165,8 +159,8 @@ func exeOf(pid int) string {
 }
 
 // StopGroups sends SIGTERM to each process group in pgids, then SIGKILL after grace to
-// the groups that still have a process; it returns once that is done (or ctx ends).
-// A group that is gone is skipped. Groups at or below 1, and the caller's own, are
+// each group the SIGTERM reached; it returns once that is done (or ctx ends). A group
+// that is gone at the SIGTERM is skipped. Groups at or below 1, and the caller's own, are
 // never signalled.
 func StopGroups(ctx context.Context, pgids []int, grace time.Duration) {
 	self := syscall.Getpgrp()

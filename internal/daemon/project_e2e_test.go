@@ -42,6 +42,23 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 	return b.next.RoundTrip(r)
 }
 
+// waitEndpoint waits for the daemon at p to write its loopback endpoint: it is up. A
+// daemon start under the race detector takes seconds.
+func waitEndpoint(t *testing.T, p paths.Paths) client.Endpoint {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		ep, err := client.ReadEndpoint(p)
+		if err == nil {
+			return ep
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("daemon did not start: %v", err)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
 // TestProjectServiceEndToEnd runs the daemon and drives ProjectService over the
 // token-protected loopback listener: Register -> List -> CreateWorktree -> dirty file
 // observed on Watch -> RemoveWorktree -> Unregister, then a prompt shutdown with a
@@ -86,16 +103,7 @@ func TestProjectServiceEndToEnd(t *testing.T) {
 		<-done
 	})
 
-	var ep client.Endpoint
-	for i := 0; ; i++ {
-		if ep, err = client.ReadEndpoint(p); err == nil {
-			break
-		}
-		if i > 200 {
-			t.Fatalf("daemon did not start: %v", err)
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
+	ep := waitEndpoint(t, p)
 	var protocols http.Protocols
 	protocols.SetUnencryptedHTTP2(true)
 	hc := &http.Client{Transport: bearer{token: ep.Token, next: &http.Transport{

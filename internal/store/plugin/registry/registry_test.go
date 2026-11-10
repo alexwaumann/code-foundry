@@ -93,6 +93,10 @@ func TestParseLocation(t *testing.T) {
 		{in: "https://plugins.example.com/index.json", url: "https://plugins.example.com/index.json", index: "https://plugins.example.com/index.json"},
 		{in: "https://plugins.example.com/team/", url: "https://plugins.example.com/team", index: "https://plugins.example.com/team/index.json"},
 		{in: "http://127.0.0.1:8080/index.json", url: "http://127.0.0.1:8080/index.json", index: "http://127.0.0.1:8080/index.json"},
+		{in: "https://raw.githubusercontent.com/o/r/main/index.json", url: "https://raw.githubusercontent.com/o/r/main/index.json",
+			index: "https://raw.githubusercontent.com/o/r/main/index.json"},
+		{in: "https://raw.githubusercontent.com/o/r/main/", url: "https://raw.githubusercontent.com/o/r/main",
+			index: "https://raw.githubusercontent.com/o/r/main/index.json"},
 		{in: "http://plugins.example.com/index.json", err: "plain http only for localhost"},
 		{in: "https://github.com/o", err: "want https://github.com/<owner>/<repo>"},
 		{in: "https://github.com/o/r/tree/main", err: "want https://github.com/<owner>/<repo>"},
@@ -219,6 +223,46 @@ func TestClientCacheAndMerge(t *testing.T) {
 	locs, _ := registry.ParseList(srv.URL + "/index.json, o/main")
 	if !c.SetLocations(locs) || c.SetLocations(locs) {
 		t.Error("SetLocations should report a change once")
+	}
+}
+
+// Cached reads the disk cache without waiting for a Read's fetch in flight.
+func TestCachedDoesNotWaitForAFetch(t *testing.T) {
+	entered, release := make(chan struct{}, 1), make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release
+		_, _ = w.Write([]byte(`{"schema":1,"plugins":[]}`))
+	}))
+	defer srv.Close()
+	c := registry.NewClient(registry.Options{CacheDir: t.TempDir(), Fetcher: registry.Fetcher{HTTP: srv.Client()}, Log: slog.New(slog.DiscardHandler)})
+	locs, err := registry.ParseList(srv.URL + "/index.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.SetLocations(locs)
+	read := make(chan struct{})
+	go func() {
+		defer close(read)
+		c.Read(context.Background(), true)
+	}()
+	defer func() {
+		close(release)
+		<-read
+	}()
+	<-entered
+	done := make(chan registry.Merged, 1)
+	go func() { done <- c.Cached() }()
+	select {
+	case m := <-done:
+		if len(m.Registries) != 1 || len(m.Entries) != 0 {
+			t.Errorf("cached = %+v", m)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Cached waited for the fetch")
 	}
 }
 

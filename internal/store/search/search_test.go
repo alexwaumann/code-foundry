@@ -603,12 +603,17 @@ func TestRunTokenLiveWhileRunning(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	sp := h.spawn(t)
+	tokens := 0
 	for _, kv := range sp.Env {
 		if tok, ok := strings.CutPrefix(kv, "CODE_FOUNDRY_TOKEN="); ok {
+			tokens++
 			if s, live := h.caps.Lookup(tok); !live || s.Search != e.ID {
 				t.Errorf("scope = %+v, live %v", s, live)
 			}
 		}
+	}
+	if tokens != 1 {
+		t.Fatalf("%d CODE_FOUNDRY_TOKEN entries in %q, want 1", tokens, sp.Env)
 	}
 }
 

@@ -21,7 +21,8 @@ const DefaultTTL = time.Hour
 
 // Options configures a Client.
 type Options struct {
-	// CacheDir keeps one file per registry (<sha256 of the URL>.json). Required.
+	// CacheDir keeps one file per registry (<the URL's SHA-256, first 16 hex digits>.json).
+	// Required.
 	CacheDir string
 	// Fetcher reads indexes; its Gh is required for github.com registries.
 	Fetcher Fetcher
@@ -170,21 +171,26 @@ func (c *Client) writeCache(cf cacheFile) error {
 // cached index (however old) is used and the failure reported in its Status. Read never
 // fails as a whole: a registry that cannot be read contributes nothing and says why.
 func (c *Client) Read(ctx context.Context, refresh bool) Merged {
-	return c.read(ctx, func(cf cacheFile, ok bool) bool {
+	return c.read(ctx, true, func(cf cacheFile, ok bool) bool {
 		return refresh || !ok || c.opts.Now().Sub(cf.FetchedAt) >= c.opts.TTL
 	})
 }
 
 // Cached returns the merged index from the disk cache only, however old (no network):
-// what the daemon knows at start.
+// what the daemon knows at start. It does not wait for a Read's fetches: cache files are
+// replaced whole (rename), so reading one needs no lock.
 func (c *Client) Cached() Merged {
-	return c.read(context.Background(), func(cacheFile, bool) bool { return false })
+	return c.read(context.Background(), false, func(cacheFile, bool) bool { return false })
 }
 
-func (c *Client) read(ctx context.Context, fetch func(cf cacheFile, ok bool) bool) Merged {
+// read merges the registries' indexes, fetching those fetch says to. lock serializes it
+// with other fetching reads.
+func (c *Client) read(ctx context.Context, lock bool, fetch func(cf cacheFile, ok bool) bool) Merged {
 	locs := c.Locations()
-	c.fetchMu.Lock()
-	defer c.fetchMu.Unlock()
+	if lock {
+		c.fetchMu.Lock()
+		defer c.fetchMu.Unlock()
+	}
 	out := Merged{Entries: []Entry{}, Registries: make([]Status, 0, len(locs))}
 	byName := map[string]int{}
 	for _, loc := range locs {
@@ -213,7 +219,11 @@ func (c *Client) read(ctx context.Context, fetch func(cf cacheFile, ok bool) boo
 			st.FetchedAt = cf.FetchedAt
 			idx, issues, err := Parse(cf.Index)
 			if err != nil {
-				st.Error = strings.TrimSpace(st.Error + "; cached index: " + err.Error())
+				msg := "cached index: " + err.Error()
+				if st.Error != "" {
+					msg = st.Error + "; " + msg
+				}
+				st.Error = msg
 			}
 			st.Issues = issues
 			st.Plugins = len(idx.Plugins)

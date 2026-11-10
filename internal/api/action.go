@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -253,12 +252,8 @@ func actionToProto(a action.Action) *v1.Action {
 		Id: a.ID, ProjectId: a.ProjectID, Name: a.Name, Command: a.Command, Icon: actionIcons[a.Icon],
 		InTerminal: a.InTerminal, OnWorktreeCreate: a.OnWorktreeCreate, Position: int32(a.Position),
 	}
-	if !a.CreatedAt.IsZero() {
-		p.CreatedAt = timestamppb.New(a.CreatedAt)
-	}
-	if !a.UpdatedAt.IsZero() {
-		p.UpdatedAt = timestamppb.New(a.UpdatedAt)
-	}
+	p.CreatedAt = timestamp(a.CreatedAt)
+	p.UpdatedAt = timestamp(a.UpdatedAt)
 	return p
 }
 
@@ -296,12 +291,8 @@ func actionRunToProto(r action.Run) *v1.ActionRun {
 	if r.State == action.RunExited {
 		p.State, p.ExitCode = v1.ActionRunState_ACTION_RUN_STATE_EXITED, int32(r.ExitCode)
 	}
-	if !r.StartedAt.IsZero() {
-		p.StartedAt = timestamppb.New(r.StartedAt)
-	}
-	if !r.FinishedAt.IsZero() {
-		p.FinishedAt = timestamppb.New(r.FinishedAt)
-	}
+	p.StartedAt = timestamp(r.StartedAt)
+	p.FinishedAt = timestamp(r.FinishedAt)
 	return p
 }
 
@@ -310,9 +301,7 @@ func actionRunRecordToProto(r action.RunRecord) *v1.ActionRunRecord {
 		RunId: r.RunID, ActionId: r.ActionID, ProjectId: r.ProjectID, ThreadId: r.ThreadID,
 		Mode: actionModeToProto(r.Mode), Trigger: actionTriggerToProto(r.Trigger),
 	}
-	if !r.StartedAt.IsZero() {
-		p.StartedAt = timestamppb.New(r.StartedAt)
-	}
+	p.StartedAt = timestamp(r.StartedAt)
 	return p
 }
 

@@ -29,8 +29,8 @@ import (
 // The found groups are probed for listening TCP sockets with one lsof call for every
 // running shell of every thread: 1, 3 and 10 seconds after any shell starts, then every
 // 10 seconds, and not at all while no shell runs. A shell's end drops it, ports and all,
-// at once (the runner publishes the list without it). lsof missing or failing turns the
-// watch off for the daemon's life, logged once.
+// at once (the runner publishes the list without it). lsof missing, or 3 failed calls in
+// a row (serverFailLimit), turns the watch off for the daemon's life, logged once.
 
 // ShellStopGrace is how long a stopped background shell's process group gets between
 // SIGTERM and SIGKILL (StopShell).

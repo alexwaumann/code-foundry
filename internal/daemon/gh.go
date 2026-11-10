@@ -43,24 +43,37 @@ func startGh(ctx context.Context, log *slog.Logger, store ghTracker, projects in
 	go func() {
 		defer wg.Done()
 		defer sub.Close()
+		// Two projects can share a slug (two clones of one repository): it is tracked
+		// while any of them has it.
 		slugs := map[string]string{} // project id -> tracked slug
+		inUse := func(slug string) bool {
+			for _, s := range slugs {
+				if s == slug {
+					return true
+				}
+			}
+			return false
+		}
 		track := func(id, slug string) {
 			slug = strings.ToLower(slug)
-			if prev, ok := slugs[id]; ok && prev == slug {
+			prev, ok := slugs[id]
+			if ok && prev == slug {
 				return
 			}
-			if prev, ok := slugs[id]; ok && prev != "" {
+			delete(slugs, id)
+			if ok && prev != "" && !inUse(prev) {
 				if err := store.Untrack(prev); err != nil {
 					log.Warn("gh untrack", "slug", prev, "err", err)
 				}
 			}
-			delete(slugs, id)
 			if slug == "" {
 				return
 			}
-			if err := store.Track(slug); err != nil {
-				log.Warn("gh track", "slug", slug, "err", err)
-				return
+			if !inUse(slug) {
+				if err := store.Track(slug); err != nil {
+					log.Warn("gh track", "slug", slug, "err", err)
+					return
+				}
 			}
 			slugs[id] = slug
 		}

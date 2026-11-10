@@ -38,9 +38,9 @@ type Threads interface {
 	SetResidentWakeNote(name string, fn thread.WakeNoteFunc)
 }
 
-// Config is what the Ember store reads from the ember.* settings (and one threads.*
-// one). The daemon maps the settings onto it (the store does not import the settings
-// store) and calls ConfigChanged after every change.
+// Config is what the Ember store reads from the ember.* settings. The daemon maps the
+// settings onto it (the store does not import the settings store) and calls
+// ConfigChanged after every change.
 type Config struct {
 	// Enabled is ember.enabled.
 	Enabled bool
@@ -149,13 +149,13 @@ type Store struct {
 	// mu guards everything below.
 	mu    sync.Mutex
 	tasks []Task // without Thread, in board order
-	// reset are the tasks New put back to todo (ResetAtStart).
-	reset []Task
 	st    persisted
 	// cfg and enabled are the settings last applied (applySettings).
 	cfg     Config
 	enabled bool
 	applied bool
+	// enableFailed: the last enable failed; the tick tries again (retryEnable).
+	enableFailed bool
 	// consolidating: an epoch boundary runs (boundary).
 	consolidating bool
 	// timers are the resident's timers as last read (refreshTimers).
@@ -214,7 +214,7 @@ func New(ctx context.Context, opts Options) (*Store, error) {
 	s := &Store{opts: opts, log: opts.Log, ctx: sctx, cancel: cancel, tasks: tasks, st: loadState(opts.Log, opts.Dir),
 		configChanged: make(chan struct{}, 1)}
 	s.mu.Lock()
-	s.reset = s.resetOrphansLocked(ctx, opts.Now())
+	s.resetOrphansLocked(ctx, opts.Now())
 	s.mu.Unlock()
 	opts.Threads.SetResidentTools(Name, Tools)
 	opts.Threads.SetCreateDefaults(s.workerDefaults)
@@ -300,6 +300,7 @@ func (s *Store) run(threadSub *bus.Subscription[thread.Event], subsSub *bus.Subs
 			s.onThreads()
 			s.refreshTimers()
 		case <-tick.C:
+			s.retryEnable()
 			s.onThreads()
 		}
 	}
@@ -321,25 +322,36 @@ func drain[T any](c <-chan T) {
 func (s *Store) applySettings(ctx context.Context) {
 	cfg := s.opts.Config()
 	s.mu.Lock()
-	was, first, prev := s.enabled, !s.applied, s.cfg
+	was, first, prev, failed := s.enabled, !s.applied, s.cfg, s.enableFailed
 	s.mu.Unlock()
+	var enableErr error
 	// Recorded once applied: the thread changes the actions make are looked at with the
 	// new settings (onThreads runs on the same goroutine).
 	defer func() {
 		s.mu.Lock()
-		s.cfg, s.enabled, s.applied = cfg, cfg.Enabled, true
+		s.cfg, s.enabled, s.applied, s.enableFailed = cfg, cfg.Enabled, true, enableErr != nil
 		s.mu.Unlock()
 		s.publish()
 	}()
 	switch {
-	case cfg.Enabled && (first || !was):
-		if err := s.enable(ctx, cfg); err != nil {
-			s.log.Error("ember: enabling failed", "err", err)
+	case cfg.Enabled && (first || !was || failed):
+		if enableErr = s.enable(ctx, cfg); enableErr != nil {
+			s.log.Error("ember: enabling failed", "err", enableErr)
 		}
 	case cfg.Enabled && (prev.Model != cfg.Model || prev.Effort != cfg.Effort):
 		s.configure(ctx, cfg)
 	case !cfg.Enabled && was:
 		s.disable()
+	}
+}
+
+// retryEnable applies the settings again when the last enable failed.
+func (s *Store) retryEnable() {
+	s.mu.Lock()
+	failed := s.enableFailed
+	s.mu.Unlock()
+	if failed {
+		s.applySettings(s.ctx)
 	}
 }
 
@@ -620,18 +632,19 @@ func (s *Store) publishLocked(threads *thread.Snapshot) {
 // (s.mu held).
 func (s *Store) derivedTasksLocked(threads *thread.Snapshot) []Task {
 	out := make([]Task, len(s.tasks))
-	var teams *teamIndex
+	var ix *teamIndex
 	for i, t := range s.tasks {
 		if t.ThreadID != "" {
-			t.Thread = taskThread(threads, t.ThreadID)
+			if ix == nil {
+				ix = newTeamIndex(threads)
+			}
+			w, ok := ix.byID[t.ThreadID]
+			t.Thread = newTaskThread(t.ThreadID, w, ok)
 			if staleReport(t) {
 				t.Thread.Report = thread.Report{}
 			}
 			if t.State.Open() && !t.Thread.Removed {
-				if teams == nil {
-					teams = newTeamIndex(threads)
-				}
-				t.Thread.Team = teams.team(t.ThreadID)
+				t.Thread.Team = ix.team(t.ThreadID)
 			}
 		}
 		out[i] = t
@@ -658,6 +671,11 @@ func staleReport(t Task) bool {
 // taskThread is the worker id's progress from threads.
 func taskThread(threads *thread.Snapshot, id string) *TaskThread {
 	t, ok := threads.Thread(id)
+	return newTaskThread(id, t, ok)
+}
+
+// newTaskThread is the worker id's progress from its thread t (ok false: removed).
+func newTaskThread(id string, t thread.Thread, ok bool) *TaskThread {
 	if !ok {
 		return &TaskThread{ID: id, Removed: true}
 	}

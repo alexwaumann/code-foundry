@@ -7,7 +7,7 @@ import (
 )
 
 func TestDecodePullRequest(t *testing.T) {
-	pr, p1, _, err := decodePullRequest(fixtureData(t, "pull_request_14586_page1.json"))
+	pr, p1, err := decodePullRequest(fixtureData(t, "pull_request_14586_page1.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,20 +31,20 @@ func TestDecodePullRequest(t *testing.T) {
 		t.Errorf("first run = %+v", first)
 	}
 
-	_, p2, _, err := decodePullRequest(fixtureData(t, "pull_request_14586_page2.json"))
+	_, p2, err := decodePullRequest(fixtureData(t, "pull_request_14586_page2.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p2.Runs) != 5 || p2.Next.HasNextPage {
 		t.Errorf("page2 runs=%d next=%+v", len(p2.Runs), p2.Next)
 	}
-	if _, _, _, err := decodePullRequest(fixtureData(t, "graphql_pr_not_found.json")); !errors.Is(err, ErrNotFound) {
+	if _, _, err := decodePullRequest(fixtureData(t, "graphql_pr_not_found.json")); !errors.Is(err, ErrNotFound) {
 		t.Errorf("not found err = %v", err)
 	}
 }
 
 func TestDecodeChecks(t *testing.T) {
-	page, _, err := decodeChecks(fixtureData(t, "checks_main.json"))
+	page, err := decodeChecks(fixtureData(t, "checks_main.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,16 +53,16 @@ func TestDecodeChecks(t *testing.T) {
 		t.Errorf("sha=%s rollup=%+v runs=%d", page.SHA, page.Rollup, len(page.Runs))
 	}
 
-	if _, _, err := decodeChecks(fixtureData(t, "checks_unknown_ref.json")); !errors.Is(err, ErrNotFound) {
+	if _, err := decodeChecks(fixtureData(t, "checks_unknown_ref.json")); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown ref err = %v, want ErrNotFound", err)
 	}
-	if _, _, err := decodeChecks([]byte(`{"repository":{"object":{}}}`)); !errors.Is(err, ErrNotFound) {
+	if _, err := decodeChecks([]byte(`{"repository":{"object":{}}}`)); !errors.Is(err, ErrNotFound) {
 		t.Errorf("non-commit ref err = %v, want ErrNotFound", err)
 	}
 }
 
 func TestDecodeMixedStatusContexts(t *testing.T) {
-	page, _, err := decodeChecks(fixtureData(t, "checks_mixed_synthetic.json"))
+	page, err := decodeChecks(fixtureData(t, "checks_mixed_synthetic.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

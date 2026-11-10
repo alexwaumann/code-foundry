@@ -18,7 +18,7 @@ import (
 // connecting, and after the user's own reconnects. The answer is cached on the thread's
 // log and persisted (threadcache_db.go): a thread whose process stopped (lifecycle.go)
 // keeps its last check, also across a daemon restart. Every new answer is an McpChanged
-// event in the thread's seq order, so ThreadService.Watch carries it.
+// event in the thread's seq order, so ThreadService.WatchThread carries it.
 
 // McpTrigger says what made the daemon check the servers.
 type McpTrigger string

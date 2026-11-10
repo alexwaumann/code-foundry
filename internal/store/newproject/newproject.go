@@ -99,8 +99,8 @@ type PublishOptions struct {
 	Visibility Visibility
 }
 
-// Service is the project store as API handlers see it. *Store implements it;
-// projecttest provides a fake.
+// Service is the new-project store as API handlers see it. *Store implements it;
+// newprojecttest provides a fake.
 type Service interface {
 	// Create starts a project named name in the projects directory and registers it.
 	Create(ctx context.Context, name string) (project.Project, error)

@@ -1874,9 +1874,8 @@ func (x *RemovedWorktree) GetKind() CleanupKind {
 
 // UncommittedWork is the error detail (with FailedPrecondition) of a worktree removal
 // refused only because the worktrees have staged, modified, untracked or conflicted
-// files: ProjectService.RemoveWorktree, WorkspaceService.RemoveProject and
-// WorkspaceService.Remove without force. The worktrees carry their status counts, so a
-// client can ask the user whether to delete that work and retry with force.
+// files: ProjectService.RemoveWorktree without force. The worktrees carry their status
+// counts, so a client can ask the user whether to delete that work and retry with force.
 type UncommittedWork struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Worktrees     []*Worktree            `protobuf:"bytes,1,rep,name=worktrees,proto3" json:"worktrees,omitempty"`

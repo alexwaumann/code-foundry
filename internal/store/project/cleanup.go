@@ -138,12 +138,6 @@ func resolved(p string) string {
 	return p
 }
 
-// MergedClean reports whether CleanupVerdict(w, now) is removable.
-func (w Worktree) MergedClean(now time.Time) bool {
-	ok, _ := CleanupVerdict(w, now)
-	return ok
-}
-
 // Landed reports whether HEAD's work is in Status.BaseRef: HEAD is reachable from it
 // (BaseAhead 0) or its commits landed as a rebased or squash-merged copy (BaseMerged).
 // False without a BaseRef or after a failed status read. Uncommitted changes do not

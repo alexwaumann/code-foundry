@@ -1,6 +1,7 @@
 package thread
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -195,6 +196,29 @@ func TestSendToStoppedThreadIsBusyAtOnce(t *testing.T) {
 	}
 	gate.open()
 	e.sentUser("second")
+}
+
+// A message's start that fails before anything is told in the timeline (here its log
+// cannot load) leaves the thread stopped with the status it had, not working.
+func TestMessageStartFailureKeepsStatus(t *testing.T) {
+	e := newEnv(t)
+	s := e.stopped("a")
+	e.setThread(s.ID, StateDisconnected, StatusNeedsAttention, "finished")
+	e.m.tmu.Lock()
+	delete(e.m.threads, s.ID)
+	e.m.tmu.Unlock()
+	ctx, cancel := context.WithCancel(e.ctx())
+	cancel()
+	if _, err := e.m.startStopped(ctx, s.ID, startOpts{first: &outgoing{text: "hi", prompt: "hi"}}); err == nil {
+		t.Fatal("started with a cancelled context")
+	}
+	got := e.snapshot(s.ID)
+	if got.State != StateDisconnected || got.Status != StatusNeedsAttention || got.StatusReason != "finished" {
+		t.Errorf("after the failed start: state %v status %v %q", got.State, got.Status, got.StatusReason)
+	}
+	if _, err := e.m.startStopped(e.ctx(), s.ID, startOpts{}); err != nil {
+		t.Errorf("the next start: %v", err)
+	}
 }
 
 // initGate holds a fake claude's initialize answer until open (CF_FAKE_CLAUDE_INIT_GATE).

@@ -88,7 +88,7 @@ Picking runs the item's action as a button's (a `click` act with the item's key 
 commands confirm, URLs and copies stay in the host). 24 entries per menu or submenu,
 labels 60 characters; items count as elements and share the view's keys
 (`plugintest.Host.PickItem` picks one in a test). **The fold:** a row narrower than its
-buttons need beside about 200 px of title (three buttons in the 400 px panel, not two)
+buttons need beside about 200 px of title (three buttons in the 420 px panel, not two)
 shows them in its ⋯ instead, first, then a separator, then its menu; an expanded panel
 or a page shows the buttons. A row with buttons and no menu gets a ⋯ only while folded.
 `h.HasCapability("view.menu")`: an older host drops menus.
@@ -108,7 +108,7 @@ renamed in place (double-click it or F2; Enter too on a row without an `action`,
 Enter runs otherwise; Enter or leaving commits, Escape cancels, an empty or unchanged
 title sends nothing). Each sends an act (`primitives.md`, "Acts") that the host shows at
 once and undoes if you return an error: answer with the view that has the change. Not on
-a `masterDetail`'s list. At 360 px nothing is hidden: grip and checkbox take 36 px.
+a `masterDetail`'s list. At 420 px nothing is hidden: grip and checkbox take 36 px.
 
 ## chips
 

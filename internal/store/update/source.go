@@ -95,7 +95,7 @@ func (s GhSource) api(ctx context.Context, what string, args ...string) (string,
 	ctx, cancel := context.WithTimeout(ctx, sourceTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, append([]string{"api"}, args...)...)
-	cmd.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "GH_NO_UPDATE_NOTIFIER=1", "NO_COLOR=1", "GH_PAGER=")
+	cmd.Env = append(os.Environ(), gh.Env...)
 	cmd.WaitDelay = 2 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

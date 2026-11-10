@@ -12,7 +12,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/client"
 	"github.com/alexwaumann/code-foundry/internal/daemon"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/version"
@@ -37,16 +36,7 @@ func TestTunnelOnTheRunningDaemon(t *testing.T) {
 		stop()
 		<-done
 	})
-	var ep client.Endpoint
-	for i := 0; ; i++ {
-		if ep, err = client.ReadEndpoint(p); err == nil {
-			break
-		}
-		if i > 400 {
-			t.Fatalf("daemon did not start: %v", err)
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
+	ep := waitEndpoint(t, p)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

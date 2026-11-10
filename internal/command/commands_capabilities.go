@@ -575,7 +575,7 @@ func capPlugins(ctx context.Context, env capEnv) (capDetail, error) {
 		"building one is the code-foundry-plugin skill.\n", len(plugins))
 	for _, p := range plugins {
 		cp := CapabilityPlugin{Name: p.GetName(), Version: p.GetVersion(), Enabled: p.GetEnabled(),
-			State: pluginStateWord(p.GetState()), Description: p.GetDescription(), Commands: []CapabilityCmd{}, Surfaces: []CapabilityView{}}
+			State: pluginState(p.GetState()), Description: p.GetDescription(), Commands: []CapabilityCmd{}, Surfaces: []CapabilityView{}}
 		for _, c := range p.GetCommands() {
 			cp.Commands = append(cp.Commands, CapabilityCmd{Name: c.GetName(), Title: c.GetTitle()})
 		}
@@ -599,15 +599,6 @@ func capPlugins(ctx context.Context, env capEnv) (capDetail, error) {
 		}
 	}
 	return capDetail{Count: count(len(plugins)), Text: strings.TrimSuffix(b.String(), "\n"), JSON: js}, nil
-}
-
-// pluginStateWord is a plugin's state in a word ("running"), "disabled" when it is off.
-func pluginStateWord(s v1.PluginState) string {
-	w := strings.ToLower(strings.TrimPrefix(s.String(), "PLUGIN_STATE_"))
-	if w == "unspecified" {
-		return "unknown"
-	}
-	return strings.ReplaceAll(w, "_", " ")
 }
 
 // CapabilitySettings is --group settings' JSON.

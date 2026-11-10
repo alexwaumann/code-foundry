@@ -11,46 +11,6 @@ import (
 // is xterm-compatible with truecolor; the GUI renders with xterm.js.
 var defaultEnv = []string{"TERM=xterm-256color", "COLORTERM=truecolor"}
 
-// mergeEnv applies overrides to base in order. "KEY=VALUE" sets KEY; a bare "KEY"
-// removes it. Later entries win. Order of first appearance is preserved.
-func mergeEnv(base []string, overrides ...[]string) []string {
-	idx := make(map[string]int, len(base))
-	out := make([]string, 0, len(base)+8)
-	set := func(kv string) {
-		key, _, hasEq := strings.Cut(kv, "=")
-		if key == "" {
-			return
-		}
-		i, seen := idx[key]
-		switch {
-		case !hasEq && seen:
-			out[i] = ""
-			delete(idx, key)
-		case !hasEq:
-		case seen:
-			out[i] = kv
-		default:
-			idx[key] = len(out)
-			out = append(out, kv)
-		}
-	}
-	for _, kv := range base {
-		set(kv)
-	}
-	for _, o := range overrides {
-		for _, kv := range o {
-			set(kv)
-		}
-	}
-	res := out[:0]
-	for _, kv := range out {
-		if kv != "" {
-			res = append(res, kv)
-		}
-	}
-	return res
-}
-
 // envValue returns the value of key in env ("" if unset).
 func envValue(env []string, key string) string {
 	for i := len(env) - 1; i >= 0; i-- {

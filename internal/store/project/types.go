@@ -1,5 +1,5 @@
-// Package project is the project store: the persisted set of registered git
-// repositories, their worktrees, and per-worktree git status.
+// Package project is the project store: the persisted set of registered projects (git
+// repositories or plain directories), their worktrees, and per-worktree git status.
 //
 // The store shells out to git through a single Runner. One FSEvents stream (for every
 // registered project and worktree) feeds debounced refresh jobs into a bounded worker
@@ -103,8 +103,9 @@ type Status struct {
 	OperationTotal int
 	Error          string // last refresh error; other fields are stale when set
 	// RefreshedAt is zero until the first refresh. After that, in a Snapshot it is the
-	// last refresh that changed something (refreshes that change nothing do not
-	// rebuild the snapshot), so it is not a "last checked" time.
+	// last refresh that changed something, or the last check once that is more than
+	// republishAfter newer (other refreshes that change nothing do not rebuild the
+	// snapshot).
 	RefreshedAt time.Time
 }
 

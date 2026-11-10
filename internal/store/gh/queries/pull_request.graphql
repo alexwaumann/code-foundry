@@ -1,5 +1,6 @@
 # One pull request with its head commit's checks (one page of contexts per request).
-# Fetched on demand by GetPullRequest; never polled.
+# Fetched on demand by GetPullRequest and LookupPullRequest, and by the poll only for a
+# watched pull request whose head branch is not known yet (pr_watch.go).
 query PullRequest($owner: String!, $name: String!, $number: Int!, $after: String) {
   rateLimit { ...RateLimitFields }
   repository(owner: $owner, name: $name) {

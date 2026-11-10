@@ -109,7 +109,7 @@ func TestBgShellsFromCapturedFrames(t *testing.T) {
 				!strings.HasPrefix(sh.TaskID, "b") || sh.Description == "" || sh.StartedAt.IsZero() {
 				t.Errorf("shell %+v", sh)
 			}
-			if !slicesEqual(f.atEnds, tt.atEnds) {
+			if !slices.Equal(f.atEnds, tt.atEnds) {
 				t.Errorf("running at the turns' ends %v, want %v", f.atEnds, tt.atEnds)
 			}
 			if n := f.set.count(); n != 0 {
@@ -125,18 +125,6 @@ func TestBgShellsFromCapturedFrames(t *testing.T) {
 			}
 		})
 	}
-}
-
-func slicesEqual(a, b []int) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // The call stays running after its turn until the shell ends; the item's output is the

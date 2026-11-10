@@ -51,9 +51,9 @@ func (d AddProjectDialog) open(uctx Context) (Result, bool) {
 
 // RegisterProjectAdd registers project.add (the Add Project dialog: the app presents it
 // itself, and the CLI or a page without a folder opens it in the windows through dialog,
-// else prints AddProjectHint; with a folder it registers it through repos.Register) and
-// project.clone. A nil repos makes project.add with a folder fail with Unimplemented; a nil
-// clone does the same for project.clone.
+// else prints AddProjectHint; with a folder it registers it through projects.Register) and
+// project.clone. A nil projects makes project.add with a folder fail with Unimplemented; a
+// nil clone does the same for project.clone.
 func RegisterProjectAdd(r *Registry, projects ProjectBackend, clone CloneFunc, dialog AddProjectDialog) error {
 	if projects == nil {
 		projects = codefoundryv1connect.UnimplementedProjectServiceHandler{}

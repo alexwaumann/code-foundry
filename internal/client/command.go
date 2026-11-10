@@ -22,7 +22,8 @@ func (c *Client) ListCommands(ctx context.Context, uctx *v1.UiContext, includeUn
 
 // WatchIntents opens UiService.WatchIntents and returns once the daemon has subscribed
 // the stream (its response headers have arrived), so intents emitted after it returns
-// are delivered. Read intents with Receive; cancel ctx to stop.
+// are delivered. Read intents with Receive; cancel ctx to stop. The CLI's end-to-end
+// tests use it; the Wails host opens the stream itself.
 func (c *Client) WatchIntents(ctx context.Context) (*connect.ServerStreamForClient[v1.UiIntent], error) {
 	stream, err := c.UI.WatchIntents(ctx, connect.NewRequest(&v1.WatchIntentsRequest{}))
 	if err != nil {
@@ -30,16 +31,4 @@ func (c *Client) WatchIntents(ctx context.Context) (*connect.ServerStreamForClie
 	}
 	stream.ResponseHeader() // blocks until the server has flushed headers
 	return stream, nil
-}
-
-// InvokeCommand calls CommandService.Invoke. Errors wrap the *connect.Error, so
-// connect.CodeOf and errors.As work on them.
-func (c *Client) InvokeCommand(ctx context.Context, name string, uctx *v1.UiContext, args map[string]string) (*v1.InvokeCommandResponse, error) {
-	res, err := c.Command.Invoke(ctx, connect.NewRequest(&v1.InvokeCommandRequest{
-		Name: name, Context: uctx, Args: args,
-	}))
-	if err != nil {
-		return nil, fmt.Errorf("invoke %s: %w", name, err)
-	}
-	return res.Msg, nil
 }

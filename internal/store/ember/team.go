@@ -44,7 +44,7 @@ type TeamMember struct {
 }
 
 // teamIndex is the threads of one snapshot, by id, and their lineage, built once per
-// publish for every task's team.
+// publish for every task's worker and team.
 type teamIndex struct {
 	byID  map[string]thread.Thread
 	nodes []thread.LineageNode

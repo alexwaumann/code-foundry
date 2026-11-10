@@ -537,7 +537,7 @@ func (in *instance) indexLocked(v *ui.View, now time.Time) {
 
 // staleVersionError is an act on a version no longer kept: the view changed under the
 // user's click. It is a failed precondition with words the GUI's toast can show.
-type staleVersionError struct{ version, current uint64 }
+type staleVersionError struct{}
 
 func (e staleVersionError) Error() string {
 	return "the view changed before this action reached it; try again"
@@ -549,7 +549,7 @@ func (e staleVersionError) Is(target error) bool { return target == ErrFailedPre
 func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	key := req.Instance
 	if key == "" {
-		in, err := m.surf.resolve(req.Ref)
+		in, err := m.surf.resolve(req.Ref, false)
 		if err != nil {
 			return 0, err
 		}
@@ -578,7 +578,7 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 	in.mu.Unlock()
 	if idx == nil {
 		m.surfLog(in.plugin, "act on version %d of %s refused: gone (the current one is %d)", ver, key, cur)
-		return 0, staleVersionError{version: ver, current: cur}
+		return 0, staleVersionError{}
 	}
 	el, err := idx.find(req.Key, req.Action)
 	if err != nil {

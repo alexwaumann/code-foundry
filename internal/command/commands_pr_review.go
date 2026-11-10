@@ -38,7 +38,6 @@ func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 				{Name: "body", Type: String, Positional: true,
 					Description: "The review's text (Markdown); required for request-changes and comment"},
 			},
-			When: hasPullRequest,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err
@@ -64,7 +63,6 @@ func reviewCommands(b GhBackend, slug, number ArgSpec) []Command {
 			Args: []ArgSpec{slug, number,
 				{Name: "body", Type: String, Required: true, Positional: true, Description: "The comment's text (Markdown)"},
 			},
-			When: hasPullRequest,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err

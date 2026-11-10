@@ -52,7 +52,7 @@ func TestFetchBaseThenCreateWorktree(t *testing.T) {
 		setup     func(t *testing.T, f fixture) (CreateWorktreeOptions, string)
 		wantFetch int
 		wantRef   string // the ref a fetch names
-		// wantErr: the fetch failed; wantRefAt: the ref on disk has a time.
+		// wantErr: the fetch failed; wantMissing: origin has no such branch.
 		wantErr, wantMissing bool
 	}{
 		{

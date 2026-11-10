@@ -62,13 +62,6 @@ func (c *Claude) SetAvailable(id, version string) {
 	c.Available[id] = version
 }
 
-// InstalledPlugins returns Plugins under the fake's lock.
-func (c *Claude) InstalledPlugins() []Plugin {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return slices.Clone(c.Plugins)
-}
-
 // Set replaces the marketplaces and plugins under the fake's lock.
 func (c *Claude) Set(markets []Marketplace, plugins []Plugin) {
 	c.mu.Lock()

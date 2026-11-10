@@ -2,6 +2,7 @@ package thread
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -72,6 +73,32 @@ func TestGroupMemberArchived(t *testing.T) {
 				t.Errorf("wakes = %d, want 1", n)
 			}
 		})
+	}
+}
+
+// An archive that fails leaves the member live: the group's wake does not say it was
+// archived. Here the member reads connected with no process, as a start that won the race
+// with the close leaves it, so the archive refuses.
+func TestGroupMemberArchiveFailed(t *testing.T) {
+	b := newGroupEnv(t, 3)
+	if _, err := b.m.Archive(b.ctx(), b.kids[0].ID, true); !errors.Is(err, ErrFailedPrecondition) {
+		t.Fatalf("archive err = %v, want a failed precondition", err)
+	}
+	if got := b.snapshot(b.kids[0].ID); !got.ArchivedAt.IsZero() {
+		t.Fatal("archived")
+	}
+	b.setStep(b.kids[1].ID, finished)
+	if n := b.quiet(); n != 0 {
+		t.Fatalf("%d wakes while one works", n)
+	}
+	b.setStep(b.kids[2].ID, finished)
+	items := b.waitItems(b.parent.ID, "the group's wake", func(items []Item) bool { return len(wakes(items)) > 0 })
+	w := wakes(items)[0]
+	if strings.Contains(w.WakeTitle, "was archived") {
+		t.Errorf("the wake names a member whose archive failed: %s", w.WakeTitle)
+	}
+	if strings.Contains(w.WakeJSON, `"archived": [`) {
+		t.Errorf("siblings.archived set:\n%s", w.WakeJSON)
 	}
 }
 

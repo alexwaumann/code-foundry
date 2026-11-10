@@ -9,6 +9,20 @@ import (
 	"time"
 )
 
+func (c *fullCache) get(k fullKey) (d FullPullRequest, stale, ok bool) {
+	e, ok := c.entry(k)
+	return e.d, e.stale, ok
+}
+
+// markStale marks k stale, as a poll that saw the pull request move does.
+func (c *fullCache) markStale(k fullKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if e, ok := c.m[k]; ok {
+		e.stale = true
+	}
+}
+
 func TestFullCacheEvictsLeastRecentlyFetched(t *testing.T) {
 	var c fullCache
 	t0 := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)

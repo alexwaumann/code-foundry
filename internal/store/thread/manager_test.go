@@ -517,6 +517,24 @@ func TestTranscriptDiscoveryAndAutoNaming(t *testing.T) {
 	}
 }
 
+// The first message's naming retries a rate limit once, as the other naming calls do.
+func TestAutoNamingRetriesARateLimit(t *testing.T) {
+	e := newEnv(t, func(o *Options) { o.NamingRetryDelay = 10 * time.Millisecond })
+	calls := 0
+	e.namer = func(msg string) (string, error) {
+		calls++ // one naming call at a time
+		if calls == 1 {
+			return "", errors.New("claude -p: exit status 1: API Error: 429 rate limit")
+		}
+		return "named-" + strings.Fields(msg)[0], nil
+	}
+	s := e.connected(CreateOptions{})
+	e.writeTranscript(argOf(e.spec(s.ID).Argv, "--session-id"), userLine("pong please"))
+	if got := e.waitFor(s.ID, "named", func(s Thread) bool { return s.Name != "" }); got.Name != "named-pong" {
+		t.Errorf("name = %q", got.Name)
+	}
+}
+
 func TestExplicitNameOrRenameSkipsAutoNaming(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Name: "chosen"})

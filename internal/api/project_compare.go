@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -129,9 +128,7 @@ func (h *Project) ListCompareCommits(ctx context.Context, req *connect.Request[v
 	commits := make([]*v1.CompareCommit, len(l.Commits))
 	for i, c := range l.Commits {
 		commits[i] = &v1.CompareCommit{Sha: c.SHA, ShortSha: c.ShortSHA, Parent: c.Parent, Subject: c.Subject, Shallow: c.Shallow}
-		if !c.AuthoredAt.IsZero() {
-			commits[i].AuthoredAt = timestamppb.New(c.AuthoredAt)
-		}
+		commits[i].AuthoredAt = timestamp(c.AuthoredAt)
 	}
 	return connect.NewResponse(&v1.ListCompareCommitsResponse{Commits: commits, Total: int32(l.Total), Error: l.Error}), nil
 }

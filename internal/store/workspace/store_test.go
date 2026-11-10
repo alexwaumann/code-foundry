@@ -208,6 +208,20 @@ func TestManagedDirsAtStart(t *testing.T) {
 	}
 }
 
+// A Create whose save fails leaves no managed dir behind.
+func TestCreateSaveFailsRemovesDir(t *testing.T) {
+	e := newStoreEnv(t)
+	if err := e.m.opts.DB.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.Create(context.Background(), CreateOptions{Name: "a", Members: []string{"web"}}); err == nil {
+		t.Fatal("Create saved on a closed database")
+	}
+	if entries, err := os.ReadDir(e.dir); err != nil || len(entries) != 0 {
+		t.Errorf("workspaces dir holds %v, %v; want nothing", entries, err)
+	}
+}
+
 // The managed dir's contents: none at first; CLAUDE.md beats AGENTS.md; skills are the
 // folders with a SKILL.md, sorted; EnsureDirs reads them again and publishes Updated only
 // when they changed; a rooted workspace reports the root's real file; a reopen reads them.

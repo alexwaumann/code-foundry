@@ -10,8 +10,10 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
 func TestThreadSetupRPCs(t *testing.T) {
@@ -79,9 +81,13 @@ func TestThreadSetupOnTheWire(t *testing.T) {
 }
 
 // An item that leaves the log can only be told by a new snapshot: a retried setup takes
-// back its turn end.
+// back its turn end. Like every snapshot, it is flushed by a heartbeat soon behind it,
+// long before the hour-long interval.
 func TestWatchThreadSnapshotAfterItemsReset(t *testing.T) {
-	fake, c := newThreadServer(t)
+	b := bus.New()
+	fake := threadtest.New(b)
+	srv := serveOnce(t, (&Thread{store: fake, bus: b, beat: time.Hour}).Route(), make(chan struct{}))
+	c := codefoundryv1connect.NewThreadServiceClient(srv.Client(), srv.URL)
 	fake.Put(thread.Thread{ID: "s1", State: thread.StateConnected})
 	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage}, thread.Item{ID: "end", Kind: thread.KindTurnEnd})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -94,16 +100,21 @@ func TestWatchThreadSnapshotAfterItemsReset(t *testing.T) {
 	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetItems()) != 2 {
 		t.Fatalf("no snapshot: %v", stream.Err())
 	}
-	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage})
-	bus.Publish[thread.ThreadEvent](fake.Bus(), thread.ItemsReset{ThreadID: "other", Seq: 1000})
-	bus.Publish[thread.ThreadEvent](fake.Bus(), thread.ItemsReset{ThreadID: "s1", Seq: 1000})
-	for stream.Receive() {
-		if snap := stream.Msg().GetSnapshot(); snap != nil {
-			if n := len(snap.GetItems()); n != 1 {
-				t.Errorf("%d items", n)
-			}
-			return
+	for range snapshotFlushes {
+		if !stream.Receive() || stream.Msg().GetHeartbeat() == nil {
+			t.Fatalf("want a flush heartbeat, got %v (%v)", stream.Msg(), stream.Err())
 		}
 	}
-	t.Fatalf("no new snapshot: %v", stream.Err())
+	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage})
+	bus.Publish[thread.ThreadEvent](b, thread.ItemsReset{ThreadID: "other", Seq: 1000})
+	bus.Publish[thread.ThreadEvent](b, thread.ItemsReset{ThreadID: "s1", Seq: 1000})
+	if !stream.Receive() {
+		t.Fatalf("no new snapshot: %v", stream.Err())
+	}
+	if n := len(stream.Msg().GetSnapshot().GetItems()); stream.Msg().GetSnapshot() == nil || n != 1 {
+		t.Fatalf("want a snapshot of 1 item, got %v", stream.Msg())
+	}
+	if !stream.Receive() || stream.Msg().GetHeartbeat() == nil {
+		t.Fatalf("want a flush heartbeat after the snapshot, got %v (%v)", stream.Msg(), stream.Err())
+	}
 }

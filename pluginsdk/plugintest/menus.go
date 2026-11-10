@@ -2,7 +2,6 @@ package plugintest
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -16,13 +15,9 @@ import (
 // disabled submenu), and an item whose action the host runs itself (a command, a URL, a
 // copy).
 func (h *Host) PickItem(ctx context.Context, instance, key string) error {
-	raw, ok := h.View(instance)
-	if !ok {
-		return fmt.Errorf("plugintest: instance %q has no view", instance)
-	}
-	var v ui.View
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return fmt.Errorf("plugintest: the view of %q: %w", instance, err)
+	v, err := h.latest(instance)
+	if err != nil {
+		return err
 	}
 	it, disabled, found := findMenuItem(v, key)
 	switch {
@@ -56,40 +51,33 @@ func findMenuItem(v ui.View, key string) (it ui.MenuItem, disabled, found bool) 
 		menus = append(menus, v.Header.Menu)
 		buttons(v.Header.Actions)
 	}
-	var walk func(ns []ui.Node)
-	walk = func(ns []ui.Node) {
-		for _, n := range ns {
-			switch {
-			case n.List != nil:
-				rows(n.List.Rows)
-			case n.MasterDetail != nil:
-				rows(n.MasterDetail.List.Rows)
-			case n.Table != nil:
-				for _, r := range n.Table.AllRows() {
-					menus = append(menus, r.Menu)
-				}
-			case n.Actions != nil:
-				buttons(n.Actions.Buttons)
-			case n.Section != nil:
-				buttons(n.Section.Actions)
-			case n.Notice != nil:
-				buttons(n.Notice.Actions)
-			case n.Empty != nil:
-				buttons(n.Empty.Actions)
-			case n.Terminal != nil:
-				buttons(n.Terminal.Actions)
+	// Every node: the match never holds.
+	findNode(v, func(n ui.Node) bool {
+		switch {
+		case n.List != nil:
+			rows(n.List.Rows)
+		case n.MasterDetail != nil:
+			rows(n.MasterDetail.List.Rows)
+		case n.Table != nil:
+			for _, r := range n.Table.AllRows() {
+				menus = append(menus, r.Menu)
 			}
-			if n.MasterDetail != nil && n.MasterDetail.EmptyDetail != nil {
-				buttons(n.MasterDetail.EmptyDetail.Actions)
-			}
-			for _, l := range n.Children() {
-				walk(l)
-			}
+		case n.Actions != nil:
+			buttons(n.Actions.Buttons)
+		case n.Section != nil:
+			buttons(n.Section.Actions)
+		case n.Notice != nil:
+			buttons(n.Notice.Actions)
+		case n.Empty != nil:
+			buttons(n.Empty.Actions)
+		case n.Terminal != nil:
+			buttons(n.Terminal.Actions)
 		}
-	}
-	for _, l := range v.NodeLists() {
-		walk(l)
-	}
+		if n.MasterDetail != nil && n.MasterDetail.EmptyDetail != nil {
+			buttons(n.MasterDetail.EmptyDetail.Actions)
+		}
+		return false
+	})
 	for _, m := range menus {
 		if m == nil {
 			continue

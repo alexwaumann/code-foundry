@@ -32,7 +32,7 @@ var ThreadPermissions = []string{"supervised", "accept-edits", "auto"}
 // supervisedHelp says what supervised does: Claude's manual mode, which asks before
 // edits and commands but runs reads, searches and read-only commands unasked, and the
 // protocol verbs every thread has pre-allowed (thread.ProtocolAllowedTools).
-const supervisedHelp = "supervised (asks before edits and commands, not read-only ones or thread report(s)/get/list/read, project list)"
+const supervisedHelp = "supervised (asks before edits and commands, not read-only ones or thread report(s)/ask/get/list/read, project list)"
 
 var threadPermissionModes = map[string]v1.PermissionMode{
 	"supervised":   v1.PermissionMode_PERMISSION_MODE_SUPERVISED,
@@ -139,8 +139,7 @@ func threadLabel(s *v1.Thread) string {
 // RegisterThreadLifecycle registers thread.new, thread.focus, thread.rename, thread.regenerate-name,
 // thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive,
 // thread.snooze, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
-// the daemon stops idle ones (docs/notes/thread-lifecycle.md). The user-facing word is "thread" (titles, descriptions, messages);
-// command names and identifiers keep "thread".
+// the daemon stops idle ones (docs/notes/thread-lifecycle.md).
 func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(

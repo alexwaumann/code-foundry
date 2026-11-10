@@ -343,10 +343,7 @@ func formatBrowse(r *v1.BrowsePluginsResponse) string {
 			if !e.GetAvailable() {
 				version += " (no " + r.GetPlatform() + " build)"
 			}
-			desc := e.GetDescription()
-			if len(desc) > 60 {
-				desc = desc[:57] + "..."
-			}
+			desc := truncateRunes(e.GetDescription(), 60)
 			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", e.GetName(), version, inst, permissionSummary(e.GetPermissions()), desc)
 		}
 		_ = tw.Flush()

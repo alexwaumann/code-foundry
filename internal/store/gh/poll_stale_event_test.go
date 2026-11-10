@@ -51,12 +51,15 @@ func TestEventStateAfterFailedDetailReopen(t *testing.T) {
 	})
 	g.moveSection("PR_a", "none", sectionAuthored)
 	fail.Store(true)
-	_ = s.Refresh(context.Background(), "o/any")
-	for _, e := range changedEvents(sub) {
-		t.Logf("event: state=%s changes=%v", e.PullRequest.State, kinds([]PullRequestChanged{e}))
-		if e.PullRequest.State != PullRequestOpen {
-			t.Errorf("GitHub says open, the event says %s", e.PullRequest.State)
-		}
+	if err := s.Refresh(context.Background(), "o/any"); err != nil {
+		t.Fatal(err)
+	}
+	evs := changedEvents(sub)
+	if got := kinds(evs); got != "#1:reopened,checks" {
+		t.Fatalf("reopen: %q", got)
+	}
+	if evs[0].PullRequest.State != PullRequestOpen {
+		t.Errorf("GitHub says open, the event says %s", evs[0].PullRequest.State)
 	}
 }
 
@@ -99,9 +102,10 @@ func TestNoFalseCloseFromStaleBranchList(t *testing.T) {
 
 	// Nothing changes on GitHub. One detail batch fails.
 	fail.Store(true)
-	_ = s.Refresh(context.Background(), "o/any")
-	for _, e := range changedEvents(sub) {
-		t.Logf("event: state=%s changes=%v", e.PullRequest.State, kinds([]PullRequestChanged{e}))
-		t.Errorf("nothing changed on GitHub, yet the poll reported %s", kinds([]PullRequestChanged{e}))
+	if err := s.Refresh(context.Background(), "o/any"); err != nil {
+		t.Fatal(err)
+	}
+	if got := kinds(changedEvents(sub)); got != "" {
+		t.Errorf("nothing changed on GitHub, yet the poll reported %s", got)
 	}
 }

@@ -48,7 +48,7 @@ type ScriptInstaller struct {
 	// ReleaseDir, when set, is passed as CODE_FOUNDRY_RELEASE_DIR (local release source).
 	ReleaseDir string
 	// AppDir is the app directory to replace (--app-dir); the installer's default
-	// (~/Applications) when empty.
+	// ($CODE_FOUNDRY_APP_DIR, else <config home>/app) when empty.
 	AppDir string
 	// Gh is passed as CODE_FOUNDRY_GH; gh.LookPath() when empty. A Finder-launched daemon
 	// may not have gh on PATH.

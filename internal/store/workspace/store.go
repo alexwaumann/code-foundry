@@ -245,10 +245,12 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Workspace, error
 	if err := ensureDir(m.log, w); err != nil {
 		return Workspace{}, err
 	}
-	if w, err = m.commit(ctx, w); err != nil {
+	saved, err := m.commit(ctx, w)
+	if err != nil {
 		_ = removeDir(m.log, m.opts.Dir, w)
 		return Workspace{}, err
 	}
+	w = saved
 	m.log.Info("workspace created", "workspace", w.ID, "name", w.Name, "members", len(w.Members), "root", w.RootPath, "dir", w.ManagedDir)
 	return w, nil
 }
@@ -291,15 +293,15 @@ func (m *Manager) RemoveProject(ctx context.Context, ref, projectRef string) (Wo
 		if err != nil {
 			return err
 		}
-		dropMember(w, pid)
+		DropMember(w, pid)
 		m.log.Info("workspace project removed", "workspace", w.ID, "project", pid, "default_primary", w.DefaultPrimary)
 		return nil
 	})
 }
 
-// dropMember removes pid from w's members; a default primary that was pid moves
-// (fallbackPrimary).
-func dropMember(w *Workspace, pid string) {
+// DropMember removes pid from w's members (in place); a default primary that was pid
+// moves (fallbackPrimary). The workspacetest fake uses it too.
+func DropMember(w *Workspace, pid string) {
 	w.Members = slices.DeleteFunc(w.Members, func(id string) bool { return id == pid })
 	if w.DefaultPrimary == pid {
 		w.DefaultPrimary = fallbackPrimary(*w)
@@ -317,7 +319,7 @@ func (m *Manager) ProjectRemoved(ctx context.Context, projectID string) error {
 			if !w.Member(projectID) {
 				return nil
 			}
-			dropMember(w, projectID)
+			DropMember(w, projectID)
 			m.log.Info("unregistered project dropped from workspace", "workspace", w.ID, "project", projectID, "default_primary", w.DefaultPrimary)
 			return nil
 		})

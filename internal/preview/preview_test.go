@@ -39,10 +39,10 @@ func TestGrants(t *testing.T) {
 	if a == b || len(a) != 32 {
 		t.Errorf("grants %q %q", a, b)
 	}
-	if d, ok := g.Dir(b); !ok || d != "/home/b" {
-		t.Errorf("Dir(%q) = %q, %v", b, d, ok)
+	if e, ok := g.lookup(b); !ok || e.dir != "/home/b" {
+		t.Errorf("lookup(%q) = %q, %v", b, e.dir, ok)
 	}
-	if _, ok := g.Dir("nope"); ok {
+	if _, ok := g.lookup("nope"); ok {
 		t.Error("unknown grant resolved")
 	}
 	file, err := g.GrantFile("/home/a")

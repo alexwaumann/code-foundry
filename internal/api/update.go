@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
@@ -158,9 +157,7 @@ func updateStatusToProto(s update.Status) *v1.UpdateStatus {
 		Progress:       s.Progress,
 		FailureReason:  s.FailureReason,
 	}
-	if !s.LastCheckedAt.IsZero() {
-		out.LastCheckedAt = timestamppb.New(s.LastCheckedAt)
-	}
+	out.LastCheckedAt = timestamp(s.LastCheckedAt)
 	return out
 }
 

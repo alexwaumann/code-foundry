@@ -24,26 +24,26 @@ func (s *Store) PublishOwners(context.Context) ([]gh.PublishOwner, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	out := make([]gh.PublishOwner, len(s.owners))
-	for i, o := range s.owners {
+	return cloneOwners(s.owners), nil
+}
+
+func cloneOwners(in []gh.PublishOwner) []gh.PublishOwner {
+	out := make([]gh.PublishOwner, len(in))
+	for i, o := range in {
 		o.Allowed = slices.Clone(o.Allowed)
 		out[i] = o
 	}
-	return out, nil
+	return out
 }
 
 // CachedPublishOwners implements gh.Owners: the set owners, never stale, or nothing
-// when none were set.
-func (s *Store) CachedPublishOwners(ctx context.Context) ([]gh.PublishOwner, bool, bool) {
+// when none were set. Like the real store's cache it is not a call and SetError does not
+// fail it.
+func (s *Store) CachedPublishOwners(context.Context) ([]gh.PublishOwner, bool, bool) {
 	s.mu.Lock()
-	n := len(s.owners)
-	s.mu.Unlock()
-	if n == 0 {
+	defer s.mu.Unlock()
+	if len(s.owners) == 0 {
 		return nil, false, false
 	}
-	owners, err := s.PublishOwners(ctx)
-	if err != nil {
-		return nil, false, false
-	}
-	return owners, false, true
+	return cloneOwners(s.owners), false, true
 }

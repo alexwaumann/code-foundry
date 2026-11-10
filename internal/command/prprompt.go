@@ -29,9 +29,9 @@ const (
 	// threadHead and threadTail are the comments a long review thread keeps: its first
 	// and its last two, with a "N more comments" line between them.
 	threadHead, threadTail = 1, 2
-	// MaxPRPromptBytes is the largest prompt a pull request thread starts with. The
-	// thread runner types the prompt into the terminal, whose input backlog is 1 MiB
-	// (internal/store/terminal/input.go); a larger prompt would be cut silently.
+	// MaxPRPromptBytes is the largest prompt a pull request thread starts with: the PR's
+	// text goes into the first message, so a huge description or review discussion
+	// would make that turn slow and costly. A larger prompt is refused, not cut.
 	MaxPRPromptBytes = 200 << 10
 )
 
@@ -113,7 +113,7 @@ func sanitizePRCode(s string) string {
 }
 
 // sanitizeQuestion keeps the user's own question as written (newlines included) but
-// drops control characters other than newline and tab, which would act as keystrokes.
+// drops control characters other than newline and tab, which have no place in a prompt.
 func sanitizeQuestion(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\t' {

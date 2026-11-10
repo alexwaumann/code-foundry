@@ -185,7 +185,7 @@ func watchEvent(c search.Changed) (*v1.SearchWatchEvent, bool) {
 	case search.EventStatus:
 		e := c.Entry
 		ev.Event = &v1.SearchWatchEvent_Status{Status: &v1.SearchStatusChange{Status: searchStatuses[e.Status], Error: e.Error,
-			FinishedAt: optTime(e.FinishedAt), CostUsd: e.CostUSD, DurationMs: e.Duration.Milliseconds(), Unseen: e.Unseen}}
+			FinishedAt: timestamp(e.FinishedAt), CostUsd: e.CostUSD, DurationMs: e.Duration.Milliseconds(), Unseen: e.Unseen}}
 		return ev, true
 	default:
 		return nil, false
@@ -364,8 +364,8 @@ func searchEntriesToProto(list []search.Entry) []*v1.SearchEntry {
 
 // SearchEntryToProto is e on the API.
 func SearchEntryToProto(e search.Entry) *v1.SearchEntry {
-	out := &v1.SearchEntry{Id: e.ID, Mode: searchModes[e.Mode], Query: e.Query, CreatedAt: optTime(e.CreatedAt),
-		FinishedAt: optTime(e.FinishedAt), Status: searchStatuses[e.Status], Error: e.Error, Answer: e.Answer,
+	out := &v1.SearchEntry{Id: e.ID, Mode: searchModes[e.Mode], Query: e.Query, CreatedAt: timestamp(e.CreatedAt),
+		FinishedAt: timestamp(e.FinishedAt), Status: searchStatuses[e.Status], Error: e.Error, Answer: e.Answer,
 		Hits: make([]*v1.AgentSearchHit, len(e.Hits)), Steps: make([]*v1.AgentSearchStep, len(e.Steps)),
 		Searches: int32(e.Searches()), ThreadsRead: int32(e.ThreadsRead()), ClaudeSessionId: e.ClaudeSessionID, Model: e.Model,
 		CostUsd: e.CostUSD, DurationMs: e.Duration.Milliseconds(), Unseen: e.Unseen, Version: e.Version, PromotedThreadId: e.PromotedThreadID,
@@ -381,8 +381,8 @@ func SearchEntryToProto(e search.Entry) *v1.SearchEntry {
 
 func searchHitToProto(h search.Hit) *v1.AgentSearchHit {
 	return &v1.AgentSearchHit{N: int32(h.N), ThreadId: h.ThreadID, ThreadName: h.ThreadName, Archived: h.Archived, ItemId: h.ItemID,
-		Ordinal: h.Ordinal, Speaker: searchSpeakers[thread.Speaker(h.Speaker)], ItemCreatedAt: optTime(h.ItemCreatedAt),
-		Quote: h.Quote, Why: h.Why, Opened: h.Opened, ReportedAt: optTime(h.ReportedAt)}
+		Ordinal: h.Ordinal, Speaker: searchSpeakers[thread.Speaker(h.Speaker)], ItemCreatedAt: timestamp(h.ItemCreatedAt),
+		Quote: h.Quote, Why: h.Why, Opened: h.Opened, ReportedAt: timestamp(h.ReportedAt)}
 }
 
 func searchStepToProto(s search.Step) *v1.AgentSearchStep {

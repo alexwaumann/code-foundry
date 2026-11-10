@@ -1166,10 +1166,13 @@ type UiIntent_ShowView struct {
 	// (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
 	// thread_id whose name is not a panel action.
 	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// What a panel action that opens one item shows: "panel.file" takes path (absolute)
-	// and line, "panel.diff" project, worktree, path and scope ("working" | "branch"),
-	// "panel.pr" slug and number (view.panel.file, view.panel.diff, view.panel.pr;
-	// docs/notes/control-5-fixes.md). Empty for every other name.
+	// What the view shows, for the names that take more than the name: the panel
+	// actions that open one item ("panel.file", "panel.diff", "panel.pr",
+	// "panel.gallery"; docs/notes/control-5-fixes.md), the Projects page (one project's
+	// or workspace's) and search.open (an agent search). Each name's keys are documented
+	// with its name's constant in internal/command (ViewPanelFile, ViewPanelDiff,
+	// ViewPanelPR, ViewPanelGallery, ViewProjects, ViewSearch). Empty for every other
+	// name.
 	Params        map[string]string `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

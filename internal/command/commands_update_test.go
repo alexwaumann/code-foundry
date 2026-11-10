@@ -189,7 +189,6 @@ func TestAppRestart(t *testing.T) {
 		installErr error
 		wantMsg    string
 		wantJSON   command.AppRestart
-		wantErr    error
 		restarts   int
 		// wantConfirm is the confirmation message of an unconfirmed invoke.
 		wantConfirm string
@@ -286,16 +285,12 @@ func TestAppRestart(t *testing.T) {
 				t.Fatal("unconfirmed invoke notified GUIs")
 			}
 			if tt.backErr {
-				// Every call fails now; an unreadable status is not DOWNLOADING, so Run
-				// reaches the notify, which must abort before the restart.
+				// Every call fails now; Run reaches the notify, which must abort before the
+				// restart.
 				u.Err = errors.New("unavailable")
 			}
 			res, err := reg.Invoke(ctx, command.Context{}, "app.restart", nil, command.Confirmed(true))
 			switch {
-			case tt.wantErr != nil:
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("err = %v, want %v", err, tt.wantErr)
-				}
 			case !tt.restart:
 				if err == nil || !strings.Contains(err.Error(), "cannot restart") {
 					t.Fatalf("err = %v", err)
@@ -378,19 +373,18 @@ func TestDaemonRestart(t *testing.T) {
 		status   v1.UpdateState
 		restart  bool
 		wantMsg  string
-		wantErr  error
 		restarts int
 		// wantConfirm is the confirmation message of an unconfirmed invoke.
 		wantConfirm string
 	}{
-		{"one working thread", live, v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, true, "restarting the daemon (cuts off 1 thread working or waiting on you); the next client starts the installed version", nil, 1, one},
-		{"background work is cut off too", shell, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon (cuts off 1 background shell); the next client starts the installed version", nil, 1,
+		{"one working thread", live, v1.UpdateState_UPDATE_STATE_RESTART_REQUIRED, true, "restarting the daemon (cuts off 1 thread working or waiting on you); the next client starts the installed version", 1, one},
+		{"background work is cut off too", shell, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon (cuts off 1 background shell); the next client starts the installed version", 1,
 			"1 background shell will be cut off. Restart the daemon anyway?"},
-		{"an idle running thread does not count", idle, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
-		{"stopped threads do not count", dead, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
-		{"restarts while downloading", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "restarting the daemon (cuts off 1 thread working or waiting on you); the next client starts the installed version", nil, 1, one},
-		{"a download is not installed", idle, v1.UpdateState_UPDATE_STATE_DOWNLOADED, true, "restarting the daemon; the next client starts the installed version", nil, 1, quiet},
-		{"no restart hook", live, v1.UpdateState_UPDATE_STATE_IDLE, false, "", nil, 0, one},
+		{"an idle running thread does not count", idle, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", 1, quiet},
+		{"stopped threads do not count", dead, v1.UpdateState_UPDATE_STATE_IDLE, true, "restarting the daemon; the next client starts the installed version", 1, quiet},
+		{"restarts while downloading", live, v1.UpdateState_UPDATE_STATE_DOWNLOADING, true, "restarting the daemon (cuts off 1 thread working or waiting on you); the next client starts the installed version", 1, one},
+		{"a download is not installed", idle, v1.UpdateState_UPDATE_STATE_DOWNLOADED, true, "restarting the daemon; the next client starts the installed version", 1, quiet},
+		{"no restart hook", live, v1.UpdateState_UPDATE_STATE_IDLE, false, "", 0, one},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -408,10 +402,6 @@ func TestDaemonRestart(t *testing.T) {
 			}
 			res, err := reg.Invoke(ctx, command.Context{}, "daemon.restart", nil, command.Confirmed(true))
 			switch {
-			case tt.wantErr != nil:
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("err = %v, want %v", err, tt.wantErr)
-				}
 			case !tt.restart:
 				if err == nil || !strings.Contains(err.Error(), "cannot restart") {
 					t.Fatalf("err = %v", err)

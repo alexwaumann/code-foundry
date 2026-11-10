@@ -6,9 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/alexwaumann/code-foundry/internal/client"
 	"github.com/alexwaumann/code-foundry/internal/daemon"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/version"
@@ -42,15 +40,7 @@ func TestDaemonInstallsSkills(t *testing.T) {
 		stop()
 		<-done
 	})
-	for i := 0; ; i++ {
-		if _, err := client.ReadEndpoint(p); err == nil {
-			break
-		}
-		if i > 200 {
-			t.Fatalf("daemon did not start: %v", err)
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
+	waitEndpoint(t, p)
 
 	if b, err := os.ReadFile(filepath.Join(p.Claude(), "VERSION")); err != nil || string(b) != "v1.2.3-test\n" {
 		t.Errorf("VERSION = %q, %v", b, err)

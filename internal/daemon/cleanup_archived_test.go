@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -84,13 +83,7 @@ func TestArchiveCleanup(t *testing.T) {
 			c.ctx, c.cancel = context.WithCancel(context.Background())
 			c.archived(archived)
 			c.stop()
-			var removed []string
-			for _, call := range pf.Calls {
-				if p, ok := strings.CutPrefix(call, "RemoveWorktree "); ok {
-					removed = append(removed, p[strings.Index(p, " ")+1:])
-				}
-			}
-			slices.Sort(removed)
+			removed := removedPaths(pf)
 			if !slices.Equal(removed, tt.wantRemoved) {
 				t.Errorf("removed %q, want %q", removed, tt.wantRemoved)
 			}

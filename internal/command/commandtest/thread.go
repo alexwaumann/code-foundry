@@ -46,10 +46,6 @@ type Thread struct {
 	CheckoutsResp *v1.ThreadCheckoutsResponse
 	// PlacementResp is CheckPlacement's answer (nil: an empty one).
 	PlacementResp *v1.CheckPlacementResponse
-	// Prompts is ListPrompts' answer.
-	Prompts []*v1.SentPrompt
-	// SearchResp is Search's answer (nil: an empty one).
-	SearchResp *v1.SearchThreadsResponse
 	// PageShown makes ShowHtml answer reused (the page's card is still live) unless the
 	// request has again.
 	PageShown bool
@@ -123,23 +119,20 @@ func (s *Thread) Create(_ context.Context, r *connect.Request[v1.CreateThreadReq
 	return connect.NewResponse(res), nil
 }
 
-// ListPrompts records the request and returns Prompts.
+// ListPrompts records the request and returns no prompts.
 func (s *Thread) ListPrompts(_ context.Context, r *connect.Request[v1.ListPromptsRequest]) (*connect.Response[v1.ListPromptsResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&v1.ListPromptsResponse{Prompts: s.Prompts}), nil
+	return connect.NewResponse(&v1.ListPromptsResponse{}), nil
 }
 
-// Search records the request and returns SearchResp.
+// Search records the request and returns no results.
 func (s *Thread) Search(_ context.Context, r *connect.Request[v1.SearchThreadsRequest]) (*connect.Response[v1.SearchThreadsResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
-	if s.SearchResp == nil {
-		return connect.NewResponse(&v1.SearchThreadsResponse{}), nil
-	}
-	return connect.NewResponse(s.SearchResp), nil
+	return connect.NewResponse(&v1.SearchThreadsResponse{}), nil
 }
 
 // Checkouts returns CheckoutsResp (an empty answer for the requested thread when nil).
@@ -203,8 +196,8 @@ func (s *Thread) Send(_ context.Context, r *connect.Request[v1.SendThreadMessage
 	return connect.NewResponse(&v1.SendThreadMessageResponse{Item: &v1.ThreadItem{Id: "i-sent", Ordinal: s.SentOrdinal}}), nil
 }
 
-// Get returns Current with the requested id; without Current, the thread in Others
-// with that id, if any.
+// Get returns the thread in Others with the requested id, if any; else Current with
+// that id.
 func (s *Thread) Get(_ context.Context, r *connect.Request[v1.GetThreadRequest]) (*connect.Response[v1.GetThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
@@ -213,10 +206,10 @@ func (s *Thread) Get(_ context.Context, r *connect.Request[v1.GetThreadRequest])
 		return nil, err
 	}
 	cur := &v1.Thread{State: v1.ThreadState_THREAD_STATE_CONNECTED}
-	if s.Current != nil {
-		cur = proto.CloneOf(s.Current)
-	} else if i := slices.IndexFunc(s.Others, func(o *v1.Thread) bool { return o.GetId() == r.Msg.GetId() }); i >= 0 {
+	if i := slices.IndexFunc(s.Others, func(o *v1.Thread) bool { return o.GetId() == r.Msg.GetId() }); i >= 0 {
 		cur = proto.CloneOf(s.Others[i])
+	} else if s.Current != nil {
+		cur = proto.CloneOf(s.Current)
 	}
 	cur.Id = r.Msg.GetId()
 	return connect.NewResponse(&v1.GetThreadResponse{Thread: cur}), nil
@@ -320,9 +313,6 @@ func (s *Thread) Snooze(_ context.Context, r *connect.Request[v1.SnoozeThreadReq
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: cur}), nil
 }
 
-// RunIn returns Current (default: a CONNECTED thread in workspace "w-1") with the
-// requested id. A disconnected thread runs in the target at once; a live one gets it
-// as pending_worktree_path. The target is worktree_path, else /worktrees/<project_id>.
 // Move echoes the request on Current (default: a DISCONNECTED thread without a project):
 // the project (or the workspace's "<workspace>-1") as the primary, in the worktree given,
 // else /worktrees/<project> (new_worktree: branch "cf/1" unless given, made_worktree and
@@ -366,6 +356,9 @@ func (s *Thread) Move(_ context.Context, r *connect.Request[v1.MoveThreadRequest
 	return connect.NewResponse(res), nil
 }
 
+// RunIn returns Current (default: a CONNECTED thread in workspace "w-1") with the
+// requested id. A disconnected thread runs in the target at once; a live one gets it
+// as pending_worktree_path. The target is worktree_path, else /worktrees/<project_id>.
 func (s *Thread) RunIn(_ context.Context, r *connect.Request[v1.RunInThreadRequest]) (*connect.Response[v1.RunInThreadResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err

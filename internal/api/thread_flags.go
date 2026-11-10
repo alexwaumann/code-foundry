@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -26,9 +25,7 @@ func flagsToProto(fs []thread.Flag) []*v1.ThreadFlag {
 			Plugin: f.Source, PluginDisplayName: f.SourceName, Level: v1.ThreadFlagLevel(f.Level),
 			Reason: f.Reason, UntilSeen: f.UntilSeen,
 		}
-		if !f.SetAt.IsZero() {
-			out[i].SetAt = timestamppb.New(f.SetAt)
-		}
+		out[i].SetAt = timestamp(f.SetAt)
 	}
 	return out
 }

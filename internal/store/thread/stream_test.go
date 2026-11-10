@@ -99,6 +99,12 @@ func TestRenderedWritePermissionEndToEnd(t *testing.T) {
 	if len(snap.Pending) != 1 || snap.Pending[0].Kind != KindPermission || snap.Pending[0].Summary != "Write hello.txt" {
 		t.Fatalf("pending %+v", snap.Pending)
 	}
+	if seq, pending, err := re.m.Pending(re.ctx(), s.ID); err != nil || seq < snap.Seq || !slices.Equal(pending, snap.Pending) {
+		t.Errorf("Pending = %d %+v %v; want %+v at seq >= %d", seq, pending, err, snap.Pending, snap.Seq)
+	}
+	if _, _, err := re.m.Pending(re.ctx(), "nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Pending of an unknown thread: %v", err)
+	}
 	if got.PendingRequestID == "" || got.PendingRequestID != snap.Pending[0].RequestID {
 		t.Errorf("PendingRequestID %q, pending %q", got.PendingRequestID, snap.Pending[0].RequestID)
 	}

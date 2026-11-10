@@ -181,7 +181,7 @@ func TestWaitingOnBackgroundWorkUntilTheReport(t *testing.T) {
 			if at < 0 || !slices.Equal(rest, want) {
 				t.Errorf("statuses = %q; want them to end %q (busy allowed before finished)", seen, want)
 			}
-			if b := slices.Index(seen[max(at, 0):], "busy (working)"); b >= 0 && b != len(seen[at:])-2 {
+			if b := slices.Index(seen[max(at, 0):], "busy (working)"); b >= 0 && b != len(seen[max(at, 0):])-2 {
 				t.Errorf("busy before the end frames: %q", seen)
 			}
 			if at >= 0 && slices.Contains(seen[:at], "needs attention (finished)") {

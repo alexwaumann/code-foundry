@@ -128,9 +128,9 @@ func (s *AppService) SetZoom(percent int) error {
 
 // Relaunch quits the app and starts this executable again once this process has
 // exited, so the new process runs whatever is on disk at this path now (an installed
-// update swaps the app directory in place). It keeps the arguments and the environment
-// (CODE_FOUNDRY_HOME, CODE_FOUNDRY_BIN, the adopted PATH, ...). Threads are unaffected:
-// they live in the daemon.
+// update swaps the app directory in place). It keeps the environment (CODE_FOUNDRY_HOME,
+// CODE_FOUNDRY_BIN, the adopted PATH, ...). Threads are unaffected: they live in the
+// daemon.
 func (s *AppService) Relaunch() error {
 	s.log.Info("relaunch requested")
 	// On darwin os.Executable is the path this process was started from, not wherever
@@ -139,7 +139,7 @@ func (s *AppService) Relaunch() error {
 	if err != nil {
 		return fmt.Errorf("relaunch: %w", err)
 	}
-	script := relaunchCommand(os.Getpid(), exe, os.Args[1:])
+	script := relaunchCommand(os.Getpid(), exe)
 	// Detached, stdio on /dev/null: the shell outlives this process.
 	cmd := exec.Command("/bin/sh", "-c", script)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
@@ -152,15 +152,10 @@ func (s *AppService) Relaunch() error {
 	return nil
 }
 
-// relaunchCommand is a shell script that waits for pid to exit, then executes exe with
-// args (two windows never run at once).
-func relaunchCommand(pid int, exe string, args []string) string {
-	var b strings.Builder
-	b.WriteString("while kill -0 " + strconv.Itoa(pid) + " 2>/dev/null; do sleep 0.1; done; exec " + shellQuote(exe))
-	for _, a := range args {
-		b.WriteString(" " + shellQuote(a))
-	}
-	return b.String()
+// relaunchCommand is a shell script that waits for pid to exit, then executes exe (two
+// windows never run at once).
+func relaunchCommand(pid int, exe string) string {
+	return "while kill -0 " + strconv.Itoa(pid) + " 2>/dev/null; do sleep 0.1; done; exec " + shellQuote(exe)
 }
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }

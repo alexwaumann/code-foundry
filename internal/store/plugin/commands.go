@@ -194,7 +194,8 @@ func (m *Manager) commandDownLocked(e *entry) string {
 	return fmt.Sprintf("plugin %s is %s; %s", e.name, e.state, restart)
 }
 
-// whyDownLocked explains why a plugin cannot take a command now. m.mu held.
+// whyDownLocked explains why a plugin cannot show a surface now: the surface's
+// unavailable text, shorter than commandDownLocked's error. m.mu held.
 func (m *Manager) whyDownLocked(e *entry) string {
 	switch e.state {
 	case StateStarting:

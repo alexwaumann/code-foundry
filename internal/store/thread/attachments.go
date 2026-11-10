@@ -57,14 +57,6 @@ var AttachmentTypes = map[string]string{
 	pdfType:      ".pdf",
 }
 
-// maxAttachmentBytes is the size limit for a type in AttachmentTypes.
-func maxAttachmentBytes(mimeType string) int {
-	if mimeType == pdfType {
-		return MaxPDFAttachmentBytes
-	}
-	return MaxAttachmentBytes
-}
-
 // attachmentType validates a declared MIME type against the data and returns the
 // extension to store it with. The declared type must be accepted and the content must
 // sniff as an accepted type too (the stored extension follows the content). The size
@@ -303,7 +295,8 @@ func (m *Manager) ReadAttachment(_ context.Context, path string) ([]byte, string
 		return nil, "", fmt.Errorf("%w: attachment %q", ErrNotFound, path)
 	}
 	mimeType := http.DetectContentType(data)
-	if AttachmentTypes[mimeType] == "" || len(data) > maxAttachmentBytes(mimeType) {
+	ext := AttachmentTypes[mimeType]
+	if ext == "" || int64(len(data)) > attachmentLimit(ext) {
 		return nil, "", fmt.Errorf("%w: attachment %q is %s, not an image or PDF", ErrInvalidArgument, path, mimeType)
 	}
 	return data, mimeType, nil
@@ -336,10 +329,10 @@ func attachmentPaths(as []attachment) []string {
 }
 
 // messageAttachments checks a message's attachment paths (checkAttachments), reads
-// each PDF's page count from its file name (stagedPDFPages; pdfPages for a name
-// without one), and enforces MaxMessageMediaBytes over what goes inline. A file is a
+// each PDF's page count from its file name (stagedPDFPages; the size estimate for a
+// name without one), and enforces MaxMessageMediaBytes over what goes inline. A file is a
 // PDF by its extension, which StageAttachment took from the sniffed content.
-func messageAttachments(ctx context.Context, dir string, paths []string) ([]attachment, error) {
+func messageAttachments(dir string, paths []string) ([]attachment, error) {
 	clean, err := checkAttachments(dir, paths)
 	if err != nil || len(clean) == 0 {
 		return nil, err
@@ -354,7 +347,7 @@ func messageAttachments(ctx context.Context, dir string, paths []string) ([]atta
 		if a.pdf {
 			var ok bool
 			if a.pages, a.exact, ok = stagedPDFPages(p); !ok {
-				a.pages, a.exact = pdfPages(ctx, p)
+				a.pages = estimatePDFPages(a.size)
 			}
 		}
 		if a.inline() {

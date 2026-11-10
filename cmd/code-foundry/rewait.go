@@ -82,7 +82,8 @@ func (cl *cli) rewait(ctx context.Context, cmd *v1.Command, uctx *v1.UiContext, 
 			return nil, err
 		case <-time.After(rewaitPause):
 		}
-		if _, cerr := cl.connect(ctx); cerr == nil {
+		if c, cerr := cl.connect(ctx); cerr == nil {
+			cl.conn = c
 			break
 		} else if try >= rewaitConnectTries || time.Since(start) >= limit-time.Second {
 			return nil, fmt.Errorf("%w; reconnecting: %w", err, cerr)

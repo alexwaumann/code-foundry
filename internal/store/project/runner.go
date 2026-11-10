@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 )
 
 // Runner runs git. Every git invocation in this package goes through a Runner.
@@ -121,42 +123,20 @@ type ExecRunner struct {
 // DefaultGitTimeout bounds a single git command that is not a fetch.
 const DefaultGitTimeout = 30 * time.Second
 
-// scrubbedEnv lists variables that would redirect git away from the directory we
-// point it at. A daemon started from inside a git hook would inherit them.
-var scrubbedEnv = []string{
-	"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
-	"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX",
-}
-
-// gitEnv returns the environment for git: the daemon's, minus scrubbedEnv, plus
-// settings that keep git non-interactive, side-effect free, and parseable.
+// gitEnv returns the environment for git: fsx.GitEnv (no variables that would
+// redirect git away from the directory we point it at, no prompts, no optional locks:
+// `git status` would otherwise rewrite the index, fire our own watcher and loop), plus
+// stable, untranslated output and no pager.
 func gitEnv(base []string) []string {
 	out := make([]string, 0, len(base)+4)
-	for _, kv := range base {
-		name, _, _ := strings.Cut(kv, "=")
-		drop := false
-		for _, s := range scrubbedEnv {
-			if name == s {
-				drop = true
-				break
-			}
+	for _, kv := range fsx.GitEnv(base) {
+		switch name, _, _ := strings.Cut(kv, "="); name {
+		case "LC_ALL", "GIT_PAGER":
+			continue
 		}
-		switch name {
-		case "GIT_TERMINAL_PROMPT", "GIT_OPTIONAL_LOCKS", "LC_ALL", "GIT_PAGER":
-			drop = true
-		}
-		if !drop {
-			out = append(out, kv)
-		}
+		out = append(out, kv)
 	}
-	return append(out,
-		"GIT_TERMINAL_PROMPT=0", // never prompt for credentials
-		// `git status` otherwise takes index.lock and rewrites the index to refresh
-		// stat info. That write fires our own watcher and would loop forever.
-		"GIT_OPTIONAL_LOCKS=0",
-		"LC_ALL=C", // stable, untranslated output and messages
-		"GIT_PAGER=cat",
-	)
+	return append(out, "LC_ALL=C", "GIT_PAGER=cat")
 }
 
 // guardedKey marks a context for guarded.
@@ -231,7 +211,7 @@ func (r ExecRunner) exec(ctx context.Context, dir string, stdin []byte, stdout i
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	} // else /dev/null
-	// A new thread has no controlling terminal, so neither git nor ssh can open
+	// A new session has no controlling terminal, so neither git nor ssh can open
 	// /dev/tty to prompt for a password or host key, even when the daemon runs in a
 	// terminal with --dev.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

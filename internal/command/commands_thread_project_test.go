@@ -55,7 +55,7 @@ func TestThreadProjectSet(t *testing.T) {
 			wantMsg: "removed r-api from thread fix (s-c) (1 project); its checkout stays on disk; it no longer follows workspace platform (w-plat) " +
 				"(thread workspace saves the set as one); Claude restarts for it once idle, resuming the conversation",
 			wantReq: &v1.RemoveThreadProjectRequest{Id: "s-c", Project: "r-api"}},
-		{name: "no thread in the GUI", cmd: "thread.project.add", ctx: command.Context{ActiveView: "dashboard"}, args: map[string]string{"project": "api"}, wantErr: command.ErrUnavailable},
+		{name: "no thread in the GUI", cmd: "thread.project.add", ctx: command.Context{ActiveView: "pullrequests"}, args: map[string]string{"project": "api"}, wantErr: command.ErrUnavailable},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

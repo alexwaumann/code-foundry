@@ -2,10 +2,12 @@ package gh
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -85,6 +87,47 @@ func TestSetPullRequestDraft(t *testing.T) {
 				t.Errorf("detail draft = %t, %v; want %t", d.PullRequest.Draft, err, tt.draft)
 			}
 		})
+	}
+}
+
+// A caller that stops waiting while the mutation is in flight still leaves clients
+// re-reading once it lands.
+func TestSetPullRequestDraftCallerLeaves(t *testing.T) {
+	g, w, s, _, events := mergeWorld(t)
+	if _, err := s.FullPullRequest(context.Background(), "o/r", 1, false); err != nil {
+		t.Fatal(err)
+	}
+	started, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	w.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+		if op == "ConvertToDraft" {
+			once.Do(func() { close(started) })
+			<-release
+		}
+		return g.respond(op, doc, vars)
+	})
+	drain(events)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.SetPullRequestDraft(ctx, "o/r", 1, true)
+		done <- err
+	}()
+	<-started
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	close(release)
+	// The worker runs one job at a time: this one ends after the mutation's.
+	if _, err := submitFunc(context.Background(), s, "after-draft", func(context.Context) (struct{}, error) { return struct{}{}, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if drain(events) == 0 {
+		t.Error("no detail event after the change")
+	}
+	if _, stale, ok := s.full.get(fullKey{"o/r", 1}); !ok || !stale {
+		t.Errorf("cached detail stale = %t (cached %t), want stale", stale, ok)
 	}
 }
 

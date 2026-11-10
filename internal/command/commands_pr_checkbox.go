@@ -25,7 +25,6 @@ func checkboxCommand(b GhBackend, slug, number ArgSpec) Command {
 			{Name: "checked", Type: Bool, Required: true, Description: "Tick it (--checked=false: untick it)"},
 			{Name: "text", Type: String, Description: "The item's text as shown: its source line after the box. Refused unless it still reads the same"},
 		},
-		When: hasPullRequest,
 		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 			if err := checkPullRequestArgs(a); err != nil {
 				return Result{}, err

@@ -106,25 +106,13 @@ func (m *Manager) RegenerateName(ctx context.Context, id string) (Thread, error)
 }
 
 // regenerateCall runs the namer for an explicit naming call, bounded by NamingTimeout,
-// the caller's ctx and the store's, retrying once after NamingRetryDelay when the
-// failure looks like a rate limit (as startSlug does).
+// the caller's ctx and the store's (callNamer).
 func (m *Manager) regenerateCall(ctx context.Context, id string, req NamingRequest) (Naming, error) {
 	ctx, cancel := context.WithTimeout(WithExplicitNaming(withNamingThread(ctx, id)), m.opts.NamingTimeout)
 	defer cancel()
 	stop := context.AfterFunc(m.ctx, cancel)
 	defer stop()
-	n, err := m.opts.Namer(ctx, req)
-	if isRateLimit(err) {
-		m.log.Info("naming rate limited; retrying once", "thread", id, "err", err)
-		t := time.NewTimer(m.opts.NamingRetryDelay)
-		select {
-		case <-t.C:
-			n, err = m.opts.Namer(ctx, req)
-		case <-ctx.Done():
-			t.Stop()
-		}
-	}
-	return n, err
+	return m.callNamer(ctx, id, req)
 }
 
 // recentTurnsContext renders the thread's most recent turns for a naming call: its last

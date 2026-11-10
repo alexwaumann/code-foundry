@@ -44,8 +44,8 @@ func Checkout(t testing.TB) string {
 		"enterprise/skills/pr-review/SKILL.md": appendTo(t, dir, "enterprise/skills/pr-review/SKILL.md", "\nMore checks.\n"),
 	})
 	Commit(t, dir, Catalog, map[string]string{
-		"enterprise/c1-claude-code-marketplace/enterprise-data/skills/catalog/SKILL.md": appendTo(t, dir,
-			"enterprise/c1-claude-code-marketplace/enterprise-data/skills/catalog/SKILL.md", "\nMore tables.\n"),
+		"enterprise/acme-marketplace/enterprise-data/skills/catalog/SKILL.md": appendTo(t, dir,
+			"enterprise/acme-marketplace/enterprise-data/skills/catalog/SKILL.md", "\nMore tables.\n"),
 	})
 	return dir
 }

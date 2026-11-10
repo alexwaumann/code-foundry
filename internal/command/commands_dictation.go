@@ -173,15 +173,11 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				"Code Foundry in front; the window opens and ends the session.",
 			Category: dictationCategory,
 			Args: []ArgSpec{
-				{Name: "phase", Type: String, Default: DictationHoldPress, Description: "press, release (transcribe the rest) or discard (drop it)"},
+				{Name: "phase", Type: Enum, Enum: []string{DictationHoldPress, DictationHoldRelease, DictationHoldDiscard}, Default: DictationHoldPress,
+					Description: "press, release (transcribe the rest) or discard (drop it)"},
 			},
 			Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
 				phase := a.String("phase")
-				switch phase {
-				case DictationHoldPress, DictationHoldRelease, DictationHoldDiscard:
-				default:
-					return Result{}, fmt.Errorf("%w: unknown phase %q", ErrInvalidArgs, phase)
-				}
 				if d.Emitter == nil {
 					return Result{}, fmt.Errorf("%w: no app windows to dictate in", ErrUnavailable)
 				}

@@ -131,7 +131,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Project",
-			Description:  "Show a project's worktree (default: its main one) in the Projects page's side panel in every connected window.",
+			Description:  "Show a project's page in every connected window, with the worktree's row selected when given.",
 			Category:     "View",
 			NoKeybinding: true,
 			Args: []ArgSpec{

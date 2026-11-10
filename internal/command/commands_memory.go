@@ -280,7 +280,7 @@ func memoryNotify(e Emitter, c memoryCallerInfo, title string) {
 	}
 	body := fmt.Sprintf("By thread %q.", c.label)
 	e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
-		Level: v1.UiIntent_Notify_LEVEL_INFO, Title: clipText(title, 120), Body: body,
+		Level: v1.UiIntent_Notify_LEVEL_INFO, Title: truncateRunes(title, 120), Body: body,
 		Link: memoryLink, LinkLabel: "Show in Settings",
 	}}})
 }

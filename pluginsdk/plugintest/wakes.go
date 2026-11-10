@@ -141,10 +141,11 @@ func (h *Host) checkFire(f pluginsdk.WakeFire) error {
 	invalid := func(format string, a ...any) error {
 		return pluginsdk.NewError(pluginsdk.CodeInvalidParams, "wake/fire: "+format, a...)
 	}
+	title := strings.TrimSpace(f.Title) // as the host trims it
 	switch {
-	case strings.TrimSpace(f.Title) == "" || strings.ContainsAny(f.Title, "\r\n"):
+	case title == "" || strings.ContainsAny(title, "\r\n"):
 		return invalid("title is one line, required")
-	case utf8.RuneCountInString(f.Title) > pluginsdk.MaxWakeTitle:
+	case utf8.RuneCountInString(title) > pluginsdk.MaxWakeTitle:
 		return invalid("title longer than %d characters", pluginsdk.MaxWakeTitle)
 	case len(f.Payload) > pluginsdk.MaxWakePayload:
 		return invalid("payload of %d bytes (at most %d)", len(f.Payload), pluginsdk.MaxWakePayload)

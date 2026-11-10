@@ -184,3 +184,36 @@ func TestSettleBranchLinks(t *testing.T) {
 	e.restart()
 	check("after restart ")
 }
+
+// A dropped link another child of the ancestor still has stays on the ancestor, now
+// through that child, and the walk stops there: the union holds, and a restart's fold
+// finds nothing to add.
+func TestSettleBranchLinksAnotherChildHasIt(t *testing.T) {
+	e := newEnv(t)
+	ids, names := lineage(e, [][2]string{{"g", ""}, {"p", "g"}, {"c", "p"}, {"c2", "p"}})
+	e.m.LinkBranchPullRequests(ids["c"], branchLinks(1))
+	e.m.linkPullRequests(ids["c2"], childLinks(1))
+	if n := e.m.SettleBranchLinks(ids["c"], nil, []string{childLink(1).URL}); n != 1 {
+		t.Errorf("removed %d; want 1 (c's own)", n)
+	}
+	want := map[string][]string{
+		"g":  {"#1 child p"},
+		"p":  {"#1 child c2"},
+		"c":  nil,
+		"c2": {"#1 claude"},
+	}
+	check := func(when string) {
+		for n, w := range want {
+			got, err := e.m.Get(e.ctx(), ids[n])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if facts := linkFacts(t, got.LinkedPullRequests, names); !slices.Equal(facts, w) {
+				t.Errorf("%s%s links = %q; want %q", when, n, facts, w)
+			}
+		}
+	}
+	check("")
+	e.restart()
+	check("after restart ")
+}

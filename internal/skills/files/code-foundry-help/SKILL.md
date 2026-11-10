@@ -21,7 +21,7 @@ description: "Answer how-to questions about Code Foundry, the app this thread ru
 ## Explain first, then offer
 
 1. Answer in the app's terms: where to click, which shortcut, which page. Name a setting
-   by its Settings page label (Settings › Threads › New threads work in), not its key.
+   by its Settings page label (Settings › General › New threads work in), not its key.
 2. Offer the action in the user's words, as a question: "Want me to make Fresh copy the
    default?" Show the command only if they ask for it.
 3. Run it only after the user says yes. Then say what changed (and if it needs a daemon restart).

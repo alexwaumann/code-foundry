@@ -54,6 +54,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 		return nil, threadError(err)
 	}
 	if reacted {
+		items.Close()
 		itemsC = nil
 	}
 	var dropped, itemsDropped uint64
@@ -90,6 +91,7 @@ func (h *Thread) Wait(ctx context.Context, req *connect.Request[v1.WaitThreadReq
 				reacted = true
 			}
 			if reacted {
+				items.Close()
 				itemsC = nil // no need to follow the items further
 			}
 		case ev, open := <-sub.C():

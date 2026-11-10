@@ -157,9 +157,10 @@ func EditLabels(cur, add, remove []string, clear bool) ([]string, error) {
 // CleanReport validates a report's status, summary and data; data is compacted. A
 // summary over MaxReportSummaryRunes is cut (CutReportSummary), not refused: a worker
 // that wrote too much still reports, and ReportSummaryCut tells the caller so
-// (docs/notes/ember-fixes-2-small.md).
+// (docs/notes/ember-fixes-2-small.md). ReportFinished is the daemon's own: no caller
+// files it.
 func CleanReport(r Report) (Report, error) {
-	if r.Status == ReportNone || !r.Status.valid() {
+	if r.Status == ReportNone || r.Status == ReportFinished || !r.Status.valid() {
 		return Report{}, fmt.Errorf("%w: report status %d: give done, blocked, failed or progress", ErrInvalidArgument, r.Status)
 	}
 	r.Summary = strings.TrimSpace(r.Summary)

@@ -22,6 +22,11 @@ func TestMergeEnv(t *testing.T) {
 		{"remove", []string{"A=1", "B=2"}, []string{"A"}, []string{"B=2"}},
 		{"remove then set", []string{"A=1"}, []string{"A", "A=4"}, []string{"A=4"}},
 		{"remove missing", []string{"A=1"}, []string{"Z"}, []string{"A=1"}},
+		{"later entry wins", []string{"A=1"}, []string{"A=2", "A=3"}, []string{"A=3"}},
+		{"value with equals", nil, []string{"X=a=b"}, []string{"X=a=b"}},
+		{"empty value", []string{"A=1"}, []string{"A="}, []string{"A="}},
+		{"duplicate in base collapses", []string{"A=1", "A=2"}, nil, []string{"A=2"}},
+		{"empty key ignored", []string{"=x", "A=1"}, nil, []string{"A=1"}},
 	}
 	for _, tt := range tests {
 		if got := MergeEnv(tt.base, tt.overrides); !slices.Equal(got, tt.want) {

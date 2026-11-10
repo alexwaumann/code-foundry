@@ -82,7 +82,7 @@ func (h *Skill) Registries(context.Context, *connect.Request[v1.ListSkillRegistr
 		out.Registries = append(out.Registries, &v1.SkillRegistry{
 			Name: r.Name, Repo: r.Repo, Source: r.Source, Url: r.URL, Ref: r.Ref, Dir: r.Dir, Owner: r.Owner,
 			Plugins: int32(r.Plugins), Skills: int32(r.Skills), Shallow: r.Shallow,
-			ReadAt: optionalTime(r.ReadAt), RefreshedAt: optionalTime(r.RefreshedAt), Error: r.Err, Issues: r.Issues,
+			ReadAt: timestamp(r.ReadAt), RefreshedAt: timestamp(r.RefreshedAt), Error: r.Err, Issues: r.Issues,
 		})
 	}
 	return connect.NewResponse(out), nil
@@ -156,7 +156,7 @@ var (
 func skillEntryToProto(snap *skill.Snapshot, e marketplace.Entry) *v1.SkillEntry {
 	out := &v1.SkillEntry{
 		Kind: skillKinds.to(e.Kind), Tier: skillTiers.to(e.Tier), Name: e.Name, Description: e.Description, By: e.By,
-		Version: e.Version, DeclaredVersion: e.DeclaredVersion, LastUpdated: optionalTime(e.LastUpdated),
+		Version: e.Version, DeclaredVersion: e.DeclaredVersion, LastUpdated: timestamp(e.LastUpdated),
 		Registry: e.Registry, Path: e.Path, Keywords: e.Keywords, Skills: e.Skills, SetupScript: e.SetupScript,
 		State: v1.SkillEntryState_SKILL_ENTRY_STATE_NOT_INSTALLED,
 	}
@@ -176,7 +176,7 @@ func installedSkillToProto(in skill.Installed) *v1.InstalledSkill {
 	out := &v1.InstalledSkill{
 		Kind: skillKinds.to(in.Kind), Name: in.Name, Id: in.ID(), Registry: in.Registry, Path: in.Path,
 		Tier: skillTiers.to(in.Tier), Description: in.Description, By: in.By, Version: in.Version,
-		LastUpdated: optionalTime(in.LastUpdated), Enabled: in.Enabled, Dir: in.Dir, Scope: in.Scope,
+		LastUpdated: timestamp(in.LastUpdated), Enabled: in.Enabled, Dir: in.Dir, Scope: in.Scope,
 		Skills: in.Skills, SetupScript: in.SetupScript, NeedsSetup: in.NeedsSetup,
 		State: v1.InstalledSkillState_INSTALLED_SKILL_STATE_INSTALLED,
 	}
@@ -187,7 +187,7 @@ func installedSkillToProto(in skill.Installed) *v1.InstalledSkill {
 		out.State = v1.InstalledSkillState_INSTALLED_SKILL_STATE_MISSING
 	}
 	if u := in.Update; u != nil {
-		out.Update = &v1.SkillOffer{Version: u.Version, LastUpdated: optionalTime(u.LastUpdated), CommitSha: u.CommitSHA}
+		out.Update = &v1.SkillOffer{Version: u.Version, LastUpdated: timestamp(u.LastUpdated), CommitSha: u.CommitSHA}
 	}
 	return out
 }

@@ -402,6 +402,18 @@ func TestInstallFromGitHubRelease(t *testing.T) {
 	if p, _ := m.Snapshot().Plugin("gh-plugin"); p.Manifest.Version != "0.4.0" || p.Installed.Source != "o/ghp" || p.Update != nil {
 		t.Errorf("after the update: %s from %+v, offer %+v", p.Manifest.Version, p.Installed, p.Update)
 	}
+	// Browse reads the release offers while an update check records them.
+	browsed := make(chan struct{})
+	go func() {
+		defer close(browsed)
+		for range 10 {
+			_, _ = m.Browse(ctx, false)
+		}
+	}()
+	for range 10 {
+		_, _ = m.CheckUpdates(ctx, false)
+	}
+	<-browsed
 }
 
 func TestInstallLinksAndDevConflicts(t *testing.T) {

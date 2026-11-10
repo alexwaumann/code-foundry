@@ -67,7 +67,7 @@ func TestValidateGridAndInline(t *testing.T) {
 		{"negative spacer", NewSpacer("s", -4), "nodes[0].spacer.size: -4 px is outside"},
 		// group
 		{"group of every kind it holds", NewGroup("grp", AlignBetween, text("t"), NewChips("c", NewChip("c1", "Build", StatusOK)), bar,
-			NewProgress("p", "Deploy", frac(0.5))), ""},
+			NewProgress("p", "Deploy", Fraction(0.5))), ""},
 		{"most items", group(Group{Items: leaves(MaxGroupItems)}), ""},
 		{"no items", NewGroup("grp", AlignStart), "nodes[0].group.items: 0 items, want 1 to 8"},
 		{"too many items", group(Group{Items: leaves(MaxGroupItems + 1)}), "nodes[0].group.items: 9 items, want 1 to 8"},
@@ -86,7 +86,7 @@ func TestValidateGridAndInline(t *testing.T) {
 		{"an item without a kind", NewGroup("grp", AlignStart, Node{Key: "x"}), "nodes[0].group.items[0]: a node has exactly one kind"},
 		{"an item of two kinds", NewGroup("grp", AlignStart, Node{Key: "x", Text: &Text{Content: Plain("x")}, Chips: &Chips{}}), "this one has 2"},
 		{"a refused item's key still counts", NewGroup("grp", AlignStart, NewMarkdown("grp", "x")), `nodes[0].group.items[0].key: "grp" is already used by nodes[0]`},
-		{"a bad item", NewGroup("grp", AlignStart, NewProgress("p", "", frac(2))), "nodes[0].group.items[0].progress.value: 2 is outside 0..1"},
+		{"a bad item", NewGroup("grp", AlignStart, NewProgress("p", "", Fraction(2))), "nodes[0].group.items[0].progress.value: 2 is outside 0..1"},
 		{"duplicate item keys", NewGroup("grp", AlignStart, text("t"), text("t")), `nodes[0].group.items[1].key: "t" is already used by nodes[0].group.items[0]`},
 		{"a group in a grid item", NewGrid("grid", NewGridItem("a", NewGroup("grp", AlignEnd, bar))), ""},
 	}
@@ -194,5 +194,3 @@ func TestGridAndInlineJSON(t *testing.T) {
 		t.Errorf("decoded %+v (%v)", back.Grid, err)
 	}
 }
-
-func frac(v float64) *float64 { return &v }

@@ -64,8 +64,9 @@ func ThemeSlots(path string) []string {
 
 // decode parses a settings file into raw string-encoded values keyed by settings key.
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
-// found by Field.parse. Under [keybindings], unquoted dotted keys (thread.new = ...)
-// parse as nested tables and are flattened back.
+// found by Field.parse. Nested tables are flattened to dotted keys: under
+// [keybindings], unquoted dotted keys (thread.new = ...) parse as nested tables, and an
+// unknown sub-table ([threads.experimental]) is kept, key by key, for the next save.
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {
@@ -78,7 +79,7 @@ func decode(data []byte) (map[string]string, error) {
 			raw[group] = stringify(v)
 			continue
 		}
-		flatten(raw, group, tbl, group == GroupKeybindings)
+		flatten(raw, group, tbl)
 	}
 	renameMovedKeys(raw)
 	dropRetiredKeys(raw)
@@ -127,11 +128,11 @@ func dropRetiredKeys(raw map[string]string) {
 	}
 }
 
-func flatten(raw map[string]string, prefix string, tbl map[string]any, nested bool) {
+func flatten(raw map[string]string, prefix string, tbl map[string]any) {
 	for k, v := range tbl {
 		key := prefix + "." + k
-		if sub, ok := v.(map[string]any); ok && nested {
-			flatten(raw, key, sub, true)
+		if sub, ok := v.(map[string]any); ok {
+			flatten(raw, key, sub)
 			continue
 		}
 		raw[key] = stringify(v)
@@ -173,7 +174,7 @@ const fileHeader = `# code-foundry settings.
 
 // unitWords spells a field's Unit out for the file's comments, which have no input to
 // show it in (" seconds" in "Range 60 to 86400 seconds.").
-var unitWords = map[string]string{"s": " seconds", "pt": " points", "%": " percent"}
+var unitWords = map[string]string{"s": " seconds", "pt": " points", "%": " percent", "tokens": " tokens", "h": " hours"}
 
 // render produces the file for values (resolved.fileValues: the accepted values,
 // canonical, and the raw text of keys with issues), keyed by settings key. Every static

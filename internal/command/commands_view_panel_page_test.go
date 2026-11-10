@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -38,6 +39,11 @@ func TestPanelPage(t *testing.T) {
 			wantParams: map[string]string{"path": "/wt/welcome.html", "project": "r1", "base": "/wt", "page": "1"}, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
 		{name: "with a title", args: map[string]string{"path": "/wt/welcome.html", "title": "  Welcome "}, files: page("/wt/welcome.html", bridged),
 			wantParams: map[string]string{"path": "/wt/welcome.html", "project": "r1", "base": "/wt", "page": "1", "title": "Welcome"}, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+		{name: "a title is plain text on one line", args: map[string]string{"path": "/wt/welcome.html", "title": "Wel\u202ecome\n  page\x07"}, files: page("/wt/welcome.html", bridged),
+			wantParams: map[string]string{"path": "/wt/welcome.html", "project": "r1", "base": "/wt", "page": "1", "title": "Welcome page"}, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+		{name: "a title that cleans to nothing is left out", args: map[string]string{"path": "/wt/welcome.html", "title": "\u202e\n"}, files: page("/wt/welcome.html", bridged),
+			wantParams: map[string]string{"path": "/wt/welcome.html", "project": "r1", "base": "/wt", "page": "1"}, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+		{name: "a title too long for a tab", args: map[string]string{"path": "/wt/welcome.html", "title": strings.Repeat("x", 101)}, files: page("/wt/welcome.html", bridged), argErr: "title"},
 		{name: "an .HTM file", args: map[string]string{"path": "/wt/OLD.HTM"}, files: page("/wt/OLD.HTM", bridged),
 			wantParams: map[string]string{"path": "/wt/OLD.HTM", "project": "r1", "base": "/wt", "page": "1"}, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
 		{name: "in the app, no message", ctx: command.Context{ActiveThreadID: "s-aaaaaaaaaaa1", ActiveView: "thread"},

@@ -54,10 +54,6 @@ func ParseLocation(raw string) (Location, error) {
 		}
 		return Location{URL: "https://github.com/" + repo, Repo: repo}, nil
 	}
-	if strings.EqualFold(u.Host, "raw.githubusercontent.com") && u.Scheme == "https" {
-		// Fine as a plain URL (a public repository's raw file).
-		return Location{URL: u.String(), IndexURL: u.String()}, nil
-	}
 	norm := strings.TrimRight(u.String(), "/")
 	idx := norm
 	if !strings.HasSuffix(strings.ToLower(u.Path), ".json") {

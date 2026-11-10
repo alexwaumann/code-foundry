@@ -22,8 +22,9 @@ const (
 )
 
 // StreamHeartbeat is sent on a long-lived server stream the GUI holds
-// (ThreadService.Watch, TerminalService.Attach, EventService.Watch,
-// EmberService.WatchBoard, PluginService.WatchSurface) once the stream has carried
+// (ThreadService.WatchThread, TerminalService.Attach, EventService.Watch,
+// EmberService.WatchBoard, PluginService.WatchSurface, DictationService.Watch and
+// Session, SearchService.Watch and WatchRecent) once the stream has carried
 // nothing else for 5 s (api.HeartbeatInterval), and on ThreadService.WatchThread also
 // shortly after a snapshot, to release its end (docs/notes/thread-open-stall.md). It
 // carries no state and no seq.

@@ -228,7 +228,7 @@ type CheckRollup struct {
 }
 
 // PullRequest is one pull request in the viewer's scope with its head commit's check
-// rollup. Polled pull requests carry every field; GetPullRequest fills the same set.
+// rollup. Polled pull requests carry every field; PullRequest fills the same set.
 type PullRequest struct {
 	// ID is GitHub's node id (the poll's key).
 	ID      string `json:"id,omitempty"`

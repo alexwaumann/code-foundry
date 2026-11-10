@@ -6,9 +6,6 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/childproc"
 )
 
-// StderrTail is how much of the process's stderr is kept for LastError.
-const StderrTail = childproc.StderrTail
-
 // Spec describes a CLI process to start.
 type Spec struct {
 	// Argv[0] is resolved against the PATH of the process's environment.

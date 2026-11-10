@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -22,9 +21,7 @@ func metadataToProto(s thread.Thread, p *v1.Thread) {
 	p.Labels = slices.Clone(s.Labels)
 	p.ReportStatus = v1.ThreadReportStatus(s.Report.Status)
 	p.ReportSummary, p.ReportData = s.Report.Summary, s.Report.Data
-	if !s.Report.At.IsZero() {
-		p.ReportAt = timestamppb.New(s.Report.At)
-	}
+	p.ReportAt = timestamp(s.Report.At)
 	p.BudgetUsd = s.BudgetUSD
 }
 
@@ -38,7 +35,6 @@ func (h *Thread) Label(ctx context.Context, req *connect.Request[v1.LabelThreadR
 	return connect.NewResponse(&v1.LabelThreadResponse{Thread: threadToProto(s)}), nil
 }
 
-// Report records a thread's report, replacing the previous one.
 // Ask sends a created thread's question to its creator.
 func (h *Thread) Ask(ctx context.Context, req *connect.Request[v1.AskThreadRequest]) (*connect.Response[v1.AskThreadResponse], error) {
 	m := req.Msg
@@ -49,6 +45,7 @@ func (h *Thread) Ask(ctx context.Context, req *connect.Request[v1.AskThreadReque
 	return connect.NewResponse(&v1.AskThreadResponse{Creator: threadToProto(creator), Repeated: repeated}), nil
 }
 
+// Report records a thread's report, replacing the previous one.
 func (h *Thread) Report(ctx context.Context, req *connect.Request[v1.ReportThreadRequest]) (*connect.Response[v1.ReportThreadResponse], error) {
 	m := req.Msg
 	s, err := h.store.Report(ctx, m.GetId(), thread.Report{

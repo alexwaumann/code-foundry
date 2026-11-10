@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "enterprise-data",
-      "source": "./enterprise/c1-claude-code-marketplace/enterprise-data",
+      "source": "./enterprise/acme-marketplace/enterprise-data",
       "description": "Query the data warehouse and its catalog.",
       "version": "1.4.0",
       "category": "data",

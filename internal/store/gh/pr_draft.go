@@ -194,24 +194,25 @@ func (s *Store) freshFor(ctx context.Context, k fullKey, look func(*FullPullRequ
 // state, or no answer, invalidates the detail so clients re-read, and so does success.
 // what names the change in errors ("disabling auto-merge").
 func (s *Store) stateWrite(ctx context.Context, k fullKey, what, doc string, vars map[string]any, refused func(*PartialError) error) ([]byte, error) {
-	data, err := submitFunc(ctx, s, doc+"|"+k.String(), func(ctx context.Context) ([]byte, error) {
+	return submitFunc(ctx, s, doc+"|"+k.String(), func(ctx context.Context) ([]byte, error) {
 		data, err := s.call(ctx, doc, vars)
 		var pe *PartialError
 		switch {
 		case errors.As(err, &pe):
-			return nil, refused(pe)
+			err = refused(pe)
 		case outcomeUnknown(err):
-			return nil, fmt.Errorf("pull request #%d: GitHub did not confirm %s, and it may have happened; refresh before trying again: %w",
+			err = fmt.Errorf("pull request #%d: GitHub did not confirm %s, and it may have happened; refresh before trying again: %w",
 				k.number, what, err)
-		case err != nil:
+		}
+		// On the worker, as a caller that left is not there to do it.
+		if err == nil || outcomeUnknown(err) || errors.Is(err, ErrFailedPrecondition) || errors.Is(err, ErrNotFound) {
+			s.invalidateFull(k)
+		}
+		if err != nil {
 			return nil, err
 		}
 		return data, nil
 	})
-	if err == nil || outcomeUnknown(err) || errors.Is(err, ErrFailedPrecondition) || errors.Is(err, ErrNotFound) {
-		s.invalidateFull(k)
-	}
-	return data, err
 }
 
 // draftRefusal says why d cannot be made a draft (draft) or ready for review, or "".

@@ -101,6 +101,10 @@ type Command struct {
 	// differs from what the user agreed to (plugin consent). A call confirmed without
 	// being asked (the CLI's --yes) has it empty.
 	BindConfirm string
+	// ConfirmBind, when set with BindConfirm, is the value Bind carries in place of
+	// ConfirmDigest(message). It sees the message asked, so it can bind what that message
+	// names (thread.stop-waiting: the ids of the shells it names).
+	ConfirmBind func(ctx context.Context, uctx Context, args Args, message string) string
 }
 
 // Available reports whether c is available in uctx.
@@ -306,6 +310,9 @@ func (c *Command) validate() error {
 		if c.Confirm == "" || i < 0 || c.Args[i].Type != String || c.Args[i].Required || c.Args[i].Positional {
 			return invalid("BindConfirm %q must name an optional String flag of a command with Confirm", c.BindConfirm)
 		}
+	}
+	if c.ConfirmBind != nil && c.BindConfirm == "" {
+		return invalid("ConfirmBind without BindConfirm")
 	}
 	if c.ConfirmLabel != "" && c.Confirm == "" {
 		return invalid("ConfirmLabel without Confirm")

@@ -23,9 +23,9 @@ err := h.UpdateView(open.Instance, v)
 
 ## Design rules
 
-- The panel is 400 px wide by default, may be 280 px, and can be expanded: short labels
-  (pills of one or two words). There is no table node; rows, pairs and chips wrap or
-  truncate, and layout nodes degrade to one column (`ui-layout.md`). Titles get one line and
+- The panel is 420 px wide by default, 280 px at the narrowest, and can be expanded: short
+  labels (pills of one or two words). Rows, pairs and chips wrap or truncate, table
+  columns drop, and layout nodes degrade to one column (`ui-layout.md`). Titles get one line and
   the header sub-line two, then are cut for good: guidance is a `text` node.
 - **No filled buttons.** The one thing that needs the user next is `attention` (amber
   outline); everything else is the default `muted`, `outline` for a little weight, or
@@ -152,7 +152,7 @@ manifest's; `tabTitle` (40 characters) renames the panel tab; up to 2 header but
 icon-only (give them an icon) at the end of the sub-line, then the header's `menu` as a ⋯
 (`nodes.md`, menus). The title is one line; the
 sub-line (with `sublineIcon`, a neutral icon from the list, before it) wraps to two lines
-(about 50 characters each at 400 px, 30 at 280 px) and is cut after that, never revealed:
+(about 50 characters each at 420 px, 30 at 280 px) and is cut after that, never revealed:
 a sentence of guidance goes in a `text` node. **Tabs** switch views inside one surface: the host draws the strip, sends a
 `tab` act (`act.Kind == "tab"`, `act.Key` the tab's key) when the user switches, and
 keeps form drafts per tab. The plugin answers with the view of the new active tab:

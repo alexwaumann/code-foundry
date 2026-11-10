@@ -13,7 +13,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/client"
 	"github.com/alexwaumann/code-foundry/internal/daemon"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/theme"
@@ -31,6 +30,7 @@ func TestTerminalsAnswerColorQueriesFromTheTheme(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	t.Setenv("HOME", t.TempDir())
 	p := paths.New(home)
 	ctx, stop := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -40,16 +40,7 @@ func TestTerminalsAnswerColorQueriesFromTheTheme(t *testing.T) {
 		<-done
 	})
 
-	var ep client.Endpoint
-	for i := 0; ; i++ {
-		if ep, err = client.ReadEndpoint(p); err == nil {
-			break
-		}
-		if i > 2400 { // a daemon start under the race detector takes seconds
-			t.Fatalf("daemon did not start: %v", err)
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
+	ep := waitEndpoint(t, p)
 	var protocols http.Protocols
 	protocols.SetUnencryptedHTTP2(true)
 	hc := &http.Client{Transport: bearer{token: ep.Token, next: &http.Transport{

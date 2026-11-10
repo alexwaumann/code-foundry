@@ -3,7 +3,6 @@ package ember
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -140,9 +139,6 @@ func TestResetOrphansAtLoad(t *testing.T) {
 	if got, _ := e.s.Snapshot().Task(parent.ID); got.State != StateDoing {
 		t.Fatalf("parent before = %s", got.State)
 	}
-	if len(e.s.ResetAtStart()) != 0 {
-		t.Errorf("a fresh store reset %v", e.s.ResetAtStart())
-	}
 	e.s.Close()
 	e.advance(time.Hour)
 	again, err := New(ctx, e.opts)
@@ -161,13 +157,6 @@ func TestResetOrphansAtLoad(t *testing.T) {
 	}
 	if got, _ := snap.Task(orphan.ID); !strings.HasPrefix(got.Outcome, "its worker never started (the app restarted at ") {
 		t.Errorf("outcome = %q", got.Outcome)
-	}
-	var ids []string
-	for _, r := range again.ResetAtStart() {
-		ids = append(ids, r.ID)
-	}
-	if !slices.Equal(ids, []string{orphan.ID, lone.ID}) {
-		t.Errorf("ResetAtStart = %q", ids)
 	}
 }
 

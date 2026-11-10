@@ -145,13 +145,6 @@ type Options struct {
 	// thread's worktree-mode worktrees nobody else has from it, as for an archive
 	// (docs/notes/remove-cleans-worktrees.md).
 	Removed func(t Thread)
-	// Unindexed, when set, keeps a thread out of thread search (search_index.go): its
-	// items get no search document and queries never attribute a hit to it. For a thread
-	// the user should never find, such as a hidden utility run made as a thread; it is
-	// asked with the thread as the snapshot has it (a thread not in it yet is indexed),
-	// on every save, so it must be cheap and must not call back into the store. Nil:
-	// every thread is indexed.
-	Unindexed func(t Thread) bool
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -707,7 +700,7 @@ func (m *Manager) Create(ctx context.Context, o CreateOptions) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
-	attachments, err := messageAttachments(ctx, m.opts.AttachmentsDir, o.Attachments)
+	attachments, err := messageAttachments(m.opts.AttachmentsDir, o.Attachments)
 	if err != nil {
 		return Thread{}, err
 	}
@@ -1122,7 +1115,7 @@ func (m *Manager) spawn(ctx context.Context, id string, l launch) error {
 // the other members' checkouts and the granted dirs (in that order, every spawn), the
 // system prompt (ThreadPrompt, the workspace's instructions, the app memory read now,
 // the thread's own append), then the extras' env and PATH entries. The prompt is never in argv (it
-// is the first user message). g is what the conversation's allow-for-thread answers
+// is the first user message). g is what the conversation's allow-for-session answers
 // granted (an effort restart's; a fresh spawn starts without). wait lets the extras wait
 // briefly for a plugin still starting (spawnextras.go); the effort restart passes false.
 // x is the extras it applied, for the staleness fingerprint (envstale.go); mem is what
@@ -1473,7 +1466,7 @@ func (m *Manager) detach(r *runner, fn func(*Thread)) {
 	m.servers.changed() // its shells are gone (servers.go)
 }
 
-// startNaming names a thread from its first user message, once.
+// startNaming names a thread from its first user message, once (callNamer).
 func (m *Manager) startNaming(id, msg string) {
 	m.mu.Lock()
 	rec, ok := m.recs[id]
@@ -1489,7 +1482,7 @@ func (m *Manager) startNaming(id, msg string) {
 		ctx, cancel := context.WithTimeout(withNamingThread(m.ctx, id), m.opts.NamingTimeout)
 		defer cancel()
 		start := time.Now()
-		n, err := m.opts.Namer(ctx, NamingRequest{Message: msg})
+		n, err := m.callNamer(ctx, id, NamingRequest{Message: msg})
 		if err != nil {
 			m.log.Warn("auto-naming failed", "thread", id, "err", err)
 			return

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
@@ -50,9 +49,7 @@ func mcpStatusToProto(s *thread.McpStatus) *v1.ThreadMcpStatus {
 		return nil
 	}
 	out := &v1.ThreadMcpStatus{Trigger: mcpTriggers[s.Trigger], Server: s.Server, Servers: make([]*v1.McpServer, len(s.Servers))}
-	if !s.CheckedAt.IsZero() {
-		out.CheckedAt = timestamppb.New(s.CheckedAt)
-	}
+	out.CheckedAt = timestamp(s.CheckedAt)
 	for i, sv := range s.Servers {
 		p := &v1.McpServer{
 			Name: sv.Name, Status: mcpServerStatuses[sv.Status], ServerName: sv.ServerName, Version: sv.Version,

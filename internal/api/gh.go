@@ -203,6 +203,7 @@ func ghError(err error) error {
 	return connect.NewError(connect.CodeUnknown, err)
 }
 
+// timestamp is t on the wire, nil when zero.
 func timestamp(t time.Time) *timestamppb.Timestamp {
 	if t.IsZero() {
 		return nil

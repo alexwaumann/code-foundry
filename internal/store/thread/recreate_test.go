@@ -94,7 +94,7 @@ func TestSendRecreatesRemovedWorktree(t *testing.T) {
 		{name: "a different path is refused", refs: []string{"refs/heads/<b>"},
 			prepare: func(e *env, _ *recreatingEnv, _ Thread) {
 				r, _ := e.projects.Snapshot().Project("r1")
-				r.Name = "renamed"
+				r.GitHubSlug = "acme/moved"
 				e.projects.Put(r)
 			},
 			wantErr: "not at the thread's"},

@@ -1,10 +1,6 @@
 package api
 
 import (
-	"time"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
@@ -31,16 +27,8 @@ func threadAgentsToProto(runs []thread.AgentRun) []*v1.ThreadAgentRun {
 			Status: agentStatuses[r.Status], Activity: r.Activity, LastTool: r.LastTool,
 			TotalTokens: r.TotalTokens, ToolUses: r.ToolUses, DurationMs: r.DurationMS,
 			Summary: r.Summary, Error: r.Error, NoteItemId: r.NoteItemID,
-			StartedAt: optTime(r.StartedAt), ResumedAt: optTime(r.ResumedAt), EndedAt: optTime(r.EndedAt),
+			StartedAt: timestamp(r.StartedAt), ResumedAt: timestamp(r.ResumedAt), EndedAt: timestamp(r.EndedAt),
 		}
 	}
 	return out
-}
-
-// optTime is t on the wire, nil when zero.
-func optTime(t time.Time) *timestamppb.Timestamp {
-	if t.IsZero() {
-		return nil
-	}
-	return timestamppb.New(t)
 }

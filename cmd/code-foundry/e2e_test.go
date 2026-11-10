@@ -117,8 +117,6 @@ func TestCLIAgainstDaemon(t *testing.T) {
 		{"project create keeps projects under home", []string{"project", "create", "demo"}, errUsage, "", "outside your home directory"},
 		{"project github publish needs a project", []string{"project", "github", "publish", "--owner", "me", "--visibility", "public"}, errUsage, "",
 			"project.github.publish: missing --project (default: the active project; there is none)"},
-		// terminal.* is registered against the Unimplemented stub until 1a is wired.
-		{"store-backed stub", []string{"terminal.kill", "--id", "t1"}, errAny, "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

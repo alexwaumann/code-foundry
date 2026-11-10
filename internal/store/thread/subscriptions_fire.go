@@ -22,21 +22,21 @@ import (
 //	{ "kind": "thread", "subscription_id": "sub-…", "condition": "settled", "fired_at": "…", "thread": { … } }
 //	```
 //
-// A thread wake says what its target's row does not: a turn that ended with no report,
-// or one filed before the thread's last message, is "finished without a report" or
-// "(report is from before its last message)", with "report_stale" and the turn's
-// "last_message" in the JSON; a pending permission prompt or question comes whole in
-// "pending" (request id, tool, input, a question's option labels); a thread that
-// created threads has "children" counts and "; 2 of its 3 child threads still working"
-// in the header:
+// A thread wake's text has a plain-text body in place of the JSON (waketext.go); the JSON
+// is its WakeJSON. It says what its target's row does not: an idle thread's ended turn
+// has its "last_message" in the JSON, and one that ended without a word reads "finished
+// without a word"; a report filed before the thread's last message (stale) and the
+// daemon's own (ReportFinished) are left out of the header and of the JSON's "report"; a
+// pending permission prompt or question comes whole in "pending" (request id, tool,
+// input, a question's option labels); a thread that created threads has "children"
+// counts and "; 2 of its 3 child threads still working" in the header:
 //
-//	[code-foundry wake] Thread "Add LICENSE" (s-…) needs attention: finished without a report.
+//	[code-foundry wake] Thread "Add LICENSE" (s-…) needs attention: finished without a word.
 //	[code-foundry wake] Thread "Docs lead" (s-…) needs attention: finished; 2 of its 3 child threads still working.
 //
-// A turn that went on talking after filing its report ends "said more after its report"
-// and has "last_message" too. A wake about one of the subscriber's own children counts
-// its siblings, and thread wakes firing together go as one message; a lead only waiting
-// on its workers wakes no one (subscriptions_batch.go).
+// A wake about one of the subscriber's own children counts its siblings, and thread
+// wakes firing together go as one message; a lead only waiting on its workers wakes no
+// one (subscriptions_batch.go).
 //
 // The item keeps the header without its prefix (WakeTitle) and the JSON (WakeJSON), so
 // the GUI can draw it as a "Woken by …" row. The rate limit: a subscriber gets at most
@@ -67,7 +67,7 @@ const (
 )
 
 // wakeQueue is a subscriber's waiting deliveries; running while its drain goroutine runs;
-// holding while drain holds a thread wake open for others to join it (batchLocked).
+// holding while drain holds a thread wake open for others to join it (collectBatch).
 type wakeQueue struct {
 	items   []delivery
 	running bool
@@ -294,7 +294,7 @@ func (m *Manager) enqueueLocked(subscriber string, d delivery) {
 
 // next pops subscriber's next delivery; false (and the queue gone) when it is empty. A
 // thread wake popped while batching is on holds the queue open (holding) for others to
-// join it (batchLocked).
+// join it (collectBatch).
 func (s *subscriptions) next(subscriber string, batching bool) (delivery, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -614,9 +614,11 @@ func lastTurn(items []Item) (started, ended time.Time, text string) {
 
 // itemsUntil is items without the turn a message after the fire started: a wake is built
 // after it fired (the batch window at least), and it is about the turn that ended then.
+// A fire's time is cut to the millisecond, so an item's is too: a message written in the
+// fire's own millisecond came before it.
 func itemsUntil(items []Item, at time.Time) []Item {
 	for i, it := range items {
-		if it.Kind == KindUserMessage && it.ParentToolUseID == "" && it.CreatedAt.After(at) {
+		if it.Kind == KindUserMessage && it.ParentToolUseID == "" && it.CreatedAt.Truncate(time.Millisecond).After(at) {
 			return items[:i]
 		}
 	}
@@ -697,11 +699,8 @@ func pendingInput(in string) any {
 	case len(in) <= maxPendingInput:
 		return in
 	}
-	cut := maxPendingInput
-	for cut > 0 && !utf8.RuneStart(in[cut]) {
-		cut--
-	}
-	return in[:cut] + "… [" + strconv.Itoa(len(in)-cut) + " more bytes; thread read --full has it all]"
+	head := cutUTF8(in, maxPendingInput)
+	return head + "… [" + strconv.Itoa(len(in)-len(head)) + " more bytes; thread read --full has it all]"
 }
 
 // threadWake is the wake message of sub about thread t, fired at, with detail d.
@@ -887,6 +886,17 @@ func oneLine(s string, max int) string {
 	}
 	r := []rune(s)
 	return strings.TrimSpace(string(r[:max-1])) + "…"
+}
+
+// cutUTF8 is s cut to at most n bytes on a rune boundary.
+func cutUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }
 
 // outputTail is the last max bytes of s, starting on a rune boundary.

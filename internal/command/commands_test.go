@@ -122,7 +122,6 @@ func TestAvailability(t *testing.T) {
 		{"view.usage", command.Context{ActiveView: "thread"}, true},
 		{"terminal.new", command.Context{}, true}, // the CLI (no view): owner from --cwd
 		{"terminal.new", command.Context{ActiveView: "pullrequests"}, false},
-		{"terminal.new", command.Context{ActiveView: "pullrequests"}, false},
 		{"terminal.new", command.Context{ActiveThreadID: "s1"}, true},
 		{"terminal.close", command.Context{}, false},
 		{"terminal.close", command.Context{ActiveTerminalID: "t1"}, true},

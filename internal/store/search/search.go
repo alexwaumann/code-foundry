@@ -6,8 +6,8 @@
 // The run is no thread: the store starts claude itself over stream-json
 // (internal/claudestream), so it never reaches the thread store's snapshot, the sidebar,
 // notifications, the search index or Usage. Its cost is on its history entry. Its tools
-// are Bash limited by permission rules to the four CLI verbs it needs (runArgs), in an
-// empty working directory.
+// are Bash limited by permission rules to the three CLI commands it needs
+// (allowedCommands), in an empty working directory.
 //
 // A hit is accepted only when its quote occurs in that message's searchable text, in a
 // thread of the default search scope (thread.Manager.VerifyQuote). Promote continues the
@@ -15,6 +15,7 @@
 package search
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -321,13 +322,13 @@ func New(ctx context.Context, o Options) (*Store, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	o.WallTime = cmpOr(o.WallTime, WallTime)
-	o.WrapUpAfter = cmpOr(o.WrapUpAfter, WrapUpAfter)
-	o.MaxToolCalls = cmpOr(o.MaxToolCalls, MaxToolCalls)
-	o.MaxHits = cmpOr(o.MaxHits, MaxHits)
-	o.MaxEntries = cmpOr(o.MaxEntries, MaxEntries)
-	o.StartTimeout = cmpOr(o.StartTimeout, 30*time.Second)
-	o.KillGrace = cmpOr(o.KillGrace, 2*time.Second)
+	o.WallTime = cmp.Or(o.WallTime, WallTime)
+	o.WrapUpAfter = cmp.Or(o.WrapUpAfter, WrapUpAfter)
+	o.MaxToolCalls = cmp.Or(o.MaxToolCalls, MaxToolCalls)
+	o.MaxHits = cmp.Or(o.MaxHits, MaxHits)
+	o.MaxEntries = cmp.Or(o.MaxEntries, MaxEntries)
+	o.StartTimeout = cmp.Or(o.StartTimeout, 30*time.Second)
+	o.KillGrace = cmp.Or(o.KillGrace, 2*time.Second)
 	s := &Store{opts: o, log: o.Log, entries: map[string]*Entry{}, runs: map[string]*run{}}
 	list, err := loadEntries(ctx, o.DB)
 	if err != nil {
@@ -346,14 +347,6 @@ func New(ctx context.Context, o Options) (*Store, error) {
 		s.entries[e.ID] = e
 	}
 	return s, nil
-}
-
-func cmpOr[T comparable](v, def T) T {
-	var zero T
-	if v == zero {
-		return def
-	}
-	return v
 }
 
 // Close stops every running search (FAILED, "the daemon stopped") and waits for them.

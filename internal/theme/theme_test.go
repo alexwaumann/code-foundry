@@ -26,12 +26,13 @@ func TestCatalog(t *testing.T) {
 			}
 		}
 	}
+	var cat Set
 	for _, s := range []string{SchemeDark, SchemeLight} {
-		if d := Default(s); !Valid(d, s) {
+		if d := Default(s); !cat.Valid(d, s) {
 			t.Errorf("Default(%s) = %q is not a %s theme", s, d, s)
 		}
-		if len(IDs(s)) != len(Names(s)) || len(IDs(s)) == 0 {
-			t.Errorf("IDs/Names(%s) = %d/%d", s, len(IDs(s)), len(Names(s)))
+		if len(cat.IDs(s)) != len(cat.Names(s)) || len(cat.IDs(s)) == 0 {
+			t.Errorf("IDs/Names(%s) = %d/%d", s, len(cat.IDs(s)), len(cat.Names(s)))
 		}
 	}
 	if Default(SchemeDark) != "github-dark" || Default(SchemeLight) != "github-light" {
@@ -58,14 +59,15 @@ func TestCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.id+"/"+tt.scheme, func(t *testing.T) {
-			err := Check(tt.id, tt.scheme)
+			var cat Set
+			err := cat.Check(tt.id, tt.scheme)
 			if tt.want == "" {
-				if err != nil || !Valid(tt.id, tt.scheme) {
+				if err != nil || !cat.Valid(tt.id, tt.scheme) {
 					t.Fatalf("Check = %v, want nil", err)
 				}
 				return
 			}
-			if err == nil || !strings.Contains(err.Error(), tt.want) || Valid(tt.id, tt.scheme) {
+			if err == nil || !strings.Contains(err.Error(), tt.want) || cat.Valid(tt.id, tt.scheme) {
 				t.Fatalf("Check = %v, want %q", err, tt.want)
 			}
 		})

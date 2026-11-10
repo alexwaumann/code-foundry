@@ -51,8 +51,10 @@ func (b *logBuffer) add(source, level, text string) {
 	b.seq++
 	l := LogLine{Seq: b.seq, Time: b.now(), Source: source, Level: level, Text: text}
 	b.lines = append(b.lines, l)
-	if over := len(b.lines) - b.tailCap; over > 0 {
-		b.lines = append(b.lines[:0], b.lines[over:]...)
+	// Trimmed in batches: up to tailCap more lines wait, so a full tail is not shifted
+	// on every line. tailLocked reads only the last tailCap.
+	if len(b.lines) >= 2*b.tailCap {
+		b.lines = append(b.lines[:0], b.lines[len(b.lines)-b.tailCap:]...)
 	}
 	b.write(l)
 	for ch := range b.subs {
@@ -85,8 +87,9 @@ func (b *logBuffer) tail(n int) []LogLine {
 }
 
 func (b *logBuffer) tailLocked(n int) []LogLine {
-	if n <= 0 || n > len(b.lines) {
-		n = len(b.lines)
+	kept := min(len(b.lines), b.tailCap)
+	if n <= 0 || n > kept {
+		n = kept
 	}
 	return append([]LogLine(nil), b.lines[len(b.lines)-n:]...)
 }

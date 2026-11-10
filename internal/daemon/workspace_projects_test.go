@@ -62,20 +62,22 @@ func TestWorkspaceProjectsGlue(t *testing.T) {
 	}
 	stop := startWorkspaceProjects(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)), ws, func() *project.Snapshot { return projects }, b)
 	defer stop()
-	if w, _ := ws.Snapshot().Workspace("w-1"); w.Member("r-gone") || w.DefaultPrimary != workspace.PrimaryWorkspace {
+	if w, _ := ws.Snapshot().Workspace("w-1"); w.Member("r-gone") || w.DefaultPrimary != "r-web" {
 		t.Fatalf("at start: %+v", w)
 	}
 	bus.Publish[project.Event](b, project.ProjectRemoved{ID: "r-web"})
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if w, _ := ws.Snapshot().Workspace("w-2"); !w.Member("r-web") {
+		w1, _ := ws.Snapshot().Workspace("w-1")
+		w2, _ := ws.Snapshot().Workspace("w-2")
+		if !w1.Member("r-web") && !w2.Member("r-web") {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	for _, id := range []string{"w-1", "w-2"} {
-		if w, _ := ws.Snapshot().Workspace(id); w.Member("r-web") {
-			t.Errorf("%s still has r-web: %+v", id, w)
+	for id, primary := range map[string]string{"w-1": workspace.PrimaryWorkspace, "w-2": "r-api"} {
+		if w, _ := ws.Snapshot().Workspace(id); w.Member("r-web") || w.DefaultPrimary != primary {
+			t.Errorf("%s: %+v, want r-web gone and %s the default primary", id, w, primary)
 		}
 	}
 	if calls := strings.Join(ws.Calls(), ","); !strings.Contains(calls, "ProjectRemoved r-gone") || !strings.Contains(calls, "ProjectRemoved r-web") {

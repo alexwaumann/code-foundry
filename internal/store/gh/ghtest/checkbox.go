@@ -10,8 +10,9 @@ import (
 
 // SetPullRequestCheckbox implements gh.Service: it records "checkbox <key> <index>
 // <checked> <text>". A pull request that is not set fails NotFound; an item that is gone
-// or reads differently fails like the real store. A change edits the detail's Body and
-// publishes gh.PullRequestDetailUpdated.
+// or reads differently fails like the real store and, like it, publishes
+// gh.PullRequestDetailUpdated so the client reads again. A change edits the detail's Body
+// and publishes gh.PullRequestDetailUpdated.
 func (s *Store) SetPullRequestCheckbox(_ context.Context, slug string, number int, r gh.CheckboxChange) (gh.CheckboxResult, error) {
 	key, err := prKey(slug, number)
 	if err != nil {
@@ -31,6 +32,7 @@ func (s *Store) SetPullRequestCheckbox(_ context.Context, slug string, number in
 	next, changed, why := gh.SetTaskItem(d.Body, r.Index, r.Text, r.Checked)
 	if why != "" {
 		s.mu.Unlock()
+		s.publishDetail(strings.Split(key, "#")[0], number)
 		return gh.CheckboxResult{}, fmt.Errorf("%w: pull request #%d %s", gh.ErrFailedPrecondition, number, why)
 	}
 	d.Body = next

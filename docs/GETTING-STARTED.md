@@ -54,7 +54,7 @@ classifier decide. You can change all three in a running thread too.
   in its own copy (the one it already has, if any).
 
 A choice applies to that thread only; the next one starts from the default again. Set
-the default for every project under Settings › Threads › **New threads work in**.
+the default for every project under Settings › General › **New threads work in**.
 
 ### Right after you send
 
