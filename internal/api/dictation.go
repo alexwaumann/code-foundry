@@ -170,6 +170,31 @@ func (h *Dictation) Session(ctx context.Context, req *connect.Request[v1.Dictati
 	if err := stream.Send(heartbeatEvent); err != nil {
 		return err
 	}
+	// The bus drops events a slow stream cannot take, the end among them: ask the store at
+	// each heartbeat and after a drop. Once it has ended, what is still buffered goes first.
+	endedSince := func() (bool, error) {
+		reason, ended, ok := h.store.SessionEnded(id)
+		if !ended {
+			return !ok, nil
+		}
+		for {
+			select {
+			case ev, open := <-sub.C():
+				if !open {
+					return true, nil
+				}
+				if ev.SessionID != id {
+					continue
+				}
+				if err := stream.Send(dictationSessionEventToProto(ev)); err != nil || ev.Kind == dictation.SessionEnded {
+					return true, err
+				}
+			default:
+				return true, stream.Send(dictationEndedToProto(reason))
+			}
+		}
+	}
+	dropped := sub.Dropped()
 	beat := newHeartbeat(h.beat)
 	defer beat.Stop()
 	for {
@@ -178,6 +203,9 @@ func (h *Dictation) Session(ctx context.Context, req *connect.Request[v1.Dictati
 			return nil
 		case <-beat.C():
 			beat.Reset()
+			if done, err := endedSince(); done || err != nil {
+				return err
+			}
 			if err := stream.Send(heartbeatEvent); err != nil {
 				return err
 			}
@@ -185,15 +213,20 @@ func (h *Dictation) Session(ctx context.Context, req *connect.Request[v1.Dictati
 			if !ok {
 				return nil
 			}
-			if ev.SessionID != id {
-				continue
+			if ev.SessionID == id {
+				beat.Reset()
+				if err := stream.Send(dictationSessionEventToProto(ev)); err != nil {
+					return err
+				}
+				if ev.Kind == dictation.SessionEnded {
+					return nil
+				}
 			}
-			beat.Reset()
-			if err := stream.Send(dictationSessionEventToProto(ev)); err != nil {
-				return err
-			}
-			if ev.Kind == dictation.SessionEnded {
-				return nil
+			if d := sub.Dropped(); d != dropped {
+				dropped = d
+				if done, err := endedSince(); done || err != nil {
+					return err
+				}
 			}
 		}
 	}
