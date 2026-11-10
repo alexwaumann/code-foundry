@@ -537,8 +537,18 @@ func (s workspaceSource) topics() []topic {
 	return []topic{busTopic(s.bus, watchBuffer, workspaceWrap)}
 }
 
-func (s workspaceSource) snapshot(context.Context) []*v1.Event {
+// snapshot and resume read every workspace's folder again first (EnsureDirs), as
+// WorkspaceService.Watch does, so hand edits to its instructions and skills show on
+// connect: in the snapshot, or as an event after a resume.
+func (s workspaceSource) snapshot(ctx context.Context) []*v1.Event {
+	s.resume(ctx)
 	return []*v1.Event{workspaceWrap(s.store.Snapshot())}
+}
+
+func (s workspaceSource) resume(ctx context.Context) {
+	if err := s.store.EnsureDirs(ctx, ""); err != nil {
+		slog.WarnContext(ctx, "workspace folders on events connect", "err", err)
+	}
 }
 
 // ---- terminal ------------------------------------------------------------------

@@ -415,7 +415,9 @@ export enum EventSource {
 
   /**
    * Workspaces (branch sets). Sent right after project, before terminal: members name
-   * projects, and threads name workspaces.
+   * projects, and threads name workspaces. Connecting (with the snapshot or a resume)
+   * reads every workspace's folder again first (instructions, skills, links), so hand
+   * edits show without a spawn, as with WorkspaceService.Watch.
    *
    * @generated from enum value: EVENT_SOURCE_WORKSPACE = 11;
    */
