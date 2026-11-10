@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openHelloDemo, resetMock } from "./fixtures";
 
 /**
  * The date field's popover in a real browser (docs/notes/plugin-date-ansi.md): the keyboard
@@ -15,22 +15,12 @@ const due = (page: Page) => surface(page).locator('[data-testid="plugin-date"][d
 const popover = (page: Page) => page.getByTestId("plugin-date-popover");
 const focusedDay = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("data-day") ?? null);
 
-/** Thread s-3 selected, its panel showing the hello demo (opened from the palette). */
-async function openDemo(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
-}
-
 test.beforeEach(async () => {
   await resetMock();
 });
 
 test("the date field: the keyboard opens the calendar on today, Enter picks a day, Escape closes, the focus comes back", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await tab(page, "form").click();
   await expect(due(page)).toHaveText(/No due date/);
   const today = await page.evaluate(() => {
@@ -68,7 +58,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.clock.setFixedTime(new Date(2026, 10, 11, 10));
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1400, height: 900 });
-    await openDemo(page);
+    await openHelloDemo(page);
     await tab(page, "form").click();
     await due(page).click();
     await popover(page).locator('[data-day="2026-11-14"]').click();

@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { emit, expectTooltip, invocations, mockUrl, openApp, openStreams, resetMock, row, threadPrompt } from "./fixtures";
+import { emit, expectTooltip, invocations, invokeAs, openApp, openStreams, resetMock, row, threadPrompt } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -515,12 +514,7 @@ test("view.panel.expand from the palette and the CLI; focus follows the hidden t
   // The CLI: CommandService.Invoke emits ShowView "panel.expand" to every window.
   await threadPrompt(page).click();
   await expect.poll(() => region(page)).toBe("content");
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name: "view.panel.expand" }),
-  });
-  expect(res.ok).toBe(true);
+  expect((await invokeAs("", "view.panel.expand")).ok).toBe(true);
   await expect(page.getByTestId("content-pane")).toBeHidden();
   // The thread's prompt had focus and is hidden now: the panel takes it.
   await expect.poll(() => region(page)).toBe("panel");

@@ -11,11 +11,6 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-/** cmd+n, then the nth project row of the picker: that project's composer. */
-async function compose(page: Page, n = 1): Promise<void> {
-  await composeProject(page, n);
-}
-
 const heading = (page: Page) => page.getByTestId("composer-heading");
 const trigger = (page: Page) => page.getByTestId("composer-project-trigger");
 const list = (page: Page) => page.getByTestId("composer-project-list");
@@ -27,7 +22,7 @@ const prompt = (page: Page) => page.getByTestId("composer-prompt");
 // src/components/compose/ComposerSets.test.tsx. What stays: where the list sits, the dotted underline, and focus.
 test("the heading's picker: centred under the name; a project row closes it and the prompt takes focus", async ({ page }) => {
   await openApp(page);
-  await compose(page, 1);
+  await composeProject(page, 1);
   await trigger(page).click();
   await expect(list(page)).toBeVisible();
   await expect(page.getByPlaceholder("Switch to a workspace or project…")).toBeFocused();
@@ -51,7 +46,7 @@ test("the heading's picker: centred under the name; a project row closes it and 
 
 test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc closes it and the prompt takes focus", async ({ page }) => {
   await openApp(page);
-  await compose(page, 1);
+  await composeProject(page, 1);
   await page.keyboard.type("Keep me");
 
   // Prompt ← the collision banner's "Use a new branch" (s-1 runs in code-foundry's folder) ← Add project ← the heading's name.
@@ -86,7 +81,7 @@ test("the trigger is a Tab stop before the chips; Enter/Space open it, Esc close
 
 test("taking a project out drops its skill tags after a confirm; the rest stays", async ({ page }) => {
   await openApp(page);
-  await compose(page, 1);
+  await composeProject(page, 1);
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await page.getByTestId("composer-input").click();

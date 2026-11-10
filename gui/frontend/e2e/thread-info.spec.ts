@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { expectTooltip, invocations, mockPost, openApp, openTooltip, resetMock, row, setZoom } from "./fixtures";
 
 /**
  * The thread info card (docs/notes/thread-info-card.md) over the mock's
@@ -375,12 +375,6 @@ test("the action menu: the gear's blocks, the item hovers as two blocks, arrows 
   // A gear click or Enter on a focused gear opens that action's editor and runs nothing; the
   // item's text runs it: ThreadInfoCard.test.tsx ("the action menu") and GearMenuItem.test.tsx.
 });
-
-/** Sets the page zoom (stores/ui setZoom), as zoom-popovers.spec.ts does. */
-async function setZoom(page: Page, percent: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);
-  await expect(page.locator("html")).toHaveAttribute("data-zoom", String(percent));
-}
 
 for (const zoom of [90, 125]) {
   test(`at ${String(zoom)}% zoom the row menus sit under their rows at the rows' width`, async ({ page }) => {

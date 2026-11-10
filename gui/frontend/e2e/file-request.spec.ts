@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, invokeAs, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
 
 /**
  * A thread asking the user to edit a file, and the keyboard around it
@@ -29,12 +28,7 @@ async function writeDisk(path: string, text: string): Promise<void> {
 
 /** The CLI in thread s-1 running a verb. */
 async function fromThread(name: string, args: Record<string, string>): Promise<void> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name, args, context: { activeThreadId: "s-1" } }),
-  });
-  expect(res.ok).toBe(true);
+  expect((await invokeAs("s-1", name, args)).ok).toBe(true);
 }
 
 async function inThread(page: Page): Promise<void> {

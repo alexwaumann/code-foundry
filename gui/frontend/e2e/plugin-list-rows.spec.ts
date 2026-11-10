@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openHelloDemo, pluginActs, resetMock } from "./fixtures";
 
 /**
  * A list's interactive rows in a real browser (docs/notes/plugin-list-rows.md): only what
@@ -12,18 +12,8 @@ import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 const surface = (page: Page) => page.getByTestId("plugin-surface");
 const rowEl = (page: Page, key: string) => surface(page).locator(`[data-testid="plugin-row"][data-key="${key}"]`);
 
-async function acts(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/plugin/acts`);
-  return (await res.json()) as string[];
-}
-
 async function openTodo(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await surface(page).locator('[data-testid="plugin-tab"][data-key="todo"]').click();
   await expect(rowEl(page, "todo-1")).toBeVisible();
 }
@@ -63,7 +53,7 @@ test("a pointer drag lifts the row, draws the drop line and moves it on release"
   await page.mouse.up();
   await expect(page.getByTestId("plugin-row-lifted")).toHaveCount(0);
   await expect.poll(() => order(page, "todo-open")).toEqual(["todo-5", "todo-1", "todo-2", "todo-3", "todo-4"]);
-  expect((await acts()).filter((a) => a.includes("action=move"))).toEqual([expect.stringMatching(/ todo-5 .* value= action=move$/)]);
+  expect((await pluginActs()).filter((a) => a.includes("action=move"))).toEqual([expect.stringMatching(/ todo-5 .* value= action=move$/)]);
   // The release clicked nothing: the row's place is all that changed.
   await expect(rowEl(page, "todo-5").getByTestId("plugin-row-edit")).toHaveCount(0);
 });
@@ -87,7 +77,7 @@ test("dragging to a scrolled pane's edge scrolls it, and a virtualized list take
   const line = page.getByTestId("plugin-row-drop");
   await expect(line).toBeVisible();
   await page.mouse.up();
-  const moved = (await acts()).filter((a) => a.includes(" r1 ") && a.includes("action=move"));
+  const moved = (await pluginActs()).filter((a) => a.includes(" r1 ") && a.includes("action=move"));
   expect(moved).toHaveLength(1);
   const after = /value=(r\d+) action=move$/.exec(moved[0] ?? "")?.[1] ?? "";
   expect(Number(after.slice(1))).toBeGreaterThan(20);

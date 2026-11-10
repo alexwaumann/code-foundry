@@ -313,3 +313,49 @@ export async function expectProjectRevealed(page: Page, name: string, worktreeBr
   await expect(page.getByTestId("page-name")).toHaveText(name);
   if (worktreeBranch) await expect(page.locator('[data-nav-key^="pw:"][aria-selected="true"]')).toContainText(worktreeBranch);
 }
+
+/**
+ * Runs a command as the CLI inside thread `threadId` would ("" for none): no active view, so
+ * the reply's message is the CLI's. Not ok for a refusal, its message then the error's.
+ */
+export async function invokeAs(threadId: string, name: string, args: Record<string, string> = {}): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
+    body: JSON.stringify({ name, args, ...(threadId ? { context: { activeThreadId: threadId } } : {}) }),
+  });
+  return { ok: res.ok, message: ((await res.json()) as { message?: string }).message ?? "" };
+}
+
+/** The mock's scripted thread calls, in order (/__mock/thread/calls). */
+export async function threadCalls(): Promise<string[]> {
+  const res = await fetch(`${mockUrl}/__mock/thread/calls`);
+  return (await res.json()) as string[];
+}
+
+/** What the mock's plugins were asked to do, in order (/__mock/plugin/acts). */
+export async function pluginActs(): Promise<string[]> {
+  const res = await fetch(`${mockUrl}/__mock/plugin/acts`);
+  return (await res.json()) as string[];
+}
+
+/** The app with thread s-3 selected and its panel showing the hello plugin's demo (from the palette), live. */
+export async function openHelloDemo(page: Page): Promise<void> {
+  await openApp(page);
+  await row(page, "s:s-3").click();
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("Show Hello Demo");
+  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
+  await expect(page.getByTestId("plugin-surface")).toHaveAttribute("data-phase", "live");
+}
+
+/** The selection's side panel `width` px wide, through the app's own panel store. */
+export async function setPanelWidth(page: Page, width: number): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
+}
+
+/** The page zoom at `percent`, through the app's own store (cmd+= / cmd+-), once applied. */
+export async function setZoom(page: Page, percent: number): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);
+  await expect(page.locator("html")).toHaveAttribute("data-zoom", String(percent));
+}

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openHelloDemo, resetMock } from "./fixtures";
 
 /**
  * Plugin stats and bars in a real browser (docs/notes/plugin-stats-bars.md): what the unit
@@ -15,12 +15,7 @@ const plot = (page: Page) => surface(page).getByTestId("plugin-bars-plot");
 const tip = (page: Page) => surface(page).getByTestId("plugin-bar-tip");
 
 async function openDemo(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await expect(stats(page)).toBeVisible();
 }
 

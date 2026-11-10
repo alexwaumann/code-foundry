@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openApp, openHelloDemo, resetMock, row } from "./fixtures";
 
 /**
  * Plugin surfaces, consent and Settings → Plugins (docs/notes/plugins-5-gui.md) against the
@@ -12,12 +12,7 @@ const tab = (page: Page, key: string) => surface(page).locator(`[data-testid="pl
 
 /** Thread s-3 selected, its panel showing the hello demo (opened from the palette). */
 async function openDemo(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.hello.demo");
 }
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, invocations, mockPost, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { CF, invocations, mockPost, openApp, resetMock, row, selectWorktree, setPanelWidth } from "./fixtures";
 
 /**
  * The Pull request surface in the side panel, against the mock daemon's fixtures
@@ -61,8 +61,8 @@ async function openPr(page: Page, number: number): Promise<void> {
 }
 
 /** Sets the current selection's side panel width through the app's own panel store, and waits for it. */
-async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
+async function panelWidth(page: Page, width: number): Promise<void> {
+  await setPanelWidth(page, width);
   await expect.poll(async () => (await panel(page).boundingBox())?.width).toBe(width);
 }
 
@@ -134,7 +134,7 @@ test("the readiness box fits at 360, 420 and 560px in every state: nothing overf
   for (const width of [360, 420, 560]) {
     for (const n of [145, 160, 161, 162, 163, 164, 142, 139, 140, 131, 138]) {
       await openPr(page, n);
-      await setPanelWidth(page, width);
+      await panelWidth(page, width);
       await expect(page.getByTestId("pr-surface")).toHaveAttribute("data-pr", `${SLUG}#${String(n)}`);
       await expect(page.getByTestId("pr-ready-headline")).toBeVisible();
       await boxFits(page);
@@ -153,7 +153,7 @@ test("the Code tab's compact box: headline and footer on one line when the panel
     [420, false],
     [360, false],
   ] as const) {
-    await setPanelWidth(page, width);
+    await panelWidth(page, width);
     await boxFits(page);
     const head = await boxOf(page, "pr-ready-headline");
     const foot = await boxOf(page, "pr-ready-footer");
@@ -362,7 +362,7 @@ test("cmd+w from inside the surface closes its tab; the last tab gone, the panel
 test("at 280px nothing overflows: header, readiness box, inner tab bar, logins, popups; the active tab is revealed", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await setPanelWidth(page, 280);
+  await panelWidth(page, 280);
   await expect(page.getByTestId("pr-surface")).toBeVisible();
 
   // Overview: the header, the box (its footer wraps) and the bar fit.
@@ -565,7 +565,7 @@ test("choosing Ask again with the composer open focuses it; the menu reopened ri
 test("at 280px the composer's hint fits and its field grows, then scrolls", async ({ page }) => {
   await openPrPage(page);
   await prRow(page, "authored", 145).click();
-  await setPanelWidth(page, 280);
+  await panelWidth(page, 280);
   await openAsk(page);
   expect(await overflowX(page, "pr-ask")).toBeLessThanOrEqual(0);
   expect(await page.getByTestId("pr-ask-hint").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -616,7 +616,7 @@ test("at 280px the merge split button stays inside the box and its dropdown insi
   await shotViewport(page);
   await openPrPage(page);
   await prRow(page, "authored", 142).click();
-  await setPanelWidth(page, 280);
+  await panelWidth(page, 280);
   await expect(page.getByTestId("pr-merge-button")).toBeVisible();
   await boxFits(page);
   expect(inside(await boxOf(page, "pr-merge-button-split"), await boxOf(page, "pr-readiness"))).toBe(true);

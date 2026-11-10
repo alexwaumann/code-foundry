@@ -13,11 +13,6 @@ async function staged(): Promise<{ path: string; name: string; mimeType: string;
   return (await res.json()) as { path: string; name: string; mimeType: string; size: number; pages: number }[];
 }
 
-/** cmd+n, then the nth project row of the picker: that project's composer. */
-async function compose(page: Page, n = 1): Promise<void> {
-  await composeProject(page, n);
-}
-
 /** The prompt as the draft stores it (chips as `![name](cf-attachment://id)` tokens). */
 function prompt(page: Page) {
   return page.getByTestId("composer-prompt");
@@ -94,7 +89,7 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
 test("pickers are keyboard operable; Tab goes prompt → pickers → send", async ({ page }) => {
   await freshCopyByDefault();
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("Refactor the sidebar");
 
   await page.keyboard.press("Tab");
@@ -191,7 +186,7 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
 // unit-tested in src/components/compose/ComposerAttachments.test.tsx. What stays: a real paste.
 test("attachments: a pasted image lands as a thumbnail; into an empty prompt, with no chip", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await pasteImage(page, "pasted.png");
   await expect(page.getByTestId("attachment")).toHaveCount(1);
   await expect(page.getByTestId("prompt-chip")).toHaveCount(0);
@@ -202,7 +197,7 @@ test("attachments: a pasted image lands as a thumbnail; into an empty prompt, wi
 
 test("the draft survives switching away; Esc on an empty draft shows the project", async ({ page }) => {
   await openApp(page);
-  await compose(page, 3);
+  await composeProject(page, 3);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
   await page.keyboard.type("Half-written idea");
   await row(page, "s:s-1").click();
@@ -210,7 +205,7 @@ test("the draft survives switching away; Esc on an empty draft shows the project
 
   // No project highlighted in the picker, Backspace back to the commands, and thread.new from the
   // palette showing the picker: unit-tested in src/components/palette/CommandPalette.test.tsx.
-  await compose(page, 3);
+  await composeProject(page, 3);
   await expect(prompt(page)).toHaveAttribute("data-value", "Half-written idea");
 
   // Esc with text does nothing; with an empty draft it returns to the Projects page.
@@ -224,7 +219,7 @@ test("the draft survives switching away; Esc on an empty draft shows the project
 
 test("image chips: inserted at the caret, one unit for arrows and Backspace, × asks while referenced, sent as references", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   const input = page.getByTestId("composer-input");
   const chips = page.getByTestId("prompt-chip");
   const thumbs = page.getByTestId("attachment");
@@ -318,7 +313,7 @@ test("image chips: inserted at the caret, one unit for arrows and Backspace, × 
 
 test("an image dropped on the prompt attaches it and puts a chip at the caret", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("Use this logo");
   await page.getByTestId("composer-input").evaluate((el, bytes) => {
     const dt = new DataTransfer();
@@ -347,7 +342,7 @@ async function pasteText(page: Page, text: string): Promise<void> {
 // the backdrop's outside press.
 test("attachment preview: centred in the window; the backdrop closes it and focus returns", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
   const open = page.getByTestId("attachment-open");
   await expect(open).toHaveCSS("cursor", "pointer");
@@ -370,7 +365,7 @@ test("attachment preview: centred in the window; the backdrop closes it and focu
 
 test("attachment preview: from an inline chip by click or Space; Enter next to a chip still sends", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   const input = page.getByTestId("composer-input");
   const chip = page.getByTestId("prompt-chip");
   const preview = page.getByTestId("attachment-preview");
@@ -420,7 +415,7 @@ test("attachment preview: from an inline chip by click or Space; Enter next to a
 
 test("attachment preview: a chip whose image is gone opens nothing", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("See");
   await pasteText(page, " ![gone.png](cf-attachment://a999) ");
   const chip = page.getByTestId("prompt-chip");
@@ -452,7 +447,7 @@ async function pasteFile(page: Page, name: string, type: string, data: Buffer): 
 // window, and a real paste.
 test("PDFs: picked and pasted, a first-page tile and a chip with pages, previewed page by page", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   const two = testPdf(2);
   const tiles = page.getByTestId("attachment");
   const chips = page.getByTestId("prompt-chip");
@@ -521,7 +516,7 @@ test.describe("a long PDF's preview", () => {
 
   test("draws pages at most at 2x and releases the ones scrolled far away", async ({ page }) => {
     await openApp(page);
-    await compose(page);
+    await composeProject(page);
     await page.getByTestId("composer-file-input").setInputFiles([{ name: "book.pdf", mimeType: "application/pdf", buffer: testPdf(30) }]);
     await expect(page.getByTestId("attachment")).toHaveAttribute("data-pages", "30");
     await page.getByTestId("attachment-open").click();

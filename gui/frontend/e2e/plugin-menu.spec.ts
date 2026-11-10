@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockUrl, openApp, resetMock, row } from "./fixtures";
+import { openHelloDemo, pluginActs, resetMock } from "./fixtures";
 
 /**
  * Plugin menus in a real browser (docs/notes/plugin-menu.md) against the mock's hello demo:
@@ -12,19 +12,9 @@ import { mockUrl, openApp, resetMock, row } from "./fixtures";
 const surface = (page: Page) => page.getByTestId("plugin-surface");
 const buildRow = (page: Page) => surface(page).locator('[data-testid="plugin-row"][data-key="run-2"]');
 
-async function acts(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/plugin/acts`);
-  return (await res.json()) as string[];
-}
-
 /** Thread s-3 selected, its panel showing the hello demo's Overview, Build #2 in view. */
 async function openDemo(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await buildRow(page).scrollIntoViewIfNeeded();
 }
 
@@ -91,7 +81,7 @@ test("a narrow row folds its buttons into the ⋯; a pick in the Priority submen
   await expect(sub).toBeVisible();
   await sub.locator('[data-key="run-2-p-high"]').click();
   await expect(menu).toHaveCount(0);
-  await expect.poll(async () => (await acts()).some((a) => a.includes(" run-2-p-high "))).toBe(true);
+  await expect.poll(async () => (await pluginActs()).some((a) => a.includes(" run-2-p-high "))).toBe(true);
   await buildRow(page).hover();
   await buildRow(page).getByRole("button", { name: "More options" }).click();
   await menu.locator('[data-testid="plugin-menu-sub"]').hover();

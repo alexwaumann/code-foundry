@@ -3,7 +3,7 @@
 // Every test here fails without the feature: each strip had its own DndContext, so a tab
 // could only reorder within its strip, and there was no band, ghost, marker or tint.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, openApp, resetMock, row } from "./fixtures";
+import { CF, openApp, resetMock, row, setPanelWidth } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
@@ -19,10 +19,6 @@ const tabIn = (page: Page, g: 0 | 1, title: string) => tabsOf(page, g).filter({ 
 const bodyOf = (page: Page, g: 0 | 1) => group(page, g).getByTestId("panel-body");
 const band = (page: Page) => panel(page).getByTestId("panel-drop-band");
 const ghost = (page: Page) => page.getByTestId("panel-tab-ghost");
-
-async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
-}
 
 /** Calls a function of the app's own panel store with JSON arguments. */
 async function store(page: Page, fn: string, ...args: unknown[]): Promise<void> {

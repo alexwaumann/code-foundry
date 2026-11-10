@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openHelloDemo, pluginActs, resetMock } from "./fixtures";
 
 /**
  * Exploratory layout checks on the mock (WebKit). Custom views go through the mock's
@@ -11,11 +11,6 @@ import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 const surface = (page: Page) => page.getByTestId("plugin-surface");
 const tab = (page: Page, key: string) => surface(page).locator(`[data-testid="plugin-tab"][data-key="${key}"]`);
 
-async function acts(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/plugin/acts`);
-  return (await res.json()) as string[];
-}
-
 /** Errors the page logged or threw. */
 function watchErrors(page: Page): string[] {
   const out: string[] = [];
@@ -25,15 +20,6 @@ function watchErrors(page: Page): string[] {
     if ((m.type() === "error" || m.type() === "warning") && !/Browser Environment Detected|Failed to load resource/.test(m.text())) out.push(`${m.type()}: ${m.text()}`);
   });
   return out;
-}
-
-async function openDemo(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
 }
 
 async function control(what: string): Promise<void> {
@@ -63,7 +49,7 @@ test.beforeEach(async () => {
 });
 
 test("a long list in a sized pane renders its rows as the pane scrolls (virtualized lists and pane scroll)", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, { view: { nodes: [{ key: "box", pane: { height: 300, children: [{ key: "lst", list: { rows: rows(80) } }] } }] } });
   const pane = surface(page).locator('[data-testid="plugin-pane"][data-key="box"]');
   await expect(pane.locator('[data-testid="plugin-list"]')).toHaveAttribute("data-virtual", "true");
@@ -76,7 +62,7 @@ test("a long list in a sized pane renders its rows as the pane scrolls (virtuali
 
 test("a long list in a wide master-detail's detail renders as the detail side scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
-  await openDemo(page);
+  await openHelloDemo(page);
   await dragPanel(page, -600);
   await showView(page, { view: { nodes: [{ key: "md", masterDetail: { list: { rows: rows(3, "m") }, selected: "m0", detail: [{ key: "dl", list: { rows: rows(80) } }] } }] } });
   const md = surface(page).locator('[data-testid="plugin-master-detail"]');
@@ -89,7 +75,7 @@ test("a long list in a wide master-detail's detail renders as the detail side sc
 });
 
 test("a fill pane follows its top when a section above it folds and unfolds", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, {
     view: {
       nodes: [
@@ -114,7 +100,7 @@ test("a fill pane follows its top when a section above it folds and unfolds", as
 });
 
 test("a group of eight progress bars with noWrap at the panel's default width", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, { view: { nodes: [{ key: "grp", group: { noWrap: true, items: rows(8, "pg").map((r, i) => ({ key: r.key, progress: { value: i / 8, label: r.title } })) } }] } });
   const grp = surface(page).getByTestId("plugin-group");
   const over = await grp.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
@@ -124,7 +110,7 @@ test("a group of eight progress bars with noWrap at the panel's default width", 
 });
 
 test("a group of eight progress bars wraps one per line at 240 px; between with one item sits at the start", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, {
     view: {
       nodes: [
@@ -143,7 +129,7 @@ test("a group of eight progress bars wraps one per line at 240 px; between with 
 });
 
 test("a flex spacer in a strip with a form: what follows sits at the row's end, the form keeps the free width", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, {
     view: {
       nodes: [{ key: "body", text: { content: "body" } }],
@@ -164,7 +150,7 @@ test("a flex spacer in a strip with a form: what follows sits at the row's end, 
 });
 
 test("a tabs node with eight long titles at the panel's width scrolls its strip, not the surface", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   const items = Array.from({ length: 8 }, (_, i) => ({ key: `t${String(i)}`, label: `A long tab title ${String(i)}` }));
   await showView(page, { view: { nodes: [{ key: "tn", tabs: { items, active: "t7", children: [{ key: "c7", text: { content: "seven" } }] } }] } });
   const strip = surface(page).getByTestId("plugin-node-tabs");
@@ -184,7 +170,7 @@ test("a tabs node with eight long titles at the panel's width scrolls its strip,
   await surface(page).locator('[data-testid="plugin-node-tab"][data-key="t0"]').click();
   await expect(surface(page).locator('[data-testid="plugin-node-tab"][data-key="t0"]')).toHaveAttribute("aria-selected", "true");
   await expect(surface(page).getByTestId("plugin-tabs-node")).toHaveAttribute("data-active", "t0");
-  expect((await acts()).some((a) => a.includes(" t0 "))).toBe(true);
+  expect((await pluginActs()).some((a) => a.includes(" t0 "))).toBe(true);
 });
 
 // Select and Back thrash with slow acts and coalesced views, ending on the last row with nothing pending
@@ -194,7 +180,7 @@ test("a tabs node with eight long titles at the panel's width scrolls its strip,
 test("tab switching mid-act and resize thrash end on the plugin's tab with its drafts", async ({ page }) => {
   const errors = watchErrors(page);
   await page.setViewportSize({ width: 1600, height: 900 });
-  await openDemo(page);
+  await openHelloDemo(page);
   await tab(page, "layout").click();
   await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
   const search = surface(page).getByTestId("plugin-toolbar").getByTestId("plugin-input");
@@ -204,7 +190,7 @@ test("tab switching mid-act and resize thrash end on the plugin's tab with its d
   await tab(page, "overview").click();
   await tab(page, "layout").click();
   for (let i = 0; i < 8; i++) await dragPanel(page, i % 2 === 0 ? -500 : 500, 2);
-  await expect.poll(async () => (await acts()).filter((a) => / (run-list|overview|layout) /.test(a)).length).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => (await pluginActs()).filter((a) => / (run-list|overview|layout) /.test(a)).length).toBeGreaterThanOrEqual(3);
   await page.waitForTimeout(400);
   await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
   await expect(surface(page).getByTestId("plugin-toolbar").getByTestId("plugin-input")).toHaveValue("draft-on-layout");
@@ -216,7 +202,7 @@ test("tab switching mid-act and resize thrash end on the plugin's tab with its d
 });
 
 test("the strips never paint over the scrolled body (z-order)", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await tab(page, "layout").click();
   const scroll = surface(page).getByTestId("plugin-scroll");
   for (const top of [0, 150, 400, 10_000]) {
@@ -233,7 +219,7 @@ test("the strips never paint over the scrolled body (z-order)", async ({ page })
 });
 
 test("Back from a row far down a narrow list scrolls the body to that row", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, { view: { nodes: [{ key: "md", masterDetail: { list: { rows: rows(30) }, selected: "", detail: [] } }] } });
   const md = surface(page).locator('[data-testid="plugin-master-detail"]');
   const scroll = surface(page).getByTestId("plugin-scroll");
@@ -251,7 +237,7 @@ test("Back from a row far down a narrow list scrolls the body to that row", asyn
 
 test("a fill pane in the second of stacked columns follows its top when the columns go side by side", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, {
     view: {
       nodes: [
@@ -284,7 +270,7 @@ test("a fill pane in the second of stacked columns follows its top when the colu
 });
 
 test("Back from a row far down a long (virtualized) list focuses that row; the focus is not paid later to a row the plugin selects", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   const spec = (sel: string) => ({
     view: {
       toolbar: [{ key: "search", form: { fields: [{ key: "q", name: "q", label: "Filter", input: { placeholder: "Filter" } }] } }],
@@ -321,7 +307,7 @@ test("Back from a row far down a long (virtualized) list focuses that row; the f
 });
 
 test("two flex spacers in one fill pane share its free height; a flex spacer in a strip without a form takes the free width", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, {
     view: {
       nodes: [
@@ -359,7 +345,7 @@ test("two flex spacers in one fill pane share its free height; a flex spacer in 
 });
 
 test("live-5: the view's tabs are one tab stop WebKit reaches (it skips plain buttons), arrows move between them", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await tab(page, "layout").click();
   await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
   const search = surface(page).getByTestId("plugin-toolbar").getByTestId("plugin-input");
@@ -377,7 +363,7 @@ test("live-5: the view's tabs are one tab stop WebKit reaches (it skips plain bu
 });
 
 test("live-9: a log alone in a short px pane shrinks to it, so its newest line shows", async ({ page }) => {
-  await openDemo(page);
+  await openHelloDemo(page);
   await showView(page, { view: { nodes: [{ key: "box", pane: { height: 120, children: [{ key: "lg", log: { lines: rows(40).map((r) => ({ text: r.title })), rows: 40 } }] } }] } });
   const pane = surface(page).locator('[data-testid="plugin-pane"][data-key="box"]');
   const box = pane.getByTestId("plugin-log-box");
@@ -391,7 +377,7 @@ test("live-9: a log alone in a short px pane shrinks to it, so its newest line s
 
 test("live-7: a wide master-detail's side at its end hands the wheel on to the body", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
-  await openDemo(page);
+  await openHelloDemo(page);
   await dragPanel(page, -600);
   await showView(page, {
     view: {

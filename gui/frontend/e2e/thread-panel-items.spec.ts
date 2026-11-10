@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invokeAs, openApp, resetMock, row } from "./fixtures";
 
 /**
  * view.panel.file, view.panel.diff and view.panel.pr from inside a thread
@@ -14,13 +13,9 @@ const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
 
 /** Runs a command as the CLI inside thread s-1 would (no active view). */
 async function inS1(name: string, args: Record<string, string>): Promise<string> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name, args, context: { activeThreadId: "s-1" } }),
-  });
+  const res = await invokeAs("s-1", name, args);
   expect(res.ok).toBe(true);
-  return ((await res.json()) as { message?: string }).message ?? "";
+  return res.message;
 }
 
 const shots = process.env.SHOTS;

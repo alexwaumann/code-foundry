@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, mockPost, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, mockPost, openApp, openThreadChanges, resetMock, row, setPanelWidth } from "./fixtures";
 
 /**
  * The Diff tab where only a real browser can tell (docs/notes/diff-viewer-2.md): the file list
@@ -12,16 +12,12 @@ const list = (page: Page) => page.getByTestId("diff-file-list");
 const column = (page: Page) => page.getByTestId("diff-list-column");
 const file = (page: Page) => page.getByTestId("diff-file");
 
-async function panelWidth(page: Page, w: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(w)}))`);
-}
-
 async function openDiff(page: Page, width: number): Promise<void> {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await openThreadChanges(page);
-  await panelWidth(page, width);
+  await setPanelWidth(page, width);
   await expect(list(page)).toBeVisible();
 }
 
@@ -43,7 +39,7 @@ test("the list follows the panel's own width, not the window's, and keeps the fi
   expect(rail.height).toBeGreaterThan(400);
 
   // The window stays as wide as it was: only the panel narrows.
-  await panelWidth(page, 480);
+  await setPanelWidth(page, 480);
   await expect(list(page)).toHaveAttribute("data-layout", "top");
   await expect(file(page)).toHaveAttribute("data-path", "README.md");
   const top = await column(page).boundingBox();
@@ -52,7 +48,7 @@ test("the list follows the panel's own width, not the window's, and keeps the fi
   expect(Math.abs(top.y + top.height - under.y)).toBeLessThanOrEqual(1);
   expect(Math.abs(top.width - under.width)).toBeLessThanOrEqual(1);
 
-  await panelWidth(page, 760);
+  await setPanelWidth(page, 760);
   await expect(list(page)).toHaveAttribute("data-layout", "rail");
 });
 
@@ -75,7 +71,7 @@ test("a long list is virtualized and scrolls inside itself, in both layouts", as
   if (!box || !diffBox) throw new Error("no boxes");
   expect(box.y + box.height).toBeLessThanOrEqual(diffBox.y + diffBox.height + 1);
 
-  await panelWidth(page, 480);
+  await setPanelWidth(page, 480);
   await expect(list(page)).toHaveAttribute("data-layout", "top");
   await expect(rows).toHaveAttribute("data-virtual", "true");
   expect(await rows.evaluate((e) => e.clientHeight)).toBeLessThanOrEqual(150);
@@ -108,7 +104,7 @@ test("Commits sit at the foot of the list, and a long list scrolls inside itself
   await expect(rows.getByText("Older commit 0799")).toBeVisible();
 
   // On top the code keeps its share with the list open.
-  await panelWidth(page, 480);
+  await setPanelWidth(page, 480);
   await expect(list(page)).toHaveAttribute("data-layout", "top");
   await expect(section).toHaveAttribute("data-open", "true");
   expect(await rows.evaluate((e) => e.clientHeight)).toBeLessThanOrEqual(90);
@@ -178,7 +174,7 @@ test("a long subject leaves the diff in reach, and the band keeps its share of a
   const band = page.getByTestId("diff-commit");
   await expect(page.getByTestId("diff-commit-body")).toBeVisible();
   for (const [layout, width] of [["top", 480], ["rail", 760]] as const) {
-    await panelWidth(page, width);
+    await setPanelWidth(page, width);
     await expect(list(page)).toHaveAttribute("data-layout", layout);
     for (const h of [800, 400, 250]) {
       await surfaceHeight(page, h);
@@ -298,10 +294,10 @@ test("the list on top comes back on the current row, not at the top", async ({ p
   await expect.poll(() => cursorInView(page)).toBe(true);
 
   // The width takes the list away and brings it back too.
-  await panelWidth(page, 760);
+  await setPanelWidth(page, 760);
   await expect(list(page)).toHaveAttribute("data-layout", "rail");
   await expect.poll(() => cursorInView(page)).toBe(true);
-  await panelWidth(page, 480);
+  await setPanelWidth(page, 480);
   await expect(list(page)).toHaveAttribute("data-layout", "top");
   await expect.poll(() => cursorInView(page)).toBe(true);
 });

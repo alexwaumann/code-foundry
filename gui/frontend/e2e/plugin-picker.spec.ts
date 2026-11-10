@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openHelloDemo, resetMock } from "./fixtures";
 
 /**
  * The plugin picker (pluginsdk/ui Select.Search; docs/notes/plugin-picker.md) against the
@@ -16,12 +16,7 @@ const tab = (page: Page, key: string) => surface(page).locator(`[data-testid="pl
 const picker = (page: Page) => page.getByTestId("plugin-picker");
 
 async function openDemo(page: Page, tabKey: string): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await tab(page, tabKey).click();
   await expect(tab(page, tabKey)).toHaveAttribute("aria-selected", "true");
 }
