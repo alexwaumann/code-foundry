@@ -11,10 +11,14 @@
  */
 import type { AttachEventView } from "@/api/terminal";
 import type { Disposable, FindResults, TermSize, TerminalRenderer } from "@/terminal/renderer";
+import type { XtermRendererOptions } from "@/terminal/xterm";
 
 class FakeXterm implements TerminalRenderer {
   size: TermSize = { cols: 80, rows: 24 };
   focused = 0;
+  constructor(opts: XtermRendererOptions) {
+    renderers.options.push(opts);
+  }
   mount(): void {}
   write(_data: Uint8Array, parsed?: () => void): void {
     parsed?.();
@@ -62,6 +66,9 @@ export const finds = {
   calls: [] as string[],
   publish: null as ((results: FindResults) => void) | null,
 };
+
+/** The options each renderer the host made was given, oldest first. */
+export const renderers = { options: [] as XtermRendererOptions[] };
 
 export const xtermFakes = { XtermRenderer: FakeXterm };
 
