@@ -123,6 +123,26 @@ func eventually(t *testing.T, what string, timeout time.Duration, cond func() bo
 	}
 }
 
+// settled waits until the runner has not run sub for a while and returns its count.
+// The FSEvents stream can deliver the fixture's own git writes, made just before
+// Register, a batch or two (streamLatency apart) after the stream starts.
+func settled(t *testing.T, cr *countingRunner, sub string) int {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	n := cr.count(sub)
+	for {
+		time.Sleep(2 * streamLatency)
+		m := cr.count(sub)
+		if m == n {
+			return n
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s still running after 5s", sub)
+		}
+		n = m
+	}
+}
+
 func nudged(ch chan struct{}) bool {
 	select {
 	case <-ch:
@@ -204,8 +224,7 @@ func TestPollTiers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(300 * time.Millisecond)
-	before := cr.count("status")
+	before := settled(t, cr, "status")
 	time.Sleep(600 * time.Millisecond)
 	if n := cr.count("status"); n != before {
 		t.Fatalf("idle project polled: status ran %d more times", n-before)
