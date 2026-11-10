@@ -33,6 +33,11 @@ async function openHtmlThread(page: Page): Promise<void> {
   await row(page, "s:s-r1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await expect(items(page)).toHaveCount(2);
+  // The page loads, then asks for its height and the log keeps its bottom in view: clicks
+  // wait until the layout stops moving, or one can land where a button was.
+  const card = hello(page).getByTestId("thread-html-card");
+  await expect(card.frameLocator('[data-testid="thread-html-frame"]').locator("#hello")).toHaveText("Hello");
+  await expect.poll(async () => (await card.getByTestId("thread-html-frame").boundingBox())?.height ?? 0).toBeLessThan(300);
 }
 
 test("an inline page renders in its card, follows cf:resize, and its frame runs scripts", async ({ page }) => {
@@ -175,7 +180,7 @@ test("a theme switch keeps a page that acks cf:theme and reloads one that only l
   // The stylesheet-only page reloads (its count starts again) and repaints in the new theme.
   await expect(plain.getByTestId("thread-html-frame")).toHaveAttribute("data-load", "1");
   await expect(plainDoc.locator("#plain")).toHaveText("Stylesheet only");
-  await expect.poll(() => plainDoc.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(darkBg);
+  await expect(plainDoc.locator("body")).not.toHaveCSS("background-color", darkBg);
   // The listening page acked: same load, state kept, repainted by the message.
   await expect(listen.getByTestId("thread-html-frame")).toHaveAttribute("data-load", "0");
   await expect(listenDoc.locator("#hello")).toHaveText("Hello x1");
@@ -191,7 +196,7 @@ test("a page's prefers-color-scheme is the app's scheme, not the system's", asyn
   await mockPost("settings/external?appearance.theme=light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", /light/);
   await expect(doc.locator("#scheme")).toHaveText("sees light");
-  await expect.poll(() => doc.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+  await expect(doc.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await page.emulateMedia({ colorScheme: null });
 });
 
