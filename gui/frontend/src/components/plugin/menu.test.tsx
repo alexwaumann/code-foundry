@@ -328,6 +328,18 @@ describe("folding a row's buttons (sketch C)", () => {
   });
 });
 
+describe("the header's actions", () => {
+  it("draws one with an icon icon-only, and one without as a small labelled button", () => {
+    inView(<SurfaceHeader header={{ title: "Jenkins", actions: [btn("refresh", "Refresh", { icon: "refresh-cw" }), btn("rerun", "Rerun failed")] }} fallbackTitle="Jenkins" icon="hammer" />);
+    const [refresh, rerun] = within(screen.getByTestId("plugin-subline")).getAllByTestId("plugin-button");
+    expect(refresh?.getAttribute("aria-label")).toBe("Refresh");
+    expect(refresh?.textContent).toBe("");
+    expect(rerun?.getAttribute("aria-label")).toBeNull();
+    expect(rerun?.textContent).toBe("Rerun failed");
+    expect(rerun?.getAttribute("data-size")).toBe("xs");
+  });
+});
+
 describe("the header's ⋯", () => {
   it("follows its actions and acts with the item's key", async () => {
     inView(<SurfaceHeader header={{ title: "Jenkins", actions: [btn("refresh", "Refresh", { icon: "refresh-cw", iconOnly: true })], menu: { items: [item("rebuild-all", "Rebuild all"), { separator: true }, item("settings", "Settings")] } }} fallbackTitle="Jenkins" icon="hammer" />);
