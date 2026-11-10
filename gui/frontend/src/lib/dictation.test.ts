@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barHeight, decayLevels, downloadProgress, easeLevels, formatElapsed, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, microphoneDescription, deviceVerb, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
+import { barHeight, decayLevels, downloadProgress, easeLevels, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, microphoneDescription, deviceVerb, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
 
 describe("phraseAtCaret", () => {
   it.each([
@@ -123,16 +123,6 @@ describe("level bars", () => {
 });
 
 describe("formatting", () => {
-  it.each([
-    [0, "0:00"],
-    [4_200, "0:04"],
-    [61_000, "1:01"],
-    [750_000, "12:30"],
-    [-5, "0:00"],
-  ])("formatElapsed(%d)", (ms, want) => {
-    expect(formatElapsed(ms)).toBe(want);
-  });
-
   it("sizes", () => {
     expect(gigabytes(874_188_075)).toBe("0.9 GB");
     expect(memorySize(48 * 2 ** 30)).toBe("48 GB");

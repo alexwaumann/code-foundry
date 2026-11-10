@@ -213,27 +213,3 @@ export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReas
   return threadBadge(s) === "busy" ? "working" : "idle";
 }
 
-/** "just now", "5 min ago", "3 h ago", "2 d ago"; "never" for null. */
-export function formatAgo(ms: number | null, now: number = Date.now()): string {
-  if (ms === null) return "never";
-  const s = Math.max(0, Math.round((now - ms) / 1000));
-  if (s < 45) return "just now";
-  const m = Math.round(s / 60);
-  if (m < 60) return `${String(m)} min ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${String(h)} h ago`;
-  return `${String(Math.round(h / 24))} d ago`;
-}
-
-/**
- * A compact age for the sidebar's archived rows: whole minutes under an hour ("0m" under a
- * minute, "59m"), whole hours under a day ("23h"), else whole days ("3d"). Rounded down; a
- * time in the future reads "0m".
- */
-export function shortAge(ms: number, now: number = Date.now()): string {
-  const m = Math.floor(Math.max(0, now - ms) / 60_000);
-  if (m < 60) return `${String(m)}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)}h`;
-  return `${String(Math.floor(h / 24))}d`;
-}

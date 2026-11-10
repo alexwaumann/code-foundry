@@ -8,7 +8,7 @@ function nowSeconds(): number {
 }
 
 /**
- * The composer's amber "Rate limited · retrying in 20 s (attempt 3 of 10)" line above the
+ * The composer's amber "Rate limited · retrying in 20s (attempt 3 of 10)" line above the
  * prompt (docs/notes/api-retry-note.md; the rule is retryNote). Claude Code retries
  * failed API requests itself and says nothing when one goes through, so the line follows
  * the thread's retry field: set by an api_retry frame, cleared by the next frame of any

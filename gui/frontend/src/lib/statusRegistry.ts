@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ThreadView } from "@/api/threads";
+import { DAY, MINUTE, type DurationUnits } from "./duration";
 import type { StatusLine, StatusLineKind } from "./statusLine";
 import { statusNote } from "./thread";
 
@@ -142,7 +143,7 @@ export function statusDetail(line: StatusLine, thread: StatusDetailThread | unde
 /**
  * The time line 1's elapsed counts from (epoch ms) for the entry's timeMode: the status
  * change for "status", the last activity for "activity", null for "none" or when unknown.
- * Format it with lib/elapsed.ts formatElapsed.
+ * Format it with lib/duration formatDuration and statusTimeUnits.
  */
 export function statusTimeAt(line: StatusLine, thread: Partial<Pick<ThreadView, "statusChangedAtMs" | "lastActivityAtMs">> | undefined): number | null {
   switch (statusRegistry[line.kind].timeMode) {
@@ -153,4 +154,12 @@ export function statusTimeAt(line: StatusLine, thread: Partial<Pick<ThreadView, 
     case "none":
       return null;
   }
+}
+
+/**
+ * The units of a row's time `ms` after its status changed or it was last active: "4s" under
+ * a minute, "4m" under an hour, "1h 4m" ("1h" on the hour) under a day, "3d" from a day.
+ */
+export function statusTimeUnits(ms: number): DurationUnits {
+  return { days: true, hours: ms < DAY, minutes: ms < DAY, seconds: ms < MINUTE };
 }

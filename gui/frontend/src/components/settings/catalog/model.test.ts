@@ -55,15 +55,15 @@ describe("words", () => {
   it.each([
     [null, "not read yet"],
     [now - 10_000, "read just now"],
-    [now - 5 * 60_000, "read 5 min ago"],
-    [now - 3 * 3_600_000, "read 3 h ago"],
-    [now - 2 * DAY, "read 2 d ago"],
+    [now - 5 * 60_000, "read 5m ago"],
+    [now - 3 * 3_600_000, "read 3h ago"],
+    [now - 2 * DAY, "read 2d ago"],
   ])("readWords(%s) is %s", (at, want) => {
     expect(readWords(at, now)).toBe(want);
   });
 
   it("readHint is the newest read, as a sentence", () => {
-    expect(readHint([now - DAY, now - 5 * 60_000, null], now)).toBe("Read 5 min ago");
+    expect(readHint([now - DAY, now - 5 * 60_000, null], now)).toBe("Read 5m ago");
     expect(readHint([null], now)).toBe("Not read yet");
     expect(readHint([], now)).toBe("Not read yet");
   });

@@ -6,7 +6,8 @@ import type { UpdateStatusView } from "@/api/update";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { formatAgo, restartCutsOff } from "@/lib/thread";
+import { formatAge } from "@/lib/duration";
+import { restartCutsOff } from "@/lib/thread";
 import { busyHeading, cutOffLabel, displayVersion, failureHeadline, updateView, type UpdateVariant, type UpdateView } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { useThreadsStore, type ThreadsData } from "@/stores/threads";
@@ -35,7 +36,7 @@ const primaries: Partial<Record<UpdateVariant, Primary>> = {
 };
 
 function checked(st: UpdateStatusView): string {
-  return st.lastCheckedAt ? `Checked ${formatAgo(st.lastCheckedAt.getTime())}` : "Not checked yet";
+  return st.lastCheckedAt ? `Checked ${formatAge(st.lastCheckedAt.getTime(), Date.now(), { minutes: true, hours: true, days: true })}` : "Not checked yet";
 }
 
 /** "Running v0.15.0 (tip 3) · tip channel". */

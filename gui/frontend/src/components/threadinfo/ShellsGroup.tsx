@@ -3,8 +3,8 @@ import { useShallow } from "zustand/react/shallow";
 import { ExternalLink, Globe, LoaderCircle, Square, SquareTerminal } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import type { BackgroundShellView } from "@/api/threads";
-import { fmtElapsed } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
+import { formatDuration } from "@/lib/duration";
 import { serverSourceWords, type ServerSource } from "@/lib/servers";
 import { serverAddress, shellCount } from "@/lib/threadInfo";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,7 @@ const ROW_BUTTON = "flex size-5 items-center justify-center rounded-sm outline-n
 /** How long the shell has run, ticking; "" when its start is unknown. */
 function Uptime({ startedAtMs }: { startedAtMs: number | null }) {
   const now = useNow(1000);
-  return startedAtMs === null ? null : <span className="shrink-0 tabular-nums">{fmtElapsed(now - startedAtMs)}</span>;
+  return startedAtMs === null ? null : <span className="shrink-0 tabular-nums">{formatDuration(now - startedAtMs, { hours: true, minutes: true, seconds: true })}</span>;
 }
 
 /** One running shell in the fold: a spinner, its command in mono, its description muted, how long it has run. */

@@ -162,7 +162,7 @@ describe("Agent rows", () => {
     expect(q(el, "thread-agent-failed")?.textContent).toBe("failed");
     expect(q(el, "thread-agent-failed")?.className).toBe("chip fail");
     expect(el.querySelector('[aria-label="Running"]')).toBeNull();
-    expect(q(el, "thread-tool")?.textContent).toContain("1m 03s");
+    expect(q(el, "thread-tool")?.textContent).toContain("1m 3s");
     // The call's own "error" chip gives way to "failed".
     expect(el.querySelectorAll(".chip.fail")).toHaveLength(1);
   });
@@ -194,7 +194,7 @@ describe("agent notes", () => {
     expect(row.querySelector("svg")?.getAttribute("class")).toContain("t-emerald");
     expect(q(row, "thread-agent-note-name")?.textContent).toBe("PR 1");
     expect(q(row, "thread-agent-note-summary")?.textContent).toBe("Added tests; make check is green.");
-    expect(row.textContent).toBe("Agent finished·PR 1Added tests; make check is green.3 min ago");
+    expect(row.textContent).toBe("Agent finished·PR 1Added tests; make check is green.3m ago");
     expect(q(el, "thread-note")).toBeNull();
   });
 

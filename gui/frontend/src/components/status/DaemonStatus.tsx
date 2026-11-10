@@ -1,5 +1,5 @@
 import { Tip } from "@/components/ui/tooltip";
-import { formatUptime } from "@/lib/format";
+import { formatDuration } from "@/lib/duration";
 import { displayVersion } from "@/lib/update";
 import { cn } from "@/lib/utils";
 import { useEventsStore } from "@/stores/events";
@@ -39,7 +39,7 @@ export function DaemonStatus() {
   const silent = useEventsStore((s) => s.silent) && status === "ok";
   const oldDaemon = useUpdateStore((s) => s.oldDaemon);
   const label = status === "ok" ? "daemon" : status === "error" ? "daemon unreachable" : "connecting";
-  const details = [label, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatUptime(uptime)}`, status === "error" && error, silent && (oldDaemon ? OLD_DAEMON_DETAIL : SILENT_DETAIL)]
+  const details = [label, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatDuration(uptime * 1000, { days: true, hours: true, minutes: true, seconds: true })}`, status === "error" && error, silent && (oldDaemon ? OLD_DAEMON_DETAIL : SILENT_DETAIL)]
     .filter(Boolean)
     .join(" · ");
 

@@ -71,7 +71,7 @@ describe("skill settings model", () => {
 
 
   it("registryLine counts and dates a marketplace", () => {
-    expect(registryLine({ plugins: 1, skills: 39, readAtMs: now - 5 * 60_000 }, now)).toBe("1 plugin · 39 skills · read 5 min ago");
+    expect(registryLine({ plugins: 1, skills: 39, readAtMs: now - 5 * 60_000 }, now)).toBe("1 plugin · 39 skills · read 5m ago");
   });
 
   it("chips: none or both is any, one is its value; a press toggles", () => {
@@ -254,7 +254,7 @@ describe("the page menu", () => {
   });
 
   it("refreshHint is the newest read, as a sentence", () => {
-    expect(refreshHint([reg, { readAtMs: now - DAY }], now)).toBe("Read 5 min ago");
+    expect(refreshHint([reg, { readAtMs: now - DAY }], now)).toBe("Read 5m ago");
     expect(refreshHint([{ readAtMs: null }], now)).toBe("Not read yet");
     expect(refreshHint(undefined, now)).toBe("Not read yet");
   });

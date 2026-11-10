@@ -135,7 +135,7 @@ describe("SubagentPane", () => {
     expect(screen.queryByTestId("thread-title")).toBeNull();
     expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["thread-info-toggle", "bottom-toggle", "panel-toggle"]);
     expect(tid("subagent-lineage-parent").textContent).toBe("Agents panel");
-    expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · Opus · high · launched by turn 1's Agent call, 4 min ago");
+    expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · Opus · high · launched by turn 1's Agent call, 4m ago");
     expect(tid("subagent-prompt").textContent).toContain(PROMPT);
     expect(tid("subagent-prompt").textContent).not.toContain("Prompt from");
     // The run's own items only (not the parent's message, not the nested run's), in order, under the header.
@@ -207,8 +207,8 @@ describe("SubagentPane", () => {
     setLog([run("a1", { status: "failed", error: "Stopped: process exited with code 1", durationMs: 63_000, endedAtMs: NOW - 3 * 60_000 }), NESTED], ITEMS);
     show();
     expect(head().getAttribute("data-status")).toBe("failed");
-    expect(head().textContent).toContain("Failed after 1m 03s");
-    expect(head().querySelector(".t-red")?.textContent).toBe("Failed after 1m 03s");
+    expect(head().textContent).toContain("Failed after 1m 3s");
+    expect(head().querySelector(".t-red")?.textContent).toBe("Failed after 1m 3s");
     expect(tid("subagent-error").textContent).toBe("Stopped: process exited with code 1");
     expect(tid("subagent-error").getAttribute("role")).toBe("alert");
     expect(say()).toBe("This agent failed, and Agents panel was told.");
@@ -409,7 +409,7 @@ describe("SubagentPane: the mock's done Explore and failed run", () => {
     );
     show("a0");
     expect(tid("subagent-name").textContent).toBe("Find the header chip pattern");
-    expect(tid("subagent-lineage-meta").textContent).toMatch(/^foreground · Explore · Haiku · launched by turn 1's Agent call, [56] min ago$/);
+    expect(tid("subagent-lineage-meta").textContent).toMatch(/^foreground · Explore · Haiku · launched by turn 1's Agent call, [56]m ago$/);
     expect(tid("thread-turn-header").textContent).toBe("Worked for 12s·6 tools·9.4K tokens·Haiku");
     fireEvent.click(screen.getByRole("button", { name: "Show this agent's work" }));
     expect(screen.getByTestId("thread-group").textContent).toBe("Read 1 file, searched code onceHeaderActions.tsx");

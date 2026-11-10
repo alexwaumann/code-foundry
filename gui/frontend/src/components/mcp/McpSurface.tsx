@@ -60,7 +60,7 @@ const STALE_PILL = "border border-dashed border-cf-text-muted/50 text-cf-text-mu
 const HINT_ICON: Record<ToolHint, LucideIcon> = { "read-only": Eye, writes: Pencil, destructive: TriangleAlert, "open-world": Globe };
 
 /**
- * "Checked 12s ago, at the start of the last turn", or when stale "Last check 12 min ago ·
+ * "Checked 12s ago, at the start of the last turn", or when stale "Last check 12m ago ·
  * may be out of date": its own component, so the clock re-renders only this line.
  */
 function CheckedText({ checkedAtMs, trigger, server, stale }: { checkedAtMs: number | null; trigger: Parameters<typeof checkedLine>[0]["trigger"]; server: string; stale: boolean }) {

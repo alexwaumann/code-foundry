@@ -193,7 +193,7 @@ describe("the API-retry line", () => {
     act(() => {
       put({ retry: retry(20), status: "busy" });
     });
-    expect(note()?.textContent).toBe("Rate limited · retrying in 20 s (attempt 3 of 10)");
+    expect(note()?.textContent).toBe("Rate limited · retrying in 20s (attempt 3 of 10)");
     // In the card, before the prompt.
     const card = screen.getByTestId("thread-composer");
     expect(card.contains(note())).toBe(true);
@@ -207,11 +207,11 @@ describe("the API-retry line", () => {
   it("counts down on the composer's own clock and turns into retrying now", () => {
     put({ retry: retry(5, { attempt: 1, errorStatus: 529, error: "overloaded" }) });
     render(<ThreadComposer threadId="s-r1" pending={[]} busy />);
-    expect(note()?.textContent).toBe("API overloaded · retrying in 5 s (attempt 1 of 10)");
+    expect(note()?.textContent).toBe("API overloaded · retrying in 5s (attempt 1 of 10)");
     act(() => {
       vi.advanceTimersByTime(3_000);
     });
-    expect(note()?.textContent).toBe("API overloaded · retrying in 2 s (attempt 1 of 10)");
+    expect(note()?.textContent).toBe("API overloaded · retrying in 2s (attempt 1 of 10)");
     act(() => {
       vi.advanceTimersByTime(4_000);
     });

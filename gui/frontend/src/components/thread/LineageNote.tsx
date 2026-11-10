@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useNow } from "@/lib/clock";
-import { formatAgo } from "@/lib/thread";
+import { formatAge } from "@/lib/duration";
 import { CodeBlock } from "./Code";
 
 /** An expandable note's body: a code block under a small label ("Wake payload", "JSON"). */
@@ -13,10 +13,10 @@ export interface LineageNoteBody {
   code: string;
 }
 
-/** "just now", "5 min ago": the note's age on the shared 30 s clock. */
+/** "just now", "5m ago": the note's age on the shared 30 s clock. */
 function Age({ atMs }: { atMs: number }) {
   const now = useNow(30_000);
-  return <>{formatAgo(atMs, now)}</>;
+  return <>{formatAge(atMs, now, { minutes: true, hours: true, days: true })}</>;
 }
 
 /**

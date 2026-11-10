@@ -111,7 +111,7 @@ describe("headerParts", () => {
     ["running", run({}), "Opus 4.8", ["Working for 4m 12s", "23 tools", "48.2K tokens", "Opus 4.8"]],
     ["done", run({ status: "done", durationMs: 38_000, toolUses: 1, totalTokens: 6_100 }), "haiku", ["Worked for 38s", "1 tool", "6.1K tokens", "haiku"]],
     ["done, no counters or model", run({ status: "done", durationMs: 0, startedAtMs: null, toolUses: 0, totalTokens: 0 }), "", ["Worked"]],
-    ["failed", run({ status: "failed", durationMs: 63_000, toolUses: 9, totalTokens: 12_000 }), "opus", ["Failed after 1m 03s", "9 tools", "12K tokens", "opus"]],
+    ["failed", run({ status: "failed", durationMs: 63_000, toolUses: 9, totalTokens: 12_000 }), "opus", ["Failed after 1m 3s", "9 tools", "12K tokens", "opus"]],
     ["failed, no time", run({ status: "failed", durationMs: 0, startedAtMs: null, toolUses: 0, totalTokens: 0 }), "", ["Failed"]],
   ])("%s", (_name, r, model, want) => {
     expect(headerParts(r, model, NOW)).toEqual(want);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { McpServerStatusView, McpServerView, McpStatusView } from "@/api/mcp";
-import { bucketCounts, bucketEmptyLine, canReconnect, checkedAgo, checkedLine, claudeRunning, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_SETTLING_LINE, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
+import { bucketCounts, bucketEmptyLine, canReconnect, checkedLine, claudeRunning, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_SETTLING_LINE, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
 
 const NOW = 1_800_000_000_000;
 
@@ -12,29 +12,11 @@ function status(servers: McpServerView[], o: Partial<McpStatusView> = {}): McpSt
   return { checkedAtMs: NOW, trigger: "turn", server: "", servers, ...o };
 }
 
-describe("checkedAgo", () => {
-  it.each<[string, number | null, string]>([
-    ["unknown", null, ""],
-    ["now", NOW, "just now"],
-    ["4.9 s", NOW - 4900, "just now"],
-    ["5 s", NOW - 5000, "5s ago"],
-    ["12 s", NOW - 12_000, "12s ago"],
-    ["59 s", NOW - 59_999, "59s ago"],
-    ["1 min", NOW - 60_000, "1 min ago"],
-    ["59 min", NOW - 59 * 60_000 - 59_000, "59 min ago"],
-    ["2 h", NOW - 2 * 3_600_000 - 5, "2 h ago"],
-    ["3 d", NOW - 3 * 86_400_000, "3 d ago"],
-    ["a clock ahead", NOW + 3000, "just now"],
-  ])("%s", (_name, ms, want) => {
-    expect(checkedAgo(ms, NOW)).toBe(want);
-  });
-});
-
 describe("checkedLine", () => {
   it.each<[string, Partial<McpStatusView>, string]>([
     ["a turn's start", { checkedAtMs: NOW - 12_000, trigger: "turn" }, "Checked 12s ago, at the start of the last turn"],
-    ["a refresh", { checkedAtMs: NOW - 2000, trigger: "refresh" }, "Checked just now"],
-    ["a reconnect", { checkedAtMs: NOW - 180_000, trigger: "reconnect", server: "github" }, "Checked 3 min ago, after reconnecting github"],
+    ["a refresh", { checkedAtMs: NOW - 2000, trigger: "refresh" }, "Checked 2s ago"],
+    ["a reconnect", { checkedAtMs: NOW - 180_000, trigger: "reconnect", server: "github" }, "Checked 3m ago, after reconnecting github"],
     ["a reconnect without a name", { trigger: "reconnect", server: "" }, "Checked just now"],
     ["no time", { checkedAtMs: null, trigger: "turn" }, "Checked, at the start of the last turn"],
     ["unknown trigger", { checkedAtMs: NOW - 7000, trigger: "unknown" }, "Checked 7s ago"],
@@ -71,9 +53,9 @@ describe("stale state", () => {
   });
 
   it.each<[string, number | null, string]>([
-    ["12 min", NOW - 12 * MIN, "Last check 12 min ago · may be out of date"],
-    ["just now (Claude stopped)", NOW - 1000, "Last check just now · may be out of date"],
-    ["2 h", NOW - 2 * 60 * MIN, "Last check 2 h ago · may be out of date"],
+    ["12 min", NOW - 12 * MIN, "Last check 12m ago · may be out of date"],
+    ["a second ago (Claude stopped)", NOW - 1000, "Last check 1s ago · may be out of date"],
+    ["2 h", NOW - 2 * 60 * MIN, "Last check 2h ago · may be out of date"],
     ["unknown time", null, "May be out of date"],
   ])("staleLine: %s", (_name, ms, want) => {
     expect(staleLine(ms, NOW)).toBe(want);

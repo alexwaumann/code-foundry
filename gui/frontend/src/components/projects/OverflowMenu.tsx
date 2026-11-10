@@ -17,7 +17,7 @@ export type OverflowItem =
       testId: string;
       /** Shown at the item's right, e.g. how many things it acts on. */
       badge?: number;
-      /** A second, quieter line under the label: what the item stands on ("Read 5 min ago"), or why it is disabled. */
+      /** A second, quieter line under the label: what the item stands on ("Read 5m ago"), or why it is disabled. */
       hint?: string;
       disabled?: boolean;
     }

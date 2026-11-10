@@ -682,7 +682,7 @@ describe("the page menu", () => {
   it("says when the marketplaces were read and what they hold", async () => {
     show();
     openMenu(screen.getByTestId("skill-menu"));
-    expect((await screen.findByTestId("skill-refresh-hint")).textContent).toBe("Read 5 min ago");
+    expect((await screen.findByTestId("skill-refresh-hint")).textContent).toBe("Read 5m ago");
     expect(screen.getByTestId("skill-registries-open-hint").textContent).toBe("ai-marketplace · 3 plugins · 1,237 skills");
   });
 

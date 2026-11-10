@@ -4,7 +4,8 @@
  * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
 import type { ThreadFlagView, ThreadView } from "@/api/threads";
-import { formatAgo, isWaiting, threadBadge, statusKind, statusNote, topFlag } from "./thread";
+import { formatAge } from "./duration";
+import { isWaiting, threadBadge, statusKind, statusNote, topFlag } from "./thread";
 import { hasSetupWork, setupCurrentStep, setupFailure } from "./threadSetup";
 
 /**
@@ -151,6 +152,9 @@ function streamLine(s: Pick<ThreadView, "status" | "statusReason" | "statusChang
   }
 }
 
+/** How long ago a line's status began: "just now", "5m ago", "3h ago", "2d ago". */
+const AGE = { minutes: true, hours: true, days: true } as const;
+
 const words: Readonly<Record<StatusLineKind, string>> = {
   place: "",
   working: "Working",
@@ -175,7 +179,7 @@ const words: Readonly<Record<StatusLineKind, string>> = {
 export function statusText(l: StatusLine, now: number): string {
   const word = words[l.kind];
   if (word === "") return l.detail;
-  if (l.at !== null) return l.kind === "finished" ? `${word} ${formatAgo(l.at, now)}` : `${word} · ${formatAgo(l.at, now)}`;
+  if (l.at !== null) return l.kind === "finished" ? `${word} ${formatAge(l.at, now, AGE)}` : `${word} · ${formatAge(l.at, now, AGE)}`;
   return l.detail ? `${word} · ${l.detail}` : word;
 }
 

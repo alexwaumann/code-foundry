@@ -4,12 +4,13 @@ import { Broom, FolderOpen, FolderPlus, Folders, GitPullRequest, Layers, Search 
 import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
 import { PanelToggle } from "@/components/panel/PanelToggle";
-import { shortAge } from "@/components/prs/format";
+import { PR_CELL_AGE } from "@/components/prs/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNow } from "@/lib/clock";
+import { formatAge } from "@/lib/duration";
 import { useWidth } from "@/lib/useWidth";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider, NavRow } from "@/lib/NavRow";
@@ -88,7 +89,7 @@ function AgeCell({ ms }: { ms: number | null }) {
   const now = useNow(30_000);
   return (
     <span className="truncate text-right text-caption text-cf-text-muted tabular-nums" data-testid="index-age">
-      {ms === null ? "" : shortAge(ms, now)}
+      {ms === null ? "" : formatAge(ms, now, PR_CELL_AGE)}
     </span>
   );
 }

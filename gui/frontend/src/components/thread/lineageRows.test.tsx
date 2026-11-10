@@ -55,7 +55,7 @@ describe("Created by note", () => {
     const row = q(el, "thread-created-by-note") as HTMLElement;
     expect(row.className).toBe("lnote");
     expect(row.querySelector("svg.lucide-corner-down-right")).not.toBeNull();
-    expect(row.textContent).toBe("Created byFix login redirect·brief: Add retry, keep the PR small18 min ago");
+    expect(row.textContent).toBe("Created byFix login redirect·brief: Add retry, keep the PR small18m ago");
     expect(q(el, "thread-note")).toBeNull();
     // Not expandable: no chevron, the line is not a button.
     expect(q(row, "thread-created-by-note-line")?.getAttribute("role")).toBeNull();
@@ -69,7 +69,7 @@ describe("Created by note", () => {
   it("no brief: just the creator", () => {
     const el = show([note("note-created-by", "Created by Fix login redirect")]);
     expect(q(el, "thread-created-by-note-brief")).toBeNull();
-    expect(q(el, "thread-created-by-note")?.textContent).toBe("Created byFix login redirect18 min ago");
+    expect(q(el, "thread-created-by-note")?.textContent).toBe("Created byFix login redirect18m ago");
   });
 
   it("a renamed creator: its current name, linked by id; a later rename re-renders", () => {

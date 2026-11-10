@@ -1,5 +1,6 @@
 import type { GitOpView } from "@/api/gitops";
-import { formatRunDuration } from "@/lib/actions";
+import { RUN_DURATION } from "@/lib/actions";
+import { formatDuration } from "@/lib/duration";
 import { basename } from "@/lib/path";
 
 /** The worktree an op ran in, for the toast's second line. */
@@ -24,7 +25,7 @@ export function GitOpProgress({ op }: { op: GitOpView }) {
  * own state does, so local state would let the output spill out of the toast.
  */
 export function GitOpResult({ op, expanded = false, onToggle }: { op: GitOpView; expanded?: boolean; onToggle?: () => void }) {
-  const meta = [where(op), op.durationMs > 0 ? formatRunDuration(op.durationMs) : ""].filter(Boolean).join(" · ");
+  const meta = [where(op), op.durationMs > 0 ? formatDuration(op.durationMs, RUN_DURATION) : ""].filter(Boolean).join(" · ");
   return (
     <div data-testid="gitop-toast" data-op-id={op.id} data-state={op.state} className="flex min-w-0 flex-col gap-1">
       <span data-testid="gitop-summary" className="break-words text-cf-text">

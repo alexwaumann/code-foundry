@@ -19,7 +19,6 @@ import {
   runEndMs,
   runMs,
   shellSegments,
-  shortDuration,
   splitTaskLinks,
   timerRows,
   toggleModel,
@@ -27,7 +26,6 @@ import {
   unclosed,
   unclosedTasks,
   unclosedWords,
-  updatedAgo,
   waitingThreads,
   waitingTitle,
   waitingWords,
@@ -393,15 +391,6 @@ describe("workSummary and workMs", () => {
     expect(runMs([bash("1", "x", 0, 3)], 42_000)).toBe(3000);
     expect(runMs([think], null)).toBe(0);
   });
-
-  it.each([
-    [400, ""],
-    [40_000, "40s"],
-    [125_000, "2m"],
-    [3_900_000, "1h 05m"],
-  ])("shortDuration(%i) is %j", (ms, want) => {
-    expect(shortDuration(ms)).toBe(want);
-  });
 });
 
 describe("the board", () => {
@@ -481,15 +470,6 @@ describe("the board", () => {
     const [card] = boardSections([lead], NOW).inProgress;
     expect(card && workerRows(card)[0]?.meta.text).toBe("2 workers started: Habit colour, s-0a1b2c3d4e5f");
     expect(withNames("see s-zz", new Map())).toBe("see s-zz");
-  });
-
-  it.each([
-    [NOW - 20_000, "updated just now"],
-    [NOW - 4 * MIN, "updated 4m ago"],
-    [NOW - 125 * MIN, "updated 2h ago"],
-    [NOW - 50 * 60 * MIN, "updated 2d ago"],
-  ])("labels a worker's age (%i)", (at, want) => {
-    expect(updatedAgo(at, NOW)).toBe(want);
   });
 });
 

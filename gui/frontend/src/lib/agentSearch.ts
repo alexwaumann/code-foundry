@@ -5,7 +5,7 @@
  */
 import type { AgentHitView, AgentStepView, SearchEntryView, SearchWatchEventView } from "@/api/search";
 import { answerPieces, withoutRefs } from "./answerMarkdown";
-import { formatUptime } from "./format";
+import { formatDuration } from "./duration";
 import { markdownText } from "./markdownText";
 import { relativeAge } from "./promptHistory";
 
@@ -167,7 +167,7 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 /** A run's time: "21s", "1m 4s". */
 export function tookLabel(ms: number): string {
-  return formatUptime(Math.round(ms / 1000));
+  return formatDuration(ms, { hours: true, minutes: true, seconds: true });
 }
 
 /** The line under the answer: "2 searches · read 3 threads · 21s". */

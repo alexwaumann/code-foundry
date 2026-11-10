@@ -4,7 +4,8 @@ import { ArrowRight, Bot, CornerLeftUp, Square } from "lucide-react";
 import { ThreadPlaceRows } from "@/components/thread/ThreadPlaceRows";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { agentName, fmtElapsed } from "@/lib/agents";
+import { agentName } from "@/lib/agents";
+import { formatDuration } from "@/lib/duration";
 import { useNowSelect } from "@/lib/clock";
 import { childIds, lineageStatus } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
@@ -108,7 +109,7 @@ function LineageItem({ threadId, row, sub = false, inert = false }: { threadId: 
   const live = row.state === "working" || row.state === "attention";
   const now = useNowSelect(1000, (n) => (live ? n : 0));
   const ms = lineageElapsedMs(row, now);
-  const elapsed = ms === null ? "" : fmtElapsed(ms);
+  const elapsed = ms === null ? "" : formatDuration(ms, { hours: true, minutes: true, seconds: true });
   const stoppable = row.kind === "thread" && live;
   const choices = useModelChoices();
   const threadModel = useThreadsStore((s) => (row.kind === "agent" ? (s.byId[threadId]?.model ?? "") : ""));

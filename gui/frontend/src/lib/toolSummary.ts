@@ -7,6 +7,7 @@
  */
 import type { ToolCallView } from "@/api/thread";
 import { parseDiffFromFile, parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
+import { formatDuration } from "./duration";
 
 export type Json = Record<string, unknown>;
 
@@ -112,15 +113,9 @@ function verbOf(name: string, tense: Tense): string {
   return tense === "pending" ? v[0] : tense === "running" ? v[1] : v[2];
 }
 
-/** "0.9s", "41s", "4m 08s"; "" under 50 ms. */
-export function formatDuration(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 50) return "";
-  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${String(s)}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)}m ${String(s % 60).padStart(2, "0")}s`;
-  return `${String(Math.floor(m / 60))}h ${String(m % 60).padStart(2, "0")}m`;
+/** How long a step took: "0.9s", "41s", "4m 8s"; "" under 50 ms. */
+export function tookText(ms: number): string {
+  return Number.isFinite(ms) && ms >= 50 ? formatDuration(ms, { hours: true, minutes: true, seconds: true, tenths: true }) : "";
 }
 
 /** A Bash call's exit code from its result text ("Exit code 1\n…"), 0 when it succeeded, null when unknown. */
@@ -307,7 +302,7 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
   const cwd = opts.cwd ?? "";
   const s: ToolSummary = { verb: verbOf(t.name, opts.tense), target: "", targetStyle: "bold", detail: "", detailMono: true, meta: "", added: 0, removed: 0, chip: null };
   const done = opts.tense === "done";
-  const duration = done && opts.durationMs !== undefined ? formatDuration(opts.durationMs) : "";
+  const duration = done && opts.durationMs !== undefined ? tookText(opts.durationMs) : "";
   switch (t.name) {
     case "Bash": {
       s.target = firstLine(str(input, "command"));
@@ -381,7 +376,7 @@ export function toolSummary(t: ToolCallView, opts: { tense: Tense; durationMs?: 
       s.detailMono = false;
       const tools = num(result, "totalToolUseCount");
       const ms = num(result, "totalDurationMs");
-      s.meta = [tools !== null ? plural(tools, "tool") : "", ms !== null ? formatDuration(ms) : ""].filter(Boolean).join(" · ");
+      s.meta = [tools !== null ? plural(tools, "tool") : "", ms !== null ? tookText(ms) : ""].filter(Boolean).join(" · ");
       break;
     }
     case "WebFetch":

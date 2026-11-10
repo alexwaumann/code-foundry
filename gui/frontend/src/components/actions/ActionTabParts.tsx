@@ -1,7 +1,8 @@
 import { CircleCheck, CircleStop, CircleX, LoaderCircle, RotateCcw, Square } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
-import { actionCommandOf, actionTabStatus, commandEcho, formatRunClock, formatRunDuration, type ActionTabStatus } from "@/lib/actions";
+import { actionCommandOf, actionTabStatus, commandEcho, RUN_DURATION, type ActionTabStatus } from "@/lib/actions";
 import { useNow } from "@/lib/clock";
+import { formatClock, formatDuration } from "@/lib/duration";
 import { ACTION_LABEL, ACTION_RUN_LABEL } from "@/lib/termlabel";
 import { cn } from "@/lib/utils";
 import { rerunAction, stopActionRun } from "@/stores/actionActions";
@@ -69,7 +70,7 @@ export function ActionEcho({ id }: { id: string }) {
 /** The running clock, re-rendered once a second (its own component, so the line around it is not). */
 function RunningClock({ startedAtMs }: { startedAtMs: number | null }) {
   const now = useNow(1000);
-  return <span className="tabular-nums" data-testid="action-status-time">{formatRunClock(startedAtMs === null ? 0 : now - startedAtMs)}</span>;
+  return <span className="tabular-nums" data-testid="action-status-time">{formatClock(startedAtMs === null ? 0 : now - startedAtMs)}</span>;
 }
 
 function Sep() {
@@ -150,7 +151,7 @@ export function ActionStatusLine({ id }: { id: string }) {
             <>
               <Sep />
               <span className="tabular-nums" data-testid="action-status-time">
-                {formatRunDuration(finished - started)}
+                {formatDuration(finished - started, RUN_DURATION)}
               </span>
             </>
           )}

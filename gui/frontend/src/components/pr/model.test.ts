@@ -38,8 +38,8 @@ describe("checkTone and checkDuration", () => {
   it.each([
     [null, null, ""],
     [NOW - 92 * 1000, NOW, "1m 32s"],
-    [NOW - 10 * M, null, "10m 0s"],
-    [NOW - 2 * H - 5 * M, NOW - 5 * M, "2h 0m"],
+    [NOW - 10 * M, null, "10m"],
+    [NOW - 2 * H - 5 * M, NOW - 5 * M, "2h"],
   ])("started %s completed %s -> %s", (startedAtMs, completedAtMs, want) => {
     expect(checkDuration({ startedAtMs, completedAtMs }, NOW)).toBe(want);
   });
@@ -48,7 +48,7 @@ describe("checkTone and checkDuration", () => {
     ["skipped, zero length", { conclusion: "skipped", status: "completed", startedAtMs: NOW - M, completedAtMs: NOW - M }, "skipped"],
     ["neutral", { conclusion: "neutral", status: "completed", startedAtMs: null, completedAtMs: null }, "skipped"],
     ["passed", { conclusion: "success", status: "completed", startedAtMs: NOW - 92 * 1000, completedAtMs: NOW }, "1m 32s"],
-    ["running", { conclusion: "", status: "in_progress", startedAtMs: NOW - 10 * M, completedAtMs: null }, "10m 0s"],
+    ["running", { conclusion: "", status: "in_progress", startedAtMs: NOW - 10 * M, completedAtMs: null }, "10m"],
     ["queued", { conclusion: "", status: "queued", startedAtMs: null, completedAtMs: null }, "queued"],
     ["in progress, not started", { conclusion: "", status: "in_progress", startedAtMs: null, completedAtMs: null }, "in progress"],
   ])("checkMeta %s -> %s", (_name, c, want) => {

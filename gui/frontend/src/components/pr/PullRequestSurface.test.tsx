@@ -411,7 +411,7 @@ describe("the ⋯ menu", () => {
     await settle();
     expect(invocationsOf("pr.refresh").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
     expect(byTestId("pr-menu")).toBeTruthy();
-    expect(byTestId("pr-menu-refresh-hint").textContent).toMatch(/^Updated [0-5]s ago$/);
+    expect(byTestId("pr-menu-refresh-hint").textContent).toMatch(/^Updated (just now|[0-5]s ago)$/);
     expect(toastTexts().filter((t) => t.startsWith("Refreshed #145"))).toEqual([]);
     // A failure is toasted and reported over the copy, which stays.
     world.failNext.add("pr.refresh");

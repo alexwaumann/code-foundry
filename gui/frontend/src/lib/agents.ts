@@ -15,15 +15,6 @@ export function agentMode(r: Pick<AgentRunView, "background">): string {
   return r.background ? "background" : "foreground";
 }
 
-/** "0s", "38s", "1m 03s", "4m 12s", "1h 05m". */
-export function fmtElapsed(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${String(s)}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)}m ${String(s % 60).padStart(2, "0")}s`;
-  return `${String(Math.floor(m / 60))}h ${String(m % 60).padStart(2, "0")}m`;
-}
-
 /**
  * How long the run ran: while running, from its start (or its last wake) to now; once
  * ended, Claude's duration, else its start to its end. Null when unknown.

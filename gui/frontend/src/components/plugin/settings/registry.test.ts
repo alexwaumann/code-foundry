@@ -36,8 +36,8 @@ describe("registry words", () => {
     expect(shortSource("https://github.com/o/reg")).toBe("o/reg");
     expect(shortSource("http://127.0.0.1:8765/index.json")).toBe("127.0.0.1:8765/index.json");
     const r = { url: "u", fetchedAtMs: 0, cached: true, error: "", plugins: 1, issues: [] };
-    expect(registryLine(r, 5 * 60_000)).toBe("1 plugin · read 5 min ago");
-    expect(registryLine({ ...r, fetchedAtMs: 0 }, 48 * 3_600_000)).toBe("1 plugin · read 2 d ago");
+    expect(registryLine(r, 5 * 60_000)).toBe("1 plugin · read 5m ago");
+    expect(registryLine({ ...r, fetchedAtMs: 0 }, 48 * 3_600_000)).toBe("1 plugin · read 2d ago");
     expect(registryLine({ ...r, fetchedAtMs: 60_000 }, 0)).toBe("1 plugin · read just now");
     expect(registryLine({ ...r, plugins: 0, fetchedAtMs: null }, 0)).toBe("0 plugins");
     expect(registryErrorWords("not found: no index.json in o/r (or no access with your gh login)")).toBe("Not found, or your gh login cannot read it.");

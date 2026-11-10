@@ -4,7 +4,8 @@
  * whose Agent call launched it, and its prompt and turn header.
  */
 import type { AgentRunView } from "@/api/agents";
-import { agentElapsedMs, fmtElapsed } from "./agents";
+import { agentElapsedMs } from "./agents";
+import { formatDuration } from "./duration";
 import { buildTurns, workNodes, type TimelineItem, type WorkNode } from "./threadTimeline";
 import { fmtTok } from "./usage";
 
@@ -95,7 +96,7 @@ export function headerParts(run: Pick<AgentRunView, "status" | "startedAtMs" | "
   const ms = agentElapsedMs(run, now);
   const failed = run.status === "failed";
   const word = run.status === "running" ? "Working" : failed ? "Failed" : "Worked";
-  const parts = [ms === null ? word : `${word} ${failed ? "after" : "for"} ${fmtElapsed(ms)}`];
+  const parts = [ms === null ? word : `${word} ${failed ? "after" : "for"} ${formatDuration(ms, { hours: true, minutes: true, seconds: true })}`];
   if (run.toolUses > 0) parts.push(toolsLabel(run.toolUses));
   if (run.totalTokens > 0) parts.push(`${fmtTok(run.totalTokens)} tokens`);
   if (model) parts.push(model);

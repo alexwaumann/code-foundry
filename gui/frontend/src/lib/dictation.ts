@@ -110,12 +110,6 @@ export function barHeight(v: number): number {
   return 3 + Math.min(1, Math.max(0, v)) * 11;
 }
 
-/** Elapsed listening time as m:ss ("0:04", "12:30"). */
-export function formatElapsed(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${String(Math.floor(s / 60))}:${String(s % 60).padStart(2, "0")}`;
-}
-
 /** Bytes as whole decimal megabytes, like the daemon's messages ("557 MB"). */
 export function megabytes(bytes: number): string {
   return `${String(Math.floor(bytes / 1_000_000))} MB`;

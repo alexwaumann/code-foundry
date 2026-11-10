@@ -69,10 +69,10 @@ describe("RememberedSection", () => {
     ]);
     const metas = screen.getAllByTestId("memory-meta").map((m) => m.textContent);
     expect(metas).toEqual([
-      "Remembered 5 min ago · by Renamed thread",
-      "Remembered 5 min ago · by Old work (archived)",
-      "Remembered 5 min ago · by Usage page polish (removed)",
-      "Remembered 5 min ago",
+      "Remembered 5m ago · by Renamed thread",
+      "Remembered 5m ago · by Old work (archived)",
+      "Remembered 5m ago · by Usage page polish (removed)",
+      "Remembered 5m ago",
       "Added by hand",
     ]);
     const bys = screen.getAllByTestId("memory-by");

@@ -4,6 +4,7 @@
  * the editor's draft and what Save sends.
  */
 import type { ActionIconName, ActionView } from "@/api/actions";
+import type { DurationUnits } from "./duration";
 
 export type ActionTabStatus = "running" | "stopping" | "ok" | "stopped" | "failed";
 
@@ -24,26 +25,8 @@ export function actionTabStatus(t: { state: string; exitCode: number }, stopRequ
   return stopRequested && STOPPED_CODES.has(t.exitCode) ? "stopped" : "failed";
 }
 
-/** A running run's clock: "0:12", "12:05", "1:02:03". */
-export function formatRunClock(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = String(total % 60).padStart(2, "0");
-  return h > 0 ? `${String(h)}:${String(m).padStart(2, "0")}:${s}` : `${String(m)}:${s}`;
-}
-
 /** A finished run's duration: "4.2s" under 10 s, "42s", "3m 5s", "1h 2m". */
-export function formatRunDuration(ms: number): string {
-  const d = Math.max(0, ms);
-  if (d < 10_000) return `${(Math.floor(d / 100) / 10).toFixed(1)}s`;
-  const total = Math.floor(d / 1000);
-  if (total < 60) return `${String(total)}s`;
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  if (h > 0) return `${String(h)}h ${String(m)}m`;
-  return `${String(m)}m ${String(total % 60)}s`;
-}
+export const RUN_DURATION: DurationUnits = { hours: true, minutes: true, seconds: true, tenths: true };
 
 /**
  * The command a terminal runs, for the dimmed `$ command` echo: the run's command when the

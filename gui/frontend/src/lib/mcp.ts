@@ -4,6 +4,7 @@
  * check re-renders only the cards whose server changed.
  */
 import type { McpServerStatusView, McpServerView, McpStatusView, McpToolView } from "@/api/mcp";
+import { formatAge } from "./duration";
 
 /** The status pill's words. */
 export const MCP_STATUS_LABEL: Readonly<Record<McpServerStatusView, string>> = {
@@ -103,23 +104,15 @@ export function bucketCounts(servers: readonly Pick<McpServerView, "status">[]):
   return out;
 }
 
-/** "just now", "12s ago", "3 min ago", "2 h ago", "4 d ago"; "" for an unknown time. */
-export function checkedAgo(ms: number | null, now: number): string {
-  if (ms === null) return "";
-  const s = Math.max(0, Math.floor((now - ms) / 1000));
-  if (s < 5) return "just now";
-  if (s < 60) return `${String(s)}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)} min ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)} h ago`;
-  return `${String(Math.floor(h / 24))} d ago`;
+/** "just now", "12s ago", "3m ago", "2h ago", "4d ago"; "" for an unknown time. */
+function checkedAgo(ms: number | null, now: number): string {
+  return ms === null ? "" : formatAge(ms, now, { seconds: true, minutes: true, hours: true, days: true });
 }
 
 /**
  * The header's second line: when the servers were checked and why. "Checked 12s ago, at
  * the start of the last turn", "Checked just now, after reconnecting github", "Checked
- * 3 min ago".
+ * 3m ago".
  */
 export function checkedLine(s: Pick<McpStatusView, "checkedAtMs" | "trigger" | "server">, now: number): string {
   const ago = checkedAgo(s.checkedAtMs, now);
@@ -162,7 +155,7 @@ export function mcpStale(s: McpStaleInput, now: number): boolean {
   return s.checkedAtMs !== null && now - s.checkedAtMs >= MCP_STALE_AFTER_MS;
 }
 
-/** The stale header's line: "Last check 12 min ago · may be out of date". */
+/** The stale header's line: "Last check 12m ago · may be out of date". */
 export function staleLine(checkedAtMs: number | null, now: number): string {
   const ago = checkedAgo(checkedAtMs, now);
   return ago ? `Last check ${ago} · may be out of date` : "May be out of date";

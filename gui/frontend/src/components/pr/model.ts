@@ -3,8 +3,8 @@
  * tones and durations, reviewer status, the summary's conversation and the timeline.
  */
 import type { CheckView, PullRequestCommentView, PullRequestCommitView, PullRequestDetailView, PullRequestReviewerView, PullRequestView, ReviewThreadView } from "@/api/gh";
-import { shortAge } from "@/components/prs/format";
-import { formatUptime } from "@/lib/format";
+import { PR_AGE } from "@/components/prs/format";
+import { formatAge, formatDuration } from "@/lib/duration";
 import type { SortOrder } from "@/stores/prPanel";
 
 export type Tone = "success" | "failure" | "pending" | "neutral" | "merged" | "draft";
@@ -38,7 +38,7 @@ export function checkTone(c: Pick<CheckView, "conclusion" | "status">): "success
 export function checkDuration(c: Pick<CheckView, "startedAtMs" | "completedAtMs">, now: number): string {
   if (c.startedAtMs === null) return "";
   const end = c.completedAtMs ?? now;
-  return formatUptime(Math.max(0, (end - c.startedAtMs) / 1000));
+  return formatDuration(end - c.startedAtMs, { days: true, hours: true, minutes: true, seconds: true });
 }
 
 /** Whether a check is running now (its duration grows every second). */
@@ -56,13 +56,11 @@ export function checkMeta(c: Pick<CheckView, "conclusion" | "status" | "startedA
 }
 
 /**
- * Relative age with "ago", on the Pull Requests page's scale (shortAge): "just now",
+ * Relative age with "ago", on the Pull Requests page's scale (PR_AGE): "just now",
  * "5m ago", "3h ago", "2d ago", "3w ago", "4mo ago"; "" when unknown.
  */
 export function ago(ms: number | null, now: number): string {
-  if (ms === null) return "";
-  const a = shortAge(ms, now);
-  return a === "now" ? "just now" : `${a} ago`;
+  return ms === null ? "" : formatAge(ms, now, PR_AGE);
 }
 
 export type ReviewerStatus = "approved" | "changes_requested" | "commented" | "dismissed" | "requested" | "none";

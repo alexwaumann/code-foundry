@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ActionView } from "@/api/actions";
-import { actionCommandOf, actionTabStatus, addArgs, commandEcho, draftOf, draftProblem, editArgs, formatRunClock, formatRunDuration, NEW_ACTION_DRAFT } from "./actions";
+import { actionCommandOf, actionTabStatus, addArgs, commandEcho, draftOf, draftProblem, editArgs, NEW_ACTION_DRAFT, RUN_DURATION } from "./actions";
+import { formatDuration } from "./duration";
 
 const action: ActionView = { id: "a-1", projectId: "repo-cf", name: "Test", command: "go test ./...", icon: "test", inTerminal: true, onWorktreeCreate: false, position: 1 };
 
@@ -31,19 +32,7 @@ describe("actionTabStatus", () => {
   });
 });
 
-describe("formatRunClock", () => {
-  it.each([
-    [0, "0:00"],
-    [-5, "0:00"],
-    [12_400, "0:12"],
-    [725_000, "12:05"],
-    [3_723_000, "1:02:03"],
-  ])("%d ms", (ms, want) => {
-    expect(formatRunClock(ms)).toBe(want);
-  });
-});
-
-describe("formatRunDuration", () => {
+describe("RUN_DURATION", () => {
   it.each([
     [0, "0.0s"],
     [4_230, "4.2s"],
@@ -53,7 +42,7 @@ describe("formatRunDuration", () => {
     [185_000, "3m 5s"],
     [3_720_000, "1h 2m"],
   ])("%d ms", (ms, want) => {
-    expect(formatRunDuration(ms)).toBe(want);
+    expect(formatDuration(ms, RUN_DURATION)).toBe(want);
   });
 });
 

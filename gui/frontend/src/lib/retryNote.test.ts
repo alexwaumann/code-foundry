@@ -14,13 +14,13 @@ function input(o: Partial<RetryNoteInput> = {}): RetryNoteInput {
 
 describe("retryNote", () => {
   it.each<[string, Partial<RetryNoteInput>, string | null]>([
-    ["a rate limit, 20 s out", {}, "Rate limited · retrying in 20 s (attempt 3 of 10)"],
-    ["a fraction of a second rounds up", { nowMs: DUE - 1 }, "Rate limited · retrying in 1 s (attempt 3 of 10)"],
+    ["a rate limit, 20 s out", {}, "Rate limited · retrying in 20s (attempt 3 of 10)"],
+    ["a fraction of a second rounds up", { nowMs: DUE - 1 }, "Rate limited · retrying in 1s (attempt 3 of 10)"],
     ["past due: the request is in flight", { nowMs: DUE + 5_000 }, "Rate limited · retrying now (attempt 3 of 10)"],
-    ["overloaded", { retry: retry({ error: "overloaded", errorStatus: 529 }) }, "API overloaded · retrying in 20 s (attempt 3 of 10)"],
-    ["a server error by status", { retry: retry({ error: "server_error", errorStatus: 500 }) }, "API error 500 · retrying in 20 s (attempt 3 of 10)"],
-    ["a connection error", { retry: retry({ error: "connection", errorStatus: 0 }) }, "No response from the API · retrying in 20 s (attempt 3 of 10)"],
-    ["no max", { retry: retry({ maxRetries: 0 }) }, "Rate limited · retrying in 20 s (attempt 3)"],
+    ["overloaded", { retry: retry({ error: "overloaded", errorStatus: 529 }) }, "API overloaded · retrying in 20s (attempt 3 of 10)"],
+    ["a server error by status", { retry: retry({ error: "server_error", errorStatus: 500 }) }, "API error 500 · retrying in 20s (attempt 3 of 10)"],
+    ["a connection error", { retry: retry({ error: "connection", errorStatus: 0 }) }, "No response from the API · retrying in 20s (attempt 3 of 10)"],
+    ["no max", { retry: retry({ maxRetries: 0 }) }, "Rate limited · retrying in 20s (attempt 3)"],
     ["no retry", { retry: null }, null],
   ])("%s", (_name, over, want) => {
     expect(retryNote(input(over))).toBe(want);
@@ -42,11 +42,11 @@ describe("retryCause", () => {
 
 describe("fmtRetryIn", () => {
   it.each<[number, string]>([
-    [500, "1 s"],
-    [20_000, "20 s"],
-    [60_000, "1 min"],
-    [65_000, "1 min 5 s"],
-    [180_000, "3 min"],
+    [500, "1s"],
+    [20_000, "20s"],
+    [60_000, "1m"],
+    [65_000, "1m 5s"],
+    [180_000, "3m"],
   ])("%d ms", (ms, want) => {
     expect(fmtRetryIn(ms)).toBe(want);
   });

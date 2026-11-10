@@ -7,8 +7,8 @@
  * puts steps back to pending, restarts the times and can change a generated branch.
  */
 import type { ThreadSetupStepStatusView, ThreadSetupStepView, ThreadSetupView, ThreadView } from "@/api/threads";
-import { shortAge } from "./thread";
-import { formatDuration } from "./toolSummary";
+import { formatAge, formatDuration } from "./duration";
+import { tookText } from "./toolSummary";
 
 /** How long a step runs before the checklist shows: a fast thread never flashes one. */
 export const SETUP_REVEAL_MS = 300;
@@ -135,7 +135,7 @@ function fetchWords(word: string, ref: string): SetupLabel {
 function refAge(st: ThreadSetupStepView, nowMs: number): string {
   if (st.refAtMs === null) return "";
   const from = st.endedAtMs ?? nowMs;
-  return from - st.refAtMs < 60_000 ? " from under a minute ago" : ` from ${shortAge(st.refAtMs, from)} ago`;
+  return from - st.refAtMs < 60_000 ? " from under a minute ago" : ` from ${formatAge(st.refAtMs, from, { minutes: true, hours: true, days: true })}`;
 }
 
 function warningWords(st: ThreadSetupStepView, nowMs: number): SetupLabel {
@@ -233,13 +233,13 @@ export function setupLines(s: ThreadSetupView, nowMs: number): SetupLine[] {
 /** A line's time at the right: how long it took, or has run in whole seconds; "" while it has not started. */
 export function setupLineTime(l: Pick<SetupLine, "status" | "startedAtMs" | "endedAtMs">, nowMs: number): string {
   if (l.startedAtMs === null) return "";
-  if (l.endedAtMs !== null) return formatDuration(l.endedAtMs - l.startedAtMs);
+  if (l.endedAtMs !== null) return tookText(l.endedAtMs - l.startedAtMs);
   return l.status === "running" ? wholeSeconds(nowMs - l.startedAtMs) : "";
 }
 
-/** A running time as the turn's live header has it: "3s", "1m 02s". */
+/** A running time as the turn's live header has it: "3s", "1m 2s". */
 function wholeSeconds(ms: number): string {
-  return formatDuration(Math.max(0, ms)).replace(/\.\ds$/, "s") || "0s";
+  return formatDuration(ms, { hours: true, minutes: true, seconds: true });
 }
 
 /** A line's words as plain text. */
@@ -309,12 +309,12 @@ export function setupView(s: ThreadSetupView | null | undefined, nowMs: number, 
     case "cancelled": {
       const ms = setupTookMs(s);
       // Whole seconds, but for a cancel inside the first one, which "0s" would misstate.
-      const took = ms === null ? "" : ms < 1000 ? formatDuration(ms) : wholeSeconds(ms);
+      const took = ms === null ? "" : ms < 1000 ? tookText(ms) : wholeSeconds(ms);
       return { kind: "cancelled", label: took ? `Setup cancelled after ${took}` : "Setup cancelled" };
     }
     case "done": {
       if (setupRowPhase(s, seen) !== "done") return { kind: "none" };
-      const took = formatDuration(setupTookMs(s) ?? 0);
+      const took = tookText(setupTookMs(s) ?? 0);
       return { kind: "done", label: took ? `Set up in ${took}` : "Set up", warning: setupFoldWarning(s, nowMs), lines: setupLines(s, nowMs) };
     }
     case "running": {

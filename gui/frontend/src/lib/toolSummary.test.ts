@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCallView } from "@/api/thread";
-import { agentReport, diffStats, diffText, exitCode, formatDuration, num, obj, parseObject, patchHunks, splitPath, str, firstPatchLine, structuredPatchText, toolDiff, toolDiffFiles, toolFileTarget, toolSummary, type Tense, type ToolDiff } from "./toolSummary";
+import { agentReport, diffStats, diffText, exitCode, num, obj, parseObject, patchHunks, splitPath, str, firstPatchLine, structuredPatchText, toolDiff, toolDiffFiles, toolFileTarget, toolSummary, tookText, type Tense, type ToolDiff } from "./toolSummary";
 
 function call(name: string, input: object, over: Partial<ToolCallView> = {}): ToolCallView {
   return { toolUseId: "t", name, inputJson: JSON.stringify(input), status: "done", output: "", isError: false, resultJson: "", ...over };
@@ -22,10 +22,10 @@ describe("helpers", () => {
     [10, ""],
     [900, "0.9s"],
     [41_000, "41s"],
-    [248_000, "4m 08s"],
-    [3_720_000, "1h 02m"],
-  ])("formatDuration(%i) = %s", (ms, want) => {
-    expect(formatDuration(ms)).toBe(want);
+    [248_000, "4m 8s"],
+    [3_720_000, "1h 2m"],
+  ])("tookText(%i) = %s", (ms, want) => {
+    expect(tookText(ms)).toBe(want);
   });
   it("exitCode reads Claude's error text", () => {
     expect(exitCode({ isError: false, output: "", status: "done" })).toBe(0);

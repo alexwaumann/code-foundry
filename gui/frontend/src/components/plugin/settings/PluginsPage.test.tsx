@@ -523,7 +523,7 @@ describe("Settings → Plugins: the page menu", () => {
   it("says when the registries were read and what they hold", async () => {
     show();
     openMenu();
-    expect((await screen.findByTestId("registry-refresh-hint")).textContent).toBe("Read 5 min ago");
+    expect((await screen.findByTestId("registry-refresh-hint")).textContent).toBe("Read 5m ago");
     expect(screen.getByTestId("registry-open-hint").textContent).toBe("alexwaumann/code-foundry-plugins · 5 plugins");
   });
 
@@ -638,7 +638,7 @@ describe("Settings → Plugins: a plugin's secrets", () => {
     });
     expect(m.secrets).toHaveBeenCalledWith("acme-data", expect.anything());
     const token = acme.getAllByTestId("plugin-secret").find((s) => s.dataset.key === "token");
-    expect(token?.textContent).toContain("set 3 d ago");
+    expect(token?.textContent).toContain("set 3d ago");
   });
 
   it("delete runs plugin.secrets.delete (the daemon confirms) and reads the list again", async () => {
