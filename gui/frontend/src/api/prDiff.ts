@@ -1,7 +1,7 @@
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { GhService, type GetPullRequestDiffResponse, type GetPullRequestFileResponse } from "@/gen/codefoundry/v1/gh_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 /** A pull request's unified diff as GitHub renders it (GhService.GetPullRequestDiff). */
 export interface PullRequestDiffView {
@@ -15,7 +15,7 @@ export interface PullRequestDiffView {
 }
 
 export function toPullRequestDiffView(r: GetPullRequestDiffResponse): PullRequestDiffView {
-  return { diff: r.diff, headSha: r.headSha, truncated: r.truncated, fetchedAtMs: r.fetchedAt ? timestampMs(r.fetchedAt) : null };
+  return { diff: r.diff, headSha: r.headSha, truncated: r.truncated, fetchedAtMs: ms(r.fetchedAt) };
 }
 
 const TOO_LARGE_PREFIX = "too large: ";

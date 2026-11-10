@@ -1,5 +1,4 @@
 import { create, fromJsonString } from "@bufbuild/protobuf";
-import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import {
   CheckConclusion,
   CheckRollupState,
@@ -29,6 +28,7 @@ import {
 } from "@/gen/codefoundry/v1/gh_pb";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 // View models for GhService's reads. Generated types stay in src/api.
 
@@ -348,8 +348,6 @@ export interface ReviewerCandidatesView {
   /** The pending requests, then (for a query) GitHub's matches, each by login; the author is left out. */
   candidates: ReviewerCandidateView[];
 }
-
-const ms = (t: Timestamp | undefined): number | null => (t ? timestampMs(t) : null);
 
 const rollupStates: Record<CheckRollupState, RollupStateView> = {
   [CheckRollupState.UNSPECIFIED]: "none",

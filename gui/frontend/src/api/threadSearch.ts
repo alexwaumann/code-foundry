@@ -4,11 +4,11 @@
  * file. The daemon's match ranges count code points; the views count UTF-16 units, as
  * JavaScript strings do, so `text.slice(start, end)` is the match.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { ThreadItemRole, ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { SearchSpeaker, type SearchHit, type SearchMatchRange, type SearchThreadGroup, type SearchThreadName, type SearchThreadsResponse } from "@/gen/codefoundry/v1/thread_search_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { toThreadItemView, type ThreadItemView } from "./thread";
+import { ms } from "./timestamp";
 
 /** A match in a text: [start, end) in UTF-16 units. */
 export interface TextRange {
@@ -110,7 +110,7 @@ function rangesOf(text: string, ranges: readonly SearchMatchRange[]): TextRange[
 }
 
 export function toSearchNameView(n: SearchThreadName): SearchNameView {
-  return { threadId: n.threadId, name: n.name, ranges: rangesOf(n.name, n.ranges), archived: n.archived, lastActivityMs: n.lastActivityAt ? timestampMs(n.lastActivityAt) : null };
+  return { threadId: n.threadId, name: n.name, ranges: rangesOf(n.name, n.ranges), archived: n.archived, lastActivityMs: ms(n.lastActivityAt) };
 }
 
 export function toSearchHitView(h: SearchHit): SearchHitView {
@@ -119,7 +119,7 @@ export function toSearchHitView(h: SearchHit): SearchHitView {
     itemId: h.itemId,
     ordinal: Number(h.ordinal),
     speaker: speakers[h.speaker],
-    createdAtMs: h.createdAt ? timestampMs(h.createdAt) : null,
+    createdAtMs: ms(h.createdAt),
     snippet: h.snippet,
     ranges: rangesOf(h.snippet, h.ranges),
   };

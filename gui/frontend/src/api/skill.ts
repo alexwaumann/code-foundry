@@ -8,8 +8,6 @@
  * Not to be confused with api/filesystem.ts's ListSkills (the "/" commands a composer
  * offers): that lists what Claude Code would load, this what a marketplace offers.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
-import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import {
   InstalledSkillState,
   SkillEntryState,
@@ -25,6 +23,7 @@ import {
   type SkillRegistry,
 } from "@/gen/codefoundry/v1/skill_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 /** A Claude Code plugin the marketplace index lists, or a standalone skill directory. */
 export type SkillKindView = "plugin" | "skill";
@@ -54,10 +53,6 @@ function toKindProto(k: SkillKindView | ""): SkillKind {
 
 function toTierProto(t: SkillTierView): SkillTier {
   return t === "enterprise" ? SkillTier.ENTERPRISE : t === "community" ? SkillTier.COMMUNITY : SkillTier.UNSPECIFIED;
-}
-
-function ms(t: Timestamp | undefined): number | null {
-  return t ? timestampMs(t) : null;
 }
 
 /**

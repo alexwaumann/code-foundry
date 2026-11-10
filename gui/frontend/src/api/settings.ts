@@ -10,6 +10,7 @@ import {
   type SettingsSnapshot,
 } from "@/gen/codefoundry/v1/settings_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 export type SettingTypeView = "string" | "int" | "bool" | "enum" | "path" | "keybinding";
 
@@ -203,7 +204,7 @@ function toBackdropView(b: Backdrop): BackdropView {
     size: Number(b.size),
     width: b.width,
     height: b.height,
-    addedAt: b.addedAt ? Number(b.addedAt.seconds) * 1000 + Math.floor(b.addedAt.nanos / 1e6) : 0,
+    addedAt: ms(b.addedAt) ?? 0,
   };
 }
 

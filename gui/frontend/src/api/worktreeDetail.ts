@@ -1,6 +1,6 @@
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { ProjectService, type WorktreeDetail } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 /** One changed path. `status` is a git letter (A M D R C T U) or "?" for untracked. */
 export interface FileChangeView {
@@ -60,10 +60,10 @@ export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
       subject: l.subject,
       authorName: l.authorName,
       authorEmail: l.authorEmail,
-      authoredAtMs: l.authoredAt ? timestampMs(l.authoredAt) : null,
+      authoredAtMs: ms(l.authoredAt),
     })),
     logTotal: d.logTotal,
-    computedAtMs: d.computedAt ? timestampMs(d.computedAt) : null,
+    computedAtMs: ms(d.computedAt),
     error: d.error,
   };
 }

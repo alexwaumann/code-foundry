@@ -3,7 +3,6 @@
  * (docs/notes/actions-1-daemon.md, actions-2-gui.md). View models for ActionService's
  * messages and the EventService action source; generated types stay inside src/api.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   ActionIcon,
   ActionPickSource,
@@ -19,6 +18,7 @@ import {
   type LastActionRunResponse,
 } from "@/gen/codefoundry/v1/action_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 /** The six icons, in the editor's order; the names action.add/edit's --icon takes. */
 export const ACTION_ICONS = ["play", "test", "lint", "configure", "build", "debug"] as const;
@@ -135,8 +135,8 @@ export function toActionRunView(r: ActionRun): ActionRunView {
     terminalId: r.terminalId,
     running: r.state === ActionRunState.RUNNING,
     exitCode: r.exitCode,
-    startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
-    finishedAtMs: r.finishedAt ? timestampMs(r.finishedAt) : null,
+    startedAtMs: ms(r.startedAt),
+    finishedAtMs: ms(r.finishedAt),
     trigger: triggerNames[r.trigger],
     ports: r.ports,
   };
@@ -214,7 +214,7 @@ export function toActionRunRecordView(r: ActionRunRecord): ActionRunRecordView {
     threadId: r.threadId,
     mode: modeNames[r.mode],
     trigger: triggerNames[r.trigger],
-    startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
+    startedAtMs: ms(r.startedAt),
   };
 }
 

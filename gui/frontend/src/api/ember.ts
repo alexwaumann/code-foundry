@@ -2,11 +2,11 @@
  * EmberService (docs/notes/ember-2-store.md): Ember's status and task board as view
  * models. The board is read-only here: Ember changes it through the `ember.*` commands.
  */
-import { timestampMs, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { EmberService, EmberTaskState, type EmberBoard, type EmberStatus, type EmberTask, type EmberTaskDescendant, type EmberTaskThread, type EmberTimer } from "@/gen/codefoundry/v1/ember_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import { reportStatusMap, stateMap, statusMap, toThreadSetupView, type ThreadReportStatusView, type ThreadSetupView, type ThreadStateView, type ThreadStatusView } from "./threads";
+import { ms } from "./timestamp";
 
 export type EmberTaskStateView = "todo" | "doing" | "blocked" | "done" | "cancelled";
 
@@ -119,10 +119,6 @@ const stateViews: Readonly<Partial<Record<number, EmberTaskStateView>>> = {
   [EmberTaskState.DONE]: "done",
   [EmberTaskState.CANCELLED]: "cancelled",
 };
-
-function ms(t: Timestamp | undefined): number | null {
-  return t ? timestampMs(t) : null;
-}
 
 function toTaskThreadView(t: EmberTaskThread): EmberTaskThreadView {
   return {

@@ -4,9 +4,9 @@
  * turn (and after a reconnect); ThreadService.WatchThread carries each check (the snapshot's
  * `mcp`, then `mcp` events), so the panel reads them from the thread store.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { McpCheckTrigger, McpServerStatus, ThreadService, type McpServer, type ThreadMcpStatus } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { ms } from "./timestamp";
 
 export type McpServerStatusView = "connected" | "failed" | "needs-auth" | "pending" | "disabled" | "unknown";
 /** What made the daemon check: a turn's start, a refresh, or a reconnect of `server`. */
@@ -82,7 +82,7 @@ function toServerView(s: McpServer): McpServerView {
 export function toMcpStatusView(s: ThreadMcpStatus | undefined): McpStatusView | null {
   if (!s) return null;
   return {
-    checkedAtMs: s.checkedAt ? timestampMs(s.checkedAt) : null,
+    checkedAtMs: ms(s.checkedAt),
     trigger: s.trigger in triggers ? triggers[s.trigger] : "unknown",
     server: s.server,
     servers: s.servers.map(toServerView),

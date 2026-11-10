@@ -5,8 +5,8 @@
  * change, so the thread info card's agent rows, the strip above the composer and the
  * timeline's Agent rows read it from the thread store.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { ThreadAgentStatus, type ThreadAgentRun } from "@/gen/codefoundry/v1/thread_pb";
+import { ms } from "./timestamp";
 
 export type AgentStatusView = "running" | "done" | "failed" | "unknown";
 
@@ -74,9 +74,9 @@ export function toAgentRunView(r: ThreadAgentRun): AgentRunView {
     durationMs: Number(r.durationMs),
     summary: r.summary,
     error: r.error,
-    startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
-    resumedAtMs: r.resumedAt ? timestampMs(r.resumedAt) : null,
-    endedAtMs: r.endedAt ? timestampMs(r.endedAt) : null,
+    startedAtMs: ms(r.startedAt),
+    resumedAtMs: ms(r.resumedAt),
+    endedAtMs: ms(r.endedAt),
     noteItemId: r.noteItemId,
   };
 }
