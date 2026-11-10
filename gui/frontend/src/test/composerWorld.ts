@@ -12,22 +12,14 @@ import { useSettingsStore } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { resetComposerDaemon } from "./composerFakes";
 import { resetDaemon } from "./daemonFakes";
+import { MODELS } from "../../mock/models";
 import { seedWorld } from "./projectsWorld";
 
 /** What every send from the composer adds to thread.new's args: its setup runs in the background, with the draft to undo it (docs/notes/instant-threads-4-composer.md). */
 export const BACKGROUND = { "background-setup": "true", "draft-json": expect.any(String) as string };
 
 /** internal/model's registry as the mock's settings schema lists it. */
-const MODEL_CHOICES = [
-  { value: "claude-opus-5-5[1m]", label: "Opus 5.5" },
-  { value: "claude-opus-4-8[1m]", label: "Opus 4.8" },
-  { value: "claude-opus-4-7[1m]", label: "Opus 4.7" },
-  { value: "claude-sonnet-5-5[1m]", label: "Sonnet 5.5" },
-  { value: "claude-sonnet-5[1m]", label: "Sonnet 5" },
-  { value: "claude-sonnet-4-6[1m]", label: "Sonnet 4.6" },
-  { value: "claude-haiku-5-5[1m]", label: "Haiku 5.5" },
-  { value: "claude-4.5-haiku[1m]", label: "Haiku 4.5" },
-];
+const MODEL_CHOICES = MODELS.map(({ value, label }) => ({ value, label }));
 
 /** jsdom lays nothing out: ProseMirror, cmdk and Radix ask for rects, scrolling and observers. */
 export function stubLayout(): void {
