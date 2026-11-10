@@ -97,7 +97,7 @@ Still deferred: table, image, charts, ANSI colours, segmented control, the ifram
 ### Example plugins: GitHub Actions run tracker and test watcher
 
 Jenkins and the enterprise auth wizard are **not** built: neither backend exists outside
-Alex's work. Their documents stay in this directory as the reference for what coworkers
+one user's workplace. Their documents stay in this directory as the reference for what users
 will build (the Jenkins tracker is the first real third-party plugin expected). The
 shipped examples are:
 

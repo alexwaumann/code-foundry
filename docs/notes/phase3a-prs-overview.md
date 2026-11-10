@@ -245,7 +245,7 @@ Observed:
   (same numbers, one request instead of two). The global count uses REST as asked, with
   `contributionsCollection` as the fallback.
 * Branch PRs are kept only when authored by the viewer and from the repo itself (not
-  forks), as the brief specifies. A colleague's PR on a checked-out branch is not shown.
+  forks), as the brief specifies. Another author's PR on a checked-out branch is not shown.
 * The overview's sync line replaces 2c's upstream/ahead/behind/changes grid, and the
   header moved to the page bar. The Sessions and Terminals lists are unchanged.
 * An extra RPC field, `GetDashboardRequest.include_untracked`, plus the dev-only

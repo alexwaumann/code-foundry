@@ -32,7 +32,7 @@ Agreed with Alex (the brief):
   skills: "This thread runs inside code-foundry. Its skills (code-foundry-orchestrate,
   code-foundry-help) say how to delegate work to other threads and how to answer
   questions about the app." A workspace thread's line follows it, as before.
-* **No `` !`command` `` in any skill.** Managed enterprise settings (Alex's work laptop)
+* **No `` !`command` `` in any skill.** Managed enterprise settings (a user's managed Mac)
   forbid dynamic shell in skills, so whatever is dynamic is rendered by the daemon at
   start. `TestRender` fails on a `` !` `` in any skill file.
 * **`--add-dir`, not hooks, `--plugin-dir` or `--settings`.** Claude Code loads the
