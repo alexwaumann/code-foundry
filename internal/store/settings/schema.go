@@ -644,7 +644,7 @@ var staticFields = []Field{
 		Key: KeyBaseFromOrigin, Group: GroupProjects, Page: PageSource, Section: "projects", Type: Bool, Title: "Branch from origin unless local is ahead",
 		Description: "Start a new worktree's branch from origin's copy of its base branch (the default branch when none is given), fetched first, " +
 			"unless the local branch is ahead of it or has diverged: then from the local branch. " +
-			"Off always starts from the local branch and never fetches. A remote branch, tag or commit given as the base is always used as is.",
+			"Off always starts from the local branch, and new branches are not fetched from origin; checking out a branch only origin has still fetches it. A remote branch, tag or commit given as the base is always used as is.",
 		Default: "true",
 		bind:    func(s *Settings) any { return &s.Projects.BaseFromOrigin },
 	},

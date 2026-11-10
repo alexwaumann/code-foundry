@@ -1333,13 +1333,14 @@ type CreateWorktreeRequest struct {
 	BaseRef string `protobuf:"bytes,3,opt,name=base_ref,json=baseRef,proto3" json:"base_ref,omitempty"`
 	// Fetch the remote branch the new branch may start from first (origin's copy of a
 	// bare name, before comparing it with the local branch, or a remote-tracking
-	// base_ref). Bounded; a failed fetch is logged and the stale ref is used. Nothing is
-	// fetched with projects.base_from_origin off.
+	// base_ref), or the branch itself when only origin has it. Bounded; a failed fetch
+	// is logged and the stale ref is used. With projects.base_from_origin off a new
+	// branch's start point is not fetched; a branch only origin has still is.
 	Fetch bool `protobuf:"varint,5,opt,name=fetch,proto3" json:"fetch,omitempty"`
 	// Overrides projects.base_from_origin for this call: true is the rule (origin's
 	// copy of the default branch or a bare branch name, fetched with fetch, unless the
 	// local branch is ahead of it), false the local branch, base_ref used as typed and
-	// nothing fetched. Unset: the setting.
+	// the new branch's start point not fetched. Unset: the setting.
 	BaseFromOrigin *bool `protobuf:"varint,6,opt,name=base_from_origin,json=baseFromOrigin,proto3,oneof" json:"base_from_origin,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache

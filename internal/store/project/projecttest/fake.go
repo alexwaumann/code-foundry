@@ -60,8 +60,9 @@ type Fake struct {
 	Err error
 	// Calls records method calls, e.g. "Register /x", "Refresh r1".
 	Calls []string
-	// Fetches records every fetch of a base, FetchBase's and a CreateWorktree's with
-	// Fetch and BaseFromOrigin, in call order. OnFetch, when set, runs in each: it may
+	// Fetches records every fetch, in call order: FetchBase's and a CreateWorktree's
+	// with Fetch and BaseFromOrigin, and a CreateWorktree's with Fetch of a branch only
+	// origin has (whatever BaseFromOrigin says). OnFetch, when set, runs in each: it may
 	// block (a slow remote), and an error is that fetch's failure; FetchRefAt is then
 	// the age told of the ref on disk.
 	Fetches    []project.CreateWorktreeOptions
@@ -209,8 +210,11 @@ func (f *Fake) Unregister(_ context.Context, id string) error {
 
 // CreateWorktree implements project.Store.
 func (f *Fake) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptions) (project.Worktree, error) {
-	if o.Fetch && o.BaseFromOrigin {
-		f.fetch(ctx, o)
+	switch {
+	case o.Fetch && f.originOnly(o):
+		f.fetch(ctx, o, "origin/"+o.Branch)
+	case o.Fetch && o.BaseFromOrigin:
+		f.fetch(ctx, o, baseRef(o))
 	}
 	if err := ctx.Err(); err != nil {
 		return project.Worktree{}, err // as git, which never starts on a dead context
@@ -261,13 +265,38 @@ func (f *Fake) CreateWorktree(ctx context.Context, o project.CreateWorktreeOptio
 // With o.BaseFromOrigin off it fetches nothing, as the real store does.
 func (f *Fake) FetchBase(ctx context.Context, o project.CreateWorktreeOptions) {
 	if o.BaseFromOrigin {
-		f.fetch(ctx, o)
+		f.fetch(ctx, o, baseRef(o))
 	}
 }
 
-// fetch is one fetch of o's base, told through o.Progress.
-func (f *Fake) fetch(ctx context.Context, o project.CreateWorktreeOptions) {
-	ref := "origin/" + strings.TrimPrefix(cmp.Or(o.BaseRef, "main"), "origin/")
+// baseRef is the origin branch a fetch of o's base fetches.
+func baseRef(o project.CreateWorktreeOptions) string {
+	return "origin/" + strings.TrimPrefix(cmp.Or(o.BaseRef, "main"), "origin/")
+}
+
+// originOnly reports whether o checks out a branch that only origin has (SetRefs lists
+// it under Remote, and no worktree or local ref has it), which the real store fetches
+// whatever BaseFromOrigin says: git's DWIM.
+func (f *Fake) originOnly(o project.CreateWorktreeOptions) bool {
+	if o.BaseRef != "" {
+		return false
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	refs := f.refs[o.ProjectID]
+	if !slices.Contains(refs.Remote, "origin/"+o.Branch) || slices.Contains(refs.Local, o.Branch) {
+		return false
+	}
+	for _, w := range f.projects[o.ProjectID].Worktrees {
+		if w.Branch == o.Branch {
+			return false
+		}
+	}
+	return true
+}
+
+// fetch is one fetch of ref for o, told through o.Progress.
+func (f *Fake) fetch(ctx context.Context, o project.CreateWorktreeOptions, ref string) {
 	f.mu.Lock()
 	f.Fetches = append(f.Fetches, o)
 	hook := f.OnFetch

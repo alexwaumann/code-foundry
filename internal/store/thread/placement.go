@@ -718,7 +718,7 @@ type prefetches struct{ done map[string]chan struct{} }
 
 // startPrefetches starts fetching each of todo's bases for a new branch, unless that
 // branch is known to exist (its base is ignored, and CreateWorktree fetches what it
-// checks out) or nothing is fetched at all (BaseFromOrigin off).
+// checks out) or new branches are not fetched from origin (BaseFromOrigin off).
 func (m *Manager) startPrefetches(ctx context.Context, w *worktreePlan, bc branchChoice, paths []string, todo []project.Project, t *setupTracker) *prefetches {
 	if !w.fromOrigin || (bc.verbatim != "" && m.branchExists(ctx, paths, bc.verbatim)) {
 		return nil
