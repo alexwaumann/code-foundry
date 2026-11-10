@@ -1,7 +1,8 @@
 import { useEffect, useState, type KeyboardEvent, type RefObject } from "react";
-import { appInfo, pickDirectory } from "@/api/app";
+import { pickDirectory } from "@/api/app";
 import { OUTDATED_DAEMON_MESSAGE, isOutdatedDaemon } from "@/api/errors";
 import { PathRejectedError, listDirectories, type DirectoryListingView } from "@/api/filesystem";
+import { useHosted } from "@/components/compose/useHostFiles";
 import { descendInto, tabCompletion, typedDir } from "@/palette/paths";
 
 /** Pause after a keystroke before asking the daemon. */
@@ -51,21 +52,6 @@ export function usePathListing(query: string, enabled: boolean): PathListingStat
   return state;
 }
 
-/** True once the Wails host answers (the native folder picker is available). */
-export function useAppHost(): boolean {
-  const [host, setHost] = useState(false);
-  useEffect(() => {
-    let live = true;
-    void appInfo().then((info) => {
-      if (live) setHost(info !== null);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  return host;
-}
-
 /**
  * Folder completion for a path typed into a cmdk input: the palette's `path` prompts and
  * the Add Project dialog's Local folder tab share it. The caller owns the input value
@@ -93,7 +79,7 @@ export function usePathCompletion(opts: {
 } {
   const { query, enabled, rootRef, replace } = opts;
   const paths = usePathListing(query, enabled);
-  const host = useAppHost();
+  const host = useHosted();
 
   /** Name of the highlighted folder suggestion (cmdk keeps the highlight in the DOM). */
   const highlightedEntry = (): string | null =>

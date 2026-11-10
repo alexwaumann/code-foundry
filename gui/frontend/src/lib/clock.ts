@@ -51,9 +51,20 @@ function subscriberFor(periodMs: number): (cb: () => void) => () => void {
   return s;
 }
 
+/**
+ * The period's time for a render. A clock nobody subscribes to has stopped ticking, so a
+ * stale one reads the time afresh: the first paint of a new subscriber is not the time of
+ * the last tick. Within a period it stays the same value, so a render reads one snapshot.
+ */
+function snapshot(periodMs: number): number {
+  const c = clock(periodMs);
+  if (!c.timer && Date.now() - c.now >= periodMs) c.now = Date.now();
+  return c.now;
+}
+
 /** Current time, re-rendering every periodMs. */
 export function useNow(periodMs = 1000): number {
-  return useSyncExternalStore(subscriberFor(periodMs), () => clock(periodMs).now);
+  return useSyncExternalStore(subscriberFor(periodMs), () => snapshot(periodMs));
 }
 
 /**
@@ -62,5 +73,5 @@ export function useNow(periodMs = 1000): number {
  * check going stale) without a render every tick. `select` may change between renders.
  */
 export function useNowSelect<T>(periodMs: number, select: (now: number) => T): T {
-  return useSyncExternalStore(subscriberFor(periodMs), () => select(clock(periodMs).now));
+  return useSyncExternalStore(subscriberFor(periodMs), () => select(snapshot(periodMs)));
 }

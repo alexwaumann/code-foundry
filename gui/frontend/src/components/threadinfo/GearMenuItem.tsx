@@ -106,7 +106,7 @@ export function GearMenuItem({
 }
 
 /** What GearMenuItem passes its item part (a dropdown's or a context menu's item takes these). */
-export interface GearItemProps {
+interface GearItemProps {
   className?: string;
   children?: ReactNode;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
@@ -133,5 +133,5 @@ export const GEAR_ITEM =
  * highlighted, bright (and the glyph full colour) under the pointer or with focus. Hidden
  * (opacity, still focusable) unless its item is highlighted or it has focus.
  */
-export const GEAR_BUTTON =
+const GEAR_BUTTON =
   "ml-auto flex size-4 shrink-0 items-center justify-center text-cf-text-muted opacity-0 outline-none after:absolute after:inset-y-0 after:right-0 after:-z-1 after:w-8 after:rounded-r-md group-data-highlighted/gear:opacity-100 group-data-highlighted/gear:after:bg-cf-control-hover/50 hover:text-cf-text hover:after:bg-cf-control-hover focus-visible:text-cf-text focus-visible:opacity-100 focus-visible:after:bg-cf-control-hover";

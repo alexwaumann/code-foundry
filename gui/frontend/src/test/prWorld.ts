@@ -11,7 +11,7 @@
  *   vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
  *
  * then `seedPrWorld()` in beforeEach. Nothing here imports a store or a mocked module, so the
- * factories may import it; the stores are reset by the test (resetPrStores in prStores.ts).
+ * factories may import it; the stores are reset by the test (resetPrStores in prPanelHarness.tsx).
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { CommandView } from "@/api/command";
@@ -37,7 +37,7 @@ export const SLUG = "alexwaumann/code-foundry";
 export const GP_SLUG = "alexwaumann/ghostty-playground";
 export const VIEWER = "alexwaumann";
 export const HEAD_142 = "5eb1d0a142000000000000000000000000000000";
-export const HEAD_146 = "f04c146000000000000000000000000000000000";
+const HEAD_146 = "f04c146000000000000000000000000000000000";
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -126,7 +126,7 @@ function reviewer(login: string, o: Partial<PullRequestReviewerView> = {}): Pull
 }
 
 function comment(t0: number, prNumber: number, kind: PullRequestCommentView["kind"], id: string, author: string, body: string, agoMs: number, o: Partial<PullRequestCommentView> = {}): PullRequestCommentView {
-  return { id, kind, author, authorIsBot: false, authorAvatarUrl: avatar(author), body, createdAtMs: t0 - agoMs, url: `https://github.com/${SLUG}/pull/${String(prNumber)}#${id}`, path: "", reviewState: "", reviewId: "", ...o };
+  return { id, kind, author, authorIsBot: false, authorAvatarUrl: avatar(author), body, createdAtMs: t0 - agoMs, url: `https://github.com/${SLUG}/pull/${String(prNumber)}#${id}`, path: "", reviewState: "", ...o };
 }
 
 function check(t0: number, name: string, workflow: string, status: string, conclusion: string, o: { url?: string; startedAgo?: number; completedAgo?: number; description?: string } = {}): CheckView {
@@ -191,14 +191,14 @@ function openDetail(t0: number, pr: PullRequestView): PullRequestDetailView {
     ],
     reviewThreads: [
       thread("PRRT_1", "internal/store/terminal/actor.go", 214, "right", false, false, [
-        c("review_comment", "PRRC_1", "teammate-kim", "A resize queued while `snapshot()` runs is overwritten here.", 3 * HOUR, { path: "internal/store/terminal/actor.go", reviewId: "PRR_kim" }),
-        c("review_comment", "PRRC_2", VIEWER, "Good catch. Keeping the last pending size instead.", 2 * HOUR, { path: "internal/store/terminal/actor.go", reviewId: "PRR_reply" }),
+        c("review_comment", "PRRC_1", "teammate-kim", "A resize queued while `snapshot()` runs is overwritten here.", 3 * HOUR, { path: "internal/store/terminal/actor.go" }),
+        c("review_comment", "PRRC_2", VIEWER, "Good catch. Keeping the last pending size instead.", 2 * HOUR, { path: "internal/store/terminal/actor.go" }),
       ]),
       thread("PRRT_2", "internal/store/terminal/attach.go", 88, "right", false, false, [
-        c("review_comment", "PRRC_3", "coderabbitai", "Consider returning the error from `Resize` instead of logging it.", 6 * HOUR, { authorIsBot: true, path: "internal/store/terminal/attach.go", reviewId: "PRR_bot" }),
+        c("review_comment", "PRRC_3", "coderabbitai", "Consider returning the error from `Resize` instead of logging it.", 6 * HOUR, { authorIsBot: true, path: "internal/store/terminal/attach.go" }),
       ]),
       thread("PRRT_3", "internal/store/terminal/terminal.go", 40, "left", true, true, [
-        c("review_comment", "PRRC_4", "teammate-kim", "Why remove the size check?", 8 * HOUR, { path: "internal/store/terminal/terminal.go", reviewId: "PRR_kim_old" }),
+        c("review_comment", "PRRC_4", "teammate-kim", "Why remove the size check?", 8 * HOUR, { path: "internal/store/terminal/terminal.go" }),
       ]),
     ],
     checks: [
@@ -450,7 +450,7 @@ const reviewVerdicts: Record<string, { state: ReviewStateView; done: string; own
  * The world: details by key, candidates, the dashboard, and the mock's controls (failNext,
  * hold) as methods. Every pr.* handler is registered in daemonFakes' daemon by seedPrWorld.
  */
-export class PrWorld {
+class PrWorld {
   readonly t0 = Date.now();
   readonly details = new Map<string, PullRequestDetailView>();
   readonly candidates = new Map<string, Candidate[]>();
@@ -769,7 +769,7 @@ export class PrWorld {
 }
 
 /** The world the fakes read; seedPrWorld replaces it. */
-export let prWorld = new PrWorld();
+let prWorld = new PrWorld();
 
 /** A fresh world with its command handlers installed (call after resetDaemon, in beforeEach). */
 export function seedPrWorld(): PrWorld {

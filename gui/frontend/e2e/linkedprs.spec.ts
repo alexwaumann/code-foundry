@@ -20,21 +20,8 @@ async function link(thread: string, number: number, agoMs = 0, slug = CF): Promi
   expect(res.added).toBe(true);
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async () => {
   await resetMock();
-  await page.addInitScript(() => {
-    const w = window as unknown as { __copied: string[] };
-    w.__copied = [];
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: (t: string) => {
-          w.__copied.push(t);
-          return Promise.resolve();
-        },
-      },
-    });
-  });
 });
 
 // The sidebar tag's number, +N, state and tone as links arrive: unit-tested in

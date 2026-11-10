@@ -20,7 +20,8 @@ export const PATTERNS: Record<Category, readonly RegExp[]> = {
   // palette guard (lib/palette.test.ts) polices arbitrary colours.
   size: [/\btext-(?:xs|sm|base|lg|xl|2xl|3xl)\b/g, /\btext-\[(?!(?:color:|color-mix\(|oklch\(|oklab\(|rgba?\(|hsla?\(|#))[^\]]+\]/g],
   leading: [/\bleading-\[[^\]]+\]/g],
-  radius: [/\brounded\b(?!-)/g, /\brounded-\[[^\]]+\]/g],
+  // rounded-xl is --radius, rounded-pane's value under a name off the scale.
+  radius: [/\brounded\b(?!-)/g, /\brounded-\[[^\]]+\]/g, /\brounded(?:-[trblse]{1,2})?-xl\b/g],
 };
 
 /** What to use instead, for the failure message. */

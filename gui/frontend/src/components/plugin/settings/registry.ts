@@ -1,4 +1,5 @@
 import type { IndexEntryView, InstallProgressView, RegistryView, Tone } from "@/api/plugin";
+import { readWords } from "@/components/settings/catalog/model";
 
 /** An install step in words: "Downloading… 1.2 MB", "Checking the SHA-256…", or the failure. */
 export function progressWords(p: InstallProgressView): string {
@@ -60,14 +61,10 @@ export function entryAction(e: Pick<IndexEntryView, "relation">): "install" | "u
   return null;
 }
 
-/** "3 plugins · fetched 10:42 (cached)" for a registry that answered; its failure shows on its own. */
-export function registryLine(r: RegistryView, now: number = Date.now()): string {
-  const parts = [`${String(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`];
-  if (r.fetchedAtMs !== null) {
-    const mins = Math.round((now - r.fetchedAtMs) / 60_000);
-    parts.push(mins < 1 ? "read just now" : mins < 60 ? `read ${String(mins)} min ago` : `read ${String(Math.round(mins / 60))} h ago`);
-  }
-  return parts.join(" · ");
+/** "3 plugins · read 5 min ago" ("3 plugins" before a first read); a failure shows on its own. */
+export function registryLine(r: Pick<RegistryView, "plugins" | "fetchedAtMs">, now: number): string {
+  const count = `${String(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`;
+  return [count, ...(r.fetchedAtMs !== null ? [readWords(r.fetchedAtMs, now)] : [])].join(" · ");
 }
 
 /** A registry error in words a user can act on (gh's 404 and auth failures, being offline). */

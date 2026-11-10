@@ -3,7 +3,6 @@ import { useShallow } from "zustand/react/shallow";
 import type { PullRequestView } from "@/api/gh";
 import { branchPullRequestsResource, DASHBOARD_KEY, dashboardResource, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { useThreadsStore } from "@/stores/threads";
-import { newestFirst } from "@/surfaces/linkedprsTarget";
 import { findLinkedPr, fresher, linkedPrState, type LinkedPrFact } from "./linkedPrTag";
 
 /**
@@ -15,6 +14,11 @@ import { findLinkedPr, fresher, linkedPrState, type LinkedPrFact } from "./linke
  */
 export function useSidebarDashboard(): void {
   useEffect(() => dashboardResource.watch(DASHBOARD_KEY), []);
+}
+
+/** Newest linked first: the stored first-seen order reversed. */
+function newestFirst<T>(links: readonly T[]): T[] {
+  return [...links].reverse();
 }
 
 /** The thread's linked pull requests' keys (pullRequestKey), newest first. */

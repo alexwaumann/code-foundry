@@ -32,7 +32,6 @@ function run(id: string, description: string, o: Partial<AgentRunView> = {}): Ag
     spawnDepth: 1,
     status: "running",
     activity: "",
-    lastTool: "",
     totalTokens: 0,
     toolUses: 0,
     durationMs: 0,

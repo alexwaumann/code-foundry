@@ -19,7 +19,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
   }),
 }));
 
-const ctx: ViewCtx = { watchKey: "w", instance: "p/s/global", plugin: "p", viewTab: "", uiContext: emptyContext, inert: false };
+const ctx: ViewCtx = { watchKey: "w", instance: "p/s/global", viewTab: "", uiContext: emptyContext, inert: false };
 
 /** Widths jsdom does not lay out: a stats node's by its key, a bar plot's 300 px. */
 let widths: Record<string, number> = {};

@@ -109,7 +109,7 @@ function Body({ d }: { d: DashboardView }) {
           rootRef.current?.focus({ preventScroll: true });
         }}
       >
-        {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run `gh auth login`; the lists below are from the last successful poll.</Banner>}
+        {!d.authenticated && <Banner tone="warn">gh is not authenticated. Run <span className="font-mono">gh auth login</span>; the lists below are from the last successful poll.</Banner>}
         {d.dashboardsDisabled && (
           <Banner tone="info">
             Pull request dashboards are turned off (<span className="font-mono">github.dashboards_enabled</span> in Settings), so the lists are empty.

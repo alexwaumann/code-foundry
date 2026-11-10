@@ -125,9 +125,6 @@ export interface ThreadWorld {
   setThemeSlot(scheme: "dark" | "light", id: string): void;
 }
 
-/** What Claude reports as the model of a reply for a picked one (a family alias resolves to its current model). */
-const CANONICAL: Readonly<Record<string, string>> = { fable: "claude-fable-5-1", opus: "claude-opus-4-8", sonnet: "claude-sonnet-5", haiku: "claude-haiku-5-5" };
-
 interface Log {
   seq: number;
   items: ItemInit[];
@@ -146,6 +143,9 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
   "base64",
 );
 
+/** How long a compaction takes. */
+const COMPACT_MS = 600;
+
 /**
  * The scripted conversation's states. servers: the shells state with two dev servers
  * listening beside them (mock/shells.ts scriptServers). stopped: idle's conversation, the thread stopped at
@@ -154,9 +154,6 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
-/** How long a compaction takes. */
-const COMPACT_MS = 600;
-
 export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "waiting" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
 export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "waiting", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
 
@@ -559,6 +556,11 @@ export class MockThreadLogs {
     return this.slash.get(id) ?? [];
   }
 
+  /** Whether the thread offers a slash command called name (the daemon's offersSlashCommand). */
+  offersSlashCommand(id: string, name: string): boolean {
+    return (this.slash.get(id) ?? []).some((c) => c.name === name);
+  }
+
   /** Replaces the thread's slash commands and publishes the Watch's `commands` event (the whole list; [] the process ended). */
   setSlashCommands(id: string, commands: SlashCommandInit[]): void {
     this.world.worktreeOf(id);
@@ -671,7 +673,6 @@ export class MockThreadLogs {
     this.publish(id, { event: { case: "delta", value: { threadId: id, seq: BigInt(l.seq), itemId: it.id, ordinal: it.ordinal, field: ThreadItemDelta_Field.TEXT, text } } });
   }
 
-  /** Ends the turn: the streaming text completes, a turn_end follows, the thread is finished (seen when watched). */
   /**
    * Ends the running turn like the daemon: the turn_end carries Claude's running total
    * (the previous one + 0.04, or `total`), the turn's own cost (0.04, or `turnCost`: a
@@ -707,7 +708,8 @@ export class MockThreadLogs {
     const cost = opts.total ?? (prevCost?.payload?.case === "turnEnd" ? (prevCost.payload.value.costUsd ?? 0) : 0) + 0.04;
     const turnCostUsd = opts.turnCost ?? 0.04;
     const picked = this.world.modelOf(id);
-    const model = opts.model ?? CANONICAL[picked] ?? picked;
+    // Claude names the model of a reply without the context window's "[1m]".
+    const model = opts.model ?? picked.replace(/\[1m\]$/, "");
     this.append(
       id,
       this.item(id, {
@@ -1458,13 +1460,6 @@ export class MockThreadLogs {
   }
 
   /**
-   * thread.send: the user message at once, then a short streamed reply and the turn's end.
-   * A stopped thread starts first, like the daemon's Send: the reply waits for Claude.
-   * Sent while a turn runs it is a steer, like the daemon's: the message lands inside the
-   * turn (the text streaming at the moment completes first), Claude replies to it in the
-   * same turn, and one turn_end ends it.
-   */
-  /**
    * ThreadService.ShowHtml (code-foundry view.inline; docs/notes/inline-html.md): an html
    * item at the end of the log, its path relative to the thread's cwd when inside it. Only
    * the extension is checked here (the daemon also wants a file under home).
@@ -1491,6 +1486,13 @@ export class MockThreadLogs {
     return this.append(id, this.item(id, { case: "theme", value: { ...theme, previous, previousVersion, previousGone } }));
   }
 
+  /**
+   * thread.send: the user message at once, then a short streamed reply and the turn's end.
+   * A stopped thread starts first, like the daemon's Send: the reply waits for Claude.
+   * Sent while a turn runs it is a steer, like the daemon's: the message lands inside the
+   * turn (the text streaming at the moment completes first), Claude replies to it in the
+   * same turn, and one turn_end ends it.
+   */
   send(id: string, text: string, attachments: string[], composerText = ""): ItemInit {
     // Like the daemon's: nothing is recorded for a thread whose transcript is gone.
     this.world.refuseTranscriptMissing(id);
@@ -1620,7 +1622,7 @@ export class MockThreadLogs {
         run: (_ctx, a) => {
           const atts = (a.attachments ?? "").split(",").filter(Boolean);
           // Like the daemon's Manager.Send: nothing reaches Claude and nothing is recorded.
-          refuseSlashCommand(a.text ?? "");
+          refuseSlashCommand(a.text ?? "", (name) => this.offersSlashCommand(a.id ?? "", name));
           this.calls.push(`send ${a.id ?? ""} ${a.text ?? ""}${atts.length > 0 ? ` [${atts.join(",")}]` : ""}`);
           this.send(a.id ?? "", a.text ?? "", atts, a["composer-text"] ?? "");
           // The daemon's message is for the CLI (commands_thread.go sendNext); the GUI must not toast it as is.

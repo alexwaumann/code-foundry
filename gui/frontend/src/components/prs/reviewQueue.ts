@@ -1,10 +1,12 @@
 import type { PullRequestView } from "@/api/gh";
+import { sameLogin, type YourReview } from "@/components/pr/review";
+import { pullRequestKey } from "@/stores/gh";
 
 /** Why a pull request needs the viewer's review. */
 export type NeedsWhy = "requested" | "requested_team" | "new_commits" | "dismissed";
 
 /** The viewer's verdict on a pull request they reviewed and need not look at again yet. */
-export type Verdict = "approved" | "changes_requested" | "commented";
+export type Verdict = YourReview;
 
 export interface NeedsRow {
   pr: PullRequestView;
@@ -21,12 +23,10 @@ export interface ReviewQueue {
   reviewed: ReviewedRow[];
 }
 
-const sameLogin = (a: string, b: string): boolean => a !== "" && a.toLowerCase() === b.toLowerCase();
-
 /** Newest updated first; unknown times last. Stable, so the daemon's order breaks ties. */
 const byUpdated = (a: { pr: PullRequestView }, b: { pr: PullRequestView }): number => (b.pr.updatedAtMs ?? -Infinity) - (a.pr.updatedAtMs ?? -Infinity);
 
-const prId = (p: PullRequestView): string => `${p.repoSlug.toLowerCase()}#${String(p.number)}`;
+const prId = (p: PullRequestView): string => pullRequestKey(p.repoSlug, p.number);
 
 /**
  * Splits the dashboard's review lists into what needs the viewer's review and what they
@@ -80,10 +80,4 @@ export const needsLabel: Record<NeedsWhy, string> = {
   requested_team: "Requested · via team",
   new_commits: "Re-review · new commits",
   dismissed: "Re-review · review dismissed",
-};
-
-export const verdictLabel: Record<Verdict, string> = {
-  approved: "You approved",
-  changes_requested: "You requested changes",
-  commented: "You commented",
 };

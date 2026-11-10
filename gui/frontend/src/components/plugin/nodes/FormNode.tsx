@@ -492,7 +492,7 @@ export function FormNode({ node, data }: NodeProps<"form">) {
     void send(data);
   };
   return (
-    <FormContext.Provider value={{ draftKey, formKey: node.key, locked }}>
+    <FormContext.Provider value={{ draftKey, locked }}>
       <form
         className={cn("flex min-w-0", strip ? "flex-wrap items-center gap-1.5" : "flex-col gap-3")}
         onSubmit={onSubmit}

@@ -22,7 +22,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
   }),
 }));
 
-const ctx: ViewCtx = { watchKey: "w", instance: "p/s/global", plugin: "p", viewTab: "", uiContext: emptyContext } as ViewCtx;
+const ctx: ViewCtx = { watchKey: "w", instance: "p/s/global", viewTab: "", uiContext: emptyContext } as ViewCtx;
 
 function inView(children: ReactNode) {
   return render(<ViewContext.Provider value={ctx}>{children}</ViewContext.Provider>);

@@ -38,11 +38,6 @@ export function setupWaitedFor(s: ThreadSetupView | null | undefined): boolean {
   return s?.phase === "running" && !s.background;
 }
 
-/** A setup that failed or was cancelled: nothing ran, and nothing will until it is tried again. */
-export function setupStopped(s: ThreadSetupView | null | undefined): boolean {
-  return s?.phase === "failed" || s?.phase === "cancelled";
-}
-
 /**
  * The thread has no cwd yet: its worktrees are being made, or a setup that did not finish
  * never got that far (the daemon's Thread.unplaced). A placement that landed before a later

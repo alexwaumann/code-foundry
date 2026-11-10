@@ -36,22 +36,22 @@ export function bucket(model: string, o: Partial<UsageBucketView>): UsageBucketV
 }
 
 /** Two models, priced: Opus $224.00 and Fable $96.00, $320.00 in all, cache reads saving $1,134.00. */
-export function sampleUsage(): UsageBucketView[] {
+function sampleUsage(): UsageBucketView[] {
   return [
     bucket("claude-opus-5-5", { requests: 290, input: 9800, output: 720_000, cacheRead: 252_000_000, cacheWrite5m: 1_100_000, cacheWrite1h: 7_400_000, inputCostUsd: 0.05, outputCostUsd: 18, cacheReadCostUsd: 126, cacheWrite5mCostUsd: 6.95, cacheWrite1hCostUsd: 73, costUsd: 224, cacheSavingsUsd: 1134 }),
     bucket("claude-fable-5-1", { requests: 122, input: 3100, output: 260_000, cacheRead: 97_000_000, cacheWrite5m: 400_000, cacheWrite1h: 3_300_000, inputCostUsd: 0.02, outputCostUsd: 6.5, cacheReadCostUsd: 48.5, cacheWrite5mCostUsd: 2.48, cacheWrite1hCostUsd: 38.5, costUsd: 96 }),
   ];
 }
 
-export function action(id: string, projectId: string, name: string, position: number, icon: ActionView["icon"] = "play"): ActionView {
+function action(id: string, projectId: string, name: string, position: number, icon: ActionView["icon"] = "play"): ActionView {
   return { id, projectId, name, command: name.toLowerCase(), icon, inTerminal: false, onWorktreeCreate: false, position };
 }
 
-export function agentRun(id: string, o: Partial<AgentRunView>): AgentRunView {
-  return { id, toolUseId: `tu-${id}`, parentId: "", description: id, agentType: "general-purpose", model: "", effort: "", background: true, spawnDepth: 1, status: "running", activity: "", lastTool: "", totalTokens: 0, toolUses: 0, durationMs: 0, summary: "", error: "", startedAtMs: ago(3), resumedAtMs: null, endedAtMs: null, noteItemId: "", ...o };
+function agentRun(id: string, o: Partial<AgentRunView>): AgentRunView {
+  return { id, toolUseId: `tu-${id}`, parentId: "", description: id, agentType: "general-purpose", model: "", effort: "", background: true, spawnDepth: 1, status: "running", activity: "", totalTokens: 0, toolUses: 0, durationMs: 0, summary: "", error: "", startedAtMs: ago(3), resumedAtMs: null, endedAtMs: null, noteItemId: "", ...o };
 }
 
-export function shell(taskId: string, command: string, o: Partial<BackgroundShellView> = {}): BackgroundShellView {
+function shell(taskId: string, command: string, o: Partial<BackgroundShellView> = {}): BackgroundShellView {
   return { taskId, description: "", command, startedAtMs: Date.now() - 75_000, ports: [], ...o };
 }
 
@@ -139,7 +139,7 @@ export function resetCard(): void {
   actionPicksResource.store.setState({ entries: {} });
   editorAppsResource.store.setState({ entries: {} });
   placementResource.store.setState({ entries: {} });
-  useActionsStore.setState({ byId: {}, byProject: {}, runs: {}, loaded: true });
+  useActionsStore.setState({ byId: {}, byProject: {}, runs: {} });
   useThreadStore.setState({ logs: {} });
   usePanelStore.setState({ byKey: {} });
 }
@@ -148,7 +148,7 @@ function putActions(actions: ActionView[]): void {
   const byId = Object.fromEntries(actions.map((a) => [a.id, a]));
   const byProject: Record<string, string[]> = {};
   for (const a of [...actions].sort((x, y) => x.position - y.position)) (byProject[a.projectId] ??= []).push(a.id);
-  useActionsStore.setState({ byId, byProject, runs: {}, loaded: true });
+  useActionsStore.setState({ byId, byProject, runs: {} });
 }
 
 /**
@@ -276,7 +276,7 @@ export function seedChildServer(): { parent: string; child: string; devRun: stri
   return { parent: "s-ti-1", child, devRun: "r-dev", devTerminal: "t-dev", debugRun: "r-debug" };
 }
 
-export const WS9 = ["api", "web", "auth-lib", "docs", "mobile", "infra", "billing", "notify", "cli"] as const;
+const WS9 = ["api", "web", "auth-lib", "docs", "mobile", "infra", "billing", "notify", "cli"] as const;
 const wsPath = (n: string) => `${HOME}/src/${n}.worktrees/cf-auth-tokens`;
 
 /**

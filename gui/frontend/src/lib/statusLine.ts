@@ -4,9 +4,8 @@
  * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
 import type { ThreadFlagView, ThreadView } from "@/api/threads";
-import { formatAgo, threadBadge, statusKind, statusNote, topFlag } from "./thread";
+import { formatAgo, isWaiting, threadBadge, statusKind, statusNote, topFlag } from "./thread";
 import { hasSetupWork, setupCurrentStep, setupFailure } from "./threadSetup";
-import { isWaiting } from "./waiting";
 
 /**
  * - "place": just "project @ branch" (idle, unknown; whether Claude's process runs never shows)
@@ -51,6 +50,15 @@ export type StatusLineKind =
   | "setupCancelled";
 
 export type StatusTone = "muted" | "sky" | "amber" | "emerald" | "red";
+
+/** A status tone's text colour: amber waiting on the user, red failed, emerald done; none for muted (it inherits). */
+export const statusToneText: Readonly<Record<StatusTone, string>> = {
+  muted: "",
+  sky: "text-cf-info-text",
+  amber: "text-cf-warning-text",
+  emerald: "text-cf-success-text",
+  red: "text-cf-error-text",
+};
 
 export interface StatusLine {
   kind: StatusLineKind;

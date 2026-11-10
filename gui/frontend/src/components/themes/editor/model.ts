@@ -7,7 +7,7 @@
 import type { BaseKey } from "@/stores/themeEditor";
 import { oklchRgb } from "@/themes/color";
 
-export interface BaseMeta {
+interface BaseMeta {
   readonly label: string;
   /** What it paints, in a few words (the row's second line). */
   readonly hint: string;
@@ -19,7 +19,7 @@ const ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "whi
 
 export const TONE_KEYS = ["success", "warning", "error", "info", "highlight"] as const;
 
-export const BASE_META: Readonly<Record<string, BaseMeta>> = {
+const BASE_META: Readonly<Record<string, BaseMeta>> = {
   canvas: { label: "Canvas", hint: "window, sidebar, title band", slot: "--cf-canvas" },
   surface: { label: "Surface", hint: "panes and the terminal", slot: "--cf-surface" },
   text: { label: "Text", hint: "body text, held at 7:1", slot: "--cf-text" },

@@ -83,7 +83,7 @@ export interface PullRequestView {
   updatedAtMs: number | null;
   mergedAtMs: number | null;
   // Detail the poll keeps for every PR in the viewer's scope (open PRs only for the
-  // review and merge fields). Not shown yet; available to views.
+  // review and merge fields).
   mergeable: MergeableView;
   /** Lower case GitHub merge state ("clean", "blocked", "behind", ...); "" if unknown. */
   mergeState: string;
@@ -253,8 +253,6 @@ export interface PullRequestCommentView {
   path: string;
   /** Reviews: the review's state. */
   reviewState: ReviewStateView;
-  /** Review comments: the review they belong to (group a review's inline comments by it); "" otherwise. */
-  reviewId: string;
 }
 
 export interface ReviewThreadView {
@@ -407,8 +405,7 @@ export function toRollupView(r: CheckRollup | undefined): CheckRollupView {
 }
 
 function toCheckRunView(c: CheckRun): CheckRunView {
-  const conclusion = c.conclusion === CheckConclusion.UNSPECIFIED ? "" : CheckConclusion[c.conclusion].toLowerCase();
-  return { name: c.name, workflow: c.workflow, url: c.url, conclusion };
+  return { name: c.name, workflow: c.workflow, url: c.url, conclusion: enumName(CheckConclusion, c.conclusion) };
 }
 
 export function toPullRequestView(p: PullRequest): PullRequestView {
@@ -446,11 +443,6 @@ export function toPullRequestView(p: PullRequest): PullRequestView {
 
 function toMonthView(m: MonthActivity | undefined): MonthView {
   return { month: m?.month ?? "", commits: m?.commits ?? 0, merged: m?.merged ?? 0 };
-}
-
-/** The stats' month at index i (0 = current), or an empty month when not fetched. */
-export function statsMonth(s: StatsView, i: number): MonthView {
-  return s.months[i] ?? toMonthView(undefined);
 }
 
 export function toStatsView(s: ActivityStats | undefined): StatsView {
@@ -585,7 +577,6 @@ function toCommentView(c: PullRequestComment): PullRequestCommentView {
     url: c.url,
     path: c.path,
     reviewState: reviewStates[c.reviewState],
-    reviewId: c.reviewId,
   };
 }
 

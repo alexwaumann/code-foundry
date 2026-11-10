@@ -11,7 +11,7 @@ import { usePrPool } from "./useRefSources";
 import { PR_ACCENT } from "./tagStyle";
 
 /** What a thread tag shows (the composer's and the sent bubble's): its current name, project and status. */
-export interface ThreadTagInfo {
+interface ThreadTagInfo {
   /** The thread's current name; the tag's label when the thread is not known (removed). */
   name: string;
   known: boolean;
@@ -38,7 +38,7 @@ export function useThreadTagInfo(id: string, label: string): ThreadTagInfo {
 }
 
 /** What a pull request tag shows: its title and its state's accent (the PR rows' colour). */
-export interface PrTagInfo {
+interface PrTagInfo {
   /** "" when the pull request is not among those the GUI knows. */
   title: string;
   /** The `--chip-accent` class for its state (unknown: muted). */

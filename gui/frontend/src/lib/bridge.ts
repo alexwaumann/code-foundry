@@ -1,7 +1,7 @@
 /**
  * The page↔host message contract of the bridge (docs/notes/bridge-2-gui.md): what a page
  * shown in a thread posts to its parent through `/cf/bridge.js`, and what the host
- * (lib/bridgeHost.ts) posts back. Parsing, arg filling and the reply shapes; pure.
+ * (stores/bridgeHost.ts) posts back. Parsing, arg filling and the reply shapes; pure.
  *
  * Every frame's src carries a nonce in its fragment (`#cf=<nonce>`, withNonce), and the
  * script sends it back on every message: the host hears only its own frame's window, at

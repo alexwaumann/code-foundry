@@ -20,11 +20,6 @@ export interface WorktreeRef {
   path: string;
 }
 
-export interface TreeProject {
-  id: string;
-  worktreePaths: readonly string[];
-}
-
 /** One thread as the sidebar list needs it. */
 export interface ListThread {
   id: string;

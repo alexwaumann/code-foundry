@@ -67,7 +67,7 @@ type WorkspaceEventInit = MessageInitShape<typeof WorkspaceEventSchema>;
  * where new threads start. What its managed dir holds (the instructions file's name and
  * the skills) is set by the test controls, as a thread writing them would.
  */
-export interface MockWorkspace {
+interface MockWorkspace {
   id: string;
   name: string;
   /** Project ids, sorted. */
@@ -238,7 +238,7 @@ interface MockThread {
    */
   pluginEnvChange: string;
   /**
-   * Thread.transcript_missing (POST /__mock/thread/transcript, MOCK_SCENARIO=transcript-deleted):
+   * Thread.transcript_missing (POST /__mock/thread/transcript, /__mock/transcript-deleted):
    * stopped, and Claude Code deleted its transcript, so it cannot continue: a message and a
    * fork are refused with the daemon's words (docs/notes/transcript-deleted.md).
    */
@@ -246,11 +246,11 @@ interface MockThread {
 }
 
 /** The daemon's refusal of a thread whose transcript is gone (internal/store/thread/transcriptmissing.go). */
-export const TRANSCRIPT_MISSING_MESSAGE =
+const TRANSCRIPT_MISSING_MESSAGE =
   "Claude Code deleted this thread's transcript (its cleanupPeriodDays setting, 30 days by default), so the conversation cannot continue. This is a Claude Code setting, not a Code Foundry one.";
 
 /** A plugin's flag on a thread (docs/notes/plugins-3-events-flags-env.md). */
-export interface MockFlag {
+interface MockFlag {
   plugin: string;
   pluginDisplayName: string;
   level: ThreadFlagLevel;
@@ -285,6 +285,7 @@ interface CmdDef {
   /** Like the daemon's Command.ConfirmLabel: the confirm button's words. */
   confirmLabel?: string;
   /** Like the daemon's Command.read_only: it changes nothing (a page's bridge runs it without a click). */
+  readOnly?: boolean;
   /** Like the daemon's Command.no_palette: the palette does not list it. */
   noPalette?: boolean;
 }
@@ -335,11 +336,6 @@ export function snoozeUntil(args: Record<string, string>, now = Date.now()): Dat
   return new Date(ms);
 }
 
-/**
- * Why stopping Claude now cuts something off (the daemon's midTurn): starting, or
- * connected and busy, or waiting on a permission request or question; "" otherwise.
- * Restarts count the threads this is set for (command.ActiveThread).
- */
 /** s-1's running tool while it is busy (Thread.busy_tool). */
 const S1_BUSY_TOOL = "Bash go test ./internal/...";
 
@@ -348,6 +344,11 @@ function busyToolFor(status: ThreadStatus, reason: string, tool: string): string
   return status === ThreadStatus.BUSY && reason !== "compacting" ? tool : "";
 }
 
+/**
+ * Why stopping Claude now cuts something off (the daemon's midTurn): starting, or
+ * connected and busy, or waiting on a permission request or question; "" otherwise.
+ * Restarts count the threads this is set for (command.ActiveThread).
+ */
 function midTurn(s: { state: ThreadState; status: ThreadStatus; statusReason: string }): string {
   if (s.state === ThreadState.STARTING) return "Claude is still working";
   if (s.state !== ThreadState.CONNECTED) return "";
@@ -385,7 +386,7 @@ function hiddenWorkingText(n: number): string {
 }
 
 /** "end" closes attached streams (after the process exits). */
-export type AttachItem = AttachEventInit | "end";
+type AttachItem = AttachEventInit | "end";
 
 interface MockTerm {
   id: string;
@@ -504,11 +505,11 @@ const enc = new TextEncoder();
 /** How long a new shell takes to print its prompt before terminal.new --run types into it. */
 const RUN_PROMPT_MS = 150;
 /** thread.regenerate-name: how long "the utility model" takes, and the title it gives. */
-export const REGENERATE_NAME_MS = 400;
+const REGENERATE_NAME_MS = 400;
 /** thread.move: how long the move takes (placing, naming, set_cwd), and the title "the utility model" gives it. */
-export const MOVE_MS = 600;
-export const MOVED_NAME = "Fix the login redirect";
-export const REGENERATED_NAME = "Regenerated thread name";
+const MOVE_MS = 600;
+const MOVED_NAME = "Fix the login redirect";
+const REGENERATED_NAME = "Regenerated thread name";
 
 /**
  * terminal.new --run's value as typed keys, like the daemon for a shell without bracketed
@@ -532,14 +533,14 @@ const permissionModes: Record<string, PermissionMode> = {
 };
 
 /** "Add a dark mode toggle!" -> "Add a dark mode" (what the daemon's title naming stands in for). */
-export function promptTitle(prompt: string): string {
+function promptTitle(prompt: string): string {
   const words = prompt.replace(/[^A-Za-z0-9']+/g, " ").trim().split(" ").filter(Boolean).slice(0, 4);
   const title = words.join(" ");
   return title.charAt(0).toUpperCase() + title.slice(1);
 }
 
 /** "Add a dark mode" -> "add-a-dark-mode": the daemon's slugify, for cf/<slug> branches. */
-export function promptSlug(prompt: string): string {
+function promptSlug(prompt: string): string {
   return prompt.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean).slice(0, 4).join("-");
 }
 
@@ -686,17 +687,17 @@ function firstMessageOf(args: Record<string, string>): MockThread["firstMessage"
   return text || attachments.length > 0 ? { text, attachments, composerText: args["composer-prompt"] ?? "" } : null;
 }
 
+/** A `date` line like the clock terminal's. */
+function clockLine(d: Date): string {
+  return d.toString().replace(/ GMT.*$/, "");
+}
+
 /**
  * The default world's thread histories (MockThreadLogs.seed), so every thread's timeline has
  * something to show: s-1 is mid-reply, s-2 waits on a Bash permission (its status reason
  * names it), s-3 finished before it exited, s-4 crashed mid-turn, s-6 finished before its
  * close. s-5 is still starting: nothing yet.
  */
-/** A `date` line like the clock terminal's. */
-function clockLine(d: Date): string {
-  return d.toString().replace(/ GMT.*$/, "");
-}
-
 const SEEDS: Readonly<Record<string, SeedHistory | undefined>> = {
   [HELLO_THREAD]: {
     prompt: "say hello in one line",
@@ -853,7 +854,7 @@ export class World {
       return t ? { name: t.name, archived: t.archivedAt !== null } : undefined;
     },
     items: (id) => (this.threads.has(id) ? this.logs.snapshotValue(id).items : []),
-    promote: (question, firstMessage) => this.createThread("", HOME, "opus", "", { name: "", autoNamed: true, nameIn: 2, pendingName: question.slice(0, 40), firstMessage: { text: firstMessage, attachments: [], composerText: "" } }).id,
+    promote: (question, firstMessage) => this.createThread("", HOME, this.threadDefaults().model, this.threadDefaults().effort, { name: "", autoNamed: true, nameIn: 2, pendingName: question.slice(0, 40), firstMessage: { text: firstMessage, attachments: [], composerText: "" } }).id,
   });
   /** Dictation (mock/dictation.ts; DictationService): enabled is dictation.enabled, the rest scripted. */
   readonly dictation = new MockDictation({
@@ -906,7 +907,6 @@ export class World {
       if (this.terms.has(id)) this.kill(id, code);
     },
   });
-  /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
   /** Plugins and the hello demo surface (mock/plugins.ts); the EventService plugin source. */
   readonly plugins = new MockPlugins({
     publish: (v) => this.events.publish({ source: EventSource.PLUGIN, event: { event: { case: "plugin", value: v } } }),
@@ -941,6 +941,7 @@ export class World {
       this.emit(intent);
     },
   });
+  /** UpdateService (Phase 3d): publishes into the events hub as the update source. */
   readonly update = new MockUpdater(
     (v) => this.events.publish({ source: EventSource.UPDATE, event: { event: { case: "update", value: v } } }),
     () => this.restartCost(),
@@ -993,6 +994,8 @@ export class World {
   private timer: ReturnType<typeof setInterval> | null = null;
   private seconds = 0;
   private nextId = 1;
+  /** The next workspace's number: never reused, so a removal frees no id. */
+  private nextWorkspace = 1;
 
   constructor() {
     // Like the daemon: the theme slots list the user's themes first (store/usertheme).
@@ -1005,6 +1008,7 @@ export class World {
     this.terms.clear();
     this.projects.clear();
     this.workspaces.clear();
+    this.nextWorkspace = 1;
     this.invocations = [];
     this.attachments.clear();
     this.attachmentBytes.clear();
@@ -1328,7 +1332,7 @@ export class World {
     const given = refs.map((r) => this.projectRef(r.split(":")[0]?.trim() ?? "").id);
     if (given.length === 0 && !root) throw new CommandError("invalid", "a workspace needs at least one project or a root folder");
     const w: MockWorkspace = {
-      id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
+      id: `w-${String(this.nextWorkspace++).padStart(12, "0")}`,
       name: n,
       members: [...new Set(given)].sort(),
       rootPath: root,
@@ -1403,6 +1407,7 @@ export class World {
     this.terms.clear();
     this.threads.clear();
     this.workspaces.clear();
+    this.nextWorkspace = 1;
     for (const id of [...this.projects.keys()]) {
       this.actions.removeProject(id);
       this.projectEvents.publish({ event: { case: "projectRemovedId", value: id } });
@@ -1427,8 +1432,8 @@ export class World {
 
   /**
    * Scenario: one thread per status kind the sidebar distinguishes (lib/thread statusKind),
-   * with captured reasons and staggered statusChangedAt. POST /__mock/status-kinds, or
-   * MOCK_SCENARIO=status-kinds. Idempotent. Not in the default world, whose rows e2e pins.
+   * with captured reasons and staggered statusChangedAt. POST /__mock/status-kinds.
+   * Idempotent. Not in the default world, whose rows e2e pins.
    */
   addStatusKinds(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -1729,6 +1734,7 @@ export class World {
    *           (api … cli), cwd api diverged 3/1, auth-lib moved to cf/auth-tokens-2,
    *           mobile mid-rebase, seven PRs over four projects (#58 stacked on #57), a
    *           Typecheck run in web (the action row names web);
+   *   archived single as an archive leaves it: stopped, its worktree cleaned up, its links kept;
    *   busy    single, working (Push waits for the model);
    *   child   single, then s-ti-child made by s-ti-1 (its parent row);
    *   nogit   s-ti-nogit in "writing" (no git: no git group);
@@ -1736,7 +1742,9 @@ export class World {
    *           ghostty-playground (the header crumb "ghostty-playground +2");
    *   home    s-ti-home "Plan the week": no project (the header crumb "No project");
    *   servers s-ti-srv "Serve the docs preview": two servers listening (pnpm on 5173 and
-   *           24678, python3 on 9399) and two shells that do not (mock/shells.ts).
+   *           24678, python3 on 9399) and two shells that do not (mock/shells.ts);
+   *   child-server single running Debug daemon, and its child s-ti-kid-srv running Dev
+   *           with the servers state's shells (their servers roll up to the parent).
    */
   addThreadInfo(scenario: string): string {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -1897,7 +1905,7 @@ export class World {
         return s.id;
       }
       default:
-        throw new CommandError("invalid", "scenario must be single, archived, ws9, busy, child, nogit, unnamed or home");
+        throw new CommandError("invalid", "scenario must be single, archived, ws9, busy, child, nogit, unnamed, home, servers or child-server");
     }
   }
 
@@ -2430,7 +2438,7 @@ export class World {
     if (!/^[^/\s]+\/[^/\s]+$/.test(slug) || !Number.isInteger(number) || number <= 0) throw new CommandError("invalid", "slug must be owner/name and number a positive integer");
     if (!Number.isFinite(agoMs) || agoMs < 0) throw new CommandError("invalid", "ago must be a non-negative number of milliseconds");
     const url = `https://github.com/${slug}/pull/${String(number)}`;
-    if (s.linkedPullRequests.some((l) => l.url === url)) return false;
+    if (s.linkedPullRequests.some((l) => l.url.toLowerCase() === url.toLowerCase())) return false;
     const linkedAt = new Date(Date.now() - agoMs);
     s.linkedPullRequests = [...s.linkedPullRequests, { slug, number, url, linkedAt }];
     this.publishThread(s);
@@ -2495,7 +2503,6 @@ export class World {
     this.publishThread(s);
   }
 
-  /** The detector's reading changed (reason defaults to a typical one for the status). */
   /** Test control: the clock stops (or, held false, resumes) changing this thread (MockThread.held); controls and input always do. */
   holdThread(id: string, held = true): void {
     this.thread(id).held = held;
@@ -2547,8 +2554,7 @@ export class World {
   /**
    * Scenario: a thread whose transcript Claude Code deleted, "Fix sidebar flake", stopped a
    * month ago with one exchange in its timeline (docs/notes/transcript-deleted.md). POST
-   * /__mock/transcript-deleted, or MOCK_SCENARIO=transcript-deleted. Idempotent; returns
-   * its id.
+   * /__mock/transcript-deleted. Idempotent; returns its id.
    */
   addTranscriptDeleted(): string {
     const id = "s-transcript-deleted";
@@ -2669,7 +2675,11 @@ export class World {
     return JSON.stringify(out);
   }
 
-  /** busyTool: the running tool to show (Thread.busy_tool); kept only while busy and not compacting. Omitted: unchanged (dropped when the status no longer allows one). */
+  /**
+   * The detector's reading changed (reason defaults to a typical one for the status).
+   * busyTool: the running tool to show (Thread.busy_tool); kept only while busy and not
+   * compacting. Omitted: unchanged (dropped when the status no longer allows one).
+   */
   setThreadStatus(id: string, status: ThreadStatus, reason?: string, busyTool?: string): void {
     const s = this.thread(id);
     if (s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", "thread is disconnected");
@@ -2862,10 +2872,11 @@ export class World {
     return this.archiveCascade(root).filter((t) => t.archivedAt === null && midTurn(t) !== "");
   }
 
-  /** Archives one thread (no cascade): closes Claude, removes its shells, unpins, unsnoozes, stamps it. */
+  /** Archives one thread (no cascade): closes Claude, removes its shells, stops its background runs, unpins, unsnoozes, stamps it. */
   private archiveOne(s: MockThread): void {
     if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
     this.closeShells((l) => l[LABEL_THREAD] === s.id);
+    this.actions.stopBackground((r) => r.threadId === s.id);
     s.pinned = false;
     s.archivedAt ??= new Date();
     s.snoozedUntil = null;
@@ -2891,6 +2902,7 @@ export class World {
     }
     if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
     this.closeShells((l) => l[LABEL_THREAD] === s.id);
+    this.actions.stopBackground((r) => r.threadId === s.id);
     s.pinned = false;
     s.archivedAt = null;
     s.snoozedUntil = until;
@@ -2904,6 +2916,7 @@ export class World {
     const s = this.thread(id);
     if (s.state !== ThreadState.DISCONNECTED) this.stopThread(s.id, "closed", 0);
     this.closeShells((l) => l[LABEL_THREAD] === s.id);
+    this.actions.stopBackground((r) => r.threadId === s.id);
     s.pinned = false;
     s.archivedAt = null;
     s.snoozedUntil = null;
@@ -3258,11 +3271,6 @@ export class World {
   }
 
   /**
-   * Who owns a shell terminal.new starts, like the daemon (internal/command/commands_terminal.go):
-   * the active thread, else the active registered worktree, else the deepest registered worktree
-   * containing cwd. Refuses a cwd outside every project.
-   */
-  /**
    * skill.setup's terminal, like the daemon's: owned by the context's thread, else its
    * worktree, else its project's main worktree (null with none); kind=setup with the
    * skill and its tab's title. The script prints a few lines and exits 0 about a second
@@ -3290,6 +3298,11 @@ export class World {
     return { id: t.id, cwd: t.cwd, labels: t.labels };
   }
 
+  /**
+   * Who owns a shell terminal.new starts, like the daemon (internal/command/commands_terminal.go):
+   * the active thread, else the active registered worktree, else the deepest registered worktree
+   * containing cwd. Refuses a cwd outside every project.
+   */
   private shellOwner(ctx: UiContext | undefined, cwd: string): { labels: Record<string, string>; cwd: string } {
     const s = ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined;
     if (ctx?.activeThreadId) {
@@ -3370,8 +3383,7 @@ export class World {
     let baseRef = "";
     const created = args["new-worktree"] === "true";
     if (created) requireGit(project, "a new worktree");
-    // A scripted background setup: Create answers at once, and the script is where it stands.
-    const scripted = args["background-setup"] === "true" ? this.nextSetup : "";
+    const scripted = this.scriptedSetup(args);
     if (created) {
       baseRef = args.base || (project.remotes.length > 0 ? `origin/${project.defaultBranch}` : project.defaultBranch);
       if (!scripted) await settle(this.worktreeDelayMs);
@@ -3387,8 +3399,8 @@ export class World {
       await settle(150);
       if (prompt.includes("FAIL")) throw new CommandError("unavailable", "start claude: exec: \"claude\": executable file not found in $PATH");
     }
-    const model = args.model || "claude-opus-4-8[1m]";
-    const s = this.createThread(project.id, path, model, args.effort ?? "", {
+    const d = this.threadDefaults();
+    const s = this.createThread(project.id, path, args.model || d.model, args.effort ?? d.effort, {
       name: args.name ?? "",
       autoNamed: !args.name,
       // Named in the background a moment after it starts (1–2 ticks), like the daemon.
@@ -3400,16 +3412,25 @@ export class World {
       firstMessage: scripted ? null : first,
       ...lineage,
     });
-    if (scripted) {
-      this.nextSetup = "";
-      s.setupHold = { draftJson: args["draft-json"] ?? "", first, queued: [] };
-      this.scriptSetup(s.id, scripted, false);
-    }
+    this.holdForSetup(s, scripted, args, first);
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, project.id, path);
     // Like the daemon: every new thread is focused (unless focus=false); the GUI skips a hidden one (stores/intents.ts).
     if (args.focus !== "false") this.focusThread(s.id);
     return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
+  }
+
+  /** A scripted background setup (POST /__mock/thread-setup): Create answers at once, and the script is where it stands. */
+  private scriptedSetup(args: Record<string, string>): string {
+    return args["background-setup"] === "true" ? this.nextSetup : "";
+  }
+
+  /** Puts a new thread where its scripted setup stands, holding its first message ("" scripted: nothing). */
+  private holdForSetup(s: MockThread, scripted: string, args: Record<string, string>, first: MockThread["firstMessage"]): void {
+    if (!scripted) return;
+    this.nextSetup = "";
+    s.setupHold = { draftJson: args["draft-json"] ?? "", first, queued: [] };
+    this.scriptSetup(s.id, scripted, false);
   }
 
   /**
@@ -3437,16 +3458,19 @@ export class World {
     if (ctx?.activeWorktreePath) throw new CommandError("invalid", "no-project starts a thread without a project; it does not take worktree");
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
+    const lineage = this.createdByArgs(args);
     const gen = this.generation;
     await sleep(150);
     if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
-    const s = this.createThread("", HOME, args.model || "opus", args.effort ?? "", {
+    const d = this.threadDefaults();
+    const s = this.createThread("", HOME, args.model || d.model, args.effort ?? d.effort, {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
       pendingName: promptTitle(prompt) || `thread-${String(this.nextId)}`,
       permissionMode: permissionModes[permission] ?? PermissionMode.UNSPECIFIED,
       firstMessage: firstMessageOf(args),
+      ...lineage,
     });
     if (args.focus !== "false") this.focusThread(s.id);
     return { message: `created thread ${s.id} in ${HOME} (no project)`, resultJson: JSON.stringify({ id: s.id, worktreePath: HOME }) };
@@ -3467,6 +3491,8 @@ export class World {
     for (const p of (args.attachments ?? "").split(",").filter(Boolean)) {
       if (!this.attachments.has(p)) throw new CommandError("invalid", `attachment ${p} was not staged`);
     }
+    const lineage = this.createdByArgs(args);
+    const scripted = this.scriptedSetup(args);
     const gen = this.generation;
     const settle = async (ms: number) => {
       await sleep(ms);
@@ -3489,7 +3515,8 @@ export class World {
       const path = !created || r.git === false ? this.mainPathOf(id) : (r.worktrees.find((w) => w.branch === branch)?.path ?? this.addWorktree(r, branch, r.remotes.length > 0 ? `origin/${r.defaultBranch}` : r.defaultBranch).path);
       if (id === primary) cwd = path;
     }
-    const s = this.createThread(primary === "workspace" ? "" : primary, cwd, args.model || "claude-opus-4-8[1m]", args.effort ?? "", {
+    const d = this.threadDefaults();
+    const s = this.createThread(primary === "workspace" ? "" : primary, cwd, args.model || d.model, args.effort ?? d.effort, {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
@@ -3499,8 +3526,10 @@ export class World {
       branch,
       projectIds: [...ids].sort(),
       workspaceId: ws?.id ?? "",
-      firstMessage: first,
+      firstMessage: scripted ? null : first,
+      ...lineage,
     });
+    this.holdForSetup(s, scripted, args, first);
     if (args.focus !== "false") this.focusThread(s.id);
     const warnings = this.hintsFor(s);
     return {
@@ -3582,6 +3611,9 @@ export class World {
     if (!inFolder && !set.includes(primary)) throw new CommandError("invalid", `project ${primary} is not one of thread ${src.id}'s projects (${set.join(", ")})`);
     const prompt = args.prompt ?? "";
     const permission = args.permission ?? "";
+    const first = firstMessageOf(args);
+    const lineage = this.createdByArgs(args);
+    const scripted = this.scriptedSetup(args);
     const gen = this.generation;
     await sleep(150);
     if (gen !== this.generation) throw new CommandError("unavailable", "mock reset while thread.new ran");
@@ -3597,7 +3629,8 @@ export class World {
       return worktreeMode && p.git !== false ? (p.worktrees.find((w) => w.branch === src.branch)?.path ?? this.addWorktree(p, src.branch, src.baseRef || p.defaultBranch).path) : this.mainPathOf(primary);
     };
     const path = placeOf();
-    const s = this.createThread(primary, path, args.model || src.model || "claude-opus-4-8[1m]", args.effort ?? "", {
+    const d = this.threadDefaults();
+    const s = this.createThread(primary, path, args.model || d.model, args.effort ?? d.effort, {
       name: args.name ?? "",
       autoNamed: !args.name,
       nameIn: args.name ? 0 : 2,
@@ -3609,8 +3642,10 @@ export class World {
       projectIds: set,
       checkoutPaths: shared,
       workspaceId: src.workspaceId,
-      firstMessage: firstMessageOf(args),
+      firstMessage: scripted ? null : first,
+      ...lineage,
     });
+    this.holdForSetup(s, scripted, args, first);
     if (args.focus !== "false") this.focusThread(s.id);
     const warnings = this.hintsFor(s);
     return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path, projectIds: this.projectIdsOf(s) }), ...(warnings.length > 0 ? { warnings } : {}) };
@@ -3742,12 +3777,6 @@ export class World {
     return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, git: r.git !== false, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
   }
 
-  /**
-   * ProjectService.Register (the Add Project dialog's Local folder tab and an existing clone
-   * destination), with the daemon's rules: "~" expands, the path must be absolute and
-   * under home, a folder inside a git repository adds that repository, any other folder
-   * a project without git, and an already registered project is returned unchanged.
-   */
   /** A typed path as the daemon's handlers take it: "~" expanded, absolute, cleaned, under home. */
   private homePath(raw: string): string {
     if (raw === "") throw new CommandError("invalid", "invalid argument: path is required");
@@ -3794,7 +3823,7 @@ export class World {
     let name = base;
     for (let i = 2; taken(name); i++) name = `${base} ${String(i)}`;
     const w: MockWorkspace = {
-      id: `w-${String(this.workspaces.size + 1).padStart(12, "0")}`,
+      id: `w-${String(this.nextWorkspace++).padStart(12, "0")}`,
       name,
       members: [...ids].sort(),
       rootPath: info.path,
@@ -3809,6 +3838,12 @@ export class World {
     return w;
   }
 
+  /**
+   * ProjectService.Register (the Add Project dialog's Local folder tab and an existing clone
+   * destination), with the daemon's rules: "~" expands, the path must be absolute and
+   * under home, a folder inside a git repository adds that repository, any other folder
+   * a project without git, and an already registered project is returned unchanged.
+   */
   registerFolder(raw: string): MockProject {
     const path = this.homePath(raw);
     const registered = (p: string) =>
@@ -3917,7 +3952,6 @@ export class World {
     return { id, name, path };
   }
 
-  /** ProjectService.Publish succeeded: origin on GitHub, main tracking origin/main. */
   /** Every project's id, name and folder (mock/projectRename.ts). */
   projectList(): { id: string; name: string; path: string }[] {
     return [...this.projects.values()].map((r) => ({ id: r.id, name: r.name, path: r.path }));
@@ -3931,6 +3965,7 @@ export class World {
     this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(project) } });
   }
 
+  /** ProjectService.Publish succeeded: origin on GitHub, main tracking origin/main. */
   setOrigin(id: string, slug: string): void {
     const project = this.projects.get(id);
     if (!project) return;
@@ -4144,9 +4179,9 @@ export class World {
             { name: "workspace", type: ArgType.STRING, required: false, description: "Workspace id or name the thread belongs to" },
             { name: "projects", type: ArgType.STRING, required: false, description: "Comma-separated projects it works in (project:base with new-worktree); it runs in the first unless project" },
             { name: "like", type: ArgType.STRING, required: false, description: "Thread to copy projects, branch and mode from" },
-            { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES, defaultValue: "claude-opus-4-8[1m]" },
-            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"], defaultValue: "high" },
-            { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
+            { name: "model", type: ArgType.ENUM, required: false, description: "Model (default: settings threads.default_model)", enumValues: MODEL_VALUES },
+            { name: "effort", type: ArgType.ENUM, required: false, description: "Effort (default: settings threads.default_effort)", enumValues: ["low", "medium", "high", "xhigh", "max"] },
+            { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"], defaultValue: "auto" },
             { name: "new-worktree", type: ArgType.BOOL, required: false, description: "Create a worktree for the thread" },
             { name: "no-project", type: ArgType.BOOL, required: false, description: "Start the thread without a project, in the home directory" },
             { name: "base", type: ArgType.STRING, required: false, description: "Base ref for the new worktree" },
@@ -4181,15 +4216,27 @@ export class World {
         },
       })),
       {
-        cmd: { name: "thread.fork", title: "Fork Thread", category: "Thread", description: "Start a new thread that continues this one's conversation", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" }] },
+        cmd: {
+          name: "thread.fork",
+          title: "Fork Thread",
+          category: "Thread",
+          description: "Start a new thread that continues this one's conversation",
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
+            { name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" },
+            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves)", defaultValue: "true" },
+          ],
+        },
         when: (ctx) => activeThread(ctx) !== undefined,
-        run: (ctx) => {
-          const s = activeThread(ctx);
+        run: (ctx, args) => {
+          const s = args.id ? this.thread(args.id) : activeThread(ctx);
           if (!s) throw new CommandError("unavailable", "no active thread");
           this.refuseTranscriptMissing(s.id);
-          const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { pendingName: `${s.name || s.id} (fork)`, permissionMode: s.permissionMode, parentId: s.id, checkoutPaths: { ...s.checkoutPaths } });
+          const named = args.name ? { name: args.name, autoNamed: false, nameIn: 0 } : { pendingName: `${s.name || s.id} (fork)` };
+          const f = this.createThread(s.projectId, s.worktreePath, s.model, s.effort, { ...named, permissionMode: s.permissionMode, parentId: s.id, checkoutPaths: { ...s.checkoutPaths } });
           this.logs.fork(s.id, f.id, s.name || s.id);
-          this.focusThread(f.id);
+          if (args.focus !== "false") this.focusThread(f.id);
           return `Forked ${s.name || s.id}`;
         },
       },
@@ -4482,7 +4529,7 @@ export class World {
             { name: "project", type: ArgType.STRING, required: false, description: "Where it runs: one of the thread's projects, or workspace" },
             { name: "model", type: ArgType.ENUM, required: false, description: "Model", enumValues: MODEL_VALUES },
             { name: "effort", type: ArgType.ENUM, required: false, description: "Effort", enumValues: ["low", "medium", "high", "xhigh", "max"] },
-            { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"] },
+            { name: "permission", type: ArgType.ENUM, required: false, description: "Permission mode", enumValues: ["supervised", "accept-edits", "auto"], defaultValue: "auto" },
             { name: "prompt", type: ArgType.STRING, required: false, description: "First prompt" },
             { name: "attachments", type: ArgType.STRING, required: false, description: "Staged attachment paths, comma-separated" },
             { name: "composer-prompt", type: ArgType.STRING, required: false, description: "The composer's text of prompt with its tag tokens" },
@@ -4656,11 +4703,11 @@ export class World {
           args: [{ name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" }],
           // Like the daemon: only a restart that cuts something off asks.
           confirmIf: (ctx, args) => {
-            const s = args.id ? this.threads.get(args.id) : activeThread(ctx);
+            const s = args.id ? this.thread(args.id) : activeThread(ctx);
             return s !== undefined && this.interrupts(s).why !== "";
           },
           confirm: (ctx, args) => {
-            const s = args.id ? this.threads.get(args.id) : activeThread(ctx);
+            const s = args.id ? this.thread(args.id) : activeThread(ctx);
             const { why, ends } = s ? this.interrupts(s) : { why: "", ends: "" };
             const q = `Restart Claude for ${s?.name || (s?.id ?? "")}? The conversation continues`;
             return ends === "ends the turn" ? `${q}; the current turn is interrupted.` : `${q}, but ${why}; restarting ${ends}.`;
@@ -4877,15 +4924,16 @@ export class World {
       },
       {
         cmd: {
-          name: "project.unregister", title: "Remove Project", category: "Project", description: "Stop tracking the active project", keybindings: [], args: [],
-          confirm: (ctx) => `Stop tracking project ${ctx?.activeProjectId ?? ""}? Its threads lose their worktree; clean worktrees Code Foundry made that no thread uses are removed (branches stay).`,
+          name: "project.unregister", title: "Remove Project", category: "Project", description: "Stop tracking a project", keybindings: [],
+          args: [{ name: "project", type: ArgType.STRING, required: false, description: "Project id (default: the active project)" }],
+          confirm: (ctx, args) => `Stop tracking project ${args.project || (ctx?.activeProjectId ?? "")}? Its threads lose their worktree; clean worktrees Code Foundry made that no thread uses are removed (branches stay).`,
         },
         when: (ctx) => Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)),
-        run: (ctx) => {
-          const id = ctx?.activeProjectId ?? "";
-          this.projects.delete(id);
-          this.projectEvents.publish({ event: { case: "projectRemovedId", value: id } });
-          return `Unregistered ${id}`;
+        run: (ctx, args) => {
+          const id = args.project || (ctx?.activeProjectId ?? "");
+          if (!this.projects.has(id)) throw new CommandError("notfound", `project ${id} not found`);
+          this.removeProject(id);
+          return `unregistered ${id}`;
         },
       },
       {
@@ -4937,6 +4985,8 @@ export class World {
           requireGit(project, "a new worktree");
           const branch = args.branch ?? "";
           const w: MockWorktree = { path: `${HOME}/.code-foundry/worktrees/${project.githubSlug || `_local/${project.name}`}/${branch.replace(/\//g, "-")}`, branch, head: "c0ffee00", isMain: false, status: clean({ upstream: "", baseRef: "" }) };
+          // Like git worktree add: an existing path is refused.
+          if (project.worktrees.some((x) => x.path === w.path)) throw new CommandError("unavailable", `create worktree: '${w.path}' already exists`);
           project.worktrees.push(w);
           this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
           return `created worktree ${w.path} on ${branch}`;
@@ -5006,7 +5056,7 @@ export class World {
           description: "Fetch, then remove the project's worktrees (or one) whose work is already in origin/<default>. Reports only what it removed. Branches are kept.",
           keybindings: [],
           args: [
-            { name: "project", type: ArgType.STRING, required: true, description: "Project name or id" },
+            { name: "project", type: ArgType.STRING, required: true, description: "Project id, name, or a path inside it" },
             { name: "path", type: ArgType.PATH, required: false, description: "One worktree (default: every merged one)" },
           ],
           confirm: (ctx, args) => {
@@ -5034,21 +5084,26 @@ export class World {
         run: (_ctx, args) => `delivered=${String(this.emit({ intent: { case: "openPalette", value: { query: args.query ?? "" } } }))}`,
       },
       {
-        cmd: { name: "ui.notify", noPalette: true, title: "Send Test Notification", category: "Developer", description: "Emit a Notify intent", keybindings: [], args: [{ name: "level", type: ArgType.ENUM, required: true, description: "Level", enumValues: ["info", "warning", "error"], defaultValue: "info" }] },
+        cmd: {
+          name: "ui.notify",
+          noPalette: true,
+          title: "Show Notification",
+          category: "View",
+          description: "Show a notification in every connected window.",
+          keybindings: [],
+          args: [
+            { name: "title", type: ArgType.STRING, required: true, description: "Notification title" },
+            { name: "body", type: ArgType.STRING, required: false, description: "Notification body" },
+            { name: "level", type: ArgType.ENUM, required: false, description: "Severity", enumValues: ["info", "warning", "error"], defaultValue: "info" },
+          ],
+        },
         when: always,
         run: (_ctx, args) => {
           const levels: Record<string, UiIntent_Notify_Level> = { info: UiIntent_Notify_Level.INFO, warning: UiIntent_Notify_Level.WARNING, error: UiIntent_Notify_Level.ERROR };
           const level = levels[args.level ?? "info"] ?? UiIntent_Notify_Level.INFO;
-          this.intents.publish({ intent: { case: "notify", value: { level, title: `Test ${args.level ?? "info"}`, body: "Sent from the mock daemon" } } });
+          this.intents.publish({ intent: { case: "notify", value: { level, title: args.title ?? "", body: args.body ?? "" } } });
           return "";
         },
-      },
-      {
-        // Mock-only: no daemon command prompts for a path in the palette (context-bound
-        // paths are sent as not required), so e2e/paths.spec.ts drives the prompt with this.
-        cmd: { name: "dev.path", title: "Echo Path", category: "Developer", description: "Report a folder (the palette's path prompt)", keybindings: [], args: [{ name: "path", type: ArgType.PATH, required: true, description: "Folder" }] },
-        when: always,
-        run: (_ctx, args) => `path ${args.path ?? ""}`,
       },
       {
         cmd: { name: "daemon.status", noPalette: true, title: "Daemon Status", category: "Daemon", description: "Show pid and uptime", keybindings: [], args: [] },
@@ -5336,7 +5391,6 @@ export class World {
     ];
   }
 
-  /** The registry with settings applied: keybinding overrides and thread.new defaults. */
   /** threads.default_model and threads.default_effort ("" when unset). */
   private threadDefaults(): { model: string; effort: string } {
     const v = this.settings.values();
@@ -5390,17 +5444,20 @@ export class World {
       at: new Date().toISOString(),
     });
     if (!entry) throw new CommandError("notfound", `unknown command ${name}`);
+    // Like the daemon's Args: an arg not given reads as its default.
+    const full = { ...args };
+    for (const a of entry.cmd.args) if (full[a.name] === undefined && a.defaultValue !== undefined) full[a.name] = a.defaultValue;
     // Like the daemon's context-bound args: an explicit worktree stands in for the context's.
-    let whenCtx = args.worktree ? ({ ...ctx, activeWorktreePath: args.worktree } as UiContext) : ctx;
+    let whenCtx = full.worktree ? ({ ...ctx, activeWorktreePath: full.worktree } as UiContext) : ctx;
     // A terminal command's --id stands in for the context's terminal the same way.
-    if (name.startsWith("terminal.") && args.id) whenCtx = { ...whenCtx, activeTerminalId: args.id } as UiContext;
+    if (name.startsWith("terminal.") && full.id) whenCtx = { ...whenCtx, activeTerminalId: full.id } as UiContext;
     // And a thread command's --id for the context's thread (thread.new-like from the composer).
-    if (name.startsWith("thread.") && args.id && this.threads.has(args.id)) whenCtx = { ...whenCtx, activeThreadId: args.id } as UiContext;
+    if (name.startsWith("thread.") && full.id && this.threads.has(full.id)) whenCtx = { ...whenCtx, activeThreadId: full.id } as UiContext;
     if (!entry.when(whenCtx)) throw new CommandError("unavailable", `${name} is not available here`);
     for (const a of entry.cmd.args) {
-      if (a.required && !args[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
+      if (a.required && !full[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }
-    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, args) ?? true)) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, args), entry.cmd.confirmLabel);
-    return entry.run(ctx, args);
+    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, full) ?? true)) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, full), entry.cmd.confirmLabel);
+    return entry.run(ctx, full);
   }
 }

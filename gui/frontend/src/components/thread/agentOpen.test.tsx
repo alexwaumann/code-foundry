@@ -34,7 +34,6 @@ function run(id: string, o: Partial<AgentRunView> = {}): AgentRunView {
     spawnDepth: 1,
     status: "running",
     activity: "",
-    lastTool: "",
     totalTokens: 0,
     toolUses: 0,
     durationMs: 0,

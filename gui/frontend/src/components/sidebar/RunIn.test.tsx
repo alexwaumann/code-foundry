@@ -102,11 +102,9 @@ describe("Run in", () => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-drv": { ...(s.byId["s-drv"] as ThreadView), pendingWorktreePath: LOGIN } } }));
     });
     render(<SidebarRow row={{ key: "s:s-drv", kind: "thread", section: "idle", threadId: "s-drv" }} selected={false} cursor={false} onActivate={() => undefined} />);
-    expect(screen.queryByTestId("row-moving")).toBeNull();
     act(() => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-drv": { ...(s.byId["s-drv"] as ThreadView), projectId: "repo-cf", worktreePath: LOGIN, pendingWorktreePath: "" } } }));
     });
-    expect(screen.queryByTestId("row-moving")).toBeNull();
     expect(screen.getByTestId("row-project").textContent).toBe("code-foundry");
     expect(screen.getByTestId("row-branch").textContent).toBe("cf/login");
   });

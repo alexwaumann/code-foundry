@@ -16,21 +16,8 @@ import { themeById, type ThemeFile, type ThemeScheme } from "@/themes";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
 import { useSettingsStore } from "./settings";
-import { editTheme } from "./themePicker";
+import { setThemeSlot } from "./themePicker";
 import { useThemesStore } from "./themes";
-
-/** Puts a scheme's slot on `id`. False when the command failed (it toasts why). */
-async function setSlot(scheme: ThemeScheme, id: string): Promise<boolean> {
-  return (await runCommandForResult(`theme.set-${scheme}`, { theme: id }, { quiet: true })) !== null;
-}
-
-/** Puts a scheme's slot on a theme a thread saved without applying (the card's Apply). */
-export const applySavedTheme = setSlot;
-
-/** Opens the Themes page's editor on one of the user's themes. */
-export function editSavedTheme(id: string): Promise<boolean> {
-  return editTheme(id);
-}
 
 /** What a card's (or its toast's) Undo puts back: another theme, or a version of its own. */
 export interface ThemeUndoTarget {
@@ -95,7 +82,7 @@ export function themeUndoState(t: ThemeUndoTarget, saved: ThemeFile | null, slot
 /** Runs an Undo: the slot back on the previous theme, or the replaced version back. */
 export async function undoTheme(t: ThemeUndoTarget): Promise<boolean> {
   if (t.previous === t.id) return (await runCommandForResult("theme.restore", { theme: t.id, version: t.version }, { quiet: true })) !== null;
-  return setSlot(t.scheme, t.previous);
+  return setThemeSlot(t.scheme, t.previous);
 }
 
 /**

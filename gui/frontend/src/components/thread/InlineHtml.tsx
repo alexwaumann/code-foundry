@@ -447,8 +447,9 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
 
 /**
  * The page over the thread pane's body (the conversation and its composer; not its header,
- * the sidebar or the side panel, which stay usable), dimming it; Esc, Close or a click on
- * the dimmed edge closes it, and its frame goes with it. Opening moves focus to Close, not
+ * the sidebar or the side panel, which stay usable), dimming it; Esc (pressed in that body,
+ * or with nothing focused), Close or a click on the dimmed edge closes it, and its frame
+ * goes with it. Opening moves focus to Close, not
  * the frame: keys inside the frame never reach the app (it is another document), so ⌘[ works
  * only while focus is outside it; Close stays one click or Tab away. Esc inside the frame
  * closes it too when the page loads /cf/bridge.js and nothing in the page consumed it: the
@@ -471,6 +472,10 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
     box.current?.querySelector<HTMLElement>("[data-lightbox-close]")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Only a press in the pane it covers, or with nothing focused: the bottom terminal, the
+      // side panel and a layer opened over the app keep their own Escape.
+      const t = e.target;
+      if (t instanceof Element && t !== document.body && t !== document.documentElement && !pane?.contains(t)) return;
       e.preventDefault();
       e.stopPropagation();
       close.current();

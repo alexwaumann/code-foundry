@@ -620,8 +620,8 @@ describe("panel store", () => {
   });
 
   it("openSurface opens another selection's panel by key, without a focus request", () => {
-    expect(openSurface("worktree:r:/p", diff)).toBe(true);
-    expect(getPanel("worktree:r:/p")).toEqual(entry(true, [diff], diff.id));
+    expect(openSurface("view:projects:project:r", diff)).toBe(true);
+    expect(getPanel("view:projects:project:r")).toEqual(entry(true, [diff], diff.id));
     expect(getPanel().open).toBe(false);
     expect(useUiStore.getState().panelFocusSeq).toBe(0);
   });

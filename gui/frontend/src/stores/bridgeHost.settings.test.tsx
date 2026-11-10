@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfirmationView } from "@/api/command";
+import { commandFailedError } from "@/api/commandErrors";
 import type { ThreadView } from "@/api/threads";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { answerConfirm } from "./confirm";
@@ -88,9 +89,7 @@ describe("a page changing a setting", () => {
 
   it("hears a user-only refusal as it is, failed, with no dialog", async () => {
     const refusal = "advanced.claude_path can only be changed by you, in Settings → Advanced → Claude path";
-    const { Code, ConnectError } = await import("@connectrpc/connect");
-    const { CommandFailedSchema } = await import("@/gen/codefoundry/v1/command_pb");
-    invokeCommand.mockRejectedValue(new ConnectError(refusal, Code.FailedPrecondition, undefined, [{ desc: CommandFailedSchema, value: { command: "settings.set" } }]));
+    invokeCommand.mockRejectedValue(commandFailedError("settings.set", refusal));
     render(<ConfirmDialog />);
     const posts = page();
     await vi.waitFor(() => {

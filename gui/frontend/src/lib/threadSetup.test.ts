@@ -14,7 +14,6 @@ import {
   setupNoteLine,
   setupRevealAt,
   setupRowPhase,
-  setupStopped,
   setupUnfinished,
   setupView,
   setupWaitedFor,
@@ -304,16 +303,15 @@ describe("the sidebar's words", () => {
 });
 
 describe("predicates", () => {
-  const cases: [string, ThreadSetupView | null, boolean, boolean][] = [
-    ["none", null, false, false],
-    ["running", setup("running", []), true, false],
-    ["done", setup("done", []), false, false],
-    ["failed", setup("failed", []), true, true],
-    ["cancelled", setup("cancelled", []), true, true],
+  const cases: [string, ThreadSetupView | null, boolean][] = [
+    ["none", null, false],
+    ["running", setup("running", []), true],
+    ["done", setup("done", []), false],
+    ["failed", setup("failed", []), true],
+    ["cancelled", setup("cancelled", []), true],
   ];
-  it.each(cases)("%s", (_, s, unfinished, stopped) => {
+  it.each(cases)("%s", (_, s, unfinished) => {
     expect(setupUnfinished(s)).toBe(unfinished);
-    expect(setupStopped(s)).toBe(stopped);
   });
 
   it("is unplaced only while a setup that did not finish left no cwd", () => {

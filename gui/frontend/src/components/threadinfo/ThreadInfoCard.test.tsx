@@ -534,8 +534,7 @@ describe("ThreadInfoCard: other scenarios", () => {
     expect(parts(screen.getByTestId("ti-mcp-meta"))).toBe("1 needs login 1 failed");
     expect(screen.getByTestId("ti-mcp-needs-login").className).toContain("text-cf-warning-text");
     expect(screen.getByTestId("ti-mcp-failed").className).toContain("text-cf-error-text");
-    // No zone of its own: the row is the trigger.
-    expect(screen.queryByTestId("ti-mcp-menu-zone")).toBeNull();
+    // The row is the trigger.
     expect(mcp.getAttribute("aria-haspopup")).toBe("menu");
 
     // A press on the value opens the menu, not the tab.

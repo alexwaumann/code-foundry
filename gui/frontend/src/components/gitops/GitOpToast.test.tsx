@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", () => ({ runCommand }));
 const { applyGitOpsEvent } = await import("@/stores/gitops");
+const { GitOpResult } = await import("./GitOpToast");
 
 /**
  * The git-op toasts (stores/gitops.tsx over GitOpToast) in a real sonner Toaster: progress
@@ -151,5 +152,16 @@ describe("git-op toasts", () => {
     });
     expect(within(toastOf("Push main")).queryByRole("button", { name: "Open" })).toBeNull();
     expect(screen.queryByTestId("gitop-output-toggle")).toBeNull();
+  });
+});
+
+describe("GitOpResult", () => {
+  it.each([
+    [1400, "code-foundry · 1.4s"],
+    [248_000, "code-foundry · 4m 8s"],
+    [0, "code-foundry"],
+  ])("a %ims op reads %s", (durationMs, want) => {
+    render(<GitOpResult op={op({ state: "succeeded", summary: "pushed", durationMs })} />);
+    expect(screen.getByTestId("gitop-toast").textContent).toBe(`pushed${want}`);
   });
 });

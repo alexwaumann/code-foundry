@@ -257,7 +257,6 @@ describe("SidebarRow line 3: the branch", () => {
     ["waiting on a wake", { status: "idle", statusReason: "waiting" }],
   ])("%s: the branch glyph and the branch in mono, never what it does or needs", (_name, o) => {
     renderRow(o);
-    expect(screen.queryByTestId("row-detail")).toBeNull();
     expect(screen.getByTestId("row-branch").textContent).toBe("main");
     expect(screen.getByTestId("row-branch").className).toContain("font-mono");
     expect(screen.getByTestId("row-branch-icon").getAttribute("class")).toContain("lucide-git-branch");
@@ -267,7 +266,6 @@ describe("SidebarRow line 3: the branch", () => {
   it("a queued move does not replace the branch (the card says it)", () => {
     useProjectsStore.setState((st) => ({ byId: { ...st.byId, cf: { ...(st.byId.cf as object), worktrees: [{ path: "/src/cf", branch: "main", head: "a", isMain: true }, { path: "/src/cf-2", branch: "next", head: "b", isMain: false }] } } }) as never);
     renderRow({ pendingWorktreePath: "/src/cf-2" });
-    expect(screen.queryByTestId("row-moving")).toBeNull();
     expect(screen.getByTestId("row-branch").textContent).toBe("main");
   });
 
@@ -306,7 +304,6 @@ describe("SidebarRow line 3: the branch", () => {
     const a = screen.getByTestId("row-bg-agents");
     expect(a.textContent).toBe("3");
     expect(a.getAttribute("aria-label")).toBe("3 subagents");
-    expect(screen.queryByTestId("row-detail")).toBeNull();
     expect(screen.getByTestId("row-branch").textContent).toBe("main");
     // The last live child settles: the badge follows.
     act(() => {
@@ -320,7 +317,6 @@ describe("SidebarRow line 3: the branch", () => {
     renderRow({ state: "disconnected" });
     const body = screen.getByTestId("thread-body");
     expect(body.className).not.toContain("opacity-50");
-    expect(body.getAttribute("data-offline")).toBeNull();
     expect(body.getAttribute("data-thread-badge")).toBe("idle");
   });
 });
@@ -535,6 +531,25 @@ describe("SidebarRow rename field", () => {
     fireEvent.change(input, { target: { value: "Login loop" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(renameThread).toHaveBeenCalledWith("s-1", "Login loop");
+  });
+
+  it.each(["Escape", "Enter"])("%s gives focus back to what had it when the rename began", (key) => {
+    const list = document.createElement("div");
+    list.tabIndex = 0;
+    document.body.append(list);
+    onTestFinished(() => {
+      list.remove();
+    });
+    list.focus();
+    renderRow({ name: "Login loop" });
+    act(() => {
+      useUiStore.setState({ renamingThreadId: "s-1" });
+    });
+    const input = screen.getByTestId("rename-input");
+    expect(document.activeElement).toBe(input);
+    fireEvent.keyDown(input, { key });
+    expect(screen.queryByTestId("rename-input")).toBeNull();
+    expect(document.activeElement).toBe(list);
   });
 });
 
@@ -794,7 +809,6 @@ describe("SidebarRow linked PRs tag", () => {
     renderRow({ linkedPullRequests: [link(1)] });
     const t = tag() as HTMLElement;
     expect(t.hasAttribute("data-tip")).toBe(false);
-    expect(t.hasAttribute("data-quiet")).toBe(false);
     fireEvent.pointerMove(t, { pointerType: "mouse" });
     expect(cardOpen()).toBe(1);
     fireEvent.pointerOver(screen.getByTestId("thread-name"), { pointerType: "mouse", relatedTarget: t });
@@ -962,7 +976,6 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(text(card, "tip-project-meta")).toBe(place);
     expect(within(card).queryByTestId("tip-project-chip")).toBeNull();
     expect(text(card, "tip-branch")).toBe(branch);
-    expect(within(card).queryByTestId("tip-branch-chip")).toBeNull();
   });
 
   it("a waiting thread's card says the daemon's whole reason and names its live children", () => {
@@ -1008,7 +1021,6 @@ describe("SidebarRow card (docs/notes/sidebar-thread-card.md)", () => {
     expect(text(card, "tip-project")).toBe("ghostty-playgroundFresh copy");
     expect(text(card, "tip-project-meta")).toBe("Fresh copy");
     expect(text(card, "tip-branch")).toBe("cf/login");
-    expect(within(card).queryByTestId("tip-set")).toBeNull();
   });
 
   it("an unnamed set: N projects, in place: Project folder", () => {
@@ -1197,8 +1209,7 @@ describe("a thread's setup", () => {
       expect(screen.getByTestId("row-status-word").textContent).toBe("Setting up");
       expect(screen.getByTestId("row-status").className).toContain("text-cf-info-text");
       expect(screen.getByTestId("row-time").textContent).toBe("12s");
-      expect(screen.queryByTestId("row-detail")).toBeNull();
-      expect(screen.queryByTestId("row-branch")).toBeNull();
+        expect(screen.queryByTestId("row-branch")).toBeNull();
       expect(atRest(line3())).toBe("");
     } finally {
       vi.useRealTimers();
@@ -1216,7 +1227,6 @@ describe("a thread's setup", () => {
     expect(screen.getByTestId("row-status-word").textContent).toBe("Setup failed");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
     expect(screen.queryByTestId("row-time")).toBeNull();
-    expect(screen.queryByTestId("row-detail")).toBeNull();
     expect(screen.getByTestId("row-snooze")).toBeTruthy();
   });
 
@@ -1224,7 +1234,6 @@ describe("a thread's setup", () => {
     renderRow({ worktreePath: "", state: "disconnected", status: "idle", statusReason: "setup cancelled", setup: setup("cancelled") });
     expect(screen.getByTestId("row-status-word").textContent).toBe("Cancelled");
     expect(screen.getByTestId("row-status").className).toContain("text-cf-sidebar-muted-foreground");
-    expect(screen.queryByTestId("row-detail")).toBeNull();
     expect(screen.queryByTestId("row-branch")).toBeNull();
   });
 });

@@ -95,7 +95,8 @@ export function pickedSummary(picked: readonly SelectOption[]): string {
 /**
  * A picker's search acts: the box's text goes through pickerTerm, then after
  * PICKER_DEBOUNCE_MS and one act at a time (liveSender), the newest last. Below the
- * threshold nothing is sent and what waits is dropped. The same term twice running goes once.
+ * threshold nothing is sent and what waits is dropped. The same term twice running goes once;
+ * typed again after the box went under the threshold, it goes again (a failed search retried).
  */
 export function searchSender(send: (term: string) => Promise<unknown>, delay = PICKER_DEBOUNCE_MS): LiveSender {
   const live = liveSender(send, delay);

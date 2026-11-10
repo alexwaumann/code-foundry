@@ -84,7 +84,7 @@ async function settle(): Promise<void> {
 }
 
 /** The model, effort and permission a draft sends without a pick (the registry's defaults here; the mock's settings in e2e). */
-const DEFAULTS = { model: "claude-opus-4-8[1m]", effort: "high", permission: "auto" };
+const DEFAULTS = { model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto" };
 
 /** Where hoverTip last put the pointer: a Command ignores a pointer that did not move. */
 let pointerX = 0;

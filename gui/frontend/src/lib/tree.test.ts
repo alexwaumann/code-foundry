@@ -58,8 +58,8 @@ describe("buildRows (the flat thread list)", () => {
     expect(rows.map((r) => r.section)).toEqual(["pinned", "pinned", "pinned", "attention", "attention", "attention", "attention", "done", "idle", "idle", "working", "working", "working"]);
   });
 
-  // A thread waiting on its child threads (lib/waiting) sorts with the idle ones, below
-  // finished turns and above Working: its group is threadGroup's.
+  // A thread waiting on its child threads (lib/waiting) sorts under the Working footer
+  // with them (threadGroup).
   it("sorts a thread waiting on its child threads under Working, with them", () => {
     const waiting = threadGroup({ state: "connected", status: "idle", statusReason: "waiting on 2 child threads" });
     const done = threadGroup({ state: "connected", status: "attention", statusReason: "finished" });

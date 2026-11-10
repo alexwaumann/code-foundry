@@ -1,8 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, ExternalLink, Loader2, RefreshCw, TriangleAlert, WrapText } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Loader2, RefreshCw, WrapText } from "lucide-react";
 import { CodeView, type CodeViewHandle, type CodeViewReactOptions } from "@pierre/diffs/react";
 import type { CodeViewDiffItem, CodeViewItem, FileDiffContentsLoader } from "@pierre/diffs";
 import { isTooLargeMessage, tooLargeText } from "@/api/prDiff";
+import { statusColor } from "@/components/diff/files";
 import { RowList } from "@/components/prs/RowList";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,7 @@ import { expandFailed, pullRequestDiffResource, readPullRequestFile, refreshPull
 import { sectionOpenByDefault, toggleSection, usePrPanelStore } from "@/stores/prPanel";
 import { useResource } from "@/stores/resource";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
+import { Banner } from "./Banner";
 import { parsePrDiff, prFileLoader, type PrDiffFile, type PrDiffModel } from "./diffModel";
 import "@/components/code/code.css";
 
@@ -26,8 +28,6 @@ const FILE_ROWS = 7.5;
 const LINE_HEIGHT = 19;
 /** The file header's height (FileHeader h-9), for the same reason. */
 const HEADER_H = 36;
-
-const statusColor: Record<PrDiffFile["status"], string> = { A: "text-cf-diff-addition", M: "text-cf-diff-modified", D: "text-cf-diff-deletion", R: "text-cf-info-text" };
 
 const styleOptions: readonly { value: DiffStyle; label: string }[] = [
   { value: "unified", label: "Unified" },
@@ -112,19 +112,23 @@ function Strip({ prRef, tabKey, model, listOpen }: { prRef: PrRef; tabKey: strin
 /** A warning under the strip, with the way to the whole diff on GitHub. */
 function Notice({ children, url, testId }: { children: ReactNode; url: string; testId: string }) {
   return (
-    <div className="mx-4 mt-2 flex shrink-0 items-start gap-2 rounded-lg border border-cf-warning/30 bg-cf-warning-surface px-3 py-2 text-caption text-cf-warning-text" role="status" data-testid={testId}>
-      <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1 break-words">{children}</span>
-      <button
-        type="button"
-        className="flex shrink-0 items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-1 focus-visible:ring-cf-focus"
-        onClick={() => void openUrl(`${url}/files`)}
-        data-testid={`${testId}-open`}
-      >
-        Open on GitHub
-        <ExternalLink className="size-3" aria-hidden />
-      </button>
-    </div>
+    <Banner
+      testId={testId}
+      className="mt-2 shrink-0"
+      action={
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-1 focus-visible:ring-cf-focus"
+          onClick={() => void openUrl(`${url}/files`)}
+          data-testid={`${testId}-open`}
+        >
+          Open on GitHub
+          <ExternalLink className="size-3" aria-hidden />
+        </button>
+      }
+    >
+      {children}
+    </Banner>
   );
 }
 

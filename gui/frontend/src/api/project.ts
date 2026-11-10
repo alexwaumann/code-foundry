@@ -49,8 +49,8 @@ export interface WorktreeView {
   /**
    * The git half of "safe to clean up" (the daemon's project.MergedCleanReason): not main,
    * on a branch, nothing uncommitted, every commit in status.baseRef. Live threads,
-   * terminals and workspaces are checked against their own slices (lib/projects.ts
-   * isCleanable). Absent counts as false.
+   * terminals and workspaces are checked against their own slices
+   * (components/projects/useCleanable.ts). Absent counts as false.
    */
   mergedClean?: boolean;
   /** Code Foundry made it (recorded when made); only these can be cleaned up. Absent counts as false. */

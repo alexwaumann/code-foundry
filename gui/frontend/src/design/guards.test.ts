@@ -47,6 +47,7 @@ describe("scanSource", () => {
     ["JSX text is not read", `<p>a rounded corner, text-sm</p>`, []],
     ["regex literals are not read", `const re = /text-sm|rounded/;`, []],
     ["English words in strings count", `const s = "rounded up";`, ["radius:rounded"]],
+    ["rounded-xl is off the scale (rounded-pane is its name)", `const c = "rounded-xl rounded-t-xl rounded-2xl";`, ["radius:rounded-xl", "radius:rounded-t-xl"]],
   ])("%s", (_name, source, want) => {
     expect(scanSource("x.tsx", source).map((h) => `${h.category}:${h.match}`)).toEqual(want);
   });

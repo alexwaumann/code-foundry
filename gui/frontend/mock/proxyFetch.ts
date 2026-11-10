@@ -16,7 +16,13 @@ export interface MockFetch {
 
 const fetches: MockFetch[] = [];
 
-const refused = /^(127\.|0\.|169\.254\.|localhost$|\[::1?\]$|\[fe80:)/i;
+/** The daemon's refusedAddr: what a host a page may not reach is, "" for one it may. */
+function refusal(host: string): string {
+  if (/^(127\.|localhost$|\[::1\]$)/i.test(host)) return "a loopback address";
+  if (/^(0\.|\[::\]$)/.test(host)) return "an unspecified address";
+  if (/^(169\.254\.|\[fe80:)/i.test(host)) return "a link-local address";
+  return "";
+}
 
 const text = (s: string) => new TextEncoder().encode(s);
 
@@ -28,7 +34,8 @@ export async function mockProxyFetch(req: { url: string; method: string; headers
     throw new ConnectError(`"${req.url}" is not an absolute http or https URL`, Code.InvalidArgument);
   }
   if (u.protocol !== "http:" && u.protocol !== "https:") throw new ConnectError(`only http and https URLs are fetched, not ${u.protocol}`, Code.InvalidArgument);
-  if (refused.test(u.hostname)) throw new ConnectError(`${u.hostname} is a loopback address (${u.hostname}), which a page may not reach`, Code.InvalidArgument);
+  const why = refusal(u.hostname);
+  if (why) throw new ConnectError(`${u.hostname} is ${why} (${u.hostname}), which a page may not reach`, Code.InvalidArgument);
   const f: MockFetch = { url: req.url, method: req.method || "GET", headers: { ...req.headers }, aborted: false };
   fetches.push(f);
   if (u.host !== "upstream.test") throw new ConnectError(`${f.method} ${u.host} failed: the mock reaches no network`, Code.Unavailable);

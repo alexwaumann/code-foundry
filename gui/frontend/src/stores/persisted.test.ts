@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { emptyBottom, getBottom, sanitizeBottomState, toggleBottom, useBottomStore } from "./bottomPanel";
 import { setPreviewMode, useCodeViewStore } from "./codeView";
 import { usePanelStore } from "./panel";
+import { addRecentFile, useRecentFilesStore } from "./recentFiles";
 import { addRecentReviewer, useReviewerRecentsStore } from "./reviewerRecents";
+import { lastSearchMode, setSearchMode, useSearchDialogStore } from "./searchDialog";
 import { useSettingsPrefsStore } from "./settingsPrefs";
 import { FONT_MAX, FONT_DEFAULT, HOME, SIDEBAR_DEFAULT, SIDEBAR_MIN, useUiStore, ZOOM_DEFAULT, ZOOM_MAX } from "./ui";
 
@@ -32,7 +34,7 @@ const stores: Persisted[] = [
   },
   {
     name: "code-foundry.panel",
-    version: 3,
+    version: 6,
     rehydrate: () => usePanelStore.persist.rehydrate(),
     fields: ["byKey"],
     use: () => {
@@ -81,6 +83,26 @@ const stores: Persisted[] = [
     fields: ["boundOnly"],
     use: () => {
       expect(typeof useSettingsPrefsStore.getState().boundOnly).toBe("boolean");
+    },
+  },
+  {
+    name: "code-foundry.recent-files",
+    version: 1,
+    rehydrate: () => useRecentFilesStore.persist.rehydrate(),
+    fields: ["byKey"],
+    use: () => {
+      addRecentFile("thread:x", { project: "p", base: "/w", path: "/w/a.go" });
+      for (const list of Object.values(useRecentFilesStore.getState().byKey)) for (const f of list) expect(f.path.startsWith("/")).toBe(true);
+    },
+  },
+  {
+    name: "code-foundry.searchDialog",
+    version: 1,
+    rehydrate: () => useSearchDialogStore.persist.rehydrate(),
+    fields: ["mode"],
+    use: () => {
+      expect(["agent", "find"]).toContain(lastSearchMode());
+      setSearchMode("find");
     },
   },
 ];

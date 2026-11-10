@@ -31,7 +31,7 @@ export function ProjectBadge({ name, className }: { name: string; className?: st
 }
 
 /** The House badge that stands for "No project" where a project shows its two letters. */
-export function NoProjectBadge({ className }: { className?: string }) {
+function NoProjectBadge({ className }: { className?: string }) {
   return (
     <span aria-hidden className={`flex size-6 shrink-0 items-center justify-center rounded-md bg-cf-surface-sunken text-cf-text-muted ${className ?? ""}`}>
       <House className="size-3.5" />

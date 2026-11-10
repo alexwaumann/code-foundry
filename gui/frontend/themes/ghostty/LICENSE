@@ -3,6 +3,8 @@ The theme files in this directory are copied unchanged from Ghostty's bundled th
 iTerm2-Color-Schemes (https://github.com/mbadolato/iTerm2-Color-Schemes). That project
 is distributed under the MIT License below. Each colour scheme belongs to its original
 author; themes/overrides.json records the upstream project of every one used here.
+One file is not from Ghostty: "Petros Dusk" is a user's own Ghostty theme, shared for
+this app (overrides.json marks it "local").
 
 MIT License
 

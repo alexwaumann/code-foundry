@@ -103,7 +103,6 @@ const comment = (id: string, atMs: number | null, o: Partial<PullRequestCommentV
   url: "",
   path: "",
   reviewState: "",
-  reviewId: "",
   ...o,
 });
 

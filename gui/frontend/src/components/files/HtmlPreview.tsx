@@ -9,8 +9,6 @@ import { usePreviewGrant } from "./previewGrant";
 import { usePageThread } from "./usePageThread";
 import { FileEmptyState, FileLoading } from "./states";
 
-export { HTML_PREVIEW_SANDBOX } from "./HtmlFrame";
-
 /**
  * An HTML file rendered live: the daemon serves it, and everything under its scope (its
  * checkout, else its directory; the file alone when that directory is home or another

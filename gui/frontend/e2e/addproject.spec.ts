@@ -3,8 +3,7 @@ import { openAddProjectDialog, openApp, resetMock } from "./fixtures";
 
 // The Add Project dialog (project.add): its entry points (the palette, New thread's project
 // picker, the Projects page) and the Local folder tab's mouse and hover behaviour. The tabs'
-// logic is unit-tested in src/components/addproject/AddProjectDialog.test.tsx; completion
-// itself is e2e/paths.spec.ts.
+// logic is unit-tested in src/components/addproject/AddProjectDialog.test.tsx.
 
 test.beforeEach(async () => {
   await resetMock();

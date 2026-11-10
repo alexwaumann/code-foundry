@@ -195,7 +195,7 @@ export class MockMemory {
     };
     return [
       {
-        cmd: cmd("memory.show", "Memory: Show Preferences", "List the user's standing preferences, numbered.", []),
+        cmd: { ...cmd("memory.show", "Memory: Show Preferences", "List the user's standing preferences, numbered.", []), noPalette: true },
         when: always,
         run: (_c: UiContext | undefined, a) => {
           record("memory.show", a);
@@ -203,9 +203,9 @@ export class MockMemory {
         },
       },
       {
-        cmd: cmd("memory.add", "Memory: Remember a Preference", "Remember a standing preference for every thread in every project.", [
+        cmd: { ...cmd("memory.add", "Memory: Remember a Preference", "Remember a standing preference for every thread in every project.", [
           { name: "text", type: ArgType.STRING, required: true, description: "The preference, one line (several words need no quotes)" },
-        ]),
+        ]), noPalette: true },
         when: always,
         run: (_c, a) => {
           record("memory.add", a);
@@ -215,10 +215,10 @@ export class MockMemory {
         },
       },
       {
-        cmd: cmd("memory.remove", "Memory: Forget a Preference", "Forget one remembered preference: by its number in `memory show`, its text, its id, or text found in it alone.", [
+        cmd: { ...cmd("memory.remove", "Memory: Forget a Preference", "Forget one remembered preference: by its number in `memory show`, its text, its id, or text found in it alone.", [
           { name: "entry", type: ArgType.STRING, required: false, description: "The entry's number in memory show, its text, its id, or text that only that entry contains" },
           { name: "id", type: ArgType.STRING, required: false, description: "The entry's id (memory show --json): its file name without .md. Instead of entry" },
-        ]),
+        ]), noPalette: true },
         when: always,
         run: (_c, a) => {
           record("memory.remove", a);

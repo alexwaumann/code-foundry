@@ -6,13 +6,6 @@ import "./ember.css";
 /** Where the flame sits: the pinned sidebar row (28×32), the chat header (18×20), the settings nav (14×16), an empty state (64×72). */
 export type FlameSize = "row" | "header" | "nav" | "hero";
 
-const STATE_LABELS: Readonly<Record<FlameState, string>> = {
-  idle: "Idle",
-  thinking: "Thinking",
-  working: "Workers running",
-  attention: "Has something for you",
-};
-
 /** The mouth per state: a smile, a small "o" while thinking, a flat concentrating line while working, an open grin for attention. */
 const MOUTH: Readonly<Record<FlameState, ReactNode>> = {
   idle: <path className="mouth" strokeWidth="1.1" d="M13.8 27.5q2.2 1.8 4.4 0" />,
@@ -32,18 +25,16 @@ const INNER_GRADIENT = "cf-flame-inner-fill";
  * with the eyes up and one brow raised, working flickers with sparks and the brows pulled
  * in, attention bounces with wide eyes, an open grin and an amber ring. Hovering winks.
  * It animates regardless of the system's Reduce Motion (a mascot's idle motion, not an
- * interaction animation). Decorative unless `label` is set.
+ * interaction animation). Decorative: its row or header names it.
  */
-export function Flame({ state, size, label, className }: { state: FlameState; size: FlameSize; label?: string; className?: string }) {
+export function Flame({ state, size, className }: { state: FlameState; size: FlameSize; className?: string }) {
   return (
     <span
       className={cn("cf-flame", className)}
       data-size={size}
       data-state={state}
       data-testid="ember-flame"
-      role={label ? "img" : undefined}
-      aria-label={label ? `${label}: ${STATE_LABELS[state]}` : undefined}
-      aria-hidden={label ? undefined : true}
+      aria-hidden
     >
       <svg viewBox="0 -2 32 36">
         <defs>

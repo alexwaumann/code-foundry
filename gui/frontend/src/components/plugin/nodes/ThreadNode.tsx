@@ -13,7 +13,7 @@ import { ShownAbove } from "./ShownAbove";
 const InlineThread = lazy(() => import("@/components/thread/InlineThread").then((m) => ({ default: m.InlineThread })));
 
 /** A thread node's height for "auto". */
-export const THREAD_AUTO_PX = 420;
+const THREAD_AUTO_PX = 420;
 
 /**
  * The plugin's own Claude thread, inline (docs/notes/plugins-6-thread-terminal.md): the

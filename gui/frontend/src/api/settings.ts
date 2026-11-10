@@ -167,12 +167,6 @@ export async function getSettingsSchema(conn: DaemonConnection = daemon): Promis
   return { groups: res.groups.map(toGroupView), fields: res.fields.map(toSettingFieldView), pages: res.pages.map(toSettingPageView) };
 }
 
-export async function getSettings(conn: DaemonConnection = daemon): Promise<SettingsSnapshotView | null> {
-  const c = await conn.client(SettingsService);
-  const res = await c.get({});
-  return res.settings ? toSettingsSnapshotView(res.settings) : null;
-}
-
 /**
  * Applies a partial change ("" resets a key). Throws SettingsValidationError when the
  * daemon rejects values, other errors as they come.

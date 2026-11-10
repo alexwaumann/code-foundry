@@ -324,6 +324,22 @@ describe("picking a file", () => {
     expect(panelActive("thread:s-1")).toBeNull();
   });
 
+  it("a failed search lists none of the previous query's files, and a later Enter opens nothing", async () => {
+    await openFinder("s-1");
+    search.mockResolvedValueOnce([match("repo-cf", CF, "tree.go", [0])]);
+    typeQuery("tr");
+    await searched();
+    expect(rows()).toEqual(["[t]ree.go"]);
+    search.mockRejectedValueOnce(new Error("boom"));
+    typeQuery("tree.g");
+    await searched();
+    expect(screen.getByTestId("finder-error").textContent).toBe("Cannot search: boom");
+    expect(rows()).toEqual([]);
+    fireEvent.keyDown(input(), { key: "Enter" });
+    await settle(5);
+    expect(panelActive("thread:s-1")).toBeNull();
+  });
+
   it("Enter on a changed file opens a File tab, not a Diff tab, and an open one only activates", async () => {
     daemon.worktreeDetail.set(`repo-cf\u0000${CF}`, detail("repo-cf", CF, [{ path: "a.ts", status: "M" }]));
     openFileInPanel("thread:s-1", { project: "repo-cf", base: CF, path: "a.ts" });

@@ -12,9 +12,10 @@ export interface Backoff {
 export const defaultBackoff: Backoff = { initialMs: 250, maxMs: 10_000, factor: 2 };
 
 /**
- * How often the daemon sends a StreamHeartbeat on a quiet ThreadService.WatchThread,
- * TerminalService.Attach, EventService.Watch or EmberService.WatchBoard. Mirrors api.HeartbeatInterval
- * (internal/api/heartbeat.go): keep them equal.
+ * How often the daemon sends a StreamHeartbeat on a quiet long-lived stream
+ * (ThreadService.WatchThread, TerminalService.Attach, EventService.Watch and the others
+ * runStream watches). Mirrors api.HeartbeatInterval (internal/api/heartbeat.go): keep
+ * them equal.
  */
 export const HEARTBEAT_MS = 5_000;
 

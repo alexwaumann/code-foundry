@@ -20,7 +20,8 @@ function Link({ href, children, tip, open }: { href?: string | undefined; childr
   const url = resolveLink(href);
   // A link whose target was stripped (javascript:, an anchor) is plain text: no href,
   // no pointer, nothing to click.
-  // The tooltip is the link's markdown title, else where it goes (the window has no status bar).
+  // The tooltip is the link's markdown title, else where it goes (the window has no status
+  // bar), unless the link's text already says that (a bare URL).
   if (!url)
     return (
       <Tip label={tip}>
@@ -28,7 +29,7 @@ function Link({ href, children, tip, open }: { href?: string | undefined; childr
       </Tip>
     );
   return (
-    <Tip label={tip ?? url}>
+    <Tip label={tip ?? (showsTarget(children, href, url) ? undefined : url)}>
       <a
         href={url}
         onClick={(e) => {
@@ -51,6 +52,12 @@ function Link({ href, children, tip, open }: { href?: string | undefined; childr
       </a>
     </Tip>
   );
+}
+
+/** Whether a link's text is its own target (a bare URL), so a tooltip would only repeat it. */
+function showsTarget(children: ReactNode, href: string | undefined, url: string): boolean {
+  const text = Array.isArray(children) && children.length === 1 ? (children[0] as ReactNode) : children;
+  return typeof text === "string" && (text === href || text === url);
 }
 
 /** A click with the main button and no cmd or ctrl (which mean "in the browser"). */

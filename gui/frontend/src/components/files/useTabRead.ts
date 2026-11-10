@@ -1,7 +1,7 @@
 /**
  * Reads for the File and Diff tabs (docs/notes/file-viewer-3-tabs.md). The data lives in
  * the tab's component state, so only the visible tab holds it and unmounting frees it; no
- * cache beyond the tab. A tab mounts each time it becomes the active one (SidePanel keys
+ * cache beyond the tab. A tab mounts each time it becomes the active one (GroupBody keys
  * its body by tab), so switching back to it reads again. Besides that, a read runs again
  * on the refresh button, when the window becomes visible, when the daemon recomputes the
  * file's worktree (worktree_detail_updated, seen through the worktree detail resource),

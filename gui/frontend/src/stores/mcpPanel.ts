@@ -4,7 +4,6 @@
  */
 import { mcpTab, selectionMcpThread } from "@/surfaces/mcpTarget";
 import { keyOf, openSurface } from "./panel";
-import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore, type Selection } from "./ui";
 
@@ -14,7 +13,6 @@ import { useUiStore, type Selection } from "./ui";
  */
 export function openMcpSurface(sel: Selection = useUiStore.getState().selection): string | null {
   const key = keyOf(sel);
-  const s = { projects: useProjectsStore.getState(), threads: useThreadsStore.getState() };
-  if (key === null || selectionMcpThread(sel, s) === null) return null;
+  if (key === null || selectionMcpThread(sel, { threads: useThreadsStore.getState() }) === null) return null;
   return openSurface(key, mcpTab()) ? key : null;
 }

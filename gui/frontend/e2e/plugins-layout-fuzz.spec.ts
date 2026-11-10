@@ -2,11 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
- * Exploratory layout checks on the mock (WebKit; /tmp/cf-layout-fuzz/gui.md has the
- * findings). Custom views go through the mock's `view:<json>` demo tab and its fuzz controls
- * (`__viewdelay`, `__actdelay`, `__failnext`: mock/plugins.ts fuzzControl). `test.fail()`
- * marks a check that shows a bug today (it passes while the bug is there); the bugs fixed
- * since (docs/notes/plugins-layout-fixes-gui.md) are plain checks now.
+ * Exploratory layout checks on the mock (WebKit). Custom views go through the mock's
+ * `view:<json>` demo tab and its fuzz controls (`__viewdelay`, `__actdelay`, `__failnext`:
+ * mock/plugins.ts fuzzControl). The bugs they found and their fixes:
+ * docs/notes/plugins-layout-fixes-gui.md.
  */
 
 const surface = (page: Page) => page.getByTestId("plugin-surface");
@@ -71,7 +70,6 @@ test("a long list in a sized pane renders its rows as the pane scrolls (virtuali
   await pane.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  await page.waitForTimeout(300);
   // The last rows must be drawn where the pane now shows them.
   await expect(pane.locator('[data-testid="plugin-row"][data-key="r79"]')).toBeVisible({ timeout: 2000 });
 });
@@ -87,7 +85,6 @@ test("a long list in a wide master-detail's detail renders as the detail side sc
   await detail.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
-  await page.waitForTimeout(300);
   await expect(detail.locator('[data-testid="plugin-row"][data-key="r79"]')).toBeVisible({ timeout: 2000 });
 });
 
@@ -109,12 +106,11 @@ test("a fill pane follows its top when a section above it folds and unfolds", as
     return s && p ? Math.round(s.y + s.height - (p.y + p.height)) : NaN;
   };
   const initial = await bottomGap();
-  await surface(page).getByTestId("plugin-section-toggle").click();
-  await page.waitForTimeout(200);
-  const folded = await bottomGap();
-  test.info().annotations.push({ type: "fill-1", description: `bottom gap: ${String(initial)} px unfolded at mount, ${String(folded)} px after folding the section above` });
+  test.info().annotations.push({ type: "fill-1", description: `bottom gap: ${String(initial)} px unfolded at mount` });
   expect(initial).toBe(16);
-  expect(folded).toBe(16);
+  // Folding the section above keeps it.
+  await surface(page).getByTestId("plugin-section-toggle").click();
+  await expect.poll(bottomGap).toBe(16);
 });
 
 test("a group of eight progress bars with noWrap at the panel's default width", async ({ page }) => {
@@ -283,10 +279,8 @@ test("a fill pane in the second of stacked columns follows its top when the colu
   const stacked = await gap();
   await dragPanel(page, -500);
   await expect(cols).toHaveAttribute("data-layout", "row");
-  await page.waitForTimeout(200);
-  const row = await gap();
-  test.info().annotations.push({ type: "fill-3", description: `gap under the fill pane: stacked ${String(stacked)} px, side by side ${String(row)} px` });
-  expect(row).toBe(16);
+  test.info().annotations.push({ type: "fill-3", description: `gap under the fill pane stacked: ${String(stacked)} px` });
+  await expect.poll(gap).toBe(16);
 });
 
 test("Back from a row far down a long (virtualized) list focuses that row; the focus is not paid later to a row the plugin selects", async ({ page }) => {

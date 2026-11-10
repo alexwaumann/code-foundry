@@ -1,7 +1,8 @@
 import { createContext, useCallback, useMemo, useRef, useState } from "react";
 
 /**
- * Keyboard cursor over a page's rows (the Pull Requests page, the worktree overview).
+ * Keyboard cursor over a page's rows (the Pull Requests page, the Projects pages, the diff
+ * file and commit lists).
  * The page lists every navigable row in display order; rows render through NavRow.
  * ↑/↓ (or k/j), Home/End move; Enter or Space activates (cmd+Enter: the secondary action); →/←
  * expand or collapse. The page's

@@ -4,7 +4,6 @@
  * Generated types stay in this file.
  */
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentSearchStepKind,
   SearchMode,
@@ -18,6 +17,7 @@ import {
 } from "@/gen/codefoundry/v1/search_pb";
 import { SearchSpeaker } from "@/gen/codefoundry/v1/thread_search_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
+import { isNotFound } from "./errors";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import type { SearchSpeakerView } from "./threadSearch";
 
@@ -204,7 +204,7 @@ export function toSearchWatchEventView(ev: SearchWatchEvent): SearchWatchEventVi
 
 /** Whether an error is the daemon's NOT_FOUND (a forgotten search). */
 export function isSearchGone(err: unknown): boolean {
-  return err instanceof ConnectError && err.code === Code.NotFound;
+  return isNotFound(err);
 }
 
 /** SearchService.StartAgent: the RUNNING entry (search.agent waits for the end; the dialog watches instead). */

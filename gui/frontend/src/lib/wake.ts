@@ -121,11 +121,6 @@ export function wakeLines(w: WakeView): WakeLine[] {
   return batch.map((b) => lineOf(b, w));
 }
 
-/** The note's line for a wake message (a batch's first wake). */
-export function wakeLine(w: WakeView): WakeLine {
-  return wakeLines(w)[0] ?? lineOf(null, w);
-}
-
 function lineOf(p: Obj | null, w: WakeView): WakeLine {
   const json = p ? JSON.stringify(p, null, 2) : w.json;
   const thread = obj(p?.thread);

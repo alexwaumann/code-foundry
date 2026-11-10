@@ -38,9 +38,6 @@ export function RowContextMenu<P extends RowMenuPart = never>({
   const { setCursor } = useContext(NavContext);
   const triggerRef = useRef<HTMLDivElement>(null);
   const picked = useRef<(() => void) | null>(null);
-  const onPick = (run: () => void) => {
-    picked.current = run;
-  };
   const [pick] = useState<RowMenuPick>(() => ({
     pick: (run) => {
       picked.current = run;
@@ -85,7 +82,7 @@ export function RowContextMenu<P extends RowMenuPart = never>({
         }}
       >
         <RowMenuPickContext.Provider value={pick}>
-          <OpenItems items={items} parts={parts ?? (NO_PARTS as RowMenuParts<P>)} onPick={onPick} />
+          <OpenItems items={items} parts={parts ?? (NO_PARTS as RowMenuParts<P>)} onPick={pick.pick} />
         </RowMenuPickContext.Provider>
       </ContextMenuContent>
     </ContextMenu>

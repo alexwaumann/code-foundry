@@ -1,7 +1,7 @@
 /**
  * Where the app paints each slot, in a few words, for the Themes page's editor (the slot
  * view's "Used by"). Kept apart from the rules (slots.ts) because it describes components,
- * not derivation; slotUses.test.ts holds it to SLOT_NAMES both ways. docs/THEMES.md's live
+ * not derivation; contrastReport.test.ts (SLOT_USES) holds it to SLOT_NAMES both ways. docs/THEMES.md's live
  * slot list is the longer form; "pages only" are the slots the app itself does not read.
  */
 const TONES = ["success", "warning", "error", "info", "highlight"] as const;

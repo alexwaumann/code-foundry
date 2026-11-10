@@ -1,4 +1,4 @@
-import type { CheckRollupView, PullRequestView, ReviewView } from "@/api/gh";
+import type { CheckRollupView, PullRequestView } from "@/api/gh";
 
 /** Compact age for tables: "now", "5m", "3h", "2d", "3w", "4mo", "2y"; "—" when unknown. */
 export function shortAge(ms: number | null, now: number): string {
@@ -46,25 +46,16 @@ export function monthName(month: string, now: number): string {
 
 export type ChecksTone = "success" | "failure" | "pending" | "none";
 
-/** Display bucket and label for a check rollup: "✓ 12", "✗ 2/14", "● 3/14", "no checks". */
+/**
+ * Display bucket and label for a check rollup: "12/12 passed", "2/14 failing", "4/13 pending",
+ * "no checks"; just "failing" when the rollup fails without a failed check (a commit status).
+ */
 export function checksSummary(c: CheckRollupView): { tone: ChecksTone; label: string } {
   if (c.total === 0) return { tone: "none", label: "no checks" };
-  if (c.failed > 0 || c.state === "failure" || c.state === "error") return { tone: "failure", label: `${String(c.failed)}/${String(c.total)} failing` };
+  if (c.failed > 0) return { tone: "failure", label: `${String(c.failed)}/${String(c.total)} failing` };
+  if (c.state === "failure" || c.state === "error") return { tone: "failure", label: "failing" };
   if (c.pending > 0 || c.state === "pending" || c.state === "expected") return { tone: "pending", label: `${String(c.pending)}/${String(c.total)} pending` };
   return { tone: "success", label: `${String(c.passed + c.skipped)}/${String(c.total)} passed` };
-}
-
-export function reviewLabel(r: ReviewView): string {
-  switch (r) {
-    case "approved":
-      return "approved";
-    case "changes_requested":
-      return "changes requested";
-    case "review_required":
-      return "review required";
-    default:
-      return "—";
-  }
 }
 
 /** "owner/name" -> "name" for narrow repo columns. */

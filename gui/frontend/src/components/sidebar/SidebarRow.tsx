@@ -8,13 +8,13 @@ import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentsLabel } from "@/lib/agents";
-import { useNow, useNowSelect } from "@/lib/clock";
+import { useNowSelect } from "@/lib/clock";
 import { formatElapsed } from "@/lib/elapsed";
 import { QUIET } from "@/lib/quiet";
 import { cn } from "@/lib/utils";
 import { threadBadge, shortAge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
-import { statusLine, statusText, tipStatusTone, type StatusLineKind, type StatusTone, type TipStatusTone } from "@/lib/statusLine";
+import { statusLine, statusText, statusToneText, tipStatusTone, type StatusLineKind, type TipStatusTone } from "@/lib/statusLine";
 import { statusBadge, statusTimeAt } from "@/lib/statusRegistry";
 import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
@@ -34,30 +34,33 @@ interface RowProps {
   row: Row;
   selected: boolean;
   cursor: boolean;
-  onActivate: (row: Row, how: "click") => void;
+  onActivate: (row: Row) => void;
 }
 
 /**
  * Inline name editor; Enter or blur commits via thread.rename, Escape cancels. It commits
  * only an edit of the name it opened with: a name that changed meanwhile (the naming
  * model's title replacing a provisional name) is not overwritten by the untouched text.
+ * Enter and Escape give focus back to what had it when the rename began; a blur leaves
+ * focus where it went.
  */
 function RenameField({ id, name }: { id: string; name: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
   const opened = useRef(name);
-  const returnTo = useRef<Element | null>(null);
+  // Read on the first render: by the first effect, autoFocus has already moved focus here.
+  const [returnTo] = useState(() => document.activeElement);
   useEffect(() => {
-    returnTo.current = document.activeElement;
     ref.current?.select();
   }, []);
-  const finish = (commit: boolean) => {
+  const finish = (commit: boolean, restoreFocus: boolean) => {
     if (done.current) return;
     done.current = true;
     const value = ref.current?.value.trim() ?? "";
     useUiStore.getState().setRenaming(null);
     if (commit && value && value !== opened.current && value !== name) void renameThread(id, value);
-    if (returnTo.current instanceof HTMLElement && returnTo.current.isConnected) returnTo.current.focus();
+    if (!restoreFocus) return;
+    if (returnTo instanceof HTMLElement && returnTo !== document.body && returnTo.isConnected) returnTo.focus();
     else useUiStore.getState().focusSidebar();
   };
   return (
@@ -76,25 +79,16 @@ function RenameField({ id, name }: { id: string; name: string }) {
       }}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === "Enter") finish(true);
-        else if (e.key === "Escape") finish(false);
+        if (e.key === "Enter") finish(true, true);
+        else if (e.key === "Escape") finish(false, true);
       }}
       onBlur={() => {
-        finish(true);
+        finish(true, false);
       }}
     />
   );
 }
 
-
-/** The hover card's status colours (lib/statusLine tones): amber waiting on the user, red failed, emerald done. */
-const toneClasses: Readonly<Record<StatusTone, string>> = {
-  muted: "",
-  sky: "text-cf-info-text",
-  amber: "text-cf-warning-text",
-  emerald: "text-cf-success-text",
-  red: "text-cf-error-text",
-};
 
 /**
  * Time since `at` (lib/elapsed formatElapsed: "4s", "4m", "1h 4m", "3d"). One shared 1 s
@@ -435,7 +429,7 @@ function TipStatus({ id }: { id: string }) {
   const finished = line.kind === "finished";
   const timed = changedAt !== null && (finished || timedCardKinds.has(line.kind));
   return (
-    <div className={cn("mb-[3px] flex items-start gap-2 leading-5", toneClasses[tone])} data-testid="tip-status" data-tone={tone}>
+    <div className={cn("mb-[3px] flex items-start gap-2 leading-5", statusToneText[tone])} data-testid="tip-status" data-tone={tone}>
       <Icon className="mt-[3px] size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 break-words">
         {statusText({ ...line, at: null }, 0)}
@@ -470,8 +464,8 @@ function TipCreatedBy({ id }: { id: string }) {
 }
 
 /**
- * A queued "Run in…" move in full (the row's "moving to X…" is cut short and does not say
- * when): the thread runs there once it is idle at its prompt. Nothing without a move.
+ * A queued "Run in…" move, which only this card shows (the row keeps the current place):
+ * the thread runs there once it is idle at its prompt. Nothing without a move.
  */
 function TipMoving({ id }: { id: string }) {
   const { movingTo } = useThreadPlace(id);
@@ -610,11 +604,11 @@ function SectionHeader({ row }: { row: HeaderRow }) {
 /** How long ago the thread was archived ("5m", "3h", "2d"), on the shared 30 s clock. */
 function ArchivedAge({ id }: { id: string }) {
   const at = useThreadsStore((s) => s.byId[id]?.archivedAtMs ?? null);
-  const now = useNow(30_000);
+  const age = useNowSelect(30_000, (now) => (at === null ? "" : shortAge(at, now)));
   if (at === null) return null;
   return (
     <span className="ml-auto shrink-0 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-archived-age">
-      {shortAge(at, now)}
+      {age}
     </span>
   );
 }
@@ -637,13 +631,13 @@ function SavedMark() {
 function SnoozeLeft({ id }: { id: string }) {
   const until = useThreadsStore((s) => s.byId[id]?.snoozedUntilMs ?? null);
   const saved = useThreadsStore((s) => (s.byId[id]?.savedAtMs ?? null) !== null);
-  const now = useNow(30_000);
+  const left = useNowSelect(30_000, (now) => (until === null ? "" : shortRemaining(until, now)));
   if (saved) return <SavedMark />;
   if (until === null) return null;
   return (
     <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-snooze-left">
       <AlarmClock className="size-3 shrink-0" aria-hidden data-testid="row-snooze-icon" />
-      {shortRemaining(until, now)}
+      {left}
     </span>
   );
 }
@@ -694,7 +688,7 @@ export const SidebarRow = memo(function SidebarRow({ row, selected, cursor, onAc
           cursor && "group-focus:ring-1 group-focus:ring-cf-focus group-focus:ring-inset",
         )}
         onClick={() => {
-          onActivate(row, "click");
+          onActivate(row);
         }}
         onDoubleClick={() => {
           useUiStore.getState().setRenaming(row.threadId);

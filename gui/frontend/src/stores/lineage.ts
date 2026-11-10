@@ -1,8 +1,7 @@
 /**
  * Narrow selectors over thread lineage (lib/lineage, docs/notes/agents-3-lineage-gui.md),
- * all derived from the thread list: no RPC. Id lists are shallow-compared, so a related
- * thread's status change re-renders only its own row (the rows select their fields), and
- * a list re-renders only when a thread joins, leaves or changes creator.
+ * all derived from the thread list: no RPC. Each selects a value or a few fields
+ * (shallow-compared), so a related thread's unrelated change re-renders nothing.
  */
 import { useShallow } from "zustand/react/shallow";
 import { creatorOf, noteCreator, type Creator } from "@/lib/lineage";

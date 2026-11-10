@@ -11,13 +11,13 @@ import { fitColumns, TABLE_GAP_PX } from "@/components/table/fit";
 import { buttonsWidth } from "./menu";
 
 /** A weighted column's least width when it sets none (pluginsdk/ui TableColumnMinWidth). */
-export const COLUMN_MIN_PX = 80;
+const COLUMN_MIN_PX = 80;
 
 /** The ⋯ track at a row's end (MoreMenu is 24 px). */
-export const MORE_PX = 24;
+const MORE_PX = 24;
 
 /** A column's least width (px): its fixed width, else its minWidth. */
-export function columnFloor(c: TableColumn): number {
+function columnFloor(c: TableColumn): number {
   return c.width ?? c.minWidth ?? COLUMN_MIN_PX;
 }
 

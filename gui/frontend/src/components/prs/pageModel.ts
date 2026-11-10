@@ -3,7 +3,7 @@
  * rows and counts, the summary cards' subtitles, and the header's freshness. Pure.
  */
 import type { DashboardView, ProjectPullRequestsView, PullRequestView } from "@/api/gh";
-import type { Freshness } from "@/stores/gh";
+import { pullRequestKey, type Freshness } from "@/stores/gh";
 import { repoName } from "./format";
 import { ACTION_RANK, authoredRows, authoredStatus, type AuthoredRow, type AuthoredStatus, type AuthoredStatusKind } from "./authoredStatus";
 import { reviewQueue, type NeedsRow, type ReviewedRow } from "./reviewQueue";
@@ -55,7 +55,7 @@ export interface Cap {
 /** The nav key of a section's cap footer: an option after its rows, so the keyboard reaches it too. */
 export const capKey = (section: Section): string => `cap:${section}`;
 
-export const prId = (p: Pick<PullRequestView, "repoSlug" | "number">): string => `${p.repoSlug.toLowerCase()}#${String(p.number)}`;
+export const prId = (p: Pick<PullRequestView, "repoSlug" | "number">): string => pullRequestKey(p.repoSlug, p.number);
 
 /** The pull requests GitHub matched beyond the list it returned (0 when uncapped). */
 const hiddenCount = (l: ProjectPullRequestsView): number => Math.max(0, l.totalCount - l.pullRequests.length);
@@ -311,10 +311,6 @@ export function cards(m: PageModel): Card[] {
 }
 
 /**
- * The header's freshness over both of the page's fetches: the older fetch time (the
- * project lists' only once they were fetched) and the first error.
- */
-/**
  * What the page can say about a dashboard: "pending" before anything answered (a daemon's first
  * poll on an empty cache), when empty lists mean "not known yet", not "none"; "failed" when
  * the first polls fail; else "ready". A poll that found nothing publishes no dashboard event,
@@ -327,6 +323,10 @@ export function dashboardLoad(d: Pick<DashboardView, "fetchedAtMs" | "authentica
   return reading ? "pending" : "ready";
 }
 
+/**
+ * The header's freshness over both of the page's fetches: the older fetch time (the
+ * project lists' only once they were fetched) and the first error.
+ */
 export function olderFreshness(dashboard: Freshness, projects: Freshness): Freshness {
   const a = dashboard.fetchedAtMs;
   const b = projects.fetchedAtMs;

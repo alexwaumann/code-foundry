@@ -1,4 +1,4 @@
-import { memo, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { memo, useContext, useMemo, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   Bot,
@@ -32,7 +32,7 @@ import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, agentName, fmtElapsed, parseAgentNote } from "@/lib/agents";
-import { useNow } from "@/lib/clock";
+import { useNow, useNowSelect } from "@/lib/clock";
 import { parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
 import { formatAgo } from "@/lib/thread";
@@ -356,7 +356,6 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
   );
 });
 
-/** Claude's text: markdown, with a caret while it streams; the turn's final answer gets more air. */
 /**
  * Copies a finished turn's answer (its final text items, `answer`'s ids, joined by blank
  * lines): a 24px button at the answer's top right, shown while the answer is hovered,
@@ -382,6 +381,7 @@ function CopyAnswer({ answer }: { answer: string }) {
   );
 }
 
+/** Claude's text: markdown, with a caret while it streams; the turn's final answer gets more air. */
 const TextRow = memo(function TextRow({ id, final, answer }: { id: string; final: boolean; answer?: string }) {
   const { threadId } = useThreadCtx();
   const it = useThreadItem(threadId, id);
@@ -877,21 +877,6 @@ const UserRow = memo(function UserRow({ id, steer }: { id: string; steer?: boole
   );
 });
 
-/** Re-renders every second while `live`. */
-function useLiveNow(live: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!live) return;
-    const t = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => {
-      clearInterval(t);
-    };
-  }, [live]);
-  return now;
-}
-
 /** A header's line: its parts with a "·" between them; the first one red when `red`. */
 function Parts({ parts, red }: { parts: readonly string[]; red?: boolean }) {
   return parts.map((p, i) => (
@@ -981,7 +966,8 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   // The first turn's work starts when the setup ends, not when its message was sent.
   const setupEnd = useThreadsStore((s) => (live ? (s.byId[threadId]?.setup?.endedAtMs ?? null) : null));
   const start = sent !== null && setupEnd !== null ? Math.max(sent, setupEnd) : sent;
-  const now = useLiveNow(live);
+  // A finished turn's header is fixed: only the live one ticks.
+  const now = useNowSelect(1000, (n) => (live ? n : 0));
   const models = useModelChoices();
   if (live) {
     const parts = ["Working"];

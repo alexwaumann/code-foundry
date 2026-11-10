@@ -50,6 +50,7 @@ import { useProjectKind } from "@/components/icons/projectKind";
 import { projectMenu, workspaceMenu } from "./menus";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { RowContextMenu } from "./RowContextMenu";
+import { openCursorRowMenu } from "./rowMenu";
 import { useCleanableCount } from "./useCleanable";
 import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrder } from "./useOrder";
 import { useWorkspaceTerminal } from "./workspaceHooks";
@@ -458,7 +459,7 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
                 filterRef.current?.focus();
                 return;
               }
-              nav.onKeyDown(e);
+              if (!openCursorRowMenu(e)) nav.onKeyDown(e);
             }}
           >
             {!loaded ? (

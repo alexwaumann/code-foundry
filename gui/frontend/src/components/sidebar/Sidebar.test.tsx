@@ -111,7 +111,6 @@ describe("Sidebar: the thread list", () => {
     expect(["s-1", "s-2", "s-3", "s-4", "s-5", "s-6"].map(badge)).toEqual(["busy", "attention", "idle", "idle", "busy", "idle"]);
     expect(rowOf("s:s-5")?.getAttribute("data-section")).toBe("working");
     expect(within(rowOf("s:s-5") as HTMLElement).getByTestId("row-status").textContent).toMatch(/^Working\d+[smhd]/);
-    for (const id of ["s-3", "s-4", "s-6"]) expect(within(rowOf(`s:${id}`) as HTMLElement).getByTestId("thread-body").hasAttribute("data-offline")).toBe(false);
     expect(list().textContent).not.toMatch(/disconnected|starting|closing/i);
   });
 
@@ -122,7 +121,6 @@ describe("Sidebar: the thread list", () => {
     const s1 = rowOf("s:s-1") as HTMLElement;
     expect(s1.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("error");
     expect(within(s1).getByTestId("row-status").textContent).toBe("Interrupted");
-    expect(within(s1).queryByTestId("row-detail")).toBeNull();
     // In the main list's waiting band (as after an Unsnooze of an interrupted thread).
     expect(s1.getAttribute("data-section")).toBe("attention");
     setThread("s-2", { state: "disconnected", status: "attention", statusReason: "permission: Bash zig build -Doptimize=ReleaseFast" });
@@ -130,7 +128,6 @@ describe("Sidebar: the thread list", () => {
     const s2 = rowOf("s:s-2") as HTMLElement;
     expect(s2.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("attention");
     expect(within(s2).getByTestId("row-status").textContent).toBe("Permission");
-    expect(within(s2).queryByTestId("row-detail")).toBeNull();
     expect(within(s2).getByTestId("row-branch").textContent).not.toBe("");
   });
 
@@ -252,7 +249,6 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     expect(s8.getAttribute("data-section")).toBe("attention");
     expect(within(s8).getByTestId("row-status").textContent).toBe("Woke");
     expect(within(s8).getByTestId("row-status").className).toContain("text-cf-warning-text");
-    expect(within(s8).queryByTestId("row-detail")).toBeNull();
   });
 
   it("Archived: collapsed by default with its count, last; expanded, the one-line row with its age; gone with no archived thread, back with one", () => {
@@ -452,7 +448,6 @@ describe("Sidebar: the menu pane", () => {
   it("marks the current page: New thread on a composer, Projects, Pull Requests", () => {
     useUiStore.setState({ selection: { kind: "compose", projectId: "" } as never });
     render(<Sidebar />);
-    expect(screen.queryByTestId("sidebar-toolbar")).toBeNull();
     expect(current()).toEqual(["sidebar-new-thread"]);
     expect(screen.getByTestId("sidebar-new-thread").className).toContain("bg-cf-sidebar-row-selected");
     for (const id of ["nav-projects", "nav-pullrequests"]) {

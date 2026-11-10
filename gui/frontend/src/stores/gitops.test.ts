@@ -27,7 +27,14 @@ describe("planGitOpToasts", () => {
       kind: "snapshot",
       ops: [op("running", "running"), op("queued", "queued"), op("mine", "succeeded"), op("old", "failed")],
     });
-    expect(p.actions.map((a) => `${a.show}:${a.op.id}`)).toEqual(["progress:running", "progress:queued", "result:mine"]);
+    expect(p.actions.map((a) => `${a.show}:${a.show === "dismiss" ? a.id : a.op.id}`)).toEqual(["progress:running", "progress:queued", "result:mine"]);
     expect([...p.shown].sort()).toEqual(["queued", "running"]);
+  });
+
+  it("on a snapshot without an op it was showing (the daemon restarted), takes its progress toast down", () => {
+    const p = planGitOpToasts(new Set(["a", "b"]), { kind: "snapshot", ops: [op("b", "running")] });
+    expect(p.actions).toEqual([{ show: "progress", op: op("b", "running") }, { show: "dismiss", id: "a" }]);
+    expect([...p.shown]).toEqual(["b"]);
+    expect(planGitOpToasts(new Set(["a"]), { kind: "snapshot", ops: [] })).toEqual({ shown: new Set(), actions: [{ show: "dismiss", id: "a" }] });
   });
 });

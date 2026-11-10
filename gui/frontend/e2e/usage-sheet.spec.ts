@@ -19,13 +19,6 @@ async function openUsage(page: Page) {
   await expect(sheet(page)).toHaveCSS("opacity", "1");
 }
 
-async function rect(page: Page) {
-  return sheet(page).evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
-  });
-}
-
 /** Clicks the page where `testId` is: under the open sheet that hits the backdrop. */
 async function clickUnder(page: Page, testId: string) {
   const box = await page.getByTestId(testId).boundingBox();
@@ -33,38 +26,29 @@ async function clickUnder(page: Page, testId: string) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
-for (const [w, h, want] of [
-  // The cap: 1280x1280 centred.
-  [1500, 1400, { x: 110, y: 60, width: 1280, height: 1280 }],
-  // Width at the cap, height margin-limited.
-  [1440, 900, { x: 80, y: 48, width: 1280, height: 804 }],
-  // Margin-limited: 48px from every edge.
-  [1000, 700, { x: 48, y: 48, width: 904, height: 604 }],
-] as const) {
-  test(`at ${String(w)}x${String(h)} the sheet is ${String(want.width)}x${String(want.height)} with a 44px header`, async ({ page }) => {
-    await page.setViewportSize({ width: w, height: h });
-    await openApp(page);
-    await openUsage(page);
-    await expect(sheet(page)).toHaveAttribute("role", "dialog");
-    await expect(sheet(page)).toHaveAttribute("data-size", "sheet");
-    await expect(page.getByRole("dialog", { name: "Usage" })).toBeVisible();
-    expect(await rect(page)).toEqual(want);
-    await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(1);
-    // The header: the title, the note, the range control and the ×, not a window drag surface.
-    const header = sheet(page).locator("[data-sheet-header]");
-    expect((await header.boundingBox())?.height).toBe(44);
-    await expect(header).toContainText("Usage");
-    await expect(header).toContainText("Code Foundry threads only");
-    await expect(header.getByTestId("usage-page-range")).toBeVisible();
-    await expect(header.getByTestId("usage-page-close")).toBeVisible();
-    expect(await header.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).not.toBe("drag");
-    // The body scrolls inside the sheet: nothing spills out of it.
-    const body = await sheet(page).evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
-    expect(body.scroll).toBe(body.client);
-    // Nothing of it is left in the content pane.
-    await expect(page.getByTestId("content-pane").getByTestId("usage-page")).toHaveCount(0);
-  });
-}
+// The sheet's size at each window size is the shared sheet rule's: settings-sheet.spec.ts.
+test("the sheet is a dialog with a 44px header, and its body scrolls inside it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openApp(page);
+  await openUsage(page);
+  await expect(sheet(page)).toHaveAttribute("role", "dialog");
+  await expect(sheet(page)).toHaveAttribute("data-size", "sheet");
+  await expect(page.getByRole("dialog", { name: "Usage" })).toBeVisible();
+  await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(1);
+  // The header: the title, the note, the range control and the ×, not a window drag surface.
+  const header = sheet(page).locator("[data-sheet-header]");
+  expect((await header.boundingBox())?.height).toBe(44);
+  await expect(header).toContainText("Usage");
+  await expect(header).toContainText("Code Foundry threads only");
+  await expect(header.getByTestId("usage-page-range")).toBeVisible();
+  await expect(header.getByTestId("usage-page-close")).toBeVisible();
+  expect(await header.evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim())).not.toBe("drag");
+  // The body scrolls inside the sheet: nothing spills out of it.
+  const body = await sheet(page).evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
+  expect(body.scroll).toBe(body.client);
+  // Nothing of it is left in the content pane.
+  await expect(page.getByTestId("content-pane").getByTestId("usage-page")).toHaveCount(0);
+});
 
 test("the chart button toggles it; Escape, the backdrop and the × close it, and the thread's prompt takes the keyboard back", async ({ page }) => {
   await openApp(page);

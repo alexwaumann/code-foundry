@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { useSettingValue } from "@/stores/settings";
 import { useThreadItem } from "@/stores/thread";
 import { useThemesStore, useUserThemes } from "@/stores/themes";
-import { applySavedTheme, editSavedTheme, themeUndoState, undoTheme, type ThemeUndoTarget } from "@/stores/themeCards";
+import { themeUndoState, undoTheme, type ThemeUndoTarget } from "@/stores/themeCards";
+import { editTheme, setThemeSlot } from "@/stores/themePicker";
 import { contrastReport } from "@/themes/contrast";
 import { themeById, themeOf, type Theme, type UserThemeFile } from "@/themes";
 import { useThreadCtx } from "./context";
@@ -142,7 +143,7 @@ function ApplyButton({ scheme, id }: { scheme: UserThemeFile["scheme"]; id: stri
       data-testid="thread-theme-apply"
       onClick={() => {
         setBusy(true);
-        void applySavedTheme(scheme, id).finally(() => {
+        void setThemeSlot(scheme, id).finally(() => {
           setBusy(false);
         });
       }}
@@ -167,7 +168,7 @@ function EditButton({ id }: { id: string }) {
       disabled={gone}
       data-testid="thread-theme-edit"
       onClick={() => {
-        void editSavedTheme(id);
+        void editTheme(id);
       }}
     >
       <Pencil aria-hidden />

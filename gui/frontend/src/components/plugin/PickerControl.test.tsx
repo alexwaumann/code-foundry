@@ -22,7 +22,7 @@ vi.mock("@/api/plugin", async (importOriginal) => ({
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
-const ctx: ViewCtx = { watchKey: "w", instance: "p/s/global", plugin: "p", viewTab: "", uiContext: emptyContext } as ViewCtx;
+const ctx: ViewCtx = { watchKey: "w", instance: "p/s/global", viewTab: "", uiContext: emptyContext } as ViewCtx;
 
 const people: SelectOption[] = [
   { key: "o-me", value: "me", label: "Me", avatar: "AW", detail: "you", group: "Selected" },

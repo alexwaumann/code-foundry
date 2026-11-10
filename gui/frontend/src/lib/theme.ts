@@ -192,11 +192,6 @@ export function activeThemeSlots(): Readonly<Record<string, string>> {
   return activeTheme().slots;
 }
 
-/** activeThemeSlots(); re-renders when the active theme changes. */
-export function useActiveThemeSlots(): Readonly<Record<string, string>> {
-  return useSyncExternalStore(subscribe, activeThemeSlots, activeThemeSlots);
-}
-
 /**
  * Calls cb with the resolved slots now and after every change of the active theme (not on
  * a preference or slot change that leaves it the same). Returns an unsubscribe.

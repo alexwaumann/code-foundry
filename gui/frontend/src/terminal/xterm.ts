@@ -69,7 +69,6 @@ export class XtermRenderer implements TerminalRenderer {
    * reset(), so without it the find would take the reset screen for the snapshot's replay.
    */
   private pending = 0;
-  kind: RendererKind = "dom";
 
   constructor(private readonly opts: XtermRendererOptions) {
     this.term = new Terminal({
@@ -249,7 +248,6 @@ export class XtermRenderer implements TerminalRenderer {
   }
 
   private setKind(kind: RendererKind): void {
-    this.kind = kind;
     this.opts.onRendererChange?.(kind);
   }
 

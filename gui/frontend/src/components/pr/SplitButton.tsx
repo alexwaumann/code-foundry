@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { POPUP_COLLISION_PADDING, POPUP_FIT, stopPlainKeys, usePanelBoundary } from "./keys";
 
 /** A split button's colour: the merge's success fill, or the neutral control. */
-export type SplitTone = "success" | "neutral";
+type SplitTone = "success" | "neutral";
 
 /** A blocked main part: the neutral control without its hover (it runs nothing). */
 const blockedLook = "border-cf-border bg-cf-canvas dark:border-cf-input dark:bg-cf-input/30";
@@ -59,6 +59,14 @@ export function SplitButton({
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // Going busy (here or from another surface, the palette or the CLI) shuts the menu for
+  // good: the controlled `open && !busy` alone would leave `open` set, and the menu would
+  // pop back once the work settles. Derived during render, like ReviewButton's.
+  const [wasBusy, setWasBusy] = useState(busy);
+  if (busy !== wasBusy) {
+    setWasBusy(busy);
+    if (busy) setOpen(false);
+  }
   const { ref, boundary } = usePanelBoundary();
   const reasonId = useId();
   const blocked = reason !== null || busy;

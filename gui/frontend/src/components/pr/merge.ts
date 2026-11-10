@@ -12,7 +12,7 @@ export const MERGE_METHOD_LABELS: Record<MergeMethodView, string> = {
   rebase: "Rebase and merge",
 };
 
-export const MERGE_METHOD_ORDER: readonly MergeMethodView[] = ["merge", "squash", "rebase"];
+const MERGE_METHOD_ORDER: readonly MergeMethodView[] = ["merge", "squash", "rebase"];
 
 /** The split button's label for a method (the menu keeps GitHub's longer ones). */
 export const MERGE_BUTTON_LABELS: Record<MergeMethodView, string> = {

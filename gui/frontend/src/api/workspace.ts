@@ -3,8 +3,8 @@ import type { Workspace, WorkspaceEvent } from "@/gen/codefoundry/v1/workspace_p
 
 /**
  * A member of a workspace: a project. A workspace has no worktrees since the reshape
- * (docs/notes/workspaces-v2-2-workspaces.md): worktreePath is always "" until the GUI
- * moves to thread checkouts (workspaces v2, PRs 3 and 4).
+ * (docs/notes/workspaces-v2-2-workspaces.md): worktreePath is always "" (a thread has its
+ * checkouts).
  */
 export interface WorkspaceMemberView {
   projectId: string;

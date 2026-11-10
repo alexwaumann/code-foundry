@@ -128,7 +128,9 @@ function HeaderCell({ col, sort, onSort, inert }: { col: TableColumn; sort: Tabl
           }}
         >
           {end && arrow}
-          <span className="truncate">{label}</span>
+          <Tip label={label} whenTruncated>
+            <span className="truncate">{label}</span>
+          </Tip>
           {!end && arrow}
         </button>
       ) : (

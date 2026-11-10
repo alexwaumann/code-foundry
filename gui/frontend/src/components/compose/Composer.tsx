@@ -43,7 +43,7 @@ import {
   type ComposeTarget,
   type WorktreeChoice,
 } from "@/lib/compose";
-import { fileSources, skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
+import { skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
 import { byName, resolveSet, setName, WORKSPACE_PRIMARY, type ResolvedSet } from "@/lib/projectSet";
 import { NO_PROJECT } from "@/lib/threadRow";
@@ -85,7 +85,7 @@ const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
 const HOME_TRIGGERS: readonly TriggerChar[] = ["/", "@"];
 const NO_TRIGGERS: readonly TriggerChar[] = [];
 
-/** Model and effort the composer starts with: the settings defaults, else opus / high. */
+/** Model and effort the composer starts with: the settings defaults, else the registry's (Sonnet 5, medium). */
 function useDefaults(): { model: string; effort: string } {
   const model = pickDefault(useModelChoices(), useSettingValue("threads.default_model"), DEFAULT_MODEL);
   const effort = pickDefault(EFFORT_CHOICES, useSettingValue("threads.default_effort"), DEFAULT_EFFORT);
@@ -337,7 +337,6 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   useEffect(() => {
     void loadSkills(sources);
   }, [sources]);
-  const fileSrcs = useMemo(() => fileSources({ projectIds: sourceIds, paths: sourcePaths }), [sourceIds, sourcePaths]);
   const primaryMain = useProjectsStore((s) => {
     const p = s.byId[primaryProject];
     return p ? mainCheckout(p) : "";
@@ -347,7 +346,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const hostFiles = useHostFiles({ draftKey, editorRef, disabled: busy, startDir: existingPath || sourcePaths[primaryProject] || primaryMain || "" });
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
   const skillSource = useSkillSource(trigger, skillSourcesKey(sources), sourceIds);
-  const fileSource = useFileSource(trigger, fileSrcs, sourceIds, primaryProject);
+  const fileSource = useFileSource(trigger, sources, sourceIds, primaryProject);
   const mentionSource = useMentionSource(trigger, home ? null : fileSource, "");
   const prSource = usePrSource(trigger, useProjectSlugs(sourceIds));
   const bySource: Record<TriggerChar, CompletionSource> = { "/": skillSource, "@": mentionSource, "#": prSource };

@@ -4,6 +4,7 @@ import type { AgentHitView, SearchEntryView } from "@/api/search";
 import { Kbd } from "@/components/ui/kbd";
 import { formatChord } from "@/keys/chord";
 import { ANSWER_ROW, defaultSelection, endedNote, footerModel, hasAnswerRow, moveHit, restoreSelection, resultRows, searchEnded, tookLabel } from "@/lib/agentSearch";
+import { useNow } from "@/lib/clock";
 import { canonicalModelName } from "@/lib/models";
 import { imeKeyDown } from "@/lib/ime";
 import { markSearchSeen, openAgentHit, promoteAgent, stopAgent } from "@/stores/agentSearch";
@@ -17,19 +18,14 @@ import type { RestoreInit, SearchModeProps } from "./types";
 import { useSearchWatch } from "./useAgentSearch";
 import { previewKey, useSearchPreview, type PreviewLoaders, type PreviewTarget } from "./useSearch";
 
-/** The clock, ticking each second while `on`. */
-function useNow(on: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!on) return;
-    const t = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => {
-      clearInterval(t);
-    };
-  }, [on]);
-  return now;
+/** How long a running search has run, ticking each second (only this span re-renders). */
+function Elapsed({ since }: { since: number }) {
+  const now = useNow(1000);
+  return (
+    <span className="tabular-nums" data-testid="agent-elapsed">
+      {tookLabel(Math.max(0, now - since))}
+    </span>
+  );
 }
 
 /** The footer's right side: the utility model at low effort (the shown search's, else the setting's). */
@@ -163,7 +159,6 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
   const query = raw.trim();
   const { entry, gone } = useSearchWatch(dialog.entryId, dialog.seed, dialog.watchSearch);
   const running = entry?.status === "running";
-  const now = useNow(running || query === "");
   const hits = useMemo(() => entry?.hits ?? [], [entry?.hits]);
   const status = entry?.status ?? "running";
   const answer = entry?.answer ?? "";
@@ -288,7 +283,6 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
 
   const model = useFooterModel(entry?.model ?? "");
   const canDictate = dialog.dictation.availability !== "hidden";
-  const elapsed = entry && running ? Math.max(0, now - entry.createdAtMs) : 0;
   const recentRow = query === "" ? dialog.selectedRecent : null;
 
   let left: React.ReactNode;
@@ -296,7 +290,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
     left = (
       <>
         <AskHint />
-        <RecentList recent={dialog.recent} now={now} />
+        <RecentList recent={dialog.recent} />
       </>
     );
   } else if (gone) {
@@ -346,9 +340,7 @@ export function AgentSearch({ query: raw, header, dialog, loaders }: SearchModeP
           {right}
           {resultsShown && running && (
             <div className="flex shrink-0 items-center justify-end gap-3 px-5 py-2 text-caption text-cf-text-muted" data-testid="agent-running">
-              <span className="tabular-nums" data-testid="agent-elapsed">
-                {tookLabel(elapsed)}
-              </span>
+              <Elapsed since={entry.createdAtMs} />
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-caption text-cf-text outline-none hover:bg-cf-control-hover focus-visible:ring-2 focus-visible:ring-cf-focus/50"

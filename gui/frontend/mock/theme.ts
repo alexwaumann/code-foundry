@@ -46,6 +46,11 @@ export function publishMockTheme(f: MockFrame): void {
   published = { id: f.id, scheme: f.scheme, vars: { ...f.vars } };
 }
 
+/** POST /__mock/reset: nothing published, as at the daemon's start. */
+export function resetMockTheme(): void {
+  published = null;
+}
+
 const root = (f: MockFrame, indent = "") =>
   `${indent}:root {\n${indent}  color-scheme: ${f.scheme};\n` +
   Object.keys(f.vars)

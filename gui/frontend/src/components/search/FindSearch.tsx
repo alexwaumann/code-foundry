@@ -67,7 +67,7 @@ function SearchEmpty({ query, searching, dialog }: { query: string; searching: b
         <p className="px-5 py-6 text-body-sm text-cf-text-muted" data-testid="search-empty">
           Search every thread's name and messages: yours, Claude's text and answered questions. A capital letter makes it case-sensitive.
         </p>
-        <RecentList recent={dialog.recent} now={dialog.now} />
+        <RecentList recent={dialog.recent} />
       </>
     );
   }

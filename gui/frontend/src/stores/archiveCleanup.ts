@@ -4,8 +4,9 @@
  * closed, and the bottom panel is closed (the daemon removed the thread's shells, so its
  * tabs went on their own). A File tab with unsaved edits stays, and its panel opens, so the
  * user finds it on coming back: this can happen from another window or the CLI, with no one
- * to ask. Removing a thread drops its drafts, since nothing can reach them after; a thread
- * list that failed reports no removal, though it empties the store. Reacting to the threads store rather than wrapping
+ * to ask. Removing a thread drops its drafts and its side panel, bottom panel and recent
+ * files entries, since nothing can reach them after; a thread list that failed reports no
+ * removal, though it empties the store. Reacting to the threads store rather than wrapping
  * archiveThread / snoozeThread makes every archive and snooze behave the same. Only a
  * transition counts (not archived or snoozed to so, on a thread this window already
  * knew), so panels opened later on an archived or snoozed thread are left alone, a
@@ -24,6 +25,7 @@ import { isSnoozed } from "@/lib/snooze";
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { dropPanelDrafts, unsavedTabs } from "./fileEdit";
 import { emptyEntry, keyOf, usePanelStore, type PanelEntry } from "./panel";
+import { useRecentFilesStore } from "./recentFiles";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
 
@@ -65,6 +67,21 @@ export function resetThreadPanels(id: string): void {
   if (key in useBottomStore.getState().byKey) useBottomStore.setState((s) => ({ byKey: { ...s.byKey, [key]: emptyBottom } }));
 }
 
+function without<T>(byKey: Readonly<Record<string, T>>, key: string): Record<string, T> {
+  const { [key]: _gone, ...rest } = byKey;
+  return rest;
+}
+
+/** Drops a removed thread's drafts and its side panel, bottom panel and recent files entries. */
+function forgetThreadPanels(id: string): void {
+  const key = keyOf({ kind: "thread", id });
+  if (key === null) return;
+  dropPanelDrafts(key);
+  if (key in usePanelStore.getState().byKey) usePanelStore.setState((s) => ({ byKey: without(s.byKey, key) }));
+  if (key in useBottomStore.getState().byKey) useBottomStore.setState((s) => ({ byKey: without(s.byKey, key) }));
+  if (key in useRecentFilesStore.getState().byKey) useRecentFilesStore.setState((s) => ({ byKey: without(s.byKey, key) }));
+}
+
 /** Ids the store had before and not now (a removed event, or a snapshot without them). */
 export function newlyRemoved(prev: ThreadsData, next: ThreadsData): string[] {
   if (prev.byId === next.byId) return [];
@@ -86,7 +103,7 @@ export function startArchiveCleanup(): () => void {
     for (const id of putAway) resetThreadPanels(id);
     for (const id of newlyRemoved(prev, s)) {
       putAway.add(id);
-      if (s.availability !== "unavailable") dropPanelDrafts(keyOf({ kind: "thread", id }) ?? "");
+      if (s.availability !== "unavailable") forgetThreadPanels(id);
     }
     const ui = useUiStore.getState();
     if (putAwaySelected(ui.selection, putAway)) ui.select(HOME);

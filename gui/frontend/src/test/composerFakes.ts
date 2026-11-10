@@ -15,7 +15,7 @@ import type { RefsView } from "@/api/project";
 import type { SkillSourceView, SkillView } from "@/api/filesystem";
 
 /** One StageAttachment the composer made (a picked or pasted file: its name, type, size and pages). */
-export interface StagedFile {
+interface StagedFile {
   path: string;
   name: string;
   mimeType: string;
@@ -27,8 +27,6 @@ export const composerDaemon = {
   /** ListRefs per project id (mock/world.ts: local branches plus origin's, the default first). */
   refs: new Map<string, RefsView>(),
   staged: [] as StagedFile[],
-  /** ListSkills calls: "<project ids> <includeUser>". */
-  skillCalls: [] as string[],
 };
 
 const ORIGIN = ["main", "release/v0.3", "feat/sidebar"];
@@ -47,7 +45,6 @@ export function resetComposerDaemon(): void {
   composerDaemon.refs.set("repo-dot", refs("main", ["main"], ["main"]));
   composerDaemon.refs.set("repo-sk", refs("main", ["main", "experiment/shaders"], []));
   composerDaemon.staged.length = 0;
-  composerDaemon.skillCalls.length = 0;
 }
 resetComposerDaemon();
 
@@ -65,7 +62,6 @@ const PROJECT_SKILLS = [
 
 export const filesystemFakes = {
   listSkills: (sources: readonly SkillSourceView[], includeUser: boolean): Promise<SkillView[]> => {
-    composerDaemon.skillCalls.push(`${sources.map((s) => s.projectId).join(",")} ${String(includeUser)}`);
     const project = sources.flatMap((s) => PROJECT_SKILLS.map<SkillView>((k) => ({ ...k, scope: "project", projectId: s.projectId, path: `/p/${s.projectId}/.claude/skills/${k.name}/SKILL.md` })));
     const user: SkillView[] = includeUser ? [{ name: "commit", description: "Write a commit message and commit.", scope: "user", projectId: "", path: "/Users/dev/.claude/skills/commit/SKILL.md" }] : [];
     return Promise.resolve([...project, ...user]);
@@ -96,13 +92,9 @@ const PROMPTS: readonly [string, string, string, string, string, number][] = [
   ["s-3", "Fix resize race", "repo-cf", "The sidebar flickers when the window resizes. Find the race.", "", 290],
 ];
 
-/** ListPrompts calls: "<scope> <thread or projects> <query>". */
-export const promptCalls: string[] = [];
-
 export const promptFakes = {
   /** ThreadService.ListPrompts as the daemon scopes it: one thread, the threads sharing a project (with a thread, or the projects), or all; a case-insensitive substring. */
   listPrompts: (opts: { scope: "thread" | "project" | "all"; threadId?: string; projectIds?: readonly string[]; query?: string; limit?: number }) => {
-    promptCalls.push(`${opts.scope} ${opts.threadId ?? (opts.projectIds ?? []).join(",")} ${opts.query ?? ""}`);
     const projectOf = (id: string) => PROMPTS.find((p) => p[0] === id)?.[2] ?? "";
     const projects = opts.scope === "project" ? (opts.threadId ? [projectOf(opts.threadId)] : [...(opts.projectIds ?? [])]) : [];
     const q = (opts.query ?? "").toLowerCase();

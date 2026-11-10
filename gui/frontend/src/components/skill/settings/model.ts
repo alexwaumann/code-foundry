@@ -54,9 +54,9 @@ export function tierLabel(t: SkillTierView): string {
   return t === "enterprise" ? "Enterprise" : t === "community" ? "Community" : "";
 }
 
-/** "1 skill", "4 skills". */
+/** "1 skill", "1,237 skills". */
 export function skillCount(n: number): string {
-  return `${String(n)} ${n === 1 ? "skill" : "skills"}`;
+  return `${countWords(n)} ${n === 1 ? "skill" : "skills"}`;
 }
 
 /** Where an installed row comes from: "from <marketplace>", or "Local" for a skill Code Foundry did not install. */
@@ -72,7 +72,7 @@ export function installedWords(e: Pick<SkillEntryView, "state">): string {
 
 /** A marketplace's line: "3 plugins · 39 skills · read 5 min ago". */
 export function registryLine(r: Pick<SkillRegistryView, "plugins" | "skills" | "readAtMs">, now: number): string {
-  return [`${String(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`, skillCount(r.skills), readWords(r.readAtMs, now)].join(" · ");
+  return [`${countWords(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`, skillCount(r.skills), readWords(r.readAtMs, now)].join(" · ");
 }
 
 /** The chips in a group: none or both on is "any" (""), one on is its value. */
@@ -262,5 +262,5 @@ export function registriesSummary(rs: readonly Pick<SkillRegistryView, "name" | 
   const plugins = rs.reduce((n, r) => n + r.plugins, 0);
   const skills = rs.reduce((n, r) => n + r.skills, 0);
   const first = rs.length === 1 ? (rs[0]?.name ?? "") : `${String(rs.length)} marketplaces`;
-  return [first, `${countWords(plugins)} ${plugins === 1 ? "plugin" : "plugins"}`, `${countWords(skills)} ${skills === 1 ? "skill" : "skills"}`].join(" · ");
+  return [first, `${countWords(plugins)} ${plugins === 1 ? "plugin" : "plugins"}`, skillCount(skills)].join(" · ");
 }

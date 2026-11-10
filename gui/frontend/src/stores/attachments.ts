@@ -141,11 +141,6 @@ export async function loadAttachment(path: string): Promise<LoadedAttachment | n
   return loaded;
 }
 
-/** The object URL of a staged attachment (null while loading or when it is gone). */
-export async function loadAttachmentUrl(path: string): Promise<string | null> {
-  return (await loadAttachment(path))?.url ?? null;
-}
-
 /**
  * A staged PDF's summary (null when it is gone or pdf.js cannot read it, both remembered;
  * a failed fetch is not).

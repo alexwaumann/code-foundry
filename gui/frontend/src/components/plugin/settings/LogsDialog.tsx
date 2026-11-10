@@ -13,7 +13,7 @@ function clock(ms: number | null): string {
 
 /**
  * The tail of a plugin's log (stderr, its log lines and the daemon's own lines about it),
- * re-read every 2 s while open. The file's path is under it.
+ * re-read 2 s after each read while open. The file's path is under it.
  */
 export function LogsDialog({ plugin, displayName, onClose }: { plugin: string; displayName: string; onClose: () => void }) {
   const [lines, setLines] = useState<PluginLogLineView[]>([]);
@@ -21,6 +21,7 @@ export function LogsDialog({ plugin, displayName, onClose }: { plugin: string; d
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
+    let t: ReturnType<typeof setTimeout> | undefined;
     const load = () => {
       pluginLogs(plugin, 300, ctl.signal)
         .then((r) => {
@@ -30,13 +31,16 @@ export function LogsDialog({ plugin, displayName, onClose }: { plugin: string; d
         })
         .catch((err: unknown) => {
           if (!ctl.signal.aborted) setError(errorMessage(err));
+        })
+        .finally(() => {
+          // The next read once this one is back: a slow daemon never has two in flight.
+          if (!ctl.signal.aborted) t = setTimeout(load, 2000);
         });
     };
     load();
-    const t = setInterval(load, 2000);
     return () => {
       ctl.abort();
-      clearInterval(t);
+      clearTimeout(t);
     };
   }, [plugin]);
   return (

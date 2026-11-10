@@ -41,7 +41,7 @@ test("the focused list takes real keys: Home, ↓ and Enter select; cmd+2 is the
 // daemon's When (internal/command); queuing until idle and the new worktree are the daemon's
 // (internal/store/thread runin_test.go).
 
-// The Projects view removing a workspace, New thread from a project's page, Remove worktree with its context, no Remove on the main checkout: src/components/projects/WorkspacePage.test.tsx ("Remove workspace asks first…") and ProjectPage.test.tsx ("a checkout row's menu…", "the header's menu…"); the hover-shown terminal button is projects.spec.ts's.
+// The Projects view removing a workspace, New thread from a project's page, Remove worktree with its context, no Remove on the main checkout: src/components/projects/WorkspacePage.test.tsx ("Remove workspace asks first…") and ProjectPage.test.tsx ("a checkout row's menu…", "the header's menu…").
 
 // Status kinds: the order and sections (src/lib/tree.test.ts), each row's icon, word, tone and detail,
 // the idle time muted, no time on waiting rows, the name never coloured (src/components/sidebar/SidebarRow.test.tsx),
@@ -268,7 +268,6 @@ test("a long permission prompt: the row keeps its branch; the card wraps all of 
   await openApp(page);
   const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
   const approval = row(page, "s:s-k-approval");
-  await expect(approval.getByTestId("row-detail")).toHaveCount(0);
   await approval.hover();
   await expect(tip).toHaveAttribute("data-thread-id", "s-k-approval");
   const status = tip.getByTestId("tip-status");

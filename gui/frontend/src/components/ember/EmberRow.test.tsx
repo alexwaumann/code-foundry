@@ -31,7 +31,7 @@ function live(f: () => void): void {
 beforeEach(() => {
   setEmberEnabled(true);
   putEmberThread();
-  useUiStore.setState({ selection: { kind: "home" } as never, cursorKey: null });
+  useUiStore.setState({ selection: { kind: "none" }, cursorKey: null });
   usePanelStore.setState({ byKey: {} });
   world = new EmberWorld();
   world.publish();

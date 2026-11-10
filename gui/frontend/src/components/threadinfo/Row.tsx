@@ -168,7 +168,7 @@ function ownPress(e: { target: EventTarget; currentTarget: Element }): boolean {
  * (`group/split`). Use it as a Radix trigger's child (RowMore does). An explicit tabIndex:
  * WebKit (the app's WKWebView) leaves plain buttons out of the Tab order, unlike the rows.
  */
-export function RowMoreButton({ label, className, ...rest }: { label: string } & Omit<ComponentProps<"button">, "children">) {
+function RowMoreButton({ label, className, ...rest }: { label: string } & Omit<ComponentProps<"button">, "children">) {
   return (
     <button
       type="button"

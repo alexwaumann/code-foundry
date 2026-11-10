@@ -138,6 +138,22 @@ describe("searchSender", () => {
     expect(sent).toEqual(["al", "alex"]);
   });
 
+  it("sends a term again after the box went under the threshold (a search that failed is retried by retyping it)", async () => {
+    vi.useFakeTimers();
+    const sent: string[] = [];
+    const s = searchSender((t) => {
+      sent.push(t);
+      return Promise.resolve();
+    });
+    s.push("ale");
+    await vi.advanceTimersByTimeAsync(PICKER_DEBOUNCE_MS);
+    s.push("a");
+    s.push("al");
+    s.push("ale");
+    await vi.advanceTimersByTimeAsync(PICKER_DEBOUNCE_MS);
+    expect(sent).toEqual(["ale", "ale"]);
+  });
+
   it("sends nothing after cancel", async () => {
     vi.useFakeTimers();
     const send = vi.fn(() => Promise.resolve());

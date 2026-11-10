@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { McpServerStatusView, McpServerView, McpStatusView } from "@/api/mcp";
-import { bucketCounts, bucketEmptyLine, canReconnect, checkedAgo, checkedLine, claudeRunning, connectedSummary, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_SETTLING_LINE, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
+import { bucketCounts, bucketEmptyLine, canReconnect, checkedAgo, checkedLine, claudeRunning, MCP_BUCKET_EMPTY, MCP_BUCKET_LABEL, MCP_BUCKETS, MCP_SETTLING_LINE, MCP_STALE_AFTER_MS, mcpBucket, mcpStale, metaParts, needsAttention, sameServer, shareMcp, staleLine, toolCount, toolHints, transportLabel, type McpBucket, type McpStaleInput } from "./mcp";
 
 const NOW = 1_800_000_000_000;
 
@@ -103,10 +103,6 @@ describe("card helpers", () => {
     expect(needsAttention(st)).toBe(attention);
   });
 
-  it("counts the connected", () => {
-    expect(connectedSummary([server("a"), server("b", { status: "failed" }), server("c")])).toBe("2 of 3 connected");
-    expect(connectedSummary([])).toBe("0 of 0 connected");
-  });
 
   it.each<[string, { readOnly: boolean; destructive: boolean; openWorld: boolean }, string[]]>([
     ["read-only", { readOnly: true, destructive: false, openWorld: false }, ["read-only"]],

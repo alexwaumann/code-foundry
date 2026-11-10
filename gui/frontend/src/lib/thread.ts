@@ -42,14 +42,6 @@ export function isWorkingThread(t: Pick<ThreadView, "state" | "status">): boolea
   return threadBadge(t) === "busy";
 }
 
-export const badgeLabels: Record<ThreadBadge, string> = {
-  busy: "busy",
-  idle: "idle",
-  attention: "needs attention",
-  error: "error",
-  unknown: "thread",
-};
-
 /**
  * What a thread is waiting on or why it stopped, classified from the daemon's status
  * reason (the daemon's stream_status.go; the store's "interrupted"). "waiting for …",

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "bun check -b && vite build --mode production",
     "build:dev": "bun check -b && vite build --minify false --mode development",
-    "preview": "vite preview",
     "typecheck": "bun check -b",
     "lint": "oxlint --type-aware --deny-warnings",
     "test": "vitest run",

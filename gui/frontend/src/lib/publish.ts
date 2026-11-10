@@ -1,6 +1,6 @@
 /**
  * Rules for the Add Project dialog's New tab and the publish picker (pure, table
- * tested): project names (the daemon's project.ValidateName), the projects directory
+ * tested): project names (the daemon's newproject.ValidateName), the projects directory
  * shown as the destination, and which visibilities an owner offers and which is the
  * default.
  */

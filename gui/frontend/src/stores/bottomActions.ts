@@ -86,12 +86,12 @@ async function startShell(ctx: UiContextView, args: Record<string, string> = {})
 
 /**
  * Lets the selection's bottom panel show and take the keyboard: an open sheet (Settings,
- * Themes or Usage) closes, since a modal keeps focus inside it and a shell under it could
+ * Themes, Usage or Help) closes, since a modal keeps focus inside it and a shell under it could
  * not be typed in, and its side panel leaves full width (an expanded side panel hides the
  * content column).
  */
 function uncoverBottom(key: string): void {
-  useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false });
+  useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
   if (getPanel(key).expanded) expandPanel(key, false);
 }
 

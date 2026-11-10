@@ -8,7 +8,7 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 const NO_WORKSPACES: WorkspaceLookup = { byId: {} };
 
 /** The fields of a thread its place line reads, primitives only (an unknown thread: all empty). */
-export function placeInputOf(x: ThreadView | undefined): ThreadPlaceInput {
+function placeInputOf(x: ThreadView | undefined): ThreadPlaceInput {
   return {
     projectId: x?.projectId ?? "",
     worktreePath: x?.worktreePath ?? "",
@@ -47,8 +47,8 @@ export function useBranchlessRows(ids: readonly string[]): string {
 }
 
 /**
- * A thread's place line (lib/threadRow threadRowModel), each part from a narrow selector
- * returning a primitive: "project @ branch", or for several projects "<workspace name> @
+ * A thread's place line (lib/threadRow threadRowModel), its parts from one shallow-compared
+ * selector of primitives: "project @ branch", or for several projects "<workspace name> @
  * <branch>" / "<N projects> @ <branch>" (set), and a queued Run in move. The sidebar
  * row's line 2 (the run-in project only, the set label only for a workspace folder:
  * inFolder) reads it.
@@ -56,11 +56,12 @@ export function useBranchlessRows(ids: readonly string[]): string {
 export function useThreadPlace(id: string) {
   const s = useThreadPlaceInput(id);
   const set = useWorkspacesStore((st) => setLabel(s, st));
-  const project = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).project);
-  const branch = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).branch);
-  const noGit = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noGit);
-  const noProject = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).noProject);
-  const movingTo = useProjectsStore((st) => threadRowModel(s, st, NO_WORKSPACES).movingTo);
+  const { project, branch, noGit, noProject, movingTo } = useProjectsStore(
+    useShallow((st) => {
+      const m = threadRowModel(s, st, NO_WORKSPACES);
+      return { project: m.project, branch: m.branch, noGit: m.noGit, noProject: m.noProject, movingTo: m.movingTo };
+    }),
+  );
   // A thread in its workspace's folder (no project id): the place is the folder, named by the set label.
   const inFolder = !noProject && s.projectId === "" && s.workspaceId !== "";
   return { project, branch, noGit, noProject, movingTo, set: noProject ? null : set, inFolder };

@@ -27,8 +27,8 @@ const { useWorkspacesStore } = await import("@/stores/workspaces");
  * The Add Project dialog (project.add's presenter: New, Local folder with the folder-of-repos
  * choice, GitHub) and the Publish to GitHub dialog, against fakes of the mock daemon's folder
  * tree, GitHub and owners (src/test/addProjectFakes.ts). docs/notes/add-project-4-create.md,
- * docs/notes/workspaces-v2-6-scan.md. e2e keeps the palette entry points, the path completion
- * (e2e/paths.spec.ts) and the chevron's hover CSS.
+ * docs/notes/workspaces-v2-6-scan.md. e2e keeps the palette entry points and the chevron's
+ * hover CSS.
  */
 
 const dialog = () => screen.getByTestId("add-project-dialog");
@@ -556,8 +556,8 @@ describe("the GitHub tab", () => {
     expect(lines.at(-1)?.getAttribute("data-transient")).toBe("true");
     await waitFor(() => {
       expect(within(card()).getByTestId("add-project-clone").textContent).toBe("Retry clone");
+      expect(input().disabled).toBe(false);
     });
-    expect(input().disabled).toBe(false);
     expect(dialog()).toBeTruthy();
   });
 

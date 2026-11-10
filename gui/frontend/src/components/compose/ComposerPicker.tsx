@@ -8,7 +8,7 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/compon
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export interface PickerOption {
+interface PickerOption {
   value: string;
   label: string;
   /** Second, muted line (or trailing text). */

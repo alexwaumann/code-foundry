@@ -60,7 +60,7 @@ interface StoreModule {
     getState(): {
       logs: Record<string, { seq: number; order: string[]; byId: Record<string, StoreItem | undefined> } | undefined>;
       folds: Record<string, Record<string, boolean> | undefined>;
-      watch: { threadId: string; status: string } | null;
+      watches: Record<string, { status: string } | undefined>;
     };
   };
   structOf(it: StoreItem): unknown;
@@ -115,7 +115,7 @@ test("the timeline keeps up with a long turn", async ({ page }) => {
       return {
         storeSeq: log?.seq ?? -1,
         storeItems: log?.order.length ?? -1,
-        watch: s.watch?.threadId === id ? s.watch.status : "none",
+        watch: s.watches[id]?.status ?? "none",
         rows,
         maxIdx: idx.length ? Math.max(...idx) : -1,
         atBottom: el?.dataset.atBottom !== undefined,

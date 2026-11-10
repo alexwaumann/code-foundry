@@ -20,11 +20,11 @@ function useTabStatus(id: string): ActionTabStatus {
 }
 
 /** The action's icon (the action as it is now; Play once it was deleted). */
-export function ActionTabIcon({ id, className }: { id: string; className?: string }) {
+export function ActionTabIcon({ id }: { id: string }) {
   const actionId = useTerminalsStore((s) => s.byId[id]?.labels[ACTION_LABEL] ?? "");
   const icon = useActionsStore((s) => s.byId[actionId]?.icon ?? "play");
   const Icon = ACTION_ICON[icon];
-  return <Icon className={cn("size-3.5 shrink-0", className)} aria-hidden />;
+  return <Icon className="size-3.5 shrink-0" aria-hidden />;
 }
 
 /**

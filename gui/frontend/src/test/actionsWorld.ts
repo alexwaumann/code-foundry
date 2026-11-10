@@ -35,12 +35,12 @@ export function action(id: string, projectId: string, name: string, command: str
 export function seedActions(): void {
   const list = seeds.map(([id, name, command, icon, onCreate], i) => action(id, "repo-cf", name, command, icon, { onWorktreeCreate: onCreate, position: i }));
   act(() => {
-    useActionsStore.setState({ byId: Object.fromEntries(list.map((a) => [a.id, a])), byProject: { "repo-cf": list.map((a) => a.id) }, runs: {}, loaded: true });
+    useActionsStore.setState({ byId: Object.fromEntries(list.map((a) => [a.id, a])), byProject: { "repo-cf": list.map((a) => a.id) }, runs: {} });
   });
 }
 
 /** Who a run is for: a thread, or a worktree of a project (the Projects page's runs). */
-export type RunOwner = { threadId: string; projectId: string; worktree: string } | { threadId?: undefined; projectId: string; worktree: string };
+type RunOwner = { threadId: string; projectId: string; worktree: string } | { threadId?: undefined; projectId: string; worktree: string };
 
 let seq = 0;
 

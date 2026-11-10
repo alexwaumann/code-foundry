@@ -416,7 +416,7 @@ test("cmd+j on a thread without shells starts one with the keyboard in it; its e
   await expect.poll(() => focusInBottomTerminal(page)).toBe(true);
 });
 
-// The last shell of a panel not on screen exiting closes it too: src/stores/bottomActions.test.ts ("another thread selected: hidden all the same"); the exit event's wiring is the Projects page test below.
+// The last shell of a panel not on screen exiting closes it too: src/stores/bottomActions.test.ts ("another thread selected: hidden all the same").
 
 // The Projects page's last shell exiting and the empty state's hint: BottomPanel.test.tsx.
 

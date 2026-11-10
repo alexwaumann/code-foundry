@@ -5,29 +5,6 @@ import { refChoices, REF_CHOICES_MAX } from "./sources";
 
 const file = (path: string, o: Partial<CompareFileView> = {}): CompareFileView => ({ path, oldPath: "", status: "M", added: 1, deleted: 1, binary: false, submodule: false, ...o });
 
-describe("listPace", () => {
-  it.each([
-    [0, 250],
-    [60, 250],
-    [125, 250],
-    [130, 500],
-    [500, 1000],
-    [1400, 3000],
-    [60000, 3000],
-  ])("a read of %ims waits %ims", (took, want) => {
-    expect(listPace(took)).toBe(want);
-  });
-});
-
-describe("splitPath", () => {
-  it.each([
-    ["a/b/c.ts", "a/b/", "c.ts"],
-    ["c.ts", "", "c.ts"],
-  ])("%s", (p, dir, name) => {
-    expect(splitPath(p)).toEqual([dir, name]);
-  });
-});
-
 describe("buildFileRows", () => {
   it("conflicts first, the rest in the daemon's order", () => {
     const rows = buildFileRows([file("a.ts"), file("b.ts", { status: "U" }), file("c.ts")]);

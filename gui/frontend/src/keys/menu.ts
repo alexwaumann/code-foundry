@@ -14,7 +14,7 @@ import { jumpToAttention, startCommandNamed } from "./bindings";
  * bindings.ts). Keep the names in sync with gui/menu.go.
  */
 const menuViewActions: Readonly<Record<string, () => void>> = {
-  // Thread > Next Needing Attention, as cmd+shift+a and the sidebar's bell.
+  // Thread > Next Needing Attention, as cmd+shift+a.
   "attention.next": () => {
     if (!jumpToAttention()) toast.info("No threads need attention");
   },

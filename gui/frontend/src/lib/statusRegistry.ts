@@ -88,8 +88,8 @@ export function statusBadge(line: StatusLine): StatusBadge {
 }
 
 /**
- * The thread fields statusDetail reads. busyTool (the tool a working turn runs,
- * "Bash make check") is optional so this compiles before and after ThreadView has it.
+ * The thread fields statusDetail reads. busyTool is the tool a working turn runs
+ * ("Bash make check"); absent counts as none.
  */
 export type StatusDetailThread = Pick<ThreadView, "status" | "statusReason"> & { busyTool?: string };
 

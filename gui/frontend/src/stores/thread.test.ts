@@ -7,6 +7,7 @@ import {
   applyPendingEvent,
   applyThreadEvent,
   applyThreadEvents,
+  applyThreadSourceEvent,
   applyWatchBatch,
   closePageModal,
   deferTurnFolds,
@@ -14,6 +15,7 @@ import {
   openPageModal,
   PAGE_FLASH_MS,
   prunePageModals,
+  setAnswering,
   setPageModalSource,
   foldDeferredTurns,
   forgetTurnView,
@@ -261,6 +263,27 @@ describe("applyPendingEvent (EventService thread source)", () => {
     p = applyPendingEvent(p, { kind: "pending", threadId: "a", seq: 5, pending: [] });
     expect(Object.keys(p)).toEqual(["b"]);
     expect(applyPendingEvent(p, { kind: "appended", threadId: "b", seq: 9, item: text("x", 1) })).toBe(p);
+  });
+});
+
+describe("answering", () => {
+  beforeEach(() => {
+    useThreadStore.setState({ logs: {}, pending: {}, synced: {}, answering: {} });
+  });
+
+  it("forgets an answered request once no pending list has it, from either source", () => {
+    applyThreadSourceEvent({ kind: "pending", threadId: "a", seq: 1, pending: [pend("r1"), pend("r2")] });
+    applyWatchBatch("a", [snapshot(1, [], [pend("r1"), pend("r2")])]);
+    setAnswering("a", "r1", true);
+    setAnswering("a", "r2", true);
+    // The Watch has dropped r1, the EventService not yet: it stays answered (its prompt stays away).
+    applyWatchBatch("a", [{ kind: "pending", threadId: "a", seq: 2, pending: [pend("r2")] }]);
+    expect(useThreadStore.getState().answering.a).toEqual({ r1: true, r2: true });
+    applyThreadSourceEvent({ kind: "pending", threadId: "a", seq: 2, pending: [pend("r2")] });
+    expect(useThreadStore.getState().answering.a).toEqual({ r2: true });
+    applyThreadSourceEvent({ kind: "pending", threadId: "a", seq: 3, pending: [] });
+    applyWatchBatch("a", [{ kind: "pending", threadId: "a", seq: 3, pending: [] }]);
+    expect(useThreadStore.getState().answering).toEqual({});
   });
 });
 

@@ -48,22 +48,16 @@ cf.on("project-list", () => {});
 </script>
 </body></html>`;
 
-test("a healthy page reloads on a write in place, a rewrite of the same size, and a touch", async ({ page }) => {
+// Which writes count (in place, same size, touch, nothing): src/stores/fileStamps.test.ts.
+test("a healthy page reloads on a write and on a touch", async ({ page }) => {
   await openHtmlThread(page);
   await write(healthy("Edited"));
   await expect(doc(page).locator("#hello")).toHaveText("Edited");
-  // cp over the file with contents of the same length: only the time tells.
-  await write(healthy("Edytid"));
-  await expect(doc(page).locator("#hello")).toHaveText("Edytid");
   // touch: the page runs again (its state goes), contents unchanged.
   await doc(page).locator("#wave").click();
   await expect(doc(page).locator("#wave")).toHaveText("Waved");
   await touch();
   await expect(doc(page).locator("#wave")).toHaveText("Wave");
-  // Nothing written: no reload.
-  await doc(page).locator("#wave").click();
-  await page.waitForTimeout(2500);
-  await expect(doc(page).locator("#wave")).toHaveText("Waved");
 });
 
 test("a page that errored on load reloads when it is fixed, and when it is only touched", async ({ page }) => {
