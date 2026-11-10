@@ -371,8 +371,12 @@ func (r *HTTPRunner) send(ctx context.Context, method, u string, body []byte, to
 // body with GraphQL errors is classified by them even alongside data (GitHub answers
 // NOT_FOUND and RATE_LIMITED with HTTP 200); with data as well (and not rate limited)
 // the data comes back with a *PartialError. Non-2xx without an errors array is
-// classified by status.
+// classified by status, and so is a 502 or 504 with one: GitHub's timeout, which the
+// poll answers by shrinking the query.
 func parseGraphQLResponse(res httpResult) (json.RawMessage, error) {
+	if res.status == http.StatusBadGateway || res.status == http.StatusGatewayTimeout {
+		return nil, classifyHTTP(res)
+	}
 	var resp graphQLResponse
 	jsonErr := json.Unmarshal(res.body, &resp)
 	if res.status != http.StatusUnauthorized && jsonErr == nil && len(resp.Errors) > 0 {

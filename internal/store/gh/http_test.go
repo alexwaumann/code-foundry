@@ -137,6 +137,10 @@ func TestParseGraphQLResponse(t *testing.T) {
 			ErrRateLimited, &wantRL{secondary: true}},
 		{"bad credentials", 401, nil, "@http_401_bad_credentials.json", ErrNotAuthenticated, nil},
 		{"graphql timeout", 502, nil, "", ErrServerTimeout, nil},
+		{"graphql timeout with errors", 502, nil,
+			`{"data":null,"errors":[{"message":"Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug."}]}`,
+			ErrServerTimeout, nil},
+		{"gateway timeout with errors", 504, nil, `{"errors":[{"message":"timeout"}]}`, ErrServerTimeout, nil},
 		{"service unavailable", 503, nil, "", ErrNetwork, nil},
 	}
 	for _, tt := range tests {
