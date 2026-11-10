@@ -48,6 +48,15 @@ describe("HtmlPreview", () => {
     expect(previewFile).toHaveBeenCalledTimes(1);
   });
 
+  it("loads the page again on each Refresh press, though the text did not change", async () => {
+    previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me", singleFile: false });
+    const { rerender } = render(<HtmlPreview path="/Users/me/a.html" text="one" name="a.html" reloads={0} />);
+    const first = await screen.findByTestId("file-html-frame");
+    rerender(<HtmlPreview path="/Users/me/a.html" text="one" name="a.html" reloads={1} />);
+    expect(screen.getByTestId("file-html-frame")).not.toBe(first);
+    expect(previewFile).toHaveBeenCalledTimes(1);
+  });
+
   it("posts the theme to the frame on load and on every theme change", async () => {
     setThemePreference("dark");
     previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });

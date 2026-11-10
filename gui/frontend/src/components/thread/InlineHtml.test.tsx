@@ -151,6 +151,18 @@ describe("an inline page's card", () => {
     expect(within(c).getByTestId("thread-html-source-toggle").getAttribute("aria-disabled")).toBe("true");
   });
 
+  it("Reload loads the page again as written; there is nothing to reload behind the source or a failed page", async () => {
+    mount();
+    const c = () => card("hello.html") as HTMLElement;
+    const first = await within(c()).findByTestId("thread-html-frame");
+    fireEvent.click(within(c()).getByTestId("thread-html-reload"));
+    expect(within(c()).getByTestId("thread-html-frame")).not.toBe(first);
+    fireEvent.click(within(c()).getByTestId("thread-html-source-toggle"));
+    expect(within(c()).getByTestId("thread-html-reload").getAttribute("aria-disabled")).toBe("true");
+    await within(card("gone.html") as HTMLElement).findByTestId("thread-html-failed");
+    expect(within(card("gone.html") as HTMLElement).getByTestId("thread-html-reload").getAttribute("aria-disabled")).toBe("true");
+  });
+
   it("open in side panel opens the file in the thread's own panel", () => {
     mount();
     fireEvent.click(within(card("hello.html") as HTMLElement).getByTestId("thread-html-panel"));

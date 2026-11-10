@@ -1245,6 +1245,11 @@ tab's preview in the side panel) run in sandboxed frames that never touch the AP
 * **The theme**: the GUI publishes its active theme and resolved slots with
   `UiService.PublishTheme`; the pages listener serves them as `/cf/theme.css` and
   `/cf/theme.json` (`internal/theme`, `docs/notes/theme-css-route.md`).
+* **What a frame cannot do**: the frame has no window to open, no dialog and no download, and
+  a site loaded in it cannot sign in. The daemon writes `internal/preview/frame.js` into every
+  HTML document a frame navigates to: a clicked link to another site, and `window.open`, go to
+  the browser (`view.open.url`); `alert`, `confirm`, `prompt` and downloads are reported in the
+  page's error badge (`docs/notes/page-frame-links.md`).
 * **Page storage**: WebKit keeps a cross-site frame's localStorage for the session only, so
   `cf.storage` writes go through the GUI to `ThreadService.SetPageStorage`, one JSON file per
   thread (at most 256 KiB), handed back to a page as it loads (`PageStorage`;

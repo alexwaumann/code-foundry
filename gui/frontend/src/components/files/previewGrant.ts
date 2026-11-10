@@ -21,6 +21,46 @@ export function pageKey(data: unknown): "Escape" | null {
   return m.type === "cf:key" && m.key === "Escape" ? "Escape" : null;
 }
 
+/** The longest URL a page may ask the browser to open. */
+const OPEN_URL_MAX = 2048;
+
+/**
+ * A link the page's frame script sends to the browser, `{ type: "cf:open", url }` (internal/
+ * preview/frame.js): the http(s) URL, or null for any other message.
+ */
+export function pageOpenUrl(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const m = data as { type?: unknown; url?: unknown };
+  if (m.type !== "cf:open" || typeof m.url !== "string" || m.url.length > OPEN_URL_MAX) return null;
+  try {
+    const u = new URL(m.url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What a frame cannot do for a page (internal/preview/frame.js). */
+export type PageUnsupported = "alert" | "confirm" | "prompt" | "download";
+
+const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: string }>> = {
+  alert: { call: "alert()", message: "alert() shows nothing in a page here: show the message in the page itself" },
+  confirm: { call: "confirm()", message: "confirm() shows nothing in a page here and answers false: ask with a dialog in the page itself" },
+  prompt: { call: "prompt()", message: "prompt() shows nothing in a page here and answers null: ask with a field in the page itself" },
+  download: { call: "download", message: "a page here cannot save a file: show the content, or offer it to copy" },
+};
+
+/**
+ * A call the frame could not make for the page, `{ type: "cf:unsupported", what, text }`, as
+ * the page's strip reports it (lib/pageErrors.ts); null for any other message.
+ */
+export function pageUnsupported(data: unknown): { call: string; message: string } | null {
+  if (typeof data !== "object" || data === null) return null;
+  const m = data as { type?: unknown; what?: unknown };
+  if (m.type !== "cf:unsupported" || typeof m.what !== "string" || !Object.hasOwn(UNSUPPORTED, m.what)) return null;
+  return UNSUPPORTED[m.what as PageUnsupported];
+}
+
 /** A page's answer to `cf:theme`, `{ type: "cf:theme:ack" }`: it applied the theme itself, so its frame need not reload. */
 export function isThemeAck(data: unknown): boolean {
   return typeof data === "object" && data !== null && (data as { type?: unknown }).type === "cf:theme:ack";

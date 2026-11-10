@@ -59,17 +59,15 @@ const root = (f: MockFrame, indent = "") =>
     .join("") +
   `${indent}}\n`;
 
-/**
- * A thread page's HTML painted in the served theme, as the daemon paints a request with
- * ?cf-page=1 (internal/preview/paint.go; docs/notes/inline-page-frame.md): the scheme's meta
- * and the surface as html's background, first in its head (else after <html>, else after the
- * doctype, else first). A plainer scan than the daemon's: the mock's pages have no comments
- * before their head.
- */
-export function mockPaint(html: string): string {
-  const tag = published
+/** The paint tag: the published theme's scheme and surface, else "light dark" and Canvas. */
+export function mockPaintTag(): string {
+  return published
     ? `<meta name="color-scheme" content="${published.scheme}"><style>:where(html){background-color:var(--cf-surface, ${published.vars["--cf-surface"] ?? "Canvas"})}</style>`
     : `<meta name="color-scheme" content="light dark"><style>:where(html){background-color:var(--cf-surface, Canvas)}</style>`;
+}
+
+/** html with tag as the first thing in its head (after <head>, else <html>, else the doctype, else first). */
+export function insertInHead(html: string, tag: string): string {
   for (const re of [/<head(?:\s[^>]*)?>/i, /<html(?:\s[^>]*)?>/i, /^\s*<!doctype[^>]*>/i]) {
     const m = re.exec(html);
     if (m) return html.slice(0, m.index + m[0].length) + tag + html.slice(m.index + m[0].length);

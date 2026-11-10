@@ -20,7 +20,7 @@ import { FileEmptyState, FileLoading } from "./states";
  * reloads when the file's text changes (the thread edited it). A footer says what the page
  * can reach.
  */
-export function HtmlPreview({ path, text, name, page: own }: { path: string; text: string; name: string; page?: { title: string } | undefined }) {
+export function HtmlPreview({ path, text, name, page: own, reloads = 0 }: { path: string; text: string; name: string; page?: { title: string } | undefined; /** The user's Refresh presses: each loads the page again, as written. */ reloads?: number }) {
   const grant = usePreviewGrant("", path);
   // A page its panel's thread showed (or opened as its own) has that thread's bridge; any other file none.
   const page = usePageThread(path, own);
@@ -51,7 +51,7 @@ export function HtmlPreview({ path, text, name, page: own }: { path: string; tex
     );
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="file-html">
-      <HtmlFrame key={version} url={grant.preview.url} name={page?.title || name} thread={page?.thread ?? null} className="min-h-0 flex-1" onPageErrors={setErrors} testId="file-html-frame" />
+      <HtmlFrame key={`${String(version)}:${String(reloads)}`} url={grant.preview.url} name={page?.title || name} thread={page?.thread ?? null} className="min-h-0 flex-1" onPageErrors={setErrors} testId="file-html-frame" />
       <div className="flex shrink-0 items-center gap-1.5 border-t border-cf-divider px-3 py-1 text-caption-sm" data-testid="file-html-footer">
         <ShieldCheck className="size-3 shrink-0" aria-hidden />
         <span className="min-w-0 truncate">

@@ -24,7 +24,7 @@ import (
 //
 // Only for the themed frames, which the GUI marks with ThemedParam in the page's URL (a
 // thread's pages; the File tab's preview of any other HTML file keeps the bytes as written
-// and looks like a browser). Every other response is the file byte for byte.
+// and looks like a browser).
 
 // ThemedParam is the query parameter (value "1") the GUI adds to the URL of a page shown
 // with a thread (gui/frontend/src/components/files/HtmlFrame.tsx): its HTML is painted.

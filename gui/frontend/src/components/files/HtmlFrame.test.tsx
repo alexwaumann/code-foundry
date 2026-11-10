@@ -14,13 +14,24 @@ vi.mock("@/stores/bridgeHost", () => ({
     };
   },
 }));
-const { FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
+/** Whether the user is in the frame (lib/frameAttention), and the links it sent to the browser. */
+const user = vi.hoisted(() => ({ present: true, opened: [] as string[] }));
+vi.mock("@/lib/frameAttention", () => ({ watchFrameAttention: () => ({ present: () => user.present, stop: () => {} }) }));
+vi.mock("@/stores/gh", () => ({
+  openUrl: (url: string) => {
+    user.opened.push(url);
+    return Promise.resolve();
+  },
+}));
+const { FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, OPEN_GAP_MS, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
 
 const URL_ = "http://127.0.0.1:4100/preview/g1/page.html";
 const PAGES = "http://127.0.0.1:4100";
 
 beforeEach(() => {
   hosts.length = 0;
+  user.present = true;
+  user.opened.length = 0;
 });
 afterEach(cleanup);
 
@@ -95,6 +106,45 @@ describe("HtmlFrame", () => {
     f.send({ type: "cf:resize", height: 140 });
     expect(hosts.at(-1)?.received).toHaveLength(1);
     expect(heights).toEqual([140]);
+  });
+
+  it("opens a link its page sent in the browser: no nonce needed, only while the user is in the frame, one per OPEN_GAP_MS", () => {
+    vi.useFakeTimers();
+    try {
+      const f = mount("t-1");
+      f.send({ type: "cf:open", url: "https://github.com/acme/app" });
+      f.send({ type: "cf:open", url: "https://github.com/acme/second" }); // too soon after
+      vi.advanceTimersByTime(OPEN_GAP_MS);
+      f.send({ type: "cf:open", url: "javascript:alert(1)" });
+      f.send({ type: "cf:open", url: "https://example.com/evil" }, { origin: "https://example.com" }); // a site the frame went to
+      user.present = false;
+      f.send({ type: "cf:open", url: "https://example.com/unasked" });
+      user.present = true;
+      f.send({ type: "cf:open", url: "https://example.com/later" });
+      expect(user.opened).toEqual(["https://github.com/acme/app", "https://example.com/later"]);
+      expect(hosts.at(-1)?.received).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("lists what the frame could not do for the page with its errors, an opaque page's too", () => {
+    const seen: { call: string; code: string; count: number }[][] = [];
+    render(<HtmlFrame url={URL_} name="page.html" thread={null} onPageErrors={(list) => seen.push(list.map(({ call, code, count }) => ({ call, code, count })))} testId="frame" />);
+    const win = screen.getByTestId<HTMLIFrameElement>("frame").contentWindow;
+    const send = (data: unknown) => {
+      act(() => {
+        window.dispatchEvent(new MessageEvent("message", { data, origin: "null", source: win }));
+      });
+    };
+    send({ type: "cf:unsupported", what: "confirm", text: "Delete it?" });
+    send({ type: "cf:unsupported", what: "confirm", text: "Delete it?" });
+    send({ type: "cf:unsupported", what: "download", text: "rows.csv" });
+    send({ type: "cf:unsupported", what: "nothing" });
+    expect(seen.at(-1)).toEqual([
+      { call: "confirm()", code: "unavailable", count: 2 },
+      { call: "download", code: "unavailable", count: 1 },
+    ]);
   });
 
   it("asks for a thread's page painted in the theme (cf-page=1) and any other page as written", () => {

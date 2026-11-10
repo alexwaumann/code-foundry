@@ -84,7 +84,7 @@ func TestHandlerPaints(t *testing.T) {
 	paint := func() (string, string) { return "dark", "#0d1117" }
 	srv := httptest.NewServer(Handler(g, paint, slog.New(slog.DiscardHandler)))
 	t.Cleanup(srv.Close)
-	tag := string(paintTag("dark", "#0d1117"))
+	tag := string(paintTag("dark", "#0d1117")) + string(frameTag)
 
 	tests := []struct {
 		name, method, path, want string

@@ -26,6 +26,12 @@ show `e.message` in the page where it happened (that row, that button); `alert()
 - **No sign-in.** SSO and OAuth redirects fail. For an external API ask the user to paste an API
   token into a password field, keep it in `cf.storage`, send it in a header with `cf.fetch` (CORS
   never blocks it). Plain `fetch` only for an API known to allow any origin.
+- **Links leave for the browser.** A link to another site, and `window.open`, open in the user's
+  browser (after a click; the page stays). A link to another file of the page loads in the frame.
+- **No dialogs, no downloads.** `alert()` shows nothing, `confirm()` answers false and `prompt()`
+  null: ask in the page (`Dialog` from `@cf/ui`). A `download` link or a file made in script saves
+  nothing: show the content with a copy button, or have Claude write the file. Each one shows in
+  the page's error badge.
 - **Storage is per thread.** The same file in another thread starts empty.
 - **Data a source lacks** (closed PRs, another repo): a read verb through `cf.run`, else the
   service's API through `cf.fetch`. A plugin cannot feed a page: never offer it.

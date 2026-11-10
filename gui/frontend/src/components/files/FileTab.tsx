@@ -126,6 +126,8 @@ export function FileTab({ target }: { target: FileTarget }) {
   const lines = useMemo(() => (text === null ? 0 : lineCount(text)), [text]);
   const rendered = kind !== null && text !== null && mode === "rendered";
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  // Refresh presses: a rendered page loads again even when the file did not change.
+  const [refreshes, setRefreshes] = useState(0);
   const onSize = useCallback((w: number, h: number) => {
     setDims({ w, h });
   }, []);
@@ -220,7 +222,7 @@ export function FileTab({ target }: { target: FileTarget }) {
         name={name}
         dir={dir}
         fullPath={abs}
-        actions={<FileActions place={place} line={line} onRefresh={reload} extra={editable && !creating && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
+        actions={<FileActions place={place} line={line} onRefresh={() => { setRefreshes((n) => n + 1); reload(); }} extra={editable && !creating && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
       >
         {kind && text !== null && !dirty && !creating && (
           <ModeSwitch
@@ -284,7 +286,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={opening ? null : file} error={read.error} reload={reload} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} onSize={onSize} onPages={setPages} />
+      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} onSize={onSize} onPages={setPages} />
     </div>
   );
 }
@@ -293,6 +295,7 @@ function FileBody({
   file,
   error,
   reload,
+  refreshes,
   place,
   name,
   abs,
@@ -308,6 +311,7 @@ function FileBody({
   file: FileReadView | null;
   error: string | null;
   reload: () => void;
+  refreshes: number;
   place: FilePlace;
   name: string;
   abs: string;
@@ -385,6 +389,6 @@ function FileBody({
       </FileEmptyState>
     );
   if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} />;
-  if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} page={page} />;
+  if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} page={page} reloads={refreshes} />;
   return <CodeBody name={name} text={text} lines={lines} line={line} edit={edit} />;
 }
