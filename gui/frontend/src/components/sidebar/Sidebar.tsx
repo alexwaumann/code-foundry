@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
@@ -9,7 +9,7 @@ import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/title
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
 import { sidebarAnchor } from "@/lib/inSidebar";
 import { isSnoozed } from "@/lib/snooze";
-import { zoomFactor } from "@/lib/zoom";
+import { useHeight } from "@/lib/useWidth";
 import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useShownEmberThreadId } from "@/stores/ember";
 import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
@@ -106,26 +106,6 @@ function panelOf(row: Row): Panel {
 function stepThread(rows: readonly Row[], i: number, dir: 1 | -1): number {
   for (let j = i + dir; j >= 0 && j < rows.length; j += dir) if (rows[j] && isThreadRow(rows[j] as Row)) return j;
   return i;
-}
-
-/**
- * An element's height in layout px (viewport px divided by the page zoom, lib/zoom.ts),
- * kept current with a ResizeObserver (it reports once when observing starts); 0 until then.
- */
-function useHeight(ref: RefObject<HTMLElement | null>): number {
-  const [h, setH] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setH(el.getBoundingClientRect().height / zoomFactor());
-    });
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-    };
-  }, [ref]);
-  return h;
 }
 
 /** Scrolls a panel so its row at an index is in view (the keyboard cursor moved there). */
@@ -485,7 +465,7 @@ export function Sidebar() {
 
 function SidebarShown({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
-  const bodyHeight = useHeight(bodyRef);
+  const bodyHeight = useHeight(bodyRef, 0);
   useSidebarDashboard();
   return (
     <aside className="relative flex shrink-0 flex-col bg-cf-sidebar" style={{ width }} data-testid="sidebar">
