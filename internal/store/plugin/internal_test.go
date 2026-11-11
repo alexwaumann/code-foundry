@@ -90,6 +90,27 @@ func TestLogBufferRotatesAndTails(t *testing.T) {
 	}
 }
 
+// A line after close (a plugin's reader draining what the process wrote, after the store
+// closed or the plugin was removed) reaches the tail and leaves the file and its
+// directory alone: it used to open the file again, which recreated the log directory
+// while the test's TempDir cleanup removed it (TestMisbehavingPlugins/flood on CI).
+func TestLogBufferAfterClose(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "logs")
+	b := newLogBuffer(filepath.Join(dir, "p.log"), 1<<20, 10, time.Now)
+	b.add("host", "", "before")
+	b.close()
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	b.add("host", "", "protocol: late")
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a line after close recreated the log: %v", err)
+	}
+	if got := b.tail(0); len(got) != 2 || got[1].Text != "protocol: late" {
+		t.Errorf("tail %+v", got)
+	}
+}
+
 func TestConsentText(t *testing.T) {
 	m := pluginsdk.Manifest{Name: "hello", DisplayName: "Hello", Version: "0.1.0", Exec: []string{"bin/hello"}}
 	if got := ConsentText(m); got != "Enable Hello 0.1.0? It runs bin/hello as you and asks for no permissions." {

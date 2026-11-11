@@ -201,3 +201,6 @@ runs also failed in both builds with `connect: can't assign requested address`: 
 of loopback connections a second used up the ephemeral ports. That comes from the stress
 rate, not the test, and it was gone at one run per process (at most about 2,300
 connections in TIME_WAIT).
+
+The flaky tests in internal/store/plugin that CI hit from 2026-11-05 to 2026-11-11 are in
+`docs/notes/flaky-plugin-tests.md`.

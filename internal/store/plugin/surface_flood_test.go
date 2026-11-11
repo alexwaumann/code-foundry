@@ -23,7 +23,6 @@ func TestSurfaceFloodThrottleLifts(t *testing.T) {
 	})
 	w := e.watch("panel", s1)
 	w.view("first view", contains("count 0"))
-	waitOpen(t, e, w.key)
 	act := func(key string) {
 		t.Helper()
 		if _, err := e.act(w.key, plugin.ActRequest{Key: key}); err != nil {

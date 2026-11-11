@@ -17,10 +17,9 @@ import (
 // and otherwise reach the plugin with the version (and node) acted on. The surf panel
 // has a master-detail pmd (rows pr1, pr2) whose detail is a tabs node ptabs (pt1, pt2).
 func TestLayoutActEdges(t *testing.T) {
-	e := newSurfEnv(t, nil)
+	e := newSurfEnv(t, stillClock) // version 1 stays kept however long the acts take
 	w := e.watch("panel", s1)
 	w.view("first view", contains("count 0"))
-	waitOpen(t, e, w.key)
 	for _, c := range []struct {
 		name string
 		req  plugin.ActRequest
@@ -41,7 +40,7 @@ func TestLayoutActEdges(t *testing.T) {
 	if _, err := e.act(w.key, plugin.ActRequest{Key: "inc"}); err != nil {
 		t.Fatal(err)
 	}
-	w.view("after inc", contains("count 2"))
+	w.view("after inc", contains("count 1"))
 	if _, err := e.act(w.key, plugin.ActRequest{Key: "pr1", Version: 1}); err != nil {
 		t.Fatal(err)
 	}
@@ -63,26 +62,28 @@ func TestLayoutActEdges(t *testing.T) {
 // still acts however many came since (up to 64), and one replaced longer ago is refused
 // with words the GUI's toast can show (no instance key), as a failed precondition.
 func TestActsOnRecentVersions(t *testing.T) {
+	// The host's clock moves only when the test moves it: with time.Now plus the skew, the
+	// real time the 21 acts took counted too, and over keptFor (under -race on a busy
+	// machine) the first version was gone before the act on it.
+	base := time.Now()
 	var skew atomic.Int64
 	e := newSurfEnv(t, func(o *plugin.Options) {
-		o.Now = func() time.Time { return time.Now().Add(time.Duration(skew.Load())) }
+		o.Now = func() time.Time { return base.Add(time.Duration(skew.Load())) }
 	})
 	w := e.watch("panel", s1)
 	w.view("first view", contains("count 0"))
-	waitOpen(t, e, w.key)
 	first, err := e.act(w.key, plugin.ActRequest{Key: "inc"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	start := time.Now()
 	for range 20 {
 		if _, err := e.act(w.key, plugin.ActRequest{Key: "inc"}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	w.view("after the stream", contains("count 22"))
+	w.view("after the stream", contains("count 21"))
 	if _, err := e.act(w.key, plugin.ActRequest{Key: "pr2", Version: first}); err != nil {
-		t.Fatalf("an act on version %d, 21 versions back and %s old: %v", first, time.Since(start).Round(time.Millisecond), err)
+		t.Fatalf("an act on version %d, 21 versions back: %v", first, err)
 	}
 	w.view("the select on the old version", contains(`version=`+strconvU(first)))
 	// Four seconds on, the next view prunes it.
@@ -108,7 +109,6 @@ func TestActTimeoutAndStop(t *testing.T) {
 	e := newSurfEnv(t, func(o *plugin.Options) { o.ActTimeout = 300 * time.Millisecond })
 	w := e.watch("panel", s1)
 	w.view("first view", contains("count 0"))
-	waitOpen(t, e, w.key)
 	_, err := e.act(w.key, plugin.ActRequest{Key: "hang"})
 	if !errors.Is(err, context.DeadlineExceeded) || err.Error() != "plugin surf did not answer within 300ms" {
 		t.Errorf("an unanswered act: %v", err)
@@ -116,23 +116,5 @@ func TestActTimeoutAndStop(t *testing.T) {
 	_, err = e.act(w.key, plugin.ActRequest{Key: "exit"})
 	if !errors.Is(err, plugin.ErrUnavailable) || err.Error() != "plugin surf stopped while handling the action" {
 		t.Errorf("an act the plugin stops on: %v", err)
-	}
-}
-
-// waitOpen waits until the instance's surface/open has been answered: the first view
-// comes while the plugin is still handling the open, and an act before the answer is
-// refused ("not open"). It acts on "inc" until one goes through.
-func waitOpen(t *testing.T, e *surfEnv, key string) {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		_, err := e.act(key, plugin.ActRequest{Key: "inc"})
-		if err == nil {
-			return
-		}
-		if !strings.Contains(err.Error(), "is not open") || time.Now().After(deadline) {
-			t.Fatalf("waiting for the open: %v", err)
-		}
-		time.Sleep(10 * time.Millisecond)
 	}
 }

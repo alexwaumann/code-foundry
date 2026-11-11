@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -61,16 +60,8 @@ func TestListRowActs(t *testing.T) {
 	e := newSurfEnv(t, nil)
 	w := e.watch("rows", s1)
 	w.view("first view", contains("got nothing"))
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		_, err := e.act(w.key, plugin.ActRequest{Key: "rb"})
-		if err == nil {
-			break
-		}
-		if !strings.Contains(err.Error(), "is not open") || time.Now().After(deadline) {
-			t.Fatalf("waiting for the open: %v", err)
-		}
-		time.Sleep(10 * time.Millisecond)
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "rb"}); err != nil {
+		t.Fatal(err)
 	}
 	w.view("the row's own click", contains(`got click:open key=rb node= value=`+"\\u003cnil\\u003e"+` data=\"b\"`))
 

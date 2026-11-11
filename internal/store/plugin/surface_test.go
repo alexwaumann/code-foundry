@@ -146,6 +146,14 @@ func (p *panel) Close(r pluginsdk.CloseReason) {
 	p.h.Log().Info("closed", "instance", p.inst, "reason", string(r))
 }
 
+// openGate holds every panel open while it is set (the hold-open command) until
+// release-open: a test that must see what a watcher gets before the plugin's fresh view
+// controls when that view comes.
+var openGate struct {
+	mu sync.Mutex
+	ch chan struct{}
+}
+
 type still struct{}
 
 func (still) Act(context.Context, pluginsdk.SurfaceAct) error { return nil }
@@ -168,9 +176,36 @@ func surfacePlugin() pluginsdk.Plugin {
 			"toast": func(_ context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				return pluginsdk.CommandResult{}, h.ToastIn(req.Arg("instance"), pluginsdk.ToastError, "boom")
 			},
+			"hold-open": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				openGate.mu.Lock()
+				defer openGate.mu.Unlock()
+				if openGate.ch == nil {
+					openGate.ch = make(chan struct{})
+				}
+				return pluginsdk.CommandResult{Message: "held"}, nil
+			},
+			"release-open": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				openGate.mu.Lock()
+				defer openGate.mu.Unlock()
+				if openGate.ch != nil {
+					close(openGate.ch)
+					openGate.ch = nil
+				}
+				return pluginsdk.CommandResult{Message: "released"}, nil
+			},
 		},
 		Surfaces: map[string]pluginsdk.SurfaceFactory{
-			"panel": func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
+			"panel": func(ctx context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
+				openGate.mu.Lock()
+				gate := openGate.ch
+				openGate.mu.Unlock()
+				if gate != nil {
+					select {
+					case <-gate:
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					}
+				}
 				p := &panel{h: h, inst: open.Instance}
 				h.Log().Info("open", "instance", open.Instance, "thread", open.Context.ThreadID, "project", open.Context.ProjectID, "facts", len(open.Facts))
 				return p, h.UpdateView(open.Instance, p.view())
@@ -212,6 +247,7 @@ func surfaceManifest() pluginsdk.Manifest {
 			{Name: "toast", Title: "Toast", Args: []pluginsdk.ArgSpec{{Name: "instance"}}},
 			{Name: "gated-cmd", Title: "Gated", When: "surf.on"},
 			{Name: "broken-when", Title: "Broken when", When: "thread &&"},
+			{Name: "hold-open", Title: "Hold open"}, {Name: "release-open", Title: "Release open"},
 		},
 		Surfaces: []pluginsdk.SurfaceSpec{
 			{ID: "panel", Title: "Panel"},
@@ -376,6 +412,14 @@ func (e *surfEnv) waitLog(what string) {
 
 var s1 = command.Context{ActiveThreadID: "s-1"}
 
+// stillClock gives the host a clock that stands still, for a test that acts on an older
+// version: it stays kept (keptFor after it was replaced) however long the acts between
+// take in real time, which under -race on a busy machine can pass keptFor.
+func stillClock(o *plugin.Options) {
+	now := time.Now()
+	o.Now = func() time.Time { return now }
+}
+
 func TestSurfaceLifecycle(t *testing.T) {
 	e := newSurfEnv(t, nil)
 	w := e.watch("panel", s1)
@@ -409,13 +453,22 @@ func TestSurfaceLifecycle(t *testing.T) {
 	e.waitLog("host  closed surf/panel/thread:s-1 (no viewer for")
 	e.waitLog("log info closed instance=surf/panel/thread:s-1")
 
-	// Back after the grace: the cached view paints, then the plugin reopens it.
+	// Back after the grace: the cached view paints, then the plugin reopens it. The plugin
+	// holds the open until the test has seen the cached view: a watcher's first update
+	// comes from its own goroutine, and a reopen that answered first (a fresh view and
+	// the open's answer) left the watcher only the live state and the fresh view.
+	if _, err := e.invoke("plugin.surf.hold-open", nil, command.Context{}); err != nil {
+		t.Fatal(err)
+	}
 	w3 := e.watch("panel", s1)
 	st := w3.until("first update", func(u plugin.SurfaceUpdate) bool { return u.State != nil }).State
 	if st.Phase != plugin.PhaseOpening || st.Message != "updating" {
 		t.Errorf("reopen state %+v", st)
 	}
 	w3.view("cached view", contains("count 2"))
+	if _, err := e.invoke("plugin.surf.release-open", nil, command.Context{}); err != nil {
+		t.Fatal(err)
+	}
 	w3.view("fresh view", contains("count 0"))
 
 	// Another thread is another instance; a project-scoped surface needs a project.
@@ -439,7 +492,7 @@ func TestSurfaceLifecycle(t *testing.T) {
 }
 
 func TestSurfaceActs(t *testing.T) {
-	e := newSurfEnv(t, nil)
+	e := newSurfEnv(t, stillClock) // the first version stays kept for the act on it below
 	w := e.watch("panel", s1)
 	first := w.view("first", contains("count 0"))
 
