@@ -173,6 +173,11 @@ type Git struct {
 	// touch debounces Touch, apart from deb and treeDeb so fs events keep their
 	// shorter windows.
 	touch *debouncer
+	// ignoreStream drops the stream's batches (onStream). Tests set it when they count
+	// status runs or feed onEvents themselves: on a busy machine fseventsd delivers
+	// writes made before the stream started (a fixture's git setup) a second or more
+	// after it did, numbered after writes made later.
+	ignoreStream atomic.Bool
 
 	// live is the worktrees with a live thread (SetLiveWorktrees); pollNudge and
 	// fetchNudge wake the tier loops when a project may have turned live (activity.go).
@@ -248,7 +253,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		g.log.Debug("worktree touched", "path", k.path, "debounced", true)
 		g.sched.request(k)
 	})
-	g.fs = newFSWatcher(g.log, g.streamPaths, g.onEvents)
+	g.fs = newFSWatcher(g.log, g.streamPaths, g.onStream)
 	g.wg.Go(func() { g.fs.run(ctx) })
 	g.wg.Go(g.fs.dispatch)
 	if t := tiers(opts.FetchInterval, opts.IdleFetchInterval, DefaultFetchInterval, DefaultIdleFetchInterval); t.live > 0 {

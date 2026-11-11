@@ -85,6 +85,7 @@ func TestResolveFiles(t *testing.T) {
 	add("moved", fsevents.ItemRenamed|fsevents.ItemIsDir)           // renamed in
 	add("seen.txt", fsevents.ItemCreated|fsevents.ItemModified)     // reported before
 	add("stale.txt", fsevents.ItemCreated|fsevents.ItemModified)    // born a minute ago
+	add("late.txt", fsevents.ItemCreated|fsevents.ItemModified)     // its event delivered seconds late
 	add("untarred.txt", fsevents.ItemCreated|fsevents.ItemModified) // mtime set into the past
 	p := c.take(k)
 	if c.take(k) != nil {
@@ -98,13 +99,14 @@ func TestResolveFiles(t *testing.T) {
 		"moved":        {exists: true, dir: true, birth: old, mtime: old},
 		"seen.txt":     {exists: true, birth: now, mtime: now},
 		"stale.txt":    {exists: true, birth: old, mtime: now},
+		"late.txt":     {exists: true, birth: now.Add(-3 * time.Second), mtime: now},
 		"untarred.txt": {exists: true, birth: time.Unix(1, 0), mtime: time.Unix(1, 0)},
 	}
 	seen := map[string]time.Time{"seen.txt": old, "gone.txt": old}
 	got := resolveFiles(p, seen, now, func(rel string) fileStat { return disk[rel] })
 	want := []ChangedFile{
 		{"a.go", FileModified}, {"b.go", FileCreated}, {"gone.txt", FileRemoved},
-		{"moved/", FileRenamed}, {"olddir/", FileRemoved}, {"seen.txt", FileModified},
+		{"late.txt", FileCreated}, {"moved/", FileRenamed}, {"olddir/", FileRemoved}, {"seen.txt", FileModified},
 		{"stale.txt", FileModified}, {"untarred.txt", FileCreated},
 	}
 	if !slices.Equal(got, want) {
@@ -365,11 +367,12 @@ func (h *harness) noFilesEvent(path string, d time.Duration) {
 }
 
 // The files job runs only for live worktrees, drops ignored paths, publishes nothing
-// when all were ignored, and caps the list. Events are fed to onEvents directly (the
-// stream may add its own for the same writes, which merge).
+// when all were ignored, and caps the list. Events are fed to onEvents directly, and the
+// stream is ignored: it can deliver this setup's writes seconds late, while live.
 func TestFilesEventLiveOnly(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{})
+	h.store.ignoreStream.Store(true)
 	r, err := h.store.Register(context.Background(), f.project)
 	if err != nil {
 		t.Fatal(err)
@@ -433,10 +436,14 @@ func TestStreamFilesEvent(t *testing.T) {
 	writeFile(t, filepath.Join(f.project, ".gitignore"), "bin/\n")
 	git(t, f.project, "add", ".gitignore")
 	git(t, f.project, "commit", "-q", "-m", "ignore")
+	// README.md was written by the fixture: its edit below still carries a stale
+	// ItemCreated. An mtime in the past pulls its birth time back, so it is no longer
+	// fresh once written again.
+	past := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(f.project, "README.md"), past, past); err != nil {
+		t.Fatal(err)
+	}
 	h.store.SetLiveWorktrees([]string{f.project})
-	// Let the commit's own events flush, and README.md (written by the fixture) get
-	// older than bornSlack: its edit below still carries a stale ItemCreated.
-	time.Sleep(bornSlack + 2*window)
 
 	// Collect every files event until the wanted set has been seen.
 	want := map[string]FileOp{"README.md": FileModified, "sub/deeper/new.txt": FileCreated, "old.txt": FileCreated}
@@ -451,7 +458,6 @@ func TestStreamFilesEvent(t *testing.T) {
 	writeFile(t, filepath.Join(f.project, "bin", "x", "out.o"), "ignored\n")
 	// An extracted file: its mtime from the archive, which pulls its birth time back.
 	writeFile(t, filepath.Join(f.project, "old.txt"), "from an archive\n")
-	past := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	if err := os.Chtimes(filepath.Join(f.project, "old.txt"), past, past); err != nil {
 		t.Fatal(err)
 	}

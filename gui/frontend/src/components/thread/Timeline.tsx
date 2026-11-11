@@ -1,6 +1,6 @@
 import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import { ArrowDown } from "lucide-react";
 import { buildRows, buildTurns, decodeTimelineKey, foldingTurn, type TimelineRow } from "@/lib/threadTimeline";
 import { deferTurnFolds, foldDeferredTurns, getThreadItems, setTurnFolded, structOf, useDeferredTurns, useSetupShown, useTimelineKeys, useTurnFolds, watchTurnEnds } from "@/stores/thread";
@@ -33,6 +33,16 @@ const HOVERED_FRAME = "iframe:hover";
  */
 function inList(e: SyntheticEvent<HTMLElement>): boolean {
   return e.target instanceof Node && e.currentTarget.contains(e.target);
+}
+
+/**
+ * The virtualizer's row measurements, current. Its `measurementsCache` is only refreshed when
+ * it recomputes them (getMeasurements, private; getTotalSize runs it): a row measured as it
+ * mounted is not in it until then, and a start read from it is off by that row's change.
+ */
+function measurements(v: { getTotalSize(): number; measurementsCache: VirtualItem[] }): VirtualItem[] {
+  v.getTotalSize();
+  return v.measurementsCache;
 }
 
 /** A first guess of a row's height before it is measured. */
@@ -362,7 +372,7 @@ export function TimelineList<R extends ListRow>({
       },
       unfold: unfoldRef.current ? (itemId) => unfoldRef.current?.(rowsRef.current, itemId) ?? false : undefined,
       rowKeys: () => rowsRef.current.map((r) => r.key),
-      rowStart: (index) => v.measurementsCache[index]?.start,
+      rowStart: (index) => measurements(v)[index]?.start,
       topRow: () => v.getVirtualItemForOffset(el.scrollTop)?.index ?? 0,
     });
   }, [threadId, citable, v]);
@@ -372,7 +382,7 @@ export function TimelineList<R extends ListRow>({
   const listApi = useMemo<TimelineListApi>(
     () => ({
       scroller: () => scrollRef.current,
-      rowStart: (index) => v.measurementsCache[index]?.start,
+      rowStart: (index) => measurements(v)[index]?.start,
       scrollToRow: (index) => {
         if (index < 0 || index >= rowsRef.current.length) return;
         pinned.current = false;
@@ -435,7 +445,7 @@ export function TimelineList<R extends ListRow>({
   const keepRow = useCallback(
     (key: string) => {
       const el = scrollRef.current;
-      const m = v.measurementsCache.find((x) => x.key === key);
+      const m = measurements(v).find((x) => x.key === key);
       kept.current = el && m ? { key, offset: m.start - el.scrollTop } : null;
     },
     [v],
@@ -455,7 +465,7 @@ export function TimelineList<R extends ListRow>({
     const a = anchor.current;
     const k = kept.current;
     kept.current = null;
-    const held = k && el ? v.measurementsCache.find((x) => x.key === k.key) : undefined;
+    const held = k && el ? measurements(v).find((x) => x.key === k.key) : undefined;
     if (k && el && held) {
       const top = held.start - k.offset;
       const max = el.scrollHeight - el.clientHeight;
@@ -468,7 +478,7 @@ export function TimelineList<R extends ListRow>({
       let at = index.get(a.rows[a.index]?.key ?? "");
       for (let i = a.index - 1; at === undefined && i >= 0; i--) at = index.get(a.rows[i]?.key ?? "");
       for (let i = a.index + 1; at === undefined && i < a.rows.length; i++) at = index.get(a.rows[i]?.key ?? "");
-      const start = at === undefined ? undefined : v.measurementsCache[at]?.start;
+      const start = at === undefined ? undefined : measurements(v)[at]?.start;
       if (start !== undefined) {
         // The anchor row itself keeps its offset; a row that takes its place starts at the
         // viewport's top, not as far above it as the user had scrolled into the row that

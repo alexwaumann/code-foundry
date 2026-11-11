@@ -60,7 +60,8 @@ per-file events) and threw the path away.
   created 0, 2 and 10 s earlier still carried `ItemCreated`; at 40 s it did not. So
   `created` needs three things: a create flag, a path this worktree has not reported as
   existing in the last 10 min (`seen`, per worktree, capped at 20 000), and a *fresh*
-  file: born at most 1 s before its first event, or with a birth time equal to its mtime.
+  file: born at most 10 s before its first event (1 s until 2026-11: delivery lagged more
+  than that on a busy machine), or with a birth time equal to its mtime.
   The last one is the untar case: setting a file's mtime into the past pulls macOS's birth
   time back to it (checked with `touch -t`), so extracted and `cp -p` files are old by
   birth time but equal. A seen path is always `modified`, whatever its flags.

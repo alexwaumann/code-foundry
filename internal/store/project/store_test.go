@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -640,8 +642,10 @@ func (c *countingRunner) count(sub string) int {
 	return c.n[sub]
 }
 
-// Our own git commands must not trigger the watcher. `git status` would rewrite the
-// index (and fire the watcher, forever) without GIT_OPTIONAL_LOCKS=0.
+// Our own git commands must not trigger the watcher: a refresh writes nothing in the
+// repository. `git status` would rewrite the index (and fire the watcher, forever)
+// without GIT_OPTIONAL_LOCKS=0. The files are compared rather than status runs counted:
+// on a busy machine the stream delivers the fixture's own writes seconds late.
 func TestNoSelfTriggeredRefreshLoop(t *testing.T) {
 	f := newFixture(t)
 	// Make the index stale so a plain `git status` would want to rewrite it.
@@ -649,17 +653,65 @@ func TestNoSelfTriggeredRefreshLoop(t *testing.T) {
 	if err := os.Chtimes(filepath.Join(f.project, "README.md"), future, future); err != nil {
 		t.Fatal(err)
 	}
-	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
-	h := startHarness(t, "", Options{Runner: cr})
-	if _, err := h.store.Register(context.Background(), f.project); err != nil {
+	h := startHarness(t, "", Options{})
+	r, err := h.store.Register(context.Background(), f.project)
+	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(300 * time.Millisecond) // let any echo settle
-	before := cr.count("status")
-	time.Sleep(time.Second)
-	if after := cr.count("status"); after != before {
-		t.Fatalf("status ran %d more times while idle: refresh loop", after-before)
+	before := repoFiles(t, f.project)
+	for range 3 {
+		if err := h.store.Refresh(context.Background(), r.ID); err != nil {
+			t.Fatal(err)
+		}
 	}
+	after := repoFiles(t, f.project)
+	for p, st := range after {
+		if before[p] != st {
+			t.Errorf("a refresh wrote %s", p)
+		}
+	}
+	for p := range before {
+		if _, ok := after[p]; !ok {
+			t.Errorf("a refresh removed %s", p)
+		}
+	}
+}
+
+// fileState is what repoFiles records of a file: a rewrite changes one of them.
+type fileState struct {
+	size  int64
+	mtime time.Time
+	ino   uint64
+}
+
+// repoFiles returns every file under dir, .git included but for its object store (no
+// command of ours writes objects; the fixture's own commits may leave git's detached
+// auto maintenance taking a lock there).
+func repoFiles(t *testing.T, dir string) map[string]fileState {
+	t.Helper()
+	out := map[string]fileState{}
+	objects := filepath.Join(dir, ".git", "objects")
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == objects {
+			return filepath.SkipDir
+		}
+		if d.IsDir() {
+			return nil
+		}
+		fi, err := d.Info()
+		if err != nil {
+			return err
+		}
+		out[p] = fileState{size: fi.Size(), mtime: fi.ModTime(), ino: fi.Sys().(*syscall.Stat_t).Ino}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 func TestFetchErrorIsNotFatal(t *testing.T) {
