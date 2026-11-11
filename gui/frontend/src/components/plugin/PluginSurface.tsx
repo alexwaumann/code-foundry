@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { CircleAlert, Puzzle, RotateCcw, TriangleAlert } from "lucide-react";
+import type { UiContextView } from "@/api/command";
 import type { PluginStateView, ViewNode } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -79,35 +80,22 @@ const downWords: Partial<Record<PluginStateView, string>> = {
 
 /**
  * One plugin surface tab (docs/notes/plugins-5-gui.md): holds the instance open while the
- * tab shows (one WatchSurface), and draws its view: the header, the plugin's tabs and the
- * view's toolbar pinned at the top, its footer pinned at the bottom, the body's nodes
- * scrolling between them (the surface's own scroll area, [data-scroll-root]: fill nodes
- * fill it and live nodes count as on screen in it), and the host's states around it
- * (opening, not responding, the plugin down with its last view dimmed, failed, not
- * available here). docs/notes/plugins-layout-3-chrome.md has the strips.
+ * tab shows (one WatchSurface), names the tab after the view, and draws the body
+ * (PluginSurfaceBody) with the panel's selection, or says the surface is gone.
  */
 export function PluginSurface({ tab }: { tab: Tab }) {
   const panelKey = useCurrentPanelKey() ?? "";
   const watchKey = watchKeyOf(panelKey, tab.id);
   const { plugin, surface } = parseKind(tab.kind);
   const loaded = usePluginsStore((s) => s.loaded);
-  const title = usePluginsStore((s) => surfaceManifestOf(tab.kind, s)?.title ?? "");
-  const icon = usePluginsStore((s) => surfaceManifestOf(tab.kind, s)?.icon ?? "");
-  const pluginName = usePluginsStore((s) => s.byName[plugin]?.displayName ?? plugin);
-  const known = title !== "" || icon !== "";
+  const known = usePluginsStore((s) => {
+    const m = surfaceManifestOf(tab.kind, s);
+    return Boolean(m?.title) || Boolean(m?.icon);
+  });
   const selection = useUiStore((s) => s.selection);
   const uiContext = useMemo(() => getUiContext(selection), [selection]);
   const ctxKey = contextKey(uiContext);
   const show = useShowState(tab.kind, selection);
-
-  const phase = useSurfaceEntry(watchKey, (e) => e?.phase ?? "connecting");
-  const message = useSurfaceEntry(watchKey, (e) => e?.message ?? "");
-  const pluginState = useSurfaceEntry(watchKey, (e) => e?.pluginState ?? "unknown");
-  const view = useSurfaceEntry(watchKey, (e) => e?.view ?? null);
-  const version = useSurfaceEntry(watchKey, (e) => e?.version ?? 0);
-  const instance = useSurfaceEntry(watchKey, (e) => e?.instance ?? "");
-  const hostRendered = useSurfaceEntry(watchKey, (e) => e?.hostRendered ?? false);
-  const error = useSurfaceEntry(watchKey, (e) => e?.error ?? null);
 
   // One stream while the tab shows and the surface may show here.
   const watching = known && show !== "unavailable";
@@ -119,18 +107,10 @@ export function PluginSurface({ tab }: { tab: Tab }) {
   }, [watching, watchKey, plugin, surface, ctxKey]);
 
   // The view's tab title names the tab in the strip.
-  const tabTitle = view?.header?.tabTitle ?? "";
+  const tabTitle = useSurfaceEntry(watchKey, (e) => e?.view?.header?.tabTitle ?? "");
   useEffect(() => {
     if (tabTitle) retitlePanelTab(panelKey, tab.id, tabTitle);
   }, [panelKey, tab.id, tabTitle]);
-
-  const viewTab = view?.tabs?.active ?? "";
-  // A view tab clicked, while the plugin's view is still the old tab's: its nodes stay live, so the body dims.
-  const tabChoice = useChoice(watchKey, chooserKeyOf(instance, "", ""));
-  const switching = tabChoice !== undefined && tabChoice !== viewTab && (view?.tabs?.items.some((t) => t.key === tabChoice) ?? false);
-  const down = phase === "plugin-down" || phase === "not-responding" || phase === "failed";
-  const inert = down || error !== null;
-  const ctx = useMemo<ViewCtx>(() => ({ watchKey, instance, viewTab, uiContext, inert }), [watchKey, instance, viewTab, uiContext, inert]);
 
   if (!loaded) return <Opening />;
   if (!known) {
@@ -142,9 +122,54 @@ export function PluginSurface({ tab }: { tab: Tab }) {
       </div>
     );
   }
+  return <PluginSurfaceBody watchKey={watchKey} plugin={plugin} surface={surface} context={uiContext} unavailable={show === "unavailable"} />;
+}
+
+export interface PluginSurfaceBodyProps {
+  /** The watch the view comes from (stores/pluginSurfaces): the caller starts and stops it. */
+  watchKey: string;
+  plugin: string;
+  surface: string;
+  /** The context the surface's command buttons run with (the panel's selection). */
+  context: UiContextView;
+  /** The surface does not apply to the panel's selection: a notice in place of the view. */
+  unavailable?: boolean;
+}
+
+/**
+ * A plugin surface's view, from the watch under `watchKey`: the header, the plugin's tabs
+ * and the view's toolbar pinned at the top, its footer pinned at the bottom, the body's
+ * nodes scrolling between them (the surface's own scroll area, [data-scroll-root]: fill
+ * nodes fill it and live nodes count as on screen in it), and the host's states around it
+ * (opening, not responding, the plugin down with its last view dimmed, failed, not
+ * available here). docs/notes/plugins-layout-3-chrome.md has the strips. The side panel's
+ * tab (PluginSurface) and the shot page (src/shot) draw it.
+ */
+export function PluginSurfaceBody({ watchKey, plugin, surface, context: uiContext, unavailable = false }: PluginSurfaceBodyProps) {
+  const kind = `plugin.${plugin}.${surface}`;
+  const title = usePluginsStore((s) => surfaceManifestOf(kind, s)?.title ?? "");
+  const icon = usePluginsStore((s) => surfaceManifestOf(kind, s)?.icon ?? "");
+  const pluginName = usePluginsStore((s) => s.byName[plugin]?.displayName ?? plugin);
+
+  const phase = useSurfaceEntry(watchKey, (e) => e?.phase ?? "connecting");
+  const message = useSurfaceEntry(watchKey, (e) => e?.message ?? "");
+  const pluginState = useSurfaceEntry(watchKey, (e) => e?.pluginState ?? "unknown");
+  const view = useSurfaceEntry(watchKey, (e) => e?.view ?? null);
+  const version = useSurfaceEntry(watchKey, (e) => e?.version ?? 0);
+  const instance = useSurfaceEntry(watchKey, (e) => e?.instance ?? "");
+  const hostRendered = useSurfaceEntry(watchKey, (e) => e?.hostRendered ?? false);
+  const error = useSurfaceEntry(watchKey, (e) => e?.error ?? null);
+
+  const viewTab = view?.tabs?.active ?? "";
+  // A view tab clicked, while the plugin's view is still the old tab's: its nodes stay live, so the body dims.
+  const tabChoice = useChoice(watchKey, chooserKeyOf(instance, "", ""));
+  const switching = tabChoice !== undefined && tabChoice !== viewTab && (view?.tabs?.items.some((t) => t.key === tabChoice) ?? false);
+  const down = phase === "plugin-down" || phase === "not-responding" || phase === "failed";
+  const inert = down || error !== null;
+  const ctx = useMemo<ViewCtx>(() => ({ watchKey, instance, viewTab, uiContext, inert }), [watchKey, instance, viewTab, uiContext, inert]);
 
   let banner: ReactNode = null;
-  if (show === "unavailable") {
+  if (unavailable) {
     banner = (
       <StateNotice tone="neutral" heading="Not available here" testId="plugin-unavailable">
         {title} does not apply to this selection.
@@ -187,7 +212,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
       <div
         className="@container flex min-h-0 min-w-0 flex-1 flex-col"
         data-testid="plugin-surface"
-        data-kind={tab.kind}
+        data-kind={kind}
         data-phase={phase}
         data-version={version || undefined}
         data-host-rendered={hostRendered || undefined}
@@ -195,7 +220,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
         <SurfaceFrame
           top={
             <>
-              <SurfaceHeader header={view?.header} fallbackTitle={title} icon={icon} note={view ? undefined : show === "unavailable" ? undefined : "Loading…"} />
+              <SurfaceHeader header={view?.header} fallbackTitle={title} icon={icon} note={view || unavailable ? undefined : "Loading…"} />
               {view?.tabs && view.tabs.items.length > 0 && <ViewTabsBar tabs={view.tabs} />}
             </>
           }
@@ -215,7 +240,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
             >
               <NodeList nodes={view.nodes} box />
             </div>
-          ) : show !== "unavailable" && !down && error === null ? (
+          ) : !unavailable && !down && error === null ? (
             <Opening />
           ) : null}
         </SurfaceFrame>

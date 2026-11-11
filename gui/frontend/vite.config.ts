@@ -38,8 +38,9 @@ export default defineConfig({
   },
   plugins: [react(), tailwindcss(), wails("./bindings")],
   build: {
-    // The dictation overlay's panel loads its own small page, not the app (gui/overlay.go).
-    rolldownOptions: { input: { main: "index.html", "dictation-overlay": "dictation-overlay.html" } },
+    // The dictation overlay's panel loads its own small page, not the app (gui/overlay.go);
+    // so does a plugin surface's shot (src/shot/main.tsx).
+    rolldownOptions: { input: { main: "index.html", "dictation-overlay": "dictation-overlay.html", shot: "shot.html" } },
   },
   test: {
     environment: "jsdom",

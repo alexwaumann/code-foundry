@@ -854,6 +854,13 @@ export async function pluginDirs(signal?: AbortSignal, conn: DaemonConnection = 
   return { pluginsDir: res.pluginsDir, dataDir: res.dataDir };
 }
 
+/** Every installed plugin with its manifest's surfaces (PluginService.List), for a window without the event stream. */
+export async function listPlugins(signal?: AbortSignal, conn: DaemonConnection = daemon): Promise<PluginView[]> {
+  const c = await conn.client(PluginService);
+  const res = await c.list({}, { signal });
+  return res.plugins.map(toPluginView);
+}
+
 /** A secret a plugin keeps in the Keychain: its name and when it was set; never its value. */
 export interface PluginSecretView {
   key: string;
@@ -967,12 +974,14 @@ export interface SurfaceRefView {
   plugin: string;
   surface: string;
   context: UiContextView;
+  /** In place of the context: the key of an instance the daemon already has (<plugin>/<surface>/<scope id>). */
+  instance?: string;
 }
 
 /** Holds a surface instance open, yielding its updates (HEARTBEAT for heartbeats). */
 export async function* watchSurface(ref: SurfaceRefView, signal: AbortSignal, conn: DaemonConnection = daemon): AsyncGenerator<SurfaceUpdateView | Heartbeat> {
   const c = await conn.client(PluginService);
-  for await (const u of c.watchSurface({ ref: { plugin: ref.plugin, surface: ref.surface, context: toUiContext(ref.context) } }, { signal })) {
+  for await (const u of c.watchSurface({ ref: { plugin: ref.plugin, surface: ref.surface, context: toUiContext(ref.context), instance: ref.instance ?? "" } }, { signal })) {
     const v = toSurfaceUpdateView(u);
     if (v) yield v;
   }
