@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, setZoom } from "./fixtures";
 
 // `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
-// the projects' files with POST /__mock/files; the mock ranks like internal/fuzzy (tier,
-// then shorter path) and logs "search <project> <query>" per request.
+// the projects' files with POST /__mock/files; the mock logs "search <project> <query>" per
+// request. Its ranking is its own: the daemon's (internal/fuzzy) is tested in Go.
 
 const FILES = ["internal/api/thread.go", "gui/frontend/src/api/threads.ts", "internal/store/thread/fork.go", "README.md"];
 
@@ -76,18 +76,22 @@ test("type @thr: file rows; Enter inserts the base name and a space without send
   await composeProject(page);
   await page.keyboard.type("@thr");
   await expect(card(page)).toBeVisible();
-  // One project: no heading. Daemon order (tier, then shorter path); a directory ends with "/".
+  // One project: no heading; a directory ends with "/".
   await expect(card(page).getByTestId("completion-group")).toHaveCount(0);
-  await expect(labels(page)).toHaveText(["thread/", "thread.go", "threads.ts", "fork.go"]);
-  await expect(rows(page).nth(1)).toContainText("internal/api/thread.go");
-  await expect(rows(page).nth(1).getByTestId("completion-hit")).toHaveText(["thr"]);
-  await expect(labels(page).nth(1)).toHaveCSS("font-family", /mono|Menlo|Monaco/i);
+  await expect(rows(page)).toHaveCount(4);
+  await expect(labels(page).getByText("thread/", { exact: true })).toHaveCount(1);
+  const threadGo = rows(page).filter({ has: page.getByTestId("completion-label").getByText("thread.go", { exact: true }) });
+  await expect(threadGo).toContainText("internal/api/thread.go");
+  await expect(threadGo.getByTestId("completion-hit")).toHaveText(["thr"]);
+  await expect(threadGo.getByTestId("completion-label")).toHaveCSS("font-family", /mono|Menlo|Monaco/i);
   await expect(rows(page).nth(0)).toHaveAttribute("aria-selected", "true");
   await expect(card(page).getByRole("listbox")).toHaveAttribute("aria-label", "Files");
   await expect(card(page).getByTestId("completion-hints")).toHaveText(/↑\s*↓\s*move\s*⏎\s*⇥\s*insert\s*esc\s*dismiss/);
   expect(await searches()).toContain("search repo-cf thr");
 
-  await page.keyboard.press("ArrowDown");
+  const at = (await labels(page).allTextContents()).indexOf("thread.go");
+  for (let i = 0; i < at; i++) await page.keyboard.press("ArrowDown");
+  await expect(threadGo).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
   await expect(card(page)).toHaveCount(0);
   await expect(value(page)).toHaveAttribute("data-value", `${THREAD_GO} `);
