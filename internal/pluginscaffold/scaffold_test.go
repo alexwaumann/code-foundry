@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/pluginscaffold"
 	"github.com/alexwaumann/code-foundry/plugins"
@@ -249,5 +250,21 @@ func TestScaffoldBuilds(t *testing.T) {
 	}
 	if res.GoError != "" {
 		t.Fatal(res.GoError)
+	}
+}
+
+// A go step past its deadline ends at once, with the tools it started: a grandchild
+// holding the output pipe does not keep it waiting.
+func TestShellGoTimeout(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := pluginscaffold.ShellGo(ctx, t.TempDir(), "sleep 30 & sleep 30")
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Errorf("err = %v, want a timeout", err)
+	}
+	if d := time.Since(start); d > 5*time.Second {
+		t.Errorf("returned after %s", d)
 	}
 }

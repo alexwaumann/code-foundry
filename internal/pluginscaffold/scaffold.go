@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/fsx"
@@ -169,10 +170,14 @@ func (s Scaffolder) New(ctx context.Context, name, parent, owner string) (Result
 }
 
 // ShellGo is the daemon's go step: $SHELL -lc script in dir, so go is found on the
-// user's login PATH.
+// user's login PATH. It runs in its own process group, which the context's end kills
+// whole: killing only the shell leaves go holding the output pipe until it finishes.
 func ShellGo(ctx context.Context, dir, script string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, cmp.Or(os.Getenv("SHELL"), "/bin/zsh"), "-lc", script)
 	cmd.Dir = dir
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = time.Second
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
 		return out, fmt.Errorf("timed out after %s", GoTimeout)

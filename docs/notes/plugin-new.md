@@ -71,6 +71,9 @@ example and runs `go mod init`, `go get` of the SDK at the daemon's pin and `go 
 
 * macOS file systems are case-insensitive: a test that checks a refused `Hello` left no
   folder finds an earlier case's `hello`.
+* The go step runs in its own process group and the timeout kills the group: with
+  `exec.CommandContext` alone it killed only the shell, and `go get` kept the output pipe
+  open, so a 3-minute timeout returned after 15 minutes in the first end-to-end run.
 * The pin of a dev build from a clean commit is that commit: `go get` fetches it through
   the module proxy, which only works once the commit is pushed, and the first fetch of a
   new commit takes a while.
