@@ -305,7 +305,7 @@ func RegisterPullRequestThreads(r *Registry, d PullRequestThreadDeps) error {
 			return Result{}, wrapStep("start thread", err)
 		}
 		th := created.Msg.GetThread()
-		focusCreated(d.Emitter, a, th.GetId())
+		focusCreated(d.Emitter, a, th)
 		return Result{Message: fmt.Sprintf("Started thread %s for PR #%d", threadLabel(th), n), JSON: th}, nil
 	}
 

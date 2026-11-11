@@ -151,12 +151,22 @@ describe("the focusThread intent (child threads, docs/notes/no-sidebar-override-
     ["the user's new thread", {}, true],
     ["a new child (its creator exists)", { createdBy: "s1" }, false],
     ["a new child whose creator was removed", { createdBy: "gone" }, true],
-    ["an older child (thread.focus)", { createdBy: "s1", createdAtMs: now - 60_000 }, true],
+    // No creation-time guess (docs/notes/child-never-takes-view.md): a hidden child made
+    // long ago is skipped too; only an explicit intent (thread.focus) selects it.
+    ["a child created long ago", { createdBy: "s1", createdAtMs: now - 60_000 }, false],
+    ["a child with no creation time", { createdBy: "s1", createdAtMs: null }, false],
   ])("%s: switches the view %s", (_name, over, switches) => {
     useThreadsStore.setState({ byId: { s1: thread("s1"), n: made("n", over) }, order: ["s1", "n"] });
     applyIntent({ kind: "focusThread", threadId: "n" });
     expect(selected()).toEqual(switches ? { kind: "thread", id: "n" } : HOME);
     expect(useUiStore.getState().promptFocusSeq).toBe(switches ? 1 : 0);
+  });
+
+  it("an explicit one (thread.focus) selects a hidden child created long ago", () => {
+    useThreadsStore.setState({ byId: { s1: thread("s1"), n: made("n", { createdBy: "s1", createdAtMs: now - 60_000 }) }, order: ["s1", "n"] });
+    applyIntent({ kind: "focusThread", threadId: "n", explicit: true });
+    expect(selected()).toEqual({ kind: "thread", id: "n" });
+    expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });
 
   it("an explicit one (--focus: the user asked) selects even a new hidden child, when it arrives too", () => {

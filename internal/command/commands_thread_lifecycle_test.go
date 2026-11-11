@@ -31,6 +31,10 @@ func focusIntent(id string) *v1.UiIntent {
 	return &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id}}}
 }
 
+func explicitFocusIntent(id string) *v1.UiIntent {
+	return &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id, Explicit: true}}}
+}
+
 func TestThreadLifecycleCommands(t *testing.T) {
 	t.Setenv("HOME", "/Users/me")
 	auto := v1.PermissionMode_PERMISSION_MODE_AUTO
@@ -248,7 +252,7 @@ func TestThreadLifecycleCommands(t *testing.T) {
 			wantMsg: "unpinned thread s5", wantReqs: []proto.Message{&v1.PinThreadRequest{Id: "s5"}}},
 		{name: "pin unavailable without a thread", cmd: "thread.pin", ctx: command.Context{ActiveView: "pullrequests"}, wantErr: command.ErrUnavailable},
 		{name: "pin from the CLI without a thread", cmd: "thread.pin", wantErr: command.ErrInvalidArgs},
-		{name: "focus", cmd: "thread.focus", ctx: command.Context{ActiveThreadID: "s7"}, wantMsg: "windows=1", wantIntent: focusIntent("s7")},
+		{name: "focus", cmd: "thread.focus", ctx: command.Context{ActiveThreadID: "s7"}, wantMsg: "windows=1", wantIntent: explicitFocusIntent("s7")},
 		{name: "backend error passes through", cmd: "thread.remove", args: map[string]string{"id": "s5"},
 			backendErr: connect.NewError(connect.CodeNotFound, errors.New("nope")), wantCode: connect.CodeNotFound},
 	}
@@ -285,24 +289,40 @@ func TestThreadLifecycleCommands(t *testing.T) {
 	}
 }
 
-// A thread-starting verb with focus=false (what a page's bridge sends unless the page
-// asks) moves no window; the default still does (the cases above).
-func TestThreadCreatedNoFocus(t *testing.T) {
+// Which thread-starting calls move the windows (docs/notes/child-never-takes-view.md):
+// the user's own creation does; a thread another thread created (created-by) never does,
+// --focus or not; focus=false (what a page's bridge sends unless the page asks) does not;
+// thread.focus does, explicitly, so the window selects even a hidden child.
+func TestThreadCreatedFocus(t *testing.T) {
 	for _, tt := range []struct {
+		name string
 		cmd  string
 		ctx  command.Context
 		args map[string]string
+		want *v1.UiIntent // nil: no intent at all
 	}{
-		{"thread.new", command.Context{ActiveThreadID: "s5"}, map[string]string{"project": "r1", "focus": "false"}},
-		{"thread.fork", command.Context{ActiveThreadID: "s5"}, map[string]string{"focus": "false"}},
+		{"the user's new thread", "thread.new", command.Context{ActiveWorktreePath: "/wt"}, nil, focusIntent("s1")},
+		{"the user's new thread from the CLI", "thread.new", command.Context{}, map[string]string{"project": "r1"}, focusIntent("s1")},
+		{"a child (created-by)", "thread.new", command.Context{ActiveThreadID: "s5"}, map[string]string{"project": "r1", "created-by": "s5"}, nil},
+		{"a child placed like its creator", "thread.new", command.Context{ActiveThreadID: "s5"}, map[string]string{"created-by": "s5"}, nil},
+		{"a child with --focus: still none (thread focus asks)", "thread.new", command.Context{}, map[string]string{"project": "r1", "created-by": "s5", "focus": "true"}, nil},
+		{"focus=false", "thread.new", command.Context{ActiveThreadID: "s5"}, map[string]string{"project": "r1", "focus": "false"}, nil},
+		{"a fork", "thread.fork", command.Context{ActiveThreadID: "s5"}, nil, focusIntent("s2")},
+		{"a fork with focus=false", "thread.fork", command.Context{ActiveThreadID: "s5"}, map[string]string{"focus": "false"}, nil},
+		{"thread.focus is explicit", "thread.focus", command.Context{}, map[string]string{"id": "s7"}, explicitFocusIntent("s7")},
 	} {
-		t.Run(tt.cmd, func(t *testing.T) {
-			reg, _, e := newLifecycleRegistry(t)
+		t.Run(tt.name, func(t *testing.T) {
+			reg, b, e := newLifecycleRegistry(t)
+			b.Current = &v1.Thread{ProjectId: "r1", WorktreePath: "/wt/r1"}
 			if _, err := reg.Invoke(context.Background(), tt.ctx, tt.cmd, tt.args); err != nil {
 				t.Fatal(err)
 			}
-			if in := e.Intents(); len(in) != 0 {
+			in := e.Intents()
+			switch {
+			case tt.want == nil && len(in) != 0:
 				t.Errorf("intents = %v, want none", in)
+			case tt.want != nil && (len(in) != 1 || !proto.Equal(in[0], tt.want)):
+				t.Errorf("intents = %v, want %v", in, tt.want)
 			}
 		})
 	}

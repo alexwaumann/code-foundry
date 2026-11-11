@@ -13,6 +13,8 @@ its questions and finished turns do not reach the user there. The user still fin
 your thread's info card (its lineage group lists every thread you created). A thread the
 user creates is always shown. Nothing shows a child of yours: no setting, flag or
 command. Only when you are removed (not archived) do your children appear in the sidebar.
+Creating one never moves the user's window, whatever `--focus` says; when the user asks
+to see a child, `thread focus --id <id>` opens it in their window.
 
 So you are the one who answers your children: watch their wakes, answer their prompts
 (`reference/wakes.md`), and tell the user what they did.

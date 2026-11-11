@@ -27,25 +27,18 @@ export function inSidebar(t: SidebarFields, byId: ThreadsById): boolean {
 }
 
 /**
- * How recently a thread was created for a focusThread intent about it to count as its
- * creation's (thread.new, thread.fork and the pr.* threads focus every thread they
- * create; thread.focus focuses on request).
- */
-export const NEW_THREAD_FOCUS_MS = 10_000;
-
-/**
  * What a focusThread intent does: "select" the thread (switch the view to it), "skip" it
- * (the view stays: a hidden thread just created, so an agent creating children, perhaps
- * woken while the user works elsewhere, never yanks the view), or "wait" for it (not in
- * the thread list yet: the intent and the list event travel separately; decide once it
- * arrives). A thread created longer ago than NEW_THREAD_FOCUS_MS is an explicit
- * thread.focus and is selected, hidden or not.
+ * (the view stays), or "wait" for it (not in the thread list yet: the intent and the list
+ * event travel separately; decide once it arrives). An explicit intent (thread.focus, a
+ * view.panel.* verb's --focus: the user or an agent asked for this thread) selects any
+ * thread. A non-explicit one (a thread-starting verb's creation focus) selects only a
+ * thread in the sidebar: a hidden child never takes the view. The daemon sends no creation
+ * focus for a child at all (docs/notes/child-never-takes-view.md); this rule is the
+ * defence for a new GUI talking to an older daemon during an update.
  */
-export function threadFocus(t: (SidebarFields & Pick<ThreadView, "createdAtMs">) | undefined, byId: ThreadsById, nowMs: number): "select" | "skip" | "wait" {
+export function threadFocus(t: SidebarFields | undefined, byId: ThreadsById, explicit: boolean): "select" | "skip" | "wait" {
   if (t === undefined) return "wait";
-  if (inSidebar(t, byId)) return "select";
-  const fresh = t.createdAtMs === null || nowMs - t.createdAtMs < NEW_THREAD_FOCUS_MS;
-  return fresh ? "skip" : "select";
+  return explicit || inSidebar(t, byId) ? "select" : "skip";
 }
 
 /**

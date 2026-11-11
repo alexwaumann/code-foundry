@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inSidebar, NEW_THREAD_FOCUS_MS, sidebarAnchor, threadFocus, type SidebarFields, type ThreadsById } from "./inSidebar";
+import { inSidebar, sidebarAnchor, threadFocus, type SidebarFields, type ThreadsById } from "./inSidebar";
 
 describe("inSidebar", () => {
   const byId: ThreadsById = { p: {}, archived: {} };
@@ -16,20 +16,18 @@ describe("inSidebar", () => {
 });
 
 describe("threadFocus (a focusThread intent)", () => {
-  const now = 1_000_000;
   const byId: ThreadsById = { p: {} };
-  const t = (createdBy: string, agoMs: number | null) => ({ createdBy, createdAtMs: agoMs === null ? null : now - agoMs });
-  const cases: [string, ReturnType<typeof t> | undefined, "select" | "skip" | "wait"][] = [
-    ["not in the list yet: wait for it", undefined, "wait"],
-    ["the user's new thread", t("", 0), "select"],
-    ["a new created thread", t("p", 50), "skip"],
-    ["a new thread whose creator is gone", t("gone", 50), "select"],
-    ["a hidden thread without a creation time", t("p", null), "skip"],
-    ["a hidden thread just under the window", t("p", NEW_THREAD_FOCUS_MS - 1), "skip"],
-    ["an older hidden thread: an explicit thread.focus", t("p", NEW_THREAD_FOCUS_MS), "select"],
+  const t = (createdBy: string): SidebarFields => ({ createdBy });
+  const cases: [string, SidebarFields | undefined, boolean, "select" | "skip" | "wait"][] = [
+    ["not in the list yet: wait for it", undefined, false, "wait"],
+    ["not in the list yet, explicit: wait for it too", undefined, true, "wait"],
+    ["the user's thread", t(""), false, "select"],
+    ["a hidden child (its creator exists)", t("p"), false, "skip"],
+    ["a hidden child, explicit (thread.focus)", t("p"), true, "select"],
+    ["a child whose creator is gone (shown)", t("gone"), false, "select"],
   ];
-  it.each(cases)("%s", (_name, thread, want) => {
-    expect(threadFocus(thread, byId, now)).toBe(want);
+  it.each(cases)("%s", (_name, thread, explicit, want) => {
+    expect(threadFocus(thread, byId, explicit)).toBe(want);
   });
 });
 

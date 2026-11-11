@@ -50,17 +50,16 @@ useUiStore.subscribe((s, prev) => {
 
 /**
  * Shows a thread the daemon asked to focus (thread.new, thread.fork, pr.*, thread.focus),
- * unless it is a thread just created that is hidden from the sidebar (lib/inSidebar.ts
+ * unless a non-explicit intent names a thread hidden from the sidebar (lib/inSidebar.ts
  * threadFocus): an agent creating its children must not take the user's view. An
- * `explicit` one (a view.panel.* verb's --focus, which the user asked for) selects it
- * anyway. One not in the list yet is decided when it arrives.
+ * `explicit` one (thread.focus, a view.panel.* verb's --focus) selects it anyway. One not
+ * in the list yet is decided when it arrives.
  */
 function focusThread(id: string, explicit: boolean): void {
   clearPendingFocus();
   const decide = (): boolean => {
     const byId = useThreadsStore.getState().byId;
-    const t = byId[id];
-    const d = explicit && t !== undefined ? "select" : threadFocus(t, byId, Date.now());
+    const d = threadFocus(byId[id], byId, explicit);
     if (d === "select") useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
     return d !== "wait";
   };

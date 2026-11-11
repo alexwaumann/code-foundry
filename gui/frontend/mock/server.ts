@@ -33,7 +33,7 @@
  *   POST /__mock/live-count                       (the sidebar's live count: a working thread with background
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
- *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
+ *   POST /__mock/thread/focus?id=s-3     (FocusThread intent, explicit as thread.focus)
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
  *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
  *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn[&queued=1]
@@ -966,7 +966,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         for (const each of q.getAll("id")) world.holdThread(each, true);
         break;
       case "focus":
-        json(res, 200, { delivered: world.focusThread(id) });
+        json(res, 200, { delivered: world.focusThread(id, true) });
         return;
       case "archive":
         world.archiveThread(id, q.get("archived") !== "false");
