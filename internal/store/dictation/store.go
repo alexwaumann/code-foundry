@@ -389,6 +389,12 @@ func New(opts Options) *Store {
 
 // Close stops the engine, a running download and the supervisor.
 func (s *Store) Close() {
+	// Cancelled before the engine is detached: a reconcile in Launch (s.mu let go) checks
+	// s.ctx under s.mu once it has the engine, so either it sees the cancel and closes
+	// that engine itself, or it attached the engine before this lock and the detach
+	// below takes it. Cancelled after the unlock, an engine attached in between was
+	// never closed, and wg.Wait waited for its watch forever.
+	s.stop()
 	s.mu.Lock()
 	eng := s.detachLocked(EndDisabled)
 	dl := s.dl
@@ -396,7 +402,6 @@ func (s *Store) Close() {
 	if dl != nil {
 		dl.cancel()
 	}
-	s.stop()
 	if eng != nil {
 		eng.Close()
 	}

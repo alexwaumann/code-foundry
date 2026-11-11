@@ -1,8 +1,12 @@
 package thread
 
 import (
+	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -126,7 +130,9 @@ func TestMemorySpawned(t *testing.T) {
 func TestMemoryRefreshOnResume(t *testing.T) {
 	var mu sync.Mutex
 	entries, readErr := []string{"Use tabs"}, error(nil)
-	e := newEnv(t, func(o *Options) {
+	// "three" is the second message of one process: the capture needs a turn for it
+	// (text-table alone has one per process, so that turn would never end).
+	e := newFixtureEnvAt(t, repeatedCapture(t, "text-table", 2), nil, func(o *Options) {
 		o.Memory = func() ([]string, error) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -183,11 +189,15 @@ func TestMemoryRefreshOnResume(t *testing.T) {
 			want, hash = tt.note+"\n\n"+tt.text, memoryHash(tt.mem)
 		}
 		e.waitSent(tt.name, func(m map[string]any) bool { return userTextOf(m) == want })
-		items := e.waitItems(s.ID, tt.name, func(items []Item) bool { return lastUser(items).Text == tt.text })
-		if u := lastUser(items); u.MemoryNote != tt.note {
-			t.Errorf("%s: the item's memory note = %q, want %q", tt.name, u.MemoryNote, tt.note)
+		u := lastUser(e.waitItems(s.ID, tt.name, func(items []Item) bool { return lastUser(items).Text == tt.text }))
+		// The turn that read this message is over (the status alone may still be the last
+		// turn's), and the send is done: it takes the hash after it writes the item's note.
+		e.waitFor(s.ID, tt.name+": the hash", func(s Thread) bool {
+			return s.MemoryHash == hash && s.HandledThrough >= u.Ordinal && turnOver(s)
+		})
+		if u := lastUser(e.items(s.ID).Items); u.Text != tt.text || u.MemoryNote != tt.note {
+			t.Errorf("%s: the item = %q with memory note %q, want %q", tt.name, u.Text, u.MemoryNote, tt.note)
 		}
-		e.waitFor(s.ID, tt.name+": the hash", func(s Thread) bool { return s.MemoryHash == hash && turnOver(s) })
 	}
 	refreshes := slices.DeleteFunc(e.sentTexts(), func(t string) bool { return !strings.HasPrefix(t, "Updated standing preferences") })
 	if len(refreshes) != 3 {
@@ -210,7 +220,10 @@ func TestMemoryRefreshOnResume(t *testing.T) {
 	send(f.ID, "forked")
 	forkNote := MemoryRefreshHeading + "\n- Fork rule"
 	e.waitSent("the fork's message", func(m map[string]any) bool { return userTextOf(m) == forkNote+"\n\nforked" })
-	e.waitFor(f.ID, "the fork's hash", func(s Thread) bool { return s.MemoryHash == memoryHash([]string{"Fork rule"}) && turnOver(s) })
+	fu := lastUser(e.waitItems(f.ID, "the fork's item", func(items []Item) bool { return lastUser(items).Text == "forked" }))
+	e.waitFor(f.ID, "the fork's hash", func(s Thread) bool {
+		return s.MemoryHash == memoryHash([]string{"Fork rule"}) && s.HandledThrough >= fu.Ordinal && turnOver(s)
+	})
 
 	// Persisted: the row's hash and the item's note.
 	e.restart()
@@ -220,4 +233,19 @@ func TestMemoryRefreshOnResume(t *testing.T) {
 	if u := lastUser(e.items(f.ID).Items); u.Text != "forked" || u.MemoryNote != forkNote {
 		t.Errorf("the fork's item after a daemon restart = %+v", u)
 	}
+}
+
+// repeatedCapture is the capture fixture n times over in one file, so one process
+// answers n messages with a turn each (the fake replays the next turn per message).
+func repeatedCapture(t *testing.T, fixture string, n int) string {
+	t.Helper()
+	b, err := os.ReadFile(fixturePath(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), fixture+"-x"+strconv.Itoa(n)+".jsonl")
+	if err := os.WriteFile(path, bytes.Repeat(b, n), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

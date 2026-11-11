@@ -83,3 +83,121 @@ Verified, `-race`: before, 9 of 300 and 11 of 400 failed in single runs; under l
 (8 processes plus the plugin flood test running) 38 of 1,600 failed at `GOMAXPROCS=4` and
 0 of 1,600 at `GOMAXPROCS=1`. After: 0 of 1,000 in a single run, and 0 of 1,600 at each of
 `GOMAXPROCS=4` and `GOMAXPROCS=1` under the same load.
+
+# Round 2 (2026-11-11)
+
+Five more failures from CI runs in the week before, each of which passed on rerun. Two
+were races in the product (gh, dictation) and one was a race in a test (thread). Two were
+already fixed on main (project, the thread package's timeout), and one was a pull
+request's own bug (the CLI tests). Stress runs used the `-race` test binary
+(`go test -race -c`) with 24 processes at once on 12 cores, at the default GOMAXPROCS
+and at 2 and 1.
+
+## TestEventStateAfterFailedDetailReopen, TestCachedPullRequestAfterTheWatchEnded (internal/store/gh)
+
+CI: `WARNING: DATA RACE`, a read in `WatchPullRequests` (pr_watch.go:74) against a write
+in `setWatch` from the poll's `resolveWatchedHeads`.
+
+Cause, in the store: `WatchPullRequests` makes `next` the store's `prWatches` under
+`s.mu`, unlocks, and then logs `len(next)`. From the unlock on, `next` is the store's map,
+and the poll goroutine writes it under `s.mu` (`setWatch` records a looked-up head). The
+log line's read had no lock. It is harmless in effect (a debug count), but it is a data
+race in the daemon, not only in the tests. It needs the poll to run in parallel with the
+caller, so it never failed at `GOMAXPROCS=1`.
+
+Fix: the count is read before the unlock.
+
+Verified, both tests per run: before, 9 of 2,000 failed at `GOMAXPROCS=2` (each the same
+race report), 0 of 2,000 at 1 and 0 of 400 at the default. After: 0 of 2,000 at each of
+the default, 2 and 1.
+
+## TestMemoryRefreshOnResume (internal/store/thread)
+
+CI, two ways: `changed, started on send: the item's memory note = ""` (and the same for
+`cleared`), and `timed out waiting for the next message of that process: the hash` with
+the thread busy.
+
+Two races, both in the test.
+
+- The note. A message that starts a stopped thread is written as an item before the
+  handshake, and gets its memory note only after it went to Claude
+  (`proj.w.change` in sendMessage, after `conn.Send`). The test waited for the fake to
+  receive the text, then read the item at once, so it could see the item before the
+  note was written.
+- The hash. The fake replays the next turn of its capture for every message, and
+  text-table has one turn (the part after its result is only a `command_lifecycle`
+  line). "three" is the second message of one process, so its turn never ends. The test
+  passed only because `turnOver` read the status of the previous turn: the status is
+  published after a 10 ms debounce, and a test that polled within it went on. When the
+  test goroutine was late (a busy runner), the thread was busy for good. The restart in
+  the next case then interrupted the turn that never ended (the fake's stdin log shows
+  the `interrupt`).
+
+Fix: the fake replays text-table twice in one file, so a process answers two messages.
+Each case waits for the turn that read its message to be over
+(`HandledThrough >= the item's ordinal`, as `TestHandledThroughPublished` does, beside
+`turnOver` and the hash) before it reads the item's note. sendMessage writes the note
+before it records the hash, so a hash that changed means the note is there; where the
+hash does not change, the note is never written. The fork's wait at the end does the
+same.
+
+Verified: before, 2 of 240 failed (the note) at the default and 6 of 240 (the hash) at
+`GOMAXPROCS=1`, 0 of 240 at 2. After: 0 of 480 at each of the default, 2 and 1.
+
+The package's 10 minute timeout on 2026-11-05 (run 42106823986) was the
+`TestMoveHoldsTheIdleStop` deadlock fixed by 5cd5baa23 that day: the run's branch did not
+have that commit, and the dump shows the test asleep holding `m.mu` at the old line 730
+while the run loop waits for `m.mu` in `startNaming`. On main it held: 0 of 240 at each of
+the default, 2 and 1.
+
+## TestCompareRunsNoSubmoduleFsmonitor (internal/store/project)
+
+CI: `the submodule's core.fsmonitor ran: ran ran`.
+
+Already fixed on main by 9d0083a78, which merged after both failing runs. The old canary
+logged any git run in the submodule, so the store's own background `git status` could trip
+it; the script now answers only to `GIT_NO_LAZY_FETCH`, which only a guarded comparison
+command sets. Verified: the test as it was before that commit failed 66 of 900 with the
+CI message (10/300 at the default, 29/300 at 2, 27/300 at 1); on main, 0 of 900.
+
+## The CLI e2e tests at 60 s (cmd/code-foundry)
+
+CI (run 42953317317, on a pull request's branch): `TestCLICapabilities`,
+`TestCLIAgainstDaemon`, `TestCLINotifyReachesWatcher`, `TestCLIMemory`, `TestCLISettings`
+and `TestCLIConfirm`, each `daemon did not become ready` after 60 s.
+
+The branch's own bug, nothing on main: each also logs `daemon.Run: db: migrations
+0059_plugin_dev_watch.sql and 0059_thread_turn_started.sql share version 59`, and every
+other test that opens a database failed in the same run (internal/api, internal/client,
+internal/command) with the same error. The branch had added a migration with the number
+main had taken meanwhile, and it was renumbered to 0060 before it merged. Nothing
+changed for these.
+
+## TestDownloadSources (internal/store/dictation)
+
+CI: the package hit the 10 minute timeout on main (run 41919048925). The dump: the test's
+cleanup in `Store.Close`, waiting in `wg.Wait`, and one `Store.watch` goroutine ranging
+over an engine's events that never ended.
+
+Cause, in the store: `Close` detached the engine under `s.mu`, let go of it, and only then
+cancelled `s.ctx`. A `reconcile` in `Launch` (which runs without `s.mu`) that got its
+engine back in that gap took `s.mu`, saw the context still live, attached the engine and
+started its `watch`. Nobody closed that engine, so `wg.Wait` waited forever. In the
+daemon it would hang shutdown the same way when dictation was being turned on as it
+stopped. TestDownloadSources hits it because a download that lands turns dictation on
+(`Options.Enable`, whose test double calls `ConfigChanged` in a goroutine), so the store
+starts an engine just as the case's cleanup closes it.
+
+Fix: `Close` cancels `s.ctx` before it takes `s.mu`. reconcile checks `s.ctx` under
+`s.mu` after `Launch`, so either it sees the cancel and closes the engine itself, or it
+attached the engine before Close's lock and the detach takes it.
+
+Verified. With one run per process and 8 processes at once: before, 2 of 3,000 hung
+(both in `Close` with a `watch` left, at the default GOMAXPROCS; 0 of 1,000 at each of 2
+and 1); after, 0 of 3,000. With more runs per process the hang is easier to hit: before,
+61 of 1,200 processes hung (50 runs each with 24 processes at once, and 10 runs each with
+12 at once); after, 0 of 600 processes (10 runs each with 12 at once) hung. Those faster
+runs also failed in both builds with `connect: can't assign requested address`: thousands
+of loopback connections a second used up the ephemeral ports. That comes from the stress
+rate, not the test, and it was gone at one run per process (at most about 2,300
+connections in TIME_WAIT).
