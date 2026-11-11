@@ -17,12 +17,6 @@ mockup also shows that the primitives are enough.
   with a plugin tab (Jenkins) in the strip and both plugin surfaces under the built-ins.
 * Extra params: `w=280` sets the panel width, `tall` lets the panel grow to fit its
   content, and `outline` labels every node with its primitive name.
-* `node shoot.mjs [jenkins,auth,list]` (WebKit, 1440×900 @2x) writes to `shots/`:
-  `<plugin>-<state>-<theme>.png` (full page), `…-<theme>-panel.png` (panel crop),
-  `<plugin>-<state>-narrow.png` (280px, dark, tall) and `<plugin>-<state>-outline.png`
-  (400px, dark, tall, primitives labelled). For `list` the files are `list-<theme>.png`,
-  `list-<theme>-panel.png` and `list-narrow.png`. Playwright is loaded from this
-  worktree's `gui/frontend/node_modules`, or from the main checkout's if this one has none.
 
 ## Primitives used
 
@@ -148,4 +142,3 @@ belongs there, not in the body), `divider`, indeterminate `progress`, `info` not
 6. Is it acceptable to wrap long log lines, or do logs need a no-wrap option for tables
    and progress bars in Jenkins output?
 
-Committed shots are a curated subset (key states, dark/light, one 280px crop); `node shoot.mjs` regenerates all 77.

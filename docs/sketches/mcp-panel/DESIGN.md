@@ -1,9 +1,7 @@
 # MCP panel tab: three sketches
 
 Static sketch of the side panel's MCP tab (`docs/notes/rendered-threads-followups.md` §2):
-a rendered thread in the main pane, the panel on the right with an **MCP** tab. Open
-`index.html?variant=a|b|c&theme=dark|light`; `node shoot.mjs [a,b,c]` renders
-`shots/<v>-<theme>.png` (1440×900 @2x, WebKit) and `-panel.png` crops.
+a rendered thread in the main pane, the panel on the right with an **MCP** tab.
 
 Data is what `mcp_status` returns (status, serverInfo, error, scope, tools with
 annotations) plus `source` from `system/init`. Six servers cover every state:
@@ -32,4 +30,4 @@ was last checked (each `system/init`, i.e. the start of a turn) and a refresh bu
 **Variant B.** Reconnect is the only action: no Disable/Enable buttons (a server disabled
 in Claude's config shows as disabled, nothing to do here; the header's refresh button
 re-asks `mcp_status`). Keep the tool annotation icons, each with a tooltip naming the
-hint (read-only, destructive, open-world, writes). `shots/b-*.png` are the final state.
+hint (read-only, destructive, open-world, writes).

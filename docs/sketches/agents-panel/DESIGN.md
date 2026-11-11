@@ -1,9 +1,7 @@
 # Agents panel tab: three sketches
 
 Static sketch of a side-panel **Agents** tab plus three ways a thread shows that
-subagents are running. Open `index.html?variant=a|b|c&thread=chip|strip|line&theme=dark|light`;
-`node shoot.mjs` renders `shots/<v>-<theme>.png` (+ `-panel.png` crops, thread=chip) and
-`shots/thread-<strip|line>-<theme>.png` (variant b). 1440×900 @2x, WebKit.
+subagents are running.
 
 Data is what the stream already carries and the daemon parses but drops today
 (`claudestream.Task`: `task_started` with description, subagent_type, is_backgrounded,

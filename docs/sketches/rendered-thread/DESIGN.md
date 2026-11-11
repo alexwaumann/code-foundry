@@ -1,8 +1,6 @@
 # Rendered thread: timeline + follow-up composer
 
-> Copied from `/tmp/cf-thread-sketch` by rendered threads PR 2. Only variant A's screenshots
-> (`shots/a-*.png`) are kept; the fonts load from `gui/frontend/public/fonts`, and
-> `shoot.mjs` was not copied. Open `index.html?variant=a&theme=dark|light&state=…`.
+> Copied from `/tmp/cf-thread-sketch` by rendered threads PR 2.
 
 This is a static sketch of the opt-in "rendered" thread mode described in
 `docs/notes/rendered-threads-handoff.md`. The main pane shows one thread, "Fix stale PR
@@ -196,17 +194,8 @@ Open points for Alex:
 
 ## Files
 
-* `index.html`, `thread.js` (content + the three layouts), `style.css` (tokens + shared
-  pieces), `variants.css`, `icons.js` (lucide paths), `fonts/` (bundled TTFs).
-* `shoot.mjs`: Playwright WebKit at 1440×900 @2x. Run it with `node shoot.mjs [a,b,c]`;
-  it imports `@playwright/test` from the main checkout's `gui/frontend/node_modules`.
-* `shots/<v>-<theme>.png` is the default state at 1440×900, scrolled to the bottom. Each
-  also has these companions:
-  * `-full.png`: the whole thread;
-  * `-diff.png`: crop of the expanded Edit;
-  * `-permission.png`: crop of the prompt (in A, the whole composer card it docks into);
-  * `-question.png`: the AskUserQuestion state;
-  * `-streaming.png`: the streaming state.
+* `style.css` (tokens + shared pieces) and `variants.css`, which the app's
+  `gui/frontend/src/components/thread/thread.css` was ported from.
 
 ## Decisions (Alex, 2026-10-11)
 

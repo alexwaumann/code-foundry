@@ -55,8 +55,7 @@ icon, title, meta, trailing actions), log block (monospace, tail-follows, copy),
 (variants: default, muted, destructive; loading state), link, text input, secret input,
 select, checkbox/toggle, progress (determinate + indeterminate), section (titled, maybe
 collapsible), inline notice (info / amber / red), toast, empty state, divider, spinner.
-Also decide: a header primitive matching existing surface headers (`shdr` in
-`docs/sketches/mcp-panel/style.css`), forms (grouping inputs + submit, validation
+Also decide: a header primitive matching existing surface headers, forms (grouping inputs + submit, validation
 messages), and whether a tabs/segmented primitive is warranted.
 
 ## The two example plugins (from users)
@@ -89,10 +88,9 @@ appears under a project or thread selection, and maybe as a settings entry.
 * Actions are always visible and muted, not hover-revealed, in panel surfaces.
 * The panel is 400–420px wide; everything must work at 280px (PANEL_MIN) too.
 * Dark and light both first-class. Tokens come from
-  `docs/sketches/rendered-thread/style.css` and the panel chrome from
-  `docs/sketches/mcp-panel/style.css`; reuse them, do not invent a palette.
-* Match the existing surface look (MCP cards in `docs/sketches/mcp-panel/shots/b-*.png`,
-  live components under `gui/frontend/src/components/panel` and `components/mcp`).
+  `docs/sketches/rendered-thread/style.css`; reuse them, do not invent a palette.
+* Match the existing surface look (live components under
+  `gui/frontend/src/components/panel` and `components/mcp`).
 
 ## Conventions
 
