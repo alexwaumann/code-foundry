@@ -190,6 +190,15 @@ func surfacePlugin() pluginsdk.Plugin {
 				return still{}, nil
 			},
 			"rows": newRowsSurface, // list_rows_test.go
+			// Shows its view, then takes a while to answer surface/open.
+			"slowopen": func(_ context.Context, h *pluginsdk.Host, o pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
+				p := &panel{h: h, inst: o.Instance}
+				if err := h.UpdateView(o.Instance, p.view()); err != nil {
+					return nil, err
+				}
+				time.Sleep(300 * time.Millisecond)
+				return p, nil
+			},
 		},
 	}
 }
@@ -212,6 +221,7 @@ func surfaceManifest() pluginsdk.Manifest {
 			{ID: "silent", Title: "Silent", Scope: pluginsdk.ScopeGlobal},
 			{ID: "proj", Title: "Project", Scope: pluginsdk.ScopeProject},
 			{ID: "rows", Title: "Rows"},
+			{ID: "slowopen", Title: "Slow to open"},
 		},
 	}
 }
@@ -855,6 +865,18 @@ func TestSurfaceReopensInTheCurrentContext(t *testing.T) {
 	w = e.watch("panel", s2)
 	w.state("reopened", plugin.PhaseLive)
 	e.waitLog("instance=surf/panel/thread:s-2 project=p-2 thread=s-2")
+}
+
+// A plugin shows its first view before it answers surface/open and takes no act until it
+// has: an act on that view waits for the answer.
+func TestSurfaceActWhileOpening(t *testing.T) {
+	e := newSurfEnv(t, nil)
+	w := e.watch("slowopen", s1)
+	w.view("the view sent while opening", contains("count 0"))
+	if _, err := e.act(w.key, plugin.ActRequest{Key: "inc"}); err != nil {
+		t.Fatal(err)
+	}
+	w.view("after the act", contains("count 1"))
 }
 
 // A master-detail's row without an action sends a select act and a tabs node's tab a tab
