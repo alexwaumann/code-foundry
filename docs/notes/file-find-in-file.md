@@ -156,6 +156,11 @@ off-screen match on a 600-line file scrolled to and painted, Escape's focus and 
 125% zoom; the editor (no library panel, the pencil both ways, Escape's editor selection);
 the thread's prompt keeping its cmd+F; Rendered markdown.
 
+Two existing specs asserted that cmd+F in the editor opened the library's panel and were
+changed to the tab's bar: `file-edit.spec.ts` (the chords test) and `file-request.spec.ts`
+(a clean re-read keeping the keyboard in the find field, which still holds: the bar is
+outside the editor the re-read remounts).
+
 By hand under `make drive`: wrap and no-wrap, a match at the end of a 180-character line,
 90% zoom, the palette entry, cmd+alt+F's hand-off and back, a panel letter from the code.
 
