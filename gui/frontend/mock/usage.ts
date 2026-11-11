@@ -1,7 +1,7 @@
 /**
  * Mock token usage (docs/notes/session-usage.md): a thread's buckets priced like the
  * daemon's internal/pricing for the few models the fixtures use; any other model is
- * unpriced. Seeded on s-1; POST /__mock/usage adds a bucket to any thread.
+ * unpriced. Seeded on s-1.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { UsageBucketSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";

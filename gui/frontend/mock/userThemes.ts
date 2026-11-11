@@ -6,11 +6,9 @@
  * Catppuccin Mocha, three slots pinned) and Latte, softer (light, from Catppuccin Latte,
  * by s-3), plus a file that does not load.
  *
- * Controls (mock/server.ts): POST /__mock/themes?set=empty|seed (the directory, as a hand
- * edit); POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true] (theme save run
- * from that thread: the card and, when applied, the toast; docs/notes/theme-model-flow.md);
- * POST /__mock/themes/edit?theme=ocean-dusk&canvas=%23330000 (a save from outside the window);
- * GET /__mock/themes: { themes, calls, reports }.
+ * Controls (mock/server.ts): POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true]
+ * (theme save run from that thread: the card and, when applied, the toast;
+ * docs/notes/theme-model-flow.md) and POST /__mock/themes/recolour.
  *
  * The GUI's contrast reports (docs/notes/theme-followups.md): UiService.PublishThemeReport
  * keeps the last report per theme, keyed by the file's version (a hash of its JSON, as the
@@ -170,7 +168,6 @@ export class MockThemes {
   private user: MockUserTheme[] = seed();
   private issues = [...SEED_ISSUES];
   private version = 1;
-  readonly calls: string[] = [];
   /** The GUI's contrast reports, by theme id (UiService.PublishThemeReport). */
   private reports = new Map<string, MockReport>();
   private reportWaiters = new Set<() => void>();
@@ -195,7 +192,6 @@ export class MockThemes {
   reset(): void {
     this.user = seed();
     this.issues = [...SEED_ISSUES];
-    this.calls.length = 0;
     this.reports.clear();
     this.reportWaiters.clear();
     this.history.clear();
@@ -226,10 +222,6 @@ export class MockThemes {
 
   event(): ThemeEventInit {
     return { snapshot: this.snapshot() };
-  }
-
-  json(): { themes: MockUserTheme[]; calls: string[]; reports: Record<string, MockReport> } {
-    return { themes: this.user, calls: this.calls, reports: Object.fromEntries(this.reports) };
   }
 
   /** UiService.PublishThemeReport: keeps each report, waking a save that waits for it. */
@@ -410,7 +402,6 @@ export class MockThemes {
         ]),
         when: always,
         run: (_c, a) => {
-          this.calls.push(`theme.show ${a.theme ?? ""}`);
           const { file, user } = this.find(a.theme ?? "");
           const json = user ? fileJson(file as MockUserTheme) : { id: file.id, name: file.name, scheme: file.scheme, ...(file.pair ? { pair: file.pair } : {}), source: file.source, base: file.base, ...(file.overrides ? { overrides: file.overrides } : {}) };
           return Promise.resolve({ message: JSON.stringify(json, null, 2), resultJson: JSON.stringify(json) });
@@ -425,7 +416,6 @@ export class MockThemes {
         ]),
         when: always,
         run: async (c, a) => {
-          this.calls.push(`theme.save ${a.data ? "data" : (a.file ?? "")}`);
           if (!a.data) throw new CommandError("invalid", "the mock reads --data only");
           const t = parse(a.data);
           const by = thread(c);
@@ -458,7 +448,6 @@ export class MockThemes {
         ], false),
         when: always,
         run: async (c, a) => {
-          this.calls.push(`theme.duplicate ${a.theme ?? ""}`);
           const { file } = this.find(a.theme ?? "");
           const taken = (id: string) => this.user.some((u) => u.id === id) || curated.some((t) => t.id === id);
           const baseId = `${file.id}-copy`;
@@ -487,7 +476,6 @@ export class MockThemes {
         ]),
         when: always,
         run: async (c, a) => {
-          this.calls.push(`theme.restore ${a.theme ?? ""} ${a.version ?? ""}`);
           const kept = (this.history.get(a.theme ?? "") ?? []).find((h) => versionOf(h) === a.version);
           if (!kept) throw new CommandError("notfound", `the version of "${a.theme ?? ""}" from before is no longer kept (only the last 10 are)`);
           const { replaced } = this.save({ ...kept });
@@ -502,7 +490,6 @@ export class MockThemes {
         ], false),
         when: always,
         run: (_c, a) => {
-          this.calls.push(`theme.set-scheme ${a.scheme ?? ""}`);
           this.deps.setScheme?.(a.scheme ?? "system");
           return Promise.resolve({ message: `scheme = ${a.scheme ?? ""} (appearance.theme)`, resultJson: JSON.stringify({ key: "appearance.theme", scheme: a.scheme }) });
         },
@@ -513,7 +500,6 @@ export class MockThemes {
         ]),
         when: always,
         run: async (_c, a) => {
-          this.calls.push(`theme.check ${a.theme ?? ""}`);
           const t = this.user.find((u) => u.id === a.theme);
           if (!t) throw new CommandError("invalid", `argument "theme": "${a.theme ?? ""}" is not one of your themes`);
           const r = await this.reportOn(t);
@@ -540,7 +526,6 @@ export class MockThemes {
         },
         when: always,
         run: (_c, a) => {
-          this.calls.push(`theme.delete ${a.theme ?? a.file ?? ""}`);
           const issue = this.issueOf(a);
           if (issue) {
             this.issues = this.issues.filter((i) => i.file !== issue.file);
@@ -584,30 +569,4 @@ export class MockThemes {
     return { id: def?.id ?? "", name: def?.name ?? "" };
   }
 
-  /**
-   * POST /__mock/themes/edit?theme=<id>&<base key>=<#hex>…: a save of one of the user's
-   * themes from outside this window (the CLI, a thread, another window), base colours changed.
-   */
-  edit(q: URLSearchParams): { ok: true } {
-    const u = this.user.find((t) => t.id === q.get("theme"));
-    if (!u) throw new Error("want theme=<one of the user's themes>");
-    const base = { ...u.base };
-    for (const [k, v] of q) if (k !== "theme") (base as unknown as Record<string, string>)[k] = v;
-    this.save({ ...u, base });
-    return { ok: true };
-  }
-
-  /** POST /__mock/themes?set=empty|seed: the directory, as a hand edit. */
-  control(q: URLSearchParams): { themes: number } {
-    const set = q.get("set");
-    if (set === "empty") {
-      this.user = [];
-      this.issues = [];
-    } else if (set === "seed") {
-      this.user = seed();
-      this.issues = [...SEED_ISSUES];
-    } else throw new CommandError("invalid", "set must be empty or seed");
-    this.changed();
-    return { themes: this.user.length };
-  }
 }

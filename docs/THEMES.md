@@ -125,7 +125,7 @@ app itself paints with, so an override shows in the app:
   `--cf-info-text`, `--cf-info-surface`, `--cf-highlight`, `--cf-highlight-text`,
   `--cf-highlight-surface`, `--cf-update`, `--cf-update-text`, `--cf-update-surface`
 - Sidebar: `--cf-sidebar`, `--cf-sidebar-foreground`, `--cf-sidebar-muted-foreground`,
-  `--cf-sidebar-row-selected`, `--cf-sidebar-row-hover`, `--cf-sidebar-border`
+  `--cf-sidebar-row-selected`, `--cf-sidebar-row-hover`
 - Thread: `--cf-message-surface`, `--cf-message-foreground`, `--cf-code-background`,
   `--cf-code-foreground`, `--cf-quote-border`
 - Diff: `--cf-diff-addition`, `--cf-diff-addition-surface`, `--cf-diff-deletion`,
@@ -136,7 +136,8 @@ app itself paints with, so an override shows in the app:
 
 Pages only (the app has no place for them yet; a page the model writes may use them):
 
-- `--cf-info-foreground`, `--cf-highlight-foreground`, `--cf-update-foreground`
+- `--cf-info-foreground`, `--cf-highlight-foreground`, `--cf-update-foreground`,
+  `--cf-sidebar-border`
 
 ## Checking a theme
 

@@ -5,10 +5,9 @@
  * counts the running ones (mock/world.ts threadMsg), so the strip above the composer
  * shows them.
  *
- *   POST /__mock/thread?state=shells   shells only: a Bash run_in_background and a Monitor
- *        running, the thread idle at its prompt (state=agents has one shell beside its agents)
- *   POST /__mock/thread/shell-end?id=s-r1[&status=failed]   the oldest running shell ends:
- *        its call done with Claude's summary (or an error with it), the count published
+ *   POST /__mock/thread?state=servers   shells only: a Bash run_in_background and a Monitor
+ *        running beside two dev servers, the thread idle at its prompt (state=agents has one
+ *        shell beside its agents)
  *
  * Thread.background_shells lists them with the ports each listens on (the thread info
  * card's server rows, docs/notes/thread-servers.md); thread.shell.stop ends one with a
@@ -62,8 +61,8 @@ export function launchShell(s: AgentsScript, o: { taskId: string; command: strin
   return { toolUseId: callId(call), taskId: o.taskId, command: o.command, description: o.description, monitor, startedAt: o.at, ports: o.ports ?? [] };
 }
 
-/** The "shells" state's conversation: a dev server and a CI watch left running. */
-export function scriptShells(s: AgentsScript, now = Date.now()): ShellCall[] {
+/** Background shells: a dev server and a CI watch left running. */
+function scriptShells(s: AgentsScript, now = Date.now()): ShellCall[] {
   const ago = (sec: number) => new Date(now - sec * 1000);
   s.it({ case: "userMessage", value: { text: "Start the e2e suite in the background and watch CI on the PR; tell me when either is done.", attachments: [] } }, { at: ago(95) });
   const shells = [
@@ -77,7 +76,7 @@ export function scriptShells(s: AgentsScript, now = Date.now()): ShellCall[] {
 
 /**
  * The thread info card's "servers" scenario (World.addThreadInfo): two dev servers
- * listening (one on two ports) beside the "shells" state's two shells that do not.
+ * listening (one on two ports) beside two shells that do not.
  */
 export function scriptServers(s: AgentsScript, now = Date.now()): ShellCall[] {
   const ago = (sec: number) => new Date(now - sec * 1000);

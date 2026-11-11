@@ -10,15 +10,14 @@
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
  *
- *   GET  /__mock/invocations | writes | resizes | threads | streams
+ *   GET  /__mock/invocations | writes | threads | streams
  *   GET  /__mock/waits                            (every thread.wait invoked, held until its caller aborts it: mock/bridge.ts)
+ *   GET  /__mock/fetches                          (every proxied page fetch: mock/proxyFetch.ts)
  *   POST /__mock/reset
  *   ProjectService.SearchGitHub / LookupGitHub / Clone: mock/clone.ts (a project named "fail" fails
  *        to clone; octo-org/already-here's destination exists)
- *   GET  /__mock/github/calls                     ("search <q>", "lookup <o/n>", "clone <o/n>")
  *   ProjectService.Create / ListPublishOwners / Publish, project.create, project.github.publish:
  *        mock/create.ts (publishing private to octo-org, or a repository named "taken", fails like gh)
- *   GET  /__mock/projects/calls                   ("create <name>", "publish <id> <o/n> <visibility>", "delete <id>")
  *   POST /__mock/thread/attention?id=s-1
  *   POST /__mock/thread/status?id=s-1&status=busy|idle|attention[&reason=question: Which color?][&busyTool=Bash make check]
  *        (busyTool: Thread.busy_tool, kept only while busy and not compacting; "" clears it)
@@ -28,8 +27,6 @@
  *   POST /__mock/status-kinds                     (one thread per status kind: approval, question,
  *        plan, finished, Claude error, busy, idle, interrupted, and a stopped one still asking
  *        a question)
- *   POST /__mock/resident                         (the resident thread s-resident-ember, "Ember": kind
- *        RESIDENT, epoch 2, stopped; hidden from the sidebar and counts; World.addResident)
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; every child out of the
  *        sidebar while its creator exists; World.addLineage)
@@ -37,17 +34,13 @@
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent)
- *   POST /__mock/thread/envstale?id=s-1&change=Hello%20removed%20CF_HELLO   (a plugin's environment changed
- *     since the running process started: Thread.plugin_env_stale; an empty change clears it)
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
  *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
- *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn|start-only[&queued=1]
+ *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn[&queued=1]
  *     (Thread.setup: the thread stands where that script of mock/setup.ts leaves it, with no cwd
  *     until it is placed and held, and its timeline is its first message and, for a setup that did
  *     not finish, the synthetic turn end. Scripting another state moves it on, keeping the message,
  *     and watchers get a new snapshot, as for a retry. queued: a message sent during the setup waits there)
- *   POST /__mock/transcript-deleted              (the thread s-transcript-deleted, "Fix sidebar flake":
- *     one exchange, its transcript deleted; World.addTranscriptDeleted)
  *   POST /__mock/thread/archive?id=s-1[&archived=false]   (thread.archive as the CLI's --yes does it:
  *                                                 closes, removes its shells, unpins, stamps; false unarchives;
  *                                                 child threads go along: World.archiveCascade)
@@ -55,19 +48,14 @@
  *                                                 creator no longer exists, so they join the sidebar)
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true][&save=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
- *   POST /__mock/thread/wake?id=s-8              (the daemon's wake: unsnoozed, attention "snooze ended")
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; only tokens: its context, the result's time kept; mock/context.ts)
  *   POST /__mock/thread?state=permission|question|streaming|idle|…   (the scripted thread s-r1:
  *        mock/thread.ts, every state in its THREAD_STATES); POST /__mock/thread/delta?text=… | /__mock/thread/stream?text=… |
  *        /__mock/thread/finish[?total=1.5&turnCost=1.5&model=claude-sonnet-5] (the turn_end's figures) |
- *        /__mock/thread/fail-respond[?withdrawn=1] (the next answer fails; withdrawn: Claude withdrew
- *        the request first, NotFound); /__mock/thread/fail-turn[?subtype=error_max_turns] (the next
- *        message's turn ends in error before any text; default error_during_execution);
+ *        /__mock/thread/fail-turn[?subtype=error_max_turns] (the next message's turn ends in error
+ *        before any text; default error_during_execution);
  *        /__mock/thread/api-error[?text=…] (the next message's turn ends with Claude Code's API-error
  *        text, api_error set; default "Invalid API key · Fix external API key"); GET /__mock/thread/calls;
- *        /__mock/thread/commands?set=none|more|default (the slash commands: mock/slashCommands.ts) |
- *        /__mock/thread/agent-end?run=a1[&status=failed] (a subagent run of state=agents ends: mock/agents.ts) |
- *        /__mock/thread/shell-end[?status=failed] (the oldest background shell of state=agents|shells ends: mock/shells.ts) |
  *        /__mock/thread/wake-fire?sub=…, /__mock/thread/wake-status?sub=…&status=… (state=waiting's wake rows: mock/wakes.ts) |
  *        /__mock/thread/mcp-age?id=s-r1&ago=720 (the last MCP check that many seconds ago: mock/mcp.ts) |
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
@@ -86,47 +74,28 @@
  *                                                 event streams end: the GUI reconnects and Lists)
  *   POST /__mock/thread/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
  *        busy/idle, a starting or closing one does not settle; the sidebar order then holds still.
- *        e2e's resetMock holds s-1 and s-5.) POST /__mock/thread/release?id=s-5 undoes it.
+ *        e2e's resetMock holds s-1 and s-5.)
  *   POST /__mock/link-pr?thread=s-1&slug=owner/name&number=12[&ago=<ms>][&up=1]   (Claude linked a pull
  *                                                 request ago ms ago; deduplicated by URL like the daemon;
  *                                                 up=1 copies it up the creator chain)
- *   POST /__mock/usage?thread=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
- *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
- *                                                 thread's (model, day) bucket; s-1 is seeded)
- *   POST /__mock/threads-service?enabled=false   (simulate a daemon without ThreadService)
- *   POST /__mock/missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment
- *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
  *   POST /__mock/thread-setup?state=failed       (where the next background thread.new stops: mock/setup.ts)
- *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
  *   POST /__mock/worktree/dirty?path=…&modified=2   (the worktree has modified files; 0: clean)
- *   POST /__mock/worktree/refresh-error?path=…&error=could%20not%20reach%20origin&ago=840000
- *                                                 (its last status read failed that long ago; no error: clears)
- *   POST /__mock/worktree/operation?path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go]
- *                                                 (a git operation stops in that worktree: status
- *                                                 operation fields, U files lead its detail; no op ends it)
- *   POST /__mock/worktree/merged?project=repo-cf&branch=cf/usage-polish[&path=…]   (a clean worktree whose
- *                                                 work is in origin/main: merged_clean, so project.worktree.cleanup removes
- *                                                 it; a path outside ~/.code-foundry/worktrees is never merged_clean)
  *   POST /__mock/leftovers?project=repo-cf[&clean=1]   ("Worktrees without threads": cf/perf-spike with 3 commits
  *                                                 not in origin/main, cf/old-copy with 4 uncommitted files (merged
  *                                                 otherwise), each with an archived thread, and exp/shaders made outside
  *                                                 the app; clean=1 adds cf/usage-polish, clean and merged: World.addLeftovers)
  *   POST /__mock/workspace?name=login&projects=repo-cf,repo-gp[&root=…&primary=…&instructions=CLAUDE.md&skills=a,b]
  *                                                 (a workspace: a saved project set; nothing on disk changes)
- *   POST /__mock/workspace-files?workspace=login[&instructions=AGENTS.md&skills=a,b&rootMissing=1]
- *                                                 (what a thread wrote in the workspace's folder; "" clears)
  *   POST /__mock/set-thread?projects=repo-sk,repo-wr[&project=…|workspace][&workspace=…][&branch=feat/x][&name=…]
  *                                                 (a thread over a project set; a branch: worktree mode, none: in place)
  *   thread.new --like and thread.new-like copy a thread's set, branch, workspace and mode; thread.new's
  *   sets and thread.new-like return the collision hints as warnings (mock/projectSets.ts);
  *   thread.workspace sets a thread's workspace reference; thread.project.add and .remove change a
  *   thread's set (its workspace reference goes; a dirty member's removal asks first).
- *   POST /__mock/thread-info?scenario=single|archived|ws9|busy|child|nogit|unnamed|home|servers|child-server   (the thread info card's fixtures; World.addThreadInfo)
+ *   POST /__mock/thread-info?scenario=single|archived|ws9|home|child-server   (the thread info card's fixtures; World.addThreadInfo)
  *   POST /__mock/multi-thread?projects=repo-cf,repo-gp[&project=repo-gp&branch=feat/x&name=multi&workspace=login&createdBy=s-ti-1]
  *                                                 (a worktree-mode thread over several projects, its worktrees made)
- *   GET  /__mock/workspaces                       (id, name, members, root, default primary, files)
- *   POST /__mock/thread/project-ids?id=…&projects=repo-cf,repo-gp   (a thread's project set)
  *   POST /__mock/empty                            (a fresh install: no projects, threads or terminals)
  *   POST /__mock/welcome                          (a first run: empty, then s-welcome with no project and its
  *                                                 busy demo child s-welcome-demo; World.addWelcome)
@@ -134,7 +103,6 @@
  *   POST /__mock/workspace-thread?workspace=login[&project=repo-gp&name=driver&status=busy]
  *                                                 (a connected thread that references the workspace, its
  *                                                 members as its set, in project's main worktree)
- *   POST /__mock/project/rename?id=repo-dot&name=workspace   (the project's name, as project.rename sets it)
  *   thread.run-in queues a move (pendingWorktreePath) that lands ~2s after the thread is not busy.
  *   thread.move (and ThreadService.Move) takes a thread without a project into a project or a
  *   workspace: pending_move and naming for ~600ms, then renamed and placed (World.moveThread).
@@ -149,40 +117,27 @@
  *                                                 none; reset restores DEFAULT_FILES; several
  *                                                 projects: project=a&path=x&project=b&path=y)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
- *   POST /__mock/files/search?delay=700&fail=1    (SearchFiles answers after 700ms; fail=1: Internal; reset: at once)
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
- *        src/app.ts, docs/preview.html, docs/logo.png, bin/tool, docs/, big.log; every detail's changed files)
+ *        src/app.ts, docs/preview.html, docs/logo.png, docs/; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
  *   POST /__mock/compare/commits?count=800[&subject=N]   (that many more commits on every comparison's list, older than the rest;
  *        subject: N more characters on the newest commit's subject; reset: none)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
- *   POST /__mock/fs/remove?path=…                 (the file goes)
  *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
- *   POST /__mock/fs/refuse?code=…&message=…       (the next WriteFile fails: code as in failed_precondition)
  *   GET  /__mock/fs/text?path=…                   ({ text }: a file's contents, null when absent)
- *   GET  /__mock/fs/calls                         ("read <path>", "write <path> [force]", "diff <worktree> <file> <working|branch>")
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
- *   POST /__mock/gitops?fail=git.push&delay=800   (next git.push fails; ops take 800ms)
- *   GET  /__mock/gitops
  *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
  *   POST /__mock/settings/external?appearance.font_size=18   (a hand edit; "" deletes a key)
  *   POST /__mock/settings/external?loadError=…               (the file stops parsing)
- *   POST /__mock/backdrops/import?path=/Users/me/Pictures/a.png   (an import, as Add image… does; mock/backdrops.ts)
- *   GET  /__mock/backdrops                         ({ images: names, calls })
  *   GET  /__mock/update
- *   POST /__mock/update/state?state=idle|available|downloading|downloaded|installed|restartRequired|failed&version=v0.2.0[&reason=…]
  *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
  *   POST /__mock/update/fail?reason=…             (the next download fails)
- *   POST /__mock/update/disabled?reason=dev%20build
  *        app.restart (Restart Now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
- *   POST /__mock/gh/update | poll | stale | inbox-zero | auth?ok=false | touch?path=…   (GitHub + detail;
- *        inbox-zero empties the review queue, leaving the reviews that wait on their authors)
+ *   POST /__mock/gh/inbox-zero                (empties the review queue, leaving the reviews that wait on their authors)
  *   POST /__mock/gh/many-prs?count=150        (every list of the Pull Requests page that many long)
  *   POST /__mock/gh/project-merged-capped[?shown=3&total=64]   (the dashboard's project-wide
  *        merged list shows its first `shown` of `total`: "Showing 3 of 64")
- *   POST /__mock/gh/branch-pr?slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
- *                                                 (that branch's pull request, alone or beside the others)
  *   GET  /__mock/gh/calls                         (GhService/GetWorktreeDetail call counts;
  *        "ListReviewerCandidates query" counts the searches)
  *   POST /__mock/gh/pr-fail?command=pr.refresh             (that command's next run fails;
@@ -200,27 +155,16 @@
  *        copy, refreshing; the fetch lands ms later, adding body to the description; ms=-1: never)
  *   POST /__mock/gh/dashboard-cold            (GetDashboard as a daemon before its first poll, until
  *        /__mock/gh/dashboard-warm, which answers with the lists and publishes polled)
- *   POST /__mock/gh/pr-push?repo=o/r&number=145&sha=<40 hex>   (the detail's head moves;
- *        pull_request_detail_updated). The Code tab's diff and files: mock/prDiff.ts (one
+ *   The pull request Code tab's diff and files: mock/prDiff.ts (one
  *        three-file diff for every pull request, #140's refused as too large; counts
  *        "GetPullRequestDiff", "GetPullRequestDiff refresh", "GetPullRequestFile <path>")
  *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
  *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
  *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
- *   GET  /__mock/actions                          (actions and runs as JSON, runs with their output)
- *   POST /__mock/action/finish?run=r-…&code=N     (or terminal=t-…: that running run's process exits
- *                                                 now with code N, default 0)
  *   POST /__mock/action/setup?thread=s-1&code=1[&action=Install deps]   (a worktree-create
  *                                                 background run for that thread: some output, then
  *                                                 code after ~600 ms; default action: the project's
  *                                                 first on-worktree-create one)
- *   POST /__mock/action/run?thread=s-1&action=Test[&mode=terminal|background]   (or worktree=…
- *                                                 instead of thread: a run as the CLI or an agent
- *                                                 would start it, not through the GUI; pnpm dev,
- *                                                 action Dev, listens on 5173 after ~1.1 s)
- *   POST /__mock/action/ports?run=r-…&ports=5173,24678   (or terminal=t-…: that running run listens
- *                                                 on these ports now, as the probe reports; empty
- *                                                 closes them; a run's end clears them)
  *   POST /__mock/skills?many=1240   (that many more skills in the marketplace)
  *   POST /__mock/skills?fail=skill.install&error=…   (that skill.* command fails with the message until
  *        cleared with an empty error); registries=none|default (Claude Code without the marketplace);
@@ -231,25 +175,19 @@
  *   POST /__mock/memory?set=empty|seed|long      (the entries, as a hand edit; published; long adds a
  *                                                 700-character entry threads do not get)
  *   POST /__mock/memory?drop=<file>&quiet=1      (a file removed by hand, no event: a stale page)
- *   POST /__mock/memory/add?text=…&thread=s-1    (a thread's memory add: the entry and the "Remembered: …"
- *                                                 toast with its Settings › Memory link)
  *   GET  /__mock/memory                          ({ entries, calls })
  *   ThemeService, the theme event source and theme.show/save/duplicate/delete (mock/userThemes.ts):
  *        three user themes (Ocean Dusk and Mocha, warmer dark, Latte, softer light) and a file that
  *        does not load; reset restores them.
- *   POST /__mock/themes?set=empty|seed           (the themes directory, as a hand edit; published)
  *   POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true]   (theme save from that thread:
  *        its theme card and, applied, the toast)
- *   POST /__mock/themes/edit?theme=ocean-dusk&canvas=%23330000   (a save of that theme from outside the window: base colours changed)
  *   POST /__mock/themes/recolour?thread=s-1&theme=ocean-dusk&accent=%23e0a060   (that thread's
  *        refinement of the theme: the replaced version kept, a card whose Undo restores it)
- *   GET  /__mock/themes                          ({ themes, calls })
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
  *        s-ember-wails, s-ember-flaky). Seeded tasks: t-1a2b3c4d doing (s-ember-notes, progress),
  *        t-2b3c4d5e done and t-5e6f7a8b todo (its subtasks), t-9c0d1e2f blocked (s-ember-wails
  *        reported blocked), t-3a4b5c6d done today (s-ember-flaky), t-7e8f9a0b cancelled. Reset restores them.
- *        Every change below reaches WatchBoard streams.
  *   DictationService and dictation.* (mock/dictation.ts): enabled is dictation.enabled; the model, hardware,
  *        sessions and the microphone are scripted. A session plays levels and two phrases 1 s apart.
  *   POST /__mock/dictation?state=off|no-model|downloading|ready|unloaded|listening|error[&m1=true][&denied=true][&access=none|missing|granted|silent]
@@ -263,15 +201,10 @@
  *   GET  /__mock/search                           ({ entries, calls })
  *   GET  /__mock/ember                            (the board: status and tasks, as JSON)
  *   POST /__mock/ember?enabled=true|false         (sets ember.enabled, as the settings page would)
- *   POST /__mock/ember/task?id=t-…&state=todo|doing|blocked|done|cancelled[&outcome=…][&branch=…][&title=…]
- *   POST /__mock/ember/task/add?title=…[&state=todo|…][&parent=t-…][&thread=s-…][&detail=…]   ({ id })
- *   POST /__mock/ember/report?id=s-…&status=done|blocked|failed|progress[&summary=…]   (a worker's report, filed now)
- *   POST /__mock/ember/timer?minutes=…[&every=2m][&note=…]   ({ id }: a timer of Ember's thread; thread.unsubscribe cancels it)
- *   POST /__mock/ember/consolidating?on=true|false   (off: it finished, last_consolidated_at now)
- *   POST /__mock/ember/epoch                      (a fresh session: epoch + 1, started now, context 0)
- *   POST /__mock/ember/restart?step=cut|wake      (cut: the app's restart cuts a turn of Ember's, which
- *        ends error "interrupted" with the daemon's process_ended turn end; wake: the restart notice
- *        wakes it and it replies, finished; mock/emberChat.ts)
+ *   PluginService and the hello demo plugin (mock/plugins.ts):
+ *   POST /__mock/plugin/demotab?tab=overview|form|log|assistant|shell|stress   (the demo shows that tab)
+ *   POST /__mock/plugin/terminals?count=N         (the plugin owns terminals t-wall-0..)
+ *   GET  /__mock/plugin/acts                      (what the plugin was asked to do, in order)
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
@@ -285,7 +218,7 @@ import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { ProjectService } from "../src/gen/codefoundry/v1/project_pb";
-import { ThreadFlagLevel, ThreadReportStatus, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { ThreadFlagLevel, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
@@ -296,33 +229,32 @@ import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
 import { ThemeService } from "../src/gen/codefoundry/v1/theme_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
-import { EmberService, type EmberTaskState } from "../src/gen/codefoundry/v1/ember_pb";
+import { EmberService } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
 import { SearchService } from "../src/gen/codefoundry/v1/search_pb";
-import { emberStateNames } from "./ember";
 import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
-import { updateStateNames, type UpdateEventInit } from "./update";
+import { type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
 import { frameTag, navigated } from "./frame";
 import { insertInHead, mockPaintTag, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { serveTunnel } from "./tunnel";
-import { completionCalls, listDirectories, listSkills, resetCompletion, searchFilesSlow, searchMode, setMockFiles } from "./filesystem";
-import { cloneRepo, githubCalls, lookupGitHub, resetClones, searchGitHub } from "./clone";
+import { completionCalls, listDirectories, listSkills, resetCompletion, searchFiles, setMockFiles } from "./filesystem";
+import { cloneRepo, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { renameProjectIn } from "./projectRename";
-import { createProject, deleteProject, listPublishOwners, projectCalls, publishProject, resetProjects, visibilityFlag } from "./create";
+import { createProject, deleteProject, listPublishOwners, publishProject, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
-import { retiredUsage, utcDay } from "./usage";
+import { retiredUsage } from "./usage";
 import { ageMcp, keepMcpServers, reconnectMcp, refreshMcp } from "./mcp";
 import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
 import { listPrompts } from "./prompts";
 import { listItems, searchThreads } from "./search";
 import { mockFetches, mockProxyFetch, resetFetches } from "./proxyFetch";
-import { refuseSlashCommand, slashCommandsFor } from "./slashCommands";
+import { refuseSlashCommand } from "./slashCommands";
 import { MOCK_ATTACHMENT, MOCK_ATTACHMENT_PNG, MockThreadLogs, THREAD_STATES, type ThreadState as ScriptedThreadState } from "./thread";
 import { CommandError, ConfirmNeeded, snoozeUntil, World, type EventInit } from "./world";
 
@@ -337,11 +269,6 @@ const mockFiles = new MockFiles((path) => {
   if (!d) return undefined;
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
-
-/** False simulates a pre-Phase-2a daemon (see POST /__mock/threads-service). */
-let threadsEnabled = true;
-/** "Service/Method" paths that 404 like a daemon built before they existed. */
-const missingRpcs = new Set<string>();
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -489,7 +416,7 @@ function routes(router: ConnectRouter): void {
       return listDirectories(req.prefix, registered);
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
-    searchFiles: (req) => searchFilesSlow(world.projects, req),
+    searchFiles: (req) => searchFiles(world.projects, req),
     readFile: (req) => mockFiles.readWithLink(req.baseDir, req.path, req.maxBytes),
     writeFile: (req) => mockFiles.writeFile(req),
     previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
@@ -850,7 +777,6 @@ function routes(router: ConnectRouter): void {
           ? req.sources
           : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH],
       );
-      if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.projects.values()].map((r) => world.projectMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
@@ -885,97 +811,29 @@ async function* actionEvents(src: AsyncGenerator<{ source: EventSource; event: E
   }
 }
 
-/** Action controls: GET /__mock/actions, POST /__mock/action/{finish|setup|run|ports}. */
+/** Action controls: POST /__mock/action/setup. */
 function actionControl(res: ServerResponse, action: string, q: URLSearchParams): void {
-  const modes: Record<string, ActionRunMode> = { terminal: ActionRunMode.TERMINAL, background: ActionRunMode.BACKGROUND };
   try {
-    let run;
-    switch (action) {
-      case "finish":
-        run = world.actions.finishNow({ run: q.get("run") ?? undefined, terminal: q.get("terminal") ?? undefined }, Number(q.get("code") ?? "0"));
-        break;
-      case "setup":
-        run = world.actions.setupRun(q.get("thread") ?? "", Number(q.get("code") ?? "1"), q.get("action") ?? "");
-        break;
-      case "run": {
-        const mode = q.get("mode") ?? "";
-        if (mode && modes[mode] === undefined) throw new CommandError("invalid", "mode must be terminal or background");
-        run = world.actions.run({ action: q.get("action") ?? "", threadId: q.get("thread") ?? "", worktreePath: q.get("worktree") ?? "", mode: modes[mode] ?? ActionRunMode.UNSPECIFIED });
-        break;
-      }
-      case "ports": {
-        const ports = (q.get("ports") ?? "").split(",").filter(Boolean).map(Number);
-        if (ports.some((p) => !Number.isInteger(p) || p < 1 || p > 65535)) throw new CommandError("invalid", "ports must be TCP ports, comma separated");
-        run = world.actions.setPorts({ run: q.get("run") ?? undefined, terminal: q.get("terminal") ?? undefined }, ports);
-        break;
-      }
-      default:
-        json(res, 404, { error: "unknown action control" });
-        return;
+    if (action !== "setup") {
+      json(res, 404, { error: "unknown action control" });
+      return;
     }
+    const run = world.actions.setupRun(q.get("thread") ?? "", Number(q.get("code") ?? "1"), q.get("action") ?? "");
     json(res, 200, { id: run.id, terminalId: run.terminalId, state: ActionRunState[run.state ?? 0], mode: ActionRunMode[run.mode ?? 0], exitCode: run.exitCode, output: run.output, ports: run.ports ?? [] });
   } catch (err) {
     json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
   }
 }
 
-/** Ember controls: POST /__mock/ember[/task|/task/add|/report|/timer|/consolidating|/epoch]. */
-function emberControl(res: ServerResponse, action: string, q: URLSearchParams): void {
-  const e = world.ember;
-  const bool = (name: string): boolean => {
-    const v = q.get(name);
-    if (v !== "true" && v !== "false") throw new CommandError("invalid", `${name} must be true or false`);
-    return v === "true";
-  };
-  const state = (v: string | null): EmberTaskState => {
-    const s = emberStateNames[v ?? ""];
-    if (s === undefined) throw new CommandError("invalid", "state must be one of " + Object.keys(emberStateNames).join(", "));
-    return s;
-  };
-  try {
-    switch (action) {
-      case "":
-        world.settings.update({ "ember.enabled": String(bool("enabled")) });
-        break;
-      case "/task":
-        e.setTask(q.get("id") ?? "", state(q.get("state")), q.get("outcome"), q.get("branch"), q.get("title"));
-        break;
-      case "/task/add": {
-        const id = e.addTask({ title: q.get("title") ?? "", state: q.has("state") ? state(q.get("state")) : undefined, parentId: q.get("parent") ?? "", threadId: q.get("thread") ?? "", detail: q.get("detail") ?? "" });
-        json(res, 200, { id });
-        return;
-      }
-      case "/report": {
-        const status = { done: ThreadReportStatus.DONE, blocked: ThreadReportStatus.BLOCKED, failed: ThreadReportStatus.FAILED, progress: ThreadReportStatus.PROGRESS }[q.get("status") ?? ""];
-        if (status === undefined) throw new CommandError("invalid", "status must be done, blocked, failed or progress");
-        e.setReport(q.get("id") ?? "", status, q.get("summary") ?? "");
-        break;
-      }
-      case "/timer": {
-        const id = e.addTimer({ minutes: Number(q.get("minutes") ?? ""), every: q.get("every") ?? "", note: q.get("note") ?? "" });
-        json(res, 200, { id });
-        return;
-      }
-      case "/consolidating":
-        e.setConsolidating(bool("on"));
-        break;
-      case "/epoch":
-        e.nextEpoch();
-        break;
-      case "/restart": {
-        const step = q.get("step");
-        if (step !== "cut" && step !== "wake") throw new CommandError("invalid", "step must be cut or wake");
-        world.emberRestart(step);
-        break;
-      }
-      default:
-        json(res, 404, { error: "unknown ember control" });
-        return;
-    }
-    json(res, 200, e.json());
-  } catch (err) {
-    json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+/** Ember control: POST /__mock/ember?enabled=true|false. */
+function emberControl(res: ServerResponse, q: URLSearchParams): void {
+  const v = q.get("enabled");
+  if (v !== "true" && v !== "false") {
+    json(res, 400, { error: "enabled must be true or false" });
+    return;
   }
+  world.settings.update({ "ember.enabled": v });
+  json(res, 200, world.ember.json());
 }
 
 async function* updateEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>): AsyncGenerator<UpdateEventInit> {
@@ -984,32 +842,15 @@ async function* updateEvents(src: AsyncGenerator<{ source: EventSource; event: E
   }
 }
 
-/** Update controls: POST /__mock/update/{state|latest|fail|disabled}. */
+/** Update controls: POST /__mock/update/{latest|fail}. */
 function updateControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const u = world.update;
   switch (action) {
-    case "state": {
-      const state = updateStateNames[q.get("state") ?? ""];
-      if (state === undefined) {
-        json(res, 400, { error: "state must be one of " + Object.keys(updateStateNames).join(", ") });
-        return;
-      }
-      u.set(state, state === UpdateState.IDLE ? "" : (q.get("version") ?? "v0.2.0"), {
-        failureReason: q.get("reason") ?? (state === UpdateState.FAILED ? "installer: exit status 1: error: checksum mismatch" : ""),
-        progress: state === UpdateState.DOWNLOADING ? "==> downloading code-foundry-darwin-arm64.tar.gz" : "",
-        currentVersion: q.get("current") ?? u.status.currentVersion,
-        lastCheckedAt: new Date(),
-      });
-      break;
-    }
     case "latest":
       u.latest = q.get("version") ?? "v0.2.0";
       break;
     case "fail":
       u.failNext = q.get("reason") ?? "installer: exit status 1: error: checksum mismatch";
-      break;
-    case "disabled":
-      u.set(UpdateState.IDLE, "", { enabled: false, disabledReason: q.get("reason") ?? "dev build" });
       break;
     default:
       json(res, 404, { error: "unknown update action" });
@@ -1096,7 +937,7 @@ const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idl
 const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|flag|transcript|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
  * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
@@ -1121,8 +962,7 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         break;
       }
       case "hold":
-      case "release":
-        for (const each of q.getAll("id")) world.holdThread(each, action === "hold");
+        for (const each of q.getAll("id")) world.holdThread(each, true);
         break;
       case "focus":
         json(res, 200, { delivered: world.focusThread(id) });
@@ -1148,12 +988,6 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         if (q.get("save") === "true") world.saveThread(id);
         else world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
         break;
-      case "wake":
-        world.wakeThread(id);
-        break;
-      case "envstale":
-        world.setPluginEnvChange(id, q.get("change") ?? "");
-        break;
       case "transcript":
         world.setTranscriptMissing(id, q.get("missing") !== "false");
         break;
@@ -1178,49 +1012,18 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
 }
 
 /**
- * Plugin controls: POST /__mock/plugin/state?name=hello&state=crashed|running|failed,
- * POST /__mock/plugin/toast?name=hello&text=…, POST /__mock/plugin/invoke?name=hello&command=plugin.hello.forget[&thread=s-1],
- * POST /__mock/plugin/registry?error=… (the default registry's Browse error; empty clears it) and/or
- * &installError=… (every install fails with it after its first step; empty clears it),
- * POST /__mock/plugin/dirs?home=… (the home PluginService.List names the plugin directories under),
- * POST /__mock/plugin/demotab?tab=overview|form|log|assistant|shell|stress, POST /__mock/plugin/terminals?count=N,
- * GET /__mock/plugin/acts.
+ * Plugin controls: POST /__mock/plugin/demotab?tab=overview|form|log|assistant|shell|stress,
+ * POST /__mock/plugin/terminals?count=N, GET /__mock/plugin/acts.
  */
 function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): void {
   try {
-    const name = q.get("name") ?? "hello";
     switch (what) {
-      case "POST state": {
-        const state = q.get("state") ?? "running";
-        if (state !== "running" && state !== "crashed" && state !== "failed") throw new Error(`unknown state ${state}`);
-        world.plugins.setState(name, state);
-        json(res, 200, { ok: true });
-        return;
-      }
-      case "POST toast":
-        json(res, 200, { delivered: world.plugins.toast(name, q.get("text") ?? "") });
-        return;
-      case "POST invoke": {
-        const thread = q.get("thread") ?? "";
-        const ctx = thread ? ({ activeThreadId: thread, activeTerminalId: "", activeProjectId: "", activeWorktreePath: "", activeView: "", activeWorkspaceId: "" } as Parameters<typeof world.plugins.invokeAsk>[2]) : undefined;
-        json(res, 200, { delivered: world.plugins.invokeAsk(name, q.get("command") ?? "", ctx, {}) });
-        return;
-      }
       case "POST demotab":
         world.plugins.demoTab(q.get("tab") ?? "overview");
         json(res, 200, { ok: true });
         return;
       case "POST terminals":
         world.addWallTerminals(Number(q.get("count") ?? "0"));
-        json(res, 200, { ok: true });
-        return;
-      case "POST registry":
-        if (q.has("error") || !q.has("installError")) world.plugins.registry.error = q.get("error") ?? "";
-        if (q.has("installError")) world.plugins.registry.installError = q.get("installError") ?? "";
-        json(res, 200, { ok: true });
-        return;
-      case "POST dirs":
-        world.plugins.home = q.get("home") ?? "";
         json(res, 200, { ok: true });
         return;
       case "GET acts":
@@ -1234,14 +1037,13 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|release|focus|archive|forget|snooze|wake|flag|envstale|transcript|setup|move-fail|move-delay)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|flag|transcript|setup|move-fail|move-delay)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;
   }
-  const emberCtl = /^\/__mock\/ember(|\/task|\/task\/add|\/report|\/timer|\/consolidating|\/epoch|\/restart)$/.exec(path);
-  if (req.method === "POST" && emberCtl) {
-    emberControl(res, emberCtl[1] ?? "", q);
+  if (req.method === "POST" && path === "/__mock/ember") {
+    emberControl(res, q);
     return;
   }
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
@@ -1310,57 +1112,15 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       world.restartDaemon();
       json(res, 200, { ok: true });
       break;
-    case "POST /__mock/threads-service":
-      // enabled=false simulates a daemon without Phase 2a: ThreadService 404s and the
-      // events stream carries no thread source. Reset turns it back on.
-      threadsEnabled = q.get("enabled") !== "false";
-      json(res, 200, { enabled: threadsEnabled });
-      break;
-    case "POST /__mock/missing-rpc":
-      for (const rpc of q.getAll("rpc")) missingRpcs.add(rpc);
-      json(res, 200, { missing: [...missingRpcs] });
-      break;
-    case "POST /__mock/gitops":
-      // fail=git.push makes that command's next op fail; delay=ms sets how long ops run.
-      for (const name of q.getAll("fail")) world.gitops.failNext.add(name);
-      if (q.has("delay")) world.gitops.delayMs = Number(q.get("delay"));
-      json(res, 200, { fail: [...world.gitops.failNext], delayMs: world.gitops.delayMs });
-      break;
-    case "POST /__mock/worktree/checkout": {
-      // path=…&branch=… (no branch, or empty: detached HEAD).
-      const ok = world.checkout(q.get("path") ?? "", q.get("branch") ?? "");
-      json(res, ok ? 200 : 404, { ok });
-      break;
-    }
     case "POST /__mock/worktree/dirty": {
       // path=…&modified=2 (0: clean).
       const ok = world.setDirty(q.get("path") ?? "", Number(q.get("modified") ?? "0"));
       json(res, ok ? 200 : 404, { ok });
       break;
     }
-    case "POST /__mock/worktree/refresh-error": {
-      // path=…&error=could not reach origin&ago=840000 (ms); no error: it clears.
-      const ok = world.setRefreshError(q.get("path") ?? "", q.get("error") ?? "", Number(q.get("ago") ?? "0"));
-      json(res, ok ? 200 : 404, { ok });
-      break;
-    }
-    case "POST /__mock/worktree/operation": {
-      // path=…&op=rebase&step=3&total=6&conflicted=2[&file=a.go&file=b.go]; no op: it ends.
-      const ok = world.setOperation(q.get("path") ?? "", q.get("op") ?? "", Number(q.get("step") ?? "0"), Number(q.get("total") ?? "0"), Number(q.get("conflicted") ?? "0"), q.getAll("file"));
-      json(res, ok ? 200 : 404, { ok });
-      break;
-    }
     case "POST /__mock/leftovers":
       try {
         json(res, 200, { paths: world.addLeftovers(q.get("project") ?? "repo-cf", q.get("clean") === "1") });
-      } catch (err) {
-        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
-    case "POST /__mock/worktree/merged":
-      try {
-        const w = world.addMergedWorktree(q.get("project") ?? "", q.get("branch") ?? "", q.get("path") ?? "");
-        json(res, 200, { path: w.path });
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
@@ -1378,39 +1138,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
-    case "POST /__mock/project/rename":
-      // id=repo-dot&name=workspace: the project's name.
-      try {
-        const r = world.renameProject(q.get("id") ?? "", q.get("name") ?? "");
-        json(res, 200, { id: r.id, name: r.name });
-      } catch (err) {
-        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
     case "POST /__mock/workspace-thread":
       // workspace=login[&project=repo-gp][&name=driver][&status=busy]: a connected thread owned by the workspace.
       try {
         const s = world.addWorkspaceThread(q.get("workspace") ?? "", q.get("project") ?? "", q.get("name") ?? "driver", statusNames[q.get("status") ?? "idle"] ?? ThreadStatus.IDLE);
         json(res, 200, threadSummary(s.id));
-      } catch (err) {
-        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
-    case "POST /__mock/workspace-files":
-      try {
-        const skills = q.get("skills");
-        const rootMissing = q.get("rootMissing");
-        json(res, 200, world.setWorkspaceFiles(q.get("workspace") ?? "", q.get("instructions") ?? undefined, skills === null ? undefined : skills.split(",").filter(Boolean),
-          rootMissing === null ? undefined : rootMissing === "1"));
-      } catch (err) {
-        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
-    case "POST /__mock/thread/project-ids":
-      // id=…&projects=repo-cf,repo-gp: the thread's project set (as a later thread new --projects would make it).
-      try {
-        const t = world.setThreadProjectIds(q.get("id") ?? "", (q.get("projects") ?? "").split(",").filter(Boolean));
-        json(res, 200, threadSummary(t.id));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
@@ -1456,26 +1188,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
-    case "POST /__mock/usage":
-      // thread=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…&cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]
-      try {
-        const id = q.get("thread") ?? "";
-        const n = (k: string) => Number(q.get(k) ?? "0");
-        world.addUsage(id, {
-          model: q.get("model") ?? "",
-          day: q.get("day") ?? utcDay(0),
-          requests: n("requests"),
-          input: n("input"),
-          output: n("output"),
-          cacheRead: n("cacheRead"),
-          cacheWrite5m: n("cacheWrite5m"),
-          cacheWrite1h: n("cacheWrite1h"),
-        });
-        json(res, 200, { ok: true });
-      } catch (err) {
-        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
     case "POST /__mock/thread": {
       // state=permission|question|streaming|idle[&id=s-r1]: the sketch's scripted thread.
       const state = (q.get("state") ?? "permission") as ScriptedThreadState;
@@ -1487,15 +1199,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { id: s.id });
       break;
     }
-    case "POST /__mock/thread/agent-end":
-      // id=s-r1&run=a1[&status=done|failed]: a subagent run ends (mock/agents.ts).
-      try {
-        world.logs.endAgent(q.get("id") ?? "s-r1", q.get("run") ?? "", q.get("status") === "failed");
-        json(res, 200, { ok: true });
-      } catch (err) {
-        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
     case "POST /__mock/thread/wake-fire":
       // sub=sub-pr: a one-shot fires, so its row goes (mock/wakes.ts).
       json(res, world.logs.removeWake(q.get("sub") ?? "") ? 200 : 404, { ok: true });
@@ -1504,15 +1207,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       // id=s-r1&sub=sub-pr&status=…: a target's status changes (mock/wakes.ts).
       world.logs.setWakeStatus(q.get("id") ?? "s-r1", q.get("sub") ?? "", q.get("status") ?? "");
       json(res, 200, { ok: true });
-      break;
-    case "POST /__mock/thread/shell-end":
-      // id=s-r1[&status=failed]: the oldest background shell ends (mock/shells.ts).
-      try {
-        world.logs.endShell(q.get("id") ?? "s-r1", q.get("status") === "failed");
-        json(res, 200, { ok: true });
-      } catch (err) {
-        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
-      }
       break;
     case "POST /__mock/thread/mcp-age":
       // id=s-r1&ago=<seconds>: the thread's last MCP check that long ago (mock/mcp.ts ageMcp).
@@ -1571,18 +1265,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       });
       json(res, 200, { ok: true });
       break;
-    case "POST /__mock/thread/commands":
-      try {
-        world.logs.setSlashCommands(q.get("id") ?? "s-r1", slashCommandsFor(q.get("set") ?? "default"));
-        json(res, 200, { ok: true });
-      } catch (err) {
-        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
-    case "POST /__mock/thread/fail-respond":
-      world.logs.failRespond = q.get("withdrawn") ? "withdrawn" : "error";
-      json(res, 200, { ok: true });
-      break;
     case "POST /__mock/thread/fail-turn":
       world.logs.failTurn = q.get("subtype") || "error_during_execution";
       json(res, 200, { ok: true });
@@ -1606,12 +1288,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/welcome":
       json(res, 200, world.addWelcome());
       break;
-    case "POST /__mock/resident":
-      json(res, 200, { id: world.addResident() });
-      break;
-    case "POST /__mock/transcript-deleted":
-      json(res, 200, { id: world.addTranscriptDeleted() });
-      break;
     case "POST /__mock/empty":
       world.empty();
       json(res, 200, { ok: true });
@@ -1625,13 +1301,8 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
-    case "GET /__mock/workspaces":
-      json(res, 200, [...world.workspaces.values()]);
-      break;
     case "POST /__mock/thread-setup":
       world.nextSetup = q.get("state") ?? world.nextSetup;
-      world.refuseRetry = q.get("refuse-retry") ?? world.refuseRetry;
-      world.cancelTooLate = q.get("cancel-late") === "1" || world.cancelTooLate;
       json(res, 200, { nextSetup: world.nextSetup });
       break;
     case "POST /__mock/thread-new":
@@ -1641,19 +1312,8 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/attachments":
       json(res, 200, [...world.attachments].map(([path, a]) => ({ path, ...a })));
       break;
-    case "GET /__mock/gitops":
-      json(res, 200, world.gitops.summaries());
-      break;
     case "GET /__mock/update":
       json(res, 200, updateSummary());
-      break;
-    case "POST /__mock/gh/update":
-      world.gh.update();
-      json(res, 200, { ok: true });
-      break;
-    case "POST /__mock/gh/poll":
-      world.gh.poll();
-      json(res, 200, { ok: true });
       break;
     case "POST /__mock/gh/inbox-zero":
       world.gh.inboxZero();
@@ -1666,28 +1326,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/gh/project-merged-capped":
       world.gh.capProjectMerged(Number(q.get("shown") ?? "3"), Number(q.get("total") ?? "64"));
       json(res, 200, { ok: true });
-      break;
-    case "POST /__mock/gh/stale":
-      world.gh.stale();
-      json(res, 200, { ok: true });
-      break;
-    case "POST /__mock/gh/auth":
-      world.gh.authenticated = q.get("ok") !== "false";
-      json(res, 200, { authenticated: world.gh.authenticated });
-      break;
-    case "POST /__mock/gh/branch-pr":
-      // slug=o/r&head=b&number=N&title=…&state=open|draft|merged|closed[&ago=ms][&append=1]
-      world.gh.setBranchPullRequest(q.get("slug") ?? "", q.get("head") ?? "", Number(q.get("number") ?? "0"), q.get("title") ?? "", q.get("state") ?? "open", Number(q.get("ago") ?? "1200000"), q.get("append") === "1");
-      json(res, 200, { ok: true });
-      break;
-    case "POST /__mock/gh/touch":
-      json(res, world.gh.touch(q.get("path") ?? "") ? 200 : 404, { ok: true });
-      break;
-    case "GET /__mock/projects/calls":
-      json(res, 200, projectCalls);
-      break;
-    case "GET /__mock/github/calls":
-      json(res, 200, githubCalls);
       break;
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
@@ -1724,12 +1362,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       world.gh.setCold(false);
       json(res, 200, { ok: true });
       break;
-    case "POST /__mock/gh/pr-push": {
-      // A poll saw a push to a pull request with a detail: its head moves (mock/prDiff.ts).
-      const ok = world.gh.prDetails.push(q.get("repo") ?? "alexwaumann/code-foundry", Number(q.get("number") ?? "145"), q.get("sha") ?? "b0b0".padEnd(40, "0"));
-      json(res, ok ? 200 : 404, { ok });
-      break;
-    }
     case "GET /__mock/streams":
       json(res, 200, Object.fromEntries(openStreams));
       break;
@@ -1738,9 +1370,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/ember":
       json(res, 200, world.ember.json());
-      break;
-    case "GET /__mock/actions":
-      json(res, 200, world.actions.json());
       break;
     case "GET /__mock/skills":
       json(res, 200, world.skills.state());
@@ -1752,19 +1381,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, world.memory.json());
       break;
     case "POST /__mock/memory":
-    case "POST /__mock/memory/add":
       try {
-        if (path === "/__mock/memory") json(res, 200, world.memory.control(q));
-        else {
-          const id = q.get("thread") ?? "";
-          json(res, 200, { added: world.memory.add(q.get("text") ?? "", id, world.threads.get(id)?.name ?? "") });
-        }
+        json(res, 200, world.memory.control(q));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
-      break;
-    case "GET /__mock/themes":
-      json(res, 200, world.themes.json());
       break;
     case "POST /__mock/themes/card":
       try {
@@ -1773,23 +1394,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
-    case "POST /__mock/themes/edit":
-      try {
-        json(res, 200, world.themes.edit(q));
-      } catch (err) {
-        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
     case "POST /__mock/themes/recolour":
       try {
         json(res, 200, world.themes.recolour(q));
-      } catch (err) {
-        json(res, 400, { error: err instanceof Error ? err.message : String(err) });
-      }
-      break;
-    case "POST /__mock/themes":
-      try {
-        json(res, 200, world.themes.control(q));
       } catch (err) {
         json(res, 400, { error: err instanceof Error ? err.message : String(err) });
       }
@@ -1812,29 +1419,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { raw: world.settings.raw });
       break;
     }
-    case "POST /__mock/backdrops/import":
-      try {
-        // JSON-safe: the proto message carries bigints.
-        json(res, 200, { name: world.backdrops.import(q.get("path") ?? "")?.name ?? "" });
-      } catch (err) {
-        json(res, 400, { error: (err as Error).message });
-      }
-      break;
-    case "GET /__mock/backdrops":
-      json(res, 200, { images: world.backdrops.list().map((b) => b.name), calls: world.backdrops.calls });
-      break;
     case "GET /__mock/writes":
       json(res, 200, world.writes);
       break;
-    case "GET /__mock/resizes":
-      json(res, 200, world.resizes);
-      break;
     case "POST /__mock/reset":
-      threadsEnabled = true;
-      missingRpcs.clear();
       world.reset();
       resetClones();
-      resetProjects();
       resetCompletion();
       mockFiles.reset();
       resetPageStorage();
@@ -1859,11 +1449,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, groups.length === 1 ? groups[0] : { projects: groups });
       break;
     }
-    case "POST /__mock/files/search":
-      if (q.has("delay")) searchMode.delayMs = Number(q.get("delay"));
-      if (q.has("fail")) searchMode.fail = q.get("fail") === "1";
-      json(res, 200, searchMode);
-      break;
     case "GET /__mock/files/calls":
       json(res, 200, completionCalls);
       break;
@@ -1881,23 +1466,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       mockFiles.write(q.get("path") ?? "", q.get("text") ?? "", q.get("touch") === "1");
       json(res, 200, { ok: true });
       break;
-    case "POST /__mock/fs/remove":
-      mockFiles.remove(q.get("path") ?? "");
-      json(res, 200, { ok: true });
-      break;
     case "POST /__mock/fs/link":
       mockFiles.links.set(q.get("path") ?? "", q.get("real") ?? "");
       json(res, 200, { ok: true });
       break;
-    case "POST /__mock/fs/refuse":
-      mockFiles.refuseNextWrite(q.get("code") ?? "", q.get("message") ?? "");
-      json(res, 200, { ok: true });
-      break;
     case "GET /__mock/fs/text":
       json(res, 200, { text: mockFiles.textOf(q.get("path") ?? "") });
-      break;
-    case "GET /__mock/fs/calls":
-      json(res, 200, mockFiles.calls);
       break;
     default:
       json(res, 404, { error: "unknown control endpoint" });
@@ -1923,16 +1497,6 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://mock");
   if (url.pathname.startsWith("/__mock/")) {
     control(req, res, url.pathname, url.searchParams);
-    return;
-  }
-  if (!threadsEnabled && url.pathname.startsWith("/codefoundry.v1.ThreadService/")) {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("404 page not found\n");
-    return;
-  }
-  if (missingRpcs.has(url.pathname.replace(/^\/codefoundry\.v1\./, ""))) {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("404 page not found\n");
     return;
   }
   // The frame stylesheet, the bridge script and the page library need no credential, like

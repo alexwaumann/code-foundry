@@ -4,12 +4,9 @@
  * ember.enabled setting (world.ts wires it: turning it on adds the resident thread
  * s-resident-ember and the worker threads below). A task's worker thread is derived from
  * the world's thread when it exists, else from its fixture here; an unknown id reads as
- * removed. Ember's timers (EmberBoard.timers) are none after a reset; /__mock/ember/timer adds
- * one and thread.unsubscribe <id> cancels it. Controls: POST /__mock/ember[?enabled=],
- * /__mock/ember/task, /__mock/ember/task/add, /__mock/ember/report, /__mock/ember/timer,
- * /__mock/ember/consolidating, /__mock/ember/epoch; GET /__mock/ember (server.ts).
+ * removed. Ember's timers (EmberBoard.timers) are none after a reset; thread.unsubscribe <id>
+ * cancels one. Controls: POST /__mock/ember?enabled=, GET /__mock/ember (server.ts).
  */
-import { randomBytes } from "node:crypto";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
@@ -22,7 +19,6 @@ import {
   type EmberTimerSchema,
 } from "../src/gen/codefoundry/v1/ember_pb";
 import { ThreadReportStatus, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
-import { CommandError } from "./errors";
 import { Hub } from "./hub";
 
 export type EmberBoardInit = MessageInitShape<typeof EmberBoardSchema>;
@@ -43,15 +39,6 @@ interface MockTimer {
 }
 
 export const EMBER_THREAD = "s-resident-ember";
-
-/** query value -> state, for the controls. */
-export const emberStateNames: Record<string, EmberTaskState> = {
-  todo: EmberTaskState.TODO,
-  doing: EmberTaskState.DOING,
-  blocked: EmberTaskState.BLOCKED,
-  done: EmberTaskState.DONE,
-  cancelled: EmberTaskState.CANCELLED,
-};
 
 /** A worker thread as the world has it, for the board (World.emberThread). */
 export interface EmberThreadView {
@@ -199,8 +186,6 @@ export class MockEmber {
   private tasks: MockTask[] = [];
   private timers: MockTimer[] = [];
   private workers = new Map<string, EmberWorkerFixture>();
-  /** Reports set by /__mock/ember/report, over a fixture's own: thread id -> report. */
-  private reports = new Map<string, NonNullable<EmberWorkerFixture["report"]>>();
   epoch = 2;
   epochStartedAt = ago(180);
   contextTokens = 182_000;
@@ -216,7 +201,6 @@ export class MockEmber {
     this.tasks = seedTasks();
     this.timers = [];
     this.workers = new Map(emberWorkers().map((w) => [w.id, w]));
-    this.reports = new Map();
     this.epoch = 2;
     this.epochStartedAt = ago(180);
     this.contextTokens = 182_000;
@@ -289,16 +273,6 @@ export class MockEmber {
     return [...this.timers]
       .sort((a, b) => a.nextAt.getTime() - b.nextAt.getTime())
       .map((t) => ({ id: t.id, nextAt: timestampFromDate(t.nextAt), every: t.every, note: t.note, createdAt: timestampFromDate(t.createdAt) }));
-  }
-
-  /** POST /__mock/ember/timer: a timer of Ember's thread firing in `minutes` (every: repeating, "2m"); returns its id. */
-  addTimer(o: { minutes: number; every?: string; note?: string }): string {
-    if (!Number.isFinite(o.minutes) || o.minutes <= 0) throw new CommandError("invalid", "minutes must be a positive number");
-    const id = `sub-${randomBytes(6).toString("hex")}`;
-    const now = new Date();
-    this.timers.push({ id, nextAt: new Date(now.getTime() + o.minutes * 60_000), every: o.every ?? "", note: o.note ?? "", createdAt: now });
-    this.changed();
-    return id;
   }
 
   /** thread.unsubscribe <id> for one of Ember's timers: false when it is not one. */
@@ -377,75 +351,9 @@ export class MockEmber {
     return out;
   }
 
-  /** A thread's report: the one /__mock/ember/report set, else its fixture's. */
+  /** A thread's report: its fixture's. */
   private reportOf(id: string): EmberWorkerFixture["report"] {
-    return this.reports.get(id) ?? this.workers.get(id)?.report ?? null;
-  }
-
-  /** POST /__mock/ember/report: a worker's report (thread report), filed now. */
-  setReport(id: string, status: ThreadReportStatus, summary: string): void {
-    if (!this.deps.thread(id) && !this.workers.has(id)) throw new CommandError("notfound", `thread ${id} not found`);
-    this.reports.set(id, { status, summary, at: new Date() });
-    this.changed();
-  }
-
-  private task(id: string): MockTask {
-    const t = this.tasks.find((x) => x.id === id);
-    if (!t) throw new CommandError("notfound", `task ${id} not found`);
-    return t;
-  }
-
-  /** POST /__mock/ember/task: a task's state, and its outcome, branch and title when given. */
-  setTask(id: string, state: EmberTaskState, outcome: string | null, branch: string | null = null, title: string | null = null): EmberTaskInit {
-    const t = this.task(id);
-    if (state !== t.state) t.doneAt = state === EmberTaskState.DONE ? new Date() : null;
-    t.state = state;
-    if (outcome !== null) t.outcome = outcome;
-    if (branch !== null) t.branch = branch;
-    if (title !== null && title.trim()) t.title = title.trim();
-    t.updatedAt = new Date();
-    this.changed();
-    return this.taskMsg(t);
-  }
-
-  /** POST /__mock/ember/task/add: a new task at the end of the board; returns its id. */
-  addTask(o: { title: string; state?: EmberTaskState; parentId?: string; threadId?: string; detail?: string }): string {
-    if (!o.title.trim()) throw new CommandError("invalid", "title is required");
-    if (o.parentId) {
-      const p = this.task(o.parentId);
-      if (p.parentId) throw new CommandError("invalid", `task ${p.id} is itself a subtask (one level only)`);
-    }
-    let id: string;
-    do id = `t-${randomBytes(4).toString("hex")}`;
-    while (this.tasks.some((t) => t.id === id));
-    const now = new Date();
-    const state = o.state ?? EmberTaskState.TODO;
-    this.tasks.push({
-      id, title: o.title.trim(), detail: o.detail ?? "", state, parentId: o.parentId ?? "", threadId: o.threadId ?? "", outcome: "", branch: "",
-      position: Math.max(0, ...this.tasks.map((t) => t.position)) + 1, createdAt: now, updatedAt: now, doneAt: state === EmberTaskState.DONE ? now : null,
-    });
-    this.changed();
-    return id;
-  }
-
-  /** POST /__mock/ember/consolidating: on starts one; off finishes it (a fresh epoch follows, like the daemon). */
-  setConsolidating(on: boolean): void {
-    if (on === this.consolidating) return;
-    this.consolidating = on;
-    if (!on) {
-      this.lastConsolidatedAt = new Date();
-      this.lastConsolidationError = "";
-    }
-    this.changed();
-  }
-
-  /** POST /__mock/ember/epoch: a fresh session, started now, with an empty context. */
-  nextEpoch(): number {
-    this.epoch++;
-    this.epochStartedAt = new Date();
-    this.contextTokens = 0;
-    this.changed();
-    return this.epoch;
+    return this.workers.get(id)?.report ?? null;
   }
 
   /** GET /__mock/ember: the board as JSON (dates as RFC 3339, enums by name). */

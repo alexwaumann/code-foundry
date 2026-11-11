@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
-import { appPath, BACKGROUND, CF, emit, expectAttention, invocations, mockPost, openApp, openProjectPage, openProjects, openStreams, resetMock, row } from "./fixtures";
+import { BACKGROUND, CF, emit, expectAttention, invocations, mockPost, openApp, openProjectPage, openStreams, resetMock, row } from "./fixtures";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -222,17 +222,4 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   expect(started.get("TerminalService/Attach") ?? 0).toBe(0);
   // Server side agrees.
   await expect.poll(openStreams).toEqual({ "EventService/Watch": 1, "ThreadService/WatchThread": 1 });
-});
-
-// The notice ("Threads: service unavailable") and no rows: src/components/sidebar/Sidebar.test.tsx.
-test("a daemon without ThreadService: projects still work, and cmd+j's shell attaches live", async ({ page }) => {
-  await mockPost("threads-service?enabled=false");
-  // No rows to wait for (openApp waits for one): the notice is what shows.
-  await page.goto(appPath);
-  await expect(page.getByTestId("threads-unavailable")).toBeVisible();
-  await openProjects(page);
-  await expect(page.getByTestId("project-name").first()).toBeVisible();
-  await page.keyboard.press("Meta+j");
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-top");
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
 });

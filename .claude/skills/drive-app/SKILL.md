@@ -53,6 +53,27 @@ $P cli eval '() => window.__cfModule("/src/stores/ui.ts").then((m) => m.useUiSto
 - Full command reference (same version as the binary):
   `node_modules/.bun/playwright-core@*/node_modules/playwright-core/lib/tools/skills/playwright-cli/SKILL.md`.
 
+## Mock controls
+
+The mock's `/__mock/*` controls (POST unless marked GET; the full list heads `mock/server.ts`)
+that help most when driving by hand:
+
+- `thread?state=permission|question|streaming|idle|agents|waiting|html|long|…`: the scripted
+  thread s-r1 in that state; `thread/delta?text=…` and `thread/finish` stream a reply into it.
+- `thread/status?id=s-1&status=busy|idle|attention[&reason=…]`, `thread/stop?id=…&reason=crashed`:
+  a sidebar thread's status or end.
+- `thread-info?scenario=single|ws9|archived|home|child-server`: the thread info card's fixtures.
+- `threads?project=repo-cf&count=30&status=idle`, `lineage`, `status-kinds`, `welcome`, `empty`:
+  more threads, a lineage, one thread per status, a first run, a fresh install.
+- `workspace?name=login&projects=repo-cf,repo-gp`, `leftovers?project=repo-cf`: workspaces and
+  cleanable worktrees.
+- `settings/external?appearance.theme=light` (a hand edit of the settings file), `ember?enabled=true`,
+  `dictation?state=ready`, `gh/many-prs?count=150`.
+- `reset` puts everything back; GET `invocations` lists the commands the GUI ran.
+
+A control the session needs and the mock lacks is added in `mock/server.ts` (its `control`
+function and the header list), with the World method it calls.
+
 ## Stop
 
 Stop the background `make drive` task (or send it SIGTERM) when done. It kills the daemon and

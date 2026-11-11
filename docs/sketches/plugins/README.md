@@ -7,7 +7,7 @@ Design package; build decisions of 2026-10-18 are in `DECISIONS.md`, which overr
 | `BRIEF.md` | The decisions made in conversation with Alex that the three pieces below were written against |
 | `ARCHITECTURE.md` | Daemon, protocol, GUI, lifecycle, security, five-PR build order, ranked open questions |
 | `PRIMITIVES.md` | The UI primitive catalog, view-model schema (replace + log append), events, both plugins' states as JSON |
-| `DESIGN.md` + `index.html` + `shots/` | HTML mockups of the Jenkins tracker (6 states), the auth wizard (6 states) and the surface list, dark/light/280px, rendered from view-model data (screenshots regenerate with `shoot.mjs`; not committed) |
+| `DESIGN.md` | Notes on the HTML mockups of the Jenkins tracker (6 states), the auth wizard (6 states) and the surface list, rendered from view-model data |
 
 The three were written in parallel by separate agents from the brief. This file
 reconciles where they diverged and merges their open questions.

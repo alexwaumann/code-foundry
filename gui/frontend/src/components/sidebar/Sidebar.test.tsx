@@ -50,8 +50,7 @@ beforeEach(() => {
   // Every thread gets the list fields projectsWorld leaves out (no flags, no linked PRs).
   useThreadsStore.setState((st) => ({
     byId: Object.fromEntries(Object.entries(st.byId).map(([id, t]) => [id, Object.assign({ flags: [], linkedPullRequests: [] }, t, id === "s-6" ? { lastActivityAtMs: Date.now() - 60_000 } : {})])),
-    availability: "unknown",
-  }) as never);
+  }));
   setEmberEnabled(false);
   useUiStore.setState({ selection: HOME, cursorKey: null, sidebarVisible: true, workingCollapsed: false, snoozedCollapsed: true, archivedCollapsed: true });
   useCommandsStore.setState({ commands: [cmd("thread.new", "New Thread"), cmd("thread.pin", "Pin Thread")] });
@@ -138,12 +137,11 @@ describe("Sidebar: the thread list", () => {
     expect(screen.queryByTestId("thread-list-empty")).toBeNull();
   });
 
-  it("a daemon without ThreadService: no rows, the list says so and the status row says service unavailable", () => {
-    useThreadsStore.setState({ byId: {}, order: [], loaded: false, availability: "unavailable", error: "unimplemented: codefoundry.v1.ThreadService" } as never);
+  it("a thread list that failed before it loaded: no rows, the list says why", () => {
+    useThreadsStore.setState({ byId: {}, order: [], loaded: false, error: "deadline exceeded" });
     render(<Sidebar />);
     expect(list().querySelectorAll("[data-row-key]")).toHaveLength(0);
-    expect(screen.getByTestId("thread-list-empty").textContent).toBe("Threads are unavailable on this daemon.");
-    expect(screen.getByTestId("threads-unavailable").textContent).toBe("Threads: service unavailable");
+    expect(screen.getByTestId("thread-list-empty").textContent).toBe("Cannot list threads: deadline exceeded. Retrying…");
   });
 });
 

@@ -15,9 +15,7 @@
  *    checkout (a chip), a relative one and a git range (plain code).
  * 5. A timer with a note, a reply with no tool.
  *
- * Seven runs of work, seven task links, four wakes. POST /__mock/ember/restart adds a turn
- * the app's restart cuts (scriptEmberRestartCut) and the restart notice's wake after it
- * (scriptEmberRestartWake).
+ * Seven runs of work, seven task links, four wakes.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { MessageOrigin, ToolCallStatus, type ThreadItemSchema } from "../src/gen/codefoundry/v1/thread_pb";
@@ -199,41 +197,4 @@ export function scriptEmberChat(s: EmberChatScript, now = Date.now()): void {
   s.it({ case: "thinking", value: { text: "The notes worker is still drafting; say so." } }, { at: ago(1, 1), until: ago(1, 3) });
   text("Your check on the release notes: the worker is still drafting. I'll tell you when it reports.", ago(1, 4));
   end(ago(1, 5), 5_000);
-}
-
-/**
- * The app's restart cuts a turn of Ember's (POST /__mock/ember/restart?step=cut): the user
- * asked for more, Ember ran a command, and the daemon's shutdown ended the tool ("Interrupted:
- * the daemon stopped.") and the turn (process_ended, interrupted), as stream.go does.
- */
-export function scriptEmberRestartCut(s: EmberChatScript, now = Date.now()): void {
-  const at = (sec: number) => new Date(now - 30_000 + sec * 1000);
-  s.it({ case: "userMessage", value: { text: "Actually, pin wails at 3.0 for now, on its own branch.", attachments: [] } }, { at: at(0) });
-  s.it({ case: "thinking", value: { text: "A new piece: start a worker for the pin." } }, { at: at(2), until: at(4) });
-  s.tool(
-    "Bash",
-    { command: "code-foundry ember task start \"Pin wails at 3.0\" --project code-foundry --prompt - <<'EOF'\nPin wails at v3.0.x in go.mod; make check must pass.\nEOF" },
-    { output: "Interrupted: the daemon stopped.", status: ToolCallStatus.ERROR },
-    { at: at(5), until: at(9) },
-  );
-  s.it({ case: "turnEnd", value: { subtype: "process_ended", interrupted: true, durationMs: BigInt(9_000) } }, { at: at(9) });
-}
-
-/** The restart notice wakes Ember (its own turn was cut) and it picks the request up (POST /__mock/ember/restart?step=wake). */
-export function scriptEmberRestartWake(s: EmberChatScript, now = Date.now()): void {
-  const at = (sec: number) => new Date(now - 10_000 + sec * 1000);
-  const { bash, end, text } = helpers(s);
-  const restarted = at(0);
-  const title = "The app restarted; your own turn was interrupted. Its session resumes now.";
-  const json = JSON.stringify({ kind: "restart", restarted_at: restarted.toISOString(), interrupted: [], subscriptions: 0, own_turn_interrupted: true }, null, 2);
-  wakeMessage(s, { title, json }, restarted);
-  bash("code-foundry ember board", "# Task board\n\n## Blocked\n\n- t-9c0d1e2f Bump wails to v3.1 …", at(2));
-  bash(
-    "code-foundry ember task start \"Pin wails at 3.0\" --project code-foundry --prompt - <<'EOF'\nPin wails at v3.0.x in go.mod; make check must pass.\nEOF",
-    "t-6f7a8b9c doing: thread Pin wails at 3.0 (s-ember-pin)",
-    at(4),
-    4,
-  );
-  text("Picked up after the restart: a worker is pinning wails at 3.0 on its own branch.\n\n[Bump wails to v3.1](cf-task://t-9c0d1e2f)", at(9));
-  end(at(10), 10_000);
 }

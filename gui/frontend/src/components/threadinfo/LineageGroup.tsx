@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowRight, Bot, CornerLeftUp, Square } from "lucide-react";
 import { ThreadPlaceRows } from "@/components/thread/ThreadPlaceRows";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { agentName } from "@/lib/agents";
 import { formatDuration } from "@/lib/duration";
@@ -27,7 +26,7 @@ import { useThreadStore } from "@/stores/thread";
 import { interruptThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { Group, HOVER_CARD, Row, RowMore } from "./Row";
+import { Group, HOVER_CARD, Row } from "./Row";
 
 const DOT: Record<LineageRowState, string> = {
   working: "text-cf-link",
@@ -210,23 +209,14 @@ function ParentRow({ threadId }: { threadId: string }) {
 }
 
 /**
- * "Lineage · N running" with its menu (Archive finished, not built yet). N is the sidebar
+ * "Lineage · N running". N is the sidebar
  * badge's live count (lib/liveCount: background subagents plus live child threads), so the
  * two always agree; a foreground run listed here is the busy tool, not counted.
  */
 function LineageLabel({ threadId }: { threadId: string }) {
   const running = useLiveCount(threadId);
   return (
-    <Row
-      trailing={
-        <RowMore label="Lineage options" testId="ti-lineage-menu-trigger" menuTestId="ti-lineage-menu">
-          <DropdownMenuItem disabled data-testid="ti-archive-finished">
-            Archive finished
-          </DropdownMenuItem>
-        </RowMore>
-      }
-      testId="ti-lineage-label"
-    >
+    <Row testId="ti-lineage-label">
       <span className="text-cf-text-muted">Lineage{running > 0 && ` · ${String(running)} running`}</span>
     </Row>
   );

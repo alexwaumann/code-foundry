@@ -214,10 +214,6 @@ const STEP_MS = 250;
 export class MockRegistry {
   private entries: Entry[] = seedEntries();
   private fetchedAt = new Date(Date.now() - 12 * 60_000);
-  /** A failure Browse reports for the registry (POST /__mock/plugin/registry?error=…). */
-  error = "";
-  /** A failure every install reports after its first step, until cleared (POST /__mock/plugin/registry?installError=…). */
-  installError = "";
   /** RegistryChanged's epoch and the registries it was last published for. */
   private epoch = 0;
   private seen = "";
@@ -226,9 +222,7 @@ export class MockRegistry {
 
   reset(): void {
     this.entries = seedEntries();
-    this.error = "";
     this.seen = this.configured().join(" ");
-    this.installError = "";
     this.fetchedAt = new Date(Date.now() - 12 * 60_000);
   }
 
@@ -320,7 +314,7 @@ export class MockRegistry {
         url,
         fetchedAt: timestampFromDate(this.fetchedAt),
         cached: !refresh,
-        error: url === FIXTURE_REGISTRY ? this.error : "",
+        error: "",
         plugins: this.listOf(url).length,
         issues: this.issues(url),
       })),
@@ -337,7 +331,6 @@ export class MockRegistry {
     const url = `https://github.com/${e.repo}/releases/download/v${e.version}/${e.name}-${e.version}-darwin-arm64.tar.gz`;
     this.progress(ref, e, PluginInstallPhase.RESOLVING, `resolving ${ref}`);
     await wait();
-    if (this.installError) throw new CommandError("unavailable", this.installError);
     this.progress(ref, e, PluginInstallPhase.DOWNLOADING, `downloading ${url}`);
     await wait();
     this.progress(ref, e, PluginInstallPhase.DOWNLOADING, `downloading ${url}`, 2_621_440);
@@ -384,7 +377,6 @@ export class MockRegistry {
         run: async (_c, a) => {
           const ref = a.ref ?? "";
           const e = this.entry(ref.split("@")[0] ?? "");
-          if (this.error) throw new CommandError("notfound", this.error);
           const had = this.deps.installed(e.name);
           if (had && had.version === e.version && a.force !== "true") {
             return { message: `${e.name} ${e.version} is installed already (--force reinstalls it)`, resultJson: JSON.stringify({ plugin: { name: e.name, version: e.version, enabled: true }, version: e.version }) };

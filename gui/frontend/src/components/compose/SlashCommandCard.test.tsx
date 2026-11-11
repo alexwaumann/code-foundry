@@ -67,7 +67,7 @@ const item = (label: string) => {
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = () => undefined;
-  useSkillsStore.setState({ byKey: { [KEY]: { status: "ready", skills: SCANNED, outdated: false } } });
+  useSkillsStore.setState({ byKey: { [KEY]: { status: "ready", skills: SCANNED } } });
 });
 
 afterEach(() => {

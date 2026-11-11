@@ -103,7 +103,7 @@ export function startArchiveCleanup(): () => void {
     for (const id of putAway) resetThreadPanels(id);
     for (const id of newlyRemoved(prev, s)) {
       putAway.add(id);
-      if (s.availability !== "unavailable") forgetThreadPanels(id);
+      if (s.loaded) forgetThreadPanels(id);
     }
     const ui = useUiStore.getState();
     if (putAwaySelected(ui.selection, putAway)) ui.select(HOME);

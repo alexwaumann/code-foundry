@@ -379,8 +379,7 @@ store, same selection-change and Escape handling as settings).
 "Cache write · 1h". The side panel subtitle is "<tokens> tokens · <n> requests · <k>
 agent runs" with no status tag.
 
-Renders: `all.png` (tokens), `all-cost.png` (cost, hovering a day), `all-light.png`,
-`session.png`.
+Render: `session.png`.
 
 ## Build plan (2026-10-10)
 

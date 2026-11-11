@@ -132,14 +132,12 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await expect(openIn.getByTestId("ti-open-in-more")).toHaveAttribute("aria-label", "Open in options");
   await expect(action.getByTestId("ti-action-more")).toHaveAttribute("aria-label", "Actions options");
   await expect(pr.getByTestId("ti-pr-more")).toHaveAttribute("aria-label", "Pull request options");
-  await expect(c.getByTestId("ti-lineage-menu-trigger")).toHaveAttribute("aria-label", "Lineage options");
 
   // One right edge, the row's padding inside its own: values without a chevron, every ellipsis, every chevron.
   const edge = (await rightOf(c.getByTestId("ti-context"))) - 4;
   const ends = [
     "ti-context-meta",
     "ti-branch-meta",
-    "ti-lineage-menu-trigger",
     "ti-open-in-more",
     "ti-action-more",
     "ti-pr-more",
@@ -286,23 +284,6 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await expect(prMenu.getByTestId("ti-pr-github")).toBeVisible();
   await expectUnderRow(prMenu, pr);
   await expect(page.locator('[data-testid="panel-body"][data-surface="pullrequest"]')).toHaveCount(0);
-  await page.keyboard.press("Escape");
-
-  // Lineage's ellipsis is the same button with the same menu placement and the same
-  // menu-open rule: only its block lit. Its label has no click: hovering it lights nothing.
-  const label = c.getByTestId("ti-lineage-label");
-  const labelMore = c.getByTestId("ti-lineage-menu-trigger");
-  await label.hover({ position: { x: 30, y: 10 } });
-  await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.none, blocks.none]);
-  // Hovering its ellipsis lights that block alone: no dim block over a label that is not a target.
-  await labelMore.hover();
-  await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.full, blocks.none]);
-  await labelMore.click();
-  const lineageMenu = page.getByTestId("ti-lineage-menu");
-  await expect(lineageMenu.getByTestId("ti-archive-finished")).toBeVisible();
-  await expectUnderRow(lineageMenu, label);
-  await page.mouse.move(0, 0);
-  await expect.poll(() => lit(label, labelMore)).toEqual([blocks.none, blocks.full, blocks.none]);
   await page.keyboard.press("Escape");
 });
 

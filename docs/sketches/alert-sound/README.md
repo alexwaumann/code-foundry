@@ -15,20 +15,15 @@ no click, rounded attack). 48 kHz mono 16-bit, 0.6 s. The shipped copy is
 
 Synthesised with the Python standard library only, no samples:
 
-* `gen.py`: the first round (chime, glass, marimba, wood, forge, bloom). "Wood" won.
-* `wood.py`: variations on "Wood", with the primitives copied from `gen.py` (sine
-  partials with an exponential decay, filtered noise for the click). `soft` is the one
-  shipped.
+* `wood.py`: variations on a wooden knock (sine partials with an exponential decay,
+  filtered noise for the click). `soft` is the one shipped.
 * Every sound gets a 30 ms fade-out and is loudness-normalised: -18 dBFS RMS over its
   loudest 150 ms window, with at least 1 dB of peak headroom.
-* `wood.html`: the listening page used to choose (the WAVs inlined as base64, with a
-  volume slider).
 
 ## Regenerate
 
 ```
 python3 -I wood.py <outdir>     # writes every wood variant; soft.wav is the shipped one
-python3 -I gen.py <outdir>      # the first round
 python3 -I taps.py <outdir>     # dictation's start.wav and stop.wav
 ```
 

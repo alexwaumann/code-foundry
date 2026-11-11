@@ -7,9 +7,6 @@
  * failed background run with its "Agent failed · …" note. The thread's
  * agents_running / background_agents_running follow the list (mock/world.ts threadMsg).
  *
- *   POST /__mock/thread/agent-end?id=s-r1&run=a1[&status=done|failed]   a run ends: its
- *        Agent call's item finishes, a note follows, the list and the counts are published.
- *
  * The commands thread.agents and thread.agent.open (any active thread)
  * and thread.agent.up (the subagent view, or the CLI), like the daemon's. "PR 1" and the
  * failed run carry their own items (parent_tool_use_id = their Agent call) for the
@@ -57,13 +54,6 @@ export const PR1_PROMPT =
 function lines(tag: string, n: number): string {
   return Array.from({ length: n }, (_, i) => `\t// ${tag} ${String(i + 1)}`).join("\n");
 }
-/** What a run reports when POST /__mock/thread/agent-end ends it done. */
-export const END_REPORTS: Readonly<Record<string, string>> = {
-  a1: "Added task frame handling to the thread store with 14 table tests; make check is green.",
-  a1b: "usage_runs.go keeps one record per run; nothing to change.",
-  a2: "The Agents surface lists every run in spawn order with its live activity.",
-};
-
 /**
  * The sketch's conversation: the prompt, the Explore with its work and report, three
  * background Agent calls (two still running, one failed), Claude's reply, the turn's end

@@ -2,7 +2,7 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { sortTable, sortValue, tableParts } from "./pluginTable";
+import { sortTable, tableParts } from "./pluginTable";
 
 type Node = Record<string, unknown> & { key: string };
 
@@ -41,11 +41,5 @@ describe("the mock's tables", () => {
     sortTable(n, column, dir);
     expect(order(n)).toBe(want);
     expect((n.table as { sort: unknown }).sort).toEqual({ column, dir });
-  });
-
-  it("checks a sort's value as the daemon does", () => {
-    expect(sortValue("", "desc")).toBe("desc");
-    expect(sortValue("asc", "desc")).toBe("asc");
-    expect(() => sortValue("up", "asc")).toThrow('a sort\'s value is asc or desc, not "up"');
   });
 });

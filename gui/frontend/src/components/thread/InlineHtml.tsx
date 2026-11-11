@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, Bookmark, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, RotateCw, TriangleAlert, X, type LucideIcon } from "lucide-react";
+import { ArrowDown, ChevronRight, Code, FileCode, LoaderCircle, Maximize2, PanelRight, RotateCw, TriangleAlert, X, type LucideIcon } from "lucide-react";
 import type { ThreadItemView } from "@/api/thread";
 import { readFile } from "@/api/files";
 import { CodeBody } from "@/components/files/CodeBody";
@@ -38,8 +38,8 @@ import { HoldTopContext, PaneOverlayContext, useThreadCtx } from "./context";
 /**
  * A page the model showed inline (code-foundry view.inline; docs/notes/inline-html.md),
  * sketch variant A (docs/sketches/model-phase1): a work-log row "Showed <file> <dir>" and,
- * while open, a card: a strip (the path, then open in the side panel, expand, source and
- * save as artifact) over the page in the same sandboxed frame as the File tab's preview
+ * while open, a card: a strip (the path, then open in the side panel, reload, expand and
+ * source) over the page in the same sandboxed frame as the File tab's preview
  * (HtmlFrame). The page may ask for its height (`{ type: "cf:resize", height }`); the card
  * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default, and
  * the turn's fold never closes it: only its row does (docs/notes/thread-fold-5-text-and-html.md).
@@ -285,7 +285,6 @@ function Actions({
       <Action label="Reload page" icon={RotateCw} disabled={failed || source} onClick={onReload} testId="thread-html-reload" />
       {onExpand && <Action label="Expand" icon={Maximize2} onClick={onExpand} testId="thread-html-expand" />}
       <Action label={source ? "Show the page" : "Source"} icon={Code} pressed={source} disabled={failed} onClick={onSource} testId="thread-html-source-toggle" />
-      <Action label="Artifacts come in a later release" icon={Bookmark} disabled testId="thread-html-save" />
     </>
   );
 }

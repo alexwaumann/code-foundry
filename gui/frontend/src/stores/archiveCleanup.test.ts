@@ -103,7 +103,7 @@ describe("startArchiveCleanup", () => {
   let stop: () => void;
   const tab = makeTab("worktree", "Worktree");
   beforeEach(() => {
-    useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("a"), thread("b")]) });
+    useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("a"), thread("b")]), loaded: true });
     usePanelStore.setState({
       byKey: {
         "thread:a": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }], width: 500 },
@@ -201,7 +201,6 @@ describe("startArchiveCleanup", () => {
     };
 
     beforeEach(async () => {
-      useThreadsStore.setState({ availability: "available" });
       usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [file], activeTabId: file.id }] } } });
       await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, { path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, outsideHome: false, text: "a=1\n", lossless: true, image: null, pdf: null } satisfies FileReadView);
       noteDraft(key, "SECRET=draft\n");
@@ -212,20 +211,19 @@ describe("startArchiveCleanup", () => {
 
     it.each<[string, Error]>([
       ["NotFound", new ConnectError("no such service", Code.NotFound)],
-      ["Unimplemented", new ConnectError("no such rpc", Code.Unimplemented)],
-      ["a 404", new ConnectError("HTTP 404", Code.Unknown)],
-    ])("%s: every thread looks gone, and no draft or panel goes", async (_name, err) => {
+      ["Unavailable", new ConnectError("daemon restarting", Code.Unavailable)],
+    ])("%s: the list keeps its threads and says why, and no draft or panel goes", async (_name, err) => {
       await fails(err);
-      expect(useThreadsStore.getState().order).toEqual([]);
+      expect(useThreadsStore.getState()).toMatchObject({ order: ["a", "b"], error: (err as ConnectError).rawMessage });
       expect(useFileEditStore.getState().sessions[key]?.dirty).toBe(true);
       expect("thread:a" in usePanelStore.getState().byKey).toBe(true);
     });
 
-    it("the list coming back finds the draft where it was", async () => {
-      await fails(new ConnectError("no such rpc", Code.Unimplemented));
+    it("the list coming back clears the error and finds the draft where it was", async () => {
+      await fails(new ConnectError("daemon restarting", Code.Unavailable));
       listThreads.mockResolvedValue([thread("a"), thread("b")]);
       await reconcileThreads(new AbortController().signal);
-      expect(useThreadsStore.getState().availability).toBe("available");
+      expect(useThreadsStore.getState().error).toBeNull();
       expect(useFileEditStore.getState().sessions[key]?.dirty).toBe(true);
     });
 

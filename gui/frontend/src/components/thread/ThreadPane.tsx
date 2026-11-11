@@ -34,7 +34,7 @@ import "./thread.css";
  * thread (a stale selection), or one the first List has not brought yet.
  */
 function ThreadMissing() {
-  const loaded = useThreadsStore((st) => st.loaded || st.availability !== "unknown");
+  const loaded = useThreadsStore((st) => st.loaded);
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <Backdrop />

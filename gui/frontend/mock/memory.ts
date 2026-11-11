@@ -7,9 +7,7 @@
  *
  * Controls (mock/server.ts): POST /__mock/memory?set=empty|seed|long (the entries, as a hand
  * edit; long adds an entry past 500 characters), ?drop=<file>&quiet=1 (a file removed by
- * hand without an event, so an open page is stale), POST /__mock/memory/add?text=…&thread=s-1 (a thread's `memory add`: the entry and
- * the daemon's "Remembered: …" toast with its Settings › Memory link). GET /__mock/memory:
- * { entries, calls }.
+ * hand without an event, so an open page is stale). GET /__mock/memory: { entries, calls }.
  */
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";

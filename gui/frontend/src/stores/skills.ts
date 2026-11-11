@@ -2,19 +2,15 @@
  * Skills and slash commands the composer offers after "/" (FilesystemService.ListSkills),
  * cached per source list (lib/completion skillSourcesKey: the draft's projects and their
  * checkouts) with the user's included. The composer loads its list on mount and whenever
- * its members change; a reload keeps showing the previous list. A daemon older than the
- * RPC marks the entry outdated and the composer offers nothing (no notice).
+ * its members change; a reload keeps showing the previous list.
  */
 import { create } from "zustand";
 import { listSkills, type SkillSourceView, type SkillView } from "@/api/filesystem";
-import { isOutdatedDaemon } from "@/api/errors";
 import { skillSourcesKey } from "@/lib/completion";
 
 export interface SkillsEntry {
   status: "loading" | "ready" | "error";
   skills: readonly SkillView[];
-  /** The daemon predates ListSkills. */
-  outdated: boolean;
 }
 
 interface SkillsState {
@@ -41,15 +37,14 @@ export function loadSkills(sources: readonly SkillSourceView[], list: ListSkills
   const pending = inFlight.get(key);
   if (pending) return pending;
   const prev = useSkillsStore.getState().byKey[key];
-  if (!prev) set(key, { status: "loading", skills: [], outdated: false });
+  if (!prev) set(key, { status: "loading", skills: [] });
   const run = (async () => {
     try {
       const skills = await list(sources, true);
-      set(key, { status: "ready", skills, outdated: false });
-    } catch (err) {
-      const outdated = isOutdatedDaemon(err);
-      if (prev?.status === "ready" && !outdated) return;
-      set(key, { status: "error", skills: [], outdated });
+      set(key, { status: "ready", skills });
+    } catch {
+      if (prev?.status === "ready") return;
+      set(key, { status: "error", skills: [] });
     } finally {
       inFlight.delete(key);
     }
@@ -60,7 +55,7 @@ export function loadSkills(sources: readonly SkillSourceView[], list: ListSkills
 
 const NONE: readonly SkillView[] = [];
 
-/** The loaded skills of a source list (empty while loading, on error or on an outdated daemon). */
+/** The loaded skills of a source list (empty while loading or on error). */
 export function useSkills(key: string): readonly SkillView[] {
   return useSkillsStore((s) => s.byKey[key]?.skills ?? NONE);
 }

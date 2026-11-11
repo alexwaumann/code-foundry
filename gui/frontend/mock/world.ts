@@ -80,8 +80,6 @@ interface MockWorkspace {
   instructions: string;
   /** Skill folder names in .claude/skills, sorted. */
   skills: string[];
-  /** A rooted workspace's root is gone (moved or renamed). */
-  rootMissing?: boolean;
   createdAt: Date;
 }
 
@@ -186,7 +184,7 @@ interface MockThread {
   /** Claude's pr-link records: one per URL, first-seen order (POST /__mock/link-pr). */
   /** via: the direct child a copy came through (the daemon's LinkChild); absent for the thread's own link. */
   linkedPullRequests: { slug: string; number: number; url: string; linkedAt: Date; via?: string }[];
-  /** Token usage buckets (mock/usage.ts; POST /__mock/usage). */
+  /** Token usage buckets (mock/usage.ts). */
   usage: MockUsage[];
   /** The thread's context totals (mock/context.ts). */
   contextTokens: MockContext["contextTokens"];
@@ -223,7 +221,7 @@ interface MockThread {
   /** "plugin:<name>" for a plugin's own thread (hidden from the user's lists); "" for the user's. */
   owner: string;
   /**
-   * A resident thread's name (Thread.kind RESIDENT, resident_name; POST /__mock/resident):
+   * A resident thread's name (Thread.kind RESIDENT, resident_name):
    * the daemon's own agent thread, hidden from the user's lists; "" for any other.
    */
   resident: string;
@@ -232,13 +230,7 @@ interface MockThread {
   /** Thread.naming: thread.regenerate-name's call is in flight. Unset otherwise. */
   naming?: boolean;
   /**
-   * Thread.plugin_env_change while plugin_env_stale (POST /__mock/thread/envstale): a plugin's
-   * session environment changed since the running process started; "" when current.
-   * thread.restart and the process's end clear it (docs/notes/plugins-env-restart.md).
-   */
-  pluginEnvChange: string;
-  /**
-   * Thread.transcript_missing (POST /__mock/thread/transcript, /__mock/transcript-deleted):
+   * Thread.transcript_missing (POST /__mock/thread/transcript):
    * stopped, and Claude Code deleted its transcript, so it cannot continue: a message and a
    * fork are refused with the daemon's words (docs/notes/transcript-deleted.md).
    */
@@ -430,15 +422,13 @@ interface MockWorktree {
     baseAhead?: number;
     baseBehind?: number;
     conflicted?: number;
-    /** A git operation in progress ("rebase", "merge", ...; POST /__mock/worktree/operation). */
+    /** A git operation in progress ("rebase", "merge", ...). */
     operation?: string;
     operationStep?: number;
     operationTotal?: number;
-    /** The last status read failed (POST /__mock/worktree/refresh-error). */
+    /** The last status read failed. */
     error?: string;
   };
-  /** The last status read was this long ago (ms); absent: now. */
-  refreshedAgoMs?: number;
   /** Made by the app (the daemon records it); absent: by path, under ~/.code-foundry/worktrees. */
   managed?: boolean;
   /** Its commits landed in baseRef as a rebased or squash-merged copy (the daemon's BaseMerged). */
@@ -973,10 +963,6 @@ export class World {
   attachmentBytes = new Map<string, Uint8Array>();
   /** The setup state the next thread.new with background-setup stops in; "": it finishes at once (POST /__mock/thread-setup). */
   nextSetup = "";
-  /** thread.setup.retry's refusal; "": it runs (POST /__mock/thread-setup?refuse-retry=…). */
-  refuseRetry = "";
-  /** The next thread.setup.cancel comes too late (POST /__mock/thread-setup?cancel-late=1). */
-  cancelTooLate = false;
   /** How long thread.new takes to create a worktree (ms). */
   worktreeDelayMs = 700;
   /** thread.move: how long placing and naming take (POST /__mock/thread/move-delay). */
@@ -990,7 +976,6 @@ export class World {
   private generation = 0;
   invocations: Invocation[] = [];
   writes: { id: string; data: string }[] = [];
-  resizes: { id: string; cols: number; rows: number }[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private seconds = 0;
   private nextId = 1;
@@ -1015,8 +1000,6 @@ export class World {
     this.logs.reset();
     this.worktreeDelayMs = 700;
     this.nextSetup = "";
-    this.refuseRetry = "";
-    this.cancelTooLate = false;
     this.terminalNewDelayMs = 0;
     this.terminalNewFail = null;
     this.moveFail = null;
@@ -1026,7 +1009,6 @@ export class World {
     this.settings.reset();
     this.backdrops.reset();
     this.writes = [];
-    this.resizes = [];
     this.nextId = 1;
     for (const r of initialProjects()) this.projects.set(r.id, r);
     this.gh.reset();
@@ -1109,7 +1091,6 @@ export class World {
       name: w.name,
       members: [...w.members].sort(),
       rootPath: w.rootPath,
-      rootMissing: w.rootMissing === true,
       defaultPrimary: w.defaultPrimary,
       managedDir: this.managedDirOf(w),
       instructions: w.instructions ? `${this.workspaceDirOf(w)}/${w.instructions}` : "",
@@ -1132,21 +1113,6 @@ export class World {
     const r = this.projects.get(ref) ?? [...this.projects.values()].find((x) => x.name === ref);
     if (!r) throw new CommandError("notfound", `project ${ref} not found`);
     return r;
-  }
-
-  /**
-   * A worktree on `branch` whose work is in origin/<default> and that has no changes
-   * (cleanable unless something holds it). `path`: put it there instead, e.g. outside the
-   * app's worktrees directory, as another tool would (then it is never cleanable).
-   */
-  addMergedWorktree(projectRef: string, branch: string, path = ""): MockWorktree {
-    const project = this.projectRef(projectRef);
-    const w = this.addWorktree(project, branch, `origin/${project.defaultBranch || "main"}`);
-    if (path) {
-      w.path = path;
-      this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(project) } });
-    }
-    return w;
   }
 
   /**
@@ -1388,16 +1354,6 @@ export class World {
     return w;
   }
 
-  /** Test control: what a thread wrote into the workspace's folder (its instructions file, its skills). POST /__mock/workspace-files. */
-  setWorkspaceFiles(ref: string, instructions: string | undefined, skills: readonly string[] | undefined, rootMissing?: boolean): MockWorkspace {
-    const w = this.workspaceRef(ref);
-    if (instructions !== undefined) w.instructions = instructions;
-    if (skills !== undefined) w.skills = [...skills].sort();
-    if (rootMissing !== undefined) w.rootMissing = rootMissing;
-    this.publishWorkspace(w);
-    return w;
-  }
-
   /** Test control: a fresh install, with no projects, workspaces, threads or terminals. POST /__mock/empty. */
   empty(): void {
     for (const [id, t] of this.terms) {
@@ -1464,7 +1420,7 @@ export class World {
   /**
    * Scenario: the resident thread "ember" (docs/notes/ember-1-primitives.md): the daemon's
    * own agent, stopped, in its own directory, in its second epoch, with no project. Kept
-   * out of the sidebar and the counts like a plugin's thread. POST /__mock/resident.
+   * out of the sidebar and the counts like a plugin's thread.
    * Idempotent; returns its id.
    */
   addResident(): string {
@@ -1479,27 +1435,6 @@ export class World {
       this.ember.changed();
     }
     return id;
-  }
-
-  /**
-   * POST /__mock/ember/restart (docs/notes/ember-fixes-2-gui.md): "cut", the app's restart
-   * cuts a turn of Ember's, as the daemon's shutdown does (a tool it stopped under, a
-   * process_ended turn end, error "interrupted"); "wake", the restart notice wakes Ember and
-   * it replies (finished).
-   */
-  emberRestart(step: "cut" | "wake"): void {
-    const id = this.addResident();
-    if (step === "cut") {
-      this.logs.emberRestartCut(id);
-      this.stopThread(id, "daemon stopped", 0, ThreadStatus.BUSY);
-      return;
-    }
-    this.logs.emberRestartWake(id);
-    const s = this.thread(id);
-    s.state = ThreadState.CONNECTED;
-    this.setStatus(s, ThreadStatus.NEEDS_ATTENTION, "finished");
-    s.lastActivityAt = new Date();
-    this.publishThread(s);
   }
 
   /**
@@ -1789,29 +1724,11 @@ export class World {
     switch (scenario) {
       case "single":
         return single().id;
-      case "busy": {
-        const s = single();
-        this.setStatus(s, ThreadStatus.BUSY, "working: Fix the stale PR badge");
-        this.publishThread(s);
-        return s.id;
-      }
       case "archived": {
         // As an archive leaves it: the thread stopped, its worktree cleaned up, its links kept.
         const s = single();
         this.archiveThread(s.id, true);
         this.dropWorktree(s.worktreePath);
-        return s.id;
-      }
-      case "child": {
-        const p = single();
-        const c = this.addThread({ ...base, id: "s-ti-child", projectId: "repo-cf", worktreePath: CF, name: "Port the rotation to web", createdBy: p.id, createdByName: p.name, status: ThreadStatus.BUSY, statusReason: "working: Port the rotation to web" });
-        this.publishThread(c);
-        return c.id;
-      }
-      case "servers": {
-        const s = this.threads.get("s-ti-srv") ?? this.addThread({ ...base, id: "s-ti-srv", projectId: "repo-cf", worktreePath: CF, name: "Serve the docs preview" });
-        this.logs.load(s.id, "servers");
-        this.publishThread(s);
         return s.id;
       }
       case "child-server": {
@@ -1828,11 +1745,6 @@ export class World {
         const debug = this.actions.run({ action: "a-debug0000000", threadId: p.id, mode: ActionRunMode.BACKGROUND });
         this.actions.setPorts({ run: debug.id ?? "" }, [7788]);
         return p.id;
-      }
-      case "nogit": {
-        const s = this.addThread({ ...base, id: "s-ti-nogit", projectId: "repo-wr", worktreePath: WR, name: "Outline the essay" });
-        this.publishThread(s);
-        return s.id;
       }
       case "ws9": {
         const names = ["api", "web", "auth-lib", "docs", "mobile", "infra", "billing", "notify", "cli"];
@@ -1892,29 +1804,14 @@ export class World {
         this.publishThread(s);
         return s.id;
       }
-      case "unnamed": {
-        // Three projects in no workspace: the header's crumb reads "ghostty-playground +2".
-        const s = this.threads.get("s-ti-un") ?? this.addMultiThread(["repo-cf", "repo-gp", "repo-dot"], "repo-gp", "cf/config-readers", "Sweep the config readers", "", "s-ti-un");
-        s.held = true;
-        this.publishThread(s);
-        return s.id;
-      }
       case "home": {
         const s = this.threads.get("s-ti-home") ?? this.addThread({ ...base, id: "s-ti-home", projectId: "", worktreePath: HOME, name: "Plan the week" });
         this.publishThread(s);
         return s.id;
       }
       default:
-        throw new CommandError("invalid", "scenario must be single, archived, ws9, busy, child, nogit, unnamed, home, servers or child-server");
+        throw new CommandError("invalid", "scenario must be single, archived, ws9, home or child-server");
     }
-  }
-
-  /** Test control: a thread's project set. POST /__mock/thread/project-ids. */
-  setThreadProjectIds(id: string, ids: readonly string[]): MockThread {
-    const s = this.thread(id);
-    s.projectIds = ids.map((r) => this.projectRef(r).id);
-    this.publishThread(s);
-    return s;
   }
 
   /**
@@ -2254,7 +2151,6 @@ export class World {
       owner: "",
       resident: "",
       epoch: 1,
-      pluginEnvChange: "",
       transcriptMissing: false,
       ...o,
       state,
@@ -2370,7 +2266,6 @@ export class World {
       ...(s.owner ? { owner: s.owner } : {}),
       ...(s.resident ? { kind: ThreadKind.RESIDENT, residentName: s.resident } : {}),
       epoch: s.epoch,
-      ...(s.pluginEnvChange ? { pluginEnvStale: true, pluginEnvChange: s.pluginEnvChange } : {}),
       ...(s.transcriptMissing ? { transcriptMissing: true } : {}),
       ...(s.archivedAt ? { archivedAt: timestampFromDate(s.archivedAt) } : {}),
       ...(s.snoozedUntil ? { snoozedUntil: timestampFromDate(s.snoozedUntil) } : {}),
@@ -2421,7 +2316,6 @@ export class World {
     s.disconnectReason = reason;
     s.exitCode = code;
     s.settleIn = 0;
-    s.pluginEnvChange = ""; // the next start gets the current environment
     // A stop while starting: the queued reply never comes (the daemon drops it with the process).
     s.onReady = [];
     s.lastActivityAt = new Date();
@@ -2485,24 +2379,6 @@ export class World {
     return { linked: true, link };
   }
 
-  /**
-   * Claude made requests: adds counters to the thread's (model, day) bucket, or a new
-   * bucket, and republishes the thread (the daemon's live fold, coarser).
-   */
-  addUsage(id: string, u: MockUsage): void {
-    const s = this.thread(id);
-    if (!u.model) throw new CommandError("invalid", "model is required");
-    const counters = [u.requests, u.input, u.output, u.cacheRead, u.cacheWrite5m, u.cacheWrite1h];
-    if (counters.some((n) => !Number.isInteger(n) || n < 0)) throw new CommandError("invalid", "counters must be non-negative integers");
-    const i = s.usage.findIndex((b) => b.model === u.model && b.day === u.day && (b.tier ?? "") === (u.tier ?? "") && (b.speed ?? "") === (u.speed ?? ""));
-    const old = s.usage[i];
-    const merged: MockUsage = old
-      ? { ...old, requests: old.requests + u.requests, input: old.input + u.input, output: old.output + u.output, cacheRead: old.cacheRead + u.cacheRead, cacheWrite5m: old.cacheWrite5m + u.cacheWrite5m, cacheWrite1h: old.cacheWrite1h + u.cacheWrite1h }
-      : u;
-    s.usage = old ? s.usage.map((b, j) => (j === i ? merged : b)) : [...s.usage, merged];
-    this.publishThread(s);
-  }
-
   /** Test control: the clock stops (or, held false, resumes) changing this thread (MockThread.held); controls and input always do. */
   holdThread(id: string, held = true): void {
     this.thread(id).held = held;
@@ -2521,14 +2397,6 @@ export class World {
       if (s.archivedAt) throw new CommandError("unavailable", "thread is archived");
       s.flags = [...rest, { ...f, level: f.level, setAt: new Date() }].sort((a, b) => b.level - a.level || b.setAt.getTime() - a.setAt.getTime());
     }
-    this.publishThread(s);
-  }
-
-  /** A plugin's session environment changed (or, with "", is current again) for a running thread. */
-  setPluginEnvChange(id: string, change: string): void {
-    const s = this.thread(id);
-    if (change && s.state !== ThreadState.CONNECTED) throw new CommandError("unavailable", "only a running thread can be stale");
-    s.pluginEnvChange = change;
     this.publishThread(s);
   }
 
@@ -2551,38 +2419,11 @@ export class World {
     if (s.transcriptMissing && s.state === ThreadState.DISCONNECTED) throw new CommandError("unavailable", TRANSCRIPT_MISSING_MESSAGE);
   }
 
-  /**
-   * Scenario: a thread whose transcript Claude Code deleted, "Fix sidebar flake", stopped a
-   * month ago with one exchange in its timeline (docs/notes/transcript-deleted.md). POST
-   * /__mock/transcript-deleted. Idempotent; returns its id.
-   */
-  addTranscriptDeleted(): string {
-    const id = "s-transcript-deleted";
-    if (!this.threads.has(id)) {
-      const ago = (min: number) => new Date(Date.now() - min * 60_000);
-      const s = this.addThread({ id, projectId: "repo-cf", worktreePath: CF, name: "Fix sidebar flake", model: "claude-sonnet-5[1m]", effort: "medium",
-        state: ThreadState.DISCONNECTED, disconnectReason: "idle", status: ThreadStatus.IDLE, statusReason: "at prompt", statusChangedAt: ago(45 * 24 * 60),
-        createdAt: ago(45 * 24 * 60 + 30), lastActivityAt: ago(45 * 24 * 60), held: true, transcriptMissing: true });
-      this.logs.seed(id, {
-        prompt: "Can you look at why TestUsageFromLiveTranscript flakes in CI?",
-        intro: "Let me run it in a loop.",
-        command: "go test ./internal/store/thread -run TestUsageFromLiveTranscript -count=50",
-        output: "ok  \tgithub.com/alexwaumann/code-foundry/internal/store/thread\t4.812s",
-        reply: "The flake comes from the usage fold reading a transcript line before the writer flushed it. I added a retry in `runner.go` and the test passed 50× locally.",
-        minutesAgo: 45 * 24 * 60,
-        end: "done",
-      });
-      this.publishThread(s);
-    }
-    return id;
-  }
-
   /** ThreadService.Restart: a running thread restarts with the current environment; any other is left as it is. */
   restartThread(id: string): boolean {
     const s = this.thread(id);
     if (s.state !== ThreadState.CONNECTED && s.state !== ThreadState.STARTING) return false;
     this.logs.restart(id);
-    s.pluginEnvChange = "";
     this.publishThread(s);
     return true;
   }
@@ -2649,15 +2490,13 @@ export class World {
   retrySetup(id: string): void {
     const s = this.thread(id);
     if (!isSetupStopped(s.setup?.phase)) throw new CommandError("unavailable", `thread ${id} has no setup to try again`);
-    if (this.refuseRetry) throw new CommandError("unavailable", this.refuseRetry);
     this.scriptSetup(id, "running", false);
   }
 
   /** thread.setup.cancel: what a running background setup made goes; too late once it is done. */
   cancelSetup(id: string): void {
     const s = this.thread(id);
-    if (s.setup?.phase === ThreadSetupPhase.DONE || this.cancelTooLate) {
-      this.cancelTooLate = false;
+    if (s.setup?.phase === ThreadSetupPhase.DONE) {
       throw new CommandError("unavailable", `thread ${id} finished its setup: it was too late to cancel it, and Claude is starting; interrupt it instead`);
     }
     if (s.setup?.phase !== ThreadSetupPhase.RUNNING) throw new CommandError("unavailable", `thread ${id}'s setup is not running`);
@@ -2726,12 +2565,6 @@ export class World {
     this.logs.load(id, state);
     // The agents panel sketch's thread (mock/agents.ts).
     if (state === "agents") s.name = "Agents panel";
-    if (state === "stopped") {
-      // Stopped at its prompt cache expiry: the last result is past the TTL, so the
-      // composer's cold-cache note shows (the daemon's idle stop).
-      s.lastResultAt = new Date(Date.now() - (this.cacheTTLSeconds() + 120) * 1000);
-      this.stopThread(id, "idle", 0, ThreadStatus.IDLE);
-    }
     if (state === "crashed") {
       // Before the handshake (the daemon's failStart): no turn ran; status error "did not start".
       s.lastError = `Claude did not start: exit code 1: ${CRASH_STDERR}`;
@@ -3221,7 +3054,6 @@ export class World {
   resize(id: string, cols: number, rows: number): void {
     const t = this.term(id);
     if (cols < 1 || rows < 1) throw new CommandError("invalid", "cols and rows must be positive");
-    this.resizes.push({ id, cols, rows });
     if (t.cols === cols && t.rows === rows) return;
     t.cols = cols;
     t.rows = rows;
@@ -3728,49 +3560,10 @@ export class World {
     return false;
   }
 
-  /**
-   * A git operation stops in the worktree at `path` (POST /__mock/worktree/operation): the
-   * status carries it and `conflicted` unmerged entries, which lead the worktree detail as
-   * U files (`files`, else conflict_1.go, ...). An empty `op` ends it: the status clears
-   * and the U files go.
-   */
-  setOperation(path: string, op: string, step: number, total: number, conflicted: number, files: string[]): boolean {
-    for (const project of this.projects.values()) {
-      const w = project.worktrees.find((x) => x.path === path);
-      if (!w) continue;
-      w.status = op
-        ? { ...w.status, operation: op, operationStep: step, operationTotal: total, conflicted, dirty: w.status.dirty || conflicted > 0 }
-        : { ...w.status, operation: "", operationStep: 0, operationTotal: 0, conflicted: 0 };
-      const names = op ? Array.from({ length: conflicted }, (_, i) => files[i] ?? `conflict_${String(i + 1)}.go`) : [];
-      this.gh.setConflicts(path, names);
-      this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * The worktree's last status read failed with `error` `agoMs` ago (POST
-   * /__mock/worktree/refresh-error); an empty error clears it (read now).
-   */
-  setRefreshError(path: string, error: string, agoMs: number): boolean {
-    for (const project of this.projects.values()) {
-      const w = project.worktrees.find((x) => x.path === path);
-      if (!w) continue;
-      w.status = { ...w.status, error };
-      if (error) w.refreshedAgoMs = agoMs;
-      else delete w.refreshedAgoMs;
-      this.projectEvents.publish({ event: { case: "worktreeUpdated", value: this.worktreeMsg(project.id, w) } });
-      return true;
-    }
-    return false;
-  }
-
   // ---- Project API -----------------------------------------------------------------
 
   worktreeMsg(projectId: string, w: MockWorktree): WorktreeInit {
-    const at = new Date(Date.now() - (w.refreshedAgoMs ?? 0));
-    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), managed: managed(w), landed: landed(w), cleanupReason: verdictReason(w), status: { ...w.status, refreshedAt: timestampFromDate(at) } };
+    return { projectId, path: w.path, branch: w.branch, head: w.head, detached: w.detached ?? false, isMain: w.isMain, mergedClean: mergedClean(w), managed: managed(w), landed: landed(w), cleanupReason: verdictReason(w), status: { ...w.status, refreshedAt: timestampFromDate(new Date()) } };
   }
 
   projectMsg(r: MockProject): ProjectInit {
@@ -3917,14 +3710,6 @@ export class World {
   projectInfo(id: string): { name: string; path: string; git: boolean; remotes: string[] } | undefined {
     const r = this.projects.get(id);
     return r && { name: r.name, path: r.path, git: r.git !== false, remotes: r.remotes };
-  }
-
-  /** Test control: a project's name (the daemon takes it from the folder; e.g. "workspace", the primary keyword). POST /__mock/project/rename. */
-  renameProject(id: string, name: string): MockProject {
-    const r = this.projectRef(id);
-    r.name = name;
-    this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(r) } });
-    return r;
   }
 
   /** ProjectService.Delete (and project.unregister): the project is gone. */

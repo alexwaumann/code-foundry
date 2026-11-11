@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SkillSourceView, SkillView } from "@/api/filesystem";
-import { OutdatedDaemonError } from "@/api/errors";
 import { skillSourcesKey } from "@/lib/completion";
 import { loadSkills, resetSkills, useSkillsStore, type ListSkillsFn } from "./skills";
 
@@ -28,10 +27,10 @@ describe("skills store", () => {
   it("loads a source list with the user's skills, keyed by the list", async () => {
     const list = vi.fn<ListSkillsFn>().mockResolvedValue([deploy, commit]);
     const p = loadSkills(R1, list);
-    expect(entry(R1)).toEqual({ status: "loading", skills: [], outdated: false });
+    expect(entry(R1)).toEqual({ status: "loading", skills: [] });
     await p;
     expect(list).toHaveBeenCalledWith(R1, true);
-    expect(entry(R1)).toEqual({ status: "ready", skills: [deploy, commit], outdated: false });
+    expect(entry(R1)).toEqual({ status: "ready", skills: [deploy, commit] });
     expect(entry([{ projectId: "r1", path: "/h/r1-wt" }])).toBeUndefined();
   });
 
@@ -63,25 +62,16 @@ describe("skills store", () => {
     await loadSkills(R1, () => Promise.resolve([deploy]));
     const { fn, calls } = deferred();
     const p = loadSkills(R1, fn);
-    expect(entry(R1)).toEqual({ status: "ready", skills: [deploy], outdated: false });
+    expect(entry(R1)).toEqual({ status: "ready", skills: [deploy] });
     calls[0]?.reject(new Error("boom"));
     await p;
-    expect(entry(R1)).toEqual({ status: "ready", skills: [deploy], outdated: false });
+    expect(entry(R1)).toEqual({ status: "ready", skills: [deploy] });
     await loadSkills(R1, () => Promise.resolve([deploy, commit]));
     expect(entry(R1)?.skills).toEqual([deploy, commit]);
   });
 
-  it.each([
-    ["an outdated daemon", new OutdatedDaemonError(new Error("404")), true],
-    ["any other error", new Error("boom"), false],
-  ])("%s: nothing to offer", async (_name, err, outdated) => {
-    await loadSkills(R1, () => Promise.reject(err));
-    expect(entry(R1)).toEqual({ status: "error", skills: [], outdated });
-  });
-
-  it("an outdated daemon also replaces a list loaded before (the RPC is gone)", async () => {
-    await loadSkills(R1, () => Promise.resolve([deploy]));
-    await loadSkills(R1, () => Promise.reject(new OutdatedDaemonError(new Error("404"))));
-    expect(entry(R1)).toEqual({ status: "error", skills: [], outdated: true });
+  it("a first load that fails: nothing to offer", async () => {
+    await loadSkills(R1, () => Promise.reject(new Error("boom")));
+    expect(entry(R1)).toEqual({ status: "error", skills: [] });
   });
 });

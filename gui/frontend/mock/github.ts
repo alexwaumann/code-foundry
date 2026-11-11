@@ -414,42 +414,6 @@ export class GhWorld {
   }
 
   /**
-   * Test control (POST /__mock/gh/branch-pr): a pull request on `head` in the given state
-   * (open, draft, merged, closed), `ageMs` old; with `append`, beside the branch's others,
-   * else alone. Announced like a poll.
-   */
-  setBranchPullRequest(slug: string, head: string, number: number, title: string, state: string, ageMs: number, append: boolean): void {
-    const merged = state === "merged";
-    const pr = this.pr(slug, number, title, {
-      headRef: head,
-      ageMs,
-      draft: state === "draft",
-      state: merged ? PullRequestState.MERGED : state === "closed" ? PullRequestState.CLOSED : PullRequestState.OPEN,
-      mergedAt: merged ? this.at(ageMs) : undefined,
-      checks: state === "draft" ? rollup(CheckRollupState.PENDING, 1, 0, 2) : rollup(CheckRollupState.SUCCESS, 3),
-      reviewDecision: state === "open" ? ReviewDecision.APPROVED : ReviewDecision.REVIEW_REQUIRED,
-    });
-    // Newer than the fixtures': the panel shows the newest.
-    pr.createdAt = timestampFromDate(new Date(Date.now() - ageMs));
-    const key = `${slug}\u0000${head}`;
-    this.branches.set(key, append ? [...(this.branches.get(key) ?? []), pr] : [pr]);
-    this.publishGh({ event: { case: "branchPullRequestsUpdated", value: { repoSlug: slug, headRef: head, fetchedAt: timestampFromDate(new Date()) } } });
-  }
-
-  /**
-   * The worktree detail's unmerged files (setOperation): `names` as U entries ahead of the
-   * rest, replacing any earlier ones; recomputed and announced.
-   */
-  setConflicts(path: string, names: string[]): void {
-    const d = this.details.get(path);
-    if (!d) return;
-    const rest = (d.files ?? []).filter((f) => f.status !== "U");
-    d.files = [...names.map((p) => ({ path: p, status: "U", added: 0, deleted: 0, binary: false, uncommitted: true, oldPath: "" })), ...rest];
-    d.computedAt = timestampFromDate(new Date());
-    this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
-  }
-
-  /**
    * The thread info card's fixtures (World.addThreadInfo): a pull request on `head` (into
    * `base`) beside the branch's others, with its checks and review, so its detail resolves.
    */
@@ -553,14 +517,6 @@ export class GhWorld {
     return { event: { case: "polled", value: { fetchedAt: d.fetchedAt, lastError: d.lastError, projectsFetchedAt: d.projectsFetchedAt, projectsLastError: d.projectsLastError } } };
   }
 
-  /** A poll found a new PR: add it and announce the dashboard (and the poll). */
-  update(): void {
-    const pr = this.pr("alexwaumann/code-foundry", 150, "feat(gui): Pull Requests page", { headRef: "phase3a", checks: rollup(CheckRollupState.PENDING, 3, 0, 5), ageMs: 0 });
-    this.dashboard = { ...this.dashboard, authored: [pr, ...this.dashboard.authored], fetchedAt: timestampFromDate(new Date()) };
-    this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
-    this.publishGh(this.polledEvent());
-  }
-
   /**
    * Inbox zero: no review requests and nothing stale; only the reviews that wait on their
    * authors are left. Announced like a poll.
@@ -570,22 +526,6 @@ export class GhWorld {
     const fresh = (p: PrInit) => (p.latestReviews ?? []).every((r) => r.author !== VIEWER || r.commitSha === p.headSha);
     this.dashboard = { ...d, reviewRequested: [], reviewed: d.reviewed.filter(fresh), fetchedAt: timestampFromDate(new Date()) };
     this.publishGh({ event: { case: "dashboardUpdated", value: { fetchedAt: this.dashboard.fetchedAt } } });
-    this.publishGh(this.polledEvent());
-  }
-
-  /**
-   * The last successful poll was 10 minutes ago, and the latest one failed. Like the
-   * daemon, only the polled event says so: nothing re-reads the dashboard.
-   */
-  stale(): void {
-    this.dashboard = { ...this.dashboard, fetchedAt: timestampFromDate(new Date(Date.now() - 10 * MIN)), lastError: "github rate limit (secondary): paused" };
-    this.publishGh(this.polledEvent());
-  }
-
-  /** A poll that changed nothing: only the polled event, with a fresh time. */
-  poll(): void {
-    const at = timestampFromDate(new Date());
-    this.dashboard = { ...this.dashboard, fetchedAt: at, lastError: "", projectsFetchedAt: at, projectsLastError: "" };
     this.publishGh(this.polledEvent());
   }
 
@@ -627,15 +567,6 @@ export class GhWorld {
     this.publishGh(this.polledEvent());
   }
 
-  /** A file appeared in a worktree: recompute and announce. */
-  touch(path: string): boolean {
-    const d = this.details.get(path);
-    if (!d) return false;
-    d.files = [...(d.files ?? []), { path: "later.txt", status: "?", added: 1, deleted: 0, binary: false, uncommitted: true, oldPath: "" }];
-    d.computedAt = timestampFromDate(new Date());
-    this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId: d.projectId, path, computedAt: d.computedAt } } });
-    return true;
-  }
 }
 
 /** 120 files across nested directories (the list virtualizes; directories start collapsed). */

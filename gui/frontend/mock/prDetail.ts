@@ -1400,13 +1400,4 @@ export class PrDetailWorld {
     return true;
   }
 
-  /** A poll saw a push: the head moves to sha (the Code tab reads its diff again), announced like a comment. */
-  push(slug: string, number: number, sha: string): boolean {
-    const d = this.details.get(key(slug, number));
-    if (!d?.pullRequest) return false;
-    d.pullRequest.headSha = sha;
-    d.fetchedAt = timestampFromDate(new Date());
-    this.h.publishGh({ event: { case: "pullRequestDetailUpdated", value: { repoSlug: slug.toLowerCase(), number } } });
-    return true;
-  }
 }
