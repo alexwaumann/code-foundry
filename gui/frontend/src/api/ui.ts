@@ -76,8 +76,8 @@ export type NotifyLevel = "info" | "warning" | "error";
 export type UiIntentView =
   | { kind: "focusTerminal"; terminalId: string }
   /**
-   * Select a thread. `explicit` (a view.panel.* verb's --focus: the user asked) selects
-   * even a hidden thread just created, which a focusThread otherwise leaves alone.
+   * Select a thread. `explicit` (thread.focus, a view.panel.* verb's --focus) selects even
+   * a thread hidden from the sidebar, which a non-explicit focusThread leaves alone.
    */
   | { kind: "focusThread"; threadId: string; explicit?: boolean }
   | { kind: "focusProject"; projectId: string; worktreePath: string }

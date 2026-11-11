@@ -181,7 +181,7 @@ func RegisterThemeAsk(r *Registry, d ThemeAskDeps) error {
 				return Result{}, wrapStep("start thread", err)
 			}
 			th := created.Msg.GetThread()
-			focusCreated(d.Emitter, a, th.GetId())
+			focusCreated(d.Emitter, a, th)
 			return Result{Message: fmt.Sprintf("started thread %s to make the theme (no project)", threadLabel(th)), JSON: th}, nil
 		},
 	})

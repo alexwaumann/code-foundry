@@ -2610,10 +2610,18 @@ export class World {
     this.publishThread(s);
   }
 
-  /** Emits FocusThread for an existing thread. */
-  focusThread(id: string): number {
+  /** Emits FocusThread for an existing thread; `explicit` as thread.focus sends it. */
+  focusThread(id: string, explicit = false): number {
     this.thread(id);
-    return this.emit({ intent: { case: "focusThread", value: { threadId: id } } });
+    return this.emit({ intent: { case: "focusThread", value: explicit ? { threadId: id, explicit } : { threadId: id } } });
+  }
+
+  /**
+   * Like the daemon's focusCreated: a new thread is focused unless focus=false or another
+   * thread created it (docs/notes/child-never-takes-view.md).
+   */
+  private focusCreated(s: MockThread, args: Record<string, string>): void {
+    if (args.focus !== "false" && !s.createdBy) this.focusThread(s.id);
   }
 
   /** UiService.Emit: delivered to UiService watchers and EventService watchers with UI. */
@@ -3250,8 +3258,7 @@ export class World {
     this.holdForSetup(s, scripted, args, first);
     // Like the daemon's WorktreeCreated: the project's on-worktree-create actions, in the background.
     if (created) this.actions.worktreeCreated(s.id, project.id, path);
-    // Like the daemon: every new thread is focused (unless focus=false); the GUI skips a hidden one (stores/intents.ts).
-    if (args.focus !== "false") this.focusThread(s.id);
+    this.focusCreated(s, args);
     return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path }) };
   }
 
@@ -3307,7 +3314,7 @@ export class World {
       firstMessage: firstMessageOf(args),
       ...lineage,
     });
-    if (args.focus !== "false") this.focusThread(s.id);
+    this.focusCreated(s, args);
     return { message: `created thread ${s.id} in ${HOME} (no project)`, resultJson: JSON.stringify({ id: s.id, worktreePath: HOME }) };
   }
 
@@ -3365,7 +3372,7 @@ export class World {
       ...lineage,
     });
     this.holdForSetup(s, scripted, args, first);
-    if (args.focus !== "false") this.focusThread(s.id);
+    this.focusCreated(s, args);
     const warnings = this.hintsFor(s);
     return {
       message: `created thread ${s.id} in ${cwd}${ws ? ` (workspace ${ws.name})` : ""}`,
@@ -3481,7 +3488,7 @@ export class World {
       ...lineage,
     });
     this.holdForSetup(s, scripted, args, first);
-    if (args.focus !== "false") this.focusThread(s.id);
+    this.focusCreated(s, args);
     const warnings = this.hintsFor(s);
     return { message: `created thread ${s.id} in ${path}`, resultJson: JSON.stringify({ id: s.id, worktreePath: path, projectIds: this.projectIdsOf(s) }), ...(warnings.length > 0 ? { warnings } : {}) };
   }
@@ -3982,7 +3989,7 @@ export class World {
             { name: "background-setup", type: ArgType.BOOL, required: false, description: "Return at once and set the thread up in the background (the GUI sets it)" },
             { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)", defaultToThreadEnv: true },
-            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves)", defaultValue: "true" },
+            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves). Never for a thread another thread created (created-by): thread focus shows one on request", defaultValue: "true" },
           ],
         },
         // Like the daemon: also in the composer, whose no-project target has no project, and from a thread's CLI or page.
@@ -4014,7 +4021,7 @@ export class World {
           args: [
             { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
             { name: "name", type: ArgType.STRING, required: false, description: "Name for the fork" },
-            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves)", defaultValue: "true" },
+            { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves). Never for a thread another thread created (created-by): thread focus shows one on request", defaultValue: "true" },
           ],
         },
         when: (ctx) => activeThread(ctx) !== undefined,

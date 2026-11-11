@@ -272,7 +272,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					return Result{Message: "thread " + threadLabel(s) + " in " + s.GetWorktreePath() +
 						" was created earlier for request id " + req.GetRequestId() + "; nothing new started", JSON: s}, nil
 				}
-				focusCreated(e, a, s.GetId())
+				focusCreated(e, a, s)
 				msg := createdMessage(req, res.Msg, r.projectNamer(ctx))
 				if req.GetNotify() {
 					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
@@ -296,7 +296,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				if err := r.known(ctx, ThreadID, a.String("id")); err != nil {
 					return Result{}, err
 				}
-				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id")}}}).Result(), nil
+				// Explicit: asked for, so the window selects even a child hidden from the
+				// sidebar (docs/notes/child-never-takes-view.md).
+				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id"), Explicit: true}}}).Result(), nil
 			},
 		},
 		Command{
@@ -347,7 +349,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					return Result{}, err
 				}
 				s := res.Msg.GetThread()
-				focusCreated(e, a, s.GetId())
+				focusCreated(e, a, s)
 				return Result{Message: "forked " + a.String("id") + " into " + threadLabel(s), JSON: s}, nil
 			},
 		},

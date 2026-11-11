@@ -10,19 +10,25 @@ import (
 )
 
 // createdFocusArg is the focus of a verb that starts a thread (thread.new, thread.fork,
-// the pr.* threads, theme.ask): every window moves to the new thread, as it always has.
-// A page's bridge sends focus=false unless the page passes it, so a page that starts a
-// thread keeps the user's view and its own handler runs (docs/notes/bridge-fix-c-gui.md).
+// the pr.* threads, theme.ask): every window moves to the new thread, unless another
+// thread created it (docs/notes/child-never-takes-view.md). A page's bridge sends
+// focus=false unless the page passes it, so a page that starts a thread keeps the user's
+// view and its own handler runs (docs/notes/bridge-fix-c-gui.md).
 var createdFocusArg = ArgSpec{Name: "focus", Type: Bool, Default: "true",
-	Description: "Select the new thread in every window (--focus=false: no window moves)"}
+	Description: "Select the new thread in every window (--focus=false: no window moves). " +
+		"Never for a thread another thread created (created-by): thread focus shows one on request"}
 
 // focusCreated emits the FocusThread a thread-starting verb sends for its new thread,
-// unless focus is false.
-func focusCreated(e Emitter, a Args, id string) {
-	if !a.Bool("focus") {
+// unless focus is false or another thread created it. A child never takes the user's
+// view, --focus or not: an agent creating threads, perhaps woken while the user works
+// elsewhere, would otherwise move every window. It is decided here on the created
+// thread's CreatedBy, which the daemon stamps, so every thread-starting verb is covered;
+// thread.focus (explicit) is the way to show one.
+func focusCreated(e Emitter, a Args, th *v1.Thread) {
+	if !a.Bool("focus") || th.GetCreatedBy() != "" {
 		return
 	}
-	e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id}}})
+	e.Emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: th.GetId()}}})
 }
 
 // callerPlacement places a thread.new that names no project, worktree, workspace or

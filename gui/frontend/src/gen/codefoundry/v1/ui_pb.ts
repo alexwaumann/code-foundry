@@ -643,9 +643,9 @@ export type UiIntent_FocusThread = Message<"codefoundry.v1.UiIntent.FocusThread"
   threadId: string;
 
   /**
-   * The user asked for it (a view.panel.* verb's --focus): the window selects the
-   * thread even when it is a hidden child created moments ago, which a FocusThread
-   * otherwise leaves alone so an agent creating threads does not take the user's view.
+   * Someone asked for this thread (thread.focus, a view.panel.* verb's --focus): the
+   * window selects it even when it is a hidden child, which a non-explicit FocusThread
+   * (a thread-starting verb's) leaves alone so an agent's threads never take the view.
    *
    * @generated from field: bool explicit = 2;
    */

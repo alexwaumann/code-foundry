@@ -1463,9 +1463,9 @@ func (x *UiIntent_ShowView) GetParams() map[string]string {
 type UiIntent_FocusThread struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// The user asked for it (a view.panel.* verb's --focus): the window selects the
-	// thread even when it is a hidden child created moments ago, which a FocusThread
-	// otherwise leaves alone so an agent creating threads does not take the user's view.
+	// Someone asked for this thread (thread.focus, a view.panel.* verb's --focus): the
+	// window selects it even when it is a hidden child, which a non-explicit FocusThread
+	// (a thread-starting verb's) leaves alone so an agent's threads never take the view.
 	Explicit      bool `protobuf:"varint,2,opt,name=explicit,proto3" json:"explicit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

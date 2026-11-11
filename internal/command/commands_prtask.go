@@ -305,7 +305,7 @@ func (d PullRequestThreadDeps) startPRTask(ctx context.Context, a Args, s string
 		return Result{}, afterClone(wrapStep("start thread", err))
 	}
 	th := created.Msg.GetThread()
-	focusCreated(d.Emitter, a, th.GetId())
+	focusCreated(d.Emitter, a, th)
 	msg := fmt.Sprintf("Started thread %s for PR #%d", threadLabel(th), n)
 	if cloned {
 		msg = fmt.Sprintf("Cloned %s and started thread %s for PR #%d", match, threadLabel(th), n)
