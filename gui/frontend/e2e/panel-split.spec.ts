@@ -3,8 +3,7 @@
 // Every test here fails without the feature: there is no view.panel.split, no
 // panel-split / panel-group / panel-split-divider element, and only one strip.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, invocations, invokeAs, openApp, openThreadChanges, resetMock, row, setPanelWidth } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
@@ -26,10 +25,6 @@ function region(page: Page) {
 /** The group holding the focused element, or null. */
 function focusedGroupEl(page: Page) {
   return page.evaluate(() => document.activeElement?.closest("[data-panel-group]")?.getAttribute("data-panel-group") ?? null);
-}
-
-async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
 }
 
 /** The current panel's stored entry, through the app's own store. */
@@ -77,12 +72,7 @@ function expandedWidth(page: Page): Promise<number> {
 }
 
 async function invokeSplit(): Promise<void> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name: "view.panel.split" }),
-  });
-  expect(res.ok).toBe(true);
+  expect((await invokeAs("", "view.panel.split")).ok).toBe(true);
 }
 
 /** The group whose header holds the panel's expand and toggle buttons. */

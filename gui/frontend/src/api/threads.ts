@@ -1,4 +1,3 @@
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
@@ -22,6 +21,7 @@ import {
 import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { ms } from "./timestamp";
 
 /**
  * Where the thread's Claude process is. The daemon manages it (starts it on a message,
@@ -526,11 +526,11 @@ function toThreadSetupStepView(st: ThreadSetupStep): ThreadSetupStepView[] {
       ref: st.ref,
       branch: st.branch,
       status: setupStepStatus(st.status),
-      startedAtMs: st.startedAt ? timestampMs(st.startedAt) : null,
-      endedAtMs: st.endedAt ? timestampMs(st.endedAt) : null,
+      startedAtMs: ms(st.startedAt),
+      endedAtMs: ms(st.endedAt),
       error: st.error,
       warning: st.warning,
-      refAtMs: st.refAt ? timestampMs(st.refAt) : null,
+      refAtMs: ms(st.refAt),
       existing: st.existing,
     },
   ];
@@ -542,8 +542,8 @@ export function toThreadSetupView(s: ThreadSetup | undefined): ThreadSetupView |
   if (!s || phase === null) return null;
   return {
     phase,
-    startedAtMs: s.startedAt ? timestampMs(s.startedAt) : null,
-    endedAtMs: s.endedAt ? timestampMs(s.endedAt) : null,
+    startedAtMs: ms(s.startedAt),
+    endedAtMs: ms(s.endedAt),
     steps: s.steps.flatMap(toThreadSetupStepView),
     error: s.error,
     background: s.background,
@@ -565,9 +565,9 @@ export function toThreadView(s: Thread): ThreadView {
     state: stateMap[s.state],
     status: statusMap[s.status],
     statusReason: s.statusReason,
-    statusChangedAtMs: s.statusChangedAt ? timestampMs(s.statusChangedAt) : null,
-    createdAtMs: s.createdAt ? timestampMs(s.createdAt) : null,
-    lastActivityAtMs: s.lastActivityAt ? timestampMs(s.lastActivityAt) : null,
+    statusChangedAtMs: ms(s.statusChangedAt),
+    createdAtMs: ms(s.createdAt),
+    lastActivityAtMs: ms(s.lastActivityAt),
     parentId: s.parentId,
     permissionMode: permissionMap[s.permissionMode],
     baseRef: s.baseRef,
@@ -580,15 +580,15 @@ export function toThreadView(s: Thread): ThreadView {
     pendingMove: s.pendingMove ? { projectId: s.pendingMove.projectId, workspaceId: s.pendingMove.workspaceId, worktreePath: s.pendingMove.worktreePath, branch: s.pendingMove.branch } : null,
     setup: toThreadSetupView(s.setup),
     pinned: s.pinned,
-    archivedAtMs: s.archivedAt ? timestampMs(s.archivedAt) : null,
-    snoozedUntilMs: s.snoozedUntil ? timestampMs(s.snoozedUntil) : null,
-    savedAtMs: s.savedAt ? timestampMs(s.savedAt) : null,
+    archivedAtMs: ms(s.archivedAt),
+    snoozedUntilMs: ms(s.snoozedUntil),
+    savedAtMs: ms(s.savedAt),
     effortPending: s.effortPending,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({
       slug: l.slug,
       number: l.number,
       url: l.url,
-      linkedAt: l.linkedAt ? timestampMs(l.linkedAt) : null,
+      linkedAt: ms(l.linkedAt),
     })),
     usage: s.usage.map(toUsageBucketView),
     costUsd: s.costUsd,
@@ -596,7 +596,7 @@ export function toThreadView(s: Thread): ThreadView {
     agentRuns: s.agentRuns.map(toAgentRunUsageView),
     contextTokens: Number(s.contextTokens),
     contextWindow: Number(s.contextWindow),
-    cacheExpiresAtMs: s.cacheExpiresAt ? timestampMs(s.cacheExpiresAt) : null,
+    cacheExpiresAtMs: ms(s.cacheExpiresAt),
     contextRereadUsd: s.contextRereadUsd,
     agentsRunning: s.agentsRunning,
     backgroundAgentsRunning: s.backgroundAgentsRunning,
@@ -606,12 +606,12 @@ export function toThreadView(s: Thread): ThreadView {
       taskId: b.taskId,
       description: b.description,
       command: b.command,
-      startedAtMs: b.startedAt ? timestampMs(b.startedAt) : null,
+      startedAtMs: ms(b.startedAt),
       ports: [...b.ports],
     })),
     backgroundWakePending: s.backgroundWakePending,
     retry: s.retry
-      ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: s.retry.retryAt ? timestampMs(s.retry.retryAt) : 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
+      ? { attempt: s.retry.attempt, maxRetries: s.retry.maxRetries, retryAtMs: ms(s.retry.retryAt) ?? 0, errorStatus: s.retry.errorStatus, error: s.retry.error }
       : null,
     createdBy: s.createdBy,
     createdByName: s.createdByName,
@@ -643,7 +643,7 @@ export function toThreadFlagView(f: ThreadFlag): ThreadFlagView[] {
       pluginName: f.pluginDisplayName || f.plugin,
       level,
       reason: f.reason,
-      setAtMs: f.setAt ? timestampMs(f.setAt) : null,
+      setAtMs: ms(f.setAt),
       untilSeen: f.untilSeen,
     },
   ];
@@ -662,7 +662,7 @@ export const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView 
 export function toThreadReportView(s: Thread): ThreadReportView | null {
   const status = reportStatusMap[s.reportStatus] ?? null;
   if (!status) return null;
-  return { status, summary: s.reportSummary, data: s.reportData, atMs: s.reportAt ? timestampMs(s.reportAt) : null };
+  return { status, summary: s.reportSummary, data: s.reportData, atMs: ms(s.reportAt) };
 }
 
 export function toAgentRunUsageView(r: AgentRun): AgentRunUsageView {
@@ -675,7 +675,7 @@ export function toAgentRunUsageView(r: AgentRun): AgentRunUsageView {
     background: r.background,
     status: r.status === AgentRunStatus.OPEN ? "open" : "closed",
     spawnDepth: r.spawnDepth,
-    startedAtMs: r.startedAt ? timestampMs(r.startedAt) : null,
+    startedAtMs: ms(r.startedAt),
     usage: r.usage.map(toUsageBucketView),
     costUsd: r.costUsd,
     unpriced: r.unpriced,

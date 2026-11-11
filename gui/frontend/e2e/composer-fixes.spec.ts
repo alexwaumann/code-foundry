@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { composeProject, openApp, resetMock } from "./fixtures";
 
 /**
@@ -8,10 +8,6 @@ import { composeProject, openApp, resetMock } from "./fixtures";
  * Save as workspace in a workspace folder, the like headings and labels, a like draft whose
  * thread is removed, the menus' and palette's rules, deduped hints, the header chip.
  */
-
-async function composeIn(page: Page, n: number): Promise<void> {
-  await composeProject(page, n);
-}
 
 test.beforeEach(async () => {
   await resetMock();
@@ -32,7 +28,7 @@ test.beforeEach(async () => {
 
 test("16: cmd+N from a new-thread composer's prompt opens the project picker", async ({ page }) => {
   await openApp(page);
-  await composeIn(page, 1);
+  await composeProject(page, 1);
   await page.keyboard.press("Meta+n");
   await expect(page.getByTestId("palette")).toHaveAttribute("data-mode", "projects");
 });

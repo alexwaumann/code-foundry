@@ -109,12 +109,15 @@
   /** The switch: the model downloads first when it is not on disk (dictation turns on when it lands). */
   function Dictation({ onOn }: { onOn: () => void }) {
     const [snap, setSnap] = useState<any>(null);
+    const [on, setOn] = useState(false);
     const [note, setNote] = useState("");
     const { text, clear, say } = useProblem();
     const refresh = () => cf.run("dictation.status", {}).then((r) => setSnap(r.json)).catch(() => setSnap({}));
-    useEffect(() => { refresh(); const id = setInterval(refresh, 5000); return () => clearInterval(id); }, []);
-    const on = !!snap?.enabled;
+    useEffect(() => { refresh(); }, []);
+    useEffect(() => cf.on("settings", (s: any) => setOn(s?.values?.["dictation.enabled"] === "true"), () => {}), []);
     const downloading = !!snap?.model?.download;
+    // A download's progress has no live source: look again while one runs.
+    useEffect(() => { if (!downloading) return; const id = setTimeout(refresh, 2000); return () => clearTimeout(id); }, [snap]);
     const toggle = (next: boolean) => {
       clear();
       if (next && !snap?.model?.downloaded) {

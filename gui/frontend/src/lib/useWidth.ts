@@ -1,6 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
-/** The client height of `ref`'s element, kept current as useWidth does its width; `initial` until the first measure, and for a hidden element. */
+/**
+ * The client height of `ref`'s element, kept current as useWidth does its width; `initial`
+ * until the first measure, and for a hidden element. Layout px under the page zoom
+ * (lib/zoom.ts): an element's client box is laid out under it.
+ */
 export function useHeight(ref: React.RefObject<HTMLDivElement | null>, initial = 800): number {
   const [height, setHeight] = useState(initial);
   useLayoutEffect(() => {

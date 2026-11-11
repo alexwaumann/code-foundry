@@ -397,14 +397,6 @@ func (m *Manager) removeThreads(ctx context.Context, name string, logs *logBuffe
 	return removed
 }
 
-// threadsWords is "its N thread(s)", for messages.
-func threadsWords(n int) string {
-	if n == 1 {
-		return "its 1 thread"
-	}
-	return fmt.Sprintf("its %d threads", n)
-}
-
 // ownedNodeProblems are a view's thread and terminal nodes that name another owner's
 // thread or terminal. An id the host does not know passes (the GUI shows it gone).
 func (a *actor) ownedNodeProblems(v *ui.View) []string {

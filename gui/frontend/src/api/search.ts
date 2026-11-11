@@ -3,7 +3,6 @@
  * mapped to view models for the search dialog (docs/notes/search-6-agent-gui.md).
  * Generated types stay in this file.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   AgentSearchStepKind,
   SearchMode,
@@ -20,6 +19,7 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { isNotFound } from "./errors";
 import { HEARTBEAT, type Heartbeat } from "./stream";
 import type { SearchSpeakerView } from "./threadSearch";
+import { ms } from "./timestamp";
 
 export type SearchStatusView = "running" | "done" | "failed" | "stopped";
 export type SearchModeView = "agent" | "find";
@@ -133,7 +133,7 @@ export function toAgentHitView(h: AgentSearchHit): AgentHitView {
     itemId: h.itemId,
     ordinal: Number(h.ordinal),
     speaker: speakers[h.speaker],
-    itemAtMs: h.itemCreatedAt ? timestampMs(h.itemCreatedAt) : null,
+    itemAtMs: ms(h.itemCreatedAt),
     quote: h.quote,
     why: h.why,
     opened: h.opened,
@@ -149,8 +149,8 @@ export function toSearchEntryView(e: SearchEntry): SearchEntryView {
     id: e.id,
     mode: e.mode === SearchMode.FIND ? "find" : "agent",
     query: e.query,
-    createdAtMs: e.createdAt ? timestampMs(e.createdAt) : 0,
-    finishedAtMs: e.finishedAt ? timestampMs(e.finishedAt) : null,
+    createdAtMs: ms(e.createdAt) ?? 0,
+    finishedAtMs: ms(e.finishedAt),
     status: e.mode === SearchMode.FIND ? "done" : statuses[e.status],
     error: e.error,
     answer: e.answer,
@@ -191,7 +191,7 @@ export function toSearchWatchEventView(ev: SearchWatchEvent): SearchWatchEventVi
         version,
         status: statuses[s.status],
         error: s.error,
-        finishedAtMs: s.finishedAt ? timestampMs(s.finishedAt) : null,
+        finishedAtMs: ms(s.finishedAt),
         costUsd: s.costUsd,
         durationMs: Number(s.durationMs),
         unseen: s.unseen,

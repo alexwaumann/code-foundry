@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
@@ -120,14 +121,15 @@ func memberRef(w Workspace, projects *project.Snapshot, ref string) (string, err
 }
 
 // Within reports whether path is root or inside it, comparing both the cleaned paths
-// and their symlink-resolved forms (/tmp and /private/tmp are the same place).
+// and their symlink-resolved forms (/tmp and /private/tmp are the same place), in any
+// case as APFS does (fsx.Within).
 func Within(path, root string) bool {
 	if path == "" || root == "" {
 		return false
 	}
 	for _, p := range []string{filepath.Clean(path), realPath(path)} {
 		for _, r := range []string{filepath.Clean(root), realPath(root)} {
-			if p == r || strings.HasPrefix(p, strings.TrimSuffix(r, "/")+"/") {
+			if fsx.Within(r, p) {
 				return true
 			}
 		}

@@ -9,7 +9,7 @@ versioning, the update state machine, the commands and the GUI surfaces are unch
 
 ## Why
 
-Managed Macs block unsigned `.app` bundles. Alex's coworkers' MDM has an "Any macOS
+Managed Macs block unsigned `.app` bundles. Some users' MDM has an "Any macOS
 Bundle" rule. The same MDM allows bare Mach-O executables, and the Wails GUI runs fine as
 one (checked before this change with `make gui-bin`). So the app is no longer a bundle.
 There is one layout, with no bundle path kept alongside it.
@@ -349,8 +349,8 @@ No Info.plist, `ditto`, `wails3 package` or `create:app:bundle` is involved any 
   requires `CodeFoundry` in the archive, so the in-app update and `code-foundry update`
   fail with "the archive has no CodeFoundry executable". Run the install one-liner, quit
   the old GUI (its relaunch would exec the removed `CodeFoundry`), then run
-  `code-foundry daemon restart` and `code-foundry gui`. No compatibility shim: Alex is the
-  only user.
+  `code-foundry daemon restart` and `code-foundry gui`. No compatibility shim: the app had
+  no other users yet.
 
 ## Left for a follow-up
 

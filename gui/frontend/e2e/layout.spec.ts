@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, openApp, resetMock, row } from "./fixtures";
+import { composeProject, openApp, resetMock, row, setZoom } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -89,16 +89,15 @@ test("the app name and the history buttons fit whole at the minimum sidebar widt
   await openApp(page);
   const title = page.getByTestId("sidebar-app-name");
   const setWidth = (w: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
-  const setZoom = (z: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
   const fits = () => title.evaluate((el) => el.scrollWidth <= el.clientWidth);
   await setWidth(260);
   await expect.poll(async () => (await box(page, "sidebar")).width).toBe(260);
   expect(await fits()).toBe(true);
   // Zoomed out, the gutter is wider in layout px (80 screen px over 0.9): the tightest case.
-  await setZoom(90);
+  await setZoom(page, 90);
   await expect(page.locator("html")).toHaveAttribute("data-zoom", "90");
   expect(await fits()).toBe(true);
-  await setZoom(150);
+  await setZoom(page, 150);
   await expect(page.locator("html")).toHaveAttribute("data-zoom", "150");
   expect(await fits()).toBe(true);
   await expect(title).toBeVisible();

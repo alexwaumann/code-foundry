@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/command"
 )
 
 // Install identity (docs/notes/plugins-8-secrets-hardening.md). A plugin's consent, its
@@ -111,7 +113,7 @@ type takeover struct {
 func (t *takeover) inherits() string {
 	w := t.what
 	if t.threads > 0 {
-		w = append(slices.Clone(w), threadsWords(t.threads))
+		w = append(slices.Clone(w), command.ThreadsWords(t.threads))
 	}
 	return andList(w)
 }
@@ -123,7 +125,7 @@ func (t *takeover) done() string {
 		w = append(w, "deleted "+andList(t.what))
 	}
 	if len(t.removed) > 0 {
-		w = append(w, "removed "+threadsWords(len(t.removed)))
+		w = append(w, "removed "+command.ThreadsWords(len(t.removed)))
 	}
 	if len(w) == 0 {
 		return "nothing to delete"
@@ -252,9 +254,9 @@ func takeoverConsent(name string, t *takeover) string {
 	s := fmt.Sprintf("\nIt replaces the plugin %s from %s: ", name, originWords(t.from))
 	switch {
 	case len(t.what) > 0 && t.threads > 0:
-		return s + andList(t.what) + " will be deleted, and it removes " + threadsWords(t.threads) + "."
+		return s + andList(t.what) + " will be deleted, and it removes " + command.ThreadsWords(t.threads) + "."
 	case t.threads > 0:
-		return s + "it removes " + threadsWords(t.threads) + "."
+		return s + "it removes " + command.ThreadsWords(t.threads) + "."
 	}
 	return s + andList(t.what) + " will be deleted."
 }

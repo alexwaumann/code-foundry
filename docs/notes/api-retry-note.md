@@ -1,7 +1,7 @@
 # API retry note
 
 Status: built on branch `t3code/pre-release-readiness-checklist` (2026-10-13), from the
-pre-release review: coworkers share a 200k tokens/min/model limit over Bedrock, so a
+pre-release review: users who share a Bedrock account share a 200k tokens/min/model limit, so a
 fleet of threads will 429 more often than the TUI did, and a thread waiting on a retry
 showed only "Working" with no output.
 

@@ -1,5 +1,5 @@
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import type { Workspace, WorkspaceEvent } from "@/gen/codefoundry/v1/workspace_pb";
+import { ms } from "./timestamp";
 
 /**
  * A member of a workspace: a project. A workspace has no worktrees since the reshape
@@ -56,7 +56,7 @@ export function toWorkspaceView(w: Workspace): WorkspaceView {
     managedDir: w.managedDir,
     instructions: w.instructions,
     skills: [...w.skills],
-    createdAtMs: w.createdAt ? timestampMs(w.createdAt) : null,
+    createdAtMs: ms(w.createdAt),
   };
 }
 

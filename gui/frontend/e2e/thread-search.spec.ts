@@ -98,6 +98,8 @@ test("a long list keeps the selected row on screen, past the fold and when it wr
   await mockPost("threads?project=repo-cf&count=30&status=idle&prefix=Fingerprint");
   await openApp(page);
   await page.keyboard.press("Meta+Shift+F");
+  // Tab switches the mode only once the field has the keyboard.
+  await expect(input(page)).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(dialog(page)).toHaveAttribute("data-mode", "find");
   await page.keyboard.type("fingerprint");

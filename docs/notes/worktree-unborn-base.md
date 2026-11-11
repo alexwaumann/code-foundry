@@ -1,6 +1,6 @@
 # Worktree from an unborn branch
 
-A coworker's `git init` folder (no commit yet) failed `thread.new` with a new
+A user's `git init` folder (no commit yet) failed `thread.new` with a new
 worktree: `git worktree add --no-track -b cf/... <path> main` → `fatal: invalid
 reference: main`. Nothing hardcodes main or master on that path: `defaultBranch`
 (no origin) returns the branch the main checkout's HEAD names, unborn included, and

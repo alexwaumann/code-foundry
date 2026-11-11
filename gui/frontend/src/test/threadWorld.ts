@@ -2,95 +2,17 @@
  * The mock daemon's scripted s-r1 "Fix stale PR badge" (mock/thread.ts load) as view models,
  * for component tests of the timeline and the composer: turn 1 (reads, greps, a question, a
  * failing test, the Edit, a code-reviewer subagent, the markdown answer), and turn 2 per
- * state. Times are relative to `now` the way the mock's `ago(min, sec)` is. It does not
- * import mock/: when the script changes, change this copy with it.
+ * state. Times are relative to `now` the way the mock's `ago(min, sec)` is. The script's text
+ * comes from mock/threadScript.ts; when the script's items change, change these with them.
  */
 import type { ThreadItemView, ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { buildRows, buildTurns, decodeTimelineKey, timelineKey, type TimelineRow } from "@/lib/threadTimeline";
 import { structOf, useThreadStore } from "@/stores/thread";
+import { ANSWER, ANSWER_STREAMING, EDIT_NEW, EDIT_OLD, EDIT_PATCH, FAIL_OUTPUT, GREP_OUTPUT, MOCK_ATTACHMENT as ATTACHMENT, PUSH, QUESTIONS } from "../../mock/threadScript";
+
+export { ANSWER, ANSWER_STREAMING };
 
 export const CF = "/Users/dev/src/code-foundry";
-const ATTACHMENT = "/mock/attachments/pr-badge-stale.png";
-const PUSH = "git push --force-with-lease origin cf/pr-badge-stale";
-
-const GREP_OUTPUT =
-  'internal/store/pr/gh/query.graphql:23:      headRefOid\ninternal/store/pr/model.go:31:\tHeadRefOid     string\ninternal/store/pr/decode.go:58:\tpr.HeadRefOid = n.HeadRefOid\ninternal/store/pr/decode_test.go:72:\tHeadRefOid: "9f3c2e1",\ninternal/store/linkedpr/sync.go:104:\tif old.HeadRefOid != pr.HeadRefOid {';
-const FAIL_OUTPUT =
-  "Exit code 1\n--- FAIL: TestFingerprintChangesOnForcePush (0.00s)\n    fingerprint_test.go:41: fingerprint unchanged after the head moved\n        got:  {CheckCount:3 ReviewState:APPROVED}\n        want: a different fingerprint\nFAIL\nFAIL\tgithub.com/alexwaumann/code-foundry/internal/store/pr\t0.412s";
-
-const ANSWER_HEAD = `## Fixed: stale badge after a force-push
-
-The poller compared only \`CheckCount\` and \`ReviewState\`, so a force-push that kept the same checks looked unchanged and the badge never refreshed. The fingerprint now includes the head SHA, which the batched GraphQL query already returns, so **no extra API calls**.
-
-### What changed
-
-- \`Fingerprint\` carries \`HeadOid\` ([internal/store/pr/fingerprint.go](https://github.com/alexwaumann/code-foundry/blob/main/internal/store/pr/fingerprint.go)).
-- \`fingerprintOf\` fills it from \`pr.HeadRefOid\`.
-- New test \`TestFingerprintChangesOnForcePush\`; the reviewer subagent found nothing else.
-
-| Case | Before | After |
-| --- | --- | --- |
-| New commit, same checks | skipped | refreshed |
-| Force-push, same checks | skipped | refreshed |
-| Nothing changed | skipped | skipped |
-
-`;
-const GO_BLOCK = "```go\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.ReviewDecision,\n\t\tHeadOid:     pr.HeadRefOid, // moves on every push\n\t}\n}\n```\n\n";
-export const ANSWER = `${ANSWER_HEAD}${GO_BLOCK}Tests: \`go test ./internal/store/pr/\` passes. I have not pushed.`;
-export const ANSWER_STREAMING = `${ANSWER_HEAD}\`\`\`go\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.Revi`;
-
-const EDIT_OLD = "type Fingerprint struct {\n\tCheckCount  int\n\tReviewState string\n}\n\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{CheckCount: len(pr.Checks), ReviewState: pr.ReviewDecision}\n}";
-const EDIT_NEW =
-  "type Fingerprint struct {\n\tCheckCount  int\n\tReviewState string\n\tHeadOid     string // moves on every push, force-pushes included\n}\n\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.ReviewDecision,\n\t\tHeadOid:     pr.HeadRefOid,\n\t}\n}";
-const EDIT_PATCH = [
-  {
-    oldStart: 18,
-    oldLines: 9,
-    newStart: 18,
-    newLines: 14,
-    lines: [
-      " // Fingerprint is what the poller compares between two polls of a pull request.",
-      " type Fingerprint struct {",
-      " \tCheckCount  int",
-      " \tReviewState string",
-      "+\tHeadOid     string // moves on every push, force-pushes included",
-      " }",
-      " ",
-      " func fingerprintOf(pr PullRequest) Fingerprint {",
-      "-\treturn Fingerprint{CheckCount: len(pr.Checks), ReviewState: pr.ReviewDecision}",
-      "+\treturn Fingerprint{",
-      "+\t\tCheckCount:  len(pr.Checks),",
-      "+\t\tReviewState: pr.ReviewDecision,",
-      "+\t\tHeadOid:     pr.HeadRefOid,",
-      "+\t}",
-      " }",
-    ],
-  },
-];
-
-const QUESTIONS = {
-  questions: [
-    {
-      question: "The branch was rebased onto main, so a plain push will be rejected. How should I push?",
-      header: "Push",
-      multiSelect: false,
-      options: [
-        { label: "Force with lease (Recommended)", description: "Overwrites the remote branch only if nobody else pushed to it" },
-        { label: "Push to a new branch", description: "cf/pr-badge-stale-2, then retarget PR #63" },
-        { label: "Don't push", description: "Leave the commits local" },
-      ],
-    },
-    {
-      question: "Should I also update the PR description?",
-      header: "PR text",
-      multiSelect: false,
-      options: [
-        { label: "Yes", description: "Mention the fingerprint change" },
-        { label: "No", description: "" },
-      ],
-    },
-  ],
-};
 
 export function request(over: Partial<ThreadRequestView>): ThreadRequestView {
   return {

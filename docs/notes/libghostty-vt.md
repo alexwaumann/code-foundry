@@ -46,7 +46,7 @@ Working demo: `libghostty-vt-demo.go.txt` next to this file.
 ## Vendoring tried and reverted (2026-10-09)
 
 PR #6 committed the prebuilt, stripped `libghostty-vt.a` so a clone could build without
-zig or codeberg (ghostty's zig dependencies live there, blocked on Alex's work network).
+zig or codeberg (ghostty's zig dependencies live there, blocked on some managed networks).
 It was reverted the same day once the app shipped as bare binaries, which removed the
 need to build on that machine. Two things learned there still apply:
 

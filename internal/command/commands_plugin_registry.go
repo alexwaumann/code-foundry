@@ -143,7 +143,7 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 					msg += " (removed " + res.Msg.GetRemoved() + ")"
 				}
 				if ids := res.Msg.GetRemovedThreadIds(); len(ids) > 0 {
-					msg += "\nremoved " + threadsWords(len(ids)) + ": " + strings.Join(ids, ", ")
+					msg += "\nremoved " + ThreadsWords(len(ids)) + ": " + strings.Join(ids, ", ")
 				}
 				if p := res.Msg.GetPurged(); len(p) > 0 {
 					msg += "\ndeleted " + strings.Join(p, ", ")
@@ -159,11 +159,11 @@ func RegisterPluginRegistry(r *Registry, b PluginRegistryBackend, threads Plugin
 func uninstallConfirm(name string, purge bool, n int) string {
 	switch {
 	case purge && n > 0:
-		return "Uninstall plugin " + name + "? It removes " + threadsWords(n) + " and deletes its data, its secrets in the Keychain, its logs and the consent given."
+		return "Uninstall plugin " + name + "? It removes " + ThreadsWords(n) + " and deletes its data, its secrets in the Keychain, its logs and the consent given."
 	case purge:
 		return "Uninstall plugin " + name + " and delete its data, its secrets in the Keychain, its logs and the consent given?"
 	case n > 0:
-		return "Uninstall plugin " + name + "? It removes " + threadsWords(n) + "; its data, secrets and consent stay (--purge deletes them)."
+		return "Uninstall plugin " + name + "? It removes " + ThreadsWords(n) + "; its data, secrets and consent stay (--purge deletes them)."
 	}
 	return "Uninstall plugin " + name + "? Its data, secrets and consent stay (--purge deletes them)."
 }
@@ -181,8 +181,8 @@ func pluginThreadCount(ctx context.Context, threads PluginThreadLister, name str
 	return len(res.Msg.GetThreads())
 }
 
-// threadsWords is "its N thread(s)".
-func threadsWords(n int) string {
+// ThreadsWords is "its N thread(s)", for messages about a plugin's threads.
+func ThreadsWords(n int) string {
 	if n == 1 {
 		return "its 1 thread"
 	}

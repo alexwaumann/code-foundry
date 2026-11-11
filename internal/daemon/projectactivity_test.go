@@ -125,11 +125,9 @@ func TestProjectActivity(t *testing.T) {
 	waitCalls("live /w/a", "live ")
 
 	// Items: an edit's result is a debounced touch, a turn end an immediate one; a
-	// thread without a project and an unknown thread touch nothing.
-	snap.Store(&thread.Snapshot{Threads: []thread.Thread{
-		{ID: "t1", ProjectID: "p", WorktreePath: "/w/a"},
-		{ID: "t2", WorktreePath: "/Users/me"},
-	}})
+	// thread without a project and an unknown thread touch nothing. The live set stays
+	// as published: a list event can still be queued, and its resync reads this snapshot.
+	snap.Store(&thread.Snapshot{Threads: []thread.Thread{th, {ID: "t2", WorktreePath: "/Users/me"}}})
 	edit := thread.Item{Kind: thread.KindToolCall, Tool: &thread.ToolCall{Name: "Edit", Status: thread.ToolDone}}
 	bus.Publish[thread.ThreadEvent](b, thread.ItemUpdated{ThreadID: "t2", Item: edit})
 	bus.Publish[thread.ThreadEvent](b, thread.ItemUpdated{ThreadID: "gone", Item: edit})

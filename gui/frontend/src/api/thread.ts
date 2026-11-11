@@ -6,7 +6,7 @@
  * thread's seq. The EventService `thread` source carries only pending requests (a
  * pending_snapshot, then a pending event per change), for badges without a Watch.
  */
-import { timestampDate, timestampMs } from "@bufbuild/protobuf/wkt";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
   MessageOrigin,
   ThreadItemDelta_Field,
@@ -27,6 +27,7 @@ import { toMcpStatusView, type McpStatusView } from "./mcp";
 import { toSlashCommandViews, type SlashCommandView } from "./slashCommands";
 import { toUserThemeFile } from "./theme";
 import type { UserThemeFile } from "@/themes";
+import { ms } from "./timestamp";
 
 export type ToolStatusView = "running" | "done" | "error" | "unknown";
 export type RequestStateView = "pending" | "allowed" | "denied" | "cancelled" | "unknown";
@@ -261,8 +262,8 @@ export function toThreadItemView(it: ThreadItem): ThreadItemView | null {
     id: it.id,
     ordinal: Number(it.ordinal),
     parentToolUseId: it.parentToolUseId,
-    createdAtMs: it.createdAt ? timestampMs(it.createdAt) : null,
-    updatedAtMs: it.updatedAt ? timestampMs(it.updatedAt) : null,
+    createdAtMs: ms(it.createdAt),
+    updatedAtMs: ms(it.updatedAt),
     streaming: it.streaming,
     ...(it.placedAfter > 0n ? { placedAfter: Number(it.placedAfter) } : {}),
   };

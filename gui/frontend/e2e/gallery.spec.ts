@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invokeAs, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The Gallery tab (docs/notes/gallery-surface.md): what only a browser shows. Which tiles,
@@ -23,12 +22,7 @@ async function show(page: Page, images: { path: string; caption?: string }[]): P
 
 /** The same call with the keyboard left where it is. */
 async function reopen(page: Page, images: { path: string; caption?: string }[]): Promise<void> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name: "view.panel.gallery", args: { title: "Shots", images: JSON.stringify(images) }, context: { activeThreadId: "s-1" } }),
-  });
-  expect(res.ok).toBe(true);
+  expect((await invokeAs("s-1", "view.panel.gallery", { title: "Shots", images: JSON.stringify(images) })).ok).toBe(true);
   await expect(tiles(page).first()).toBeVisible();
 }
 

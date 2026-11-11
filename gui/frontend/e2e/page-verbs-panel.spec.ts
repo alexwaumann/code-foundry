@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { CF, invocations, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { CF, invocations, invokeAs, openApp, resetMock, row } from "./fixtures";
 
 /**
  * view.panel.page (docs/notes/page-verbs.md): thread s-1 opens an HTML page in its own side
@@ -15,13 +14,8 @@ const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
 const inner = (page: Page) => page.frameLocator('[data-testid="file-html-frame"]');
 
 /** Runs a command as the CLI (or a page's bridge) inside thread s-1 would: no active view. */
-async function inS1(name: string, args: Record<string, string>): Promise<{ ok: boolean; message: string }> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name, args, context: { activeThreadId: "s-1" } }),
-  });
-  return { ok: res.ok, message: ((await res.json()) as { message?: string }).message ?? "" };
+function inS1(name: string, args: Record<string, string>): Promise<{ ok: boolean; message: string }> {
+  return invokeAs("s-1", name, args);
 }
 
 const shots = process.env.SHOTS;

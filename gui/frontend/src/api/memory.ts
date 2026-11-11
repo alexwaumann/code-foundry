@@ -5,7 +5,6 @@
  * snapshots); remembering and forgetting are the memory.* commands. The only file that
  * uses the generated memory types.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   MemoryService,
   type MemoryEntry,
@@ -14,6 +13,7 @@ import {
 } from "@/gen/codefoundry/v1/memory_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { isNotFound } from "./errors";
+import { ms } from "./timestamp";
 
 /** Who added an entry: a thread (and its name then), or the user. */
 export type MemoryOriginView =
@@ -73,7 +73,7 @@ function toEntry(e: MemoryEntry): MemoryEntryView {
     id: e.id || e.file.replace(/\.md$/i, ""),
     index: e.index,
     text: e.text,
-    createdMs: e.created ? timestampMs(e.created) : null,
+    createdMs: ms(e.created),
     origin: e.threadId ? { kind: "thread", threadId: e.threadId, threadName: e.threadName } : { kind: "user" },
     injected: e.injected,
     leftOut: toLeftOut(e.leftOut, e.injected),

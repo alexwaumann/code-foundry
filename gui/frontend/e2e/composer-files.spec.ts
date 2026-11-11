@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { composeProject, freshCopyByDefault, invocations, mockPost, mockUrl, openApp, resetMock, setZoom } from "./fixtures";
 
 // `@` file completion against the mock's SearchFiles (mock/filesystem.ts): each test sets
 // the projects' files with POST /__mock/files; the mock ranks like internal/fuzzy (tier,
@@ -18,11 +18,6 @@ test.beforeEach(async () => {
   // files (composer-threads.spec.ts covers that group): archived, it is not offered.
   await mockPost("thread/archive?id=s-5");
 });
-
-/** cmd+n, then the nth project row of the picker: that project's composer. */
-async function compose(page: Page, n = 1): Promise<void> {
-  await composeProject(page, n);
-}
 
 /** The prompt as the draft stores it (tags as tokens). */
 const value = (page: Page) => page.getByTestId("composer-prompt");
@@ -58,7 +53,6 @@ async function composerBoxes(page: Page): Promise<{ composer: Box; row: Box }> {
   return { composer: await boxOf(page, "composer-card"), row: await boxOf(page, "composer-worktree-row") };
 }
 
-const setZoom = (page: Page, z: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(z)}))`);
 
 /** The list's height in layout px and how many rows it shows whole. */
 function listFit(page: Page) {
@@ -79,7 +73,7 @@ const MANY = Array.from({ length: 20 }, (_, i) => `src/f${String(i + 1).padStart
 
 test("type @thr: file rows; Enter inserts the base name and a space without sending; send gets @cf-file://", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("@thr");
   await expect(card(page)).toBeVisible();
   // One project: no heading. Daemon order (tier, then shorter path); a directory ends with "/".
@@ -116,7 +110,7 @@ test("type @thr: file rows; Enter inserts the base name and a space without send
 
 test("Escape leaves the text; no matches says so; a click inserts a directory; Tab inserts", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("@thr");
   await expect(rows(page)).toHaveCount(4);
   await page.keyboard.press("Escape");
@@ -152,7 +146,7 @@ test("a second project: files grouped by project, the primary first; tooltips na
   await setFiles("repo-cf", ["internal/api/thread.go", "README.md"]);
   await setFiles("repo-sk", ["internal/api/thread.go", "sketch.md"]);
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await page.keyboard.press("Escape");
@@ -206,7 +200,7 @@ for (const zoom of [100, 125, 150]) {
     await openApp(page);
     await setZoom(page, zoom);
     await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));
-    await compose(page);
+    await composeProject(page);
     const before = await composerBoxes(page);
     await page.keyboard.type("@src");
     await expect(rows(page)).toHaveCount(21);
@@ -255,7 +249,7 @@ test("a short window shows fewer rows; a taller one all eight; a very short one 
   // A fresh copy: no collision banner (s-1 runs in code-foundry's folder) taking the short window's room.
   await freshCopyByDefault();
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   const before = await composerBoxes(page);
   await page.keyboard.type("@src");
   await expect(rows(page)).toHaveCount(21);

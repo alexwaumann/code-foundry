@@ -1,4 +1,3 @@
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   CleanupKind,
   ProjectService,
@@ -9,6 +8,7 @@ import {
 } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { ms } from "./timestamp";
 
 export interface GitStatusView {
   upstream: string;
@@ -125,7 +125,7 @@ export function toGitStatusView(s: GitStatus | undefined): GitStatusView {
     untracked: s.untracked,
     conflicted: s.conflicted,
     dirty: s.dirty,
-    refreshedAtMs: s.refreshedAt ? timestampMs(s.refreshedAt) : null,
+    refreshedAtMs: ms(s.refreshedAt),
     baseRef: s.baseRef,
     baseAhead: s.baseAhead,
     baseBehind: s.baseBehind,

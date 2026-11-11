@@ -1,4 +1,3 @@
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import {
   TerminalService,
   TerminalState,
@@ -8,6 +7,7 @@ import {
 } from "@/gen/codefoundry/v1/terminal_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
+import { ms } from "./timestamp";
 
 export type TerminalStateView = "running" | "exited" | "unknown";
 
@@ -51,8 +51,8 @@ export function toTerminalView(t: Terminal): TerminalView {
     title: t.title,
     state: stateMap[t.state],
     exitCode: t.exitCode,
-    startedAtMs: t.startedAt ? timestampMs(t.startedAt) : null,
-    exitedAtMs: t.exitedAt ? timestampMs(t.exitedAt) : null,
+    startedAtMs: ms(t.startedAt),
+    exitedAtMs: ms(t.exitedAt),
     altScreen: t.altScreen,
     labels: { ...t.labels },
   };

@@ -1,8 +1,8 @@
 import { create } from "@bufbuild/protobuf";
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { DiffSourceKind, DiffSourceSchema, ProjectService, type CompareWorktreeResponse, type DiffSource, type FileVersion, type GetWorktreeCompareFileResponse, type ListCompareCommitsResponse, type ResolvedDiffSource } from "@/gen/codefoundry/v1/project_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
+import { ms } from "./timestamp";
 
 /**
  * One side of a comparison: the merge base with the checkout's base ref (what the branch
@@ -163,7 +163,7 @@ export async function compareWorktree(t: CompareTarget, paths: readonly string[]
 
 export function toCompareLog(r: ListCompareCommitsResponse): CompareLogView {
   return {
-    commits: r.commits.map((c) => ({ sha: c.sha, shortSha: c.shortSha, parent: c.parent, subject: c.subject, authoredAtMs: c.authoredAt ? timestampMs(c.authoredAt) : null, shallow: c.shallow })),
+    commits: r.commits.map((c) => ({ sha: c.sha, shortSha: c.shortSha, parent: c.parent, subject: c.subject, authoredAtMs: ms(c.authoredAt), shallow: c.shallow })),
     total: r.total,
     error: r.error,
   };

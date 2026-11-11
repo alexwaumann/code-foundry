@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { composeProject, invocations, leaveSidebar, mockPost, mockUrl, openApp, openStreams, resetMock, row, testPdf } from "./fixtures";
+import { composeProject, invocations, leaveSidebar, mockPost, openApp, openStreams, resetMock, row, testPdf, threadCalls } from "./fixtures";
 
 /**
  * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
@@ -56,11 +56,6 @@ async function wheelUpTo(page: Page, target: Locator): Promise<void> {
     await page.mouse.wheel(0, -200);
     await page.waitForTimeout(50);
   }
-}
-
-async function calls(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/thread/calls`);
-  return (await res.json()) as string[];
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -504,7 +499,7 @@ test("a follow-up goes through thread.send with the composer's tags projected; t
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("thread-composer").getByTestId("prompt-tag")).toHaveText("/review");
   await page.keyboard.press("Enter");
-  await expect.poll(calls).toContain("send s-r1 Ship it with /review");
+  await expect.poll(threadCalls).toContain("send s-r1 Ship it with /review");
   const send = (await invocations()).find((i) => i.name === "thread.send");
   expect(send?.args).toMatchObject({ id: "s-r1", text: "Ship it with /review" });
   expect(send?.args["composer-text"]).toMatch(/^Ship it with \[\/review\]\(cf-skill:\/\/[\w.~-]+\/review\)$/);
@@ -530,7 +525,7 @@ test("the prompt is focused again after a send from the Send button", async ({ p
   await editor.click();
   await page.keyboard.type("And the tests");
   await page.getByTestId("thread-send").click();
-  await expect.poll(calls).toContain("send s-r1 And the tests");
+  await expect.poll(threadCalls).toContain("send s-r1 And the tests");
   await expect(page.getByTestId("composer-prompt")).toHaveAttribute("data-value", "");
   await expect(editor).toBeFocused();
   // Typing goes straight into the prompt.

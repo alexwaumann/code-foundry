@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockUrl, openApp, resetMock, row } from "./fixtures";
+import { openHelloDemo, pluginActs, resetMock } from "./fixtures";
 
 /**
  * Plugin tables in a real browser (docs/notes/plugin-table.md) against the mock's hello
@@ -14,19 +14,9 @@ const surface = (page: Page) => page.getByTestId("plugin-surface");
 const builds = (page: Page) => surface(page).locator('[data-testid="plugin-table"][data-key="builds"]');
 const box = (page: Page) => builds(page).getByTestId("plugin-table-box");
 
-async function acts(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/plugin/acts`);
-  return (await res.json()) as string[];
-}
-
 /** Thread s-3 selected, its panel showing the hello demo's Runs tab, the Builds table in view. */
 async function openRuns(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await surface(page).getByRole("tab", { name: "Runs" }).click();
   await builds(page).scrollIntoViewIfNeeded();
 }
@@ -77,7 +67,7 @@ test("a header click comes back from the plugin sorted, its arrow on the column"
   await builds(page).getByRole("button", { name: "Sort by Duration" }).click();
   await expect(first()).toHaveAttribute("data-key", "b-1285");
   await expect(builds(page).getByRole("button", { name: "Duration, sorted descending" })).toBeVisible();
-  await expect.poll(async () => (await acts()).some((a) => a.includes(" b-dur ") && a.includes("value=desc"))).toBe(true);
+  await expect.poll(async () => (await pluginActs()).some((a) => a.includes(" b-dur ") && a.includes("value=desc"))).toBe(true);
 });
 
 /** Waits until no finite animation runs (a menu's fade-in), so a screenshot shows it settled. */

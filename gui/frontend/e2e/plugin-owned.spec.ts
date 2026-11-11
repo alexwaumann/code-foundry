@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTerminalText, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { expectTerminalText, openHelloDemo, pluginActs, resetMock, row } from "./fixtures";
 
 /**
  * A plugin's own thread and terminal in its surface (docs/notes/plugins-6-thread-terminal.md)
@@ -11,19 +11,9 @@ const surface = (page: Page) => page.getByTestId("plugin-surface");
 const tab = (page: Page, key: string) => surface(page).locator(`[data-testid="plugin-tab"][data-key="${key}"]`);
 const button = (page: Page, key: string) => surface(page).locator(`[data-testid="plugin-button"][data-key="${key}"]`);
 
-async function acts(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/plugin/acts`);
-  return (await res.json()) as string[];
-}
-
 /** Thread s-3 selected, its panel showing the hello demo on a tab. */
 async function openDemoTab(page: Page, key: string): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await tab(page, key).click();
   await expect(tab(page, key)).toHaveAttribute("aria-selected", "true");
 }
@@ -44,7 +34,7 @@ test("the Assistant tab shows the plugin's thread inline with its composer; it i
 
   // Send hello reaches the plugin, which sends to its own thread: the reply streams in here.
   await button(page, "send-hello").click();
-  await expect.poll(async () => (await acts()).some((a) => a.includes(" send-hello "))).toBe(true);
+  await expect.poll(async () => (await pluginActs()).some((a) => a.includes(" send-hello "))).toBe(true);
   await expect(thread.getByTestId("thread-timeline").getByText("say hello in one line")).toHaveCount(2);
 
   // Typing in the inline composer sends to the plugin's thread.

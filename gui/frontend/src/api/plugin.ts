@@ -9,7 +9,6 @@
  * short enum strings, empty fields left out, an Inline that is plain text as a bare
  * string, and a node as `{key, <kind>: {…}}`.
  */
-import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { fromJsonString, type JsonObject } from "@bufbuild/protobuf";
 import {
   PluginIndexRelation,
@@ -35,6 +34,7 @@ import type { BarsData, StatsData } from "./pluginCharts";
 import type { TableData } from "./pluginTable";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
+import { ms } from "./timestamp";
 
 // ---------------------------------------------------------------------------------------
 // The view model (pluginsdk/ui)
@@ -764,18 +764,18 @@ export function toPluginView(p: Plugin): PluginView {
     issues: [...p.issues],
     permissions: toPermissions(p.permissions),
     granted: p.granted ? toPermissions(p.granted) : null,
-    consentedAtMs: p.consentedAt ? timestampMs(p.consentedAt) : null,
+    consentedAtMs: ms(p.consentedAt),
     needsConsent: p.needsConsent,
     consentText: p.consentText,
     pid: p.pid,
-    startedAtMs: p.startedAt ? timestampMs(p.startedAt) : null,
-    nextRestartAtMs: p.nextRestartAt ? timestampMs(p.nextRestartAt) : null,
+    startedAtMs: ms(p.startedAt),
+    nextRestartAtMs: ms(p.nextRestartAt),
     restarts: p.restarts,
     commands: p.commands.map((c) => ({ name: c.name, title: c.title, description: c.description })),
     surfaces: p.surfaces.map((s) => ({ id: s.id, title: s.title, icon: s.icon, scope: s.scope, when: s.when, showCommand: s.showCommand, kind: s.kind })),
     logPath: p.logPath,
     install: p.install
-      ? { kind: p.install.kind, source: p.install.source, version: p.install.version, sha256: p.install.sha256, installedAtMs: p.install.installedAt ? timestampMs(p.install.installedAt) : null }
+      ? { kind: p.install.kind, source: p.install.source, version: p.install.version, sha256: p.install.sha256, installedAtMs: ms(p.install.installedAt) }
       : null,
     updateAvailable: p.updateAvailable,
     updateVersion: p.updateVersion,
@@ -838,7 +838,7 @@ export interface PluginLogLineView {
 }
 
 function toLogLine(l: PluginLogLine): PluginLogLineView {
-  return { seq: Number(l.seq), timeMs: l.time ? timestampMs(l.time) : null, source: l.source, level: l.level, text: l.text };
+  return { seq: Number(l.seq), timeMs: ms(l.time), source: l.source, level: l.level, text: l.text };
 }
 
 /** Where the daemon keeps plugins: the packages, and the parent of each plugin's data dir (<dataDir>/<name>). */
@@ -861,7 +861,7 @@ export interface PluginSecretView {
 }
 
 export function toSecretView(s: PluginSecret): PluginSecretView {
-  return { key: s.key, updatedAtMs: s.updatedAt ? timestampMs(s.updatedAt) : null };
+  return { key: s.key, updatedAtMs: ms(s.updatedAt) };
 }
 
 /** A plugin's secrets, names only (PluginService.ListSecrets), sorted by name. */
@@ -901,7 +901,7 @@ function toEnvironment(e: PluginEnvironment): PluginEnvironmentView {
     projects: [...e.projects],
     noProject: e.noProject,
     issues: [...e.issues],
-    updatedAtMs: e.updatedAt ? timestampMs(e.updatedAt) : null,
+    updatedAtMs: ms(e.updatedAt),
   };
 }
 
@@ -1067,7 +1067,7 @@ export interface RegistryView {
 }
 
 function toRegistry(r: PluginRegistry): RegistryView {
-  return { url: r.url, fetchedAtMs: r.fetchedAt ? timestampMs(r.fetchedAt) : null, cached: r.cached, error: r.error, plugins: r.plugins, issues: [...r.issues] };
+  return { url: r.url, fetchedAtMs: ms(r.fetchedAt), cached: r.cached, error: r.error, plugins: r.plugins, issues: [...r.issues] };
 }
 
 /** A plugin a registry lists (its latest version) and what is installed of it. */

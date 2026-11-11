@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, openStreams, resetMock, row } from "./fixtures";
+import { mockPost, openHelloDemo, openStreams, resetMock } from "./fixtures";
 
 /**
  * Plugin thread and terminal nodes each hold their own stream, with nothing rationing them
@@ -17,12 +17,7 @@ async function totalStreams(): Promise<number> {
 }
 
 async function openStress(page: Page): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await mockPost("plugin/demotab?tab=stress");
   await expect(surface(page).locator('[data-testid="plugin-tab"][data-key="stress"]')).toHaveAttribute("aria-selected", "true");
 }
@@ -99,12 +94,7 @@ const attaches = async () => (await openStreams())["TerminalService/Attach"] ?? 
 test("a wall holds a stream for what is on screen: never more at first, and scrolling swaps them", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await mockPost(`plugin/terminals?count=${String(4 * WALL_ROWS)}`);
-  await openApp(page);
-  await row(page, "s:s-3").click();
-  await page.keyboard.press("Meta+k");
-  await page.keyboard.type("Show Hello Demo");
-  await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
-  await expect(surface(page)).toHaveAttribute("data-phase", "live");
+  await openHelloDemo(page);
   await page.getByTestId("panel-expand").click();
 
   // The most live nodes at any moment, from before the view lands.

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, leaveSidebar, mockPost, mockUrl, openApp, openTooltip, resetMock, row } from "./fixtures";
+import { invocations, leaveSidebar, mockPost, openApp, openTooltip, resetMock, row, threadCalls } from "./fixtures";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -25,13 +25,8 @@ async function openThread(page: Page, state: State, scheme: "dark" | "light" = "
   await leaveSidebar(page, editor(page));
 }
 
-async function calls(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/thread/calls`);
-  return (await res.json()) as string[];
-}
-
 async function responds(): Promise<string[]> {
-  return (await calls()).filter((c) => c.startsWith("respond"));
+  return (await threadCalls()).filter((c) => c.startsWith("respond"));
 }
 
 /** A crop of the composer card (where the prompts dock). */
@@ -153,7 +148,7 @@ test("question keyboard from the editor: digits pick, Enter moves on and submits
 
 test("Escape never interrupts a running turn (editor or timeline); the Interrupt button does", async ({ page }) => {
   await openThread(page, "streaming");
-  const interrupts = async () => (await calls()).filter((c) => c.startsWith("interrupt"));
+  const interrupts = async () => (await threadCalls()).filter((c) => c.startsWith("interrupt"));
   // The empty editor.
   await editor(page).click();
   await page.keyboard.press("Escape");
@@ -165,7 +160,7 @@ test("Escape never interrupts a running turn (editor or timeline); the Interrupt
   await expect(page.getByTestId("thread-interrupt")).toBeVisible();
 
   await page.getByTestId("thread-interrupt").click();
-  await expect.poll(calls).toContain("interrupt s-r1");
+  await expect.poll(threadCalls).toContain("interrupt s-r1");
   await expect(page.locator('[data-testid="thread-turn-header"]:not([data-live])').last()).toContainText("Interrupted");
   await expect(page.getByTestId("thread-interrupt")).toHaveCount(0);
   // No success toast for an interrupt: the header says it.

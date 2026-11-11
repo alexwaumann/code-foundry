@@ -1,7 +1,6 @@
 package thread
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,6 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
+
+	"github.com/alexwaumann/code-foundry/internal/claudestream"
 )
 
 // Transcript discovery and tailing.
@@ -175,38 +176,14 @@ func readAppended(f *os.File, off *int64, sp *lineSplitter, lines [][]byte) ([][
 	}
 }
 
-// lineSplitter cuts a byte stream into lines. Lines longer than maxLineBytes are
-// skipped (huge attachments), never buffered whole.
-type lineSplitter struct {
-	partial []byte
-	skip    bool // discarding the rest of an over-long line
-}
+// lineSplitter cuts a transcript into its non-empty lines (claudestream.Splitter).
+// Lines longer than maxLineBytes are skipped (huge attachments), never buffered whole.
+type lineSplitter struct{ s claudestream.Splitter }
 
 // split appends the complete non-empty lines in data to lines, each a copy.
 func (t *lineSplitter) split(lines [][]byte, data []byte) [][]byte {
-	for len(data) > 0 {
-		i := bytes.IndexByte(data, '\n')
-		if i < 0 {
-			if !t.skip {
-				t.partial = append(t.partial, data...)
-				if len(t.partial) > maxLineBytes {
-					t.partial, t.skip = nil, true
-				}
-			}
-			return lines
-		}
-		if t.skip {
-			t.skip = false
-		} else {
-			line := append(t.partial, data[:i]...)
-			t.partial = nil
-			if len(line) > 0 && len(line) <= maxLineBytes {
-				lines = append(lines, line)
-			}
-		}
-		data = data[i+1:]
-	}
-	return lines
+	t.s.Max = maxLineBytes
+	return t.s.Split(lines, data)
 }
 
 // ensureWatches watches the project dir, or the projects root until the project dir
@@ -267,28 +244,5 @@ func scanLines(path string, limit int64, fn func(line []byte)) error {
 	if limit > 0 {
 		r = io.LimitReader(f, limit)
 	}
-	var (
-		sp    lineSplitter
-		lines [][]byte
-	)
-	buf := make([]byte, tailReadChunk)
-	for {
-		n, err := r.Read(buf)
-		if n > 0 {
-			lines = sp.split(lines[:0], buf[:n])
-			for _, line := range lines {
-				fn(line)
-			}
-		}
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return err
-		}
-	}
-	if !sp.skip && len(sp.partial) > 0 {
-		fn(sp.partial)
-	}
-	return nil
+	return claudestream.ReadLines(r, maxLineBytes, fn)
 }

@@ -3,7 +3,6 @@
  * it: the snapshot (Watch), one session's events (Session), and Start and Stop. Download,
  * cancel and remove are user actions, so they run as the dictation.* commands, not here.
  */
-import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
   DictationEndReason,
   DictationService,
@@ -13,6 +12,7 @@ import {
 } from "@/gen/codefoundry/v1/dictation_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, type Heartbeat } from "./stream";
+import { ms } from "./timestamp";
 
 export type DictationStateView = "disabled" | "noModel" | "downloading" | "loading" | "ready" | "unloaded" | "listening" | "error";
 
@@ -130,7 +130,7 @@ export function toDictationView(s: DictationSnapshot): DictationView {
       download: d ? { receivedBytes: Number(d.receivedBytes), totalBytes: Number(d.totalBytes), bytesPerSecond: Number(d.bytesPerSecond) } : null,
     },
     hardware: { chip: hw?.chip ?? "", memoryBytes: Number(hw?.memoryBytes ?? 0n), m1Family: hw?.m1Family ?? false },
-    session: s.session ? { id: s.session.id, clientId: s.session.clientId, startedAtMs: s.session.startedAt ? timestampDate(s.session.startedAt).getTime() : 0, stopping: s.session.stopping } : null,
+    session: s.session ? { id: s.session.id, clientId: s.session.clientId, startedAtMs: ms(s.session.startedAt) ?? 0, stopping: s.session.stopping } : null,
     error: s.error,
     micDenied: s.micDenied,
     accessibility: s.accessibility

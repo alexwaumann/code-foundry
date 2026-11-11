@@ -8,7 +8,7 @@ conversation; this note is the record so a fresh agent can pick it up. Read
 
 ## 1. Problem
 
-At work Alex's changes span several repositories at once: a UI repo plus one or two
+A user's changes often span several repositories at once: a UI repo plus one or two
 service repos, or the same mechanical change across many repos. The old personal tool
 (claude-foundry) had "workspaces": one named branch, one worktree per member repo, and
 sessions that knew about the sibling worktrees. The settled workflow is **one driver
@@ -129,7 +129,7 @@ Each step: `make check` green, exercised end to end, a `docs/notes/` entry.
   `workspaces-2-launch.md`.
 * `--add-dir` on a sibling worktree under the work sandbox: can `git commit` there
   write the sibling's main-repo `.git`? Alex says `permissions.additionalDirectories`
-  with `~/` makes this moot at work, and it is not sandboxed at home; still worth one
+  with `~/` makes this moot on a managed Mac, and it is not sandboxed elsewhere; still worth one
   real run.
 * Loopback endpoint in session env: confirm the CLI works from inside a sandboxed
   session on the work laptop once step 1 exists.

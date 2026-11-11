@@ -21,11 +21,6 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png` });
 }
 
-/** cmd+n, then the first project row: the code-foundry composer. */
-async function compose(page: Page): Promise<void> {
-  await composeProject(page);
-}
-
 const value = (page: Page) => page.getByTestId("composer-prompt").first();
 const card = (page: Page) => page.getByTestId("completion-card");
 const rows = (page: Page) => card(page).getByTestId("completion-item");
@@ -38,7 +33,7 @@ const RESIZE = "[Fix resize race](cf-thread://s-3)";
 
 test("@res: a Threads group above Files; Enter inserts the thread tag", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("@res");
   await expect(headings(page)).toHaveText(["Threads", "Files"]);
   await expect(labels(page)).toHaveText(["Fix resize race", "resize.md"]);
@@ -66,7 +61,7 @@ test("@res: a Threads group above Files; Enter inserts the thread tag", async ({
 
 test("the tag shows the thread's current name; Backspace removes it whole, undo brings it back; a pasted token becomes a tag", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.evaluate((text) => {
     const data = new DataTransfer();
     data.setData("text/plain", text);

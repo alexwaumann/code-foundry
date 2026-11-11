@@ -30,6 +30,7 @@
  */
 import { waitingReason } from "./liveCount";
 import { sampleWakes, scriptWaiting, type WakeInit } from "./wakes";
+import { ANSWER, ANSWER_HEAD, ANSWER_STREAMING, EDIT_NEW, EDIT_OLD, EDIT_PATCH, FAIL_OUTPUT, GO_BLOCK, GREP_OUTPUT, MOCK_ATTACHMENT, PUSH, QUESTIONS } from "./threadScript";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
@@ -53,6 +54,8 @@ import { mcpFixture, type McpStatusInit } from "./mcp";
 import { SETUP_PROMPT, type SetupMessage } from "./setup";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
 import { scriptServers, scriptShells, shellSummary, type ShellCall } from "./shells";
+
+export { MOCK_ATTACHMENT };
 
 export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
@@ -136,8 +139,7 @@ interface Log {
   pendingEffort: string;
 }
 
-/** A staged image the scripted first message refers to (a 48×32 PNG). */
-export const MOCK_ATTACHMENT = "/mock/attachments/pr-badge-stale.png";
+/** The staged image the scripted first message refers to (MOCK_ATTACHMENT), a 48×32 PNG. */
 export const MOCK_ATTACHMENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAADAAAAAgCAIAAADbtmxLAAAAb0lEQVR42mOQt9YZVIhh1EGD1UFml+oJOGj24x3kITKcgowG2EForsF00yB2EH3SDS40YIl6cIXQYHQQCbnMf101jRCZ5RCdHTRadYw6iPYOommFOuqg0UQ96qDB6KCBqryGjoNG09Cog0YdRBsEAH1iaYqNxtrOAAAAAElFTkSuQmCC",
   "base64",
@@ -168,57 +170,9 @@ export const CRASHED_PROMPT = {
     "The PR badge in the sidebar stays green after a force-push, see ![pr-badge-stale.png](cf-attachment://0) Look at [poller.go](cf-file://repo-cf/internal/store/pr/poller.go) and tell me why the fingerprint misses it with [/tdd](cf-skill://~/tdd).",
 };
 
-const ANSWER_HEAD = `## Fixed: stale badge after a force-push
-
-The poller compared only \`CheckCount\` and \`ReviewState\`, so a force-push that kept the same checks looked unchanged and the badge never refreshed. The fingerprint now includes the head SHA, which the batched GraphQL query already returns, so **no extra API calls**.
-
-### What changed
-
-- \`Fingerprint\` carries \`HeadOid\` ([internal/store/pr/fingerprint.go](https://github.com/alexwaumann/code-foundry/blob/main/internal/store/pr/fingerprint.go)).
-- \`fingerprintOf\` fills it from \`pr.HeadRefOid\`.
-- New test \`TestFingerprintChangesOnForcePush\`; the reviewer subagent found nothing else.
-
-| Case | Before | After |
-| --- | --- | --- |
-| New commit, same checks | skipped | refreshed |
-| Force-push, same checks | skipped | refreshed |
-| Nothing changed | skipped | skipped |
-
-`;
-const GO_BLOCK = "```go\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.ReviewDecision,\n\t\tHeadOid:     pr.HeadRefOid, // moves on every push\n\t}\n}\n```\n\n";
-const ANSWER = `${ANSWER_HEAD}${GO_BLOCK}Tests: \`go test ./internal/store/pr/\` passes. I have not pushed.`;
-const ANSWER_STREAMING = `${ANSWER_HEAD}\`\`\`go\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.Revi`;
 /** What /__mock/thread/finish completes the streaming answer with. */
 const ANSWER_REST = ANSWER.slice(ANSWER_STREAMING.length);
 
-const EDIT_OLD = "type Fingerprint struct {\n\tCheckCount  int\n\tReviewState string\n}\n\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{CheckCount: len(pr.Checks), ReviewState: pr.ReviewDecision}\n}";
-const EDIT_NEW =
-  "type Fingerprint struct {\n\tCheckCount  int\n\tReviewState string\n\tHeadOid     string // moves on every push, force-pushes included\n}\n\nfunc fingerprintOf(pr PullRequest) Fingerprint {\n\treturn Fingerprint{\n\t\tCheckCount:  len(pr.Checks),\n\t\tReviewState: pr.ReviewDecision,\n\t\tHeadOid:     pr.HeadRefOid,\n\t}\n}";
-const EDIT_PATCH = [
-  {
-    oldStart: 18,
-    oldLines: 9,
-    newStart: 18,
-    newLines: 14,
-    lines: [
-      " // Fingerprint is what the poller compares between two polls of a pull request.",
-      " type Fingerprint struct {",
-      " \tCheckCount  int",
-      " \tReviewState string",
-      "+\tHeadOid     string // moves on every push, force-pushes included",
-      " }",
-      " ",
-      " func fingerprintOf(pr PullRequest) Fingerprint {",
-      "-\treturn Fingerprint{CheckCount: len(pr.Checks), ReviewState: pr.ReviewDecision}",
-      "+\treturn Fingerprint{",
-      "+\t\tCheckCount:  len(pr.Checks),",
-      "+\t\tReviewState: pr.ReviewDecision,",
-      "+\t\tHeadOid:     pr.HeadRefOid,",
-      "+\t}",
-      " }",
-    ],
-  },
-];
 const TEST_FILE = `package pr
 
 import "testing"
@@ -241,34 +195,6 @@ func TestFingerprintStableWithoutChanges(t *testing.T) {
 	}
 }
 `;
-const FAIL_OUTPUT =
-  "Exit code 1\n--- FAIL: TestFingerprintChangesOnForcePush (0.00s)\n    fingerprint_test.go:41: fingerprint unchanged after the head moved\n        got:  {CheckCount:3 ReviewState:APPROVED}\n        want: a different fingerprint\nFAIL\nFAIL\tgithub.com/alexwaumann/code-foundry/internal/store/pr\t0.412s";
-const GREP_OUTPUT =
-  'internal/store/pr/gh/query.graphql:23:      headRefOid\ninternal/store/pr/model.go:31:\tHeadRefOid     string\ninternal/store/pr/decode.go:58:\tpr.HeadRefOid = n.HeadRefOid\ninternal/store/pr/decode_test.go:72:\tHeadRefOid: "9f3c2e1",\ninternal/store/linkedpr/sync.go:104:\tif old.HeadRefOid != pr.HeadRefOid {';
-const QUESTIONS = {
-  questions: [
-    {
-      question: "The branch was rebased onto main, so a plain push will be rejected. How should I push?",
-      header: "Push",
-      multiSelect: false,
-      options: [
-        { label: "Force with lease (Recommended)", description: "Overwrites the remote branch only if nobody else pushed to it" },
-        { label: "Push to a new branch", description: "cf/pr-badge-stale-2, then retarget PR #63" },
-        { label: "Don't push", description: "Leave the commits local" },
-      ],
-    },
-    {
-      question: "Should I also update the PR description?",
-      header: "PR text",
-      multiSelect: false,
-      options: [
-        { label: "Yes", description: "Mention the fingerprint change" },
-        { label: "No", description: "" },
-      ],
-    },
-  ],
-};
-
 const MULTI = {
   questions: [
     {
@@ -284,7 +210,6 @@ const MULTI = {
   ],
 };
 
-const PUSH = "git push --force-with-lease origin cf/pr-badge-stale";
 const POLLER_OLD = "\tif fp == prev {\n\t\treturn\n\t}";
 const POLLER_NEW = "\tif fp == prev && !force {\n\t\treturn\n\t}";
 

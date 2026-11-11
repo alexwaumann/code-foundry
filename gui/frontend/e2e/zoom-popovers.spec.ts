@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { composeProject, freshCopyByDefault, openApp, resetMock, row } from "./fixtures";
+import { expect, test, type Locator } from "@playwright/test";
+import { composeProject, freshCopyByDefault, openApp, resetMock, row, setZoom } from "./fixtures";
 
 /**
  * Floating surfaces under page zoom (CSS zoom on <html>, lib/zoom.ts). Radix positions
@@ -11,15 +11,6 @@ import { composeProject, freshCopyByDefault, openApp, resetMock, row } from "./f
 test.beforeEach(async () => {
   await resetMock();
 });
-
-async function setZoom(page: Page, percent: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setZoom(${String(percent)}))`);
-  await expect(page.locator("html")).toHaveAttribute("data-zoom", String(percent));
-}
-
-async function compose(page: Page): Promise<void> {
-  await composeProject(page);
-}
 
 async function rect(l: Locator) {
   const b = await l.boundingBox();
@@ -37,7 +28,7 @@ for (const zoom of [90, 125, 150]) {
     await freshCopyByDefault();
     await openApp(page);
     await setZoom(page, zoom);
-    await compose(page);
+    await composeProject(page);
     const trigger = page.getByTestId("composer-model");
     await trigger.click();
     const list = page.getByTestId("composer-model-list");
@@ -61,7 +52,7 @@ test("at 150% a picker without room below flips above its trigger, the same gap 
   await page.setViewportSize({ width: 1280, height: 560 });
   await openApp(page);
   await setZoom(page, 150);
-  await compose(page);
+  await composeProject(page);
   const trigger = page.getByTestId("composer-model");
   await trigger.click();
   const list = page.getByTestId("composer-model-list");

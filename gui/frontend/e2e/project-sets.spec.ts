@@ -18,11 +18,6 @@ interface ThreadSummary {
   createdWorktree: boolean;
 }
 
-/** The composer for a project from cmd+N, the nth project row. */
-async function composeIn(page: Page, n: number): Promise<void> {
-  await composeProject(page, n);
-}
-
 /** The heading's picker (one pick: a workspace or a project). */
 async function openSetPicker(page: Page) {
   await page.getByTestId("composer-project-trigger").click();
@@ -53,7 +48,7 @@ test.beforeEach(async () => {
 // What the daemon makes of thread.new (branch names, worktrees) is Go's.
 test("a set's Work in and Run in share one row; a pill's pick and a closed picker hand the keyboard to the prompt", async ({ page }) => {
   await openApp(page);
-  await composeIn(page, 1);
+  await composeProject(page, 1);
   const list = await openAddProject(page);
   await option(list, "ghostty-playground").click();
   await page.keyboard.press("Escape");
@@ -113,7 +108,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1440, height: 900 });
     await openApp(page);
-    await composeIn(page, 1);
+    await composeProject(page, 1);
     const heading = await openSetPicker(page);
     await heading.locator('[data-workspace="w-000000000001"]').click();
     const add = await openAddProject(page);

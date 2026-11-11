@@ -17,10 +17,6 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png` });
 }
 
-async function compose(page: Page): Promise<void> {
-  await composeProject(page);
-}
-
 const value = (page: Page) => page.getByTestId("composer-prompt").first();
 const card = (page: Page) => page.getByTestId("completion-card");
 const rows = (page: Page) => card(page).getByTestId("completion-item");
@@ -33,7 +29,7 @@ const PR139 = "[#139](cf-pr://alexwaumann/code-foundry/139)";
 
 test("#13: open pull requests first, then merged; #139 + Enter inserts the tag; the send projects owner/repo#N", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("review #13");
   await expect(labels(page)).toHaveText(["#139", "#133", "#138", "#136"]);
   await expect(rows(page).nth(0)).toContainText("feat(thread): JSONL transcript discovery");
@@ -63,7 +59,7 @@ test("#13: open pull requests first, then merged; #139 + Enter inserts the tag; 
 
 test("#13 + Enter sends as typed while #139 is listed", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("fixes #13");
   await expect(labels(page)).toHaveText(["#139", "#133", "#138", "#136"]);
   await page.keyboard.press("Enter");
@@ -75,7 +71,7 @@ test("#13 + Enter sends as typed while #139 is listed", async ({ page }) => {
 
 test("arrow down + Enter inserts the highlighted pull request; Tab inserts the first", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("#13");
   await expect(labels(page)).toHaveText(["#139", "#133", "#138", "#136"]);
   await page.keyboard.press("ArrowDown");
@@ -92,7 +88,7 @@ test("arrow down + Enter inserts the highlighted pull request; Tab inserts the f
 // A heading, C#, a bare # and a space stay text: src/lib/completion.test.ts.
 test("by title; typing on to a number nothing has closes the card without a word; Escape keeps the text", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("#jsonl");
   await expect(labels(page)).toHaveText(["#139"]);
   await expect(rows(page).nth(0).getByTestId("completion-hit")).toHaveText(["JSONL"]);

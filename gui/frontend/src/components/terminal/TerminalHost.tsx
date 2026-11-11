@@ -11,6 +11,7 @@ import { AttachController, type AttachState } from "@/terminal/attach";
 import { TerminalInput } from "@/terminal/input";
 import { XtermRenderer, type RendererKind } from "@/terminal/xterm";
 import { TerminalFindBar } from "./TerminalFindBar";
+import { openTerminalLink } from "./terminalLinks";
 
 interface DevHook {
   renderer: XtermRenderer;
@@ -146,6 +147,7 @@ export function TerminalHost({
       fontSize: Math.round((ui.fontSize * ui.zoom) / 100),
       isGlobalChord,
       onRendererChange: setRendererKind,
+      openLink: openTerminalLink,
     });
     renderer.mount(host);
     const controller = new AttachController(

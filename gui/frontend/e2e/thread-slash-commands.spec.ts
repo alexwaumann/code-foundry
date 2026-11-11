@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row, threadCalls } from "./fixtures";
 
 /**
  * A running thread's "/" card offers the slash commands its process reported
@@ -23,11 +23,6 @@ async function openThread(page: Page, scheme: "dark" | "light" = "dark"): Promis
   await expect(page.getByTestId("thread-pane")).toBeVisible();
   await expect(page.getByTestId("thread-timeline").locator("[data-row-type]").first()).toBeVisible();
   await page.getByTestId("thread-composer").locator('[contenteditable="true"]').click();
-}
-
-async function calls(): Promise<string[]> {
-  const res = await fetch(`${mockUrl}/__mock/thread/calls`);
-  return (await res.json()) as string[];
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -67,7 +62,7 @@ test("a built-in inserts plain text; a skill keeps its tag; the text goes as typ
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("thread-composer").getByTestId("prompt-tag")).toHaveText("/deploy");
   await page.keyboard.press("Enter");
-  await expect.poll(calls).toContain("send s-r1 /compact keep the plan and /deploy");
+  await expect.poll(threadCalls).toContain("send s-r1 /compact keep the plan and /deploy");
 });
 
 // The daemon's refusal under the composer, the text kept, and a message it takes clearing it:

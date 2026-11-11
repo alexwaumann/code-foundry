@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -241,7 +242,7 @@ func TestDictationService(t *testing.T) {
 // A host that dies mid-session never closes its audio stream. The session must end with it:
 // left open, the next launch would capture for a hold nobody is making.
 func TestDictationAudioLostEndsTheSession(t *testing.T) {
-	_, c := newDictationServer(t)
+	l, c := newDictationServer(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	watch, err := c.Watch(ctx, connect.NewRequest(&v1.WatchDictationRequest{}))
@@ -261,9 +262,18 @@ func TestDictationAudioLostEndsTheSession(t *testing.T) {
 	if err := audio.Send(&v1.DictationAudioFrame{SessionId: start.Msg.GetSessionId(), Pcm: make([]byte, 640)}); err != nil {
 		t.Fatal(err)
 	}
+	// Listening comes with Start; the handler knows the session only once the frame is in.
 	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
 		return m.GetState() == v1.DictationState_DICTATION_STATE_LISTENING
 	})
+	for deadline := time.Now().Add(3 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		if f, _ := l.Last().Frames(); f == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the audio frame never reached the engine")
+		}
+	}
 	lose()
 	recvUntil(t, watch, func(m *v1.DictationSnapshot) bool {
 		return m.GetState() == v1.DictationState_DICTATION_STATE_READY
@@ -317,5 +327,61 @@ func TestDictationSnapshotPick(t *testing.T) {
 				t.Errorf("settings: %v", got)
 			}
 		})
+	}
+}
+
+// endsQuietly is a store whose session ends without its end reaching the bus, as when a
+// stalled stream's buffer was full.
+type endsQuietly struct {
+	DictationStore
+	mu    sync.Mutex
+	ended bool
+}
+
+func (s *endsQuietly) end() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ended = true
+}
+
+func (s *endsQuietly) SessionEnded(string) (dictation.EndReason, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return dictation.EndSilence, s.ended, true
+}
+
+// A session stream whose end event was dropped still ends, at its next heartbeat.
+func TestDictationSessionEndsWhenTheEndWasDropped(t *testing.T) {
+	st := &endsQuietly{}
+	h := NewDictation(st, bus.New())
+	h.beat = 10 * time.Millisecond
+	route := h.Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	t.Cleanup(srv.Close)
+	c := codefoundryv1connect.NewDictationServiceClient(srv.Client(), srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	session, err := c.Session(ctx, connect.NewRequest(&v1.DictationSessionRequest{SessionId: "s1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !session.Receive() || session.Msg().GetHeartbeat() == nil {
+		t.Fatalf("first message %v, want a heartbeat: %v", session.Msg(), session.Err())
+	}
+	st.end()
+	var last *v1.DictationSessionEvent
+	for session.Receive() {
+		last = session.Msg()
+	}
+	if err := session.Err(); err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	if last.GetEnded().GetReason() != v1.DictationEndReason_DICTATION_END_REASON_SILENCE {
+		t.Errorf("last message %v, want ended by silence", last)
 	}
 }

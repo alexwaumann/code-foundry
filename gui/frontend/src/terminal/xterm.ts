@@ -22,8 +22,8 @@ export interface XtermRendererOptions {
   isGlobalChord: (chord: string) => boolean;
   /** Notified when the active renderer changes (WebGL -> DOM after context loss). */
   onRendererChange?: (kind: RendererKind) => void;
-  /** Opens a clicked link; defaults to window.open. */
-  openLink?: (uri: string) => void;
+  /** Opens a cmd+clicked link; defaults to window.open. */
+  openLink?: (uri: string, event: MouseEvent) => void;
   /** How many matches the find highlights and counts; defaults to FIND_LIMIT. */
   findLimit?: number;
 }
@@ -198,7 +198,7 @@ export class XtermRenderer implements TerminalRenderer {
     const open = this.opts.openLink ?? ((uri: string) => window.open(uri, "_blank", "noopener"));
     this.term.loadAddon(
       new WebLinksAddon((e, uri) => {
-        if (e.metaKey) open(uri); // cmd+click, like Terminal.app and iTerm
+        if (e.metaKey) open(uri, e); // cmd+click, like Terminal.app and iTerm
       }),
     );
     this.enableWebgl();

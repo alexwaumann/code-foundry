@@ -15,8 +15,8 @@ const DefaultMaxLine = 64 << 20
 // readChunk is how much the reader asks for at a time.
 const readChunk = 64 << 10
 
-// Splitter cuts a byte stream into lines like the transcript tailer does
-// (internal/store/thread lineSplitter): empty lines are dropped and a line longer
+// Splitter cuts a byte stream into lines (Claude's stdout here, a transcript in the
+// thread store's tailer): empty and whitespace-only lines are dropped and a line longer
 // than Max is skipped to its newline.
 type Splitter struct {
 	// Max is the longest line kept; 0 means DefaultMaxLine.

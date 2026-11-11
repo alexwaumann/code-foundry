@@ -8,11 +8,6 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-/** cmd+n, then the nth project row of the picker: that project's composer. */
-async function compose(page: Page, n = 1): Promise<void> {
-  await composeProject(page, n);
-}
-
 /** The prompt as the draft stores it (tags as tokens). */
 function value(page: Page) {
   return page.getByTestId("composer-prompt");
@@ -64,7 +59,7 @@ const COMMIT = "[/commit](cf-skill://~/commit)";
 
 test("type /dep: the card offers /deploy, Enter inserts a tag and a space without sending; send gets /deploy", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await expect.poll(completionCalls).toContain("skills repo-cf true");
   const skillCalls = async () => (await completionCalls()).filter((c) => c.startsWith("skills ")).length;
   const loaded = await skillCalls();
@@ -102,7 +97,7 @@ test("type /dep: the card offers /deploy, Enter inserts a tag and a space withou
 
 test("Escape leaves the text; no matches says so once, then closes; Tab and a click insert", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("/dep");
   await expect(card(page)).toBeVisible();
   await page.keyboard.press("Escape");
@@ -159,7 +154,7 @@ test("Escape leaves the text; no matches says so once, then closes; Tab and a cl
 
 test("tags are atoms: Backspace removes one whole, undo restores it, a pasted token becomes a tag", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("/review");
   await page.keyboard.press("Enter");
   await expect(value(page)).toHaveAttribute("data-value", "[/review](cf-skill://repo-cf/review) ");
@@ -182,7 +177,7 @@ test("tags are atoms: Backspace removes one whole, undo restores it, a pasted to
 
 test("hovering a skill tag says what it is", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.keyboard.type("/deploy");
   await page.keyboard.press("Enter");
   await page.keyboard.type("/commit");
@@ -202,7 +197,7 @@ test("hovering a skill tag says what it is", async ({ page }) => {
 
 test("a second project: skills grouped by project", async ({ page }) => {
   await openApp(page);
-  await compose(page);
+  await composeProject(page);
   await page.getByTestId("composer-add-project").click();
   await page.getByTestId("composer-add-project-list").getByRole("option").filter({ hasText: "sketches" }).click();
   await page.keyboard.press("Escape");

@@ -5,7 +5,8 @@ vi.mock("@/terminal/xterm", async () => (await import("@/test/terminalHost")).xt
 vi.mock("@/api/terminal", async (orig) => ({ ...(await orig<typeof import("@/api/terminal")>()), ...(await import("@/test/terminalHost")).terminalApiFakes }));
 
 const { TerminalHost } = await import("./TerminalHost");
-const { attach, finds } = await import("@/test/terminalHost");
+const { attach, finds, renderers } = await import("@/test/terminalHost");
+const { openTerminalLink } = await import("./terminalLinks");
 const { useCommandsStore } = await import("@/stores/commands");
 const { closeTerminalFind, openTerminalFind, useTerminalFindStore } = await import("@/stores/terminalFind");
 
@@ -44,6 +45,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useTerminalFindStore.setState({ byTerminal: {} });
+});
+
+describe("the terminal host", () => {
+  it("opens a cmd+clicked link through the app, not window.open", () => {
+    render(host("t1"));
+    expect(renderers.options.at(-1)?.openLink).toBe(openTerminalLink);
+  });
 });
 
 describe("the terminal's find bar", () => {

@@ -59,7 +59,7 @@ Also decide: a header primitive matching existing surface headers (`shdr` in
 `docs/sketches/mcp-panel/style.css`), forms (grouping inputs + submit, validation
 messages), and whether a tabs/segmented primitive is warranted.
 
-## The two example plugins (from Alex's coworkers)
+## The two example plugins (from users)
 
 **1. Jenkins pipeline tracker.** Available on any thread whose PR checks link to a
 Jenkins pipeline. Polls Jenkins itself. Surface: header (PR number/title, pipeline link,

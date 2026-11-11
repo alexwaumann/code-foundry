@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { MOCK_TOKEN } from "../playwright.config";
-import { invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
+import { invocations, invokeAs, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The first-run welcome page (docs/notes/welcome-page.md): the real page from the pages
@@ -17,12 +16,7 @@ const inner = (page: Page) => page.frameLocator('[data-testid="file-html-frame"]
 
 /** Runs a command inside the welcome thread, as its CLI would. */
 async function inThread(name: string, args: Record<string, string>): Promise<void> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.CommandService/Invoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ name, args, context: { activeThreadId: THREAD } }),
-  });
-  expect(res.ok).toBe(true);
+  expect((await invokeAs(THREAD, name, args)).ok).toBe(true);
 }
 
 test.beforeEach(async () => {

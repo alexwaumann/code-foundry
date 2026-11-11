@@ -32,7 +32,7 @@ of projects on the fly, and a workspace lived inside one project. Engineers read
 * Skills in `.claude/skills` **do** load from an add-dir whose `.claude` is a **symlink**.
 * Reads and writes through a symlink inside an add-dir are **denied** by Claude Code's
   own check (it resolves the real path: "outside the allowed working directories"). The
-  user's managed settings at work add the home directory, so there the real files are
+  user's managed settings on a managed Mac add the home directory, so there the real files are
   writable anyway; elsewhere Claude asks. Do **not** add prompt text about writability.
 * `--add-dir` refuses a path that does not exist. Loaded files are labelled with their
   path, but small models still blur which repo a file belongs to.
