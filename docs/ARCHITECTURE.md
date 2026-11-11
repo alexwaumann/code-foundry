@@ -890,15 +890,15 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   ask and review), tinted by a ProseMirror decoration, never a mark. The host's hold key
   drives the same session through `dictation.hold`, and the window tells the daemon whether
   a composer can take it (`ComposerTarget`).
-* Stream liveness: the daemon sends a `StreamHeartbeat` on each of those three streams
-  after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
-  `api/stream.ts` `HEARTBEAT_MS`). WKWebView can hold a stream's last bytes after the
-  window was hidden, minimized or covered until more bytes arrive; the heartbeat releases
-  them. It also holds the end of a large message in a visible window, so `WatchThread`
-  sends two more heartbeats 10 ms and 100 ms after a snapshot, or a thread could take 5 s
-  to open (`docs/notes/thread-open-stall.md`). `runStream` reconnects an attempt that heartbeated and then went silent for three
-  intervals, and WatchThread (`resyncOnVisible`) reopens for a fresh snapshot when
-  the page becomes visible again (`docs/notes/thread-render-stall.md`).
+* Stream liveness: the daemon sends a `StreamHeartbeat` on every long-lived stream the
+  GUI holds after 5 s without other messages (`api.HeartbeatInterval`, mirrored by
+  `api/stream.ts` `HEARTBEAT_MS`). A hung or stopped daemon keeps its sockets open and
+  says nothing, so `runStream` reconnects an attempt that heartbeated and then went silent
+  for three intervals (`StreamSilentError`), a thread shows "catching up…" while its Watch
+  retries, and Events' `silent` flag names a socket that brings nothing while pings
+  answer. Hiding or showing the window touches no stream. The post-snapshot flushes and
+  the resync on show were for fetch in WKWebView, which held a stream's last bytes back,
+  and went once every stream was on the tunnel (`docs/notes/ws-stall-workarounds.md`).
 * A thread's content pane is `components/thread`: a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
   re-render only their row), turns that fold under their header the moment they finish (the

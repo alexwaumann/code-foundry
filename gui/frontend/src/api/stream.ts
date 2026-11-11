@@ -193,12 +193,6 @@ export interface StreamHandlers<T> {
    * is never watched.
    */
   livenessMs?: number;
-  /**
-   * Reconnect at once (no backoff; status "connecting") when the page becomes visible
-   * after being hidden, so the new attempt starts from a fresh snapshot. For streams
-   * whose first message is a snapshot that replaces the client's state.
-   */
-  resyncOnVisible?: boolean;
 }
 
 function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
@@ -247,35 +241,15 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
   const status = (s: StreamStatus, err?: string) => {
     if (!stopped()) h.onStatus?.(s, err);
   };
-  // A resync aborts the current attempt (or the backoff sleep) and starts a new one at once.
-  let resyncPending = false;
-  let wake = new AbortController();
-  const resync = () => {
-    resyncPending = true;
-    wake.abort();
-  };
-  // Read and clear through a function: TS would narrow a direct read across the awaits
-  // during which resync() can run.
-  const takeResync = () => {
-    const p = resyncPending;
-    resyncPending = false;
-    return p;
-  };
-  const unwatchVisibility = h.resyncOnVisible ? onBecameVisible(resync) : () => undefined;
 
   void (async () => {
     let attempt = 0;
     while (!outer.signal.aborted) {
       const ctl = new AbortController();
-      // This attempt is itself the fresh start a pending resync asked for (one during the
-      // backoff sleep cut it short), and it starts over the backoff.
-      if (takeResync()) attempt = 0;
-      wake = new AbortController();
       const onAbort = () => {
         ctl.abort();
       };
       outer.signal.addEventListener("abort", onAbort);
-      wake.signal.addEventListener("abort", onAbort);
       status(attempt === 0 ? "connecting" : "retrying");
       let failure: unknown = null;
       let watchdog: ReturnType<typeof setTimeout> | undefined;
@@ -312,7 +286,7 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         // that hangs (a stopped daemon) keeps reporting connecting or retrying.
         let first = !connected;
         for await (const ev of h.open(ctl.signal)) {
-          // A stopped or resynced attempt's late events must not reach the client.
+          // A stopped attempt's late events must not reach the client.
           if (ctl.signal.aborted) break;
           heard = true;
           proven();
@@ -341,24 +315,17 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         ctl.abort();
         clearTimeout(watchdog);
         outer.signal.removeEventListener("abort", onAbort);
-        wake.signal.removeEventListener("abort", onAbort);
       }
       if (stopped()) break;
-      if (takeResync()) {
-        attempt = 0;
-        continue;
-      }
       if (failure !== null) {
         h.onError?.(failure);
         if (isPermanent(failure)) {
           status("stopped", errorMessage(failure));
-          unwatchVisibility();
           return;
         }
         status("retrying", errorMessage(failure));
       } else if (h.shouldReconnectOnEnd && !h.shouldReconnectOnEnd()) {
         status("stopped");
-        unwatchVisibility();
         return;
       }
       const delay = backoffDelay(attempt, backoff) * (0.8 + Math.random() * 0.4);
@@ -368,18 +335,14 @@ export function runStream<T>(h: StreamHandlers<T>): () => void {
         nap.abort();
       };
       outer.signal.addEventListener("abort", cut);
-      wake.signal.addEventListener("abort", cut);
       napping.add(cut);
       await sleep(delay, nap.signal);
       napping.delete(cut);
       outer.signal.removeEventListener("abort", cut);
-      wake.signal.removeEventListener("abort", cut);
     }
-    unwatchVisibility();
   })();
 
   return () => {
     outer.abort();
-    unwatchVisibility();
   };
 }

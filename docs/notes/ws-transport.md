@@ -5,7 +5,8 @@
 `TerminalService.Attach` and `PluginService.WatchSurface`. PR 4 moved the rest, `EventService.Watch`
 last, so every GUI stream is on the tunnel and none has a fetch path. Every unary call stays on
 fetch, terminal input included. PR 5 removed the stream slots and the plugin cap
-(`docs/notes/ws-remove-slots.md`).
+(`docs/notes/ws-remove-slots.md`). PR 6 removed the workarounds for fetch's held bytes: the
+post-snapshot flushes and the resync on show (`docs/notes/ws-stall-workarounds.md`).
 
 ## Shape
 
@@ -200,7 +201,7 @@ grep '"path":"/codefoundry.v1.EventService/Watch"' "$L" | grep '"method":"POST"'
 | `reason` | Meaning |
 | --- | --- |
 | `served` | The handler returned first: a terminal that exited, a daemon shutting down, or a slow `Attach` subscriber the terminal store dropped. |
-| `client closed` | The client sent a close, or data that is not a count: a tab switch, a resync, the watchdog, `AttachController` dropping a stream. The end of stream then fails to write; that failure is not news. |
+| `client closed` | The client sent a close, or data that is not a count: a tab switch, the watchdog, `AttachController` dropping a stream. The end of stream then fails to write; that failure is not news. |
 | `client gone` | The connection died with no close frame: the app quit, a crashed page, a killed Networking process. `err` says what failed; `EOF` is a page that went away (milestone 3). |
 | `write timeout` | The client was connected and took nothing for 30 s: a window that never reopened, or a write that never finished. A daemon shutting down cuts that wait to a second. |
 | `no request` | The opening frames never came. A view that left at once logs this too. |
@@ -223,10 +224,10 @@ Checks:
    pair can be a resync.
 5. `write timeout` or `client gone` on an idle tunnel: note the time and what the Mac was doing.
 
-`resyncOnVisible` streams (Ember's board, the visible thread, dictation) reconnect in 15-20 ms each
-time the window goes from hidden to visible, by design, so covering and uncovering the window adds
-`client closed` and `tunnel open` lines. Keep them out of the idle count. `EventService.Watch` has no
-such setting.
+At the time, `resyncOnVisible` streams (Ember's board, the visible thread, dictation) reconnected in
+15-20 ms each time the window went from hidden to visible, so covering and uncovering the window added
+`client closed` and `tunnel open` lines. PR 6 removed that (`docs/notes/ws-stall-workarounds.md`):
+showing the window now opens no stream.
 
 To back out at the time: empty `TUNNELLED_STREAMS`, which PR 4 removed.
 
@@ -247,8 +248,8 @@ grep -c 'dropped slow attach subscriber' "$L"
 What to expect:
 
 1. `tunnel refused`: none, as in milestone 1.
-2. Almost every close is `client closed`, and `served` for exits and restarts. Tab switches and
-   showing the window each add a few.
+2. Almost every close is `client closed`, and `served` for exits and restarts. Tab switches each
+   add a few (showing the window did too, before PR 6).
 3. `write timeout` should be rare and should line up with something: a very busy page, or a build
    flooding a terminal while the page was stalled. Note what the Mac was doing. On an idle tunnel it
    means a daemon that stopped hearing counts, which is the result to report.

@@ -81,8 +81,7 @@ func TestThreadSetupOnTheWire(t *testing.T) {
 }
 
 // An item that leaves the log can only be told by a new snapshot: a retried setup takes
-// back its turn end. Like every snapshot, it is flushed by a heartbeat soon behind it,
-// long before the hour-long interval.
+// back its turn end.
 func TestWatchThreadSnapshotAfterItemsReset(t *testing.T) {
 	b := bus.New()
 	fake := threadtest.New(b)
@@ -100,11 +99,6 @@ func TestWatchThreadSnapshotAfterItemsReset(t *testing.T) {
 	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetItems()) != 2 {
 		t.Fatalf("no snapshot: %v", stream.Err())
 	}
-	for range snapshotFlushes {
-		if !stream.Receive() || stream.Msg().GetHeartbeat() == nil {
-			t.Fatalf("want a flush heartbeat, got %v (%v)", stream.Msg(), stream.Err())
-		}
-	}
 	fake.PutItems("s1", thread.Item{ID: "u1", Kind: thread.KindUserMessage})
 	bus.Publish[thread.ThreadEvent](b, thread.ItemsReset{ThreadID: "other", Seq: 1000})
 	bus.Publish[thread.ThreadEvent](b, thread.ItemsReset{ThreadID: "s1", Seq: 1000})
@@ -113,8 +107,5 @@ func TestWatchThreadSnapshotAfterItemsReset(t *testing.T) {
 	}
 	if n := len(stream.Msg().GetSnapshot().GetItems()); stream.Msg().GetSnapshot() == nil || n != 1 {
 		t.Fatalf("want a snapshot of 1 item, got %v", stream.Msg())
-	}
-	if !stream.Receive() || stream.Msg().GetHeartbeat() == nil {
-		t.Fatalf("want a flush heartbeat after the snapshot, got %v (%v)", stream.Msg(), stream.Err())
 	}
 }

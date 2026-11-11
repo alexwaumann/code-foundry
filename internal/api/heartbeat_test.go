@@ -363,54 +363,16 @@ func TestThreadWatchHeartbeatKeepsSeq(t *testing.T) {
 	t.Fatalf("stream ended: %v", s.Err())
 }
 
-// TestHeartbeatFlush: Flush makes the next silences snapshotFlushes, one per Reset, whatever
-// was sent; then the interval applies again.
-func TestHeartbeatFlush(t *testing.T) {
-	want := func(h *heartbeat, soon int) {
-		t.Helper()
-		if len(h.soon) != soon {
-			t.Fatalf("soon = %v, want %d left", h.soon, soon)
-		}
-	}
-	h := newHeartbeat(time.Hour)
-	defer h.Stop()
-	h.Reset()
-	want(h, 0)
-	h.Flush()
-	want(h, len(snapshotFlushes)-1)
-	for i := len(snapshotFlushes) - 2; i >= 0; i-- {
-		h.Reset()
-		want(h, i)
-	}
-	h.Reset()
-	want(h, 0)
-	// A resync's snapshot starts over, and the shared list stays whole.
-	h.Flush()
-	want(h, len(snapshotFlushes)-1)
-	if len(snapshotFlushes) < 2 {
-		t.Fatalf("snapshotFlushes = %v: the backstop is gone", snapshotFlushes)
-	}
-}
-
-// TestThreadWatchFlushesSnapshot: with the interval far away, heartbeats still follow the
-// snapshot, each sent apart from it, and then the stream is quiet.
-func TestThreadWatchFlushesSnapshot(t *testing.T) {
+// TestThreadWatchQuietAfterSnapshot: with the interval far away, nothing follows the
+// snapshot. The heartbeats that used to chase a snapshot were for fetch in WKWebView,
+// which held a message's end back; the tunnel does not (docs/notes/ws-stall-workarounds.md).
+func TestThreadWatchQuietAfterSnapshot(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	s := openThreadBeats(t, ctx, time.Hour)
-	for range snapshotFlushes {
-		select {
-		case m, ok := <-s.msgs:
-			if !ok || m != "heartbeat" {
-				t.Fatalf("got %q (open %v), want a heartbeat", m, ok)
-			}
-		case <-ctx.Done():
-			t.Fatal("no flush after the snapshot")
-		}
-	}
 	select {
 	case m := <-s.msgs:
-		t.Fatalf("got %q after the flushes, want silence", m)
-	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("got %q after the snapshot, want silence", m)
+	case <-time.After(300 * time.Millisecond):
 	}
 }

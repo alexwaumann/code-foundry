@@ -1,5 +1,8 @@
 # Thread open stall
 
+> Superseded: the post-snapshot flushes went with `docs/notes/ws-stall-workarounds.md`. Over the
+> WebSocket tunnel no snapshot is held, so they had nothing left to release.
+
 A thread sometimes took about 5 s to open. The time was not the database or the daemon: a
 49 MB thread loads in about 265 ms the first time and is on the wire in 25 ms after that.
 
