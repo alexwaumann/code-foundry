@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { readFile, type FileReadView } from "@/api/files";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
@@ -6,6 +6,7 @@ import { CodeBlock } from "@/components/thread/Code";
 import { PathPlaceContext } from "@/components/thread/context";
 import { PathChip } from "@/components/thread/PathChip";
 import { Tip } from "@/components/ui/tooltip";
+import { useMarkdownFind } from "./useFileFind";
 import { useBlobSrc } from "./useBlobSrc";
 import "@/components/thread/thread.css";
 import "@/components/thread/codeActions.css";
@@ -45,7 +46,7 @@ function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }
   if (image) return <img ref={imgRef} alt={alt} data-testid="md-local-image" />;
   return (
     <Tip label={alt ? src : null}>
-      <span className="inline-flex items-center gap-1 rounded-sm border px-1.5 text-caption">
+      <span className="inline-flex items-center gap-1 rounded-sm border px-1.5 text-caption" data-find-skip>
         <ImageIcon className="size-3" aria-hidden />
         {file === null ? "Loading image…" : alt || src}
       </span>
@@ -61,8 +62,11 @@ function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }
  * the tab was opened from), not the file's own folder. A reading column with padding,
  * headings on the type roles (files.css).
  */
-export function MarkdownPreview({ text, dir, project, base }: { text: string; dir: string; project: string; base: string }) {
+export function MarkdownPreview({ text, dir, project, base, findKey }: { text: string; dir: string; project: string; base: string; findKey?: string | undefined }) {
   const place = useMemo(() => ({ project, base }), [project, base]);
+  const scroller = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  useMarkdownFind(findKey, scroller, content);
   const extras = useMemo<MarkdownExtras>(
     () => ({
       code: (lang, code) => <CodeBlock lang={lang} code={code} />,
@@ -77,8 +81,8 @@ export function MarkdownPreview({ text, dir, project, base }: { text: string; di
     [dir],
   );
   return (
-    <div className="min-h-0 flex-1 overflow-auto" data-testid="file-markdown">
-      <div className="cf-thread cf-file-md mx-auto max-w-3xl px-5 py-4">
+    <div ref={scroller} tabIndex={findKey !== undefined ? -1 : undefined} className="min-h-0 flex-1 overflow-auto outline-none" data-testid="file-markdown">
+      <div ref={content} className="cf-thread cf-file-md mx-auto max-w-3xl px-5 py-4">
         <PathPlaceContext.Provider value={place}>
           <Markdown extras={extras}>{text}</Markdown>
         </PathPlaceContext.Provider>

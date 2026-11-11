@@ -86,12 +86,12 @@ test("with the caret in the editor, its chords are its own and typing fires no s
   await expect(line(page, 1)).toContainText("fdwc import");
   await expect(tabs(page)).toHaveText([/ vs /, "app.ts"]);
 
-  // cmd+F is the editor's find, not the thread's.
+  // cmd+F is the tab's find (e2e/file-find.spec.ts), not the thread's.
   await page.keyboard.press("Meta+f");
-  await expect(file(page).locator("[data-search-panel] input").first()).toBeFocused();
+  await expect(page.getByTestId("file-find-input")).toBeFocused();
   await expect(page.getByTestId("thread-find")).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(file(page).locator("[data-search-panel]")).toHaveCount(0);
+  await expect(page.getByTestId("file-find")).toHaveCount(0);
   await line(page, 1).click();
 
   // cmd+] indents, where it would otherwise be Forward.

@@ -33,3 +33,13 @@
   background-image: conic-gradient(var(--checker) 25%, transparent 0 50%, var(--checker) 0 75%, transparent 0);
   background-size: 16px 16px;
 }
+
+/* The File tab's find over rendered markdown (FileFind.tsx): the thread find's tints. The
+   code's are inside the library's shadow root (components/code/codeCss.ts). */
+::highlight(cf-file-find) {
+  background-color: color-mix(in oklab, var(--cf-warning) 26%, transparent);
+}
+::highlight(cf-file-find-current) {
+  background-color: var(--cf-warning);
+  color: var(--cf-warning-foreground);
+}

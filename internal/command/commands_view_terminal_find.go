@@ -15,15 +15,18 @@ const (
 )
 
 // SharedChords maps a command to the one whose default chord it shares: the chord runs the
-// key while the keyboard is in a terminal, and the value everywhere else. The GUI decides
-// at the key press from where the keyboard is (terminalScoped in
-// gui/frontend/src/keys/bindings.ts), so a stale command list, or a terminal the daemon's
-// context does not know (a plugin's node), still gets its own. No other two commands may
-// share a chord (TestKeybindingsAreUniqueAndNotReserved).
+// key while the keyboard is in its place (a terminal for terminal.*, a File tab for
+// file.search*), and the value everywhere else. The GUI decides at the key press from where
+// the keyboard is (scopedCommand in gui/frontend/src/keys/bindings.ts), so a stale command
+// list, or a terminal the daemon's context does not know (a plugin's node), still gets its
+// own. No other two commands may share a chord (TestKeybindingsAreUniqueAndNotReserved).
 var SharedChords = map[string]string{
 	"terminal.find":          "thread.find",
 	"terminal.find.next":     "thread.find.next",
 	"terminal.find.previous": "thread.find.previous",
+	"file.search":            "thread.find",
+	"file.search.next":       "thread.find.next",
+	"file.search.previous":   "thread.find.previous",
 }
 
 // canFindInTerminal is the find verbs' availability: a terminal with the keyboard, which

@@ -43,6 +43,15 @@ func TestNoKeybindingCommands(t *testing.T) {
 	}
 }
 
+// sharedRoot is the command whose chord name shares (SharedChords), or name itself: two
+// commands may bind one chord only when they share it with the same command.
+func sharedRoot(name string) string {
+	if root, ok := command.SharedChords[name]; ok {
+		return root
+	}
+	return name
+}
+
 func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {
 	f := newFixture(t)
 	owner := map[string]string{} // normalized chord -> command
@@ -55,7 +64,7 @@ func TestKeybindingsAreUniqueAndNotReserved(t *testing.T) {
 			if slices.Contains(command.ReservedChords, chord) {
 				t.Errorf("%s binds reserved chord %q", l.Command.Name, k)
 			}
-			if prev, ok := owner[chord]; ok && command.SharedChords[prev] != l.Command.Name && command.SharedChords[l.Command.Name] != prev {
+			if prev, ok := owner[chord]; ok && sharedRoot(prev) != sharedRoot(l.Command.Name) {
 				t.Errorf("%s and %s both bind %q", prev, l.Command.Name, chord)
 			}
 			owner[chord] = l.Command.Name

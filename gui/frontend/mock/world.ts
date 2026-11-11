@@ -5015,6 +5015,18 @@ export class World {
         when: (ctx: UiContext | undefined) => !ctx?.activeView || Boolean(ctx.activeTerminalId),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
       })),
+      // internal/command canSearchFile: a thread view (the GUI's palette further asks for a File tab that can search); the CLI always.
+      ...(
+        [
+          ["file.search", "Find in File", "Find in the File tab. Searches the file the side panel's File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"],
+          ["file.search.next", "Find Next in File", "Next match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+g"],
+          ["file.search.previous", "Find Previous in File", "Previous match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+shift+g"],
+        ] as const
+      ).map(([name, title, description, chord]) => ({
+        cmd: { name, title, category: "View", description, keybindings: [chord], args: [] },
+        when: (ctx: UiContext | undefined) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId)),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
+      })),
       {
         cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },
         when: always,

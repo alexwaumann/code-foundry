@@ -126,6 +126,13 @@ export function focusEditor(key: string): void {
   editors.get(key)?.focus();
 }
 
+/** Selects a span of the tab's document and gives its editor the keyboard (a find's match as the find closes). False with no editor on screen. */
+export function selectInEditor(key: string, from: EditorPlace, to: EditorPlace): boolean {
+  const editor = editors.get(key);
+  editor?.select(from, to);
+  return editor !== undefined;
+}
+
 /** The next editor of this tab takes the keyboard (the pencil, Discard, Reload). */
 export function focusNextEditor(key: string): void {
   nextFocus.set(key, null);

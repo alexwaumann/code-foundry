@@ -21,6 +21,7 @@ import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
 import { presentFileFinder } from "./fileFinder";
 import { presentSearch } from "./threadSearch";
+import { presentFileFind } from "./fileFind";
 import { presentTerminalFind } from "@/stores/terminalFind";
 import { presentThreadFind } from "./threadFind";
 import { presentDictationHold, presentDictationToggle } from "./dictation";
@@ -220,6 +221,13 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       return presentTerminalFind("next");
     case "terminal.find.previous":
       return presentTerminalFind("previous");
+    case "file.search":
+      // file.search: the find bar of the File tab with the keyboard, else of the one on screen.
+      return presentFileFind("open");
+    case "file.search.next":
+      return presentFileFind("next");
+    case "file.search.previous":
+      return presentFileFind("previous");
     case "search.open":
       // search.open: the palette's Find dialog over every thread, whatever the window shows,
       // on the agent search in `id` when it names one.

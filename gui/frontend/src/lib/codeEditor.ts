@@ -26,9 +26,11 @@ export interface EditorHandle {
   focus: (at?: EditorPlace) => void;
   /** Where the caret is; null before there is one. */
   caret: () => EditorPlace | null;
+  /** Selects from one place to another (on one line: a find's match) and takes the keyboard. */
+  select: (from: EditorPlace, to: EditorPlace) => void;
 }
 
-export function editorHandle(editor: Pick<CodeEditor, "focus" | "getViewState">): EditorHandle {
+export function editorHandle(editor: Pick<CodeEditor, "focus" | "getViewState" | "setSelections">): EditorHandle {
   return {
     focus: (at) => {
       editor.focus(at && { lineNumber: at.line + 1, character: at.character });
@@ -38,6 +40,10 @@ export function editorHandle(editor: Pick<CodeEditor, "focus" | "getViewState">)
       if (!s) return null;
       const { line, character } = s.direction === -1 ? s.start : s.end;
       return { line, character };
+    },
+    select: (from, to) => {
+      editor.setSelections([{ start: from, end: to, direction: "forward" }]);
+      editor.focus({ preventScroll: true });
     },
   };
 }

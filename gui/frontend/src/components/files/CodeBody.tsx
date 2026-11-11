@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
 import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
+import { useCodeFind } from "./useFileFind";
 
 /** Above this many lines the file lays out only its visible lines (the library's virtualizer). */
 export const VIRTUALIZE_LINES = 400;
@@ -49,19 +50,23 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
  * A text file as code: line numbers, the codeView store's wrap, scrolling inside the tab.
  * `line` is marked with the library's selection (controlled, so a click does not move it)
  * and scrolled to; a long file goes through CodeScroll. `edit` is the File tab's editor.
+ * `findKey`: the tab's find (FileFind.tsx); the box then takes the keyboard on a click, so
+ * cmd+F knows the tab is meant (letters still reach the panel: the box is no text field).
  */
-export function CodeBody({ name, text, lines, line, edit }: { name: string; text: string; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined }) {
+export function CodeBody({ name, text, lines, line, edit, findKey }: { name: string; text: string; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined; findKey?: string | undefined }) {
   const box = useRef<HTMLDivElement>(null);
   const virtual = lines > VIRTUALIZE_LINES;
   const selected = useMemo(() => (line ? { start: line, end: line } : null), [line]);
   useScrollToLine(box, line, virtual);
+  useCodeFind(findKey, box, virtual, text, edit?.active ? edit.stateKey : undefined);
+  const focusable = findKey !== undefined ? -1 : undefined;
   const code = edit ? <CodeFile name={name} contents={text} selectedLines={selected} edit={edit} /> : <CodeFile name={name} contents={text} selectedLines={selected} />;
   return virtual ? (
-    <div ref={box} className="flex min-h-0 flex-1 flex-col" data-testid="file-code" data-virtual="">
+    <div ref={box} tabIndex={focusable} className="flex min-h-0 flex-1 flex-col outline-none" data-testid="file-code" data-virtual="">
       <CodeScroll className="min-h-0 flex-1 overflow-auto">{code}</CodeScroll>
     </div>
   ) : (
-    <div ref={box} className="min-h-0 flex-1 overflow-auto" data-testid="file-code">
+    <div ref={box} tabIndex={focusable} className="min-h-0 flex-1 overflow-auto outline-none" data-testid="file-code">
       {code}
     </div>
   );

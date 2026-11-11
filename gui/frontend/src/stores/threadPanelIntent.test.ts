@@ -211,7 +211,7 @@ describe("a ShowView scoped to a thread", () => {
         showItem("panel.file", { ...ask, line: "2", focus: "1" });
         const key = fileEditKey("thread:b", fileTab({ project: "web", base: WEB_FEAT, path: ENV }).id);
         const focus = vi.fn();
-        noteEditor(key, { focus, caret: () => null });
+        noteEditor(key, { focus, caret: () => null, select: vi.fn() });
         expect(focus).toHaveBeenCalledTimes(1);
       });
 
@@ -221,7 +221,7 @@ describe("a ShowView scoped to a thread", () => {
         showItem("panel.file", { ...ask, path, line: "2" });
         const key = fileEditKey("thread:b", fileTab({ project: "web", base: WEB_FEAT, path }).id);
         const focus = vi.fn();
-        noteEditor(key, { focus, caret: () => null });
+        noteEditor(key, { focus, caret: () => null, select: vi.fn() });
         expect(focus).not.toHaveBeenCalled();
       });
 

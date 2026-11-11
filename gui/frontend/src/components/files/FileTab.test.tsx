@@ -5,13 +5,14 @@ import type { CodeFileEdit } from "@/components/code/CodeFile";
 import { PanelKeyContext } from "@/components/panel/panelKeyContext";
 import type { ThreadView } from "@/api/threads";
 import { useCodeViewStore } from "@/stores/codeView";
-import { useFileEditStore } from "@/stores/fileEdit";
+import { fileEditKey, useFileEditStore } from "@/stores/fileEdit";
+import { canSearchFile, openFileFind, useFileFindStore } from "@/stores/fileFind";
 import { openFileInPanel } from "@/stores/filePanel";
 import { activeTab, getPanel, usePanelStore } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
-import { fileOfTab, type FileTarget } from "@/surfaces/fileTarget";
+import { fileOfTab, fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { FileTab } from "./FileTab";
 
 // readFile answers from `files`; pdf.js does not run in jsdom (no canvas), so lib/pdf is a
@@ -747,5 +748,103 @@ describe("a file opened before its thread had a checkout", () => {
     show(target);
     await screen.findByTestId("code-file");
     expect(screen.getByTestId("file-held").textContent).toBe("Read-only until this thread's worktree is ready");
+  });
+});
+
+describe("find in the file", () => {
+  const target = (path: string): FileTarget => ({ project: "", base: "/Users/me/w", path });
+  const keyOf = (path: string) => fileEditKey("thread:a", fileTab(target(path)).id);
+  const openTab = (path: string) =>
+    render(
+      <PanelKeyContext value="thread:a">
+        <FileTab target={target(path)} />
+      </PanelKeyContext>,
+    );
+  const loaded = () =>
+    waitFor(() => {
+      expect(screen.getByTestId("file-tab").getAttribute("data-loading")).toBeNull();
+    });
+  const count = () => screen.getByTestId("file-find-count").textContent;
+
+  afterEach(() => {
+    useFileFindStore.setState({ byTab: {} });
+  });
+
+  it("a text file can search: cmd+F's bar sits under the header and counts the file's matches", async () => {
+    files.set("/Users/me/w/a.ts", { text: "const a = 1;\nconst b = a;\n", lossless: true, binary: false, mime: "text/typescript", size: 26 });
+    openTab("a.ts");
+    await loaded();
+    expect(canSearchFile()).toBe(true);
+    expect(screen.queryByTestId("file-find")).toBeNull();
+    act(() => {
+      openFileFind(keyOf("a.ts"));
+    });
+    const input = await screen.findByTestId("file-find-input");
+    expect(document.activeElement).toBe(input);
+    // The bar comes right after the header's rows, before the bands and the code.
+    expect(screen.getByTestId("file-find").previousElementSibling?.querySelector('[data-testid="file-edit"]')).not.toBeNull();
+    fireEvent.change(input, { target: { value: "const" } });
+    await waitFor(() => {
+      expect(count()).toBe("1 of 2");
+    });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(count()).toBe("2 of 2");
+    });
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    await waitFor(() => {
+      expect(count()).toBe("1 of 2");
+    });
+  });
+
+  it("the bar, its query and its match stay across the pencil, and the count follows the draft", async () => {
+    files.set("/Users/me/w/.env", { text: "A=1\nB=2\n", lossless: true, binary: false, mime: "text/plain", size: 8, modifiedAtMs: 1 });
+    openTab(".env");
+    await loaded();
+    act(() => {
+      openFileFind(keyOf(".env"));
+    });
+    fireEvent.change(await screen.findByTestId("file-find-input"), { target: { value: "=" } });
+    fireEvent.keyDown(screen.getByTestId("file-find-input"), { key: "Enter" });
+    await waitFor(() => {
+      expect(count()).toBe("2 of 2");
+    });
+    fireEvent.click(screen.getByTestId("file-edit"));
+    await screen.findByTestId("draft");
+    expect(screen.getByTestId("file-find-input")).toHaveProperty("value", "=");
+    expect(count()).toBe("2 of 2");
+    draft.text = "A=1\nB=2\nC=3\n";
+    fireEvent.change(screen.getByTestId("draft"), { target: { value: draft.text } });
+    await waitFor(() => {
+      expect(count()).toBe("2 of 3");
+    });
+  });
+
+  it("Escape closes the bar and gives the keyboard back to the code", async () => {
+    files.set("/Users/me/w/a.ts", { text: "x\n", lossless: true, binary: false, mime: "text/typescript", size: 2 });
+    openTab("a.ts");
+    await loaded();
+    act(() => {
+      openFileFind(keyOf("a.ts"));
+    });
+    fireEvent.keyDown(await screen.findByTestId("file-find-input"), { key: "Escape" });
+    expect(screen.queryByTestId("file-find")).toBeNull();
+    expect(useFileFindStore.getState().byTab[keyOf("a.ts")]).toBeUndefined();
+    expect(document.activeElement).toBe(screen.getByTestId("file-code"));
+  });
+
+  it.each<[string, string, Partial<FileReadView>]>([
+    ["an HTML page shown rendered (a frame of its own)", "/Users/me/w/page.html", { text: "<p>hi</p>", lossless: true, binary: false, mime: "text/html", size: 9 }],
+    ["an image", "/Users/me/w/logo.png", { mime: "image/png", image: new Uint8Array([1]), binary: true, size: 1 }],
+    ["a binary", "/Users/me/w/tool", { binary: true, text: null, size: 9 }],
+  ])("nothing to search in %s: no bar, and cmd+F stays the thread's", async (_name, path, f) => {
+    files.set(path, f);
+    openTab(path.slice("/Users/me/w/".length));
+    await loaded();
+    expect(canSearchFile()).toBe(false);
+    act(() => {
+      openFileFind(keyOf(path.slice("/Users/me/w/".length)));
+    });
+    expect(screen.queryByTestId("file-find")).toBeNull();
   });
 });

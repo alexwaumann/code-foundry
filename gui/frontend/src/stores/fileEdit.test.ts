@@ -60,7 +60,7 @@ async function editing(text: string | null = null, v = view()): Promise<void> {
   if (!s) throw new Error("no session");
   lib.attached.add(s.stateKey);
   lib.drafts.set(s.stateKey, text ?? s.seed);
-  noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+  noteEditor(KEY, { focus: vi.fn(), caret: () => null, select: vi.fn() });
   if (text !== null) noteDraft(KEY, text);
 }
 
@@ -653,7 +653,7 @@ describe("file.save", () => {
     const b = useFileEditStore.getState().sessions[other];
     lib.drafts.set(b?.stateKey ?? "", "b\n");
     noteDraft(other, "b\n");
-    noteEditor(other, { focus: vi.fn(), caret: () => null });
+    noteEditor(other, { focus: vi.fn(), caret: () => null, select: vi.fn() });
     const wrap = focusOn(edit()?.stateKey ?? "");
     api.write.mockResolvedValue(written());
     presentFileSave();
@@ -717,7 +717,7 @@ describe("Save File from the palette", () => {
     await startEdit(OTHER, { panelKey: PANEL, tabId: "files:y", base: "/w" }, view({ path: "/w/b.txt" }));
     lib.drafts.set(other()?.stateKey ?? "", "b\n");
     noteDraft(OTHER, "b\n");
-    noteEditor(OTHER, { focus: vi.fn(), caret: () => null });
+    noteEditor(OTHER, { focus: vi.fn(), caret: () => null, select: vi.fn() });
     const wrap = document.createElement("div");
     wrap.setAttribute("data-code-editor", edit()?.stateKey ?? "");
     const host = document.createElement("div");
@@ -760,7 +760,7 @@ describe("Save File from the palette", () => {
   it("is listed by that editor too: a tab it does not have says nothing", async () => {
     const wrap = await split();
     const input = openPalette();
-    noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+    noteEditor(KEY, { focus: vi.fn(), caret: () => null, select: vi.fn() });
     // That editor's tab closed while the palette was up: nothing is left of what it meant.
     useFileEditStore.setState((s) => {
       const { [KEY]: _gone, ...rest } = s.sessions;
@@ -774,7 +774,7 @@ describe("Save File from the palette", () => {
 
   it("gives the keyboard back to that editor once the palette has gone", async () => {
     const wrap = await split();
-    const editor = { focus: vi.fn(), caret: () => null };
+    const editor = { focus: vi.fn(), caret: () => null, select: vi.fn() };
     noteEditor(KEY, editor);
     const input = openPalette();
     api.write.mockResolvedValue(written());
@@ -790,7 +790,7 @@ describe("Save File from the palette", () => {
   it("with no editor holding the keyboard it is the focused group's rule, and nothing moves the keyboard", async () => {
     const wrap = await split();
     wrap.remove();
-    const editor = { focus: vi.fn(), caret: () => null };
+    const editor = { focus: vi.fn(), caret: () => null, select: vi.fn() };
     noteEditor(OTHER, editor);
     const input = openPalette();
     api.write.mockResolvedValue(written({ path: "/w/b.txt" }));
@@ -905,10 +905,10 @@ describe("the keyboard", () => {
     wrap.append(host);
     document.body.append(wrap);
     host.focus();
-    noteEditor(KEY, { focus: vi.fn(), caret: () => ({ line: 3, character: 7 }) });
+    noteEditor(KEY, { focus: vi.fn(), caret: () => ({ line: 3, character: 7 }), select: vi.fn() });
     observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
     wrap.remove();
-    const next = { focus: vi.fn(), caret: () => null };
+    const next = { focus: vi.fn(), caret: () => null, select: vi.fn() };
     noteEditor(KEY, next);
     expect(next.focus).toHaveBeenCalledWith({ line: 3, character: 7 });
   });
@@ -916,7 +916,7 @@ describe("the keyboard", () => {
   it("a clean re-read with the keyboard elsewhere leaves it there", async () => {
     await editing();
     observeRead(KEY, view({ modifiedAtMs: 101, text: "theirs" }));
-    const next = { focus: vi.fn(), caret: () => null };
+    const next = { focus: vi.fn(), caret: () => null, select: vi.fn() };
     noteEditor(KEY, next);
     expect(next.focus).not.toHaveBeenCalled();
   });

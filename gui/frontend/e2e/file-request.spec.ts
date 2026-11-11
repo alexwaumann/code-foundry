@@ -138,8 +138,9 @@ test("with find open, an outside change leaves the keyboard in the find field an
   await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: "notes.txt", edit: true })}))`);
   await expect(editor(page)).toBeVisible();
   await line(page, 1).click();
+  // The tab's find bar (e2e/file-find.spec.ts), outside the editor that the re-read remounts.
   await page.keyboard.press("Meta+f");
-  const find = file(page).locator("[data-search-panel] input").first();
+  const find = page.getByTestId("file-find-input");
   await expect(find).toBeFocused();
 
   await writeDisk(notes, "theirs\n");
