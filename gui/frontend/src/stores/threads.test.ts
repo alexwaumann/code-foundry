@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
-import { formatAgo } from "@/lib/thread";
 import { windowTitle } from "@/lib/title";
 import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
@@ -330,15 +329,6 @@ describe("event dispatch", () => {
 });
 
 describe("thread presentation", () => {
-  it.each([
-    [null, "never"],
-    [1_000_000 - 10_000, "just now"],
-    [1_000_000 - 5 * 60_000, "5 min ago"],
-    [1_000_000 - 3 * 3_600_000, "3 h ago"],
-  ])("ago %#", (ms, want) => {
-    expect(formatAgo(ms, 1_000_000)).toBe(want);
-  });
-
   it("window title carries the attention count", () => {
     expect(windowTitle(0)).toBe("Code Foundry");
     expect(windowTitle(3)).toBe("Code Foundry (3)");

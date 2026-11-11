@@ -219,7 +219,7 @@ describe("SetupRow", () => {
     act(() => {
       seed(setup("running", [step("fetch", "done", { ref: "origin/main", startedAtMs: start, endedAtMs: start + 290 }), step("start", "pending")]));
     });
-    expect(lines()).toEqual(["done: Fetched origin/main0.3s", "pending: Starting Claude"]);
+    expect(lines()).toEqual(["done: Fetched origin/main0.2s", "pending: Starting Claude"]);
     expect(screen.getByTestId("thread-setup-live")).toBeTruthy();
   });
 

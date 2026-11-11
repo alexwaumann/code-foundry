@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UsageBucketView } from "@/api/threads";
-import { bucketTokens, emptyTotals, fmtShare, fmtTok, fmtUsd, modelColorVars, modelSlot, TOKEN_KINDS, totalUsage, usageByModel } from "./usage";
+import { bucketTokens, compareModels, emptyTotals, fmtShare, fmtTok, fmtUsd, modelBaseId, modelColors, modelFamily, TOKEN_KINDS, tint, totalUsage, usageByModel } from "./usage";
 
 function bucket(model: string, o: Partial<UsageBucketView> = {}): UsageBucketView {
   return {
@@ -76,24 +76,59 @@ describe("folds", () => {
 });
 
 describe("model colours", () => {
-  it.each<[string, number]>([
-    ["claude-opus-5-5", 1],
-    ["claude-fable-5-1", 2],
-    ["claude-sonnet-5-5", 3],
-    ["claude-haiku-5-5", 4],
-    ["claude-haiku-5-5-20261001", 4],
-    ["claude-opus-5-5[1m]", 1],
-    ["claude-opus-5", 5],
-    ["claude-opus-5-55", 5],
-    ["<synthetic>", 5],
-    ["", 5],
-  ])("%s is slot %d", (model, slot) => {
-    expect(modelSlot(model)).toBe(slot);
+  it.each<[string, string | undefined]>([
+    ["claude-opus-5-5", "opus"],
+    ["claude-opus-4-8[1m]", "opus"],
+    ["claude-opus-4-7", "opus"],
+    ["claude-fable-5-1", "fable"],
+    ["claude-mythos-1", "fable"],
+    ["claude-sonnet-5", "sonnet"],
+    ["claude-sonnet-4-6[1m]", "sonnet"],
+    ["claude-haiku-5-5-20261001", "haiku"],
+    ["claude-3-5-sonnet-20241022", "sonnet"],
+    ["us.anthropic.claude-opus-4-8-v1:0", "opus"],
+    ["claude-opusx-1", undefined],
+    ["claude-next-1", undefined],
+    ["<synthetic>", undefined],
+    ["", undefined],
+  ])("%s is in family %s", (model, family) => {
+    expect(modelFamily(model)).toBe(family);
   });
 
-  it("carries the slot's light and dark colours as CSS vars", () => {
-    expect(modelColorVars("claude-opus-5-5")).toEqual({ "--sw-l": "#2a78d6", "--sw-d": "#3987e5" });
-    expect(modelColorVars("claude-next-1")).toEqual({ "--sw-l": "oklch(0.65 0 0)", "--sw-d": "oklch(0.6 0 0)" });
+  it.each([
+    ["claude-haiku-5-5-20261001", "claude-haiku-5-5"],
+    ["claude-opus-4-8[1m]", "claude-opus-4-8"],
+    ["claude-opus-4-8@20261001", "claude-opus-4-8"],
+    ["claude-sonnet-5", "claude-sonnet-5"],
+  ])("%s's base id is %s", (model, want) => {
+    expect(modelBaseId(model)).toBe(want);
+  });
+
+  it("orders by family, newest version first, others last", () => {
+    const models = ["claude-next-1", "claude-haiku-5-5", "claude-sonnet-4-6", "claude-opus-4-7", "claude-sonnet-5", "claude-opus-5-5", "claude-fable-5-1", "claude-opus-4-8", "claude-opus-5"];
+    expect(models.sort(compareModels)).toEqual(["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-fable-5-1", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-5-5", "claude-next-1"]);
+  });
+
+  it.each([
+    ["#2a78d6", 0, "#2a78d6"],
+    ["#000000", 0.5, "#808080"],
+    ["#2a78d6", 1, "#ffffff"],
+  ])("tints %s by %d to %s", (hex, t, want) => {
+    expect(tint(hex, t)).toBe(want);
+  });
+
+  it("gives a family's newest model its hue and each older one a lighter shade; others are grey", () => {
+    const c = modelColors(["claude-opus-4-7", "claude-sonnet-5", "claude-opus-4-8", "claude-next-1", "claude-opus-5-5"]);
+    expect(c.get("claude-opus-5-5")).toEqual({ "--sw-l": "#2a78d6", "--sw-d": "#3987e5" });
+    expect(c.get("claude-opus-4-8")).toEqual({ "--sw-l": tint("#2a78d6", 0.38), "--sw-d": tint("#3987e5", 0.38) });
+    expect(c.get("claude-sonnet-5")).toEqual({ "--sw-l": "#1baf7a", "--sw-d": "#199e70" });
+    expect(c.get("claude-next-1")).toEqual({ "--sw-l": "oklch(0.65 0 0)", "--sw-d": "oklch(0.6 0 0)" });
+    const opus = ["claude-opus-5-5", "claude-opus-4-8", "claude-opus-4-7"].map((m) => c.get(m)?.["--sw-l"]);
+    expect(new Set(opus).size).toBe(3);
+  });
+
+  it("a lone model of a family takes the family's hue whatever its version", () => {
+    expect(modelColors(["claude-sonnet-4-6"]).get("claude-sonnet-4-6")).toEqual({ "--sw-l": "#1baf7a", "--sw-d": "#199e70" });
   });
 });
 

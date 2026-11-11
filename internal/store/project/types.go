@@ -217,7 +217,9 @@ type CreateWorktreeOptions struct {
 	// local branch; without origin, or when origin has no such branch, from the local
 	// branch. A remote-tracking ref ("origin/x", "upstream/x"), a tag, a sha or an
 	// expression ("HEAD~2") is used as typed. Off (the kill switch): no BaseRef is the
-	// local default branch, a BaseRef is used as typed, and nothing is fetched.
+	// local default branch, a BaseRef is used as typed, and new branches are not
+	// fetched from origin; checking out a branch only origin has (git's DWIM, see
+	// Fetch) still fetches it.
 	BaseFromOrigin bool
 	// Fetch refreshes the start point before branching from it: when the new branch
 	// may start at a remote branch (origin's copy of a bare name with BaseFromOrigin,

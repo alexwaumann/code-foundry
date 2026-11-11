@@ -8,10 +8,10 @@ import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { agentMode, agentName } from "@/lib/agents";
 import { useNow } from "@/lib/clock";
+import { formatAge } from "@/lib/duration";
 import { canonicalModelName } from "@/lib/models";
 import { agentPrompt, headerParts, lastTextId, reportIsLastText, runFolded, runFoldKey, runNodes, shownNodes, turnOfCall } from "@/lib/subagentView";
 import { decodeTimelineKey, type WorkNode } from "@/lib/threadTimeline";
-import { formatAgo } from "@/lib/thread";
 import { useAgentRun } from "@/stores/agents";
 import { useModelChoices } from "@/stores/settings";
 import { goUpFromSubagent } from "@/stores/subagentActions";
@@ -99,7 +99,7 @@ function RunTitle({ threadId, runId }: { threadId: string; runId: string }) {
 
 /**
  * "↳ Subagent of <parent> · background · general-purpose · Opus 4.8 · high · launched by
- * turn 3's Agent call, 4 min ago".
+ * turn 3's Agent call, 4m ago".
  */
 function LineageRow({ threadId, run }: { threadId: string; run: AgentRunView }) {
   const parent = useParentName(threadId);
@@ -107,7 +107,7 @@ function LineageRow({ threadId, run }: { threadId: string; run: AgentRunView }) 
   const keys = useTimelineKeys(threadId);
   const turn = useMemo(() => turnOfCall(keys.map(decodeTimelineKey), run.toolUseId), [keys, run.toolUseId]);
   const now = useNow(30_000);
-  const launched = run.startedAtMs === null ? "" : formatAgo(run.startedAtMs, now);
+  const launched = run.startedAtMs === null ? "" : formatAge(run.startedAtMs, now, { minutes: true, hours: true, days: true });
   const meta = [agentMode(run), run.agentType, model, run.effort].filter(Boolean).join(" · ");
   const when = turn > 0 ? `launched by turn ${String(turn)}'s Agent call${launched ? `, ${launched}` : ""}` : launched ? `launched ${launched}` : "";
   const tail = [meta, when].filter(Boolean).join(" · ");

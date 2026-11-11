@@ -622,7 +622,7 @@ describe("SidebarRow archived", () => {
     renderArchived({ name: "", archivedAtMs: Date.now() });
     expect(screen.getByTestId("thread-name").textContent).toBe("s-1");
     expect(screen.getByTestId("thread-name").className).toContain("text-cf-sidebar-muted-foreground");
-    expect(screen.getByTestId("row-archived-age").textContent).toBe("0m");
+    expect(screen.getByTestId("row-archived-age").textContent).toBe("now");
   });
 });
 

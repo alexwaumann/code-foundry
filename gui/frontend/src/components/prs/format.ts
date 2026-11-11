@@ -1,30 +1,14 @@
 import type { CheckRollupView, PullRequestView } from "@/api/gh";
+import type { AgeUnits } from "@/lib/duration";
 
-/** Compact age for tables: "now", "5m", "3h", "2d", "3w", "4mo", "2y"; "—" when unknown. */
-export function shortAge(ms: number | null, now: number): string {
-  if (ms === null) return "—";
-  const s = Math.max(0, Math.floor((now - ms) / 1000));
-  if (s < 60) return "now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)}h`;
-  const d = Math.floor(h / 24);
-  if (d < 14) return `${String(d)}d`;
-  if (d < 60) return `${String(Math.floor(d / 7))}w`;
-  if (d < 365) return `${String(Math.floor(d / 30))}mo`;
-  return `${String(Math.floor(d / 365))}y`;
-}
+/** The tables' ages, minutes to years: "5m ago", "3h ago", "2d ago", "3w ago", "4mo ago", "2y ago". */
+export const PR_AGE: AgeUnits = { minutes: true, hours: true, days: true, weeks: true, months: true, years: true };
 
-/** "updated 8s ago" / "updated 3m ago"; "not fetched yet" when never. */
-export function updatedAgo(ms: number | null, now: number): string {
-  if (ms === null) return "not fetched yet";
-  const s = Math.max(0, Math.floor((now - ms) / 1000));
-  if (s < 60) return `updated ${String(s)}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `updated ${String(m)}m ago`;
-  return `updated ${shortAge(ms, now)} ago`;
-}
+/** A table cell's age: "now", "5m", "3h", "2d", "3w", "4mo", "2y". */
+export const PR_CELL_AGE: AgeUnits = { ...PR_AGE, ago: false };
+
+/** A poll's freshness: "updated 8s ago", "updated 3m ago", "updated 2d ago". */
+export const FETCH_AGE: AgeUnits = { ...PR_AGE, seconds: true };
 
 /** Freshness of a polled value: "fresh", "stale" past `staleAfterMs`, "error" with an error. */
 export type Freshness = "fresh" | "stale" | "error" | "never";

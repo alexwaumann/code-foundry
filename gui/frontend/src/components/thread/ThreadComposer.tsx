@@ -85,7 +85,7 @@ function useThreadSources(threadId: string) {
   }, [noProject, projectIds, paths]);
 }
 
-/** "Snooze ended · 2 min ago" in amber, like the sidebar row's line 2, for a woken thread. */
+/** "Snooze ended · 2m ago" in amber, like the sidebar row's line 2, for a woken thread. */
 function SnoozeEnded({ at }: { at: number | null }) {
   const now = useNow(30_000);
   return (

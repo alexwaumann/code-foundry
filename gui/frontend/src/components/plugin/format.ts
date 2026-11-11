@@ -2,17 +2,10 @@
  * How the host formats a view's times (PRIMITIVES.md §A "time", DECISIONS.md "duration"):
  * one shared style for elapsed times and fixed durations, relative times, countdowns.
  */
+import { formatClock, formatDuration, type DurationUnits } from "@/lib/duration";
 
-/** "42s", "4m 12s", "1h 4m", "2d 3h" (negative counts as zero). */
-export function formatDuration(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${String(s)}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)}m ${String(s % 60)}s`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)}h ${String(m % 60)}m`;
-  return `${String(Math.floor(h / 24))}d ${String(h % 24)}h`;
-}
+/** An elapsed time or a duration: "42s", "4m 12s", "1h 4m", "2d 3h" (negative counts as zero). */
+const DURATION: DurationUnits = { days: true, hours: true, minutes: true, seconds: true };
 
 /**
  * A `duration` span (a fixed time a plugin measured): under a second in tenths ("0.2s",
@@ -23,7 +16,7 @@ export function formatFixedDuration(ms: number): string {
   if (ms <= 0) return "0s";
   if (ms < 100) return "<0.1s";
   if (ms < 1000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`;
-  return formatDuration(ms);
+  return formatDuration(ms, DURATION);
 }
 
 function unit(n: number, word: string): string {
@@ -41,19 +34,14 @@ export function formatRelative(atMs: number, nowMs: number): string {
 
 /** "9:41", "1:02:03" until atMs, then "expired". */
 export function formatCountdown(atMs: number, nowMs: number): string {
-  const s = Math.floor((atMs - nowMs) / 1000);
-  if (s <= 0) return "expired";
-  const h = Math.floor(s / 3600);
-  const mm = Math.floor((s % 3600) / 60);
-  const ss = String(s % 60).padStart(2, "0");
-  return h > 0 ? `${String(h)}:${String(mm).padStart(2, "0")}:${ss}` : `${String(mm)}:${ss}`;
+  return atMs - nowMs < 1000 ? "expired" : formatClock(atMs - nowMs);
 }
 
 /** A time span's text now; "" for a time that does not parse. */
 export function formatTime(at: string, style: "relative" | "elapsed" | "countdown" | undefined, nowMs: number): string {
   const ms = Date.parse(at);
   if (Number.isNaN(ms)) return "";
-  if (style === "elapsed") return formatDuration(nowMs - ms);
+  if (style === "elapsed") return formatDuration(nowMs - ms, DURATION);
   if (style === "countdown") return formatCountdown(ms, nowMs);
   return formatRelative(ms, nowMs);
 }

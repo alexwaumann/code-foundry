@@ -4,7 +4,7 @@ import type { SearchEntryView } from "@/api/search";
 import { errorMessage } from "@/api/stream";
 import { DictationMic } from "@/components/compose/DictationMic";
 import { useComposerDictation } from "@/components/compose/useComposerDictation";
-import { Segmented } from "@/components/usage/Segmented";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { chordFromEvent } from "@/keys/chord";
 import { openingSelection, unseenCue, unseenToRestore, type SearchModeId, type SearchSession } from "@/lib/agentSearch";
 import { phraseAtCaret, phraseOnOneLine } from "@/lib/dictation";
@@ -65,14 +65,22 @@ function SearchHeader({
             e.preventDefault();
           }}
         >
-          <Segmented
-            options={modes.map((m) => ({ value: m.id, label: m.label }))}
+          <RadioGroup
+            variant="segmented"
+            size="sm"
             value={mode.id}
-            onChange={setMode}
+            onValueChange={(v) => {
+              setMode(v as SearchModeId);
+            }}
             aria-label="Search mode"
-            className="text-label font-normal"
             data-testid="search-mode"
-          />
+          >
+            {modes.map((m) => (
+              <RadioGroupChoice key={m.id} value={m.id} className="text-label font-normal" data-testid={`search-mode-${m.id}`}>
+                {m.label}
+              </RadioGroupChoice>
+            ))}
+          </RadioGroup>
         </div>
       )}
     </div>

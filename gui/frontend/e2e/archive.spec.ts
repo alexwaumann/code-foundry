@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { holdThreads, mockPost, openApp, resetMock, row } from "./fixtures";
 
 // Archived threads in the sidebar (docs/notes/archive-threads-2-sidebar.md). The default
-// world has one archived thread, s-7 ("Spike a canvas sidebar", archived 90 min ago); the
+// world has one archived thread, s-7 ("Spike a canvas sidebar", archived 90m ago); the
 // Archived section is collapsed by default.
 
 test.beforeEach(async () => {

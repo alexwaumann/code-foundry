@@ -347,7 +347,7 @@ describe("MCP surface staleness", () => {
 
   it.each<[string, string, number, boolean, string]>([
     ["running, checked 12s ago: current", "s-r", 12_000, false, "Checked 12s ago, at the start of the last turn"],
-    ["running, checked 12 min ago: stale", "s-r", 12 * 60_000, true, "Last check 12 min ago · may be out of date"],
+    ["running, checked 12m ago: stale", "s-r", 12 * 60_000, true, "Last check 12m ago · may be out of date"],
     ["Claude not running, checked 12s ago: stale", "s-off", 12_000, true, "Last check 12s ago · may be out of date"],
   ])("%s", (_name, id, ago, stale, line) => {
     setMcp(id, { ...STATUS, checkedAtMs: Date.now() - ago });
@@ -366,7 +366,7 @@ describe("MCP surface staleness", () => {
         vi.advanceTimersByTime(15_000);
       });
       expectStale(true);
-      expect(screen.getByTestId("mcp-checked").textContent).toBe("Last check 10 min ago · may be out of date");
+      expect(screen.getByTestId("mcp-checked").textContent).toBe("Last check 10m ago · may be out of date");
       // A fresh check: current again; then Claude stops: stale at once.
       act(() => {
         setMcp("s-r", { ...STATUS, checkedAtMs: Date.now() });

@@ -4,7 +4,8 @@ import type { EmberTaskView } from "@/api/ember";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
-import { boardSections, cardMeta, cardProgress, timerRows, unclosed, unclosedWords, updatedAgo, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
+import { formatAge } from "@/lib/duration";
+import { boardSections, cardMeta, cardProgress, timerRows, unclosed, unclosedWords, workerRows, type BoardCard, type TaskDot, type TimerRow, type WorkerRow } from "@/lib/ember";
 import { statusToneText, type StatusTone } from "@/lib/statusLine";
 import { cn } from "@/lib/utils";
 import { runCommandForResult } from "@/stores/commands";
@@ -70,7 +71,7 @@ function WorkerLine({ row, now }: { row: WorkerRow; now: number }) {
       )}
       {row.atMs !== null && (
         <span className="shrink-0 text-cf-text-muted tabular-nums" data-testid="ember-worker-age">
-          {updatedAgo(row.atMs, now)}
+          {`updated ${formatAge(row.atMs, now, { minutes: true, hours: true, days: true })}`}
         </span>
       )}
     </>

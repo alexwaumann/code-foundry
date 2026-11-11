@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CheckRollupView } from "@/api/gh";
-import { checksSummary, freshness, monthName, prKey, repoName, shortAge, updatedAgo } from "./format";
+import { formatAge } from "@/lib/duration";
+import { checksSummary, FETCH_AGE, freshness, monthName, PR_CELL_AGE, prKey, repoName } from "./format";
 
 const NOW = new Date(2026, 9, 8, 12, 0, 0).getTime();
 const S = 1000;
@@ -8,9 +9,8 @@ const M = 60 * S;
 const H = 60 * M;
 const D = 24 * H;
 
-describe("shortAge", () => {
+describe("PR_CELL_AGE", () => {
   it.each([
-    [null, "—"],
     [NOW - 10 * S, "now"],
     [NOW - 5 * M, "5m"],
     [NOW - 3 * H, "3h"],
@@ -20,18 +20,18 @@ describe("shortAge", () => {
     [NOW - 800 * D, "2y"],
     [NOW + 5 * M, "now"],
   ])("%s -> %s", (ms, want) => {
-    expect(shortAge(ms, NOW)).toBe(want);
+    expect(formatAge(ms, NOW, PR_CELL_AGE)).toBe(want);
   });
 });
 
-describe("updatedAgo and freshness", () => {
+describe("FETCH_AGE and freshness", () => {
   it.each([
-    [null, "not fetched yet"],
-    [NOW - 8 * S, "updated 8s ago"],
-    [NOW - 3 * M, "updated 3m ago"],
-    [NOW - 2 * H, "updated 2h ago"],
+    [NOW - 8 * S, "8s ago"],
+    [NOW - 3 * M, "3m ago"],
+    [NOW - 2 * H, "2h ago"],
+    [NOW - 20 * D, "2w ago"],
   ])("%s -> %s", (ms, want) => {
-    expect(updatedAgo(ms, NOW)).toBe(want);
+    expect(formatAge(ms, NOW, FETCH_AGE)).toBe(want);
   });
   it.each([
     [NOW - M, "", "fresh"],

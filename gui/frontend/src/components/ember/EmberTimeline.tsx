@@ -8,13 +8,13 @@ import { TimelineRowView } from "@/components/thread/rows";
 import { TimelineList } from "@/components/thread/Timeline";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
+import { formatDuration } from "@/lib/duration";
 import {
   buildEmberRows,
   clockTime,
   restartCuts,
   runEndMs,
   runMs,
-  shortDuration,
   splitTaskLinks,
   turnEndAfter,
   WORK_ROW_HEIGHT,
@@ -178,7 +178,7 @@ function finishedMs(log: ItemLog, ids: readonly string[]): number {
 function LiveElapsed({ threadId, ids }: { threadId: string; ids: readonly string[] }) {
   const now = useNow(1000);
   const ms = useThreadStore((s) => workMs(runItems(s.logs[threadId], ids), now));
-  const d = shortDuration(ms);
+  const d = ms < 1000 ? "" : formatDuration(ms, { hours: true, minutes: true, seconds: true });
   return d ? (
     <>
       <span className="sep">·</span>
@@ -200,7 +200,7 @@ const WorkRowView = memo(function WorkRowView({ row }: { row: WorkRow }) {
   const ms = useThreadStore((s) => (row.live ? 0 : finishedMs(s.logs[threadId], row.ids)));
   const endMs = useThreadStore((s) => (row.live ? null : runEndMs(runItems(s.logs[threadId], row.ids))));
   const now = useNow(60_000);
-  const took = shortDuration(ms);
+  const took = ms < 1000 ? "" : formatDuration(ms, { hours: true, minutes: true, seconds: true });
   const lead = row.live ? null : took ? `Worked for ${took}` : "Worked";
   // When the run ended (the reply after it came), right-aligned like a user message's time.
   const time = endMs === null ? null : (

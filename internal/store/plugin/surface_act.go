@@ -71,11 +71,15 @@ func (a *actor) viewUpdate(_ context.Context, params json.RawMessage) (any, erro
 		}
 		return nil, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "view rejected: %s", strings.Join(shown, "; "))
 	}
-	ver, flooding := in.accept(v, canon, a.m.opts.Now())
+	ver, flood := in.accept(v, canon, a.m.opts.Now())
 	a.m.surf.setIssue(a.name, in.surfaceID, "")
-	if flooding {
+	switch flood {
+	case floodStarted:
 		a.hostLog("%s sends more than %d views a second: showing at most one a second", p.Instance, floodRate)
 		a.m.surf.setIssue(a.name, in.surfaceID+" flood", fmt.Sprintf("more than %d views a second for %ds; shown at most one a second", floodRate, floodSeconds))
+	case floodEnded:
+		a.hostLog("%s is back under %d views a second: showing every view", p.Instance, floodRate)
+		a.m.surf.setIssue(a.name, in.surfaceID+" flood", "")
 	}
 	return pluginsdk.ViewUpdateResult{Version: ver}, nil
 }

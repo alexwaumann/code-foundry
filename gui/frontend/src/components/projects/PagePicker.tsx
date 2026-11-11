@@ -1,7 +1,8 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { shortAge } from "@/components/prs/format";
+import { PR_CELL_AGE } from "@/components/prs/format";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNow } from "@/lib/clock";
+import { formatAge } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { addProject } from "@/stores/projectActions";
 import { useProjectsStore } from "@/stores/projects";
@@ -32,7 +33,7 @@ export function ProjectsCrumb() {
 
 function AgeText({ ms }: { ms: number | null }) {
   const now = useNow(30_000);
-  return <span className="ml-auto pl-4 text-caption text-cf-text-muted tabular-nums">{ms === null ? "" : shortAge(ms, now)}</span>;
+  return <span className="ml-auto pl-4 text-caption text-cf-text-muted tabular-nums">{ms === null ? "" : formatAge(ms, now, PR_CELL_AGE)}</span>;
 }
 
 function ProjectItem({ id, current }: { id: string; current: boolean }) {

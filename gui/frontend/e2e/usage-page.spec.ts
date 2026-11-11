@@ -3,9 +3,9 @@ import { openApp, resetMock } from "./fixtures";
 
 /**
  * The Usage page (view.usage), in its sheet, over the mock's usage buckets
- * (mock/usage.ts): two weeks of four models on s-1..s-4, an unpriced claude-opus-5-6 on
- * s-3, and a retired ledger
- * with claude-opus-4-8 ("Other") 12 days ago and opus 20, 33 and 60 days ago. Set
+ * (mock/usage.ts): two weeks of models from four families on s-1..s-4, an unpriced
+ * claude-opus-4-1 on s-3, and a retired ledger with claude-opus-4-8 12 days ago, opus
+ * 20, 33 and 60 days ago and <synthetic> ("Other") 5 days ago. Set
  * SHOTS=<dir> for the PR's screenshots. The sheet itself: usage-sheet.spec.ts.
  */
 

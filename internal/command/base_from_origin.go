@@ -8,7 +8,8 @@ package command
 var baseFromOriginArg = ArgSpec{Name: "base-from-origin", Type: Enum, Enum: []string{"yes", "no"},
 	Description: "Override settings projects.base_from_origin for this worktree (default: the setting). " +
 		"yes: the default branch, or a base that is a branch name, is origin's copy, fetched first, unless the local one is ahead. " +
-		"no: the local branch, or base exactly as typed (an unpushed local branch works), and nothing is fetched."}
+		"no: the local branch, or base exactly as typed (an unpushed local branch works), and new branches are not fetched from origin; " +
+		"checking out a branch only origin has still fetches it."}
 
 // baseFromOrigin is the --base-from-origin override: nil when not given (the setting).
 func baseFromOrigin(a Args) (*bool, error) {

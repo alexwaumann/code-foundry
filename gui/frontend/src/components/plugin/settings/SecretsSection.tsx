@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/lib/clock";
-import { formatAgo } from "@/lib/thread";
+import { formatAge } from "@/lib/duration";
 import { deletePluginSecret, loadPluginSecrets, usePluginSecrets } from "@/stores/pluginSecrets";
 
 /**
@@ -35,7 +35,7 @@ export function SecretsList({ name }: { name: string }) {
           <div key={s.key} className="flex min-w-0 items-center gap-2" data-testid="plugin-secret" data-key={s.key}>
             <span className="min-w-0 truncate font-mono text-caption-sm text-cf-text">{s.key}</span>
             <span className="shrink-0 text-caption-sm tabular-nums" data-testid="plugin-secret-set">
-              {s.updatedAtMs === null ? "set" : `set ${formatAgo(s.updatedAtMs, now)}`}
+              {s.updatedAtMs === null ? "set" : `set ${formatAge(s.updatedAtMs, now, { minutes: true, hours: true, days: true })}`}
             </span>
             <Button
               variant="ghost"

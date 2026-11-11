@@ -374,15 +374,6 @@ export function workerRows(c: BoardCard): WorkerRow[] {
   return rows;
 }
 
-/** A worker row's age, labelled: "updated just now", "updated 4m ago". */
-export function updatedAgo(atMs: number, now: number): string {
-  const m = Math.floor(Math.max(0, now - atMs) / 60_000);
-  if (m < 1) return "updated just now";
-  if (m < 60) return `updated ${String(m)}m ago`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `updated ${String(h)}h ago` : `updated ${String(Math.floor(h / 24))}d ago`;
-}
-
 /**
  * Distinct threads matching `is` over the tasks' worker threads and their teams (a
  * subtask's worker may sit in its parent lead's team too). The daemon lists ten of a
@@ -1235,16 +1226,6 @@ export function turnEndAfter(log: { byId: Readonly<Record<string, ThreadItemView
     if (it?.kind === "turnEnd") return it.durationMs;
   }
   return null;
-}
-
-/** "40s", "2m", "1h 05m"; "" under a second. */
-export function shortDuration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  if (s < 1) return "";
-  if (s < 60) return `${String(s)}s`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${String(m)}m`;
-  return `${String(Math.floor(m / 60))}h ${String(m % 60).padStart(2, "0")}m`;
 }
 
 // ---------- the Board's Scheduled section ----------

@@ -1,7 +1,8 @@
 import type { ApiRetryView, ThreadView } from "@/api/threads";
+import { formatDuration } from "./duration";
 
 /**
- * The composer's "Rate limited · retrying in 20 s (attempt 3 of 10)" line
+ * The composer's "Rate limited · retrying in 20s (attempt 3 of 10)" line
  * (docs/notes/api-retry-note.md): Claude Code retries failed API requests itself, and
  * without this line a thread that waits on a 429 only shows "Working" with no output.
  */
@@ -28,13 +29,9 @@ export function retryCause(r: Pick<ApiRetryView, "error" | "errorStatus">): stri
   return r.error ? `API error (${r.error})` : "API error";
 }
 
-/** "20 s", "1 min 5 s", "3 min"; whole seconds, rounded up. */
+/** "20s", "1m 5s", "3m"; whole seconds, rounded up. */
 export function fmtRetryIn(ms: number): string {
-  const s = Math.max(1, Math.ceil(ms / 1000));
-  if (s < 60) return `${String(s)} s`;
-  const m = Math.floor(s / 60);
-  const rest = s % 60;
-  return rest === 0 ? `${String(m)} min` : `${String(m)} min ${String(rest)} s`;
+  return formatDuration(Math.max(1, Math.ceil(ms / 1000)) * 1000, { hours: true, minutes: true, seconds: true });
 }
 
 /**

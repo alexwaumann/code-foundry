@@ -19,7 +19,8 @@ import (
 // (rev-list --count origin/<b>..<b> > 0, so a diverged branch counts as ahead), in
 // which case it is the local branch. Without origin, or when origin has no such branch,
 // it is the local branch. BaseFromOrigin off is the kill switch: always the local
-// branch, nothing fetched.
+// branch, and new branches are not fetched from origin; checking out a branch only
+// origin has (CreateWorktree's DWIM case) still fetches it.
 
 // baseKind is how startPoint treats a typed base.
 type baseKind int

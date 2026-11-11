@@ -6,6 +6,7 @@
  */
 import type { GitStatusView, WorktreeView } from "@/api/project";
 import type { ThreadView } from "@/api/threads";
+import { formatAge } from "./duration";
 import { threadHolds, type CleanupThreads } from "./projects";
 
 /**
@@ -63,19 +64,6 @@ export function lastArchivedOn(threads: ArchivedThreads, path: string): { id: st
   return best;
 }
 
-/** "just now", "5m ago", "3h ago", "12d ago", "3w ago", "4mo ago", "2y ago" (the tables' compact ages). */
-function agoText(ms: number, now: number): string {
-  const m = Math.floor(Math.max(0, now - ms) / 60_000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${String(m)}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 14) return `${String(d)}d ago`;
-  if (d < 60) return `${String(Math.floor(d / 7))}w ago`;
-  if (d < 365) return `${String(Math.floor(d / 30))}mo ago`;
-  return `${String(Math.floor(d / 365))}y ago`;
-}
 
 const plural = (n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 
@@ -121,7 +109,7 @@ export function leftoverReason(wt: Pick<WorktreeView, "status" | "detached" | "m
   else if (!unlanded) parts.push("clean");
   if (wt.landed === true) parts.push(n > 0 ? "merged otherwise" : "merged");
   if (o.terminal) parts.push("a terminal is open in it");
-  if (o.archivedAtMs !== null) parts.push(`last thread archived ${agoText(o.archivedAtMs, o.now)}`);
+  if (o.archivedAtMs !== null) parts.push(`last thread archived ${formatAge(o.archivedAtMs, o.now, { minutes: true, hours: true, days: true, weeks: true, months: true, years: true })}`);
   return parts.join(" · ");
 }
 

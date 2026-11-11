@@ -4,11 +4,11 @@
  * chart series. docs/notes/session-usage.md "Usage page".
  */
 import type { UsageBucketView } from "@/api/threads";
-import { MODEL_SLOTS, bucketTokens, modelSlot, totalUsage, usageByModel, type ModelUsage, type UsageTotals } from "@/lib/usage";
+import { bucketTokens, compareModels, modelBaseId, modelColors, modelFamily, OTHER_COLOR_VARS, totalUsage, usageByModel, type ModelUsage, type SwatchVars, type UsageTotals } from "@/lib/usage";
 
 const DAY_MS = 86_400_000;
 
-/** The chart series for models without a colour slot. */
+/** The chart series for models outside the colour families. */
 export const OTHER = "other";
 
 /** The last `n` UTC days ending today, oldest first, as "YYYY-MM-DD". */
@@ -29,12 +29,16 @@ export function seriesLabel(key: string): string {
 }
 
 /**
- * The chart series a model belongs to: its colour slot's model id (so a dated or suffixed
- * snapshot stacks with its family), else OTHER.
+ * The chart series a model belongs to: its id without a snapshot suffix (so a dated or
+ * suffixed snapshot stacks with its model) when it is in a colour family, else OTHER.
  */
 export function seriesOf(model: string): string {
-  const slot = modelSlot(model);
-  return MODEL_SLOTS.find(([, s]) => s === slot)?.[0] ?? OTHER;
+  return modelFamily(model) ? modelBaseId(model) : OTHER;
+}
+
+/** A series' colour in a chart's palette; grey for OTHER. */
+export function seriesColor(colors: ReadonlyMap<string, SwatchVars>, key: string): SwatchVars {
+  return colors.get(key) ?? OTHER_COLOR_VARS;
 }
 
 /** A 1, 2, 2.5 or 5 × 10^k grid step giving about four lines up to `max`. */
@@ -73,8 +77,10 @@ export interface UsagePageData {
   /** Tracked threads with usage in the range (removed threads are not counted: the ledger has no ids). */
   threads: number;
   models: ModelUsage[];
-  /** Series with usage in the range, slot order, OTHER last. */
+  /** Series with usage in the range: by family, newest first, OTHER last. */
   series: string[];
+  /** Each series' colour (OTHER has none: seriesColor greys it). */
+  colors: Map<string, SwatchVars>;
   /** One entry per day of the range, empty days included. */
   daily: DayUsage[];
 }
@@ -107,8 +113,9 @@ export function usagePageData(threads: readonly (readonly UsageBucketView[])[], 
   };
   for (const bs of threads) if (take(bs)) threadCount++;
   take(retired);
-  const series: string[] = MODEL_SLOTS.map(([m]) => m).filter((m) => seen.has(m));
+  const series = [...seen].filter((k) => k !== OTHER).sort(compareModels);
+  const colors = modelColors(series);
   if (seen.has(OTHER)) series.push(OTHER);
   const cacheSavingsUsd = inRange.reduce((s, b) => s + b.cacheSavingsUsd, 0);
-  return { totals: totalUsage(inRange), cacheSavingsUsd, threads: threadCount, models: usageByModel(inRange), series, daily };
+  return { totals: totalUsage(inRange), cacheSavingsUsd, threads: threadCount, models: usageByModel(inRange), series, colors, daily };
 }

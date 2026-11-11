@@ -4,15 +4,15 @@ import { useShallow } from "zustand/react/shallow";
 import type { UsageBucketView } from "@/api/threads";
 import { Button } from "@/components/ui/button";
 import { DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Tip } from "@/components/ui/tooltip";
 import { SheetHeader } from "@/components/window/SheetHeader";
-import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type UsageTotals } from "@/lib/usage";
+import { fmtShare, fmtTok, fmtUsd, type ModelUsage, type SwatchVars, type UsageTotals } from "@/lib/usage";
 import { useThreadsStore } from "@/stores/threads";
 import { USAGE_RANGES, useUiStore, type UsageRange } from "@/stores/ui";
 import { closeUsage } from "@/stores/views";
-import { Segmented } from "./Segmented";
 import { Swatch, UsageChart, type ChartMode } from "./UsageChart";
-import { usagePageData, utcDays } from "./usageData";
+import { seriesColor, seriesOf, usagePageData, utcDays } from "./usageData";
 
 const NONE: readonly UsageBucketView[] = [];
 const RANGE_OPTIONS = USAGE_RANGES.map((d) => ({ value: d, label: d === 1 ? "1 day" : `${String(d)} days` }));
@@ -58,16 +58,23 @@ export function UsagePage() {
       <SheetHeader className="gap-3 px-4">
         <DialogTitle>Usage</DialogTitle>
         <span className="ml-auto truncate text-caption">Code Foundry threads only</span>
-        <Segmented
-          options={RANGE_OPTIONS}
-          value={range}
-          onChange={(d: UsageRange) => {
-            setRange(d);
+        <RadioGroup
+          variant="segmented"
+          size="sm"
+          value={String(range)}
+          onValueChange={(v) => {
+            setRange(Number(v) as UsageRange);
           }}
           aria-label="Range"
           data-testid="usage-page-range"
           className="ml-1"
-        />
+        >
+          {RANGE_OPTIONS.map((o) => (
+            <RadioGroupChoice key={o.value} value={String(o.value)} data-testid={`usage-page-range-${String(o.value)}`}>
+              {o.label}
+            </RadioGroupChoice>
+          ))}
+        </RadioGroup>
         <Tip label="Close (Esc)">
           <Button variant="ghost" size="icon-xs" aria-label="Close usage" onClick={closeUsage} data-testid="usage-page-close">
             <X />
@@ -103,11 +110,26 @@ export function UsagePage() {
                 <h2 className="text-subheading">
                   Daily<span className="ml-2 font-normal text-cf-text-muted">by model</span>
                 </h2>
-                <Segmented options={MODE_OPTIONS} value={mode} onChange={setMode} aria-label="Chart measure" data-testid="usage-page-mode" />
+                <RadioGroup
+                  variant="segmented"
+                  size="sm"
+                  value={mode}
+                  onValueChange={(v) => {
+                    setMode(v as ChartMode);
+                  }}
+                  aria-label="Chart measure"
+                  data-testid="usage-page-mode"
+                >
+                  {MODE_OPTIONS.map((o) => (
+                    <RadioGroupChoice key={o.value} value={o.value} data-testid={`usage-page-mode-${o.value}`}>
+                      {o.label}
+                    </RadioGroupChoice>
+                  ))}
+                </RadioGroup>
               </div>
-              <UsageChart daily={data.daily} series={data.series} mode={mode} />
+              <UsageChart daily={data.daily} series={data.series} colors={data.colors} mode={mode} />
               <h2 className="mt-8 mb-2.5 text-subheading">By model</h2>
-              <ModelTable models={data.models} totalCost={totals.costUsd} />
+              <ModelTable models={data.models} colors={data.colors} totalCost={totals.costUsd} />
               <BucketStrip totals={totals} cacheSavingsUsd={data.cacheSavingsUsd} />
             </>
           )}
@@ -117,7 +139,7 @@ export function UsagePage() {
   );
 }
 
-function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; totalCost: number }) {
+function ModelTable({ models, colors, totalCost }: { models: readonly ModelUsage[]; colors: ReadonlyMap<string, SwatchVars>; totalCost: number }) {
   const th = "px-2 py-1.5 text-caption-sm font-medium border-b border-cf-border";
   return (
     <table className="w-full border-collapse text-body-sm" data-testid="usage-page-models">
@@ -139,7 +161,7 @@ function ModelTable({ models, totalCost }: { models: readonly ModelUsage[]; tota
             <tr key={m.model} data-testid="usage-page-model-row" data-model={m.model}>
               <td className="border-b border-cf-border p-2">
                 <span className="flex items-center">
-                  <Swatch model={m.model} />
+                  <Swatch colors={seriesColor(colors, seriesOf(m.model))} />
                   <span className="font-mono">{m.model}</span>
                   {m.unpriced && (
                     <span className="ml-1.5 rounded-sm border border-cf-border px-1.5 py-px text-caption-sm" data-testid="usage-page-unpriced">

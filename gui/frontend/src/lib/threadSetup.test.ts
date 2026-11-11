@@ -128,7 +128,7 @@ describe("setupView", () => {
   const cancels: [string, number, string][] = [
     ["whole seconds", 4300, "Setup cancelled after 4s"],
     ["inside the first second", 400, "Setup cancelled after 0.4s"],
-    ["a minute in", 65_000, "Setup cancelled after 1m 05s"],
+    ["a minute in", 65_000, "Setup cancelled after 1m 5s"],
   ];
   it.each(cancels)("cancelled: one line, %s", (_, took, label) => {
     const s = setup("cancelled", [pending("fetch"), pending("start")], { startedAtMs: NOW - took, endedAtMs: NOW });

@@ -5,7 +5,6 @@ import {
   agentName,
   agentsLabel,
   backgroundLabel,
-  fmtElapsed,
   parseAgentNote,
   sameAgent,
   shareAgents,
@@ -46,17 +45,6 @@ describe("labels", () => {
     [{ description: "", agentType: "" }, "Agent"],
   ])("agentName(%o) = %s", (r, want) => {
     expect(agentName(r)).toBe(want);
-  });
-
-  it.each([
-    [0, "0s"],
-    [999, "0s"],
-    [38_400, "38s"],
-    [63_000, "1m 03s"],
-    [252_000, "4m 12s"],
-    [3_900_000, "1h 05m"],
-  ])("fmtElapsed(%i) = %s", (ms, want) => {
-    expect(fmtElapsed(ms)).toBe(want);
   });
 
   it.each([

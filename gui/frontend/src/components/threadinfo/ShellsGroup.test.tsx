@@ -78,7 +78,7 @@ describe("the flat list", () => {
     const { parent } = seedChildServer();
     await renderGroup(parent);
     expect(rows().map((r) => r.dataset.port)).toEqual(["7788", "9399", "5173"]);
-    expect(words(row(7788))).toMatch(/^make dev · Debug daemon action · 1m 0?\ds?$/);
+    expect(words(row(7788))).toMatch(/^make dev · Debug daemon action · 1m( \ds)?$/);
     expect(words(row(9399))).toMatch(/^python3 -m http.server 9399 · Serve the web preview · 1m 1\ds$/);
     expect(words(row(5173))).toMatch(/^pnpm dev · Dev action · Serve the web preview · 1m 4\ds$/);
     expect(within(row(5173)).getByTestId("ti-server-meta").textContent).toBe("+1");

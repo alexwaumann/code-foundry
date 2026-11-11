@@ -2,10 +2,11 @@ import { Ellipsis, Loader2 } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { PullRequestDetailView } from "@/api/gh";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { updatedAgo } from "@/components/prs/format";
+import { FETCH_AGE } from "@/components/prs/format";
 import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
 import { useNow } from "@/lib/clock";
+import { formatAge } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { openUrl, pullRequestKey, useFreshness, useViewerLogin } from "@/stores/gh";
 import { copyPullRequestLink, linkPullRequestToThread, refreshPullRequest, revertPullRequest, setPullRequestDraft, usePrPanelStore, usePullRequestChange } from "@/stores/prPanel";
@@ -38,7 +39,7 @@ function RefreshHint({ fetchedAtMs, lastError, busy }: { fetchedAtMs: number | n
   const now = useNow(1000);
   const f = useFreshness(fetchedAtMs, lastError, false);
   if (busy) return <span data-testid="pr-menu-refresh-hint">Refreshing…</span>;
-  const when = f.fetchedAtMs === null ? "Not fetched yet" : `U${updatedAgo(f.fetchedAtMs, now).slice(1)}`;
+  const when = f.fetchedAtMs === null ? "Not fetched yet" : `Updated ${formatAge(f.fetchedAtMs, now, FETCH_AGE)}`;
   return (
     <Tip label={f.lastError} side="left">
       <span data-testid="pr-menu-refresh-hint" className={f.lastError ? "text-cf-warning-text" : undefined}>

@@ -108,16 +108,8 @@ export function usageByModel(buckets: readonly UsageBucketView[]): ModelUsage[] 
 
 // ---- Model colours --------------------------------------------------------------
 
-/** A colour slot: 1–4 are the known models in fixed order, 5 is everything else. */
+/** A colour slot: 1–4 are the model families in fixed order, 5 is everything else. */
 export type ModelSlot = 1 | 2 | 3 | 4 | 5;
-
-/** Fixed slot per model family (DESIGN.md: opus blue, fable orange, sonnet aqua, haiku yellow). */
-export const MODEL_SLOTS: readonly (readonly [string, ModelSlot])[] = [
-  ["claude-opus-5-5", 1],
-  ["claude-fable-5-1", 2],
-  ["claude-sonnet-5-5", 3],
-  ["claude-haiku-5-5", 4],
-];
 
 /** Light and dark colours per slot (the mockup's --s1..--s5). */
 export const SLOT_COLORS: Readonly<Record<ModelSlot, { light: string; dark: string }>> = {
@@ -128,25 +120,95 @@ export const SLOT_COLORS: Readonly<Record<ModelSlot, { light: string; dark: stri
   5: { light: "oklch(0.65 0 0)", dark: "oklch(0.6 0 0)" },
 };
 
-/** A model's slot: its id, or a dated or suffixed snapshot of it ("claude-haiku-5-5-20261001", "…[1m]"). */
-export function modelSlot(model: string): ModelSlot {
-  for (const [id, slot] of MODEL_SLOTS) {
-    if (model === id || model.startsWith(`${id}-`) || model.startsWith(`${id}[`) || model.startsWith(`${id}@`)) return slot;
-  }
-  return 5;
+/** A swatch's light and dark colours as --sw-l / --sw-d. */
+export type SwatchVars = Record<"--sw-l" | "--sw-d", string>;
+
+export type ModelFamily = "opus" | "fable" | "sonnet" | "haiku";
+
+/** Each family's slot: opus blue, fable orange, sonnet aqua, haiku yellow. */
+const FAMILY_SLOTS: Readonly<Record<ModelFamily, ModelSlot>> = { opus: 1, fable: 2, sonnet: 3, haiku: 4 };
+
+const FAMILY_RE = /(?:^|[./])claude-(?:[\d-]+-)?(opus|fable|mythos|sonnet|haiku)(?=$|[-[@:])/;
+
+/** A model's family from its id ("claude-opus-4-8", "us.anthropic.claude-sonnet-5-v1:0"); mythos counts as fable. */
+export function modelFamily(model: string): ModelFamily | undefined {
+  const f = FAMILY_RE.exec(model)?.[1];
+  if (f === undefined) return undefined;
+  return f === "mythos" ? "fable" : (f as ModelFamily);
 }
 
+/** A model id without its snapshot suffix: "claude-haiku-5-5-20261001", "…[1m]" and "…@x" are "claude-haiku-5-5". */
+export function modelBaseId(model: string): string {
+  return model.replace(/[[@].*$/, "").replace(/-\d{8}$/, "");
+}
+
+/** The version numbers in a model id: "claude-opus-4-8" is [4, 8]. */
+function modelVersion(model: string): number[] {
+  return (modelBaseId(model).match(/\d+/g) ?? []).map(Number);
+}
+
+/** Orders models by family (opus, fable, sonnet, haiku; others last), newest version first, then by id. */
+export function compareModels(a: string, b: string): number {
+  const fa = modelFamily(a);
+  const fb = modelFamily(b);
+  const sa = fa ? FAMILY_SLOTS[fa] : 5;
+  const sb = fb ? FAMILY_SLOTS[fb] : 5;
+  if (sa !== sb) return sa - sb;
+  const va = modelVersion(a);
+  const vb = modelVersion(b);
+  for (let i = 0; i < Math.max(va.length, vb.length); i++) {
+    const d = (vb[i] ?? 0) - (va[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return a.localeCompare(b);
+}
+
+/** How far the i-th model of a family (0 the newest) is mixed toward white: 0, 0.38, 0.62, 0.76… */
+function shadeTint(i: number): number {
+  return 1 - 0.62 ** i;
+}
+
+/** `hex` ("#rrggbb") mixed toward white by `t` (0–1). */
+export function tint(hex: string, t: number): string {
+  if (t <= 0) return hex;
+  const n = Number.parseInt(hex.slice(1), 16);
+  const ch = (shift: number) => {
+    const c = (n >> shift) & 0xff;
+    return Math.round(c + (255 - c) * t)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${ch(16)}${ch(8)}${ch(0)}`;
+}
+
+/** The grey of models outside the families. */
+export const OTHER_COLOR_VARS: SwatchVars = slotColorVars(5);
+
 /**
- * Inline style carrying a model's light and dark colours as --sw-l / --sw-d. Pair it with
- * the classes SWATCH_BG (or `fill-(--sw-l) dark:fill-(--sw-d)` for SVG), so the colour
- * follows the theme without a stylesheet entry.
+ * Colours for one chart's models: each takes its family's hue, the newest of a family
+ * the hue itself and each older one a lighter shade, so two models never share a colour.
+ * Models outside the families are grey.
  */
-export function modelColorVars(model: string): Record<"--sw-l" | "--sw-d", string> {
-  return slotColorVars(modelSlot(model));
+export function modelColors(models: readonly string[]): Map<string, SwatchVars> {
+  const out = new Map<string, SwatchVars>();
+  const rank = new Map<ModelFamily, number>();
+  for (const m of [...new Set(models)].sort(compareModels)) {
+    const f = modelFamily(m);
+    if (!f) {
+      out.set(m, OTHER_COLOR_VARS);
+      continue;
+    }
+    const i = rank.get(f) ?? 0;
+    rank.set(f, i + 1);
+    const c = SLOT_COLORS[FAMILY_SLOTS[f]];
+    const t = shadeTint(i);
+    out.set(m, { "--sw-l": tint(c.light, t), "--sw-d": tint(c.dark, t) });
+  }
+  return out;
 }
 
 /** A slot's colours as --sw-l / --sw-d, for series that are not models (PR activity). */
-export function slotColorVars(slot: ModelSlot): Record<"--sw-l" | "--sw-d", string> {
+export function slotColorVars(slot: ModelSlot): SwatchVars {
   const c = SLOT_COLORS[slot];
   return { "--sw-l": c.light, "--sw-d": c.dark };
 }

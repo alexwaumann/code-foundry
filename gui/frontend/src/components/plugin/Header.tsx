@@ -7,8 +7,9 @@ import { MoreMenu } from "./PluginMenu";
 /**
  * The surface's identity and freshness line (MCP's header): the icon (neutral for every
  * plugin), title, trailing count and pill on the first line; the subline (up to two lines,
- * the rest in a tooltip) and at most two icon-only actions under it, then its menu's ⋯. Before the first view it is the manifest's icon and
- * title over "Loading…".
+ * the rest in a tooltip) and at most two actions under it (icon-only, or a small labelled
+ * button when the plugin gave no icon), then its menu's ⋯. Before the first view it is the
+ * manifest's icon and title over "Loading…".
  */
 export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: ViewHeader | undefined; fallbackTitle: string; icon: string; note?: string }) {
   const hasSubline = inlineSpans(header?.subline).length > 0 || (header?.actions?.length ?? 0) > 0 || header?.menu !== undefined || Boolean(note);
@@ -47,7 +48,7 @@ export function SurfaceHeader({ header, fallbackTitle, icon, note }: { header: V
           {((header?.actions?.length ?? 0) > 0 || header?.menu) && (
             <span className="ml-auto flex shrink-0 items-center gap-0.5">
               {header?.actions?.slice(0, 2).map((b) => (
-                <PluginButton key={b.key} button={{ ...b, iconOnly: true }} />
+                <PluginButton key={b.key} button={{ ...b, iconOnly: Boolean(b.icon) }} />
               ))}
               {header?.menu && <MoreMenu items={header.menu.items} testId="plugin-header-more" />}
             </span>

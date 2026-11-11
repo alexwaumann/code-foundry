@@ -17,7 +17,7 @@ interface ThreadTagInfo {
   known: boolean;
   /** The project's name, "No project", or "" when the thread is not known. */
   project: string;
-  /** "Working", "Finished 5 min ago", "Needs input · Bash", "Idle", "Archived", "Snoozed", "Saved"; "" when not known. */
+  /** "Working", "Finished 5m ago", "Needs input · Bash", "Idle", "Archived", "Snoozed", "Saved"; "" when not known. */
   status: string;
 }
 

@@ -22,7 +22,7 @@ describe("rememberedWhen", () => {
     ["unknown", null, ""],
     ["seconds ago", now - 20_000, "just now"],
     ["in the future", now + 60_000, "just now"],
-    ["minutes ago", now - 5 * 60_000, "5 min ago"],
+    ["minutes ago", now - 5 * 60_000, "5m ago"],
     ["earlier today", new Date(2026, 9, 22, 0, 30).getTime(), "today"],
     ["yesterday late", new Date(2026, 9, 21, 23, 59).getTime(), "yesterday"],
     ["three days ago", new Date(2026, 9, 19, 9, 0).getTime(), "3 days ago"],

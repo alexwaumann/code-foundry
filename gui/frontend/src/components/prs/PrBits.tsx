@@ -3,8 +3,9 @@ import type { CheckRollupView, PrStateView, PullRequestView } from "@/api/gh";
 import { prStateText, toneText } from "@/components/pr/tones";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
+import { formatAge } from "@/lib/duration";
 import { cn } from "@/lib/utils";
-import { checksSummary, freshness, shortAge, updatedAgo } from "./format";
+import { checksSummary, FETCH_AGE, freshness, PR_CELL_AGE } from "./format";
 import { prStateLook } from "./prState";
 
 export function ChecksBadge({ checks, compact = false, branch, className }: { checks: CheckRollupView; compact?: boolean; /** Named before the label, in its tone: "⊗ main 2/16 failing". */ branch?: string; className?: string }) {
@@ -43,7 +44,7 @@ export function Age({ ms, className }: { ms: number | null; className?: string }
   const now = useNow(30_000);
   return (
     <Tip label={ms === null ? null : new Date(ms).toLocaleString()}>
-      <span className={cn("text-caption tabular-nums", className)}>{shortAge(ms, now)}</span>
+      <span className={cn("text-caption tabular-nums", className)}>{ms === null ? "—" : formatAge(ms, now, PR_CELL_AGE)}</span>
     </Tip>
   );
 }
@@ -53,7 +54,7 @@ export function Freshness({ fetchedAtMs, lastError, staleAfterMs, testId }: { fe
   const now = useNow(1000);
   const f = freshness(fetchedAtMs, lastError, now, staleAfterMs);
   const cls = f === "error" ? toneText.failure : f === "stale" ? toneText.pending : toneText.neutral;
-  const text = updatedAgo(fetchedAtMs, now) + (f === "stale" ? " · stale" : "");
+  const text = (fetchedAtMs === null ? "not fetched yet" : `updated ${formatAge(fetchedAtMs, now, FETCH_AGE)}`) + (f === "stale" ? " · stale" : "");
   return (
     <Tip label={lastError}>
       <span className={cn("text-caption tabular-nums", cls)} data-testid={testId} data-freshness={f}>

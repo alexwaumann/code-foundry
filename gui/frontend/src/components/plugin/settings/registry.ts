@@ -61,7 +61,7 @@ export function entryAction(e: Pick<IndexEntryView, "relation">): "install" | "u
   return null;
 }
 
-/** "3 plugins · read 5 min ago" ("3 plugins" before a first read); a failure shows on its own. */
+/** "3 plugins · read 5m ago" ("3 plugins" before a first read); a failure shows on its own. */
 export function registryLine(r: Pick<RegistryView, "plugins" | "fetchedAtMs">, now: number): string {
   const count = `${String(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`;
   return [count, ...(r.fetchedAtMs !== null ? [readWords(r.fetchedAtMs, now)] : [])].join(" · ");

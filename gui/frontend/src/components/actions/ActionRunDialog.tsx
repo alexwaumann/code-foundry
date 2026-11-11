@@ -5,7 +5,8 @@ import { errorMessage } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tip } from "@/components/ui/tooltip";
-import { formatRunDuration } from "@/lib/actions";
+import { RUN_DURATION } from "@/lib/actions";
+import { formatDuration } from "@/lib/duration";
 import { splitPathTail, tildify } from "@/lib/path";
 import { runAction } from "@/stores/actionActions";
 import { closeActionRunOutput, useActionDialogStore } from "@/stores/actionDialog";
@@ -47,7 +48,7 @@ function RunOutput({ runId }: { runId: string }) {
       </p>
     );
   const { run, output, truncated } = load.data;
-  const took = run.startedAtMs !== null && run.finishedAtMs !== null ? formatRunDuration(run.finishedAtMs - run.startedAtMs) : null;
+  const took = run.startedAtMs !== null && run.finishedAtMs !== null ? formatDuration(run.finishedAtMs - run.startedAtMs, RUN_DURATION) : null;
   const path = splitPathTail(tildify(run.worktreePath));
   const owner = run.threadId ? ({ kind: "thread", threadId: run.threadId } as const) : ({ kind: "worktree", projectId: run.projectId, path: run.worktreePath } as const);
   return (

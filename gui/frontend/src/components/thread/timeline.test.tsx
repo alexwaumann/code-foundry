@@ -88,7 +88,7 @@ describe("a thread waiting on a permission (s-r1, permission)", () => {
     expect(headers()).toHaveLength(1);
     const first = headers()[0] as HTMLElement;
     expect(first.getAttribute("data-folded")).toBe("true");
-    expect(first.textContent).toContain("Worked for 4m 08s");
+    expect(first.textContent).toContain("Worked for 4m 8s");
     expect(first.textContent).toContain("9 steps");
     expect(screen.queryAllByTestId("thread-group")).toHaveLength(0);
     expect(finals()[0]?.textContent).toContain("Fixed: stale badge after a force-push");

@@ -31,16 +31,17 @@ import {
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
 import { Tip } from "@/components/ui/tooltip";
-import { agentElapsedMs, agentName, fmtElapsed, parseAgentNote } from "@/lib/agents";
+import { agentElapsedMs, agentName, parseAgentNote } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
+import { formatAge, formatDuration, type DurationUnits } from "@/lib/duration";
 import { parseCreatedByNote } from "@/lib/lineage";
 import { canonicalModelName } from "@/lib/models";
-import { formatAgo } from "@/lib/thread";
 import { questionsOf } from "@/lib/threadRequest";
 import { useCopied } from "@/lib/useCopied";
 import { wakeLines, type WakeLine, type WakeTone } from "@/lib/wake";
 import { groupLabel, turnCostLabel, type StripStep, type TimelineRow, type WorkNode } from "@/lib/threadTimeline";
-import { agentReport, formatDuration, parseObject, splitPath, str, toolFileTarget, toolSummary, type Tense } from "@/lib/toolSummary";
+import { agentReport, parseObject, splitPath, str, toolFileTarget, toolSummary, tookText, type Tense } from "@/lib/toolSummary";
+
 import { useAgentRunOfCall, useAgentRunOfNote } from "@/stores/agents";
 import { useNoteCreator } from "@/stores/lineage";
 import { useModelChoices } from "@/stores/settings";
@@ -59,6 +60,9 @@ import { ThemeCardRow } from "./ThemeCard";
 import { ToolPathChip } from "./PathChip";
 import { AgentReport, ToolDetail } from "./ToolDetail";
 import { UserBubble } from "./UserBubble";
+
+/** A ticking or whole-second time: "12s", "1m 4s", "1h 5m". */
+const ELAPSED: DurationUnits = { hours: true, minutes: true, seconds: true };
 
 const TOOL_ICONS: Readonly<Record<string, LucideIcon>> = {
   Bash: SquareTerminal,
@@ -182,7 +186,7 @@ const EDIT_TOOLS: ReadonlySet<string> = new Set(["Edit", "MultiEdit", "Write", "
 function AgentElapsed({ run }: { run: AgentRunView }) {
   const now = useNow(1000);
   const ms = agentElapsedMs(run, now);
-  return ms === null ? null : <span data-testid="thread-agent-elapsed">{fmtElapsed(ms)}</span>;
+  return ms === null ? null : <span data-testid="thread-agent-elapsed">{formatDuration(ms, ELAPSED)}</span>;
 }
 
 /**
@@ -211,7 +215,7 @@ function AgentMeta({ run, itemRunning, fallback }: { run: AgentRunView; itemRunn
           failed
         </span>
       )}
-      {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{fmtElapsed(ended)}</span>}
+      {running ? <AgentElapsed run={run} /> : fallback ? <span>{fallback}</span> : ended !== null && <span>{formatDuration(ended, ELAPSED)}</span>}
       {(running || itemRunning) && <LoaderCircle className="size-3.5 animate-spin text-cf-info-text" aria-label="Running" />}
     </>
   );
@@ -346,8 +350,7 @@ const ThinkingRow = memo(function ThinkingRow({ node }: { node: Extract<WorkNode
       return { text, streaming: its.some((it) => it.streaming), ms: start !== null && end !== null ? end - start : 0 };
     }),
   );
-  const took = formatDuration(info.ms);
-  const label = info.streaming ? "Thinking…" : took && info.ms >= 1000 ? `Thought for ${took.replace(/\.\ds$/, "s")}` : "Thought";
+  const label = info.streaming ? "Thinking…" : info.ms >= 1000 ? `Thought for ${formatDuration(info.ms, ELAPSED)}` : "Thought";
   return (
     <div>
       <Row icon={Lightbulb} label={label} expanded={info.text ? open : undefined} onToggle={toggle} testId="thread-thinking" />
@@ -609,10 +612,10 @@ function CreatedByNoteRow({ createdBy, text, atMs }: { createdBy: string; text: 
   );
 }
 
-/** "just now", "5 min ago": the note's age on the shared 30 s clock. */
+/** "just now", "5m ago": the note's age on the shared 30 s clock. */
 function NoteAge({ atMs }: { atMs: number }) {
   const now = useNow(30_000);
-  return <>{formatAgo(atMs, now)}</>;
+  return <>{formatAge(atMs, now, { minutes: true, hours: true, days: true })}</>;
 }
 
 /**
@@ -650,10 +653,10 @@ function AgentNoteRow({ note, atMs, threadId, run }: { note: ReturnType<typeof p
   );
 }
 
-/** A running step's elapsed time ("12s", "1m 04s"), on the shared 1 s clock. */
+/** A running step's elapsed time ("12s", "1m 4s"), on the shared 1 s clock. */
 function StepElapsed({ from }: { from: number }) {
   const now = useNow(1000);
-  return <span className="tabular-nums">{formatDuration(Math.max(0, now - from)).replace(/\.\ds$/, "s") || "0s"}</span>;
+  return <span className="tabular-nums">{formatDuration(now - from, ELAPSED)}</span>;
 }
 
 /**
@@ -949,7 +952,7 @@ function stepsLabel(steps: number): string {
 
 /**
  * A turn's header, under its user message and above its work
- * (docs/notes/thread-fold-3-header.md). Finished: "Worked for 4m 08s · 12 steps · $1.12 ·
+ * (docs/notes/thread-fold-3-header.md). Finished: "Worked for 4m 8s · 12 steps · $1.12 ·
  * Opus" behind a chevron (right when folded, down when open); a click folds or unfolds the
  * turn's work below it, and the header keeps its place on screen (KeepRowContext). A turn
  * without work (no steps) has nothing to fold: the line is plain text. Live (the turn
@@ -972,11 +975,11 @@ const HeaderRow = memo(function HeaderRow({ row }: { row: Extract<TimelineRow, {
   if (live) {
     const parts = ["Working"];
     if (row.steps > 0) parts.push(stepsLabel(row.steps));
-    if (start !== null) parts.push(formatDuration(Math.max(0, now - start)).replace(/\.\ds$/, "s") || "0s");
+    if (start !== null) parts.push(formatDuration(now - start, ELAPSED));
     return <TurnHead live parts={parts} />;
   }
   if (it?.kind !== "turnEnd") return null;
-  const took = formatDuration(it.durationMs);
+  const took = tookText(it.durationMs);
   // An API failure ends with is_error and subtype success (docs/notes/api-error-reply-flag.md): no "(success)".
   const failedAs = it.subtype && it.subtype !== "success" ? ` (${it.subtype.replace(/_/g, " ")})` : "";
   const what = it.interrupted ? "Interrupted" : it.isError ? `Failed${failedAs}` : "Worked";

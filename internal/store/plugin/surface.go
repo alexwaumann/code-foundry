@@ -41,9 +41,10 @@ const (
 const (
 	surfaceOpenTimeout = 5 * time.Second
 	// A plugin sending more than floodRate views a second for floodSeconds seconds is
-	// throttled to one a second.
+	// throttled to one a second, until floodQuiet has passed without such a second.
 	floodRate         = 50
 	floodSeconds      = 10
+	floodQuiet        = time.Minute
 	throttledInterval = time.Second
 	// maxRawView bounds view/update's view before decoding (the 256 KB limit excludes
 	// up to four 64 KB logs).
@@ -383,6 +384,7 @@ type instance struct {
 	winStart  time.Time
 	winCount  int
 	floodWins int
+	lastFlood time.Time
 	throttled bool
 }
 
@@ -984,8 +986,17 @@ func (h *surfaceHub) instanceFor(a *actor, key string) (*instance, error) {
 	return in, nil
 }
 
+// floodChange is what a view did to an instance's throttle.
+type floodChange int
+
+const (
+	floodSame floodChange = iota
+	floodStarted
+	floodEnded
+)
+
 // accept installs a valid view and returns its version.
-func (in *instance) accept(v *ui.View, canon []byte, now time.Time) (uint64, bool) {
+func (in *instance) accept(v *ui.View, canon []byte, now time.Time) (uint64, floodChange) {
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	flooding := in.countLocked(now)
@@ -1010,22 +1021,27 @@ func (in *instance) accept(v *ui.View, canon []byte, now time.Time) (uint64, boo
 }
 
 // countLocked counts a view for the flood rule and reports when the instance has just
-// become throttled.
-func (in *instance) countLocked(now time.Time) bool {
+// become throttled or been let go.
+func (in *instance) countLocked(now time.Time) floodChange {
 	if now.Sub(in.winStart) >= time.Second {
 		if in.winCount > floodRate && now.Sub(in.winStart) < 2*time.Second {
 			in.floodWins++
+			in.lastFlood = now
 		} else {
 			in.floodWins = 0
 		}
 		in.winStart, in.winCount = now, 0
 	}
 	in.winCount++
-	if !in.throttled && in.floodWins >= floodSeconds {
+	switch {
+	case !in.throttled && in.floodWins >= floodSeconds:
 		in.throttled = true
-		return true
+		return floodStarted
+	case in.throttled && now.Sub(in.lastFlood) >= floodQuiet:
+		in.throttled = false
+		return floodEnded
 	}
-	return false
+	return floodSame
 }
 
 func hasLogContent(v *ui.View) bool {

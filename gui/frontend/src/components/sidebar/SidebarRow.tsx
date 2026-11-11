@@ -9,13 +9,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agentsLabel } from "@/lib/agents";
 import { useNowSelect } from "@/lib/clock";
-import { formatElapsed } from "@/lib/elapsed";
+import { formatAge, formatDuration } from "@/lib/duration";
 import { QUIET } from "@/lib/quiet";
 import { cn } from "@/lib/utils";
-import { threadBadge, shortAge } from "@/lib/thread";
+import { threadBadge } from "@/lib/thread";
 import { shortRemaining } from "@/lib/snooze";
 import { statusLine, statusText, statusToneText, tipStatusTone, type StatusLineKind, type TipStatusTone } from "@/lib/statusLine";
-import { statusBadge, statusTimeAt } from "@/lib/statusRegistry";
+import { statusBadge, statusTimeAt, statusTimeUnits } from "@/lib/statusRegistry";
 import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
@@ -91,13 +91,13 @@ function RenameField({ id, name }: { id: string; name: string }) {
 
 
 /**
- * Time since `at` (lib/elapsed formatElapsed: "4s", "4m", "1h 4m", "3d"). One shared 1 s
+ * Time since `at` (lib/statusRegistry statusTimeUnits: "4s", "4m", "1h 4m", "3d"). One shared 1 s
  * clock (lib/clock) drives every row that shows a time, but a row re-renders only when its
- * text changes: every second under a minute, then once a minute (elapsedTickMs's cadence).
+ * text changes: every second under a minute, then once a minute.
  * A slower clock would hand a row a `now` up to a period old.
  */
 function useElapsed(at: number): string {
-  return useNowSelect(1000, (now) => formatElapsed(at, now));
+  return useNowSelect(1000, (now) => formatDuration(now - at, statusTimeUnits(now - at)));
 }
 
 function Elapsed({ at, className }: { at: number; className?: string }) {
@@ -601,10 +601,10 @@ function SectionHeader({ row }: { row: HeaderRow }) {
   );
 }
 
-/** How long ago the thread was archived ("5m", "3h", "2d"), on the shared 30 s clock. */
+/** How long ago the thread was archived ("now", "5m", "3h", "2d"), on the shared 30 s clock. */
 function ArchivedAge({ id }: { id: string }) {
   const at = useThreadsStore((s) => s.byId[id]?.archivedAtMs ?? null);
-  const age = useNowSelect(30_000, (now) => (at === null ? "" : shortAge(at, now)));
+  const age = useNowSelect(30_000, (now) => (at === null ? "" : formatAge(at, now, { minutes: true, hours: true, days: true, ago: false })));
   if (at === null) return null;
   return (
     <span className="ml-auto shrink-0 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-archived-age">

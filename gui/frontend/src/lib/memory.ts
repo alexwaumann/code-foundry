@@ -4,6 +4,7 @@
  */
 import type { MemoryLeftOut, MemoryOriginView } from "@/api/memory";
 import type { ThreadView } from "@/api/threads";
+import { formatAge } from "./duration";
 import { MONTHS, startOfDay } from "./snooze";
 
 /**
@@ -24,15 +25,13 @@ export function memoryBy(origin: MemoryOriginView, thread: Pick<ThreadView, "nam
 }
 
 /**
- * When, after "Remembered": "just now", "5 min ago", "today", "yesterday", "3 days ago",
+ * When, after "Remembered": "just now", "5m ago", "today", "yesterday", "3 days ago",
  * then "on Oct 14" ("on Oct 14, 2025" in another year). Calendar days are local. A time in
  * the future reads "just now". "" when unknown (a file added by hand).
  */
 export function rememberedWhen(ms: number | null, now: number): string {
   if (ms === null) return "";
-  const minutes = Math.floor((now - ms) / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${String(minutes)} min ago`;
+  if (now - ms < 3_600_000) return formatAge(ms, now, { minutes: true });
   const days = Math.round((startOfDay(now) - startOfDay(ms)) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";

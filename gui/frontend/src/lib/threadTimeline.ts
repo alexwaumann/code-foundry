@@ -114,7 +114,7 @@ export type TimelineRow =
   | {
       /**
        * A turn's header, under its user message(s) and above its work. Finished: "Worked
-       * for 4m 08s · 12 steps · $1.12 · Opus", the turn's fold toggle. Live (no turn_end
+       * for 4m 8s · 12 steps · $1.12 · Opus", the turn's fold toggle. Live (no turn_end
        * yet, the thread works): "Working · 3 steps · 1m 12s", always open. Its key is
        * `h:<turn key>` in both forms, so the live row becomes the finished one in place.
        */

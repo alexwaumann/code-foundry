@@ -18,7 +18,7 @@ describe("LineageNote", () => {
     expect(line.getAttribute("role")).toBeNull();
     expect(line.getAttribute("aria-expanded")).toBeNull();
     expect(screen.getByTestId("icon")).toBeTruthy();
-    expect(screen.getByTestId("n-age").textContent).toBe("18 min ago");
+    expect(screen.getByTestId("n-age").textContent).toBe("18m ago");
     expect(line.querySelector(".chev")).toBeNull();
     fireEvent.click(line);
     expect(screen.queryByTestId("n-body")).toBeNull();

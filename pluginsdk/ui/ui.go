@@ -167,7 +167,7 @@ type Header struct {
 	Pill        *Pill    `json:"pill,omitempty"`
 	Subline     *Inline  `json:"subline,omitempty"`
 	SublineIcon string   `json:"sublineIcon,omitempty"`
-	Actions     []Button `json:"actions,omitempty"` // icon-only, at most 2
+	Actions     []Button `json:"actions,omitempty"` // at most 2; icon-only when given an icon
 	TabTitle    string   `json:"tabTitle,omitempty"`
 	// Menu is the header's overflow: a ⋯ after its actions (see Menu).
 	Menu *Menu `json:"menu,omitempty"`

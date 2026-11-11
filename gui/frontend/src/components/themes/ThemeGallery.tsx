@@ -10,7 +10,9 @@ import {
   CircleAlert,
   FilePen,
   Gauge,
+  GitBranch,
   GitMerge,
+  GitPullRequest,
   Info,
   Layers,
   Monitor,
@@ -24,8 +26,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { QUIET } from "@/lib/quiet";
+import { rowToneClasses, statusRegistry } from "@/lib/statusRegistry";
+import type { StatusLineKind } from "@/lib/statusLine";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
-import { Chip } from "@/components/thread/Chip";
 import { ThreadMarkdown } from "@/components/thread/Code";
 import { UserBubble } from "@/components/thread/UserBubble";
 import "@/components/thread/thread.css";
@@ -99,89 +104,111 @@ function Card({ label, children }: { label: string; children: ReactNode }) {
 
 // ---------------------------------------------------------------- sidebar
 
-/** SidebarRow's markup (components/sidebar/SidebarRow.tsx) with sample threads. */
-function Row({ name, selected, pinned, chip, line2 }: { name: string; selected?: boolean; pinned?: boolean; chip?: ReactNode; line2: ReactNode }) {
+/** RowStatus's markup: the status's icon in its tone (the word for screen readers only), then a time. */
+function Status({ kind, time }: { kind: StatusLineKind; time?: string }) {
+  const entry = statusRegistry[kind];
+  const Icon = entry.icon;
+  if (Icon === null) return <span className="text-caption-sm text-cf-sidebar-muted-foreground tabular-nums">{time}</span>;
+  return (
+    <span className={cn("flex min-w-0 items-center gap-[3px] text-caption-sm font-medium", rowToneClasses[entry.tone])}>
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <span className="sr-only">{entry.word}</span>
+      {time && <span className="whitespace-nowrap tabular-nums">{time}</span>}
+    </span>
+  );
+}
+
+/**
+ * SidebarRow's markup (components/sidebar/SidebarRow.tsx ThreadLabel) with a sample thread:
+ * line 1 the pin and the name, the status on the right; line 2 the project after its kind's
+ * glyph (Layers for a workspace), the counts on the right; line 3 the branch.
+ */
+function Row({ name, selected, pinned, status, project, workspace, counts, branch }: { name: string; selected?: boolean; pinned?: boolean; status: ReactNode; project: string; workspace?: boolean; counts?: ReactNode; branch: string }) {
   return (
     <div
       className={cn(
-        "flex h-[41px] shrink-0 items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
+        "flex h-[60px] shrink-0 items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
         selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90",
       )}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate">{name}</span>
-          <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 pl-1">
-            {chip}
-            {pinned && <Pin className="size-3 shrink-0 text-cf-text-muted" aria-hidden />}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex h-[22px] min-w-0 items-center gap-1.5">
+          {pinned && <Pin className="-mr-px size-3 shrink-0 text-cf-icon-muted" aria-hidden />}
+          <span className="truncate text-body font-medium text-inherit">{name}</span>
+          <span className="ml-auto flex shrink-0 items-center pl-1">{status}</span>
+        </span>
+        <span className="flex h-4 min-w-0 items-center text-caption-sm">
+          <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground">
+            {workspace ? <Layers className="size-3 shrink-0" aria-hidden /> : <ProjectKindIcon kind="github" className="size-3 shrink-0" />}
+            <span className="truncate">{project}</span>
           </span>
-        </div>
-        <div className="flex min-w-0 items-center gap-1 text-caption-sm">
-          <span className="min-w-0 truncate">{line2}</span>
-        </div>
-      </div>
+          {counts && <span className="ml-auto flex shrink-0 items-center gap-2 pl-1.5">{counts}</span>}
+        </span>
+        <span className="flex h-4 min-w-0 items-center text-caption-sm">
+          <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground">
+            <GitBranch className="size-3 shrink-0" aria-hidden />
+            <span className="truncate font-mono">{branch}</span>
+          </span>
+        </span>
+      </span>
     </div>
   );
 }
 
-function Place({ project, branch }: { project: string; branch: string }) {
-  return (
-    <>
-      {project} <span className="opacity-60">@</span> <span className="font-mono">{branch}</span>
-    </>
-  );
-}
-
+/** SidebarRow's SectionHeader: the label, the count and the chevron at the bottom of a 26px band. */
 function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
-    <div className="mt-1 flex h-[22px] shrink-0 items-center gap-1.5 px-2 text-cf-text-muted">
-      <span className="truncate text-overline">{label}</span>
-      <span className="shrink-0 text-overline font-normal tabular-nums opacity-70">{count}</span>
-      <ChevronDown className="ml-auto size-3" aria-hidden />
+    <div className="flex h-[26px] shrink-0 items-end">
+      <div className="flex h-[22px] w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-cf-sidebar-muted-foreground">
+        <span className="truncate text-caption font-medium text-inherit">{label}</span>
+        <span className="ml-auto shrink-0 text-caption text-inherit tabular-nums opacity-70">{count}</span>
+        <ChevronDown className="-mr-2 size-3 shrink-0" aria-hidden />
+      </div>
     </div>
   );
 }
 
 function MiniSidebar() {
   return (
-    <div className="flex w-[210px] shrink-0 flex-col gap-px overflow-hidden bg-cf-sidebar text-cf-sidebar-foreground" data-testid="gallery-sidebar">
-      <Row name="Theme engine tokens" selected pinned line2={<Place project="code-foundry" branch="cf/theme-engine" />} />
-      <Row name="Fix stale PR badge" line2={<span className="text-cf-warning-text">Asked a question</span>} />
-      <Row name="Release build" line2={<span className="text-cf-error-text">Error · exit status 2</span>} />
+    <div className="flex w-[210px] shrink-0 flex-col gap-2 overflow-hidden bg-cf-sidebar text-cf-sidebar-foreground" data-testid="gallery-sidebar">
+      <Row name="Theme engine tokens" selected pinned status={<Status kind="finished" />} project="code-foundry" branch="cf/theme-engine" />
+      <Row name="Fix stale PR badge" status={<Status kind="question" />} project="code-foundry" branch="cf/stale-pr-badge" />
+      <Row name="Release build" status={<Status kind="error" />} project="site" branch="cf/release-build" />
       <Row
         name="Usage page polish"
-        chip={<span className="flex shrink-0 items-center rounded-sm bg-cf-success-surface px-1 text-caption-sm font-medium text-cf-success-text tabular-nums">2 PRs</span>}
-        line2={<span className="text-cf-success-text">Finished 3m ago</span>}
-      />
-      <Row
-        name="Docs typo sweep"
-        chip={
-          <span className="flex max-w-24 min-w-0 items-center gap-0.5 rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text">
-            <Layers className="size-2.5" aria-hidden />
-            <span className="truncate">site</span>
+        status={<Status kind="place" time="3m" />}
+        project="code-foundry"
+        branch="cf/usage-polish"
+        counts={
+          <span className="flex shrink-0 items-center gap-0.5 text-caption-sm font-medium text-cf-success-text tabular-nums">
+            <GitPullRequest className="size-3 shrink-0" aria-hidden />2
           </span>
         }
-        line2={<Place project="code-foundry" branch="main" />}
       />
-      <SectionHeader label="Working" count={1} />
-      <Row
-        name="Rendered threads daemon"
-        line2={
-          <>
-            <span className="text-cf-info-text">
-              <Bot className="mr-0.5 inline size-2.5 align-[-1px]" aria-hidden />3 agents
+      <div className="flex flex-col">
+        <SectionHeader label="Working" count={1} />
+        <Row
+          name="Rendered threads daemon"
+          status={<Status kind="working" time="12m" />}
+          project="docs"
+          workspace
+          branch="cf/rendered-threads"
+          counts={
+            <span className="flex shrink-0 items-center gap-0.5 font-medium text-cf-info-text tabular-nums">
+              <Bot className="size-3 shrink-0" aria-hidden />3
             </span>
-            <span aria-hidden> · </span>
-            <span className="text-cf-info-text">Working</span>
-            <span aria-hidden> · </span>code-foundry
-          </>
-        }
-      />
-      <SectionHeader label="Snoozed" count={1} />
-      <div className="flex h-[26px] shrink-0 items-center gap-1.5 rounded-md px-2 text-cf-sidebar-foreground/90">
-        <AlarmClock className="size-3 shrink-0 text-cf-text-muted" aria-hidden />
-        <span className="truncate">Bump wails</span>
-        <span className="ml-auto shrink-0 pl-1 text-caption-sm tabular-nums">2h</span>
+          }
+        />
+        <SectionHeader label="Snoozed" count={1} />
+        <div className="flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-body-sm text-cf-sidebar-foreground/90">
+          <span className={cn("flex min-w-0 flex-1 items-center gap-1.5", QUIET)}>
+            <span className="truncate text-body text-cf-sidebar-muted-foreground">Bump wails</span>
+            <span className="ml-auto flex shrink-0 items-center gap-1 pl-1 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums">
+              <AlarmClock className="size-3 shrink-0" aria-hidden />
+              2h
+            </span>
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -412,7 +439,6 @@ function Badges() {
         <span className="rounded-sm bg-cf-info-surface px-1 text-caption-sm font-medium text-cf-info-text">working</span>
         <span className="rounded-sm bg-cf-highlight-surface px-1 text-caption-sm font-medium text-cf-highlight-text">skill</span>
         <span className="rounded-sm bg-cf-error-surface px-1 text-caption-sm font-medium text-cf-error-text">exit 1</span>
-        <Chip>worktree</Chip>
       </div>
       <div className="cf-thread flex flex-wrap items-center gap-1.5">
         <span className="chip ok">ok</span>
@@ -482,8 +508,8 @@ function Menu() {
 /** DialogContent's card, inline (not a modal). */
 function DialogCard() {
   return (
-    <div className="rounded-md bg-cf-canvas p-2">
-      <div className="rounded-lg border bg-cf-surface-overlay p-3 text-cf-text shadow-2xl">
+    <div className="rounded-2xl bg-cf-canvas p-2">
+      <div className="rounded-pane border bg-cf-surface-overlay p-3 text-cf-text shadow-2xl">
         <p className="text-heading">Archive 2 busy threads?</p>
         <p className="mt-1 text-caption">Claude stops in them and their shells close. You can unarchive them later.</p>
         <Input readOnly tabIndex={-1} aria-label="Reason" placeholder="Reason (optional)" className="mt-2 h-8" />

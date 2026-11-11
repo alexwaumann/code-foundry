@@ -3,7 +3,8 @@ import { Loader2, Mic } from "lucide-react";
 import { openExternal } from "@/api/app";
 import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
-import { barHeight, decayLevels, easeLevels, formatElapsed, LEVEL_BARS, LEVEL_GAP_MS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
+import { barHeight, decayLevels, easeLevels, LEVEL_BARS, LEVEL_GAP_MS, MIC_SETTINGS_URL, pushLevel } from "@/lib/dictation";
+import { formatClock } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { useDictateChord } from "@/stores/commands";
 import { onDictationLevel, stopDictationIn, toggleDictation, useDictationStore } from "@/stores/dictation";
@@ -21,7 +22,7 @@ function Elapsed({ since }: { since: number }) {
       clearInterval(t);
     };
   }, []);
-  return <span className="tabular-nums">{formatElapsed(since > 0 ? now - since : 0)}</span>;
+  return <span className="tabular-nums">{formatClock(since > 0 ? now - since : 0)}</span>;
 }
 
 /** Seven live level bars: levels push in from the right, the drawn bars ease toward them, and they fall back when levels stop (lib/dictation), drawn without React renders. */

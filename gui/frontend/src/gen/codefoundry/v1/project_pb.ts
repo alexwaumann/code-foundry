@@ -550,8 +550,9 @@ export type CreateWorktreeRequest = Message<"codefoundry.v1.CreateWorktreeReques
   /**
    * Fetch the remote branch the new branch may start from first (origin's copy of a
    * bare name, before comparing it with the local branch, or a remote-tracking
-   * base_ref). Bounded; a failed fetch is logged and the stale ref is used. Nothing is
-   * fetched with projects.base_from_origin off.
+   * base_ref), or the branch itself when only origin has it. Bounded; a failed fetch
+   * is logged and the stale ref is used. With projects.base_from_origin off a new
+   * branch's start point is not fetched; a branch only origin has still is.
    *
    * @generated from field: bool fetch = 5;
    */
@@ -561,7 +562,7 @@ export type CreateWorktreeRequest = Message<"codefoundry.v1.CreateWorktreeReques
    * Overrides projects.base_from_origin for this call: true is the rule (origin's
    * copy of the default branch or a bare branch name, fetched with fetch, unless the
    * local branch is ahead of it), false the local branch, base_ref used as typed and
-   * nothing fetched. Unset: the setting.
+   * the new branch's start point not fetched. Unset: the setting.
    *
    * @generated from field: optional bool base_from_origin = 6;
    */

@@ -1056,7 +1056,8 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   (`startpoint.go`): with `projects.base_from_origin` (every daemon caller passes it)
   no base or a bare branch name is origin's copy when origin has it, fetched first,
   unless the local branch is ahead of it (or diverged), then the local branch; off,
-  the local default and the base as typed, no fetch (`docs/notes/base-from-origin.md`,
+  the local default and the base as typed, not fetched (checking out a branch only
+  origin has still fetches it; `docs/notes/base-from-origin.md`,
   `docs/notes/base-origin-rule.md`). CreateWorktree records each worktree it makes (`project_worktrees`: path, HEAD, time),
   and only a recorded one is `Managed` (cleanable); a `git worktree add` under the root
   is not. Cleanup keeps one made in the last 10 minutes with no commit since, and counts

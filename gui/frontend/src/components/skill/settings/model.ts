@@ -70,7 +70,7 @@ export function installedWords(e: Pick<SkillEntryView, "state">): string {
   return e.state === "disabled" ? "Installed, disabled" : "Installed";
 }
 
-/** A marketplace's line: "3 plugins · 39 skills · read 5 min ago". */
+/** A marketplace's line: "3 plugins · 39 skills · read 5m ago". */
 export function registryLine(r: Pick<SkillRegistryView, "plugins" | "skills" | "readAtMs">, now: number): string {
   return [`${countWords(r.plugins)} ${r.plugins === 1 ? "plugin" : "plugins"}`, skillCount(r.skills), readWords(r.readAtMs, now)].join(" · ");
 }
@@ -251,7 +251,7 @@ export function marketplaceCount(rs: readonly Pick<SkillRegistryView, "plugins" 
   return rs ? rs.reduce((n, r) => n + r.plugins + r.skills, 0) : null;
 }
 
-/** Refresh marketplaces' hint: when the marketplaces were last read ("Read 5 min ago"), by the newest read. */
+/** Refresh marketplaces' hint: when the marketplaces were last read ("Read 5m ago"), by the newest read. */
 export function refreshHint(rs: readonly Pick<SkillRegistryView, "readAtMs">[] | undefined, now: number): string {
   return readHint((rs ?? []).map((r) => r.readAtMs), now);
 }
