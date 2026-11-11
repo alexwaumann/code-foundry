@@ -29,8 +29,9 @@ const SDKModule = "github.com/alexwaumann/code-foundry/pluginsdk"
 // DirPrefix starts a plugin repository's name: code-foundry-plugin-<name>.
 const DirPrefix = "code-foundry-plugin-"
 
-// GoTimeout bounds the go step (the first fetch of the SDK can take a minute).
-const GoTimeout = 3 * time.Minute
+// GoTimeout bounds the go step: the first fetch of the SDK can take a minute through the
+// Go proxy, and a minute and a half more when it falls back to GitHub (GoCommands).
+const GoTimeout = 5 * time.Minute
 
 // ErrInvalid marks a request refused before anything was written.
 var ErrInvalid = errors.New("invalid argument")
@@ -90,9 +91,24 @@ func Title(name string) string {
 	return strings.Join(words, " ")
 }
 
-// GoCommands are the commands that make the module and fetch the SDK at pin.
+// GoCommands are the commands that make the module and fetch the SDK at pin. The fetch
+// tries the Go proxy, then GitHub itself: for a commit nobody has asked the proxy for yet
+// (a build minutes old) the proxy answers for the repository's root module alone, and go
+// get fails with "does not contain package …/pluginsdk" until the proxy has the nested one
+// (docs/notes/plugin-author-spike.md).
 func GoCommands(module, pin string) []string {
-	return []string{"go mod init " + module, "go get " + SDKModule + "@" + pin, "go mod tidy"}
+	get := "go get " + SDKModule + "@" + pin
+	return []string{"go mod init " + module, get + " || GOPROXY=direct " + get, "go mod tidy"}
+}
+
+// goScript is cmds as one shell line that stops at the first to fail; each is grouped,
+// since one may hold an || of its own.
+func goScript(cmds []string) string {
+	parts := make([]string, len(cmds))
+	for i, c := range cmds {
+		parts[i] = "{ " + c + "; }"
+	}
+	return strings.Join(parts, " && ")
 }
 
 // Scaffold makes <Parent>/code-foundry-plugin-<Name> from the template, then runs the go
@@ -136,7 +152,7 @@ func Scaffold(ctx context.Context, req Request) (Result, error) {
 	cmds := GoCommands(res.Module, req.Pin)
 	gctx, cancel := context.WithTimeout(ctx, GoTimeout)
 	defer cancel()
-	if out, err := req.Go(gctx, dir, strings.Join(cmds, " && ")); err != nil {
+	if out, err := req.Go(gctx, dir, goScript(cmds)); err != nil {
 		// Start the module over by hand: a second go mod init refuses an existing go.mod.
 		_ = os.Remove(filepath.Join(dir, "go.mod"))
 		_ = os.Remove(filepath.Join(dir, "go.sum"))

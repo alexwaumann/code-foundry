@@ -43,7 +43,7 @@ plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
 
 1. **Scaffold** under the home directory (ask where the user keeps code), with Go 1.24+:
    `code-foundry plugin new <name> <dir> --owner <github owner>` makes
-   `<dir>/code-foundry-plugin-<name>` from the example, named, with the module (up to 3
+   `<dir>/code-foundry-plugin-<name>` from the example, named, with the module (up to 5
    minutes). Fill in the README; ask which Actions runner to use (`publishing.md`, "Runners").
 2. **Manifest**: edit `plugin.json`, with the fewest permissions that work.
 3. **SDK**: `plugin new` pins this build's; an existing plugin takes it with
@@ -53,9 +53,9 @@ plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
    `OnEvent` and `Shutdown` as needed.
 5. **Run**: `code-foundry plugin dev "$PWD" --watch --follow=false` builds (`make build`)
    and restarts it now and after each edit (a failed build exits 1; the old one runs on).
-   The first time, and when permissions grow, it prints the consent text and exits 2: tell
-   the user what the plugin may do and re-run with `--yes` once they agree. `plugin list`
-   must say `running (dev, watching)`.
+   The first time, and when permissions grow, it prints the consent text and exits 2: stop,
+   show the user that text, and re-run with `--yes` only after they say yes (their call, even
+   with no permissions). `plugin list` must say `running (dev, watching)`.
 6. **Check**: `code-foundry plugin logs <name> --lines 50` shows its stderr, `h.Log()` and
    refused calls or views (never `--follow` from Bash: it does not return). Drive
    it with `plugin <name> <command>`, `plugin surface` (`--shot s.png` to see it) and

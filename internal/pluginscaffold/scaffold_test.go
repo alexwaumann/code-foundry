@@ -197,10 +197,12 @@ func TestGoStep(t *testing.T) {
 				t.Fatal(err)
 			}
 			cmds := pluginscaffold.GoCommands("github.com/octo/code-foundry-plugin-hello", "v0.4.0")
-			if gotDir != res.Dir || gotScript != strings.Join(cmds, " && ") {
+			if gotDir != res.Dir || gotScript != "{ "+strings.Join(cmds, "; } && { ")+"; }" {
 				t.Errorf("go step ran %q in %s", gotScript, gotDir)
 			}
-			if want := "go get github.com/alexwaumann/code-foundry/pluginsdk@v0.4.0"; cmds[1] != want {
+			// The proxy first, then GitHub itself (a commit the proxy has not fetched yet).
+			get := "go get github.com/alexwaumann/code-foundry/pluginsdk@v0.4.0"
+			if want := get + " || GOPROXY=direct " + get; cmds[1] != want {
 				t.Errorf("go get = %q, want %q", cmds[1], want)
 			}
 			if res.GoError != tt.wantErr {

@@ -39,7 +39,7 @@ example and runs `go mod init`, `go get` of the SDK at the daemon's pin and `go 
   as a GitHub login), else the bare `code-foundry-plugin-<name>`, and the output says to
   `go mod edit -module` before publishing.
 * **The go step** is `$SHELL -lc 'go mod init … && go get …@<pin> && go mod tidy'` (login
-  PATH, as project actions run), 3-minute timeout. On failure the files stay, the go.mod
+  PATH, as project actions run), 5-minute timeout (3 until the GitHub fallback, plugin-author-spike.md). On failure the files stay, the go.mod
   and go.sum it may have made are removed (a second `go mod init` refuses an existing
   go.mod), the result carries the error with the last 10 lines of output and the three
   commands, and the exit code is 1. Not an error: the files are the useful part.

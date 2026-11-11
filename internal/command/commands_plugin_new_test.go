@@ -28,14 +28,14 @@ func TestPluginNew(t *testing.T) {
 			args: map[string]string{"name": "hello", "dir": "/Users/a/src", "owner": "octo"},
 			res:  pluginscaffold.Result{Dir: "/Users/a/src/code-foundry-plugin-hello", Module: "github.com/octo/code-foundry-plugin-hello", Files: make([]string, 10)},
 			want: "created /Users/a/src/code-foundry-plugin-hello (module github.com/octo/code-foundry-plugin-hello, 10 files)\n" +
-				"next: cd /Users/a/src/code-foundry-plugin-hello && make build && code-foundry plugin dev \"$PWD\" --follow=false",
+				"next: cd /Users/a/src/code-foundry-plugin-hello && code-foundry plugin dev \"$PWD\" --watch --follow=false",
 		},
 		{
 			name: "bare module, quoted folder",
 			args: map[string]string{"name": "hello", "dir": "/Users/a/my code"},
 			res:  pluginscaffold.Result{Dir: "/Users/a/my code/code-foundry-plugin-hello", Module: "code-foundry-plugin-hello", Files: make([]string, 10)},
 			want: "created /Users/a/my code/code-foundry-plugin-hello (module code-foundry-plugin-hello, 10 files)\n" +
-				"next: cd '/Users/a/my code/code-foundry-plugin-hello' && make build && code-foundry plugin dev \"$PWD\" --follow=false\n" +
+				"next: cd '/Users/a/my code/code-foundry-plugin-hello' && code-foundry plugin dev \"$PWD\" --watch --follow=false\n" +
 				"before publishing: go mod edit -module github.com/<owner>/code-foundry-plugin-hello",
 		},
 		{
@@ -48,9 +48,9 @@ func TestPluginNew(t *testing.T) {
 				"finish it by hand:\n" +
 				"  cd /Users/a/src/code-foundry-plugin-hello\n" +
 				"  go mod init code-foundry-plugin-hello\n" +
-				"  go get github.com/alexwaumann/code-foundry/pluginsdk@main\n" +
+				"  go get github.com/alexwaumann/code-foundry/pluginsdk@main || GOPROXY=direct go get github.com/alexwaumann/code-foundry/pluginsdk@main\n" +
 				"  go mod tidy\n" +
-				"then: make build && code-foundry plugin dev \"$PWD\" --follow=false\n" +
+				"then: code-foundry plugin dev \"$PWD\" --watch --follow=false\n" +
 				"before publishing: go mod edit -module github.com/<owner>/code-foundry-plugin-hello",
 			wantCode: 1,
 		},
