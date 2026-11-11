@@ -1,23 +1,15 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
 import { mockPost, openApp, openStreams, resetMock, row } from "./fixtures";
 
 /**
- * The visible thread's Watch after the window was hidden, and the "reconnecting…" chip
- * (docs/notes/thread-render-stall.md). Playwright cannot hide the page, so these fake
- * document.visibilityState and dispatch visibilitychange as WKWebView does.
+ * The visible thread's Watch across a thread switch, and the "reconnecting…" chip when a
+ * Watch is dropped and cannot come back. Hiding the window leaves the Watch alone
+ * (`stores/watchVisibility.test.ts`; docs/notes/ws-stall-workarounds.md).
  */
 
 test.beforeEach(async () => {
   await resetMock();
 });
-
-async function setVisibility(page: Page, state: "hidden" | "visible"): Promise<void> {
-  await page.evaluate((s) => {
-    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => s });
-    Object.defineProperty(document, "hidden", { configurable: true, get: () => s === "hidden" });
-    document.dispatchEvent(new Event("visibilitychange"));
-  }, state);
-}
 
 const WATCH = /\/stream\/codefoundry\.v1\.ThreadService\/WatchThread$/;
 
@@ -40,34 +32,32 @@ async function track(page: Page): Promise<{ watches: () => number }> {
 const chipSeen = (page: Page) => page.evaluate(() => (window as unknown as { __chipSeen: boolean }).__chipSeen);
 const timeline = (page: Page) => page.getByTestId("thread-timeline").locator("[data-row-type]").first();
 
-test("showing the window again reopens the visible thread's Watch, without the reconnecting chip", async ({ page }) => {
+test("a thread switch reopens the Watch without the reconnecting chip", async ({ page }) => {
   const t = await track(page);
   await mockPost("thread?state=idle");
   await openApp(page);
   await row(page, "s:s-r1").click();
   await expect(timeline(page)).toBeVisible();
+  const before = t.watches();
   // A thread switch and back: a fresh Watch each time, never "reconnecting".
   await row(page, "s:s-2").click();
   await row(page, "s:s-r1").click();
   await expect(timeline(page)).toBeVisible();
+  await expect.poll(t.watches).toBeGreaterThanOrEqual(before + 2);
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
-  const before = t.watches();
-
-  await setVisibility(page, "hidden");
-  await setVisibility(page, "visible");
-  await expect.poll(t.watches).toBe(before + 1);
-  // The old Watch was closed: still one open.
-  await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
-  await expect(timeline(page)).toBeVisible();
   expect(await chipSeen(page)).toBe(false);
 });
 
 test("a Watch that cannot reconnect shows the chip over the log until it is back", async ({ page }) => {
   // Routed from the start: a Watch reaches the mock until `refuse`, then its socket dies.
   let refuse = false;
+  const live: WebSocketRoute[] = [];
   await page.routeWebSocket(WATCH, (ws) => {
     if (refuse) void ws.close({ code: 1011 });
-    else ws.connectToServer();
+    else {
+      ws.connectToServer();
+      live.push(ws);
+    }
   });
   await mockPost("thread?state=idle");
   await openApp(page);
@@ -76,10 +66,9 @@ test("a Watch that cannot reconnect shows the chip over the log until it is back
   const chip = page.getByTestId("thread-catching-up");
   await expect(chip).toHaveCount(0);
 
-  // The daemon is unreachable for the Watch; a resync drops the open one.
+  // The daemon is unreachable for the Watch, and the open one drops.
   refuse = true;
-  await setVisibility(page, "hidden");
-  await setVisibility(page, "visible");
+  for (const ws of live.splice(0)) await ws.close({ code: 1011 });
   await expect(chip).toBeVisible();
   await expect(chip).toHaveText("catching up…");
   // The log stays on screen under it.

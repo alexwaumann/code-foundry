@@ -1,5 +1,9 @@
 # Thread render stall: diagnosis and fix
 
+> Superseded in part: the resync on show (`resyncOnVisible`) and the diagnostic tests named
+> below went with `docs/notes/ws-stall-workarounds.md`, once every stream ran over the WebSocket
+> tunnel, which holds nothing back. The heartbeats, the watchdog and the chip stay.
+
 The report: in a rendered thread, messages stop rendering while Claude keeps working.
 They show up once the user leaves the thread and comes back. The diagnosis comes first;
 the shipped fix and its live result are in "Fix (shipped)" below.

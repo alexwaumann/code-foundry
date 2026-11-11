@@ -6,12 +6,9 @@ package codefoundry.v1;
 // (ThreadService.WatchThread, TerminalService.Attach, EventService.Watch,
 // EmberService.WatchBoard, PluginService.WatchSurface, DictationService.Watch and
 // Session, SearchService.Watch and WatchRecent) once the stream has carried
-// nothing else for 5 s (api.HeartbeatInterval), and on ThreadService.WatchThread also
-// shortly after a snapshot, to release its end (docs/notes/thread-open-stall.md). It
-// carries no state and no seq.
+// nothing else for 5 s (api.HeartbeatInterval). It carries no state and no seq.
 //
-// Two reasons (docs/notes/thread-render-stall.md): after the Wails window was hidden,
-// minimized or covered, WKWebView can hold back the last bytes of a streaming response
-// until more bytes arrive, and a heartbeat's bytes release them; and a client can treat
-// a stream that has gone silent for several intervals as dead and reconnect.
+// It is the stream's sign of life: a hung or stopped daemon keeps the socket open and
+// sends nothing, so a client treats a stream that has gone silent for several intervals
+// as dead and reconnects (docs/notes/ws-stall-workarounds.md).
 message StreamHeartbeat {}

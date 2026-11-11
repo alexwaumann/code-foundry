@@ -63,7 +63,6 @@ export function holdEmberBoard(): () => void {
   if (stop === null) {
     stop = runStream<EmberBoardView>({
       open: (signal) => watchEmberBoard(signal),
-      resyncOnVisible: true,
       onEvent: (board) => {
         useEmberStore.setState({ board, error: null });
       },

@@ -62,7 +62,6 @@ export function holdDictation(): () => void {
   if (stopWatch === null) {
     stopWatch = runStream<DictationView>({
       open: (signal) => watchDictation(signal),
-      resyncOnVisible: true,
       onEvent: applySnapshot,
       onError: invalidateOnTransportError,
     });

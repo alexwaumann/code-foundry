@@ -87,7 +87,7 @@ func TestThreadAgentsWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = stream.Close() }()
-	// The heartbeats that flush the snapshot can come before or after the next event.
+	// Skip heartbeats: they carry nothing for these tests.
 	next := func() *v1.ThreadEvent {
 		t.Helper()
 		for {

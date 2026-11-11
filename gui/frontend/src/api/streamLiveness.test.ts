@@ -1,8 +1,7 @@
 /**
- * runStream's liveness watchdog and visibility resync (docs/notes/thread-render-stall.md):
- * the daemon heartbeats quiet streams every HEARTBEAT_MS; a stream that has heartbeated
- * and then goes silent for livenessMs is reconnected, and a stream with resyncOnVisible
- * reconnects at once when the page becomes visible after being hidden.
+ * runStream's liveness watchdog: the daemon heartbeats quiet streams every HEARTBEAT_MS,
+ * and a stream that has heartbeated and then goes silent for livenessMs is reconnected.
+ * The page's visibility does not touch a stream (docs/notes/ws-stall-workarounds.md).
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -189,20 +188,6 @@ describe("late events", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(got).toEqual([1]);
   });
-
-  it("an event a resynced attempt yields never reaches onEvent", async () => {
-    const d = deaf();
-    const got: number[] = [];
-    const stop = runStream<number>({ open: () => d.open(), onEvent: (v) => got.push(v), resyncOnVisible: true });
-    await vi.advanceTimersByTimeAsync(0);
-    setVisibility("hidden");
-    setVisibility("visible");
-    d.release();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(d.opened).toBe(2);
-    expect(got).toEqual([1, 20]);
-    stop();
-  });
 });
 
 describe("open status", () => {
@@ -223,46 +208,28 @@ describe("open status", () => {
   });
 });
 
-describe("resyncOnVisible", () => {
-  it("reconnects at once when the page becomes visible after being hidden", async () => {
+describe("page visibility", () => {
+  it("hiding and showing the page neither aborts nor reopens an attempt", async () => {
     const s = server();
-    const r = start(s, { resyncOnVisible: true });
+    const r = start(s);
     s.push(1);
     await vi.advanceTimersByTimeAsync(0);
-    setVisibility("hidden");
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(s.opened).toBe(1);
-    setVisibility("visible");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(s.opened).toBe(2);
+    for (let i = 0; i < 3; i++) {
+      setVisibility("hidden");
+      await vi.advanceTimersByTimeAsync(30_000);
+      setVisibility("visible");
+      await vi.advanceTimersByTimeAsync(0);
+    }
     s.push(2);
     await vi.advanceTimersByTimeAsync(0);
+    expect(s.opened).toBe(1);
+    expect(s.aborted).toBe(0);
     expect(r.got).toEqual([1, 2]);
-    // A resync is not a failure: no error, no backoff, "connecting" rather than "retrying".
-    expect(r.errors).toEqual([]);
-    expect(r.statuses).toEqual(["connecting", "open", "connecting", "open"]);
+    expect(r.statuses).toEqual(["connecting", "open"]);
     r.stop();
   });
 
-  it("does nothing for a page that was never hidden, or without the option", async () => {
-    const s1 = server();
-    const r1 = start(s1, { resyncOnVisible: true });
-    const s2 = server();
-    const r2 = start(s2);
-    await vi.advanceTimersByTimeAsync(0);
-    setVisibility("visible");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(s1.opened).toBe(1);
-    setVisibility("hidden");
-    setVisibility("visible");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(s1.opened).toBe(2);
-    expect(s2.opened).toBe(1);
-    r1.stop();
-    r2.stop();
-  });
-
-  it("cuts a backoff sleep short", async () => {
+  it("showing the page does not cut a backoff sleep short", async () => {
     const s = server();
     let fail = true;
     const r = runStream<number>({
@@ -271,47 +238,14 @@ describe("resyncOnVisible", () => {
         yield* s.open(signal);
       },
       onEvent: () => undefined,
-      // A long backoff: only the resync can end it within the test.
       backoff: { initialMs: 60_000, maxMs: 60_000, factor: 1 },
-      resyncOnVisible: true,
     });
     await vi.advanceTimersByTimeAsync(0);
     fail = false;
     setVisibility("hidden");
     setVisibility("visible");
     await vi.advanceTimersByTimeAsync(0);
-    expect(s.opened).toBe(1);
+    expect(s.opened).toBe(0);
     r();
-  });
-
-  it("rapid hide/show keeps one attempt open: each show aborts the previous one", async () => {
-    const s = server();
-    const r = start(s, { resyncOnVisible: true });
-    s.push(1);
-    await vi.advanceTimersByTimeAsync(0);
-    for (let i = 0; i < 5; i++) {
-      setVisibility("hidden");
-      setVisibility("visible");
-    }
-    await vi.advanceTimersByTimeAsync(0);
-    // Every attempt but the last was aborted: never two Watches at once.
-    expect(s.opened - s.aborted).toBe(1);
-    s.push(2);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(r.got).toEqual([1, 2]);
-    expect(r.errors).toEqual([]);
-    expect(r.statuses).not.toContain("retrying");
-    r.stop();
-  });
-
-  it("stops listening once stopped", async () => {
-    const s = server();
-    const r = start(s, { resyncOnVisible: true });
-    await vi.advanceTimersByTimeAsync(0);
-    r.stop();
-    setVisibility("hidden");
-    setVisibility("visible");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(s.opened).toBe(1);
   });
 });
