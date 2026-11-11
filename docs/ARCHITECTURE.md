@@ -159,6 +159,7 @@ internal/
   guide/                   the agent guide and the skills' references, rendered from commands and settings
   skills/                  the Claude Code skills written for every thread at daemon start
                            (the entry skill, orchestrate, help, plugin, pages), and Ember's own (ember)
+  pluginscaffold/          `plugin new`: a plugin repository from the minimal example (§10)
   fsx/                     the home-directory boundary, directory completion, file reads and writes
   fuzzy/                   path ranking for `@` completion and the file finder (pure)
   logfile/                 a size-capped log file with one rotation (daemon and plugin logs)
@@ -1167,9 +1168,10 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   drafts per instance and tab; the consent dialog is `plugin.enable`'s confirm; `shot.html`
   (`src/shot`) draws one surface alone in the published theme and reports its height when
   ready, for `plugin surface --shot` (`docs/notes/plugin-surface-shot-page.md`).
-* **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop: copy
-  the template (`plugins/examples/minimal`, embedded), `go get` the SDK at this daemon's
-  pin, `plugin dev`, `plugin logs`, `plugin surface` / `plugin
+* **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop:
+  `plugin new` (`internal/pluginscaffold`: the embedded `plugins/examples/minimal`
+  renamed, its module made and the SDK fetched with `go get` at this daemon's
+  pin), `plugin dev`, `plugin logs`, `plugin surface` / `plugin
   act`, plugintest, release tarballs (`make release`, one script for `release.yml` on
   the runner the user names and for a release by hand when they have none), the
   registry pull request. Its CLI and host

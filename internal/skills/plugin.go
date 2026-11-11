@@ -240,7 +240,7 @@ func exampleReferences() []reference {
 // pluginVerbOrder is the order of the plugin.* verbs in cli.md: the development loop
 // first. Verbs not named here follow by name.
 var pluginVerbOrder = []string{
-	"plugin.dev", "plugin.list", "plugin.logs", "plugin.surface", "plugin.act", "plugin.restart",
+	"plugin.new", "plugin.dev", "plugin.list", "plugin.logs", "plugin.surface", "plugin.act", "plugin.restart",
 	"plugin.reload", "plugin.enable", "plugin.disable", "plugin.env", "plugin.secrets.list", "plugin.secrets.delete",
 }
 

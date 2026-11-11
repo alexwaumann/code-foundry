@@ -81,7 +81,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"action.list", "action.add", "action.edit", "action.remove", "action.run", "action.wait", "action.stop", "action.runs", "action.last",
 		"plugin.list", "plugin.enable", "plugin.disable", "plugin.restart", "plugin.reload", "plugin.logs", "plugin.dev",
 		"plugin.secrets.list", "plugin.secrets.delete", "plugin.env", "plugin.surface", "plugin.act", "pr.checks",
-		"plugin.threads", "plugin.terminals", "plugin.wakes",
+		"plugin.threads", "plugin.terminals", "plugin.wakes", "plugin.new",
 		"plugin.browse", "plugin.install", "plugin.update", "plugin.uninstall",
 		"skill.browse", "skill.install", "skill.enable", "skill.disable", "skill.update", "skill.uninstall", "skill.remove", "skill.setup", "skill.refresh",
 		"ember.status", "ember.board", "ember.remember", "ember.reseed", "ember.enable", "ember.disable", "ember.task.add", "ember.task.update", "ember.task.done", "ember.task.start", "ember.task.cancel", "ember.task.list", "ember.task.show",

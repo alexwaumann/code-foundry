@@ -52,10 +52,13 @@ func TestRenderPluginSkill(t *testing.T) {
 	// what is rendered from the host's own lists. The limits table has its own test
 	// (TestViewLimitsNameEveryLimit); nothing here freezes its numbers or a file's prose.
 	body := string(files[skills.Plugin+"/SKILL.md"])
-	for _, want := range []string{"pluginsdk@" + src.Commit, "/Users/ada/.code-foundry/claude/.claude/skills/code-foundry-plugin/example/", src.Version} {
+	for _, want := range []string{"pluginsdk@" + src.Commit, "code-foundry plugin new <name>", src.Version} {
 		if !strings.Contains(body, want) {
 			t.Errorf("SKILL.md lacks %q", want)
 		}
+	}
+	if pub := string(files[skills.Plugin+"/reference/publishing.md"]); !strings.Contains(pub, "/Users/ada/.code-foundry/claude/.claude/skills/code-foundry-plugin/example/.github") {
+		t.Error("publishing.md lacks the example's installed path")
 	}
 	manifest := string(files[skills.Plugin+"/reference/manifest.md"])
 	for _, fact := range src.Facts {
@@ -149,10 +152,10 @@ func TestSDKPin(t *testing.T) {
 		want string
 	}{
 		// A build without a clean commit names main.
-		{"dirty", skills.Sources{Version: "dev", Commit: "abc-dirty"}, "pluginsdk@main\n"},
-		{"commit", skills.Sources{Version: "dev", Commit: sha}, "pluginsdk@" + sha + "\n"},
+		{"dirty", skills.Sources{Version: "dev", Commit: "abc-dirty"}, "pluginsdk@main`"},
+		{"commit", skills.Sources{Version: "dev", Commit: sha}, "pluginsdk@" + sha + "`"},
 		// A build from a commit carrying the SDK's tag pins its version.
-		{"tagged", skills.Sources{Version: "v1.4.0", Commit: sha, SDKTag: "pluginsdk/v0.2.1"}, "pluginsdk@v0.2.1\n"},
+		{"tagged", skills.Sources{Version: "v1.4.0", Commit: sha, SDKTag: "pluginsdk/v0.2.1"}, "pluginsdk@v0.2.1`"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			files, err := skills.Render(tt.src)
