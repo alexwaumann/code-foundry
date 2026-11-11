@@ -41,7 +41,8 @@ func loadSubscriptions(ctx context.Context, db *sql.DB) ([]Subscription, error) 
 	return out, nil
 }
 
-// saveSubscription inserts s or rewrites its repeat flag, counts, suppressed fire and note.
+// saveSubscription inserts s or rewrites its repeat flag, counts, suppressed fire, note and
+// args (an explicit subscribe drops a notify subscription's until; subscriptions_until.go).
 func saveSubscription(ctx context.Context, db *sql.DB, s Subscription) error {
 	repeat := 0
 	if s.Repeat {
@@ -56,7 +57,8 @@ func saveSubscription(ctx context.Context, db *sql.DB, s Subscription) error {
 			fired_count = excluded.fired_count,
 			last_fired_at = excluded.last_fired_at,
 			suppressed_at = excluded.suppressed_at,
-			note = excluded.note`,
+			note = excluded.note,
+			args = excluded.args`,
 		s.ID, s.SubscriberID, string(s.TargetKind), s.TargetID, string(s.Condition), repeat,
 		millis(s.CreatedAt), s.FiredCount, millis(s.LastFiredAt), encodeArgs(s.Args), millis(s.SuppressedAt), s.Note)
 	if err != nil {

@@ -217,6 +217,9 @@ type SubscribeOptions struct {
 	// Note says why (at most MaxNote characters, kept on one line): the wake carries
 	// it, the listings show it. Subscribing again with a note replaces the note.
 	Note string
+	// endsOnFinish makes a --notify subscription (notifyCreator, renotify): it ends once
+	// its thread finished a turn (UntilFinished, subscriptions_until.go).
+	endsOnFinish bool
 	// BeforeSend and AfterOrdinal (thread targets only, not both) tie a subscription to a
 	// message sent to the target: pr.task's forward wakes its sender once the turn that
 	// handled the task ended (docs/notes/pr-task-forward.md). It subscribes BeforeSend,
@@ -310,6 +313,10 @@ type subscriptions struct {
 	// groupArchived are the members archived while their group waited, by subscriber
 	// then group: its released wakes name them (archive_group.go). In memory only.
 	groupArchived map[string]map[string][]wakeSibling
+	// ended are the --notify subscriptions that ended with their thread's finish, by id
+	// (subscriptions_until.go): persisted, never listed or fired; a send by the subscriber
+	// renews them.
+	ended map[string]Subscription
 }
 
 // subRec is a subscription, whether its target met the condition when last seen, and
@@ -334,6 +341,10 @@ type subRec struct {
 	// is tried again every retryAt, and the subscription goes with the one that gets
 	// through (retryFinalWakesLocked). In memory.
 	final func(Subscription, time.Time) Message
+	// keep: an UntilFinished subscription does not end before its target handled this
+	// ordinal (a message its subscriber sent while it worked; subscriptions_until.go). In
+	// memory.
+	keep int64
 }
 
 // extraNote is a note for one wake only: the first wake whose target's HandledThrough
@@ -441,6 +452,12 @@ func loadSubscriptionState(ctx context.Context, db *sql.DB, log *slog.Logger, re
 	}
 	var stale []string
 	for _, sub := range rows {
+		if isEnded(sub) {
+			if !s.loadEnded(sub, func(id string) bool { _, ok := live(id); return ok }) {
+				stale = append(stale, sub.ID)
+			}
+			continue
+		}
 		_, okSub := live(sub.SubscriberID)
 		if okSub && (sub.TargetKind == TargetPlugin || sub.TargetKind == TargetTimer) {
 			// The plugin re-arms when it starts (PluginSubscriptions); a timer that came due
@@ -590,6 +607,16 @@ func (m *Manager) Subscribe(ctx context.Context, o SubscribeOptions) (SubscribeR
 		}
 		args = map[string]string{groupArg: group}
 	}
+	if o.endsOnFinish {
+		if kind != TargetThread || cond != CondSettled || !o.Repeat {
+			return SubscribeResult{}, fmt.Errorf("%w: a notify subscription takes a thread, the settled condition and repeat", ErrInvalidArgument)
+		}
+		args = maps.Clone(args)
+		if args == nil {
+			args = map[string]string{}
+		}
+		args[untilArg] = untilFinished
+	}
 	now := m.opts.Now().Round(0).Truncate(time.Millisecond)
 	repeat := o.Repeat && kind != TargetActionRun
 	if kind == TargetTimer {
@@ -680,12 +707,16 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 	}
 	for _, r := range s.byID {
 		if r.s.SubscriberID == sub.SubscriberID && r.s.TargetKind == sub.TargetKind && r.s.TargetID == sub.TargetID && r.s.Condition == sub.Condition &&
-			maps.Equal(r.s.Args, sub.Args) {
+			sameArgs(r.s.Args, sub.Args) {
 			switch {
 			case g.before:
 				return SubscribeResult{Subscription: r.s, Existed: true}, nil
 			case g.after > 0:
 				return m.armLocked(r, target, g.after, sub.Note), nil
+			case sub.UntilFinished():
+				// A notify subscription made again (renotify) leaves the one there as it is,
+				// explicit or not.
+				return SubscribeResult{Subscription: r.s, Existed: true}, nil
 			}
 			// Subscribing again, as a warning about an unchecked one invites: this answer is
 			// fresh, so a condition it meets fires now rather than never.
@@ -696,9 +727,12 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 					return SubscribeResult{Subscription: r.s, Fired: true}, nil
 				}
 			}
-			if r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note) {
+			if r.s.Repeat != sub.Repeat || (sub.Note != "" && r.s.Note != sub.Note) || r.s.UntilFinished() {
+				// Asked for explicitly, a notify subscription becomes an explicit one: it no
+				// longer ends with its thread's finish.
 				r.s.Repeat = sub.Repeat
 				r.s.Note = cmp.Or(sub.Note, r.s.Note)
+				r.s.Args = withoutUntil(r.s.Args)
 				if err := saveSubscription(context.Background(), s.db, r.s); err != nil {
 					return SubscribeResult{}, err
 				}
@@ -730,6 +764,11 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 				r.final, r.retryAt = build, m.opts.Now().Add(timerRetry)
 			}
 		}
+	}
+	if fired && sub.TargetKind == TargetThread && m.endsLocked(r, target) {
+		// A notify subscription whose thread already finished: the wake was its last.
+		m.endLocked(r)
+		return SubscribeResult{Subscription: r.s, Fired: true}, nil
 	}
 	if fired && (!r.s.Repeat || prTerminal(r.s.Condition)) {
 		m.log.Info("wake subscription fired at once", "subscription", sub.ID, "subscriber", sub.SubscriberID,
@@ -766,13 +805,16 @@ func (m *Manager) armLocked(r *subRec, target Thread, ordinal int64, note string
 		r.through = max(r.through, ordinal)
 	}
 	r.addExtraLocked(note, ordinal)
+	if r.s.UntilFinished() {
+		r.keep = max(r.keep, ordinal) // not ended before the turn that handles the message
+	}
 	was := r.sat
 	r.sat, r.req = r.meets(target), requestKey(target)
 	if !r.sat || was || !m.fireThreadLocked(r, target) {
 		return SubscribeResult{Subscription: r.s, Existed: true}
 	}
 	out := r.s
-	m.subs.firedLocked(r)
+	m.firedThreadLocked(r, target)
 	m.log.Info("wake subscription fired as it was armed", "subscription", r.s.ID, "subscriber", r.s.SubscriberID, "target", r.s.TargetID)
 	return SubscribeResult{Subscription: out, Existed: true, Fired: true}
 }
@@ -817,11 +859,11 @@ func (m *Manager) observeLocked(t Thread) {
 		was, wasReq := r.sat, r.req
 		r.sat, r.req = now, req
 		newRequest := was && firesOnRequest(r.s.Condition) && req != "" && req != wasReq
-		if !now || (was && !newRequest) {
+		if !now || (was && !newRequest && !m.answeredIntoFinishLocked(r, wasReq, t)) {
 			continue
 		}
 		if m.fireThreadLocked(r, t) {
-			s.firedLocked(r)
+			m.firedThreadLocked(r, t)
 		}
 	}
 }
@@ -946,6 +988,7 @@ func (m *Manager) forgetLocked(id, why string) {
 		q.items = nil
 	}
 	s.forgetHeldLocked(id, nil)
+	s.forgetEndedLocked(id)
 	if why == "removed" {
 		delete(s.sent, id)
 		delete(s.noted, id)
@@ -1027,6 +1070,9 @@ func (m *Manager) unsubscribe(o UnsubscribeOptions) ([]Subscription, error) {
 			out = append(out, w)
 			ids = append(ids, w.ID)
 		}
+	}
+	if kind == TargetThread {
+		s.dropEndedLocked(subscriber, target) // no send renews a notify that ended (subscriptions_until.go)
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("%w: thread %s has no subscription to %s", ErrNotFound, subscriber, cmp.Or(target, "a timer"))
@@ -1137,9 +1183,12 @@ func (m *Manager) checkNotify(notify bool, group, creator string) error {
 }
 
 // notifyCreator subscribes creator to the new thread child (CreateOptions.Notify):
-// settled, repeat. The thread exists by now, so a failure is logged, not returned.
-func (m *Manager) notifyCreator(ctx context.Context, creator, child, group string) {
-	res, err := m.Subscribe(ctx, SubscribeOptions{SubscriberID: creator, TargetThreadID: child, Condition: CondSettled, Repeat: true, Group: group})
+// settled, repeat, ending once the child finished (subscriptions_until.go) unless
+// repeat (CreateOptions.NotifyRepeat). The thread exists by now, so a failure is
+// logged, not returned.
+func (m *Manager) notifyCreator(ctx context.Context, creator, child, group string, repeat bool) {
+	res, err := m.Subscribe(ctx, SubscribeOptions{SubscriberID: creator, TargetThreadID: child, Condition: CondSettled, Repeat: true, Group: group,
+		endsOnFinish: !repeat})
 	if err != nil {
 		m.log.Warn("subscribe the creator to its new thread", "thread", child, "created_by", creator, "err", err)
 		return

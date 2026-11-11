@@ -244,7 +244,9 @@ type ThreadSubscription struct {
 	// before the GitHub poll saw it), a plugin's state ("running", "disabled"), a timer's
 	// next fire ("next 09:30", "due"); "gone" when the target no longer exists.
 	TargetStatus string `protobuf:"bytes,12,opt,name=target_status,json=targetStatus,proto3" json:"target_status,omitempty"`
-	// A plugin target's args: given, defaulted or taken from the subscriber's context.
+	// A plugin target's args: given, defaulted or taken from the subscriber's context. A
+	// thread target's: "group" (thread new --notify-group) and "until": "finished" (a
+	// --notify subscription, which ends with the wake reporting its thread finished).
 	Args map[string]string `protobuf:"bytes,20,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Why the subscriber asked to be woken (SubscribeThreadRequest.note); its wake
 	// carries it. "" for none.

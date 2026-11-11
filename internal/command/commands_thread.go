@@ -147,6 +147,8 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 					"its turn ended, or it asks for a permission or an answer, which it prints with the thread respond line (--json: the thread, not the message item)"},
 				withDefault(ArgSpec{Name: "for", Type: String, Description: "With wait: how long to wait at most, as thread.wait's for"},
 					waitForArg.Default),
+				{Name: "notify", Type: Bool, Default: "true", Description: "When by's --notify subscription to the thread ended with its finish, subscribe it again, " +
+					"so the answer wakes it (=false: no; never with wait, which waits instead)"},
 			},
 			When: hasThread,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -160,6 +162,7 @@ func RegisterThread(r *Registry, b ThreadBackend) error {
 				res, err := b.Send(ctx, connect.NewRequest(&v1.SendThreadMessageRequest{
 					ThreadId: a.String("id"), Text: a.String("text"), Attachments: splitList(a.String("attachments")),
 					ComposerText: a.String("composer-text"), ByThreadId: a.String("by"),
+					NoNotify: !a.Bool("notify") || a.Bool("wait"),
 				}))
 				if r, ok := removedFrom(err); ok {
 					return removedWaitResult(r, ""), nil // exit 1, not a usage error

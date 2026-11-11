@@ -112,6 +112,12 @@ var rules = []rule{
 	// A child's last message reaches its parent whole, with git's word on the branch.
 	{note: "wake-groups", file: orchFile, says: []string{"--notify-group", "do not feed each"}},
 	{note: "thread-ask", file: wakesFile, says: []string{"thread ask", "say nothing"}},
+	// A --notify subscription ends with the finish's wake; a send renews it (no manual
+	// subscribe), and the parent of a lead holds none on the lead's workers.
+	{note: "notify-ends-on-finish", file: orchFile, says: []string{"until the wake that says it finished", "subscribes you again"}},
+	{note: "notify-ends-on-finish", file: wakesFile, says: []string{"the last wake from that child", "the send subscribes you", "never subscribe or unsubscribe by hand"},
+		never: []string{"fires again on its next settle"}},
+	{note: "notify-ends-on-finish", file: leadsFile, says: []string{"its answer wakes no one"}},
 	{note: "wake-final-message", file: wakesFile, says: []string{"it said", "from the app, not the thread"}, never: []string{"report_stale", "said more"}},
 	{note: "wake-final-message", file: orchFile, says: []string{"no closing report", "thread report blocked"}, never: []string{"after any later message", "report_stale"}},
 	{note: "wake-final-message", file: emberFile, says: []string{"no closing report", "what git says"}, never: []string{"after any later message", "report_stale"}},

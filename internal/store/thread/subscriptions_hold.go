@@ -130,15 +130,26 @@ func (m *Manager) holdLocked(p threadWakePart) (int, bool) {
 }
 
 // heldOnlyLocked are the held wakes to subscriber ("": to every thread) whose
-// subscription is gone, by id: a one-shot goes when it fires, so a held wake is all that
-// is left of it, and it will wake the thread all the same. Subscriptions lists them and
-// Unsubscribe by id drops them. Callers hold s.mu.
+// subscription is gone, by id: a one-shot goes when it fires, and so does a --notify
+// subscription with its thread's finish (subscriptions_until.go), so a held wake, for a
+// lead or for a group, is all that is left of it, and it will wake the thread all the
+// same. Subscriptions lists them and Unsubscribe by id drops them. Callers hold s.mu.
 func (s *subscriptions) heldOnlyLocked(subscriber string) map[string]Subscription {
 	out := map[string]Subscription{}
+	add := func(id string, sub Subscription) {
+		if _, kept := s.byID[id]; !kept && (subscriber == "" || sub.SubscriberID == subscriber) {
+			out[id] = sub
+		}
+	}
 	for _, h := range s.held {
 		for id, sub := range h {
-			if _, kept := s.byID[id]; !kept && (subscriber == "" || sub.SubscriberID == subscriber) {
-				out[id] = sub
+			add(id, sub)
+		}
+	}
+	for _, groups := range s.groups {
+		for _, g := range groups {
+			for id, w := range g {
+				add(id, w.sub)
 			}
 		}
 	}

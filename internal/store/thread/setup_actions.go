@@ -67,7 +67,7 @@ func (r *SetupRequest) options(s Thread) CreateOptions {
 	return CreateOptions{ProjectID: r.ProjectID, WorktreePath: r.WorktreePath, ProjectIDs: slices.Clone(r.ProjectIDs), Like: r.Like,
 		NewBranch: r.NewBranch, CheckoutMode: r.CheckoutMode, WorkspaceID: r.WorkspaceID, NoProject: r.NoProject, Cwd: r.Cwd,
 		ResumeSession: r.ResumeSession, NewWorktree: r.NewWorktree, Name: r.Name, InitialPrompt: r.InitialPrompt,
-		ComposerPrompt: r.ComposerPrompt, Attachments: slices.Clone(r.Attachments), Notify: r.Notify, NotifyGroup: r.NotifyGroup, DraftJSON: r.DraftJSON,
+		ComposerPrompt: r.ComposerPrompt, Attachments: slices.Clone(r.Attachments), Notify: r.Notify, NotifyGroup: r.NotifyGroup, NotifyRepeat: r.NotifyRepeat, DraftJSON: r.DraftJSON,
 		Model: s.Model, Effort: s.Effort, PermissionMode: s.PermissionMode, CreatedBy: s.CreatedBy, Brief: s.Brief,
 		Labels: slices.Clone(s.Labels), BudgetUSD: s.BudgetUSD, Owner: s.Owner, Env: slices.Clone(s.SpawnEnv),
 		AddDirs: slices.Clone(s.SpawnAddDirs), SystemPromptAppend: s.SystemPromptAppend, BackgroundSetup: true}

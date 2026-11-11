@@ -73,6 +73,9 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 		{Id: "sub-7", SubscriberThreadId: "s-timed", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_TIMER,
 			TargetId: "at:2026-10-20T19:00:00.000Z", TargetName: "at 14:00 CDT", Condition: fired, TargetStatus: "next 14:00 CDT",
 			Note: "remind the user to review the PWA branch (t-aa39dec3)"},
+		{Id: "sub-8", SubscriberThreadId: "s-lead", Target: v1.ThreadSubscriptionTarget_THREAD_SUBSCRIPTION_TARGET_THREAD,
+			TargetId: "s-k", TargetName: "Kid", Condition: settled, Repeat: true, Args: map[string]string{"until": "finished", "group": "g"},
+			TargetStatus: "busy (working)"},
 	}
 	// Times print local, as the store's listing and the wake say them (e13-5).
 	sevenPM := thread.ClockTime(time.Date(2026, 10, 20, 19, 0, 0, 0, time.UTC), time.Now())
@@ -202,12 +205,24 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 			wantMsg: "ID     SUBSCRIBER  TARGET              UNTIL  REPEAT  FIRED  LAST FIRED  TARGET STATUS   NOTE\n" +
 				"sub-6  s-timed     timer every 30m     fired  yes     1      -           next 10:30 CDT\n" +
 				"sub-7  s-timed     timer at 14:00 CDT  fired  no      0      -           next 14:00 CDT  remind the user to review the PWA branch (t-aa39dec3)"},
+		{name: "list a notify subscription", cmd: "thread.subscriptions", args: map[string]string{"id": "s-lead"},
+			wantMsg: "ID     SUBSCRIBER  TARGET                    UNTIL    REPEAT      FIRED  LAST FIRED  TARGET STATUS\n" +
+				"sub-8  s-lead      thread s-k group=g (Kid)  settled  until done  0      -           busy (working)"},
 		{name: "list none", cmd: "thread.subscriptions", args: map[string]string{"id": "s-none"}, wantMsg: "thread s-none has no wake subscriptions"},
 		{name: "list needs a thread", cmd: "thread.subscriptions", wantErr: command.ErrInvalidArgs},
 
 		{name: "new with notify", cmd: "thread.new", args: map[string]string{"project": "r1", "created-by": "s-me", "notify": "true"},
-			wantMsg:  "created thread s1 in ; s-me is woken each time it settles",
+			wantMsg:  "created thread s1 in ; s-me is woken when it settles, until the wake that says it finished; s-me's next thread send to it subscribes again",
 			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-me", Notify: true}}},
+		{name: "new with notify-repeat", cmd: "thread.new", args: map[string]string{"project": "r1", "created-by": "s-me", "notify": "true", "notify-repeat": "true"},
+			wantMsg:  "created thread s1 in ; s-me is woken each time it settles",
+			wantReqs: []proto.Message{&v1.CreateThreadRequest{ProjectId: "r1", PermissionMode: auto, CreatedBy: "s-me", Notify: true, NotifyRepeat: true}}},
+		{name: "notify-repeat needs notify", cmd: "thread.new", args: map[string]string{"project": "r1", "created-by": "s-me", "notify-repeat": "true"},
+			wantErr: command.ErrInvalidArgs},
+		{name: "send renews a notify by default", cmd: "thread.send", args: map[string]string{"id": "s-k", "text": "more", "by": "s-lead"},
+			wantReqs: []proto.Message{&v1.SendThreadMessageRequest{ThreadId: "s-k", Text: "more", ByThreadId: "s-lead"}}},
+		{name: "send with notify=false", cmd: "thread.send", args: map[string]string{"id": "s-k", "text": "more", "by": "s-lead", "notify": "false"},
+			wantReqs: []proto.Message{&v1.SendThreadMessageRequest{ThreadId: "s-k", Text: "more", ByThreadId: "s-lead", NoNotify: true}}},
 		{name: "notify needs created-by", cmd: "thread.new", ctx: inThread, args: map[string]string{"project": "r1", "notify": "true"}, wantErr: command.ErrInvalidArgs},
 	}
 	for _, tt := range tests {
@@ -254,5 +269,24 @@ func TestThreadSubscriptionCommands(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// thread send --wait waits for the answer itself: it never renews a --notify subscription
+// as well (one wake and one wait for the same answer).
+func TestThreadSendWaitDoesNotRenewNotify(t *testing.T) {
+	reg := command.NewRegistry()
+	b := &commandtest.Thread{}
+	if err := command.RegisterThread(reg, b); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = reg.Invoke(context.Background(), command.Context{}, "thread.send",
+		map[string]string{"id": "s-k", "text": "more", "by": "s-lead", "wait": "true", "for": "1s"})
+	reqs := b.Requests()
+	if len(reqs) == 0 {
+		t.Fatal("no requests")
+	}
+	if send, ok := reqs[0].(*v1.SendThreadMessageRequest); !ok || !send.GetNoNotify() {
+		t.Errorf("first request = %v, want a send with no_notify", reqs[0])
 	}
 }

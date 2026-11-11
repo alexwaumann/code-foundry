@@ -106,7 +106,7 @@ code-foundry thread reports --created-by $CODE_FOUNDRY_THREAD --label batch-1018
 
 `-` is a child still working. A finished child's last message may ask you something in
 prose (its wake quotes it). Answer with `thread send --id <id> "..."` without `--wait`
-and end the turn; its subscription wakes you again.
+and end the turn; the send subscribes you again, so the answer wakes you.
 When every child has finished, check which branches touch the same files
 (`git diff --name-only origin/main...<branch>` per branch) and summarise for the user
 (one line per child with its PR and any overlap). Leave the threads open: the user may
@@ -201,7 +201,7 @@ something (answer with the `thread respond` line it prints, then `thread wait` a
 While you wait in a turn the user cannot reach you: for a follow-up longer than a minute
 or so, prefer the `--notify` shape.
 To follow up with several children at once, send to each without `--wait` and end your
-turn (their `--notify` subscriptions wake you), or run the `send --wait` calls in
+turn (each send renews that child's `--notify` wake), or run the `send --wait` calls in
 parallel (a plain `thread wait` after a `send` waits for the answer to that message).
 Inside a wake turn of a `--notify` batch, always the first: a `send --wait` there holds
 back the other children's wakes. Repeat until the PR is right, then tell the user it is ready to merge. When the user says

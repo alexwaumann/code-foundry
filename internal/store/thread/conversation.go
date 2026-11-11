@@ -49,8 +49,17 @@ func (r *runner) exchange(ctx context.Context, cmd threadCmd) (threadReply, erro
 // (ErrTranscriptMissing: nothing is written). A message to a starting thread waits for the
 // handshake behind the first prompt (queue); one to a closing thread waits for the exit,
 // then starts it; one to a thread in setup goes on its row (sendToSetup). A sent message
-// unarchives and unsnoozes the thread.
+// unarchives and unsnoozes the thread. A thread's message to a thread whose --notify
+// subscription to it ended subscribes it again (renotify, subscriptions_until.go).
 func (m *Manager) Send(ctx context.Context, id string, msg Message) (Item, error) {
+	it, err := m.send(ctx, id, msg)
+	if err == nil {
+		m.renotify(ctx, id, msg, it)
+	}
+	return it, err
+}
+
+func (m *Manager) send(ctx context.Context, id string, msg Message) (Item, error) {
 	log, err := m.thread(ctx, id)
 	if err != nil {
 		return Item{}, err

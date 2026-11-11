@@ -36,3 +36,5 @@ the lead follows.
   `thread list --descendants-of $CODE_FOUNDRY_THREAD` (the whole tree, itself included).
   A follow-up on a piece a lead ran goes to that piece's worker (`thread send`; the
   lead's report or `thread list --descendants-of <lead>` names it), not to a new thread.
+  You hold no `--notify` on that worker, so its answer wakes no one: `send --wait`, or
+  `thread subscribe --thread <worker>` (one wake) and end your turn.

@@ -65,8 +65,9 @@ ones you create stay out of it: they are yours to answer.
    - `code-foundry thread send --id <id> "..." --wait --for 30m` sends a follow-up and
      waits the same way (the user cannot reach you meanwhile: for work longer than a
      minute, prefer `--notify`, or run the wait as a background Bash task).
-   - End your turn. `--notify` sends you a `[code-foundry wake]` message each time the
-     child settles; best for long work. For several children whose pieces do not feed each
+   - End your turn. `--notify` sends you a `[code-foundry wake]` message when the child
+     settles, until the wake that says it finished: that one is its last, and your next
+     `thread send` to it subscribes you again by itself. Best for long work. For several children whose pieces do not feed each
      other, `--notify-group <name>` in place of it on each: one wake when all of them
      settled, and at once for a failure, a prompt or a question.
    - For a pull request's CI or review: `code-foundry thread subscribe --pr <owner/name#N>

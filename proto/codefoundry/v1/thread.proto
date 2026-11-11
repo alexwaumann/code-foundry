@@ -930,6 +930,10 @@ message SendThreadMessageRequest {
   // The thread that sends it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
   // Kept on the item, so prompt history (ListPrompts) leaves the message out.
   string by_thread_id = 5;
+  // A send by_thread_id to a thread whose --notify subscription from it ended (the thread
+  // finished) subscribes it again the same way, armed on this message; true opts out
+  // (thread send --notify=false, and --wait, which waits instead).
+  bool no_notify = 6;
 }
 
 message SendThreadMessageResponse {

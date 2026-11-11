@@ -714,13 +714,18 @@ message CreateThreadRequest {
   // Thread.budget_usd; 0 for none, never negative.
   double budget_usd = 18;
   // With created_by: also subscribe the creator to the new thread, condition SETTLED,
-  // repeat (ThreadService.Subscribe), so the creator's agent is woken each time the new
-  // thread settles. INVALID_ARGUMENT without created_by. See
-  // docs/notes/agents-4-wake.md.
+  // repeat (ThreadService.Subscribe), so the creator's agent is woken when the new thread
+  // settles, until a wake reports it finished a turn: then the subscription ends, and the
+  // creator's next send to it subscribes it again (SendThreadMessageRequest.no_notify;
+  // ThreadSubscription.args "until": "finished"). INVALID_ARGUMENT without created_by. See
+  // docs/notes/agents-4-wake.md and docs/notes/notify-ends-on-finish.md.
   bool notify = 19;
   // Implies notify: the creator's wake waits until every thread of this group settled, and
   // comes at once for one that failed or needs it (docs/notes/wake-groups.md).
   string notify_group = 31;
+  // With notify: the subscription does not end when the thread finishes; it wakes the
+  // creator each time the thread settles until it is archived (Ember's workers).
+  bool notify_repeat = 32;
   // An idempotency key (at most 128 characters): a Create with a key its creator
   // (created_by, or the user when empty) already used within the last 24 hours returns
   // the thread that first Create made (CreateThreadResponse.reused) and starts nothing;

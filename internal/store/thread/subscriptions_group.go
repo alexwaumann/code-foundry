@@ -81,6 +81,7 @@ func (m *Manager) holdGroupLocked(p threadWakePart) bool {
 		s.groups[who][group] = map[string]groupWake{}
 	}
 	s.groups[who][group][p.sub.ID] = groupWake{sub: p.sub, target: p.t.ID}
+	s.changedLocked(who) // one that ended with the finish is listed again (heldOnlyLocked)
 	m.log.Info("wake held for its group", "thread", who, "group", group, "subscription", p.sub.ID, "target", p.t.ID)
 	return true
 }
@@ -137,6 +138,7 @@ func (m *Manager) releaseGroupsLocked(subscriber string) {
 // hold m.mu and m.subs.mu.
 func (m *Manager) releaseGroupWakeLocked(w groupWake, group string, gone []wakeSibling) {
 	s, sub := m.subs, w.sub
+	s.changedLocked(sub.SubscriberID) // no longer listed, if its subscription is gone
 	rec, ok := m.recs[w.target]
 	if !ok {
 		return

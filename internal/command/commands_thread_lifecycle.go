@@ -178,7 +178,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				{Name: "brief", Type: String, Description: "What the thread is for, in at most 500 characters (shown with the creator's note)"},
 				{Name: "labels", Type: String, Description: "Comma-separated labels (lowercase letters, digits, -, _, . and /)"},
 				{Name: "budget", Type: String, Description: "Spending limit in USD at Claude API rates, e.g. 5.00: Claude is interrupted when the thread's cost reaches it"},
-				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message each time the new thread settles (a repeat thread.subscribe)"},
+				{Name: "notify", Type: Bool, Description: "With created-by: wake the creator with a message when the new thread settles, until a wake says it finished " +
+					"(a prompt, a question or an error does not end it); the creator's next thread.send to it subscribes again"},
+				{Name: "notify-repeat", Type: Bool, Description: "With notify: keep waking the creator each time the thread settles, until it is archived"},
 				{Name: "notify-group", Type: String, Description: "Like notify, but one wake for the group: its threads' wakes wait until all of them settled, and come at once for a failure, a prompt or a question"},
 				createdFocusArg,
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
@@ -203,6 +205,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					ProjectIds: projects, LikeThreadId: a.String("like"), NewBranch: a.Bool("new-branch"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
 					Notify: a.Bool("notify") || a.String("notify-group") != "", NotifyGroup: a.String("notify-group"), RequestId: a.String("request-id"),
+					NotifyRepeat:    a.Bool("notify-repeat"),
 					BackgroundSetup: a.Bool("background-setup"), DraftJson: a.String("draft-json"),
 					// A model or effort from the settings' default, not chosen: a resident's
 					// worker defaults may replace it (docs/notes/ember-2-store.md).
@@ -233,6 +236,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				if req.Notify && strings.TrimSpace(req.CreatedBy) == "" {
 					return Result{}, InvalidArg("notify", "needs created-by (the thread to wake; the CLI defaults it to $CODE_FOUNDRY_THREAD inside a thread)")
+				}
+				if req.NotifyRepeat && !req.Notify {
+					return Result{}, InvalidArg("notify-repeat", "only applies with notify or notify-group")
 				}
 				if a.Has("budget") {
 					usd, err := parseUSD("budget", a.String("budget"))
@@ -275,7 +281,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				focusCreated(e, a, s)
 				msg := createdMessage(req, res.Msg, r.projectNamer(ctx))
 				if req.GetNotify() {
-					msg += "; " + req.GetCreatedBy() + " is woken each time it settles"
+					msg += "; " + notifyLine(req)
 				}
 				// Collision hints, never a refusal: printed on stderr.
 				return Result{Message: msg, JSON: s, Warnings: res.Msg.GetHints()}, nil

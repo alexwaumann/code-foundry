@@ -297,6 +297,9 @@ type Message struct {
 	// ByThreadID is the thread that sends it (the CLI's $CODE_FOUNDRY_THREAD), kept on the
 	// item as SentBy; "" for the user.
 	ByThreadID string
+	// NoNotify: the send does not subscribe ByThreadID again to a thread whose --notify
+	// subscription ended (thread send --notify=false, --wait; subscriptions_until.go).
+	NoNotify bool
 	// compact: Compact's /compact (compact.go).
 	compact bool
 }
