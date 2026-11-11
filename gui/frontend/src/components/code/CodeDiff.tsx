@@ -3,6 +3,7 @@ import { MultiFileDiff, PatchDiff, Virtualizer, type FileDiffOptions } from "@pi
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore, type DiffStyle } from "@/stores/codeView";
+import { CODE_SHADOW_CSS } from "./codeCss";
 import { useCodeHost } from "./useCodeHost";
 import "./code.css";
 
@@ -44,6 +45,7 @@ function useDiffOptions({ diffStyle, wrap, lineNumbers = true }: Pick<CodeDiffPr
       disableLineNumbers: !lineNumbers,
       diffIndicators: "bars",
       lineDiffType: "word-alt",
+      unsafeCSS: CODE_SHADOW_CSS,
     }),
     [theme, themeType, style, overflow, lineNumbers],
   );

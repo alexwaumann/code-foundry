@@ -4,6 +4,7 @@ import { createCodeEditor, editorHandle, type CodeEditor, type EditorHandle } fr
 import { useCodeTheme } from "@/lib/codeTheme";
 import { cn } from "@/lib/utils";
 import { useCodeViewStore } from "@/stores/codeView";
+import { CODE_SHADOW_CSS } from "./codeCss";
 import { useCodeHost } from "./useCodeHost";
 import "./code.css";
 
@@ -69,7 +70,7 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
   const overflow = (wrap ?? storeWrap) ? "wrap" : "scroll";
   const file = useMemo(() => ({ name, contents }), [name, contents]);
   const options = useMemo(
-    (): FileOptions<undefined, undefined> => ({ theme, themeType, disableFileHeader: true, disableLineNumbers: !lineNumbers, overflow }),
+    (): FileOptions<undefined, undefined> => ({ theme, themeType, disableFileHeader: true, disableLineNumbers: !lineNumbers, overflow, unsafeCSS: CODE_SHADOW_CSS }),
     [theme, themeType, lineNumbers, overflow],
   );
   const host = useCodeHost();
