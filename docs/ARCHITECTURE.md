@@ -384,7 +384,7 @@ Services (v1):
   published, for the dictation overlay's page); PublishThemeReport (the GUI's contrast
   report on a user theme, which `theme save` and `theme check` print); WatchShots and
   PublishShot (the app's host is the one capturer of `plugin surface --shot`'s PNGs,
-  `internal/shot`); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
+  `internal/shot`; it holds WatchShots and answers one request at a time, `gui/shot.go`); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
   changes only that thread's side panel and never a window's selection; `ui.presence`
   tells a thread's model whether the user is looking and whether a window shows its
   thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
@@ -1174,7 +1174,9 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   `WatchSurface` per visible surface; host-side `command`, `openUrl` and `copy`; form
   drafts per instance and tab; the consent dialog is `plugin.enable`'s confirm; `shot.html`
   (`src/shot`) draws one surface alone in the published theme and reports its height when
-  ready, for `plugin surface --shot` (`docs/notes/plugin-surface-shot-page.md`).
+  ready, for `plugin surface --shot` (`docs/notes/plugin-surface-shot-page.md`); the Wails
+  host loads it in a window it orders in off every display for each shot, snapshots the
+  webview and publishes the PNG (`gui/shot.go`, `docs/notes/plugin-surface-shot-host.md`).
 * **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop:
   `plugin new` (`internal/pluginscaffold`: the embedded `plugins/examples/minimal`
   renamed, its module made and the SDK fetched with `go get` at this daemon's

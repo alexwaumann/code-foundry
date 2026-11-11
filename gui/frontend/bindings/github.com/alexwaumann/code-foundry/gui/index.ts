@@ -4,14 +4,17 @@
 import * as AppService from "./appservice.js";
 import * as DaemonService from "./daemonservice.js";
 import * as OverlayService from "./overlayservice.js";
+import * as ShotService from "./shotservice.js";
 export {
     AppService,
     DaemonService,
-    OverlayService
+    OverlayService,
+    ShotService
 };
 
 export type {
     AppInfo,
     DaemonEndpoint,
+    ShotRendered,
     WindowBackground
 } from "./models.js";

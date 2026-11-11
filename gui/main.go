@@ -63,6 +63,7 @@ func main() {
 	daemonService := NewDaemonService(p, log)
 	appService := NewAppService(log, p.WindowBackground())
 	overlayService := NewOverlayService(log)
+	shotService := NewShotService(log)
 	// Set below, before the app runs, which is when a second launch can first be heard.
 	var bar *menuBar
 	app := application.New(application.Options{
@@ -73,6 +74,7 @@ func main() {
 			application.NewService(daemonService),
 			application.NewService(appService),
 			application.NewService(overlayService),
+			application.NewService(shotService),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -178,6 +180,14 @@ func main() {
 	inputs := newInputReporter(&coreAudioInputs{}, p.InputNames(), log)
 	go inputs.run(watchCtx)
 	go watchDictation(watchCtx, daemonService.connect, newAVMicrophone(log), anywhere, overlayService, hold, inputs, log)
+	// The host draws `plugin surface --shot` for the daemon in a window never on a display
+	// (shot.go). Stopped as the app starts quitting, before its windows go.
+	shotService.panel = newShotWindow(app, log)
+	shotService.publish = publishShot(daemonService.connect)
+	shotCtx, stopShots := context.WithCancel(watchCtx)
+	app.OnShutdown(stopShots)
+	go shotService.run(shotCtx)
+	go watchShots(shotCtx, daemonService.connect, shotService, log)
 
 	if err := app.Run(); err != nil {
 		log.Error("wails app", "err", err)

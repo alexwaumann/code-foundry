@@ -20,6 +20,16 @@ export interface DaemonEndpoint {
 }
 
 /**
+ * ShotRendered is the page's report of a surface drawn and measured.
+ */
+export interface ShotRendered {
+    /**
+     * ContentHeight is the surface's full height in CSS px, its scroll area unrolled.
+     */
+    "contentHeight": number;
+}
+
+/**
  * WindowBackground is what the frontend reports on every theme or scheme change
  * (lib/theme.ts): the sheet of the dark and the light theme, the scheme setting, and the
  * scheme in effect now.
