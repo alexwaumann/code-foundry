@@ -52,6 +52,27 @@ func (h *Host) TableRows(instance, table string) (keys []string, ok bool) {
 	return keys, true
 }
 
+// TableCell returns a row's cell in a table's column (a meter's value, label and tone are
+// in its Meter) in the instance's latest view, as the host draws it; ok is false without
+// such a table or row, or when the row has no cell in that column.
+func (h *Host) TableCell(instance, table, row, column string) (cell ui.Cell, ok bool) {
+	v, err := h.latest(instance)
+	if err != nil {
+		return ui.Cell{}, false
+	}
+	n, found := findNode(v, func(n ui.Node) bool { return n.Key == table && n.Table != nil })
+	if !found {
+		return ui.Cell{}, false
+	}
+	for _, r := range n.Table.AllRows() {
+		if r.Key == row {
+			cell, ok = r.Cells[column]
+			return cell, ok
+		}
+	}
+	return ui.Cell{}, false
+}
+
 // findColumn finds the table that has a column keyed column, and the column.
 func findColumn(v ui.View, column string) (ui.Node, ui.TableColumn, bool) {
 	var col ui.TableColumn

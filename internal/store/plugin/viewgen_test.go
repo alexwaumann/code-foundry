@@ -228,8 +228,9 @@ func (g *viewGen) row() ui.Row {
 }
 
 // table returns a table: columns with every width, priority, style and sort option, rows
-// or groups whose cells are of its columns (glyphs, pills, spans), and a sort; broken, a
-// width with a weight, a cell of no column, rows and groups, a sort of no column.
+// or groups whose cells are of its columns (glyphs, pills, spans, meters), and a sort;
+// broken, a width with a weight, a cell of no column, a meter out of 0..1 or beside a
+// value, rows and groups, a sort of no column.
 func (g *viewGen) table() *ui.Table {
 	t := &ui.Table{Dense: g.chance(0.3)}
 	var sortable []string
@@ -272,13 +273,22 @@ func (g *viewGen) table() *ui.Table {
 				continue
 			}
 			cell := ui.Cell{Value: ui.Plain(g.label())}
-			switch g.r.IntN(5) {
+			switch g.r.IntN(6) {
 			case 0:
 				cell.Glyph = &ui.Glyph{Status: ui.StatusFailed}
 			case 1:
 				cell = ui.Cell{Pill: &ui.Pill{Label: "failed", Tone: ui.ToneError}}
 			case 2:
 				cell.Value = ui.Spans(ui.T("p90 ").AsMono(), ui.Span{Duration: &ui.Duration{Ms: 252000}})
+			case 3:
+				m := ui.Meter{Value: []float64{0, 1, 0.5, g.r.Float64()}[g.r.IntN(4)], Label: g.pick("", "86%", "3 of 8", "–"), Tone: ui.Tone(g.pick("", "ok", "attention", "error", "muted"))}
+				if g.bad() {
+					m.Value = []float64{-0.5, 1.5, 86}[g.r.IntN(3)]
+				}
+				cell = ui.Cell{Meter: &m}
+				if g.bad() {
+					cell.Value = ui.Plain("86%")
+				}
 			}
 			r.Cells[c.Key] = cell
 		}

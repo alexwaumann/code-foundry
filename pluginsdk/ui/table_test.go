@@ -10,8 +10,8 @@ import (
 
 // tableSeed has a sorted table with every column option (a status glyph column, a pill
 // column, mono, muted and caption cells, fixed, weighted and least widths, priorities, an
-// unlabelled icon column), rows with an action, buttons and a menu, a selected row, and a
-// grouped dense table in a section with a collapsed group and a count.
+// unlabelled icon column, a meter column), rows with an action, buttons and a menu, a
+// selected row, and a grouped dense table in a section with a collapsed group and a count.
 const tableSeed = `{"nodes":[
   {"key":"builds","table":{"title":"Builds","count":1288,"sort":{"column":"b-num","dir":"desc"},"emptyText":"No builds yet",
     "columns":[
@@ -21,13 +21,14 @@ const tableSeed = `{"nodes":[
       {"key":"b-cause","label":"Cause","priority":1},
       {"key":"b-dur","label":"Duration","width":72,"align":"end","style":"mono","priority":6,"sortable":true,"sortFirst":"desc"},
       {"key":"b-age","label":"Age","width":40,"align":"end","style":"caption","priority":7},
-      {"key":"b-icon","width":16,"style":"muted"}],
+      {"key":"b-icon","width":16,"style":"muted"},
+      {"key":"b-rate","label":"Pass rate","weight":2,"minWidth":64,"priority":2}],
     "rows":[
       {"key":"b-1288","cells":{"b-num":{"value":"#1288","glyph":{"status":"running"}},"b-status":{"pill":{"label":"running"}},"b-branch":"main",
         "b-cause":{"spans":[{"text":"push · "},{"text":"1 commit","url":"https://example.com/c"}]},"b-dur":{"spans":[{"duration":{"ms":130000}}]},
-        "b-age":{"spans":[{"time":{"at":"2026-11-08T09:00:00Z"}}]}},"action":{"event":"open-build","data":"1288"},"selected":true},
+        "b-age":{"spans":[{"time":{"at":"2026-11-08T09:00:00Z"}}]},"b-rate":{"meter":{"value":0}}},"action":{"event":"open-build","data":"1288"},"selected":true},
       {"key":"b-1287","cells":{"b-num":{"value":"#1287","glyph":{"status":"failed","hint":"3 failed"}},"b-status":{"pill":{"label":"failed","tone":"error"}},
-        "b-cause":{"spans":[{"text":"integration · 3 failed","tone":"error"}]},"b-icon":{"glyph":{"icon":"lock","tone":"muted"}}},
+        "b-cause":{"spans":[{"text":"integration · 3 failed","tone":"error"}]},"b-icon":{"glyph":{"icon":"lock","tone":"muted"}},"b-rate":{"meter":{"value":0.86,"label":"86%","tone":"attention"}}},
         "actions":[{"key":"b-1287-rerun","label":"Rerun","icon":"rotate-cw","action":{"event":"rerun","data":"1287"}}],
         "menu":{"items":[{"key":"b-1287-log","label":"Open console","action":{"event":"log","data":"1287"}},{"separator":true},
           {"key":"b-1287-open","label":"Open in CI","action":{"openUrl":"https://example.com/1287"}}]}}]}},

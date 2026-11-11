@@ -128,30 +128,37 @@ type TableGroup struct {
 }
 
 // Cell is one value: an Inline (text, tones, times, durations, links) after an optional
-// Glyph (a status or an icon: a build's state) and before an optional Pill. A cell with
-// only a value encodes as that Inline (a bare string when it is plain text); otherwise as
-// {"value": …, "glyph": …, "pill": …}.
+// Glyph (a status or an icon: a build's state) and before an optional Pill; or a Meter
+// alone (a share or a rate drawn as a bar). A cell with only a value encodes as that
+// Inline (a bare string when it is plain text); otherwise as {"value": …, "glyph": …,
+// "pill": …} or {"meter": …}.
 type Cell struct {
 	Value *Inline `json:"value,omitempty"`
 	Glyph *Glyph  `json:"glyph,omitempty"`
 	Pill  *Pill   `json:"pill,omitempty"`
+	// Meter is the cell's whole content: with it, no value, glyph or pill. Hosts that
+	// draw it announce TableMeterCapability; an older host drops it (an empty cell), so
+	// send a TextCell of the label instead when HasCapability is false.
+	Meter *Meter `json:"meter,omitempty"`
 }
 
 type cellJSON struct {
 	Value *Inline `json:"value,omitempty"`
 	Glyph *Glyph  `json:"glyph,omitempty"`
 	Pill  *Pill   `json:"pill,omitempty"`
+	Meter *Meter  `json:"meter,omitempty"`
 }
 
 // MarshalJSON encodes a cell with only a value as that value.
 func (c Cell) MarshalJSON() ([]byte, error) {
-	if c.Glyph == nil && c.Pill == nil && c.Value != nil {
+	if c.Glyph == nil && c.Pill == nil && c.Meter == nil && c.Value != nil {
 		return json.Marshal(c.Value)
 	}
 	return json.Marshal(cellJSON(c))
 }
 
-// UnmarshalJSON accepts an Inline (a string or {text, spans}) or {value, glyph, pill}.
+// UnmarshalJSON accepts an Inline (a string or {text, spans}) or {value, glyph, pill,
+// meter}.
 func (c *Cell) UnmarshalJSON(b []byte) error {
 	var probe map[string]json.RawMessage
 	if json.Unmarshal(b, &probe) == nil {
@@ -168,7 +175,7 @@ func (c *Cell) UnmarshalJSON(b []byte) error {
 	}
 	var in Inline
 	if err := in.UnmarshalJSON(b); err != nil {
-		return errors.New("cell: want a string, {text, spans} or {value, glyph, pill}")
+		return errors.New("cell: want a string, {text, spans} or {value, glyph, pill, meter}")
 	}
 	*c = Cell{Value: &in}
 	return nil
@@ -403,7 +410,7 @@ func (c *checker) table(path string, t *Table) {
 }
 
 // tableRow checks one row: its key, its cells (each of a column, a value, glyph and pill
-// as elsewhere), its action, buttons and menu.
+// as elsewhere, or a meter alone), its action, buttons and menu.
 func (c *checker) tableRow(path string, r TableRow, cols map[string]TableColumn) {
 	c.key(path, r.Key)
 	for _, k := range slices.Sorted(maps.Keys(r.Cells)) {
@@ -419,6 +426,7 @@ func (c *checker) tableRow(path string, r TableRow, cols map[string]TableColumn)
 		}
 		c.glyph(p+".glyph", cell.Glyph)
 		c.pill(p+".pill", cell.Pill)
+		c.meter(p, cell)
 	}
 	c.action(path+".action", r.Action)
 	c.buttons(path+".actions", r.Actions, MaxRowButtons)
