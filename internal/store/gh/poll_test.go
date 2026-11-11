@@ -527,10 +527,19 @@ func TestPollCacheRestart(t *testing.T) {
 		return len(s.Snapshot().Dashboard.Authored) == 1 && len(st.PullRequests) == 1
 	})
 	// The poll row is the last cache write of a poll, after the rows the snapshot above
-	// reflects; the restart below must see it.
+	// reflects; the restart below must see them. Any poll row is not enough: Track's poll
+	// can write one before the branch is watched, and the poll that fetches the branch
+	// sets it in memory before it writes its rows. So wait for the branch's row and a poll
+	// row at least as new, which only the end of that poll (or a later one) writes
+	// (docs/notes/flaky-ci-tests.md).
 	waitFor(t, "poll row", func() bool {
-		p, ok, err := loadActivityRow[pollRow](context.Background(), s.cache, activityPoll)
-		return err == nil && ok && !p.FetchedAt.IsZero()
+		ctx := context.Background()
+		b, ok, err := loadActivityRow[BranchPullRequests](ctx, s.cache, activityBranchKey(branchKey{"o/r", "branch-1"}))
+		if err != nil || !ok || len(b.PullRequests) != 1 || b.FetchedAt.IsZero() {
+			return false
+		}
+		p, ok, err := loadActivityRow[pollRow](ctx, s.cache, activityPoll)
+		return err == nil && ok && !p.FetchedAt.Before(b.FetchedAt)
 	})
 
 	// Restart: the snapshot comes from the cache before any request, the first poll
