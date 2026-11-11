@@ -20,6 +20,19 @@ before it is pushed, so CI mostly repeats a result we have.
   the head's tree hash. Match: the three real jobs are skipped. On `push` to main the
   real jobs always run, so the merged tree gets one honest run (today main went red once
   on a test that passed on the PR).
+- **A late attestation re-runs the PR's run (2026-11-11).** The `attested` job reads the
+  status once, when it starts. Agents usually open the PR (which starts the run) and only
+  then run `make attest`, so the status often arrived after the decision: of 25 merged
+  PRs, #618-#621 were attested 1-7 minutes late and ran the full suite anyway, two of them
+  going red on a `go-test` flake the local check had not hit. `make attest` now looks up
+  the newest `pull_request` run of `ci.yml` for the commit after posting. If its attested
+  job has not started, nothing to do. If the real jobs were skipped, nothing to do. If
+  the run already finished green, it is left alone. Otherwise (running, queued for a
+  runner, failed or cancelled) it is cancelled, waited on, and re-run with
+  `gh run rerun`; the new attempt's attested job sees the status and skips. Skipped jobs
+  resolve within seconds of `attested`, so real jobs still queued 30 s after it count as
+  running. This step is best effort: it prints what it did and never fails the
+  attestation, which is already posted.
 - **Three jobs.** `go-test` and `go-lint` (gofmt, vet, staticcheck) on macOS,
   `frontend` on ubuntu-latest; nothing in typecheck/lint/vitest needs macOS, and the
   Linux runner starts in seconds. The Go setup (setup-go + cached libghostty-vt) moved to
@@ -33,6 +46,8 @@ before it is pushed, so CI mostly repeats a result we have.
 - `make check` must finish green before committing a docs note or any other file, or the
   tree changes and `make attest` refuses. Order: edit, `make check`, commit, push,
   `make attest`.
+- `make attest` before opening the PR is still the fastest path (no cancel and re-run),
+  but either order now ends with the jobs skipped.
 - The record is per git dir, so a second worktree needs its own `make check`.
 - `gh api` uses the caller's `gh` login; the daemon's sessions have `gh` on PATH already.
 
