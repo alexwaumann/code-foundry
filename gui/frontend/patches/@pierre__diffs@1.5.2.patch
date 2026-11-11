@@ -1,3 +1,172 @@
+diff --git a/dist/components/CodeView.js b/dist/components/CodeView.js
+index 140f94fe8480aa6b4ccbfca5573123442644a808..14aded25c23f4ba252c47f3dc0e88a2835a96075 100644
+--- a/dist/components/CodeView.js
++++ b/dist/components/CodeView.js
+@@ -16,6 +16,7 @@ import { prefersReducedMotion } from "../utils/prefersReducedMotion.js";
+ import { roundToDevicePixel } from "../utils/roundToDevicePixel.js";
+ import { VirtualizedFile } from "./VirtualizedFile.js";
+ import { VirtualizedFileDiff } from "./VirtualizedFileDiff.js";
++import { getLayoutHeight } from "../utils/getLayoutZoom.js";
+ //#region src/components/CodeView.ts
+ const CODE_VIEW_DIFF_OPTION_KEYS = [
+ 	"theme",
+@@ -368,8 +369,8 @@ var CodeView = class CodeView {
+ 		this.scrollDirty = true;
+ 	}
+ 	measureMountedHosts() {
+-		if (this.header.element != null) this.setHostHeight(this.header, this.header.element.getBoundingClientRect().height);
+-		if (this.footer.element != null) this.setHostHeight(this.footer, this.footer.element.getBoundingClientRect().height);
++		if (this.header.element != null) this.setHostHeight(this.header, getLayoutHeight(this.header.element));
++		if (this.footer.element != null) this.setHostHeight(this.footer, getLayoutHeight(this.footer.element));
+ 	}
+ 	setup(root) {
+ 		if (this.root != null) throw new Error("CodeView.setup: already setup");
+@@ -1986,7 +1987,7 @@ var CodeView = class CodeView {
+ 	getHeight() {
+ 		if (!this.heightDirty) return this.height;
+ 		this.heightDirty = false;
+-		this.height = this.root?.getBoundingClientRect().height ?? 0;
++		this.height = this.root == null ? 0 : getLayoutHeight(this.root);
+ 		return this.height;
+ 	}
+ 	getScrollHeight() {
+diff --git a/dist/components/VirtualizedFile.js b/dist/components/VirtualizedFile.js
+index d1f57cdef24ed5d34d391ee3bfe4a1d3505acd73..d682e3e8abdfe20c6a1e6246ef89ec9144bdd0cd 100644
+--- a/dist/components/VirtualizedFile.js
++++ b/dist/components/VirtualizedFile.js
+@@ -5,6 +5,7 @@ import { areFileTargetsEqual } from "../utils/areFileTargetsEqual.js";
+ import { computeVirtualFileMetrics, getVirtualFileHeaderHeight, getVirtualFileHeaderRegion, getVirtualFilePaddingBottom } from "../utils/computeVirtualFileMetrics.js";
+ import { FILE_ANNOTATION_DOM_KEY, includesFileAnnotations, shouldRenderFileAnnotations } from "../utils/includesFileAnnotations.js";
+ import { File } from "./File.js";
++import { getLayoutRowHeight } from "../utils/getLayoutZoom.js";
+ //#region src/components/VirtualizedFile.ts
+ const LAYOUT_CHECKPOINT_INTERVAL = 5e3;
+ const NO_GHOST_TEXT_ROWS = /* @__PURE__ */ new Map();
+@@ -150,11 +151,11 @@ var VirtualizedFile = class extends File {
+ 			const ghostHeight = (ghostTextRows.get(lineIndex) ?? 0) * lineHeight;
+ 			const cachedHeight = this.cache.heights.get(lineIndex);
+ 			if (!measureAllRows && (cachedHeight == null || cachedHeight === lineHeight + ghostHeight)) continue;
+-			let measuredHeight = line.getBoundingClientRect().height + ghostHeight;
++			let measuredHeight = getLayoutRowHeight(line) + ghostHeight;
+ 			let hasMetadata = false;
+ 			if (line.nextElementSibling instanceof HTMLElement && ("lineAnnotation" in line.nextElementSibling.dataset || "noNewline" in line.nextElementSibling.dataset)) {
+ 				if ("noNewline" in line.nextElementSibling.dataset) hasMetadata = true;
+-				measuredHeight += line.nextElementSibling.getBoundingClientRect().height;
++				measuredHeight += getLayoutRowHeight(line.nextElementSibling);
+ 			}
+ 			const expectedHeight = this.getLineHeight(lineIndex, hasMetadata);
+ 			if (measuredHeight === expectedHeight) continue;
+@@ -628,7 +629,7 @@ function measureFileAnnotationHeight(content) {
+ 	for (const child of content.children) {
+ 		if (!(child instanceof HTMLElement)) continue;
+ 		if (child.dataset.lineAnnotation !== FILE_ANNOTATION_DOM_KEY) continue;
+-		height = Math.max(height ?? 0, child.getBoundingClientRect().height);
++		height = Math.max(height ?? 0, getLayoutRowHeight(child));
+ 	}
+ 	return height;
+ }
+diff --git a/dist/components/VirtualizedFileDiff.js b/dist/components/VirtualizedFileDiff.js
+index 96f970f1c09c6de6edc1b355813520fa4d366d2b..9ea494e3fd2db9a6aca18eccb4487353be28afb6 100644
+--- a/dist/components/VirtualizedFileDiff.js
++++ b/dist/components/VirtualizedFileDiff.js
+@@ -13,6 +13,7 @@ import { hydratePartialDiff } from "../utils/hydratePartialDiff.js";
+ import { iterateOverDiff } from "../utils/iterateOverDiff.js";
+ import { parseDiffFromFile } from "../utils/parseDiffFromFile.js";
+ import { FileDiff } from "./FileDiff.js";
++import { getLayoutRowHeight } from "../utils/getLayoutZoom.js";
+ //#region src/components/VirtualizedFileDiff.ts
+ const VIRTUALIZED_FILE_DIFF_LAYOUT_CHECKPOINT_INTERVAL = 3e3;
+ const NO_GHOST_TEXT_ROWS = /* @__PURE__ */ new Map();
+@@ -195,11 +196,11 @@ var VirtualizedFileDiff = class extends FileDiff {
+ 				if (skipsGhostRows && ghostRows > 0) continue;
+ 				const previousDelta = this.cache.heightDeltas.get(lineIndex) ?? 0;
+ 				if (!measureAllRows && previousDelta === ghostRows * lineHeight) continue;
+-				let measuredHeight = line.getBoundingClientRect().height + ghostRows * lineHeight;
++				let measuredHeight = getLayoutRowHeight(line) + ghostRows * lineHeight;
+ 				let hasMetadata = false;
+ 				if (line.nextElementSibling instanceof HTMLElement && ("lineAnnotation" in line.nextElementSibling.dataset || "noNewline" in line.nextElementSibling.dataset)) {
+ 					if ("noNewline" in line.nextElementSibling.dataset) hasMetadata = true;
+-					measuredHeight += line.nextElementSibling.getBoundingClientRect().height;
++					measuredHeight += getLayoutRowHeight(line.nextElementSibling);
+ 				}
+ 				const estimatedHeight = this.getEstimatedLineHeight(hasMetadata);
+ 				const nextDelta = measuredHeight - estimatedHeight;
+@@ -1061,7 +1062,7 @@ function measureFileAnnotationHeight(codeGroups) {
+ 		for (const child of content.children) {
+ 			if (!(child instanceof HTMLElement)) continue;
+ 			if (child.dataset.lineAnnotation !== FILE_ANNOTATION_DOM_KEY) continue;
+-			height = Math.max(height ?? 0, child.getBoundingClientRect().height);
++			height = Math.max(height ?? 0, getLayoutRowHeight(child));
+ 		}
+ 	}
+ 	return height;
+diff --git a/dist/components/Virtualizer.js b/dist/components/Virtualizer.js
+index 4063b992bf7c4958c0d8a305977280ea9a3a7330..be6abd10c31945c7660953381f3ae9d1ace171f2 100644
+--- a/dist/components/Virtualizer.js
++++ b/dist/components/Virtualizer.js
+@@ -1,6 +1,7 @@
+ import { dequeueRender, queueRender } from "../managers/UniversalRenderingManager.js";
+ import { createWindowFromScrollPosition } from "../utils/createWindowFromScrollPosition.js";
+ import { areVirtualWindowSpecsEqual } from "../utils/areVirtualWindowSpecsEqual.js";
++import { getLayoutHeight, getLayoutZoom } from "../utils/getLayoutZoom.js";
+ //#region src/components/Virtualizer.ts
+ const DEFAULT_OVERSCROLL_SIZE = 1e3;
+ const INTERSECTION_OBSERVER_MARGIN = DEFAULT_OVERSCROLL_SIZE * 4;
+@@ -151,6 +152,10 @@ var Virtualizer = class Virtualizer {
+ 	setupElement(contentContainer) {
+ 		if (this.root == null || this.root instanceof Document) throw new Error("Virtualizer.setupElement: Invalid setup method");
+ 		this.root.addEventListener("scroll", this.handleElementScroll, { passive: true });
++		// The virtualizer anchors the scroll itself (scrollFix), like CodeView:
++		// the browser's own anchoring would move it again on a relayout (a
++		// page zoom change in edit mode jumped tens of lines).
++		this.root.style.overflowAnchor = "none";
+ 		this.resizeObserver?.observe(this.root);
+ 		contentContainer ??= this.root.firstElementChild ?? void 0;
+ 		if (contentContainer instanceof HTMLElement) {
+@@ -165,6 +170,7 @@ var Virtualizer = class Virtualizer {
+ 		this.intersectionObserver?.disconnect();
+ 		this.intersectionObserver = void 0;
+ 		this.root?.removeEventListener("scroll", this.handleElementScroll);
++		if (this.root != null && !(this.root instanceof Document)) this.root.style.removeProperty("overflow-anchor");
+ 		window.removeEventListener("scroll", this.handleWindowScroll);
+ 		window.removeEventListener("resize", this.handleWindowResize);
+ 		this.root = void 0;
+@@ -283,7 +289,7 @@ var Virtualizer = class Virtualizer {
+ 		if (fileTypeOffset === "top") {
+ 			if (top !== fileOffset) this.applyScrollFix(top - fileOffset);
+ 		} else {
+-			const bottom = top + fileElement.getBoundingClientRect().height;
++			const bottom = top + getLayoutHeight(fileElement);
+ 			if (bottom !== fileOffset) this.applyScrollFix(bottom - fileOffset);
+ 		}
+ 	}
+@@ -409,7 +415,7 @@ var Virtualizer = class Virtualizer {
+ 		this.height = (() => {
+ 			if (this.root == null) return 0;
+ 			if (this.root instanceof Document) return globalThis.innerHeight;
+-			return this.root.getBoundingClientRect().height;
++			return getLayoutHeight(this.root);
+ 		})();
+ 		return this.height;
+ 	}
+@@ -422,10 +428,15 @@ var Virtualizer = class Virtualizer {
+ 		return this.root == null || this.root instanceof Document ? void 0 : this.root;
+ 	}
+ };
++/**
++* How far below the scroll container's top an element is, in the container's
++* layout px (the unit of scrollTop): rects are viewport px, so under a CSS
++* zoom the distance is divided by the container's zoom.
++*/
+ function getRelativeBoundingTop(element, scrollContainer) {
+ 	const rect = element.getBoundingClientRect();
+-	const scrollContainerTop = scrollContainer?.getBoundingClientRect().top ?? 0;
+-	return rect.top - scrollContainerTop;
++	if (scrollContainer == null) return rect.top;
++	return (rect.top - scrollContainer.getBoundingClientRect().top) / getLayoutZoom(scrollContainer);
+ }
+ //#endregion
+ export { Virtualizer };
 diff --git a/dist/editor/editor.js b/dist/editor/editor.js
 index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb75d66a16 100644
 --- a/dist/editor/editor.js
@@ -115,10 +284,16 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  				lastTop = top;
  				searchStart = low + 1;
 diff --git a/dist/editor/textMeasure.js b/dist/editor/textMeasure.js
-index 96d4fb137ea683b66381b1ce6e47e8708a89366c..93f0ec4d1700542dbf247356f5cc6d746e7c2bf7 100644
+index 96d4fb137ea683b66381b1ce6e47e8708a89366c..f9e13a65591d0d1cb49272b665f13a04466f86cd 100644
 --- a/dist/editor/textMeasure.js
 +++ b/dist/editor/textMeasure.js
-@@ -131,10 +131,18 @@ var Metrics = class {
+@@ -1,4 +1,5 @@
+ import { getGraphemeSegmenter, h, round } from "./utils.js";
++import { getLayoutZoom } from "../utils/getLayoutZoom.js";
+ //#region src/editor/textMeasure.ts
+ const TEXT_WIDTH_CACHE_LIMIT = 4096;
+ const COMBINING_MARK_PATTERN = /\p{Mark}/u;
+@@ -131,10 +132,18 @@ var Metrics = class {
  	* measure the width of the text using the DOM
  	* this is slow because it cause a reflow, use it for non-ascii text;
  	* results are memoized per text so repeated measurements skip the reflow
@@ -138,7 +313,7 @@ index 96d4fb137ea683b66381b1ce6e47e8708a89366c..93f0ec4d1700542dbf247356f5cc6d74
  		const cached = this.#textWidthCache.get(cacheKey);
  		if (cached !== void 0) return cached;
  		const measureEl = h("span", {
-@@ -151,7 +159,7 @@ var Metrics = class {
+@@ -151,7 +160,7 @@ var Metrics = class {
  		}, this.#root);
  		let width;
  		try {
@@ -147,24 +322,7 @@ index 96d4fb137ea683b66381b1ce6e47e8708a89366c..93f0ec4d1700542dbf247356f5cc6d74
  		} finally {
  			measureEl.remove();
  		}
-@@ -176,6 +184,16 @@ var Metrics = class {
- 		return hadCachedTextWidths;
- 	}
- };
-+/**
-+* The effective CSS zoom of an element: the factor between its layout px and
-+* the viewport px of getBoundingClientRect(), getClientRects() and pointer
-+* events. 1 where `currentCSSZoom` is missing (engines from before zoom was
-+* standardized, whose rects are already in layout px).
-+*/
-+function getLayoutZoom(element) {
-+	const zoom = element?.currentCSSZoom;
-+	return typeof zoom === "number" && zoom > 0 ? zoom : 1;
-+}
- /** Check if the text needs DOM text measurement. */
- function needsDomTextMeasurement(text) {
- 	for (let i = 0; i < text.length; i++) {
-@@ -238,6 +256,6 @@ function getExpandedAsciiTextColumns(text, tabSize) {
+@@ -238,6 +247,6 @@ function getExpandedAsciiTextColumns(text, tabSize) {
  	return columns;
  }
  //#endregion
@@ -173,3 +331,44 @@ index 96d4fb137ea683b66381b1ce6e47e8708a89366c..93f0ec4d1700542dbf247356f5cc6d74
  
  //# sourceMappingURL=textMeasure.js.map
 \ No newline at end of file
+diff --git a/dist/utils/getLayoutZoom.js b/dist/utils/getLayoutZoom.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e64184c620beb304ccf5ae6ac15d8b020ecca5f
+--- /dev/null
++++ b/dist/utils/getLayoutZoom.js
+@@ -0,0 +1,35 @@
++//#region src/utils/getLayoutZoom.ts
++/**
++* The effective CSS zoom of an element: the factor between its layout px and
++* the viewport px of getBoundingClientRect(), getClientRects() and pointer
++* events. 1 where `currentCSSZoom` is missing (engines from before zoom was
++* standardized, whose rects are already in layout px).
++*
++* Under a zoom, scrollTop, scrollHeight, clientHeight, offsetHeight and the
++* heights the library sets in CSS are layout px, so a rect distance is divided
++* by this before it meets any of them.
++*/
++function getLayoutZoom(element) {
++	const zoom = element?.currentCSSZoom;
++	return typeof zoom === "number" && zoom > 0 ? zoom : 1;
++}
++/** An element's border-box height in layout px (its rect height over its zoom). */
++function getLayoutHeight(element) {
++	const { height } = element.getBoundingClientRect();
++	const zoom = getLayoutZoom(element);
++	return zoom === 1 ? height : height / zoom;
++}
++/**
++* A rendered row's height in layout px, for comparing with the line height:
++* under a zoom the browser snaps the zoomed height to its own grid, so the
++* rect over the zoom misses a whole number by a hair (19 px rows measure
++* 18.99 at 90%), which would count every row as resized. Rows are whole
++* layout px there; at zoom 1 the rect is used as is.
++*/
++function getLayoutRowHeight(element) {
++	const { height } = element.getBoundingClientRect();
++	const zoom = getLayoutZoom(element);
++	return zoom === 1 ? height : Math.round(height / zoom);
++}
++//#endregion
++export { getLayoutHeight, getLayoutRowHeight, getLayoutZoom };

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
 import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
+import { zoomFactor } from "@/lib/zoom";
 import { useCodeFind } from "./useFileFind";
 
 /** Above this many lines the file lays out only its visible lines (the library's virtualizer). */
@@ -29,7 +30,8 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
     const step = () => {
       const row = root.querySelector(DIFFS_TAG_NAME)?.shadowRoot?.querySelector<HTMLElement>(`[data-line="${String(line)}"]`);
       if (row) {
-        const top = row.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop;
+        // Rects are viewport px, scrollTop layout px: under a page zoom the distance is divided back.
+        const top = (row.getBoundingClientRect().top - root.getBoundingClientRect().top) / zoomFactor() + root.scrollTop;
         root.scrollTop = Math.max(0, top - root.clientHeight / 3);
         return;
       }

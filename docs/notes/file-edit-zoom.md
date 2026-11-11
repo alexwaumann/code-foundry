@@ -73,18 +73,71 @@ re-measured on `document.fonts.ready`, so load order did not show. Very long lin
 measure per wrap segment. In a 420-line file (the virtualized path), carets line up
 wherever rows are rendered. Search matches, bracket matches and selections use the same
 `#getCharX` as the caret. Popovers (markers, selection actions, edit predictions) and the
-ghost-text row count also mix units, but the File tab uses none of them; they are in the
-upstream report.
+ghost-text row count also mix units; they are left unpatched, and the File tab uses none of
+them.
+
+## The virtualizer under zoom (files over 400 lines)
+
+Bug (reported by a user): a long file went blank near the end at any zoom but 100%. Worse
+than first seen, measured in WebKit on a 1200-line file scrolled to the end (rows rendered
+against the scroller): at 90% three rows of 57 on screen, at 110% and up none, read-only or
+editing, wrap or not; mid-file at 125–200% blank too. The Diff tab (CodeScroll) the same; the
+PR code tab (CodeView) only in wrap mode (blank strips of 60–400 px at 110–200%).
+
+Mechanism, confirmed by measuring before patching: in WebKit `scrollTop`, `scrollHeight`,
+`clientHeight` and `offsetHeight` are layout px; rects are viewport px (layout × zoom). The
+library mixed them:
+
+* `Virtualizer.getRelativeBoundingTop` (a rect distance) is added to `scrollTop` to place a
+  file in the scroller (`getOffsetInScrollContainer`, the file's `top`) and in `scrollFix`.
+  Scrolled by S, the file's top came out S·(1 − zoom) off: +2300 px at 90% at the end of the
+  file, −5800 px at 125%. The render window (scrollTop ± 1000) then missed the rows.
+* `getHeight` (Virtualizer and CodeView) took the scroller's rect height as its height, and
+  CodeView its header/footer.
+* In wrap mode (and with annotations) `reconcileHeights` (VirtualizedFile,
+  VirtualizedFileDiff) stored each rendered row's rect height: 23.75 for a 19 px row at
+  125%, so the computed content height, the scrollbar, and where every later row was
+  thought to be grew with the zoom.
+
+Fix, in the same patch file, one helper module (`dist/utils/getLayoutZoom.js`; the
+editor's `getLayoutZoom` moved there and `textMeasure.js` re-exports it):
+
+* `getRelativeBoundingTop` divides by the scroll container's zoom; `getHeight`, scrollFix's
+  file height and CodeView's header/footer read `getLayoutHeight` (rect over zoom).
+* Row heights read `getLayoutRowHeight`: rect over zoom, rounded to a whole px when the
+  zoom is not 1. The browser snaps zoomed heights to its 1/64 px grid, so 19 px rows measure
+  18.99 at 90%; unrounded, every row would count as resized. At 100% the rect is used as is.
+* The simple Virtualizer sets `overflow-anchor: none` on its scroller, as CodeView already
+  does: it anchors with `scrollFix`, and WebKit's own anchoring then moved it again on a zoom
+  change in edit mode (14700 → 15122 px at 100% → 125%, 23 lines; 740 → 875 after a cycle
+  of zooms). No script scrolled: a setter trap on `scrollTop` saw nothing.
+
+Ours: `CodeBody`'s scroll to a line (a File tab opened at a line) added a rect distance to
+`scrollTop` too; at 200% line 900 landed 1.87 screens above the view. It divides by the
+zoom now. Find in file (`useFileFind.ts`) already did.
+
+Checked (WebKit, mock): at 90, 110, 125, 150 and 200%, read-only and edit, wrap and no-wrap,
+File tab, Diff tab and PR code tab: no blank strip mid-file or at the end, the last line on
+screen at the end (under it at most the file's bottom padding, as at 100%), the scroll
+height within 100 px of 100%'s (23,836) in no-wrap; a File tab opened at line 900 puts
+it a third down; a zoom cycle (90 → 125 → 200 → 110 → 150 → 100) keeps the first line
+within one; find in file steps to all 12 matches of a 600-line file, both ways, at 90, 125
+and 200%, view and edit. 100% unchanged (same rows rendered, same scroll positions).
+
+`e2e/file-zoom-scroll.spec.ts`: the end at 90/125%, wrap and not; edit mode at 125% plus the
+zoom-change jump; line 900 at 200%. Each of the three parts of the fix fails its own test
+when taken out. The file is 1200 short lines: the error grows with the scroll (0.1 × S at 90%),
+and at 600 lines it would be about the render window's 1000 px margin, too close to fail. The mock writes files from a URL,
+so spaces go as `+` to stay under Node's 16 KB header limit.
+
+Not patched: `window` scrolling (a Document root: `window.scrollY` under a zoomed `<html>`
+was not measured, and the app never uses it) and the annotation height sync
+(`ResizeManager`, `lineAnnotations.js`), unused here.
 
 ## Not fixed here
 
 * **A click at the start of a wrapped row** puts the caret at the end of the row above (the
   library resolves the shared offset to the earlier row). At 100% too; a library choice,
   not zoom.
-* **The library's Virtualizer under zoom** (files over 400 lines, read-only too): it adds
-  `getBoundingClientRect` offsets (viewport px) to `scrollTop` (layout px), takes the
-  scroller's rect height as its height, and in wrap mode stores row heights from rects. At
-  90% the rows near the end are not rendered (a blank strip at the bottom); at 125% in edit
-  mode, scrolled to the end, no rows at all. A scroll bug, not a selection one: a follow-up.
 * **The real Wails window.** WebKit through Playwright only; WKWebView should behave the
   same (`currentCSSZoom` is in both).
