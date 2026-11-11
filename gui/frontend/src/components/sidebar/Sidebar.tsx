@@ -4,7 +4,6 @@ import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
 import { HistoryButtons } from "@/components/sidebar/HistoryButtons";
 import { useBranchlessRows } from "@/components/thread/useThreadPlace";
-import { Tip } from "@/components/ui/tooltip";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
 import { sidebarAnchor } from "@/lib/inSidebar";
@@ -210,7 +209,7 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   const cursorKey = useUiStore((s) => s.cursorKey);
   const focusSeq = useUiStore((s) => s.sidebarFocusSeq);
   const loaded = useThreadsStore((s) => s.loaded);
-  const unavailable = useThreadsStore((s) => s.availability === "unavailable");
+  const listError = useThreadsStore((s) => s.error);
   const streamError = useEventsStore((s) => s.streamError);
   // Ember's pinned row (under the menu pane, components/ember/EmberRow.tsx) is the first stop
   // of the arrows: above the first thread, and where they start while its chat is selected.
@@ -358,7 +357,8 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
   };
 
   const activeRow = onEmber ? undefined : rows[cursorIndex];
-  const emptyText = unavailable ? "Threads are unavailable on this daemon." : loaded ? null : streamError ? `Cannot list threads: ${streamError}. Retrying…` : "Loading…";
+  const loadError = streamError ?? listError;
+  const emptyText = loaded ? null : loadError ? `Cannot list threads: ${loadError}. Retrying…` : "Loading…";
   return (
     <RowTooltipsEnabled value={menuRow === null}>
       <ContextMenu
@@ -405,20 +405,6 @@ function SidebarList({ bodyHeight }: { bodyHeight: number }) {
         {menuRow && <RowMenu id={menuRow.threadId} />}
       </ContextMenu>
     </RowTooltipsEnabled>
-  );
-}
-
-/** Shown when the daemon has no ThreadService (older daemon): everything else still works. */
-function ThreadsUnavailable() {
-  const unavailable = useThreadsStore((s) => s.availability === "unavailable");
-  const error = useThreadsStore((s) => s.error);
-  if (!unavailable) return null;
-  return (
-    <Tip label={error} side="right">
-      <p className="shrink-0 border-t border-cf-sidebar-border px-2 py-1.5 text-caption-sm" data-testid="threads-unavailable">
-        Threads: service unavailable
-      </p>
-    </Tip>
   );
 }
 
@@ -477,7 +463,6 @@ function SidebarShown({ width }: { width: number }) {
         <SidebarMenu />
         <EmberRow />
         <SidebarList bodyHeight={bodyHeight} />
-        <ThreadsUnavailable />
         <SidebarStatus />
       </div>
       <ResizeHandle />

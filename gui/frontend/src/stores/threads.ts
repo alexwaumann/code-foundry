@@ -20,15 +20,8 @@ export interface ThreadsData {
   owned?: readonly string[];
 }
 
-/**
- * Whether the daemon serves ThreadService. "unavailable" (e.g. HTTP 404 from a daemon
- * without Phase 2a) leaves the rest of the UI working: thread rows are simply absent.
- */
-export type ThreadsAvailability = "unknown" | "available" | "unavailable";
-
 interface ThreadsState extends ThreadsData {
   loaded: boolean;
-  availability: ThreadsAvailability;
   error: string | null;
   /**
    * Usage of removed threads (the daemon's retired ledger). Usage over every thread is the
@@ -243,7 +236,6 @@ export function applyThreadListEvent(prev: ThreadsData, ev: ThreadListEventView)
 export const useThreadsStore = create<ThreadsState>()(() => ({
   ...emptyThreads,
   loaded: false,
-  availability: "unknown",
   error: null,
   retiredUsage: [],
   epoch: 0,

@@ -93,9 +93,6 @@
  *   POST /__mock/usage?thread=s-2&model=claude-opus-5&requests=3&cacheRead=1000[&input=…&output=…
  *        &cacheWrite5m=…&cacheWrite1h=…&day=YYYY-MM-DD]   (Claude made requests: added to the
  *                                                 thread's (model, day) bucket; s-1 is seeded)
- *   POST /__mock/threads-service?enabled=false   (simulate a daemon without ThreadService)
- *   POST /__mock/missing-rpc?rpc=ProjectService/ListRefs&rpc=ThreadService/StageAttachment
- *                                                 (simulate a daemon older than those RPCs: 404)
  *   POST /__mock/thread-new?delay=700            (how long thread.new takes to make a worktree)
  *   POST /__mock/thread-setup?state=failed       (where the next background thread.new stops: mock/setup.ts)
  *   POST /__mock/worktree/checkout?path=…&branch=…   (the worktree switches branch; no branch detaches HEAD)
@@ -337,11 +334,6 @@ const mockFiles = new MockFiles((path) => {
   if (!d) return undefined;
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
-
-/** False simulates a pre-Phase-2a daemon (see POST /__mock/threads-service). */
-let threadsEnabled = true;
-/** "Service/Method" paths that 404 like a daemon built before they existed. */
-const missingRpcs = new Set<string>();
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;
@@ -850,7 +842,6 @@ function routes(router: ConnectRouter): void {
           ? req.sources
           : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH],
       );
-      if (!threadsEnabled) want.delete(EventSource.THREAD_LIST);
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.projects.values()].map((r) => world.projectMsg(r)) } } } } } },
         { source: EventSource.WORKSPACE, event: { event: { case: "workspace", value: world.workspaceSnapshot() } } },
@@ -1309,16 +1300,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/daemon/restart":
       world.restartDaemon();
       json(res, 200, { ok: true });
-      break;
-    case "POST /__mock/threads-service":
-      // enabled=false simulates a daemon without Phase 2a: ThreadService 404s and the
-      // events stream carries no thread source. Reset turns it back on.
-      threadsEnabled = q.get("enabled") !== "false";
-      json(res, 200, { enabled: threadsEnabled });
-      break;
-    case "POST /__mock/missing-rpc":
-      for (const rpc of q.getAll("rpc")) missingRpcs.add(rpc);
-      json(res, 200, { missing: [...missingRpcs] });
       break;
     case "POST /__mock/gitops":
       // fail=git.push makes that command's next op fail; delay=ms sets how long ops run.
@@ -1830,8 +1811,6 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, world.resizes);
       break;
     case "POST /__mock/reset":
-      threadsEnabled = true;
-      missingRpcs.clear();
       world.reset();
       resetClones();
       resetProjects();
@@ -1923,16 +1902,6 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://mock");
   if (url.pathname.startsWith("/__mock/")) {
     control(req, res, url.pathname, url.searchParams);
-    return;
-  }
-  if (!threadsEnabled && url.pathname.startsWith("/codefoundry.v1.ThreadService/")) {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("404 page not found\n");
-    return;
-  }
-  if (missingRpcs.has(url.pathname.replace(/^\/codefoundry\.v1\./, ""))) {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("404 page not found\n");
     return;
   }
   // The frame stylesheet, the bridge script and the page library need no credential, like

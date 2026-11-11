@@ -290,7 +290,7 @@ describe("deriveContext for a thread", () => {
 
 describe("event dispatch", () => {
   beforeEach(() => {
-    useThreadsStore.setState({ ...emptyThreads, availability: "unknown", error: null });
+    useThreadsStore.setState({ ...emptyThreads, loaded: false, error: null });
     useTerminalsStore.setState({ ...emptyTerminals });
     useProjectsStore.setState({ ...emptyProjects });
     useUiStore.setState({ selection: { kind: "none" } });
@@ -302,7 +302,7 @@ describe("event dispatch", () => {
     dispatchEvent({ source: "project", event: { kind: "snapshot", projects: [] } });
     dispatchEvent({ source: "gh", event: { kind: "viewer" } });
     dispatchEvent({ source: "ui", event: { kind: "focusThread", threadId: "s1" } });
-    expect(useThreadsStore.getState()).toMatchObject({ order: ["s1"], availability: "available" });
+    expect(useThreadsStore.getState()).toMatchObject({ order: ["s1"], loaded: true });
     expect(useTerminalsStore.getState().order).toEqual(["t1"]);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
   });
@@ -319,7 +319,7 @@ describe("event dispatch", () => {
   });
 
   it("a FocusTerminal that races its shell reveals the shell once it arrives", () => {
-    useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("s1")]), availability: "available" });
+    useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("s1")]), loaded: true });
     useTerminalsStore.setState({ ...emptyTerminals, loaded: true });
     applyIntent({ kind: "focusTerminal", terminalId: "t1" });
     expect(useUiStore.getState().selection).toEqual({ kind: "none" });

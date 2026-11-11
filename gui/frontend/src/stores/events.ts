@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { Code, ConnectError } from "@connectrpc/connect";
 import { daemon, invalidateOnTransportError } from "@/api/endpoint";
 import { reportClientState, watchEvents, type EventView } from "@/api/events";
 import { listProjects } from "@/api/project";
@@ -71,11 +70,11 @@ const handlers: Handlers = {
     if (removed) onRemovedTerminal(removed, before);
   },
   threadList: (ev) => {
-    // Thread events prove the service exists, even if List failed transiently.
+    // A snapshot is the whole list, even if List failed transiently.
     useThreadsStore.setState((s) => ({
       ...applyThreadListEvent(s, ev),
       retiredUsage: applyRetiredUsage(s.retiredUsage, ev),
-      availability: "available",
+      loaded: s.loaded || ev.kind === "snapshot",
       error: null,
       epoch: ev.kind === "snapshot" ? s.epoch + 1 : s.epoch,
     }));
@@ -130,25 +129,14 @@ export function dispatchEvent(ev: EventView): void {
   for (const tap of taps) tap(ev);
 }
 
-/** True when the error means the daemon does not serve the RPC (older daemon). */
-function isMissingService(err: unknown): boolean {
-  if (!(err instanceof ConnectError)) return false;
-  return err.code === Code.Unimplemented || err.code === Code.NotFound || /HTTP 404/.test(err.rawMessage);
-}
-
-/** Lists threads without failing the resync: a daemon without ThreadService still works. */
+/** Lists threads without failing the resync: a failed List keeps the threads it has. */
 export async function reconcileThreads(signal: AbortSignal): Promise<void> {
   try {
     const list = await listThreads(daemon, signal);
-    useThreadsStore.setState((s) => ({ ...replaceThreads(s, list), loaded: true, availability: "available", error: null, epoch: s.epoch + 1 }));
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, list), loaded: true, error: null, epoch: s.epoch + 1 }));
   } catch (err) {
     if (isAbort(err)) throw err;
-    const missing = isMissingService(err);
-    useThreadsStore.setState((s) => ({
-      ...(missing ? replaceThreads(s, []) : s),
-      availability: missing ? "unavailable" : s.availability,
-      error: missing ? "service unavailable" : errorMessage(err),
-    }));
+    useThreadsStore.setState({ error: errorMessage(err) });
   }
 }
 
@@ -156,10 +144,9 @@ export async function reconcileThreads(signal: AbortSignal): Promise<void> {
  * Keeps every slice in sync over one EventService.Watch. On each (re)connect the
  * per-service List calls run alongside the stream (events are buffered until they
  * resolve), so a reconnect reconciles removals the stream's snapshot cannot express
- * (terminal.proto has no snapshot message). Threads are retried every `threadRetryMs`
- * while the service is unavailable.
+ * (terminal.proto has no snapshot message).
  */
-export function startEventSync(threadRetryMs = 10_000): () => void {
+export function startEventSync(): () => void {
   // Counted in ticks, not by the clock: a Mac waking from sleep is not a silent stream.
   let delivered = false;
   let quietTicks = 0;
@@ -199,14 +186,8 @@ export function startEventSync(threadRetryMs = 10_000): () => void {
   // The daemon polls GitHub less while no GUI window is visible, and counts an open
   // thread as seen only while a window is visible and focused.
   const unwatchPageState = onPageStateChange(() => void reportClientState());
-  const retry = setInterval(() => {
-    if (useThreadsStore.getState().availability === "unavailable" && useEventsStore.getState().stream === "open") {
-      void reconcileThreads(new AbortController().signal).catch(() => undefined);
-    }
-  }, threadRetryMs);
   return () => {
     unwatchPageState();
-    clearInterval(retry);
     clearInterval(silence);
     stop();
   };
