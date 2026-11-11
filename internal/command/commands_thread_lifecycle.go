@@ -205,7 +205,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					ProjectIds: projects, LikeThreadId: a.String("like"), NewBranch: a.Bool("new-branch"),
 					CreatedBy: a.String("created-by"), Brief: a.String("brief"), Labels: splitList(a.String("labels")),
 					Notify: a.Bool("notify") || a.String("notify-group") != "", NotifyGroup: a.String("notify-group"), RequestId: a.String("request-id"),
-					NotifyRepeat: a.Bool("notify-repeat"),
+					NotifyRepeat:    a.Bool("notify-repeat"),
 					BackgroundSetup: a.Bool("background-setup"), DraftJson: a.String("draft-json"),
 					// A model or effort from the settings' default, not chosen: a resident's
 					// worker defaults may replace it (docs/notes/ember-2-store.md).
