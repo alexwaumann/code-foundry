@@ -228,3 +228,5 @@ Run in that order it failed every time. `reset()` now clears the records.
 Hiding the window closes no stream, and on return every thread stream reconnects at once
 (`stream.ts`, `thread.ts`). That is old behaviour, now without a ration: 33 watches took 0.29 s, so
 nothing changed here. Worth a look if a user holds far more threads than that.
+
+Settled in PR 6: showing the window reopens no stream (`docs/notes/ws-stall-workarounds.md`).
