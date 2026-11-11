@@ -269,6 +269,7 @@ const mockFiles = new MockFiles((path) => {
   if (!d) return undefined;
   return { projectId: d.projectId ?? "", baseRef: d.baseRef, files: (d.files ?? []).map((f) => ({ path: f.path ?? "", status: f.status ?? "", oldPath: f.oldPath, binary: f.binary, uncommitted: f.uncommitted })) };
 });
+world.exportDisk = mockFiles;
 
 function rpcError(err: unknown): ConnectError {
   if (err instanceof ConnectError) return err;

@@ -47,7 +47,10 @@ const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: str
   alert: { call: "alert()", message: "alert() shows nothing in a page here: show the message in the page itself" },
   confirm: { call: "confirm()", message: "confirm() shows nothing in a page here and answers false: ask with a dialog in the page itself" },
   prompt: { call: "prompt()", message: "prompt() shows nothing in a page here and answers null: ask with a field in the page itself" },
-  download: { call: "download", message: "a page here cannot save a file: show the content, or offer it to copy" },
+  download: {
+    call: "download",
+    message: 'a download saves nothing in a page here: in the click\'s handler, save the file into the thread\'s checkout with cf.run("file.export", { path, text }) (base64 for bytes) and show the path it answers',
+  },
 };
 
 /**

@@ -18,6 +18,7 @@ import { prDetailCall } from "./prDetail";
 import { prTaskCommand } from "./prTask";
 import { GhWorld, ghEvent, viewCommands } from "./github";
 import { bridgeCommands } from "./bridgeCommands";
+import { fileExportCommands, type ExportDisk } from "./fileExport";
 import { cloneExists } from "./clone";
 import { folderInfo, HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
@@ -274,8 +275,8 @@ interface CmdDef {
   confirm?: (ctx: UiContext | undefined, args: Record<string, string>) => string;
   /** Like the daemon's Command.ConfirmIf: when set, confirmation is asked only when it returns true. */
   confirmIf?: (ctx: UiContext | undefined, args: Record<string, string>) => boolean;
-  /** Like the daemon's Command.ConfirmLabel: the confirm button's words. */
-  confirmLabel?: string;
+  /** Like the daemon's Command.ConfirmLabel: the confirm button's words (a page's question has its own). */
+  confirmLabel?: string | ((ctx: UiContext | undefined, args: Record<string, string>) => string);
   /** Like the daemon's Command.read_only: it changes nothing (a page's bridge runs it without a click). */
   readOnly?: boolean;
   /** Like the daemon's Command.no_palette: the palette does not list it. */
@@ -975,6 +976,8 @@ export class World {
   /** Bumped by reset(), so a thread.new still sleeping from before a reset does nothing. */
   private generation = 0;
   invocations: Invocation[] = [];
+  /** The files file.export writes (server.ts sets mock/files.ts's MockFiles). */
+  exportDisk: ExportDisk | null = null;
   writes: { id: string; data: string }[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private seconds = 0;
@@ -3905,6 +3908,7 @@ export class World {
     return [
       ...viewCommands((i) => this.emit(i)),
       ...bridgeCommands(() => [...this.threads.values()]),
+      ...fileExportCommands((id) => this.threads.get(id)?.worktreePath, () => this.exportDisk),
       ...this.logs.commands(),
       ...mcpCommands(this.logs, (i) => this.emit(i)),
       ...panelItemCommands((id) => {
@@ -5242,7 +5246,10 @@ export class World {
     for (const a of entry.cmd.args) {
       if (a.required && !full[a.name]) throw new CommandError("invalid", `missing required arg ${a.name}`);
     }
-    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, full) ?? true)) throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, full), entry.cmd.confirmLabel);
+    if (entry.cmd.confirm && !confirmed && (entry.cmd.confirmIf?.(ctx, full) ?? true)) {
+      const label = entry.cmd.confirmLabel;
+      throw new ConfirmNeeded(name, entry.cmd.title, entry.cmd.confirm(ctx, full), typeof label === "function" ? label(ctx, full) : label);
+    }
     return entry.run(ctx, full);
   }
 }
