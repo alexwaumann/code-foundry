@@ -43,6 +43,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
+	"github.com/alexwaumann/code-foundry/internal/shot"
 	"github.com/alexwaumann/code-foundry/internal/skills"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -215,6 +216,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	// The GUI's active theme, published for pages the model writes (GET /cf/theme.css),
 	// and its contrast reports on the user's themes (theme save, theme check).
 	liveTheme, themeReports := theme.NewLive(), theme.NewReports()
+	// Shots of plugin surfaces (plugin surface --shot): the app's host draws them.
+	shots := shot.New()
 	// Terminals answer color queries from the theme; dark until the GUI publishes one.
 	st.terminal.SetColors(ctx, terminalColors(theme.DefaultFrame(theme.SchemeDark)))
 	filesystemAPI := api.NewFilesystem(st.home, st.project, grants).WithTemp(tempRoots).WithPagesOrigin(pagesOrigin(pagesPort))
@@ -239,7 +242,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	defer func() { _ = plugins.Close() }()
-	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins).WithDirs(p.Plugins(), p.PluginData())
+	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins).WithShots(shots).WithDirs(p.Plugins(), p.PluginData())
 	// Every claude spawn gets the plugins' session environments (plugin_hooks.go), and
 	// so does every new bottom-panel shell, without the add-dirs (plugin_env.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
@@ -340,7 +343,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	routes := []api.Route{
 		api.NewHealth(started, opts.Version, skills.WelcomePath(p.Pages())).Route(),
 		commandAPI.Route(),
-		api.NewUI(events, liveTheme, themeReports).WithThemePublished(publishTerminalColors(st.terminal)).Route(),
+		api.NewUI(events, liveTheme, themeReports).WithShots(shots).WithThemePublished(publishTerminalColors(st.terminal)).Route(),
 		terminalAPI.Route(),
 		threadAPI.Route(),
 		projectAPI.Route(),

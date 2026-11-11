@@ -10,6 +10,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/shot"
 	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
@@ -20,11 +21,13 @@ const intentBuffer = 32
 // UI implements codefoundryv1connect.UiServiceHandler. Intents travel on the bus as
 // command.IntentEvent, so ui.* commands and Emit reach the same watchers. PublishTheme
 // records the GUI's active theme for the frame stylesheet (theme.Live), PublishThemeReport
-// its contrast report on the user's themes (theme.Reports).
+// its contrast report on the user's themes (theme.Reports). WatchShots and PublishShot make
+// the app's host the capturer of plugin surface shots (shot.Broker).
 type UI struct {
 	bus     *bus.Bus
 	theme   *theme.Live
 	reports *theme.Reports
+	shots   *shot.Broker // nil: WatchShots and PublishShot are unimplemented
 	// published hears each theme theme.Live accepted; nil: nobody listens.
 	published func(context.Context, theme.Frame)
 }
@@ -43,8 +46,16 @@ func (h *UI) WithThemePublished(fn func(context.Context, theme.Frame)) *UI {
 	return h
 }
 
-// Route mounts the service.
+// WithShots serves WatchShots and PublishShot from b.
+func (h *UI) WithShots(b *shot.Broker) *UI {
+	h.shots = b
+	return h
+}
+
+// Route mounts the service. A message may be as large as a shot's PNG and a little more,
+// no larger.
 func (h *UI) Route(opts ...connect.HandlerOption) Route {
+	opts = append(opts, connect.WithReadMaxBytes(shot.MaxPNG+1<<20))
 	path, handler := codefoundryv1connect.NewUiServiceHandler(h, opts...)
 	return Route{Path: path, Handler: handler}
 }
@@ -124,4 +135,51 @@ func (h *UI) PublishThemeReport(_ context.Context, req *connect.Request[v1.Publi
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	return connect.NewResponse(&v1.PublishThemeReportResponse{}), nil
+}
+
+// errNoShots answers the shot RPCs on a daemon without a broker.
+var errNoShots = connect.NewError(connect.CodeUnimplemented, errors.New("this daemon takes no screenshots"))
+
+// WatchShots makes the caller the capturer of plugin surface shots until it leaves or
+// another stream replaces it, and sends it each request. Headers go out once it is the
+// capturer, so a host that has seen them can be asked.
+func (h *UI) WatchShots(ctx context.Context, _ *connect.Request[v1.WatchShotsRequest], stream *connect.ServerStream[v1.ShotRequest]) error {
+	if h.shots == nil {
+		return errNoShots
+	}
+	reqs, gone, disconnect := h.shots.Connect()
+	defer disconnect()
+	if err := stream.Send(nil); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-gone:
+			return connect.NewError(connect.CodeAborted, errors.New("another capturer connected"))
+		case r := <-reqs:
+			if err := stream.Send(r); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// PublishShot answers one shot request.
+func (h *UI) PublishShot(_ context.Context, req *connect.Request[v1.PublishShotRequest]) (*connect.Response[v1.PublishShotResponse], error) {
+	if h.shots == nil {
+		return nil, errNoShots
+	}
+	m := req.Msg
+	err := h.shots.Publish(m.GetId(), m.GetPng(), m.GetError(), int(m.GetContentHeight()))
+	switch {
+	case err == nil:
+		return connect.NewResponse(&v1.PublishShotResponse{}), nil
+	case errors.Is(err, shot.ErrUnknownID):
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, shot.ErrTooLarge):
+		return nil, connect.NewError(connect.CodeResourceExhausted, err)
+	}
+	return nil, connect.NewError(connect.CodeInvalidArgument, err)
 }
