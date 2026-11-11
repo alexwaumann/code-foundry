@@ -2,14 +2,16 @@
  * The shot page (docs/notes/plugin-surface-shot-page.md): one plugin surface alone at the
  * window's width, drawn by the side panel's own body (PluginSurfaceBody) in the theme as
  * last published, with no app chrome. A request comes from the URL
- * (`?plugin=…&surface=…&scope=…&minVersion=…`) or from window.cfShot(request); its report
- * goes to `report` below, which for now marks <html>: data-shot-ready (the content
- * height) or data-shot-error ("<failure>: <reason>"), and data-shot-id.
+ * (`?plugin=…&surface=…&scope=…&minVersion=…`) or from window.cfShot(request), which is
+ * how the Wails host (gui/shot.go) sends them. Its report marks <html>: data-shot-ready (the
+ * content height) or data-shot-error ("<failure>: <reason>"), and data-shot-id; and in the
+ * app it goes to the host, which snapshots the window (src/api/shot.ts).
  */
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "../index.css";
 import { listPlugins } from "@/api/plugin";
+import { reportShotToHost, shotPageReady } from "@/api/shot";
 import { getPublishedTheme } from "@/api/ui";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { applyPluginEvent, usePluginsStore } from "@/stores/plugins";
@@ -62,9 +64,10 @@ function mark(r: ShotReport): void {
   else ds.shotError = `${r.failure}: ${r.reason}`;
 }
 
-// The host's report call joins here (the Wails host's PR); without a host, the marks are the report.
+// Marked first: the host snapshots on its report, and the marks are not drawn.
 const report = (r: ShotReport) => {
   mark(r);
+  reportShotToHost(r);
 };
 
 const controller = new ShotController({
@@ -114,3 +117,4 @@ createRoot(root).render(
 
 const fromUrl = requestFromSearch(window.location.search);
 if (fromUrl) window.cfShot(fromUrl);
+shotPageReady();
