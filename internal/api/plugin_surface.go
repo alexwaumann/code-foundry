@@ -153,6 +153,7 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	// followed by "live" and no new view is current too (the plugin re-sent the same
 	// view): it ends the wait shortly after.
 	var settle <-chan time.Time
+	var pending *plugin.SurfaceState // the last state
 	open := true
 loop:
 	for {
@@ -164,17 +165,20 @@ loop:
 			}
 			switch {
 			case u.State != nil:
+				pending = u.State
 				out.State = surfaceStateToProto(u.State)
 				switch {
 				case u.State.Phase == plugin.PhaseFailed:
 					break loop
-				case u.State.Phase != plugin.PhaseOpening && view != nil:
+				case surfacePending(u.State):
+					settle = nil
+				case view != nil:
 					settle = time.After(getSurfaceSettle)
 				}
 			case u.View != nil:
 				view = u.View
 				out.View = surfaceViewToProto(u.View)
-				if out.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_OPENING {
+				if pending == nil || !surfacePending(pending) {
 					break loop
 				}
 			}
@@ -197,6 +201,14 @@ loop:
 		}
 	}
 	return connect.NewResponse(out), nil
+}
+
+// surfacePending: a view in this state is not the current one yet. The instance is
+// opening, or its plugin is down only while it stops and starts again (a restart, a dev
+// rebuild): the cached view is the old process's.
+func surfacePending(s *plugin.SurfaceState) bool {
+	return s.Phase == plugin.PhaseOpening ||
+		(s.Phase == plugin.PhasePluginDown && (s.PluginState == plugin.StateStarting || s.PluginState == plugin.StateStopping))
 }
 
 // settleSurface reads updates until no view has come for quiet (or maxSurfaceSettle has
