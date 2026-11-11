@@ -1,0 +1,175 @@
+diff --git a/dist/editor/editor.js b/dist/editor/editor.js
+index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb75d66a16 100644
+--- a/dist/editor/editor.js
++++ b/dist/editor/editor.js
+@@ -23,7 +23,7 @@ import { findBracketMatchRanges } from "./matchBrackets.js";
+ import { createSpriteElement } from "./sprite.js";
+ import { SearchPanelWidget } from "./searchPanel.js";
+ import { SelectionActionWidget } from "./selectionAction.js";
+-import { Metrics, getExpandedAsciiTextColumns, getUnicodeMeasurementOffsets, snapTextOffsetToUnicodeBoundary } from "./textMeasure.js";
++import { Metrics, getExpandedAsciiTextColumns, getLayoutZoom, getUnicodeMeasurementOffsets, snapTextOffsetToUnicodeBoundary } from "./textMeasure.js";
+ import { EditorTokenizer, renderLineTokens } from "./tokenizer.js";
+ //#region src/editor/editor.ts
+ function getShadowRootRange(shadowRoot) {
+@@ -93,6 +93,8 @@ var Editor = class {
+ 	#wrapLineOffsetsCache = /* @__PURE__ */ new Map();
+ 	#lineElementsCache = /* @__PURE__ */ new Map();
+ 	#lastAccessedCharX;
++	/** The content's CSS zoom when the layout caches below were filled. */
++	#layoutZoom;
+ 	#globalStyleElement;
+ 	#editorStyleElement;
+ 	#themeStyleElement;
+@@ -1310,6 +1312,7 @@ var Editor = class {
+ 		this.#resizeObserver = new ResizeObserver(this.#handleLayoutResize);
+ 		this.#resizeObserver.observe(contentEl);
+ 		this.#resizeObserver.observe(contentEl.parentElement);
++		this.#resizeObserver.observe(contentEl.ownerDocument.documentElement);
+ 		this.#computeContentOffset(contentEl);
+ 	}
+ 	#handleCustomPasteEvent = async () => {
+@@ -1776,11 +1779,12 @@ var Editor = class {
+ 		this.#contentWidthCache = void 0;
+ 		const gutterWidthChanged = this.#getGutterWidth() !== prevGutterWidth;
+ 		const contentWidthChanged = this.#getContentWidth() !== prevContentWidth;
+-		if (!gutterWidthChanged && !contentWidthChanged) return;
++		const zoomChanged = this.#syncLayoutZoom();
++		if (!gutterWidthChanged && !contentWidthChanged && !zoomChanged) return;
+ 		this.#lineElementsCache.clear();
+ 		this.#lastAccessedCharX = void 0;
+ 		this.#metrics.clearTextWidthCache();
+-		if (contentWidthChanged) {
++		if (contentWidthChanged || zoomChanged) {
+ 			this.#wrapLineOffsetsCache.clear();
+ 			if (this.#isWrap || lineAnnotations > 0) this.#lineYCache.clear();
+ 		}
+@@ -1792,6 +1796,25 @@ var Editor = class {
+ 		this.#computeContentOffset(this.#contentElement);
+ 		this.#renderCarets();
+ 	};
++	/**
++	* Notice a change of the content's CSS zoom (a page zoom), dropping what was
++	* laid out under the old one: wrap points and row tops move with the glyph
++	* widths at the new zoom, whether or not any observed box changed size.
++	* The first call only records it. Returns true when it changed.
++	*/
++	#syncLayoutZoom() {
++		const contentElement = this.#contentElement;
++		if (contentElement === void 0) return false;
++		const zoom = getLayoutZoom(contentElement);
++		const previous = this.#layoutZoom;
++		this.#layoutZoom = zoom;
++		if (previous === void 0 || previous === zoom) return false;
++		this.#gutterWidthCache = void 0;
++		this.#contentWidthCache = void 0;
++		this.#wrapLineOffsetsCache.clear();
++		this.#resetCache();
++		return true;
++	}
+ 	#remeasureMetricsOnFontLoad() {
+ 		if (this.#fontRemeasureScheduled) return;
+ 		const fonts = document.fonts;
+@@ -2284,7 +2307,7 @@ var Editor = class {
+ 		if (drag === void 0 || drag.focusLine === void 0 || selectionStart === void 0 || textDocument === void 0) return false;
+ 		const anchor = selectionStart.direction === -1 ? selectionStart.end : selectionStart.start;
+ 		const scrollLeft = this.#contentElement?.parentElement?.scrollLeft ?? 0;
+-		const characterDeltaRaw = (drag.clientX - drag.startClientX + scrollLeft - drag.startScrollLeft) / this.#metrics.ch;
++		const characterDeltaRaw = ((drag.clientX - drag.startClientX) / getLayoutZoom(this.#contentElement) + scrollLeft - drag.startScrollLeft) / this.#metrics.ch;
+ 		const characterDelta = characterDeltaRaw < 0 ? -Math.round(-characterDeltaRaw) : Math.round(characterDeltaRaw);
+ 		const focusCharacter = Math.max(0, anchor.character + characterDelta);
+ 		const goal = {
+@@ -2752,6 +2775,7 @@ var Editor = class {
+ 	}
+ 	#updateSelections(selections) {
+ 		this.__postponeBgTokenizeToNextFrame();
++		this.#syncLayoutZoom();
+ 		const previousSelections = this.#selections;
+ 		let selectionsChanged = previousSelections?.length !== selections.length;
+ 		if (!selectionsChanged && previousSelections !== void 0) for (let i = 0; i < selections.length; i++) {
+@@ -3514,7 +3538,7 @@ var Editor = class {
+ 		if (this.#gutterWidthCache === void 0) {
+ 			const diffsColumnNumberWidth = this.#contentElement?.parentElement?.style.getPropertyValue("--diffs-column-number-width");
+ 			if (diffsColumnNumberWidth !== void 0 && diffsColumnNumberWidth.length > 2 && diffsColumnNumberWidth.endsWith("px")) this.#gutterWidthCache = parseInt(diffsColumnNumberWidth.slice(0, -2), 10);
+-			else this.#gutterWidthCache = this.#gutterElement.offsetWidth;
++			else this.#gutterWidthCache = this.#gutterElement.getBoundingClientRect().width / getLayoutZoom(this.#gutterElement);
+ 		}
+ 		return this.#gutterWidthCache;
+ 	}
+@@ -3617,7 +3641,8 @@ var Editor = class {
+ 			const divRect = div.getBoundingClientRect();
+ 			if (divRect.width === 0) return;
+ 			const unicodeOffsets = getUnicodeMeasurementOffsets(lineText);
+-			const wrapLineStartLeft = divRect.left + this.#metrics.ch;
++			const zoom = getLayoutZoom(div);
++			const wrapLineStartLeft = divRect.left + this.#metrics.ch * zoom;
+ 			const graphemeCount = unicodeOffsets === void 0 ? lineText.length : unicodeOffsets.length - 1;
+ 			const graphemeStart = (index) => unicodeOffsets === void 0 ? index : unicodeOffsets[index];
+ 			const measureGrapheme = (index) => {
+@@ -3639,7 +3664,7 @@ var Editor = class {
+ 				}
+ 				if (low >= graphemeCount) break;
+ 				const { left, top } = measureGrapheme(low);
+-				const startsPastLineStart = isSafari() && left - wrapLineStartLeft > this.#metrics.ch / 2;
++				const startsPastLineStart = isSafari() && (left - wrapLineStartLeft) / zoom > this.#metrics.ch / 2;
+ 				starts.push(graphemeStart(startsPastLineStart ? low - 1 : low));
+ 				lastTop = top;
+ 				searchStart = low + 1;
+diff --git a/dist/editor/textMeasure.js b/dist/editor/textMeasure.js
+index 96d4fb137ea683b66381b1ce6e47e8708a89366c..93f0ec4d1700542dbf247356f5cc6d746e7c2bf7 100644
+--- a/dist/editor/textMeasure.js
++++ b/dist/editor/textMeasure.js
+@@ -131,10 +131,18 @@ var Metrics = class {
+ 	* measure the width of the text using the DOM
+ 	* this is slow because it cause a reflow, use it for non-ascii text;
+ 	* results are memoized per text so repeated measurements skip the reflow
++	*
++	* getBoundingClientRect() is in viewport px: under CSS `zoom` on an
++	* ancestor it is the layout width times the zoom, while canvas widths and
++	* every position the editor draws are layout px. Divide it back, and key
++	* the memo by the zoom too: a glyph's layout width can differ per zoom
++	* (emoji do), and a zoom change need not resize anything the editor
++	* observes.
+ 	*/
+ 	domMeasureTextWidth(text) {
+ 		if (this.#root === void 0) throw new Error("Metrics not initialized");
+-		const cacheKey = text + "|" + this.#font;
++		const zoom = getLayoutZoom(this.#root);
++		const cacheKey = text + "|" + this.#font + "|" + zoom;
+ 		const cached = this.#textWidthCache.get(cacheKey);
+ 		if (cached !== void 0) return cached;
+ 		const measureEl = h("span", {
+@@ -151,7 +159,7 @@ var Metrics = class {
+ 		}, this.#root);
+ 		let width;
+ 		try {
+-			width = round(measureEl.getBoundingClientRect().width);
++			width = round(measureEl.getBoundingClientRect().width / zoom);
+ 		} finally {
+ 			measureEl.remove();
+ 		}
+@@ -176,6 +184,16 @@ var Metrics = class {
+ 		return hadCachedTextWidths;
+ 	}
+ };
++/**
++* The effective CSS zoom of an element: the factor between its layout px and
++* the viewport px of getBoundingClientRect(), getClientRects() and pointer
++* events. 1 where `currentCSSZoom` is missing (engines from before zoom was
++* standardized, whose rects are already in layout px).
++*/
++function getLayoutZoom(element) {
++	const zoom = element?.currentCSSZoom;
++	return typeof zoom === "number" && zoom > 0 ? zoom : 1;
++}
+ /** Check if the text needs DOM text measurement. */
+ function needsDomTextMeasurement(text) {
+ 	for (let i = 0; i < text.length; i++) {
+@@ -238,6 +256,6 @@ function getExpandedAsciiTextColumns(text, tabSize) {
+ 	return columns;
+ }
+ //#endregion
+-export { Metrics, getExpandedAsciiTextColumns, getUnicodeMeasurementOffsets, needsDomTextMeasurement, snapTextOffsetToUnicodeBoundary };
++export { Metrics, getExpandedAsciiTextColumns, getLayoutZoom, getUnicodeMeasurementOffsets, needsDomTextMeasurement, snapTextOffsetToUnicodeBoundary };
+ 
+ //# sourceMappingURL=textMeasure.js.map
+\ No newline at end of file

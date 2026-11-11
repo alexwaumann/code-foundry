@@ -74,6 +74,7 @@
   },
   "patchedDependencies": {
     "@wailsio/runtime@3.1.0": "patches/@wailsio__runtime@3.1.0.patch",
+    "@pierre/diffs@1.5.2": "patches/@pierre__diffs@1.5.2.patch",
   },
   "packages": {
     "@asamuzakjp/css-color": ["@asamuzakjp/css-color@7.1.2", "", { "dependencies": { "@csstools/css-calc": "3.4.1", "@csstools/css-color-parser": "4.2.4", "@csstools/css-parser-algorithms": "4.0.1", "@csstools/css-tokenizer": "4.0.2", "lru-cache": "11.5.3" } }, "sha512-99DHAnXDB5z6EEK+9GMpVI7Mw4oxj97dY5bpOzMnjADQWxI8rN6TvTduuFLUhUMlS7/CfVZ06tcZsus6cltnNw=="],
