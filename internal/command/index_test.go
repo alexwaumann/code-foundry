@@ -18,7 +18,7 @@ import (
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
 //     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe).
 var noIndex = []string{
-	"action.last", "composer.history", "thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
+	"action.last", "composer.history", "file.export", "thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
 	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.workspace",
 	"view.thread-info", "worktree.editors",
 }

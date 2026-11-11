@@ -15,7 +15,7 @@ import (
 // asks first. Some ask anyway, through Confirm.
 var pageRuns = []string{
 	"action.add", "action.edit", "action.run", "app.restart", "daemon.restart", "dictation.start",
-	"git.fetch", "git.pull", "git.push", "plugin.dev", "plugin.enable", "plugin.install",
+	"file.export", "git.fetch", "git.pull", "git.push", "plugin.dev", "plugin.enable", "plugin.install",
 	"plugin.secrets.delete", "plugin.uninstall", "plugin.update", "pr.auto-merge", "pr.checkbox",
 	"pr.comment", "pr.create", "pr.merge", "pr.revert", "pr.review", "pr.review.request",
 	"project.add-workspace", "project.branch.delete", "project.clone", "project.delete", "project.git.init",

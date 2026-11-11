@@ -111,6 +111,9 @@ type Deps struct {
 	// FileEdits checks a file the File tab is to edit (Filesystem.CheckEdit), for
 	// view.panel.file --edit. Nil makes it fail with Unimplemented.
 	FileEdits command.FileEditChecker
+	// FileExports writes a page's file into its thread's checkout (Filesystem.ExportFile),
+	// for file.export. Nil makes it fail with Unimplemented.
+	FileExports command.FileExporter
 	// FileDiffs reads what differs in a checkout as the Diff tab does
 	// (ProjectService.CompareWorktree), for view.panel.diff. Nil makes it fail with
 	// Unimplemented.
@@ -199,6 +202,7 @@ func Register(r *command.Registry, d Deps) error {
 			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread, Settings: d.Settings,
 			Workspaces: d.Workspace,
 		}),
+		command.RegisterFileExport(r, command.FileExportDeps{Thread: d.Thread, Files: d.FileExports}),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterWorkspaceReveal(r, d.Workspace, d.Reveal),
