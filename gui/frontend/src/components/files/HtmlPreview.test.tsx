@@ -60,8 +60,15 @@ describe("HtmlPreview", () => {
   it("posts the theme to the frame on load and on every theme change", async () => {
     setThemePreference("dark");
     previewFile.mockResolvedValue({ url: "http://127.0.0.1:1/preview/g/a.html", scope: "/Users/me/x", singleFile: false });
-    render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
+    const { rerender } = render(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
     const frame = await screen.findByTestId<HTMLIFrameElement>("file-html-frame");
+    // The frame is in the DOM once its commit lands, but that commit's effects may not have
+    // run yet (the grant resolved outside act). HtmlFrame's theme subscription posts once when
+    // it starts; left pending, it would run inside fireEvent below and count as a fourth post.
+    // React flushes a commit's effects before it starts another update, so rerendering settles
+    // the mount before the spy goes on (docs/notes/flaky-ci-tests.md).
+    rerender(<HtmlPreview path="/Users/me/x/a.html" text="x" name="a.html" />);
+    expect(screen.getByTestId("file-html-frame")).toBe(frame);
     const win = frame.contentWindow;
     if (!win) throw new Error("no contentWindow");
     const post = vi.spyOn(win, "postMessage").mockImplementation(() => undefined);
