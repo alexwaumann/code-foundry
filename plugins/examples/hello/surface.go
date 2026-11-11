@@ -133,7 +133,7 @@ func (d *demo) viewLocked() ui.View {
 		nodes = layoutNodes(id, d.ownErr, d.filter)
 		toolbar, footer = layoutChrome(d.filter)
 	case "run-list":
-		nodes = append(runsNodes(d.runs), buildsNodes(d.builds)...)
+		nodes = append(runsNodes(d.runs), buildsNodes(d.builds, d.h.HasCapability(ui.TableMeterCapability))...)
 	case "todo":
 		nodes = todoNodes(d.todo)
 	default:

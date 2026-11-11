@@ -17,15 +17,16 @@ import (
 // The Runs tab's tables: the builds sort by the header the host's sort act names (#
 // descending first, Branch ascending first, Duration descending first), the failed builds
 // carry a Rerun button and every build a menu, the tests table's Passed group starts
-// collapsed with its whole count, and the captured run-list view the mock replays has the
-// same tables. HELLO_DUMP_RUNS=<file> writes the Runs tab's view as JSON (to recapture
+// collapsed with its whole count, the suites' pass rates are meters (their labels as text
+// on a host without meters), and the captured run-list view the mock replays has the same
+// tables. HELLO_DUMP_RUNS=<file> writes the Runs tab's view as JSON (to recapture
 // internal/store/plugin/testdata/hello-demo/run-list.json).
 func TestBuildsTable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	h := plugintest.Start(t, plugin(), plugintest.Options{Name: "hello",
 		Granted:      pluginsdk.Permissions{Secrets: true, Events: []string{"threads"}, ThreadStatus: true, SessionEnv: true, Threads: true, Terminals: true, Commands: []string{"thread.send"}},
-		Capabilities: []string{"threads", "terminals"}})
+		Capabilities: []string{"threads", "terminals", ui.TableMeterCapability}})
 	if err := h.OpenSurface(ctx, inst, "demo", pluginsdk.UiContext{ThreadID: "s-1"}); err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +102,27 @@ func TestBuildsTable(t *testing.T) {
 	tests := table(v, "tests")
 	if !tests.Dense || len(tests.Groups) != 3 || !tests.Groups[2].Collapsed || *tests.Groups[2].Count != 142 || tests.Groups[0].Collapsed {
 		t.Errorf("tests %+v", tests)
+	}
+	suites := table(v, "suites")
+	rates := map[string]string{}
+	for _, r := range suites.Rows {
+		b, _ := json.Marshal(r.Cells["su-rate"])
+		rates[r.Key] = string(b)
+	}
+	for key, want := range map[string]string{
+		"su-unit":        `{"meter":{"value":1,"label":"100%","tone":"ok"}}`,
+		"su-integration": `{"meter":{"value":0.86,"label":"86%","tone":"attention"}}`,
+		"su-e2e":         `{"meter":{"value":0.41,"label":"41%","tone":"error"}}`,
+		"su-fuzz":        `{"meter":{"value":0.375,"label":"3 of 8"}}`,
+		"su-bench":       `{"meter":{"value":0.2,"label":"1 of 5","tone":"muted"}}`,
+		"su-lint":        `{"meter":{"value":0,"label":"–"}}`,
+	} {
+		if rates[key] != want {
+			t.Errorf("%s: %s, want %s", key, rates[key], want)
+		}
+	}
+	if got := suitesTable(false).Table.Rows[1].Cells["su-rate"]; got.Meter != nil || got.Value.Text != "86%" {
+		t.Errorf("without meters: %+v", got)
 	}
 	matchRunsFixture(t, v)
 }

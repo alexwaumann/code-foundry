@@ -6,8 +6,8 @@
  * nodes/TableNode.tsx draws it.
  */
 import type { Glyph, Inline, Pill } from "@/api/plugin";
-import type { CellStyle, SortDir, TableCell, TableColumn, TableData, TableGroup, TableRow, TableSort } from "@/api/pluginTable";
-import { fitColumns, TABLE_GAP_PX } from "@/components/table/fit";
+import type { CellStyle, SortDir, TableCell, TableColumn, TableData, TableGroup, TableMeter, TableRow, TableSort } from "@/api/pluginTable";
+import { fitColumns, TABLE_GAP_PX, TABLE_INSET_PX } from "@/components/table/fit";
 import { buttonsWidth } from "./menu";
 
 /** A weighted column's least width when it sets none (pluginsdk/ui TableColumnMinWidth). */
@@ -81,16 +81,53 @@ export function tableLayout(t: TableData, width: number | null): TableLayout {
   return { columns, template: tracks.join(" "), folded, buttons, more };
 }
 
+/**
+ * Each shown column's width (px, display order) in a table `width` px wide (as tableLayout
+ * takes it; null before it is measured: none known), as the rows' grid resolves the
+ * template: fixed tracks at their width, and the free width shared by weight, a weighted
+ * column whose share is under its floor frozen at the floor (CSS grid's fr sizing for
+ * `minmax(Npx, Wfr)`). The buttons' and ⋯ tracks and the 12 px gaps come off first. A
+ * meter cell takes its column's width to decide whether its label fits.
+ */
+export function columnWidths(layout: TableLayout, width: number | null): (number | null)[] {
+  if (width === null) return layout.columns.map(() => null);
+  const tracks = layout.columns.length + (layout.buttons > 0 ? 1 : 0) + (layout.more ? 1 : 0);
+  let free = width - TABLE_INSET_PX - Math.max(0, tracks - 1) * TABLE_GAP_PX - layout.buttons - (layout.more ? MORE_PX : 0);
+  const out: (number | null)[] = layout.columns.map((c) => c.width ?? null);
+  for (const c of layout.columns) if (c.width) free -= c.width;
+  let flex = layout.columns.flatMap((c, i) => (c.width ? [] : [i]));
+  for (;;) {
+    const weights = flex.reduce((n, i) => n + (layout.columns[i]?.weight || 1), 0);
+    const fr = weights > 0 ? Math.max(0, free) / weights : 0;
+    const frozen = flex.filter((i) => {
+      const c = layout.columns[i];
+      return c !== undefined && (c.weight || 1) * fr < columnFloor(c);
+    });
+    if (frozen.length === 0) {
+      for (const i of flex) out[i] = (layout.columns[i]?.weight || 1) * fr;
+      return out;
+    }
+    for (const i of frozen) {
+      const c = layout.columns[i];
+      if (c === undefined) continue;
+      out[i] = columnFloor(c);
+      free -= columnFloor(c);
+    }
+    flex = flex.filter((i) => !frozen.includes(i));
+  }
+}
+
 /** The direction a click on `c`'s header asks for (pluginsdk/ui NextSort): the sorted column's other direction, else the column's first. */
 export function nextSort(c: TableColumn, sort: TableSort | undefined): SortDir {
   if (sort?.column === c.key) return sort.dir === "desc" ? "asc" : "desc";
   return c.sortFirst === "desc" ? "desc" : "asc";
 }
 
-/** A cell's value, glyph and pill (a bare Inline is the value alone; an absent cell is empty). */
-export function cellParts(cell: TableCell | undefined): { value?: Inline; glyph?: Glyph; pill?: Pill } {
+/** A cell's value, glyph and pill, or its meter alone (a bare Inline is the value alone; an absent cell is empty). */
+export function cellParts(cell: TableCell | undefined): { value?: Inline; glyph?: Glyph; pill?: Pill; meter?: TableMeter } {
   if (cell === undefined) return {};
   if (typeof cell === "string") return { value: cell };
+  if ("meter" in cell) return { meter: cell.meter };
   if ("value" in cell || "glyph" in cell || "pill" in cell) return cell;
   // {text, spans}, or {} (an empty cell).
   return "text" in cell || "spans" in cell ? { value: cell } : {};

@@ -1140,7 +1140,8 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   10 minutes after the last (`idle`), or at once when its thread or project goes
   (`context_gone`, on the daemon's thread and project events) or its `when` stops
   holding (`unavailable`). Views are the `pluginsdk/ui` JSON, validated by the daemon
-  (schema, limits, keys, URLs, the commands a view may run, secrets), re-encoded,
+  (schema, limits, keys, URLs, the commands a view may run, secrets), re-encoded
+  (unknown fields dropped, so an older daemon shows a newer table cell, a meter, as empty),
   versioned and coalesced per watcher; log nodes take appends. `PluginService.WatchSurface`,
   `GetSurface` and `Act` serve them; an act names an element of a recent version and the
   daemon fills in the rest. `ShotSurface` returns a PNG the app's host draws (§4

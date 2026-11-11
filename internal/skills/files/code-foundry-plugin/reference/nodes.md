@@ -297,3 +297,15 @@ wins; send a collapsed group's rows too). `Dense` draws 24 px rows; `EmptyText` 
 without rows. A list reads as sentences (a title over a second line); a table when every
 row has the same few facts. Check `h.HasCapability("view.node.table")`; not in a toolbar,
 footer or group.
+
+**A meter cell** is a share or a rate in a row (a suite's pass rate, a branch's share of
+the builds): a thin bar the column's width with a short label after it,
+`ui.MeterCell(0.86, "86%").WithMeterTone(ui.ToneAttention)`. Not for running work (that
+is the `progress` node). The value is a fraction, 0 to 1 (out of range, NaN or infinite is
+refused, never clamped); 0 draws the empty track. You format the label ("86%", "3 of 8",
+"–"; at most 16 characters, one line): the host never formats a number. The tone colours
+the fill as stats and bars do (`ok` emerald, `attention` amber, `error` red, `muted`),
+neutral by default. A meter is the cell's whole content: no value, glyph or pill beside
+it. In a narrow column the label goes into a tooltip and the bar stays. Check
+`h.HasCapability("view.table.meter")` and send `ui.TextCell(label)` without it: an older
+host drops the meter and shows an empty cell.
