@@ -88,13 +88,19 @@ func finishedTurn(t Thread, kids wakeChildren) bool {
 // note still waiting for a later turn, ends (endLocked); otherwise as firedLocked.
 // Callers hold m.mu and m.subs.mu.
 func (m *Manager) firedThreadLocked(r *subRec, t Thread) {
-	// A note for a later message's turn (a pr.task forward's), or a message its subscriber
-	// sent while it worked (keep), still waits for a turn: not the end yet.
-	if r.s.UntilFinished() && len(r.extra) == 0 && t.HandledThrough >= r.keep && finishedTurn(t, m.childrenLocked(t.ID)) {
+	if m.endsLocked(r, t) {
 		m.endLocked(r)
 		return
 	}
 	m.subs.firedLocked(r)
+}
+
+// endsLocked reports whether r's fire about t ends it: an UntilFinished subscription whose
+// t finished, with no note for a later message's turn (a pr.task forward's) and no message
+// its subscriber sent while it worked (keep) still waiting for a turn. Callers hold m.mu
+// and m.subs.mu.
+func (m *Manager) endsLocked(r *subRec, t Thread) bool {
+	return r.s.UntilFinished() && len(r.extra) == 0 && t.HandledThrough >= r.keep && finishedTurn(t, m.childrenLocked(t.ID))
 }
 
 // answeredIntoFinishLocked reports whether r, an UntilFinished subscription last seen
@@ -215,7 +221,13 @@ func (m *Manager) renotify(ctx context.Context, id string, msg Message, it Item)
 		return
 	}
 	s.mu.Lock()
-	s.dropEndedLocked(by, id)
+	if _, still := s.ended[ended.ID]; still {
+		// Renewed; a record the renewal itself made (it fired at once on a finish) stays.
+		delete(s.ended, ended.ID)
+		if err := deleteSubscriptions(context.Background(), s.db, []string{ended.ID}); err != nil {
+			s.log.Error("delete an ended notify subscription", "subscription", ended.ID, "err", err)
+		}
+	}
 	s.mu.Unlock()
 	m.log.Info("notify renewed by a send", "thread", id, "by", by, "subscription", res.Subscription.ID, "fired", res.Fired,
 		"existed", res.Existed, "ordinal", it.Ordinal)

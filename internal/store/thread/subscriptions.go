@@ -765,6 +765,11 @@ func (m *Manager) subscribe(sub Subscription, run ActionRun, pr *PullRequestInfo
 			}
 		}
 	}
+	if fired && sub.TargetKind == TargetThread && m.endsLocked(r, target) {
+		// A notify subscription whose thread already finished: the wake was its last.
+		m.endLocked(r)
+		return SubscribeResult{Subscription: r.s, Fired: true}, nil
+	}
 	if fired && (!r.s.Repeat || prTerminal(r.s.Condition)) {
 		m.log.Info("wake subscription fired at once", "subscription", sub.ID, "subscriber", sub.SubscriberID,
 			"target", sub.TargetID, "condition", sub.Condition)

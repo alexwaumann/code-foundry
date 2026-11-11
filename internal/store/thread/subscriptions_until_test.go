@@ -302,6 +302,27 @@ func TestRenotify(t *testing.T) {
 			t.Errorf("stored = %+v", rows)
 		}
 	})
+	t.Run("the answer came before the renewal", func(t *testing.T) {
+		n := newNotifyEnv(t)
+		n.setStep(n.child.ID, finished)
+		n.waitItems(n.parent.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+		// The message's turn ended before renotify ran: it fires at once, and that finish
+		// ends the renewed subscription too.
+		n.setStep(n.child.ID, busy)
+		n.m.update(n.child.ID, false, func(rec *record) { rec.s.HandledThrough = 9 })
+		n.setStep(n.child.ID, finished)
+		n.m.renotify(n.ctx(), n.child.ID, Message{ByThreadID: n.parent.ID}, Item{Ordinal: 9})
+		n.waitItems(n.parent.ID, "the answer's wake", func(items []Item) bool { return len(wakes(items)) == 2 })
+		if subs := n.subsOf(n.parent.ID); len(subs) != 0 {
+			t.Errorf("subscriptions = %+v", subs)
+		}
+		if got := len(n.ended(n.parent.ID, n.child.ID)); got != 1 {
+			t.Errorf("%d ended records, want 1", got)
+		}
+		if rows := n.storedSubs(); len(rows) != 1 || !isEnded(rows[0]) {
+			t.Errorf("stored = %+v", rows)
+		}
+	})
 	t.Run("no ended record, no subscription", func(t *testing.T) {
 		e := newEnv(t)
 		parent, child := e.stopped("parent"), e.stopped("child")
