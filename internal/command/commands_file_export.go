@@ -95,7 +95,7 @@ func RegisterFileExport(r *Registry, d FileExportDeps) error {
 			{Name: "path", Type: String, Required: true, Positional: true,
 				Description: "A file name, or a path relative to the checkout that stays inside it, in a folder that exists; no name may start with a dot"},
 			{Name: "text", Type: String, FileOrStdin: true, PageShowsSize: true, Description: "The contents, as text (@file: from a file, -: stdin)"},
-			{Name: "base64", Type: String, FileOrStdin: true, PageShowsSize: true, Description: "The contents, as base64, for a file that is not text"},
+			{Name: "base64", Type: String, FileOrStdin: true, PageShowsSize: true, Description: "The contents, as base64, for a file that is not text (@file: from a file, -: stdin)"},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
 				Description: "Thread whose checkout it goes in (default: the thread this runs in, $CODE_FOUNDRY_THREAD)" + IDHelp},
 			exportReplacesArg,
@@ -256,7 +256,7 @@ func exportContents(a Args) ([]byte, error) {
 		return nil, InvalidArg("text", "needs the contents: --text, or --base64 for bytes")
 	}
 	if len(b) > MaxExportBytes {
-		return nil, InvalidArg("text", "the contents are %s, at most %s", byteSize(len(b)), byteSize(MaxExportBytes))
+		return nil, InvalidArg("text", "the contents are %d bytes, at most %d (%d KiB)", len(b), MaxExportBytes, MaxExportBytes>>10)
 	}
 	return b, nil
 }

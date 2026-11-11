@@ -165,7 +165,7 @@ func TestFileExportContents(t *testing.T) {
 		{name: "both", args: map[string]string{"text": "a", "base64": "YQ=="}, why: "once"},
 		{name: "not base64", args: map[string]string{"base64": "not base64!"}, why: "is not base64"},
 		{name: "at the cap", args: map[string]string{"text": strings.Repeat("x", command.MaxExportBytes)}, want: strings.Repeat("x", command.MaxExportBytes)},
-		{name: "past the cap", args: map[string]string{"text": strings.Repeat("x", command.MaxExportBytes+1)}, why: "at most 256.0 KiB"},
+		{name: "past the cap", args: map[string]string{"text": strings.Repeat("x", command.MaxExportBytes+1)}, why: "262145 bytes, at most 262144 (256 KiB)"},
 		{name: "past the cap in bytes", args: map[string]string{"base64": base64.StdEncoding.EncodeToString(make([]byte, command.MaxExportBytes+1))}, why: "at most"},
 	}
 	for _, tt := range tests {

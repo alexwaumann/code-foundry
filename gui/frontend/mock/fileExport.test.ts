@@ -30,14 +30,14 @@ describe("the mock's file.export, like the daemon's", () => {
   it("refuses contents given twice, none, or past 256 KiB, and a thread with no checkout", () => {
     expect(() => cmd.run(cli, { path: "x", text: "a", base64: "YQ==" })).toThrow("once");
     expect(() => cmd.run(cli, { path: "x" })).toThrow("needs the contents");
-    expect(() => cmd.run(cli, { path: "x", text: "x".repeat(256 * 1024 + 1) })).toThrow("at most 256.0 KiB");
+    expect(() => cmd.run(cli, { path: "x", text: "x".repeat(256 * 1024 + 1) })).toThrow("262145 bytes, at most 262144 (256 KiB)");
     expect(() => cmd.run(cli, { path: "x", text: "a", thread: "t2" })).toThrow("no checkout yet");
   });
 
   it("asks a page first, and anyone before replacing a file", () => {
     expect(cmd.cmd.confirmIf(cli, { path: "new.csv", text: "a" })).toBe(false);
     expect(cmd.cmd.confirmIf(page, { path: "new.csv", text: "a" })).toBe(true);
-    expect(cmd.cmd.confirm(page, { path: "new.csv", text: "a" })).toBe('Run this?\nfile.export --path "new.csv" --text <1 byte>\nSaves 1 byte to /w/a/new.csv');
+    expect(cmd.cmd.confirm(page, { path: "new.csv", text: "a" })).toBe('Run this?\nfile.export --path "new.csv" --text <1 byte> --thread "t1"\nSaves 1 byte to /w/a/new.csv');
     expect(cmd.cmd.confirmLabel(page, { path: "new.csv", text: "a" })).toBe("Allow");
     expect(cmd.cmd.confirmIf(cli, { path: "rows.csv", text: "a" })).toBe(true);
     expect(cmd.cmd.confirm(cli, { path: "rows.csv", text: "a" })).toMatch(/^Replace \/w\/a\/rows\.csv\?/);

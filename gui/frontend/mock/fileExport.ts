@@ -53,7 +53,7 @@ function exportContents(args: Record<string, string>): string {
     out = Buffer.from(enc, "base64").toString("latin1");
     bytes = out.length;
   } else throw new CommandError("invalid", "file.export: text: needs the contents: --text, or --base64 for bytes");
-  if (bytes > MAX_EXPORT_BYTES) throw new CommandError("invalid", `file.export: text: the contents are ${byteSize(bytes)}, at most ${byteSize(MAX_EXPORT_BYTES)}`);
+  if (bytes > MAX_EXPORT_BYTES) throw new CommandError("invalid", `file.export: text: the contents are ${String(bytes)} bytes, at most ${String(MAX_EXPORT_BYTES)} (256 KiB)`);
   return out;
 }
 
@@ -98,6 +98,7 @@ export function fileExportCommands(cwdOf: (threadId: string) => string | undefin
           if (p.was !== null) return `Replace ${p.abs}? A file is there already (${byteSize(p.was.length)}); it becomes ${byteSize(p.contents.length)}.`;
           const call = [`file.export --path ${JSON.stringify(args.path ?? "")}`];
           for (const k of ["text", "base64"]) if (args[k] !== undefined) call.push(`--${k} <${byteSize(args[k].length)}>`);
+          call.push(`--thread ${JSON.stringify(args.thread || ctx?.activeThreadId || "")}`);
           return `Run this?\n${call.join(" ")}\nSaves ${byteSize(p.contents.length)} to ${p.abs}`;
         },
         confirmIf: (ctx: UiContext | undefined, args: Record<string, string>) => plan(ctx, args).was !== null || ctx?.origin === CallOrigin.PAGE,
