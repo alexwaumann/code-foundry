@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row, setZoom } from "./fixtures";
 
 /**
  * Editing a file in the File tab (docs/notes/file-edit-2-gui.md), for what only a browser
@@ -301,4 +301,106 @@ test("a draft survives leaving the tab, and a long file edits through the virtua
   await file(page).getByTestId("file-save").click();
   await expect(status(page)).toHaveText("Editing");
   await expect.poll(() => disk(long)).toMatch(/line 600\ntail$/);
+});
+
+/** Where grapheme `index` of line `n` starts, and its row's middle, in viewport px: a Range over the editor's own text. */
+async function glyph(page: Page, n: number, index: number): Promise<{ x: number; y: number }> {
+  return line(page, n).evaluate((row, i) => {
+    const seg = [...new Intl.Segmenter().segment(row.textContent)][i];
+    if (!seg) throw new Error(`no grapheme ${String(i)}`);
+    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let start = 0;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const length = (node as Text).length;
+      if (seg.index < start + length) {
+        range.setStart(node, seg.index - start);
+        range.setEnd(node, seg.index - start + seg.segment.length);
+        break;
+      }
+      start += length;
+    }
+    const r = range.getBoundingClientRect();
+    return { x: r.left, y: (r.top + r.bottom) / 2 };
+  }, index);
+}
+
+/** How far the drawn caret is from the start of grapheme `index` of line `n`, in viewport px (half the vertical distance counts). */
+async function caretOff(page: Page, n: number, index: number, zoom: number): Promise<number> {
+  const at = await glyph(page, n, index);
+  const caret = await file(page)
+    .locator("[data-caret]")
+    .evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: (r.top + r.bottom) / 2 };
+    });
+  // The library centres its 2px caret on the boundary: one layout px to the left of it.
+  return Math.round(Math.max(Math.abs(caret.x + zoom - at.x), Math.abs(caret.y - at.y) / 2) * 10) / 10;
+}
+
+test("caret and selection sit on an emoji line's text at 125%, wrapped or not, and follow it when the zoom changes", async ({ page }) => {
+  // Emoji and ZWJ sequences are measured in the DOM (docs/notes/file-edit-zoom.md); the long line wraps in the panel.
+  const wide = `${"abcdefghijklmnopqrstuvwxyz".split("").map((c) => `${c}😀`).join("")} and the end`;
+  const wideLine = `const wide = "${wide}";`;
+  await writeDisk(`${CF}/src/emoji.ts`, `const emoji = "😀 smile 👨‍👩‍👧 family after";\n${wideLine}\n`);
+  await openFile(page, "src/emoji.ts");
+  await startEditing(page);
+  await setZoom(page, 125);
+  const after = 33; // the "f" of "after"
+  const smile = 17; // the "s" of "smile"
+  // The "n" of "end": the emoji run wraps anywhere, so its rows move with the zoom; a word's second letter never starts one.
+  const end = [...new Intl.Segmenter().segment(wideLine.slice(0, wideLine.indexOf("end")))].length + 1;
+
+  let at = await glyph(page, 1, after);
+  await page.mouse.click(at.x + 1, at.y);
+  await expect.poll(() => caretOff(page, 1, after, 1.25)).toBeLessThan(1);
+  const from = await glyph(page, 1, smile);
+  await page.keyboard.down("Shift");
+  await page.mouse.click(from.x + 1, from.y);
+  await page.keyboard.up("Shift");
+  await expect(file(page).locator("[data-selection-range]")).toHaveCount(1);
+  const range = await file(page)
+    .locator("[data-selection-range]")
+    .evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right };
+    });
+  expect(Math.abs(range.left - from.x)).toBeLessThan(1);
+  expect(Math.abs(range.right - at.x)).toBeLessThan(1);
+
+  await page.evaluate(`__cfModule("/src/stores/codeView.ts").then((m) => m.setWrap(true))`);
+  await expect.poll(() => line(page, 2).evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(50);
+  at = await glyph(page, 2, end);
+  await page.mouse.click(at.x + 1, at.y);
+  await expect.poll(() => caretOff(page, 2, end, 1.25)).toBeLessThan(1);
+
+  // To 90% with the editor open: the caret follows its text on its own (an emoji's layout width differs per
+  // zoom, and so may the wrap points), and no width measured at 125% is reused.
+  await setZoom(page, 90);
+  await expect.poll(() => caretOff(page, 2, end, 0.9)).toBeLessThan(1);
+  at = await glyph(page, 2, end);
+  await page.mouse.click(at.x + 1, at.y);
+  await expect.poll(() => caretOff(page, 2, end, 0.9)).toBeLessThan(1);
+  at = await glyph(page, 1, after);
+  await page.mouse.click(at.x + 1, at.y);
+  await expect.poll(() => caretOff(page, 1, after, 0.9)).toBeLessThan(1);
+});
+
+test("at 175% the caret sits on its text on every row of a wrapped ASCII line", async ({ page }) => {
+  // Wide enough that the panel stays open at 175%.
+  await page.setViewportSize({ width: 2400, height: 1100 });
+  const words = Array.from({ length: 6 }, () => "lorem ipsum dolor sit amet consectetur adipiscing elit").join(" ");
+  await writeDisk(`${CF}/src/words.ts`, `const words = "${words}";\n`);
+  await openFile(page, "src/words.ts");
+  await page.evaluate(`__cfModule("/src/stores/codeView.ts").then((m) => m.setWrap(true))`);
+  await startEditing(page);
+  await setZoom(page, 175);
+  await expect.poll(() => line(page, 1).evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(100);
+  // The "o" of the last "lorem", the "i" of the last "elit": second letters, so never a row's first, on later rows.
+  const text = `const words = "${words}";`;
+  for (const index of [text.lastIndexOf("lorem") + 1, text.lastIndexOf("elit") + 1]) {
+    const at = await glyph(page, 1, index);
+    await page.mouse.click(at.x + 1, at.y);
+    await expect.poll(() => caretOff(page, 1, index, 1.75)).toBeLessThan(1);
+  }
 });
