@@ -68,7 +68,7 @@ plugins:
 		cp "$$dir/bin/$$name" "bin/plugins/$$name/bin/$$name"; \
 	done
 
-.PHONY: all gen build check attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
+.PHONY: all gen build check check-unlocked attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
         dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz \
         guide-eval guide-eval-compare
 
@@ -101,16 +101,32 @@ build: ghostty-vt whisper-cpp
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry ./cmd/code-foundry
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry-dictate ./cmd/code-foundry-dictate
 
-## check: everything CI runs. On success it records the working tree's hash so that
+## check: everything the sweep on main runs. On success it records the working tree's hash so that
 ## `make attest` can vouch for it once committed and pushed (scripts/attest.sh); a tree
 ## edited while the checks ran is not recorded.
+##
+## One check runs at a time on this machine, across worktrees: a second one waits its turn
+## (docs/notes/ci-rethink.md). Several at once starve each other until timing tests and the
+## FSEvents tests fail at random, and every agent then re-runs into the same load. The lock
+## is the kernel's (lockf), so a killed check frees it. CHECK_LOCK= (empty) runs without it.
+CHECK_LOCK ?= $(HOME)/Library/Caches/code-foundry/check.lock
 check:
+ifeq ($(strip $(CHECK_LOCK)),)
+	@$(MAKE) --no-print-directory check-unlocked
+else
+	@mkdir -p "$(dir $(CHECK_LOCK))"
+	@lockf -s -t 0 "$(CHECK_LOCK)" true || echo "make check: another worktree's check is running; waiting for it"
+	@lockf "$(CHECK_LOCK)" $(MAKE) --no-print-directory check-unlocked
+endif
+
+check-unlocked:
 	@scripts/attest.sh start
 	@$(MAKE) --no-print-directory go-check frontend-check
 	@scripts/attest.sh record
 
 ## attest: post a "local-check" commit status on the pushed HEAD, provided its tree is the
-## one `make check` last passed on. CI then skips its jobs for that pull request.
+## one `make check` last passed on. That status is what turns a pull request's only
+## check (`attested`) green; the suite itself does not run on a pull request.
 attest:
 	@scripts/attest.sh post
 
@@ -235,9 +251,16 @@ package: ghostty-vt whisper-cpp frontend-deps
 release:
 	./scripts/release.sh $(if $(DRY_RUN),--dry-run) $(filter-out dev,$(VERSION))
 
-## promote: publish the head of main as a stable release through the release workflow
-## (channel=stable); VERSION=vX.Y.Z overrides the computed version. Prints the run URL.
+## promote: publish a stable release through the release workflow (channel=stable). The
+## workflow tags the newest commit on main whose sweep (the ci workflow on a push to
+## main) is green, which is the commit the newest tip was built from; a head of main the
+## sweep has not passed is not promoted. VERSION=vX.Y.Z overrides the computed version.
+## Prints the commit and the run URL.
 promote:
+	@sha="$$(gh api 'repos/{owner}/{repo}/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1' --jq '.workflow_runs[0].head_sha // empty')"; \
+	if [ -z "$$sha" ]; then echo "promote: no green sweep on main; nothing to promote" >&2; exit 1; fi; \
+	ahead="$$(gh api "repos/{owner}/{repo}/compare/$$sha...main" --jq .ahead_by)"; \
+	echo "promoting $$sha, the newest commit on main with a green sweep ($$ahead newer on main not included)"
 	gh workflow run release.yml --ref main -f channel=stable $(if $(filter-out dev,$(VERSION)),-f version=$(VERSION))
 	@sleep 5
 	@gh run list --workflow release.yml --event workflow_dispatch --limit 1 --json url --jq '.[0].url'

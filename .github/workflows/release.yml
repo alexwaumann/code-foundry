@@ -6,18 +6,26 @@ name: release
 # `gh release create` by scripts/release.sh (idempotent, so a failed run can simply be
 # re-run).
 #
-#   push to main       tip: a prerelease vX.Y.Z-tip.N (X.Y.Z the stable this commit would
-#                      become, N the first-parent commits since the last stable), then the
-#                      tip releases beyond the newest five are deleted with their tags.
-#                      HEAD already tagged stable: nothing to publish.
-#   workflow_dispatch  channel=stable (default; `make promote`) tags the head of main
-#                      vX.Y.Z as a full release. channel=tip publishes a tip by hand.
+#   green sweep        tip: when the ci workflow finishes green for a push to main (the
+#                      sweep, docs/notes/ci-rethink.md), that commit becomes a prerelease
+#                      vX.Y.Z-tip.N (X.Y.Z the stable this commit would become, N the
+#                      first-parent commits since the last stable), then the tip releases
+#                      beyond the newest five are deleted with their tags. A red sweep
+#                      publishes nothing; the next green one covers every merge since.
+#                      The commit already tagged stable: nothing to publish.
+#   workflow_dispatch  channel=stable (default; `make promote`) tags the newest commit on
+#                      main with a green sweep vX.Y.Z as a full release. channel=tip
+#                      publishes a tip of the dispatched ref by hand.
 #
 # Automatic releases are ON (docs/notes/phase3d-packaging.md, "Enabling automatic
-# releases"). The repository variable RELEASE_ENABLED gates both the push trigger and
+# releases"). The repository variable RELEASE_ENABLED gates both the sweep trigger and
 # manual runs; set it to anything but "true" to pause releases.
 on:
-  push:
+  # Fires for every finished ci run whose branch is main; the job's `if` keeps the green
+  # sweeps. Pull request runs come from other branches and never start this workflow.
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -33,23 +41,56 @@ on:
 
 permissions:
   contents: write # tag push, gh release create and delete with GITHUB_TOKEN
-
-# Two merges in quick succession must not compute the same version; queue, never cancel
-# a release half-way. GitHub keeps one pending run per group: a newer queued run cancels
-# an older pending one (a skipped tip number, or a pending promotion to re-dispatch).
-concurrency:
-  group: release
-  cancel-in-progress: false
+  actions: read # a promotion looks up the newest green sweep
 
 jobs:
   release:
-    if: vars.RELEASE_ENABLED == 'true'
+    # Of the ci runs on main, only a green one for a push is a sweep: not a red one, not
+    # a pending one a newer merge replaced, not a manual run.
+    if: >-
+      vars.RELEASE_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    # Two sweeps in quick succession must not compute the same version; queue, never
+    # cancel a release half-way. GitHub keeps one pending job per group: a newer queued
+    # one cancels an older pending one (a skipped tip number, or a pending promotion to
+    # re-dispatch). On the job, not the workflow, so that a run skipped by the `if` above
+    # never takes a pending release's place.
+    concurrency:
+      group: release
+      cancel-in-progress: false
     # Apple silicon: the assets are darwin-arm64.
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
+      # The commit to release: the sweep's own commit for a tip (not the head of main,
+      # which may have moved on unchecked), the newest green sweep's for a promotion, the
+      # dispatched ref for a tip by hand.
+      - name: Pick the commit
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SWEEP_SHA: ${{ github.event.workflow_run.head_sha }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            sha="$SWEEP_SHA"
+          elif [ "$CHANNEL" = tip ]; then
+            sha="$GITHUB_SHA"
+          else
+            sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&event=push&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // empty')"
+            if [ -z "$sha" ]; then
+              echo "::error::no green sweep on main; nothing to promote"
+              exit 1
+            fi
+          fi
+          echo "releasing $sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
         with:
+          ref: ${{ steps.commit.outputs.sha }}
           # Full history and tags: next-version.sh reads commits since the last tag.
           fetch-depth: 0
           fetch-tags: true
@@ -80,8 +121,8 @@ jobs:
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-          # Pushes publish tips; dispatches default to stable.
-          CHANNEL: ${{ github.event_name == 'push' && 'tip' || inputs.channel }}
+          # A green sweep publishes a tip; dispatches default to stable.
+          CHANNEL: ${{ github.event_name == 'workflow_run' && 'tip' || inputs.channel }}
           VERSION: ${{ inputs.version }}
           CODE_FOUNDRY_RELEASE_REPO: ${{ github.repository }}
         run: |
@@ -94,7 +135,7 @@ jobs:
       # Keep the five newest tip releases; older ones go with their tags. Stables and
       # other prereleases are never touched.
       - name: Prune tip releases
-        if: github.event_name == 'push' || inputs.channel == 'tip'
+        if: github.event_name == 'workflow_run' || inputs.channel == 'tip'
         shell: bash # -eo pipefail: a failed listing fails the step
         env:
           GH_TOKEN: ${{ github.token }}

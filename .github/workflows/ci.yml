@@ -1,60 +1,63 @@
 name: ci
 
-# Three jobs (go-test, go-lint on macOS; frontend on Linux) so wall time is the longest
-# of them, not their sum. For a pull request whose head commit carries a "local-check"
-# status with its tree hash (posted by `make attest` after a green `make check`, see
-# docs/notes/ci-attest.md), all three are skipped: the same suite already ran on a Mac.
-# The attested job reads the status once; when `make attest` comes after it, the script
-# cancels and re-runs this run so the re-run skips them. Pushes to main always run
-# everything.
+# Two different things under one name (docs/notes/ci-rethink.md):
+#
+#   pull_request   One job, `attested`. It is green when the head commit carries a
+#                  "local-check" status naming its tree (posted by `make attest` after a
+#                  green `make check`), red otherwise. The suite does not run here: the
+#                  product is macOS-only and the same suite already ran on a Mac. There is
+#                  no fallback run; a red `attested` means run `make check` and
+#                  `make attest`.
+#   push to main   The sweep: go-test, go-lint (macOS) and frontend (Linux) on the merged
+#                  tree. Runs queue instead of cancelling, so a run always finishes and
+#                  the next one covers every merge that landed meanwhile. A green sweep
+#                  starts the tip release (release.yml).
+#   manual         `gh workflow run ci.yml --ref <branch>` runs the sweep's jobs on any
+#                  branch, for a clean-machine run on request.
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
   statuses: read
 
+# A pull request's newer push replaces its older run. On main nothing is cancelled
+# mid-run: GitHub keeps one running and one pending run per group, and a newer pending
+# run replaces an older pending one, whose commits the newer run's tree includes.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   attested:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    outputs:
-      skip: ${{ steps.check.outputs.skip }}
     steps:
       - uses: actions/checkout@v7
-        if: github.event_name == 'pull_request'
         with:
           # The PR head itself, not the merge commit: the attestation names its tree.
           ref: ${{ github.event.pull_request.head.sha }}
-      - id: check
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
           tree="$(git rev-parse 'HEAD^{tree}')"
           attested="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/status" \
             --jq '[.statuses[] | select(.context == "local-check" and .state == "success") | .description] | first // ""')"
           if [ "$attested" = "tree $tree" ]; then
-            echo "::notice::$SHA was checked locally (make attest, tree $tree); skipping CI jobs."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$SHA was checked locally (make attest, tree $tree)."
           else
-            echo "no local-check attestation for tree $tree (found: '${attested:-none}'); running CI."
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "::error::no local-check attestation for tree $tree (found: '${attested:-none}'). Run \`make check\`, push, then \`make attest\`; it re-runs this job."
+            exit 1
           fi
 
   go-test:
-    needs: attested
-    if: needs.attested.outputs.skip != 'true'
+    if: github.event_name != 'pull_request'
     # macOS only: the gui package links Wails (cgo + WebKit), and the product is macOS-only.
     runs-on: macos-latest
     timeout-minutes: 20
@@ -64,8 +67,7 @@ jobs:
       - run: make go-test
 
   go-lint:
-    needs: attested
-    if: needs.attested.outputs.skip != 'true'
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -74,8 +76,7 @@ jobs:
       - run: make go-lint
 
   frontend:
-    needs: attested
-    if: needs.attested.outputs.skip != 'true'
+    if: github.event_name != 'pull_request'
     # Nothing in the frontend checks is macOS-specific; Linux runners start in seconds.
     runs-on: ubuntu-latest
     timeout-minutes: 15

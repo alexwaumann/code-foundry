@@ -17,7 +17,7 @@ make gui-e2e  # Playwright (WebKit, 4 workers) against the mock daemon; not part
 make drive    # mock daemon + Vite for an agent to drive with `playwright cli` (DAEMON=dev: scratch dev daemon); skill .claude/skills/drive-app
 make dev      # daemon in foreground with text logs; the browser dev frontend on :9245 may call it (CODE_FOUNDRY_DEV_ORIGINS for other ports)
 make package VERSION=vX.Y.Z   # release assets in dist/ (tarball of the three executables + VERSION, install.sh, checksums.txt)
-make release  # manual release fallback (DRY_RUN=1 prints the commands); releases run on push to main
+make release  # manual release fallback (DRY_RUN=1 prints the commands); a tip is released after each green sweep on main
 make gui-build  # builds the GUI, gui/bin/Code Foundry, which `code-foundry gui` launches from ./bin
 make gui-dev    # make build, then the GUI with hot reload (auto-starts the daemon if needed)
 ```
@@ -73,10 +73,46 @@ make gui-dev    # make build, then the GUI with hot reload (auto-starts the daem
 
 Before claiming a step done: `make check` green, the new behavior exercised end to end
 (daemon + CLI or daemon + GUI), and a short note in `docs/notes/<step>.md` recording
-decisions and gotchas. Notes are text only: screenshots belong in the PR body (served
-from a shots branch or the PR's commits), never under `docs/notes/`.
+decisions and gotchas. Notes are text only: screenshots belong in the PR body, never under
+`docs/notes/`.
 
-After the final commit is pushed, run `make attest`. It posts a `local-check` status on
-the pushed commit if its tree is the one `make check` last passed on, and CI then skips
-its jobs for that pull request (a run that already started is cancelled and re-run). If it refuses (tree changed since the check), run
-`make check` again and re-attest. Never attest a tree you did not check.
+## Pull requests
+
+Every change lands as a pull request, and the pull request is the record of it: what
+changed, why, and for a UI change what the app looks like before and after.
+
+- Order: edit, `make check`, commit, push, `make attest`, `gh pr create`. `make attest`
+  posts a `local-check` status on the pushed commit if its tree is the one `make check`
+  last passed on. That status is the pull request's only check (`attested`): green with it,
+  red without it, and the suite does not run on a pull request. If `make attest` refuses
+  (the tree changed since the check), run `make check` again and re-attest; a PR opened
+  before `make attest` has its red check re-run by it. Never attest a tree you did not check.
+- One `make check` runs at a time on the machine; yours waits its turn behind other
+  worktrees'. Do not go around the lock or loop on re-runs: fix what you touched, and
+  re-run an unrelated timing failure once, naming it.
+- Screenshots go in the body with `gh pr create --attach <file>` (or `gh pr edit --attach`),
+  dark and light, before and after for a UI change. No shots branches.
+- A UI change is compared with what was agreed before it was built. It must match on
+  intent, not pixel for pixel. Every difference from what was agreed is listed in the body
+  with its reason, and repeated in the thread.
+- Workers open pull requests; the lead merges. A lead is the agent that aligned with the
+  user (an agent working alone with the user is its own lead). A worker is an agent another
+  agent started: it opens its PR, reports the URL, and never merges. The lead reads the
+  diff, asks the worker for follow-ups, and merges.
+- The lead merges when the PR is ready, without asking: `attested` green, the diff read,
+  screenshots matching the agreed intent. Merging is the default; "don't merge yet" or
+  "stack these and wait" from the user turns it off for that work. Ask first only for an
+  on-disk migration, or a result that departs from the agreed intent in a way you cannot
+  justify.
+- Merge with `gh pr merge --merge` and the default subject. Rebase a branch onto main;
+  never merge main into it.
+
+## After the merge
+
+Each push to main gets a sweep: the full suite on the merged tree, one run at a time, each
+covering every merge since the last. A green sweep publishes the tip release from that
+commit; a red one publishes nothing, so main stays red and tips stop until it is fixed.
+Fix forward, fast: a red sweep is first checked for a timing flake (fix the test so it
+waits for or controls what it raced, `docs/notes/flaky-ci-tests.md`; never a longer
+timeout, a sleep, a retry or a skip), then for a real break. `make promote` tags the
+newest sweep-green commit, not the head of main. Details: `docs/notes/ci-rethink.md`.

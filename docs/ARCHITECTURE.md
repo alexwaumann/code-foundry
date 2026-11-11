@@ -78,8 +78,9 @@ the GUI next to it. `code-foundry daemon` runs the daemon in the foreground. Eve
 auto-starts the daemon if the socket is absent. Packaging and updates:
 `docs/notes/bare-binary-distribution.md` (layout and launch) on top of
 `docs/notes/phase3d-packaging.md` (releases and the update flow). Releases come in two
-channels: a `vX.Y.Z-tip.N` prerelease per push to main, and stables promoted with `make
-promote` (`docs/notes/release-channels-handoff.md`).
+channels: a `vX.Y.Z-tip.N` prerelease per green sweep on main (the full suite on the
+merged tree, `docs/notes/ci-rethink.md`), and stables promoted from the newest sweep-green
+commit with `make promote` (`docs/notes/release-channels-handoff.md`).
 
 ## 2. The one rule
 
