@@ -12,9 +12,14 @@ import (
 // Ten seconds of more than 50 views a second throttle a surface and raise its flood
 // issue; a quiet minute after the last flooding second lifts both.
 func TestSurfaceFloodThrottleLifts(t *testing.T) {
+	// The host's clock moves only when the test moves it. A clock of time.Now plus the skew
+	// also counted the real time each act took: under load (-race, a busy runner) one flood
+	// of 100 views took over a second, so a window was more than two seconds old when the
+	// next one began and did not count as a flooding second (docs/notes/flaky-ci-tests.md).
+	base := time.Now()
 	var skew atomic.Int64
 	e := newSurfEnv(t, func(o *plugin.Options) {
-		o.Now = func() time.Time { return time.Now().Add(time.Duration(skew.Load())) }
+		o.Now = func() time.Time { return base.Add(time.Duration(skew.Load())) }
 	})
 	w := e.watch("panel", s1)
 	w.view("first view", contains("count 0"))
