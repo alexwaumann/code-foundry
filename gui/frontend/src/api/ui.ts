@@ -28,6 +28,21 @@ export async function publishTheme(theme: PublishedTheme, conn: DaemonConnection
 }
 
 /**
+ * The theme as last published (UiService.GetTheme), for a window that does not run the
+ * theme engine (the shot page): GitHub Dark before the first publish.
+ */
+export async function getPublishedTheme(conn: DaemonConnection = daemon): Promise<PublishedTheme> {
+  try {
+    const c = await conn.client(UiService);
+    const res = await c.getTheme({});
+    return { id: res.id, scheme: res.scheme === "light" ? "light" : "dark", vars: res.vars };
+  } catch (err) {
+    invalidateOnTransportError(err, conn);
+    throw err;
+  }
+}
+
+/**
  * The GUI's contrast report on one version of a user theme (UiService.PublishThemeReport,
  * docs/notes/theme-followups.md): the pairs that fall short and the stale pins.
  */
