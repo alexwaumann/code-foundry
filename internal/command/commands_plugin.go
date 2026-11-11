@@ -178,10 +178,14 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 			Title:     "Develop Plugin",
 			Description: "Link a plugin folder (with its plugin.json) into ~/.code-foundry/plugins under the manifest's name " +
 				"and enable it, asking for consent like plugin enable. A dev plugin restarts within 2 s after a crash and " +
-				"never gives up. From a terminal the CLI then follows its log (--follow=false: do not).",
+				"never gives up. --watch: the daemon watches the folder and, after each change, runs the build and restarts it " +
+				"(a failed build leaves the running plugin; plugin logs shows why). From a terminal the CLI then follows its log (--follow=false: do not).",
 			Category: "Plugin",
 			Args: []ArgSpec{
 				{Name: "path", Type: Path, Required: true, Positional: true, Description: "The plugin's folder"},
+				{Name: "watch", Type: Bool, Description: "Build and restart the plugin now and after every change in its folder " +
+					"(kept across daemon restarts; --watch=false stops; not given: as it was)"},
+				{Name: "build", Type: String, Description: "The build command the watch runs in the folder with your login shell (default: make build)"},
 				{Name: "force", Type: Bool, Description: "Take the name from a plugin of another source (a link to another folder, " +
 					"an installed package, which it removes, or its leftovers), deleting its secrets, data and consent and removing its threads"},
 				followArg,
@@ -201,12 +205,20 @@ func RegisterPlugin(r *Registry, b PluginBackend) error {
 				return res.Msg.GetConsentText()
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
-				res, err := b.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: a.Path("path"), Consent: true, Force: a.Bool("force"), ConsentDigest: a.String(consentArg.Name)}))
+				req := &v1.DevPluginRequest{Path: a.Path("path"), Consent: true, Force: a.Bool("force"), ConsentDigest: a.String(consentArg.Name), Build: a.String("build")}
+				if a.Given("watch") {
+					w := a.Bool("watch")
+					req.Watch = &w
+				}
+				res, err := b.Dev(ctx, connect.NewRequest(req))
 				if err != nil {
 					return Result{}, err
 				}
 				p := res.Msg.GetPlugin()
 				msg := fmt.Sprintf("linked %s as dev plugin %s; %s", a.Path("path"), p.GetName(), enabledMessage(p))
+				if p.GetDevWatch() {
+					msg += "\nwatching " + p.GetDevPath() + ": every change runs `" + p.GetDevBuild().GetCommand() + "` and restarts it (plugin logs " + p.GetName() + ")"
+				}
 				if ids := res.Msg.GetRemovedThreadIds(); len(ids) > 0 {
 					msg += "\nremoved the replaced plugin's threads: " + strings.Join(ids, ", ")
 				}
@@ -314,12 +326,18 @@ func formatPlugins(ps []*v1.Plugin) string {
 	_, _ = fmt.Fprintln(tw, "NAME\tVERSION\tSTATE\tPERMISSIONS\tCOMMANDS\tSURFACES\tWAKES\tNOTE")
 	for _, p := range ps {
 		state := pluginState(p.GetState())
-		if p.GetDev() {
+		switch {
+		case p.GetDevWatch():
+			state += " (dev, watching)"
+		case p.GetDev():
 			state += " (dev)"
 		}
 		note := ""
 		if p.GetState() == v1.PluginState_PLUGIN_STATE_CRASHED || p.GetState() == v1.PluginState_PLUGIN_STATE_FAILED {
 			note = p.GetLastError()
+		}
+		if b := p.GetDevBuild(); p.GetDevWatch() && b.GetState() == v1.PluginDevBuildState_PLUGIN_DEV_BUILD_STATE_FAILED && note == "" {
+			note = fmt.Sprintf("build failed (exit %d): code-foundry plugin logs %s", b.GetExitCode(), p.GetName())
 		}
 		switch {
 		case p.GetDisabledReason() != "":

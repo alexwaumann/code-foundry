@@ -22,10 +22,13 @@ type Surfaces struct {
 	// Elements is what SurfaceElements returns.
 	Elements []plugin.SurfaceElement
 	// ActErr, when set, is Act's error.
-	ActErr  error
-	acts    []plugin.ActRequest
-	watches []chan plugin.SurfaceUpdate
-	refs    []plugin.SurfaceRef
+	ActErr error
+	// SettleErr, when set, is DevSettle's error.
+	SettleErr error
+	settles   []string
+	acts      []plugin.ActRequest
+	watches   []chan plugin.SurfaceUpdate
+	refs      []plugin.SurfaceRef
 }
 
 var _ plugin.Surfaces = (*Surfaces)(nil)
@@ -125,4 +128,19 @@ func (s *Surfaces) Acts() []plugin.ActRequest {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]plugin.ActRequest(nil), s.acts...)
+}
+
+// DevSettle implements plugin.Surfaces: it records the plugin and answers SettleErr.
+func (s *Surfaces) DevSettle(_ context.Context, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settles = append(s.settles, name)
+	return s.SettleErr
+}
+
+// Settles returns the plugins DevSettle was called for.
+func (s *Surfaces) Settles() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.settles...)
 }

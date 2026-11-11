@@ -432,16 +432,13 @@ func resolveExec(dir string, exec []string) ([]string, error) {
 // (never a thread's or the daemon's endpoint unless the api permission is granted).
 var minimalEnv = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "TZ", "SSH_AUTH_SOCK", "__CF_USER_TEXT_ENCODING"}
 
+func isMinimalEnv(k string) bool {
+	return slices.Contains(minimalEnv, k) || strings.HasPrefix(k, "LC_")
+}
+
 // pluginEnv is the plugin process's whole environment.
 func (m *Manager) pluginEnv(name string, info spawnInfo, dataDir string) []string {
-	var env []string
-	for _, kv := range m.opts.Environ {
-		k, _, _ := strings.Cut(kv, "=")
-		if slices.Contains(minimalEnv, k) || strings.HasPrefix(k, "LC_") {
-			env = append(env, kv)
-		}
-	}
-	env = append(env,
+	env := append(m.minimalEnviron(),
 		pluginsdk.EnvPlugin+"="+name,
 		pluginsdk.EnvPluginDir+"="+info.dir,
 		pluginsdk.EnvPluginData+"="+dataDir,

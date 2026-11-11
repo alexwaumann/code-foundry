@@ -23,10 +23,14 @@ type row struct {
 	// Origin is the source the consent, secrets and data belong to (origin.go, migration
 	// 0033); "" when not known.
 	Origin string
+	// DevWatch and DevBuild are `plugin dev --watch` and its --build (devwatch.go,
+	// migration 0059); "" builds with DefaultDevBuild.
+	DevWatch bool
+	DevBuild string
 }
 
 func loadRows(ctx context.Context, db *sql.DB) (map[string]row, error) {
-	rows, err := db.QueryContext(ctx, `SELECT name, enabled, granted_json, consented_at, dev_path, origin FROM plugins`)
+	rows, err := db.QueryContext(ctx, `SELECT name, enabled, granted_json, consented_at, dev_path, origin, dev_watch, dev_build FROM plugins`)
 	if err != nil {
 		return nil, fmt.Errorf("plugin: load: %w", err)
 	}
@@ -37,10 +41,11 @@ func loadRows(ctx context.Context, db *sql.DB) (map[string]row, error) {
 		var enabled int
 		var granted string
 		var consented int64
-		if err := rows.Scan(&r.Name, &enabled, &granted, &consented, &r.DevPath, &r.Origin); err != nil {
+		var watch int
+		if err := rows.Scan(&r.Name, &enabled, &granted, &consented, &r.DevPath, &r.Origin, &watch, &r.DevBuild); err != nil {
 			return nil, fmt.Errorf("plugin: load: %w", err)
 		}
-		r.Enabled = enabled != 0
+		r.Enabled, r.DevWatch = enabled != 0, watch != 0
 		if granted != "" {
 			var p pluginsdk.Permissions
 			if err := json.Unmarshal([]byte(granted), &p); err == nil {
@@ -71,16 +76,19 @@ func saveRow(ctx context.Context, db *sql.DB, r row, now time.Time) error {
 	if !r.ConsentedAt.IsZero() {
 		consented = r.ConsentedAt.UnixMilli()
 	}
-	enabled := 0
+	enabled, watch := 0, 0
 	if r.Enabled {
 		enabled = 1
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO plugins (name, enabled, granted_json, consented_at, dev_path, origin, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+	if r.DevWatch {
+		watch = 1
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO plugins (name, enabled, granted_json, consented_at, dev_path, origin, dev_watch, dev_build, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (name) DO UPDATE SET enabled = excluded.enabled, granted_json = excluded.granted_json,
 			consented_at = excluded.consented_at, dev_path = excluded.dev_path, origin = excluded.origin,
-			updated_at = excluded.updated_at`,
-		r.Name, enabled, granted, consented, r.DevPath, r.Origin, now.UnixMilli()); err != nil {
+			dev_watch = excluded.dev_watch, dev_build = excluded.dev_build, updated_at = excluded.updated_at`,
+		r.Name, enabled, granted, consented, r.DevPath, r.Origin, watch, r.DevBuild, now.UnixMilli()); err != nil {
 		return fmt.Errorf("plugin: save %s: %w", r.Name, err)
 	}
 	return nil

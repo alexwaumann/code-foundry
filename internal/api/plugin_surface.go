@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -134,6 +135,9 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	if err := h.needSurfaces(); err != nil {
 		return nil, err
 	}
+	if err := h.surfaces.DevSettle(ctx, surfacePlugin(req.Msg.GetRef().GetPlugin(), req.Msg.GetRef().GetInstance())); err != nil {
+		return nil, pluginError(err)
+	}
 	wait := time.Duration(req.Msg.GetWaitMs()) * time.Millisecond
 	if wait <= 0 {
 		wait = defaultSurfaceWait
@@ -203,6 +207,17 @@ loop:
 	return connect.NewResponse(out), nil
 }
 
+// surfacePlugin is the plugin a request names, by name or by an instance key
+// (<plugin>/<surface>/<scope>): a watched dev plugin is settled first (DevSettle), so a
+// read right after an edit sees the rebuilt plugin.
+func surfacePlugin(name, instance string) string {
+	if name != "" {
+		return name
+	}
+	p, _, _ := strings.Cut(instance, "/")
+	return p
+}
+
 // surfacePending: a view in this state is not the current one yet. The instance is
 // opening, or its plugin is down only while it stops and starts again (a restart, a dev
 // rebuild): the cached view is the old process's.
@@ -246,6 +261,13 @@ func (h *Plugin) Act(ctx context.Context, req *connect.Request[v1.SurfaceActRequ
 		return nil, err
 	}
 	m := req.Msg
+	inst := m.GetInstance()
+	if inst == "" {
+		inst = m.GetRef().GetInstance()
+	}
+	if err := h.surfaces.DevSettle(ctx, surfacePlugin(m.GetRef().GetPlugin(), inst)); err != nil {
+		return nil, pluginError(err)
+	}
 	ar := plugin.ActRequest{Instance: m.GetInstance(), Version: m.GetVersion(), Key: m.GetKey(), Action: m.GetAction()}
 	if m.GetContext() != nil {
 		ar.Context = contextFromProto(m.GetContext())

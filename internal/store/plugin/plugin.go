@@ -109,6 +109,11 @@ type Plugin struct {
 	// at most 2 s and never fail for crashing.
 	Dev     bool
 	DevPath string
+	// DevWatch: the daemon watches DevPath, builds on a change with DevBuild.Command and
+	// restarts the plugin (`plugin dev --watch`, devwatch.go). DevBuild is set for every
+	// dev plugin; its State only while watched.
+	DevWatch bool
+	DevBuild DevBuild
 	// Manifest is the parsed plugin.json; zero when it could not be read.
 	Manifest pluginsdk.Manifest
 	// Issues are manifest warnings (unknown fields) and registration problems.
@@ -198,8 +203,8 @@ type EnableResult struct {
 type LogLine struct {
 	Seq  uint64
 	Time time.Time
-	// Source is "stderr", "log" (a log notification) or "host" (the daemon's own lines:
-	// starts, exits, refused calls).
+	// Source is "stderr", "log" (a log notification), "build" (a watched dev plugin's
+	// build output) or "host" (the daemon's own lines: starts, exits, refused calls).
 	Source string
 	// Level is the log notification's level; "" for stderr.
 	Level string
@@ -233,6 +238,10 @@ type Store interface {
 	// DevShown is Dev with consent, bound like EnableShown to the dry run's consent text
 	// (takeover included).
 	DevShown(ctx context.Context, dir, shown string, force bool) (EnableResult, error)
+	// SetDevWatch turns a dev plugin's watch on or off and sets its build command (""
+	// keeps it). On builds and restarts it now and waits; a failed build is an error with
+	// its last lines (devwatch.go).
+	SetDevWatch(ctx context.Context, name string, on bool, build string) (Plugin, error)
 	// Reload rescans the plugins dir.
 	Reload(ctx context.Context) error
 	// Logs returns the last n lines of a plugin's log (all kept when n <= 0).

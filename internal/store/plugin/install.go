@@ -503,7 +503,7 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 	r := rows[p.name]
 	r.Name = p.name
 	if r.DevPath != "" {
-		r.DevPath = ""
+		r.DevPath, r.DevWatch, r.DevBuild = "", false, ""
 		if err := saveRow(ctx, m.opts.DB, r, m.opts.Now()); err != nil {
 			return InstallResult{}, err
 		}
@@ -758,7 +758,7 @@ func (m *Manager) Uninstall(ctx context.Context, name string, purge bool) (Unins
 	}
 	var res UninstallResult
 	if hasRow && (r.Enabled || r.DevPath != "") {
-		r.Enabled, r.DevPath = false, ""
+		r.Enabled, r.DevPath, r.DevWatch, r.DevBuild = false, "", false, ""
 		if err := saveRow(ctx, m.opts.DB, r, m.opts.Now()); err != nil {
 			return UninstallResult{}, err
 		}
