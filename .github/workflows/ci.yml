@@ -4,7 +4,9 @@ name: ci
 # of them, not their sum. For a pull request whose head commit carries a "local-check"
 # status with its tree hash (posted by `make attest` after a green `make check`, see
 # docs/notes/ci-attest.md), all three are skipped: the same suite already ran on a Mac.
-# Pushes to main always run everything.
+# The attested job reads the status once; when `make attest` comes after it, the script
+# cancels and re-runs this run so the re-run skips them. Pushes to main always run
+# everything.
 
 on:
   push:

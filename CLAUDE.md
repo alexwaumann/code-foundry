@@ -78,5 +78,5 @@ from a shots branch or the PR's commits), never under `docs/notes/`.
 
 After the final commit is pushed, run `make attest`. It posts a `local-check` status on
 the pushed commit if its tree is the one `make check` last passed on, and CI then skips
-its jobs for that pull request. If it refuses (tree changed since the check), run
+its jobs for that pull request (a run that already started is cancelled and re-run). If it refuses (tree changed since the check), run
 `make check` again and re-attest. Never attest a tree you did not check.
