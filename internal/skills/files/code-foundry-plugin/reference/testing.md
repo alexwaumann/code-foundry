@@ -182,6 +182,16 @@ What the unit tests cannot show, with the plugin linked by `plugin dev` (its fol
 any scratch project you `code-foundry project add` to test against, must be under the
 home directory; so must an unpacked release tarball you try):
 
+- **Linked with `--watch`**, the daemon scans the folder (not `bin`, `dist`,
+  `node_modules`, dot entries or the folder of `exec[0]`), runs the build after a change
+  and restarts the plugin. `plugin surface` and `plugin act` first wait for the build of
+  any edit you just made and the restart, so their view is your source's; when the build
+  failed they fail with `build failed: code-foundry plugin logs <name>`, where its output
+  is (source `build`). `plugin dev "$PWD" --watch` again rebuilds by hand;
+  `--build "<cmd>"` changes the command (kept), `--watch=false` stops watching. A build
+  that rewrites a watched file with new content every time loops: generate into an
+  ignored folder.
+
 - `code-foundry plugin <name> <command> [args] --thread <id>`: a command, as its view
   button would run it.
 - `code-foundry plugin surface <name> <surface> --thread <id>` opens the surface for that

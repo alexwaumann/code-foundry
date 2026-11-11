@@ -112,6 +112,13 @@ type Options struct {
 	// Wakes keeps the wake subscriptions to the plugins' sources and delivers their
 	// fires (wakes.go); nil refuses wake/fire. The daemon adapts the thread store.
 	Wakes WakeSink
+
+	// Shell runs a watched dev plugin's build as `Shell -lc <build>` (devbuild.go;
+	// default: $SHELL of Environ, else /bin/zsh). DevWatchInterval is how often a watched
+	// dev folder is scanned, DevBuildTimeout how long one build may take; zero values
+	// take DefaultDevWatchInterval and DefaultDevBuildTimeout.
+	Shell                             string
+	DevWatchInterval, DevBuildTimeout time.Duration
 }
 
 func (o *Options) defaults() {
@@ -134,6 +141,8 @@ func (o *Options) defaults() {
 	d(&o.FirstViewTimeout, DefaultFirstViewTimeout)
 	d(&o.CoalesceInterval, DefaultCoalesce)
 	d(&o.ActTimeout, DefaultActTimeout)
+	d(&o.DevWatchInterval, DefaultDevWatchInterval)
+	d(&o.DevBuildTimeout, DefaultDevBuildTimeout)
 	if o.CrashLimit <= 0 {
 		o.CrashLimit = DefaultCrashLimit
 	}
@@ -157,6 +166,14 @@ func (o *Options) defaults() {
 	}
 	if o.Environ == nil {
 		o.Environ = os.Environ()
+	}
+	if o.Shell == "" {
+		o.Shell = "/bin/zsh"
+		for _, kv := range o.Environ {
+			if v, ok := strings.CutPrefix(kv, "SHELL="); ok && filepath.IsAbs(v) {
+				o.Shell = v
+			}
+		}
 	}
 }
 
@@ -188,6 +205,9 @@ type Manager struct {
 	// inst is where packages came from and the registries' last index (install.go,
 	// updates.go).
 	inst installState
+
+	// devw is the watched dev plugins (devwatch.go).
+	devw devWatchState
 }
 
 var _ Store = (*Manager)(nil)
@@ -216,6 +236,11 @@ type entry struct {
 
 	actor *actor
 	logs  *logBuffer
+
+	// devBuild is the watched dev plugin's last build; devWatchOff says why its watch
+	// stopped on its own (devwatch.go).
+	devBuild    DevBuild
+	devWatchOff string
 }
 
 // New returns a Manager with nothing loaded: Start scans the plugins dir and starts
@@ -233,6 +258,7 @@ func New(opts Options) (*Manager, error) {
 	}
 	m := &Manager{opts: opts, log: opts.Log, entries: map[string]*entry{}}
 	m.avail.interval = availabilityInterval
+	m.devw.ticker = realTicker
 	m.surf = newSurfaceHub(m)
 	m.rebuildLocked()
 	go m.surf.run()
@@ -286,6 +312,9 @@ func (m *Manager) publicLocked(e *entry) Plugin {
 	}
 	if e.dev {
 		p.DevPath = e.dir
+		p.DevWatch = e.row.DevWatch && e.row.Enabled && e.devWatchOff == ""
+		p.DevBuild = e.devBuild
+		p.DevBuild.Command = devBuildCommand(e.row.DevBuild)
 	}
 	if e.row.Granted != nil {
 		g := *e.row.Granted
@@ -438,6 +467,7 @@ func (m *Manager) reloadLocked(ctx context.Context) error {
 	m.mu.Unlock()
 	for _, e := range gone {
 		m.stopActor(e, StateDisabled)
+		m.syncDevWatchGone(e.name)
 		m.unregister(e.name)
 		m.forget(ctx, e.name, nil, "the plugin was removed")
 		m.surf.dropIssues(e.name)
@@ -456,6 +486,7 @@ func (m *Manager) reloadLocked(ctx context.Context) error {
 // permissions grew, registers its commands, and starts, restarts (when the package
 // changed, or always with restart) or leaves its actor. opMu held.
 func (m *Manager) apply(ctx context.Context, name string, f found, r row, restart bool) {
+	defer m.syncDevWatch(name)
 	r.Name = name
 	m.mu.Lock()
 	e, ok := m.entries[name]
@@ -650,6 +681,7 @@ func (m *Manager) Disable(ctx context.Context, name string) (Plugin, error) {
 	}
 	m.update(name, nil, func(e *entry) { e.row, e.disabledReason = r, "" })
 	m.stopActor(e, StateDisabled)
+	m.syncDevWatch(name)
 	m.unregister(name)
 	m.forget(ctx, name, e.logs, "the plugin was disabled")
 	e.logs.add("host", "", "disabled")
@@ -889,6 +921,8 @@ func (m *Manager) secretDeleted(name, key string) {
 
 // Close stops every plugin (shutdown, then SIGTERM, then SIGKILL) and waits.
 func (m *Manager) Close() error {
+	// The watchers first, without opMu: one may be restarting its plugin.
+	m.stopDevWatches()
 	m.opMu.Lock()
 	defer m.opMu.Unlock()
 	m.mu.Lock()

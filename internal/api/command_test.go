@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 )
 
 func TestCommandErrorCodes(t *testing.T) {
@@ -52,6 +53,28 @@ func TestCommandErrorCodes(t *testing.T) {
 				t.Errorf("CommandFailed detail = %v, want %v", failed, command.IsFailed(tt.err))
 			}
 		})
+	}
+}
+
+// A watched dev plugin's failed build, through the plugin backend, is the command's own
+// failure: its words without the code, and the CommandFailed detail (the CLI exits 1).
+func TestCommandErrorDevBuildFailed(t *testing.T) {
+	store := fmt.Errorf("%w (exit 2); the running plugin is unchanged:\nmain.go:3: undefined: x", plugin.ErrDevBuildFailed)
+	err := commandError("plugin.dev", pluginError(store))
+	var ce *connect.Error
+	if !errors.As(err, &ce) || ce.Code() != connect.CodeFailedPrecondition || ce.Message() != store.Error() {
+		t.Fatalf("got %v", err)
+	}
+	failed := false
+	for _, d := range ce.Details() {
+		if m, derr := d.Value(); derr == nil {
+			if cf, ok := m.(*v1.CommandFailed); ok && cf.GetCommand() == "plugin.dev" {
+				failed = true
+			}
+		}
+	}
+	if !failed {
+		t.Error("no CommandFailed detail")
 	}
 }
 

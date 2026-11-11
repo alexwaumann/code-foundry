@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -204,5 +205,77 @@ func TestSurfacesUnimplemented(t *testing.T) {
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
 		t.Errorf("act without surfaces: %v", err)
+	}
+}
+
+// A plugin restarting (a dev rebuild) is down while it starts: GetSurface waits through
+// that for the new process's view instead of returning the old one's cached view.
+func TestGetSurfaceWaitsThroughStarting(t *testing.T) {
+	_, surfaces, c := newSurfaceServer(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	surfaces.Available["hello/main"] = true
+	key := "hello/main/thread:s-1"
+	go func() {
+		for surfaces.Watches() == 0 {
+			time.Sleep(5 * time.Millisecond)
+		}
+		surfaces.Push(plugin.SurfaceUpdate{State: &plugin.SurfaceState{Instance: key, Phase: plugin.PhasePluginDown, PluginState: plugin.StateStarting}})
+		surfaces.Push(plugin.SurfaceUpdate{View: &plugin.SurfaceView{Instance: key, Version: 1, JSON: []byte(`{"nodes":[{"key":"old"}]}`)}})
+		time.Sleep(50 * time.Millisecond)
+		surfaces.Push(plugin.SurfaceUpdate{State: &plugin.SurfaceState{Instance: key, Phase: plugin.PhaseOpening, Message: "updating", PluginState: plugin.StateRunning}})
+		surfaces.Push(plugin.SurfaceUpdate{State: &plugin.SurfaceState{Instance: key, Phase: plugin.PhaseLive, PluginState: plugin.StateRunning}})
+		surfaces.Push(plugin.SurfaceUpdate{View: &plugin.SurfaceView{Instance: key, Version: 2, JSON: []byte(`{"nodes":[{"key":"new"}]}`)}})
+	}()
+	res, err := c.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: helloRef}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Msg.GetView().GetVersion() != 2 || res.Msg.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_LIVE {
+		t.Errorf("got %v, want the new process's view", res.Msg)
+	}
+}
+
+// A plugin that is down for good (disabled, failed) still answers at once with what is
+// cached.
+func TestGetSurfaceDownReturnsCached(t *testing.T) {
+	_, surfaces, c := newSurfaceServer(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	surfaces.Available["hello/main"] = true
+	key := "hello/main/thread:s-1"
+	go func() {
+		for surfaces.Watches() == 0 {
+			time.Sleep(5 * time.Millisecond)
+		}
+		surfaces.Push(plugin.SurfaceUpdate{State: &plugin.SurfaceState{Instance: key, Phase: plugin.PhasePluginDown, PluginState: plugin.StateFailed}})
+		surfaces.Push(plugin.SurfaceUpdate{View: &plugin.SurfaceView{Instance: key, Version: 1, JSON: []byte(`{"nodes":[]}`)}})
+	}()
+	start := time.Now()
+	res, err := c.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: helloRef}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Msg.GetView().GetVersion() != 1 || res.Msg.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_PLUGIN_DOWN || time.Since(start) > 2*time.Second {
+		t.Errorf("got %v after %s", res.Msg, time.Since(start))
+	}
+}
+
+// GetSurface and Act settle a watched dev plugin first; a failed build is the answer.
+func TestSurfaceDevSettle(t *testing.T) {
+	_, surfaces, c := newSurfaceServer(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	surfaces.Available["hello/main"] = true
+	surfaces.SettleErr = fmt.Errorf("plugin hello: %w: code-foundry plugin logs hello", plugin.ErrDevBuildFailed)
+	_, err := c.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: helloRef}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "build failed: code-foundry plugin logs hello") {
+		t.Errorf("get: %v", err)
+	}
+	if _, err := c.Act(ctx, connect.NewRequest(&v1.SurfaceActRequest{Instance: "hello/main/thread:s-1", Key: "go"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("act: %v", err)
+	}
+	if got := surfaces.Settles(); fmt.Sprint(got) != "[hello hello]" || surfaces.Watches() != 0 || len(surfaces.Acts()) != 0 {
+		t.Errorf("settles %v, watches %d, acts %d", got, surfaces.Watches(), len(surfaces.Acts()))
 	}
 }

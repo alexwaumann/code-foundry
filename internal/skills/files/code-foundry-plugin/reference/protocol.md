@@ -64,6 +64,12 @@ the host does not speak or a missing or non-executable `exec[0]` fails at once (
 plugin keeps retrying: you are about to build it). While it is down its commands stay
 listed and fail with the reason; its surfaces say so.
 
+**Rebuilds.** With `plugin dev --watch`, each successful build is a `shutdown` and a
+start: a new process, `initialize` again, and `surface/open` again for every surface
+someone has open (it shows the last view as updating meanwhile). Keep nothing in memory
+that must outlive a rebuild; `CODE_FOUNDRY_PLUGIN_DATA` does. A failed build changes
+nothing: the old process keeps running.
+
 ## Host → plugin
 
 | Method | Kind (timeout) | Params → result | SDK |

@@ -205,6 +205,29 @@ message Plugin {
   // The manifest's wake sources: events a thread subscribes to with `thread subscribe
   // --plugin <plugin>/<source>` (docs/notes/plugins-wake-sources.md).
   repeated PluginWake wakes = 31;
+  // A dev plugin whose folder the daemon watches: on a change it runs dev_build.command
+  // and restarts the plugin (`plugin dev --watch`, docs/notes/plugin-dev-watch.md).
+  bool dev_watch = 32;
+  // A dev plugin's build command and, while watched, its last build.
+  PluginDevBuild dev_build = 33;
+}
+
+enum PluginDevBuildState {
+  // Nothing built since the watch began.
+  PLUGIN_DEV_BUILD_STATE_UNSPECIFIED = 0;
+  PLUGIN_DEV_BUILD_STATE_RUNNING = 1;
+  PLUGIN_DEV_BUILD_STATE_OK = 2;
+  // The running plugin is the last good build's.
+  PLUGIN_DEV_BUILD_STATE_FAILED = 3;
+}
+
+message PluginDevBuild {
+  // Run as $SHELL -lc <command> in the dev folder ("make build" unless --build named one).
+  string command = 1;
+  PluginDevBuildState state = 2;
+  // A failed build's exit status; -1 when it timed out or did not start.
+  int32 exit_code = 3;
+  google.protobuf.Timestamp finished_at = 4;
 }
 
 // PluginWake is one manifest wake source.
@@ -292,6 +315,11 @@ message DevPluginRequest {
   bool force = 4;
   // With consent: as EnablePluginRequest.consent_digest, over the dry run's consent_text.
   string consent_digest = 5;
+  // Set: turn the watch on (build and restart on every change; a failed first build is
+  // an error with its last lines) or off. Unset leaves it as it is.
+  optional bool watch = 6;
+  // The build command the watch runs ("" keeps the one it has, else "make build").
+  string build = 7;
 }
 
 message DevPluginResponse {
@@ -317,7 +345,8 @@ message PluginLogLine {
   // follower missed lines.
   uint64 seq = 1;
   google.protobuf.Timestamp time = 2;
-  // "stderr", "log" (the plugin's log notifications) or "host" (the daemon's lines).
+  // "stderr", "log" (the plugin's log notifications), "build" (a watched dev plugin's
+  // build output) or "host" (the daemon's lines).
   string source = 3;
   // A log notification's level (debug, info, warn, error).
   string level = 4;

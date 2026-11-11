@@ -101,6 +101,17 @@ func (h *Plugin) Dev(ctx context.Context, req *connect.Request[v1.DevPluginReque
 	if err != nil {
 		return nil, pluginError(err)
 	}
+	if !m.GetDryRun() && !res.NeedsConsent && (m.Watch != nil || m.GetBuild() != "") {
+		on := res.Plugin.DevWatch
+		if m.Watch != nil {
+			on = m.GetWatch()
+		}
+		p, err := h.store.SetDevWatch(ctx, res.Plugin.Name, on, m.GetBuild())
+		if err != nil {
+			return nil, pluginError(err)
+		}
+		res.Plugin = p
+	}
 	return connect.NewResponse(&v1.DevPluginResponse{
 		Plugin: pluginToProto(res.Plugin), NeedsConsent: res.NeedsConsent, ConsentText: res.Consent,
 		RemovedThreadIds: res.RemovedThreads,
@@ -273,7 +284,19 @@ func pluginToProto(p plugin.Plugin) *v1.Plugin {
 			When: s.When, ShowCommand: plugin.ShowCommand(p.Name, s.ID), Kind: plugin.SurfaceKind(p.Name, s.ID)})
 	}
 	out.Wakes = pluginWakesToProto(p.Name, mf.Wakes)
+	if p.Dev {
+		out.DevWatch = p.DevWatch
+		b := p.DevBuild
+		out.DevBuild = &v1.PluginDevBuild{Command: b.Command, State: devBuildStates[b.State], ExitCode: int32(b.ExitCode), FinishedAt: timestamp(b.FinishedAt)}
+	}
 	return out
+}
+
+var devBuildStates = map[plugin.DevBuildState]v1.PluginDevBuildState{
+	plugin.DevBuildNone:    v1.PluginDevBuildState_PLUGIN_DEV_BUILD_STATE_UNSPECIFIED,
+	plugin.DevBuildRunning: v1.PluginDevBuildState_PLUGIN_DEV_BUILD_STATE_RUNNING,
+	plugin.DevBuildOK:      v1.PluginDevBuildState_PLUGIN_DEV_BUILD_STATE_OK,
+	plugin.DevBuildFailed:  v1.PluginDevBuildState_PLUGIN_DEV_BUILD_STATE_FAILED,
 }
 
 func pluginLogLineToProto(l plugin.LogLine) *v1.PluginLogLine {
@@ -287,7 +310,7 @@ func pluginError(err error) error {
 		code = connect.CodeNotFound
 	case errors.Is(err, plugin.ErrInvalidArgument):
 		code = connect.CodeInvalidArgument
-	case errors.Is(err, plugin.ErrFailedPrecondition):
+	case errors.Is(err, plugin.ErrFailedPrecondition), errors.Is(err, plugin.ErrDevBuildFailed):
 		code = connect.CodeFailedPrecondition
 	case errors.Is(err, plugin.ErrClosed), errors.Is(err, plugin.ErrUnavailable):
 		code = connect.CodeUnavailable

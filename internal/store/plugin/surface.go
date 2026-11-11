@@ -196,6 +196,10 @@ type Surfaces interface {
 	// Act forwards an action to the plugin (surface/act) and returns the version acted
 	// on. A plugin's error wraps ErrPluginRefused.
 	Act(ctx context.Context, req ActRequest) (uint64, error)
+	// DevSettle, for a watched dev plugin, scans its folder now and waits for the build
+	// and restart of any change; it fails when that build failed (devwatch.go). Others
+	// return at once.
+	DevSettle(ctx context.Context, plugin string) error
 }
 
 var _ Surfaces = (*Manager)(nil)

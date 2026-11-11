@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -31,6 +32,9 @@ type cliFollower struct {
 	target func(vals map[string]string, res *v1.InvokeCommandResponse) (name string, lines int32, ok bool)
 	// follow, when set, replaces following the plugin's log (plugin surface --watch).
 	follow func(ctx context.Context, cl *cli, c *client.Client, res *v1.InvokeCommandResponse) error
+	// flag is the flag that asks to follow ("" is follow): only it, so plugin dev's
+	// --watch (the daemon's watch) does not stream.
+	flag string
 }
 
 var cliFollowers = map[string]cliFollower{
@@ -44,6 +48,7 @@ var cliFollowers = map[string]cliFollower{
 	"plugin.surface": {
 		target: func(_ map[string]string, _ *v1.InvokeCommandResponse) (string, int32, bool) { return "", 0, true },
 		follow: watchSurface,
+		flag:   "watch",
 	},
 	"plugin.dev": {onTerminal: true, target: func(_ map[string]string, res *v1.InvokeCommandResponse) (string, int32, bool) {
 		var dev v1.DevPluginResponse
@@ -54,11 +59,12 @@ var cliFollowers = map[string]cliFollower{
 	}},
 }
 
-// wantsFollow: --follow (plugin surface: --watch) given (true), or not given and the follower follows on a
-// terminal and this is one.
+// wantsFollow: the follower's flag (--follow; plugin surface: --watch) given (true), or
+// not given and the follower follows on a terminal and this is one.
 func (cl *cli) wantsFollow(f cliFollower, flags []*argFlag) bool {
+	flag := cmp.Or(f.flag, "follow")
 	for _, a := range flags {
-		if (a.spec.GetName() == "follow" || a.spec.GetName() == "watch") && a.set {
+		if a.spec.GetName() == flag && a.set {
 			b, err := strconv.ParseBool(a.value)
 			return err == nil && b
 		}

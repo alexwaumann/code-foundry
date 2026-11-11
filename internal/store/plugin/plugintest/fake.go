@@ -22,6 +22,8 @@ type Fake struct {
 	bus *bus.Bus
 	// Err, when set, is returned by every mutation.
 	Err error
+	// DevBuildErr, when set, is SetDevWatch's error turning the watch on.
+	DevBuildErr error
 
 	mu      sync.Mutex
 	plugins map[string]plugin.Plugin
@@ -178,6 +180,24 @@ func (f *Fake) DevShown(ctx context.Context, dir, shown string, force bool) (plu
 		return plugin.EnableResult{}, err
 	}
 	return f.EnableShown(ctx, lastElem(dir), shown)
+}
+
+// SetDevWatch implements plugin.Store: it records the call (`devwatch on=<on>
+// build="<build>" <name>`) and sets DevWatch and the build command; DevBuildErr, when set, is a
+// failed first build.
+func (f *Fake) SetDevWatch(_ context.Context, name string, on bool, build string) (plugin.Plugin, error) {
+	p, err := f.mutate(fmt.Sprintf("devwatch on=%v build=%q", on, build), name, func(p *plugin.Plugin) {
+		p.DevWatch = on
+		if build != "" {
+			p.DevBuild.Command = build
+		} else if p.DevBuild.Command == "" {
+			p.DevBuild.Command = plugin.DefaultDevBuild
+		}
+	})
+	if err == nil && on && f.DevBuildErr != nil {
+		return p, f.DevBuildErr
+	}
+	return p, err
 }
 
 func (f *Fake) getLocked(name string) (plugin.Plugin, error) {

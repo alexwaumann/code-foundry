@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -134,6 +135,9 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	if err := h.needSurfaces(); err != nil {
 		return nil, err
 	}
+	if err := h.surfaces.DevSettle(ctx, surfacePlugin(req.Msg.GetRef().GetPlugin(), req.Msg.GetRef().GetInstance())); err != nil {
+		return nil, pluginError(err)
+	}
 	wait := time.Duration(req.Msg.GetWaitMs()) * time.Millisecond
 	if wait <= 0 {
 		wait = defaultSurfaceWait
@@ -153,6 +157,7 @@ func (h *Plugin) GetSurface(ctx context.Context, req *connect.Request[v1.GetSurf
 	// followed by "live" and no new view is current too (the plugin re-sent the same
 	// view): it ends the wait shortly after.
 	var settle <-chan time.Time
+	var pending *plugin.SurfaceState // the last state
 	open := true
 loop:
 	for {
@@ -164,17 +169,20 @@ loop:
 			}
 			switch {
 			case u.State != nil:
+				pending = u.State
 				out.State = surfaceStateToProto(u.State)
 				switch {
 				case u.State.Phase == plugin.PhaseFailed:
 					break loop
-				case u.State.Phase != plugin.PhaseOpening && view != nil:
+				case surfacePending(u.State):
+					settle = nil
+				case view != nil:
 					settle = time.After(getSurfaceSettle)
 				}
 			case u.View != nil:
 				view = u.View
 				out.View = surfaceViewToProto(u.View)
-				if out.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_OPENING {
+				if pending == nil || !surfacePending(pending) {
 					break loop
 				}
 			}
@@ -197,6 +205,25 @@ loop:
 		}
 	}
 	return connect.NewResponse(out), nil
+}
+
+// surfacePlugin is the plugin a request names, by name or by an instance key
+// (<plugin>/<surface>/<scope>): a watched dev plugin is settled first (DevSettle), so a
+// read right after an edit sees the rebuilt plugin.
+func surfacePlugin(name, instance string) string {
+	if name != "" {
+		return name
+	}
+	p, _, _ := strings.Cut(instance, "/")
+	return p
+}
+
+// surfacePending: a view in this state is not the current one yet. The instance is
+// opening, or its plugin is down only while it stops and starts again (a restart, a dev
+// rebuild): the cached view is the old process's.
+func surfacePending(s *plugin.SurfaceState) bool {
+	return s.Phase == plugin.PhaseOpening ||
+		(s.Phase == plugin.PhasePluginDown && (s.PluginState == plugin.StateStarting || s.PluginState == plugin.StateStopping))
 }
 
 // settleSurface reads updates until no view has come for quiet (or maxSurfaceSettle has
@@ -234,6 +261,13 @@ func (h *Plugin) Act(ctx context.Context, req *connect.Request[v1.SurfaceActRequ
 		return nil, err
 	}
 	m := req.Msg
+	inst := m.GetInstance()
+	if inst == "" {
+		inst = m.GetRef().GetInstance()
+	}
+	if err := h.surfaces.DevSettle(ctx, surfacePlugin(m.GetRef().GetPlugin(), inst)); err != nil {
+		return nil, pluginError(err)
+	}
 	ar := plugin.ActRequest{Instance: m.GetInstance(), Version: m.GetVersion(), Key: m.GetKey(), Action: m.GetAction()}
 	if m.GetContext() != nil {
 		ar.Context = contextFromProto(m.GetContext())

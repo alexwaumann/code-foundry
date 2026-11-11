@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -159,5 +160,45 @@ func TestPluginListDirs(t *testing.T) {
 				t.Errorf("data_dir = %q, want %q", got, tc.data)
 			}
 		})
+	}
+}
+
+// Dev with watch set turns the watch on or off after linking; unset leaves it; a failed
+// first build is the error.
+func TestDevWatch(t *testing.T) {
+	fake, c := newPluginServer(t)
+	ctx := context.Background()
+	on, off := true, false
+	res, err := c.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: "/Users/a/src/w", Consent: true, Watch: &on, Build: "go build -o bin/w ."}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := res.Msg.GetPlugin()
+	if !p.GetDevWatch() || p.GetDevBuild().GetCommand() != "go build -o bin/w ." {
+		t.Errorf("watch on: %v", p)
+	}
+	if _, err := c.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: "/Users/a/src/w", Consent: true})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: "/Users/a/src/w", Consent: true, Watch: &off})); err != nil {
+		t.Fatal(err)
+	}
+	// A dry run never touches the watch.
+	if _, err := c.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: "/Users/a/src/w", DryRun: true, Watch: &on})); err != nil {
+		t.Fatal(err)
+	}
+	var watches []string
+	for _, call := range fake.Calls() {
+		if strings.HasPrefix(call, "devwatch") {
+			watches = append(watches, call)
+		}
+	}
+	if want := `[devwatch on=true build="go build -o bin/w ." w devwatch on=false build="" w]`; fmt.Sprint(watches) != want {
+		t.Errorf("calls %q\nwant %s", watches, want)
+	}
+	fake.DevBuildErr = fmt.Errorf("%w (exit 2); the running plugin is unchanged:\nmain.go:3: undefined: x", plugin.ErrDevBuildFailed)
+	_, err = c.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: "/Users/a/src/w", Consent: true, Watch: &on}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "undefined: x") {
+		t.Errorf("failed build: %v", err)
 	}
 }
