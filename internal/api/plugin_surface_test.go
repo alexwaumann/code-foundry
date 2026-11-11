@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -257,5 +258,24 @@ func TestGetSurfaceDownReturnsCached(t *testing.T) {
 	}
 	if res.Msg.GetView().GetVersion() != 1 || res.Msg.GetState().GetPhase() != v1.SurfacePhase_SURFACE_PHASE_PLUGIN_DOWN || time.Since(start) > 2*time.Second {
 		t.Errorf("got %v after %s", res.Msg, time.Since(start))
+	}
+}
+
+// GetSurface and Act settle a watched dev plugin first; a failed build is the answer.
+func TestSurfaceDevSettle(t *testing.T) {
+	_, surfaces, c := newSurfaceServer(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	surfaces.Available["hello/main"] = true
+	surfaces.SettleErr = fmt.Errorf("%w: plugin hello: build failed: code-foundry plugin logs hello", plugin.ErrFailedPrecondition)
+	_, err := c.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: helloRef}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "build failed: code-foundry plugin logs hello") {
+		t.Errorf("get: %v", err)
+	}
+	if _, err := c.Act(ctx, connect.NewRequest(&v1.SurfaceActRequest{Instance: "hello/main/thread:s-1", Key: "go"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Errorf("act: %v", err)
+	}
+	if got := surfaces.Settles(); fmt.Sprint(got) != "[hello hello]" || surfaces.Watches() != 0 || len(surfaces.Acts()) != 0 {
+		t.Errorf("settles %v, watches %d, acts %d", got, surfaces.Watches(), len(surfaces.Acts()))
 	}
 }

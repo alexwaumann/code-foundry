@@ -150,8 +150,10 @@ type devWatchState struct {
 	w      map[string]*devWatcher
 	closed bool
 	wg     sync.WaitGroup
-	// ticker makes a watcher's scan ticks (tests send their own).
+	// ticker makes a watcher's scan ticks (tests send their own); ticked, when set, hears
+	// of each tick once it is handled (a build included).
 	ticker func(d time.Duration) (<-chan time.Time, func())
+	ticked chan struct{}
 }
 
 func realTicker(d time.Duration) (<-chan time.Time, func()) {
@@ -393,7 +395,12 @@ func (w *devWatcher) run(ticks <-chan time.Time) {
 			}
 			if r.force || !cur.sameContent(base) {
 				base, pending = cur, nil
-				lastErr = w.build(r.force)
+				var reply error
+				reply, lastErr = w.build()
+				if r.force {
+					r.reply <- reply
+					continue
+				}
 			}
 			r.reply <- lastErr
 		case <-ticks:
@@ -406,9 +413,12 @@ func (w *devWatcher) run(ticks <-chan time.Time) {
 				pending = nil
 			case pending != nil && cur.sameContent(pending):
 				base, pending = cur, nil
-				lastErr = w.build(false)
+				_, lastErr = w.build()
 			default:
 				pending = cur
+			}
+			if t := w.m.devw.ticked; t != nil {
+				t <- struct{}{}
 			}
 		}
 	}
@@ -423,12 +433,14 @@ func (w *devWatcher) logs() *logBuffer {
 }
 
 // build runs the build and, when it succeeds, restarts the plugin and waits for it to
-// start. The error is what DevSettle answers; first quotes the build's last lines.
-func (w *devWatcher) build(first bool) error {
+// start. Both errors are nil on success; on a failure first quotes the build's last
+// lines (SetDevWatch's answer) and settle points at the log (DevSettle's, until the next
+// build).
+func (w *devWatcher) build() (first, settle error) {
 	m := w.m
 	logs := w.logs()
 	if logs == nil {
-		return nil
+		return nil, nil
 	}
 	w.mu.Lock()
 	cfg := w.cfg
@@ -437,7 +449,7 @@ func (w *devWatcher) build(first bool) error {
 	logs.add("host", "", "building: "+cfg.build)
 	res := m.runDevBuild(w.ctx, cfg.dir, cfg.build, logs)
 	if w.ctx.Err() != nil {
-		return nil // the watch stopped (the daemon closing, the watch turned off)
+		return nil, nil // the watch stopped (the daemon closing, the watch turned off)
 	}
 	now := m.opts.Now()
 	if !res.ok() {
@@ -446,10 +458,8 @@ func (w *devWatcher) build(first bool) error {
 		m.update(w.name, nil, func(e *entry) {
 			e.devBuild = DevBuild{State: DevBuildFailed, ExitCode: res.exit, FinishedAt: now}
 		})
-		if first {
-			return fmt.Errorf("%w: %s:\n%s", ErrFailedPrecondition, msg, strings.Join(res.tail, "\n"))
-		}
-		return fmt.Errorf("%w: plugin %s: %w: code-foundry plugin logs %s", ErrFailedPrecondition, w.name, errDevBuildFailed, w.name)
+		return fmt.Errorf("%w: %s:\n%s", ErrFailedPrecondition, msg, strings.Join(res.tail, "\n")),
+			fmt.Errorf("%w: plugin %s: %w: code-foundry plugin logs %s", ErrFailedPrecondition, w.name, errDevBuildFailed, w.name)
 	}
 	m.update(w.name, nil, func(e *entry) {
 		e.devBuild = DevBuild{State: DevBuildOK, FinishedAt: now}
@@ -459,7 +469,7 @@ func (w *devWatcher) build(first bool) error {
 	p, err := m.Restart(w.ctx, w.name)
 	if err != nil {
 		logs.add("host", "", fmt.Sprintf("build ok in %s; restart failed: %v", roundDuration(res.took), err))
-		return err
+		return err, err
 	}
 	if !p.Enabled {
 		dir := cfg.dir
@@ -468,11 +478,12 @@ func (w *devWatcher) build(first bool) error {
 		}
 		grew := fmt.Sprintf("its permissions grew, so it was disabled: run `code-foundry plugin dev %s --yes` to review them and enable it again", dir)
 		logs.add("host", "", "build ok in "+roundDuration(res.took)+"; "+grew)
-		return fmt.Errorf("%w: plugin %s: %s", ErrFailedPrecondition, w.name, grew)
+		err := fmt.Errorf("%w: plugin %s: %s", ErrFailedPrecondition, w.name, grew)
+		return err, err
 	}
 	logs.add("host", "", fmt.Sprintf("build ok in %s; restarted", roundDuration(res.took)))
 	w.waitStarted(sub)
-	return nil
+	return nil, nil
 }
 
 // waitStarted waits until the restarted plugin is no longer starting (running, crashed
@@ -495,7 +506,11 @@ func (w *devWatcher) waitStarted(sub *bus.Subscription[Event]) {
 	}
 }
 
-// roundDuration is d to a tenth of a second: 1.4s.
+// roundDuration is d to a tenth of a second (1.4s), or to the millisecond under one
+// (42ms).
 func roundDuration(d time.Duration) string {
+	if d < time.Second {
+		return d.Round(time.Millisecond).String()
+	}
 	return d.Round(100 * time.Millisecond).String()
 }

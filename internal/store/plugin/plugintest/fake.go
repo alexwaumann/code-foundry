@@ -182,11 +182,11 @@ func (f *Fake) DevShown(ctx context.Context, dir, shown string, force bool) (plu
 	return f.EnableShown(ctx, lastElem(dir), shown)
 }
 
-// SetDevWatch implements plugin.Store: it records the call ("devwatch <name> on=<on>
-// build=<build>") and sets DevWatch and the build command; DevBuildErr, when set, is a
+// SetDevWatch implements plugin.Store: it records the call (`devwatch on=<on>
+// build="<build>" <name>`) and sets DevWatch and the build command; DevBuildErr, when set, is a
 // failed first build.
 func (f *Fake) SetDevWatch(_ context.Context, name string, on bool, build string) (plugin.Plugin, error) {
-	p, err := f.mutate(fmt.Sprintf("devwatch %s on=%v build=%s", name, on, build), name, func(p *plugin.Plugin) {
+	p, err := f.mutate(fmt.Sprintf("devwatch on=%v build=%q", on, build), name, func(p *plugin.Plugin) {
 		p.DevWatch = on
 		if build != "" {
 			p.DevBuild.Command = build
