@@ -208,14 +208,9 @@ export function setMockFiles(projectId: string, files: string[]): void {
   filesByProject.set(projectId, files);
 }
 
-/** How SearchFiles answers (POST /__mock/files/search?delay=700&fail=1): after delayMs, failing when fail. */
-export const searchMode = { delayMs: 0, fail: false };
-
 export function resetCompletion(): void {
   filesByProject.clear();
   completionCalls.length = 0;
-  searchMode.delayMs = 0;
-  searchMode.fail = false;
 }
 
 type SkillInit = MessageInitShape<typeof SkillSchema>;
@@ -430,16 +425,6 @@ export function querySplits(words: readonly string[], name: string, multi: boole
     if (!lead && !trail) break;
   }
   return out;
-}
-
-/** searchFiles as the router serves it: logged, then after searchMode.delayMs, failing when searchMode.fail. */
-export async function searchFilesSlow(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): Promise<SearchInit> {
-  if (searchMode.delayMs > 0) await new Promise((r) => setTimeout(r, searchMode.delayMs));
-  if (searchMode.fail) {
-    completionCalls.push(`search ${(req.sources.length > 0 ? req.sources : [req]).map((s) => s.projectId).join(",")} ${req.query}`);
-    throw new ConnectError("search failed", Code.Internal);
-  }
-  return searchFiles(projects, req);
 }
 
 // Go compares paths as bytes: UTF-8 length for "shorter", byte (code point) order after.

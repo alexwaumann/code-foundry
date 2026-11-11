@@ -1,17 +1,14 @@
 /**
  * FilesystemService.ReadFile and ProjectService.GetWorktreeFileDiff for the mock daemon
  * (the File and Diff panel tabs, docs/notes/file-viewer-3-tabs.md). A small fixed disk in
- * the code-foundry main worktree (a README, a TypeScript file, an HTML page, images and PDFs
- * under and over the 32 MiB read cap, a binary, a folder, a 4 MB log), and every changed file of a worktree detail (mock/github.ts)
+ * the code-foundry main worktree (a README, a TypeScript file, HTML pages, images, PDFs and
+ * a folder), and every changed file of a worktree detail (mock/github.ts)
  * on both sides: its old side derived from the new one by its status letter. Anything else is
  * not found.
  *
  *   POST /__mock/fs/write?path=…&text=…   (a file's new contents on disk; reset restores the fixtures)
- *   POST /__mock/fs/remove?path=…         (the file goes)
  *   POST /__mock/fs/link?path=…&real=…    (ReadFile says a link leads from the path to real; reset forgets it)
- *   POST /__mock/fs/refuse?code=…&message=…   (the next WriteFile fails with that Connect code name)
  *   GET  /__mock/fs/text?path=…           ({ text }: a file's contents on disk, null when absent)
- *   GET  /__mock/fs/calls                 ("read <path>", "write <path> [force] [create]", "diff <worktree> <file> <scope>")
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
@@ -36,8 +33,6 @@ const isCommit = (s: CompareSide): boolean => s?.kind === DiffSourceKind.REF && 
 type CompareFileInit = MessageInitShape<typeof GetWorktreeCompareFileResponseSchema>;
 /** One side of a comparison request; unset is that side's default. */
 type CompareSide = DiffSource | undefined;
-
-const sideName = (s: CompareSide): string => (s?.kind === DiffSourceKind.REF ? s.ref : String(s?.kind ?? 0));
 
 /** What the detail fixtures say about a changed file (mock/github.ts FileInit). */
 export interface ChangedFile {
@@ -321,12 +316,7 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/shots/large.png`, { data: solidPng(1600, 1000), mime: "image/png", binary: true }],
     [`${CF}/docs/shots/broken.png`, { data: enc.encode("not a picture"), mime: "image/png", binary: true }],
     [`${CF}/docs/spec.pdf`, { data: Uint8Array.from(testPdf(3, Math.round(1.2 * MiB))), mime: "application/pdf", binary: true }],
-    // Over 32 MiB: only the first bytes would come back (the data stands in for them).
-    [`${CF}/docs/huge.png`, { data: PNG, mime: "image/png", binary: true, size: 50_000_000 }],
-    [`${CF}/docs/huge.pdf`, { data: Uint8Array.from(testPdf(1)), mime: "application/pdf", binary: true, size: 50_000_000 }],
-    [`${CF}/bin/tool`, { data: Uint8Array.from([0x7f, 0x45, 0x4c, 0x46, 0, 0, 1]), mime: "application/octet-stream", binary: true, size: 2_400_000 }],
     [`${CF}/docs`, { data: new Uint8Array(), mime: "", dir: true, size: 192 }],
-    [`${CF}/big.log`, { data: enc.encode("start of a long log\n".repeat(10)), mime: "text/plain; charset=utf-8", size: 4_400_000 }],
   ]);
 }
 
@@ -346,8 +336,6 @@ function olderOf(path: string, now: string): string {
 
 export class MockFiles {
   private disk = fixtures();
-  private refusal: ConnectError | null = null;
-  readonly calls: string[] = [];
 
   constructor(private readonly detailOf: (path: string) => DetailFiles | undefined) {}
 
@@ -366,13 +354,6 @@ export class MockFiles {
     this.longCommitSubject = 0;
     this.links.clear();
     this.disk = fixtures();
-    this.refusal = null;
-    this.calls.length = 0;
-  }
-
-  /** The file goes, as `rm` would. */
-  remove(path: string): void {
-    this.disk.delete(path);
   }
 
   /** Where a path's link leads, for ReadFile's real_path; POST /__mock/fs/link. */
@@ -383,12 +364,6 @@ export class MockFiles {
     const r = this.readFile(baseDir, path, maxBytes);
     const real = this.links.get(r.resolvedPath ?? "");
     return real === undefined ? r : { ...r, realPath: real, mode: 0o644 };
-  }
-
-  /** The next WriteFile fails with this code ("failed_precondition") and message. */
-  refuseNextWrite(code: string, message: string): void {
-    const name = code.replace(/(^|_)([a-z])/g, (_, _sep: string, c: string) => c.toUpperCase()) as keyof typeof Code;
-    this.refusal = new ConnectError(message, Code[name]);
   }
 
   /** A file's contents as text; null when nothing is there. */
@@ -444,7 +419,6 @@ export class MockFiles {
       this.grants.set(scope, grant);
     }
     const rel = abs.slice(scope.length + 1);
-    this.calls.push(`preview ${abs}`);
     const single = TEMP_ROOTS.includes(scope);
     return { url: `/preview/${grant}/${rel.split("/").map(encodeURIComponent).join("/")}`, scope: single ? abs : scope, singleFile: single };
   }
@@ -472,7 +446,6 @@ export class MockFiles {
       abs = `${baseDir}/${path}`;
     }
     abs = normalize(abs);
-    this.calls.push(`read ${abs}`);
     const outsideHome = abs !== HOME && !abs.startsWith(`${HOME}/`);
     if (outsideHome && !inTemp(abs)) throw new ConnectError(`${abs} is outside your home directory and the temp folders`, Code.InvalidArgument);
     const e = this.onDisk(abs);
@@ -498,10 +471,6 @@ export class MockFiles {
   /** internal/fsx Writer: a changed or vanished file is a conflict, nothing written; force writes whatever is there; create takes a place where nothing is. */
   writeFile(req: WriteFileRequest): WriteInit {
     const abs = req.path.startsWith("/") ? normalize(req.path) : normalize(`${req.baseDir}/${req.path}`);
-    this.calls.push(`write ${abs}${req.force ? " force" : ""}${req.create ? " create" : ""}`);
-    const refusal = this.refusal;
-    this.refusal = null;
-    if (refusal) throw refusal;
     const e = this.onDisk(abs);
     if (e?.dir) throw new ConnectError(`${abs} is a directory`, Code.InvalidArgument);
     if (req.create) {
@@ -521,7 +490,6 @@ export class MockFiles {
   compare(worktree: string, base: CompareSide, head: CompareSide): CompareInit {
     const detail = this.detailOf(worktree);
     if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
-    this.calls.push(`compare ${worktree} ${sideName(base)} ${sideName(head)}`);
     const baseRef = detail.baseRef ?? "";
     const resolved = (s: CompareSide) => {
       if (s?.kind === DiffSourceKind.REF) return { kind: s.kind, label: s.ref, sha: "ddc0461310bb" };
@@ -547,7 +515,6 @@ export class MockFiles {
   /** The commits of a comparison: the worktree's log whatever the sides, each the next one's child; the last is a root. */
   compareCommits(worktree: string): CompareLogInit {
     const log = this.compareLog(worktree);
-    this.calls.push(`compareCommits ${worktree}`);
     const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject ?? ""}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
     return { commits, total: commits.length };
   }
@@ -579,7 +546,6 @@ export class MockFiles {
     const detail = this.detailOf(worktree);
     if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
     const branch = scope === DiffScope.BRANCH;
-    this.calls.push(`diff ${worktree} ${file} ${branch ? "branch" : "working"}`);
     const baseRef = detail.baseRef ?? "";
     const meta = { baseRef, mergeBase: baseRef ? "c6d3bc2477aa" : "", head: "ddc0461310bb" };
     if (branch && !baseRef) return { ...meta, error: "the worktree has no base branch to compare with" };

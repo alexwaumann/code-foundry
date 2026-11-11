@@ -4,8 +4,6 @@
  * daemon sniffs the content), names the copy from the path instead of the content, and
  * every image reads as the same small PNG. Selection goes through MockSettings like the
  * daemon's store goes through the settings store.
- *
- *   POST /__mock/backdrops/import?path=/Users/me/Pictures/a.png   (what Add image… would do)
  */
 import { createHash } from "node:crypto";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -25,8 +23,6 @@ interface MockBackdrop {
 
 export class MockBackdrops {
   private images: MockBackdrop[] = [];
-  /** "import <path>", "remove <name>", "read <name>". */
-  calls: string[] = [];
 
   constructor(private readonly settings: MockSettings) {
     settings.backdropExists = (name) => this.images.some((b) => b.name === name);
@@ -34,7 +30,6 @@ export class MockBackdrops {
 
   reset(): void {
     this.images = [];
-    this.calls = [];
   }
 
   list() {
@@ -42,7 +37,6 @@ export class MockBackdrops {
   }
 
   import(path: string) {
-    this.calls.push(`import ${path}`);
     if (!path.startsWith("/")) throw new CommandError("invalid", `invalid argument: image "${path}" is not absolute`);
     if (path.includes("missing")) throw new CommandError("notfound", `not found: image "${path}" does not exist`);
     if (path.includes("huge")) throw new CommandError("invalid", "invalid argument: the limit for a backdrop image is 24 MiB");
@@ -59,7 +53,6 @@ export class MockBackdrops {
   }
 
   remove(name: string): void {
-    this.calls.push(`remove ${name}`);
     if (!this.images.some((b) => b.name === name)) throw new CommandError("notfound", `not found: backdrop "${name}"`);
     this.images = this.images.filter((b) => b.name !== name);
     if (this.settings.value("appearance.backdrop_file") !== name) return;
@@ -69,7 +62,6 @@ export class MockBackdrops {
   }
 
   read(name: string): { data: Uint8Array; mimeType: string } {
-    this.calls.push(`read ${name}`);
     if (name.includes("/") || name.startsWith(".")) throw new CommandError("invalid", `invalid argument: "${name}" is not a file name in the backdrops folder`);
     if (!this.images.some((b) => b.name === name)) throw new CommandError("notfound", `not found: backdrop "${name}"`);
     return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };

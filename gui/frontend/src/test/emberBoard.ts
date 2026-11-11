@@ -229,7 +229,7 @@ export class EmberWorld {
     this.publish();
   }
 
-  /** POST /__mock/ember/report: a worker's report, filed now. */
+  /** A worker's report, filed now. */
   report(id: string, status: ThreadReportStatusView, summary: string): void {
     const w = this.workers.find((x) => x.id === id);
     if (!w) throw new Error(`no worker ${id}`);
@@ -237,7 +237,7 @@ export class EmberWorld {
     this.publish();
   }
 
-  /** POST /__mock/ember/task: a task's state, and its outcome and title when given. */
+  /** A task's state, and its outcome and title when given. */
   task(id: string, o: Partial<Pick<TaskSeed, "state" | "outcome" | "title" | "branch">>): void {
     const t = this.tasks.find((x) => x.id === id);
     if (!t) throw new Error(`no task ${id}`);
@@ -246,13 +246,13 @@ export class EmberWorld {
     this.publish();
   }
 
-  /** POST /__mock/ember/task/add: a todo task at the end. */
+  /** A todo task at the end. */
   addTask(id: string, title: string): void {
     this.tasks.push({ id, title, detail: "", state: "todo", parentId: "", threadId: "", outcome: "", branch: "", position: this.tasks.length + 1, createdAtMs: Date.now(), updatedAtMs: Date.now(), doneAtMs: null });
     this.publish();
   }
 
-  /** POST /__mock/ember/timer: a timer of Ember's thread firing in `minutes`. */
+  /** A timer of Ember's thread firing in `minutes`. */
   addTimer(id: string, minutes: number, o: { every?: string; note?: string } = {}): void {
     this.timers.push({ id, nextAtMs: Date.now() + minutes * MIN, every: o.every ?? "", note: o.note ?? "" });
     this.publish();

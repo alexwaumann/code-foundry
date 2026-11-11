@@ -140,8 +140,6 @@ export const SETUP_SCRIPTS: Readonly<Record<string, SetupScript>> = {
       st.kind === FETCH ? { ...st, status: WARNING, warning: "Could not reach origin", error: "fatal: unable to access origin", refAgo: 2 * 3_600_000 + 60_000 } : st,
     ),
   },
-  // Nothing to make: only Claude's start, which shows nothing and leaves no fold line.
-  "start-only": { phase: ThreadSetupPhase.DONE, started: 400, ended: 0, steps: [{ kind: START, status: DONE, started: 400, ended: 0 }], placed: true },
 };
 
 /** A script as Thread.setup, its times taken from `now`. */

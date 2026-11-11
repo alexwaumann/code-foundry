@@ -44,20 +44,12 @@ export interface ProjectWorld {
   removeProject(id: string): void;
 }
 
-/** Every Create, Publish and Delete ("create <name>", "publish <id> <owner>/<name> <visibility>", "delete <id>"). */
-export const projectCalls: string[] = [];
-
-export function resetProjects(): void {
-  projectCalls.length = 0;
-}
-
 export function listPublishOwners(): { owners: PublishOwnerInit[]; stale: boolean } {
   return { owners: publishOwners, stale: false };
 }
 
 /** ProjectService.Delete and project.delete. */
 export function deleteProject(world: ProjectWorld, projectId: string): void {
-  projectCalls.push(`delete ${projectId}`);
   const project = world.projectInfo(projectId);
   if (!project) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
   if (project.path.slice(0, project.path.lastIndexOf("/")) !== PROJECTS) {
@@ -68,7 +60,6 @@ export function deleteProject(world: ProjectWorld, projectId: string): void {
 
 /** ProjectService.Create and project.create. */
 export function createProject(world: ProjectWorld, name: string): { id: string; name: string; path: string } {
-  projectCalls.push(`create ${name}`);
   const why = projectNameError(name);
   if (why) throw new ConnectError(`invalid argument: ${why}`, Code.InvalidArgument);
   const path = `${PROJECTS}/${name}`;
@@ -98,7 +89,6 @@ export async function publishProject(world: ProjectWorld, projectId: string, own
   if (!project) throw new ConnectError(`project not found: "${projectId}"`, Code.NotFound);
   const ghName = name || project.name;
   const vis = visibilityNames[visibility.toLowerCase()];
-  projectCalls.push(`publish ${projectId} ${owner}/${ghName} ${visibility}`);
   if (!vis) throw new ConnectError(`invalid argument: visibility "${visibility}" (want public, internal or private)`, Code.InvalidArgument);
   if (!owner) throw new ConnectError("invalid argument: a GitHub owner is required", Code.InvalidArgument);
   if (!project.git) throw new ConnectError(`failed precondition: ${project.name} is not a git repository; initialize git first`, Code.FailedPrecondition);

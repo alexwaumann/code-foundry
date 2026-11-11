@@ -13,10 +13,7 @@
  * counter in the header, Pin, a form whose save needs a name (else the plugin refuses)
  * and toasts "saved", a build that appends six log lines 300 ms apart.
  *
- * Controls (mock/server.ts): POST /__mock/plugin/state?name=hello&state=crashed|running|failed
- * (the plugin goes down or comes back; its open surfaces follow), POST /__mock/plugin/toast?text=…
- * (a view/toast without an instance: a Notify intent), POST /__mock/plugin/invoke?command=…
- * (a host/invoke with confirm "ask": an InvokeCommand intent), POST /__mock/plugin/demotab?tab=…
+ * Controls (mock/server.ts): POST /__mock/plugin/demotab?tab=…
  * (the demo shows a tab, "stress" included: two threads and a terminal), POST
  * /__mock/plugin/terminals?count=N (the plugin owns terminals t-wall-0..), GET /__mock/plugin/acts.
  */
@@ -36,7 +33,6 @@ import {
   type SurfaceRef,
   type SurfaceUpdateSchema,
 } from "../src/gen/codefoundry/v1/plugin_pb";
-import { UiIntent_Notify_Level } from "../src/gen/codefoundry/v1/ui_pb";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { Hub } from "./hub";
@@ -951,7 +947,7 @@ export interface PluginDeps {
   registries: () => string;
 }
 
-/** The daemon's home for the plugin directories (PluginService.List; POST /__mock/plugin/dirs?home=…). */
+/** The daemon's home for the plugin directories (PluginService.List). */
 export const MOCK_HOME = "/Users/dev/.code-foundry";
 
 /** Secrets the plugins keep in the Keychain, names only (PluginService.ListSecrets). */
@@ -1184,7 +1180,7 @@ export class MockPlugins {
     }
   }
 
-  /** The plugin goes down or comes back (POST /__mock/plugin/state); open instances follow. */
+  /** The plugin goes down or comes back; open instances follow. */
   setState(name: string, state: "running" | "crashed" | "failed"): void {
     const p = this.plugin(name);
     p.state = state === "running" ? PluginState.RUNNING : state === "crashed" ? PluginState.CRASHED : PluginState.FAILED;
@@ -1207,16 +1203,6 @@ export class MockPlugins {
         inst.hub.publish(inst.state(p.state));
       }
     }
-  }
-
-  /** A plugin's view/toast without an instance: a Notify intent titled with its name. */
-  toast(name: string, text: string): number {
-    return this.deps.emit({ intent: { case: "notify", value: { level: UiIntent_Notify_Level.INFO, title: this.plugin(name).displayName, body: text } } });
-  }
-
-  /** A host/invoke with confirm "ask": the GUI runs the command through its confirm. */
-  invokeAsk(name: string, command: string, ctx: UiContext | undefined, args: Record<string, string>): number {
-    return this.deps.emit({ intent: { case: "invokeCommand", value: { name: command, args, ...(ctx ? { context: ctx } : {}), caller: `plugin:${name}` } } });
   }
 
   environment(): EnvironmentInit[] {

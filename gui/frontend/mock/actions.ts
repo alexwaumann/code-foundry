@@ -15,8 +15,7 @@
  *   a-build0000000  Build         build      make build        terminal, exits 0 after ~1.5 s
  *   a-install00000  Install deps  configure  pnpm install      terminal, on worktree create, exits 0 after ~1.2 s
  *   a-debug0000000  Debug daemon  debug      make dev          terminal, runs until stopped
- * pnpm dev listens on 5173 once Vite says so; /__mock/action/ports sets any run's ports, and a
- * run's end clears them, as the daemon's probe does (docs/notes/action-run-ports.md).
+ * pnpm dev listens on 5173 once Vite says so, and a run's end clears its ports, as the daemon's probe does (docs/notes/action-run-ports.md).
  * Any other command prints two lines and exits after ~1.2 s with the code in "exit N"
  * (else 0); one containing "sleep infinity" or the word "dev" runs until stopped.
  * Store refusals read like internal/store/action's: the sentinel first ("failed
@@ -451,31 +450,6 @@ export class MockActions {
     };
   }
 
-  /** GET /__mock/actions: plain JSON. */
-  json(): { actions: Record<string, unknown>[]; runs: Record<string, unknown>[] } {
-    return {
-      actions: this.sorted("").map((a) => ({ ...a, icon: iconName(a.icon), createdAt: a.createdAt.toISOString(), updatedAt: a.updatedAt.toISOString() })),
-      runs: this.runs.map((r) => ({
-        id: r.id,
-        actionId: r.actionId,
-        actionName: r.actionName,
-        command: r.command,
-        projectId: r.projectId,
-        threadId: r.threadId,
-        worktreePath: r.worktreePath,
-        mode: ActionRunMode[r.mode],
-        terminalId: r.terminalId,
-        state: ActionRunState[r.state],
-        exitCode: r.exitCode,
-        startedAt: r.startedAt.toISOString(),
-        finishedAt: r.finishedAt?.toISOString() ?? null,
-        trigger: ActionRunTrigger[r.trigger],
-        output: r.output,
-        ports: r.ports,
-      })),
-    };
-  }
-
   // ---- Actions ------------------------------------------------------------------
 
   private action(id: string): MockAction {
@@ -783,7 +757,7 @@ export class MockActions {
     for (const r of this.runs) if (r.mode === ActionRunMode.BACKGROUND && r.state === ActionRunState.RUNNING && match(r)) this.finish(r, 143);
   }
 
-  /** POST /__mock/action/finish: a running run (by run id or terminal id) exits now with code. */
+  /** A running run (by run id or terminal id) exits now with code. */
   finishNow(ref: { run?: string; terminal?: string }, code: number): RunInit {
     const r = this.runs.find((x) => (ref.run ? x.id === ref.run : x.terminalId === ref.terminal));
     if (!r) throw new CommandError("notfound", `no run ${ref.run ?? `in terminal ${ref.terminal ?? ""}`}`);
@@ -800,7 +774,7 @@ export class MockActions {
     return this.runMsg(r, true);
   }
 
-  /** POST /__mock/action/ports: a running run (by run id or terminal id) listens on ports now; [] closes them. */
+  /** A running run (by run id or terminal id) listens on ports now; [] closes them. */
   setPorts(ref: { run?: string; terminal?: string }, ports: number[]): RunInit {
     const r = this.runs.find((x) => (ref.run ? x.id === ref.run : x.terminalId === ref.terminal));
     if (!r) throw new CommandError("notfound", `no run ${ref.run ?? `in terminal ${ref.terminal ?? ""}`}`);

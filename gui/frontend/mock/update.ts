@@ -74,16 +74,6 @@ const MAX_AUTO_ATTEMPTS = 3;
  */
 type AutoMode = "none" | "new" | "all";
 
-export const updateStateNames: Record<string, UpdateState> = {
-  idle: UpdateState.IDLE,
-  available: UpdateState.AVAILABLE,
-  downloading: UpdateState.DOWNLOADING,
-  downloaded: UpdateState.DOWNLOADED,
-  installed: UpdateState.INSTALLED,
-  restartRequired: UpdateState.RESTART_REQUIRED,
-  failed: UpdateState.FAILED,
-};
-
 function plural(n: number, word: string): string {
   return `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 }

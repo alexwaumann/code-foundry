@@ -4,8 +4,7 @@
  * replaced and terminal-only built-ins already dropped), in Claude's order: the project's
  * skills (`deploy`, `review`, as mock/filesystem.ts scans them; Claude appends
  * " (project)"), the user's `commit`, built-ins and bundled skills, then a plugin's
- * skills. Seeded with the MCP status on running threads (mock/thread.ts load and seed);
- * POST /__mock/thread/commands replaces it and publishes the Watch's `commands` event.
+ * skills. Seeded with the MCP status on running threads (mock/thread.ts load and seed).
  *
  * Send refuses a message whose first word is a command the app replaces, with the
  * daemon's exact text (internal/store/thread/slashdeny.go).
@@ -41,14 +40,6 @@ export function slashCommandsFixture(): SlashCommandInit[] {
     { name: "pdf", description: "Use this skill whenever the user wants to do anything with PDF files.", aliases: ["anthropic-skills:pdf"] },
     { name: "anthropic-skills:deep-research", description: "Use this skill when the user's prompt requires researching a topic across multiple sources." },
   ];
-}
-
-/** POST /__mock/thread/commands?set=…: none (the process ended), more (a skill appeared), default. */
-export function slashCommandsFor(set: string): SlashCommandInit[] {
-  if (set === "none") return [];
-  const list = slashCommandsFixture();
-  if (set === "more") list.splice(2, 0, { name: "gamma", description: "A skill written while the thread ran. (project)" });
-  return list;
 }
 
 const REFUSALS: Readonly<Record<string, string>> = {

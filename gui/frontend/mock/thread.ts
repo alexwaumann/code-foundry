@@ -17,8 +17,6 @@
  *   POST /__mock/thread/api-error[?text=…]     the next message's turn ends with Claude Code's API-error text
  *   GET  /__mock/thread/calls                  thread.* invocations ("send <id> <text> [attachments]", ...)
  *   POST /__mock/thread/cache?id=s-r1&ago=<s>  the last result <s> seconds ago (mock/context.ts)
- *   POST /__mock/thread/commands?id=s-r1&set=none|more|default   replaces the slash commands
- *        (mock/slashCommands.ts) and publishes the Watch's `commands` event
  *
  * thread.send appends the user message, streams a short reply over ~1 s and ends the turn;
  * thread.interrupt ends a running turn as interrupted and withdraws pending requests.
@@ -46,14 +44,14 @@ import {
   type ThreadPendingRequestSchema,
   type ThemeItemSchema,
 } from "../src/gen/codefoundry/v1/thread_pb";
-import { END_REPORTS, scriptAgents, type AgentRunInit } from "./agents";
-import { scriptEmberChat, scriptEmberRestartCut, scriptEmberRestartWake, type EmberChatScript } from "./emberChat";
+import { scriptAgents, type AgentRunInit } from "./agents";
+import { scriptEmberChat } from "./emberChat";
 import { CommandError } from "./errors";
 import { Hub } from "./hub";
 import { mcpFixture, type McpStatusInit } from "./mcp";
 import { SETUP_PROMPT, type SetupMessage } from "./setup";
 import { refuseSlashCommand, slashCommandsFixture, type SlashCommandInit } from "./slashCommands";
-import { scriptServers, scriptShells, shellSummary, type ShellCall } from "./shells";
+import { scriptServers, shellSummary, type ShellCall } from "./shells";
 
 export { MOCK_ATTACHMENT };
 
@@ -149,15 +147,13 @@ export const MOCK_ATTACHMENT_PNG = Buffer.from(
 const COMPACT_MS = 600;
 
 /**
- * The scripted conversation's states. servers: the shells state with two dev servers
- * listening beside them (mock/shells.ts scriptServers). stopped: idle's conversation, the thread stopped at
- * its prompt cache expiry (no process; mock/world.ts backdates its last result so the
- * cache has expired); crashed: Claude did not start for a message (its item, the error
+ * The scripted conversation's states. servers: two background shells with two dev servers
+ * listening beside them (mock/shells.ts scriptServers); crashed: Claude did not start for a message (its item, the error
  * item and the daemon's process_ended turn end; mock/world.ts stops the thread with status
  * error "did not start").
  */
-export type ThreadState = "permission" | "question" | "streaming" | "idle" | "parallel" | "multi" | "subagent" | "agents" | "shells" | "waiting" | "servers" | "stopped" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
-export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "parallel", "multi", "subagent", "agents", "shells", "waiting", "servers", "stopped", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
+export type ThreadState = "permission" | "question" | "streaming" | "idle" | "multi" | "subagent" | "agents" | "waiting" | "servers" | "crashed" | "html" | "html-idle" | "html-scroll" | "long" | "html-repeat" | "theme" | "bridge" | "pagelib";
+export const THREAD_STATES: readonly ThreadState[] = ["permission", "question", "streaming", "idle", "multi", "subagent", "agents", "waiting", "servers", "crashed", "html", "html-idle", "html-scroll", "long", "html-repeat", "theme", "bridge", "pagelib"];
 
 /** The stderr line of the "crashed" state's claude (Thread.last_error). */
 export const CRASH_STDERR = "error: unknown option '--bogus'";
@@ -210,9 +206,6 @@ const MULTI = {
   ],
 };
 
-const POLLER_OLD = "\tif fp == prev {\n\t\treturn\n\t}";
-const POLLER_NEW = "\tif fp == prev && !force {\n\t\treturn\n\t}";
-
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -237,11 +230,6 @@ export class MockThreadLogs {
   private generation = 0;
   /** Threads whose /compact is running. */
   private readonly compacting = new Set<string>();
-  /**
-   * POST /__mock/thread/fail-respond: the next thread.respond fails (the prompt must come
-   * back); with ?withdrawn=1 Claude withdrew the request first (NotFound, like the daemon).
-   */
-  failRespond: "" | "error" | "withdrawn" = "";
   /**
    * POST /__mock/thread/fail-turn[?subtype=…]: the next message's turn ends in error before
    * Claude writes any text (a turn_end with is_error and that subtype, default
@@ -270,7 +258,6 @@ export class MockThreadLogs {
     this.wakes.clear();
     this.shells.clear();
     this.calls = [];
-    this.failRespond = "";
     this.failTurn = "";
     this.apiError = "";
     this.generation++;
@@ -374,9 +361,8 @@ export class MockThreadLogs {
   }
 
   /**
-   * POST /__mock/thread/shell-end: the oldest running shell (or taskId's) ends like the
-   * daemon ends it: its call finishes with Claude's summary (an error when failed), the
-   * count is published.
+   * The oldest running shell (or taskId's) ends like the daemon ends it: its call finishes
+   * with Claude's summary (an error when failed), the count is published.
    */
   endShell(id: string, failed: boolean, taskId?: string): void {
     this.world.worktreeOf(id);
@@ -407,74 +393,6 @@ export class MockThreadLogs {
     this.world.agentsChanged(id);
   }
 
-  /**
-   * POST /__mock/thread/agent-end: a running run ends like the daemon ends it. Its Agent
-   * call's item finishes with the report (or fails with the error), a background run's
-   * end adds the "Agent finished · …" note, then the list and the counts are published.
-   */
-  endAgent(id: string, runId: string, failed: boolean): void {
-    const runs = this.agentsOf(id);
-    const run = runs.find((r) => r.id === runId);
-    if (!run) throw new CommandError("notfound", `thread ${id} has no agent run ${runId}`);
-    if (run.status !== ThreadAgentStatus.RUNNING) throw new CommandError("invalid", `agent run ${runId} is not running`);
-    const now = new Date();
-    const report = END_REPORTS[runId] ?? "Done.";
-    const error = "Stopped: the agent was killed";
-    const started = run.resumedAt ?? run.startedAt;
-    const ended: AgentRunInit = {
-      ...run,
-      status: failed ? ThreadAgentStatus.FAILED : ThreadAgentStatus.DONE,
-      summary: failed ? "" : report,
-      error: failed ? error : "",
-      endedAt: timestampFromDate(now),
-      durationMs: started ? BigInt(now.getTime() - Number(started.seconds ?? 0n) * 1000) : (run.durationMs ?? 0n),
-    };
-    const call = this.log(id).items.find((x) => x.id === run.toolUseId);
-    if (call?.payload?.case === "toolCall") {
-      const out = failed ? error : report;
-      this.update(id, {
-        ...call,
-        updatedAt: timestampFromDate(now),
-        payload: { case: "toolCall", value: { ...call.payload.value, status: failed ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: failed, output: out, resultJson: "" } },
-      } as ItemInit);
-    }
-    // The run's own work stops with it: a running tool ends (done, or interrupted when it
-    // failed), a text still streaming is complete.
-    for (const x of this.log(id).items) {
-      if (x.parentToolUseId !== run.toolUseId) continue;
-      if (x.payload?.case === "toolCall" && x.payload.value.status === ToolCallStatus.RUNNING) {
-        this.update(id, {
-          ...x,
-          updatedAt: timestampFromDate(now),
-          payload: { case: "toolCall", value: { ...x.payload.value, status: failed ? ToolCallStatus.ERROR : ToolCallStatus.DONE, isError: failed, output: failed ? "Interrupted" : "ok" } },
-        } as ItemInit);
-      } else if (x.streaming) {
-        this.update(id, { ...x, streaming: false, updatedAt: timestampFromDate(now) });
-      }
-    }
-    // A done run hands its report back with a SubagentHandback call, as Claude Code's
-    // subagents do (the daemon makes its message the run's summary).
-    if (!failed) {
-      const hb = `${run.toolUseId ?? ""}-handback`;
-      this.append(
-        id,
-        this.item(
-          id,
-          { case: "toolCall", value: { toolUseId: hb, name: "SubagentHandback", inputJson: JSON.stringify({ message: report }), status: ToolCallStatus.DONE, output: "Report delivered." } },
-          { id: hb, parentToolUseId: run.toolUseId ?? "" },
-        ),
-      );
-    }
-    if (run.background) {
-      const note = this.append(id, this.item(id, { case: "note", value: { text: failed ? `Agent failed · ${run.description ?? ""} · ${error}` : `Agent finished · ${run.description ?? ""} · ${report}` } }));
-      ended.noteItemId = note.id ?? "";
-    }
-    this.setAgents(
-      id,
-      runs.map((r) => (r.id === runId ? ended : r)),
-    );
-  }
-
   /** ThreadService.SlashCommands: the running thread's list ([] when none). Throws for an unknown thread. */
   slashCommandsOf(id: string): SlashCommandInit[] {
     this.world.worktreeOf(id);
@@ -484,16 +402,6 @@ export class MockThreadLogs {
   /** Whether the thread offers a slash command called name (the daemon's offersSlashCommand). */
   offersSlashCommand(id: string, name: string): boolean {
     return (this.slash.get(id) ?? []).some((c) => c.name === name);
-  }
-
-  /** Replaces the thread's slash commands and publishes the Watch's `commands` event (the whole list; [] the process ended). */
-  setSlashCommands(id: string, commands: SlashCommandInit[]): void {
-    this.world.worktreeOf(id);
-    if (commands.length > 0) this.slash.set(id, commands);
-    else this.slash.delete(id);
-    const l = this.log(id);
-    l.seq++;
-    this.publish(id, { event: { case: "commands", value: { threadId: id, seq: BigInt(l.seq), commands } } });
   }
 
   /** The thread's MCP status (mock/mcp.ts); undefined when it has none. Throws for an unknown thread. */
@@ -653,16 +561,6 @@ export class MockThreadLogs {
     }
   }
 
-  /** Claude withdraws a pending request (control_cancel_request): the item says so, the prompt leaves. */
-  private withdraw(id: string, requestId: string): void {
-    const l = this.log(id);
-    const p = l.pending.find((x) => x.requestId === requestId);
-    const req = p && l.items.find((x) => x.id === p.itemId);
-    if (!p || (req?.payload?.case !== "permission" && req?.payload?.case !== "question")) return;
-    this.update(id, { ...req, payload: { case: req.payload.case, value: { ...req.payload.value, state: ThreadRequestState.CANCELLED, message: "withdrawn by Claude" } } } as ItemInit);
-    this.setPending(id, l.pending.filter((x) => x !== p));
-  }
-
   /** The restart with the new effort is done: the timeline says so, the flag clears. */
   private applyEffort(id: string, effort: string): void {
     this.append(id, this.item(id, { case: "commandOutput", value: { text: `Set effort to ${effort}` } }));
@@ -819,7 +717,7 @@ export class MockThreadLogs {
   }
 
   /** (Re)builds the scripted conversation in `state` (the sketch's three states, or idle: both turns done). */
-  load(id: string, loaded: ThreadState): void {
+  load(id: string, state: ThreadState): void {
     // A scripted reply still running for the previous conversation stops.
     this.generation++;
     this.logs.delete(id);
@@ -828,7 +726,7 @@ export class MockThreadLogs {
     this.shells.delete(id);
     // Checked at the start of its last turn (the status outlives the process); a thread
     // whose Claude never started has none.
-    if (loaded === "crashed") {
+    if (state === "crashed") {
       this.mcp.delete(id);
       this.slash.delete(id);
     } else {
@@ -842,7 +740,7 @@ export class MockThreadLogs {
       l.items.push(x);
       return x;
     };
-    if (loaded === "crashed") {
+    if (state === "crashed") {
       // Like the daemon's Send to a stopped thread whose claude exited before the initialize
       // handshake: the message's item, the error item, and the turn end the daemon writes
       // for a turn that never ran (turnclose.go closeOpenTurn).
@@ -852,7 +750,6 @@ export class MockThreadLogs {
       l.seq = l.items.length;
       return;
     }
-    const state = loaded === "stopped" ? "idle" : loaded;
     const tool = (name: string, input: object, value: { output?: string; isError?: boolean; resultJson?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
       const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
       // A tool call's item id is its tool_use id, like the daemon's.
@@ -882,10 +779,10 @@ export class MockThreadLogs {
       this.world.agentsChanged(id);
       return;
     }
-    if (state === "shells" || state === "servers") {
+    if (state === "servers") {
       // Background shells only (mock/shells.ts): idle at its prompt, two shells running
-      // (and two servers listening).
-      this.shells.set(id, state === "servers" ? scriptServers({ cwd, it, tool }) : scriptShells({ cwd, it, tool }));
+      // and two servers listening.
+      this.shells.set(id, scriptServers({ cwd, it, tool }));
       l.seq = l.items.length;
       this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
       this.world.agentsChanged(id);
@@ -1140,55 +1037,6 @@ export class MockThreadLogs {
       this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
       return;
     }
-    if (state === "parallel") {
-      // Two requests at once (a subagent and the main thread can ask in parallel): an Edit
-      // first, then the push.
-      text("All 412 tests pass. Tightening the poller's early return, then pushing.", { at: ago(3) });
-      const edit = tool("Edit", { file_path: p("internal/store/pr/poller.go"), old_string: POLLER_OLD, new_string: POLLER_NEW }, { status: ToolCallStatus.RUNNING }, { at: ago(2, 59) });
-      const editCall = edit.payload?.case === "toolCall" ? edit.payload.value : undefined;
-      const editPerm = it(
-        {
-          case: "permission",
-          value: {
-            requestId: "req-edit",
-            toolName: "Edit",
-            displayName: "Edit",
-            toolUseId: editCall?.toolUseId ?? "",
-            inputJson: editCall?.inputJson ?? "",
-            description: "poller.go",
-            suggestionsJson: JSON.stringify([{ type: "setMode", mode: "acceptEdits", destination: "session" }]),
-            state: ThreadRequestState.PENDING,
-          },
-        },
-        { at: ago(2, 58) },
-      );
-      const push = tool("Bash", { command: PUSH, description: "Force-push the rebased branch so PR #63 picks up the fix." }, { status: ToolCallStatus.RUNNING }, { at: ago(2, 57) });
-      const pushCall = push.payload?.case === "toolCall" ? push.payload.value : undefined;
-      const pushPerm = it(
-        {
-          case: "permission",
-          value: {
-            requestId: "req-push",
-            toolName: "Bash",
-            displayName: "Bash",
-            toolUseId: pushCall?.toolUseId ?? "",
-            inputJson: pushCall?.inputJson ?? "",
-            description: "Force-push the rebased branch so PR #63 picks up the fix.",
-            suggestionsJson: JSON.stringify([{ type: "addRules", rules: [{ toolName: "Bash", ruleContent: "git push:*" }], behavior: "allow", destination: "session" }]),
-            state: ThreadRequestState.PENDING,
-          },
-        },
-        { at: ago(2, 56) },
-      );
-      l.pending = [
-        { requestId: "req-edit", itemId: editPerm.id, question: false, toolName: "Edit", summary: "Edit poller.go" },
-        { requestId: "req-push", itemId: pushPerm.id, question: false, toolName: "Bash", summary: `Bash ${PUSH}` },
-      ];
-      l.seq = l.items.length;
-      this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, "permission: Edit poller.go");
-      this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
-      return;
-    }
     if (state === "subagent") {
       // A subagent's Write waits for permission: the request carries its agent_id, its
       // tool call sits under the Agent call (parent_tool_use_id).
@@ -1332,27 +1180,6 @@ export class MockThreadLogs {
     };
     scriptEmberChat({ it, tool });
     l.seq = l.items.length;
-  }
-
-  /** The Ember chat's script as live appends (each item reaches the thread's watchers). */
-  private emberScript(id: string): EmberChatScript {
-    const l = this.log(id);
-    const it = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => this.append(id, this.item(id, payload, over));
-    const tool = (name: string, input: object, value: { output?: string; status?: ToolCallStatus }, over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
-      const toolUseId = `toolu_${name.toLowerCase()}_${String(l.nextOrdinal)}`;
-      return it({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.DONE, ...value } }, { id: toolUseId, ...over });
-    };
-    return { it, tool };
-  }
-
-  /** POST /__mock/ember/restart?step=cut: the app's restart cuts Ember's turn (mock/emberChat.ts). */
-  emberRestartCut(id: string): void {
-    scriptEmberRestartCut(this.emberScript(id));
-  }
-
-  /** POST /__mock/ember/restart?step=wake: the restart notice wakes Ember and it replies. */
-  emberRestartWake(id: string): void {
-    scriptEmberRestartWake(this.emberScript(id));
   }
 
   /**
@@ -1593,13 +1420,6 @@ export class MockThreadLogs {
           const decision = (a.decision || "allow") as "allow" | "allow-session" | "deny";
           const sid = a.id ?? "";
           this.calls.push(`respond ${sid} ${decision}${a.request ? ` ${a.request}` : ""}${a.answer ? ` answer=${a.answer}` : ""}${a.message ? ` message=${a.message}` : ""}`);
-          const fail = this.failRespond;
-          this.failRespond = "";
-          if (fail === "error") throw new Error("the thread's process has ended");
-          if (fail === "withdrawn") {
-            this.withdraw(sid, a.request ?? "");
-            throw new CommandError("notfound", `Claude withdrew request ${a.request ?? ""}`);
-          }
           let answers: Record<string, string> = {};
           const answer = (a.answer ?? "").trim();
           if (answer.startsWith("{")) answers = JSON.parse(answer) as Record<string, string>;
