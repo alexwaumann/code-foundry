@@ -40,6 +40,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
+	"github.com/alexwaumann/code-foundry/internal/pluginscaffold"
 	"github.com/alexwaumann/code-foundry/internal/presence"
 	"github.com/alexwaumann/code-foundry/internal/preview"
 	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
@@ -319,6 +320,10 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 			return f.Scheme, ok
 		},
 		ShippedSkills: shippedSkills(log, p.Claude()),
+		// plugin new pins the SDK as the plugin skill does (skills.go).
+		PluginScaffolder: pluginscaffold.Scaffolder{
+			Home: st.home, Pin: skills.SDKPin(opts.Version.Commit, opts.Version.PluginSDKTag), Go: pluginscaffold.ShellGo,
+		},
 		Restart: func() {
 			// Let the command's response reach the caller first.
 			time.AfterFunc(restartDelay, func() { restart(errRestartRequested) })

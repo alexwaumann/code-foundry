@@ -18,7 +18,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"dictation.hold", "dictation.start", "dictation.status", "dictation.stop",
 		"ember.status", "ember.board", "ember.remember", "ember.reseed", "ember.enable", "ember.disable", "ember.task.add", "ember.task.update", "ember.task.done", "ember.task.start", "ember.task.cancel", "ember.task.list", "ember.task.show",
 		"file.export", "memory.show", "memory.add", "memory.remove", "memory.clear",
-		"plugin.act", "plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads", "plugin.wakes",
+		"plugin.act", "plugin.browse", "plugin.env", "plugin.list", "plugin.logs", "plugin.new", "plugin.reload", "plugin.secrets.list", "plugin.surface", "plugin.terminals", "plugin.threads", "plugin.wakes",
 		"pr.checks", "project.list",
 		"search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.report", "search.seen", "search.stop",
 		"settings.get", "settings.path", "settings.reset", "settings.set",

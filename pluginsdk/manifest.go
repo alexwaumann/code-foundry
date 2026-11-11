@@ -160,7 +160,7 @@ var EventSources = []string{"project", "workspace", "threads", "thread", "gh", "
 // ReservedNames are plugin names the host's own plugin.* verbs use.
 var ReservedNames = []string{
 	"list", "show", "install", "uninstall", "enable", "disable", "restart", "logs", "dev",
-	"reload", "surface", "act", "secrets", "update", "env", "threads", "terminals", "browse", "wakes",
+	"reload", "surface", "act", "secrets", "update", "env", "threads", "terminals", "browse", "wakes", "new",
 }
 
 // ReservedArgNames are CLI flags every command has; args may not use them.

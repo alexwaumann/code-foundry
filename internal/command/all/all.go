@@ -75,6 +75,8 @@ type Deps struct {
 	// PluginRegistry backs plugin.browse, plugin.install, plugin.update and
 	// plugin.uninstall. Nil works like Terminal.
 	PluginRegistry command.PluginRegistryBackend
+	// PluginScaffolder backs plugin.new. Nil makes it fail with Unimplemented.
+	PluginScaffolder command.PluginScaffolder
 	// PullRequestChecks backs pr.checks (a nil Gh works like Terminal).
 	PullRequestChecks command.PullRequestChecksDeps
 	// Skills backs skill.* (skill.setup also uses Terminal, Project and Thread). Nil
@@ -212,6 +214,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterPluginSurface(r, d.PluginSurface),
 		command.RegisterPluginOwned(r, command.PluginOwnedDeps{Thread: d.Thread, Project: d.Project, Terminal: d.Terminal}),
 		command.RegisterPluginRegistry(r, d.PluginRegistry, d.Thread),
+		command.RegisterPluginNew(r, d.PluginScaffolder),
 		command.RegisterPullRequestChecks(r, d.PullRequestChecks),
 		command.RegisterSkill(r, command.SkillDeps{Skills: d.Skills, Terminal: d.Terminal, Project: d.Project, Thread: d.Thread}),
 		command.RegisterEmber(r, command.EmberDeps{Ember: d.Ember, Settings: d.Settings, Thread: d.Thread}),
