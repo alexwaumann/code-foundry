@@ -3,6 +3,7 @@ syntax = "proto3";
 package codefoundry.v1;
 
 import "codefoundry/v1/command.proto";
+import "codefoundry/v1/plugin.proto";
 
 // UiService lets the daemon (and the CLI through it) steer a running GUI.
 service UiService {
@@ -28,6 +29,15 @@ service UiService {
   // report per theme id wins. The GUI sends every report it holds on connect, then each
   // new one, debounced. InvalidArgument for a bad id, version, slot name or value.
   rpc PublishThemeReport(PublishThemeReportRequest) returns (PublishThemeReportResponse) {}
+  // WatchShots is held open by the app's host, the one capturer of screenshots
+  // (PluginService.ShotSurface; docs/notes/plugin-surface-shot-daemon.md): it sends each
+  // request to draw and snapshot, and the host answers with PublishShot. One capturer at a
+  // time: a new stream replaces the one before it, whose open requests fail.
+  rpc WatchShots(WatchShotsRequest) returns (stream ShotRequest) {}
+  // PublishShot answers a ShotRequest by its id with a PNG or an error. NotFound for an id
+  // no one waits on any more (timed out or never asked), ResourceExhausted for a PNG over
+  // 32 MiB, InvalidArgument for bytes that are not a PNG or an answer with neither.
+  rpc PublishShot(PublishShotRequest) returns (PublishShotResponse) {}
 }
 
 // ThemeContrastIssue is one pair of resolved slots that falls short (the GUI's
@@ -69,6 +79,33 @@ message PublishThemeReportRequest {
 }
 
 message PublishThemeReportResponse {}
+
+message WatchShotsRequest {}
+
+// ShotRequest asks the app's host to draw a plugin surface in a hidden window of the
+// viewport's size and snapshot it (ShotSurfaceRequest, with an id).
+message ShotRequest {
+  string id = 1;
+  SurfaceRef ref = 2;
+  string instance = 3;
+  uint64 min_version = 4;
+  // CSS pixels, within ShotSurfaceRequest's bounds.
+  int32 width = 5;
+  int32 height = 6;
+}
+
+message PublishShotRequest {
+  // The ShotRequest's id.
+  string id = 1;
+  // The PNG; or error.
+  bytes png = 2;
+  // Why there is no PNG, in words ("the surface sent no view").
+  string error = 3;
+  // How tall the view's content is in CSS pixels.
+  int32 content_height = 4;
+}
+
+message PublishShotResponse {}
 
 message PublishThemeRequest {
   // The theme's id ("github-dark"): lowercase letters, digits and dashes.

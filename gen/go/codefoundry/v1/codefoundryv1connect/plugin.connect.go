@@ -66,6 +66,9 @@ const (
 	PluginServiceGetSurfaceProcedure = "/codefoundry.v1.PluginService/GetSurface"
 	// PluginServiceActProcedure is the fully-qualified name of the PluginService's Act RPC.
 	PluginServiceActProcedure = "/codefoundry.v1.PluginService/Act"
+	// PluginServiceShotSurfaceProcedure is the fully-qualified name of the PluginService's ShotSurface
+	// RPC.
+	PluginServiceShotSurfaceProcedure = "/codefoundry.v1.PluginService/ShotSurface"
 	// PluginServiceEnvironmentProcedure is the fully-qualified name of the PluginService's Environment
 	// RPC.
 	PluginServiceEnvironmentProcedure = "/codefoundry.v1.PluginService/Environment"
@@ -128,6 +131,13 @@ type PluginServiceClient interface {
 	// answered; its error is the plugin's message (the GUI toasts it). Command, open-url
 	// and copy actions are the host's and never reach Act.
 	Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error)
+	// ShotSurface is a PNG of a surface instance as the app draws it (plugin surface --shot;
+	// docs/notes/plugin-surface-shot-daemon.md). The daemon hands the request to the app's
+	// host, which holds UiService.WatchShots, and waits up to 15 s for its PublishShot; it
+	// never writes a file and never starts the app. FailedPrecondition when no app is open
+	// or the app could not draw it, DeadlineExceeded when it did not answer in time,
+	// Unavailable when it closed first, InvalidArgument for a size out of bounds.
+	ShotSurface(context.Context, *connect.Request[v1.ShotSurfaceRequest]) (*connect.Response[v1.ShotSurfaceResponse], error)
 	// Environment returns what plugins contribute to new Claude threads
 	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
 	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
@@ -250,6 +260,12 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(pluginServiceMethods.ByName("Act")),
 			connect.WithClientOptions(opts...),
 		),
+		shotSurface: connect.NewClient[v1.ShotSurfaceRequest, v1.ShotSurfaceResponse](
+			httpClient,
+			baseURL+PluginServiceShotSurfaceProcedure,
+			connect.WithSchema(pluginServiceMethods.ByName("ShotSurface")),
+			connect.WithClientOptions(opts...),
+		),
 		environment: connect.NewClient[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse](
 			httpClient,
 			baseURL+PluginServiceEnvironmentProcedure,
@@ -305,6 +321,7 @@ type pluginServiceClient struct {
 	watchSurface      *connect.Client[v1.WatchSurfaceRequest, v1.SurfaceUpdate]
 	getSurface        *connect.Client[v1.GetSurfaceRequest, v1.GetSurfaceResponse]
 	act               *connect.Client[v1.SurfaceActRequest, v1.SurfaceActResponse]
+	shotSurface       *connect.Client[v1.ShotSurfaceRequest, v1.ShotSurfaceResponse]
 	environment       *connect.Client[v1.PluginEnvironmentRequest, v1.PluginEnvironmentResponse]
 	browse            *connect.Client[v1.BrowsePluginsRequest, v1.BrowsePluginsResponse]
 	refreshRegistries *connect.Client[v1.RefreshPluginRegistriesRequest, v1.RefreshPluginRegistriesResponse]
@@ -383,6 +400,11 @@ func (c *pluginServiceClient) Act(ctx context.Context, req *connect.Request[v1.S
 	return c.act.CallUnary(ctx, req)
 }
 
+// ShotSurface calls codefoundry.v1.PluginService.ShotSurface.
+func (c *pluginServiceClient) ShotSurface(ctx context.Context, req *connect.Request[v1.ShotSurfaceRequest]) (*connect.Response[v1.ShotSurfaceResponse], error) {
+	return c.shotSurface.CallUnary(ctx, req)
+}
+
 // Environment calls codefoundry.v1.PluginService.Environment.
 func (c *pluginServiceClient) Environment(ctx context.Context, req *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {
 	return c.environment.CallUnary(ctx, req)
@@ -459,6 +481,13 @@ type PluginServiceHandler interface {
 	// answered; its error is the plugin's message (the GUI toasts it). Command, open-url
 	// and copy actions are the host's and never reach Act.
 	Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error)
+	// ShotSurface is a PNG of a surface instance as the app draws it (plugin surface --shot;
+	// docs/notes/plugin-surface-shot-daemon.md). The daemon hands the request to the app's
+	// host, which holds UiService.WatchShots, and waits up to 15 s for its PublishShot; it
+	// never writes a file and never starts the app. FailedPrecondition when no app is open
+	// or the app could not draw it, DeadlineExceeded when it did not answer in time,
+	// Unavailable when it closed first, InvalidArgument for a size out of bounds.
+	ShotSurface(context.Context, *connect.Request[v1.ShotSurfaceRequest]) (*connect.Response[v1.ShotSurfaceResponse], error)
 	// Environment returns what plugins contribute to new Claude threads
 	// (session/setEnvironment): one plugin's, or every one with a contribution when name is
 	// empty, as applied (validated, conflicts resolved in name order) with the issues found.
@@ -577,6 +606,12 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(pluginServiceMethods.ByName("Act")),
 		connect.WithHandlerOptions(opts...),
 	)
+	pluginServiceShotSurfaceHandler := connect.NewUnaryHandler(
+		PluginServiceShotSurfaceProcedure,
+		svc.ShotSurface,
+		connect.WithSchema(pluginServiceMethods.ByName("ShotSurface")),
+		connect.WithHandlerOptions(opts...),
+	)
 	pluginServiceEnvironmentHandler := connect.NewUnaryHandler(
 		PluginServiceEnvironmentProcedure,
 		svc.Environment,
@@ -643,6 +678,8 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 			pluginServiceGetSurfaceHandler.ServeHTTP(w, r)
 		case PluginServiceActProcedure:
 			pluginServiceActHandler.ServeHTTP(w, r)
+		case PluginServiceShotSurfaceProcedure:
+			pluginServiceShotSurfaceHandler.ServeHTTP(w, r)
 		case PluginServiceEnvironmentProcedure:
 			pluginServiceEnvironmentHandler.ServeHTTP(w, r)
 		case PluginServiceBrowseProcedure:
@@ -718,6 +755,10 @@ func (UnimplementedPluginServiceHandler) GetSurface(context.Context, *connect.Re
 
 func (UnimplementedPluginServiceHandler) Act(context.Context, *connect.Request[v1.SurfaceActRequest]) (*connect.Response[v1.SurfaceActResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Act is not implemented"))
+}
+
+func (UnimplementedPluginServiceHandler) ShotSurface(context.Context, *connect.Request[v1.ShotSurfaceRequest]) (*connect.Response[v1.ShotSurfaceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.ShotSurface is not implemented"))
 }
 
 func (UnimplementedPluginServiceHandler) Environment(context.Context, *connect.Request[v1.PluginEnvironmentRequest]) (*connect.Response[v1.PluginEnvironmentResponse], error) {

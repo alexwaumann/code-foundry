@@ -3375,6 +3375,157 @@ func (x *SurfaceActResponse) GetVersion() uint64 {
 	return 0
 }
 
+type ShotSurfaceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The surface, with the context the panel would show it in.
+	Ref *SurfaceRef `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	// The instance GetSurface opened (GetSurfaceResponse.state.instance).
+	Instance string `protobuf:"bytes,2,opt,name=instance,proto3" json:"instance,omitempty"`
+	// Draw a view of at least this version (the one plugin surface printed).
+	MinVersion uint64 `protobuf:"varint,3,opt,name=min_version,json=minVersion,proto3" json:"min_version,omitempty"`
+	// The viewport in CSS pixels (0: 420 by 900; 280 to 1600 wide, 200 to 4000 tall).
+	Width         int32 `protobuf:"varint,4,opt,name=width,proto3" json:"width,omitempty"`
+	Height        int32 `protobuf:"varint,5,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShotSurfaceRequest) Reset() {
+	*x = ShotSurfaceRequest{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShotSurfaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShotSurfaceRequest) ProtoMessage() {}
+
+func (x *ShotSurfaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShotSurfaceRequest.ProtoReflect.Descriptor instead.
+func (*ShotSurfaceRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ShotSurfaceRequest) GetRef() *SurfaceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *ShotSurfaceRequest) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *ShotSurfaceRequest) GetMinVersion() uint64 {
+	if x != nil {
+		return x.MinVersion
+	}
+	return 0
+}
+
+func (x *ShotSurfaceRequest) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *ShotSurfaceRequest) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+type ShotSurfaceResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A PNG of the viewport (the app's device pixels: twice the CSS size on a Retina screen).
+	Png []byte `protobuf:"bytes,1,opt,name=png,proto3" json:"png,omitempty"`
+	// The viewport as drawn, in CSS pixels.
+	Width  int32 `protobuf:"varint,2,opt,name=width,proto3" json:"width,omitempty"`
+	Height int32 `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
+	// How tall the view's content is in CSS pixels; above height, the shot cut it off.
+	ContentHeight int32 `protobuf:"varint,4,opt,name=content_height,json=contentHeight,proto3" json:"content_height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShotSurfaceResponse) Reset() {
+	*x = ShotSurfaceResponse{}
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShotSurfaceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShotSurfaceResponse) ProtoMessage() {}
+
+func (x *ShotSurfaceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShotSurfaceResponse.ProtoReflect.Descriptor instead.
+func (*ShotSurfaceResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ShotSurfaceResponse) GetPng() []byte {
+	if x != nil {
+		return x.Png
+	}
+	return nil
+}
+
+func (x *ShotSurfaceResponse) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *ShotSurfaceResponse) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *ShotSurfaceResponse) GetContentHeight() int32 {
+	if x != nil {
+		return x.ContentHeight
+	}
+	return 0
+}
+
 type PluginEnvironmentRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A plugin's name; empty for every plugin with a contribution.
@@ -3385,7 +3536,7 @@ type PluginEnvironmentRequest struct {
 
 func (x *PluginEnvironmentRequest) Reset() {
 	*x = PluginEnvironmentRequest{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[43]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3397,7 +3548,7 @@ func (x *PluginEnvironmentRequest) String() string {
 func (*PluginEnvironmentRequest) ProtoMessage() {}
 
 func (x *PluginEnvironmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[43]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3410,7 +3561,7 @@ func (x *PluginEnvironmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginEnvironmentRequest.ProtoReflect.Descriptor instead.
 func (*PluginEnvironmentRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{43}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *PluginEnvironmentRequest) GetName() string {
@@ -3433,7 +3584,7 @@ type PluginEnvVar struct {
 
 func (x *PluginEnvVar) Reset() {
 	*x = PluginEnvVar{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[44]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3445,7 +3596,7 @@ func (x *PluginEnvVar) String() string {
 func (*PluginEnvVar) ProtoMessage() {}
 
 func (x *PluginEnvVar) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[44]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3458,7 +3609,7 @@ func (x *PluginEnvVar) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginEnvVar.ProtoReflect.Descriptor instead.
 func (*PluginEnvVar) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{44}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *PluginEnvVar) GetKey() string {
@@ -3499,7 +3650,7 @@ type PluginEnvironment struct {
 
 func (x *PluginEnvironment) Reset() {
 	*x = PluginEnvironment{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[45]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3511,7 +3662,7 @@ func (x *PluginEnvironment) String() string {
 func (*PluginEnvironment) ProtoMessage() {}
 
 func (x *PluginEnvironment) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[45]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3524,7 +3675,7 @@ func (x *PluginEnvironment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginEnvironment.ProtoReflect.Descriptor instead.
 func (*PluginEnvironment) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{45}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *PluginEnvironment) GetPlugin() string {
@@ -3593,7 +3744,7 @@ type PluginEnvironmentResponse struct {
 
 func (x *PluginEnvironmentResponse) Reset() {
 	*x = PluginEnvironmentResponse{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[46]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3605,7 +3756,7 @@ func (x *PluginEnvironmentResponse) String() string {
 func (*PluginEnvironmentResponse) ProtoMessage() {}
 
 func (x *PluginEnvironmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[46]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3618,7 +3769,7 @@ func (x *PluginEnvironmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginEnvironmentResponse.ProtoReflect.Descriptor instead.
 func (*PluginEnvironmentResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{46}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *PluginEnvironmentResponse) GetEnvironments() []*PluginEnvironment {
@@ -3645,7 +3796,7 @@ type PluginInstall struct {
 
 func (x *PluginInstall) Reset() {
 	*x = PluginInstall{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[47]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3657,7 +3808,7 @@ func (x *PluginInstall) String() string {
 func (*PluginInstall) ProtoMessage() {}
 
 func (x *PluginInstall) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[47]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3670,7 +3821,7 @@ func (x *PluginInstall) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginInstall.ProtoReflect.Descriptor instead.
 func (*PluginInstall) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{47}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *PluginInstall) GetKind() string {
@@ -3727,7 +3878,7 @@ type PluginInstallProgress struct {
 
 func (x *PluginInstallProgress) Reset() {
 	*x = PluginInstallProgress{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[48]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3739,7 +3890,7 @@ func (x *PluginInstallProgress) String() string {
 func (*PluginInstallProgress) ProtoMessage() {}
 
 func (x *PluginInstallProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[48]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3752,7 +3903,7 @@ func (x *PluginInstallProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginInstallProgress.ProtoReflect.Descriptor instead.
 func (*PluginInstallProgress) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{48}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *PluginInstallProgress) GetRef() string {
@@ -3817,7 +3968,7 @@ type PluginRegistry struct {
 
 func (x *PluginRegistry) Reset() {
 	*x = PluginRegistry{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[49]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3829,7 +3980,7 @@ func (x *PluginRegistry) String() string {
 func (*PluginRegistry) ProtoMessage() {}
 
 func (x *PluginRegistry) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[49]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3842,7 +3993,7 @@ func (x *PluginRegistry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginRegistry.ProtoReflect.Descriptor instead.
 func (*PluginRegistry) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{49}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *PluginRegistry) GetUrl() string {
@@ -3900,7 +4051,7 @@ type PluginIndexArtifact struct {
 
 func (x *PluginIndexArtifact) Reset() {
 	*x = PluginIndexArtifact{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[50]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3912,7 +4063,7 @@ func (x *PluginIndexArtifact) String() string {
 func (*PluginIndexArtifact) ProtoMessage() {}
 
 func (x *PluginIndexArtifact) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[50]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3925,7 +4076,7 @@ func (x *PluginIndexArtifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginIndexArtifact.ProtoReflect.Descriptor instead.
 func (*PluginIndexArtifact) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{50}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *PluginIndexArtifact) GetPlatform() string {
@@ -3982,7 +4133,7 @@ type PluginIndexEntry struct {
 
 func (x *PluginIndexEntry) Reset() {
 	*x = PluginIndexEntry{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[51]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3994,7 +4145,7 @@ func (x *PluginIndexEntry) String() string {
 func (*PluginIndexEntry) ProtoMessage() {}
 
 func (x *PluginIndexEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[51]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4007,7 +4158,7 @@ func (x *PluginIndexEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginIndexEntry.ProtoReflect.Descriptor instead.
 func (*PluginIndexEntry) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{51}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *PluginIndexEntry) GetName() string {
@@ -4125,7 +4276,7 @@ type BrowsePluginsRequest struct {
 
 func (x *BrowsePluginsRequest) Reset() {
 	*x = BrowsePluginsRequest{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[52]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4137,7 +4288,7 @@ func (x *BrowsePluginsRequest) String() string {
 func (*BrowsePluginsRequest) ProtoMessage() {}
 
 func (x *BrowsePluginsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[52]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4150,7 +4301,7 @@ func (x *BrowsePluginsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowsePluginsRequest.ProtoReflect.Descriptor instead.
 func (*BrowsePluginsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{52}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *BrowsePluginsRequest) GetRefresh() bool {
@@ -4174,7 +4325,7 @@ type BrowsePluginsResponse struct {
 
 func (x *BrowsePluginsResponse) Reset() {
 	*x = BrowsePluginsResponse{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[53]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4186,7 +4337,7 @@ func (x *BrowsePluginsResponse) String() string {
 func (*BrowsePluginsResponse) ProtoMessage() {}
 
 func (x *BrowsePluginsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[53]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4199,7 +4350,7 @@ func (x *BrowsePluginsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowsePluginsResponse.ProtoReflect.Descriptor instead.
 func (*BrowsePluginsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{53}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *BrowsePluginsResponse) GetEntries() []*PluginIndexEntry {
@@ -4231,7 +4382,7 @@ type RefreshPluginRegistriesRequest struct {
 
 func (x *RefreshPluginRegistriesRequest) Reset() {
 	*x = RefreshPluginRegistriesRequest{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[54]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4243,7 +4394,7 @@ func (x *RefreshPluginRegistriesRequest) String() string {
 func (*RefreshPluginRegistriesRequest) ProtoMessage() {}
 
 func (x *RefreshPluginRegistriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[54]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4256,7 +4407,7 @@ func (x *RefreshPluginRegistriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshPluginRegistriesRequest.ProtoReflect.Descriptor instead.
 func (*RefreshPluginRegistriesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{54}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{56}
 }
 
 type RefreshPluginRegistriesResponse struct {
@@ -4268,7 +4419,7 @@ type RefreshPluginRegistriesResponse struct {
 
 func (x *RefreshPluginRegistriesResponse) Reset() {
 	*x = RefreshPluginRegistriesResponse{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[55]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4280,7 +4431,7 @@ func (x *RefreshPluginRegistriesResponse) String() string {
 func (*RefreshPluginRegistriesResponse) ProtoMessage() {}
 
 func (x *RefreshPluginRegistriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[55]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4293,7 +4444,7 @@ func (x *RefreshPluginRegistriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshPluginRegistriesResponse.ProtoReflect.Descriptor instead.
 func (*RefreshPluginRegistriesResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{55}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *RefreshPluginRegistriesResponse) GetRegistries() []*PluginRegistry {
@@ -4325,7 +4476,7 @@ type InstallPluginRequest struct {
 
 func (x *InstallPluginRequest) Reset() {
 	*x = InstallPluginRequest{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[56]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4337,7 +4488,7 @@ func (x *InstallPluginRequest) String() string {
 func (*InstallPluginRequest) ProtoMessage() {}
 
 func (x *InstallPluginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[56]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4350,7 +4501,7 @@ func (x *InstallPluginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallPluginRequest.ProtoReflect.Descriptor instead.
 func (*InstallPluginRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{56}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *InstallPluginRequest) GetRef() string {
@@ -4412,7 +4563,7 @@ type InstallPluginResponse struct {
 
 func (x *InstallPluginResponse) Reset() {
 	*x = InstallPluginResponse{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[57]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4424,7 +4575,7 @@ func (x *InstallPluginResponse) String() string {
 func (*InstallPluginResponse) ProtoMessage() {}
 
 func (x *InstallPluginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[57]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4437,7 +4588,7 @@ func (x *InstallPluginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallPluginResponse.ProtoReflect.Descriptor instead.
 func (*InstallPluginResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{57}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *InstallPluginResponse) GetPlugin() *Plugin {
@@ -4524,7 +4675,7 @@ type UpdatePluginsRequest struct {
 
 func (x *UpdatePluginsRequest) Reset() {
 	*x = UpdatePluginsRequest{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[58]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4536,7 +4687,7 @@ func (x *UpdatePluginsRequest) String() string {
 func (*UpdatePluginsRequest) ProtoMessage() {}
 
 func (x *UpdatePluginsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[58]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4549,7 +4700,7 @@ func (x *UpdatePluginsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePluginsRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePluginsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{58}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *UpdatePluginsRequest) GetName() string {
@@ -4595,7 +4746,7 @@ type PluginUpdate struct {
 
 func (x *PluginUpdate) Reset() {
 	*x = PluginUpdate{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[59]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4607,7 +4758,7 @@ func (x *PluginUpdate) String() string {
 func (*PluginUpdate) ProtoMessage() {}
 
 func (x *PluginUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[59]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4620,7 +4771,7 @@ func (x *PluginUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PluginUpdate.ProtoReflect.Descriptor instead.
 func (*PluginUpdate) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{59}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *PluginUpdate) GetName() string {
@@ -4688,7 +4839,7 @@ type UpdatePluginsResponse struct {
 
 func (x *UpdatePluginsResponse) Reset() {
 	*x = UpdatePluginsResponse{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[60]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4700,7 +4851,7 @@ func (x *UpdatePluginsResponse) String() string {
 func (*UpdatePluginsResponse) ProtoMessage() {}
 
 func (x *UpdatePluginsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[60]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4713,7 +4864,7 @@ func (x *UpdatePluginsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePluginsResponse.ProtoReflect.Descriptor instead.
 func (*UpdatePluginsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{60}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *UpdatePluginsResponse) GetUpdates() []*PluginUpdate {
@@ -4734,7 +4885,7 @@ type UninstallPluginRequest struct {
 
 func (x *UninstallPluginRequest) Reset() {
 	*x = UninstallPluginRequest{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[61]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4746,7 +4897,7 @@ func (x *UninstallPluginRequest) String() string {
 func (*UninstallPluginRequest) ProtoMessage() {}
 
 func (x *UninstallPluginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[61]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4759,7 +4910,7 @@ func (x *UninstallPluginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UninstallPluginRequest.ProtoReflect.Descriptor instead.
 func (*UninstallPluginRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{61}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *UninstallPluginRequest) GetName() string {
@@ -4790,7 +4941,7 @@ type UninstallPluginResponse struct {
 
 func (x *UninstallPluginResponse) Reset() {
 	*x = UninstallPluginResponse{}
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[62]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4802,7 +4953,7 @@ func (x *UninstallPluginResponse) String() string {
 func (*UninstallPluginResponse) ProtoMessage() {}
 
 func (x *UninstallPluginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_plugin_proto_msgTypes[62]
+	mi := &file_codefoundry_v1_plugin_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4815,7 +4966,7 @@ func (x *UninstallPluginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UninstallPluginResponse.ProtoReflect.Descriptor instead.
 func (*UninstallPluginResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{62}
+	return file_codefoundry_v1_plugin_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *UninstallPluginResponse) GetRemoved() string {
@@ -5067,7 +5218,19 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\acontext\x18\b \x01(\v2\x19.codefoundry.v1.UiContextR\acontextB\b\n" +
 	"\x06_value\".\n" +
 	"\x12SurfaceActResponse\x12\x18\n" +
-	"\aversion\x18\x01 \x01(\x04R\aversion\".\n" +
+	"\aversion\x18\x01 \x01(\x04R\aversion\"\xad\x01\n" +
+	"\x12ShotSurfaceRequest\x12,\n" +
+	"\x03ref\x18\x01 \x01(\v2\x1a.codefoundry.v1.SurfaceRefR\x03ref\x12\x1a\n" +
+	"\binstance\x18\x02 \x01(\tR\binstance\x12\x1f\n" +
+	"\vmin_version\x18\x03 \x01(\x04R\n" +
+	"minVersion\x12\x14\n" +
+	"\x05width\x18\x04 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x05 \x01(\x05R\x06height\"|\n" +
+	"\x13ShotSurfaceResponse\x12\x10\n" +
+	"\x03png\x18\x01 \x01(\fR\x03png\x12\x14\n" +
+	"\x05width\x18\x02 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x03 \x01(\x05R\x06height\x12%\n" +
+	"\x0econtent_height\x18\x04 \x01(\x05R\rcontentHeight\".\n" +
 	"\x18PluginEnvironmentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"6\n" +
 	"\fPluginEnvVar\x12\x10\n" +
@@ -5212,7 +5375,7 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x1fPLUGIN_INDEX_RELATION_INSTALLED\x10\x02\x12 \n" +
 	"\x1cPLUGIN_INDEX_RELATION_UPDATE\x10\x03\x12\x1d\n" +
 	"\x19PLUGIN_INDEX_RELATION_DEV\x10\x04\x12&\n" +
-	"\"PLUGIN_INDEX_RELATION_OTHER_SOURCE\x10\x052\xa6\x0e\n" +
+	"\"PLUGIN_INDEX_RELATION_OTHER_SOURCE\x10\x052\x80\x0f\n" +
 	"\rPluginService\x12Q\n" +
 	"\x04List\x12\".codefoundry.v1.ListPluginsRequest\x1a#.codefoundry.v1.ListPluginsResponse\"\x00\x12U\n" +
 	"\x06Enable\x12#.codefoundry.v1.EnablePluginRequest\x1a$.codefoundry.v1.EnablePluginResponse\"\x00\x12X\n" +
@@ -5229,7 +5392,8 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\fWatchSurface\x12#.codefoundry.v1.WatchSurfaceRequest\x1a\x1d.codefoundry.v1.SurfaceUpdate\"\x000\x01\x12U\n" +
 	"\n" +
 	"GetSurface\x12!.codefoundry.v1.GetSurfaceRequest\x1a\".codefoundry.v1.GetSurfaceResponse\"\x00\x12N\n" +
-	"\x03Act\x12!.codefoundry.v1.SurfaceActRequest\x1a\".codefoundry.v1.SurfaceActResponse\"\x00\x12d\n" +
+	"\x03Act\x12!.codefoundry.v1.SurfaceActRequest\x1a\".codefoundry.v1.SurfaceActResponse\"\x00\x12X\n" +
+	"\vShotSurface\x12\".codefoundry.v1.ShotSurfaceRequest\x1a#.codefoundry.v1.ShotSurfaceResponse\"\x00\x12d\n" +
 	"\vEnvironment\x12(.codefoundry.v1.PluginEnvironmentRequest\x1a).codefoundry.v1.PluginEnvironmentResponse\"\x00\x12W\n" +
 	"\x06Browse\x12$.codefoundry.v1.BrowsePluginsRequest\x1a%.codefoundry.v1.BrowsePluginsResponse\"\x00\x12v\n" +
 	"\x11RefreshRegistries\x12..codefoundry.v1.RefreshPluginRegistriesRequest\x1a/.codefoundry.v1.RefreshPluginRegistriesResponse\"\x00\x12X\n" +
@@ -5251,7 +5415,7 @@ func file_codefoundry_v1_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 64)
+var file_codefoundry_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
 var file_codefoundry_v1_plugin_proto_goTypes = []any{
 	(PluginState)(0),                        // 0: codefoundry.v1.PluginState
 	(SurfacePhase)(0),                       // 1: codefoundry.v1.SurfacePhase
@@ -5300,59 +5464,61 @@ var file_codefoundry_v1_plugin_proto_goTypes = []any{
 	(*GetSurfaceResponse)(nil),              // 44: codefoundry.v1.GetSurfaceResponse
 	(*SurfaceActRequest)(nil),               // 45: codefoundry.v1.SurfaceActRequest
 	(*SurfaceActResponse)(nil),              // 46: codefoundry.v1.SurfaceActResponse
-	(*PluginEnvironmentRequest)(nil),        // 47: codefoundry.v1.PluginEnvironmentRequest
-	(*PluginEnvVar)(nil),                    // 48: codefoundry.v1.PluginEnvVar
-	(*PluginEnvironment)(nil),               // 49: codefoundry.v1.PluginEnvironment
-	(*PluginEnvironmentResponse)(nil),       // 50: codefoundry.v1.PluginEnvironmentResponse
-	(*PluginInstall)(nil),                   // 51: codefoundry.v1.PluginInstall
-	(*PluginInstallProgress)(nil),           // 52: codefoundry.v1.PluginInstallProgress
-	(*PluginRegistry)(nil),                  // 53: codefoundry.v1.PluginRegistry
-	(*PluginIndexArtifact)(nil),             // 54: codefoundry.v1.PluginIndexArtifact
-	(*PluginIndexEntry)(nil),                // 55: codefoundry.v1.PluginIndexEntry
-	(*BrowsePluginsRequest)(nil),            // 56: codefoundry.v1.BrowsePluginsRequest
-	(*BrowsePluginsResponse)(nil),           // 57: codefoundry.v1.BrowsePluginsResponse
-	(*RefreshPluginRegistriesRequest)(nil),  // 58: codefoundry.v1.RefreshPluginRegistriesRequest
-	(*RefreshPluginRegistriesResponse)(nil), // 59: codefoundry.v1.RefreshPluginRegistriesResponse
-	(*InstallPluginRequest)(nil),            // 60: codefoundry.v1.InstallPluginRequest
-	(*InstallPluginResponse)(nil),           // 61: codefoundry.v1.InstallPluginResponse
-	(*UpdatePluginsRequest)(nil),            // 62: codefoundry.v1.UpdatePluginsRequest
-	(*PluginUpdate)(nil),                    // 63: codefoundry.v1.PluginUpdate
-	(*UpdatePluginsResponse)(nil),           // 64: codefoundry.v1.UpdatePluginsResponse
-	(*UninstallPluginRequest)(nil),          // 65: codefoundry.v1.UninstallPluginRequest
-	(*UninstallPluginResponse)(nil),         // 66: codefoundry.v1.UninstallPluginResponse
-	nil,                                     // 67: codefoundry.v1.SurfaceElement.ArgsEntry
-	(*timestamppb.Timestamp)(nil),           // 68: google.protobuf.Timestamp
-	(*UiContext)(nil),                       // 69: codefoundry.v1.UiContext
-	(*StreamHeartbeat)(nil),                 // 70: codefoundry.v1.StreamHeartbeat
-	(*structpb.Struct)(nil),                 // 71: google.protobuf.Struct
+	(*ShotSurfaceRequest)(nil),              // 47: codefoundry.v1.ShotSurfaceRequest
+	(*ShotSurfaceResponse)(nil),             // 48: codefoundry.v1.ShotSurfaceResponse
+	(*PluginEnvironmentRequest)(nil),        // 49: codefoundry.v1.PluginEnvironmentRequest
+	(*PluginEnvVar)(nil),                    // 50: codefoundry.v1.PluginEnvVar
+	(*PluginEnvironment)(nil),               // 51: codefoundry.v1.PluginEnvironment
+	(*PluginEnvironmentResponse)(nil),       // 52: codefoundry.v1.PluginEnvironmentResponse
+	(*PluginInstall)(nil),                   // 53: codefoundry.v1.PluginInstall
+	(*PluginInstallProgress)(nil),           // 54: codefoundry.v1.PluginInstallProgress
+	(*PluginRegistry)(nil),                  // 55: codefoundry.v1.PluginRegistry
+	(*PluginIndexArtifact)(nil),             // 56: codefoundry.v1.PluginIndexArtifact
+	(*PluginIndexEntry)(nil),                // 57: codefoundry.v1.PluginIndexEntry
+	(*BrowsePluginsRequest)(nil),            // 58: codefoundry.v1.BrowsePluginsRequest
+	(*BrowsePluginsResponse)(nil),           // 59: codefoundry.v1.BrowsePluginsResponse
+	(*RefreshPluginRegistriesRequest)(nil),  // 60: codefoundry.v1.RefreshPluginRegistriesRequest
+	(*RefreshPluginRegistriesResponse)(nil), // 61: codefoundry.v1.RefreshPluginRegistriesResponse
+	(*InstallPluginRequest)(nil),            // 62: codefoundry.v1.InstallPluginRequest
+	(*InstallPluginResponse)(nil),           // 63: codefoundry.v1.InstallPluginResponse
+	(*UpdatePluginsRequest)(nil),            // 64: codefoundry.v1.UpdatePluginsRequest
+	(*PluginUpdate)(nil),                    // 65: codefoundry.v1.PluginUpdate
+	(*UpdatePluginsResponse)(nil),           // 66: codefoundry.v1.UpdatePluginsResponse
+	(*UninstallPluginRequest)(nil),          // 67: codefoundry.v1.UninstallPluginRequest
+	(*UninstallPluginResponse)(nil),         // 68: codefoundry.v1.UninstallPluginResponse
+	nil,                                     // 69: codefoundry.v1.SurfaceElement.ArgsEntry
+	(*timestamppb.Timestamp)(nil),           // 70: google.protobuf.Timestamp
+	(*UiContext)(nil),                       // 71: codefoundry.v1.UiContext
+	(*StreamHeartbeat)(nil),                 // 72: codefoundry.v1.StreamHeartbeat
+	(*structpb.Struct)(nil),                 // 73: google.protobuf.Struct
 }
 var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Plugin.state:type_name -> codefoundry.v1.PluginState
 	4,  // 1: codefoundry.v1.Plugin.permissions:type_name -> codefoundry.v1.PluginPermissions
 	4,  // 2: codefoundry.v1.Plugin.granted:type_name -> codefoundry.v1.PluginPermissions
-	68, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
-	68, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
-	68, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
+	70, // 3: codefoundry.v1.Plugin.consented_at:type_name -> google.protobuf.Timestamp
+	70, // 4: codefoundry.v1.Plugin.started_at:type_name -> google.protobuf.Timestamp
+	70, // 5: codefoundry.v1.Plugin.next_restart_at:type_name -> google.protobuf.Timestamp
 	5,  // 6: codefoundry.v1.Plugin.commands:type_name -> codefoundry.v1.PluginCommand
 	6,  // 7: codefoundry.v1.Plugin.surfaces:type_name -> codefoundry.v1.PluginSurface
-	51, // 8: codefoundry.v1.Plugin.install:type_name -> codefoundry.v1.PluginInstall
+	53, // 8: codefoundry.v1.Plugin.install:type_name -> codefoundry.v1.PluginInstall
 	8,  // 9: codefoundry.v1.Plugin.wakes:type_name -> codefoundry.v1.PluginWake
 	9,  // 10: codefoundry.v1.PluginWake.args:type_name -> codefoundry.v1.PluginWakeArg
-	69, // 11: codefoundry.v1.ListPluginsRequest.context:type_name -> codefoundry.v1.UiContext
+	71, // 11: codefoundry.v1.ListPluginsRequest.context:type_name -> codefoundry.v1.UiContext
 	7,  // 12: codefoundry.v1.ListPluginsResponse.plugins:type_name -> codefoundry.v1.Plugin
 	7,  // 13: codefoundry.v1.EnablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
 	7,  // 14: codefoundry.v1.DisablePluginResponse.plugin:type_name -> codefoundry.v1.Plugin
 	7,  // 15: codefoundry.v1.RestartPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
 	7,  // 16: codefoundry.v1.DevPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	68, // 17: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
+	70, // 17: codefoundry.v1.PluginLogLine.time:type_name -> google.protobuf.Timestamp
 	23, // 18: codefoundry.v1.PluginLogsResponse.lines:type_name -> codefoundry.v1.PluginLogLine
-	68, // 19: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
+	70, // 19: codefoundry.v1.PluginSecret.updated_at:type_name -> google.protobuf.Timestamp
 	26, // 20: codefoundry.v1.ListPluginSecretsResponse.secrets:type_name -> codefoundry.v1.PluginSecret
 	33, // 21: codefoundry.v1.PluginEvent.snapshot:type_name -> codefoundry.v1.PluginSnapshot
 	7,  // 22: codefoundry.v1.PluginEvent.updated:type_name -> codefoundry.v1.Plugin
-	52, // 23: codefoundry.v1.PluginEvent.install_progress:type_name -> codefoundry.v1.PluginInstallProgress
+	54, // 23: codefoundry.v1.PluginEvent.install_progress:type_name -> codefoundry.v1.PluginInstallProgress
 	7,  // 24: codefoundry.v1.PluginSnapshot.plugins:type_name -> codefoundry.v1.Plugin
-	69, // 25: codefoundry.v1.SurfaceRef.context:type_name -> codefoundry.v1.UiContext
+	71, // 25: codefoundry.v1.SurfaceRef.context:type_name -> codefoundry.v1.UiContext
 	1,  // 26: codefoundry.v1.SurfaceState.phase:type_name -> codefoundry.v1.SurfacePhase
 	0,  // 27: codefoundry.v1.SurfaceState.plugin_state:type_name -> codefoundry.v1.PluginState
 	37, // 28: codefoundry.v1.SurfaceLogAppend.lines:type_name -> codefoundry.v1.SurfaceLogLine
@@ -5360,76 +5526,79 @@ var file_codefoundry_v1_plugin_proto_depIdxs = []int32{
 	36, // 30: codefoundry.v1.SurfaceUpdate.view:type_name -> codefoundry.v1.SurfaceView
 	38, // 31: codefoundry.v1.SurfaceUpdate.append:type_name -> codefoundry.v1.SurfaceLogAppend
 	39, // 32: codefoundry.v1.SurfaceUpdate.toast:type_name -> codefoundry.v1.SurfaceToast
-	70, // 33: codefoundry.v1.SurfaceUpdate.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	72, // 33: codefoundry.v1.SurfaceUpdate.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
 	34, // 34: codefoundry.v1.WatchSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
 	34, // 35: codefoundry.v1.GetSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
-	67, // 36: codefoundry.v1.SurfaceElement.args:type_name -> codefoundry.v1.SurfaceElement.ArgsEntry
+	69, // 36: codefoundry.v1.SurfaceElement.args:type_name -> codefoundry.v1.SurfaceElement.ArgsEntry
 	35, // 37: codefoundry.v1.GetSurfaceResponse.state:type_name -> codefoundry.v1.SurfaceState
 	36, // 38: codefoundry.v1.GetSurfaceResponse.view:type_name -> codefoundry.v1.SurfaceView
 	43, // 39: codefoundry.v1.GetSurfaceResponse.elements:type_name -> codefoundry.v1.SurfaceElement
 	34, // 40: codefoundry.v1.SurfaceActRequest.ref:type_name -> codefoundry.v1.SurfaceRef
-	71, // 41: codefoundry.v1.SurfaceActRequest.values:type_name -> google.protobuf.Struct
-	69, // 42: codefoundry.v1.SurfaceActRequest.context:type_name -> codefoundry.v1.UiContext
-	48, // 43: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
-	68, // 44: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
-	49, // 45: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
-	68, // 46: codefoundry.v1.PluginInstall.installed_at:type_name -> google.protobuf.Timestamp
-	2,  // 47: codefoundry.v1.PluginInstallProgress.phase:type_name -> codefoundry.v1.PluginInstallPhase
-	68, // 48: codefoundry.v1.PluginRegistry.fetched_at:type_name -> google.protobuf.Timestamp
-	4,  // 49: codefoundry.v1.PluginIndexEntry.permissions:type_name -> codefoundry.v1.PluginPermissions
-	54, // 50: codefoundry.v1.PluginIndexEntry.artifacts:type_name -> codefoundry.v1.PluginIndexArtifact
-	7,  // 51: codefoundry.v1.PluginIndexEntry.installed:type_name -> codefoundry.v1.Plugin
-	3,  // 52: codefoundry.v1.PluginIndexEntry.relation:type_name -> codefoundry.v1.PluginIndexRelation
-	55, // 53: codefoundry.v1.BrowsePluginsResponse.entries:type_name -> codefoundry.v1.PluginIndexEntry
-	53, // 54: codefoundry.v1.BrowsePluginsResponse.registries:type_name -> codefoundry.v1.PluginRegistry
-	53, // 55: codefoundry.v1.RefreshPluginRegistriesResponse.registries:type_name -> codefoundry.v1.PluginRegistry
-	7,  // 56: codefoundry.v1.InstallPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
-	63, // 57: codefoundry.v1.UpdatePluginsResponse.updates:type_name -> codefoundry.v1.PluginUpdate
-	10, // 58: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
-	12, // 59: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
-	14, // 60: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
-	16, // 61: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
-	18, // 62: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
-	20, // 63: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
-	22, // 64: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
-	25, // 65: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
-	27, // 66: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
-	29, // 67: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
-	31, // 68: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
-	41, // 69: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
-	42, // 70: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
-	45, // 71: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
-	47, // 72: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
-	56, // 73: codefoundry.v1.PluginService.Browse:input_type -> codefoundry.v1.BrowsePluginsRequest
-	58, // 74: codefoundry.v1.PluginService.RefreshRegistries:input_type -> codefoundry.v1.RefreshPluginRegistriesRequest
-	60, // 75: codefoundry.v1.PluginService.Install:input_type -> codefoundry.v1.InstallPluginRequest
-	62, // 76: codefoundry.v1.PluginService.Update:input_type -> codefoundry.v1.UpdatePluginsRequest
-	65, // 77: codefoundry.v1.PluginService.Uninstall:input_type -> codefoundry.v1.UninstallPluginRequest
-	11, // 78: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
-	13, // 79: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
-	15, // 80: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
-	17, // 81: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
-	19, // 82: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
-	21, // 83: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
-	24, // 84: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
-	23, // 85: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
-	28, // 86: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
-	30, // 87: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
-	32, // 88: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
-	40, // 89: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
-	44, // 90: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
-	46, // 91: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
-	50, // 92: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
-	57, // 93: codefoundry.v1.PluginService.Browse:output_type -> codefoundry.v1.BrowsePluginsResponse
-	59, // 94: codefoundry.v1.PluginService.RefreshRegistries:output_type -> codefoundry.v1.RefreshPluginRegistriesResponse
-	61, // 95: codefoundry.v1.PluginService.Install:output_type -> codefoundry.v1.InstallPluginResponse
-	64, // 96: codefoundry.v1.PluginService.Update:output_type -> codefoundry.v1.UpdatePluginsResponse
-	66, // 97: codefoundry.v1.PluginService.Uninstall:output_type -> codefoundry.v1.UninstallPluginResponse
-	78, // [78:98] is the sub-list for method output_type
-	58, // [58:78] is the sub-list for method input_type
-	58, // [58:58] is the sub-list for extension type_name
-	58, // [58:58] is the sub-list for extension extendee
-	0,  // [0:58] is the sub-list for field type_name
+	73, // 41: codefoundry.v1.SurfaceActRequest.values:type_name -> google.protobuf.Struct
+	71, // 42: codefoundry.v1.SurfaceActRequest.context:type_name -> codefoundry.v1.UiContext
+	34, // 43: codefoundry.v1.ShotSurfaceRequest.ref:type_name -> codefoundry.v1.SurfaceRef
+	50, // 44: codefoundry.v1.PluginEnvironment.env:type_name -> codefoundry.v1.PluginEnvVar
+	70, // 45: codefoundry.v1.PluginEnvironment.updated_at:type_name -> google.protobuf.Timestamp
+	51, // 46: codefoundry.v1.PluginEnvironmentResponse.environments:type_name -> codefoundry.v1.PluginEnvironment
+	70, // 47: codefoundry.v1.PluginInstall.installed_at:type_name -> google.protobuf.Timestamp
+	2,  // 48: codefoundry.v1.PluginInstallProgress.phase:type_name -> codefoundry.v1.PluginInstallPhase
+	70, // 49: codefoundry.v1.PluginRegistry.fetched_at:type_name -> google.protobuf.Timestamp
+	4,  // 50: codefoundry.v1.PluginIndexEntry.permissions:type_name -> codefoundry.v1.PluginPermissions
+	56, // 51: codefoundry.v1.PluginIndexEntry.artifacts:type_name -> codefoundry.v1.PluginIndexArtifact
+	7,  // 52: codefoundry.v1.PluginIndexEntry.installed:type_name -> codefoundry.v1.Plugin
+	3,  // 53: codefoundry.v1.PluginIndexEntry.relation:type_name -> codefoundry.v1.PluginIndexRelation
+	57, // 54: codefoundry.v1.BrowsePluginsResponse.entries:type_name -> codefoundry.v1.PluginIndexEntry
+	55, // 55: codefoundry.v1.BrowsePluginsResponse.registries:type_name -> codefoundry.v1.PluginRegistry
+	55, // 56: codefoundry.v1.RefreshPluginRegistriesResponse.registries:type_name -> codefoundry.v1.PluginRegistry
+	7,  // 57: codefoundry.v1.InstallPluginResponse.plugin:type_name -> codefoundry.v1.Plugin
+	65, // 58: codefoundry.v1.UpdatePluginsResponse.updates:type_name -> codefoundry.v1.PluginUpdate
+	10, // 59: codefoundry.v1.PluginService.List:input_type -> codefoundry.v1.ListPluginsRequest
+	12, // 60: codefoundry.v1.PluginService.Enable:input_type -> codefoundry.v1.EnablePluginRequest
+	14, // 61: codefoundry.v1.PluginService.Disable:input_type -> codefoundry.v1.DisablePluginRequest
+	16, // 62: codefoundry.v1.PluginService.Restart:input_type -> codefoundry.v1.RestartPluginRequest
+	18, // 63: codefoundry.v1.PluginService.Dev:input_type -> codefoundry.v1.DevPluginRequest
+	20, // 64: codefoundry.v1.PluginService.Reload:input_type -> codefoundry.v1.ReloadPluginsRequest
+	22, // 65: codefoundry.v1.PluginService.Logs:input_type -> codefoundry.v1.PluginLogsRequest
+	25, // 66: codefoundry.v1.PluginService.FollowLogs:input_type -> codefoundry.v1.FollowPluginLogsRequest
+	27, // 67: codefoundry.v1.PluginService.ListSecrets:input_type -> codefoundry.v1.ListPluginSecretsRequest
+	29, // 68: codefoundry.v1.PluginService.DeleteSecret:input_type -> codefoundry.v1.DeletePluginSecretRequest
+	31, // 69: codefoundry.v1.PluginService.Watch:input_type -> codefoundry.v1.WatchPluginsRequest
+	41, // 70: codefoundry.v1.PluginService.WatchSurface:input_type -> codefoundry.v1.WatchSurfaceRequest
+	42, // 71: codefoundry.v1.PluginService.GetSurface:input_type -> codefoundry.v1.GetSurfaceRequest
+	45, // 72: codefoundry.v1.PluginService.Act:input_type -> codefoundry.v1.SurfaceActRequest
+	47, // 73: codefoundry.v1.PluginService.ShotSurface:input_type -> codefoundry.v1.ShotSurfaceRequest
+	49, // 74: codefoundry.v1.PluginService.Environment:input_type -> codefoundry.v1.PluginEnvironmentRequest
+	58, // 75: codefoundry.v1.PluginService.Browse:input_type -> codefoundry.v1.BrowsePluginsRequest
+	60, // 76: codefoundry.v1.PluginService.RefreshRegistries:input_type -> codefoundry.v1.RefreshPluginRegistriesRequest
+	62, // 77: codefoundry.v1.PluginService.Install:input_type -> codefoundry.v1.InstallPluginRequest
+	64, // 78: codefoundry.v1.PluginService.Update:input_type -> codefoundry.v1.UpdatePluginsRequest
+	67, // 79: codefoundry.v1.PluginService.Uninstall:input_type -> codefoundry.v1.UninstallPluginRequest
+	11, // 80: codefoundry.v1.PluginService.List:output_type -> codefoundry.v1.ListPluginsResponse
+	13, // 81: codefoundry.v1.PluginService.Enable:output_type -> codefoundry.v1.EnablePluginResponse
+	15, // 82: codefoundry.v1.PluginService.Disable:output_type -> codefoundry.v1.DisablePluginResponse
+	17, // 83: codefoundry.v1.PluginService.Restart:output_type -> codefoundry.v1.RestartPluginResponse
+	19, // 84: codefoundry.v1.PluginService.Dev:output_type -> codefoundry.v1.DevPluginResponse
+	21, // 85: codefoundry.v1.PluginService.Reload:output_type -> codefoundry.v1.ReloadPluginsResponse
+	24, // 86: codefoundry.v1.PluginService.Logs:output_type -> codefoundry.v1.PluginLogsResponse
+	23, // 87: codefoundry.v1.PluginService.FollowLogs:output_type -> codefoundry.v1.PluginLogLine
+	28, // 88: codefoundry.v1.PluginService.ListSecrets:output_type -> codefoundry.v1.ListPluginSecretsResponse
+	30, // 89: codefoundry.v1.PluginService.DeleteSecret:output_type -> codefoundry.v1.DeletePluginSecretResponse
+	32, // 90: codefoundry.v1.PluginService.Watch:output_type -> codefoundry.v1.PluginEvent
+	40, // 91: codefoundry.v1.PluginService.WatchSurface:output_type -> codefoundry.v1.SurfaceUpdate
+	44, // 92: codefoundry.v1.PluginService.GetSurface:output_type -> codefoundry.v1.GetSurfaceResponse
+	46, // 93: codefoundry.v1.PluginService.Act:output_type -> codefoundry.v1.SurfaceActResponse
+	48, // 94: codefoundry.v1.PluginService.ShotSurface:output_type -> codefoundry.v1.ShotSurfaceResponse
+	52, // 95: codefoundry.v1.PluginService.Environment:output_type -> codefoundry.v1.PluginEnvironmentResponse
+	59, // 96: codefoundry.v1.PluginService.Browse:output_type -> codefoundry.v1.BrowsePluginsResponse
+	61, // 97: codefoundry.v1.PluginService.RefreshRegistries:output_type -> codefoundry.v1.RefreshPluginRegistriesResponse
+	63, // 98: codefoundry.v1.PluginService.Install:output_type -> codefoundry.v1.InstallPluginResponse
+	66, // 99: codefoundry.v1.PluginService.Update:output_type -> codefoundry.v1.UpdatePluginsResponse
+	68, // 100: codefoundry.v1.PluginService.Uninstall:output_type -> codefoundry.v1.UninstallPluginResponse
+	80, // [80:101] is the sub-list for method output_type
+	59, // [59:80] is the sub-list for method input_type
+	59, // [59:59] is the sub-list for extension type_name
+	59, // [59:59] is the sub-list for extension extendee
+	0,  // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_plugin_proto_init() }
@@ -5461,7 +5630,7 @@ func file_codefoundry_v1_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_plugin_proto_rawDesc), len(file_codefoundry_v1_plugin_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   64,
+			NumMessages:   66,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
