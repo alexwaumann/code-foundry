@@ -569,6 +569,18 @@ func (m *Manager) Act(ctx context.Context, req ActRequest) (uint64, error) {
 		return 0, fmt.Errorf("%w: %s", ErrFailedPrecondition, why)
 	}
 	in.mu.Lock()
+	if in.openingConn == conn {
+		// The plugin shows its first view before it answers surface/open, and takes no act
+		// until it has: one on that view waits for the answer.
+		opened := in.opened
+		in.mu.Unlock()
+		select {
+		case <-opened:
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
+		in.mu.Lock()
+	}
 	if in.openConn != conn {
 		in.mu.Unlock()
 		return 0, fmt.Errorf("%w: %s is not open (watch it first)", ErrFailedPrecondition, key)

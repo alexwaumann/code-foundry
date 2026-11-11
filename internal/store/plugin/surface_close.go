@@ -136,7 +136,8 @@ func (h *surfaceHub) closeNow(in *instance, reason pluginsdk.CloseReason, why st
 		in.mu.Unlock()
 		return
 	}
-	in.openConn, in.openingConn = nil, nil
+	in.openConn = nil
+	in.endOpeningLocked()
 	in.stopTimersLocked()
 	in.closedAt, in.closedFor = h.m.opts.Now(), reason
 	watched := len(in.watchers) > 0

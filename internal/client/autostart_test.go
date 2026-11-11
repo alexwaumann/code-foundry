@@ -95,7 +95,7 @@ func TestConnectWaitsForShuttingDownDaemon(t *testing.T) {
 	})
 	t.Cleanup(func() { <-released })
 	spawnsTestDaemon(t)
-	c, err := Connect(context.Background(), p, ConnectOptions{DaemonBinary: os.Args[0], StartTimeout: 10 * time.Second})
+	c, err := Connect(context.Background(), p, ConnectOptions{DaemonBinary: os.Args[0], StartTimeout: startWait})
 	if err != nil {
 		log, _ := os.ReadFile(p.DaemonLog())
 		t.Fatalf("Connect: %v\ndaemon log:\n%s", err, log)

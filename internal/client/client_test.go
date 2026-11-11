@@ -49,6 +49,11 @@ func shortHome(t *testing.T) paths.Paths {
 	return paths.New(dir)
 }
 
+// startWait is how long a test gives a daemon it expects to start, or to stop. A start
+// takes about two seconds under the race detector on a busy machine and has been seen past
+// five when several suites run at once; a start that fails says so long before this.
+const startWait = time.Minute
+
 func startDaemon(t *testing.T, p paths.Paths) (stop func() error) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,7 +62,7 @@ func startDaemon(t *testing.T, p paths.Paths) (stop func() error) {
 		done <- daemon.Run(ctx, daemon.Options{Paths: p, Version: version.Info{Version: "test"}})
 	}()
 	c := New(p)
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(startWait)
 	for !c.alive(context.Background()) {
 		select {
 		case err := <-done:
@@ -210,7 +215,7 @@ func TestConnectAutoStartsDaemon(t *testing.T) {
 			spawnsTestDaemon(t)
 
 			ctx := context.Background()
-			c, err := Connect(ctx, p, ConnectOptions{DaemonBinary: os.Args[0], StartTimeout: 10 * time.Second})
+			c, err := Connect(ctx, p, ConnectOptions{DaemonBinary: os.Args[0], StartTimeout: startWait})
 			if err != nil {
 				log, _ := os.ReadFile(p.DaemonLog())
 				t.Fatalf("Connect: %v\ndaemon log:\n%s", err, log)
@@ -252,7 +257,7 @@ func stopProcess(t *testing.T, pid int, p paths.Paths) {
 		t.Errorf("kill daemon %d: %v", pid, err)
 		return
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(startWait)
 	for time.Now().Before(deadline) {
 		if _, err := os.Stat(p.Socket()); errors.Is(err, os.ErrNotExist) {
 			return

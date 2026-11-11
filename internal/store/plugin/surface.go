@@ -310,7 +310,8 @@ func (h *surfaceHub) pluginChanged(name string) {
 		reopen := false
 		switch {
 		case conn == nil:
-			in.openConn, in.openingConn = nil, nil
+			in.openConn = nil
+			in.endOpeningLocked()
 			in.stopTimer(&in.firstView)
 			if len(in.watchers) > 0 && (in.state.Phase != PhasePluginDown || in.state.Message != why) {
 				in.setStateLocked(PhasePluginDown, why, state)
@@ -355,6 +356,7 @@ type instance struct {
 	facts       map[string]json.RawMessage
 	watchers    map[*watcher]struct{}
 	openConn    *pluginsdk.Conn // surface/open answered on it
+	opened      chan struct{}   // closed when the surface/open in flight ends (endOpeningLocked)
 	openingConn *pluginsdk.Conn // surface/open in flight on it
 	openVersion uint64          // version when the last open was sent
 	grace       *time.Timer
@@ -721,7 +723,8 @@ func (h *surfaceHub) graceOver(in *instance) {
 		return
 	}
 	conn := in.openConn
-	in.openConn, in.openingConn, in.grace = nil, nil, nil
+	in.openConn, in.grace = nil, nil
+	in.endOpeningLocked()
 	in.stopTimer(&in.firstView)
 	in.closedAt = h.m.opts.Now()
 	in.mu.Unlock()
@@ -753,7 +756,9 @@ func (h *surfaceHub) activate(in *instance) {
 		in.mu.Unlock()
 		return
 	}
+	in.endOpeningLocked()
 	in.openingConn, in.openConn = conn, nil
+	in.opened = make(chan struct{})
 	in.openVersion, in.closedFor = in.version, ""
 	msg := ""
 	if in.view != nil {
@@ -765,6 +770,16 @@ func (h *surfaceHub) activate(in *instance) {
 	go h.open(in, conn, open)
 }
 
+// endOpeningLocked ends the surface/open in flight, answered or given up, and lets an act
+// that waited on it go on. Callers hold in.mu.
+func (in *instance) endOpeningLocked() {
+	in.openingConn = nil
+	if in.opened != nil {
+		close(in.opened)
+		in.opened = nil
+	}
+}
+
 func (h *surfaceHub) open(in *instance, conn *pluginsdk.Conn, open pluginsdk.SurfaceOpen) {
 	ctx, cancel := context.WithTimeout(context.Background(), surfaceOpenTimeout)
 	err := conn.Call(ctx, pluginsdk.MethodSurfaceOpen, open, nil)
@@ -774,7 +789,7 @@ func (h *surfaceHub) open(in *instance, conn *pluginsdk.Conn, open pluginsdk.Sur
 		in.mu.Unlock()
 		return
 	}
-	in.openingConn = nil
+	in.endOpeningLocked()
 	if err != nil {
 		var perr *pluginsdk.Error
 		if errors.As(err, &perr) {
