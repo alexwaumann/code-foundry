@@ -19,7 +19,6 @@ func TestTableSortActs(t *testing.T) {
 	e := newSurfEnv(t, nil)
 	w := e.watch("panel", s1)
 	w.view("first view", contains("count 0"))
-	waitOpen(t, e, w.key)
 
 	if _, err := e.act(w.key, plugin.ActRequest{Key: "pt-num"}); err != nil {
 		t.Fatal(err)

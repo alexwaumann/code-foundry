@@ -26,11 +26,12 @@ type logBuffer struct {
 	tailCap int
 	now     func() time.Time
 
-	mu    sync.Mutex
-	file  *logfile.File
-	lines []LogLine
-	seq   uint64
-	subs  map[chan LogLine]struct{}
+	mu     sync.Mutex
+	file   *logfile.File
+	closed bool // the plugin is gone or the store closed: lines reach the tail, not the file
+	lines  []LogLine
+	seq    uint64
+	subs   map[chan LogLine]struct{}
 }
 
 func newLogBuffer(path string, maxBytes int64, tailCap int, now func() time.Time) *logBuffer {
@@ -75,7 +76,13 @@ func formatLine(l LogLine) string {
 }
 
 // write appends l to the file, rotating first when it would pass the cap. b.mu held.
+// After close it writes nothing: a plugin's connection can still report a line or two
+// after its run ends (its reader drains what the process wrote), and a write would open
+// the file again, after the store closed or the plugin was removed.
 func (b *logBuffer) write(l LogLine) {
+	if b.closed {
+		return
+	}
 	_, _ = b.file.Write([]byte(formatLine(l)))
 }
 
@@ -113,8 +120,10 @@ func (b *logBuffer) subscribe(n int) ([]LogLine, <-chan LogLine, func()) {
 	}
 }
 
+// close closes the file for good; later lines stay in the tail only.
 func (b *logBuffer) close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.closed = true
 	_ = b.file.Close()
 }
