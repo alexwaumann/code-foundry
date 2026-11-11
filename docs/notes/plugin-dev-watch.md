@@ -45,6 +45,12 @@ the plugin skill's per-edit `make build && plugin restart <name>`.
   debounce) and waits for any build and restart in flight; the `GetSurface` and `Act`
   handlers call it first. It fails with `build failed: code-foundry plugin logs <name>`
   while the last build failed and nothing changed since.
+- **Exit status**: a failed build is the command's own failure, not the caller's
+  mistake. Its errors have the cause `plugin.ErrDevBuildFailed`; the API's command error
+  mapping turns it into a `CommandFailed` detail, so the CLI prints the build's words and
+  exits 1 (no "Run help for usage" line) for `plugin dev --watch`, `plugin surface` and
+  `plugin act` alike, without touching the surface commands. Permissions that grew stay a
+  failed precondition (exit 2): the caller has to consent.
 - **GetSurface through a restart** (found by reading, then a failing test): during a
   restart the instance is `plugin down` with plugin state `starting`/`stopping` and the
   old process's cached view, and GetSurface returned that at once. It now waits through
@@ -67,3 +73,15 @@ the plugin skill's per-edit `make build && plugin restart <name>`.
 - Tests drive the loop with fake ticks (`devWatchState.ticker`) and a `ticked` signal so a
   tick's scan finishes before the test edits again; sending the next tick is not enough
   (the scan of the previous one may still be running).
+
+## Checked end to end
+
+Scratch home under `$HOME`, `daemon --dev`, a copy of `plugins/examples/minimal` with the
+SDK replaced by the worktree's: `plugin dev --watch` built and started it
+(`running (dev, watching)`, the CLI returned); a button label edit showed in the next
+`plugin surface` 1.5 s later with `build ok in 1.2s; restarted` in `plugin logs`; a
+compile error made `plugin surface` and `plugin dev --watch` exit 1 with the build's lines,
+`plugin list` noted `build failed (exit 2)` and the old process kept running; the watch
+came back after a daemon restart; a manifest asking for `threadStatus` disabled it with
+the `plugin dev <path> --yes` line, and that consent resumed the watch; `--watch=false`
+stopped it (an edit then built nothing).

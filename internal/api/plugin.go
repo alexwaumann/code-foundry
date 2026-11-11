@@ -310,7 +310,7 @@ func pluginError(err error) error {
 		code = connect.CodeNotFound
 	case errors.Is(err, plugin.ErrInvalidArgument):
 		code = connect.CodeInvalidArgument
-	case errors.Is(err, plugin.ErrFailedPrecondition):
+	case errors.Is(err, plugin.ErrFailedPrecondition), errors.Is(err, plugin.ErrDevBuildFailed):
 		code = connect.CodeFailedPrecondition
 	case errors.Is(err, plugin.ErrClosed), errors.Is(err, plugin.ErrUnavailable):
 		code = connect.CodeUnavailable

@@ -458,8 +458,8 @@ func (w *devWatcher) build() (first, settle error) {
 		m.update(w.name, nil, func(e *entry) {
 			e.devBuild = DevBuild{State: DevBuildFailed, ExitCode: res.exit, FinishedAt: now}
 		})
-		return fmt.Errorf("%w: %s:\n%s", ErrFailedPrecondition, msg, strings.Join(res.tail, "\n")),
-			fmt.Errorf("%w: plugin %s: %w: code-foundry plugin logs %s", ErrFailedPrecondition, w.name, errDevBuildFailed, w.name)
+		return causedError{msg: msg + ":\n" + strings.Join(res.tail, "\n"), cause: ErrDevBuildFailed},
+			causedError{msg: fmt.Sprintf("plugin %s: build failed: code-foundry plugin logs %s", w.name, w.name), cause: ErrDevBuildFailed}
 	}
 	m.update(w.name, nil, func(e *entry) {
 		e.devBuild = DevBuild{State: DevBuildOK, FinishedAt: now}

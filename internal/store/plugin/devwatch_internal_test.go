@@ -333,7 +333,7 @@ func TestDevWatchBuildFails(t *testing.T) {
 			r := newDevRig(t, "true", func(o *Options) { o.DevBuildTimeout = tt.timeout })
 			pid := r.plugin().PID
 			// The build command is the plugin's: change it the way `plugin dev --build` does.
-			if _, err := r.m.SetDevWatch(context.Background(), "w", true, tt.build); err == nil ||
+			if _, err := r.m.SetDevWatch(context.Background(), "w", true, tt.build); !errors.Is(err, ErrDevBuildFailed) ||
 				!strings.Contains(err.Error(), tt.log[0][len("build "):]) {
 				t.Fatalf("first build: %v", err)
 			}
@@ -348,7 +348,7 @@ func TestDevWatchBuildFails(t *testing.T) {
 			}
 			// Nothing changed since: a settle reports the failure.
 			err := r.m.DevSettle(context.Background(), "w")
-			if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "build failed: code-foundry plugin logs w") {
+			if !errors.Is(err, ErrDevBuildFailed) || err.Error() != "plugin w: build failed: code-foundry plugin logs w" {
 				t.Errorf("settle: %v", err)
 			}
 		})

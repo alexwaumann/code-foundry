@@ -196,7 +196,7 @@ func TestDevWatch(t *testing.T) {
 	if want := `[devwatch on=true build="go build -o bin/w ." w devwatch on=false build="" w]`; fmt.Sprint(watches) != want {
 		t.Errorf("calls %q\nwant %s", watches, want)
 	}
-	fake.DevBuildErr = fmt.Errorf("%w: build failed (exit 2); the running plugin is unchanged:\nmain.go:3: undefined: x", plugin.ErrFailedPrecondition)
+	fake.DevBuildErr = fmt.Errorf("%w (exit 2); the running plugin is unchanged:\nmain.go:3: undefined: x", plugin.ErrDevBuildFailed)
 	_, err = c.Dev(ctx, connect.NewRequest(&v1.DevPluginRequest{Path: "/Users/a/src/w", Consent: true, Watch: &on}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "undefined: x") {
 		t.Errorf("failed build: %v", err)

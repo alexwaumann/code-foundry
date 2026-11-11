@@ -122,8 +122,9 @@ func (m *Manager) runDevBuild(ctx context.Context, dir, build string, logs *logB
 	return res
 }
 
-// errDevBuildFailed is DevSettle's and the first build's error.
-var errDevBuildFailed = errors.New("build failed")
+// ErrDevBuildFailed is the cause of DevSettle's and SetDevWatch's error when a watched
+// dev plugin's build failed: the command's own failure, not the caller's mistake.
+var ErrDevBuildFailed = errors.New("build failed")
 
 // minimalEnviron is the daemon's variables a plugin inherits (minimalEnv).
 func (m *Manager) minimalEnviron() []string {

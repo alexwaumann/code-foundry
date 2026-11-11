@@ -11,6 +11,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/capability"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
@@ -100,6 +101,14 @@ func commandError(name string, err error) error {
 		// Not the caller's mistake: the thread cannot continue (the thread store's
 		// transcriptmissing.go). The CLI prints the words and exits 1, no help pointer.
 		return commandError(name, command.Failed(thread.ErrTranscriptMissing))
+	case errors.Is(err, plugin.ErrDevBuildFailed):
+		// A watched dev plugin's build failed (plugin dev --watch, plugin surface and act
+		// right after an edit): the build's words, exit 1, no help pointer.
+		msg := err.Error()
+		if errors.As(err, &ce) {
+			msg = ce.Message()
+		}
+		return commandError(name, command.Failed(errors.New(msg)))
 	case errors.Is(err, command.ErrUnknownCommand):
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, command.ErrInvalidArgs):

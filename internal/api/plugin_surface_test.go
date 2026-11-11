@@ -267,7 +267,7 @@ func TestSurfaceDevSettle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	surfaces.Available["hello/main"] = true
-	surfaces.SettleErr = fmt.Errorf("%w: plugin hello: build failed: code-foundry plugin logs hello", plugin.ErrFailedPrecondition)
+	surfaces.SettleErr = fmt.Errorf("plugin hello: %w: code-foundry plugin logs hello", plugin.ErrDevBuildFailed)
 	_, err := c.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: helloRef}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "build failed: code-foundry plugin logs hello") {
 		t.Errorf("get: %v", err)
