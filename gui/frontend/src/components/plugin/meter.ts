@@ -8,8 +8,9 @@ import type { TableMeter } from "@/api/pluginTable";
 
 /**
  * The label's slot after the track (px): wide enough for a short label in the caption role
- * with tabular figures ("100%" 33 px, "3 of 8" 38 px in WebKit), and the same in every row
- * so a column's tracks line up. A longer label is cut, whole in its tooltip.
+ * with tabular figures ("100%" 36.3 px, "3 of 8" 35.6 px in WebKit), and the same in every
+ * row so a column's tracks line up. A longer label ("12 of 345", 60 px) is cut, whole in its
+ * tooltip.
  */
 export const METER_LABEL_PX = 40;
 /** The gap between the track and the label (gap-2). */
