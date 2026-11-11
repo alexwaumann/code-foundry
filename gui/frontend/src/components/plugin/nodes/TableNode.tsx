@@ -14,7 +14,8 @@ import { openRowMenuFromKey, rowMenuItems } from "../menu";
 import { GlyphView, InlineLine, PillView, PluginButton } from "../parts";
 import { MoreMenu, RowContextMenu } from "../PluginMenu";
 import type { NodeProps } from "../registry";
-import { allRows, cellParts, CELL_STYLE, nextSort, tableItems, tableLayout, type TableItem, type TableLayout } from "../table";
+import { allRows, cellParts, CELL_STYLE, columnWidths, nextSort, tableItems, tableLayout, type TableItem, type TableLayout } from "../table";
+import { MeterCell } from "./MeterCell";
 
 /**
  * A plugin table (docs/notes/plugin-table.md), drawn like the Pull Requests page's
@@ -34,6 +35,7 @@ export function TableNode({ node, data }: NodeProps<"table">) {
   const outer = useElementWidth(el);
   // The box's border is not the rows'.
   const layout = tableLayout(data, outer === null ? null : outer - 2);
+  const widths = columnWidths(layout, outer === null ? null : outer - 2);
   const sort = useAskedSort(data.sort);
   const groupKeys = (data.groups ?? []).map((g) => draftKeyOf(ctx.instance, ctx.viewTab, g.key));
   const toggled = usePluginSurfacesStore(useShallow((s) => groupKeys.map((k) => s.collapsed[k])));
@@ -66,7 +68,7 @@ export function TableNode({ node, data }: NodeProps<"table">) {
               estimate={dense ? DENSE_ROW_H : TABLE_ROW_H}
               className="flex min-w-0 flex-col"
               testId="plugin-table-rows"
-              render={(it) => <Line item={it} layout={layout} dense={dense} groupKey={(g) => groupKeys[(data.groups ?? []).indexOf(g)] ?? ""} />}
+              render={(it) => <Line item={it} layout={layout} widths={widths} dense={dense} groupKey={(g) => groupKeys[(data.groups ?? []).indexOf(g)] ?? ""} />}
             />
           )}
         </div>
@@ -143,8 +145,8 @@ function HeaderCell({ col, sort, onSort, inert }: { col: TableColumn; sort: Tabl
 }
 
 /** One line of the body: a group's label (a toggle) or a row. */
-function Line({ item, layout, dense, groupKey }: { item: TableItem; layout: TableLayout; dense: boolean; groupKey: (g: TableGroup) => string }) {
-  if (item.kind === "row") return <RowLine row={item.row} layout={layout} dense={dense} />;
+function Line({ item, layout, widths, dense, groupKey }: { item: TableItem; layout: TableLayout; widths: (number | null)[]; dense: boolean; groupKey: (g: TableGroup) => string }) {
+  if (item.kind === "row") return <RowLine row={item.row} layout={layout} widths={widths} dense={dense} />;
   const g = item.group;
   return (
     <div className="h-7" data-key={g.key}>
@@ -167,7 +169,7 @@ function Line({ item, layout, dense, groupKey }: { item: TableItem; layout: Tabl
  * on click, Enter or Space; a right-click (or the ContextMenu key, Shift+F10) opens the
  * same menu as the ⋯.
  */
-function RowLine({ row, layout, dense }: { row: TableRow; layout: TableLayout; dense: boolean }) {
+function RowLine({ row, layout, widths, dense }: { row: TableRow; layout: TableLayout; widths: (number | null)[]; dense: boolean }) {
   const run = useRunAction();
   const { inert } = useViewCtx();
   const menu = rowMenuItems(row, layout.folded);
@@ -202,8 +204,8 @@ function RowLine({ row, layout, dense }: { row: TableRow; layout: TableLayout; d
         }}
       >
         <RowGrid template={layout.template}>
-          {layout.columns.map((c) => (
-            <CellView key={c.key} col={c} row={row} />
+          {layout.columns.map((c, i) => (
+            <CellView key={c.key} col={c} row={row} width={widths[i] ?? null} />
           ))}
           {layout.buttons > 0 && (
             // Buttons stop the row's own click.
@@ -224,9 +226,16 @@ function RowLine({ row, layout, dense }: { row: TableRow; layout: TableLayout; d
   );
 }
 
-/** A cell: its glyph, its value (one line, its tooltip only when cut) and its pill, in the column's style and alignment. */
-function CellView({ col, row }: { col: TableColumn; row: TableRow }) {
-  const { value, glyph, pill } = cellParts(row.cells?.[col.key]);
+/** A cell: its glyph, its value (one line, its tooltip only when cut) and its pill, in the column's style and alignment; or its meter alone, as wide as the column (`width`). */
+function CellView({ col, row, width }: { col: TableColumn; row: TableRow; width: number | null }) {
+  const { value, glyph, pill, meter } = cellParts(row.cells?.[col.key]);
+  if (meter) {
+    return (
+      <div className="flex h-full min-w-0 items-center" data-col={col.key}>
+        <MeterCell meter={meter} width={width} />
+      </div>
+    );
+  }
   return (
     <div className={cn("flex min-w-0 items-center gap-1.5 tabular-nums", col.align === "end" && "justify-end text-right", CELL_STYLE[col.style ?? ""])} data-col={col.key}>
       {glyph && <GlyphView glyph={glyph} style="icon" named={pill !== undefined} />}

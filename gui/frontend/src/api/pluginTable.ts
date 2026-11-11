@@ -2,7 +2,7 @@
  * The view model's table node (pluginsdk/ui table.go): rows of cells under column headers
  * that drop, least important first, as the table narrows. docs/notes/plugin-table.md.
  */
-import type { Glyph, Inline, Pill, ViewAction, ViewButton, ViewMenu } from "./plugin";
+import type { Glyph, Inline, Pill, Tone, ViewAction, ViewButton, ViewMenu } from "./plugin";
 
 export type CellStyle = "" | "muted" | "mono" | "caption";
 export type SortDir = "asc" | "desc";
@@ -26,8 +26,19 @@ export interface TableColumn {
   sortFirst?: "" | SortDir;
 }
 
-/** A cell: an Inline alone, or {value, glyph, pill}. */
-export type TableCell = Inline | { value?: Inline; glyph?: Glyph; pill?: Pill };
+/**
+ * A meter (pluginsdk/ui Meter; docs/notes/plugin-table-meter.md): a bar the cell's width
+ * filled to `value` (a fraction, 0..1) with the plugin's own `label` after it ("86%", "3 of
+ * 8"; at most 16 characters), its fill in `tone`. Always a cell's whole content.
+ */
+export interface TableMeter {
+  value: number;
+  label?: string;
+  tone?: Tone;
+}
+
+/** A cell: an Inline alone, {value, glyph, pill}, or {meter} (capability view.table.meter). */
+export type TableCell = Inline | { value?: Inline; glyph?: Glyph; pill?: Pill } | { meter: TableMeter };
 
 export interface TableRow {
   key: string;

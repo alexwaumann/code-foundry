@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import type { TableColumn, TableData, TableRow } from "@/api/pluginTable";
 import { demoView } from "@/test/pluginFixtures";
-import { cellParts, columnTrack, nextSort, rankColumns, tableItems, tableLayout } from "./table";
+import { meterShowsLabel } from "./meter";
+import { cellParts, columnTrack, columnWidths, nextSort, rankColumns, tableItems, tableLayout } from "./table";
 
 // Columns like the demo's Builds table's (plugins/examples/hello/builds.go).
 const cols: TableColumn[] = [
@@ -123,6 +124,8 @@ describe("cellParts", () => {
     { name: "a glyph and a value", cell: { value: "#1", glyph: { status: "ok" } }, want: { value: "#1", glyph: { status: "ok" } } },
     { name: "a pill alone", cell: { pill: { label: "failed" } }, want: { pill: { label: "failed" } } },
     { name: "empty", cell: {}, want: {} },
+    { name: "a meter alone", cell: { meter: { value: 0.86, label: "86%", tone: "attention" } }, want: { meter: { value: 0.86, label: "86%", tone: "attention" } } },
+    { name: "an empty meter", cell: { meter: { value: 0 } }, want: { meter: { value: 0 } } },
   ] as const)("$name", ({ cell, want }) => {
     expect(cellParts(cell)).toEqual(want);
   });
@@ -149,11 +152,55 @@ describe("tableItems", () => {
   });
 });
 
+describe("columnWidths", () => {
+  const widths = (columns: TableColumn[], w: number | null, rows: TableRow[] = [row("1")]) => columnWidths(tableLayout({ columns, rows }, w), w);
+
+  it("is unknown before the table is measured", () => {
+    expect(widths(cols.slice(0, 2), null)).toEqual([null, null]);
+  });
+
+  it("gives fixed columns their width and shares the rest by weight, after the 20 px inset and the 12 px gaps", () => {
+    // 520 - 20 - 2 gaps = 476; less 72 fixed = 404 for weights 1 and 3.
+    const c: TableColumn[] = [{ key: "a", width: 72 }, { key: "b", weight: 1, minWidth: 16 }, { key: "c", weight: 3, minWidth: 16 }];
+    expect(widths(c, 520)).toEqual([72, 101, 303]);
+  });
+
+  it("freezes a weighted column whose share is under its floor and shares the rest among the others", () => {
+    // 400 - 20 - 12 = 368: weights 1 and 5 make 61 for a, under its 120 floor; b gets 248.
+    const c: TableColumn[] = [{ key: "a", weight: 1, minWidth: 120 }, { key: "b", weight: 5, minWidth: 16 }];
+    expect(widths(c, 400)).toEqual([120, 248]);
+  });
+
+  it("takes the buttons' and the ⋯ tracks off first", () => {
+    const c: TableColumn[] = [{ key: "a", weight: 1, minWidth: 16 }];
+    const withMenu = row("1", { menu: { items: [{ key: "m", label: "M", action: { event: "e" } }] } });
+    // 300 - 20 - 12 (one gap) - 24 (⋯) = 244.
+    expect(widths(c, 300, [withMenu])).toEqual([244]);
+  });
+
+  it("keeps the floors when even they do not fit", () => {
+    expect(widths([{ key: "a", minWidth: 200 }], 100)).toEqual([200]);
+  });
+});
+
 describe("the demo's tables (run-list.json)", () => {
   const tables = demoView("run-list").nodes.flatMap((n) => (n.table ? [{ key: n.key, t: n.table }] : []));
 
-  it("are the Builds table and the grouped tests table", () => {
-    expect(tables.map((x) => x.key)).toEqual(["builds", "tests"]);
+  it("are the Builds table, the suites' pass rates and the grouped tests table", () => {
+    expect(tables.map((x) => x.key)).toEqual(["builds", "suites", "tests"]);
+  });
+
+  it("keep the suites' labels beside their meters in the side panel (384 px inside the box at 420 px) and drop them at the narrowest shot (244 px at 280 px)", () => {
+    const t = tables[1]?.t;
+    if (!t) throw new Error("no suites table");
+    const meter = cellParts(t.rows?.[1]?.cells?.["su-rate"]).meter;
+    if (!meter) throw new Error("no meter");
+    expect(meter).toEqual({ value: 0.86, label: "86%", tone: "attention" });
+    const rate = (w: number) => columnWidths(tableLayout(t, w), w)[1] ?? null;
+    expect(rate(384)).toBeCloseTo(352 / 3);
+    expect(meterShowsLabel(meter, rate(384))).toBe(true);
+    expect(rate(244)).toBeCloseTo(212 / 3);
+    expect(meterShowsLabel(meter, rate(244))).toBe(false);
   });
 
   it("show what the sketches show: at the side panel's width the Builds table keeps #, Branch, Duration and Age, its Rerun buttons folded; expanded, every column and the buttons", () => {
