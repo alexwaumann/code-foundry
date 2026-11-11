@@ -41,22 +41,13 @@ plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
 
 ## The loop
 
-1. **Scaffold** under the home directory (`plugin dev` refuses others; ask where the user
-   keeps code), in a folder named after the repository:
-   ```
-   mkdir -p <dir>/code-foundry-plugin-<name> && cd <dir>/code-foundry-plugin-<name>
-   cp -R {{cf.example}}/. .
-   ```
-   Replace `minimal` and `Minimal` with the plugin's kebab-case name (`grep -rni minimal .`)
-   and fill in the README. Ask which GitHub Actions runner to use (`publishing.md`, "Runners").
+1. **Scaffold** under the home directory (ask where the user keeps code), with Go 1.24+:
+   `code-foundry plugin new <name> <dir> --owner <github owner>` makes
+   `<dir>/code-foundry-plugin-<name>` from the example, named, with the module (up to 3
+   minutes). Fill in the README; ask which Actions runner to use (`publishing.md`, "Runners").
 2. **Manifest**: edit `plugin.json`, with the fewest permissions that work.
-3. **Module** (Go 1.24 or newer; keep the `go` line `go mod init` writes):
-   ```
-   go mod init github.com/<owner>/code-foundry-plugin-<name>
-   go get github.com/alexwaumann/code-foundry/pluginsdk@{{cf.sdkPin}}
-   go mod tidy
-   ```
-   The pin is this build's SDK (first fetch: up to a minute; not on GitHub: `@main`).
+3. **SDK**: `plugin new` pins this build's; an existing plugin takes it with
+   `go get github.com/alexwaumann/code-foundry/pluginsdk@{{cf.sdkPin}}`.
 4. **Serve**: in `main.go`, `pluginsdk.Serve(pluginsdk.Plugin{...})` with a handler for every
    manifest command (`Commands`, by name) and surface (`Surfaces`, by id), plus `Init`,
    `OnEvent` and `Shutdown` as needed.

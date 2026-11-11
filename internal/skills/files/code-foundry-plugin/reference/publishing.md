@@ -34,8 +34,8 @@ README.md            the example's template filled in: what it does, how to inst
                      its permissions and why, development
 ```
 
-The example's files are already where the repository wants them (`.github/workflows/`
-included), so a copy is the repository:
+`plugin new` puts the example's files where the repository wants them (`.github/workflows/`
+included), so its folder is the repository:
 
 ```
 git init && git add -A && git commit -m "<name> 0.1.0"
@@ -43,9 +43,9 @@ gh repo create <owner>/code-foundry-plugin-<name> --public --source . --push
 gh run watch --exit-status $(gh run list --workflow ci.yml --limit 1 --json databaseId -q '.[0].databaseId')   # with workflows
 ```
 
-When the user created the repository first, clone it, copy the example into the clone
-(the skill's step 1: keep its LICENSE) and commit and push instead of `git init` and `gh
-repo create`.
+When the user created the repository first, `plugin new` refuses its clone (not empty):
+scaffold in another folder, `cp -R <that folder>/. <the clone>` (keeping its LICENSE), and
+commit and push instead of `git init` and `gh repo create`.
 
 ## Runners
 

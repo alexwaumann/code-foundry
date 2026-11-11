@@ -56,13 +56,15 @@ func TestDaemonInstallsSkills(t *testing.T) {
 			t.Errorf("%s: %d bytes, %v", f, len(b), err)
 		}
 	}
-	// The plugin skill copies the example from where it is installed; a test build has
-	// no commit, so it pins the SDK at main.
+	// The plugin skill restores the example's workflows from where it is installed; a test
+	// build has no commit, so it pins the SDK at main.
 	plug, _ := os.ReadFile(filepath.Join(skills, "code-foundry-plugin/SKILL.md"))
-	for _, want := range []string{"cp -R " + filepath.Join(skills, "code-foundry-plugin/example") + "/. .", "pluginsdk@main"} {
-		if !strings.Contains(string(plug), want) {
-			t.Errorf("code-foundry-plugin/SKILL.md lacks %q", want)
-		}
+	if !strings.Contains(string(plug), "pluginsdk@main") {
+		t.Error("code-foundry-plugin/SKILL.md lacks pluginsdk@main")
+	}
+	pub, _ := os.ReadFile(filepath.Join(skills, "code-foundry-plugin/reference/publishing.md"))
+	if want := "cp -R " + filepath.Join(skills, "code-foundry-plugin/example") + "/.github ."; !strings.Contains(string(pub), want) {
+		t.Errorf("code-foundry-plugin/reference/publishing.md lacks %q", want)
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Errorf("the old skill is still there: %v", err)
