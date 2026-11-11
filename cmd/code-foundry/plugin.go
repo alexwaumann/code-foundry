@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"image/png"
+	"io"
+	"os"
 	"strconv"
 
 	"connectrpc.com/connect"
@@ -11,6 +16,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/client"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/shot"
 )
 
 // cliFollower keeps printing a plugin's log after a command succeeded (its result is
@@ -100,4 +106,72 @@ func (cl *cli) followPluginLog(ctx context.Context, c *client.Client, name strin
 		return cl.invokeFailed("plugin.logs", err)
 	}
 	return nil
+}
+
+// cliAfter runs after a command's result is printed and before any follower, for a "CLI:"
+// arg the daemon's command does not act on: plugin surface --shot. out is where its lines
+// go (stderr under --json, so stdout stays one JSON value).
+type cliAfter func(ctx context.Context, cl *cli, c *client.Client, uctx *v1.UiContext, vals map[string]string, res *v1.InvokeCommandResponse, out io.Writer) error
+
+var cliAfters = map[string]cliAfter{
+	"plugin.surface": writeSurfaceShot,
+}
+
+// writeSurfaceShot is plugin surface --shot: a PNG of the instance the command printed,
+// from the app (PluginService.ShotSurface), written to the file. The daemon never writes
+// it and never starts the app; without one the shot fails with the reason, exit 1.
+func writeSurfaceShot(ctx context.Context, cl *cli, c *client.Client, uctx *v1.UiContext, vals map[string]string, res *v1.InvokeCommandResponse, out io.Writer) error {
+	path := vals["shot"]
+	if path == "" {
+		return nil
+	}
+	fail := func(msg string) error {
+		fmt.Fprintf(cl.stderr, "code-foundry plugin.surface: %s\n", msg)
+		return errReported
+	}
+	var got v1.GetSurfaceResponse
+	if err := protojson.Unmarshal([]byte(res.GetResultJson()), &got); err != nil || got.GetState().GetInstance() == "" {
+		return fail("no screenshot: no surface instance in the result")
+	}
+	if got.GetView() == nil {
+		return fail("no screenshot: the surface sent no view yet")
+	}
+	width, _ := strconv.Atoi(vals["width"])
+	height, _ := strconv.Atoi(vals["height"])
+	shotRes, err := c.Plugin.ShotSurface(ctx, connect.NewRequest(&v1.ShotSurfaceRequest{
+		Ref:        &v1.SurfaceRef{Plugin: vals["name"], Surface: vals["surface"], Context: uctx},
+		Instance:   got.GetState().GetInstance(),
+		MinVersion: got.GetView().GetVersion(),
+		Width:      int32(width), Height: int32(height),
+	}))
+	if err != nil {
+		if ce := (*connect.Error)(nil); errors.As(err, &ce) {
+			return fail(ce.Message())
+		}
+		return fail("no screenshot: " + err.Error())
+	}
+	m := shotRes.Msg
+	if err := os.WriteFile(path, m.GetPng(), 0o644); err != nil {
+		return fail(fmt.Sprintf("no screenshot: %v", err))
+	}
+	fmt.Fprintln(out, shotSummary(path, m))
+	return nil
+}
+
+// shotSummary is the line --shot prints: the file, its size, and what to pass when the
+// view is taller than the viewport.
+func shotSummary(path string, m *v1.ShotSurfaceResponse) string {
+	line := fmt.Sprintf("screenshot: %s (%d by %d CSS px", path, m.GetWidth(), m.GetHeight())
+	if cfg, err := png.DecodeConfig(bytes.NewReader(m.GetPng())); err == nil {
+		line += fmt.Sprintf(", %d by %d px", cfg.Width, cfg.Height)
+	}
+	line += ")"
+	switch tall := m.GetContentHeight(); {
+	case tall <= m.GetHeight():
+	case tall <= shot.MaxHeight:
+		line += fmt.Sprintf("\nthe view is %d px tall: pass --height %d", tall, tall)
+	default:
+		line += fmt.Sprintf("\nthe view is %d px tall; the shot shows the top %d px (--height is at most %d)", tall, m.GetHeight(), shot.MaxHeight)
+	}
+	return line
 }
