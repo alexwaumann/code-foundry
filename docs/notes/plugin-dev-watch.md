@@ -20,7 +20,7 @@ the plugin skill's per-edit `make build && plugin restart <name>`.
   (`childproc`, killed whole on timeout), 5-minute timeout, the plugin's minimal env
   without the API env: the build has the plugin's privileges, not the daemon's. Every
   output line goes to the plugin log as source `build`.
-- **Command**: `--build` defaults to `make build`, kept with the dev link (migration 0059:
+- **Command**: `--build` defaults to `make build`, kept with the dev link (migration 0060:
   `plugins.dev_watch`, `plugins.dev_build`); no manifest field. `--watch` set turns the
   watch on (and builds now, synchronously: a failed first build exits 1 with its last 20
   lines) or off; unset leaves it as it was, so a plain `plugin dev` re-run does not drop

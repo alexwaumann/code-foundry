@@ -24,7 +24,7 @@ type row struct {
 	// 0033); "" when not known.
 	Origin string
 	// DevWatch and DevBuild are `plugin dev --watch` and its --build (devwatch.go,
-	// migration 0059); "" builds with DefaultDevBuild.
+	// migration 0060); "" builds with DefaultDevBuild.
 	DevWatch bool
 	DevBuild string
 }
