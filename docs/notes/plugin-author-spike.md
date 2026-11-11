@@ -38,7 +38,9 @@ It finished in one turn: 589 s, $2.95, a working plugin with tests.
    author reasoned that a plugin with no permissions was safe and re-ran with `--yes`
    without asking. The skill said "tell the user … and re-run with `--yes` once they
    agree". **Fixed here**: step 5 now says to stop, show the text, and re-run only after a
-   yes, with no permissions too.
+   yes, with no permissions too. **Softened the next day** (a user's call): an agent
+   may pass `--yes` itself for a plugin it wrote in the thread that asks for no permissions;
+   one that asks for any still needs the user's yes.
 3. **`plugin new`'s next-step line was stale**: it still printed `make build && … plugin
    dev "$PWD" --follow=false` (written before `--watch` merged). **Fixed here**: it prints
    the `--watch` form.
