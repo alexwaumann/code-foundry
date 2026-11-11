@@ -99,7 +99,9 @@ export type ThreadSubscription = Message<"codefoundry.v1.ThreadSubscription"> & 
   targetStatus: string;
 
   /**
-   * A plugin target's args: given, defaulted or taken from the subscriber's context.
+   * A plugin target's args: given, defaulted or taken from the subscriber's context. A
+   * thread target's: "group" (thread new --notify-group) and "until": "finished" (a
+   * --notify subscription, which ends with the wake reporting its thread finished).
    *
    * @generated from field: map<string, string> args = 20;
    */

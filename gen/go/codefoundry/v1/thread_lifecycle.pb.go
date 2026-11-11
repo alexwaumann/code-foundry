@@ -2707,13 +2707,18 @@ type CreateThreadRequest struct {
 	// Thread.budget_usd; 0 for none, never negative.
 	BudgetUsd float64 `protobuf:"fixed64,18,opt,name=budget_usd,json=budgetUsd,proto3" json:"budget_usd,omitempty"`
 	// With created_by: also subscribe the creator to the new thread, condition SETTLED,
-	// repeat (ThreadService.Subscribe), so the creator's agent is woken each time the new
-	// thread settles. INVALID_ARGUMENT without created_by. See
-	// docs/notes/agents-4-wake.md.
+	// repeat (ThreadService.Subscribe), so the creator's agent is woken when the new thread
+	// settles, until a wake reports it finished a turn: then the subscription ends, and the
+	// creator's next send to it subscribes it again (SendThreadMessageRequest.no_notify;
+	// ThreadSubscription.args "until": "finished"). INVALID_ARGUMENT without created_by. See
+	// docs/notes/agents-4-wake.md and docs/notes/notify-ends-on-finish.md.
 	Notify bool `protobuf:"varint,19,opt,name=notify,proto3" json:"notify,omitempty"`
 	// Implies notify: the creator's wake waits until every thread of this group settled, and
 	// comes at once for one that failed or needs it (docs/notes/wake-groups.md).
 	NotifyGroup string `protobuf:"bytes,31,opt,name=notify_group,json=notifyGroup,proto3" json:"notify_group,omitempty"`
+	// With notify: the subscription does not end when the thread finishes; it wakes the
+	// creator each time the thread settles until it is archived (Ember's workers).
+	NotifyRepeat bool `protobuf:"varint,32,opt,name=notify_repeat,json=notifyRepeat,proto3" json:"notify_repeat,omitempty"`
 	// An idempotency key (at most 128 characters): a Create with a key its creator
 	// (created_by, or the user when empty) already used within the last 24 hours returns
 	// the thread that first Create made (CreateThreadResponse.reused) and starts nothing;
@@ -2922,6 +2927,13 @@ func (x *CreateThreadRequest) GetNotifyGroup() string {
 		return x.NotifyGroup
 	}
 	return ""
+}
+
+func (x *CreateThreadRequest) GetNotifyRepeat() bool {
+	if x != nil {
+		return x.NotifyRepeat
+	}
+	return false
 }
 
 func (x *CreateThreadRequest) GetRequestId() string {
@@ -7918,7 +7930,7 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x127\n" +
-	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xae\b\n" +
+	"\tlinked_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\blinkedAt\"\xd3\b\n" +
 	"\x13CreateThreadRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
@@ -7942,7 +7954,8 @@ const file_codefoundry_v1_thread_lifecycle_proto_rawDesc = "" +
 	"\n" +
 	"budget_usd\x18\x12 \x01(\x01R\tbudgetUsd\x12\x16\n" +
 	"\x06notify\x18\x13 \x01(\bR\x06notify\x12!\n" +
-	"\fnotify_group\x18\x1f \x01(\tR\vnotifyGroup\x12\x1d\n" +
+	"\fnotify_group\x18\x1f \x01(\tR\vnotifyGroup\x12#\n" +
+	"\rnotify_repeat\x18  \x01(\bR\fnotifyRepeat\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x14 \x01(\tR\trequestId\x12'\n" +
 	"\x0fmodel_defaulted\x18\x16 \x01(\bR\x0emodelDefaulted\x12)\n" +

@@ -111,7 +111,9 @@ message ThreadSubscription {
   // before the GitHub poll saw it), a plugin's state ("running", "disabled"), a timer's
   // next fire ("next 09:30", "due"); "gone" when the target no longer exists.
   string target_status = 12;
-  // A plugin target's args: given, defaulted or taken from the subscriber's context.
+  // A plugin target's args: given, defaulted or taken from the subscriber's context. A
+  // thread target's: "group" (thread new --notify-group) and "until": "finished" (a
+  // --notify subscription, which ends with the wake reporting its thread finished).
   map<string, string> args = 20;
   // Why the subscriber asked to be woken (SubscribeThreadRequest.note); its wake
   // carries it. "" for none.

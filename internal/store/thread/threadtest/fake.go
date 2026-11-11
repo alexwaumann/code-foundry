@@ -174,7 +174,8 @@ func (f *Fake) add(call string, s thread.Thread) (thread.Thread, error) {
 // " new-worktree=<base>", " branch=<b>", " workspace=<id>", " projects=<a,b>",
 // " like=<id>", " new-branch", " checkout-mode", " no-project", " cwd=<dir>",
 // " owner=<id>", " prompt=<text>", " composer=<text>", " attachments=<a,b>",
-// " created-by=<id>", " brief=<text>", " labels=<a,b>", " budget=<usd>" and " notify"
+// " created-by=<id>", " brief=<text>", " labels=<a,b>", " budget=<usd>", " notify" and
+// " notify-repeat"
 // when set.
 func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Thread, error) {
 	f.applyCreateDefaults(ctx, &o)
@@ -255,13 +256,28 @@ func (f *Fake) Create(ctx context.Context, o thread.CreateOptions) (thread.Threa
 			return thread.Thread{}, fmt.Errorf("%w: notify needs created-by", thread.ErrInvalidArgument)
 		}
 		call += " notify"
+		if o.NotifyRepeat {
+			call += " notify-repeat"
+		}
 	}
 	s, err := f.add(call, s)
 	if err == nil && o.Notify {
+		// The store's args: the group, and "until": "finished" unless it repeats until
+		// archived (subscriptions_until.go).
+		var args map[string]string
+		if o.NotifyGroup != "" {
+			args = map[string]string{"group": o.NotifyGroup}
+		}
+		if !o.NotifyRepeat {
+			if args == nil {
+				args = map[string]string{}
+			}
+			args["until"] = "finished"
+		}
 		f.mu.Lock()
 		f.nextSub++
 		f.subs = append(f.subs, thread.Subscription{ID: fmt.Sprintf("sub-%d", f.nextSub), SubscriberID: s.CreatedBy,
-			TargetKind: thread.TargetThread, TargetID: s.ID, Condition: thread.CondSettled, Repeat: true, CreatedAt: f.Now()})
+			TargetKind: thread.TargetThread, TargetID: s.ID, Condition: thread.CondSettled, Args: args, Repeat: true, CreatedAt: f.Now()})
 		f.mu.Unlock()
 	}
 	return s, err
@@ -790,6 +806,9 @@ func (f *Fake) Send(_ context.Context, id string, msg thread.Message) (thread.It
 	}
 	if msg.ComposerText != "" {
 		call += " composer=" + msg.ComposerText
+	}
+	if msg.NoNotify {
+		call += " no-notify" // the store's renotify is skipped (subscriptions_until.go)
 	}
 	if err := f.record(call); err != nil {
 		f.mu.Unlock()

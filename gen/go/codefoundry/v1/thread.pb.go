@@ -3509,7 +3509,11 @@ type SendThreadMessageRequest struct {
 	ComposerText string `protobuf:"bytes,4,opt,name=composer_text,json=composerText,proto3" json:"composer_text,omitempty"`
 	// The thread that sends it (the CLI sends $CODE_FOUNDRY_THREAD); empty for the user.
 	// Kept on the item, so prompt history (ListPrompts) leaves the message out.
-	ByThreadId    string `protobuf:"bytes,5,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
+	ByThreadId string `protobuf:"bytes,5,opt,name=by_thread_id,json=byThreadId,proto3" json:"by_thread_id,omitempty"`
+	// A send by_thread_id to a thread whose --notify subscription from it ended (the thread
+	// finished) subscribes it again the same way, armed on this message; true opts out
+	// (thread send --notify=false, and --wait, which waits instead).
+	NoNotify      bool `protobuf:"varint,6,opt,name=no_notify,json=noNotify,proto3" json:"no_notify,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3577,6 +3581,13 @@ func (x *SendThreadMessageRequest) GetByThreadId() string {
 		return x.ByThreadId
 	}
 	return ""
+}
+
+func (x *SendThreadMessageRequest) GetNoNotify() bool {
+	if x != nil {
+		return x.NoNotify
+	}
+	return false
 }
 
 type SendThreadMessageResponse struct {
@@ -6167,14 +6178,15 @@ const file_codefoundry_v1_thread_proto_rawDesc = "" +
 	"next_since\x18\x03 \x01(\tR\tnextSince\x12\x12\n" +
 	"\x04more\x18\x04 \x01(\bR\x04more\"1\n" +
 	"\x12WatchThreadRequest\x12\x1b\n" +
-	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\xb4\x01\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\xd1\x01\n" +
 	"\x18SendThreadMessageRequest\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12 \n" +
 	"\vattachments\x18\x03 \x03(\tR\vattachments\x12#\n" +
 	"\rcomposer_text\x18\x04 \x01(\tR\fcomposerText\x12 \n" +
 	"\fby_thread_id\x18\x05 \x01(\tR\n" +
-	"byThreadId\"K\n" +
+	"byThreadId\x12\x1b\n" +
+	"\tno_notify\x18\x06 \x01(\bR\bnoNotify\"K\n" +
 	"\x19SendThreadMessageResponse\x12.\n" +
 	"\x04item\x18\x01 \x01(\v2\x1a.codefoundry.v1.ThreadItemR\x04item\"3\n" +
 	"\x14CompactThreadRequest\x12\x1b\n" +

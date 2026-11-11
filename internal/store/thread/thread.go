@@ -533,6 +533,10 @@ type CreateOptions struct {
 	// NotifyGroup, with Notify, puts the subscription in a group: one wake when all of its
 	// threads settled (subscriptions_group.go).
 	NotifyGroup string
+	// NotifyRepeat, with Notify, keeps the subscription after the thread finished, until
+	// it is archived (Ember's workers); without it the subscription ends with the wake
+	// that reports the finish (subscriptions_until.go).
+	NotifyRepeat bool
 	// Owner makes the thread someone else's than the user's ("plugin:<name>"; owner.go):
 	// hidden from the user's lists. Exclusive with CreatedBy.
 	Owner string

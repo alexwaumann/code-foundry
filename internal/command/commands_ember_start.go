@@ -82,7 +82,7 @@ func emberTaskStart(r *Registry, d EmberDeps) Command {
 			}
 			raw := map[string]string{
 				"project": a.String("project"), "name": p.title, "prompt": a.String("prompt"), "created-by": creator,
-				"labels": strings.Join(emberLabels(p.id, a.String("labels")), ","), "notify": "true", "request-id": p.id,
+				"labels": strings.Join(emberLabels(p.id, a.String("labels")), ","), "notify": "true", "notify-repeat": "true", "request-id": p.id,
 			}
 			for _, name := range []string{"brief", "budget", "base"} {
 				if v := a.String(name); v != "" {

@@ -84,6 +84,39 @@ func TestThreadSubscriptions(t *testing.T) {
 	if calls := fake.Calls(); !slices.ContainsFunc(calls, func(c string) bool { return c == "Create r1    created-by=s-p notify" }) {
 		t.Errorf("calls = %q", calls)
 	}
+	// A --notify subscription ends with its thread's finish: its args say so; Ember's
+	// workers (notify_repeat) keep today's.
+	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateThreadRequest{ProjectId: "r1", CreatedBy: "s-p", Notify: true, NotifyRepeat: true})); err != nil {
+		t.Fatal(err)
+	}
+	list, err = c.ListSubscriptions(ctx, connect.NewRequest(&v1.ListThreadSubscriptionsRequest{SubscriberThreadId: "s-p"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var until []string
+	for _, s := range list.Msg.GetSubscriptions()[1:] {
+		until = append(until, s.GetArgs()["until"])
+	}
+	if !slices.Equal(until, []string{"finished", ""}) {
+		t.Errorf("until = %q", until)
+	}
+	if calls := fake.Calls(); !slices.Contains(calls, "Create r1    created-by=s-p notify notify-repeat") {
+		t.Errorf("calls = %q", calls)
+	}
+}
+
+// A send's no_notify reaches the store (thread send --notify=false, --wait).
+func TestSendNoNotify(t *testing.T) {
+	fake, c := newThreadServer(t)
+	fake.Put(thread.Thread{ID: "s-c", State: thread.StateConnected})
+	for _, no := range []bool{false, true} {
+		if _, err := c.Send(context.Background(), connect.NewRequest(&v1.SendThreadMessageRequest{ThreadId: "s-c", Text: "more", ByThreadId: "s-p", NoNotify: no})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls := fake.Calls(); !slices.Equal(calls[len(calls)-2:], []string{"Send s-c more", "Send s-c more no-notify"}) {
+		t.Errorf("calls = %q", calls)
+	}
 }
 
 func TestUserMessageOrigin(t *testing.T) {

@@ -153,6 +153,7 @@ type SetupRequest struct {
 	Attachments    []string     `json:"attachments,omitempty"`
 	Notify         bool         `json:"notify,omitempty"`
 	NotifyGroup    string       `json:"notify_group,omitempty"`
+	NotifyRepeat   bool         `json:"notify_repeat,omitempty"`
 	// DraftJSON is CreateOptions.DraftJSON: the GUI's, never read here.
 	DraftJSON string `json:"draft_json,omitempty"`
 }
@@ -162,7 +163,8 @@ func setupRequestOf(o CreateOptions) *SetupRequest {
 	return &SetupRequest{ProjectID: o.ProjectID, WorktreePath: o.WorktreePath, ProjectIDs: slices.Clone(o.ProjectIDs), Like: o.Like,
 		NewBranch: o.NewBranch, CheckoutMode: o.CheckoutMode, WorkspaceID: o.WorkspaceID, NoProject: o.NoProject, Cwd: o.Cwd,
 		ResumeSession: o.ResumeSession, NewWorktree: o.NewWorktree, Name: o.Name, InitialPrompt: o.InitialPrompt,
-		ComposerPrompt: o.ComposerPrompt, Attachments: slices.Clone(o.Attachments), Notify: o.Notify, NotifyGroup: o.NotifyGroup, DraftJSON: o.DraftJSON}
+		ComposerPrompt: o.ComposerPrompt, Attachments: slices.Clone(o.Attachments), Notify: o.Notify, NotifyGroup: o.NotifyGroup, NotifyRepeat: o.NotifyRepeat,
+		DraftJSON: o.DraftJSON}
 }
 
 // Setup is Thread.Setup. Never changed in place: edit makes the copy that replaces it.

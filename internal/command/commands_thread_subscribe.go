@@ -115,6 +115,9 @@ func subscriptionArgs(s *v1.ThreadSubscription) string {
 	args := s.GetArgs()
 	keys := make([]string, 0, len(args))
 	for k := range args {
+		if k == "until" && untilFinished(s) {
+			continue // the repeat column and "until it finishes" say it
+		}
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
@@ -124,6 +127,10 @@ func subscriptionArgs(s *v1.ThreadSubscription) string {
 	}
 	return strings.Join(parts, " ")
 }
+
+// untilFinished reports whether s is a --notify subscription, which ends with the wake
+// reporting its thread finished (docs/notes/notify-ends-on-finish.md).
+func untilFinished(s *v1.ThreadSubscription) bool { return s.GetArgs()["until"] == "finished" }
 
 // parseWakeArgs reads thread.subscribe's --arg values: "k=v" lines (the CLI joins a
 // repeated flag's values with newlines).
@@ -164,7 +171,10 @@ func subscriptionLine(s *v1.ThreadSubscription) string {
 // subscriptionWhat is subscriptionLine without the note.
 func subscriptionWhat(s *v1.ThreadSubscription) string {
 	how := "once"
-	if s.GetRepeat() {
+	switch {
+	case untilFinished(s):
+		how = "repeat until it finishes"
+	case s.GetRepeat():
 		how = "repeat"
 	}
 	verb := "is " + conditionName(s.GetCondition())
@@ -465,7 +475,10 @@ func formatSubscriptions(subs []*v1.ThreadSubscription, subscriber string) strin
 	_, _ = fmt.Fprintln(tw, header)
 	for _, s := range subs {
 		repeat, last := "no", "-"
-		if s.GetRepeat() {
+		switch {
+		case untilFinished(s):
+			repeat = "until done"
+		case s.GetRepeat():
 			repeat = "yes"
 		}
 		if t := s.GetLastFiredAt(); t != nil {

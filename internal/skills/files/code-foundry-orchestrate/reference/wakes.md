@@ -8,12 +8,15 @@ and what to do in the turn it starts. Every command runs in your Bash tool.
 ## Following up from a wake turn
 
 From a wake turn, follow up with `thread send --id <child>` WITHOUT `--wait` and end the
-turn (`send --wait` there holds back your other children's wakes); the subscription
-fires again on its next settle.
+turn (`send --wait` there holds back your other children's wakes); the send subscribes you
+to it again, so its answer wakes you. Never subscribe or unsubscribe by hand for this.
 
 ## Finished
 
-`needs attention (finished)` is a turn that ended normally. Under "It said" is the child's
+`needs attention (finished)` is a turn that ended normally, and the last wake from that
+child until you `thread send` to it: a turn the user runs in it wakes nobody. A prompt, a
+question, an error, a budget stop or a blocked or failed report is no finish: its finish
+still comes. Under "It said" is the child's
 own last message, whole: its result, and maybe a question asked in prose (answer with
 `thread send --id <child>`). You need no `thread read` for it. `Report: blocked` or `failed`
 is the child's own word that it could not finish.
