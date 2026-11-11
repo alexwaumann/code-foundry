@@ -30,7 +30,7 @@ func RegisterPluginNew(r *Registry, s PluginScaffolder) error {
 		NoPalette: true,
 		Title:     "New Plugin",
 		Description: "Start a plugin repository: <dir>/" + pluginscaffold.DirPrefix + "<name> from the minimal example " +
-			"with its name filled in, then go mod init, go get the SDK at this daemon's pin and go mod tidy (up to 3 minutes). " +
+			"with its name filled in, then go mod init, go get the SDK at this daemon's pin and go mod tidy (up to 5 minutes). " +
 			"If go fails, the files stay and it prints the commands to finish by hand (exit 1). It runs neither git init nor plugin dev.",
 		Category:     "Plugin",
 		NoKeybinding: true,
@@ -60,7 +60,7 @@ func RegisterPluginNew(r *Registry, s PluginScaffolder) error {
 // that finish the module when the go step failed.
 func formatPluginNew(res pluginscaffold.Result, owner, name string) (string, int) {
 	dir := quoteArg(res.Dir)
-	next := "make build && code-foundry plugin dev \"$PWD\" --follow=false"
+	next := "code-foundry plugin dev \"$PWD\" --watch --follow=false"
 	lines := []string{fmt.Sprintf("created %s (module %s, %d files)", res.Dir, res.Module, len(res.Files))}
 	code := 0
 	if res.GoError != "" {
