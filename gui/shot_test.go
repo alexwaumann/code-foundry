@@ -24,6 +24,8 @@ type fakeShotPanel struct {
 	picture func(id string) shotPicture
 	// noReady: an opened page never says it is ready.
 	noReady bool
+	// showErr: the window cannot be ordered in.
+	showErr error
 
 	mu       sync.Mutex
 	logs     []string
@@ -51,7 +53,11 @@ func (p *fakeShotPanel) open() {
 	}
 }
 
-func (p *fakeShotPanel) show(width, height int, req shotPageRequest) {
+func (p *fakeShotPanel) show(width, height int, req shotPageRequest) error {
+	if p.showErr != nil {
+		p.log("show failed")
+		return p.showErr
+	}
 	p.mu.Lock()
 	p.logs = append(p.logs, fmt.Sprintf("show:%s %dx%d", req.ID, width, height))
 	p.shown = req.ID
@@ -62,9 +68,10 @@ func (p *fakeShotPanel) show(width, height int, req shotPageRequest) {
 	p.mu.Unlock()
 	if p.onShow != nil {
 		p.onShow(req)
-		return
+		return nil
 	}
 	go p.svc.Rendered(req.ID, ShotRendered{ContentHeight: 900})
+	return nil
 }
 
 func (p *fakeShotPanel) snapshot() <-chan shotPicture {
@@ -228,6 +235,18 @@ func TestShotHostTimeout(t *testing.T) {
 	}
 	want := []string{"open", "show:a 420x900", "close", "open", "show:c 420x900", "snapshot:c", "hide"}
 	if got := panel.got(); !slices.Equal(got, want) {
+		t.Errorf("panel %v, want %v", got, want)
+	}
+}
+
+func TestShotWindowThatCannotShow(t *testing.T) {
+	panel := &fakeShotPanel{showErr: errors.New("cannot draw off-screen")}
+	svc, pub, ctx, _ := newShotHarness(t, panel)
+	svc.take(ctx, shotReq("a"))
+	if got, want := pub.next(t, wait), "a error=cannot draw off-screen"; got != want {
+		t.Fatalf("published %q, want %q", got, want)
+	}
+	if got, want := panel.got(), []string{"open", "show failed", "hide"}; !slices.Equal(got, want) {
 		t.Errorf("panel %v, want %v", got, want)
 	}
 }

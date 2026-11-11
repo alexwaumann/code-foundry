@@ -6,6 +6,7 @@ package main
 #include <stdint.h>
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import <objc/message.h>
 
 // cfShotDone is Go's (shot_export_darwin.go): the snapshot of request token, as PNG bytes,
 // or why there is none.
@@ -20,14 +21,6 @@ static WKWebView* cfShotWebView(NSView* v) {
 	return nil;
 }
 
-// What Wails has no option for: out of the Window menu and the Dock's window list, and no
-// AppKit animation when it orders in or out. Main thread only.
-static void cfShotConfigure(void* nsWindow) {
-	NSWindow* w = (__bridge NSWindow*)nsWindow;
-	w.excludedFromWindowsMenu = YES;
-	w.animationBehavior = NSWindowAnimationBehaviorNone;
-}
-
 // The window's content, the page's viewport, to width by height points. Main thread only.
 static void cfShotSize(void* nsWindow, double width, double height) {
 	NSWindow* w = (__bridge NSWindow*)nsWindow;
@@ -37,12 +30,24 @@ static void cfShotSize(void* nsWindow, double width, double height) {
 	if (view != nil) view.frame = w.contentView.bounds;
 }
 
-// Orders the window in outside every display: right of the rightmost screen's right edge,
-// so no part of it is on any screen, at the back of its level, without activating the app
-// or making it key. WebKit runs requestAnimationFrame only for a page in an ordered-in
-// window. Main thread only.
-static void cfShotOrderIn(void* nsWindow) {
+// Orders the window in outside every display, above and right of all of them, at the back
+// of its level, without activating the app or making it key. A borderless window keeps the
+// frame it is given; a titled one AppKit pulls back onto a screen.
+//
+// WebKit draws (and runs requestAnimationFrame) only for a page it thinks visible: in a
+// window ordered in and not occluded. A window on no display is occluded, so the webview is
+// told to ignore occlusion (a private switch, WKWebViewPrivate.h; macOS 10.13 and later).
+// Also what Wails has no option for: out of the Window menu and the Dock's window list, and
+// no AppKit animation. Returns false when the switch is missing: the page would stay hidden.
+// Main thread only.
+static bool cfShotOrderIn(void* nsWindow) {
 	NSWindow* w = (__bridge NSWindow*)nsWindow;
+	WKWebView* view = cfShotWebView(w.contentView);
+	SEL occlusion = NSSelectorFromString(@"_setWindowOcclusionDetectionEnabled:");
+	if (view == nil || ![view respondsToSelector:occlusion]) return false;
+	((void (*)(id, SEL, BOOL))objc_msgSend)(view, occlusion, NO);
+	w.excludedFromWindowsMenu = YES;
+	w.animationBehavior = NSWindowAnimationBehaviorNone;
 	CGFloat right = 0, top = 0;
 	for (NSScreen* s in [NSScreen screens]) {
 		right = MAX(right, NSMaxX(s.frame));
@@ -50,6 +55,7 @@ static void cfShotOrderIn(void* nsWindow) {
 	}
 	[w setFrameOrigin:NSMakePoint(right + 4000, top + 4000)];
 	[w orderWindow:NSWindowBelow relativeTo:0];
+	return true;
 }
 
 // Main thread only.
@@ -102,7 +108,6 @@ import (
 	"unsafe"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // shotPage is the window's page: a Vite input of its own (vite.config.ts).
@@ -112,11 +117,10 @@ const shotPage = "/shot.html"
 const shotBehavior = application.MacWindowCollectionBehaviorTransient |
 	application.MacWindowCollectionBehaviorIgnoresCycle
 
-// shotWindow is the shot page's window. It is never shown on a display: WebKit gives a
-// page in a window that was never ordered in no animation frames (the page's
-// visibilityState is "hidden"), so for each shot it is ordered in outside every display,
-// behind the app's other windows and without taking focus, and ordered out after the
-// snapshot. The snapshot is the webview's own (WKWebView takeSnapshot), not a screen
+// shotWindow is the shot page's window. It is never on a display: WebKit gives a page in a
+// window that was never ordered in no animation frames (the page's visibilityState is
+// "hidden"), so for each shot it is ordered in outside every display, behind the app's
+// other windows and without taking focus, and ordered out after the snapshot. The snapshot is the webview's own (WKWebView takeSnapshot), not a screen
 // capture, so it needs no Screen Recording permission.
 type shotWindow struct {
 	app *application.App
@@ -148,14 +152,11 @@ func (s *shotWindow) open() {
 		IgnoreMouseEvents:          true,
 		DefaultContextMenuDisabled: true,
 		Mac: application.MacWindow{
-			// Square: a borderless window, no title bar over the page.
+			// Square: borderless, so it stays where cfShotOrderIn puts it, off every display.
 			CornerType:         application.MacWindowCornerTypeSquare,
 			DisableShadow:      true,
 			CollectionBehavior: shotBehavior,
 		},
-	})
-	w.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, func(*application.WindowEvent) {
-		application.InvokeSync(func() { C.cfShotConfigure(w.NativeWindow()) })
 	})
 	s.window = w
 	s.log.Info("shot: window opened")
@@ -167,22 +168,26 @@ func (s *shotWindow) current() *application.WebviewWindow {
 	return s.window
 }
 
-func (s *shotWindow) show(width, height int, req shotPageRequest) {
+func (s *shotWindow) show(width, height int, req shotPageRequest) error {
 	w := s.current()
 	if w == nil {
-		return
+		return errors.New("the screenshot window is gone")
 	}
 	js, err := json.Marshal(req)
 	if err != nil {
-		s.log.Error("shot: request", "err", err)
-		return
+		return err
 	}
+	var in bool
 	application.InvokeSync(func() {
 		C.cfShotSize(w.NativeWindow(), C.double(width), C.double(height))
-		C.cfShotOrderIn(w.NativeWindow())
+		in = bool(C.cfShotOrderIn(w.NativeWindow()))
 	})
+	if !in {
+		return errors.New("this macOS's WebKit cannot draw a window that is on no display")
+	}
 	// json.Marshal escapes <, >, &, U+2028 and U+2029: the literal is safe in a script.
 	w.ExecJS("window.cfShot(" + string(js) + ")")
+	return nil
 }
 
 func (s *shotWindow) snapshot() <-chan shotPicture {

@@ -91,8 +91,8 @@ type shotPanel interface {
 	// page calls ShotService.PageReady once it takes requests.
 	open()
 	// show sizes the page's viewport to width by height CSS px, orders the window in
-	// outside every display and hands the page req.
-	show(width, height int, req shotPageRequest)
+	// outside every display and hands the page req; or says why it cannot.
+	show(width, height int, req shotPageRequest) error
 	// snapshot captures the viewport; the channel gets one picture.
 	snapshot() <-chan shotPicture
 	// hide orders the window out.
@@ -210,7 +210,11 @@ func (s *ShotService) shoot(ctx context.Context, job shotJob) {
 	}
 
 	left := time.Until(job.deadline) - shotCaptureMargin
-	s.panel.show(int(job.req.GetWidth()), int(job.req.GetHeight()), pageRequestOf(job.req, min(shotPageTimeout, max(left, time.Second))))
+	if err := s.panel.show(int(job.req.GetWidth()), int(job.req.GetHeight()), pageRequestOf(job.req, min(shotPageTimeout, max(left, time.Second)))); err != nil {
+		s.panel.hide()
+		s.answerError(job, err.Error())
+		return
+	}
 	var got shotAnswer
 	select {
 	case got = <-answer:
