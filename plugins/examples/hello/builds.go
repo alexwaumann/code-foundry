@@ -13,8 +13,9 @@ import (
 // The Runs tab's tables, under its master-detail (docs/notes/plugin-table.md): a table of
 // the last 30 builds (charts.go's demoBuilds) whose #, Branch and Duration headers sort it,
 // with a status glyph and a pill, a row menu, a Rerun button on the failed builds (folded
-// into the ⋯ at panel width), and columns that drop as the panel narrows; under it a dense
-// table of one build's tests in groups (Passed starts collapsed).
+// into the ⋯ at panel width), and columns that drop as the panel narrows; under it one
+// build's suites with their pass rates as meters (docs/notes/plugin-table-meter.md), and a
+// dense table of its tests in groups (Passed starts collapsed).
 
 // buildsState is the Builds table's order.
 type buildsState struct {
@@ -50,7 +51,9 @@ var buildWords = map[ui.Status]struct {
 	ui.StatusRunning: {"running", ui.ToneNeutral},
 }
 
-func buildsNodes(s buildsState) []ui.Node {
+// buildsNodes are the Runs tab's tables; meters is whether the host draws a table cell's
+// meter (ui.TableMeterCapability): without it the pass rates are their labels.
+func buildsNodes(s buildsState, meters bool) []ui.Node {
 	builds := demoBuilds()
 	slices.SortStableFunc(builds, func(a, b demoBuild) int {
 		var c int
@@ -115,7 +118,36 @@ func buildsNodes(s buildsState) []ui.Node {
 	table.Table.Title, table.Table.Count, table.Table.EmptyText = "Builds", &total, "No builds yet"
 	sort := s.sort
 	table.Table.Sort = &sort
-	return []ui.Node{table, testsTable()}
+	return []ui.Node{table, suitesTable(meters), testsTable()}
+}
+
+// suitesTable is build #1285's suites and their pass rates: a meter in each tone, a full
+// one, a neutral share told as a count, and lint's empty track (it has not run). Suite
+// takes most of the width, so in a narrow panel the rates' labels go before their bars.
+func suitesTable(meters bool) ui.Node {
+	cols := []ui.TableColumn{
+		ui.TableCol("su-name", "Suite").WithWeight(2, 96).WithPriority(9),
+		ui.TableCol("su-rate", "Pass rate").WithWeight(1, 64).WithPriority(5),
+	}
+	rate := func(v float64, label string, tone ui.Tone) ui.Cell {
+		if !meters {
+			return ui.TextCell(label)
+		}
+		return ui.MeterCell(v, label).WithMeterTone(tone)
+	}
+	row := func(name string, rate ui.Cell) ui.TableRow {
+		return ui.NewTableRow("su-"+name, map[string]ui.Cell{"su-name": ui.TextCell(name), "su-rate": rate})
+	}
+	t := ui.NewTable("suites", cols,
+		row("unit", rate(1, "100%", ui.ToneOK)),
+		row("integration", rate(0.86, "86%", ui.ToneAttention)),
+		row("e2e", rate(0.41, "41%", ui.ToneError)),
+		row("fuzz", rate(0.375, "3 of 8", ui.ToneNeutral)),
+		row("bench", rate(0.2, "1 of 5", ui.ToneMuted)),
+		row("lint", rate(0, "–", ui.ToneNeutral)),
+	)
+	t.Table.Title = "Suites in #1285"
+	return t
 }
 
 // buildMenu is a build's ⋯ and right-click menu; a running build's can abort it.

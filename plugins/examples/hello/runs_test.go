@@ -34,7 +34,7 @@ func TestRunsMasterDetail(t *testing.T) {
 	}
 	md := func(v ui.View) *ui.MasterDetail {
 		t.Helper()
-		if len(v.Nodes) != 4 || v.Nodes[1].MasterDetail == nil {
+		if len(v.Nodes) != 5 || v.Nodes[1].MasterDetail == nil {
 			t.Fatalf("nodes %+v", v.Nodes)
 		}
 		return v.Nodes[1].MasterDetail

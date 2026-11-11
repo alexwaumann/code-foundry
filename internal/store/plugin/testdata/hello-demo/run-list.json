@@ -2567,6 +2567,106 @@
       }
     },
     {
+      "key": "suites",
+      "table": {
+        "title": "Suites in #1285",
+        "columns": [
+          {
+            "key": "su-name",
+            "label": "Suite",
+            "weight": 2,
+            "minWidth": 96,
+            "priority": 9
+          },
+          {
+            "key": "su-rate",
+            "label": "Pass rate",
+            "weight": 1,
+            "minWidth": 64,
+            "priority": 5
+          }
+        ],
+        "rows": [
+          {
+            "key": "su-unit",
+            "cells": {
+              "su-name": "unit",
+              "su-rate": {
+                "meter": {
+                  "value": 1,
+                  "label": "100%",
+                  "tone": "ok"
+                }
+              }
+            }
+          },
+          {
+            "key": "su-integration",
+            "cells": {
+              "su-name": "integration",
+              "su-rate": {
+                "meter": {
+                  "value": 0.86,
+                  "label": "86%",
+                  "tone": "attention"
+                }
+              }
+            }
+          },
+          {
+            "key": "su-e2e",
+            "cells": {
+              "su-name": "e2e",
+              "su-rate": {
+                "meter": {
+                  "value": 0.41,
+                  "label": "41%",
+                  "tone": "error"
+                }
+              }
+            }
+          },
+          {
+            "key": "su-fuzz",
+            "cells": {
+              "su-name": "fuzz",
+              "su-rate": {
+                "meter": {
+                  "value": 0.375,
+                  "label": "3 of 8"
+                }
+              }
+            }
+          },
+          {
+            "key": "su-bench",
+            "cells": {
+              "su-name": "bench",
+              "su-rate": {
+                "meter": {
+                  "value": 0.2,
+                  "label": "1 of 5",
+                  "tone": "muted"
+                }
+              }
+            }
+          },
+          {
+            "key": "su-lint",
+            "cells": {
+              "su-name": "lint",
+              "su-rate": {
+                "meter": {
+                  "value": 0,
+                  "label": "–"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "key": "tests",
       "table": {
         "title": "Tests in #1285",
