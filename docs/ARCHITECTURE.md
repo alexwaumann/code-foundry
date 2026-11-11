@@ -1160,7 +1160,9 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   renderer component per node kind, drawn with the app's own components (no HTML from
   plugins, no filled buttons, neutral header icon, emerald only for `ok`); one
   `WatchSurface` per visible surface; host-side `command`, `openUrl` and `copy`; form
-  drafts per instance and tab; the consent dialog is `plugin.enable`'s confirm.
+  drafts per instance and tab; the consent dialog is `plugin.enable`'s confirm; `shot.html`
+  (`src/shot`) draws one surface alone in the published theme and reports its height when
+  ready, for `plugin surface --shot` (`docs/notes/plugin-surface-shot-page.md`).
 * **Skill.** `code-foundry-plugin` (`internal/skills`) teaches an agent the loop: copy
   the template (`plugins/examples/minimal`, embedded), `go get` the SDK at this daemon's
   pin, `plugin dev`, `plugin logs`, `plugin surface` / `plugin
