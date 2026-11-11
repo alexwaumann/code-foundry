@@ -35,6 +35,7 @@ const selected = (page: Page) => page.evaluate(() => getSelection()?.toString() 
 
 async function box(l: Locator): Promise<{ x: number; y: number; w: number; h: number }> {
   // The line's text: from its first token's left to its last token's right.
+  await expect(l).toBeVisible();
   const first = await l.locator("span").first().boundingBox();
   const last = await l.locator("span").last().boundingBox();
   if (!first || !last) throw new Error("line not laid out");
@@ -96,3 +97,23 @@ test("a marked line stays marked while text around it is selected", async ({ pag
   await expect.poll(() => selected(page)).toBe("value2");
   await expect(marked).toBeVisible();
 });
+
+/** SHOTS=<dir>: a selection in the File tab's read-only code, dark and light (2x). */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
+    test("a selection in read-only code", async ({ page }, info) => {
+      const shots = process.env.SHOTS;
+      test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await openFile(page, "src/app.ts");
+      const two = await box(line(page, 2));
+      const five = await box(line(page, 5));
+      await page.mouse.move(two.x + 6 * 7.2, two.y + two.h / 2);
+      await page.mouse.down();
+      await page.mouse.move(five.x + 9 * 7.2, five.y + five.h / 2, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(shots)}/code-select-${scheme}.png` });
+    });
+  });
+}
