@@ -53,9 +53,10 @@ plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
    `OnEvent` and `Shutdown` as needed.
 5. **Run**: `code-foundry plugin dev "$PWD" --watch --follow=false` builds (`make build`)
    and restarts it now and after each edit (a failed build exits 1; the old one runs on).
-   The first time, and when permissions grow, it prints the consent text and exits 2: stop,
-   show the user that text, and re-run with `--yes` only after they say yes (their call, even
-   with no permissions). `plugin list` must say `running (dev, watching)`.
+   The first time, and when permissions grow, it prints the consent text and exits 2. A
+   plugin you wrote here that asks for no permissions: re-run with `--yes`. One that asks for
+   any: show the user that text and re-run only after they say yes. `plugin list` must say
+   `running (dev, watching)`.
 6. **Check**: `code-foundry plugin logs <name> --lines 50` shows its stderr, `h.Log()` and
    refused calls or views (never `--follow` from Bash: it does not return). Drive
    it with `plugin <name> <command>`, `plugin surface` (`--shot s.png` to see it) and
