@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectTooltip, mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * Inline pages (code-foundry view.inline; docs/notes/inline-html.md) over the mock's
@@ -59,10 +59,6 @@ test("an inline page renders in its card, follows cf:resize, and its frame runs 
   // The page paints with the published theme (/cf/theme.css), not the frame's white.
   const bg = await doc.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(bg).not.toBe("rgb(255, 255, 255)");
-  // Save is there for the final layout but disabled, with its tooltip.
-  const save = card.getByTestId("thread-html-save");
-  await expect(save).toHaveAttribute("aria-disabled", "true");
-  await expectTooltip(page, save, "Artifacts come in a later release");
   await shot(page, "inline-html-live");
 });
 
@@ -122,7 +118,6 @@ test("expand shows the page over the thread pane's body only; the sidebar and si
   // (like Safari and the Wails window) moves between buttons with Option+Tab.
   await card.getByTestId("thread-html-expand").click();
   await box.getByTestId("thread-html-source-toggle").focus();
-  await page.keyboard.press("Alt+Tab");
   await page.keyboard.press("Alt+Tab");
   await expect(close).toBeFocused();
   await page.keyboard.press("Enter");

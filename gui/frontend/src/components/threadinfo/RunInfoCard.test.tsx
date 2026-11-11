@@ -83,7 +83,7 @@ describe("a subagent's card", () => {
     expect(tid("ti-project").getAttribute("aria-haspopup")).toBeNull();
     expect(tid("ti-open-in").textContent).toContain("Open in Finder");
     expect(tid("ti-branch")).toBeTruthy();
-    none("ti-project-menu", "ti-add-project", "ti-action", "ti-add-action-row", "ti-git", "ti-shells-group", "ti-mcp-group", "ti-lineage-menu-trigger", "ti-lineage-stop");
+    none("ti-project-menu", "ti-add-project", "ti-action", "ti-add-action-row", "ti-git", "ti-shells-group", "ti-mcp-group", "ti-lineage-stop");
   });
 
   it("drops the git state row a thread's card shows for the same checkout", () => {

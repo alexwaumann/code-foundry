@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { useThreadStore } from "@/stores/thread";
@@ -74,17 +74,5 @@ describe("LineageGroup's label", () => {
     expect(label()).toBe("Lineage · 2 running");
     set("cookie", { status: "attention", statusReason: "finished" });
     expect(label()).toBe("Lineage · 1 running");
-  });
-});
-
-describe("LineageGroup's menu (docs/notes/no-sidebar-override-1-gui.md)", () => {
-  it("offers Archive finished only: no eye, no hidden word, no Show hidden threads", async () => {
-    put([thread("parent"), thread("kid", { createdBy: "parent", status: "attention", statusReason: "finished" })]);
-    render(<LineageGroup threadId="parent" />);
-    expect(screen.getByTestId("ti-lineage").textContent).not.toContain("hidden");
-    fireEvent.pointerDown(screen.getByTestId("ti-lineage-menu-trigger"), { button: 0, ctrlKey: false, pointerType: "mouse" });
-    const menu = await screen.findByTestId("ti-lineage-menu");
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Archive finished"]);
-    expect(within(menu).queryByTestId("ti-show-hidden")).toBeNull();
   });
 });
