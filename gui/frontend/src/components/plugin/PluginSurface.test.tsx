@@ -253,6 +253,32 @@ describe("PluginSurface", () => {
   });
 });
 
+// The tab is a thin caller of PluginSurfaceBody (the shot page's too): what it decides itself.
+describe("PluginSurface's own states", () => {
+  it("a surface its show command makes unavailable here: the body's notice, its kind on the root, and no stream", async () => {
+    useCommandsStore.setState({ commands: daemon.commands.map((c) => (c.name === "plugin.hello.show.demo" ? { ...c, available: false } : c)) });
+    render(<PluginSurface tab={makeTab("plugin.hello.demo", "Hello Demo")} />);
+    await tick();
+    expect(surface().dataset.kind).toBe("plugin.hello.demo");
+    expect(within(surface()).getByTestId("plugin-unavailable").textContent).toContain("Hello Demo does not apply to this selection.");
+    expect(within(surface()).queryByTestId("plugin-opening")).toBeNull();
+    expect(surfaces.streams).toEqual([]);
+  });
+
+  it("a surface no installed plugin offers is gone, with no body", () => {
+    render(<PluginSurface tab={makeTab("plugin.hello.gone", "Gone")} />);
+    expect(screen.getByTestId("plugin-missing").textContent).toContain("The plugin hello is not installed, or no longer offers gone.");
+    expect(screen.queryByTestId("plugin-surface")).toBeNull();
+  });
+
+  it("before the plugins load, the opening bars", () => {
+    usePluginsStore.setState({ loaded: false });
+    render(<PluginSurface tab={makeTab("plugin.hello.demo", "Hello Demo")} />);
+    expect(screen.getByTestId("plugin-opening")).toBeTruthy();
+    expect(screen.queryByTestId("plugin-surface")).toBeNull();
+  });
+});
+
 describe("the side panel's surface list", () => {
   it("lists the available plugin surfaces below the built-ins; one the daemon makes available (Pin) joins, and opens", () => {
     usePanelStore.setState({ byKey: { "thread:s-3": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
