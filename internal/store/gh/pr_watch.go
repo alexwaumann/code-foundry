@@ -63,7 +63,10 @@ func (s *Store) WatchPullRequests(refs []PullRequestRef) error {
 		}
 		added = true
 	}
+	// next is the store's map from here on (the poll's setWatch writes it under s.mu), so
+	// its size is read before the unlock.
 	s.prWatches = next
+	count := len(next)
 	if added {
 		s.pollSoonLocked(now)
 	}
@@ -71,7 +74,7 @@ func (s *Store) WatchPullRequests(refs []PullRequestRef) error {
 	if added {
 		s.nudge()
 	}
-	s.log.Debug("gh watched pull requests", "count", len(next))
+	s.log.Debug("gh watched pull requests", "count", count)
 	return nil
 }
 
