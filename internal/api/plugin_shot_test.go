@@ -82,16 +82,22 @@ func TestShotSurface(t *testing.T) {
 		{name: "no app open", noCapturer: true, req: &v1.ShotSurfaceRequest{Ref: ref},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "no screenshot: the app is not open (code-foundry gui)"},
 		{name: "the default viewport, and the PNG back",
-			answer: func(*v1.ShotRequest) *v1.PublishShotRequest { return &v1.PublishShotRequest{Png: shotPNG, ContentHeight: 1640} },
-			req:    &v1.ShotSurfaceRequest{Ref: ref, Instance: "hello/main/thread:s-1", MinVersion: 3},
-			want:   &v1.ShotSurfaceResponse{Png: shotPNG, Width: 420, Height: 900, ContentHeight: 1640},
+			answer: func(*v1.ShotRequest) *v1.PublishShotRequest {
+				return &v1.PublishShotRequest{Png: shotPNG, ContentHeight: 1640}
+			},
+			req:     &v1.ShotSurfaceRequest{Ref: ref, Instance: "hello/main/thread:s-1", MinVersion: 3},
+			want:    &v1.ShotSurfaceResponse{Png: shotPNG, Width: 420, Height: 900, ContentHeight: 1640},
 			wantReq: &v1.ShotRequest{Ref: ref, Instance: "hello/main/thread:s-1", MinVersion: 3, Width: 420, Height: 900}},
 		{name: "a size of its own",
-			answer: func(*v1.ShotRequest) *v1.PublishShotRequest { return &v1.PublishShotRequest{Png: shotPNG, ContentHeight: 300} },
-			req:    &v1.ShotSurfaceRequest{Instance: "hello/main/global", Width: 600, Height: 1200},
-			want:   &v1.ShotSurfaceResponse{Png: shotPNG, Width: 600, Height: 1200, ContentHeight: 300}},
+			answer: func(*v1.ShotRequest) *v1.PublishShotRequest {
+				return &v1.PublishShotRequest{Png: shotPNG, ContentHeight: 300}
+			},
+			req:  &v1.ShotSurfaceRequest{Instance: "hello/main/global", Width: 600, Height: 1200},
+			want: &v1.ShotSurfaceResponse{Png: shotPNG, Width: 600, Height: 1200, ContentHeight: 300}},
 		{name: "the app's reason",
-			answer:   func(*v1.ShotRequest) *v1.PublishShotRequest { return &v1.PublishShotRequest{Error: "the surface sent no view"} },
+			answer: func(*v1.ShotRequest) *v1.PublishShotRequest {
+				return &v1.PublishShotRequest{Error: "the surface sent no view"}
+			},
 			req:      &v1.ShotSurfaceRequest{Ref: ref},
 			wantCode: connect.CodeFailedPrecondition, wantMsg: "no screenshot: the surface sent no view"},
 		{name: "no answer in time", req: &v1.ShotSurfaceRequest{Ref: ref},
