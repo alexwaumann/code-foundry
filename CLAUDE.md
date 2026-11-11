@@ -61,6 +61,8 @@ make gui-dev    # make build, then the GUI with hot reload (auto-starts the daem
   stream counts, and a flow across routes and the daemon's streams.
 - A test mixing both is split: the logic goes in vitest and a short e2e test keeps only the
   browser part. Never repeat in e2e an assertion a unit test already makes.
+- What trips up a component test (jsdom, Radix, TanStack Virtual, dnd-kit, cmdk, vitest mocks):
+  `docs/notes/testing-gotchas.md`.
 - Daemon rules (refusals, git detection) are tested in Go, not through the mock.
 - Playwright browsers (e2e, sketches, `playwright cli`) load localhost only: the mock, Vite, a
   `--dev` daemon. Never browse the public web with them; their builds lag security fixes. WebKit
