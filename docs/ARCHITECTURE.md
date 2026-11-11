@@ -381,7 +381,9 @@ Services (v1):
 * `UiService` — WatchIntents (server stream: focus thread, open palette, …); PublishTheme
   (the GUI's active theme and its resolved slots, §13) and GetTheme (the theme last
   published, for the dictation overlay's page); PublishThemeReport (the GUI's contrast
-  report on a user theme, which `theme save` and `theme check` print); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
+  report on a user theme, which `theme save` and `theme check` print); WatchShots and
+  PublishShot (the app's host is the one capturer of `plugin surface --shot`'s PNGs,
+  `internal/shot`); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
   changes only that thread's side panel and never a window's selection; `ui.presence`
   tells a thread's model whether the user is looking and whether a window shows its
   thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
@@ -1133,7 +1135,8 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   (schema, limits, keys, URLs, the commands a view may run, secrets), re-encoded,
   versioned and coalesced per watcher; log nodes take appends. `PluginService.WatchSurface`,
   `GetSurface` and `Act` serve them; an act names an element of a recent version and the
-  daemon fills in the rest. A form's secret input with `store` goes to the Keychain, and
+  daemon fills in the rest. `ShotSurface` returns a PNG the app's host draws (§4
+  WatchShots), which the CLI writes; with no app open it fails and never starts one. A form's secret input with `store` goes to the Keychain, and
   the plugin sees only `{key, stored}`.
 * **Events, flags, environment.** `events/subscribe` feeds a plugin the EventService
   sources it was granted, on the same loop as `Watch`, through a bounded drop-oldest

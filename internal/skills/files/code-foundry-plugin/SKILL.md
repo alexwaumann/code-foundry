@@ -65,9 +65,9 @@ plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
    text and exits 2: tell the user what the plugin may do and re-run with `--yes` once they
    agree. `code-foundry plugin list` must say `running (dev)`.
 6. **Check**: `code-foundry plugin logs <name> --lines 50` shows its stderr, `h.Log()` and
-   refused calls or views (never `--follow` from your Bash tool: it does not return). Drive
-   it with `plugin <name> <command>`, `plugin surface` and `plugin act` (`testing.md`,
-   "Against the daemon"). Nothing watches the folder: after each edit,
+   refused calls or views (never `--follow` from Bash: it does not return). Drive
+   it with `plugin <name> <command>`, `plugin surface` (`--shot s.png` to see it) and
+   `plugin act` (`testing.md`). Nothing watches the folder: after each edit,
    `make build && code-foundry plugin restart <name>`.
 7. **Test**: `go test ./...` with plugintest: every command, every act, and every view
    through `ui.View.Validate`.

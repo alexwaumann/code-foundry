@@ -193,6 +193,12 @@ home directory; so must an unpacked release tarball you try):
   pid=$!; sleep 5; kill $pid`. The instance stays open 10 minutes after the last look.
   `--thread` (and `--project`) take a unique suffix; the global `--context-thread` works
   too.
+- **Look at what you drew**: `code-foundry plugin surface <name> <surface> --thread <id>
+  --shot /tmp/s.png` prints the view, then writes a PNG of it as the open app draws it (in
+  its theme, 420 by 900 CSS px; `--width`, `--height`). Read the PNG: a valid view can
+  still be cramped, cut off or unreadable. A view taller than the shot says which
+  `--height` to pass. With the app closed it prints the reason and exits 1; it never
+  opens the app.
 - `code-foundry plugin act <name> <surface> <event> --thread <id>` acts as a click: the
   event name positionally or `--key <element key>`, `tab --key <tab key>` for a tab,
   `--value` for a field's change, `--values '{"field": "…"}'` for a submit. An event goes

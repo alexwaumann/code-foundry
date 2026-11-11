@@ -11,6 +11,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/shot"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
@@ -20,6 +21,7 @@ type Plugin struct {
 	store    plugin.Store
 	bus      *bus.Bus
 	surfaces plugin.Surfaces // nil: WatchSurface, GetSurface and Act are unimplemented
+	shots    *shot.Broker    // nil: ShotSurface is unimplemented (WithShots)
 	beat     time.Duration   // WatchSurface's heartbeat interval; zero is HeartbeatInterval
 	// The plugins dir and the parent of the data dirs, as List reports them (WithDirs).
 	pluginsDir, dataDir string

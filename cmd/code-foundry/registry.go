@@ -373,6 +373,19 @@ func (cl *cli) runRegistry(ctx context.Context, args []string) error {
 		}
 		return exitCodeError(code)
 	}
+	if after, ok := cliAfters[cmd.GetName()]; ok {
+		c, err := cl.daemon(ctx)
+		if err != nil {
+			return err
+		}
+		out := cl.stdout
+		if *asJSON {
+			out = cl.stderr
+		}
+		if err := after(ctx, cl, c, uctx, vals, res, out); err != nil {
+			return err
+		}
+	}
 	if f, ok := cliFollowers[cmd.GetName()]; ok && !*asJSON && cl.wantsFollow(f, flags) {
 		if name, lines, ok := f.target(vals, res); ok {
 			c, err := cl.daemon(ctx)

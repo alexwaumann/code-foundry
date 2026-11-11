@@ -59,6 +59,13 @@ service PluginService {
   // answered; its error is the plugin's message (the GUI toasts it). Command, open-url
   // and copy actions are the host's and never reach Act.
   rpc Act(SurfaceActRequest) returns (SurfaceActResponse) {}
+  // ShotSurface is a PNG of a surface instance as the app draws it (plugin surface --shot;
+  // docs/notes/plugin-surface-shot-daemon.md). The daemon hands the request to the app's
+  // host, which holds UiService.WatchShots, and waits up to 15 s for its PublishShot; it
+  // never writes a file and never starts the app. FailedPrecondition when no app is open
+  // or the app could not draw it, DeadlineExceeded when it did not answer in time,
+  // Unavailable when it closed first, InvalidArgument for a size out of bounds.
+  rpc ShotSurface(ShotSurfaceRequest) returns (ShotSurfaceResponse) {}
   // Environment returns what plugins contribute to new Claude threads
   // (session/setEnvironment): one plugin's, or every one with a contribution when name is
   // empty, as applied (validated, conflicts resolved in name order) with the issues found.
@@ -525,6 +532,28 @@ message SurfaceActRequest {
 message SurfaceActResponse {
   // The version acted on.
   uint64 version = 1;
+}
+
+message ShotSurfaceRequest {
+  // The surface, with the context the panel would show it in.
+  SurfaceRef ref = 1;
+  // The instance GetSurface opened (GetSurfaceResponse.state.instance).
+  string instance = 2;
+  // Draw a view of at least this version (the one plugin surface printed).
+  uint64 min_version = 3;
+  // The viewport in CSS pixels (0: 420 by 900; 280 to 1600 wide, 200 to 4000 tall).
+  int32 width = 4;
+  int32 height = 5;
+}
+
+message ShotSurfaceResponse {
+  // A PNG of the viewport (the app's device pixels: twice the CSS size on a Retina screen).
+  bytes png = 1;
+  // The viewport as drawn, in CSS pixels.
+  int32 width = 2;
+  int32 height = 3;
+  // How tall the view's content is in CSS pixels; above height, the shot cut it off.
+  int32 content_height = 4;
 }
 
 message PluginEnvironmentRequest {

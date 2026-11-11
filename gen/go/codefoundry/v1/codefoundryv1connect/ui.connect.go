@@ -44,6 +44,10 @@ const (
 	// UiServicePublishThemeReportProcedure is the fully-qualified name of the UiService's
 	// PublishThemeReport RPC.
 	UiServicePublishThemeReportProcedure = "/codefoundry.v1.UiService/PublishThemeReport"
+	// UiServiceWatchShotsProcedure is the fully-qualified name of the UiService's WatchShots RPC.
+	UiServiceWatchShotsProcedure = "/codefoundry.v1.UiService/WatchShots"
+	// UiServicePublishShotProcedure is the fully-qualified name of the UiService's PublishShot RPC.
+	UiServicePublishShotProcedure = "/codefoundry.v1.UiService/PublishShot"
 )
 
 // UiServiceClient is a client for the codefoundry.v1.UiService service.
@@ -70,6 +74,15 @@ type UiServiceClient interface {
 	// report per theme id wins. The GUI sends every report it holds on connect, then each
 	// new one, debounced. InvalidArgument for a bad id, version, slot name or value.
 	PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error)
+	// WatchShots is held open by the app's host, the one capturer of screenshots
+	// (PluginService.ShotSurface; docs/notes/plugin-surface-shot-daemon.md): it sends each
+	// request to draw and snapshot, and the host answers with PublishShot. One capturer at a
+	// time: a new stream replaces the one before it, whose open requests fail.
+	WatchShots(context.Context, *connect.Request[v1.WatchShotsRequest]) (*connect.ServerStreamForClient[v1.ShotRequest], error)
+	// PublishShot answers a ShotRequest by its id with a PNG or an error. NotFound for an id
+	// no one waits on any more (timed out or never asked), ResourceExhausted for a PNG over
+	// 32 MiB, InvalidArgument for bytes that are not a PNG or an answer with neither.
+	PublishShot(context.Context, *connect.Request[v1.PublishShotRequest]) (*connect.Response[v1.PublishShotResponse], error)
 }
 
 // NewUiServiceClient constructs a client for the codefoundry.v1.UiService service. By default, it
@@ -113,6 +126,18 @@ func NewUiServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(uiServiceMethods.ByName("PublishThemeReport")),
 			connect.WithClientOptions(opts...),
 		),
+		watchShots: connect.NewClient[v1.WatchShotsRequest, v1.ShotRequest](
+			httpClient,
+			baseURL+UiServiceWatchShotsProcedure,
+			connect.WithSchema(uiServiceMethods.ByName("WatchShots")),
+			connect.WithClientOptions(opts...),
+		),
+		publishShot: connect.NewClient[v1.PublishShotRequest, v1.PublishShotResponse](
+			httpClient,
+			baseURL+UiServicePublishShotProcedure,
+			connect.WithSchema(uiServiceMethods.ByName("PublishShot")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -123,6 +148,8 @@ type uiServiceClient struct {
 	publishTheme       *connect.Client[v1.PublishThemeRequest, v1.PublishThemeResponse]
 	getTheme           *connect.Client[v1.GetThemeRequest, v1.GetThemeResponse]
 	publishThemeReport *connect.Client[v1.PublishThemeReportRequest, v1.PublishThemeReportResponse]
+	watchShots         *connect.Client[v1.WatchShotsRequest, v1.ShotRequest]
+	publishShot        *connect.Client[v1.PublishShotRequest, v1.PublishShotResponse]
 }
 
 // WatchIntents calls codefoundry.v1.UiService.WatchIntents.
@@ -150,6 +177,16 @@ func (c *uiServiceClient) PublishThemeReport(ctx context.Context, req *connect.R
 	return c.publishThemeReport.CallUnary(ctx, req)
 }
 
+// WatchShots calls codefoundry.v1.UiService.WatchShots.
+func (c *uiServiceClient) WatchShots(ctx context.Context, req *connect.Request[v1.WatchShotsRequest]) (*connect.ServerStreamForClient[v1.ShotRequest], error) {
+	return c.watchShots.CallServerStream(ctx, req)
+}
+
+// PublishShot calls codefoundry.v1.UiService.PublishShot.
+func (c *uiServiceClient) PublishShot(ctx context.Context, req *connect.Request[v1.PublishShotRequest]) (*connect.Response[v1.PublishShotResponse], error) {
+	return c.publishShot.CallUnary(ctx, req)
+}
+
 // UiServiceHandler is an implementation of the codefoundry.v1.UiService service.
 type UiServiceHandler interface {
 	// WatchIntents is held open by the GUI. Intents are fan-out: every watcher gets each.
@@ -174,6 +211,15 @@ type UiServiceHandler interface {
 	// report per theme id wins. The GUI sends every report it holds on connect, then each
 	// new one, debounced. InvalidArgument for a bad id, version, slot name or value.
 	PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error)
+	// WatchShots is held open by the app's host, the one capturer of screenshots
+	// (PluginService.ShotSurface; docs/notes/plugin-surface-shot-daemon.md): it sends each
+	// request to draw and snapshot, and the host answers with PublishShot. One capturer at a
+	// time: a new stream replaces the one before it, whose open requests fail.
+	WatchShots(context.Context, *connect.Request[v1.WatchShotsRequest], *connect.ServerStream[v1.ShotRequest]) error
+	// PublishShot answers a ShotRequest by its id with a PNG or an error. NotFound for an id
+	// no one waits on any more (timed out or never asked), ResourceExhausted for a PNG over
+	// 32 MiB, InvalidArgument for bytes that are not a PNG or an answer with neither.
+	PublishShot(context.Context, *connect.Request[v1.PublishShotRequest]) (*connect.Response[v1.PublishShotResponse], error)
 }
 
 // NewUiServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -213,6 +259,18 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(uiServiceMethods.ByName("PublishThemeReport")),
 		connect.WithHandlerOptions(opts...),
 	)
+	uiServiceWatchShotsHandler := connect.NewServerStreamHandler(
+		UiServiceWatchShotsProcedure,
+		svc.WatchShots,
+		connect.WithSchema(uiServiceMethods.ByName("WatchShots")),
+		connect.WithHandlerOptions(opts...),
+	)
+	uiServicePublishShotHandler := connect.NewUnaryHandler(
+		UiServicePublishShotProcedure,
+		svc.PublishShot,
+		connect.WithSchema(uiServiceMethods.ByName("PublishShot")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.UiService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UiServiceWatchIntentsProcedure:
@@ -225,6 +283,10 @@ func NewUiServiceHandler(svc UiServiceHandler, opts ...connect.HandlerOption) (s
 			uiServiceGetThemeHandler.ServeHTTP(w, r)
 		case UiServicePublishThemeReportProcedure:
 			uiServicePublishThemeReportHandler.ServeHTTP(w, r)
+		case UiServiceWatchShotsProcedure:
+			uiServiceWatchShotsHandler.ServeHTTP(w, r)
+		case UiServicePublishShotProcedure:
+			uiServicePublishShotHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -252,4 +314,12 @@ func (UnimplementedUiServiceHandler) GetTheme(context.Context, *connect.Request[
 
 func (UnimplementedUiServiceHandler) PublishThemeReport(context.Context, *connect.Request[v1.PublishThemeReportRequest]) (*connect.Response[v1.PublishThemeReportResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.PublishThemeReport is not implemented"))
+}
+
+func (UnimplementedUiServiceHandler) WatchShots(context.Context, *connect.Request[v1.WatchShotsRequest], *connect.ServerStream[v1.ShotRequest]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.WatchShots is not implemented"))
+}
+
+func (UnimplementedUiServiceHandler) PublishShot(context.Context, *connect.Request[v1.PublishShotRequest]) (*connect.Response[v1.PublishShotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.UiService.PublishShot is not implemented"))
 }

@@ -20,6 +20,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/shot"
 )
 
 // PluginSurfaceBackend is the slice of PluginService plugin.surface and plugin.act
@@ -94,14 +95,21 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 				"side panel would, wait for its view, and print the view's JSON and the elements that act " +
 				"(code-foundry plugin act). It returns at the first view; --settle 2s waits until no new view has " +
 				"come for 2 s (a surface that shows \"Loading\" first). --watch keeps printing new views, log appends " +
-				"and toasts (CLI).",
+				"and toasts (CLI). --shot out.png then writes a PNG of the surface as the open app draws it (CLI).",
 			Category:     "Plugin",
 			NoKeybinding: true,
 			Args: append(surfaceArgs(), settleArg("", "before printing"),
-				ArgSpec{Name: "watch", Type: Bool, Description: "CLI: keep printing updates until interrupted"}),
+				ArgSpec{Name: "watch", Type: Bool, Description: "CLI: keep printing updates until interrupted"},
+				ArgSpec{Name: "shot", Type: Path, Description: "CLI: after the view, write a PNG of the surface as the app draws it to this file (the app must be open)"},
+				withDefault(ArgSpec{Name: "width", Type: Int, Description: fmt.Sprintf("--shot's viewport width in CSS pixels (%d to %d)", shot.MinWidth, shot.MaxWidth)}, strconv.Itoa(shot.DefaultWidth)),
+				withDefault(ArgSpec{Name: "height", Type: Int, Description: fmt.Sprintf("--shot's viewport height in CSS pixels (%d to %d); a taller view is cut off", shot.MinHeight, shot.MaxHeight)}, strconv.Itoa(shot.DefaultHeight)),
+			),
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				settle, err := settleOf(a)
 				if err != nil {
+					return Result{}, err
+				}
+				if err := shotSizeOK(a); err != nil {
 					return Result{}, err
 				}
 				res, err := b.GetSurface(ctx, connect.NewRequest(&v1.GetSurfaceRequest{Ref: surfaceRef(uctx, a), SettleMs: int32(settle.Milliseconds())}))
@@ -147,6 +155,20 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 			},
 		},
 	)
+}
+
+// shotSizeOK refuses a --width or --height out of bounds (both have defaults) before
+// anything opens, so the CLI's ShotSurface call after the view never fails on it.
+func shotSizeOK(a Args) error {
+	for _, side := range []struct {
+		name   string
+		lo, hi int
+	}{{"width", shot.MinWidth, shot.MaxWidth}, {"height", shot.MinHeight, shot.MaxHeight}} {
+		if v := a.Int(side.name); v < side.lo || v > side.hi {
+			return InvalidArg(side.name, "--%s %d is out of bounds (%d to %d)", side.name, v, side.lo, side.hi)
+		}
+	}
+	return nil
 }
 
 // pinToView binds a page's yes to what it was asked about: the re-invoke carries the view's
