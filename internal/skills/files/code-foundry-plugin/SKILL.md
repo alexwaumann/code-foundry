@@ -51,15 +51,15 @@ plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
 4. **Serve**: in `main.go`, `pluginsdk.Serve(pluginsdk.Plugin{...})` with a handler for every
    manifest command (`Commands`, by name) and surface (`Surfaces`, by id), plus `Init`,
    `OnEvent` and `Shutdown` as needed.
-5. **Run**: `make build && code-foundry plugin dev "$PWD" --follow=false` (use `make build`,
-   not `go build ./...`). The first time, and when permissions grow, it prints the consent
-   text and exits 2: tell the user what the plugin may do and re-run with `--yes` once they
-   agree. `code-foundry plugin list` must say `running (dev)`.
+5. **Run**: `code-foundry plugin dev "$PWD" --watch --follow=false` builds (`make build`)
+   and restarts it now and after each edit (a failed build exits 1; the old one runs on).
+   The first time, and when permissions grow, it prints the consent text and exits 2: tell
+   the user what the plugin may do and re-run with `--yes` once they agree. `plugin list`
+   must say `running (dev, watching)`.
 6. **Check**: `code-foundry plugin logs <name> --lines 50` shows its stderr, `h.Log()` and
    refused calls or views (never `--follow` from Bash: it does not return). Drive
    it with `plugin <name> <command>`, `plugin surface` (`--shot s.png` to see it) and
-   `plugin act` (`testing.md`). Nothing watches the folder: after each edit,
-   `make build && code-foundry plugin restart <name>`.
+   `plugin act` (`testing.md`); after an edit they wait for the build.
 7. **Test**: `go test ./...` with plugintest: every command, every act, and every view
    through `ui.View.Validate`.
 8. **Publish** (`publishing.md`): only after asking the user, since it goes out under their

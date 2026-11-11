@@ -1101,7 +1101,8 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
 
 * **Package.** A folder `$CONFIG/plugins/<name>` with a `plugin.json` (name, version,
   protocol, `exec`, permissions, commands, surfaces) and the executable. `plugin dev`
-  links a folder there; registry installs unpack a release tarball there. A
+  links a folder there (`--watch`: the daemon rebuilds and restarts it on every change);
+  registry installs unpack a release tarball there. A
   plugin found on disk is disabled until the user consents to its permissions
   (`commands` globs, `events` sources, `threadStatus`, `sessionEnv`, `secrets`,
   `threads`, `terminals`, `api`: the registry entry's keys); more permissions on an
@@ -1110,7 +1111,13 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   enabled plugin (start with cwd = package folder and a minimal env, `initialize`
   within 5 s, ping every 30 s, backoff 1 s to 60 s, failed after 5 crashes in 10 min,
   dev plugins never fail), logs (`logs/plugins/<name>.log` plus a 1,000-line tail), the
-  Keychain secrets (`security`, service `code-foundry-plugin`). Plugin → host methods
+  Keychain secrets (`security`, service `code-foundry-plugin`), and the dev watch
+  (`devwatch.go`, `docs/notes/plugin-dev-watch.md`): a goroutine per watched dev plugin
+  polls its folder every 500 ms (stat, hash only on a size or mtime change, act when two
+  scans agree; no FSEvents, which is the project store's), runs `$SHELL -lc <build>` with
+  the plugin's minimal env and logs it as source `build`, then `Restart`s; `DevSettle`
+  runs first in `GetSurface` and `Act`, so a read after an edit sees the rebuild or the
+  build's failure. Plugin → host methods
   are a registry (`hostMethods`) each feature file fills from `init`. The store never
   imports the thread or gh stores: the daemon adapts them (`plugin_hooks.go`,
   `pluginfacts.go`).

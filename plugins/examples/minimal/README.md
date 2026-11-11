@@ -29,8 +29,8 @@ if anything.)
 ## Development
 
 ```
-make build && code-foundry plugin dev "$PWD" --yes   # link and run it
-make test                                           # plugintest
+code-foundry plugin dev "$PWD" --watch --yes      # link it; build and restart on every edit
+make test                                         # plugintest
 code-foundry plugin surface minimal status --thread <id>
 code-foundry plugin logs minimal --lines 50
 ```
