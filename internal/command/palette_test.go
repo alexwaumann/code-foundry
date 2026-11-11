@@ -27,7 +27,7 @@ var noPalette = []string{
 	"dictation.hold", "dictation.start", "dictation.status", "dictation.stop",
 	"ember.board", "ember.disable", "ember.enable", "ember.remember", "ember.reseed",
 	"ember.status", "ember.task.add", "ember.task.cancel", "ember.task.done", "ember.task.list",
-	"ember.task.show", "ember.task.start", "ember.task.update", "memory.add", "memory.remove",
+	"ember.task.show", "ember.task.start", "ember.task.update", "file.export", "memory.add", "memory.remove",
 	"memory.show", "plugin.act", "plugin.browse", "plugin.dev", "plugin.disable", "plugin.enable",
 	"plugin.env", "plugin.install", "plugin.list", "plugin.logs", "plugin.restart",
 	"plugin.secrets.delete", "plugin.secrets.list", "plugin.surface", "plugin.terminals",

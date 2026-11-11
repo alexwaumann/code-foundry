@@ -188,6 +188,7 @@ describe("what the app reads from the frame script", () => {
 
   it("names each call a page cannot make, and nothing else", () => {
     for (const what of ["alert", "confirm", "prompt", "download"]) expect(pageUnsupported({ type: "cf:unsupported", what })?.message).toMatch(/page/);
+    expect(pageUnsupported({ type: "cf:unsupported", what: "download" })?.message).toContain('cf.run("file.export"');
     expect(pageUnsupported({ type: "cf:unsupported", what: "toString" })).toBeNull();
     expect(pageUnsupported({ type: "cf:open", what: "alert" })).toBeNull();
   });

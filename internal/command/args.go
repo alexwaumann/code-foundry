@@ -103,6 +103,9 @@ type ArgSpec struct {
 	// PageAsks marks a flag that makes a command safe without it run a program: given,
 	// a page's call asks the user first (PageClass), whatever the command's class.
 	PageAsks bool
+	// PageShowsSize makes a page's question show this value's size, not the value: a
+	// file's contents, which would not fit the dialog (String args only).
+	PageShowsSize bool
 }
 
 // positional is s taking a bare word on the CLI too: `thread archive 8f3a`.
@@ -138,6 +141,8 @@ func (s ArgSpec) validate() error {
 		return errors.New("only a path arg can default to the working directory")
 	case s.DefaultToThreadEnv && (s.Type != String || s.Context != NoContext || s.Default != ""):
 		return errors.New("only a string arg without a context or default can default to $CODE_FOUNDRY_THREAD")
+	case s.PageShowsSize && s.Type != String:
+		return errors.New("only a string arg shows its size to a page")
 	case s.FileOrStdin && s.Type != String:
 		return errors.New("only a string arg can be read from a file or stdin")
 	case s.ID != NoID && (s.Type != String || !knownIDKind(s.ID)):

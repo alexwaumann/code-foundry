@@ -123,7 +123,10 @@ func (c *Command) pageCall(a Args) string {
 		case int:
 			sb.WriteString(" --" + s.Name + " " + strconv.Itoa(x))
 		case string:
-			if x != "" {
+			switch {
+			case s.PageShowsSize && a.Given(s.Name):
+				sb.WriteString(" --" + s.Name + " <" + byteSize(len(x)) + ">")
+			case x != "":
 				sb.WriteString(" --" + s.Name + " " + strconv.Quote(x))
 			}
 		}

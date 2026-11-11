@@ -84,6 +84,29 @@ test("SHOTS: a verb that asks opens the app's confirm dialog", async ({ page }) 
   await dialog.getByTestId("confirm-cancel").click();
 });
 
+// file.export's rules (paths, replacing, the cap, the page's question) are the daemon's: internal/command/commands_file_export_test.go.
+test("a page's Export button saves into its thread's checkout once the user allows it, and shows the path", async ({ page }) => {
+  await openBridgeThread(page);
+  await doc(page).locator("#export").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toContainText(`Saves 32 bytes to ${CF}/rows.csv`);
+  await expect(dialog.getByTestId("confirm-caller-detail")).toContainText("Bridge check");
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${shots}/page-save-question-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
+  await expect(dialog.getByTestId("confirm-ok")).toBeEnabled();
+  await dialog.getByTestId("confirm-ok").click();
+  await expect(doc(page).locator("#export-out")).toHaveText(`Saved to ${CF}/rows.csv`);
+  const saved = (await (await fetch(`${mockUrl}/__mock/fs/text?path=${encodeURIComponent(`${CF}/rows.csv`)}`)).json()) as { text: string | null };
+  expect(saved.text).toBe("id,name\ns-r1,Fix stale PR badge\n");
+  expect((await invocations()).filter((i) => i.name === "file.export").map((i) => i.confirmed)).toEqual([false, true]);
+});
+
 test("a subscription delivers the snapshot, then every change; closing the card lets go of everything", async ({ page }) => {
   await openBridgeThread(page);
   const rows = doc(page).locator("#rows");

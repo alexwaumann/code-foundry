@@ -372,6 +372,13 @@ export class MockFiles {
     return e ? new TextDecoder().decode(e.data) : null;
   }
 
+  /** Whether a folder is at `abs`: one listed as such, or one holding a file. */
+  hasFolder(abs: string): boolean {
+    if (this.disk.get(abs)?.dir) return true;
+    for (const p of this.disk.keys()) if (p.startsWith(`${abs}/`)) return true;
+    return false;
+  }
+
   /** Writes a file's contents; with `touch`, only its modification time moves (touch(1); `s` is ignored). */
   write(path: string, s: string, touch = false): void {
     const was = this.disk.get(path);

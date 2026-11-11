@@ -42,6 +42,9 @@ type WriteRequest struct {
 	Force bool
 	// Create makes a file that does not exist. Not with Force.
 	Create bool
+	// Within, when set, is a directory the file a write lands on must be under, symlinks
+	// resolved on both: a page's file stays in its thread's checkout (file.export).
+	Within string
 }
 
 // WriteResult is Write's result.
@@ -112,6 +115,9 @@ func (w *Writer) Write(req WriteRequest) (WriteResult, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	t, err := w.locate(p, req.Path)
+	if err == nil {
+		err = req.within(t, req.Path)
+	}
 	if err != nil {
 		return WriteResult{}, err
 	}
@@ -169,6 +175,56 @@ func (w *Writer) Write(req WriteRequest) (WriteResult, error) {
 		return WriteResult{}, w.failed(p, t.real, err)
 	}
 	return WriteResult{Path: p, Size: written.Size(), ModifiedAt: written.ModTime().UnixMilli()}, nil
+}
+
+// Lookup is what Write would find for req, writing nothing: the path, NotFound for
+// nothing there, else the file's Size and ModifiedAt, the baseline that replaces just that
+// file. Its refusals are Write's for a place it would not write: out of reach, Protected,
+// outside Within, a directory or anything else that is not a regular file, a symlink
+// leading nowhere, a missing directory.
+func (w *Writer) Lookup(req WriteRequest) (WriteResult, error) {
+	if strings.IndexByte(req.Path, 0) >= 0 || strings.IndexByte(req.BaseDir, 0) >= 0 {
+		return WriteResult{}, fmt.Errorf("%w: the path holds a NUL", ErrInvalidArgument)
+	}
+	p, err := ResolveReadPath(w.Root, req.BaseDir, req.Path)
+	if err != nil {
+		return WriteResult{}, err
+	}
+	t, err := w.locate(p, req.Path)
+	if err == nil {
+		err = req.within(t, req.Path)
+	}
+	switch {
+	case err != nil:
+		return WriteResult{}, err
+	case t.noDir:
+		return WriteResult{}, fmt.Errorf("%w: the directory of %s does not exist", ErrInvalidArgument, req.Path)
+	case t.info == nil:
+		return WriteResult{Path: p, NotFound: true}, nil
+	case t.info.IsDir():
+		return WriteResult{}, fmt.Errorf("%w: %s is a directory", ErrInvalidArgument, req.Path)
+	case t.info.Mode()&fs.ModeSymlink != 0: // locate resolved the rest
+		return WriteResult{}, fmt.Errorf("%w: %s is a symlink that leads nowhere", ErrInvalidArgument, req.Path)
+	case !t.info.Mode().IsRegular():
+		return WriteResult{}, fmt.Errorf("%w: %s is not a regular file", ErrInvalidArgument, req.Path)
+	}
+	return WriteResult{Path: p, Size: t.info.Size(), ModifiedAt: t.info.ModTime().UnixMilli()}, nil
+}
+
+// within refuses a target outside req.Within. A target whose directory is missing is
+// refused for that, by the caller.
+func (r WriteRequest) within(t writeTarget, path string) error {
+	if r.Within == "" || t.noDir {
+		return nil
+	}
+	dir, err := evalSymlinks(r.Within)
+	if err != nil {
+		return fmt.Errorf("%w: %s cannot be read: %w", ErrInvalidArgument, r.Within, err)
+	}
+	if !Within(dir, t.real) || len(t.real) == len(dir) {
+		return fmt.Errorf("%w: %s leads outside %s", ErrInvalidArgument, path, r.Within)
+	}
+	return nil
 }
 
 // matches reports whether fi is the file the request's read saw, compared as ReadFile

@@ -118,7 +118,7 @@ export const staticPages: PageInit[] = [
 
 /** Commands a chord is no use for (command.Command.NoKeybinding): no keybinding field. */
 export const NO_KEYBINDING = new Set([
-  "action.list", "action.runs", "action.stop", "action.wait", "app.version", "daemon.status", "daemon.version", "dictation.status",
+  "action.list", "action.runs", "action.stop", "action.wait", "app.version", "daemon.status", "daemon.version", "dictation.status", "file.export",
   "memory.add", "memory.clear", "memory.remove", "memory.show", "plugin.browse", "plugin.reload", "project.list",
   "search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.seen", "search.stop",
   "settings.get", "settings.path", "settings.reset", "settings.set", "skill.browse", "terminal.list",
