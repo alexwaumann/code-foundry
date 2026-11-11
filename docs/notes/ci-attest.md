@@ -1,5 +1,10 @@
 # CI: local attestation and split jobs
 
+> Since 2026-11-11 (`docs/notes/ci-rethink.md`) the suite no longer runs on a pull request
+> at all: `attested` is its only check, red without the status, and `make attest` re-runs
+> that job instead of cancelling a full run. How the record and the status are made, below,
+> is unchanged; what is said about skipping jobs and the fallback run is history.
+
 A CI run on the macOS runner took about 15 minutes: 3 of setup, 0:50 `go vet`, 2:20
 staticcheck, 5:15 `go test -race` (3:36 of it `internal/store/session`), 3:10 frontend.
 The product is macOS-only and every change is already checked with `make check` on a Mac

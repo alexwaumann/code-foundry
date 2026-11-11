@@ -50,9 +50,12 @@ channel at a time, switched in settings.
    unchanged. The CLI (`code-foundry version`), tags, release names and the `VERSION` file
    show the raw tag.
 4. **Every push to main publishes a tip prerelease.** Same commit already tagged stable
-   (right after a promotion): nothing to publish.
+   (right after a promotion): nothing to publish. *Since 2026-11-11
+   (`docs/notes/ci-rethink.md`): a tip is published per green sweep on main, from the
+   sweep's commit, not per push.*
 5. **Promotion is explicit:** `workflow_dispatch` with `channel=stable` (the dispatch
-   default), tagging the head of main `vX.Y.Z` as a full release. `make promote` runs
+   default), tagging the head of main `vX.Y.Z` as a full release. *Since 2026-11-11: it
+   tags the newest commit on main with a green sweep, which may be behind the head.* `make promote` runs
    `gh workflow run release.yml -f channel=stable` (and `-f version=` when given) and
    prints the run URL. `make release` stays the local fallback and defaults to stable.
    Stable notes use `--generate-notes --notes-start-tag <previous stable>`.

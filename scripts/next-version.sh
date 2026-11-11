@@ -17,9 +17,9 @@
 # --tip prints the tip prerelease tag <next version>-tip.<N> instead (release channels,
 # docs/notes/release-channels-handoff.md): the stable this commit would become if
 # promoted now, and N = first-parent commits since the latest release tag
-# (`git rev-list --first-parent --count <tag>..HEAD`), which is the number of tip
-# releases since that stable because every push to main publishes one. The base can move
-# between pushes (a feat: bumps it) while N keeps climbing; N resets at each promotion.
+# (`git rev-list --first-parent --count <tag>..HEAD`). A tip is published per green sweep
+# on main, not per push, so N skips the commits a sweep covered together. The base can
+# move between tips (a feat: bumps it) while N keeps climbing; N resets at each promotion.
 # Nothing to release, or N = 0 -> "". --tip-count N supplies N without git (implies --tip).
 #
 # --log FILE holds full commit messages separated by ASCII RS (0x1e), as printed by

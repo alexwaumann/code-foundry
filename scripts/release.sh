@@ -10,7 +10,7 @@
 #           Promotion: `make promote` dispatches the workflow with channel=stable.
 #   tip     a prerelease vX.Y.Z-tip.N (scripts/next-version.sh --tip): X.Y.Z is the
 #           stable this commit would become if promoted now, N the first-parent commits
-#           since the last stable. Every push to main publishes one. Nothing new since
+#           since the last stable. Every green sweep on main publishes one. Nothing new since
 #           the stable, or HEAD already tagged stable: nothing to publish.
 #
 # Without a version, the next one comes from conventional commits since the last stable
