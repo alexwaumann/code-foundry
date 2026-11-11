@@ -93,8 +93,11 @@ const (
 	// maxSeen bounds that memory per worktree; past it the memory starts over.
 	maxSeen = 20_000
 	// bornSlack is how long before a path's first event in the window its file may have
-	// been born and still count as created (event delivery lags creation).
-	bornSlack = time.Second
+	// been born and still count as created. Event delivery lags creation: by up to 2.3 s
+	// with the machine at load 30 (fseventsd falls behind), so a second reported new files
+	// as modified. A stale ItemCreated comes from a file born long before (half a minute
+	// and more), so this stays well short of that.
+	bornSlack = 10 * time.Second
 	// checkIgnoreRetries bounds re-running check-ignore after it refused a path (inside a
 	// submodule, beyond a symlink).
 	checkIgnoreRetries = 4

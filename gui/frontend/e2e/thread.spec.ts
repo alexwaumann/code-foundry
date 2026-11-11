@@ -277,6 +277,10 @@ for (const scheme of schemes) {
       expect((before?.y ?? 0) < (box?.y ?? 0)).toBe(true);
       const height = await timeline.evaluate((el) => el.scrollHeight);
       const text = pane(page).locator('[data-testid="thread-text"][data-final]').last();
+      // The reader has stopped scrolling: past the virtualizer's 150 ms scrolling window, the
+      // rows the turn's end shows are measured as they mount. The anchor then has to read the
+      // new sizes, not the measurements cached before them (it moved the answer 8 px).
+      await page.waitForTimeout(300);
       await mockPost("thread/finish");
       await expect(answer).toHaveCount(0);
       await expect(text).toContainText("I have not pushed.");

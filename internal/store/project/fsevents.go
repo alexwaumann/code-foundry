@@ -143,7 +143,14 @@ func (g *Git) streamPaths() []string {
 	return streamRoots(g.routes, g.wtRootReal)
 }
 
-// onEvents is the route func of the store's watcher: it maps a batch to job keys under
+// onStream is the route func of the store's watcher.
+func (g *Git) onStream(evs []fsevents.Event) {
+	if !g.ignoreStream.Load() {
+		g.onEvents(evs)
+	}
+}
+
+// onEvents maps a batch of fs events to job keys under
 // one read lock of the routing table, then triggers each key once per debouncer. Edits
 // in a worktree's tree go to treeDeb (1 s), everything else to deb (300 ms). The same
 // key from both routes keeps two independent timers; the scheduler merges the requests.

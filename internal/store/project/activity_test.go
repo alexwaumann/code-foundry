@@ -123,26 +123,6 @@ func eventually(t *testing.T, what string, timeout time.Duration, cond func() bo
 	}
 }
 
-// settled waits until the runner has not run sub for a while and returns its count.
-// The FSEvents stream can deliver the fixture's own git writes, made just before
-// Register, a batch or two (streamLatency apart) after the stream starts.
-func settled(t *testing.T, cr *countingRunner, sub string) int {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	n := cr.count(sub)
-	for {
-		time.Sleep(2 * streamLatency)
-		m := cr.count(sub)
-		if m == n {
-			return n
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("%s still running after 5s", sub)
-		}
-		n = m
-	}
-}
-
 func nudged(ch chan struct{}) bool {
 	select {
 	case <-ch:
@@ -219,12 +199,15 @@ func TestPollTiers(t *testing.T) {
 	f := newFixture(t)
 	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
 	h := startHarness(t, "", Options{Runner: cr, PollInterval: 100 * time.Millisecond, IdlePollInterval: time.Hour})
+	// Only the poll runs status here: the stream can deliver the fixture's own writes
+	// seconds late.
+	h.store.ignoreStream.Store(true)
 	ctx := context.Background()
 	r, err := h.store.Register(ctx, f.project)
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := settled(t, cr, "status")
+	before := cr.count("status")
 	time.Sleep(600 * time.Millisecond)
 	if n := cr.count("status"); n != before {
 		t.Fatalf("idle project polled: status ran %d more times", n-before)
@@ -275,12 +258,14 @@ func TestFetchTiers(t *testing.T) {
 
 // TestTouch: Touch debounces per worktree (a burst is one status run), TouchNow runs
 // at once; both see an edit below the top level. The FSEvents stream sees that edit
-// too, so its tree window is set out of reach: only Touch and TouchNow refresh here.
+// too, and can deliver the fixture's own writes seconds late, so it is ignored: only
+// Touch and TouchNow refresh here.
 func TestTouch(t *testing.T) {
 	f := newFixture(t)
 	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
 	const window = 300 * time.Millisecond
-	h := startHarness(t, "", Options{Runner: cr, TouchDebounce: window, TreeDebounce: time.Hour})
+	h := startHarness(t, "", Options{Runner: cr, TouchDebounce: window})
+	h.store.ignoreStream.Store(true)
 	if _, err := h.store.Register(context.Background(), f.project); err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +273,6 @@ func TestTouch(t *testing.T) {
 	if err := os.Symlink(f.project, link); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(200 * time.Millisecond)
 	before := cr.count("status")
 
 	writeFile(t, filepath.Join(f.project, "sub", "x.txt"), "edited\n")
