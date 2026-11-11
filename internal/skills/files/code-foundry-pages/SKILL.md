@@ -85,7 +85,7 @@ stylesheets, keep `/cf/bridge.js`, and read `reference/react.md`.
   or from `cf.on`. The press, click or key counts for 5 seconds: a quick read awaited first
   is fine, anything slower first (a long wait, a timer) loses it. For several, start them all
   in the handler: `await Promise.all(items.map((x) => cf.run(…)))`; a slider on `change`, not `input`.
-- **The app asks the user** before a verb that needs it, and before any that runs a program, writes to git or GitHub or installs code (`terminal.new` with `argv`, `action.run`, `pr.comment`, a plugin's own): its own dialog shows the call over the page. Add no `confirm()`. One question at a time, 5 s apart, 3 a minute; past that a call rejects `invalid`, so ask from one button, not a loop.
+- **The app asks the user** before a verb that needs it, and before any that runs a program, saves a file, writes to git or GitHub or installs code (`terminal.new` with `argv`, `action.run`, `pr.comment`, a plugin's own): its own dialog shows the call over the page. Add no `confirm()`. One question at a time, 5 s apart, 3 a minute; past that a call rejects `invalid`, so ask from one button, not a loop.
 - **On success** update that row from the result at once in your own words: never print `text`.
 - **This thread**: pass `id` (`id: cf.thread.id` for the page's own: without one, archive, remove and snooze
   refuse it). Leave `cf.thread.id` out of lists of threads to act on: archiving it closes the page.
