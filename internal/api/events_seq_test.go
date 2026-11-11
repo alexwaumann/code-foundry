@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
 func (f *eventsFixture) watchSince(t *testing.T, ctx context.Context, since uint64, sources ...v1.EventSource) *eventStream {
@@ -226,5 +228,33 @@ func TestEventsTransientTopics(t *testing.T) {
 	r := f.watchSince(t, ctx, before.GetSeq(), v1.EventSource_EVENT_SOURCE_UI, v1.EventSource_EVENT_SOURCE_PROJECT)
 	if got := describe(r.next()); got != "project.updated b" {
 		t.Fatalf("replay = %q, want project.updated b", got)
+	}
+}
+
+// Connecting reads every workspace's folder again (EnsureDirs), so hand edits to its
+// instructions and skills show: before the snapshot, and on a resume, which has none
+// (a change goes out as a live event).
+func TestEventsWorkspaceConnectReadsFolders(t *testing.T) {
+	f := newEventsFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ensured := func() int { return strings.Count(strings.Join(f.ws.Calls(), "\n"), "EnsureDirs") }
+	first := f.watch(t, ctx, v1.EventSource_EVENT_SOURCE_WORKSPACE)
+	if ev := first.next(); describe(ev) != "workspace.snapshot(0)" || ensured() != 1 {
+		t.Fatalf("first event %q after %d EnsureDirs, want the snapshot after 1", describe(ev), ensured())
+	}
+	if _, err := f.ws.Create(ctx, workspace.CreateOptions{Name: "shop", Members: []string{"web"}}); err != nil {
+		t.Fatal(err)
+	}
+	last := first.nextLive().GetSeq()
+	s := f.watchSince(t, ctx, last, v1.EventSource_EVENT_SOURCE_WORKSPACE)
+	if _, err := f.ws.Create(ctx, workspace.CreateOptions{Name: "docs", Members: []string{"web"}}); err != nil {
+		t.Fatal(err)
+	}
+	if ev := s.next(); ev.GetSeq() <= last {
+		t.Fatalf("resumed with %q seq %d, want a live event after %d", describe(ev), ev.GetSeq(), last)
+	}
+	if n := ensured(); n != 2 {
+		t.Errorf("EnsureDirs ran %d times, want once per connect (2)", n)
 	}
 }

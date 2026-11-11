@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -12,39 +11,23 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// OpenWithFunc opens path with the app whose bundle id is bundleID.
-type OpenWithFunc func(ctx context.Context, bundleID, path string) error
-
-// OpenWithApp runs `open -b bundleID path`.
-func OpenWithApp(ctx context.Context, bundleID, path string) error {
-	if out, err := exec.CommandContext(ctx, "open", "-b", bundleID, path).CombinedOutput(); err != nil {
-		return fmt.Errorf("open -b %s %s: %w: %s", bundleID, path, err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
 // WorkspaceOpenDeps are workspace.open.editor's dependencies.
 type WorkspaceOpenDeps struct {
 	// Workspace finds the workspace. Nil works like Terminal.
 	Workspace WorkspaceBackend
 	// Editors lists the installed editor apps (GitOpsService.ListEditorApps): only one of
-	// them opens the folder. Nil works like Terminal.
+	// them opens the folder, which it does as a gitops op (GitOpsService.OpenEditor).
+	// Nil works like Terminal.
 	Editors GitOpsBackend
-	// Open opens the folder. Nil: OpenWithApp.
-	Open OpenWithFunc
 }
 
 // RegisterWorkspaceOpen registers workspace.open.editor: the workspace page's Open in
 // list (its Folder row's ⋯, the page's ⋯ and the index row's menu) opens the workspace's
-// folder in an installed editor (docs/notes/workspace-page-polish.md). worktree.open.editor
-// cannot: it opens registered worktrees only, and a workspace's folder is its root or its
-// managed dir under the config home. The app is a bundle id from worktree.editors, so the
-// palette does not list it (the page offers each app by name).
+// folder in an installed editor (docs/notes/workspace-page-polish.md), with the gitops op
+// worktree.open.editor --app runs. It takes a workspace rather than a path: a workspace's
+// folder is its root or its managed dir under the config home. The app is a bundle id
+// from worktree.editors, so the palette does not list it (the page offers each app by name).
 func RegisterWorkspaceOpen(r *Registry, d WorkspaceOpenDeps) error {
-	open := d.Open
-	if open == nil {
-		open = OpenWithApp
-	}
 	return r.RegisterAll(Command{
 		Name:        "workspace.open.editor",
 		NoPalette:   true,
@@ -79,8 +62,12 @@ func RegisterWorkspaceOpen(r *Registry, d WorkspaceOpenDeps) error {
 				return Result{}, err
 			}
 			dir := workspaceFolder(w)
-			if err := open(ctx, app.GetBundleId(), dir); err != nil {
+			res, err := d.Editors.OpenEditor(ctx, connect.NewRequest(&v1.OpenEditorRequest{WorktreePath: dir, App: app.GetBundleId()}))
+			if err != nil {
 				return Result{}, err
+			}
+			if op := res.Msg.GetOp(); op.GetState() != v1.GitOpState_GIT_OP_STATE_SUCCEEDED {
+				return gitOpResult(op)
 			}
 			return Result{Message: "opened " + dir + " in " + app.GetName(), JSON: map[string]string{"path": dir, "app": app.GetBundleId()}}, nil
 		},

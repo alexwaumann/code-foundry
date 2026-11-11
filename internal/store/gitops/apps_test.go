@@ -111,6 +111,15 @@ func TestOpenEditorApp(t *testing.T) {
 	if c := fr.called("open"); len(c) != 2 || !slices.Equal(c[1].Args, []string{"-b", "com.todesktop.230313mzl4w4u92", readme}) {
 		t.Errorf("open -b file calls = %+v", c)
 	}
+	// A folder no project registers (a workspace's) opens with the app too.
+	plain, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, OpenOptions{WorktreePath: plain, App: "dev.zed.Zed"})), "opened "+filepath.Base(plain)+" in Zed")
+	if c := fr.called("open"); len(c) != 3 || !slices.Equal(c[2].Args, []string{"-b", "dev.zed.Zed", plain}) {
+		t.Errorf("open -b folder calls = %+v", c)
+	}
 	// An app installed since the last detection is found; one that is not refuses.
 	bundles = append(bundles, "/Applications/Xcode.app")
 	wantOK(t, mustOp(t)(w.m.OpenEditor(ctx, OpenOptions{WorktreePath: w.a, App: "com.apple.dt.Xcode"})), "opened a in Xcode")

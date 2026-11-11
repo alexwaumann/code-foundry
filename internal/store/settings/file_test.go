@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -17,8 +18,8 @@ func TestDecode(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "empty", in: "", want: map[string]string{}},
-		{name: "typed values", in: "[threads]\nauto_name = false\nscrollback_lines = 5000\n[appearance]\ntheme = \"dark\"\n",
-			want: map[string]string{"threads.auto_name": "false", "threads.scrollback_lines": "5000", "appearance.theme": "dark"}},
+		{name: "typed values", in: "[threads]\nauto_name = false\nclose_grace_seconds = 5\n[appearance]\ntheme = \"dark\"\n",
+			want: map[string]string{"threads.auto_name": "false", "threads.close_grace_seconds": "5", "appearance.theme": "dark"}},
 		{name: "lenient string int", in: "[appearance]\nfont_size = \"15\"\n", want: map[string]string{"appearance.font_size": "15"}},
 		{name: "float stays a float", in: "[appearance]\nfont_size = 13.5\n", want: map[string]string{"appearance.font_size": "13.5"}},
 		{name: "quoted keybinding keys", in: "[keybindings]\n\"thread.new\" = \"cmd+shift+n\"\n",
@@ -125,6 +126,41 @@ func TestDecodeMovedKeys(t *testing.T) {
 			}
 			if v := tt.want[KeyUtilityModel]; !strings.Contains(out, "[models]") || !strings.Contains(out, "\nutility = \""+v+"\"\n") {
 				t.Errorf("rendered file lacks utility = %q under [models]:\n%s", v, out)
+			}
+		})
+	}
+}
+
+// threads.scrollback_lines moved to appearance.scrollback_lines (the bottom panel's
+// shells, beside the terminal font): a file that sets the old key keeps its value, and the
+// next save writes it under [appearance] only.
+func TestDecodeMovedScrollback(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "the old key moves", in: "[threads]\nscrollback_lines = 5000\n", want: "5000"},
+		{name: "the new key wins over the old", in: "[threads]\nscrollback_lines = 5000\n[appearance]\nscrollback_lines = 20000\n", want: "20000"},
+		{name: "the new key alone", in: "[appearance]\nscrollback_lines = 20000\n", want: "20000"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := decode([]byte(tt.in))
+			if err != nil || !maps.Equal(raw, map[string]string{"appearance.scrollback_lines": tt.want}) {
+				t.Fatalf("decode = %v, %v; want appearance.scrollback_lines %s", raw, err, tt.want)
+			}
+			r := resolve(raw, testCmds)
+			if got := r.settings.Appearance.ScrollbackLines; strconv.Itoa(got) != tt.want {
+				t.Errorf("Appearance.ScrollbackLines = %d, want %s", got, tt.want)
+			}
+			keep, _ := r.fileValues(raw)
+			out := string(render(keep, r.issues))
+			if strings.Contains(out, "[threads]\nscrollback_lines") || !strings.Contains(out, "\nscrollback_lines = "+tt.want+"\n") {
+				t.Errorf("rendered file does not have scrollback_lines = %s under [appearance] alone:\n%s", tt.want, out)
+			}
+			if i, j := strings.Index(out, "[appearance]"), strings.Index(out, "\nscrollback_lines = "+tt.want); i < 0 || j < i {
+				t.Errorf("scrollback_lines is not under [appearance]:\n%s", out)
 			}
 		})
 	}

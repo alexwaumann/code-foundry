@@ -88,7 +88,9 @@ const (
 	// settings, before UI intents.
 	EventSource_EVENT_SOURCE_UPDATE EventSource = 10
 	// Workspaces (branch sets). Sent right after project, before terminal: members name
-	// projects, and threads name workspaces.
+	// projects, and threads name workspaces. Connecting (with the snapshot or a resume)
+	// reads every workspace's folder again first (instructions, skills, links), so hand
+	// edits show without a spawn, as with WorkspaceService.Watch.
 	EventSource_EVENT_SOURCE_WORKSPACE EventSource = 11
 	// Rendered threads' pending requests (permission prompts and questions), for
 	// every rendered thread: a ThreadPendingSnapshot (right after the thread list), then a

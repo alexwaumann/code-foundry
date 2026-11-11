@@ -101,9 +101,11 @@ var retiredKeys = []string{
 // the old key reads as if it set the new one (unless it sets that too, which wins), and
 // the next save writes only the new key. threads.naming_model became models.utility when
 // the utility model became the model for all of the app's small jobs
-// (docs/notes/search-1-utility-model.md).
+// (docs/notes/search-1-utility-model.md); threads.scrollback_lines became
+// appearance.scrollback_lines once only the terminals' shells read it, not threads.
 var movedKeys = map[string]string{
-	GroupThreads + ".naming_model": KeyUtilityModel,
+	GroupThreads + ".naming_model":     KeyUtilityModel,
+	GroupThreads + ".scrollback_lines": KeyScrollback,
 }
 
 // renameMovedKeys moves raw's movedKeys to their new keys.

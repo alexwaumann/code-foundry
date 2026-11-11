@@ -13,6 +13,8 @@ import (
 
 // OpenOptions names what OpenEditor and Reveal open: a worktree, or one file.
 type OpenOptions struct {
+	// WorktreePath is any existing absolute directory: a registered worktree, or a
+	// folder no project registers (a workspace's).
 	WorktreePath string
 	// File is absolute or relative to WorktreePath, and must be under Options.Root;
 	// empty opens the worktree.

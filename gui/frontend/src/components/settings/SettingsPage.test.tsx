@@ -63,7 +63,7 @@ const fields: SettingFieldView[] = [
   f("threads.cache_ttl_seconds", "Prompt cache lifetime", "int", "general", "lifecycle", { defaultValue: "3600", unit: "s", min: 60, max: 86400 }),
   f("appearance.font_family", "Terminal font", "string", "appearance", "terminal", { defaultValue: "" }),
   f("appearance.font_size", "Terminal font size", "int", "appearance", "terminal", { defaultValue: "13", unit: "pt", min: 9, max: 28 }),
-  f("threads.scrollback_lines", "Scrollback", "int", "appearance", "terminal", { defaultValue: "30000", min: 100, max: 100000, restartRequired: true }),
+  f("appearance.scrollback_lines", "Scrollback", "int", "appearance", "terminal", { defaultValue: "30000", min: 100, max: 100000, restartRequired: true }),
   f("appearance.backdrop", "Backdrop", "enum", "appearance", "window", { enumValues: ["forest", "none", "custom"], defaultValue: "forest" }),
   f("appearance.backdrop_file", "Backdrop file", "string", "appearance", "window"),
   f("notifications.sound", "Alert sound", "bool", "notifications", "alerts", { defaultValue: "false" }),
@@ -217,7 +217,7 @@ describe("the settings page", () => {
     expect(within(row("appearance.font_size")).getByTestId("setting-unit").textContent).toBe("pt");
     expect(within(row("appearance.font_size")).queryByTestId("restart-hint")).toBeNull();
     const terminal = document.querySelector('[data-section="terminal"]');
-    expect(terminal?.querySelector('[data-setting="threads.scrollback_lines"] [data-testid="restart-hint"]')).not.toBeNull();
+    expect(terminal?.querySelector('[data-setting="appearance.scrollback_lines"] [data-testid="restart-hint"]')).not.toBeNull();
   });
 
   it("a dependent row dims while its toggle is off (its editor still works); across sections it says why", () => {
@@ -273,14 +273,14 @@ describe("the settings page", () => {
     expect(within(row("appearance.font_size")).getByTestId("setting-error").textContent).toBe("Want 9 to 28");
     expect(save.fn.mock.calls.some(([v]) => "appearance.font_size" in v)).toBe(false);
 
-    spin("threads.scrollback_lines").focus();
-    fireEvent.change(spin("threads.scrollback_lines"), { target: { value: "20000" } });
-    press(spin("threads.scrollback_lines"), "Enter");
-    expect(save.fn).toHaveBeenLastCalledWith({ "threads.scrollback_lines": "20000" });
+    spin("appearance.scrollback_lines").focus();
+    fireEvent.change(spin("appearance.scrollback_lines"), { target: { value: "20000" } });
+    press(spin("appearance.scrollback_lines"), "Enter");
+    expect(save.fn).toHaveBeenLastCalledWith({ "appearance.scrollback_lines": "20000" });
     act(() => {
-      setValues({ ...useSettingsStore.getState().snapshot?.values }, { restartPending: ["threads.scrollback_lines"] });
+      setValues({ ...useSettingsStore.getState().snapshot?.values }, { restartPending: ["appearance.scrollback_lines"] });
     });
-    expect(within(row("threads.scrollback_lines")).getByTestId("restart-pending")).toBeTruthy();
+    expect(within(row("appearance.scrollback_lines")).getByTestId("restart-pending")).toBeTruthy();
   });
 
   it("a number reverts on Escape, which leaves the page open, and commits on Enter", () => {

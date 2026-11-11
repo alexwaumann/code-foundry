@@ -222,7 +222,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		},
 	})
 	s.terminal = terminal.New(terminal.Options{
-		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Threads.ScrollbackLines),
+		Bus: s.bus, Logger: log.With("store", "terminal"), MaxScrollbackLines: uint(cfg.Appearance.ScrollbackLines),
 	})
 	// Workspaces open before threads: a spawn of a thread that references one reads it
 	// (and re-checks its managed dir). New makes every managed dir.

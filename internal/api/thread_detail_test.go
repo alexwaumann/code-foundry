@@ -13,27 +13,28 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
 
-// Get with with_detail says whether the report predates the last message (E6 §4.2).
-func TestThreadGetDetailReportStale(t *testing.T) {
+// Every thread says whether its report predates its latest turn, from the record: with
+// or without with_detail, and with no items to read.
+func TestThreadReportStale(t *testing.T) {
 	t0 := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
-	for _, tt := range []struct {
-		name   string
-		detail bool
-		want   bool
-	}{{"with detail", true, true}, {"without", false, false}} {
-		t.Run(tt.name, func(t *testing.T) {
-			fake, c := newThreadServer(t)
-			fake.Put(thread.Thread{ID: "s-1", State: thread.StateConnected, Status: thread.StatusBusy,
-				Report: thread.Report{Status: thread.ReportDone, Summary: "ok", At: t0}})
-			fake.PutItems("s-1", thread.Item{ID: "u1", Kind: thread.KindUserMessage, Text: "now the other one", CreatedAt: t0.Add(time.Minute)})
-			res, err := c.Get(context.Background(), connect.NewRequest(&v1.GetThreadRequest{Id: "s-1", WithDetail: tt.detail}))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := res.Msg.GetThread().GetReportStale(); got != tt.want {
-				t.Errorf("report_stale = %v, want %v", got, tt.want)
-			}
-		})
+	for _, detail := range []bool{true, false} {
+		fake, c := newThreadServer(t)
+		fake.Put(thread.Thread{ID: "s-1", State: thread.StateConnected, Status: thread.StatusBusy, TurnStartedAt: t0.Add(time.Minute),
+			Report: thread.Report{Status: thread.ReportDone, Summary: "ok", At: t0}})
+		res, err := c.Get(context.Background(), connect.NewRequest(&v1.GetThreadRequest{Id: "s-1", WithDetail: detail}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p := res.Msg.GetThread(); !p.GetReportStale() || !p.GetTurnStartedAt().AsTime().Equal(t0.Add(time.Minute)) {
+			t.Errorf("with_detail %v: report_stale %v, turn_started_at %v; want true at %v", detail, p.GetReportStale(), p.GetTurnStartedAt(), t0.Add(time.Minute))
+		}
+		list, err := c.List(context.Background(), connect.NewRequest(&v1.ListThreadsRequest{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := list.Msg.GetThreads(); len(got) != 1 || !got[0].GetReportStale() {
+			t.Errorf("list: %v, want one stale report", got)
+		}
 	}
 }
 

@@ -635,9 +635,9 @@ func wakeDetailOf(t Thread, items []Item, kids wakeChildren) wakeDetail {
 	if Meets(CondIdle, t) && !lastUser.IsZero() && !turnEnd.Before(lastUser) {
 		d.endedAt = turnEnd
 	}
-	d.staleReport = t.Report.Status != ReportNone && t.Report.At.Before(lastUser.Truncate(time.Millisecond))
+	d.staleReport = reportOlder(t.Report, lastUser)
 	if Meets(CondIdle, t) {
-		d.lastMessage = cutMessage(last)
+		d.lastMessage = LastSaid(t, items)
 		d.silent = last == "" && !lastUser.IsZero()
 	}
 	if t.Status == StatusNeedsAttention && isRequestReason(t.StatusReason) {
