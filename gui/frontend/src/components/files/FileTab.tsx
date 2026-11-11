@@ -12,6 +12,7 @@ import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePat
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
 import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
+import { noteFileKeyboard, setFileFindDraft, useFileFindOpen } from "@/stores/fileFind";
 import { canTell, dismissAsk, fileFacts, saveAndTell } from "@/stores/fileRequest";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
@@ -25,6 +26,7 @@ import { HtmlPreview } from "./HtmlPreview";
 import { ImagePreview } from "./ImagePreview";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PdfPreview } from "./PdfPreview";
+import { FileFindBar } from "./FileFind";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
 import { useFileHold } from "./useFileHold";
 import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
@@ -54,7 +56,9 @@ function SavedAgo({ ms }: { ms: number | null }) {
  * a whole text file in place (stores/fileEdit.ts): while it does, the tab shows the
  * session's version, and those reads only go through observeRead, so none of them can
  * replace a draft. A thread can ask the user to edit it (`ask`, stores/fileRequest.ts): the
- * tab opens editing under a band, on an empty document where no file is.
+ * tab opens editing under a band, on an empty document where no file is. Text as code
+ * (viewed or edited) and rendered markdown have a find (file.search, FileFind.tsx): a band
+ * under the header that stays across the pencil.
  */
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line, page, ask } = target;
@@ -169,6 +173,7 @@ export function FileTab({ target }: { target: FileTarget }) {
   const seedLines = useMemo(() => lineCount(seed), [seed]);
   const onDraft = useCallback((t: string) => {
     noteDraft(editKey, t);
+    setFileFindDraft(editKey, t);
   }, [editKey]);
   const onOpening = useCallback((stateKey: string) => {
     editorOpening(editKey, stateKey);
@@ -194,6 +199,12 @@ export function FileTab({ target }: { target: FileTarget }) {
   const mark = ask !== undefined && !dirty;
   const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onOpening, onDetached, onReady, mark }), [stateKey, revision, onDraft, onOpening, onDetached, onReady, mark]);
 
+  // What the find can search: the text as code, viewed or edited, or rendered markdown (an
+  // HTML page is a frame of its own, an image or a PDF has no text here).
+  const searchable = file !== null && !opening && !file.notFound && !file.isDir && text !== null && !(rendered && kind === "html");
+  const findKey = searchable ? editKey : undefined;
+  const findOpen = useFileFindOpen(editKey) && searchable;
+
   const meta = !file || creating ? null : file.notFound || file.isDir ? null : file.pdf ? (
     pdfMeta(file.size, file.truncated ? null : pages)
   ) : file.image ? (
@@ -216,7 +227,17 @@ export function FileTab({ target }: { target: FileTarget }) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="file-tab" data-path={abs} data-mode={kind ? mode : undefined} data-loading={read.loading || undefined}>
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      data-testid="file-tab"
+      data-path={abs}
+      data-mode={kind ? mode : undefined}
+      data-loading={read.loading || undefined}
+      data-file-find-box=""
+      onFocus={() => {
+        noteFileKeyboard(editKey);
+      }}
+    >
       <FileHeader
         icon={fileIconOf(abs, file?.mime)}
         name={name}
@@ -256,6 +277,7 @@ export function FileTab({ target }: { target: FileTarget }) {
           />
         )}
       </FileHeader>
+      {findOpen && <FileFindBar findKey={editKey} />}
       {held && <NoticeBar testId="file-held">{held}</NoticeBar>}
       {ask && editing && (
         <FileRequestBand
@@ -286,7 +308,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} onSize={onSize} onPages={setPages} />
+      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} findKey={findKey} onSize={onSize} onPages={setPages} />
     </div>
   );
 }
@@ -305,6 +327,7 @@ function FileBody({
   page,
   rendered,
   edit,
+  findKey,
   onSize,
   onPages,
 }: {
@@ -321,6 +344,7 @@ function FileBody({
   page: FileTarget["page"];
   rendered: "markdown" | "html" | null;
   edit: CodeFileEdit;
+  findKey: string | undefined;
   onSize: (w: number, h: number) => void;
   onPages: (pages: number) => void;
 }) {
@@ -388,7 +412,7 @@ function FileBody({
         {reveal}
       </FileEmptyState>
     );
-  if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} />;
+  if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} findKey={findKey} />;
   if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} page={page} reloads={refreshes} />;
-  return <CodeBody name={name} text={text} lines={lines} line={line} edit={edit} />;
+  return <CodeBody name={name} text={text} lines={lines} line={line} edit={edit} findKey={findKey} />;
 }

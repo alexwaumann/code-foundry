@@ -10,9 +10,15 @@
  * those inside the column. The selection takes the app's colour; in the File tab's editor
  * the library's own unlayered `::selection` (transparent: it draws its selection itself)
  * wins over this layered one.
+ *
+ * The File tab's find paints its matches in here with the Custom Highlight API
+ * (components/files/fileFindPaint.ts); a `::highlight` rule applies only in its own tree,
+ * so the thread find's tints (thread/find/find.css) are repeated for the shadow root.
  */
 export const CODE_SHADOW_CSS = `
 [data-content] { -webkit-user-select: text; user-select: text; cursor: text; }
 [data-content-buffer], [data-separator-wrapper], [data-separator-content], [data-merge-conflict-action-separator], [data-annotation-content] { -webkit-user-select: none; user-select: none; cursor: default; }
 ::selection { background-color: var(--cf-selection); }
+::highlight(cf-file-find) { background-color: color-mix(in oklab, var(--cf-warning) 26%, transparent); }
+::highlight(cf-file-find-current) { background-color: var(--cf-warning); color: var(--cf-warning-foreground); }
 `;

@@ -35,6 +35,9 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		{command: "terminal.find", view: command.ViewTerminalFind},
 		{command: "terminal.find.next", view: command.ViewTerminalFindNext},
 		{command: "terminal.find.previous", view: command.ViewTerminalFindPrevious},
+		{command: "file.search", view: command.ViewFileSearch},
+		{command: "file.search.next", view: command.ViewFileSearchNext},
+		{command: "file.search.previous", view: command.ViewFileSearchPrevious},
 		{command: "search.open", view: command.ViewSearch},
 	}
 	for _, tt := range tests {

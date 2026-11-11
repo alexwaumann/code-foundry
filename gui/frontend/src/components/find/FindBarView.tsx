@@ -23,14 +23,17 @@ function barCommand(e: KeyboardEvent, commands: FindBarCommands): keyof FindBarC
 }
 
 /**
- * The find bar both finds share (the thread's, components/thread/find/FindBar.tsx, and the
- * terminal's, components/terminal/TerminalFindBar.tsx): the query, then "Aa" while the
+ * The find bar every find shares (the thread's, components/thread/find/FindBar.tsx, the
+ * terminal's, components/terminal/TerminalFindBar.tsx, and the File tab's,
+ * components/files/FileFind.tsx): the query, then "Aa" while the
  * search is case-sensitive (smart case: a capital letter in the query), the count, previous,
  * next and close. Enter and shift+Enter step, Escape closes; the find verbs' chords work in
  * its field. Presentational: the caller owns the state, where the bar sits (`className`)
- * and when its field takes the keyboard (`inputRef`).
+ * and when its field takes the keyboard (`inputRef`). `docked`: a band in the layout (the
+ * File tab's, under its header) instead of a card floating over what it searches.
  */
 export function FindBarView({
+  docked = false,
   className,
   label,
   testId,
@@ -43,6 +46,7 @@ export function FindBarView({
   onStep,
   onClose,
 }: {
+  docked?: boolean;
   className: string;
   /** "Find in thread": the field's placeholder, and the bar's and field's accessible name. */
   label: string;
@@ -83,7 +87,11 @@ export function FindBarView({
   };
   return (
     <div
-      className={cn("pointer-events-auto absolute flex h-9.5 items-center gap-1 rounded-lg border bg-cf-surface-overlay py-1 pr-1 pl-3 shadow-2xl", className)}
+      className={cn(
+        "flex h-9.5 items-center gap-1 py-1 pr-1 pl-3",
+        docked ? "shrink-0 border-b border-cf-divider bg-cf-surface" : "pointer-events-auto absolute rounded-lg border bg-cf-surface-overlay shadow-2xl",
+        className,
+      )}
       role="search"
       aria-label={label}
       data-keys-local

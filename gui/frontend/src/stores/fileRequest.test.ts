@@ -65,7 +65,7 @@ async function asked(text: string | null = null, read = view(), over: Partial<ty
   const s = edit();
   if (!s) throw new Error("no session");
   lib.drafts.set(s.stateKey, text ?? s.seed);
-  noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+  noteEditor(KEY, { focus: vi.fn(), caret: () => null, select: vi.fn() });
   if (text !== null) noteDraft(KEY, text);
 }
 
@@ -217,7 +217,7 @@ describe("Save and tell", () => {
       const s = edit();
       expect(s?.creating).toBe(true);
       if (s) lib.drafts.set(s.stateKey, "");
-      noteEditor(KEY, { focus: vi.fn(), caret: () => null });
+      noteEditor(KEY, { focus: vi.fn(), caret: () => null, select: vi.fn() });
       presentFileSave();
       await new Promise((r) => setTimeout(r, 20));
       expect(calls).toEqual([]);

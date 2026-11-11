@@ -45,7 +45,7 @@ var pageState = []string{
 	"composer.history", "composer.stage", "dictation.allow", "dictation.download",
 	"dictation.download.cancel", "dictation.hold", "dictation.remove", "dictation.stop",
 	"dictation.toggle", "ember.disable", "ember.enable", "ember.task.cancel", "ember.task.done",
-	"file.find", "file.save", "memory.clear", "memory.remove", "notifications.test",
+	"file.find", "file.save", "file.search", "file.search.next", "file.search.previous", "memory.clear", "memory.remove", "notifications.test",
 	"plugin.act", "plugin.browse", "plugin.disable", "plugin.reload", "plugin.restart",
 	"plugin.surface", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "project.add",
 	"project.create", "project.refresh", "project.rename", "project.unregister", "search.clear",

@@ -3,6 +3,7 @@ import type { CommandView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
+import { registerFileFindHost, useFileFindStore, type FileFindHost } from "@/stores/fileFind";
 import { registerTerminalFindHost, useTerminalFindStore } from "@/stores/terminalFind";
 import { useThreadFindStore } from "@/stores/threadFind";
 import { useSubagentViewStore } from "@/stores/subagentView";
@@ -841,6 +842,170 @@ describe("the find chords, by where the keyboard is", () => {
     useUiStore.getState().openPalette();
     press(shell(), { key: "f", code: "KeyF", metaKey: true });
     expect(terminalOpen()).toBe(false);
+    useUiStore.getState().closePalette();
+  });
+});
+
+describe("the find chords in a File tab", () => {
+  const FIND = [cmd({ name: "thread.find", keybindings: ["cmd+f"] }), cmd({ name: "thread.find.next", keybindings: ["cmd+g"] }), cmd({ name: "thread.find.previous", keybindings: ["cmd+shift+g"] })];
+  const FILE = [cmd({ name: "file.search", keybindings: ["cmd+f"] }), cmd({ name: "file.search.next", keybindings: ["cmd+g"] }), cmd({ name: "file.search.previous", keybindings: ["cmd+shift+g"] })];
+  let installed: () => void;
+  let release: () => void;
+  let step: ReturnType<typeof vi.fn<(dir: 1 | -1) => void>>;
+  let handOff: ReturnType<typeof vi.fn<(query: string) => void>>;
+  let host: FileFindHost;
+  let tab: HTMLElement;
+
+  const list = (...commands: CommandView[]) => {
+    useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext()) });
+  };
+  const fileOpen = () => "k1" in useFileFindStore.getState().byTab;
+  const threadOpen = () => "s-1" in useThreadFindStore.getState().byThread;
+
+  /** The tab's code box, which takes the keyboard on a click (view mode). */
+  function code(): HTMLElement {
+    const el = document.createElement("div");
+    el.tabIndex = -1;
+    tab.append(el);
+    el.focus();
+    return el;
+  }
+
+  /** The tab's editor (edit mode): a contenteditable in a shadow root, and the library's find and replace panel. */
+  function editor(): { host: HTMLElement; content: HTMLElement; panelField: HTMLInputElement } {
+    const wrap = document.createElement("div");
+    wrap.setAttribute("data-code-editor", "k");
+    const h = document.createElement("div");
+    wrap.append(h);
+    const root = h.attachShadow({ mode: "open" });
+    const content = document.createElement("div");
+    content.setAttribute("contenteditable", "true");
+    const panel = document.createElement("div");
+    panel.setAttribute("data-search-panel", "");
+    const panelField = document.createElement("input");
+    panel.append(panelField);
+    root.append(content, panel);
+    tab.append(wrap);
+    return { host: h, content, panelField };
+  }
+
+  beforeEach(() => {
+    installed = installKeybindings();
+    tab = document.createElement("div");
+    tab.setAttribute("data-file-find-box", "");
+    document.body.append(tab);
+    step = vi.fn<(dir: 1 | -1) => void>();
+    handOff = vi.fn<(query: string) => void>();
+    host = { root: tab, step, opened: vi.fn(), finish: vi.fn(), handOff };
+    release = registerFileFindHost("k1", host);
+    useThreadsStore.setState({ byId: { "s-1": thread("s-1") }, order: ["s-1"] });
+    useUiStore.getState().select({ kind: "thread", id: "s-1" });
+    list(...FIND, ...FILE);
+  });
+
+  afterEach(() => {
+    installed();
+    release();
+    document.body.replaceChildren();
+    useFileFindStore.setState({ byTab: {} });
+    useThreadFindStore.setState({ byThread: {} });
+    useThreadsStore.setState({ byId: {}, order: [] });
+    useUiStore.getState().select(HOME);
+  });
+
+  it("cmd+f on the tab's code opens its bar, not the thread's", () => {
+    const e = press(code(), { key: "f", code: "KeyF", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(fileOpen()).toBe(true);
+    expect(threadOpen()).toBe(false);
+  });
+
+  it("cmd+f in the thread's prompt stays the thread's, with the tab on screen", () => {
+    const el = document.createElement("div");
+    el.dataset.chordYield = "";
+    el.setAttribute("contenteditable", "true");
+    document.body.append(el);
+    press(el, { key: "f", code: "KeyF", metaKey: true });
+    expect(threadOpen()).toBe(true);
+    expect(fileOpen()).toBe(false);
+  });
+
+  it("cmd+g and cmd+shift+g step the tab's open bar, and open a closed one", () => {
+    const el = code();
+    press(el, { key: "g", code: "KeyG", metaKey: true });
+    expect(fileOpen()).toBe(true);
+    expect(step).not.toHaveBeenCalled();
+    press(el, { key: "g", code: "KeyG", metaKey: true });
+    press(el, { key: "g", code: "KeyG", metaKey: true, shiftKey: true });
+    expect(step.mock.calls).toEqual([[1], [-1]]);
+  });
+
+  it("in the editor, cmd+f is the tab's bar and never reaches the library's own find", () => {
+    const { content } = editor();
+    const e = press(content, { key: "f", code: "KeyF", metaKey: true, composed: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(fileOpen()).toBe(true);
+  });
+
+  it("in the library's find and replace panel its chords stay its own", () => {
+    const { panelField } = editor();
+    const e = press(panelField, { key: "f", code: "KeyF", metaKey: true, composed: true });
+    expect(e.defaultPrevented).toBe(false);
+    expect(fileOpen()).toBe(false);
+  });
+
+  it("cmd+alt+f in the editor is the library's replace, which takes the bar's query", () => {
+    const { content } = editor();
+    useFileFindStore.setState({ byTab: { k1: { query: "value", focusSeq: 1, focusedSeq: 1, current: null, revealSeq: 0, index: -1, total: 0, capped: false, draft: null } } });
+    const e = press(content, { key: "f", code: "KeyF", metaKey: true, altKey: true, composed: true });
+    expect(e.defaultPrevented).toBe(false);
+    expect(handOff).toHaveBeenCalledWith("value");
+    expect(fileOpen()).toBe(false);
+  });
+
+  it("a text field of the tab's own keeps its keys (the bar handles its chords itself)", () => {
+    const field = document.createElement("input");
+    tab.append(field);
+    field.focus();
+    press(field, { key: "f", code: "KeyF", metaKey: true });
+    expect(fileOpen()).toBe(false);
+    expect(threadOpen()).toBe(false);
+  });
+
+  it("a File tab that cannot search (an HTML page, an image) leaves cmd+f to the thread", () => {
+    release();
+    const el = code();
+    press(el, { key: "f", code: "KeyF", metaKey: true });
+    expect(fileOpen()).toBe(false);
+    expect(threadOpen()).toBe(true);
+    release = registerFileFindHost("k1", host);
+  });
+
+  it("the keymap does not give the shared chord to the file's command", () => {
+    expect(commandBindings(useCommandsStore.getState().commands).get("cmd+f")?.name).toBe("thread.find");
+  });
+
+  it("a rebound file.search moves with the user: cmd+f in the tab is the thread's again", () => {
+    list(...FIND, cmd({ name: "file.search", keybindings: ["cmd+shift+y"] }));
+    const el = code();
+    press(el, { key: "f", code: "KeyF", metaKey: true });
+    expect(threadOpen()).toBe(true);
+    expect(fileOpen()).toBe(false);
+    press(el, { key: "y", code: "KeyY", metaKey: true, shiftKey: true });
+    expect(fileOpen()).toBe(true);
+  });
+
+  it("the palette lists the file's verbs only with a tab that can search on screen", () => {
+    expect(inPalette(FILE[0] as CommandView)).toBe(true);
+    release();
+    expect(inPalette(FILE[0] as CommandView)).toBe(false);
+    release = registerFileFindHost("k1", host);
+  });
+
+  it("the palette open keeps the chord from the tab", () => {
+    useUiStore.getState().openPalette();
+    press(code(), { key: "f", code: "KeyF", metaKey: true });
+    expect(fileOpen()).toBe(false);
     useUiStore.getState().closePalette();
   });
 });

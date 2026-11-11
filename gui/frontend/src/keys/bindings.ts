@@ -18,6 +18,7 @@ import { presentPromptHistory } from "@/stores/historyComposers";
 import { canSaveFile } from "@/stores/fileEdit";
 import { presentFileSave } from "@/stores/fileRequest";
 import { presentFileFinder } from "@/stores/fileFinder";
+import { canSearchFile, fileFindTabAt, handOffFileFind, presentFileFind } from "@/stores/fileFind";
 import { presentTerminalFind } from "@/stores/terminalFind";
 import { presentThreadFind } from "@/stores/threadFind";
 import { presentSearch } from "@/stores/threadSearch";
@@ -176,6 +177,8 @@ export function inPalette(c: CommandView): boolean {
   if (c.name === "thread.move.open" && !canMoveThread(getUiContext().activeThreadId)) return false;
   // file.save: only with a File tab editing in front of it.
   if (c.name === "file.save" && !canSaveFile()) return false;
+  // file.search and its steps: only with a File tab that can search on screen.
+  if (fileScoped.has(c.name) && !canSearchFile()) return false;
   return isStartable(c) && !c.noPalette;
 }
 
@@ -188,12 +191,13 @@ const paletteSupplied: ReadonlySet<string> = new Set(["thread.new", "thread.new-
 
 /**
  * Commands that share their chords with another (internal/command SharedChords): they run
- * only while the keyboard is in a terminal, where they win over it, so cmd+f finds in the
- * terminal there and in the thread everywhere else. Decided by where the keyboard is, not
- * by availability: the list can be a debounce behind a focus change, and a plugin's terminal
- * node is in no context.
+ * only while the keyboard is in their place, where they win over it, so cmd+f finds in the
+ * terminal in a terminal, in the file in a File tab, and in the thread everywhere else.
+ * Decided by where the keyboard is, not by availability: the list can be a debounce behind
+ * a focus change, and a plugin's terminal node is in no context.
  */
 const terminalScoped: ReadonlySet<string> = new Set(["terminal.find", "terminal.find.next", "terminal.find.previous"]);
+const fileScoped: ReadonlySet<string> = new Set(["file.search", "file.search.next", "file.search.previous"]);
 
 let bindingCache: { commands: readonly CommandView[]; inSubagent: boolean; map: Map<string, CommandView> } | null = null;
 
@@ -207,7 +211,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
   if (bindingCache?.commands === commands && bindingCache.inSubagent === inSubagent) return bindingCache.map;
   const map = new Map<string, CommandView>();
   for (const c of commands) {
-    if (!isStartable(c) || terminalScoped.has(c.name)) continue;
+    if (!isStartable(c) || terminalScoped.has(c.name) || fileScoped.has(c.name)) continue;
     for (const k of c.keybindings) {
       const chord = normalizeChord(k);
       if (chord && !map.has(chord)) map.set(chord, c);
@@ -217,7 +221,27 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
   return map;
 }
 
-let terminalCache: { commands: readonly CommandView[]; map: Map<string, CommandView> } | null = null;
+const scopedCache = new Map<ReadonlySet<string>, { commands: readonly CommandView[]; map: Map<string, CommandView> }>();
+
+/** The command of `scope` this chord runs (any chord with cmd, ctrl or alt). */
+function scopedCommand(scope: ReadonlySet<string>, chord: string): CommandView | undefined {
+  if (!/^(cmd|ctrl|alt)\+/.test(chord)) return undefined;
+  const { commands } = useCommandsStore.getState();
+  let cache = scopedCache.get(scope);
+  if (cache?.commands !== commands) {
+    const map = new Map<string, CommandView>();
+    for (const c of commands) {
+      if (!scope.has(c.name)) continue;
+      for (const k of c.keybindings) {
+        const bound = normalizeChord(k);
+        if (bound && !map.has(bound)) map.set(bound, c);
+      }
+    }
+    cache = { commands, map };
+    scopedCache.set(scope, cache);
+  }
+  return cache.map.get(chord);
+}
 
 /**
  * The command of terminalScoped this chord runs in a terminal. Any chord with cmd, ctrl or
@@ -225,20 +249,21 @@ let terminalCache: { commands: readonly CommandView[]; map: Map<string, CommandV
  * means this terminal's find, not the program's. A bare key stays the program's.
  */
 function terminalCommand(chord: string): CommandView | undefined {
-  if (!/^(cmd|ctrl|alt)\+/.test(chord)) return undefined;
-  const { commands } = useCommandsStore.getState();
-  if (terminalCache?.commands !== commands) {
-    const map = new Map<string, CommandView>();
-    for (const c of commands) {
-      if (!terminalScoped.has(c.name)) continue;
-      for (const k of c.keybindings) {
-        const bound = normalizeChord(k);
-        if (bound && !map.has(bound)) map.set(bound, c);
-      }
-    }
-    terminalCache = { commands, map };
-  }
-  return terminalCache.map.get(chord);
+  return scopedCommand(terminalScoped, chord);
+}
+
+/**
+ * The command of fileScoped this chord runs with the keyboard in a File tab that can search
+ * (its code, its editor, its header; not a text field of its own, whose keys are its own,
+ * nor the editor's find and replace panel). Rebind file.search away and cmd+f there is the
+ * editor's own find again in edit mode (codeEditorChords), the thread's in view mode.
+ */
+function fileCommand(e: KeyboardEvent, target: Element | null, code: boolean, chord: string): { command: CommandView; tab: string } | undefined {
+  if (!code && isEditable(target)) return undefined;
+  if (keyTarget(e)?.closest("[data-search-panel]")) return undefined;
+  const command = scopedCommand(fileScoped, chord);
+  const tab = command ? fileFindTabAt(target) : null;
+  return command && tab !== null ? { command, tab } : undefined;
 }
 
 /**
@@ -483,6 +508,11 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   "terminal.find": () => presentTerminalFind("open") || true,
   "terminal.find.next": () => presentTerminalFind("next") || true,
   "terminal.find.previous": () => presentTerminalFind("previous") || true,
+  // Window-local: the find bar of the File tab with the keyboard, or a step through its
+  // matches (stores/fileFind.ts). The CLI's reach every window through ShowView.
+  "file.search": () => presentFileFind("open") || true,
+  "file.search.next": () => presentFileFind("next") || true,
+  "file.search.previous": () => presentFileFind("previous") || true,
   // Window-local: the palette's Find dialog over every thread (stores/threadSearch.ts), from
   // any view, on the search `id` names (the sidebar's search row). The CLI's reaches every
   // window through ShowView.
@@ -620,6 +650,18 @@ export function handleKeyDown(e: KeyboardEvent): void {
   const target = e.target instanceof Element ? e.target : null;
   const shell = Boolean(target?.closest("[data-terminal-host]"));
   const code = inCodeEditor(e, target);
+  const inFile = useUiStore.getState().palette.open ? undefined : fileCommand(e, target, code, chord);
+  if (inFile) {
+    e.preventDefault();
+    e.stopPropagation();
+    startCommand(inFile.command);
+    return;
+  }
+  // The editor's find and replace panel (the library's) opening: the tab's bar hands it the query.
+  if (code && chord === "cmd+alt+f") {
+    const tab = fileFindTabAt(target);
+    if (tab !== null) handOffFileFind(tab);
+  }
   if (code && (codeEditorChords.has(chord) || editingChord(chord))) return;
   // Only the prompt's text yields: a composer button or picker keeps the usual keys
   // (F2 renames).
