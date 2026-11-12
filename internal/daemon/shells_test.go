@@ -94,6 +94,16 @@ func TestShellReaper(t *testing.T) {
 			wantGone: true},
 		{name: "the sweep removes an action terminal of a removed thread", labels: action("s9", "r1", "%dir"), wantGone: true},
 		{name: "the sweep leaves a live thread's action terminal", labels: action("s1", "r1", "%dir")},
+		// A free shell belongs to no thread or project: only its exit removes it.
+		{name: "a free shell that exits is removed", labels: termlabel.Free(), exit: true, wantGone: true},
+		{name: "a free shell that exited before the start is swept", labels: termlabel.Free(), exitedBefore: true, wantGone: true},
+		{name: "the sweep leaves a free shell", labels: termlabel.Free()},
+		{name: "unregistering a project leaves a free shell", labels: termlabel.Free(), event: event(project.ProjectRemoved{ID: ""})},
+		{name: "removing a thread leaves a free shell", labels: termlabel.Free(), event: event(thread.Removed{ID: ""})},
+		// A quick shell is a thread's shell.
+		{name: "removing its thread kills and removes a quick shell", labels: termlabel.QuickShell("s1", "r1", "%dir"),
+			event: event(thread.Removed{ID: "s1"}), wantGone: true},
+		{name: "the sweep removes a quick shell of a removed thread", labels: termlabel.QuickShell("s9", "r1", "%dir"), wantGone: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -201,5 +211,49 @@ func TestShellReaperStopsDuringACleanup(t *testing.T) {
 	}
 	if _, err := f.Get(t.Context(), term.ID); err != nil {
 		t.Errorf("shell after stop: %v, want it still there (never exited)", err)
+	}
+}
+
+// The sweep never reaps a free shell, even when every owner check would fail: it has no
+// owner to check, by design, not by accident.
+func TestShellReaperLeavesFreeShells(t *testing.T) {
+	b := bus.New()
+	f := terminaltest.New(b)
+	free, err := f.Create(t.Context(), terminal.Spec{Argv: []string{"zsh"}, Labels: termlabel.Free()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned, err := f.Create(t.Context(), terminal.Spec{Argv: []string{"zsh"}, Labels: termlabel.Shell("s1", "r1", "/cf-test/w")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop, err := startShellReaper(t.Context(), shellReaperOptions{
+		Log: discard, Terminals: f, Bus: b, SweepEvery: 10 * time.Millisecond,
+		DirGone:       func(string) bool { return true },
+		ProjectExists: func(string) bool { return false },
+		ThreadExists:  func(string) bool { return false },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	for _, ev := range []project.Event{project.WorktreeRemoved{Path: ""}, project.ProjectRemoved{ID: ""}} {
+		bus.Publish(b, ev)
+	}
+	bus.Publish[thread.Event](b, thread.Removed{ID: ""})
+	// The owned shell going shows the sweeps and events ran.
+	for {
+		if _, err := f.Get(t.Context(), owned.ID); errors.Is(err, terminal.ErrNotFound) {
+			break
+		}
+		select {
+		case <-t.Context().Done():
+			t.Fatal("the owned shell was never reaped")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	time.Sleep(50 * time.Millisecond) // a few more sweeps
+	if _, err := f.Get(t.Context(), free.ID); err != nil {
+		t.Errorf("free shell: %v, want it kept", err)
 	}
 }

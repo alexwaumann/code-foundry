@@ -36,7 +36,7 @@ var noPalette = []string{
 	"pr.review.request", "pr.task", "project.branch.delete", "project.list", "settings.get", "settings.path",
 	"search.agent", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.report",
 	"search.seen", "search.stop", "settings.reset", "settings.set", "skill.browse", "skill.disable", "skill.enable",
-	"skill.install", "skill.remove", "skill.setup", "skill.uninstall", "terminal.list",
+	"skill.install", "skill.remove", "skill.setup", "skill.uninstall", "terminal.list", "terminal.new-free",
 	"theme.check", "theme.list", "theme.restore", "theme.save", "theme.show", "thread.agent.open",
 	"thread.agents", "thread.ask", "thread.budget", "thread.checkouts", "thread.commands", "thread.flag.clear",
 	"thread.flags", "thread.focus", "thread.get", "thread.items", "thread.label", "thread.list",

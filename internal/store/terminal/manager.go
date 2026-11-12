@@ -38,6 +38,12 @@ type Options struct {
 	// MetadataInterval throttles title/alt-screen updates per terminal. Default 50ms
 	// (at most 20 updates per second).
 	MetadataInterval time.Duration
+	// FactsDelay is how long after output a terminal's facts (facts.go) are read: at
+	// most one sample per FactsDelay while output keeps coming. Default 200ms.
+	FactsDelay time.Duration
+	// FactsRecheck are the delays of the samples taken after that one while the terminal
+	// stays quiet, each from the one before. Default 1s, 4s. Empty (not nil): none.
+	FactsRecheck []time.Duration
 	// SubscriberBuffer is the per-Attach channel capacity in events. Default 256.
 	SubscriberBuffer int
 	// Now is the clock. Default time.Now.
@@ -65,6 +71,12 @@ func (o Options) withDefaults() Options {
 	}
 	if o.MetadataInterval <= 0 {
 		o.MetadataInterval = 50 * time.Millisecond
+	}
+	if o.FactsDelay <= 0 {
+		o.FactsDelay = 200 * time.Millisecond
+	}
+	if o.FactsRecheck == nil {
+		o.FactsRecheck = []time.Duration{time.Second, 4 * time.Second}
 	}
 	if o.SubscriberBuffer < 2 {
 		o.SubscriberBuffer = 256
@@ -187,13 +199,14 @@ func (m *Manager) prepare(spec Spec, env []string) (*exec.Cmd, Terminal, error) 
 
 	cmd := &exec.Cmd{Path: path, Args: slices.Clone(spec.Argv), Env: env, Dir: cwd}
 	info := Terminal{
-		ID:     id,
-		Argv:   slices.Clone(spec.Argv),
-		Cwd:    cwd,
-		Cols:   cols,
-		Rows:   rows,
-		State:  StateRunning,
-		Labels: maps.Clone(spec.Labels),
+		ID:      id,
+		Argv:    slices.Clone(spec.Argv),
+		Cwd:     cwd,
+		LiveCwd: cwd,
+		Cols:    cols,
+		Rows:    rows,
+		State:   StateRunning,
+		Labels:  maps.Clone(spec.Labels),
 	}
 	return cmd, info, nil
 }

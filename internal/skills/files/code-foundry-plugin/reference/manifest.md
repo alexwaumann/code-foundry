@@ -73,7 +73,7 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 
 | Key | Type | Grants |
 |---|---|---|
-| `commands` | globs | `Host.Invoke` and view command buttons for these host commands. Globs over dotted names: `*` within a segment, `**` across (`"thread.send"`, `"view.open.*"`, `"action.**"`). `plugin.<verb>` management commands are refused whatever the globs. The list: `reference/host-commands.md`. |
+| `commands` | globs | `Host.Invoke` and view command buttons for these host commands. Globs over dotted names: `*` within a segment, `**` across (`"thread.send"`, `"view.open.*"`, `"action.**"`). `plugin.<verb>` management commands are refused whatever the globs. The list: `reference/host-commands.md` and `reference/host-commands-thread-view.md`. |
 | `events` | sources | `Host.Subscribe` to these event sources: {{cf.eventSources}}. |
 | `threadStatus` | bool | `Host.SetFlag`: attention or error flags on threads. |
 | `sessionEnv` | bool | `Host.SetEnvironment`: env, PATH entries and `--add-dir`s for new Claude threads. |
