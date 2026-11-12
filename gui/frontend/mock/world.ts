@@ -2993,6 +2993,8 @@ export class World {
       exitedAt: t.exitedAt ? timestampFromDate(t.exitedAt) : undefined,
       altScreen: t.altScreen,
       labels: t.labels,
+      // The daemon reads these from the process table; a mock shell never moves or runs a job.
+      liveCwd: t.cwd,
     };
   }
 
@@ -3967,6 +3969,22 @@ export class World {
           await new Promise((r) => setTimeout(r, RUN_PROMPT_MS));
           this.write(t.id, enc.encode(keys));
           return { message: `created terminal ${t.id} and ran the command in it`, resultJson };
+        },
+      },
+      {
+        cmd: {
+          name: "terminal.new-free",
+          title: "New Terminal in Home Folder",
+          category: "Terminal",
+          description: "Start a shell in the home folder, owned by nothing.",
+          noPalette: true,
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: a free shell (kind shell, no owner labels), in the home directory.
+        run: () => {
+          const t = this.create(["/bin/zsh"], HOME, { [LABEL_KIND]: KIND_SHELL }, "shell");
+          return { message: `created terminal ${t.id} in ${HOME}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) };
         },
       },
       {
