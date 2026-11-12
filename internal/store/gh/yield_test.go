@@ -695,10 +695,6 @@ func TestEveryReadLeavesWithItsCaller(t *testing.T) {
 			_, err := s.PullRequest(ctx, "o/r", 8)
 			return err
 		}},
-		{"checks", func(ctx context.Context, s *Store) error {
-			_, err := s.Checks(ctx, "o/r", "main")
-			return err
-		}},
 		{"reviewer candidates", func(ctx context.Context, s *Store) error {
 			_, err := s.ReviewerCandidates(ctx, "o/r", 8, "ab")
 			return err

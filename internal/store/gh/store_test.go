@@ -477,36 +477,6 @@ func TestStorePullRequestDetail(t *testing.T) {
 	}
 }
 
-func TestStoreChecks(t *testing.T) {
-	f := &fakeRunner{}
-	checks, unknown := fixtureData(t, "checks_main.json"), fixtureData(t, "checks_unknown_ref.json")
-	g := newFakeGitHub()
-	f.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
-		switch {
-		case op == "Checks" && vars["ref"] == "main":
-			return checks, nil
-		case op == "Checks":
-			return unknown, nil
-		}
-		return g.respond(op, doc, vars)
-	})
-	s := startStore(t, testOptions(openTestDB(t), f, nil))
-	ctx := context.Background()
-	rc, err := s.Checks(ctx, "ghostty-org/ghostty", "main")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rc.SHA != "a60e9e2a57f73e1eef2bd1cf2995a467f69e7fb0" || len(rc.Runs) != 54 || rc.Rollup.Skipped != 50 || rc.FetchedAt.IsZero() {
-		t.Errorf("checks = sha %s, %d runs, rollup %+v", rc.SHA, len(rc.Runs), rc.Rollup)
-	}
-	if _, err := s.Checks(ctx, "ghostty-org/ghostty", "no-such-branch"); !errors.Is(err, ErrNotFound) {
-		t.Errorf("unknown ref err = %v, want ErrNotFound", err)
-	}
-	if _, err := s.Checks(ctx, "ghostty-org/ghostty", ""); !errors.Is(err, ErrInvalidArgument) {
-		t.Errorf("empty ref err = %v", err)
-	}
-}
-
 // A renamed repository: the poll learns its new name, and its pull requests (search
 // results carry the new name) are found under the tracked slug.
 func TestStoreRenamedRepository(t *testing.T) {

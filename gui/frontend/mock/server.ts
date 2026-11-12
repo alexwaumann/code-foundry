@@ -428,7 +428,6 @@ function routes(router: ConnectRouter): void {
       if (!req.headRef) throw new ConnectError("head_ref is required", Code.InvalidArgument);
       return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
     },
-    refresh: () => ({}),
     getPullRequestDetail: (req) => world.gh.prDetails.delayed(() => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) }))),
     listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number, req.query)),
     setReviewRequest: (req) =>

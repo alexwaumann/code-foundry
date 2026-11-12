@@ -183,7 +183,6 @@ const (
 	jobPoll jobKind = iota
 	jobAuth
 	jobPullRequest
-	jobChecks
 	// jobFunc runs job.run; job.id identifies it for coalescing (pr_detail.go).
 	jobFunc
 )
@@ -192,7 +191,6 @@ type job struct {
 	kind   jobKind
 	slug   string
 	number int
-	ref    string
 	// id and run: jobFunc only.
 	id  string
 	run func(context.Context) (any, error)
@@ -210,12 +208,11 @@ func (j *job) key() string {
 	if j.kind == jobFunc {
 		return fmt.Sprintf("%d|%s", j.kind, j.id)
 	}
-	return fmt.Sprintf("%d|%s|%d|%s", j.kind, j.slug, j.number, j.ref)
+	return fmt.Sprintf("%d|%s|%d", j.kind, j.slug, j.number)
 }
 
 type jobResult struct {
 	detail PullRequestDetail
-	checks RefChecks
 	value  any // jobFunc
 	err    error
 }
@@ -403,33 +400,6 @@ func (s *Store) PullRequest(ctx context.Context, slug string, number int) (PullR
 		return PullRequestDetail{}, res.err
 	}
 	return res.detail, nil
-}
-
-// Checks implements Service.
-func (s *Store) Checks(ctx context.Context, slug, ref string) (RefChecks, error) {
-	key, err := NormalizeSlug(slug)
-	if err != nil {
-		return RefChecks{}, err
-	}
-	if ref == "" || len(ref) > 255 {
-		return RefChecks{}, fmt.Errorf("%w: ref %q", ErrInvalidArgument, ref)
-	}
-	cached, ok, err := s.cache.loadChecks(ctx, key, ref)
-	if err != nil {
-		s.log.Warn("gh cache read failed", "err", err)
-	}
-	if ok && s.opts.Now().Sub(cached.FetchedAt) < s.opts.DetailTTL {
-		return cached, nil
-	}
-	res := s.submit(ctx, &job{kind: jobChecks, slug: key, ref: ref, read: true})
-	if res.err != nil {
-		if ok && ctx.Err() == nil {
-			cached.LastError = res.err.Error()
-			return cached, nil
-		}
-		return RefChecks{}, res.err
-	}
-	return res.checks, nil
 }
 
 // submit queues an on-demand job (coalescing with an identical queued one) and waits
@@ -657,8 +627,6 @@ func (s *Store) execute(ctx context.Context, j *job) {
 		s.checkAuth(ctx)
 	case jobPullRequest:
 		res.detail, res.err = s.fetchPullRequest(ctx, j.slug, j.number)
-	case jobChecks:
-		res.checks, res.err = s.fetchChecks(ctx, j.slug, j.ref)
 	case jobFunc:
 		res.value, res.err = j.run(ctx)
 	}

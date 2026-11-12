@@ -127,12 +127,6 @@ func TestGhReads(t *testing.T) {
 		checks[2].GetStatus() != v1.CheckStatus_CHECK_STATUS_UNSPECIFIED {
 		t.Errorf("detail = %v", d.Msg)
 	}
-
-	store.SetChecks("ghostty-org/ghostty", "main", gh.RefChecks{SHA: "a60e9e2", Rollup: gh.CheckRollup{State: gh.RollupSuccess, Total: 1, Passed: 1}, FetchedAt: at})
-	c, err := client.ListChecks(ctx, connect.NewRequest(&v1.ListChecksRequest{RepoSlug: "ghostty-org/ghostty", Ref: "main"}))
-	if err != nil || c.Msg.GetSha() != "a60e9e2" || c.Msg.GetRollup().GetState() != v1.CheckRollupState_CHECK_ROLLUP_STATE_SUCCESS {
-		t.Errorf("checks = %v, %v", c.Msg, err)
-	}
 }
 
 func TestGhErrorCodes(t *testing.T) {
@@ -160,10 +154,6 @@ func TestGhErrorCodes(t *testing.T) {
 		_, err := client.GetPullRequest(ctx, connect.NewRequest(&v1.GetPullRequestRequest{RepoSlug: "a/b", Number: 1}))
 		if got := connect.CodeOf(err); got != tt.want {
 			t.Errorf("%v: code = %v, want %v", tt.err, got, tt.want)
-		}
-		_, err = client.Refresh(ctx, connect.NewRequest(&v1.RefreshGhRequest{RepoSlug: "a/b"}))
-		if got := connect.CodeOf(err); got != tt.want {
-			t.Errorf("refresh %v: code = %v, want %v", tt.err, got, tt.want)
 		}
 	}
 }

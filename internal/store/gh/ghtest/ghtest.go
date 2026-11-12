@@ -19,7 +19,6 @@ type Store struct {
 
 	mu      sync.Mutex
 	details map[string]gh.PullRequestDetail
-	checks  map[string]gh.RefChecks
 	branch  map[string]gh.BranchPullRequests
 	err     error
 	calls   []string
@@ -35,7 +34,7 @@ var _ gh.Service = (*Store)(nil)
 
 // New returns an empty fake that publishes to b (which may be nil).
 func New(b *bus.Bus) *Store {
-	s := &Store{bus: b, details: map[string]gh.PullRequestDetail{}, checks: map[string]gh.RefChecks{}, branch: map[string]gh.BranchPullRequests{}}
+	s := &Store{bus: b, details: map[string]gh.PullRequestDetail{}, branch: map[string]gh.BranchPullRequests{}}
 	s.snap.Store(&gh.Snapshot{Viewer: gh.ViewerState{Authenticated: true}, Repos: map[string]gh.RepoState{}})
 	return s
 }
@@ -74,14 +73,7 @@ func (s *Store) SetPullRequest(slug string, d gh.PullRequestDetail) {
 	s.details[fmt.Sprintf("%s#%d", key, d.PullRequest.Number)] = d
 }
 
-// SetChecks sets what Checks returns for slug and ref.
-func (s *Store) SetChecks(slug, ref string, c gh.RefChecks) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.checks[slug+"@"+ref] = c
-}
-
-// SetError makes Refresh, PullRequest, and Checks fail with err (nil clears it).
+// SetError makes Refresh and PullRequest fail with err (nil clears it).
 func (s *Store) SetError(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -174,22 +166,4 @@ func (s *Store) PullRequest(_ context.Context, slug string, number int) (gh.Pull
 		return gh.PullRequestDetail{}, fmt.Errorf("%w: %s#%d", gh.ErrNotFound, key, number)
 	}
 	return d, nil
-}
-
-// Checks implements gh.Service.
-func (s *Store) Checks(_ context.Context, slug, ref string) (gh.RefChecks, error) {
-	key, err := gh.NormalizeSlug(slug)
-	if err != nil {
-		return gh.RefChecks{}, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.err != nil {
-		return gh.RefChecks{}, s.err
-	}
-	c, ok := s.checks[key+"@"+ref]
-	if !ok {
-		return gh.RefChecks{}, fmt.Errorf("%w: %s@%s", gh.ErrNotFound, key, ref)
-	}
-	return c, nil
 }

@@ -65,45 +65,6 @@ func (h *Gh) GetPullRequest(ctx context.Context, req *connect.Request[v1.GetPull
 	}), nil
 }
 
-// ListChecks returns the checks on a ref.
-func (h *Gh) ListChecks(ctx context.Context, req *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error) {
-	c, err := h.store.Checks(ctx, req.Msg.GetRepoSlug(), req.Msg.GetRef())
-	if err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.ListChecksResponse{
-		Sha:       c.SHA,
-		Rollup:    rollupToProto(c.Rollup),
-		Checks:    checkRunsToProto(c.Runs),
-		FetchedAt: timestamp(c.FetchedAt),
-		LastError: c.LastError,
-	}), nil
-}
-
-// Refresh forwards to the store.
-func (h *Gh) Refresh(ctx context.Context, req *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error) {
-	if err := h.store.Refresh(ctx, req.Msg.GetRepoSlug()); err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.RefreshGhResponse{}), nil
-}
-
-// Track forwards to the store.
-func (h *Gh) Track(_ context.Context, req *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error) {
-	if err := h.store.Track(req.Msg.GetRepoSlug()); err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.TrackGhRepoResponse{}), nil
-}
-
-// Untrack forwards to the store.
-func (h *Gh) Untrack(_ context.Context, req *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error) {
-	if err := h.store.Untrack(req.Msg.GetRepoSlug()); err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.UntrackGhRepoResponse{}), nil
-}
-
 // ghPolledEvent and ghViewerEvent map gh bus events; shared with EventService.
 func ghPolledEvent(e gh.Polled) *v1.GhEvent {
 	return &v1.GhEvent{Event: &v1.GhEvent_Polled_{Polled: &v1.GhEvent_Polled{

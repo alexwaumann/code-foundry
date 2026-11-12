@@ -47,8 +47,6 @@ type Service interface {
 	Refresh(ctx context.Context, slug string) error
 	// PullRequest returns one pull request with its head commit's checks.
 	PullRequest(ctx context.Context, slug string, number int) (PullRequestDetail, error)
-	// Checks returns the checks on the commit a ref resolves to.
-	Checks(ctx context.Context, slug, ref string) (RefChecks, error)
 	// BranchPullRequests returns the viewer's cached pull requests whose head is
 	// branch head of the repository, and keeps that branch in the poll for a while
 	// (activity.go). It never waits on GitHub.
@@ -340,15 +338,6 @@ type PullRequestDetail struct {
 	FetchedAt   time.Time   `json:"fetchedAt"`
 	// LastError is set when a refresh failed and this is the stale cached copy.
 	LastError string `json:"-"`
-}
-
-// RefChecks is the checks on the commit a ref resolved to.
-type RefChecks struct {
-	SHA       string      `json:"sha"`
-	Rollup    CheckRollup `json:"rollup"`
-	Runs      []CheckRun  `json:"runs"`
-	FetchedAt time.Time   `json:"fetchedAt"`
-	LastError string      `json:"-"`
 }
 
 // Snapshot is the store's immutable published state. Never mutate it.
