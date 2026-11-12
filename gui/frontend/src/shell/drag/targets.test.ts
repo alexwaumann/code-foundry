@@ -207,6 +207,10 @@ describe("dropTarget: a rail", () => {
     expect(dropTarget(scene, tabA, p)).toEqual({ kind: "pane", pane: "p-2" });
   });
 
+  it("takes a sidebar thread as a whole: its tab opens there", () => {
+    expect(dropTarget(scene, { kind: "thread", thread: "s-1" }, { x: 520, y: 200 })).toEqual({ kind: "pane", pane: "p-2" });
+  });
+
   it("takes no tab of its own, and not itself", () => {
     expect(dropTarget(scene, tabC, { x: 750, y: 150 })).toBeNull();
     expect(dropTarget(scene, paneP2, { x: 750, y: 150 })).toBeNull();

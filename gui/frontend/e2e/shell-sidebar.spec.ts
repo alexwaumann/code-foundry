@@ -146,6 +146,23 @@ test("a row dragged into a strip opens its thread at the place the bar shows", a
   await expect.poll(async () => outline(await storedRoot())).toBe("[s-sb-charts,s-1]");
 });
 
+test("a row dropped on a rail opens its thread in that folded pane", async ({ page }) => {
+  // Two panes; at a 520px grid (less than the two minimums) the unfocused left one folds to a rail (shell-19-rails-fullscreen.md).
+  const root: Node = { t: "split", id: "s-r", dir: "row", kids: [pane("p-l", [{ id: "t-prs", kind: "prs", title: "Pull Requests" }]), pane("p-m", [thread("s-1")])], sizes: [0.5, 0.5] };
+  await seed(root, "p-m");
+  await openShell(page);
+  const grid = await box(page, '[data-testid="shell-grid"]');
+  await page.setViewportSize({ width: Math.round(1400 - grid.width + 520), height: 900 });
+  const rail = page.locator('[data-testid="shell-rail"][data-pane-id="p-l"]');
+  await expect(rail).toBeVisible();
+  const to = await box(page, '[data-testid="shell-rail"][data-pane-id="p-l"]');
+  await liftRow(page, "s-sb-trip", "Plan the spring trip", { x: to.x + to.width / 2, y: to.y + to.height / 2 });
+  await expect(page.getByTestId("shell-drop-preview")).toHaveAttribute("data-kind", "pane");
+  await page.mouse.up();
+  await expect.poll(async () => outline(await storedRoot())).toBe("row([prs,s-sb-trip] [s-1])");
+  expect((await invocations()).find((i) => i.name === "thread.open")?.args).toMatchObject({ id: "s-sb-trip", pane: "p-l" });
+});
+
 test("typing in a composer tab makes a draft: listed, kept through closing its tab and a reload, cleared when emptied", async ({ page }) => {
   await seed(pane("p-1", [thread("s-1"), { id: "t-c", kind: "compose", params: { project: "repo-cf" } }], "t-c"), "p-1");
   await openShell(page);
@@ -210,7 +227,13 @@ for (const scheme of ["dark", "light"] as const) {
     await openShell(page);
     await page.setViewportSize({ width: 1400, height: 1100 });
     await expect(rowEl(page, "s-sb-flaky")).toBeVisible();
-    const sidebar = page.getByTestId("sidebar");
+    // The sidebar with the top bar's part above it (the bar spans the window; PR 15).
+    const sidebar = {
+      screenshot: async (o: { path: string }) => {
+        const b = await box(page, '[data-testid="sidebar"]');
+        await page.screenshot({ path: o.path, clip: { x: 0, y: 0, width: b.x + b.width + 120, height: b.y + b.height } });
+      },
+    };
     await page.mouse.move(800, 600);
     await still(page);
     await sidebar.screenshot({ path: at("sidebar") });
@@ -248,5 +271,15 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(page.locator('[data-row-key="s:s-2"]')).toHaveCount(0);
     await header.screenshot({ path: at("scope-space") });
     await sidebar.screenshot({ path: at("sidebar-this-space") });
+
+    // The row's menu: Open ▸ and Move to space ▸ (the second space, Review, holds Port renderer).
+    await page.getByTestId("needs-scope").click();
+    await rowEl(page, "s-sb-trip").click({ button: "right" });
+    await page.getByTestId("row-menu-move-to-space").hover();
+    await expect(page.getByTestId("row-menu-move-to-space-spaces")).toBeVisible();
+    await still(page);
+    await page.screenshot({ path: at("row-menu-move"), clip: { x: 0, y: 0, width: 760, height: 1100 } });
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
   });
 }
