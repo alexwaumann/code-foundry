@@ -193,9 +193,10 @@ fuzz:
 		fi; \
 	done
 
+# go test -race over both modules, the slow packages split into groups that run side by
+# side (scripts/go-test.sh, docs/notes/check-speed.md). GO_TEST_SPLIT= runs them whole.
 go-test: gui-dist-stub ghostty-vt whisper-cpp
-	go test -race ./...
-	cd pluginsdk && go test -race ./...
+	@scripts/go-test.sh
 
 frontend-deps: bun-version
 	bun install --cwd $(FRONTEND) --frozen-lockfile
