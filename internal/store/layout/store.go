@@ -40,6 +40,8 @@ type Manager struct {
 	mu    sync.Mutex
 	state *core.State
 	rev   uint64
+	// imported is the import mark (metaLegacyImport): "" until ImportLegacy ran.
+	imported string
 	// disk is the state the tables hold (at diskRev); nil: they must be rewritten whole.
 	disk    *core.State
 	diskRev uint64
@@ -94,14 +96,14 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	} else if len(repairs) > 0 {
 		m.log.Warn("layout: repaired the stored layout", "repairs", repairs)
 	}
-	m.state, m.rev = st, got.rev
+	m.state, m.rev, m.imported = st, got.rev, got.imported
 	if got.fresh || len(repairs) > 0 {
-		if err := save(ctx, opts.DB, nil, st, m.rev, opts.Now()); err != nil {
+		if err := save(ctx, opts.DB, nil, st, m.rev, m.imported, opts.Now()); err != nil {
 			return nil, err
 		}
 	}
 	m.disk, m.diskRev = st, m.rev
-	m.snap.Store(&Snapshot{Rev: m.rev, State: st})
+	m.snap.Store(m.snapshot())
 	return m, nil
 }
 
@@ -133,16 +135,56 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	if FocusOnly(prev, next) {
 		m.later()
 	} else {
-		if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, m.opts.Now()); err != nil {
+		if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, m.imported, m.opts.Now()); err != nil {
 			return Commit{}, err
 		}
 		m.disk, m.diskRev = next, rev
 		m.stopTimer()
 	}
 	m.state, m.rev = next, rev
-	m.snap.Store(&Snapshot{Rev: rev, State: next})
-	bus.Publish(m.opts.Bus, Event{Rev: rev, ClientID: opts.ClientID, Delta: Diff(prev, next), Op: op.OpName(), Result: res})
+	m.snap.Store(m.snapshot())
+	m.publish(prev, opts.ClientID, op.OpName(), res)
 	return Commit{Rev: rev, Changed: true, Result: res}, nil
+}
+
+// ImportLegacy implements Store.
+func (m *Manager) ImportLegacy(ctx context.Context, in core.LegacyInput, opts ApplyOptions) (ImportCommit, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return ImportCommit{}, ErrClosed
+	}
+	if m.imported != "" {
+		return ImportCommit{Rev: m.rev}, nil
+	}
+	prev := m.state
+	next, res, err := core.ImportLegacy(prev, in, m.opts.IDs)
+	if err != nil {
+		return ImportCommit{}, err
+	}
+	rev := m.rev + 1
+	imported := fmt.Sprintf("done:%d", m.opts.Now().UnixMilli())
+	if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, imported, m.opts.Now()); err != nil {
+		return ImportCommit{}, err
+	}
+	m.stopTimer()
+	m.disk, m.diskRev = next, rev
+	m.state, m.rev, m.imported = next, rev, imported
+	m.snap.Store(m.snapshot())
+	m.publish(prev, opts.ClientID, ImportOp, core.Result{})
+	return ImportCommit{Rev: rev, Imported: true, Result: res}, nil
+}
+
+// snapshot is the state now as a Snapshot. Callers hold m.mu (or own m, in New).
+func (m *Manager) snapshot() *Snapshot {
+	return &Snapshot{Rev: m.rev, State: m.state, LegacyImported: m.imported != ""}
+}
+
+// publish announces the commit that took prev to the state now. Callers hold m.mu.
+func (m *Manager) publish(prev *core.State, client, op string, res core.Result) {
+	d := Diff(prev, m.state)
+	d.LegacyImported = m.imported != ""
+	bus.Publish(m.opts.Bus, Event{Rev: m.rev, ClientID: client, Delta: d, Op: op, Result: res})
 }
 
 // later makes sure a write of the state is coming. Callers hold m.mu.
@@ -176,7 +218,7 @@ func (m *Manager) flush(ctx context.Context) error {
 	if m.disk == m.state && m.diskRev == m.rev {
 		return nil
 	}
-	if err := save(ctx, m.opts.DB, m.disk, m.state, m.rev, m.opts.Now()); err != nil {
+	if err := save(ctx, m.opts.DB, m.disk, m.state, m.rev, m.imported, m.opts.Now()); err != nil {
 		return err
 	}
 	m.disk, m.diskRev = m.state, m.rev

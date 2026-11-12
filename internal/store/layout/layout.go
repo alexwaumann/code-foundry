@@ -40,12 +40,31 @@ type Store interface {
 	// while the daemon runs (kept when the window goes), else DefaultViewport. It is not
 	// stored: a restarted daemon lays out in DefaultViewport until a window reports.
 	Viewport() Viewport
+	// ImportLegacy runs the first-load import (core.ImportLegacy) once in the life of the
+	// database: its result and the imported mark are one commit, written in one transaction,
+	// even when the layout itself does not change. Once the mark is set it changes nothing
+	// and answers Imported false with the layout as it is.
+	ImportLegacy(ctx context.Context, in core.LegacyInput, opts ApplyOptions) (ImportCommit, error)
 }
+
+// ImportCommit is what an ImportLegacy did.
+type ImportCommit struct {
+	// Rev is the commit's rev, or the current rev when the import ran before.
+	Rev uint64
+	// Imported is false when the import ran before: nothing changed.
+	Imported bool
+	Result   core.LegacyResult
+}
+
+// ImportOp is the name an import's Event carries as its Op.
+const ImportOp = "import_legacy"
 
 // Snapshot is the layout at one rev. State is shared and must never be mutated.
 type Snapshot struct {
 	Rev   uint64
 	State *core.State
+	// LegacyImported: the first-load import ran (ImportLegacy).
+	LegacyImported bool
 }
 
 // ApplyOptions are the caller's facts about an Apply.
@@ -99,6 +118,8 @@ type Delta struct {
 	Threads []ThreadEntry
 	// RemovedThreads are threads whose record went, sorted.
 	RemovedThreads []string
+	// LegacyImported is the snapshot's, always set.
+	LegacyImported bool
 }
 
 // ThreadEntry is one thread's record.

@@ -292,6 +292,14 @@ func (f *Fake) SetTitle(id, title string) error {
 	return nil
 }
 
+// SetLabels implements terminal.Store.
+func (f *Fake) SetLabels(_ context.Context, id string, labels map[string]string) (terminal.Terminal, error) {
+	if err := f.update(id, func(t *fakeTerm) []terminal.AttachEvent { t.info.Labels = maps.Clone(labels); return nil }); err != nil {
+		return terminal.Terminal{}, err
+	}
+	return f.Get(context.Background(), id)
+}
+
 // SetFacts sets what the terminal's process is doing (Terminal.LiveCwd, Foreground,
 // LastCommand), as the real store reads it from the process table, and publishes it.
 func (f *Fake) SetFacts(id, liveCwd, foreground, lastCommand string) error {

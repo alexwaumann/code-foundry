@@ -1,0 +1,3310 @@
+[
+  {
+    "doc": "v1: a tab's repo param is project, and the ids that pointed at it follow (then on to v6)",
+    "stored": {
+      "version": 1,
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "worktree?path=%2Fsrc%2Fweb&repo=web",
+                "kind": "worktree",
+                "title": "web",
+                "params": {
+                  "repo": "web",
+                  "path": "/src/web"
+                }
+              }
+            ],
+            "activeTabId": "worktree?path=%2Fsrc%2Fweb&repo=web"
+          },
+          "view:projects": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "worktree?path=%2Fsrc%2Fweb&repo=web",
+                "kind": "worktree",
+                "title": "web",
+                "params": {
+                  "repo": "web",
+                  "path": "/src/web"
+                }
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "worktree?path=%2Fsrc%2Fweb&repo=web"
+          },
+          "thread:s-2": {
+            "open": false,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "pullrequest?number=12",
+                "kind": "pullrequest",
+                "title": "#12",
+                "params": {
+                  "number": "12"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=12"
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fsrc%2Fweb",
+                "kind": "diff",
+                "title": "Diff · web",
+                "params": {
+                  "project": "web",
+                  "worktree": "/src/web"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fsrc%2Fweb"
+          }
+        ]
+      },
+      "view:projects": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fsrc%2Fweb",
+                "kind": "diff",
+                "title": "Diff · web",
+                "params": {
+                  "project": "web",
+                  "worktree": "/src/web"
+                }
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff?project=web&worktree=%2Fsrc%2Fweb"
+          }
+        ]
+      },
+      "thread:s-2": {
+        "open": false,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "pullrequest?number=12&slug=",
+                "kind": "pullrequest",
+                "title": "#12",
+                "params": {
+                  "number": "12"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=12&slug="
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v1: a worktree tab ends as a Diff tab",
+    "stored": {
+      "version": 1,
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "worktree?path=%2Fsrc%2Fweb&repo=web",
+                "kind": "worktree",
+                "title": "web",
+                "params": {
+                  "repo": "web",
+                  "path": "/src/web"
+                }
+              }
+            ],
+            "activeTabId": "worktree?path=%2Fsrc%2Fweb&repo=web"
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fsrc%2Fweb",
+                "kind": "diff",
+                "title": "Diff · web",
+                "params": {
+                  "project": "web",
+                  "worktree": "/src/web"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fsrc%2Fweb"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v2: an open panel with an active tab",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": "diff"
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": "diff"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v2: a picking panel keeps pickFrom in its group",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff"
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v2: a panel without tabs",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": false,
+            "tabs": [],
+            "activeTabId": null
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": false,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v2: a kept-open panel without tabs",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "tabs": [],
+            "activeTabId": null
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v2: width and expanded stay on the entry",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": false,
+            "tabs": [
+              {
+                "id": "pullrequest?number=12",
+                "kind": "pullrequest",
+                "title": "#12",
+                "params": {
+                  "number": "12"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=12",
+            "width": 500,
+            "expanded": true
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": false,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=12&slug=",
+                "kind": "pullrequest",
+                "title": "#12",
+                "params": {
+                  "number": "12"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=12&slug="
+          }
+        ],
+        "width": 500,
+        "expanded": true
+      }
+    }
+  },
+  {
+    "doc": "v2: every key",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "a": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          },
+          "b": {
+            "open": false,
+            "tabs": [],
+            "activeTabId": null
+          }
+        }
+      }
+    },
+    "want": {
+      "a": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      },
+      "b": {
+        "open": false,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v2: picking with a width",
+    "stored": {
+      "version": 2,
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "files",
+            "width": 500
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "files"
+          }
+        ],
+        "width": 500
+      }
+    }
+  },
+  {
+    "doc": "v3: a worktree tab is its worktree's Changes tab, then a Diff tab",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  },
+                  {
+                    "id": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web",
+                    "kind": "worktree",
+                    "title": "web · cf/x",
+                    "params": {
+                      "project": "web",
+                      "path": "/wt/web/cf-x"
+                    }
+                  }
+                ],
+                "activeTabId": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x",
+                "kind": "diff",
+                "title": "Diff · web · cf/x",
+                "params": {
+                  "project": "web",
+                  "worktree": "/wt/web/cf-x"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: the removed surfaces' tabs go",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "usage",
+                    "kind": "usage",
+                    "title": "Usage",
+                    "params": {}
+                  },
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  },
+                  {
+                    "id": "linkedprs",
+                    "kind": "linkedprs",
+                    "title": "Linked PRs",
+                    "params": {}
+                  },
+                  {
+                    "id": "threads",
+                    "kind": "threads",
+                    "title": "Threads",
+                    "params": {}
+                  },
+                  {
+                    "id": "agents",
+                    "kind": "agents",
+                    "title": "Agents",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "agents"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: a workspace folder's Worktree tab goes",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "worktree?path=%2Fws%2Fplatform&workspace=w-1",
+                    "kind": "worktree",
+                    "title": "platform",
+                    "params": {
+                      "workspace": "w-1",
+                      "path": "/ws/platform"
+                    }
+                  },
+                  {
+                    "id": "diff",
+                    "kind": "diff",
+                    "title": "Diff",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "diff"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": "diff"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: nothing left: an empty group",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": false,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "usage",
+                    "kind": "usage",
+                    "title": "Usage",
+                    "params": {}
+                  },
+                  {
+                    "id": "worktree?path=%2Fws%2Fplatform&workspace=w-1",
+                    "kind": "worktree",
+                    "title": "platform",
+                    "params": {
+                      "workspace": "w-1",
+                      "path": "/ws/platform"
+                    }
+                  }
+                ],
+                "activeTabId": "usage"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": false,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: picking from a worktree tab",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web",
+                    "kind": "worktree",
+                    "title": "web · cf/x",
+                    "params": {
+                      "project": "web",
+                      "path": "/wt/web/cf-x"
+                    }
+                  },
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": null,
+                "pickFrom": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x",
+                "kind": "diff",
+                "title": "Diff · web · cf/x",
+                "params": {
+                  "project": "web",
+                  "worktree": "/wt/web/cf-x"
+                }
+              },
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: picking from a removed tab shows the first tab left",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "usage",
+                    "kind": "usage",
+                    "title": "Usage",
+                    "params": {}
+                  },
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": null,
+                "pickFrom": "usage"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: other tabs and the entry's fields stay",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=12",
+                    "kind": "pullrequest",
+                    "title": "#12",
+                    "params": {
+                      "number": "12"
+                    }
+                  },
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "pullrequest?number=12"
+              }
+            ],
+            "width": 480,
+            "expanded": true
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=12&slug=",
+                "kind": "pullrequest",
+                "title": "#12",
+                "params": {
+                  "number": "12"
+                }
+              },
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "pullrequest?number=12&slug="
+          }
+        ],
+        "width": 480,
+        "expanded": true
+      }
+    }
+  },
+  {
+    "doc": "v3: a split keeps both groups while each has a tab",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web",
+                    "kind": "worktree",
+                    "title": "web · cf/x",
+                    "params": {
+                      "project": "web",
+                      "path": "/wt/web/cf-x"
+                    }
+                  }
+                ],
+                "activeTabId": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  },
+                  {
+                    "id": "usage",
+                    "kind": "usage",
+                    "title": "Usage",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "usage"
+              }
+            ],
+            "ratio": 0.4,
+            "focused": 1
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x",
+                "kind": "diff",
+                "title": "Diff · web · cf/x",
+                "params": {
+                  "project": "web",
+                  "worktree": "/wt/web/cf-x"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x"
+          },
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ],
+        "ratio": 0.4,
+        "focused": 1
+      }
+    }
+  },
+  {
+    "doc": "v3: a split whose group emptied is one group",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "files"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "threads",
+                    "kind": "threads",
+                    "title": "Threads",
+                    "params": {}
+                  },
+                  {
+                    "id": "agents",
+                    "kind": "agents",
+                    "title": "Agents",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "threads"
+              }
+            ],
+            "ratio": 0.4,
+            "focused": 1
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: two keys through to v6",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "usage",
+                    "kind": "usage",
+                    "title": "Usage",
+                    "params": {}
+                  },
+                  {
+                    "id": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web",
+                    "kind": "worktree",
+                    "title": "web · cf/x",
+                    "params": {
+                      "project": "web",
+                      "path": "/wt/web/cf-x"
+                    }
+                  }
+                ],
+                "activeTabId": "usage"
+              }
+            ]
+          },
+          "view:projects": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web",
+                    "kind": "worktree",
+                    "title": "web · cf/x",
+                    "params": {
+                      "project": "web",
+                      "path": "/wt/web/cf-x"
+                    }
+                  }
+                ],
+                "activeTabId": "worktree?path=%2Fwt%2Fweb%2Fcf-x&project=web"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x",
+                "kind": "diff",
+                "title": "Diff · web · cf/x",
+                "params": {
+                  "project": "web",
+                  "worktree": "/wt/web/cf-x"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x"
+          }
+        ]
+      },
+      "view:projects": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x",
+                "kind": "diff",
+                "title": "Diff · web · cf/x",
+                "params": {
+                  "project": "web",
+                  "worktree": "/wt/web/cf-x"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fwt%2Fweb%2Fcf-x"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v3: groups of {} (a store an older build rewrote)",
+    "stored": {
+      "version": 3,
+      "state": {
+        "byKey": {
+          "view:projects": {
+            "open": true,
+            "groups": [
+              {}
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "view:projects": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v4: a mixed-case pull request tab takes the lower-case id",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=Alex%2FRepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "Alex/Repo",
+                      "number": "1"
+                    }
+                  },
+                  {
+                    "id": "files?path=Alex%2FRepo",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {
+                      "path": "Alex/Repo"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=Alex%2FRepo"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "Alex/Repo",
+                  "number": "1"
+                }
+              },
+              {
+                "id": "files?path=Alex%2FRepo",
+                "kind": "files",
+                "title": "Files",
+                "params": {
+                  "path": "Alex/Repo"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v4: a lower-case tab stays",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "1"
+                    }
+                  },
+                  {
+                    "id": "files?path=Alex%2FRepo",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {
+                      "path": "Alex/Repo"
+                    }
+                  }
+                ],
+                "activeTabId": "files?path=Alex%2FRepo"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "alex/repo",
+                  "number": "1"
+                }
+              },
+              {
+                "id": "files?path=Alex%2FRepo",
+                "kind": "files",
+                "title": "Files",
+                "params": {
+                  "path": "Alex/Repo"
+                }
+              }
+            ],
+            "activeTabId": "files?path=Alex%2FRepo"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v4: two tabs of one pull request are one",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=Alex%2FRepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "Alex/Repo",
+                      "number": "1"
+                    }
+                  },
+                  {
+                    "id": "pullrequest?number=2&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#2",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "2"
+                    }
+                  },
+                  {
+                    "id": "pullrequest?number=1&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "Alex/Repo",
+                  "number": "1"
+                }
+              },
+              {
+                "id": "pullrequest?number=2&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#2",
+                "params": {
+                  "slug": "alex/repo",
+                  "number": "2"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v4: picking goes back to the tab that stayed",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=Alex%2FRepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "Alex/Repo",
+                      "number": "1"
+                    }
+                  },
+                  {
+                    "id": "pullrequest?number=1&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": null,
+                "pickFrom": "pullrequest?number=1&slug=alex%2Frepo"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "Alex/Repo",
+                  "number": "1"
+                }
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "pullrequest?number=1&slug=alex%2Frepo"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v4: a copy in the other group goes",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=Alex%2FRepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "Alex/Repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=Alex%2FRepo"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=2&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#2",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "2"
+                    }
+                  },
+                  {
+                    "id": "pullrequest?number=1&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+              }
+            ],
+            "focused": 1,
+            "ratio": 0.4
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "Alex/Repo",
+                  "number": "1"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+          },
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=2&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#2",
+                "params": {
+                  "slug": "alex/repo",
+                  "number": "2"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=2&slug=alex%2Frepo"
+          }
+        ],
+        "ratio": 0.4,
+        "focused": 1
+      }
+    }
+  },
+  {
+    "doc": "v4: a group left empty is one group again",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=Alex%2FRepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "Alex/Repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=Alex%2FRepo"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=alex%2Frepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "alex/repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+              }
+            ],
+            "focused": 1,
+            "ratio": 0.4
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "Alex/Repo",
+                  "number": "1"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v4: a split picking in an empty group stays split",
+    "stored": {
+      "version": 4,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=1&slug=Alex%2FRepo",
+                    "kind": "pullrequest",
+                    "title": "#1",
+                    "params": {
+                      "slug": "Alex/Repo",
+                      "number": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=1&slug=Alex%2FRepo"
+              },
+              {
+                "tabs": [],
+                "activeTabId": null
+              }
+            ],
+            "focused": 1
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "pullrequest?number=1&slug=alex%2Frepo",
+                "kind": "pullrequest",
+                "title": "#1",
+                "params": {
+                  "slug": "Alex/Repo",
+                  "number": "1"
+                }
+              }
+            ],
+            "activeTabId": "pullrequest?number=1&slug=alex%2Frepo"
+          },
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ],
+        "focused": 1
+      }
+    }
+  },
+  {
+    "doc": "v5: a Changes tab is the checkout's Diff tab",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  }
+                ],
+                "activeTabId": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: another checkout's Changes tab keeps its project in the title",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes · web · cf/demo",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  }
+                ],
+                "activeTabId": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff · web · cf/demo",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: a one-file Diff tab keeps its file",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts",
+                      "scope": "working"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "a.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: the branch scope is the merge base against HEAD",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts",
+                      "scope": "branch"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "head": "ref:HEAD",
+                  "path": "a.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: a rename keeps its source",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=new.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "new.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "new.ts",
+                      "scope": "working",
+                      "oldPath": "old.ts"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=new.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "new.ts",
+                  "oldPath": "old.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: a checkout's tabs are one tab where the first stood",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files?path=%2Fu%2Fa.ts",
+                    "kind": "files",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "base": "/u/web.wt/feat",
+                      "path": "/u/a.ts"
+                    }
+                  },
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  },
+                  {
+                    "id": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts",
+                      "scope": "working"
+                    }
+                  },
+                  {
+                    "id": "diff?path=b.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "b.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "b.ts",
+                      "scope": "branch"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files?path=%2Fu%2Fa.ts",
+                "kind": "files",
+                "title": "a.ts",
+                "params": {
+                  "project": "web",
+                  "base": "/u/web.wt/feat",
+                  "path": "/u/a.ts"
+                }
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "a.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: with none showing, the last opened file decides",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files?path=%2Fu%2Fa.ts",
+                    "kind": "files",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "base": "/u/web.wt/feat",
+                      "path": "/u/a.ts"
+                    }
+                  },
+                  {
+                    "id": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts",
+                      "scope": "working"
+                    }
+                  },
+                  {
+                    "id": "diff?path=b.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "b.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "b.ts",
+                      "scope": "branch"
+                    }
+                  }
+                ],
+                "activeTabId": "files?path=%2Fu%2Fa.ts"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files?path=%2Fu%2Fa.ts",
+                "kind": "files",
+                "title": "a.ts",
+                "params": {
+                  "project": "web",
+                  "base": "/u/web.wt/feat",
+                  "path": "/u/a.ts"
+                }
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "head": "ref:HEAD",
+                  "path": "b.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "files?path=%2Fu%2Fa.ts"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: two checkouts stay two tabs",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  },
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Fother&project=web",
+                    "kind": "changes",
+                    "title": "Changes · web · other",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/other"
+                    }
+                  },
+                  {
+                    "id": "diff?path=c.ts&project=web&worktree=%2Fu%2Fweb.wt%2Fother",
+                    "kind": "diff",
+                    "title": "c.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/other",
+                      "path": "c.ts",
+                      "scope": "working"
+                    }
+                  }
+                ],
+                "activeTabId": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "own": "1"
+                }
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Fother",
+                "kind": "diff",
+                "title": "Diff · web · other",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/other",
+                  "path": "c.ts"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: the other group's file decides too, and the split survives",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files?path=%2Fu%2Fa.ts",
+                    "kind": "files",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "base": "/u/web.wt/feat",
+                      "path": "/u/a.ts"
+                    }
+                  },
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  }
+                ],
+                "activeTabId": "files?path=%2Fu%2Fa.ts"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=b.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "b.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "b.ts",
+                      "scope": "working"
+                    }
+                  },
+                  {
+                    "id": "files?x",
+                    "kind": "files",
+                    "title": "x",
+                    "params": {
+                      "project": "web",
+                      "base": "/u/web.wt/feat",
+                      "path": "/u/a.ts"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=b.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files?path=%2Fu%2Fa.ts",
+                "kind": "files",
+                "title": "a.ts",
+                "params": {
+                  "project": "web",
+                  "base": "/u/web.wt/feat",
+                  "path": "/u/a.ts"
+                }
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "b.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "files?path=%2Fu%2Fa.ts"
+          },
+          {
+            "tabs": [
+              {
+                "id": "files?x",
+                "kind": "files",
+                "title": "x",
+                "params": {
+                  "project": "web",
+                  "base": "/u/web.wt/feat",
+                  "path": "/u/a.ts"
+                }
+              }
+            ],
+            "activeTabId": "files?x"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: a group left empty folds the split",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  }
+                ],
+                "activeTabId": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=b.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "b.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "b.ts",
+                      "scope": "working"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=b.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ],
+            "ratio": 0.4,
+            "focused": 1
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "b.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: picking from a tab that merged",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts",
+                      "scope": "working"
+                    }
+                  }
+                ],
+                "activeTabId": null,
+                "pickFrom": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "a.ts",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: a Changes tab that names no worktree goes",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "changes",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {}
+                  },
+                  {
+                    "id": "files?path=%2Fu%2Fa.ts",
+                    "kind": "files",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "base": "/u/web.wt/feat",
+                      "path": "/u/a.ts"
+                    }
+                  }
+                ],
+                "activeTabId": "changes"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files?path=%2Fu%2Fa.ts",
+                "kind": "files",
+                "title": "a.ts",
+                "params": {
+                  "project": "web",
+                  "base": "/u/web.wt/feat",
+                  "path": "/u/a.ts"
+                }
+              }
+            ],
+            "activeTabId": "files?path=%2Fu%2Fa.ts"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: two entries",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "a": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/feat"
+                    }
+                  }
+                ],
+                "activeTabId": "changes?path=%2Fu%2Fweb.wt%2Ffeat&project=web"
+              }
+            ]
+          },
+          "b": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "a.ts",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts",
+                      "scope": "working"
+                    }
+                  },
+                  {
+                    "id": "changes?path=%2Fu%2Fweb.wt%2Fother&project=web",
+                    "kind": "changes",
+                    "title": "Changes",
+                    "params": {
+                      "project": "web",
+                      "path": "/u/web.wt/other"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?path=a.ts&project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "a": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      },
+      "b": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "a.ts",
+                  "own": "1"
+                }
+              },
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Fother",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/other",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v5: a v6 diff renumbered to 5 by an older build is kept",
+    "stored": {
+      "version": 5,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "Diff",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "own": "1"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "own": "1"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v6: groups without a tabs array",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": {
+          "view:projects": {
+            "open": true,
+            "width": 420,
+            "groups": [
+              {}
+            ]
+          },
+          "thread:s-1": {
+            "open": true,
+            "groups": [
+              {}
+            ],
+            "width": 765,
+            "focused": 1
+          }
+        }
+      }
+    },
+    "want": {
+      "view:projects": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ],
+        "width": 420
+      },
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ],
+        "width": 765
+      }
+    }
+  },
+  {
+    "doc": "v6: a sound split and picking entry stays",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "files"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "diff",
+                    "kind": "diff",
+                    "title": "Diff",
+                    "params": {}
+                  },
+                  {
+                    "id": "pullrequest?number=12",
+                    "kind": "pullrequest",
+                    "title": "#12",
+                    "params": {
+                      "number": "12"
+                    }
+                  }
+                ],
+                "activeTabId": null,
+                "pickFrom": "pullrequest?number=12"
+              }
+            ],
+            "ratio": 0.3,
+            "focused": 1,
+            "width": 600,
+            "expanded": true
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          },
+          {
+            "tabs": [
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              },
+              {
+                "id": "pullrequest?number=12",
+                "kind": "pullrequest",
+                "title": "#12",
+                "params": {
+                  "number": "12"
+                }
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "pullrequest?number=12"
+          }
+        ],
+        "width": 600,
+        "expanded": true,
+        "ratio": 0.3,
+        "focused": 1
+      }
+    }
+  },
+  {
+    "doc": "v6: a version 2 shape that still carries groups, and one without",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": {
+          "a": {
+            "open": true,
+            "tabs": [],
+            "activeTabId": null,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "files"
+              }
+            ]
+          },
+          "b": {
+            "open": true,
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff"
+          }
+        }
+      }
+    },
+    "want": {
+      "a": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      },
+      "b": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "diff"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v6: junk entries, malformed tabs, a missing active tab, a bad ratio or focus, a third group",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": {
+          "junk": 7,
+          "list": [],
+          "k": {
+            "open": "yes",
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  },
+                  {
+                    "id": 1
+                  },
+                  {
+                    "id": "x",
+                    "kind": "y",
+                    "title": "t",
+                    "params": {
+                      "a": 1,
+                      "b": "c"
+                    }
+                  }
+                ],
+                "activeTabId": "gone",
+                "pickFrom": "files"
+              }
+            ],
+            "ratio": 3,
+            "focused": 1,
+            "width": "wide"
+          },
+          "extra": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "files"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "diff",
+                    "kind": "diff",
+                    "title": "Diff",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "diff"
+              },
+              {
+                "tabs": [
+                  {
+                    "id": "pullrequest?number=12",
+                    "kind": "pullrequest",
+                    "title": "#12",
+                    "params": {
+                      "number": "12"
+                    }
+                  }
+                ],
+                "activeTabId": "pullrequest?number=12"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": false,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              },
+              {
+                "id": "x",
+                "kind": "y",
+                "title": "t",
+                "params": {
+                  "b": "c"
+                }
+              }
+            ],
+            "activeTabId": null,
+            "pickFrom": "files"
+          }
+        ]
+      },
+      "extra": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          },
+          {
+            "tabs": [
+              {
+                "id": "diff",
+                "kind": "diff",
+                "title": "Diff",
+                "params": {}
+              }
+            ],
+            "activeTabId": "diff"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v6: a split with both groups empty is no split",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": {
+          "k": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [],
+                "activeTabId": null
+              },
+              {
+                "tabs": [],
+                "activeTabId": null
+              }
+            ],
+            "ratio": 0.3,
+            "focused": 1
+          }
+        }
+      }
+    },
+    "want": {
+      "k": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [],
+            "activeTabId": null
+          }
+        ],
+        "ratio": 0.3
+      }
+    }
+  },
+  {
+    "doc": "v6: byKey null",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": null
+      }
+    },
+    "want": {}
+  },
+  {
+    "doc": "v6: byKey a number",
+    "stored": {
+      "version": 6,
+      "state": {
+        "byKey": 7
+      }
+    },
+    "want": {}
+  },
+  {
+    "doc": "v9: a newer build's store goes through the repair only",
+    "stored": {
+      "version": 9,
+      "state": {
+        "byKey": {
+          "thread:s-2": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "files",
+                "future": 1
+              }
+            ],
+            "future": true
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-2": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "v7: a newer build's diff tab is not migrated again",
+    "stored": {
+      "version": 7,
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                    "kind": "diff",
+                    "title": "feat vs main",
+                    "params": {
+                      "project": "web",
+                      "worktree": "/u/web.wt/feat",
+                      "path": "a.ts"
+                    }
+                  }
+                ],
+                "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat",
+                "kind": "diff",
+                "title": "feat vs main",
+                "params": {
+                  "project": "web",
+                  "worktree": "/u/web.wt/feat",
+                  "path": "a.ts"
+                }
+              }
+            ],
+            "activeTabId": "diff?project=web&worktree=%2Fu%2Fweb.wt%2Ffeat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "no version: the repair only",
+    "stored": {
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "files"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "files"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "a version that is a string: the repair only",
+    "stored": {
+      "version": "3",
+      "state": {
+        "byKey": {
+          "thread:s-1": {
+            "open": true,
+            "groups": [
+              {
+                "tabs": [
+                  {
+                    "id": "usage",
+                    "kind": "usage",
+                    "title": "Usage",
+                    "params": {}
+                  },
+                  {
+                    "id": "files",
+                    "kind": "files",
+                    "title": "Files",
+                    "params": {}
+                  }
+                ],
+                "activeTabId": "usage"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "want": {
+      "thread:s-1": {
+        "open": true,
+        "groups": [
+          {
+            "tabs": [
+              {
+                "id": "usage",
+                "kind": "usage",
+                "title": "Usage",
+                "params": {}
+              },
+              {
+                "id": "files",
+                "kind": "files",
+                "title": "Files",
+                "params": {}
+              }
+            ],
+            "activeTabId": "usage"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "doc": "state null",
+    "stored": {
+      "version": 6,
+      "state": null
+    },
+    "want": {}
+  },
+  {
+    "doc": "a store that is null",
+    "stored": null,
+    "want": {}
+  },
+  {
+    "doc": "a store that is an array",
+    "stored": [],
+    "want": {}
+  },
+  {
+    "doc": "not JSON",
+    "raw": "{not json",
+    "want": {}
+  },
+  {
+    "doc": "absent (empty)",
+    "raw": "",
+    "want": {}
+  }
+]

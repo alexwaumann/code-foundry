@@ -25,6 +25,14 @@ service LayoutService {
   // (1180 x 820 before any) where a rule needs pixels: placing a linked surface,
   // restoring one, a direction verb.
   rpc SetViewport(SetViewportRequest) returns (SetViewportResponse) {}
+  // ImportLegacy is the first-load import (docs/notes/shell-18-legacy-import.md): the
+  // classic window's side panel and bottom panel stores, which live in the window's
+  // localStorage, become each thread's remembered set and quick terminal. No thread is
+  // opened; a classic user's layout is left as one empty space. Running terminals keep
+  // running: a thread's first shell becomes its quick terminal (labelled slot=quick), its
+  // other terminals remembered terminal tabs. It runs once in the life of the database:
+  // later calls change nothing and answer imported false with the layout as it is.
+  rpc ImportLegacy(ImportLegacyRequest) returns (ImportLegacyResponse) {}
 }
 
 message GetLayoutRequest {}
@@ -47,6 +55,8 @@ message Layout {
   // Only threads with something stored; every other thread lives in default_space_id
   // and has nothing remembered.
   repeated ThreadLayout threads = 5;
+  // The first-load import ran (LayoutService.ImportLegacy).
+  bool legacy_imported = 6;
 }
 
 // LayoutSpace is a named layout: one tree of panes.
@@ -222,6 +232,8 @@ message LayoutDelta {
   repeated ThreadLayout threads = 6;
   // Threads whose record went: they now live in default_space_id with nothing stored.
   repeated string removed_thread_ids = 7;
+  // Layout.legacy_imported after the commit; always set.
+  bool legacy_imported = 8;
 }
 
 message ApplyLayoutRequest {
@@ -271,6 +283,41 @@ message SetViewportRequest {
 }
 
 message SetViewportResponse {}
+
+message ImportLegacyRequest {
+  // The raw value of the window's localStorage "code-foundry.panel" (any version; empty
+  // when absent).
+  string panel_json = 1;
+  // The raw value of localStorage "code-foundry.bottom" (empty when absent).
+  string bottom_json = 2;
+  // As ApplyLayoutRequest.client_id.
+  string client_id = 3;
+}
+
+message ImportLegacyResponse {
+  // The layout after the call.
+  Layout layout = 1;
+  // False when the import ran before: nothing changed.
+  bool imported = 2;
+  // The threads given a remembered set or a quick terminal, by thread id.
+  repeated LegacyImportedThread threads = 3;
+  // Unlinked terminal tabs the classic window's shells had been given, taken out of the
+  // layout. Their terminals keep running (code-foundry terminal list shows them).
+  repeated string removed_tab_ids = 4;
+  // Open linked tabs moved into their thread's remembered set.
+  repeated string folded_tab_ids = 5;
+  // What could not be carried, one line each (a surface the shell does not have, a thread
+  // that is archived or gone).
+  repeated string dropped = 6;
+}
+
+message LegacyImportedThread {
+  string thread_id = 1;
+  // The tabs added to its remembered set, in order.
+  repeated string tab_ids = 2;
+  // The shell that became its quick terminal; empty when none did.
+  string quick_terminal_id = 3;
+}
 
 // LayoutOp is one operation. Each case names the op of internal/layout it runs (its JSON
 // name). Cases 1 to 9 are the thread ops (placement, opening, closing and restoring a
