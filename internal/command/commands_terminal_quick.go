@@ -21,14 +21,15 @@ import (
 // openTerminalTab gives new terminal id a tab: linked to thread and placed by the rules, or,
 // for a shell of no thread, unlinked in the focused pane of the current space. From the user
 // it takes the focus; from inside a thread it never does. Without a layout it does nothing.
-// It returns a phrase for the command's message.
-func openTerminalTab(ctx context.Context, d TerminalDeps, uctx Context, thread, id string) (string, error) {
+// It returns a phrase for the command's message. pane (a pane's "+" menu) puts
+// the tab in that pane instead.
+func openTerminalTab(ctx context.Context, d TerminalDeps, uctx Context, thread, id, pane string) (string, error) {
 	if d.Layout == nil {
 		return "", nil
 	}
 	focus := uctx.FromUser()
 	tb := &core.Tab{Kind: "terminal", Thread: thread, Params: map[string]string{core.TerminalParam: id}}
-	c, err := layout{store: d.Layout}.apply(ctx, &core.OpenSurface{Tab: tb, Focus: focus}, !focus)
+	c, err := layout{store: d.Layout}.apply(ctx, &core.OpenSurface{Pane: pane, Tab: tb, Focus: focus}, !focus)
 	if err != nil {
 		return "", fmt.Errorf("created terminal %s, but could not open its tab: %w", id, err)
 	}
@@ -43,6 +44,9 @@ type QuickResult struct {
 	Open       bool   `json:"open"`
 	TerminalID string `json:"terminal_id,omitempty"`
 }
+
+// terminalPaneArg is terminal.new's and terminal.new-free's --pane: the pane's "+" menu.
+var terminalPaneArg = paneIDArg("pane", "Open the terminal's tab in this pane (the pane's + menu) instead of placing it")
 
 func terminalLayoutCommands(d TerminalDeps, quick *sync.Mutex) []Command {
 	l := layout{store: d.Layout}

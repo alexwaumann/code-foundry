@@ -122,6 +122,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
 				{Name: "quick", Type: Bool, Description: "The thread's quick terminal (needs a thread): one per thread; " +
 					"when it is running it is returned, and --run types into it"},
+				terminalPaneArg,
 			},
 			When: canStartShell,
 			WhyUnavailable: func(Context) string {
@@ -180,7 +181,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if a.Bool("quick") {
 					msg = "created thread " + owner.thread + "'s quick terminal " + t.GetId()
 				} else {
-					tab, err := openTerminalTab(ctx, d, c, owner.thread, t.GetId())
+					tab, err := openTerminalTab(ctx, d, c, owner.thread, t.GetId(), a.String("pane"))
 					if err != nil {
 						return Result{}, err
 					}
