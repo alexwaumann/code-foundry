@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -199,9 +200,7 @@ func TestPollTiers(t *testing.T) {
 	f := newFixture(t)
 	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
 	h := startHarness(t, "", Options{Runner: cr, PollInterval: 100 * time.Millisecond, IdlePollInterval: time.Hour})
-	// Only the poll runs status here: the stream can deliver the fixture's own writes
-	// seconds late.
-	h.store.ignoreStream.Store(true)
+	// Only the poll runs status here: the test's event source sends nothing.
 	ctx := context.Background()
 	r, err := h.store.Register(ctx, f.project)
 	if err != nil {
@@ -227,6 +226,33 @@ func TestPollTiers(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventually(t, "polls while the detail is watched", 3*time.Second, func() bool { return cr.count("status") >= before+3 })
+}
+
+// TestPollReconcilesWithoutEvents: the poll alone (the test's source sends no event, as
+// when one is lost or the stream failed to start) sees a worktree and a remote added
+// outside the app, and retries a stream that failed to start.
+func TestPollReconcilesWithoutEvents(t *testing.T) {
+	dir := newLocalProject(t)
+	h := startHarness(t, "", Options{PollInterval: 100 * time.Millisecond})
+	h.fake.failStarts(true)
+	r, err := h.store.Register(context.Background(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(h.fake.running(), dir) {
+		t.Fatal("the stream started while starts fail")
+	}
+	side := filepath.Join(filepath.Dir(dir), "side")
+	git(t, dir, "worktree", "add", "-q", "-b", "side", side)
+	git(t, dir, "remote", "add", "origin", "https://github.com/acme/momentum.git")
+	h.fake.failStarts(false)
+	h.waitFor("the worktree and the remote, from a poll", func(ev Event) bool {
+		u, ok := ev.(ProjectUpdated)
+		return ok && u.Project.ID == r.ID && len(u.Project.Worktrees) == 2 && slices.Equal(u.Project.Remotes, []string{"origin"})
+	})
+	h.waitStreamRunning("the project and the new worktree", func(p []string) bool {
+		return slices.Contains(p, dir) && slices.Contains(p, side)
+	})
 }
 
 // TestFetchTiers: an idle project is not fetched at the live interval; one that turns
@@ -257,15 +283,13 @@ func TestFetchTiers(t *testing.T) {
 }
 
 // TestTouch: Touch debounces per worktree (a burst is one status run), TouchNow runs
-// at once; both see an edit below the top level. The FSEvents stream sees that edit
-// too, and can deliver the fixture's own writes seconds late, so it is ignored: only
-// Touch and TouchNow refresh here.
+// at once; both see an edit below the top level. The test's event source sends nothing
+// (fakestream_test.go): only Touch and TouchNow refresh here.
 func TestTouch(t *testing.T) {
 	f := newFixture(t)
 	cr := &countingRunner{next: ExecRunner{}, n: map[string]int{}}
 	const window = 300 * time.Millisecond
 	h := startHarness(t, "", Options{Runner: cr, TouchDebounce: window})
-	h.store.ignoreStream.Store(true)
 	if _, err := h.store.Register(context.Background(), f.project); err != nil {
 		t.Fatal(err)
 	}

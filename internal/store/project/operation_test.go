@@ -102,7 +102,7 @@ func mustMkdir(t *testing.T, p string) {
 }
 
 // TestOperationStateThroughWatcher runs real conflicting operations with the poll
-// disabled, so each change is seen through the admin dir watches alone.
+// disabled, so each change is seen through the events on the admin dirs alone.
 func TestOperationStateThroughWatcher(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{WorktreeRoot: filepath.Join(f.base, "wt")})
@@ -127,21 +127,25 @@ func TestOperationStateThroughWatcher(t *testing.T) {
 
 	// Linked worktree: rebase stops on the first of two picks.
 	gitFails(t, w.Path, "rebase", "main")
+	h.fsChanged()
 	h.waitFor("rebase in progress", worktreeUpdated(w.Path, func(w Worktree) bool {
 		s := w.Status
 		return s.Operation == OpRebase && s.OperationStep == 1 && s.OperationTotal == 2 && s.Conflicted == 1
 	}))
 	git(t, w.Path, "rebase", "--abort")
+	h.fsChanged()
 	h.waitFor("rebase cleared", worktreeUpdated(w.Path, func(w Worktree) bool {
 		return w.Status.Operation == "" && w.Status.OperationStep == 0 && w.Branch == "feat"
 	}))
 
 	// Main worktree: a conflicting merge.
 	gitFails(t, f.project, "merge", "feat")
+	h.fsChanged()
 	h.waitFor("merge in progress", worktreeUpdated(f.project, func(w Worktree) bool {
 		return w.Status.Operation == OpMerge && w.Status.OperationTotal == 0 && w.Status.Conflicted == 1
 	}))
 	git(t, f.project, "merge", "--abort")
+	h.fsChanged()
 	h.waitFor("merge cleared", worktreeUpdated(f.project, func(w Worktree) bool {
 		return w.Status.Operation == "" && w.Status.Conflicted == 0
 	}))

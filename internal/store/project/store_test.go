@@ -95,6 +95,9 @@ type harness struct {
 	bus   *bus.Bus
 	sub   *bus.Subscription[Event]
 	db    *sql.DB
+	// fake is the store's event source (fakestream_test.go); nil when the test asked
+	// for a real FSEvents stream (Options.streams = fseventsSource).
+	fake *fakeStream
 }
 
 func startHarness(t *testing.T, dbPath string, opts Options) *harness {
@@ -134,11 +137,16 @@ func startHarness(t *testing.T, dbPath string, opts Options) *harness {
 	if opts.IdlePollInterval == 0 {
 		opts.IdlePollInterval = opts.PollInterval
 	}
+	var fake *fakeStream
+	if opts.streams == nil {
+		fake = newFakeStream()
+		opts.streams = fake.source
+	}
 	s, err := Start(context.Background(), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := &harness{t: t, store: s, bus: b, sub: sub, db: d}
+	h := &harness{t: t, store: s, bus: b, sub: sub, db: d, fake: fake}
 	t.Cleanup(h.close)
 	return h
 }
@@ -258,11 +266,13 @@ func TestWorktreeLifecycleAndWatcher(t *testing.T) {
 
 	// Top-level file in the worktree root -> watcher -> WorktreeUpdated.
 	writeFile(t, filepath.Join(w.Path, "dirty.txt"), "x\n")
+	h.fsChanged()
 	h.waitFor("untracked file", worktreeUpdated(w.Path, func(w Worktree) bool { return w.Status.Untracked == 1 }))
 
 	// Commit inside the worktree: reflog/index in its admin dir -> new head, ahead of base.
 	git(t, w.Path, "add", "dirty.txt")
 	git(t, w.Path, "commit", "-q", "-m", "wip")
+	h.fsChanged()
 	h.waitFor("commit", worktreeUpdated(w.Path, func(w Worktree) bool {
 		return !w.Status.Dirty && w.Status.BaseAhead == 1
 	}))
@@ -274,6 +284,7 @@ func TestWorktreeLifecycleAndWatcher(t *testing.T) {
 	git(t, f.other, "commit", "-q", "-m", "other")
 	git(t, f.other, "push", "-q")
 	git(t, f.project, "fetch", "-q")
+	h.fsChanged()
 	h.waitFor("behind after fetch", worktreeUpdated(f.project, func(w Worktree) bool { return w.Status.Behind == 1 }))
 
 	// The main worktree cannot be removed; a dirty worktree needs force.
@@ -455,6 +466,7 @@ func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
 	ext := filepath.Join(f.base, "ext")
 	// First linked worktree: creates .git/worktrees (event on the common dir).
 	git(t, f.project, "worktree", "add", "-q", "-b", "ext", ext)
+	h.fsChanged()
 	h.waitFor("ProjectUpdated with external worktree", func(ev Event) bool {
 		u, ok := ev.(ProjectUpdated)
 		return ok && u.Project.ID == r.ID && len(u.Project.Worktrees) == 2
@@ -462,6 +474,7 @@ func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
 	// Second one: entry in .git/worktrees.
 	ext2 := filepath.Join(f.base, "ext2")
 	git(t, f.project, "worktree", "add", "-q", "--detach", ext2)
+	h.fsChanged()
 	h.waitFor("detached external worktree", func(ev Event) bool {
 		u, ok := ev.(ProjectUpdated)
 		if !ok || len(u.Project.Worktrees) != 3 {
@@ -475,6 +488,7 @@ func TestExternalWorktreeAddAndRemoveAreDetected(t *testing.T) {
 		return false
 	})
 	git(t, f.project, "worktree", "remove", ext)
+	h.fsChanged()
 	h.waitFor("external remove", func(ev Event) bool {
 		rm, ok := ev.(WorktreeRemoved)
 		return ok && rm.Path == ext
@@ -598,6 +612,8 @@ func TestRegisterErrors(t *testing.T) {
 	}
 }
 
+// The poll alone notices the project moved away and back: the test's event source sends
+// nothing.
 func TestMissingProjectReportsErrorAndRecovers(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{PollInterval: 100 * time.Millisecond})
