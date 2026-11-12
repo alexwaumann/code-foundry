@@ -83,20 +83,32 @@ function currentThread(): string {
 
 /**
  * cmd+t: a new terminal tab linked to the current thread, placed by the rules. With no thread a
- * shell of the page's checkout (the Projects page), else one in the home directory.
+ * shell of the page's checkout (the Projects page), else one in the home directory. A pane's "+"
+ * menu names the thread (`thread`) and its pane (`pane`: the tab opens there).
  */
-export async function newTerminalTab(): Promise<void> {
-  const thread = currentThread();
+export async function newTerminalTab(opts: { thread?: string; pane?: string } = {}): Promise<void> {
+  const thread = opts.thread ?? currentThread();
   const ctx = thread ? getUiContext({ kind: "thread", id: thread }) : getUiContext();
   const verb = ctx.activeThreadId || ctx.activeWorktreePath ? "terminal.new" : "terminal.new-free";
-  const res = await runCommandForResult(verb, {}, { ctx, quiet: true });
+  const res = await runCommandForResult(verb, opts.pane ? { pane: opts.pane } : {}, { ctx, quiet: true });
   await intoNewTerminal(res?.resultJson);
 }
 
-/** cmd+shift+t: a terminal tab linked to nothing, in the home directory. */
-export async function newFreeTerminalTab(): Promise<void> {
-  const res = await runCommandForResult("terminal.new-free", {}, { quiet: true });
+/** cmd+shift+t: a terminal tab linked to nothing, in the home directory; the "+" menu's Terminal, in its `pane`. */
+export async function newFreeTerminalTab(pane = ""): Promise<void> {
+  const res = await runCommandForResult("terminal.new-free", pane ? { pane } : {}, { quiet: true });
   await intoNewTerminal(res?.resultJson);
+}
+
+/**
+ * A running terminal that has no tab (a shell the classic window's bottom panel started) gets one
+ * in `pane` (the "+" menu): ui.focus.terminal --pane. The keyboard follows it.
+ */
+export async function openTerminalIn(id: string, pane: string): Promise<void> {
+  const res = await runCommandForResult("ui.focus.terminal", { id, pane }, { quiet: true });
+  if (!res) return;
+  const tab = await whenTerminalTab(id);
+  if (tab) requestPaneFocus(tab.paneId);
 }
 
 /** A code block's "Run in terminal": a new terminal tab of the thread, linked to it, runs the command. */

@@ -7,6 +7,8 @@
  * PanePlusMenu.tsx, components/thread/ThreadHeader.tsx) draw these and run them through
  * shell/linkedRun.ts. See docs/notes/shell-12-linked-tabs.md.
  */
+import type { TerminalView } from "@/api/terminal";
+import { isPanelLabels, THREAD_LABEL } from "@/lib/termlabel";
 import type { LayoutState, TabEntry } from "@/stores/layout";
 
 /** The identity key of a thread's diff of one checkout (internal/layout identity.go). */
@@ -75,11 +77,18 @@ export function threadSurfaces(thread: string, checkouts: readonly Checkout[], p
   return { diffs, prs: prItems, terminals };
 }
 
-/** What a menu item or the row does: run a verb (with a thread's context), focus an open tab, or only say something. */
+/**
+ * What a menu item or the row does: run a verb (with a thread's context), focus an open tab, only
+ * say something, or a terminal: a new one (a thread's, or with no thread a free one), or a running
+ * one given a tab. Terminals go through PR 13's actions (shell/terminalActions.ts), the same verbs
+ * as cmd+t and cmd+shift+t, with the keyboard following into the new tab.
+ */
 export type LinkedAction =
   | { run: string; args: Record<string, string>; thread?: string }
   | { focus: string }
-  | { say: string };
+  | { say: string }
+  | { terminal: "new"; thread: string; pane: string }
+  | { terminal: "show"; id: string; pane: string };
 
 /**
  * The action of one of a thread's surfaces. An open one is focused where it is (tab.focus keeps
@@ -99,9 +108,33 @@ export function surfaceAction(thread: string, item: ThreadSurfaceItem, pane = ""
   }
 }
 
-/** "New terminal tab" for a thread: terminal.new with the thread as its context, in `pane` or placed by the rules. */
+/** "New terminal tab" for a thread: cmd+t's terminal.new with the thread as its context, in `pane` or placed by the rules. */
 export function newTerminalAction(thread: string, pane = ""): LinkedAction {
-  return { run: "terminal.new", args: pane ? { pane } : {}, thread };
+  return { terminal: "new", thread, pane };
+}
+
+/** The terminals the layout's tabs show, in any space. */
+export function tabbedTerminalIds(tabs: Readonly<Record<string, TabEntry>>): string[] {
+  return Object.values(tabs).flatMap((t) => (t.kind === "terminal" && t.params.terminal ? [t.params.terminal] : []));
+}
+
+/** A running terminal with no tab, given one in the "+" menu's pane (ui.focus.terminal --pane). */
+export function showTerminalAction(id: string, pane: string): LinkedAction {
+  return { terminal: "show", id, pane };
+}
+
+/**
+ * The running terminals that have no tab anywhere and belong to no thread: a shell, an action run
+ * or a setup the classic window's bottom panel started for a checkout, or a free shell whose tab
+ * went with a layout reset. A thread's terminals are not listed (its quick terminal, and the tabs
+ * its close put away, come back with the thread); nor are plugins' own. In the terminals' order.
+ */
+export function untabbedTerminals(terminals: Readonly<Record<string, TerminalView>>, order: readonly string[], tabbedIds: readonly string[]): TerminalView[] {
+  const tabbed = new Set(tabbedIds);
+  return order.flatMap((id) => {
+    const t = terminals[id];
+    return t && t.state === "running" && !tabbed.has(id) && !t.labels[THREAD_LABEL] && isPanelLabels(t.labels) ? [t] : [];
+  });
 }
 
 /** The "+" menu's general items. */
@@ -113,7 +146,7 @@ export function plusAction(item: PlusItem, pane: string): LinkedAction {
     case "new-thread":
       return { run: "composer.new", args: { pane } };
     case "terminal":
-      return { run: "terminal.new-free", args: { pane } };
+      return { terminal: "new", thread: "", pane };
     case "prs":
       return { run: "view.pullrequests", args: { pane } };
     case "projects":

@@ -33,19 +33,34 @@ function OpenMark({ open }: { open: boolean }) {
   return open ? <span className="ml-auto pl-4 text-caption text-cf-text-muted">open</span> : null;
 }
 
-/** A terminal tab's name, as its strip names it. */
-function TerminalName({ tabId }: { tabId: string }) {
-  const tab = useTab(tabId);
-  const title = shellSurfaceOf("terminal").useTitle(tab ?? { id: tabId, kind: "terminal", thread: "", key: "", params: {}, title: "", name: "", paneId: "" });
-  return <span className="truncate">{title === "terminal" ? "Terminal" : title}</span>;
+const NO_TAB = { kind: "terminal", thread: "", key: "", params: {}, title: "", name: "", paneId: "" };
+
+/** A terminal tab's icon and name, as its strip draws them (the terminal surface's: what runs in it). */
+function TerminalTabLabel({ tabId }: { tabId: string }) {
+  const tab = useTab(tabId) ?? { ...NO_TAB, id: tabId };
+  const surface = shellSurfaceOf("terminal");
+  const title = surface.useTitle(tab);
+  const Icon = surface.TabIcon;
+  return (
+    <>
+      {Icon ? <Icon tab={tab} /> : <SquareTerminal />}
+      <span className="truncate">{title}</span>
+    </>
+  );
 }
 
 function SurfaceItem({ item, onPick }: { item: ThreadSurfaceItem; onPick: () => void }) {
-  const Icon = item.kind === "pullrequest" ? GitPullRequest : item.kind === "terminal" ? SquareTerminal : shellSurfaceOf("diff").icon;
+  const Icon = item.kind === "pullrequest" ? GitPullRequest : shellSurfaceOf("diff").icon;
   return (
     <DropdownMenuItem onSelect={onPick} data-testid="thread-surface-item" data-kind={item.kind} data-key={item.key} data-open={item.openTab ? "" : undefined}>
-      <Icon className={item.kind === "pullrequest" ? "text-cf-success-text" : undefined} />
-      {item.kind === "terminal" ? <TerminalName tabId={item.tabId} /> : <span className="truncate">{item.label}</span>}
+      {item.kind === "terminal" ? (
+        <TerminalTabLabel tabId={item.tabId} />
+      ) : (
+        <>
+          <Icon className={item.kind === "pullrequest" ? "text-cf-success-text" : undefined} />
+          <span className="truncate">{item.label}</span>
+        </>
+      )}
       <OpenMark open={item.openTab !== ""} />
     </DropdownMenuItem>
   );

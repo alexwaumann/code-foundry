@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Folders, GitPullRequest, MessageSquare, Plus, SquareTerminal } from "lucide-react";
 import {
   DropdownMenu,
@@ -14,10 +15,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
-import { plusAction, type LinkedAction, type PlusItem } from "@/shell/linked";
+import { terminalName } from "@/lib/terminalName";
+import { plusAction, showTerminalAction, tabbedTerminalIds, untabbedTerminals, type LinkedAction, type PlusItem } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
 import { useThreadName } from "@/shell/useThreadName";
 import { useLayoutStore } from "@/stores/layout";
+import { useTerminalsStore } from "@/stores/terminals";
+import { TERMINAL_ICONS } from "./terminalIcons";
 import { ThreadDot } from "./ThreadDot";
 import { ThreadSurfaceItems } from "./ThreadSurfaceItems";
 
@@ -35,6 +39,36 @@ function useActiveThread(paneId: string): string {
     const t = p ? s.tabs[p.active] : undefined;
     return t?.kind === "thread" ? t.thread : "";
   });
+}
+
+/** The ids of the running terminals no tab shows (shell/linked.ts untabbedTerminals). */
+function useUntabbedTerminals(): string[] {
+  const tabbed = useLayoutStore(useShallow((s) => tabbedTerminalIds(s.tabs)));
+  return useTerminalsStore(useShallow((s) => untabbedTerminals(s.byId, s.order, tabbed).map((t) => t.id)));
+}
+
+/** A running terminal with no tab, under Terminal: named as its tab would be; a pick gives it a tab in this pane. */
+function UntabbedTerminalItem({ id, pick, paneId }: { id: string; paneId: string; pick: (a: LinkedAction) => void }) {
+  const named = useTerminalsStore(
+    useShallow((s) => {
+      const t = s.byId[id];
+      return t ? terminalName({ manual: "", argv: t.argv, dir: t.liveCwd || t.cwd, foreground: t.foreground }) : { name: id, icon: "shell" as const, auto: true };
+    }),
+  );
+  const Icon = TERMINAL_ICONS[named.icon];
+  return (
+    <DropdownMenuItem
+      className="pl-7"
+      data-testid="plus-untabbed-terminal"
+      data-terminal-id={id}
+      onSelect={() => {
+        pick(showTerminalAction(id, paneId));
+      }}
+    >
+      <Icon />
+      <span className="truncate">{named.name}</span>
+    </DropdownMenuItem>
+  );
 }
 
 function ThreadSub({ threadId, paneId, spaceId, pick }: { threadId: string; paneId: string; spaceId: string; pick: (a: LinkedAction) => void }) {
@@ -61,11 +95,14 @@ function ThreadSub({ threadId, paneId, spaceId, pick }: { threadId: string; pane
  * last tab. With a thread's tab active, first a submenu of that thread's surfaces (the header's
  * Open ▸ items); then New thread, Terminal (a free one), Pull Requests and Projects. The choice
  * opens in this pane (`--pane`), except a linked surface already open, which is focused where it
- * is (shell/linked.ts). Keyboard: Enter or Space opens it, arrows move, right opens the submenu.
+ * is (shell/linked.ts). Under Terminal, the running terminals that have no tab (a classic bottom
+ * panel's shells): a pick gives one a tab here. Keyboard: Enter or Space opens it, arrows move,
+ * right opens the submenu.
  */
 export function PanePlusMenu({ paneId }: { paneId: string }) {
   const threadId = useActiveThread(paneId);
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
+  const untabbed = useUntabbedTerminals();
   const [open, setOpen] = useState(false);
   // A pick that moves the keyboard (a tab, a composer) keeps it there when the menu closes.
   const picked = useRef(false);
@@ -103,18 +140,20 @@ export function PanePlusMenu({ paneId }: { paneId: string }) {
       >
         {threadId && <ThreadSub threadId={threadId} paneId={paneId} spaceId={spaceId} pick={pick} />}
         {GENERAL.map(({ item, label, icon: Icon, chord }) => (
-          <DropdownMenuItem
-            key={item}
-            data-testid="plus-item"
-            data-item={item}
-            onSelect={() => {
-              pick(plusAction(item, paneId));
-            }}
-          >
-            <Icon />
-            {label}
-            {chord && <DropdownMenuShortcut>{formatChord(chord)}</DropdownMenuShortcut>}
-          </DropdownMenuItem>
+          <Fragment key={item}>
+            <DropdownMenuItem
+              data-testid="plus-item"
+              data-item={item}
+              onSelect={() => {
+                pick(plusAction(item, paneId));
+              }}
+            >
+              <Icon />
+              {label}
+              {chord && <DropdownMenuShortcut>{formatChord(chord)}</DropdownMenuShortcut>}
+            </DropdownMenuItem>
+            {item === "terminal" && untabbed.map((id) => <UntabbedTerminalItem key={id} id={id} paneId={paneId} pick={pick} />)}
+          </Fragment>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

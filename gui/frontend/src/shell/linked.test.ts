@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LayoutState, PaneEntry, TabEntry } from "@/stores/layout";
-import { closeThreadAction, diffKey, linkedRowOf, moveToSpaceAction, newTerminalAction, plusAction, prKey, rowAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces } from "./linked";
+import type { TerminalView } from "@/api/terminal";
+import { closeThreadAction, diffKey, linkedRowOf, moveToSpaceAction, newTerminalAction, plusAction, prKey, rowAction, showTerminalAction, spaceChoices, spaceTabs, surfaceAction, tabbedTerminalIds, threadSurfaces, untabbedTerminals } from "./linked";
 
 const t = (id: string, kind: string, thread: string, key: string, paneId: string): TabEntry => ({ id, kind, thread, key, params: {}, title: "", name: "", paneId });
 
@@ -56,11 +57,12 @@ describe("the actions", () => {
     expect(surfaceAction("s-1", term, "p-2")).toEqual({ focus: "t-x" });
   });
 
-  it("start a thread's terminal with its context; the + menu's general items open in its pane", () => {
-    expect(newTerminalAction("s-1")).toEqual({ run: "terminal.new", args: {}, thread: "s-1" });
-    expect(newTerminalAction("s-1", "p-2")).toEqual({ run: "terminal.new", args: { pane: "p-2" }, thread: "s-1" });
+  it("start a thread's terminal (cmd+t's) or a free one (cmd+shift+t's); the + menu's general items open in its pane", () => {
+    expect(newTerminalAction("s-1")).toEqual({ terminal: "new", thread: "s-1", pane: "" });
+    expect(newTerminalAction("s-1", "p-2")).toEqual({ terminal: "new", thread: "s-1", pane: "p-2" });
     expect(plusAction("new-thread", "p-2")).toEqual({ run: "composer.new", args: { pane: "p-2" } });
-    expect(plusAction("terminal", "p-2")).toEqual({ run: "terminal.new-free", args: { pane: "p-2" } });
+    expect(plusAction("terminal", "p-2")).toEqual({ terminal: "new", thread: "", pane: "p-2" });
+    expect(showTerminalAction("t-9", "p-2")).toEqual({ terminal: "show", id: "t-9", pane: "p-2" });
     expect(plusAction("prs", "p-2")).toEqual({ run: "view.pullrequests", args: { pane: "p-2" } });
     expect(plusAction("projects", "p-2")).toEqual({ run: "view.projects", args: { pane: "p-2" } });
     expect(moveToSpaceAction("s-1", "sp-b")).toEqual({ run: "thread.space.move", args: { id: "s-1", space: "sp-b" } });
@@ -128,5 +130,43 @@ describe("spaceTabs and spaceChoices", () => {
       { id: "sp-a", name: "Main", here: true },
       { id: "sp-b", name: "Review", here: false },
     ]);
+  });
+});
+
+describe("untabbedTerminals", () => {
+  const term = (id: string, labels: Record<string, string>, state: TerminalView["state"] = "running"): TerminalView => ({
+    id,
+    argv: ["/bin/zsh"],
+    cwd: "/w",
+    cols: 80,
+    rows: 24,
+    title: "",
+    state,
+    exitCode: 0,
+    startedAtMs: null,
+    exitedAtMs: null,
+    altScreen: false,
+    labels,
+    liveCwd: "",
+    foreground: "",
+    lastCommand: "",
+  });
+  const all = [
+    term("t-proj", { kind: "shell", project: "pj", worktree: "/w" }),
+    term("t-free", { kind: "shell" }),
+    term("t-act", { kind: "action", project: "pj", worktree: "/w", action: "dev" }),
+    term("t-tabbed", { kind: "shell" }),
+    term("t-thread", { kind: "shell", thread: "s-1" }),
+    term("t-quick", { kind: "shell", thread: "s-1", slot: "quick" }),
+    term("t-gone", { kind: "shell" }, "exited"),
+    term("t-plugin", { kind: "plugin", plugin: "p" }),
+  ];
+  const byId = Object.fromEntries(all.map((x) => [x.id, x]));
+
+  it("lists running terminals of no thread that no tab shows, in order; never a thread's, an exited one or a plugin's", () => {
+    const tabs = { "t-x": t("t-x", "terminal", "", "term:t-tabbed", "p-1") };
+    tabs["t-x"].params = { terminal: "t-tabbed" };
+    expect(tabbedTerminalIds(tabs)).toEqual(["t-tabbed"]);
+    expect(untabbedTerminals(byId, all.map((x) => x.id), tabbedTerminalIds(tabs)).map((x) => x.id)).toEqual(["t-proj", "t-free", "t-act"]);
   });
 });
