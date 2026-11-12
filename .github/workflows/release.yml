@@ -44,28 +44,23 @@ permissions:
   actions: read # a promotion looks up the newest green sweep
 
 jobs:
-  release:
+  # The commit to release, or none. A separate job on Linux, so that a release there is
+  # no commit for costs seconds, not a macOS build.
+  pick:
     # Of the ci runs on main, only a green one for a push is a sweep: not a red one, not
     # a pending one a newer merge replaced, not a manual run.
     if: >-
       vars.RELEASE_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
-    # Two sweeps in quick succession must not compute the same version; queue, never
-    # cancel a release half-way. GitHub keeps one pending job per group: a newer queued
-    # one cancels an older pending one (a skipped tip number, or a pending promotion to
-    # re-dispatch). On the job, not the workflow, so that a run skipped by the `if` above
-    # never takes a pending release's place.
-    concurrency:
-      group: release
-      cancel-in-progress: false
-    # Apple silicon: the assets are darwin-arm64.
-    runs-on: macos-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
-      # The commit to release: the sweep's own commit for a tip (not the head of main,
-      # which may have moved on unchecked), the newest green sweep's for a promotion, the
-      # dispatched ref for a tip by hand.
+      # The sweep's own commit for a tip (not the head of main, which may have moved on
+      # unchecked), the newest green sweep's for a promotion, the dispatched ref for a tip
+      # by hand.
       - name: Pick the commit
         id: commit
         env:
@@ -85,12 +80,44 @@ jobs:
               exit 1
             fi
           fi
+          # GitHub refuses a tag pushed with the workflow's own token when the commit's
+          # .github/workflows differs from the head of main's ("refusing to allow a GitHub
+          # App to create or update workflow"; the token cannot be given that permission).
+          # That is a commit from before a merge that changed a workflow. Its tip is
+          # skipped: the sweep of that merge, or of any later one, publishes everything.
+          workflows() {
+            gh api "repos/$GITHUB_REPOSITORY/contents/.github?ref=$1" --jq '.[] | select(.name == "workflows") | .sha'
+          }
+          if [ "$(workflows "$sha")" != "$(workflows main)" ]; then
+            why="${sha:0:9} is from before a workflow change on main, and the workflow's token may not tag it"
+            if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+              echo "::warning::$why; no tip for this sweep, the next green sweep publishes one"
+              exit 0
+            fi
+            echo "::error::$why; wait for the sweep of the newer commits to finish green, then run this again"
+            exit 1
+          fi
           echo "releasing $sha"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+  release:
+    needs: pick
+    if: needs.pick.outputs.sha != ''
+    # Two sweeps in quick succession must not compute the same version; queue, never
+    # cancel a release half-way. GitHub keeps one pending job per group: a newer queued
+    # one cancels an older pending one (a skipped tip number, or a pending promotion to
+    # re-dispatch). On the job, not the workflow, so that a run with nothing to release
+    # never takes a pending release's place.
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    # Apple silicon: the assets are darwin-arm64.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ steps.commit.outputs.sha }}
+          ref: ${{ needs.pick.outputs.sha }}
           # Full history and tags: next-version.sh reads commits since the last tag.
           fetch-depth: 0
           fetch-tags: true
