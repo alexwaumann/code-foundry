@@ -53,6 +53,7 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 			Args: []ArgSpec{
 				{Name: "argv", Type: String, PageAsks: true, Description: `Command line, split like a shell would (e.g. "htop -d 5")`},
 				{Name: "run", Type: String, PageAsks: true, Description: "A command line typed into the new shell once it has printed its prompt, then Return"},
+				terminalPaneArg,
 			},
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 				argv, err := a.Words("argv")
@@ -76,7 +77,7 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 				}
 				t := res.Msg.GetTerminal()
 				msg := "created terminal " + t.GetId() + " in " + home
-				tab, err := openTerminalTab(ctx, d, c, "", t.GetId())
+				tab, err := openTerminalTab(ctx, d, c, "", t.GetId(), a.String("pane"))
 				if err != nil {
 					return Result{}, err
 				}

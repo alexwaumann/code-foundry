@@ -22,6 +22,8 @@ import { FindLayer } from "./find/FindLayer";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
 import { HeaderActions } from "./HeaderActions";
+import { ThreadHeader } from "./ThreadHeader";
+import { useShellPane } from "@/shell/paneContext";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
@@ -95,15 +97,21 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const infoOpen = useUiStore((s) => s.threadInfoOpen);
   const findOpen = useThreadFindOpen(threadId);
   const [rowRef, infoFits] = useInfoRoom(threadId);
+  // In a window shell pane the shell's header (ThreadHeader): the tab above is the title.
+  const shellPane = useShellPane();
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
-        <PaneHeader className="gap-2 px-3" data-testid="thread-header">
-          <ThreadTitle id={threadId} />
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
-            <HeaderActions />
-          </span>
-        </PaneHeader>
+        {shellPane ? (
+          <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />
+        ) : (
+          <PaneHeader className="gap-2 px-3" data-testid="thread-header">
+            <ThreadTitle id={threadId} />
+            <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
+              <HeaderActions />
+            </span>
+          </PaneHeader>
+        )}
         {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating. */}
         <div
           className="relative flex min-h-0 flex-1"

@@ -82,6 +82,9 @@ func TestTerminalNewOpensATab(t *testing.T) {
 			pane: "p-left", focused: true},
 		{name: "a free shell", verb: "terminal.new-free", uctx: fromCLI, pane: "p-left", focused: true},
 		{name: "a free shell from a thread", verb: "terminal.new-free", uctx: fromThread, pane: "p-left"},
+		// A pane's "+" menu: --pane puts the tab there, linked or not.
+		{name: "a thread's shell in a pane", verb: "terminal.new", uctx: fromApp, args: map[string]string{"pane": "p-left"}, pane: "p-left", thread: threadA, focused: true},
+		{name: "a free shell in a pane", verb: "terminal.new-free", uctx: fromCLI, args: map[string]string{"pane": "p-right"}, pane: "p-right", focused: true},
 		{name: "the quick terminal", verb: "terminal.new", uctx: fromApp, args: map[string]string{"quick": "true"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

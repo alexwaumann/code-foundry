@@ -19,6 +19,7 @@ export function panelSurface(kind: string, spec: SurfaceSpec | undefined): Shell
     icon: spec?.icon ?? Puzzle,
     useTitle: (tab) => tab.name || tab.title || spec?.title || kind,
     render: (tab) => (spec ? spec.render(seamTab(tab, spec.title)) : null),
+    linkedNoun: spec?.title ?? kind,
   };
 }
 

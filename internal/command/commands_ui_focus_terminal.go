@@ -31,9 +31,10 @@ func WithTerminalTabs(l layoutstore.Store, terms TerminalBackend) UIOption {
 	return func(o *uiOptions) { o.layout, o.terminals = l, terms }
 }
 
-// focusTerminalTab focuses terminal id's tab, or its quick terminal's thread. It returns a
-// phrase for the message.
-func (o uiOptions) focusTerminalTab(ctx context.Context, id string) (string, error) {
+// focusTerminalTab focuses terminal id's tab, or its quick terminal's thread. A terminal with no
+// tab gets one in pane when it is given (a pane's "+" menu), else by the placement rules. It
+// returns a phrase for the message.
+func (o uiOptions) focusTerminalTab(ctx context.Context, id, pane string) (string, error) {
 	if o.layout == nil || o.terminals == nil {
 		return "", nil
 	}
@@ -54,7 +55,7 @@ func (o uiOptions) focusTerminalTab(ctx context.Context, id string) (string, err
 		return fmt.Sprintf("opened thread %s's quick terminal %s; ", thread, id), nil
 	}
 	tb := &core.Tab{Kind: "terminal", Thread: thread, Params: map[string]string{core.TerminalParam: id}}
-	c, err := l.apply(ctx, &core.OpenSurface{Tab: tb, Focus: true}, false)
+	c, err := l.apply(ctx, &core.OpenSurface{Pane: pane, Tab: tb, Focus: true}, false)
 	if err != nil {
 		return "", err
 	}

@@ -12,7 +12,7 @@ import { neighbour, type Direction } from "../src/shell/geometry/neighbours";
 import { plainRects } from "../src/shell/geometry/rects";
 import type { GeoNode } from "../src/shell/geometry/types";
 import { CommandError } from "./errors";
-import { layoutRpcError, panes, type MockLayout, type Node, type Op, type Space, type State } from "./layout";
+import { identify, layoutRpcError, panes, type MockLayout, type Node, type Op, type Space, type State } from "./layout";
 
 interface Arg {
   name: string;
@@ -40,6 +40,8 @@ export interface LayoutVerbsWorld {
   readonly layout: MockLayout;
   /** Whether a thread exists. */
   hasThread(id: string): boolean;
+  /** A thread's project and worktree ("" without one): its own diff's checkout (view.thread-diff). */
+  threadCheckout?(id: string): { projectId: string; worktreePath: string };
 }
 
 const CATEGORY = "Layout";
@@ -163,6 +165,36 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       run: (_c, a) => {
         const { tab } = resolveTab(L.state(), a.tab);
         return run({ op: "focus_tab", tab: tab.id }, () => `focused tab ${tab.id}`);
+      },
+    },
+    {
+      // internal/command commands_view_open.go threadDiffCommand: the thread's diff, focused; from that diff, the thread.
+      cmd: {
+        name: "view.thread-diff",
+        title: "Thread Diff",
+        category: "View",
+        description: "Go to the focused thread's diff, opening it beside the thread when it is not open; from that diff, go back to the thread.",
+        keybindings: [],
+        noPalette: true,
+        args: [str("tab", "The tab to start from (default: the focused tab)"), focusArg],
+      },
+      when: always,
+      run: (_c, a) => {
+        const st = L.state();
+        const { sp, tab } = resolveTab(st, a.tab);
+        const thread = tab.thread ?? "";
+        if (!thread) refuse(`failed precondition: tab ${tab.id} belongs to no thread`, "unavailable");
+        if (tab.kind === "diff") return run({ op: "open_thread", thread, focus: true }, (r) => `back to thread ${thread} (tab ${r.result.tab ?? ""})`);
+        const c = world.threadCheckout?.(thread);
+        if (!c?.projectId || !c.worktreePath) refuse(`failed precondition: thread ${thread} runs in no project worktree, so it has no diff`, "unavailable");
+        const want = { kind: "diff", thread, params: { project: c.projectId, worktree: c.worktreePath, own: "1" } };
+        const key = identify({ id: "", title: "", name: "", ...want }).key;
+        const open = panes(sp.root)
+          .flatMap((p) => p.tabs ?? [])
+          .find((t) => t.key === key);
+        // Focus an open one as it is (its chosen file and sides stay); else open it by the rules.
+        if (open) return run({ op: "focus_tab", tab: open.id }, () => `thread ${thread}'s diff is tab ${open.id}`);
+        return run({ op: "open_surface", tab: want, focus: true }, (r) => `thread ${thread}'s diff is tab ${r.result.tab ?? ""}`);
       },
     },
     {

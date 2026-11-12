@@ -124,17 +124,18 @@ func RegisterUI(r *Registry, e Emitter, opts ...UIOption) error {
 			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Terminal",
-			Description:  "Show a terminal in every connected window: the shell window focuses its tab, opening it by the placement rules when it is closed; a quick terminal opens under its thread.",
+			Description:  "Show a terminal in every connected window: the shell window focuses its tab, opening it by the placement rules when it is closed (--pane: in that pane); a quick terminal opens under its thread.",
 			Category:     "View",
 			NoKeybinding: true,
 			Args: []ArgSpec{
 				{Name: "id", Type: String, Required: true, Context: ContextTerminal, ID: TerminalID, Description: "Terminal id" + IDHelp},
+				paneIDArg("pane", "A terminal with no tab opens it in this pane (the pane's + menu); an open tab is focused where it is"),
 			},
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				if err := r.known(ctx, TerminalID, a.String("id")); err != nil {
 					return Result{}, err
 				}
-				tab, err := o.focusTerminalTab(ctx, a.String("id"))
+				tab, err := o.focusTerminalTab(ctx, a.String("id"), a.String("pane"))
 				if err != nil {
 					return Result{}, err
 				}

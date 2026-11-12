@@ -16,6 +16,8 @@ vi.mock("@/shell/commands", () => ({
 }));
 
 const { PaneTabStrip } = await import("./PaneTabStrip");
+const { tooltipText } = await import("@/test/tooltip");
+const { useTabCut } = await import("@/shell/tabCut");
 const { resetLayout } = await import("@/stores/layout");
 const { useThreadsStore } = await import("@/stores/threads");
 
@@ -89,7 +91,7 @@ describe("PaneTabStrip", () => {
     ]);
   });
 
-  /** Every tab is 150px by nature; the strip is `width` wide (its padding and gaps take 18px of it). */
+  /** Every tab is 150px by nature; the strip is `width` wide (its padding, gaps and the "+" take 48px of it). */
   function stripOf(width: number): void {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
       if (this.getAttribute("data-testid") === "shell-tab-strip") return new DOMRect(0, 0, width, 44);
@@ -118,5 +120,45 @@ describe("PaneTabStrip", () => {
     stripOf(1000);
     render(<PaneTabStrip paneId="p-1" focused />);
     expect(tabs().map((t) => t.getAttribute("data-label"))).toEqual(["full", "full", "full", "full"]);
+  });
+
+  it("marks a thread's tab icon with the attention dot while its thread needs the user, active or not, never when archived", () => {
+    const attention = (o: object = {}) => {
+      act(() => {
+        useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "attention", archivedAtMs: null, flags: [], ...o } } as never });
+      });
+    };
+    render(<PaneTabStrip paneId="p-1" focused />);
+    const dots = () => tabs().map((t) => t.querySelector('[data-testid="shell-tab-attention"]') !== null);
+    expect(dots()).toEqual([false, false, false, false]);
+    attention();
+    // Only the thread's own tab, not its diff; the thread's tab is not the active one here.
+    expect(dots()).toEqual([true, false, false, false]);
+    expect(tabs()[0]?.querySelector('[data-testid="shell-tab-attention"]')?.getAttribute("aria-label")).toBe("Needs you");
+    attention({ archivedAtMs: 1 });
+    expect(dots()).toEqual([false, false, false, false]);
+  });
+
+  it("a linked tab's hover names its thread; another tab's only a cut name", () => {
+    stripOf(1000);
+    render(<PaneTabStrip paneId="p-1" focused />);
+    const [thread, diff] = screen.getAllByRole("tab");
+    if (!thread || !diff) throw new Error("tabs");
+    expect(tooltipText(diff)).toBe("Diff of Refactor sidebar tree");
+    expect(tooltipText(thread)).toBeNull();
+  });
+
+  it("tells the header whether the active tab's name is cut", () => {
+    const cut = () => useTabCut.getState().cut["p-1"] ?? false;
+    stripOf(1000);
+    render(<PaneTabStrip paneId="p-1" focused />);
+    expect(cut()).toBe(false);
+    cleanup();
+    stripOf(250);
+    render(<PaneTabStrip paneId="p-1" focused />);
+    expect(cut()).toBe(true);
+    // A strip that goes forgets its pane.
+    cleanup();
+    expect("p-1" in useTabCut.getState().cut).toBe(false);
   });
 });

@@ -579,13 +579,21 @@ export function ghEvent(e: GhEventInit) {
   return { source: EventSource.GH, event: { event: { case: "gh" as const, value: e } } };
 }
 
-/** view.pullrequests and view.projects in the mock registry (view.open.url is in mock/gitops.ts, like 3c). */
-export function viewCommands(emit: (intent: IntentInit) => number) {
+/** --pane of the page verbs: the pane's "+" menu (internal/command openPaneArg). */
+const pagePaneArg = { name: "pane", type: ArgType.STRING, required: false, description: "Open the tab in this pane (the pane's + menu); a linked tab that is already open is focused where it is" };
+
+/**
+ * view.pullrequests and view.projects in the mock registry (view.open.url is in mock/gitops.ts, like 3c).
+ * With --pane (the shell's "+" menu) the page's tab opens in that pane through `openTab`, as the
+ * daemon's do (commands_view.go); without one the mock only sends the classic ShowView.
+ */
+export function viewCommands(emit: (intent: IntentInit) => number, openTab?: (kind: string, pane: string, params: Record<string, string>) => void) {
   return [
     {
-      cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: ["cmd+shift+d"], args: [] },
+      cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: ["cmd+shift+d"], args: [pagePaneArg] },
       when: () => true,
-      run: () => {
+      run: (_ctx: unknown, a: Record<string, string> = {}) => {
+        if (a.pane) openTab?.("prs", a.pane, {});
         emit({ intent: { case: "showView", value: { name: "pullrequests" } } });
         return ""; // like the daemon: no toast
       },
@@ -600,12 +608,14 @@ export function viewCommands(emit: (intent: IntentInit) => number) {
         args: [
           { name: "project", type: ArgType.STRING, required: false, description: "Open this project's page" },
           { name: "workspace", type: ArgType.STRING, required: false, description: "Open this workspace's page" },
+          pagePaneArg,
         ],
       },
       when: () => true,
       run: (_ctx: unknown, a: Record<string, string> = {}) => {
         // Like the daemon: which page in the ShowView's params (the ids as given; the mock resolves no names).
         const params: Record<string, string> = a.project ? { project: a.project } : a.workspace ? { workspace: a.workspace } : {};
+        if (a.pane) openTab?.("projects", a.pane, params);
         emit({ intent: { case: "showView", value: { name: "projects", params } } });
         return "";
       },
