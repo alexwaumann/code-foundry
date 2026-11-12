@@ -29,6 +29,8 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",
 		"usage.show", "view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.page", "view.panel.pr",
 		"workspace.list", "worktree.editors",
+		"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "space.rename", "space.switch", "tab.focus", "tab.list", "tab.move", "thread.open", "thread.space.move",
+		"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start",
 	}
 	var got []string
 	for _, l := range f.reg.List(command.Context{}, true) {

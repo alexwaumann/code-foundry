@@ -68,6 +68,10 @@ var pageState = []string{
 	"workspace.add-project", "workspace.new", "workspace.remove", "workspace.remove-project",
 	"workspace.rename", "workspace.reveal", "workspace.set-primary", "workspace.set-root",
 	"worktree.reveal",
+	"pane.close", "pane.focus", "pane.focus.left", "pane.focus.down", "pane.focus.up", "pane.focus.right", "pane.move", "pane.move.left", "pane.move.down", "pane.move.up", "pane.move.right",
+	"pane.resize", "pane.split", "space.move", "space.new", "space.remove", "space.rename", "space.switch", "tab.close", "tab.focus", "tab.move", "tab.next", "tab.previous",
+	"thread.close", "thread.open", "thread.space.move",
+	"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "composer.new",
 }
 
 // pageAskFlags are the flags that make a pageState verb ask a page.

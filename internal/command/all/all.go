@@ -10,6 +10,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // Deps are the dependencies of all command domains.
@@ -120,6 +121,10 @@ type Deps struct {
 	// (ProjectService.CompareWorktree), for view.panel.diff. Nil makes it fail with
 	// Unimplemented.
 	FileDiffs command.WorktreeComparer
+	// Layout backs layout.show, space.*, pane.*, tab.*, thread.open, thread.close and
+	// thread.space.move (which also use Thread). Nil registers them failing with
+	// Unimplemented.
+	Layout layoutstore.Store
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
 	// for daemon.capabilities, which also reads Daemon, Settings, Memory, Plugin, Skills
 	// and Presence. Nil: none listed.
@@ -221,6 +226,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterDictation(r, command.DictationDeps{Dictation: d.Dictation, Status: d.DictationStatus, Emitter: d.Emitter}),
 		command.RegisterSearch(r, command.SearchDeps{Search: d.Search, Wait: d.SearchWait}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
+		command.RegisterLayout(r, command.LayoutDeps{Layout: d.Layout, Thread: d.Thread}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,
 			Skills: d.Skills, Shipped: d.ShippedSkills, Presence: d.Presence,

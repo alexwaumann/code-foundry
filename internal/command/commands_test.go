@@ -89,6 +89,12 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"memory.show", "memory.add", "memory.remove", "memory.clear",
 		"dictation.toggle", "dictation.hold", "dictation.allow", "dictation.start", "dictation.stop", "dictation.download", "dictation.download.cancel", "dictation.remove", "dictation.status",
 		"daemon.capabilities",
+		"layout.show", "space.list", "tab.list", "space.new", "space.rename", "space.remove", "space.switch", "space.move",
+		"pane.focus", "pane.move", "pane.split", "pane.close", "pane.resize",
+		"pane.focus.left", "pane.focus.down", "pane.focus.up", "pane.focus.right",
+		"pane.move.left", "pane.move.down", "pane.move.up", "pane.move.right",
+		"tab.focus", "tab.move", "tab.close", "tab.next", "tab.previous", "thread.open", "thread.close", "thread.space.move",
+		"composer.new", "composer.draft.start", "composer.draft.label", "composer.draft.clear", "composer.draft.discard", "composer.draft.open",
 		"search.agent", "search.stop", "search.recent", "search.get", "search.open-hit", "search.seen", "search.find", "search.forget", "search.clear", "search.promote", "search.report",
 	}
 	for _, n := range want {
