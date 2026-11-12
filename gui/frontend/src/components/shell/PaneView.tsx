@@ -3,8 +3,10 @@ import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { PaneError } from "@/components/error/fallbacks";
 import { trafficLightGutter } from "@/components/window/titleBand";
 import { lastInputWasKeyboard } from "@/lib/inputModality";
+import { cn } from "@/lib/utils";
 import { focusPaneNow } from "@/shell/commands";
 import type { PaneRect } from "@/shell/geometry/types";
+import { usePaneDragged } from "@/shell/drag/state";
 import { ShellPaneContext, type ShellPane } from "@/shell/paneContext";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
@@ -49,6 +51,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
   const inset = useUiStore((s) => (!s.sidebarVisible && rect.x === 0 && rect.y === 0 ? trafficLightGutter(s.zoom) - 6 : 0));
   const request = useShellViewStore((s) => (s.focusRequest.paneId === paneId ? s.focusRequest.seq : 0));
   const kind = tab?.kind ?? "";
+  const dragged = usePaneDragged(paneId);
   useEffect(() => {
     if (request === 0 || !bodyRef.current) return;
     focusInto(bodyRef.current, kind);
@@ -64,13 +67,14 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
   };
   return (
     <section
-      className="absolute flex flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs"
+      className={cn("absolute flex flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs", dragged && "opacity-60")}
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
       aria-label={tab ? undefined : "Pane"}
       aria-labelledby={tab ? shellTabDomId(tab.id) : undefined}
       data-testid="shell-pane"
       data-pane-id={paneId}
       data-focused={focused || undefined}
+      data-dragging={dragged || undefined}
       onPointerDownCapture={takeFocus}
       // The keyboard entering the pane (Tab) focuses it; a surface focusing itself as it mounts does not.
       onFocusCapture={() => {

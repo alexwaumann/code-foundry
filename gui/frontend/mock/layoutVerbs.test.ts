@@ -66,6 +66,23 @@ describe("the mock's layout verbs", () => {
     expect(w.pane("p-4")).toBeUndefined();
   });
 
+  it("move a whole pane beside another, into another's strip, and onto the outer edge", async () => {
+    const w = world();
+    const moved = w.pane("p-4")?.tabs?.map((t) => t.id) ?? [];
+    await w.run("pane.move", { pane: "p-4", beside: "p-1", edge: "left" });
+    expect(panes(w.st().spaces[0]?.root).map((p) => p.id)[0]).toBe("p-4");
+    const into = await w.run("pane.move", { pane: "p-4", into: "p-1", index: "0" });
+    expect(into.pane).toBe("p-1");
+    expect(w.pane("p-4")).toBeUndefined();
+    expect(w.pane("p-1")?.tabs?.slice(0, moved.length).map((t) => t.id)).toEqual(moved);
+    await w.run("pane.move", { pane: "p-2", outer: "bottom" });
+    const root = w.st().spaces[0]?.root;
+    expect(root).toMatchObject({ t: "split", dir: "col" });
+    expect(root?.kids?.at(-1)?.id).toBe("p-2");
+    await expect(w.run("pane.move", { pane: "p-2" })).rejects.toThrow(/give one of/);
+    await expect(w.run("pane.move", { pane: "p-2", beside: "p-1" })).rejects.toThrow(/needs --edge/);
+  });
+
   it("New thread opens the space's composer for what was picked", async () => {
     const w = world("empty");
     const r = await w.run("composer.new", { project: "repo-cf", focus: "true" });

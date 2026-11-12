@@ -7,6 +7,7 @@ import { zoomFactor } from "@/lib/zoom";
 import { closeTabNow, focusTabNow } from "@/shell/commands";
 import { fitTabs, TAB_ICON_WIDTH, type TabFit } from "@/shell/geometry/tabFit";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
+import { usePaneDrag, useTabDrag } from "@/shell/drag/draggable";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
 
@@ -53,12 +54,16 @@ function ShellTab({ tabId, active, paneFocused, fit, focusable }: { tabId: strin
 
 function ShellTabOf({ tab, active, paneFocused, fit, focusable }: { tab: TabEntry; active: boolean; paneFocused: boolean; fit: TabFit | undefined; focusable: boolean }) {
   const title = useTabTitle(tab);
+  const { setNodeRef, listeners, describedBy, dragging } = useTabDrag(tab.id, tab.paneId);
   const label = fit?.label ?? "full";
   const icon = label === "icon";
   return (
     <div
+      ref={setNodeRef}
+      {...listeners}
       role="presentation"
       data-testid="shell-tab"
+      data-dragging={dragging || undefined}
       data-tab-id={tab.id}
       data-kind={tab.kind}
       data-active={active || undefined}
@@ -67,6 +72,7 @@ function ShellTabOf({ tab, active, paneFocused, fit, focusable }: { tab: TabEntr
         "group relative flex h-7 shrink-0 items-center rounded-md text-body-sm [--wails-draggable:no-drag]",
         icon ? "justify-center" : "pr-1",
         active ? (paneFocused ? ACTIVE_FOCUSED : ACTIVE_UNFOCUSED) : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
+        dragging && "opacity-40",
       )}
       style={fit ? { width: fit.width } : undefined}
       onMouseDown={(e) => {
@@ -83,6 +89,7 @@ function ShellTabOf({ tab, active, paneFocused, fit, focusable }: { tab: TabEntr
           id={shellTabDomId(tab.id)}
           aria-selected={active}
           aria-controls={active ? shellBodyDomId(tab.paneId) : undefined}
+          aria-describedby={describedBy}
           tabIndex={focusable ? 0 : -1}
           className={cn(
             "flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 rounded-md outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
@@ -146,9 +153,10 @@ function onStripKeyDown(e: KeyboardEvent<HTMLElement>): void {
 
 /**
  * A pane's tab strip: the tab is the title (docs/notes/shell-model.md), so nothing repeats it
- * under the strip by default. The strip's free space drags the window until the top bar does
- * (PR 15). `inset` keeps the strip clear of the traffic lights (the pane at the window's top left
- * with the sidebar hidden). The "+" menu (PR 12), drags (PR 14) and full screen (PR 19) come later.
+ * under the strip by default. Any tab drags, and the strip's free space drags the whole pane
+ * (components/shell/ShellDnd.tsx), so it no longer drags the window. `inset` keeps the strip clear
+ * of the traffic lights (the pane at the window's top left with the sidebar hidden). The "+" menu
+ * (PR 12) and full screen (PR 19) come later.
  */
 export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; focused: boolean; inset?: number }) {
   const pane = usePane(paneId);
@@ -157,6 +165,7 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
   const stripRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState<TabFit[] | null>(null);
+  const { setNodeRef: setPaneNode, listeners: paneListeners } = usePaneDrag(paneId);
   const key = tabIds.join(",");
 
   useLayoutEffect(() => {
@@ -183,12 +192,16 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
 
   return (
     <div
-      ref={stripRef}
+      ref={(el) => {
+        stripRef.current = el;
+        setPaneNode(el);
+      }}
+      {...paneListeners}
       role="tablist"
       aria-label="Tabs"
       aria-orientation="horizontal"
       data-testid="shell-tab-strip"
-      className="relative flex shrink-0 items-center gap-0.5 overflow-hidden border-b border-cf-divider px-1.5 [--wails-draggable:drag]"
+      className="relative flex shrink-0 items-center gap-0.5 overflow-hidden border-b border-cf-divider px-1.5 [--wails-draggable:no-drag]"
       style={{ height: PANE_HEADER_HEIGHT, paddingLeft: STRIP_PAD + inset }}
       onKeyDown={onStripKeyDown}
     >

@@ -254,6 +254,47 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
     ]),
     {
       cmd: {
+        name: "pane.move",
+        title: "Move Pane",
+        category: CATEGORY,
+        description: "Move a whole pane: beside another pane (--beside with --edge), into another pane's strip (--into, its tabs join at --index), onto an edge of the whole pane area (--outer), or to another space (--space).",
+        keybindings: [],
+        noPalette: true,
+        args: [
+          str("pane", "The pane to move", { required: true, positional: true }),
+          str("beside", "Put it beside this pane, on --edge"),
+          edgeArg("edge", "The edge of --beside it goes on"),
+          str("into", "Merge its tabs into this pane's strip"),
+          { name: "index", type: ArgType.INT, required: false, description: "With --into: where its tabs join the strip" },
+          edgeArg("outer", "Put it on this edge of the whole pane area"),
+          str("space", "Move it to this space"),
+          str("frac", "The share it takes"),
+          focusArg,
+        ],
+      },
+      when: always,
+      run: (_c, a) => {
+        const st = L.state();
+        const { pane } = resolvePane(st, a.pane);
+        const given = ["beside", "into", "outer", "space"].filter((k) => a[k]);
+        if (given.length !== 1) refuse("invalid argument: give one of --beside (with --edge), --into, --outer or --space");
+        const frac = a.frac ? { frac: Number(a.frac) } : {};
+        let op: Op;
+        if (a.beside) {
+          if (!a.edge) refuse("invalid argument: --beside needs --edge");
+          op = { op: "move_pane", pane: pane.id, target: resolvePane(st, a.beside).pane.id, edge: a.edge, ...frac };
+        } else if (a.into) {
+          op = { op: "merge_pane", pane: pane.id, target: resolvePane(st, a.into).pane.id, ...(a.index !== undefined && a.index !== "" ? { index: Number(a.index) } : {}) };
+        } else if (a.outer) {
+          op = { op: "move_pane", pane: pane.id, edge: a.outer, ...frac };
+        } else {
+          op = { op: "move_pane", pane: pane.id, space: a.space };
+        }
+        return run(op, (r) => `moved pane ${pane.id} (now pane ${r.result.pane ?? ""} in space ${r.result.space ?? ""})`);
+      },
+    },
+    {
+      cmd: {
         name: "pane.split",
         title: "Split Pane",
         category: CATEGORY,
