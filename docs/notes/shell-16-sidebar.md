@@ -3,9 +3,11 @@
 Sixteenth PR of the shell stack (`docs/notes/shell-plan.md`, section 4). With the shell flag on and
 the shell drawing the window, the sidebar has the spec's sections (Needs you, Active, then Working,
 Snoozed and Archived), the three-line thread row, the space's composer drafts, Open ▸ in the row's
-menu, and rows that drag into the pane grid. Settings has `layout.smart_swap` and
+menu with Move to space ▸, and rows that drag into the pane grid, onto a rail and onto a space tab.
+A compose tab becomes a draft as the user types. Settings has `layout.smart_swap` and
 `sidebar.needs_scope`. With the flag off (or while the shell waits for its layout) the sidebar is
-exactly today's.
+exactly today's. Rebased onto PR 15 (top bar and spaces) and PR 19 (rails and full screen): the
+sidebar sits under the top bar, which holds the app name and back and forward.
 
 ## What is in it
 
@@ -16,16 +18,19 @@ exactly today's.
 | `stores/shellSidebar.ts` | Needs you's and Active's collapsed state, persisted (`code-foundry.shellSidebar`) |
 | `components/sidebar/shell/ShellSidebarList.tsx` | the list: panels of measured rows, keyboard, cursor, context menus, footers |
 | `components/sidebar/shell/ShellRows.tsx` | the thread row, a Needs you row, a draft row, the two headers and the scope button |
-| `components/sidebar/shell/ShellRowMenus.tsx` | the thread row's menu (Open ▸ then the classic row's items) and a draft's (Open, Discard) |
+| `components/sidebar/shell/ShellRowMenus.tsx` | the thread row's menu (Open ▸, Move to space ▸, then the classic row's items) and a draft's (Open, Discard) |
 | `shell/drafts.ts` | `composer.draft.open` / `composer.draft.discard`, run quietly |
 | `shell/drag/threadDrop.ts` | a dropped row: `thread.open` into a pane, then the `tab.move` its place needs |
-| `shell/drag/{targets,drop,draggable,announce,state}.ts`, `ShellDnd.tsx` | the `thread` drag source; the context now wraps the sidebar too (`ShellDndRoot` in `App.tsx`) |
+| `shell/drag/{targets,drop,draggable,announce,state}.ts`, `ShellDnd.tsx` | the `thread` drag source; the context now wraps the sidebar too (`ShellDndRoot` in `App.tsx`; the top bar stays outside it, found in the document) |
+| `shell/spaces.ts` | `spaceDropCommands` takes a `thread` source: `thread.space.move` |
+| `shell/composerDrafts.ts`, `lib/draftLabel.ts` | a compose tab's draft as the user types: start, relabel, clear; the text kept in localStorage and dropped with the draft |
+| `lib/compose.ts`, `stores/compose.ts`, `Composer.tsx`, `ComposeTab.tsx`, `shell/surfaces/compose.tsx`, `Shell.tsx` | a target may carry a draft id (its own key `draft:<id>`); `draftId` and `onTextChange` on the Composer; a draft's tab named by its label |
 | `Sidebar.tsx`, `SidebarMenu.tsx`, `SidebarRow.tsx`, `RowMenu.tsx` | small: the switch, `pages`, exported row parts, `lead`/`terminal`/`keepFocus` |
-| `ThreadSurfaceItems.tsx`, `menuKit.ts` | the Open ▸ items take a menu kit (a context menu's for the row) |
+| `ThreadSurfaceItems.tsx`, `menuKit.ts` | the Open ▸ and Move to space ▸ items take a menu kit (a context menu's for the row) |
 | `internal/store/settings` | `layout.smart_swap` (bool, true), `sidebar.needs_scope` (all, space), groups `layout` and `sidebar`, section Appearance › Panes and sidebar |
 | `internal/store/layout/store.go`, `internal/daemon/stores.go` | `Options.SmartSwap`, read at every op (`core.Options.NoSmartSwap`) |
-| `mock/settings.ts`, `mock/world.ts`, `mock/layoutVerbs.ts`, `mock/server.ts` | the two settings, `settings.set`, `composer.draft.start/open/discard`, `POST /__mock/shell-sidebar` |
-| `e2e/shell-sidebar.spec.ts` | title wrapping, hover geometry, drags into the grid, SHOTS |
+| `mock/settings.ts`, `mock/world.ts`, `mock/layoutVerbs.ts`, `mock/server.ts` | the two settings, `settings.set`, the five `composer.draft.*` verbs, `POST /__mock/shell-sidebar` |
+| `e2e/shell-sidebar.spec.ts` | title wrapping, hover geometry, drags into the grid and onto a rail, typed drafts, SHOTS |
 
 ## Decisions
 
@@ -73,11 +78,43 @@ exactly today's.
   was focused was refused ("not available in this context") until it did. For a closed thread the
   daemon puts the surface in the focused pane; for an open one, by the placement rules.
 - **Dragging a row**: a `thread` drag source. A thread whose tab is open in the space drags as that
-  tab (a move). One of another space does not drag. A drop is `thread.open` into the target's
+  tab (a move). A drop is `thread.open` into the target's
   pane (the focused one for the outer edge), then `tab.move` to the strip place, the pane edge or
   the outer edge; nothing more for a pane's middle, or when the thread replaced the space's lone
   empty composer. The strip index is adjusted for where the open put the tab. The preview is the
-  same `treeAfterDrop` with a new pane and nothing leaving the tree.
+  same `treeAfterDrop` with a new pane and nothing leaving the tree. A rail is one target as a
+  whole (PR 19), so a row dropped on it is `thread.open --pane <the rail's pane>`, whose focus
+  unfolds it.
+- **A row onto a space tab** moves its thread there with `thread.space.move` (its linked tabs in
+  its space go along), open or not (`spaceDropCommands`). A row of another space (Needs you lists
+  every space's) drags too, but only a space tab takes it: the grid shows the current space only.
+  The window stays in its space, as for a tab dropped there.
+- **Move to space ▸** in the row's menu is the header's `MoveToSpaceItems` with the context menu's
+  kit: the spaces with their glyphs, the thread's own marked "here", New space.
+- **The current space**: the list reads `currentSpaceId` and each thread's `spaceOfThread`, so a
+  space switch (a space tab, ctrl+cmd+1…9, back and forward) changes Active, Working and Snoozed at
+  once; Needs you with "All spaces" stays as it is.
+- **Typed drafts** (`shell/composerDrafts.ts`). The user's own edit (the editor's `onChange`, so the
+  first-run welcome prefill alone does not start one) in a space's empty composer starts a draft:
+  the window picks the id (`d-` + 8 base32), copies the text to the compose store under
+  `draft:<id>`, runs `composer.draft.start --tab --id --label`, and reads the id from a pending map
+  until the layout shows the tab's `draft` param. The target's own entry is dropped once the
+  daemon answers (a refusal moves the text back). The label is the first line with text, tags by
+  their labels, at most 60 characters; it is sent `LABEL_MS` (500 ms) after typing pauses, only when
+  it changed. Text deleted to nothing clears the draft after `CLEAR_MS` (600 ms) if still empty: the
+  tab is the space's empty composer again, or closes when there is one. Sending is unchanged:
+  `thread.new --compose <tab>` and the daemon turns the draft's tab into the thread's and drops it
+  from the list, so its row goes.
+- **A draft's text** stays where the composer's text lives (the compose store), under its own key,
+  so two drafts on one project never share it. A `ComposeTarget` carries the draft id and
+  `draftKey()` gives `draft:<id>`, so send, attachments and the project switch need no other change;
+  switching a draft's project rewrites its text for the new projects in place (`retargetShellDraft`)
+  and the tab's params follow (the daemon keeps the `draft` param). The texts of `draft:` keys are
+  written to localStorage (`code-foundry.shellDrafts`) and put back at start, so a draft survives
+  closing its tab and a reload; a draft the layout no longer lists (sent, discarded, cleared, from
+  any window or the CLI) loses its text. Attachments are not kept across a reload (their files are
+  not), as for every composer.
+- **A draft's tab** is named by its label in the space's list, else "New thread".
 - **The drag follows the pointer, not dnd-kit's delta.** dnd-kit adds the scroll of the source's
   scroll containers to its delta; a sidebar row whose list scrolled under the drag (a row
   re-measured) aimed somewhere the pointer was not, and in e2e the drop bar vanished with the
@@ -95,8 +132,8 @@ exactly today's.
 
 - The scope control is one pill naming the scope in force, not a two-segment "All spaces | This
   space" control (the brief's single button).
-- No top bar: the sidebar band keeps the app name and history buttons, with no sidebar toggle
-  beside them (PR 15).
+- The sidebar starts under the top bar (PR 15's rule: the bar is not aligned to the sidebar); the
+  sketches have the app name in the sidebar's column.
 - Active shows no count while expanded; the sketch shows none either, and Needs you shows its count.
 - The pin and made-by-thread glyphs sit on line 1, not before the title (nothing narrows it).
 - Drafts are not in the sketches.
@@ -120,13 +157,29 @@ exactly today's.
   scope button's `settings.set` both ways; collapsing; Open ▸ first, no "New terminal here", Diff
   of a closed thread runs `view.open.diff` with that thread's context), `Sidebar.test.tsx` (the
   flag swaps the list and drops the page rows), `shell/drag/*` (a thread source everywhere, its
-  preview, `threadDropPlan`, its announcements), `persisted.test.ts` (the new store).
+  preview, `threadDropPlan`, its announcements, a rail taking a thread), `persisted.test.ts` (the
+  new store). After the rebase onto PR 15 and 19: `spaces.test.ts` (a row's thread onto a space
+  tab, open or not, never its own space), `ShellSidebarList.test.tsx` (Move to space ▸ and its
+  verb; the list following a space switch, with Needs you in either scope),
+  `composerDrafts.test.ts` (the start with its own key and label, a refused start, relabelling
+  after a pause and only on change, clearing after a pause unless typed into again, the text kept
+  in storage and put back, dropped once the layout stops listing the draft, kept while its start
+  runs), `draftLabel.test.ts`, `compose.test.ts` (a draft's key; a draft keeps its key on another
+  target).
 - Go: `TestSmartSwapSetting` (on: the side pane switches to b's diff; off: it stays on a's).
 - e2e `shell-sidebar.spec.ts` (WebKit, mock): a title two lines tall and clipped at the row's full
   width, a short one one line; on hover the controls sit at line 1's right and the title's box does
   not change; a row dropped on a pane's edge (stored `row([s-1] [s-sb-trip])`, `thread.open` then
   `tab.move`) and into a strip before the first tab. 20 of 20 over five repeats after the pointer
-  fix. The other shell specs pass with it.
+  fix. The other shell specs pass with it. After the rebase: a row dropped on a rail (the pane at
+  520px folds; `thread.open --pane p-l`, stored `row([prs,s-sb-trip] [s-1])`; 3 of 3); typing in a
+  composer tab lists a draft named by its label (the tab too), kept through cmd+w and a reload,
+  cleared when emptied; sending from a draft turns its tab into the thread's and its row goes.
+- `make gui-e2e` (4 workers, flag off for the classic specs): 558 passed, 157 skipped, 2 failed,
+  both also failing on `origin/shell`: `shell-spaces.spec.ts` "the top bar drags the window…" (the
+  rename field loses focus; 1 run in 12 on base and on this branch) and `thread-info.spec.ts` "the
+  overlay: off at narrow…" (1 run in 3 of the spec on base; 5 of 5 alone here). `skills.spec.ts`,
+  which failed once in the first run, passed 5 of 5 alone on this branch and on `origin/shell`.
 - End to end with `make drive DAEMON=dev` and `?shell=1` on a scratch home under /tmp and a scratch
   repository under the home folder (both removed after), threads on Sonnet 5.5 medium: a
   supervised thread asked to `touch hello.txt` moved from Active to Needs you ("Permission"), and
@@ -134,13 +187,20 @@ exactly today's.
   new` and `composer draft start` was listed under Active, stayed after `tab close`, reopened from
   its row in the focused pane, and its row's Discard closed its tab and removed it. Open ▸ Diff on
   the closed thread's row opened its diff in the focused pane, linked ("Diff of ● Ask before ls").
-  `settings get layout.smart_swap` printed true; both settings show on the Settings page.
+  `settings get layout.smart_swap` printed true; both settings show on the Settings page. After
+  the rebase, on a fresh dev home: text typed in a composer tab started a draft (the daemon took
+  the window's id), its row appeared, it survived `tab close` and a reload with its text, and
+  deleting the text cleared it back to the empty composer.
 
 ## Gotchas
 
 - The grid's outer drop band is 10px inside its edge: a pane at the grid's left with its first tab
   near that edge puts "a little into the first tab" on the band. Aim 30px into the strip.
 - dnd-kit's `DragMoveEvent.delta` is scroll-adjusted (see Decisions).
+- A fresh home with no projects prefills the home composer with the welcome prompt: typing there
+  starts a draft labelled with the prompt's first line.
+- Module state in `composerDrafts.ts` (pending ids, timers) outlives a vitest test: call
+  `resetComposerDrafts()` in `beforeEach`.
 - `useState(rowCache)` cannot infer a generic's type argument; `keyedRowCache<R>()` is the generic
   one, `rowCache` stays the classic list's.
 - A component file must export only components (fast refresh lint), so the row parts are exported
@@ -153,13 +213,10 @@ exactly today's.
   opens from the title in `NeedsLines` (`ShellRows.tsx`); the collapsed-sidebar control's count is
   the Needs you section's (`buildShellSections(...).main` header `count`, or the same filter as
   `waitsOnUser` over every space). cmd+shift+a already walks the shell's order.
-- **PR 15 (top bar, spaces)**: thread rows as drops on a space tab (the `thread` source; refuse it
-  up front or run `thread.space.move`); Move to space ▸ in the row's menu goes in `ShellRowMenu`'s
-  `lead`; the sidebar already follows `currentSpaceId`. A Needs you row of another space opens its
-  thread in that space by the daemon's rule: decide whether the window switches to it.
-- **The composer**: the shell's composer does not start drafts yet. Typing should run
-  `composer.draft.start` (with its own id), `composer.draft.label` throttled, and
-  `composer.draft.clear` when emptied, with the text stored by draft id (shell-2b-drafts.md). The
-  sidebar lists whatever the layout lists, so nothing here changes then.
+- **Spaces**: a click on a Needs you row of another space opens the thread there by the daemon's
+  rule (`thread.open --focus` switches the window to it).
+- **Drafts**: an attachments-only draft (no text) does not start a draft; nor does a dictated
+  insert that does not go through the editor's onChange. A draft's attachments are lost on a
+  reload, as every composer's are.
 - **Cutover (PR 20/21)**: delete the classic `SidebarList`, `SidebarMenu`'s `pages`, `RowMenu`'s
   `terminal` prop and the classic branch of `sidebarThreadOrder`.
