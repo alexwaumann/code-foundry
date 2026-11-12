@@ -20,12 +20,14 @@ var update = flag.Bool("update", false, "rewrite the expected parts of testdata 
 
 // opCase is one testdata/ops/*.json file (docs/notes/shell-1-layout-model.md).
 type opCase struct {
-	Doc    string          `json:"doc"`
-	State  json.RawMessage `json:"state"`
-	Op     json.RawMessage `json:"op"`
-	Want   json.RawMessage `json:"want,omitempty"`
-	Error  string          `json:"error,omitempty"`
-	Result *caseResult     `json:"result,omitempty"`
+	Doc   string          `json:"doc"`
+	State json.RawMessage `json:"state"`
+	Op    json.RawMessage `json:"op"`
+	// Options are the settings the op runs with (ApplyWith); absent means the defaults.
+	Options *Options        `json:"options,omitempty"`
+	Want    json.RawMessage `json:"want,omitempty"`
+	Error   string          `json:"error,omitempty"`
+	Result  *caseResult     `json:"result,omitempty"`
 }
 
 // caseResult is Result as a case states it: closed tabs by id.
@@ -35,14 +37,28 @@ type caseResult struct {
 	Tab      string   `json:"tab,omitempty"`
 	Existing bool     `json:"existing,omitempty"`
 	Closed   []string `json:"closed,omitempty"`
+	Rule     string   `json:"rule,omitempty"`
+	Kept     []string `json:"kept,omitempty"`
+	Ended    []string `json:"ended,omitempty"`
+	Back     []string `json:"back,omitempty"`
+	Placed   []string `json:"placed,omitempty"`
+	Fresh    []string `json:"fresh,omitempty"`
+	Swapped  []string `json:"swapped,omitempty"`
 }
 
 func toCaseResult(r Result) *caseResult {
-	c := &caseResult{Space: r.Space, Pane: r.Pane, Tab: r.Tab, Existing: r.Existing}
-	for _, t := range r.Closed {
-		c.Closed = append(c.Closed, t.ID)
+	ids := func(tabs []*Tab) []string {
+		var out []string
+		for _, t := range tabs {
+			out = append(out, t.ID)
+		}
+		return out
 	}
-	return c
+	return &caseResult{
+		Space: r.Space, Pane: r.Pane, Tab: r.Tab, Existing: r.Existing, Closed: ids(r.Closed),
+		Rule: r.Rule, Kept: ids(r.Kept), Ended: ids(r.Ended), Back: r.Back, Placed: r.Placed,
+		Fresh: r.Fresh, Swapped: r.Swapped,
+	}
 }
 
 // errorCodes names the errors a case may expect.
@@ -121,7 +137,11 @@ func TestOpCases(t *testing.T) {
 				t.Fatal(err)
 			}
 			seen[op.OpName()] = true
-			next, res, err := Apply(st, op, &SeqIDs{})
+			var opts Options
+			if c.Options != nil {
+				opts = *c.Options
+			}
+			next, res, err := ApplyWith(st, op, &SeqIDs{}, opts)
 			if *update {
 				c.Want, c.Result, c.Error = nil, nil, ""
 				if err != nil {

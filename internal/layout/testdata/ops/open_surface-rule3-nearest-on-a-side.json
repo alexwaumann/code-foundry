@@ -1,0 +1,126 @@
+{
+  "doc": "Rule 3 with two neighbours on the same side: the nearest by centre distance, here the second in layout order.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-r1",
+                  "tabs": [
+                    {
+                      "id": "t-1",
+                      "kind": "diff",
+                      "thread": "th-b",
+                      "params": {"project":"pj","worktree":"w"}
+                    }
+                  ],
+                  "active": "t-1"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-r2",
+                  "tabs": [
+                    {
+                      "id": "t-2",
+                      "kind": "diff",
+                      "thread": "th-c",
+                      "params": {"project":"pj","worktree":"w"}
+                    }
+                  ],
+                  "active": "t-2"
+                }
+              ],
+              "sizes": [0.3,0.7]
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_surface","tab":{"kind":"file","thread":"th-a","params":{"path":"/r/new"}}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-r1",
+                  "tabs": [
+                    {
+                      "id": "t-1",
+                      "kind": "diff",
+                      "thread": "th-b",
+                      "params": {"project":"pj","worktree":"w"}
+                    }
+                  ],
+                  "active": "t-1"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-r2",
+                  "tabs": [
+                    {
+                      "id": "t-2",
+                      "kind": "diff",
+                      "thread": "th-c",
+                      "params": {"project":"pj","worktree":"w"}
+                    },
+                    {"id":"t-n1","kind":"file","thread":"th-a","params":{"path":"/r/new"}}
+                  ],
+                  "active": "t-n1"
+                }
+              ],
+              "sizes": [0.3,0.7]
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-r2","tab":"t-n1","rule":"3"}
+}

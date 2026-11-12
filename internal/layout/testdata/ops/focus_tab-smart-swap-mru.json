@@ -1,0 +1,96 @@
+{
+  "doc": "Smart swap with several diffs of the thread and none shown last: the most recently focused wins over strip order.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-b","kind":"thread","thread":"th-b"}
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-da","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-db","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}},
+                {
+                  "id": "t-db2",
+                  "kind": "diff",
+                  "thread": "th-b",
+                  "params": {"project":"pj","worktree":"w2"}
+                }
+              ],
+              "active": "t-da"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-db2","t-db"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"focus_tab","tab":"t-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-b","kind":"thread","thread":"th-b"}
+              ],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-da","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-db","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}},
+                {
+                  "id": "t-db2",
+                  "kind": "diff",
+                  "thread": "th-b",
+                  "params": {"project":"pj","worktree":"w2"}
+                }
+              ],
+              "active": "t-db2"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-b","t-a","t-db2","t-db"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a","last":{"diff":"t-da"}}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-b","swapped":["p-b"]}
+}
