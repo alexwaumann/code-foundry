@@ -33,8 +33,11 @@ when the first working version is whole. Nothing partial is released.
   only a name that is cut off. Tabs go icon-only when the strip is tight. What a surface repeats in
   its own body is decided per surface; do not stack a second title band under the strip by default.
 - **Pull Requests and Projects are surfaces**, not sidebar rows. One of each per space.
-- **New thread** opens a composer tab, which becomes the thread's tab when the first message is
-  sent. A space with no panes draws the home composer.
+- **The composer** is a tab, at most one per space. New thread focuses the space's composer tab if
+  it has one, and otherwise opens one in the focused pane. Sending from it turns it into the thread's
+  tab. An empty space shows just the composer. A composer that is the only tab in its space is
+  ephemeral: opening a thread replaces it. Once the space has other tabs or panes, the composer tab
+  stays when focus moves away.
 - **Removing a space** always drops its tabs and panes and ends its unlinked terminals. A dialog asks
   what to do with its threads: move them to another space (they appear in that sidebar, nothing
   opens) or archive them all. The last space cannot be removed.
@@ -75,13 +78,12 @@ when the first working version is whole. Nothing partial is released.
   5. There is room: a new pane to the right of the thread's pane (a split of that pane, not of its
      column), at the surface type's default size.
   6. Otherwise: a tab in the thread's own pane.
-  In 3 and 4, a pane that already holds a linked tab of this thread wins, then the nearest. A pane
-  that holds a thread tab never counts as "holding linked surfaces". A pane that is joined is never
-  resized. "Room" means the conversation keeps at least 480px of width. Terminal tabs follow these
+  In 3 and 4, a pane that already holds a linked tab of this thread wins, then the nearest. Threads and
+  other surfaces may share a pane: a pane that also holds a thread tab counts like any other. A pane
+  that is joined is never resized. "Room" means the conversation keeps at least 480px of width. Terminal tabs follow these
   same rules: there is no separate rule for terminals and no "below" default.
-- **Where a thread's own tab opens** (a sidebar click, the CLI, a new thread): the focused pane if
-  its active tab is a thread; otherwise the most recently focused pane that holds a thread tab;
-  otherwise a new pane.
+- **Where a thread's own tab opens** (a sidebar click, the CLI, a new thread): the focused pane,
+  whatever it holds.
 - **A surface that belongs to no thread** (a checkout's diff opened from Projects, a pull request
   opened from Pull Requests) opens as an unlinked tab in the pane of the page it was opened from.
 - **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
@@ -110,6 +112,8 @@ when the first working version is whole. Nothing partial is released.
   terminal tabs show the same hint in the row under the strip.
 - **Terminal tabs** are named by what runs in them, with an icon; idle, by shell and folder. A manual
   name sticks until the automatic name is asked for again.
+- **Closing a terminal's tab by itself ends the terminal**, linked or not. A terminal whose tab
+  closed because its thread was closed keeps running, so reopening the thread brings it back.
 - A terminal restored after a snooze shows its idle name and one line with the last command and
   "Run again". It never reruns by itself. The last command is the foreground job's command line as
   the process list gives it; there is no shell integration.
@@ -177,11 +181,10 @@ release.
 
 ## First load for an existing user
 
-One space. Only the thread last viewed opens (the persisted selection when there is one, otherwise
-the thread with the newest user message), with its side panel tabs and terminals placed by the
-rules. Every other thread stays closed in the sidebar with its old panel tabs and terminals stored as
-its remembered set. Running terminals keep running: a thread's first bottom terminal becomes its
-quick terminal and the others become linked terminal tabs.
+One empty space, showing the composer. No thread is opened for the user. Every thread stays in the
+sidebar with its old side panel tabs and terminals stored as its remembered set, so they come back
+when the thread is opened. Running terminals keep running: a thread's first bottom terminal becomes
+its quick terminal and the others become linked terminal tabs.
 
 ## Not in this change
 
@@ -196,5 +199,8 @@ and this file disagree, this file wins. The interactive toy the plan mentions is
 algorithms only; where it differs from this file (it placed terminals below and by family), this
 file wins. `shell-plan.md` is removed before the merge to `main`.
 
-Open: whether closing a linked terminal's tab by itself ends the terminal (plan question 6).
+Answers to the plan's open questions that differ from its recommendations: placement may join a pane
+that holds a thread tab (question 5); a thread's tab opens in the focused pane (question 2); closing
+a terminal's tab ends it (question 6); there is no "thread last viewed" and no change on `main` for
+it, the first space starts empty (question 3).
 
