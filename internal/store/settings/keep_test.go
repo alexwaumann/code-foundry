@@ -61,6 +61,52 @@ func TestUpdateKeepsValuesWithIssues(t *testing.T) {
 			wantRaw:  map[string]string{"threads.experimental.foo": "1", "later.deep.er.x": "y"},
 		},
 		{
+			name:     "array of tables in a known table",
+			file:     "[[threads.later]]\na = 1\n[[threads.later]]\nb = \"x\"\n",
+			wantText: []string{"# Ignored: unknown setting.\nlater = [{a = 1}, {b = \"x\"}]\n"},
+			wantRaw:  map[string]string{"threads.later": verbatimPrefix + "[{a = 1}, {b = \"x\"}]"},
+		},
+		{
+			name:     "array of tables in an unknown table",
+			file:     "[[later.items]]\nwhen = 2026-11-11\n[[later.items]]\n",
+			wantText: []string{"\n[later]\n", "items = [{when = 2026-11-11}, {}]\n"},
+			wantRaw:  map[string]string{"later.items": verbatimPrefix + "[{when = 2026-11-11}, {}]"},
+		},
+		{
+			name:     "top-level array of tables",
+			file:     "[[loose]]\na = 1\n",
+			wantText: []string{"loose = [{a = 1}]\n"},
+			wantRaw:  map[string]string{"loose": verbatimPrefix + "[{a = 1}]"},
+		},
+		{
+			name:     "nested inline table in a list in a known table",
+			file:     "[threads]\nx = [{p = {q = 1.5, r = 2.0}}, 2, \"s\"]\n",
+			wantText: []string{"x = [{p = {q = 1.5, r = 2.0}}, 2, \"s\"]\n"},
+			wantRaw:  map[string]string{"threads.x": verbatimPrefix + "[{p = {q = 1.5, r = 2.0}}, 2, \"s\"]"},
+		},
+		{
+			name:     "nested inline table in a list in an unknown table",
+			file:     "[later]\nx = [[1, {\"a b\" = true}]]\n",
+			wantText: []string{"\n[later]\n", "x = [[1, {\"a b\" = true}]]\n"},
+			wantRaw:  map[string]string{"later.x": verbatimPrefix + "[[1, {\"a b\" = true}]]"},
+		},
+		{
+			name: "dates and times in a known table",
+			file: "[threads]\nat = 1979-05-27T07:32:00Z\nlocal = 1979-05-27T07:32:00.5\nday = 1979-05-27\nclock = 07:32:00\n",
+			wantText: []string{"at = 1979-05-27T07:32:00Z\n", "local = 1979-05-27T07:32:00.5\n", "day = 1979-05-27\n",
+				"clock = 07:32:00\n"},
+			wantRaw: map[string]string{
+				"threads.at": verbatimPrefix + "1979-05-27T07:32:00Z", "threads.local": verbatimPrefix + "1979-05-27T07:32:00.5",
+				"threads.day": verbatimPrefix + "1979-05-27", "threads.clock": verbatimPrefix + "07:32:00",
+			},
+		},
+		{
+			name:     "date-time in an unknown table",
+			file:     "[later]\nat = 1979-05-27T07:32:00-07:00\n",
+			wantText: []string{"\n[later]\n", "at = 1979-05-27T07:32:00-07:00\n"},
+			wantRaw:  map[string]string{"later.at": verbatimPrefix + "1979-05-27T07:32:00-07:00"},
+		},
+		{
 			name:     "top-level key",
 			file:     "loose = \"yes\"\n",
 			wantText: []string{"loose = \"yes\"\n"},
