@@ -10,7 +10,7 @@ import { fitTabs, TAB_ICON_WIDTH, type TabFit } from "@/shell/geometry/tabFit";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { usePaneDrag, useTabDrag } from "@/shell/drag/draggable";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { useTabRenameStore } from "@/shell/terminalActions";
+import { takeRenameAfterMenu, useTabRenameStore } from "@/shell/terminalActions";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
 import { TabNameField } from "./TerminalTab";
 
@@ -93,8 +93,8 @@ function ShellTabOf(props: { tab: TabEntry; active: boolean; paneFocused: boolea
       </ContextMenuTrigger>
       <ContextMenuContent
         onCloseAutoFocus={(e) => {
-          // A rename started from the menu keeps the keyboard in its field.
-          if (useTabRenameStore.getState().tabId === props.tab.id) e.preventDefault();
+          // A rename picked in the menu starts now, and its field takes the keyboard.
+          if (takeRenameAfterMenu(props.tab.id)) e.preventDefault();
         }}
       >
         {menu(props.tab)}

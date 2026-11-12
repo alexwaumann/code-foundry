@@ -133,6 +133,17 @@ describe("a terminal tab in its strip", () => {
     expect(calls).toEqual([["auto", "t-term"]]);
   });
 
+  it("Rename… opens the name field once the menu has closed", async () => {
+    await seed({ terminal: "term-1" }, "server");
+    render(<PaneTabStrip paneId="p-1" focused />);
+    const first = screen.getAllByTestId("shell-tab")[0];
+    if (!first) throw new Error("no tab");
+    fireEvent.contextMenu(first);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Rename…" }));
+    expect(await screen.findByTestId("shell-tab-name-field")).toBeTruthy();
+    expect(useTabRenameStore.getState().tabId).toBe("t-term");
+  });
+
   it("Automatic name is off while the tab has no manual name", async () => {
     await seed({ terminal: "term-1" });
     render(<PaneTabStrip paneId="p-1" focused />);

@@ -5,7 +5,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
 import { cn } from "@/lib/utils";
 import { closeTabNow } from "@/shell/commands";
-import { autoNameTab, beginTabRename, endTabRename, forgetRan, renameTab, runAgain, terminalOfTab } from "@/shell/terminalActions";
+import { autoNameTab, endTabRename, forgetRan, renameAfterMenuCloses, renameTab, runAgain, terminalOfTab } from "@/shell/terminalActions";
 import { useTerminalTabName } from "@/shell/terminalTab";
 import type { TabEntry } from "@/stores/layout";
 import { useTerminalsStore } from "@/stores/terminals";
@@ -146,7 +146,7 @@ export function TerminalTabMenu({ tab }: { tab: TabEntry }) {
     <>
       <ContextMenuItem
         onSelect={() => {
-          beginTabRename(tab.id);
+          renameAfterMenuCloses(tab.id);
         }}
       >
         Rename…

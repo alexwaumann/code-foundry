@@ -27,6 +27,21 @@ export function endTabRename(): void {
   useTabRenameStore.setState({ tabId: "" });
 }
 
+/** A rename picked in a tab's context menu, started once the menu has closed (its focus trap would take the field's focus). */
+let renameAfterMenu = "";
+
+export function renameAfterMenuCloses(tabId: string): void {
+  renameAfterMenu = tabId;
+}
+
+/** As the tab's menu closes: starts the rename picked in it, if any (true: the field takes the focus, not the trigger). */
+export function takeRenameAfterMenu(tabId: string): boolean {
+  if (renameAfterMenu !== tabId) return false;
+  renameAfterMenu = "";
+  beginTabRename(tabId);
+  return true;
+}
+
 /** The terminal id a terminal tab shows. */
 export function terminalOfTab(tab: Pick<TabEntry, "params">): string {
   return tab.params.terminal ?? "";
