@@ -46,7 +46,8 @@ did not work there, each silently.
   be exercised by the e2e suite. The script covers what a user does (clicks) and is tested in
   a real WebKit (`e2e/page-frame.spec.ts`).
 - **A page's own links still navigate the frame.** Pages made of several files are in use
-  (`e2e/file-tabs.spec.ts` follows one). The bridge still does not follow them.
+  (`e2e/file-tabs.spec.ts` follows one). The bridge follows them since
+  `leftovers-pages.md`.
 - **Downloads are reported, not built.** Saving a file needs a place to save it and a native
   delegate or a bridge verb. Not decided.
 

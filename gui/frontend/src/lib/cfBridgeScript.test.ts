@@ -38,7 +38,7 @@ interface Cf {
 /** The nonce the fake frame's URL carries (HtmlFrame's `#cf=<nonce>`). */
 const N = "n0nce";
 
-function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; hash?: string } = {}) {
+function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: boolean; stylesheet?: boolean; hash?: string; url?: string; navigation?: object } = {}) {
   const listeners: Record<string, ((e: unknown) => void)[]> = {};
   const posted: { m: Msg; origin: string }[] = [];
   const parent = {
@@ -53,6 +53,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
     console,
   };
   win.parent = opts.embedded === false ? win : parent;
+  if (opts.navigation) win.navigation = opts.navigation;
   const rootStyle: Record<string, string> = {};
   const doc = {
     body: { scrollHeight: 120 },
@@ -90,7 +91,19 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
   // The script under test, as a page would run it, with these globals.
   // oxlint-disable-next-line typescript/no-implied-eval
   const run = new Function("window", "navigator", "document", "localStorage", "ResizeObserver", "location", SRC) as (...globals: unknown[]) => void;
-  run(win, nav, doc, localStorage, ResizeObserver, { hash: opts.hash ?? `#cf=${N}` });
+  const where = opts.url === undefined ? null : new URL(opts.url);
+  const went: string[] = [];
+  const loc = where
+    ? {
+        href: where.href,
+        origin: where.origin,
+        pathname: where.pathname,
+        hash: where.hash,
+        assign: (u: string) => went.push(`assign ${u}`),
+        replace: (u: string) => went.push(`replace ${u}`),
+      }
+    : { hash: opts.hash ?? `#cf=${N}` };
+  run(win, nav, doc, localStorage, ResizeObserver, loc);
   const cf = win.cf as Cf;
   const send = (data: unknown, source: unknown = parent) => {
     for (const fn of listeners.message ?? []) fn({ data, source });
@@ -110,7 +123,7 @@ function load(opts: { userActivation?: { isActive: boolean } | null; embedded?: 
     });
   };
   const sent = (type: string) => posted.filter((p) => p.m.type === type).map((p) => p.m);
-  return { cf, posted, send, ready, sent, fire, nav, store, rootStyle, observed };
+  return { cf, posted, send, ready, sent, fire, nav, store, rootStyle, observed, went };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -554,5 +567,87 @@ describe("bridge.js", () => {
     error.mockRestore();
     h.send({ type: "cf:storage", values: { a: "1", c: "3" } });
     expect(s.get("a")).toBe(1);
+  });
+});
+
+describe("bridge.js: a page's own next document", () => {
+  const PAGE = `http://127.0.0.1:9246/preview/g1/docs/page.html#cf=${N}`;
+
+  /** A fake Navigation API: the script's navigate listener, and a navigate event it can cancel. */
+  function navigation() {
+    const fns: ((e: unknown) => void)[] = [];
+    const navigate = (url: string, over: Record<string, unknown> = {}) => {
+      const e = { cancelable: true, navigationType: "push", destination: { url, sameDocument: false }, formData: null, downloadRequest: null, prevented: false, preventDefault: () => (e.prevented = true), ...over };
+      for (const fn of fns) fn(e);
+      return e.prevented;
+    };
+    return { api: { addEventListener: (t: string, fn: (e: unknown) => void) => t === "navigate" && fns.push(fn) }, navigate, fns };
+  }
+
+  it("sends a navigation to another file under its grant on with the frame's nonce, after the file's own fragment", () => {
+    const n = navigation();
+    const h = load({ url: PAGE, navigation: n.api });
+    expect(n.navigate("http://127.0.0.1:9246/preview/g1/docs/detail.html")).toBe(true);
+    expect(n.navigate("http://127.0.0.1:9246/preview/g1/other/rows.html#top", { navigationType: "replace" })).toBe(true);
+    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html#cf=${N}`, `replace http://127.0.0.1:9246/preview/g1/other/rows.html#top&cf=${N}`]);
+  });
+
+  it.each([
+    ["another grant", "http://127.0.0.1:9246/preview/g2/docs/page.html", {}],
+    ["another site", "https://example.com/preview/g1/docs/page.html", {}],
+    ["another port", "http://127.0.0.1:9999/preview/g1/docs/page.html", {}],
+    ["outside the previews", "http://127.0.0.1:9246/cf/theme.json", {}],
+    ["a URL with a nonce already", `http://127.0.0.1:9246/preview/g1/docs/detail.html#cf=${N}`, {}],
+    ["the same document", "http://127.0.0.1:9246/preview/g1/docs/page.html#part", { destination: { url: "http://127.0.0.1:9246/preview/g1/docs/page.html#part", sameDocument: true } }],
+    ["a form's POST", "http://127.0.0.1:9246/preview/g1/docs/detail.html", { formData: {} }],
+    ["a download", "http://127.0.0.1:9246/preview/g1/docs/rows.csv", { downloadRequest: "rows.csv" }],
+    ["a reload", "http://127.0.0.1:9246/preview/g1/docs/page.html", { navigationType: "reload" }],
+    ["a step back", "http://127.0.0.1:9246/preview/g1/docs/detail.html", { navigationType: "traverse" }],
+    ["one it may not cancel", "http://127.0.0.1:9246/preview/g1/docs/detail.html", { cancelable: false }],
+  ])("lets a navigation go as it is: %s", (_name, url, over) => {
+    const n = navigation();
+    const h = load({ url: PAGE, navigation: n.api });
+    expect(n.navigate(url, over)).toBe(false);
+    expect(h.went).toEqual([]);
+  });
+
+  it.each([
+    ["no nonce", "http://127.0.0.1:9246/preview/g1/docs/page.html"],
+    ["no grant", `http://127.0.0.1:9246/page.html#cf=${N}`],
+  ])("carries nothing from a page with %s", (_name, url) => {
+    const n = navigation();
+    load({ url, navigation: n.api });
+    expect(n.fns).toHaveLength(0);
+  });
+
+  /** A click on a link to href, as WebKit without the Navigation API dispatches it. */
+  function click(href: string, attrs: Record<string, string> = {}, over: Record<string, unknown> = {}) {
+    const a = { href: new URL(href, PAGE).href, hasAttribute: (k: string) => k in attrs, getAttribute: (k: string) => attrs[k] ?? null };
+    const target = { closest: (sel: string) => (sel.includes("a[href]") ? a : null) };
+    const e = { target, button: 0, isTrusted: true, defaultPrevented: false, prevented: false, preventDefault: () => (e.prevented = true), ...over };
+    return e;
+  }
+
+  it("without the Navigation API, follows a plain click on a link to another file of its own with the nonce", () => {
+    const h = load({ url: PAGE });
+    const e = click("detail.html#rows");
+    h.fire("click", e);
+    expect(e.prevented).toBe(true);
+    expect(h.went).toEqual([`assign http://127.0.0.1:9246/preview/g1/docs/detail.html#rows&cf=${N}`]);
+  });
+
+  it.each([
+    ["another grant", click("/preview/g2/page.html")],
+    ["another site", click("https://example.com/")],
+    ["a new window", click("detail.html", { target: "_blank" })],
+    ["a download", click("rows.csv", { download: "" })],
+    ["a click the page took", click("detail.html", {}, { defaultPrevented: true })],
+    ["a click with a modifier", click("detail.html", {}, { metaKey: true })],
+    ["a middle click", click("detail.html", {}, { button: 1 })],
+  ])("without the Navigation API, leaves a click alone: %s", (_name, e) => {
+    const h = load({ url: PAGE });
+    h.fire("click", e);
+    expect(e.prevented).toBe(false);
+    expect(h.went).toEqual([]);
   });
 });
