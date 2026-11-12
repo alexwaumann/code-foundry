@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // ViewPullRequests is the ShowView name of the Pull Requests page.
@@ -109,6 +110,10 @@ type ViewDeps struct {
 	// Workspaces resolves view.projects --workspace (an id or a name) to its id. Nil: the
 	// value goes to the GUI as given.
 	Workspaces WorkspaceLister
+	// Layout is the shell window's layout: the item verbs, view.pullrequests and
+	// view.projects open their tabs in it, and view.thread-diff moves between a thread and
+	// its diff (commands_view_open.go). Nil: the classic window's ShowView alone.
+	Layout layoutstore.Store
 }
 
 // noFileEdits is FileEdits when nothing backs it.
@@ -134,11 +139,19 @@ func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
 
 // showPageWith is showPage with ShowView params (view.projects --project: which page).
 func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[string]string) (Result, error) {
-	fromThread := uctx.ActiveView == "" && uctx.CallerThreadID != ""
-	if fromThread && !a.Bool("focus") && d.Viewed != nil && d.Emitter.Windows() > 0 && !d.Viewed(uctx.CallerThreadID) {
-		return Result{}, connect.NewError(connect.CodeFailedPrecondition, errNotViewed)
+	if err := d.refusePage(uctx, a); err != nil {
+		return Result{}, err
 	}
 	return EmitTo(d.Emitter, showViewIntent(name, "", params)).CLIResult(uctx), nil
+}
+
+// refusePage is a page verb's refusal from a thread's CLI while no window shows that thread.
+func (d ViewDeps) refusePage(uctx Context, a Args) error {
+	fromThread := uctx.ActiveView == "" && uctx.CallerThreadID != ""
+	if fromThread && !a.Bool("focus") && d.Viewed != nil && d.Emitter.Windows() > 0 && !d.Viewed(uctx.CallerThreadID) {
+		return connect.NewError(connect.CodeFailedPrecondition, errNotViewed)
+	}
+	return nil
 }
 
 // RegisterView registers the View category's verbs, all emitted as UiIntent.ShowView:
@@ -148,14 +161,16 @@ func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[str
 //   - actions on each window's state: view.bottom.toggle, view.back, view.forward,
 //     thread.previous and thread.next;
 //   - the side panel verbs (commands_view_thread.go), which act on a thread's panel:
-//     view.panel.toggle, expand, new-tab and split (view.panel.mcp lives with its
+//     view.panel.toggle, expand, new-tab and split (view.open.mcp lives with its
 //     domain);
-//   - the item verbs (commands_view_items.go): view.panel.file, view.panel.diff and
-//     view.panel.pr;
+//   - the item verbs (commands_view_items.go): view.open.file, view.open.diff and
+//     view.open.pr, each also a tab of the shell window's layout (commands_view_open.go),
+//     with its classic view.panel.<item> alias;
 //   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
-//     conversation (category Thread), and view.panel.page (commands_view_panel_page.go),
-//     which shows one in its side panel only, and view.panel.gallery
+//     conversation (category Thread), and view.open.page (commands_view_panel_page.go),
+//     which shows one in a tab only, and view.open.gallery
 //     (commands_view_panel_gallery.go), which shows a set of images there;
+//   - view.thread-diff (commands_view_open.go), the key between a thread and its diff;
 //   - composer.history (commands_view_composer.go), the Previous prompts picker, and
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
@@ -196,6 +211,11 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		}
 	}
 	pageArgs := []ArgSpec{pageFocusArg}
+	pageTab := func(name, kind string) func(context.Context, Context, Args) (Result, error) {
+		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			return d.showPageTab(ctx, uctx, a, name, kind, nil)
+		}
+	}
 	cmds := []Command{
 		{
 			Name:        "view.usage",
@@ -211,11 +231,11 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:        "view.pullrequests",
 			Page:        PageState,
 			Title:       "Show Pull Requests",
-			Description: "Show the Pull Requests page in every app window: pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
+			Description: "Show the Pull Requests page in every app window (the shell window: its tab in the current space): pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
 			Category:    "View",
 			Keybindings: []string{"cmd+shift+d"},
-			Args:        pageArgs,
-			Run:         page(ViewPullRequests),
+			Args:        []ArgSpec{pageFocusArg, openPaneArg},
+			Run:         pageTab(ViewPullRequests, tabPRs),
 		},
 		d.projectsCommand(),
 		d.settingsCommand(),
@@ -316,6 +336,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:         show(ViewThreadNext),
 		},
 	}
-	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.panelGalleryCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
+	cmds = append(append(cmds, d.itemCommands()...), withAliases(d.panelPageCommand(), d.panelGalleryCommand())...)
+	cmds = append(cmds, d.threadDiffCommand(), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
 	return r.RegisterAll(append(append(append(cmds, d.threadFindCommands()...), d.terminalFindCommands()...), d.fileSearchCommands()...)...)
 }

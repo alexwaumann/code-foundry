@@ -1,0 +1,335 @@
+package command
+
+import (
+	"cmp"
+	"context"
+	"fmt"
+	"maps"
+	"path/filepath"
+	"strings"
+
+	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	core "github.com/alexwaumann/code-foundry/internal/layout"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
+)
+
+// view.open.*: a thread's surfaces as tabs of the shell window's layout (docs/notes/shell-model.md,
+// "Linked surfaces"; docs/notes/shell-plan.md section 2.9; docs/notes/shell-7-view-open.md).
+//
+// Each verb checks its item as it always has, then opens a tab linked to the thread through the
+// layout's open_surface, placed by the rules (or focused where it is, when a tab of the same
+// identity is open), and still sends the classic window its ShowView. So both windows work while
+// the shell is built: the classic window ignores the layout, and the shell ignores panel.*
+// ShowViews. The view.panel.<item> names stay registered as unlisted aliases of the same command
+// for one stable release.
+//
+// Focus follows the layout verbs' rule: the user's call (the app, the CLI outside a thread)
+// focuses the tab; a thread's never does without --focus.
+
+// Tab kinds of the item verbs (internal/layout/identity.go).
+const (
+	tabFile    = "file"
+	tabDiff    = "diff"
+	tabPR      = "pullrequest"
+	tabGallery = "gallery"
+	tabMcp     = "mcp"
+	tabPRs     = "prs"
+	tabProjs   = "projects"
+)
+
+// tabs opens surfaces as tabs of the layout. A nil store opens nothing: a daemon without a
+// layout, or a test of the classic half alone.
+type tabs struct{ store layoutstore.Store }
+
+// open opens tb by the placement rules, or in pane when one is given (a pane's "+" menu),
+// taking the user's focus when focus.
+func (o tabs) open(ctx context.Context, tb *core.Tab, pane string, focus bool) (*core.Result, error) {
+	if o.store == nil {
+		return nil, nil
+	}
+	c, err := layout{store: o.store}.apply(ctx, &core.OpenSurface{Tab: tb, Pane: pane, Focus: focus}, !focus)
+	if err != nil {
+		return nil, fmt.Errorf("could not open its tab: %w", err)
+	}
+	return &c.Result, nil
+}
+
+// openLead is how the item verbs' descriptions say where the tab goes.
+const openLead = "beside a thread (from a thread: its own; in the app: the selected one; the classic window: its side panel), " +
+	"or focus it where it is when the same one is open: "
+
+// openThreadArg is the item verbs' --thread.
+var openThreadArg = ArgSpec{
+	Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
+	Description: "Thread the tab belongs to; it opens beside it without taking the user's focus " +
+		"(default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app: the selected thread)" + IDHelp,
+}
+
+// openFocusArg is the item verbs' --focus.
+var openFocusArg = ArgSpec{Name: "focus", Type: Bool,
+	Description: "Also take the user's focus to the tab (the classic window: select the thread first); only when the user asked to be taken there"}
+
+// openPaneArg is the --pane of the verbs that open a tab.
+var openPaneArg = paneIDArg("pane", "Open the tab in this pane (the pane's + menu); a linked tab that is already open is focused where it is")
+
+// itemTab is the tab of kind an item verb opens for thread, showing params. Its title is what
+// `layout show` names it by until the window retitles it.
+func itemTab(kind, thread string, params map[string]string) *core.Tab {
+	tb := &core.Tab{Kind: kind, Thread: thread, Params: maps.Clone(params)}
+	switch kind {
+	case tabFile:
+		tb.Title = params["title"]
+		if tb.Title == "" && params["path"] != "" {
+			tb.Title = filepath.Base(params["path"])
+		}
+	case tabPR:
+		tb.Title = "#" + params["number"]
+	case tabGallery, tabDiff:
+		tb.Title = params["title"]
+	}
+	return tb
+}
+
+// showTab runs an item verb for thread id: check (the item's own check, which gives the tab's
+// params or refuses), then the thread's tab of kind in the layout, then the classic window's
+// ShowView view, scoped to the thread as before. A refusal changes neither window.
+func showTab(ctx context.Context, o tabs, t ThreadGetter, e Emitter, uctx Context, a Args, id, view, kind string, check panelCheck) (Result, error) {
+	var placed *core.Result
+	focus := wantsFocus(uctx, a)
+	place := func(ctx context.Context, th *v1.Thread, a Args) (map[string]string, error) {
+		var params map[string]string
+		if check != nil {
+			p, err := check(ctx, th, a)
+			if err != nil {
+				return nil, err
+			}
+			params = p
+		}
+		r, err := o.open(ctx, itemTab(kind, id, params), a.String("pane"), focus)
+		if err != nil {
+			return nil, err
+		}
+		placed = r
+		return params, nil
+	}
+	res, err := showScoped(ctx, t, e, uctx, a, id, view, place)
+	if err != nil || placed == nil {
+		return res, err
+	}
+	out, _ := res.JSON.(PanelResult)
+	out.placed(placed, focus)
+	res.JSON = out
+	if uctx.ActiveView == "" {
+		res.Message = out.message()
+	}
+	return res, nil
+}
+
+// showPanelTab is showTab for a verb that also runs unscoped: the app's own call without
+// --thread acts on each window's selection in the classic window (showPanel), and its tab goes
+// to the app's active thread.
+func showPanelTab(ctx context.Context, o tabs, t ThreadGetter, e Emitter, uctx Context, a Args, view, kind string) (Result, error) {
+	if id := panelThread(uctx, a); id != "" {
+		return showTab(ctx, o, t, e, uctx, a, id, view, kind, nil)
+	}
+	if id := a.String("thread"); id != "" {
+		if _, err := o.open(ctx, itemTab(kind, id, nil), a.String("pane"), wantsFocus(uctx, a)); err != nil {
+			return Result{}, err
+		}
+	}
+	return showPanel(ctx, t, e, uctx, a, view, nil)
+}
+
+// showItem is showTab with the view verbs' dependencies.
+func (d ViewDeps) showItem(ctx context.Context, uctx Context, a Args, id, view, kind string, check panelCheck) (Result, error) {
+	return showTab(ctx, tabs{d.Layout}, d.Thread, d.Emitter, uctx, a, id, view, kind, check)
+}
+
+// placed records where the layout put the verb's tab.
+func (r *PanelResult) placed(c *core.Result, focus bool) {
+	r.Tab, r.Pane, r.Space, r.Rule, r.Existing, r.TabFocused = c.Tab, c.Pane, c.Space, c.Rule, c.Existing, focus
+}
+
+// rulePhrases say how placement chose a tab's pane (core.Result.Rule).
+var rulePhrases = map[string]string{
+	"2": "beside the thread's other tabs", "3": "in a pane next to the thread's", "4": "in a pane of linked tabs",
+	"5": "in a new pane right of the thread", "6": "in the thread's own pane", "pane": "in the pane asked for",
+	"focused": "in the focused pane",
+}
+
+// tabMessage is an item verb's text when it placed a tab: where, and what the classic window got.
+func (r PanelResult) tabMessage() string {
+	msg := fmt.Sprintf("opened tab %s in pane %s for thread %s", r.Tab, r.Pane, r.Thread)
+	if p := rulePhrases[r.Rule]; p != "" {
+		msg += " (" + p + ")"
+	}
+	if r.Existing {
+		msg = fmt.Sprintf("thread %s's tab %s is already open in pane %s (nothing new opened)", r.Thread, r.Tab, r.Pane)
+	}
+	if r.TabFocused {
+		msg += "; it has the user's focus"
+	}
+	if r.Windows == 0 {
+		return msg + "; no app window is open"
+	}
+	return msg + fmt.Sprintf("; windows=%d", r.Windows)
+}
+
+// openAlias is the classic name of a view.open verb: the same command, kept for the threads and
+// pages that know it, out of the palette and the agents' index.
+func openAlias(c Command) Command {
+	a := c
+	a.Name = "view.panel." + strings.TrimPrefix(c.Name, "view.open.")
+	a.NoIndex, a.NoPalette = true, true
+	a.Description = "The old name of " + c.Name + ", kept for one stable release. " + c.Description
+	return a
+}
+
+// withAliases is cmds, each followed by its classic alias.
+func withAliases(cmds ...Command) []Command {
+	out := make([]Command, 0, 2*len(cmds))
+	for _, c := range cmds {
+		out = append(out, c, openAlias(c))
+	}
+	return out
+}
+
+// pageTab opens a page's tab (the Pull Requests or Projects page, one per space) in the current
+// space, or in --pane's. params nil keeps what an open tab shows.
+func (d ViewDeps) pageTab(ctx context.Context, uctx Context, a Args, kind string, params map[string]string) (*core.Result, error) {
+	return tabs{d.Layout}.open(ctx, &core.Tab{Kind: kind, Params: maps.Clone(params)}, a.String("pane"), wantsFocus(uctx, a))
+}
+
+// PageTabResult is a page verb's JSON when the layout opened its tab: EmitResult's counts, and
+// where the tab is.
+type PageTabResult struct {
+	Windows   int    `json:"windows"`
+	Receivers int    `json:"receivers"`
+	Tab       string `json:"tab"`
+	Pane      string `json:"pane"`
+	Space     string `json:"space"`
+	Existing  bool   `json:"existing,omitempty"`
+}
+
+// showPageTab runs a page verb in both windows: the refusal from a thread no window shows, then
+// the page's tab of kind, then the classic window's ShowView.
+func (d ViewDeps) showPageTab(ctx context.Context, uctx Context, a Args, name, kind string, params map[string]string) (Result, error) {
+	if err := d.refusePage(uctx, a); err != nil {
+		return Result{}, err
+	}
+	placed, err := d.pageTab(ctx, uctx, a, kind, params)
+	if err != nil {
+		return Result{}, err
+	}
+	sent := EmitTo(d.Emitter, showViewIntent(name, "", params))
+	res := sent.CLIResult(uctx)
+	if placed == nil {
+		return res, nil
+	}
+	res.JSON = PageTabResult{Windows: sent.Windows, Receivers: sent.Receivers, Tab: placed.Tab, Pane: placed.Pane, Space: placed.Space, Existing: placed.Existing}
+	if res.Message == "" {
+		return res, nil
+	}
+	res.Message = fmt.Sprintf("opened %s tab %s in pane %s of space %s", kind, placed.Tab, placed.Pane, placed.Space)
+	if placed.Existing {
+		res.Message = fmt.Sprintf("%s tab %s is already open in pane %s of space %s", kind, placed.Tab, placed.Pane, placed.Space)
+	}
+	res.Message += "; " + sent.windows()
+	return res, nil
+}
+
+// threadDiffCommand is view.thread-diff, the key for "the thread's diff, and back": from a
+// thread's tab or any surface linked to it, the thread's diff (its checkout's), focused; from
+// that diff, the thread's tab. The shell binds it to cmd+shift+d at the cutover.
+func (d ViewDeps) threadDiffCommand() Command {
+	l := layout{store: d.Layout}
+	return Command{
+		Name:  "view.thread-diff",
+		Page:  PageState,
+		Title: "Thread Diff",
+		Description: "Go to the focused thread's diff, opening it beside the thread when it is not open; from that diff, go back " +
+			"to the thread. Acts on the focused tab (--tab: that one); it only moves the user's focus.",
+		Category: "View",
+		Args:     []ArgSpec{tabIDArg("The tab to start from (default: the focused tab)"), focusArg},
+		// The classic window's cmd+shift+d is view.pullrequests; the shell maps this one (PR 20).
+		NoPalette: true, NoKeybinding: true, NoIndex: true,
+		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			if err := onlyFocus(uctx, a, "view.thread-diff"); err != nil {
+				return Result{}, err
+			}
+			snap, err := l.state()
+			if err != nil {
+				return Result{}, err
+			}
+			_, _, tb, err := l.tab(snap.State, uctx, a, "tab")
+			if err != nil {
+				return Result{}, err
+			}
+			thread := tb.Thread
+			switch {
+			case thread == "":
+				return Result{}, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("tab %s belongs to no thread", tb.ID))
+			case tb.Kind == tabDiff:
+				c, err := l.apply(ctx, &core.OpenThread{Thread: thread, Focus: true}, false)
+				if err != nil {
+					return Result{}, err
+				}
+				return layoutResult(uctx, c, fmt.Sprintf("back to thread %s (tab %s)", thread, c.Result.Tab)), nil
+			}
+			params, err := d.ownDiff(ctx, thread)
+			if err != nil {
+				return Result{}, err
+			}
+			want := itemTab(tabDiff, thread, params)
+			var op core.Op = &core.OpenSurface{Tab: want, Focus: true}
+			open := openDiff(snap.State, want)
+			if open != "" {
+				// Focus it as it is: the user's choices in it (a file, the sides) stay.
+				op = &core.FocusTab{Tab: open}
+			}
+			c, err := l.apply(ctx, op, false)
+			if err != nil {
+				return Result{}, err
+			}
+			return layoutResult(uctx, c, fmt.Sprintf("thread %s's diff is tab %s", thread, cmp.Or(open, c.Result.Tab))), nil
+		},
+	}
+}
+
+// ownDiff is the params of a thread's own diff: its checkout, everything the branch changed.
+func (d ViewDeps) ownDiff(ctx context.Context, thread string) (map[string]string, error) {
+	if d.Thread == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("no threads here"))
+	}
+	res, err := d.Thread.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: thread}))
+	if err != nil {
+		return nil, err
+	}
+	t := res.Msg.GetThread()
+	if t.GetProjectId() == "" || t.GetWorktreePath() == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("thread %s runs in no project worktree, so it has no diff", thread))
+	}
+	return map[string]string{"project": t.GetProjectId(), "worktree": t.GetWorktreePath(), "own": "1"}, nil
+}
+
+// openDiff is the open tab with want's identity in its thread's space, "" when there is none.
+func openDiff(st *core.State, want *core.Tab) string {
+	_, key, err := core.Identify(want)
+	if err != nil {
+		return ""
+	}
+	sp := st.Space(st.SpaceOf(want.Thread))
+	if sp == nil {
+		return ""
+	}
+	for _, p := range core.Panes(sp.Root) {
+		for _, tb := range p.Tabs {
+			if tb.Key == key {
+				return tb.ID
+			}
+		}
+	}
+	return ""
+}

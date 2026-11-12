@@ -123,7 +123,8 @@ type Deps struct {
 	FileDiffs command.WorktreeComparer
 	// Layout backs layout.show, space.*, pane.*, tab.*, thread.open, thread.close and
 	// thread.space.move (which also use Thread). Nil registers them failing with
-	// Unimplemented.
+	// Unimplemented. The view.open.* verbs, view.pullrequests, view.projects, thread.focus and
+	// ui.focus.terminal also open their tabs in it; nil: the classic window's intent alone.
 	Layout layoutstore.Store
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
 	// for daemon.capabilities, which also reads Daemon, Settings, Memory, Plugin, Skills
@@ -177,7 +178,7 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
-		command.RegisterUI(r, d.Emitter),
+		command.RegisterUI(r, d.Emitter, command.WithTerminalTabs(d.Layout, d.Terminal)),
 		command.RegisterPresence(r, d.Presence),
 		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste, Layout: d.Layout}),
 		command.RegisterProject(r, d.Project, d.NotGit),
@@ -189,7 +190,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project, Workspace: d.Workspace}),
 		command.RegisterThreadReports(r, d.Thread),
 		command.RegisterThread(r, d.Thread),
-		command.RegisterMcp(r, d.Thread, d.Emitter),
+		command.RegisterMcp(r, d.Thread, d.Emitter, command.WithMcpLayout(d.Layout)),
 		command.RegisterAgents(r, d.Thread, d.Emitter),
 		command.RegisterSlash(r, d.Thread),
 		command.RegisterGitOps(r, d.GitOps),
@@ -207,7 +208,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterView(r, command.ViewDeps{
 			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, FileEdits: d.FileEdits, Diffs: d.FileDiffs,
 			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread, Settings: d.Settings,
-			Workspaces: d.Workspace,
+			Workspaces: d.Workspace, Layout: d.Layout,
 		}),
 		command.RegisterFileExport(r, command.FileExportDeps{Thread: d.Thread, Files: d.FileExports}),
 		command.RegisterUsage(r, d.Thread),

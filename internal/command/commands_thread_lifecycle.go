@@ -304,7 +304,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Thread",
-			Description:  "Show a thread in every connected window.",
+			Description:  "Show a thread in every connected window: the shell window switches to the thread's space and focuses its tab, opening it when it is closed (thread.open --focus).",
 			Category:     "Thread",
 			NoKeybinding: true,
 			Args:         []ArgSpec{idArg},
@@ -313,9 +313,18 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 				if err := r.known(ctx, ThreadID, a.String("id")); err != nil {
 					return Result{}, err
 				}
+				tab, err := o.focusThreadTab(ctx, a.String("id"))
+				if err != nil {
+					return Result{}, err
+				}
 				// Explicit: asked for, so the window selects even a child hidden from the
 				// sidebar (docs/notes/child-never-takes-view.md).
-				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id"), Explicit: true}}}).Result(), nil
+				sent := EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id"), Explicit: true}}})
+				res := sent.Result()
+				if tab != "" {
+					res.Message = tab + sent.windows()
+				}
+				return res, nil
 			},
 		},
 		Command{

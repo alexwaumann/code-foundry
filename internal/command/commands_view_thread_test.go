@@ -13,6 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 )
 
 // panelVerbs are every verb that acts on a side panel and follows the thread, with the
@@ -44,6 +45,8 @@ type panelDeps struct {
 	diffs    *commandtest.FileDiffs
 	projects *commandtest.Project
 	prs      *commandtest.PullRequestChecks
+	layout   *layouttest.Fake
+	terms    *commandtest.Terminal
 }
 
 // panelRegistry registers every command, with threads read from th and one window open.
@@ -77,6 +80,12 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	}
 	if d.prs != nil {
 		deps.PullRequestChecks.Gh = d.prs
+	}
+	if d.layout != nil {
+		deps.Layout = d.layout
+	}
+	if d.terms != nil {
+		deps.Terminal = d.terms
 	}
 	if err := all.Register(reg, deps); err != nil {
 		t.Fatal(err)

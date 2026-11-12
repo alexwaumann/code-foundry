@@ -89,6 +89,15 @@ type PanelResult struct {
 	Thread    string `json:"thread"`
 	// Focused: --focus selected the thread in the windows (only with a window open).
 	Focused bool `json:"focused,omitempty"`
+	// Tab, Pane and Space are where the shell window's layout has the verb's tab
+	// (commands_view_open.go): Rule says how placement chose the pane, Existing that a tab of
+	// the same identity was open and is used, TabFocused that it took the user's focus.
+	Tab        string `json:"tab,omitempty"`
+	Pane       string `json:"pane,omitempty"`
+	Space      string `json:"space,omitempty"`
+	Rule       string `json:"rule,omitempty"`
+	Existing   bool   `json:"existing,omitempty"`
+	TabFocused bool   `json:"tab_focused,omitempty"`
 }
 
 // showViewIntent is a ShowView of name, scoped to thread when it is not "", with params.
@@ -148,8 +157,11 @@ func showScoped(ctx context.Context, t ThreadGetter, e Emitter, uctx Context, a 
 }
 
 // message is a scoped panel verb's text: "windows=1 thread=s-…" (plus "focused"), or
-// NoWindowMessage.
+// NoWindowMessage; with a tab in the layout, tabMessage.
 func (r PanelResult) message() string {
+	if r.Tab != "" {
+		return r.tabMessage()
+	}
 	if r.Windows == 0 {
 		return NoWindowMessage
 	}

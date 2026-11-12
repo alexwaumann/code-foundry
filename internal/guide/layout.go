@@ -22,8 +22,10 @@ func writeLayoutConventions(w io.Writer) {
 	p("- Never move the user's focus: your verbs leave it where it is. A tab you open or move becomes active in its own")
 	p("  pane, and waits behind the focused tab in the focused pane. Pass `--focus` only when the user asked to be taken")
 	p("  there; `space switch` and `pane focus` do nothing else, so they need it.")
-	p("- Prefer letting placement work: a thread's linked surfaces open beside it by the app's rules. Arrange by hand")
-	p("  (`tab move`, `pane move`, `pane resize`) only when the user asked for an arrangement.")
+	p("- Prefer letting placement work: `view open file|diff|pr|page|gallery|mcp` opens a thread's surface as a tab linked")
+	p("  to it, beside it by the app's rules; opening the same one again (a file's path, a pull request, a checkout's")
+	p("  diff) uses the open tab. Arrange by hand (`tab move`, `pane move`, `pane resize`) only when the user asked for")
+	p("  an arrangement.")
 	p("- `thread close` closes a thread's tab from its space (never archives it); its linked tabs are remembered and")
 	p("  come back with `thread open`.")
 }

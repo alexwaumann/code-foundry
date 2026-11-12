@@ -219,7 +219,7 @@ func TestCapabilitiesGroups(t *testing.T) {
 			jsonLen: map[string]int{"pages": 5}},
 		{group: "panel",
 			has: []string{"panel: 6 surfaces.", "--thread (default: the thread you run in)",
-				"  view.panel.mcp           the thread's MCP servers", "  view.panel.file ", "  view.panel.diff ", "  view.panel.pr ", "  view.panel.page ", "  view.panel.gallery ", "view.panel.page (--path, --title)", "renders as a chip", ".html files render there interactively", "view.inline <path> (--title, --panel) shows an .html page inline", "/cf/bridge.js sizes the card",
+				"  view.open.mcp            the thread's MCP servers", "  view.open.file ", "  view.open.diff ", "  view.open.pr ", "  view.open.page ", "  view.open.gallery ", "view.open.page (--path, --title)", "old view.panel.<item> names still work", "renders as a chip", ".html files render there interactively", "view.inline <path> (--title, --panel) shows an .html page inline", "/cf/bridge.js sizes the card",
 				"Plugin surfaces (their show verb acts on each window's selection, not a thread):\n  plugin.gh-actions.show.runs", "Actions (thread scope, from the plugin gh-actions)\n",
 				"Panel actions (they flip state you cannot see): view.panel.", "view.panel.toggle", "view.panel.split",
 				"`code-foundry ui.presence --json` only tells you whether to mention", "a \"show me\" is asking",

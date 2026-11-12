@@ -213,19 +213,19 @@ func noDiff(t *v1.Thread, rels []string, res *v1.CompareWorktreeResponse, branch
 	return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("%s has no changes in thread %s's worktree (%s against %s)", rels[0], t.GetId(), res.GetBase().GetLabel(), what))
 }
 
-// runPanelDiff is view.panel.diff. A tab of the thread's own names the thread that asked,
-// which may not be the one whose panel opens.
+// runPanelDiff is view.open.diff. A tab of the thread's own names the thread that asked,
+// which may not be the one whose tab opens.
 func (d ViewDeps) runPanelDiff(ctx context.Context, uctx Context, a Args) (Result, error) {
 	id := a.String("thread")
 	if id == "" {
-		return Result{}, InvalidArg("thread", "needs a thread whose panel to open it in (--thread, or run it inside a thread)")
+		return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
 	}
 	asker := id
 	if uctx.ActiveView == "" && uctx.CallerThreadID != "" {
 		asker = uctx.CallerThreadID
 	}
 	var warnings []string
-	res, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelDiff, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := d.showItem(ctx, uctx, a, id, ViewPanelDiff, tabDiff, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		params, w, err := d.diffCheck(ctx, t, a, asker)
 		warnings = w
 		return params, err
