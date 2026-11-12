@@ -471,3 +471,32 @@ func TestViewport(t *testing.T) {
 		t.Errorf("viewport %+v", got)
 	}
 }
+
+// The space the user is in is remembered: the app reopens in it (shell-model.md, State).
+// A switch is focus-only, so it reaches the disk within FocusDelay or at Close.
+func TestReopensInTheCurrentSpace(t *testing.T) {
+	db := dbtest.Open(t)
+	m := open(t, db, nil, nil)
+	two := apply(t, m, &core.NewSpace{Name: "Two"}).Result.Space
+	apply(t, m, &core.SwitchSpace{Space: two})
+	if got := metaValue(t, db, metaCurrentSpace); got == two {
+		t.Fatalf("current space written at once; want it written later")
+	}
+	if err := m.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	m2 := open(t, db, nil, nil)
+	if got := m2.Snapshot().State.CurrentSpace; got != two {
+		t.Errorf("reopened in %q; want %q", got, two)
+	}
+	// Removing the current space leaves the user in the space its threads moved to, and that
+	// is where the app reopens.
+	apply(t, m2, &core.RemoveSpace{Space: two})
+	main := m2.Snapshot().State.Spaces[0].ID
+	if err := m2.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := open(t, db, nil, nil).Snapshot().State.CurrentSpace; got != main {
+		t.Errorf("reopened in %q after removing the current space; want %q", got, main)
+	}
+}
