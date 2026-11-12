@@ -76,6 +76,21 @@ Before claiming a step done: `make check` green, the new behavior exercised end 
 decisions and gotchas. Notes are text only: screenshots belong in the PR body, never under
 `docs/notes/`.
 
+## Commits
+
+The subject is `type(scope): summary`: lower case, no full stop, 72 characters at most; the
+scope is the area (`gui`, `thread`, `plugin`, `api`, `pages`, ...) and may be left out. The
+body says why. `make check` and `make attest` refuse a branch with any other subject
+(`scripts/check-commits.sh`), because the release version is read from the subjects:
+
+- `feat`: something a user, plugin author or agent can now do that they could not: a new
+  verb, setting, panel, page ability or SDK API. The next release is a minor.
+- `fix`, `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`: everything
+  else, including a change to how an existing thing looks or behaves. A patch.
+- `!` before the colon (`refactor(api)!: ...`) marks a breaking change: a removed or renamed
+  verb, RPC, setting or SDK API. A minor while the version is 0.x; 1.0.0 is only ever
+  released by name.
+
 ## Pull requests
 
 Every change lands as a pull request, and the pull request is the record of it: what

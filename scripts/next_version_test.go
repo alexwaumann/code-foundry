@@ -35,7 +35,9 @@ func TestNextVersionRules(t *testing.T) {
 		{"non-conventional is a patch", "v0.3.1", []string{"Update README\n"}, "v0.3.2"},
 		{"feat is minor", "v0.3.1", []string{"fix: a\n", "feat: b\n"}, "v0.4.0"},
 		{"feat with scope", "v0.3.1", []string{"feat(gui): footer\n\nlong body\n"}, "v0.4.0"},
-		{"bang is major", "v0.3.1", []string{"feat!: drop v0 api\n"}, "v1.0.0"},
+		{"bang is major", "v1.3.1", []string{"feat!: drop v1 api\n"}, "v2.0.0"},
+		{"bang at 0.x is minor, never 1.0.0", "v0.3.1", []string{"feat!: drop v0 api\n"}, "v0.4.0"},
+		{"BREAKING CHANGE footer at 0.x is minor", "v0.21.7", []string{"refactor(api): x\n\nBREAKING CHANGE: the socket moved\n"}, "v0.22.0"},
 		{"bang with scope", "v1.2.3", []string{"fix(proto)!: rename\n"}, "v2.0.0"},
 		{"BREAKING CHANGE footer", "v1.2.3", []string{"refactor: x\n\nBREAKING CHANGE: the socket moved\n"}, "v2.0.0"},
 		{"BREAKING-CHANGE footer", "v1.2.3", []string{"chore: x\n\nBREAKING-CHANGE: y\n"}, "v2.0.0"},
@@ -106,7 +108,10 @@ func TestNextVersionFromGit(t *testing.T) {
 	commit("feat!: big")
 	git("checkout", "-q", "main")
 	git("merge", "-q", "--no-ff", "-m", "Merge branch side", "side")
-	expect("v1.0.0")
+	expect("v0.3.0") // breaking at 0.x is a minor
+	git("tag", "v1.4.2")
+	commit("fix(api)!: bigger")
+	expect("v2.0.0")
 }
 
 func TestNextVersionTipRules(t *testing.T) {
@@ -122,7 +127,8 @@ func TestNextVersionTipRules(t *testing.T) {
 		{"feat moves the base, N keeps counting", "v0.14.41", []string{"fix: a\n", "feat: b\n"}, "2", "v0.15.0-tip.2"},
 		{"chore keeps the base", "v0.14.41", []string{"fix: a\n", "feat: b\n", "chore: c\n"}, "3", "v0.15.0-tip.3"},
 		{"after a promotion N restarts", "v0.15.0", []string{"fix: d\n"}, "1", "v0.15.1-tip.1"},
-		{"breaking", "v0.15.0", []string{"feat!: e\n"}, "12", "v1.0.0-tip.12"},
+		{"breaking at 0.x", "v0.15.0", []string{"feat!: e\n"}, "12", "v0.16.0-tip.12"},
+		{"breaking", "v1.15.0", []string{"feat!: e\n"}, "12", "v2.0.0-tip.12"},
 		{"no commits since the stable: nothing", "v0.15.0", nil, "0", ""},
 		{"no commits, nonzero count: nothing", "v0.15.0", nil, "4", ""},
 		{"zero count: nothing", "v0.15.0", []string{"fix: f\n"}, "0", ""},
@@ -208,5 +214,34 @@ func TestNextVersionTipFromGit(t *testing.T) {
 	merge("d", "fix: d1")
 	publish("v0.15.1-tip.1") // N resets at the promotion
 	merge("e", "feat!: e1")
-	publish("v1.0.0-tip.2")
+	publish("v0.16.0-tip.2") // breaking at 0.x is a minor
+}
+
+// A subject the rules cannot read still counts as a patch, and is named on stderr.
+func TestNextVersionWarnsOnUnconventionalSubject(t *testing.T) {
+	script, err := filepath.Abs("next-version.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := filepath.Join(t.TempDir(), "log")
+	msgs := "fix(gh): a\n\x1e\nPages: links open in the browser\n\x1e\nfeat!: b\n\x1e\n"
+	if err := os.WriteFile(log, []byte(msgs), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("/bin/bash", script, "--last-tag", "v0.3.1", "--log", log)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, stderr.String())
+	}
+	if got := strings.TrimSpace(string(out)); got != "v0.4.0" {
+		t.Errorf("version = %q, want v0.4.0", got)
+	}
+	if !strings.Contains(stderr.String(), "Pages: links open in the browser") {
+		t.Errorf("stderr does not name the subject: %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "fix(gh)") || strings.Contains(stderr.String(), "feat!") {
+		t.Errorf("stderr names a conventional subject: %q", stderr.String())
+	}
 }
