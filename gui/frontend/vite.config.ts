@@ -18,7 +18,8 @@ export default defineConfig({
     // the bridge sources test the pages skill's field list (src/api/bridgeSourcesDoc.test.ts),
     // and the markdown text test the rendered text fixture agent search's daemon side checks
     // too (src/lib/markdownText.test.tsx), and the task items test the cases the daemon's
-    // parser checks (src/lib/taskItems.test.tsx).
+    // parser checks (src/lib/taskItems.test.tsx), and the shell geometry test the layout
+    // package's rectangles (src/shell/geometry/rects.test.ts).
     fs: {
       allow: [
         searchForWorkspaceRoot(process.cwd()),
@@ -27,6 +28,7 @@ export default defineConfig({
         path.resolve(import.meta.dirname, "../../internal/store/thread/testdata"),
         path.resolve(import.meta.dirname, "../../internal/store/gh/testdata"),
         path.resolve(import.meta.dirname, "../../internal/bridge"),
+        path.resolve(import.meta.dirname, "../../internal/layout/testdata"),
         path.resolve(import.meta.dirname, "../../internal/preview"),
         path.resolve(import.meta.dirname, "../../internal/skills/files"),
         path.resolve(import.meta.dirname, "../../pluginsdk/ui"),
