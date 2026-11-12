@@ -146,6 +146,50 @@ test("a row dragged into a strip opens its thread at the place the bar shows", a
   await expect.poll(async () => outline(await storedRoot())).toBe("[s-sb-charts,s-1]");
 });
 
+test("typing in a composer tab makes a draft: listed, kept through closing its tab and a reload, cleared when emptied", async ({ page }) => {
+  await seed(pane("p-1", [thread("s-1"), { id: "t-c", kind: "compose", params: { project: "repo-cf" } }], "t-c"), "p-1");
+  await openShell(page);
+  const input = page.locator('[data-pane-id="p-1"]').getByTestId("composer-input");
+  await input.click();
+  await page.keyboard.type("Write up the shell's sidebar");
+  const row = page.locator('[data-row-kind="draft"]');
+  await expect(row).toHaveCount(1);
+  await expect(row.getByTestId("draft-label")).toHaveText("Write up the shell's sidebar");
+  // Its tab is named by its label.
+  await expect(page.locator('[data-tab-id="t-c"]')).toContainText("Write up the shell's sidebar");
+  // Closing its tab keeps it; a reload keeps its text.
+  await page.locator('[data-tab-id="t-c"]').hover();
+  await page.keyboard.press("Meta+w");
+  await expect(page.locator('[data-tab-id="t-c"]')).toHaveCount(0);
+  await expect(row).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator("[data-shell-list]")).toBeVisible();
+  await page.locator('[data-row-kind="draft"]').click();
+  const reopened = page.getByTestId("composer-prompt");
+  await expect(reopened).toHaveAttribute("data-value", "Write up the shell's sidebar");
+  // Emptied, it is the space's empty composer again and its row goes.
+  await page.getByTestId("composer-input").click();
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.press("Backspace");
+  await expect(page.locator('[data-row-kind="draft"]')).toHaveCount(0);
+  const names = (await invocations()).filter((i) => i.name.startsWith("composer.draft.")).map((i) => i.name);
+  expect(names[0]).toBe("composer.draft.start");
+  expect(names).toContain("composer.draft.open");
+  expect(names.at(-1)).toBe("composer.draft.clear");
+});
+
+test("sending from a draft turns its tab into the thread's and its row goes", async ({ page }) => {
+  await seed(pane("p-1", [thread("s-1"), { id: "t-c", kind: "compose", params: { project: "repo-cf" } }], "t-c"), "p-1");
+  await openShell(page);
+  await page.locator('[data-pane-id="p-1"]').getByTestId("composer-input").click();
+  await page.keyboard.type("Tidy the README");
+  await expect(page.locator('[data-row-kind="draft"]')).toHaveCount(1);
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.new")?.args.compose).toBe("t-c");
+  await expect(page.locator('[data-row-kind="draft"]')).toHaveCount(0);
+  await expect(page.locator('[data-pane-id="p-1"] [data-testid="shell-tab"][data-kind="thread"][data-active="true"]')).toHaveCount(1);
+});
+
 /** SHOTS=<dir>: the whole sidebar, a hovered row, rows without a project, drafts, the scope button both ways; dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`shell sidebar screenshots (${scheme})`, async ({ page }, info) => {
