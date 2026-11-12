@@ -172,19 +172,25 @@ func (t *tx) newID(prefix string) string {
 }
 
 // usedIDs is every space, node and tab id in the state, and every pane id a thread remembers.
+// It reads states not yet sanitised too, so it skips nils.
 func usedIDs(st *State) map[string]bool {
 	used := map[string]bool{}
 	for _, sp := range st.Spaces {
+		if sp == nil {
+			continue
+		}
 		used[sp.ID] = true
 		walk(sp.Root, func(n *Node) {
 			used[n.ID] = true
 			for _, tb := range n.Tabs {
-				used[tb.ID] = true
+				if tb != nil {
+					used[tb.ID] = true
+				}
 			}
 		})
 	}
 	for _, ts := range st.Threads {
-		if ts.Remembered == nil {
+		if ts == nil || ts.Remembered == nil {
 			continue
 		}
 		used[ts.Remembered.Pane] = true

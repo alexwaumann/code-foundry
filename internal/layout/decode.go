@@ -143,8 +143,10 @@ func (s *sanitizer) run() {
 		}
 	}
 	if len(st.Spaces) == 0 {
-		sp := &Space{ID: s.claim("", "sp-", "space"), Name: "Main"}
+		sp := &Space{ID: s.t.newID("sp-"), Name: "Main"}
+		s.seen[sp.ID] = true
 		st.Spaces = []*Space{sp}
+		st.CurrentSpace, st.DefaultSpace = sp.ID, sp.ID
 		s.note("no space: added %s", sp.ID)
 	}
 	if st.Space(st.CurrentSpace) == nil {

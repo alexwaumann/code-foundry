@@ -104,7 +104,7 @@ func overlap(a, al, b, bl float64) float64 { return min(a+al, b+bl) - max(a, b) 
 // sharing the longest stretch of edge first (ties by id).
 func (l *Layout) SideNeighbours(pane string, side Edge) []string {
 	r, ok := l.Rects[pane]
-	if !ok {
+	if !ok || !side.Valid() {
 		return nil
 	}
 	type hit struct {

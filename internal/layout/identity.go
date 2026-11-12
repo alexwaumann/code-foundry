@@ -39,8 +39,8 @@ type Kind struct {
 	Name  string `json:"kind"`
 	Link  Link   `json:"link"`
 	Scope Scope  `json:"scope"`
-	// KeyParams are the params the key reads; a tab without the ones marked required in
-	// Key's doc is refused.
+	// KeyParams names the params the key reads; Identify refuses a tab missing one the key
+	// needs (a diff's checkout, a file's path, ...). The other params never change identity.
 	KeyParams  []string `json:"key_params,omitempty"`
 	Renameable bool     `json:"renameable,omitempty"`
 	// DefaultFrac is the share of the thread pane's room a new pane of this kind takes beside it.
