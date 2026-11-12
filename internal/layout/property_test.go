@@ -247,6 +247,12 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Draft = pick(s, draftIDs(st)...)
 	case *OpenDraft:
 		o.Draft, o.Focus = pick(s, draftIDs(st)...), s.n(2) == 0
+	case *SetQuick:
+		o.Thread, o.Open, o.Height = pick(s, threads...), s.n(2) == 0, pick[float64](s, 0, 0, 240, -1)
+	case *ReplaceTerminal:
+		o.Old, o.New = pick(s, terminalIDs...), pick(s, terminalIDs...)
+	case *DropTerminal:
+		o.Terminal = pick(s, terminalIDs...)
 	}
 	return op
 }
@@ -456,3 +462,7 @@ func FuzzDecode(f *testing.F) {
 		}
 	})
 }
+
+// terminalIDs are the terminal ids random terminal ops name: those random tabs hold, one no
+// tab holds, and "".
+var terminalIDs = []string{"term-1", "term-2", "term-3", "term-4", "term-5", "term-9", ""}

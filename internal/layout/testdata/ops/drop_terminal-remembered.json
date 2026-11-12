@@ -1,0 +1,81 @@
+{
+  "doc": "A remembered running terminal that went away is forgotten (its thread will not bring it back); a fresh one stays.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}},
+              "pane": "p-a",
+              "index": 1
+            },
+            {
+              "tab": {"id":"t-y","kind":"terminal","thread":"th-a","params":{"terminal":"term-y"}},
+              "pane": "p-a",
+              "index": 2,
+              "fresh": {}
+            }
+          ]
+        }
+      },
+      "th-b": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-z","kind":"terminal","thread":"th-b","params":{"terminal":"term-x"}},
+              "pane": "p-a",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"drop_terminal","terminal":"term-x"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-y","kind":"terminal","thread":"th-a","params":{"terminal":"term-y"}},
+              "pane": "p-a",
+              "index": 2,
+              "fresh": {}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {}
+}

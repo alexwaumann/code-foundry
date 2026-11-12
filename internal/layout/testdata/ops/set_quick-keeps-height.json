@@ -1,0 +1,43 @@
+{
+  "doc": "Closing keeps the height the user dragged; a height of zero keeps it too.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a","quick":{"open":true,"height":240}}}
+  },
+  "op": {"op":"set_quick","thread":"th-a","open":false},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a","quick":{"open":false,"height":240}}}
+  },
+  "result": {}
+}
