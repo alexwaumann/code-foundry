@@ -79,16 +79,18 @@ describe("PaneTabStrip", () => {
     expect(calls).toEqual([["tab.focus", "t-d"]]);
   });
 
-  it("the × and a middle click close a tab (tab.close)", () => {
+  it("the × and a middle click close a tab (tab.close), once its surface agreed (shell/closeTab.ts)", async () => {
     render(<PaneTabStrip paneId="p-1" focused />);
     fireEvent.click(screen.getByRole("button", { name: "Close Pull Requests" }));
     const thread = tabs()[0];
     if (!thread) throw new Error("tab");
     fireEvent(thread, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
-    expect(calls).toEqual([
-      ["tab.close", "t-prs"],
-      ["tab.close", "t-th"],
-    ]);
+    await vi.waitFor(() => {
+      expect(calls).toEqual([
+        ["tab.close", "t-prs"],
+        ["tab.close", "t-th"],
+      ]);
+    });
   });
 
   /** Every tab is 150px by nature; the strip is `width` wide (its padding, gaps, the "+" and the full screen button take 80px of it). */

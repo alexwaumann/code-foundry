@@ -33,4 +33,8 @@ export interface ShellSurface {
   linkedRowEnd?: (tab: TabEntry) => ReactNode;
   /** A hook: the tab's thread needs the user, which its strip marks with the attention dot on the icon. */
   useAttention?: (tab: TabEntry) => boolean;
+  /** A hook: the tab holds unsaved work (a File tab editing), which its strip marks with a dot. */
+  useUnsaved?: (tab: TabEntry) => boolean;
+  /** Asked before the user closes the tab (cmd+w, its ×, its pane); false keeps it open (shell/closeTab.ts). */
+  beforeClose?: (tab: TabEntry) => true | Promise<boolean>;
 }

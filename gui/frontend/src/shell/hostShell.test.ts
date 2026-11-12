@@ -46,12 +46,14 @@ describe("the host seam in the shell", () => {
   it("a thread's place is its linked tabs, grouped by pane, with the side panel's kinds", () => {
     const place = host.tabPlace(host.threadTarget("s-1"));
     expect(place.shown).toBe(true);
+    // A File tab keeps the side panel's id, its path (kinds.ts seamTab): its edit session's.
+    const fileId = host.tabId("files", { path: "/w/a.ts" });
     expect(place.tabs.map((t) => [t.id, t.kind])).toEqual([
       ["t-d", "diff"],
-      ["t-f", "files"],
+      [fileId, "files"],
     ]);
     expect(place.groups).toHaveLength(1);
-    expect(place.groups[0]?.active?.id).toBe("t-f");
+    expect(place.groups[0]?.active?.id).toBe(fileId);
     expect(host.tabPlace("current")).toBe(place);
   });
 
@@ -68,7 +70,8 @@ describe("the host seam in the shell", () => {
 
   it("finds a tab by its layout id from any target, and by the id a surface made from its kind and params", () => {
     expect(host.findTab("current", "t-m")?.kind).toBe("mcp");
-    expect(host.findTab(host.threadTarget("s-1"), host.tabId("files", { path: "/w/a.ts" }))?.id).toBe("t-f");
+    expect(host.findTab(host.threadTarget("s-1"), host.tabId("files", { path: "/w/a.ts" }))?.params.path).toBe("/w/a.ts");
+    expect(host.findTab("current", "t-f")?.params.path).toBe("/w/a.ts");
   });
 
   it("opens a new tab through the daemon, linked to the target's thread, without focus", () => {

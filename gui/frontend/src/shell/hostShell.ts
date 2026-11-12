@@ -103,7 +103,9 @@ export function shellPlace(s: LayoutState, target: TabTarget): TabPlace {
   if (last?.sig === sig) return last.place;
   const placeGroups: TabPlaceGroup[] = groups.map((g, i) => {
     const tabs = g.tabs.map((x) => seamTab(x));
-    return { tabs, active: tabs.find((x) => x.id === actives[i]) ?? null };
+    // Matched by layout id: a File tab's seam id is its path (kinds.ts seamTab).
+    const at = g.tabs.findIndex((x) => x.id === actives[i]);
+    return { tabs, active: tabs[at] ?? null };
   });
   const place: TabPlace = { shown: true, expanded: false, tabs: placeGroups.flatMap((g) => g.tabs), groups: placeGroups, focused };
   lastPlaces.set(t, { sig, place });
@@ -124,10 +126,20 @@ export function findShellTab(s: LayoutState, target: TabTarget, id: string): Tab
   const byId = s.tabs[id];
   if (byId) return byId;
   for (const g of groupsOf(s, target)) {
-    const hit = g.tabs.find((t) => tabId(panelKindOf(t.kind), t.params) === id);
+    const hit = g.tabs.find((t) => panelIdOf(t) === id);
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * The id the side panel gave a tab of this kind and params. A File tab's is its path alone
+ * (surfaces/fileTarget.ts fileTab), whatever else its params hold (a line, an edit, a request):
+ * its edit session and a thread's request address it by that id.
+ */
+function panelIdOf(t: TabEntry): string {
+  const kind = panelKindOf(t.kind);
+  return kind === "files" ? tabId(kind, { path: t.params.path ?? "" }) : tabId(kind, t.params);
 }
 
 function apply(op: LayoutOpView): void {

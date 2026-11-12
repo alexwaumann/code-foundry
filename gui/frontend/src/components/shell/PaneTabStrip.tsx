@@ -5,7 +5,8 @@ import { Tip } from "@/components/ui/tooltip";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
-import { closeTabNow, focusTabNow } from "@/shell/commands";
+import { focusTabNow } from "@/shell/commands";
+import { closeTabAsked } from "@/shell/closeTab";
 import { fitTabs, TAB_ICON_WIDTH, type TabFit } from "@/shell/geometry/tabFit";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { usePaneDrag, useTabDrag } from "@/shell/drag/draggable";
@@ -52,9 +53,18 @@ function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"
       <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate")} data-testid="shell-tab-label">
         {title}
       </span>
+      {surface.useUnsaved && <UnsavedDot use={surface.useUnsaved} tab={tab} measure={room} />}
       {room && <span className="size-4 shrink-0" aria-hidden />}
     </>
   );
+}
+
+/** The amber dot of a tab with unsaved work (a File tab editing), as the side panel's strip had it. */
+function UnsavedDot({ use, tab, measure }: { use: (tab: TabEntry) => boolean; tab: TabEntry; measure: boolean }) {
+  if (!use(tab)) return null;
+  // The measuring copy keeps its room only.
+  if (measure) return <span className="size-1.5 shrink-0" aria-hidden />;
+  return <span role="img" aria-label="Unsaved edits" className="size-1.5 shrink-0 rounded-full bg-cf-warning" data-testid="tab-unsaved" />;
 }
 
 /** A tab's icon: its surface's, or one that follows the tab (a terminal's). */
@@ -180,7 +190,7 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
         if (e.button === 1) e.preventDefault(); // middle click closes, below
       }}
       onAuxClick={(e) => {
-        if (e.button === 1) void closeTabNow(tab.id);
+        if (e.button === 1) void closeTabAsked(tab.id);
       }}
     >
       <Tip label={linked ? <LinkedTip tab={tab} tabName={title} cut={label !== "full"} /> : title} whenTruncated={!linked} side="bottom">
@@ -215,7 +225,7 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
               "flex size-4 shrink-0 items-center justify-center rounded-sm outline-none hover:bg-cf-text/10 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cf-focus",
               active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
             )}
-            onClick={() => void closeTabNow(tab.id)}
+            onClick={() => void closeTabAsked(tab.id)}
           >
             <X className="size-3" aria-hidden />
           </button>
