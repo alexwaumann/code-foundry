@@ -72,7 +72,9 @@ func (f *Fake) Apply(_ context.Context, op core.Op, opts layout.ApplyOptions) (l
 	if f.Err != nil {
 		return layout.Commit{}, f.Err
 	}
-	next, res, err := core.Apply(f.snap.State, op, &f.ids)
+	vp := f.viewport()
+	core.WithArea(op, vp.Width, vp.Height)
+	next, res, err := core.ApplyWith(f.snap.State, op, &f.ids, core.Options{KeepFocus: opts.KeepFocus})
 	if err != nil {
 		return layout.Commit{}, err
 	}
@@ -109,6 +111,11 @@ func (f *Fake) SetViewport(_ string, v layout.Viewport) error {
 func (f *Fake) Viewport() layout.Viewport {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	return f.viewport()
+}
+
+// viewport is Viewport; callers hold f.mu.
+func (f *Fake) viewport() layout.Viewport {
 	if !f.vpSet {
 		return layout.DefaultViewport
 	}

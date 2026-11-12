@@ -121,7 +121,9 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 		return Commit{}, ErrClosed
 	}
 	prev := m.state
-	next, res, err := core.Apply(prev, op, m.opts.IDs)
+	vp := m.Viewport()
+	core.WithArea(op, vp.Width, vp.Height)
+	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, core.Options{KeepFocus: opts.KeepFocus})
 	if err != nil {
 		return Commit{}, err
 	}
