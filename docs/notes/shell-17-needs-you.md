@@ -34,19 +34,32 @@ the flag off nothing changes (cmd+shift+a and the menu item keep selecting the n
 - **The card's data without a stream.** The EventService thread source already gives every
   thread's pending requests with a one-line summary; the card needs the whole input and the line
   before it. A thread whose Watch is open (a pane shows it) gives both from its log. Otherwise the
-  card reads them once when it opens: ListItems, the last 12 tool items (permissions and questions
-  are tools) and the last two replies, cached by request id. Until that lands the card shows the
-  summary. A hover never opens a Watch, which would also mark the thread's turns seen.
+  card reads them when it opens: ListItems, the last 12 tool items (permissions and questions are
+  tools) and the last two replies. A request read whole is kept by request id; a read that failed,
+  or that did not find the ask (not among those items, or the item answers another request), is
+  recorded as a miss and read again on the card's next open. A hover never opens a Watch, which
+  would also mark the thread's turns seen.
+- **Allow and Deny only with the whole request on screen** (review of #696). A permission's card
+  has four states (`AskView.state`, `data-ask-state`): **known** (the request whole, from the log or
+  the read: the title, the tool, the whole command, then Allow, Deny and Go to thread);
+  **loading** (a quiet "Reading the request…" line, no command, Open… and Go to thread);
+  **failed** and **notfound** (the one-line summary and why, "Open it to see it whole", Open… and
+  Go to thread). The request is only ever the oldest open request's own (`request.requestId` equals
+  the pending one's), so another request's command never sits under these buttons. The buttons send
+  the id of the request on screen (`request.requestId`, `data-request-id`) and do nothing when that
+  request is no longer open at the click (`requestOpen`: answered or being answered). When the
+  oldest open request changes while the card is open, the card follows it: from the log at once,
+  else through loading, with no buttons until the new one is known.
 - **The card per kind.** A permission: today's title ("Allow Claude to run this command?"), the
   tool chip, the whole command highlighted (or the file relative to the checkout, a page's URL,
   else the input as JSON), the thread (place icon, project, name), Claude's last line in quotes,
-  then Allow, Deny and Go to thread. A question: "Claude has a question", each question with its
+  then Allow, Deny and Go to thread (once known, above). A question: "Claude has a question", each question with its
   header chip and its option labels as plain text, then Answer… (the popup) and Go to thread. No
   radio, checkbox or field: it is never answered in the card. An ask with no request (a woken
   snooze, a plugin's flag) shows its status word and detail, Open… and Go to thread. Several
   open requests: the oldest, and "+N more".
-- **Quick actions.** Allow and Deny run `thread.respond` with `allow` / `deny` and no reason (the
-  reason is the popup's). The card shuts at once and the row goes when the daemon's status moves
+- **Quick actions.** Allow and Deny run `thread.respond` with `allow` / `deny`, the shown request's
+  id and no reason (the reason is the popup's). The card shuts at once and the row goes when the daemon's status moves
   on. Allow for session is not in the card (the sketch has Allow and Deny only).
 - **Size.** `w-max` between 320 and 560 px wide (less the window's 32 px), at most 560 px tall or
   the room Radix reports on its side (`--radix-hover-card-content-available-height`, so a card
@@ -125,8 +138,12 @@ the flag off nothing changes (cmd+shift+a and the menu item keep selecting the n
 ## Verification
 
 - vitest: `components/needs/NeedsCard.test.tsx` (a permission's tool, whole command, thread and
-  context, its three buttons; a file's relative path; the summary before the read lands; the log
-  of an open Watch and no read; a question's text and options with no radio, checkbox or field,
+  context, its three buttons; a file's relative path; the log of an open Watch and no read; each
+  state of a permission: loading (no command, no Allow or Deny), failed (the summary, Open… and Go
+  to thread, read again on the next open, then known with Allow and Deny), not found (also when the
+  item answers another request), known (Allow and Deny send that request's id); the oldest request
+  changing while open (A answered elsewhere: loading without buttons, then B's command and Allow
+  sends B's id; a new request ahead from the log: Deny sends the one shown); `requestOpen`; a question's text and options with no radio, checkbox or field,
   Answer… and Go to thread; "+1 more"; Allow and Deny run `thread.respond` with the request id and
   shut the card; Go to thread selects and answers nothing; Answer… opens the popup; the card opens
   on hover, the popup shuts it until a new hover; the keyboard opens it, a disabled card stays
