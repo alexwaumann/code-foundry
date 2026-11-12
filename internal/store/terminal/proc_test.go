@@ -146,3 +146,28 @@ func TestQuoteArgs(t *testing.T) {
 		t.Errorf("a cut wide line: cut %v, valid %v", CommandCut(wide), utf8.ValidString(wide))
 	}
 }
+
+// What one facts sample costs (docs/notes/shell-5-terminal.md): the cwd, and a running
+// job's command line.
+func BenchmarkCwdOf(b *testing.B) {
+	pid := os.Getpid()
+	for b.Loop() {
+		if _, err := cwdOf(pid); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGroupCommand(b *testing.B) {
+	cmd := exec.Command("/bin/sleep", "600")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	for b.Loop() {
+		if groupCommand(cmd.Process.Pid) == "" {
+			b.Fatal("no command")
+		}
+	}
+}
