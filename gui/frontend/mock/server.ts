@@ -5,7 +5,7 @@
  *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
  * Serves Health, Terminal, Project, Filesystem, Gh, Command, Settings, Ui, Thread, Action, GitOps, Update,
- * Plugin, Skill, Memory, Theme, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
+ * Plugin, Skill, Memory, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
@@ -176,7 +176,7 @@
  *                                                 700-character entry threads do not get)
  *   POST /__mock/memory?drop=<file>&quiet=1      (a file removed by hand, no event: a stale page)
  *   GET  /__mock/memory                          ({ entries, calls })
- *   ThemeService, the theme event source and theme.show/save/duplicate/delete (mock/userThemes.ts):
+ *   The theme event source and theme.show/save/duplicate/delete (mock/userThemes.ts):
  *        three user themes (Ocean Dusk and Mocha, warmer dark, Latte, softer light) and a file that
  *        does not load; reset restores them.
  *   POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true]   (theme save from that thread:
@@ -227,7 +227,6 @@ import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
-import { ThemeService } from "../src/gen/codefoundry/v1/theme_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
@@ -662,17 +661,6 @@ function routes(router: ConnectRouter): void {
   // The app memory (mock/memory.ts): reads only; writes are the memory.* commands.
   router.service(MemoryService, {
     get: () => ({ memory: world.memory.snapshot() }),
-  });
-
-  // The user's themes (mock/userThemes.ts): reads only; writes are the theme.* commands.
-  router.service(ThemeService, {
-    list: () => ({ themes: world.themes.snapshot() }),
-    watch: async function* (_req, ctx) {
-      yield world.themes.event();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.THEME && event.event?.case === "theme") yield event.event.value;
-      }
-    },
   });
 
   // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.

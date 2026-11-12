@@ -2,19 +2,12 @@ syntax = "proto3";
 
 package codefoundry.v1;
 
-// ThemeService reads the colour themes (docs/notes/user-themes.md): the curated catalog's
-// ids and the user's own theme files with their contents, so the GUI resolves a user
-// theme's slots with the same rules it uses for the catalog. The daemon derives no
-// colour. It only reads; saving, copying and deleting are the theme.* commands
-// (CommandService.Invoke), and picking a theme is the appearance.theme_dark /
+// The colour themes (docs/notes/user-themes.md) as EventService's theme source carries
+// them (EVENT_SOURCE_THEME): the curated catalog's ids and the user's own theme files with
+// their contents, so the GUI resolves a user theme's slots with the same rules it uses for
+// the catalog. The daemon derives no colour. Saving, copying and deleting are the theme.*
+// commands (CommandService.Invoke), and picking a theme is the appearance.theme_dark /
 // theme_light settings.
-service ThemeService {
-  // List returns the themes as last read.
-  rpc List(ListThemesRequest) returns (ListThemesResponse) {}
-  // Watch sends the themes now, then again on every change to the themes directory. The
-  // GUI gets the same events from EventService (EVENT_SOURCE_THEME).
-  rpc Watch(WatchThemesRequest) returns (stream ThemeEvent) {}
-}
 
 // CuratedTheme is a theme of the curated catalog. Its colours are in the GUI's catalog.
 message CuratedTheme {
@@ -99,14 +92,6 @@ message ThemeSnapshot {
   // Grows by one per change in this daemon's lifetime.
   uint64 version = 5;
 }
-
-message ListThemesRequest {}
-
-message ListThemesResponse {
-  ThemeSnapshot themes = 1;
-}
-
-message WatchThemesRequest {}
 
 // ThemeEvent carries every theme, on connect and per change.
 message ThemeEvent {

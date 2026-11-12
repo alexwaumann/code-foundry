@@ -4,17 +4,14 @@ import (
 	"context"
 	"slices"
 
-	"connectrpc.com/connect"
-
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/usertheme"
 	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
-// ThemeStore is the user's themes (*usertheme.Store) as ThemeService and the EventService
-// theme source read them. Writes are the theme.* commands', not this service's.
+// ThemeStore is the user's themes (*usertheme.Store) as the EventService theme source
+// reads them. Writes are the theme.* commands'.
 type ThemeStore interface {
 	// Snapshot is the themes directory as last read (Watch keeps it current).
 	Snapshot() *usertheme.Snapshot
@@ -24,58 +21,6 @@ type ThemeStore interface {
 }
 
 var _ ThemeStore = (*usertheme.Store)(nil)
-
-// Theme implements codefoundryv1connect.ThemeServiceHandler over the user theme store
-// and the curated catalog (docs/notes/user-themes.md).
-type Theme struct {
-	store ThemeStore
-	bus   *bus.Bus
-}
-
-var _ codefoundryv1connect.ThemeServiceHandler = (*Theme)(nil)
-
-// NewTheme returns a ThemeService handler. b must be the bus the store publishes
-// usertheme.Changed on.
-func NewTheme(store ThemeStore, b *bus.Bus) *Theme { return &Theme{store: store, bus: b} }
-
-// Route mounts the service.
-func (h *Theme) Route(opts ...connect.HandlerOption) Route {
-	path, handler := codefoundryv1connect.NewThemeServiceHandler(h, opts...)
-	return Route{Path: path, Handler: handler}
-}
-
-// List returns the themes as last read.
-func (h *Theme) List(context.Context, *connect.Request[v1.ListThemesRequest]) (*connect.Response[v1.ListThemesResponse], error) {
-	return connect.NewResponse(&v1.ListThemesResponse{Themes: themeSnapshotToProto(h.store, h.store.Snapshot())}), nil
-}
-
-// Watch sends the themes now, then all of them again per change.
-func (h *Theme) Watch(ctx context.Context, _ *connect.Request[v1.WatchThemesRequest], stream *connect.ServerStream[v1.ThemeEvent]) error {
-	sub := bus.Subscribe[usertheme.Changed](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := stream.Send(&v1.ThemeEvent{Snapshot: themeSnapshotToProto(h.store, h.store.Snapshot())}); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			snap := ev.Snapshot
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				snap = h.store.Snapshot()
-			}
-			if err := stream.Send(&v1.ThemeEvent{Snapshot: themeSnapshotToProto(h.store, snap)}); err != nil {
-				return err
-			}
-		}
-	}
-}
 
 // themeSource is EventService's theme source: every theme, on connect and per change.
 type themeSource struct {

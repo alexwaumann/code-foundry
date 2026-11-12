@@ -2,15 +2,15 @@
 // @generated from file codefoundry/v1/theme.proto (package codefoundry.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file codefoundry/v1/theme.proto.
  */
 export const file_codefoundry_v1_theme: GenFile = /*@__PURE__*/
-  fileDesc("Chpjb2RlZm91bmRyeS92MS90aGVtZS5wcm90bxIOY29kZWZvdW5kcnkudjEiRgoMQ3VyYXRlZFRoZW1lEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGc2NoZW1lGAMgASgJEgwKBHBhaXIYBCABKAkiaQoNVGhlbWVUZXJtaW5hbBISCgpmb3JlZ3JvdW5kGAEgASgJEg4KBmN1cnNvchgCIAEoCRITCgtjdXJzb3JfdGV4dBgDIAEoCRIRCglzZWxlY3Rpb24YBCABKAkSDAoEYW5zaRgFIAMoCSLbAQoJVGhlbWVCYXNlEg4KBmNhbnZhcxgBIAEoCRIPCgdzdXJmYWNlGAIgASgJEgwKBHRleHQYAyABKAkSDgoGYWNjZW50GAQgASgJEg8KB3N1Y2Nlc3MYBSABKAkSDwoHd2FybmluZxgGIAEoCRINCgVlcnJvchgHIAEoCRIMCgRpbmZvGAggASgJEhEKCWhpZ2hsaWdodBgJIAEoCRIMCgRsaW5rGAogASgJEi8KCHRlcm1pbmFsGAsgASgLMh0uY29kZWZvdW5kcnkudjEuVGhlbWVUZXJtaW5hbCK9AgoJVXNlclRoZW1lEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGc2NoZW1lGAMgASgJEgwKBHBhaXIYBCABKAkSDAoEZnJvbRgFIAEoCRISCgpjcmVhdGVkX2J5GAYgASgJEg4KBnNvdXJjZRgHIAEoCRInCgRiYXNlGAggASgLMhkuY29kZWZvdW5kcnkudjEuVGhlbWVCYXNlEjsKCW92ZXJyaWRlcxgJIAMoCzIoLmNvZGVmb3VuZHJ5LnYxLlVzZXJUaGVtZS5PdmVycmlkZXNFbnRyeRIMCgRwYXRoGAogASgJEg8KB3ZlcnNpb24YCyABKAkSDwoHaGlzdG9yeRgMIAMoCRowCg5PdmVycmlkZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIi8KDlRoZW1lRmlsZUlzc3VlEgwKBGZpbGUYASABKAkSDwoHbWVzc2FnZRgCIAEoCSK1AQoNVGhlbWVTbmFwc2hvdBItCgdjdXJhdGVkGAEgAygLMhwuY29kZWZvdW5kcnkudjEuQ3VyYXRlZFRoZW1lEicKBHVzZXIYAiADKAsyGS5jb2RlZm91bmRyeS52MS5Vc2VyVGhlbWUSLgoGaXNzdWVzGAMgAygLMh4uY29kZWZvdW5kcnkudjEuVGhlbWVGaWxlSXNzdWUSCwoDZGlyGAQgASgJEg8KB3ZlcnNpb24YBSABKAQiEwoRTGlzdFRoZW1lc1JlcXVlc3QiQwoSTGlzdFRoZW1lc1Jlc3BvbnNlEi0KBnRoZW1lcxgBIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRoZW1lU25hcHNob3QiFAoSV2F0Y2hUaGVtZXNSZXF1ZXN0Ij0KClRoZW1lRXZlbnQSLwoIc25hcHNob3QYASABKAsyHS5jb2RlZm91bmRyeS52MS5UaGVtZVNuYXBzaG90MqwBCgxUaGVtZVNlcnZpY2USTwoETGlzdBIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RUaGVtZXNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdFRoZW1lc1Jlc3BvbnNlIgASSwoFV2F0Y2gSIi5jb2RlZm91bmRyeS52MS5XYXRjaFRoZW1lc1JlcXVlc3QaGi5jb2RlZm91bmRyeS52MS5UaGVtZUV2ZW50IgAwAULCAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgpUaGVtZVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Chpjb2RlZm91bmRyeS92MS90aGVtZS5wcm90bxIOY29kZWZvdW5kcnkudjEiRgoMQ3VyYXRlZFRoZW1lEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGc2NoZW1lGAMgASgJEgwKBHBhaXIYBCABKAkiaQoNVGhlbWVUZXJtaW5hbBISCgpmb3JlZ3JvdW5kGAEgASgJEg4KBmN1cnNvchgCIAEoCRITCgtjdXJzb3JfdGV4dBgDIAEoCRIRCglzZWxlY3Rpb24YBCABKAkSDAoEYW5zaRgFIAMoCSLbAQoJVGhlbWVCYXNlEg4KBmNhbnZhcxgBIAEoCRIPCgdzdXJmYWNlGAIgASgJEgwKBHRleHQYAyABKAkSDgoGYWNjZW50GAQgASgJEg8KB3N1Y2Nlc3MYBSABKAkSDwoHd2FybmluZxgGIAEoCRINCgVlcnJvchgHIAEoCRIMCgRpbmZvGAggASgJEhEKCWhpZ2hsaWdodBgJIAEoCRIMCgRsaW5rGAogASgJEi8KCHRlcm1pbmFsGAsgASgLMh0uY29kZWZvdW5kcnkudjEuVGhlbWVUZXJtaW5hbCK9AgoJVXNlclRoZW1lEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGc2NoZW1lGAMgASgJEgwKBHBhaXIYBCABKAkSDAoEZnJvbRgFIAEoCRISCgpjcmVhdGVkX2J5GAYgASgJEg4KBnNvdXJjZRgHIAEoCRInCgRiYXNlGAggASgLMhkuY29kZWZvdW5kcnkudjEuVGhlbWVCYXNlEjsKCW92ZXJyaWRlcxgJIAMoCzIoLmNvZGVmb3VuZHJ5LnYxLlVzZXJUaGVtZS5PdmVycmlkZXNFbnRyeRIMCgRwYXRoGAogASgJEg8KB3ZlcnNpb24YCyABKAkSDwoHaGlzdG9yeRgMIAMoCRowCg5PdmVycmlkZXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIi8KDlRoZW1lRmlsZUlzc3VlEgwKBGZpbGUYASABKAkSDwoHbWVzc2FnZRgCIAEoCSK1AQoNVGhlbWVTbmFwc2hvdBItCgdjdXJhdGVkGAEgAygLMhwuY29kZWZvdW5kcnkudjEuQ3VyYXRlZFRoZW1lEicKBHVzZXIYAiADKAsyGS5jb2RlZm91bmRyeS52MS5Vc2VyVGhlbWUSLgoGaXNzdWVzGAMgAygLMh4uY29kZWZvdW5kcnkudjEuVGhlbWVGaWxlSXNzdWUSCwoDZGlyGAQgASgJEg8KB3ZlcnNpb24YBSABKAQiPQoKVGhlbWVFdmVudBIvCghzbmFwc2hvdBgBIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlRoZW1lU25hcHNob3RCwgEKEmNvbS5jb2RlZm91bmRyeS52MUIKVGhlbWVQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * CuratedTheme is a theme of the curated catalog. Its colours are in the GUI's catalog.
@@ -331,49 +331,6 @@ export const ThemeSnapshotSchema: GenMessage<ThemeSnapshot> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_theme, 5);
 
 /**
- * @generated from message codefoundry.v1.ListThemesRequest
- */
-export type ListThemesRequest = Message<"codefoundry.v1.ListThemesRequest"> & {
-};
-
-/**
- * Describes the message codefoundry.v1.ListThemesRequest.
- * Use `create(ListThemesRequestSchema)` to create a new message.
- */
-export const ListThemesRequestSchema: GenMessage<ListThemesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_theme, 6);
-
-/**
- * @generated from message codefoundry.v1.ListThemesResponse
- */
-export type ListThemesResponse = Message<"codefoundry.v1.ListThemesResponse"> & {
-  /**
-   * @generated from field: codefoundry.v1.ThemeSnapshot themes = 1;
-   */
-  themes?: ThemeSnapshot | undefined;
-};
-
-/**
- * Describes the message codefoundry.v1.ListThemesResponse.
- * Use `create(ListThemesResponseSchema)` to create a new message.
- */
-export const ListThemesResponseSchema: GenMessage<ListThemesResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_theme, 7);
-
-/**
- * @generated from message codefoundry.v1.WatchThemesRequest
- */
-export type WatchThemesRequest = Message<"codefoundry.v1.WatchThemesRequest"> & {
-};
-
-/**
- * Describes the message codefoundry.v1.WatchThemesRequest.
- * Use `create(WatchThemesRequestSchema)` to create a new message.
- */
-export const WatchThemesRequestSchema: GenMessage<WatchThemesRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_theme, 8);
-
-/**
  * ThemeEvent carries every theme, on connect and per change.
  *
  * @generated from message codefoundry.v1.ThemeEvent
@@ -390,40 +347,5 @@ export type ThemeEvent = Message<"codefoundry.v1.ThemeEvent"> & {
  * Use `create(ThemeEventSchema)` to create a new message.
  */
 export const ThemeEventSchema: GenMessage<ThemeEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_theme, 9);
-
-/**
- * ThemeService reads the colour themes (docs/notes/user-themes.md): the curated catalog's
- * ids and the user's own theme files with their contents, so the GUI resolves a user
- * theme's slots with the same rules it uses for the catalog. The daemon derives no
- * colour. It only reads; saving, copying and deleting are the theme.* commands
- * (CommandService.Invoke), and picking a theme is the appearance.theme_dark /
- * theme_light settings.
- *
- * @generated from service codefoundry.v1.ThemeService
- */
-export const ThemeService: GenService<{
-  /**
-   * List returns the themes as last read.
-   *
-   * @generated from rpc codefoundry.v1.ThemeService.List
-   */
-  list: {
-    methodKind: "unary";
-    input: typeof ListThemesRequestSchema;
-    output: typeof ListThemesResponseSchema;
-  },
-  /**
-   * Watch sends the themes now, then again on every change to the themes directory. The
-   * GUI gets the same events from EventService (EVENT_SOURCE_THEME).
-   *
-   * @generated from rpc codefoundry.v1.ThemeService.Watch
-   */
-  watch: {
-    methodKind: "server_streaming";
-    input: typeof WatchThemesRequestSchema;
-    output: typeof ThemeEventSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_codefoundry_v1_theme, 0);
+  messageDesc(file_codefoundry_v1_theme, 6);
 

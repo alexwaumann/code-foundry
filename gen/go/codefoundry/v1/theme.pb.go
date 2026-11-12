@@ -576,122 +576,6 @@ func (x *ThemeSnapshot) GetVersion() uint64 {
 	return 0
 }
 
-type ListThemesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListThemesRequest) Reset() {
-	*x = ListThemesRequest{}
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListThemesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListThemesRequest) ProtoMessage() {}
-
-func (x *ListThemesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListThemesRequest.ProtoReflect.Descriptor instead.
-func (*ListThemesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_theme_proto_rawDescGZIP(), []int{6}
-}
-
-type ListThemesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Themes        *ThemeSnapshot         `protobuf:"bytes,1,opt,name=themes,proto3" json:"themes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListThemesResponse) Reset() {
-	*x = ListThemesResponse{}
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListThemesResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListThemesResponse) ProtoMessage() {}
-
-func (x *ListThemesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListThemesResponse.ProtoReflect.Descriptor instead.
-func (*ListThemesResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_theme_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *ListThemesResponse) GetThemes() *ThemeSnapshot {
-	if x != nil {
-		return x.Themes
-	}
-	return nil
-}
-
-type WatchThemesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WatchThemesRequest) Reset() {
-	*x = WatchThemesRequest{}
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WatchThemesRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WatchThemesRequest) ProtoMessage() {}
-
-func (x *WatchThemesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WatchThemesRequest.ProtoReflect.Descriptor instead.
-func (*WatchThemesRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_theme_proto_rawDescGZIP(), []int{8}
-}
-
 // ThemeEvent carries every theme, on connect and per change.
 type ThemeEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -702,7 +586,7 @@ type ThemeEvent struct {
 
 func (x *ThemeEvent) Reset() {
 	*x = ThemeEvent{}
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_theme_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -714,7 +598,7 @@ func (x *ThemeEvent) String() string {
 func (*ThemeEvent) ProtoMessage() {}
 
 func (x *ThemeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_theme_proto_msgTypes[9]
+	mi := &file_codefoundry_v1_theme_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -727,7 +611,7 @@ func (x *ThemeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThemeEvent.ProtoReflect.Descriptor instead.
 func (*ThemeEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_theme_proto_rawDescGZIP(), []int{9}
+	return file_codefoundry_v1_theme_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ThemeEvent) GetSnapshot() *ThemeSnapshot {
@@ -795,17 +679,10 @@ const file_codefoundry_v1_theme_proto_rawDesc = "" +
 	"\x04user\x18\x02 \x03(\v2\x19.codefoundry.v1.UserThemeR\x04user\x126\n" +
 	"\x06issues\x18\x03 \x03(\v2\x1e.codefoundry.v1.ThemeFileIssueR\x06issues\x12\x10\n" +
 	"\x03dir\x18\x04 \x01(\tR\x03dir\x12\x18\n" +
-	"\aversion\x18\x05 \x01(\x04R\aversion\"\x13\n" +
-	"\x11ListThemesRequest\"K\n" +
-	"\x12ListThemesResponse\x125\n" +
-	"\x06themes\x18\x01 \x01(\v2\x1d.codefoundry.v1.ThemeSnapshotR\x06themes\"\x14\n" +
-	"\x12WatchThemesRequest\"G\n" +
+	"\aversion\x18\x05 \x01(\x04R\aversion\"G\n" +
 	"\n" +
 	"ThemeEvent\x129\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\x1d.codefoundry.v1.ThemeSnapshotR\bsnapshot2\xac\x01\n" +
-	"\fThemeService\x12O\n" +
-	"\x04List\x12!.codefoundry.v1.ListThemesRequest\x1a\".codefoundry.v1.ListThemesResponse\"\x00\x12K\n" +
-	"\x05Watch\x12\".codefoundry.v1.WatchThemesRequest\x1a\x1a.codefoundry.v1.ThemeEvent\"\x000\x01B\xc2\x01\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\x1d.codefoundry.v1.ThemeSnapshotR\bsnapshotB\xc2\x01\n" +
 	"\x12com.codefoundry.v1B\n" +
 	"ThemeProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
@@ -821,38 +698,30 @@ func file_codefoundry_v1_theme_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_theme_proto_rawDescData
 }
 
-var file_codefoundry_v1_theme_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_codefoundry_v1_theme_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_codefoundry_v1_theme_proto_goTypes = []any{
-	(*CuratedTheme)(nil),       // 0: codefoundry.v1.CuratedTheme
-	(*ThemeTerminal)(nil),      // 1: codefoundry.v1.ThemeTerminal
-	(*ThemeBase)(nil),          // 2: codefoundry.v1.ThemeBase
-	(*UserTheme)(nil),          // 3: codefoundry.v1.UserTheme
-	(*ThemeFileIssue)(nil),     // 4: codefoundry.v1.ThemeFileIssue
-	(*ThemeSnapshot)(nil),      // 5: codefoundry.v1.ThemeSnapshot
-	(*ListThemesRequest)(nil),  // 6: codefoundry.v1.ListThemesRequest
-	(*ListThemesResponse)(nil), // 7: codefoundry.v1.ListThemesResponse
-	(*WatchThemesRequest)(nil), // 8: codefoundry.v1.WatchThemesRequest
-	(*ThemeEvent)(nil),         // 9: codefoundry.v1.ThemeEvent
-	nil,                        // 10: codefoundry.v1.UserTheme.OverridesEntry
+	(*CuratedTheme)(nil),   // 0: codefoundry.v1.CuratedTheme
+	(*ThemeTerminal)(nil),  // 1: codefoundry.v1.ThemeTerminal
+	(*ThemeBase)(nil),      // 2: codefoundry.v1.ThemeBase
+	(*UserTheme)(nil),      // 3: codefoundry.v1.UserTheme
+	(*ThemeFileIssue)(nil), // 4: codefoundry.v1.ThemeFileIssue
+	(*ThemeSnapshot)(nil),  // 5: codefoundry.v1.ThemeSnapshot
+	(*ThemeEvent)(nil),     // 6: codefoundry.v1.ThemeEvent
+	nil,                    // 7: codefoundry.v1.UserTheme.OverridesEntry
 }
 var file_codefoundry_v1_theme_proto_depIdxs = []int32{
-	1,  // 0: codefoundry.v1.ThemeBase.terminal:type_name -> codefoundry.v1.ThemeTerminal
-	2,  // 1: codefoundry.v1.UserTheme.base:type_name -> codefoundry.v1.ThemeBase
-	10, // 2: codefoundry.v1.UserTheme.overrides:type_name -> codefoundry.v1.UserTheme.OverridesEntry
-	0,  // 3: codefoundry.v1.ThemeSnapshot.curated:type_name -> codefoundry.v1.CuratedTheme
-	3,  // 4: codefoundry.v1.ThemeSnapshot.user:type_name -> codefoundry.v1.UserTheme
-	4,  // 5: codefoundry.v1.ThemeSnapshot.issues:type_name -> codefoundry.v1.ThemeFileIssue
-	5,  // 6: codefoundry.v1.ListThemesResponse.themes:type_name -> codefoundry.v1.ThemeSnapshot
-	5,  // 7: codefoundry.v1.ThemeEvent.snapshot:type_name -> codefoundry.v1.ThemeSnapshot
-	6,  // 8: codefoundry.v1.ThemeService.List:input_type -> codefoundry.v1.ListThemesRequest
-	8,  // 9: codefoundry.v1.ThemeService.Watch:input_type -> codefoundry.v1.WatchThemesRequest
-	7,  // 10: codefoundry.v1.ThemeService.List:output_type -> codefoundry.v1.ListThemesResponse
-	9,  // 11: codefoundry.v1.ThemeService.Watch:output_type -> codefoundry.v1.ThemeEvent
-	10, // [10:12] is the sub-list for method output_type
-	8,  // [8:10] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1, // 0: codefoundry.v1.ThemeBase.terminal:type_name -> codefoundry.v1.ThemeTerminal
+	2, // 1: codefoundry.v1.UserTheme.base:type_name -> codefoundry.v1.ThemeBase
+	7, // 2: codefoundry.v1.UserTheme.overrides:type_name -> codefoundry.v1.UserTheme.OverridesEntry
+	0, // 3: codefoundry.v1.ThemeSnapshot.curated:type_name -> codefoundry.v1.CuratedTheme
+	3, // 4: codefoundry.v1.ThemeSnapshot.user:type_name -> codefoundry.v1.UserTheme
+	4, // 5: codefoundry.v1.ThemeSnapshot.issues:type_name -> codefoundry.v1.ThemeFileIssue
+	5, // 6: codefoundry.v1.ThemeEvent.snapshot:type_name -> codefoundry.v1.ThemeSnapshot
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_theme_proto_init() }
@@ -866,9 +735,9 @@ func file_codefoundry_v1_theme_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_theme_proto_rawDesc), len(file_codefoundry_v1_theme_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   0,
 		},
 		GoTypes:           file_codefoundry_v1_theme_proto_goTypes,
 		DependencyIndexes: file_codefoundry_v1_theme_proto_depIdxs,

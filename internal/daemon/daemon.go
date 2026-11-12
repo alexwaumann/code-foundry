@@ -362,7 +362,6 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		pluginAPI.Route(),
 		api.NewSkill(st.skills).Route(),
 		api.NewMemory(st.memory).Route(),
-		api.NewTheme(st.themes, events).Route(),
 		api.NewEmber(st.ember, events).Route(),
 		dictationAPI.Route(),
 		searchAPI.Route(),
