@@ -32,6 +32,8 @@ type Settings struct {
 	Projects   Projects
 	GitOps     GitOps
 	Appearance Appearance
+	Layout     Layout
+	Sidebar    Sidebar
 	// Notifications are consumed by the GUI (the Dock badge and alerts).
 	Notifications Notifications
 	// Keybindings are the valid overrides: command name -> canonical chord or
@@ -42,6 +44,20 @@ type Settings struct {
 	Ember       Ember
 	Dictation   Dictation
 	Advanced    Advanced
+}
+
+// Layout configures the window shell's panes (internal/store/layout).
+type Layout struct {
+	// SmartSwap switches panes to the focused thread's surfaces when they are open there
+	// (internal/layout swap.go).
+	SmartSwap bool
+}
+
+// Sidebar is consumed by the GUI.
+type Sidebar struct {
+	// NeedsScope is which threads the Needs you section lists: NeedsScopeAll or
+	// NeedsScopeSpace.
+	NeedsScope string
 }
 
 // Dictation configures voice dictation (internal/store/dictation).

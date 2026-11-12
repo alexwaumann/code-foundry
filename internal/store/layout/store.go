@@ -29,6 +29,8 @@ type Options struct {
 	// FocusDelay is how long a focus-only change waits before it is written (structural
 	// changes are written at once, with any focus change still waiting). Default 1s.
 	FocusDelay time.Duration
+	// SmartSwap reports the setting layout.smart_swap, read at every op; nil: on.
+	SmartSwap func() bool
 }
 
 // Manager is the Store backed by SQLite.
@@ -124,7 +126,7 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	prev := m.state
 	vp := m.Viewport()
 	core.WithArea(op, vp.Width, vp.Height)
-	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, core.Options{KeepFocus: opts.KeepFocus})
+	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, core.Options{KeepFocus: opts.KeepFocus, NoSmartSwap: m.opts.SmartSwap != nil && !m.opts.SmartSwap()})
 	if err != nil {
 		return Commit{}, err
 	}

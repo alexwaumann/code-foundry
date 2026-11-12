@@ -178,7 +178,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	if s.home, err = fsx.HomeRoot(); err != nil {
 		return nil, err
 	}
-	if s.layout, err = layout.New(ctx, layout.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "layout")}); err != nil {
+	if s.layout, err = layout.New(ctx, layout.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "layout"),
+		SmartSwap: func() bool { return s.settings.Settings().Layout.SmartSwap }}); err != nil {
 		return nil, err
 	}
 	if s.project, err = project.Start(ctx, project.Options{
