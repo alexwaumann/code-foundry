@@ -26,6 +26,7 @@ func (d ViewDeps) paneFullscreenCommand() Command {
 			{Name: "off", Type: Bool, Description: "Turn full screen off (default: toggle)"},
 			focusArg,
 		},
+		Keybindings: []string{"cmd+shift+enter"},
 		// The user's view: a model arranges panes with pane.move and pane.resize.
 		NoIndex: true,
 		Run: func(_ context.Context, uctx Context, a Args) (Result, error) {

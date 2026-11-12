@@ -131,6 +131,26 @@ describe("the mock's LayoutService", () => {
     expect(events).toHaveLength(2);
   });
 
+  it("imports once: the mark set in one commit with the layout unchanged, then a no-op; a failure changes nothing", () => {
+    const { layout, events } = service();
+    layout.seed("one-thread");
+    expect(layout.snapshotEvent().change).toMatchObject({ case: "snapshot", value: { legacyImported: false } });
+    layout.failImports = 1;
+    expect(() => layout.importLegacy("{}", "", "win-1")).toThrow(expect.objectContaining({ code: "failed_precondition" }) as Error);
+    expect(layout.legacyImported).toBe(false);
+    const first = layout.importLegacy('{"version":3}', '{"version":1}', "win-1");
+    expect(first.imported).toBe(true);
+    expect(first.layout.legacyImported).toBe(true);
+    expect(layout.rev).toBe(2);
+    expect(events.at(-1)?.change).toMatchObject({ case: "delta", value: { legacyImported: true, spaces: [] } });
+    expect(layout.importLegacy("", "").imported).toBe(false);
+    expect(layout.rev).toBe(2);
+    expect(layout.imports.map((i) => i.panelJson)).toEqual(["{}", '{"version":3}', ""]);
+    // Later commits carry the mark.
+    layout.apply({ op: "new_space", name: "Two" });
+    expect(events.at(-1)?.change).toMatchObject({ case: "delta", value: { legacyImported: true } });
+  });
+
   it("sends only the spaces a commit changed, the order always", () => {
     const { layout, events } = service();
     layout.seed("spaces");

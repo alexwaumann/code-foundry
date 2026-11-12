@@ -104,6 +104,7 @@ describe("the layout source's events", () => {
               ],
             },
           ],
+          legacyImported: false,
         },
       },
     });
@@ -113,7 +114,7 @@ describe("the layout source's events", () => {
     const layout = create(LayoutEventSchema, {
       rev: 8n,
       clientId: "win-1",
-      change: { case: "delta", value: { spaces: [{ id: "sp-b", name: "Later" }], removedSpaceIds: ["sp-c"], spaceOrder: ["sp-a", "sp-b"], currentSpaceId: "sp-a", defaultSpaceId: "sp-a", removedThreadIds: ["th-z"] } },
+      change: { case: "delta", value: { spaces: [{ id: "sp-b", name: "Later" }], removedSpaceIds: ["sp-c"], spaceOrder: ["sp-a", "sp-b"], currentSpaceId: "sp-a", defaultSpaceId: "sp-a", removedThreadIds: ["th-z"], legacyImported: true } },
     });
     const v = toEventView(wire(create(EventSchema, { event: { case: "layout", value: layout } })));
     expect(v).toEqual({
@@ -130,6 +131,7 @@ describe("the layout source's events", () => {
           defaultSpaceId: "sp-a",
           threads: [],
           removedThreadIds: ["th-z"],
+          legacyImported: true,
         },
       },
     });

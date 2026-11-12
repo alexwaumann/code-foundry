@@ -19,7 +19,14 @@ export function layoutKindOf(kind: string): string {
   return LAYOUT_KINDS[kind] ?? kind;
 }
 
-/** A layout tab as the side panel's surfaces read it. */
+/**
+ * A layout tab as the side panel's surfaces read it. A File tab keeps the id the side panel gave
+ * it, its path alone (stores/panel.ts tabId, surfaces/fileTarget.ts fileTab): its edit session,
+ * a thread's request and the unsaved dot address it by that id, and the host finds a layout tab by
+ * it too (hostShell.ts findShellTab). Every other kind is known by its layout id.
+ */
 export function seamTab(tab: Pick<TabEntry, "id" | "kind" | "title" | "name" | "params">, fallbackTitle = ""): Tab {
-  return { id: tab.id, kind: panelKindOf(tab.kind), title: tab.name || tab.title || fallbackTitle, params: tab.params };
+  const kind = panelKindOf(tab.kind);
+  const id = kind === "files" && tab.params.path ? `files?path=${encodeURIComponent(tab.params.path)}` : tab.id;
+  return { id, kind, title: tab.name || tab.title || fallbackTitle, params: tab.params };
 }

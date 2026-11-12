@@ -142,8 +142,15 @@ export function usePromptPicker(opts: {
   canOpen: boolean;
   /** The composer cannot take the picker now (a send in flight, prompts docked): it closes. */
   blocked: boolean;
+  /**
+   * What the composer shows, apart from its draft (default: draftKey). The picker closes when it
+   * changes; a window shell composer gaining its draft id as the first key is typed stays the same
+   * composer, and its picker stays open (shell/composerDrafts.ts).
+   */
+  resetKey?: string;
 }): PromptPicker {
   const { draftKey, editorRef, rootRef, threadId, source, canOpen, blocked } = opts;
+  const resetKey = opts.resetKey ?? draftKey;
   const threadScope = threadId !== "";
   const defaultScope: PromptScopeView = threadScope ? "thread" : "project";
   const [state, setState] = useState<{ open: boolean; seq: number; scope: PromptScopeView; selected: number }>({ open: false, seq: 0, scope: defaultScope, selected: 0 });
@@ -179,7 +186,7 @@ export function usePromptPicker(opts: {
     () => () => {
       setState((s) => (s.open ? { ...s, open: false } : s));
     },
-    [draftKey],
+    [resetKey],
   );
   if (blocked && state.open) setState((s) => ({ ...s, open: false }));
 

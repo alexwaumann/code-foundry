@@ -1,7 +1,7 @@
 /**
  * Full screen (docs/notes/shell-model.md, "Full screen"): one pane over the whole pane area, the
  * top bar and the sidebar staying. Window state (stores/shellView.ts `fullscreen`), never stored
- * in the layout. pane.fullscreen is the command; cmd+shift+enter (shell/keys.ts), the strip's
+ * in the layout. pane.fullscreen is the command; cmd+shift+enter (its keybinding), the strip's
  * button and a rail's run it here, Escape or the same key leave.
  *
  * The pane shown is always the space's focused pane: pane focus and move keys do nothing while it

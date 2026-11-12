@@ -361,6 +361,65 @@ func TestImportLegacyThenOpenTheThread(t *testing.T) {
 	}
 }
 
+// A terminal that no longer exists when the import runs (a daemon restart ended it, as every
+// update's does) is not carried: it is in no remembered set, nothing marks it to come back as a
+// fresh shell, and opening its thread starts no shell for it. A terminal still running (started
+// on the new daemon while an old window was open; the classic window gave it a layout tab) is
+// carried as before, the same terminal. docs/notes/shell-20-cutover.md, "Terminals at import".
+func TestImportLegacyCarriesOnlyLiveTerminals(t *testing.T) {
+	// The layout as the new daemon's shells left it: automatic tabs of a terminal that died with
+	// the old daemon (t-dead) and of one started since (t-live, t-live2).
+	st := NewState("sp-a", "Main")
+	ids := &SeqIDs{}
+	var err error
+	for _, term := range []string{"t-dead", "t-live", "t-live2"} {
+		tab := &Tab{Kind: "terminal", Thread: "s-3", Params: map[string]string{TerminalParam: term}}
+		if st, _, err = Apply(st, &OpenSurface{Tab: tab}, ids); err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := LegacyInput{
+		// The bottom store says the thread's terminals were open; it names no terminal.
+		Bottom:    bottom1(map[string]any{"thread:s-3": map[string]any{"open": true, "height": 280}, "thread:s-4": map[string]any{"open": true, "height": 200}}),
+		Threads:   []LegacyThread{{ID: "s-3"}, {ID: "s-4"}},
+		Terminals: []LegacyTerminal{lterm("t-live", "s-3", "shell", 5), lterm("t-live2", "s-3", "shell", 6)},
+	}
+	st, res, err := ImportLegacy(st, in, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyLayout(t, st)
+	// t-live is the quick shell, t-live2 a remembered tab; t-dead is nowhere.
+	if got := remembered(st, "s-3"); got != "terminal:t-live2 quick=true/280" {
+		t.Errorf("s-3: %s", got)
+	}
+	if res.Quick["s-3"] != "t-live" {
+		t.Errorf("quick %v", res.Quick)
+	}
+	if !slices.ContainsFunc(res.Dropped, func(d string) bool { return strings.Contains(d, "terminal t-dead is gone") }) {
+		t.Errorf("dropped %v: want t-dead's tab listed", res.Dropped)
+	}
+	// s-4 had bottom terminals that all died: no terminal, no fresh shell, its quick slot closed.
+	if got := remembered(st, "s-4"); strings.Contains(got, "terminal") || strings.Contains(got, "quick=true") {
+		t.Errorf("s-4: %s", got)
+	}
+	for _, th := range []string{"s-3", "s-4"} {
+		st2, open, err := Apply(st, &OpenThread{Thread: th, Focus: true}, ids)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(open.Fresh) != 0 {
+			t.Errorf("%s: opening it starts shells %v", th, open.Fresh)
+		}
+		if Holds(st2, "t-dead") {
+			t.Errorf("%s: the layout holds the dead terminal", th)
+		}
+	}
+	if !Holds(st, "t-live2") {
+		t.Errorf("held %v: want the live terminal kept", HeldTerminals(st))
+	}
+}
+
 func TestReadBottom(t *testing.T) {
 	for _, c := range []struct {
 		raw  string

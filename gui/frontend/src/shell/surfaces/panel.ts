@@ -4,22 +4,38 @@
  * the layout tab as a seam tab (shell/host.ts). Two layout kinds have other names in the panel:
  * `file` is `files` and `ember.board` is `ember`.
  */
+import { createElement } from "react";
 import { Puzzle } from "lucide-react";
+import { PanelKeyContext } from "@/components/panel/panelKeyContext";
 import { panelKindOf, seamTab } from "@/shell/kinds";
 import { surfaceOf } from "@/surfaces/registry";
 import type { SurfaceSpec } from "@/surfaces/types";
+import type { TabEntry } from "@/stores/layout";
 import type { ShellSurface } from "./types";
 
 export { layoutKindOf, panelKindOf, seamTab } from "@/shell/kinds";
 
+/** The side panel key a linked tab's body acts for: its thread's panel ("" for an unlinked tab). */
+export function panelKeyOfTab(tab: Pick<TabEntry, "thread">): string {
+  return tab.thread ? `thread:${tab.thread}` : "";
+}
+
 /** A shell surface drawing a panel surface's body. */
 export function panelSurface(kind: string, spec: SurfaceSpec | undefined): ShellSurface {
+  const title = spec?.title ?? "";
+  const useUnsaved = spec?.useUnsaved;
+  const beforeClose = spec?.beforeClose;
   return {
     kind,
     icon: spec?.icon ?? Puzzle,
     useTitle: (tab) => tab.name || tab.title || spec?.title || kind,
-    render: (tab) => (spec ? spec.render(seamTab(tab, spec.title)) : null),
+    // A linked tab's body acts for its thread as it did in that thread's side panel (a File tab's
+    // page bridge, the MCP tab's state, a pull request's links): the panel key is the thread's.
+    render: (tab) => (spec ? createElement(PanelKeyContext, { value: panelKeyOfTab(tab) }, spec.render(seamTab(tab, spec.title))) : null),
     linkedNoun: spec?.title ?? kind,
+    // Unsaved work and the question before a close, as the side panel had them (a File tab editing).
+    ...(useUnsaved ? { useUnsaved: (tab: TabEntry) => useUnsaved(panelKeyOfTab(tab), seamTab(tab, title)) } : {}),
+    ...(beforeClose ? { beforeClose: (tab: TabEntry) => beforeClose(panelKeyOfTab(tab), seamTab(tab, title)) } : {}),
   };
 }
 

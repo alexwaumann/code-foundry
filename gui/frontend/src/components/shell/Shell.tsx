@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
 import { startComposerDrafts } from "@/shell/composerDrafts";
+import { importSettled, runLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
 import { startSelectionBridge } from "@/stores/selectionBridge";
 import { startFocusHistory } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
@@ -8,30 +8,41 @@ import { setShellMode, useShellViewStore } from "@/stores/shellView";
 import { escapeLeaves, fullscreenOn, leaveFullscreen } from "@/shell/fullscreen";
 import { NeedsPopup } from "@/components/needs/NeedsPopup";
 import { PaneGrid } from "./PaneGrid";
+import { ShellNotice } from "./ShellNotice";
 
-/** How long the window waits for the daemon's layout before it falls back to the classic window. */
+/** How long the window waits for the daemon's layout before it says it is waiting. */
 export const LAYOUT_WAIT_MS = 5000;
 
 /**
- * The window shell (docs/notes/shell-model.md) in the content area, behind the shell flag: the
- * current space's pane grid. It draws once the daemon's layout arrived; a daemon without one (an
- * older build) never sends it, and the window then stays classic and says so once (plan 2.12).
+ * The window shell (docs/notes/shell-model.md): the current space's pane grid, the window's
+ * default since the cutover (docs/notes/shell-20-cutover.md). It draws once the daemon's layout
+ * arrived and the first-load import has run (shell/legacyImport.ts: once per daemon, before the
+ * first draw, from the classic window's stored panels). A failed import shows what happened with
+ * Try again and "Open without them" (ShellNotice). A daemon without a layout (one from before the
+ * shell) never sends it: the update dialog asks for Restart Now (lib/update.ts SHELL_SINCE), and
+ * after a wait the pane area says it is waiting; there is no classic fallback (plan 2.12).
  * While it draws, the selection bridge runs: select() opens tabs and the selection follows the
  * focused tab. Tabs, panes and the sidebar's thread rows drag inside ShellDnd (App.tsx).
  * See docs/notes/shell-11-pane-grid.md.
  */
 export function Shell() {
   const loaded = useLayoutStore((s) => s.loaded);
+  const imported = useLayoutStore((s) => s.legacyImported);
+  const phase = useLegacyImportStore((s) => s.phase);
   const mode = useShellViewStore((s) => s.mode);
+  const ready = importSettled(loaded, imported, phase);
+  const [slow, setSlow] = useState(false);
+  // Before the first draw: the import, once, when the daemon's layout says it has not run.
   useEffect(() => {
-    if (loaded) {
-      setShellMode("shell");
-      return;
-    }
+    if (loaded && !imported && phase === "idle") void runLegacyImport();
+  }, [loaded, imported, phase]);
+  useEffect(() => {
+    if (ready) setShellMode("shell");
+  }, [ready]);
+  useEffect(() => {
+    if (loaded) return;
     const timer = setTimeout(() => {
-      if (useLayoutStore.getState().loaded) return;
-      setShellMode("classic");
-      toast.info("This daemon has no window layout yet: showing the classic window", { id: "shell-no-layout" });
+      setSlow(true);
     }, LAYOUT_WAIT_MS);
     return () => {
       clearTimeout(timer);
@@ -58,8 +69,10 @@ export function Shell() {
   }, [mode]);
   return (
     // The top bar (TopBar) is the gap above the panes: they start right under it.
-    <div className="m-shell mt-0 flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
+    <div className="relative m-shell mt-0 flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
       {mode === "shell" && <PaneGrid />}
+      {mode !== "shell" && phase === "failed" && <ShellNotice kind="import-failed" />}
+      {mode !== "shell" && !loaded && slow && <ShellNotice kind="no-layout" />}
       {/* The Needs-you popup (components/needs/NeedsPopup.tsx): one per window, over everything. */}
       {mode === "shell" && <NeedsPopup />}
     </div>

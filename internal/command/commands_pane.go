@@ -35,8 +35,12 @@ func frac(a Args) (float64, error) {
 var directions = []struct {
 	name, title string
 	side        core.Edge
+	// letter and arrow are the direction's keys: ctrl+cmd+<key> focuses that way, with shift it
+	// moves the pane (docs/notes/shell-model.md, "Keys").
+	letter, arrow string
 }{
-	{"left", "Left", core.Left}, {"down", "Down", core.Bottom}, {"up", "Up", core.Top}, {"right", "Right", core.Right},
+	{"left", "Left", core.Left, "h", "arrowleft"}, {"down", "Down", core.Bottom, "j", "arrowdown"},
+	{"up", "Up", core.Top, "k", "arrowup"}, {"right", "Right", core.Right, "l", "arrowright"},
 }
 
 func paneIDArg(name, desc string) ArgSpec {
@@ -128,7 +132,8 @@ func (l layout) paneCommands() []Command {
 			Name: "pane.close", Title: "Close Pane", Category: layoutCategory, Page: PageState,
 			Description: "Close a pane and its tabs (default: the focused pane). Each thread in it closes as thread.close closes " +
 				"it: its linked tabs are remembered and come back when it opens again.",
-			Args: []ArgSpec{positional(paneIDArg("pane", "The pane (default: the focused one; from inside a thread, required)"))},
+			Args:        []ArgSpec{positional(paneIDArg("pane", "The pane (default: the focused one; from inside a thread, required)"))},
+			Keybindings: []string{"cmd+shift+w"},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				snap, err := l.state()
 				if err != nil {
@@ -172,7 +177,10 @@ func (l layout) paneCommands() []Command {
 		},
 	}
 	for _, d := range directions {
-		cmds = append(cmds, l.paneFocusDir(d.name, d.title, d.side), l.paneMoveDir(d.name, d.title, d.side))
+		focus, move := l.paneFocusDir(d.name, d.title, d.side), l.paneMoveDir(d.name, d.title, d.side)
+		focus.Keybindings = []string{"cmd+ctrl+" + d.letter, "cmd+ctrl+" + d.arrow}
+		move.Keybindings = []string{"cmd+ctrl+shift+" + d.letter, "cmd+ctrl+shift+" + d.arrow}
+		cmds = append(cmds, focus, move)
 	}
 	return cmds
 }

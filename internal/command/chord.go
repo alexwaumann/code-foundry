@@ -13,32 +13,29 @@ import (
 
 // ReservedChords are canonical chords no command may bind. Keep in sync with:
 //   - viewActions in gui/frontend/src/keys/bindings.ts: GUI-local actions that win over
-//     any command, even in a focused terminal (a command bound there never fires);
+//     any command, even in a focused terminal (a command bound there never fires). The
+//     nine ctrl+cmd+<digit> chords switch to that space (space.switch --index: a chord
+//     cannot carry an argument, docs/notes/shell-model.md "Keys");
 //   - editingChords in gui/frontend/src/keys/chord.ts: clipboard/undo, always left to
 //     the focused terminal or text field;
 //   - the Wails app menu (gui/app.go appMenu): quit, hide, hide others, minimize, full
-//     screen;
-//   - cmd+w: the side panel's "close the active tab" (gui/frontend/src/components/panel).
-//     The app menu's Close Window has no key equivalent, so cmd+w never closes the
-//     window, but no command may bind it either.
-//   - cmd+shift+c: the side panel's Pull request surface copies its link
-//     (COPY_LINK_CHORD in gui/frontend/src/components/pr/keys.ts). The panel handles it
-//     before the registry while it has focus, so a command bound to it would never fire
-//     there.
-//   - cmd+alt+\: the side panel's "focus the other tab group" of a split panel
-//     (FOCUS_OTHER_GROUP_CHORD in gui/frontend/src/components/panel/keys.ts), taken by the
-//     panel before the registry like cmd+shift+c.
+//     screen. The menu's Close Window has no key equivalent: cmd+w is tab.close;
+//   - cmd+shift+c: the Pull request surface copies its link (COPY_LINK_CHORD in
+//     gui/frontend/src/components/pr/keys.ts). The surface handles it before the registry
+//     while it has focus, so a command bound to it would never fire there.
 //
-// See docs/notes/phase1e-gui.md and docs/notes/phase2-integration.md.
+// See docs/notes/phase1e-gui.md, docs/notes/phase2-integration.md and
+// docs/notes/shell-20-cutover.md.
 var ReservedChords = []string{
 	// viewActions
 	"cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a",
 	"cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
+	"cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
 	"cmd+=", "cmd+-", "cmd+0",
 	// editingChords
 	"cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z",
-	// side panel: close tab; the Pull request surface's copy link; focus the other tab group
-	"cmd+w", "cmd+shift+c", `cmd+alt+\`,
+	// the Pull request surface's copy link
+	"cmd+shift+c",
 	// app menu
 	"cmd+q", "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 }

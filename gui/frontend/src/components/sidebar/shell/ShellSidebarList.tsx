@@ -187,8 +187,11 @@ function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeig
     paddingEnd,
   });
   useImperativeHandle(scrollTo, () => (i) => {
-    virtualizer.scrollToIndex(i, { align: "auto" });
-  }, [virtualizer]);
+    // The first row under the panel's leading headers (Needs you, Active) brings them along: the top.
+    const lead = rows.slice(0, i).every((r) => r.kind === "header");
+    if (lead) virtualizer.scrollToOffset(0);
+    else virtualizer.scrollToIndex(i, { align: "auto" });
+  }, [virtualizer, rows]);
   const total = virtualizer.getTotalSize();
   const footer = maxHeight !== undefined;
   return (

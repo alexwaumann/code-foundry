@@ -36,7 +36,7 @@ var noPalette = []string{
 	"pr.review.request", "pr.task", "project.branch.delete", "project.list", "settings.get", "settings.path",
 	"search.agent", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.report",
 	"search.seen", "search.stop", "settings.reset", "settings.set", "skill.browse", "skill.disable", "skill.enable",
-	"skill.install", "skill.remove", "skill.setup", "skill.uninstall", "terminal.cycle", "terminal.list", "terminal.new-free", "terminal.quick",
+	"skill.install", "skill.remove", "skill.setup", "skill.uninstall", "terminal.list",
 	"theme.check", "theme.list", "theme.restore", "theme.save", "theme.show", "thread.agent.open",
 	"thread.agents", "thread.ask", "thread.budget", "thread.checkouts", "thread.commands", "thread.flag.clear",
 	"thread.flags", "thread.focus", "thread.get", "thread.items", "thread.label", "thread.list",
@@ -45,10 +45,10 @@ var noPalette = []string{
 	"thread.unsubscribe", "thread.wait", "thread.workspace", "ui.focus.project",
 	"ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence", "usage.show",
 	"view.inline", "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url",
-	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr", "view.thread-diff",
+	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",
 	"workspace.add-project", "workspace.list", "workspace.remove", "workspace.remove-project",
 	"workspace.open.editor", "workspace.set-primary", "worktree.editors",
-	"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "tab.focus", "tab.list", "tab.move", "tab.rename", "thread.open",
+	"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "tab.focus", "tab.list", "tab.move", "thread.open",
 	"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "composer.new",
 }
 

@@ -233,9 +233,10 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Show Pull Requests",
 			Description: "Show the Pull Requests page in every app window (the shell window: its tab in the current space): pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+d"},
-			Args:        []ArgSpec{pageFocusArg, openPaneArg},
-			Run:         pageTab(ViewPullRequests, tabPRs),
+			// No default chord since the shell (docs/notes/shell-model.md, "Keys": the palette and a
+			// pane's "+" open it); bindable in settings.
+			Args: []ArgSpec{pageFocusArg, openPaneArg},
+			Run:  pageTab(ViewPullRequests, tabPRs),
 		},
 		d.projectsCommand(),
 		d.settingsCommand(),
@@ -255,9 +256,9 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Toggle Side Panel",
 			Description: "Show or hide a side panel (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+e"},
-			Args:        panelThreadArgs(),
-			Run:         panel(ViewPanelToggle, nil),
+			// Its cmd+shift+e is retired with the side panel (docs/notes/shell-model.md, "Keys").
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelToggle, nil),
 		},
 		{
 			Name:        "view.bottom.toggle",
@@ -265,8 +266,8 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Toggle Bottom Panel",
 			Description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.",
 			Category:    "View",
-			Keybindings: []string{"cmd+j"},
-			Run:         show(ViewBottomToggle),
+			// cmd+j is the quick terminal's since the shell (terminal.quick).
+			Run: show(ViewBottomToggle),
 		},
 		{
 			Name:        "view.panel.expand",
@@ -295,15 +296,15 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Split Side Panel",
 			Description: "Split or unsplit a side panel into two tab groups (from a thread: its own; in the app: the selected thread's or page's).",
 			Category:    "View",
-			Keybindings: []string{`cmd+\`},
-			Args:        panelThreadArgs(),
-			Run:         panel(ViewPanelSplit, nil),
+			// Its cmd+\ is retired with the side panel (docs/notes/shell-model.md, "Keys").
+			Args: panelThreadArgs(),
+			Run:  panel(ViewPanelSplit, nil),
 		},
 		{
 			Name:        "view.back",
 			Page:        PageState,
 			Title:       "Back",
-			Description: "Return to the previously selected thread or page.",
+			Description: "Go back to what was focused before: a tab, a pane, a space (the classic window: the previously selected thread or page).",
 			Category:    "View",
 			Keybindings: []string{"cmd+["},
 			Run:         show(ViewBack),
@@ -312,7 +313,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:        "view.forward",
 			Page:        PageState,
 			Title:       "Forward",
-			Description: "Go to the thread or page selected before going back.",
+			Description: "Go forward again to what was focused before going back.",
 			Category:    "View",
 			Keybindings: []string{"cmd+]"},
 			Run:         show(ViewForward),
@@ -323,8 +324,8 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Previous Thread",
 			Description: "Select the thread above the current one in the sidebar.",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+["},
-			Run:         show(ViewThreadPrevious),
+			// cmd+shift+[ is tab.previous since the shell (docs/notes/shell-model.md, "Keys").
+			Run: show(ViewThreadPrevious),
 		},
 		{
 			Name:        "thread.next",
@@ -332,8 +333,8 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Next Thread",
 			Description: "Select the thread below the current one in the sidebar.",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+]"},
-			Run:         show(ViewThreadNext),
+			// cmd+shift+] is tab.next since the shell.
+			Run: show(ViewThreadNext),
 		},
 	}
 	cmds = append(append(cmds, d.itemCommands()...), withAliases(d.panelPageCommand(), d.panelGalleryCommand())...)

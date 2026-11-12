@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, FolderGit2, Gauge, GitBranch, GitCommitHorizontal, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
@@ -346,9 +346,15 @@ function ComposerCard({
     [like, likeSrc.paths, single, existingPath],
   );
   const sources = useMemo(() => skillSources({ projectIds: sourceIds, paths: sourcePaths }), [sourceIds, sourcePaths]);
+  // Loaded per list, not per array: a shell composer starting its draft gets an equal list anew.
+  const sourcesKey = skillSourcesKey(sources);
+  const latestSources = useRef(sources);
+  useLayoutEffect(() => {
+    latestSources.current = sources;
+  });
   useEffect(() => {
-    void loadSkills(sources);
-  }, [sources]);
+    void loadSkills(latestSources.current);
+  }, [sourcesKey]);
   const primaryMain = useProjectsStore((s) => {
     const p = s.byId[primaryProject];
     return p ? mainCheckout(p) : "";
@@ -357,7 +363,7 @@ function ComposerCard({
   // checkout the thread will work in, the primary's main checkout for new worktrees, else home.
   const hostFiles = useHostFiles({ draftKey, editorRef, disabled: busy, startDir: existingPath || sourcePaths[primaryProject] || primaryMain || "" });
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
-  const skillSource = useSkillSource(trigger, skillSourcesKey(sources), sourceIds);
+  const skillSource = useSkillSource(trigger, sourcesKey, sourceIds);
   const fileSource = useFileSource(trigger, sources, sourceIds, primaryProject);
   const mentionSource = useMentionSource(trigger, home ? null : fileSource, "");
   const prSource = usePrSource(trigger, useProjectSlugs(sourceIds));
@@ -379,6 +385,8 @@ function ComposerCard({
   const historySource = useMemo(() => (historyIds ? { projectIds: historyIds } : {}), [historyIds]);
   const picker = usePromptPicker({
     draftKey,
+    // The shell's draft id arriving with the first key is the same composer: its picker stays open.
+    resetKey: keyOf({ ...target, draft: undefined }),
     editorRef,
     rootRef,
     threadId: "",
@@ -388,9 +396,15 @@ function ComposerCard({
   });
 
   // Focus on mount and on request (the picker, the sidebar "+"). Deferred a frame so the
-  // closing palette dialog has released focus.
+  // closing palette dialog has released focus. On mount under an open dialog (the palette, opened
+  // before the window first drew), the dialog keeps the keyboard.
+  const mountSeq = useRef(focusSeq);
   useEffect(() => {
-    const raf = requestAnimationFrame(() => editorRef.current?.focus());
+    const onMount = focusSeq === mountSeq.current;
+    const raf = requestAnimationFrame(() => {
+      if (onMount && document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return;
+      editorRef.current?.focus();
+    });
     return () => {
       cancelAnimationFrame(raf);
     };

@@ -3,6 +3,7 @@ package command_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -488,8 +489,8 @@ func TestLayoutComposerDrafts(t *testing.T) {
 }
 
 // tab.rename gives a terminal tab a name of its own and --auto (or an empty name) gives it back
-// its automatic one. Other kinds take no name; the two flags together are refused; from inside
-// a thread the tab must be named.
+// its automatic one. A thread's tab renames the thread. Other kinds take no name; the two flags
+// together are refused; from inside a thread the tab must be named.
 func TestTabRename(t *testing.T) {
 	f := newLayoutFixture(t)
 	if _, err := f.store.Apply(context.Background(), &core.AddTab{Pane: "p-right", Tab: &core.Tab{ID: "t-term", Kind: "terminal", Thread: "s-aaaa00000001",
@@ -520,7 +521,8 @@ func TestTabRename(t *testing.T) {
 		code connect.Code
 		is   error
 	}{
-		{"a thread's tab", fromCLI, map[string]string{"tab": "t-a", "name": "x"}, connect.CodeFailedPrecondition, nil},
+		{"a diff's tab", fromCLI, map[string]string{"tab": "t-diff", "name": "x"}, connect.CodeFailedPrecondition, nil},
+		{"a thread's tab with no name", fromCLI, map[string]string{"tab": "t-a"}, 0, command.ErrInvalidArgs},
 		{"both flags", fromCLI, map[string]string{"tab": "t-term", "name": "x", "auto": "true"}, 0, command.ErrInvalidArgs},
 		{"from a thread, no tab", fromThread, map[string]string{"name": "x"}, 0, command.ErrInvalidArgs},
 		{"no such tab", fromCLI, map[string]string{"tab": "t-zzz", "name": "x"}, connect.CodeNotFound, nil},
@@ -534,5 +536,40 @@ func TestTabRename(t *testing.T) {
 				t.Errorf("err = %v, want %v", err, tc.code)
 			}
 		})
+	}
+}
+
+// A thread's tab is the thread: tab.rename renames it and tab.auto-name (cmd+shift+r) has its
+// name generated again; on a terminal's tab tab.auto-name drops the manual name. The layout
+// does not change for a thread.
+func TestTabRenameThreadAndAutoName(t *testing.T) {
+	f := newLayoutFixture(t)
+	if _, err := f.store.Apply(context.Background(), &core.AddTab{Pane: "p-right", Tab: &core.Tab{ID: "t-term", Kind: "terminal", Thread: "s-aaaa00000001",
+		Params: map[string]string{core.TerminalParam: "t-1"}, Name: "logs"}}, layoutApply()); err != nil {
+		t.Fatal(err)
+	}
+	rev := f.store.Snapshot().Rev
+	if res := f.must(t, fromCLI, "tab.rename", map[string]string{"tab": "t-a", "name": "Fix login"}); res.Message != `renamed thread "Fix login"` && !strings.Contains(res.Message, "Fix login") {
+		t.Errorf("message %q", res.Message)
+	}
+	if res := f.must(t, fromApp, "tab.auto-name", map[string]string{"tab": "t-a"}); !strings.Contains(res.Message, commandtest.RegeneratedName) {
+		t.Errorf("message %q", res.Message)
+	}
+	if got := f.store.Snapshot().Rev; got != rev {
+		t.Errorf("a thread's rename changed the layout: rev %d -> %d", rev, got)
+	}
+	var kinds []string
+	for _, r := range f.thread.Requests() {
+		kinds = append(kinds, fmt.Sprintf("%T", r))
+	}
+	if want := []string{"*codefoundryv1.RenameThreadRequest", "*codefoundryv1.RegenerateNameRequest"}; !slices.Equal(kinds, want) {
+		t.Errorf("thread calls %v, want %v", kinds, want)
+	}
+	f.must(t, fromCLI, "tab.auto-name", map[string]string{"tab": "t-term"})
+	if _, _, tb := f.state().FindTab("t-term"); tb.Name != "" {
+		t.Errorf("terminal tab name after tab.auto-name: %q", tb.Name)
+	}
+	if _, err := f.run(t, fromThread, "tab.auto-name", nil); !errors.Is(err, command.ErrInvalidArgs) {
+		t.Errorf("from a thread with no tab: %v", err)
 	}
 }

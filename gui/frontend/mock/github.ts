@@ -590,7 +590,7 @@ const pagePaneArg = { name: "pane", type: ArgType.STRING, required: false, descr
 export function viewCommands(emit: (intent: IntentInit) => number, openTab?: (kind: string, pane: string, params: Record<string, string>) => void) {
   return [
     {
-      cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: ["cmd+shift+d"], args: [pagePaneArg] },
+      cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: [], args: [pagePaneArg] },
       when: () => true,
       run: (_ctx: unknown, a: Record<string, string> = {}) => {
         if (a.pane) openTab?.("prs", a.pane, {});
@@ -604,7 +604,7 @@ export function viewCommands(emit: (intent: IntentInit) => number, openTab?: (ki
         title: "Show Projects",
         category: "View",
         description: "Show the Projects page: each project's worktrees and each workspace's members; --project or --workspace opens that one's page",
-        keybindings: ["cmd+shift+j"],
+        keybindings: [],
         args: [
           { name: "project", type: ArgType.STRING, required: false, description: "Open this project's page" },
           { name: "workspace", type: ArgType.STRING, required: false, description: "Open this workspace's page" },

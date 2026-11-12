@@ -22,7 +22,20 @@ vi.mock("@/shell/commands", () => ({
 }));
 
 const { clampFloat, enterFullscreen, escapeLeaves, floatingThreadOf, fullscreenOn, fullscreenPaneOf, leaveFullscreen, presentFullscreen, toggleFullscreen } = await import("./fullscreen");
-const { shellKeyFor } = await import("./keys");
+const { presentShellCommand } = await import("./keyPresenters");
+const { normalizeChord } = await import("@/keys/chord");
+
+/** The command a chord of the key table runs (internal/command keybindings; the mock's list in vitest is not loaded here). */
+const CHORDS: Record<string, string> = {
+  "cmd+ctrl+h": "pane.focus.left",
+  "cmd+ctrl+l": "pane.focus.right",
+  "cmd+ctrl+arrowleft": "pane.focus.left",
+  "cmd+ctrl+shift+h": "pane.move.left",
+  "cmd+ctrl+shift+l": "pane.move.right",
+  "cmd+ctrl+shift+arrowright": "pane.move.right",
+  "cmd+shift+]": "tab.next",
+};
+const press = (chord: string) => presentShellCommand(CHORDS[normalizeChord(chord) ?? chord] ?? "");
 const { resetLayout, useLayoutStore } = await import("@/stores/layout");
 const { plainRects } = await import("./geometry/rects");
 const { geoTree } = await import("@/stores/layout");
@@ -121,24 +134,24 @@ describe("full screen state", () => {
 });
 
 describe("keys in full screen", () => {
-  it("cmd+shift+enter toggles it", async () => {
+  it("pane.fullscreen toggles it", async () => {
     await seed("p-1");
-    shellKeyFor("cmd+shift+enter")?.run();
+    toggleFullscreen();
     expect(shown()).toBe("p-1");
-    shellKeyFor("cmd+shift+enter")?.run();
+    toggleFullscreen();
     expect(shown()).toBe("");
   });
 
   it("pane focus and move keys do nothing while it is on", async () => {
     await seed("p-2");
     // Off: the left key focuses p-1 (at once), then moving it right swaps it with p-2.
-    shellKeyFor("cmd+ctrl+h")?.run();
-    shellKeyFor("cmd+ctrl+shift+l")?.run();
+    press("cmd+ctrl+h");
+    press("cmd+ctrl+shift+l");
     expect(ran.map(([n]) => n)).toEqual(["pane.focus.left", "pane.move.right"]);
     ran.length = 0;
     await seed("p-2");
     enterFullscreen();
-    for (const chord of ["cmd+ctrl+h", "cmd+ctrl+l", "cmd+ctrl+arrowleft", "cmd+ctrl+shift+h", "cmd+ctrl+shift+arrowright"]) shellKeyFor(chord)?.run();
+    for (const chord of ["cmd+ctrl+h", "cmd+ctrl+l", "cmd+ctrl+arrowleft", "cmd+ctrl+shift+h", "cmd+ctrl+shift+arrowright"]) press(chord);
     expect(ran).toEqual([]);
     expect(shown()).toBe("p-2");
   });
@@ -146,7 +159,7 @@ describe("keys in full screen", () => {
   it("the pane's tab keys still switch its tabs", async () => {
     await seed("p-1");
     enterFullscreen();
-    shellKeyFor("cmd+shift+]")?.run();
+    press("cmd+shift+]");
     expect(focusedTabs).toEqual(["t-th"]);
   });
 });

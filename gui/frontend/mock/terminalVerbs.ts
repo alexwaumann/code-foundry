@@ -77,8 +77,7 @@ export function terminalShellCommands(world: TerminalVerbsWorld): Entry[] {
         title: "Toggle Quick Terminal",
         category: "Terminal",
         description: "Open or close a thread's quick terminal, the shell drawn under its conversation in its pane.",
-        keybindings: [],
-        noPalette: true,
+        keybindings: ["cmd+j"],
         args: [
           arg("id", ArgType.STRING, "The thread (default: the focused tab's)", { positional: true }),
           arg("open", ArgType.BOOL, "Open it (default: toggle)"),
@@ -114,8 +113,7 @@ export function terminalShellCommands(world: TerminalVerbsWorld): Entry[] {
         title: "Cycle Thread Terminals",
         category: "Terminal",
         description: "Focus the next step of a thread's ring: its tab, each of its terminal tabs in layout order, its tab again.",
-        keybindings: [],
-        noPalette: true,
+        keybindings: ["cmd+shift+j"],
         args: [arg("tab", ArgType.STRING, "The tab to step from (default: the focused tab)"), arg("focus", ArgType.BOOL, "Take the focus")],
       },
       when: always,
@@ -169,9 +167,8 @@ export function terminalShellCommands(world: TerminalVerbsWorld): Entry[] {
         name: "tab.rename",
         title: "Rename Tab",
         category: "Layout",
-        description: "Give a tab a name of your own (default: the focused tab), or with --auto go back to its automatic name.",
-        keybindings: [],
-        noPalette: true,
+        description: "Rename a tab (default: the focused tab): a thread's tab renames the thread, a terminal's takes a name of its own; --auto goes back to the automatic name.",
+        keybindings: ["cmd+r"],
         args: [arg("tab", ArgType.STRING, "The tab", { positional: true }), arg("name", ArgType.STRING, "The name"), arg("auto", ArgType.BOOL, "Go back to the automatic name")],
       },
       when: always,
@@ -180,6 +177,23 @@ export function terminalShellCommands(world: TerminalVerbsWorld): Entry[] {
         const tab = a.tab || focusedTab(L.state())?.id || "";
         const c = apply({ op: "rename_tab", tab, name: a.auto === "true" ? "" : (a.name ?? "") });
         return ok(`renamed tab ${tab}`, { rev: c.rev, changed: c.changed, ...c.result });
+      },
+    },
+    {
+      // internal/command commands_tab.go tab.auto-name. The mock renames terminal tabs only; a thread's name is the daemon's.
+      cmd: {
+        name: "tab.auto-name",
+        title: "Name Tab Automatically",
+        category: "Layout",
+        description: "Give a tab its automatic name again (default: the focused tab): a thread's is generated again, a terminal's tab drops its own name.",
+        keybindings: ["cmd+shift+r"],
+        args: [arg("tab", ArgType.STRING, "The tab", { positional: true })],
+      },
+      when: always,
+      run: (_c, a) => {
+        const tab = a.tab || focusedTab(L.state())?.id || "";
+        const c = apply({ op: "rename_tab", tab, name: "" });
+        return ok(`tab ${tab} goes by its automatic name`, { rev: c.rev, changed: c.changed, ...c.result });
       },
     },
   ];

@@ -2,8 +2,12 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"connectrpc.com/connect"
+
+	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 )
 
@@ -11,7 +15,7 @@ func tabIDArg(desc string) ArgSpec {
 	return ArgSpec{Name: "tab", Type: String, ID: TabID, Description: desc + IDHelp}
 }
 
-// tabCommands are tab.focus, tab.move, tab.close, tab.rename, tab.next and tab.previous.
+// tabCommands are tab.focus, tab.move, tab.close, tab.rename, tab.auto-name, tab.next and tab.previous.
 func (l layout) tabCommands() []Command {
 	return []Command{
 		{
@@ -50,7 +54,8 @@ func (l layout) tabCommands() []Command {
 			Name: "tab.close", Title: "Close Tab", Category: layoutCategory, Page: PageState,
 			Description: "Close a tab (default: the focused tab); the focus returns to what had it before. A thread's tab closes " +
 				"the thread from its space as thread.close does (it is never archived).",
-			Args: []ArgSpec{positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)"))},
+			Args:        []ArgSpec{positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)"))},
+			Keybindings: []string{"cmd+w"},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				snap, err := l.state()
 				if err != nil {
@@ -77,50 +82,47 @@ func (l layout) tabCommands() []Command {
 		},
 		{
 			Name: "tab.rename", Title: "Rename Tab", Category: layoutCategory, Page: PageState,
-			Description: "Give a tab a name of your own (default: the focused tab), or with --auto go back to its automatic name. " +
-				"Only a terminal tab takes a name; a thread is renamed with thread.rename.",
+			Description: "Rename a tab (default: the focused tab). A thread's tab renames the thread (as thread.rename; in the app, " +
+				"inline in the sidebar); a terminal's tab takes a name of its own, kept until --auto (or tab.auto-name) gives it back " +
+				"its automatic name. Other tabs are named by what they show.",
 			Args: []ArgSpec{
 				positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)")),
-				{Name: "name", Type: String, Description: "The name; empty or --auto goes back to the automatic name"},
-				{Name: "auto", Type: Bool, Description: "Go back to the automatic name (what runs in the terminal)"},
+				{Name: "name", Type: String, Description: "The name; for a terminal, empty or --auto goes back to the automatic name"},
+				{Name: "auto", Type: Bool, Description: "Go back to the automatic name: a thread's is generated again, a terminal's is what runs in it"},
 			},
-			NoPalette: true, NoKeybinding: true, NoIndex: true,
+			Keybindings: []string{"cmd+r"},
+			NoIndex:     true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if a.Bool("auto") && a.String("name") != "" {
 					return Result{}, InvalidArg("auto", "--auto and --name together")
 				}
-				snap, err := l.state()
-				if err != nil {
-					return Result{}, err
-				}
-				_, _, tb, err := l.tab(snap.State, uctx, a, "tab")
-				if err != nil {
-					return Result{}, err
-				}
-				name := a.String("name")
-				c, err := l.apply(ctx, &core.RenameTab{Tab: tb.ID, Name: name}, !uctx.FromUser())
-				if err != nil {
-					return Result{}, err
-				}
-				msg := "tab " + tb.ID + " goes by its automatic name"
-				if name != "" {
-					msg = fmt.Sprintf("renamed tab %s to %q", tb.ID, name)
-				}
-				return layoutResult(uctx, c, msg), nil
+				return l.renameTab(ctx, uctx, a, a.String("name"), a.Bool("auto"))
 			},
 		},
-		l.tabStep("tab.next", "Next Tab", "the next tab", 1),
-		l.tabStep("tab.previous", "Previous Tab", "the previous tab", -1),
+		{
+			Name: "tab.auto-name", Title: "Name Tab Automatically", Category: layoutCategory, Page: PageState,
+			Description: "Give a tab its automatic name again (default: the focused tab): a thread's name is generated again from " +
+				"its recent turns (thread.regenerate-name), a terminal's tab drops its own name for what runs in it.",
+			Args:        []ArgSpec{positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)"))},
+			Keybindings: []string{"cmd+shift+r"},
+			NoIndex:     true,
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				return l.renameTab(ctx, uctx, a, "", true)
+			},
+		},
+		l.tabStep("tab.next", "Next Tab", "the next tab", 1, "cmd+shift+]"),
+		l.tabStep("tab.previous", "Previous Tab", "the previous tab", -1, "cmd+shift+["),
 	}
 }
 
 // tabStep is tab.next or tab.previous: the tab after (or before) the active one in a pane,
 // round the strip.
-func (l layout) tabStep(name, title, what string, step int) Command {
+func (l layout) tabStep(name, title, what string, step int, chord string) Command {
 	return Command{
 		Name: name, Title: title, Category: layoutCategory, Page: PageState,
 		Description: "Focus " + what + " in the pane (default: the focused pane), going round the strip.",
 		Args:        []ArgSpec{paneIDArg("pane", "The pane (default: the focused one; from inside a thread, required)"), focusArg},
+		Keybindings: []string{chord},
 		NoIndex:     true,
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			snap, err := l.state()
@@ -177,4 +179,52 @@ func (l layout) tabMove(ctx context.Context, uctx Context, a Args) (Result, erro
 		return Result{}, err
 	}
 	return layoutResult(uctx, c, fmt.Sprintf("moved tab %s to pane %s in space %s", op.Tab, c.Result.Pane, c.Result.Space)), nil
+}
+
+// renameTab is tab.rename and tab.auto-name. A thread's tab is the thread: its name is the
+// thread's (thread.rename, thread.regenerate-name). A terminal's tab takes a manual name, and
+// "" goes back to the automatic one. Any other kind is refused by the op.
+func (l layout) renameTab(ctx context.Context, uctx Context, a Args, name string, auto bool) (Result, error) {
+	snap, err := l.state()
+	if err != nil {
+		return Result{}, err
+	}
+	_, _, tb, err := l.tab(snap.State, uctx, a, "tab")
+	if err != nil {
+		return Result{}, err
+	}
+	if tb.Kind == "thread" {
+		return l.renameThread(ctx, tb.Thread, name, auto)
+	}
+	c, err := l.apply(ctx, &core.RenameTab{Tab: tb.ID, Name: name}, !uctx.FromUser())
+	if err != nil {
+		return Result{}, err
+	}
+	msg := "tab " + tb.ID + " goes by its automatic name"
+	if name != "" {
+		msg = fmt.Sprintf("renamed tab %s to %q", tb.ID, name)
+	}
+	return layoutResult(uctx, c, msg), nil
+}
+
+// renameThread names a thread from its tab: name, or with auto a generated one.
+func (l layout) renameThread(ctx context.Context, thread, name string, auto bool) (Result, error) {
+	if l.thread == nil {
+		return Result{}, connect.NewError(connect.CodeUnimplemented, errors.New("this daemon cannot rename threads"))
+	}
+	if auto {
+		res, err := l.thread.RegenerateName(ctx, connect.NewRequest(&v1.RegenerateNameRequest{Id: thread}))
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{Message: "renamed thread " + threadLabel(res.Msg.GetThread()), JSON: res.Msg.GetThread()}, nil
+	}
+	if name == "" {
+		return Result{}, InvalidArg("name", "a thread's tab is the thread: give --name, or --auto to generate one")
+	}
+	res, err := l.thread.Rename(ctx, connect.NewRequest(&v1.RenameThreadRequest{Id: thread, Name: name}))
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{Message: "renamed thread " + threadLabel(res.Msg.GetThread()), JSON: res.Msg.GetThread()}, nil
 }

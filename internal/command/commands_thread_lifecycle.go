@@ -333,9 +333,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 			Title:       "Rename Thread",
 			Description: "Set the thread's name. Turns off automatic naming.",
 			Category:    "Thread",
-			Keybindings: []string{"cmd+r"},
-			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Positional: true, Description: "New name"}},
-			When:        hasThread,
+			// cmd+r is tab.rename since the shell: on a thread's tab it renames the thread here.
+			Args: []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Positional: true, Description: "New name"}},
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameThreadRequest{Id: a.String("id"), Name: a.String("name")}))
 				if err != nil {

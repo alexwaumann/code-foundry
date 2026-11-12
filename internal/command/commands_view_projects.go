@@ -31,8 +31,8 @@ func (d ViewDeps) projectsCommand() Command {
 		Title: "Show Projects",
 		Description: "Show the Projects page in every app window (the shell window: its tab in the current space): each project's worktrees and each workspace's members, with their git state and actions; " +
 			"--project or --workspace opens that one's page.",
-		Category:    "View",
-		Keybindings: []string{"cmd+shift+j"},
+		Category: "View",
+		// No default chord since the shell: cmd+shift+j is terminal.cycle (docs/notes/shell-model.md, "Keys").
 		Args: []ArgSpec{
 			pageFocusArg,
 			// No Context: the palette and the chord keep showing the page the window showed last.

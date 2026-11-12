@@ -66,8 +66,8 @@ func terminalLayoutCommands(d TerminalDeps, quick *sync.Mutex) []Command {
 				{Name: "height", Type: Int, Description: "Its height in layout px; alone, it sets the height and keeps it open or closed"},
 				focusArg,
 			},
-			// The classic window has no quick terminal; the shell window's lists it (PR 13).
-			NoPalette: true, NoKeybinding: true, NoIndex: true,
+			Keybindings: []string{"cmd+j"},
+			NoIndex:     true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				snap, err := l.state()
 				if err != nil {
@@ -149,9 +149,10 @@ func terminalLayoutCommands(d TerminalDeps, quick *sync.Mutex) []Command {
 			Description: "Focus the next step of a thread's ring: its tab, then each of its terminal tabs in layout order, " +
 				"then its tab again. From another surface of the thread it goes to the first terminal. Acts on the focused tab " +
 				"(--tab: that one); it only moves the user's focus.",
-			Category:  "Terminal",
-			Args:      []ArgSpec{tabIDArg("The tab to step from (default: the focused tab)"), focusArg},
-			NoPalette: true, NoKeybinding: true, NoIndex: true,
+			Category:    "Terminal",
+			Args:        []ArgSpec{tabIDArg("The tab to step from (default: the focused tab)"), focusArg},
+			Keybindings: []string{"cmd+shift+j"},
+			NoIndex:     true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if err := onlyFocus(uctx, a, "terminal.cycle"); err != nil {
 					return Result{}, err

@@ -1376,10 +1376,11 @@ function threadMsg(id: string, ts: ThreadState): ThreadInit {
   };
 }
 
-export function layoutMsg(st: State, rev: number): LayoutInit {
+export function layoutMsg(st: State, rev: number, legacyImported = false): LayoutInit {
   const threads = st.threads ?? {};
   return {
     rev: BigInt(rev),
+    legacyImported,
     spaces: st.spaces.map(spaceMsg),
     currentSpaceId: st.current_space,
     defaultSpaceId: st.default_space,
@@ -1393,12 +1394,13 @@ export function layoutMsg(st: State, rev: number): LayoutInit {
 }
 
 /** The delta from one state to the next (internal/store/layout's Diff): whole changed spaces and thread records. */
-export function deltaMsg(prev: State, next: State): NonNullable<Extract<LayoutEventInit["change"], { case: "delta" }>>["value"] {
+export function deltaMsg(prev: State, next: State, legacyImported = false): NonNullable<Extract<LayoutEventInit["change"], { case: "delta" }>>["value"] {
   const before = new Map(prev.spaces.map((s) => [s.id, canon(s)]));
   const ids = new Set(next.spaces.map((s) => s.id));
   const pt = prev.threads ?? {};
   const nt = next.threads ?? {};
   return {
+    legacyImported,
     spaces: next.spaces.filter((s) => before.get(s.id) !== canon(s)).map(spaceMsg),
     removedSpaceIds: prev.spaces.filter((s) => !ids.has(s.id)).map((s) => s.id),
     spaceOrder: next.spaces.map((s) => s.id),
@@ -1622,6 +1624,15 @@ export class MockLayout {
   viewport: { clientId: string; width: number; height: number } | null = null;
   /** Every Apply, in order: the op as JSON and the client id. */
   applied: { op: Op; clientId: string }[] = [];
+  /** The first-load import ran (Layout.legacy_imported). A new database's layout has not. */
+  legacyImported = false;
+  /** Every ImportLegacy call, in order, with what the window sent. */
+  imports: { panelJson: string; bottomJson: string; clientId: string }[] = [];
+  /** The next ImportLegacy calls fail with this message, as many times as `failImports` says (a test's). */
+  importError = "";
+  failImports = 0;
+  /** How long the mock's ImportLegacy takes to answer, in ms (a test's: a slow first draw). */
+  importDelayMs = 0;
 
   constructor(
     private readonly deps: {
@@ -1642,11 +1653,30 @@ export class MockLayout {
 
   /** The source's snapshot event. */
   snapshotEvent(): LayoutEventInit {
-    return { rev: BigInt(this.revision), change: { case: "snapshot", value: layoutMsg(this.st, this.revision) } };
+    return { rev: BigInt(this.revision), change: { case: "snapshot", value: layoutMsg(this.st, this.revision, this.legacyImported) } };
   }
 
   get(): LayoutInit {
-    return layoutMsg(this.st, this.revision);
+    return layoutMsg(this.st, this.revision, this.legacyImported);
+  }
+
+  /**
+   * LayoutService.ImportLegacy: the first-load import of the classic window's panels. The import
+   * itself is the daemon's (internal/layout/legacy.go, tested in Go); the mock only records what
+   * the window sent and sets the mark in one commit, the layout unchanged, as a fresh install
+   * does. A second call changes nothing and answers imported false.
+   */
+  importLegacy(panelJson: string, bottomJson: string, clientId = ""): { layout: LayoutInit; imported: boolean } {
+    this.imports.push({ panelJson, bottomJson, clientId });
+    if (this.failImports > 0) {
+      this.failImports--;
+      fail("failed_precondition", this.importError || "the import failed");
+    }
+    if (this.legacyImported) return { layout: this.get(), imported: false };
+    this.legacyImported = true;
+    this.revision++;
+    this.deps.publish({ rev: BigInt(this.revision), change: { case: "delta", value: deltaMsg(this.st, this.st, true) }, clientId });
+    return { layout: this.get(), imported: true };
   }
 
   /** Runs an op; a change is one commit (the next rev, one delta event). keep_focus is a call from inside a thread (the commands'). */
@@ -1676,6 +1706,11 @@ export class MockLayout {
   reset(): void {
     this.applied = [];
     this.viewport = null;
+    this.imports = [];
+    this.failImports = 0;
+    this.importError = "";
+    this.importDelayMs = 0;
+    this.legacyImported = false;
     this.commit(emptyState(), "");
   }
 
@@ -1684,6 +1719,6 @@ export class MockLayout {
     const prev = this.st;
     this.st = next;
     this.revision++;
-    this.deps.publish({ rev: BigInt(this.revision), change: { case: "delta", value: deltaMsg(prev, next) }, clientId });
+    this.deps.publish({ rev: BigInt(this.revision), change: { case: "delta", value: deltaMsg(prev, next, this.legacyImported) }, clientId });
   }
 }

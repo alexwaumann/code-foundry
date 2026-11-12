@@ -22,9 +22,10 @@ async function rect(l: Locator) {
 // at 125% the same checks hold with the factor applied.
 for (const zoom of [90, 125, 150]) {
   test(`the composer model picker opens right under its trigger at ${String(zoom)}%`, async ({ page }) => {
-    // Tall enough that the whole model list fits below the trigger at 150%; a fresh copy
-    // has no collision banner (s-1 runs in code-foundry's folder) to push the card down.
-    await page.setViewportSize({ width: 1280, height: 1100 });
+    // Tall enough that the whole model list fits below the trigger at 150%, under the window
+    // shell's top bar (60px); a fresh copy has no collision banner (s-1 runs in code-foundry's
+    // folder) to push the card down.
+    await page.setViewportSize({ width: 1280, height: 1160 });
     await freshCopyByDefault();
     await openApp(page);
     await setZoom(page, zoom);

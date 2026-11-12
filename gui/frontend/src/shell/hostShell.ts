@@ -103,7 +103,9 @@ export function shellPlace(s: LayoutState, target: TabTarget): TabPlace {
   if (last?.sig === sig) return last.place;
   const placeGroups: TabPlaceGroup[] = groups.map((g, i) => {
     const tabs = g.tabs.map((x) => seamTab(x));
-    return { tabs, active: tabs.find((x) => x.id === actives[i]) ?? null };
+    // Matched by layout id: a File tab's seam id is its path (kinds.ts seamTab).
+    const at = g.tabs.findIndex((x) => x.id === actives[i]);
+    return { tabs, active: tabs[at] ?? null };
   });
   const place: TabPlace = { shown: true, expanded: false, tabs: placeGroups.flatMap((g) => g.tabs), groups: placeGroups, focused };
   lastPlaces.set(t, { sig, place });
@@ -124,10 +126,20 @@ export function findShellTab(s: LayoutState, target: TabTarget, id: string): Tab
   const byId = s.tabs[id];
   if (byId) return byId;
   for (const g of groupsOf(s, target)) {
-    const hit = g.tabs.find((t) => tabId(panelKindOf(t.kind), t.params) === id);
+    const hit = g.tabs.find((t) => panelIdOf(t) === id);
     if (hit) return hit;
   }
   return undefined;
+}
+
+/**
+ * The id the side panel gave a tab of this kind and params. A File tab's is its path alone
+ * (surfaces/fileTarget.ts fileTab), whatever else its params hold (a line, an edit, a request):
+ * its edit session and a thread's request address it by that id.
+ */
+function panelIdOf(t: TabEntry): string {
+  const kind = panelKindOf(t.kind);
+  return kind === "files" ? tabId(kind, { path: t.params.path ?? "" }) : tabId(kind, t.params);
 }
 
 function apply(op: LayoutOpView): void {
@@ -169,15 +181,39 @@ export function shellActivateTab(target: TabTarget, id: string): void {
 
 export function shellRetitleTab(target: TabTarget, id: string, title: string): void {
   const tab = findShellTab(useLayoutStore.getState(), target, id);
-  if (tab && title && tab.title !== title) apply({ op: "set_tab_params", tab: tab.id, params: { ...tab.params }, title });
+  if (tab && title && tab.title !== title) queueParams(tab.id, pendingParams.get(tab.id)?.params ?? tab.params, title);
 }
+
+/**
+ * A tab's params updates still on their way to the daemon, in order: each is computed from the one
+ * before it, not from the layout's last confirmed params, and sent after it. Two updates in a row
+ * (a File tab's save stamps the request, then ends it) would otherwise each start from the same
+ * stale params, and the daemon could apply them in either order.
+ */
+const pendingParams = new Map<string, { params: Tab["params"]; chain: Promise<void> }>();
 
 export function shellSetTabParams(target: TabTarget, id: string, params: Tab["params"] | ((old: Tab["params"]) => Tab["params"])): void {
   const tab = findShellTab(useLayoutStore.getState(), target, id);
   if (!tab) return;
-  const next = typeof params === "function" ? params(tab.params) : params;
-  if (JSON.stringify(next) === JSON.stringify(tab.params)) return;
-  apply({ op: "set_tab_params", tab: tab.id, params: { ...next } });
+  const base = pendingParams.get(tab.id)?.params ?? tab.params;
+  const next = typeof params === "function" ? params(base) : params;
+  if (JSON.stringify(next) === JSON.stringify(base)) return;
+  queueParams(tab.id, next);
+}
+
+/** Sends a tab's params (and title) after its updates already on their way. */
+function queueParams(tabId: string, params: Tab["params"], title?: string): void {
+  const chain = (pendingParams.get(tabId)?.chain ?? Promise.resolve()).then(() =>
+    applyLayoutOp({ op: "set_tab_params", tab: tabId, params: { ...params }, ...(title ? { title } : {}) }).then(
+      () => undefined,
+      // A refusal (the tab went meanwhile) changes nothing; the layout stays the daemon's.
+      () => undefined,
+    ),
+  );
+  pendingParams.set(tabId, { params, chain });
+  void chain.then(() => {
+    if (pendingParams.get(tabId)?.chain === chain) pendingParams.delete(tabId);
+  });
 }
 
 /** Puts `tab` where tab `id` is (a File tab that became another file): its params and title change in place. */

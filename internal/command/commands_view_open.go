@@ -242,19 +242,19 @@ func (d ViewDeps) showPageTab(ctx context.Context, uctx Context, a Args, name, k
 
 // threadDiffCommand is view.thread-diff, the key for "the thread's diff, and back": from a
 // thread's tab or any surface linked to it, the thread's diff (its checkout's), focused; from
-// that diff, the thread's tab. The shell binds it to cmd+shift+d at the cutover.
+// that diff, the thread's tab. Its chord is cmd+shift+d (docs/notes/shell-model.md, "Keys").
 func (d ViewDeps) threadDiffCommand() Command {
 	l := layout{store: d.Layout}
 	return Command{
 		Name:  "view.thread-diff",
 		Page:  PageState,
-		Title: "Thread Diff",
+		Title: "Toggle Thread Diff",
 		Description: "Go to the focused thread's diff, opening it beside the thread when it is not open; from that diff, go back " +
 			"to the thread. Acts on the focused tab (--tab: that one); it only moves the user's focus.",
-		Category: "View",
-		Args:     []ArgSpec{tabIDArg("The tab to start from (default: the focused tab)"), focusArg},
-		// The classic window's cmd+shift+d is view.pullrequests; the shell maps this one (PR 20).
-		NoPalette: true, NoKeybinding: true, NoIndex: true,
+		Category:    "View",
+		Args:        []ArgSpec{tabIDArg("The tab to start from (default: the focused tab)"), focusArg},
+		Keybindings: []string{"cmd+shift+d"},
+		NoIndex:     true,
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			if err := onlyFocus(uctx, a, "view.thread-diff"); err != nil {
 				return Result{}, err

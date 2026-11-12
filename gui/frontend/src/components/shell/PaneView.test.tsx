@@ -26,6 +26,7 @@ vi.mock("@/shell/commands", () => ({
 
 const { PaneView } = await import("./PaneView");
 const { resetLayout } = await import("@/stores/layout");
+const { requestPaneFocus } = await import("@/stores/shellView");
 
 const RECT = { x: 0, y: 0, w: 600, h: 400, rail: false };
 const tabs = [
@@ -99,5 +100,22 @@ describe("PaneView", () => {
     render(<PaneView paneId="p-1" rect={RECT} focused />);
     fireEvent.pointerDown(screen.getByTestId("body"));
     expect(focused).toEqual(["p-1"]);
+  });
+
+  it("its body takes the keyboard only for a focus request: never by a press on a blank spot", async () => {
+    await showing("t-prs");
+    render(<PaneView paneId="p-1" rect={RECT} focused />);
+    const body = screen.getByTestId("shell-pane-body");
+    // Not focusable: a press on a composer's heading leaves the keyboard in its prompt.
+    expect(body.hasAttribute("tabindex")).toBe(false);
+    act(() => {
+      requestPaneFocus("p-1");
+    });
+    // The surface has no focus root of its own: the body takes it, for this request only.
+    expect(document.activeElement).toBe(body);
+    act(() => {
+      body.blur();
+    });
+    expect(body.hasAttribute("tabindex")).toBe(false);
   });
 });

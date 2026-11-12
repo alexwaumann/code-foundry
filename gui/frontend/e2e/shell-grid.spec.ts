@@ -7,7 +7,7 @@ import { appPath, invocations, mockUrl, openStreams, resetMock } from "./fixture
  * keeps, focus moving between panes by a press and by ctrl+cmd+h/j/k/l through the keymap, and the
  * WatchThread streams of visible and hidden thread tabs. Which body mounts, the strip's fitting, the
  * selection bridge and the key table are vitest's (components/shell, stores/selectionBridge,
- * shell/keys). Set SHOTS=<dir> for the PR's screenshots (WebKit, 1400x900, dark and light).
+ * the commands' keybindings). Set SHOTS=<dir> for the PR's screenshots (WebKit, 1400x900, dark and light).
  */
 
 type Node = { t: "pane"; id: string; tabs: Record<string, unknown>[]; active: string } | { t: "split"; id: string; dir: "row" | "col"; kids: Node[]; sizes: number[] };
