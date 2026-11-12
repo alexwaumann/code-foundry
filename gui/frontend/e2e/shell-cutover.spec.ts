@@ -107,11 +107,16 @@ for (const scheme of ["dark", "light"] as const) {
     await page.screenshot({ path: at("cutover-first-load") });
 
     await page.keyboard.press("Meta+Slash");
+    await page.getByTestId("help-tab-shortcuts").click();
     await expect(page.getByTestId("help-shortcuts")).toBeVisible();
     await expect(page.locator('[data-help-command="pane.focus.left"]')).toBeVisible();
     await page.screenshot({ path: at("cutover-keyboard-help") });
-    await page.locator('[data-help-section="Layout"]').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: at("cutover-keyboard-help-layout") });
+    // The View section (back and forward, the thread's diff and info, full screen, the file finder) is below the fold.
+    await page.getByTestId("help-shortcuts").evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect(page.locator('[data-help-command="view.thread-diff"]')).toBeInViewport();
+    await page.screenshot({ path: at("cutover-keyboard-help-view") });
     await page.keyboard.press("Escape");
 
     await resetMock();
