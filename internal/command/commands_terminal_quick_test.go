@@ -173,6 +173,57 @@ func TestTerminalQuick(t *testing.T) {
 	}
 }
 
+// terminal.quick --height alone sets the height and keeps the open state (the height drag);
+// with --open it opens at that height. The height outlives a close.
+func TestTerminalQuickHeight(t *testing.T) {
+	f := newTermLayoutFixture(t)
+	quick := func() *core.Quick {
+		if ts := f.state().Threads[threadA]; ts != nil {
+			return ts.Quick
+		}
+		return nil
+	}
+	arg := map[string]string{"id": threadA}
+	with := func(kv ...string) map[string]string {
+		m := map[string]string{"id": threadA}
+		for i := 0; i+1 < len(kv); i += 2 {
+			m[kv[i]] = kv[i+1]
+		}
+		return m
+	}
+	res, err := f.run(t, fromApp, "terminal.quick", with("open", "true", "height", "240"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q := quick(); q == nil || !q.Open || q.Height != 240 {
+		t.Fatalf("opened: %+v", q)
+	}
+	if r := res.JSON.(command.QuickResult); r.Rev == 0 || !r.Open {
+		t.Errorf("result %+v", r)
+	}
+	if _, err := f.run(t, fromApp, "terminal.quick", with("height", "300")); err != nil {
+		t.Fatal(err)
+	}
+	if q := quick(); q == nil || !q.Open || q.Height != 300 {
+		t.Fatalf("resized: %+v", q)
+	}
+	if _, err := f.run(t, fromApp, "terminal.quick", arg); err != nil {
+		t.Fatal(err)
+	}
+	if q := quick(); q == nil || q.Open || q.Height != 300 {
+		t.Fatalf("closed: %+v", q)
+	}
+	if _, err := f.run(t, fromApp, "terminal.quick", with("height", "200")); err != nil {
+		t.Fatal(err)
+	}
+	if q := quick(); q == nil || q.Open || q.Height != 200 {
+		t.Fatalf("resized while closed: %+v", q)
+	}
+	if _, err := f.run(t, fromApp, "terminal.quick", with("height", "-5")); !errors.Is(err, command.ErrInvalidArgs) {
+		t.Errorf("a negative height: %v", err)
+	}
+}
+
 func paneActive(st *core.State, pane string) string {
 	_, p := st.FindPane(pane)
 	return p.Active

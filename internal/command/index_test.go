@@ -33,7 +33,7 @@ var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
 	"composer.draft.start", "composer.history", "composer.new", "file.export",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.move.down",
-	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.next", "tab.previous",
+	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.next", "tab.previous", "tab.rename",
 	"terminal.cycle", "terminal.quick",
 	"thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
 	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.workspace",
