@@ -28,6 +28,30 @@ type Result struct {
 	// Closed lists the tabs the op took out of the layout, in layout order. The caller ends
 	// what they hold (an unlinked terminal) or closes what they show (a thread).
 	Closed []*Tab `json:"closed,omitempty"`
+	// Rule says how placement chose where a tab went (place.go): "1" to "6", "pane" (the
+	// caller's pane), "focused" (the focused pane), "compose" (it replaced a composer tab).
+	Rule string `json:"rule,omitempty"`
+	// Kept lists linked tabs taken out of the layout into their thread's remembered set
+	// (thread.go). Their terminals keep running.
+	Kept []*Tab `json:"kept,omitempty"`
+	// Ended lists terminal tabs whose terminals the caller ends although the op did not close
+	// them now: remembered terminals of a thread being snoozed or archived.
+	Ended []*Tab `json:"ended,omitempty"`
+	// Back and Placed list the remembered tabs a thread brought back when it opened: back in
+	// their old panes, or placed fresh beside it. Fresh lists the terminal tabs among them that
+	// come back as fresh shells (after a snooze): the caller starts one for each and sets its
+	// terminal param.
+	Back   []string `json:"back,omitempty"`
+	Placed []string `json:"placed,omitempty"`
+	Fresh  []string `json:"fresh,omitempty"`
+	// Swapped lists the panes smart swap switched (swap.go).
+	Swapped []string `json:"swapped,omitempty"`
+}
+
+// Options are the user settings an op runs with.
+type Options struct {
+	// NoSmartSwap turns smart swap off (the setting layout.smart_swap, on by default).
+	NoSmartSwap bool `json:"no_smart_swap,omitempty"`
 }
 
 var registry = map[string]func() Op{}
@@ -135,15 +159,25 @@ func (s *SeqIDs) NewID(prefix string) string {
 	return prefix + "n" + strconv.Itoa(s.next[prefix])
 }
 
-// Apply runs op on a copy of st. On success it returns the new state, in normal form; on an
-// error it returns st itself, untouched.
+// Apply runs op on a copy of st with the default options. On success it returns the new
+// state, in normal form; on an error it returns st itself, untouched.
 func Apply(st *State, op Op, ids IDs) (*State, Result, error) {
+	return ApplyWith(st, op, ids, Options{})
+}
+
+// ApplyWith is Apply with options. When the op leaves a thread tab newly focused (another tab,
+// or another space, than before), smart swap runs for that thread unless it is turned off.
+func ApplyWith(st *State, op Op, ids IDs, opts Options) (*State, Result, error) {
 	t := &tx{st: st.Clone(), ids: ids}
+	before := focusedThreadTab(t.st)
 	res, err := op.apply(t)
 	if err != nil {
 		return st, Result{}, fmt.Errorf("layout %s: %w", op.OpName(), err)
 	}
 	t.finish()
+	if after := focusedThreadTab(t.st); !opts.NoSmartSwap && after.thread != "" && after != before {
+		res.Swapped = smartSwap(t.st, after.space, after.thread)
+	}
 	if err := Check(t.st); err != nil {
 		return st, Result{}, fmt.Errorf("layout %s: %w: %w", op.OpName(), ErrBroken, err)
 	}
