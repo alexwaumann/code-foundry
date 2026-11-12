@@ -42,6 +42,8 @@
  *        JSON, the last SetViewport, every Apply as an op and client id; mock/layout.ts)
  *   POST /__mock/layout?seed=empty|one-thread|thread-and-diff|grid|spaces   (that layout as one commit; or
  *        the body's state, internal/layout's JSON, for any other tree)
+ *   POST /__mock/layout/import?imported=0|1&fail=N&error=…&delay=ms   (the first-load import's mark; the
+ *        next N ImportLegacy calls fail; each answers after `delay`; GET /__mock/layout lists the calls as `imports`)
  *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
  *     command emits it; answers {"delivered": <watchers>})
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
@@ -747,6 +749,14 @@ function routes(router: ConnectRouter): void {
         throw layoutRpcError(err);
       }
     },
+    importLegacy: async (req) => {
+      if (world.layout.importDelayMs > 0) await new Promise((r) => setTimeout(r, world.layout.importDelayMs));
+      try {
+        return world.layout.importLegacy(req.panelJson, req.bottomJson, req.clientId);
+      } catch (err) {
+        throw layoutRpcError(err);
+      }
+    },
   });
 
   router.service(EventService, {
@@ -1065,7 +1075,17 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       break;
     case "GET /__mock/layout":
-      json(res, 200, { rev: world.layout.rev, state: world.layout.state(), viewport: world.layout.viewport, applied: world.layout.applied, seeds: Object.keys(SEEDS) });
+      json(res, 200, { rev: world.layout.rev, state: world.layout.state(), viewport: world.layout.viewport, applied: world.layout.applied, seeds: Object.keys(SEEDS), legacyImported: world.layout.legacyImported, imports: world.layout.imports });
+      break;
+    case "POST /__mock/layout/import":
+      // The first-load import: ?imported=0|1 sets the mark; ?fail=N makes the next N calls fail (with ?error=…).
+      if (q.has("imported")) world.layout.legacyImported = q.get("imported") === "1";
+      if (q.has("fail")) {
+        world.layout.failImports = Number(q.get("fail") ?? 0);
+        world.layout.importError = q.get("error") ?? "";
+      }
+      if (q.has("delay")) world.layout.importDelayMs = Number(q.get("delay") ?? 0);
+      json(res, 200, { legacyImported: world.layout.legacyImported, imports: world.layout.imports });
       break;
     case "POST /__mock/layout": {
       const chunks: Buffer[] = [];

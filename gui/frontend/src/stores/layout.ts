@@ -61,6 +61,8 @@ export interface TabEntry extends LayoutTabView {
 export interface LayoutState {
   /** A snapshot has arrived (with the flag on: the daemon has a layout source). */
   loaded: boolean;
+  /** The first-load import of the classic window's panels has run (shell/legacyImport.ts). */
+  legacyImported: boolean;
   /** The rev of the last commit applied. */
   rev: number;
   spaceOrder: readonly string[];
@@ -77,6 +79,7 @@ export interface LayoutState {
 
 const EMPTY: LayoutState = {
   loaded: false,
+  legacyImported: false,
   rev: 0,
   spaceOrder: [],
   currentSpaceId: "",
@@ -185,7 +188,26 @@ export function applyDelta(l: LayoutView, d: LayoutDeltaView, rev: number): Layo
     currentSpaceId: d.currentSpaceId || l.currentSpaceId,
     defaultSpaceId: d.defaultSpaceId || l.defaultSpaceId,
     threads: [...threads.values()],
+    // The mark is never taken back.
+    legacyImported: Boolean(d.legacyImported) || Boolean(l.legacyImported),
   };
+}
+
+/**
+ * The layout the first-load import answered (api/layout.ts importLegacy): applied as the snapshot
+ * it is, so the shell draws from it without waiting for the import's delta (which, coming after,
+ * is then skipped as already in).
+ */
+export function applyImportedLayout(layout: LayoutView): void {
+  if (!confirmed || layout.rev > confirmed.rev) {
+    applyLayoutEvent({ kind: "snapshot", rev: layout.rev, layout, clientId: "" });
+    return;
+  }
+  // The stream is ahead of the answer (or level with it): keep what it holds, with the mark.
+  if (layout.legacyImported && !confirmed.legacyImported) {
+    confirmed = { ...confirmed, legacyImported: true };
+    publish();
+  }
 }
 
 /** Runs an op on the daemon (no change here until its event arrives). */
@@ -291,6 +313,7 @@ function flatten(l: LayoutView): LayoutState {
   }
   return {
     loaded: true,
+    legacyImported: Boolean(l.legacyImported),
     rev: l.rev,
     spaceOrder: l.spaces.map((s) => s.id),
     currentSpaceId: l.currentSpaceId,
@@ -328,6 +351,7 @@ function shareRecord<T>(prev: Readonly<Record<string, T>>, next: Record<string, 
 function share(prev: LayoutState, next: LayoutState): LayoutState {
   const out: LayoutState = {
     loaded: next.loaded,
+    legacyImported: next.legacyImported,
     rev: next.rev,
     spaceOrder: same(prev.spaceOrder, next.spaceOrder) ? prev.spaceOrder : next.spaceOrder,
     currentSpaceId: next.currentSpaceId,

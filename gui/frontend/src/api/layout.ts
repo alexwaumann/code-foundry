@@ -116,6 +116,8 @@ export interface LayoutView {
   defaultSpaceId: string;
   /** Only threads with something stored. */
   threads: readonly ThreadLayoutView[];
+  /** The first-load import of the classic window's panels ran (LayoutService.ImportLegacy); absent reads false. */
+  legacyImported?: boolean;
 }
 
 /** Everything one commit changed: whole spaces and whole thread records. */
@@ -128,6 +130,8 @@ export interface LayoutDeltaView {
   defaultSpaceId: string;
   threads: readonly ThreadLayoutView[];
   removedThreadIds: readonly string[];
+  /** Layout.legacy_imported after the commit. */
+  legacyImported?: boolean;
 }
 
 /** The EventService layout source: the whole layout on connect, then one delta per commit. */
@@ -221,6 +225,7 @@ export function toLayoutView(l: Layout | undefined): LayoutView {
     currentSpaceId: l?.currentSpaceId ?? "",
     defaultSpaceId: l?.defaultSpaceId ?? "",
     threads: (l?.threads ?? []).map(toThreadLayoutView),
+    legacyImported: l?.legacyImported ?? false,
   };
 }
 
@@ -233,6 +238,7 @@ function toDeltaView(d: LayoutDelta): LayoutDeltaView {
     defaultSpaceId: d.defaultSpaceId,
     threads: d.threads.map(toThreadLayoutView),
     removedThreadIds: [...d.removedThreadIds],
+    legacyImported: d.legacyImported,
   };
 }
 
@@ -432,6 +438,23 @@ export async function applyLayoutOp(op: LayoutOpView, conn: DaemonConnection = d
     swappedPaneIds: [...res.swappedPaneIds],
     draftId: res.draftId,
   };
+}
+
+/** What the first-load import answered: the layout after it, and whether this call ran it. */
+export interface LegacyImportView {
+  layout: LayoutView;
+  imported: boolean;
+}
+
+/**
+ * The first-load import (docs/notes/shell-18-legacy-import.md): the classic window's stored side
+ * panels and bottom panels, as the raw localStorage strings ("" when absent), become each thread's
+ * remembered set and quick terminal. Once only: a second call answers imported false.
+ */
+export async function importLegacy(panelJson: string, bottomJson: string, conn: DaemonConnection = daemon): Promise<LegacyImportView> {
+  const c = await conn.client(LayoutService);
+  const res = await c.importLegacy({ panelJson, bottomJson, clientId: currentClientId() });
+  return { layout: { ...toLayoutView(res.layout), legacyImported: true }, imported: res.imported };
 }
 
 /** Reports the pane area's size in layout px. */

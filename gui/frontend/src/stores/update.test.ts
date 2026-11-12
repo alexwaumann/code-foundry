@@ -15,7 +15,8 @@ vi.mock("@/api/update", async (orig) => ({ ...(await orig<typeof import("@/api/u
 
 const { useCommandsStore } = await import("./commands");
 const { useHealthStore } = await import("./health");
-const { applyUpdateEvent, runUpdateAction, startUpdateSync, useUpdateStore } = await import("./update");
+const { applyUpdateEvent, isOldDaemon, runUpdateAction, startUpdateSync, useUpdateStore } = await import("./update");
+const { resetShellFlag, SHELL_FLAG_KEY } = await import("@/shell/flag");
 const { presentCommand } = await import("@/keys/bindings");
 
 function cmd(name: string): CommandView {
@@ -194,7 +195,7 @@ describe("a daemon from before the tunnel", () => {
     });
   });
 
-  it.each(["v0.21.6-tip.2", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
+  it.each(["v0.22.0-tip.1", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
     seen(version);
     await Promise.resolve();
     expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
@@ -208,5 +209,57 @@ describe("a daemon from before the tunnel", () => {
     });
     seen("v0.22.0");
     expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
+  });
+});
+
+// The window shell has no fallback (docs/notes/shell-plan.md 2.12): a daemon with the tunnel but
+// without the layout gets the same dialog, with Restart Now. The classic window (?shell=0) can
+// still follow it.
+describe("a daemon from before the window layout", () => {
+  const old = { state: "available", currentVersion: "v0.21.5" } as UpdateStatusView;
+  const seen = (version: string) => {
+    useHealthStore.setState({ status: "ok", health: { pid: 1, version, uptimeSeconds: 1 }, error: null });
+  };
+  let stop: () => void;
+
+  beforeEach(() => {
+    useUpdateStore.setState({ status: null, dialogOpen: false, oldDaemon: false });
+    useHealthStore.setState({ status: "connecting", health: null, error: null });
+    getUpdateStatus.mockResolvedValue({ ...old, state: "idle", currentVersion: "v0.21.8-tip.2" });
+  });
+  afterEach(() => {
+    stop();
+    localStorage.removeItem(SHELL_FLAG_KEY);
+    resetShellFlag();
+  });
+
+  it("opens the update dialog in the shell window", async () => {
+    stop = startUpdateSync();
+    seen("v0.21.8-tip.2");
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    });
+    expect(useUpdateStore.getState().oldDaemon).toBe(true);
+  });
+
+  it("leaves the classic window alone", async () => {
+    localStorage.setItem(SHELL_FLAG_KEY, "0");
+    resetShellFlag();
+    stop = startUpdateSync();
+    seen("v0.21.8-tip.2");
+    await Promise.resolve();
+    expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
+    expect(getUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["v0.21.5", true, true],
+    ["v0.21.5", false, true],
+    ["v0.21.8-tip.2", true, true],
+    ["v0.21.8-tip.2", false, false],
+    ["v0.22.0-tip.1", true, false],
+    ["dev", true, false],
+  ])("isOldDaemon(%s, shell %s): %s", (version, shell, want) => {
+    expect(isOldDaemon(version, shell)).toBe(want);
   });
 });

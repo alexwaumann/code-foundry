@@ -85,7 +85,8 @@ describe("Sidebar: the thread list", () => {
     expect(list().getAttribute("aria-label")).toBe("Threads");
     // No project, worktree or terminal rows: only threads and the footers' headers.
     expect(list().querySelectorAll('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveLength(0);
-    expect(screen.getByTestId("sidebar-band").textContent).toContain("Code Foundry");
+    // The window shell is the default: its top bar names the app, the sidebar has no band.
+    expect(screen.queryByTestId("sidebar-band")).toBeNull();
   });
 
   it("the keyboard: Home is the first row, ↓ moves, Enter selects; End is the last row; ↑ skips the Working header", () => {

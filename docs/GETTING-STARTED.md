@@ -89,9 +89,10 @@ left it.
 
 The thread info card (<kbd>⇧⌘I</kbd>) beside the conversation shows more about the
 selected thread: its projects and branch, what changed, its pull requests, the agents and
-threads it started, its MCP servers and what it cost. Its **Changes** row opens the side
-panel (<kbd>⇧⌘E</kbd>) on the changed files and commits. Or ask the thread: "what changed?",
-"what did this cost?". The bottom panel (<kbd>⌘J</kbd>) is a terminal in the thread's folder.
+threads it started, its MCP servers and what it cost. Its **Changes** row opens the thread's
+diff in a tab beside it (<kbd>⇧⌘D</kbd>) on the changed files and commits. Or ask the thread:
+"what changed?", "what did this cost?". The quick terminal (<kbd>⌘J</kbd>) is a shell in the
+thread's folder, under its conversation.
 
 When the work is done, ask the agent to commit and open a pull request, or use
 **Create Pull Request** from the command palette. The side panel follows its checks
