@@ -109,7 +109,8 @@ Through the existing ops:
   `clear_draft`, `discard_draft` or `open_thread` ended is gone. In that run every path fires:
   sending from a draft, clearing into the empty composer, clearing that closes a tab, reopening,
   and a draft following its tab to another space.
-- Fuzz, bounded, run by hand: `FuzzOps` and `FuzzDecode` for 60s each, both clean.
+- Fuzz, bounded, run by hand: `FuzzOps` for 60s (93k sequences) and `FuzzDecode` for 60s (18.5M
+  executions), both clean.
 - No end-to-end step: nothing is wired yet.
 
 ## For later PRs
