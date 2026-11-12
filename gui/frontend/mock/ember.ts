@@ -255,13 +255,9 @@ export class MockEmber {
     };
   }
 
-  /** Tasks in board order; open: todo, doing and blocked only. */
-  list(open = false): EmberTaskInit[] {
-    const live = [EmberTaskState.TODO, EmberTaskState.DOING, EmberTaskState.BLOCKED];
-    return [...this.tasks]
-      .sort((a, b) => a.position - b.position)
-      .filter((t) => !open || live.includes(t.state))
-      .map((t) => this.taskMsg(t));
+  /** Tasks in board order. */
+  list(): EmberTaskInit[] {
+    return [...this.tasks].sort((a, b) => a.position - b.position).map((t) => this.taskMsg(t));
   }
 
   board(): EmberBoardInit {

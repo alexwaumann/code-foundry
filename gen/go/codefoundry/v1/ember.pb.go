@@ -897,175 +897,6 @@ func (x *EmberTimer) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-type GetEmberStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetEmberStatusRequest) Reset() {
-	*x = GetEmberStatusRequest{}
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetEmberStatusRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetEmberStatusRequest) ProtoMessage() {}
-
-func (x *GetEmberStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetEmberStatusRequest.ProtoReflect.Descriptor instead.
-func (*GetEmberStatusRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ember_proto_rawDescGZIP(), []int{7}
-}
-
-type GetEmberStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        *EmberStatus           `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetEmberStatusResponse) Reset() {
-	*x = GetEmberStatusResponse{}
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetEmberStatusResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetEmberStatusResponse) ProtoMessage() {}
-
-func (x *GetEmberStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetEmberStatusResponse.ProtoReflect.Descriptor instead.
-func (*GetEmberStatusResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ember_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *GetEmberStatusResponse) GetStatus() *EmberStatus {
-	if x != nil {
-		return x.Status
-	}
-	return nil
-}
-
-type ListEmberTasksRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Only open tasks (todo, doing, blocked); default every task.
-	Open          bool `protobuf:"varint,1,opt,name=open,proto3" json:"open,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListEmberTasksRequest) Reset() {
-	*x = ListEmberTasksRequest{}
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListEmberTasksRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListEmberTasksRequest) ProtoMessage() {}
-
-func (x *ListEmberTasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListEmberTasksRequest.ProtoReflect.Descriptor instead.
-func (*ListEmberTasksRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ember_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *ListEmberTasksRequest) GetOpen() bool {
-	if x != nil {
-		return x.Open
-	}
-	return false
-}
-
-type ListEmberTasksResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Tasks         []*EmberTask           `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListEmberTasksResponse) Reset() {
-	*x = ListEmberTasksResponse{}
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListEmberTasksResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListEmberTasksResponse) ProtoMessage() {}
-
-func (x *ListEmberTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListEmberTasksResponse.ProtoReflect.Descriptor instead.
-func (*ListEmberTasksResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ember_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *ListEmberTasksResponse) GetTasks() []*EmberTask {
-	if x != nil {
-		return x.Tasks
-	}
-	return nil
-}
-
 type WatchEmberBoardRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1074,7 +905,7 @@ type WatchEmberBoardRequest struct {
 
 func (x *WatchEmberBoardRequest) Reset() {
 	*x = WatchEmberBoardRequest{}
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_ember_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1086,7 +917,7 @@ func (x *WatchEmberBoardRequest) String() string {
 func (*WatchEmberBoardRequest) ProtoMessage() {}
 
 func (x *WatchEmberBoardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_ember_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_ember_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1099,7 +930,7 @@ func (x *WatchEmberBoardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchEmberBoardRequest.ProtoReflect.Descriptor instead.
 func (*WatchEmberBoardRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_ember_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_ember_proto_rawDescGZIP(), []int{7}
 }
 
 var File_codefoundry_v1_ember_proto protoreflect.FileDescriptor
@@ -1186,14 +1017,7 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\x05every\x18\x03 \x01(\tR\x05every\x12\x12\n" +
 	"\x04note\x18\x04 \x01(\tR\x04note\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x17\n" +
-	"\x15GetEmberStatusRequest\"M\n" +
-	"\x16GetEmberStatusResponse\x123\n" +
-	"\x06status\x18\x01 \x01(\v2\x1b.codefoundry.v1.EmberStatusR\x06status\"+\n" +
-	"\x15ListEmberTasksRequest\x12\x12\n" +
-	"\x04open\x18\x01 \x01(\bR\x04open\"I\n" +
-	"\x16ListEmberTasksResponse\x12/\n" +
-	"\x05tasks\x18\x01 \x03(\v2\x19.codefoundry.v1.EmberTaskR\x05tasks\"\x18\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x18\n" +
 	"\x16WatchEmberBoardRequest*\xc2\x01\n" +
 	"\x0eEmberTaskState\x12 \n" +
 	"\x1cEMBER_TASK_STATE_UNSPECIFIED\x10\x00\x12\x19\n" +
@@ -1201,10 +1025,8 @@ const file_codefoundry_v1_ember_proto_rawDesc = "" +
 	"\x16EMBER_TASK_STATE_DOING\x10\x02\x12\x1c\n" +
 	"\x18EMBER_TASK_STATE_BLOCKED\x10\x03\x12\x19\n" +
 	"\x15EMBER_TASK_STATE_DONE\x10\x04\x12\x1e\n" +
-	"\x1aEMBER_TASK_STATE_CANCELLED\x10\x052\xa0\x02\n" +
-	"\fEmberService\x12\\\n" +
-	"\tGetStatus\x12%.codefoundry.v1.GetEmberStatusRequest\x1a&.codefoundry.v1.GetEmberStatusResponse\"\x00\x12\\\n" +
-	"\tListTasks\x12%.codefoundry.v1.ListEmberTasksRequest\x1a&.codefoundry.v1.ListEmberTasksResponse\"\x00\x12T\n" +
+	"\x1aEMBER_TASK_STATE_CANCELLED\x10\x052d\n" +
+	"\fEmberService\x12T\n" +
 	"\n" +
 	"WatchBoard\x12&.codefoundry.v1.WatchEmberBoardRequest\x1a\x1a.codefoundry.v1.EmberBoard\"\x000\x01B\xc2\x01\n" +
 	"\x12com.codefoundry.v1B\n" +
@@ -1223,7 +1045,7 @@ func file_codefoundry_v1_ember_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_ember_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_ember_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_codefoundry_v1_ember_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_codefoundry_v1_ember_proto_goTypes = []any{
 	(EmberTaskState)(0),            // 0: codefoundry.v1.EmberTaskState
 	(*EmberStatus)(nil),            // 1: codefoundry.v1.EmberStatus
@@ -1233,58 +1055,48 @@ var file_codefoundry_v1_ember_proto_goTypes = []any{
 	(*EmberTaskDescendant)(nil),    // 5: codefoundry.v1.EmberTaskDescendant
 	(*EmberBoard)(nil),             // 6: codefoundry.v1.EmberBoard
 	(*EmberTimer)(nil),             // 7: codefoundry.v1.EmberTimer
-	(*GetEmberStatusRequest)(nil),  // 8: codefoundry.v1.GetEmberStatusRequest
-	(*GetEmberStatusResponse)(nil), // 9: codefoundry.v1.GetEmberStatusResponse
-	(*ListEmberTasksRequest)(nil),  // 10: codefoundry.v1.ListEmberTasksRequest
-	(*ListEmberTasksResponse)(nil), // 11: codefoundry.v1.ListEmberTasksResponse
-	(*WatchEmberBoardRequest)(nil), // 12: codefoundry.v1.WatchEmberBoardRequest
-	(*timestamppb.Timestamp)(nil),  // 13: google.protobuf.Timestamp
-	(ThreadState)(0),               // 14: codefoundry.v1.ThreadState
-	(ThreadStatus)(0),              // 15: codefoundry.v1.ThreadStatus
-	(ThreadReportStatus)(0),        // 16: codefoundry.v1.ThreadReportStatus
-	(*ThreadSetup)(nil),            // 17: codefoundry.v1.ThreadSetup
-	(*StreamHeartbeat)(nil),        // 18: codefoundry.v1.StreamHeartbeat
+	(*WatchEmberBoardRequest)(nil), // 8: codefoundry.v1.WatchEmberBoardRequest
+	(*timestamppb.Timestamp)(nil),  // 9: google.protobuf.Timestamp
+	(ThreadState)(0),               // 10: codefoundry.v1.ThreadState
+	(ThreadStatus)(0),              // 11: codefoundry.v1.ThreadStatus
+	(ThreadReportStatus)(0),        // 12: codefoundry.v1.ThreadReportStatus
+	(*ThreadSetup)(nil),            // 13: codefoundry.v1.ThreadSetup
+	(*StreamHeartbeat)(nil),        // 14: codefoundry.v1.StreamHeartbeat
 }
 var file_codefoundry_v1_ember_proto_depIdxs = []int32{
-	13, // 0: codefoundry.v1.EmberStatus.epoch_started_at:type_name -> google.protobuf.Timestamp
-	13, // 1: codefoundry.v1.EmberStatus.last_consolidated_at:type_name -> google.protobuf.Timestamp
+	9,  // 0: codefoundry.v1.EmberStatus.epoch_started_at:type_name -> google.protobuf.Timestamp
+	9,  // 1: codefoundry.v1.EmberStatus.last_consolidated_at:type_name -> google.protobuf.Timestamp
 	2,  // 2: codefoundry.v1.EmberStatus.counts:type_name -> codefoundry.v1.EmberTaskCounts
 	0,  // 3: codefoundry.v1.EmberTask.state:type_name -> codefoundry.v1.EmberTaskState
-	13, // 4: codefoundry.v1.EmberTask.created_at:type_name -> google.protobuf.Timestamp
-	13, // 5: codefoundry.v1.EmberTask.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 6: codefoundry.v1.EmberTask.done_at:type_name -> google.protobuf.Timestamp
+	9,  // 4: codefoundry.v1.EmberTask.created_at:type_name -> google.protobuf.Timestamp
+	9,  // 5: codefoundry.v1.EmberTask.updated_at:type_name -> google.protobuf.Timestamp
+	9,  // 6: codefoundry.v1.EmberTask.done_at:type_name -> google.protobuf.Timestamp
 	4,  // 7: codefoundry.v1.EmberTask.thread:type_name -> codefoundry.v1.EmberTaskThread
-	14, // 8: codefoundry.v1.EmberTaskThread.state:type_name -> codefoundry.v1.ThreadState
-	15, // 9: codefoundry.v1.EmberTaskThread.status:type_name -> codefoundry.v1.ThreadStatus
-	16, // 10: codefoundry.v1.EmberTaskThread.report_status:type_name -> codefoundry.v1.ThreadReportStatus
-	13, // 11: codefoundry.v1.EmberTaskThread.report_at:type_name -> google.protobuf.Timestamp
-	13, // 12: codefoundry.v1.EmberTaskThread.created_at:type_name -> google.protobuf.Timestamp
-	13, // 13: codefoundry.v1.EmberTaskThread.last_activity_at:type_name -> google.protobuf.Timestamp
+	10, // 8: codefoundry.v1.EmberTaskThread.state:type_name -> codefoundry.v1.ThreadState
+	11, // 9: codefoundry.v1.EmberTaskThread.status:type_name -> codefoundry.v1.ThreadStatus
+	12, // 10: codefoundry.v1.EmberTaskThread.report_status:type_name -> codefoundry.v1.ThreadReportStatus
+	9,  // 11: codefoundry.v1.EmberTaskThread.report_at:type_name -> google.protobuf.Timestamp
+	9,  // 12: codefoundry.v1.EmberTaskThread.created_at:type_name -> google.protobuf.Timestamp
+	9,  // 13: codefoundry.v1.EmberTaskThread.last_activity_at:type_name -> google.protobuf.Timestamp
 	5,  // 14: codefoundry.v1.EmberTaskThread.descendants:type_name -> codefoundry.v1.EmberTaskDescendant
-	17, // 15: codefoundry.v1.EmberTaskThread.setup:type_name -> codefoundry.v1.ThreadSetup
-	15, // 16: codefoundry.v1.EmberTaskDescendant.status:type_name -> codefoundry.v1.ThreadStatus
-	16, // 17: codefoundry.v1.EmberTaskDescendant.report_status:type_name -> codefoundry.v1.ThreadReportStatus
-	14, // 18: codefoundry.v1.EmberTaskDescendant.state:type_name -> codefoundry.v1.ThreadState
-	13, // 19: codefoundry.v1.EmberTaskDescendant.last_activity_at:type_name -> google.protobuf.Timestamp
+	13, // 15: codefoundry.v1.EmberTaskThread.setup:type_name -> codefoundry.v1.ThreadSetup
+	11, // 16: codefoundry.v1.EmberTaskDescendant.status:type_name -> codefoundry.v1.ThreadStatus
+	12, // 17: codefoundry.v1.EmberTaskDescendant.report_status:type_name -> codefoundry.v1.ThreadReportStatus
+	10, // 18: codefoundry.v1.EmberTaskDescendant.state:type_name -> codefoundry.v1.ThreadState
+	9,  // 19: codefoundry.v1.EmberTaskDescendant.last_activity_at:type_name -> google.protobuf.Timestamp
 	1,  // 20: codefoundry.v1.EmberBoard.status:type_name -> codefoundry.v1.EmberStatus
 	3,  // 21: codefoundry.v1.EmberBoard.tasks:type_name -> codefoundry.v1.EmberTask
-	18, // 22: codefoundry.v1.EmberBoard.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
+	14, // 22: codefoundry.v1.EmberBoard.heartbeat:type_name -> codefoundry.v1.StreamHeartbeat
 	7,  // 23: codefoundry.v1.EmberBoard.timers:type_name -> codefoundry.v1.EmberTimer
-	13, // 24: codefoundry.v1.EmberTimer.next_at:type_name -> google.protobuf.Timestamp
-	13, // 25: codefoundry.v1.EmberTimer.created_at:type_name -> google.protobuf.Timestamp
-	1,  // 26: codefoundry.v1.GetEmberStatusResponse.status:type_name -> codefoundry.v1.EmberStatus
-	3,  // 27: codefoundry.v1.ListEmberTasksResponse.tasks:type_name -> codefoundry.v1.EmberTask
-	8,  // 28: codefoundry.v1.EmberService.GetStatus:input_type -> codefoundry.v1.GetEmberStatusRequest
-	10, // 29: codefoundry.v1.EmberService.ListTasks:input_type -> codefoundry.v1.ListEmberTasksRequest
-	12, // 30: codefoundry.v1.EmberService.WatchBoard:input_type -> codefoundry.v1.WatchEmberBoardRequest
-	9,  // 31: codefoundry.v1.EmberService.GetStatus:output_type -> codefoundry.v1.GetEmberStatusResponse
-	11, // 32: codefoundry.v1.EmberService.ListTasks:output_type -> codefoundry.v1.ListEmberTasksResponse
-	6,  // 33: codefoundry.v1.EmberService.WatchBoard:output_type -> codefoundry.v1.EmberBoard
-	31, // [31:34] is the sub-list for method output_type
-	28, // [28:31] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	9,  // 24: codefoundry.v1.EmberTimer.next_at:type_name -> google.protobuf.Timestamp
+	9,  // 25: codefoundry.v1.EmberTimer.created_at:type_name -> google.protobuf.Timestamp
+	8,  // 26: codefoundry.v1.EmberService.WatchBoard:input_type -> codefoundry.v1.WatchEmberBoardRequest
+	6,  // 27: codefoundry.v1.EmberService.WatchBoard:output_type -> codefoundry.v1.EmberBoard
+	27, // [27:28] is the sub-list for method output_type
+	26, // [26:27] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_ember_proto_init() }
@@ -1300,7 +1112,7 @@ func file_codefoundry_v1_ember_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_ember_proto_rawDesc), len(file_codefoundry_v1_ember_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

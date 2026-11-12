@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DescService } from "@bufbuild/protobuf";
-import { EmberService } from "@/gen/codefoundry/v1/ember_pb";
 import { HealthService } from "@/gen/codefoundry/v1/health_pb";
 import { TerminalService } from "@/gen/codefoundry/v1/terminal_pb";
+import { ThreadService } from "@/gen/codefoundry/v1/thread_pb";
 import { DaemonConnection, jsonRequested } from "./endpoint";
 
 /** Every server-streaming RPC in the generated code: its procedure, its service, its client method. */
@@ -102,8 +102,8 @@ describe("which transport a call takes", () => {
   });
 
   it("is fetch for a unary call of a service with a stream", async () => {
-    const got = await reached(async (conn) => (await conn.client(EmberService)).getStatus({}));
-    expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.EmberService/GetStatus"] });
+    const got = await reached(async (conn) => (await conn.client(ThreadService)).list({}));
+    expect(got).toEqual({ socket: [], fetch: ["http://127.0.0.1:1/codefoundry.v1.ThreadService/List"] });
   });
 
   it("is fetch for a terminal's input, which never waits on a stream", async () => {

@@ -664,8 +664,6 @@ function routes(router: ConnectRouter): void {
 
   // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.
   router.service(EmberService, {
-    getStatus: () => ({ status: world.ember.status() }),
-    listTasks: (req) => ({ tasks: world.ember.list(req.open) }),
     watchBoard: (_req, ctx) => tracked("EmberService/WatchBoard", world.ember.watch(ctx.signal)),
   });
 

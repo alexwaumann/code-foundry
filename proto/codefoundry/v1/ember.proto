@@ -12,10 +12,6 @@ import "google/protobuf/timestamp.proto";
 // choose its models. Ember's chat is its resident thread (Thread.kind RESIDENT,
 // resident_name "ember"), read through ThreadService like any thread.
 service EmberService {
-  // GetStatus is Ember's state now.
-  rpc GetStatus(GetEmberStatusRequest) returns (GetEmberStatusResponse) {}
-  // ListTasks lists the board's tasks, each with its worker thread's progress.
-  rpc ListTasks(ListEmberTasksRequest) returns (ListEmberTasksResponse) {}
   // WatchBoard sends the whole board (status, every task and Ember's timers) at once,
   // then again on every change: a task, Ember's state, a task's worker thread (its
   // status or report), or one of Ember's timers (added, fired, cancelled). A quiet
@@ -168,21 +164,6 @@ message EmberTimer {
   // Why Ember set it (thread subscribe --note); "" for none.
   string note = 4;
   google.protobuf.Timestamp created_at = 5;
-}
-
-message GetEmberStatusRequest {}
-
-message GetEmberStatusResponse {
-  EmberStatus status = 1;
-}
-
-message ListEmberTasksRequest {
-  // Only open tasks (todo, doing, blocked); default every task.
-  bool open = 1;
-}
-
-message ListEmberTasksResponse {
-  repeated EmberTask tasks = 1;
 }
 
 message WatchEmberBoardRequest {}
