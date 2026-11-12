@@ -4024,7 +4024,12 @@ export class World {
     const activeThread = (ctx: UiContext | undefined) => (ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined);
     const always = () => true;
     return [
-      ...viewCommands((i) => this.emit(i)),
+      ...viewCommands(
+        (i) => this.emit(i),
+        (kind, pane, params) => {
+          this.layout.apply({ op: "open_surface", pane, tab: { id: "", kind, ...(Object.keys(params).length > 0 ? { params } : {}) }, focus: true }, "");
+        },
+      ),
       ...bridgeCommands(() => [...this.threads.values()]),
       ...fileExportCommands((id) => this.threads.get(id)?.worktreePath, () => this.exportDisk),
       ...this.logs.commands(),
@@ -5086,7 +5091,14 @@ export class World {
       }),
       ...projectCommands(this),
       ...renameCommands(this),
-      ...layoutCommands({ layout: this.layout, hasThread: (id) => this.threads.has(id) }),
+      ...layoutCommands({
+        layout: this.layout,
+        hasThread: (id) => this.threads.has(id),
+        threadCheckout: (id) => {
+          const t = this.threads.get(id);
+          return { projectId: t?.projectId ?? "", worktreePath: t?.worktreePath ?? "" };
+        },
+      }),
       ...terminalShellCommands({
         layout: this.layout,
         ensureQuick: (thread) => this.ensureQuick(thread).id,

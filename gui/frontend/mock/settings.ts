@@ -129,7 +129,7 @@ export const NO_KEYBINDING = new Set([
   "thread.move.open", "thread.new-like", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop",
   "thread.stop-waiting", "thread.unsubscribe", "thread.wait",
   "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show",
-  "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url", "view.panel.gallery", "view.panel.page", "workspace.list",
+  "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url", "view.panel.gallery", "view.panel.page", "view.thread-diff", "workspace.list",
 ]);
 
 /** A category's keybindings section id ("Pull Request" -> "pull-request"). */
