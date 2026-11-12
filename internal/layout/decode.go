@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,15 +40,16 @@ func Decode(data []byte, ids IDs) (*State, []string, error) {
 
 // SpaceDoc is one space's stored document (the row holds its id, name and position).
 type SpaceDoc struct {
-	V     int      `json:"v"`
-	Root  *Node    `json:"root"`
-	Focus string   `json:"focus,omitempty"`
-	MRU   []string `json:"mru,omitempty"`
+	V      int      `json:"v"`
+	Root   *Node    `json:"root"`
+	Focus  string   `json:"focus,omitempty"`
+	MRU    []string `json:"mru,omitempty"`
+	Drafts []*Draft `json:"drafts,omitempty"`
 }
 
 // EncodeSpaceDoc writes a space's document.
 func EncodeSpaceDoc(sp *Space) ([]byte, error) {
-	b, err := json.Marshal(SpaceDoc{V: Version, Root: sp.Root, Focus: sp.Focus, MRU: sp.MRU})
+	b, err := json.Marshal(SpaceDoc{V: Version, Root: sp.Root, Focus: sp.Focus, MRU: sp.MRU, Drafts: sp.Drafts})
 	if err != nil {
 		return nil, fmt.Errorf("encode space %s: %w", sp.ID, err)
 	}
@@ -64,7 +66,7 @@ func DecodeSpaceDoc(id, name string, data []byte) (*Space, error) {
 	if d.V > Version {
 		return nil, fmt.Errorf("decode space %s: version %d: %w", id, d.V, ErrNewerVersion)
 	}
-	return &Space{ID: id, Name: name, Root: d.Root, Focus: d.Focus, MRU: d.MRU}, nil
+	return &Space{ID: id, Name: name, Root: d.Root, Focus: d.Focus, MRU: d.MRU, Drafts: d.Drafts}, nil
 }
 
 // ThreadDoc is one thread's stored document (the row holds its id and space).
@@ -102,16 +104,17 @@ func DecodeThreadDoc(space string, data []byte) (*ThreadState, error) {
 // a state with no space gets one called "Main". A version 0 document (no "v") is read as
 // version 1.
 func Sanitize(st *State, ids IDs) []string {
-	s := &sanitizer{t: &tx{st: st, ids: ids}, seen: map[string]bool{}, global: map[string]bool{}}
+	s := &sanitizer{t: &tx{st: st, ids: ids}, seen: map[string]bool{}, global: map[string]bool{}, draftTabs: map[string]bool{}}
 	s.run()
 	return s.repairs
 }
 
 type sanitizer struct {
-	t       *tx
-	seen    map[string]bool // ids claimed so far
-	global  map[string]bool // global-scope keys open so far
-	repairs []string
+	t         *tx
+	seen      map[string]bool // ids claimed so far
+	global    map[string]bool // global-scope keys open so far
+	draftTabs map[string]bool // drafts with a tab open so far
+	repairs   []string
 }
 
 func (s *sanitizer) note(format string, a ...any) {
@@ -161,6 +164,7 @@ func (s *sanitizer) run() {
 		s.space(sp)
 	}
 	s.threads()
+	s.drafts()
 }
 
 func (s *sanitizer) space(sp *Space) {
@@ -264,6 +268,13 @@ func (s *sanitizer) tab(sp *Space, p *Node, tb *Tab, keys map[string]bool) bool 
 		s.note("pane %s: dropped tab %q, a second %s", p.ID, tb.ID, key)
 		return false
 	}
+	if id := draftOf(tb); id != "" {
+		if s.draftTabs[id] {
+			s.note("pane %s: dropped tab %q, a second tab of draft %s", p.ID, tb.ID, id)
+			return false
+		}
+		s.draftTabs[id] = true
+	}
 	scope[key] = true
 	if tb.Name != "" && !k.Renameable {
 		s.note("tab %s: dropped the name of a %s tab", tb.ID, tb.Kind)
@@ -316,6 +327,65 @@ func (s *sanitizer) threads() {
 					ts.Space = sp.ID
 				} else {
 					st.Threads[tb.Thread] = &ThreadState{Space: sp.ID}
+				}
+			}
+		}
+	}
+}
+
+// drafts repairs the draft lists: an entry that is nil, has no id, or repeats one listed
+// before is dropped; a label is made one short line; a draft whose tab is open in another
+// space moves there, and one no space lists is listed by its tab's space (label empty); each
+// entry takes its open tab's params.
+func (s *sanitizer) drafts() {
+	st := s.t.st
+	listed := map[string]bool{}
+	for _, sp := range st.Spaces {
+		sp.Drafts = slices.DeleteFunc(sp.Drafts, func(d *Draft) bool {
+			switch {
+			case d == nil || d.ID == "":
+				s.note("space %s: dropped a draft without an id", sp.ID)
+				return true
+			case listed[d.ID]:
+				s.note("space %s: dropped draft %s, listed before", sp.ID, d.ID)
+				return true
+			}
+			listed[d.ID] = true
+			if l := draftLabel(d.Label); l != d.Label {
+				s.note("draft %s: label %q is now %q", d.ID, d.Label, l)
+				d.Label = l
+			}
+			if _, ok := d.Params[DraftParam]; ok {
+				s.note("draft %s: dropped the draft id from its params", d.ID)
+				d.Params = draftParams(d.Params)
+			}
+			return false
+		})
+		if len(sp.Drafts) == 0 {
+			sp.Drafts = nil
+		}
+	}
+	for _, sp := range st.Spaces {
+		for _, p := range Panes(sp.Root) {
+			for _, tb := range p.Tabs {
+				id := draftOf(tb)
+				if id == "" {
+					continue
+				}
+				dsp, d := findDraft(st, id)
+				switch {
+				case d == nil:
+					s.note("draft %s: open in space %s but listed nowhere, now listed there", id, sp.ID)
+					d = &Draft{ID: id}
+					sp.Drafts = append(sp.Drafts, d)
+				case dsp != sp:
+					s.note("draft %s: open in space %s, listed by %s, moved", id, sp.ID, dsp.ID)
+					unlistDraft(st, id)
+					sp.Drafts = append(sp.Drafts, d)
+				}
+				if want := draftParams(tb.Params); !maps.Equal(d.Params, want) {
+					s.note("draft %s: params are now its tab's", id)
+					d.Params = want
 				}
 			}
 		}

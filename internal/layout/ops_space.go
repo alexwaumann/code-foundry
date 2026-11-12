@@ -74,7 +74,7 @@ func (o *RenameSpace) apply(t *tx) (Result, error) {
 // RemoveSpace removes a space with all its panes and tabs (Result.Closed lists them, so the
 // caller ends the unlinked terminals). Its threads move to To (default: the space on its
 // left, else on its right), closed and with no remembered set, as do the threads of the
-// default space when it is the one removed. Archiving them instead is the caller's, through
+// default space when it is the one removed. Its drafts move to the top of To's list, closed. Archiving them instead is the caller's, through
 // the thread store. The last space cannot be removed.
 type RemoveSpace struct {
 	Space string `json:"space"`
@@ -109,6 +109,10 @@ func (o *RemoveSpace) apply(t *tx) (Result, error) {
 	var closed []*Tab
 	for _, p := range Panes(sp.Root) {
 		closed = append(closed, p.Tabs...)
+	}
+	if len(sp.Drafts) > 0 {
+		target := t.st.Space(to)
+		target.Drafts = append(slices.Clone(sp.Drafts), target.Drafts...)
 	}
 	for _, ts := range t.st.Threads {
 		if ts.Space == sp.ID {

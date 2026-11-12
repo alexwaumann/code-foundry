@@ -130,6 +130,18 @@ type Space struct {
 	Focus string `json:"focus,omitempty"`
 	// MRU holds tab ids of this space, most recently focused first, at most MaxMRU.
 	MRU []string `json:"mru,omitempty"`
+	// Drafts are the space's composer drafts, newest first, whether or not each has a tab
+	// open (drafts.go). The space's empty composer is never one of them.
+	Drafts []*Draft `json:"drafts,omitempty"`
+}
+
+// Draft is a composer with something typed in it: its id (the "draft" param of its compose
+// tab), a short label for lists, and the params its tab carries besides the id (what the next
+// thread starts from), so a closed draft reopens as it was. The text itself is not here.
+type Draft struct {
+	ID     string            `json:"id"`
+	Label  string            `json:"label,omitempty"`
+	Params map[string]string `json:"params,omitempty"`
 }
 
 // ThreadState is what the layout stores for one thread.
@@ -310,7 +322,16 @@ func (sp *Space) clone() *Space {
 	if sp == nil {
 		return nil
 	}
-	return &Space{ID: sp.ID, Name: sp.Name, Root: sp.Root.clone(), Focus: sp.Focus, MRU: slices.Clone(sp.MRU)}
+	c := &Space{ID: sp.ID, Name: sp.Name, Root: sp.Root.clone(), Focus: sp.Focus, MRU: slices.Clone(sp.MRU)}
+	if sp.Drafts != nil {
+		c.Drafts = make([]*Draft, len(sp.Drafts))
+		for i, d := range sp.Drafts {
+			if d != nil {
+				c.Drafts[i] = &Draft{ID: d.ID, Label: d.Label, Params: maps.Clone(d.Params)}
+			}
+		}
+	}
+	return c
 }
 
 func (n *Node) clone() *Node {

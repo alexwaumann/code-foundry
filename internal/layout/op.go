@@ -46,6 +46,10 @@ type Result struct {
 	Fresh  []string `json:"fresh,omitempty"`
 	// Swapped lists the panes smart swap switched (swap.go).
 	Swapped []string `json:"swapped,omitempty"`
+	// Draft is the composer draft the op started, opened or ended (drafts.go). After
+	// clear_draft, discard_draft, or open_thread sending from a draft, the draft is gone and
+	// the caller deletes its stored text.
+	Draft string `json:"draft,omitempty"`
 }
 
 // Options are the user settings an op runs with.
@@ -127,7 +131,8 @@ func EncodeOp(op Op) ([]byte, error) {
 	return out, nil
 }
 
-// IDs makes new ids for panes ("p-"), splits ("s-"), tabs ("t-") and spaces ("sp-").
+// IDs makes new ids for panes ("p-"), splits ("s-"), tabs ("t-"), spaces ("sp-") and
+// composer drafts ("d-").
 // Apply retries an id already in use.
 type IDs interface {
 	NewID(prefix string) string
@@ -214,6 +219,11 @@ func usedIDs(st *State) map[string]bool {
 			continue
 		}
 		used[sp.ID] = true
+		for _, d := range sp.Drafts {
+			if d != nil {
+				used[d.ID] = true
+			}
+		}
 		walk(sp.Root, func(n *Node) {
 			used[n.ID] = true
 			for _, tb := range n.Tabs {
@@ -283,6 +293,9 @@ func (t *tx) prepare(sp *Space, tb *Tab) (*Tab, error) {
 		return nil, err
 	}
 	tb.Key = key
+	if err := checkDraftTab(t.st, sp, tb); err != nil {
+		return nil, err
+	}
 	if tb.Kind == "thread" && t.st.SpaceOf(tb.Thread) != sp.ID {
 		return nil, fmt.Errorf("thread %s lives in space %s, not %s: %w", tb.Thread, t.st.SpaceOf(tb.Thread), sp.ID, ErrFailedPrecondition)
 	}
@@ -405,4 +418,5 @@ func (t *tx) finish() {
 			sp.MRU = nil
 		}
 	}
+	followDrafts(t.st)
 }
