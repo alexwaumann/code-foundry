@@ -96,11 +96,6 @@ func TestGitOpsRPCs(t *testing.T) {
 		})
 	}
 
-	list, err := c.List(ctx, connect.NewRequest(&v1.ListGitOpsRequest{}))
-	if err != nil || len(list.Msg.GetOps()) != len(tests) {
-		t.Fatalf("List = %v, %v", list, err)
-	}
-
 	// A failed op is a response, not an RPC error.
 	fake.Fail = "rejected"
 	op := call(unwrap(c.Push(ctx, connect.NewRequest(&v1.GitPushRequest{WorktreePath: "/w"}))))

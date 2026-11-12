@@ -58,8 +58,6 @@ const (
 	GitOpsServiceRevealProcedure = "/codefoundry.v1.GitOpsService/Reveal"
 	// GitOpsServiceOpenUrlProcedure is the fully-qualified name of the GitOpsService's OpenUrl RPC.
 	GitOpsServiceOpenUrlProcedure = "/codefoundry.v1.GitOpsService/OpenUrl"
-	// GitOpsServiceListProcedure is the fully-qualified name of the GitOpsService's List RPC.
-	GitOpsServiceListProcedure = "/codefoundry.v1.GitOpsService/List"
 )
 
 // GitOpsServiceClient is a client for the codefoundry.v1.GitOpsService service.
@@ -96,8 +94,6 @@ type GitOpsServiceClient interface {
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
 	OpenUrl(context.Context, *connect.Request[v1.OpenUrlRequest]) (*connect.Response[v1.OpenUrlResponse], error)
-	// List returns queued and running operations and the most recent finished ones.
-	List(context.Context, *connect.Request[v1.ListGitOpsRequest]) (*connect.Response[v1.ListGitOpsResponse], error)
 }
 
 // NewGitOpsServiceClient constructs a client for the codefoundry.v1.GitOpsService service. By
@@ -171,12 +167,6 @@ func NewGitOpsServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(gitOpsServiceMethods.ByName("OpenUrl")),
 			connect.WithClientOptions(opts...),
 		),
-		list: connect.NewClient[v1.ListGitOpsRequest, v1.ListGitOpsResponse](
-			httpClient,
-			baseURL+GitOpsServiceListProcedure,
-			connect.WithSchema(gitOpsServiceMethods.ByName("List")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -192,7 +182,6 @@ type gitOpsServiceClient struct {
 	listAppIcons      *connect.Client[v1.ListAppIconsRequest, v1.ListAppIconsResponse]
 	reveal            *connect.Client[v1.RevealRequest, v1.RevealResponse]
 	openUrl           *connect.Client[v1.OpenUrlRequest, v1.OpenUrlResponse]
-	list              *connect.Client[v1.ListGitOpsRequest, v1.ListGitOpsResponse]
 }
 
 // Fetch calls codefoundry.v1.GitOpsService.Fetch.
@@ -245,11 +234,6 @@ func (c *gitOpsServiceClient) OpenUrl(ctx context.Context, req *connect.Request[
 	return c.openUrl.CallUnary(ctx, req)
 }
 
-// List calls codefoundry.v1.GitOpsService.List.
-func (c *gitOpsServiceClient) List(ctx context.Context, req *connect.Request[v1.ListGitOpsRequest]) (*connect.Response[v1.ListGitOpsResponse], error) {
-	return c.list.CallUnary(ctx, req)
-}
-
 // GitOpsServiceHandler is an implementation of the codefoundry.v1.GitOpsService service.
 type GitOpsServiceHandler interface {
 	// Fetch runs `git fetch --prune` in the worktree, optionally for one remote or one
@@ -284,8 +268,6 @@ type GitOpsServiceHandler interface {
 	Reveal(context.Context, *connect.Request[v1.RevealRequest]) (*connect.Response[v1.RevealResponse], error)
 	// OpenUrl opens an http(s) URL in the default browser.
 	OpenUrl(context.Context, *connect.Request[v1.OpenUrlRequest]) (*connect.Response[v1.OpenUrlResponse], error)
-	// List returns queued and running operations and the most recent finished ones.
-	List(context.Context, *connect.Request[v1.ListGitOpsRequest]) (*connect.Response[v1.ListGitOpsResponse], error)
 }
 
 // NewGitOpsServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -355,12 +337,6 @@ func NewGitOpsServiceHandler(svc GitOpsServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(gitOpsServiceMethods.ByName("OpenUrl")),
 		connect.WithHandlerOptions(opts...),
 	)
-	gitOpsServiceListHandler := connect.NewUnaryHandler(
-		GitOpsServiceListProcedure,
-		svc.List,
-		connect.WithSchema(gitOpsServiceMethods.ByName("List")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/codefoundry.v1.GitOpsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GitOpsServiceFetchProcedure:
@@ -383,8 +359,6 @@ func NewGitOpsServiceHandler(svc GitOpsServiceHandler, opts ...connect.HandlerOp
 			gitOpsServiceRevealHandler.ServeHTTP(w, r)
 		case GitOpsServiceOpenUrlProcedure:
 			gitOpsServiceOpenUrlHandler.ServeHTTP(w, r)
-		case GitOpsServiceListProcedure:
-			gitOpsServiceListHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -432,8 +406,4 @@ func (UnimplementedGitOpsServiceHandler) Reveal(context.Context, *connect.Reques
 
 func (UnimplementedGitOpsServiceHandler) OpenUrl(context.Context, *connect.Request[v1.OpenUrlRequest]) (*connect.Response[v1.OpenUrlResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GitOpsService.OpenUrl is not implemented"))
-}
-
-func (UnimplementedGitOpsServiceHandler) List(context.Context, *connect.Request[v1.ListGitOpsRequest]) (*connect.Response[v1.ListGitOpsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GitOpsService.List is not implemented"))
 }

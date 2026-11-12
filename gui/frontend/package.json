@@ -11,7 +11,6 @@
     "lint": "oxlint --type-aware --deny-warnings",
     "test": "vitest run",
     "mock": "tsx mock/server.ts",
-    "mock:emit": "tsx mock/emit.ts",
     "themes": "tsx themes/convert.ts",
     "themes:check": "tsx themes/check.ts",
     "rendered-text-fixture": "tsx scripts/renderedTextFixture.ts",

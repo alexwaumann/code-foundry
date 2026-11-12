@@ -13,12 +13,14 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
-func TestUIEmitFanOut(t *testing.T) {
+func TestUIWatchIntentsFanOut(t *testing.T) {
+	b := bus.New()
 	mux := http.NewServeMux()
-	r := NewUI(bus.New(), theme.NewLive(), theme.NewReports()).Route()
+	r := NewUI(b, theme.NewLive(), theme.NewReports()).Route()
 	mux.Handle(r.Path, r.Handler)
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -27,14 +29,7 @@ func TestUIEmitFanOut(t *testing.T) {
 	defer cancel()
 
 	notify := &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{Title: "hi"}}}
-	emit := func() uint32 {
-		t.Helper()
-		res, err := c.Emit(ctx, connect.NewRequest(&v1.EmitIntentRequest{Intent: notify}))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return res.Msg.GetDelivered()
-	}
+	emit := func() int { return command.BusEmitter{Bus: b}.Emit(notify) }
 
 	if n := emit(); n != 0 {
 		t.Fatalf("delivered %d with no watchers", n)
@@ -59,15 +54,6 @@ func TestUIEmitFanOut(t *testing.T) {
 		if !proto.Equal(s.Msg(), notify) {
 			t.Fatalf("watcher %d got %v", i, s.Msg())
 		}
-	}
-
-	_, err := c.Emit(ctx, connect.NewRequest(&v1.EmitIntentRequest{}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Fatalf("empty intent err = %v, want invalid_argument", err)
-	}
-	_, err = c.Emit(ctx, connect.NewRequest(&v1.EmitIntentRequest{Intent: &v1.UiIntent{}}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Fatalf("intent without a case err = %v, want invalid_argument", err)
 	}
 }
 

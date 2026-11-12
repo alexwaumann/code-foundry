@@ -9,8 +9,6 @@ import "codefoundry/v1/plugin.proto";
 service UiService {
   // WatchIntents is held open by the GUI. Intents are fan-out: every watcher gets each.
   rpc WatchIntents(WatchIntentsRequest) returns (stream UiIntent) {}
-  // Emit publishes an intent to all watchers. Commands use this to drive the GUI.
-  rpc Emit(EmitIntentRequest) returns (EmitIntentResponse) {}
   // PublishTheme records the GUI's active theme and its resolved slots, so pages the model
   // writes can paint in it: the loopback listener serves it as GET /cf/theme.css and
   // /cf/theme.json (docs/notes/theme-css-route.md). The GUI calls it on connect and on
@@ -254,13 +252,4 @@ message UiIntent {
     // page already shows the change. Empty: every window shows it.
     string unless_showing = 8;
   }
-}
-
-message EmitIntentRequest {
-  UiIntent intent = 1;
-}
-
-message EmitIntentResponse {
-  // Number of connected watchers that received the intent.
-  uint32 delivered = 1;
 }

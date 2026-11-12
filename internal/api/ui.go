@@ -19,7 +19,7 @@ import (
 const intentBuffer = 32
 
 // UI implements codefoundryv1connect.UiServiceHandler. Intents travel on the bus as
-// command.IntentEvent, so ui.* commands and Emit reach the same watchers. PublishTheme
+// command.IntentEvent, so the ui.* commands reach every watcher. PublishTheme
 // records the GUI's active theme for the frame stylesheet (theme.Live), PublishThemeReport
 // its contrast report on the user's themes (theme.Reports). WatchShots and PublishShot make
 // the app's host the capturer of plugin surface shots (shot.Broker).
@@ -62,7 +62,7 @@ func (h *UI) Route(opts ...connect.HandlerOption) Route {
 
 // WatchIntents streams every intent emitted while the stream is open. Response headers
 // are flushed as soon as the watcher is subscribed, so a client that has seen them
-// counts toward Emit's delivered total.
+// counts toward an emitter's delivered total (command.BusEmitter).
 func (h *UI) WatchIntents(ctx context.Context, _ *connect.Request[v1.WatchIntentsRequest], stream *connect.ServerStream[v1.UiIntent]) error {
 	sub := bus.Subscribe[command.IntentEvent](h.bus, intentBuffer)
 	defer sub.Close()
@@ -82,16 +82,6 @@ func (h *UI) WatchIntents(ctx context.Context, _ *connect.Request[v1.WatchIntent
 			}
 		}
 	}
-}
-
-// Emit publishes an intent to all watchers.
-func (h *UI) Emit(_ context.Context, req *connect.Request[v1.EmitIntentRequest]) (*connect.Response[v1.EmitIntentResponse], error) {
-	intent := req.Msg.GetIntent()
-	if intent.GetIntent() == nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("intent is required"))
-	}
-	n := command.BusEmitter{Bus: h.bus}.Emit(intent)
-	return connect.NewResponse(&v1.EmitIntentResponse{Delivered: uint32(n)}), nil
 }
 
 // PublishTheme makes the GUI's active theme the one GET /cf/theme.css and /cf/theme.json

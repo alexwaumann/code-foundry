@@ -48,8 +48,6 @@ service GitOpsService {
   rpc Reveal(RevealRequest) returns (RevealResponse) {}
   // OpenUrl opens an http(s) URL in the default browser.
   rpc OpenUrl(OpenUrlRequest) returns (OpenUrlResponse) {}
-  // List returns queued and running operations and the most recent finished ones.
-  rpc List(ListGitOpsRequest) returns (ListGitOpsResponse) {}
 }
 
 enum GitOpKind {
@@ -230,13 +228,6 @@ message OpenUrlRequest {
 
 message OpenUrlResponse {
   GitOp op = 1;
-}
-
-message ListGitOpsRequest {}
-
-message ListGitOpsResponse {
-  // Queued and running operations first (oldest first), then finished ones, newest first.
-  repeated GitOp ops = 1;
 }
 
 message GitOpsEvent {

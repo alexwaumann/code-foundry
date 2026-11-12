@@ -136,11 +136,6 @@ func (h *GitOps) OpenUrl(ctx context.Context, req *connect.Request[v1.OpenUrlReq
 	return connect.NewResponse(&v1.OpenUrlResponse{Op: gitOpToProto(op)}), nil
 }
 
-// List implements GitOpsServiceHandler.
-func (h *GitOps) List(context.Context, *connect.Request[v1.ListGitOpsRequest]) (*connect.Response[v1.ListGitOpsResponse], error) {
-	return connect.NewResponse(&v1.ListGitOpsResponse{Ops: gitOpsToProto(h.store.Snapshot().Ops)}), nil
-}
-
 func gitopsError(err error) error {
 	code := connect.CodeInternal
 	switch {

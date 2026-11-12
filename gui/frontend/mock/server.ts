@@ -481,7 +481,6 @@ function routes(router: ConnectRouter): void {
 
   router.service(UiService, {
     watchIntents: (_req, ctx) => tracked("UiService/WatchIntents", world.intents.subscribe(ctx.signal)),
-    emit: (req) => ({ delivered: req.intent ? world.emit(req.intent) : 0 }),
     publishTheme: (req) => {
       try {
         publishMockTheme({ id: req.id, scheme: req.scheme, vars: req.vars });
@@ -638,7 +637,6 @@ function routes(router: ConnectRouter): void {
     logs: (req) => guard(() => world.plugins.logs(req.name)),
     environment: () => ({ environments: world.plugins.environment() }),
     browse: (req) => world.plugins.registry.browse(req.refresh),
-    refreshRegistries: () => ({ registries: world.plugins.registry.browse(true).registries }),
     listSecrets: (req) => guard(() => ({ secrets: world.plugins.listSecrets(req.name) })),
     deleteSecret: (req) => guard(() => (world.plugins.deleteSecret(req.name, req.key), {})),
     reload: () => ({}),

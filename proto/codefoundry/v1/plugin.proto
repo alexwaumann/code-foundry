@@ -72,8 +72,6 @@ service PluginService {
   // and every registry's state. Indexes come from the cache (1 h) unless refresh.
   // docs/notes/plugins-7-registry.md.
   rpc Browse(BrowsePluginsRequest) returns (BrowsePluginsResponse) {}
-  // RefreshRegistries reads every registry again and returns their state.
-  rpc RefreshRegistries(RefreshPluginRegistriesRequest) returns (RefreshPluginRegistriesResponse) {}
   // Install installs a plugin from a registry, a GitHub release or a folder (see
   // InstallPluginRequest.ref): it downloads this platform's tarball, checks its SHA-256,
   // validates the package and swaps it in for plugins/<name> (the data dir stays). A new
@@ -737,12 +735,6 @@ message BrowsePluginsResponse {
   repeated PluginRegistry registries = 2;
   // This machine's platform ("darwin/arm64").
   string platform = 3;
-}
-
-message RefreshPluginRegistriesRequest {}
-
-message RefreshPluginRegistriesResponse {
-  repeated PluginRegistry registries = 1;
 }
 
 message InstallPluginRequest {

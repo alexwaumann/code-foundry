@@ -121,9 +121,6 @@ func TestPluginRegistryService(t *testing.T) {
 	if err != nil || un.Msg.GetRemoved() != "/p/hello" || un.Msg.GetPurged()[0] != "its logs" {
 		t.Errorf("uninstall = %v, %v", un, err)
 	}
-	if _, err := c.RefreshRegistries(ctx, connect.NewRequest(&v1.RefreshPluginRegistriesRequest{})); err != nil {
-		t.Error(err)
-	}
 
 	// A store without the registry half answers Unimplemented.
 	plain := newRegistryServer(t, plugintest.New(nil))
