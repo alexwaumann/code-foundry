@@ -448,3 +448,30 @@ func withParam(st *core.State, id, k, v string) *core.State {
 	tb.Params[k] = v
 	return st
 }
+
+// ui.focus.terminal --pane (a pane's "+" menu): a running terminal with no tab gets one in that
+// pane, even another space's; one that has a tab is focused where it is.
+func TestFocusTerminalInAPane(t *testing.T) {
+	free := &v1.Terminal{Id: "t-fr1", Labels: termlabel.Free()}
+	f := newOpenFixture(t, free)
+	paneOf := func(id string) string {
+		for _, sp := range f.state().Spaces {
+			for _, p := range core.Panes(sp.Root) {
+				for _, tb := range p.Tabs {
+					if tb.Kind == "terminal" && tb.Params[core.TerminalParam] == id {
+						return p.ID
+					}
+				}
+			}
+		}
+		return ""
+	}
+	f.run(t, fromCLI, "ui.focus.terminal", map[string]string{"id": "t-fr1", "pane": "p-two"})
+	if got := paneOf("t-fr1"); got != "p-two" {
+		t.Fatalf("the free shell's tab is in %q, want p-two", got)
+	}
+	f.run(t, fromCLI, "ui.focus.terminal", map[string]string{"id": "t-fr1", "pane": "p-main"})
+	if got, n := paneOf("t-fr1"), len(f.tabsOf("terminal")); got != "p-two" || n != 1 {
+		t.Errorf("after a second call: in %q with %d terminal tabs, want the one tab still in p-two", got, n)
+	}
+}
