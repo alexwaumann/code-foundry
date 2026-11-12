@@ -46,11 +46,25 @@ func (h *Layout) Apply(ctx context.Context, req *connect.Request[v1.ApplyLayoutR
 	if err != nil {
 		return nil, layoutError(err)
 	}
-	out := &v1.ApplyLayoutResponse{Rev: c.Rev, SpaceId: c.Result.Space, PaneId: c.Result.Pane, TabId: c.Result.Tab, Existing: c.Result.Existing}
-	for _, tb := range c.Result.Closed {
-		out.Closed = append(out.Closed, layoutTabToProto(tb))
+	return connect.NewResponse(applyResponse(c)), nil
+}
+
+// applyResponse is what a commit reports to the caller.
+func applyResponse(c layout.Commit) *v1.ApplyLayoutResponse {
+	r := c.Result
+	tabs := func(in []*core.Tab) []*v1.LayoutTab {
+		var out []*v1.LayoutTab
+		for _, tb := range in {
+			out = append(out, layoutTabToProto(tb))
+		}
+		return out
 	}
-	return connect.NewResponse(out), nil
+	return &v1.ApplyLayoutResponse{
+		Rev: c.Rev, SpaceId: r.Space, PaneId: r.Pane, TabId: r.Tab, Existing: r.Existing,
+		Closed: tabs(r.Closed), Rule: r.Rule, Kept: tabs(r.Kept), Ended: tabs(r.Ended),
+		BackTabIds: r.Back, PlacedTabIds: r.Placed, FreshTabIds: r.Fresh, SwappedPaneIds: r.Swapped,
+		DraftId: r.Draft,
+	}
 }
 
 // SetViewport records a window's pane area.
@@ -114,7 +128,11 @@ func layoutDeltaToProto(d layout.Delta) *v1.LayoutDelta {
 }
 
 func layoutSpaceToProto(sp *core.Space) *v1.LayoutSpace {
-	return &v1.LayoutSpace{Id: sp.ID, Name: sp.Name, Root: layoutNodeToProto(sp.Root), FocusPaneId: sp.Focus, MruTabIds: sp.MRU}
+	out := &v1.LayoutSpace{Id: sp.ID, Name: sp.Name, Root: layoutNodeToProto(sp.Root), FocusPaneId: sp.Focus, MruTabIds: sp.MRU}
+	for _, d := range sp.Drafts {
+		out.Drafts = append(out.Drafts, &v1.LayoutDraft{Id: d.ID, Label: d.Label, Params: d.Params})
+	}
+	return out
 }
 
 var layoutDirs = map[core.Dir]v1.LayoutDir{core.Row: v1.LayoutDir_LAYOUT_DIR_ROW, core.Col: v1.LayoutDir_LAYOUT_DIR_COL}

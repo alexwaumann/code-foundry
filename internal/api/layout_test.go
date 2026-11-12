@@ -116,7 +116,7 @@ func TestLayoutServiceErrors(t *testing.T) {
 		{"no op", nil, connect.CodeInvalidArgument},
 		{"empty op", &v1.LayoutOp{}, connect.CodeInvalidArgument},
 		{"a case from a newer client", unknownCase, connect.CodeUnimplemented},
-		{"a thread op not run yet", &v1.LayoutOp{Op: &v1.LayoutOp_OpenThread{OpenThread: &v1.OpenThreadOp{ThreadId: "s-1"}}}, connect.CodeUnimplemented},
+		{"a thread with no tab open", &v1.LayoutOp{Op: &v1.LayoutOp_CloseThread{CloseThread: &v1.CloseThreadOp{ThreadId: "s-1"}}}, connect.CodeNotFound},
 		{"missing tab", &v1.LayoutOp{Op: &v1.LayoutOp_FocusTab{FocusTab: &v1.FocusTabOp{TabId: "t-gone"}}}, connect.CodeNotFound},
 		{"edge out of range", &v1.LayoutOp{Op: &v1.LayoutOp_SplitPane{SplitPane: &v1.SplitPaneOp{PaneId: "p-n1", Edge: 42, Tab: &v1.LayoutTab{Kind: "projects"}}}}, connect.CodeInvalidArgument},
 		{"no edge", &v1.LayoutOp{Op: &v1.LayoutOp_SplitPane{SplitPane: &v1.SplitPaneOp{PaneId: "p-n1", Tab: &v1.LayoutTab{Kind: "projects"}}}}, connect.CodeInvalidArgument},
@@ -153,22 +153,14 @@ func TestLayoutServiceErrors(t *testing.T) {
 	}
 }
 
-// Every case of LayoutOp either converts to the op of internal/layout with its own name,
-// or is one of the thread ops this daemon does not run yet.
+// Every case of LayoutOp converts to the op of internal/layout with its own name.
 func TestLayoutOpCasesConvert(t *testing.T) {
-	notYet := map[protoreflect.Name]bool{"open_thread": true, "close_thread": true, "open_surface": true, "move_thread": true}
 	oneof := (&v1.LayoutOp{}).ProtoReflect().Descriptor().Oneofs().ByName("op")
 	for i := range oneof.Fields().Len() {
 		fd := oneof.Fields().Get(i)
 		m := (&v1.LayoutOp{}).ProtoReflect()
 		m.Set(fd, protoreflect.ValueOfMessage(m.NewField(fd).Message()))
 		op, err := layoutOpFromProto(m.Interface().(*v1.LayoutOp))
-		if notYet[fd.Name()] {
-			if connect.CodeOf(err) != connect.CodeUnimplemented {
-				t.Errorf("%s: %v; want unimplemented", fd.Name(), err)
-			}
-			continue
-		}
 		if err != nil {
 			t.Errorf("%s: %v", fd.Name(), err)
 			continue
@@ -180,19 +172,8 @@ func TestLayoutOpCasesConvert(t *testing.T) {
 			t.Errorf("%s: %v", fd.Name(), err)
 		}
 	}
-	// And every op of internal/layout has a case. The ops below were added to internal/layout
-	// after the service was written and are wired by the commands step (shell PR 4), which
-	// empties this list.
-	pending := map[string]bool{
-		"open_thread": true, "close_thread": true, "open_surface": true, "move_thread": true,
-		"archive_thread": true, "snooze_thread": true,
-		"new_thread": true, "start_draft": true, "label_draft": true, "clear_draft": true,
-		"discard_draft": true, "open_draft": true,
-	}
+	// And every op of internal/layout has a case.
 	for _, name := range core.OpNames() {
-		if pending[name] {
-			continue
-		}
 		if _, ok := layoutOps[protoreflect.Name(name)]; !ok {
 			t.Errorf("op %s has no LayoutOp case", name)
 		}
