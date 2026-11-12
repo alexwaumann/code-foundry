@@ -39,7 +39,7 @@ function shape(n: GeoNode | null): unknown {
 interface Case {
   doc: string;
   state: { spaces: { id: string; root: GeoNode | null }[]; current_space: string };
-  op: { op: string; tab?: string; pane?: string; target?: string; edge?: Edge; frac?: number; space?: string };
+  op: { op: string; tab?: string; pane?: string; target?: string; edge?: Edge; frac?: number; space?: string; w?: number; h?: number };
   want?: { spaces: { id: string; root: GeoNode | null }[] };
 }
 
@@ -48,16 +48,17 @@ function findTabPane(root: GeoNode | null, tabId: string): string | null {
 }
 
 /** The fixture's op as a drag and drop, when it is one (an edge or the outer edge, in one space). */
-function asDrop(c: Case): { space: string; source: DragSource; target: DropTarget; frac: number } | null {
+function asDrop(c: Case): { space: string; source: DragSource; target: DropTarget; frac?: number; area: { w: number; h: number } } | null {
   const o = c.op;
   if (!o.edge || o.space) return null;
   const sp = c.state.spaces.find((s) => (o.op === "move_pane" ? panesOf(s.root).some((p) => p.id === o.pane) : findTabPane(s.root, o.tab ?? "")));
   if (!sp) return null;
-  const frac = o.frac ?? 0.5;
-  if (o.op === "move_pane") return { space: sp.id, source: whole(o.pane ?? ""), target: o.target ? { kind: "edge", pane: o.target, edge: o.edge } : { kind: "outer", edge: o.edge }, frac };
+  const { frac } = o;
+  const area = { w: o.w ?? 0, h: o.h ?? 0 };
+  if (o.op === "move_pane") return { space: sp.id, source: whole(o.pane ?? ""), target: o.target ? { kind: "edge", pane: o.target, edge: o.edge } : { kind: "outer", edge: o.edge }, frac, area };
   if (o.op === "move_tab") {
     const from = findTabPane(sp.root, o.tab ?? "") ?? "";
-    return { space: sp.id, source: tab(o.tab ?? "", from), target: o.pane ? { kind: "edge", pane: o.pane, edge: o.edge } : { kind: "outer", edge: o.edge }, frac };
+    return { space: sp.id, source: tab(o.tab ?? "", from), target: o.pane ? { kind: "edge", pane: o.pane, edge: o.edge } : { kind: "outer", edge: o.edge }, frac, area };
   }
   return null;
 }
@@ -72,14 +73,14 @@ describe("treeAfterDrop matches the daemon's ops (internal/layout/testdata/ops)"
     });
 
   it("finds the edge and outer cases", () => {
-    expect(cases.map(([f]) => f)).toEqual(expect.arrayContaining(["move_pane-beside.json", "move_pane-outer.json", "move_tab-to-edge.json", "move_tab-outer-edge.json", "move_tab-own-edge-only-tab.json"]));
+    expect(cases.map(([f]) => f)).toEqual(expect.arrayContaining(["move_pane-beside.json", "move_pane-beside-half.json", "move_pane-outer.json", "move_pane-outer-floor.json", "move_pane-outer-floor-no-room.json", "move_tab-to-edge.json", "move_tab-outer-edge.json", "move_tab-outer-kind-size.json", "move_tab-own-edge-only-tab.json"]));
   });
 
   it.each(cases)("%s", (_f, c, d) => {
     const root = c.state.spaces.find((s) => s.id === d.space)?.root ?? null;
     const want = c.want?.spaces.find((s) => s.id === d.space)?.root ?? null;
     if (!root) throw new Error("no root");
-    const after = treeAfterDrop(root, d.source, d.target, d.frac);
+    const after = treeAfterDrop(root, d.source, d.target, d.area, d.frac);
     // A drop the daemon leaves as it is (a pane's only tab on its own edge) is no drop here.
     expect(shape(after ? after.root : root)).toEqual(shape(want));
   });
@@ -100,12 +101,24 @@ describe("dropPreview", () => {
     expect(dropPreview(TREE, FRAME, whole("p-3"), { kind: "edge", pane: "p-1", edge: "left" })).toEqual({ x: 0, y: 0, w: 394, h: 900 });
   });
 
-  it("is a full-height column or full-width row on an outer edge", () => {
+  it("is a full-height column or full-width row of its kind's size on an outer edge", () => {
+    // p-3 (Pull Requests, half) on the left: the row is [p-3, p-1, column], 1600 less two gutters.
     const left = dropPreview(TREE, FRAME, whole("p-3"), { kind: "outer", edge: "left" });
     expect(left).toMatchObject({ x: 0, y: 0, h: 900 });
     expect(left?.w).toBeCloseTo((1600 - 24) / 2, 0);
+    // A file tab (0.35) on the bottom: 0.35 of 900 less one gutter.
     const bottom = dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "outer", edge: "bottom" });
-    expect(bottom).toMatchObject({ x: 0, w: 1600, y: 456, h: 444 });
+    expect(bottom).toMatchObject({ x: 0, w: 1600, y: 589, h: 311 });
+    // A diff pane on the right is raised to its 480px floor: 0.45 of 1576 is 709, so no; on the
+    // bottom of a 1600x1100 grid, 0.45 of 1088 is 490, so no; at 1600x1000, 0.45 of 988 is 445,
+    // raised to 480 as the rest keeps 508.
+    const tall = frameRects(TREE, 1600, 1000);
+    expect(dropPreview(TREE, tall, whole("p-2"), { kind: "outer", edge: "bottom" })).toMatchObject({ x: 0, w: 1600, h: 480 });
+  });
+
+  it("splits a pane in half whatever the kind dropped beside it", () => {
+    // A file tab beside p-2 (diff), under it: the column [p-2, new, p-3] of 900 less two gutters.
+    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "edge", pane: "p-2", edge: "bottom" })).toMatchObject({ x: 806, w: 794, h: 219 });
   });
 
   it("is the whole pane for its middle, and nothing for a strip (the bar shows it)", () => {
@@ -132,7 +145,7 @@ describe("dropPreview", () => {
       const edge = edges[Math.floor(rand() * 4)] ?? "left";
       const target: DropTarget = rand() < 0.3 ? { kind: "outer", edge } : { kind: "edge", pane: to.id, edge };
       if (source.kind === "pane" && target.kind === "edge" && target.pane === from.id) continue;
-      const after = treeAfterDrop(root, source, target);
+      const after = treeAfterDrop(root, source, target, { w: 2400, h: 1600 });
       if (!after) continue;
       const frame = plainRects(after.root, 2400, 1600);
       expect(tilingErrors(frame), JSON.stringify({ root, source, target })).toEqual([]);

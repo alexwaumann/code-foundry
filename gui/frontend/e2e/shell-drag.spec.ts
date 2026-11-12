@@ -40,6 +40,12 @@ async function storedRoot(): Promise<Node | null> {
   return ((await res.json()) as { state: { spaces: { root: Node | null }[] } }).state.spaces[0]?.root ?? null;
 }
 
+/** The sizes of the stored root split ([] for a pane or none). */
+async function rootSizes(): Promise<number[]> {
+  const root = await storedRoot();
+  return root?.t === "split" ? root.sizes : [];
+}
+
 /** The stored tree as text: `row(p-1[t-s-1,t-s-3] col(...))`, ids of new panes and splits left out. */
 function outline(n: Node | null): string {
   if (!n) return "";
@@ -216,7 +222,7 @@ test("a whole pane dropped on another pane's strip merges into it", async ({ pag
   await expectTiled(page);
 });
 
-test("a tab and a pane dropped on the grid's outer edge take a full-height column and a full-width row", async ({ page }) => {
+test("a tab and a pane dropped on the grid's outer edge take a full-height column and a full-width row of their kind's size", async ({ page }) => {
   await seed(THREE, "p-1");
   await openShell(page);
   const grid = await boxOf(page, '[data-testid="shell-grid"]');
@@ -229,6 +235,8 @@ test("a tab and a pane dropped on the grid's outer edge take a full-height colum
   expect(column.h).toBeCloseTo(grid.h, 0);
   await drop(page);
   await expectStored("row([t-s-3] [t-s-1] col([t-diff-s-1] [t-prs]))");
+  // A thread's size: half the row.
+  expect((await rootSizes())[0]).toBeCloseTo(0.5, 6);
   const landed = await boxOf(page, '[data-testid="shell-pane"]:has([data-tab-id="t-s-3"])');
   expectSameBox(landed, column);
   await expectTiled(page);
@@ -240,6 +248,9 @@ test("a tab and a pane dropped on the grid's outer edge take a full-height colum
   const rowBox = await previewBox(page);
   await drop(page);
   await expectStored("col(row([t-s-3] [t-s-1] [t-prs]) [t-diff-s-1])");
+  // A diff's size, not half: 0.45 of the column, under its 480px floor, which it does not take
+  // here as the rest would keep less than 480px.
+  expect(await rootSizes()).toEqual([expect.closeTo(0.55, 6), expect.closeTo(0.45, 6)]);
   expectSameBox(await paneBox(page, "p-2"), rowBox);
   expect((await paneBox(page, "p-2")).w).toBeCloseTo(grid.w, 0);
   await expectTiled(page);
@@ -336,7 +347,7 @@ test("a terminal tab drags like any tab; a press in its name field or its contex
   await expectStored("row([t-s-1,t-top] [t-term])");
 });
 
-/** SHOTS=<dir>: mid-drag over a strip (the bar), over a pane's edge and over the outer edge, dark and light. */
+/** SHOTS=<dir>: mid-drag over a strip (the bar), over a pane's edge and over the outer edge (a tab, then a diff pane), dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`shell drag screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
@@ -360,6 +371,13 @@ for (const scheme of ["dark", "light"] as const) {
     await expect(preview(page)).toHaveAttribute("data-kind", "outer");
     await previewBox(page);
     await page.screenshot({ path: `${shots ?? ""}/shell-drag-outer${suffix}.png` });
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    // A diff pane over the outer bottom edge: its kind's size (0.45), not half.
+    await lift(page, await stripGrip(page, "p-2"), { x: grid.x + grid.w / 2, y: grid.y + grid.h - 3 });
+    await expect(preview(page)).toHaveAttribute("data-kind", "outer");
+    await previewBox(page);
+    await page.screenshot({ path: `${shots ?? ""}/shell-drag-outer-pane${suffix}.png` });
     await page.keyboard.press("Escape");
     await page.mouse.up();
   });

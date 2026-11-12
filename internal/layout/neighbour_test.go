@@ -68,7 +68,7 @@ func TestWithArea(t *testing.T) {
 			t.Errorf("%s: %s then %s", name, raw, again)
 		}
 	}
-	for _, name := range []string{"open_surface", "open_thread", "close_thread", "move_thread", "snooze_thread", "close_pane"} {
+	for _, name := range []string{"open_surface", "open_thread", "close_thread", "move_thread", "snooze_thread", "close_pane", "move_tab", "move_pane"} {
 		op, _ := NewOp(name)
 		if !Measures(op) {
 			t.Errorf("%s does not take the pane area", name)
