@@ -7,10 +7,14 @@
 #   scripts/next-version.sh --last-tag v0.3.1 --log commits.txt [--tip-count N]   # tests: no git
 #
 # Rules, over every non-merge commit since the latest release tag reachable from HEAD:
-#   type! (e.g. "feat!:", "fix(api)!:") or a "BREAKING CHANGE:" footer  -> major
+#   type! (e.g. "feat!:", "fix(api)!:") or a "BREAKING CHANGE:" footer  -> major, but
+#                                             minor while the major version is 0
 #   feat                                                               -> minor
 #   anything else (fix, chore, refactor, docs, non-conventional)       -> patch
 # The biggest bump wins. No release tag yet -> v0.1.0. No commits since the tag -> "".
+# A breaking change never takes 0.x to 1.0.0: that release is asked for by name (the
+# release's VERSION). A subject that is not conventional (scripts/check-commits.sh) is
+# named on stderr, since it counts as a patch whatever it shipped.
 # Release tags are vMAJOR.MINOR.PATCH; pre-release tags (v1.0.0-rc.1, v1.0.0-tip.3) are
 # ignored.
 #
@@ -101,6 +105,8 @@ BUMP="$(awk 'BEGIN { RS = "\036"; bump = 0 }
 	if (msg == "") next
 	split(msg, lines, "\n")
 	subject = lines[1]
+	if (subject !~ /^(feat|fix|perf|refactor|test|docs|build|ci|chore|revert)(\([^)]*\))?!?: /)
+		print "next-version: not a conventional subject, counted as a patch: " subject > "/dev/stderr"
 	b = 1
 	if (subject ~ /^[A-Za-z]+(\([^)]*\))?!:/) b = 3
 	else if (msg ~ /(^|\n)BREAKING[ -]CHANGE:/) b = 3
@@ -132,6 +138,10 @@ printf '%s' "$LAST_TAG" | grep -Eq "$RELEASE_TAG" || {
 IFS=. read -r MAJOR MINOR PATCH <<EOF
 ${LAST_TAG#v}
 EOF
+# 0.x: a breaking change is a minor release.
+if [ "$BUMP" = 3 ] && [ "$MAJOR" = 0 ]; then
+	BUMP=2
+fi
 case "$BUMP" in
 3) emit "v$((MAJOR + 1)).0.0" ;;
 2) emit "v$MAJOR.$((MINOR + 1)).0" ;;

@@ -120,14 +120,18 @@ else
 endif
 
 check-unlocked:
+	@scripts/check-commits.sh
 	@scripts/attest.sh start
 	@$(MAKE) --no-print-directory go-check frontend-check
 	@scripts/attest.sh record
 
 ## attest: post a "local-check" commit status on the pushed HEAD, provided its tree is the
-## one `make check` last passed on. That status is what turns a pull request's only
-## check (`attested`) green; the suite itself does not run on a pull request.
+## one `make check` last passed on and every commit the branch adds has a conventional
+## subject (scripts/check-commits.sh: the check ran before the commit existed). That
+## status is what turns a pull request's only check (`attested`) green; the suite itself
+## does not run on a pull request.
 attest:
+	@scripts/check-commits.sh
 	@scripts/attest.sh post
 
 ## guide-eval: run the agent guide and skill eval on a scratch home and write a scored report
