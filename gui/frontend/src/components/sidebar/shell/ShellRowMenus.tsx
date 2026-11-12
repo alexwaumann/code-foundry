@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger } from "@/components/ui/context-menu";
-import { ThreadSurfaceItems } from "@/components/shell/ThreadSurfaceItems";
+import { MoveToSpaceItems, ThreadSurfaceItems } from "@/components/shell/ThreadSurfaceItems";
 import { contextMenuKit } from "@/components/thread/menuKit";
 import type { LinkedAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
@@ -11,7 +11,8 @@ import { RowMenu } from "../RowMenu";
 /**
  * A shell thread row's context menu: Open ▸ first (the thread's diff per checkout, its pull
  * requests, its terminal tabs and New terminal tab: the thread header's items, ThreadSurfaceItems),
- * then the classic row's items (RowMenu: rename, pin, snooze, archive, …, fork, remove) without the
+ * Move to space ▸ (the header's MoveToSpaceItems: thread.space.move, its linked tabs go along; or
+ * New space), then the classic row's items (RowMenu: rename, pin, snooze, archive, …, fork, remove) without the
  * bottom panel's terminal. For a thread whose tab is open the items follow the placement rules;
  * for a closed one they open in the focused pane (the daemon's rule for a thread not open).
  * Plugins will add thread actions here.
@@ -41,6 +42,12 @@ export function ShellRowMenu({ id }: { id: string }) {
             <ContextMenuSubTrigger data-testid="row-menu-open">Open</ContextMenuSubTrigger>
             <ContextMenuSubContent className="min-w-52" data-testid="row-menu-open-surfaces">
               <ThreadSurfaceItems threadId={id} spaceId={spaceId} kit={contextMenuKit} onPick={pick} />
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger data-testid="row-menu-move-to-space">Move to space</ContextMenuSubTrigger>
+            <ContextMenuSubContent className="min-w-44" data-testid="row-menu-move-to-space-spaces">
+              <MoveToSpaceItems threadId={id} kit={contextMenuKit} onPick={pick} />
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSeparator />

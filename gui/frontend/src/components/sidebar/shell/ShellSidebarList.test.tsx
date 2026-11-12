@@ -258,4 +258,42 @@ describe("the shell sidebar list", () => {
     // With the row's thread as the context, whatever the window shows.
     expect(runs).toEqual([{ name: "view.open.diff", args: { thread: "s-5" }, thread: "s-5" }]);
   });
+
+  it("Move to space ▸ in the row's menu lists the spaces and moves the thread with thread.space.move", async () => {
+    await seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1"), space(null, "", { id: "sp-b", name: "Review" })]), rev: 2 });
+    render(<ShellSidebarList bodyHeight={800} />);
+    fireEvent.contextMenu(rowOf("s:s-5"));
+    const menu = await screen.findByTestId("row-menu");
+    fireEvent.keyDown(within(menu).getByTestId("row-menu-move-to-space"), { key: "ArrowRight" });
+    const sub = await screen.findByTestId("row-menu-move-to-space-spaces");
+    expect([...sub.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent)).toEqual(["Mainhere", "Review", "New space"]);
+    fireEvent.click(within(sub).getByText("Review"));
+    await settle();
+    expect(runs).toEqual([{ name: "thread.space.move", args: { id: "s-5", space: "sp-b" }, thread: "s-5" }]);
+  });
+
+  it("lists the current space's threads and follows a space switch; Needs you keeps every space's asks", async () => {
+    const two = (current: string) => ({
+      ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1"), space(null, "", { id: "sp-b", name: "Review" })]),
+      currentSpaceId: current,
+      // s-3 and s-2 live in Review.
+      threads: ["s-3", "s-2"].map((id) => ({ threadId: id, spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" })),
+    });
+    await seedLayout({ ...two("sp-a"), rev: 2 });
+    render(<ShellSidebarList bodyHeight={800} />);
+    expect(rowKeys()).toEqual(["h:needs", "s:s-2", "h:active", "s:s-5", "s:s-4", "s:s-1"]);
+    await act(async () => {
+      await seedLayout({ ...two("sp-b"), rev: 3 });
+    });
+    expect(rowKeys()).toEqual(["h:needs", "s:s-2", "h:active", "s:s-3"]);
+    // With the scope on this space, Review's ask stays (it is this space's); Main's view loses it.
+    act(() => {
+      useSettingsStore.setState({ snapshot: { values: { "sidebar.needs_scope": "space" } } as never });
+    });
+    expect(rowKeys()).toEqual(["h:needs", "s:s-2", "h:active", "s:s-3"]);
+    await act(async () => {
+      await seedLayout({ ...two("sp-a"), rev: 4 });
+    });
+    expect(rowKeys()).toEqual(["h:needs", "h:active", "s:s-5", "s:s-4", "s:s-1"]);
+  });
 });
