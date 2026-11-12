@@ -18,15 +18,15 @@ import { errorMessage } from "@/api/stream";
 import { fileName, relativeTo } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { plainLine, plainName, plainPath } from "@/lib/plainText";
-import { ASK_PARAMS, fileOfTab, type FileAsk } from "@/surfaces/fileTarget";
+import { ASK_PARAMS, fileOfTab, withoutParams, type FileAsk } from "@/surfaces/fileTarget";
 import { requestChoice } from "./confirm";
 import { fileEditKey, fileEditOf, focusEditor, focusedEdit, noteEditFailure, returnFromPalette, saveFile, type FileEdit, type FileWhere, type SaveOutcome } from "./fileEdit";
-import { activatePanelTab, allTabs, dropPanelTabParams, getPanel, type Tab } from "./panel";
+import { activateTab, findTab, setTabParams, type Tab } from "@/shell/host";
 import { deliverThreadPrompt } from "./threadInfo";
 import { useThreadsStore } from "./threads";
 
 function tabOf(s: FileEdit): Tab | undefined {
-  return allTabs(getPanel(s.panelKey)).find((t) => t.id === s.tabId);
+  return findTab(s.panelKey, s.tabId);
 }
 
 /** The request standing on a session's tab; null without one. */
@@ -76,7 +76,7 @@ export function fileFacts(file: FileWhere): string[] {
 
 /** The request is over, unless a newer one took its place while a write was out. */
 function finish(s: FileEdit, ask: FileAsk): void {
-  if (askOf(s)?.id === ask.id) dropPanelTabParams(s.panelKey, s.tabId, ASK_PARAMS);
+  if (askOf(s)?.id === ask.id) setTabParams(s.panelKey, s.tabId, withoutParams(ASK_PARAMS));
 }
 
 /** "saved" and told; "untold" when the write stood and the thread did not hear; otherwise the write's outcome and nothing was sent. */
@@ -159,6 +159,6 @@ async function askClose(key: string, panelKey: string, tab: Tab, s: FileEdit): P
   }
   if (answer === "alternate") return true;
   if ((await saveTab(key)) === "saved") return true;
-  activatePanelTab(panelKey, tab.id);
+  activateTab(panelKey, tab.id);
   return false;
 }

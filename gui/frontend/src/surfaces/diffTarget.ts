@@ -1,14 +1,14 @@
 /**
  * The Diff surface's tab (docs/notes/diff-viewer-2.md): two sources of one checkout and the
  * file being looked at. One tab per checkout: the id comes from the project and worktree
- * alone, so opening the checkout again finds its tab and openTab (stores/panel.ts) hands it
+ * alone, so opening the checkout again finds its tab and openTab (shell/host.ts) hands it
  * the new params. That tab is the user's. Whatever a thread frames (a title, a note, a
  * narrowed list, hidden controls) goes in a tab with the thread in its id, and with the title
  * when it gave one, so a thread never takes over the user's tab: the same title updates the
  * same tab, as the next untitled call does the thread's untitled one. Pure.
  */
 import type { CompareSource } from "@/api/compare";
-import { tabId, type Tab } from "@/stores/panel";
+import { tabId, type Tab } from "@/shell/host";
 
 export const DIFF_KIND = "diff";
 export const DIFF_TITLE = "Diff";

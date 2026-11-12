@@ -24,7 +24,7 @@ import type { ThreadView } from "@/api/threads";
 import { isSnoozed } from "@/lib/snooze";
 import { emptyBottom, useBottomStore } from "./bottomPanel";
 import { dropPanelDrafts, unsavedTabs } from "./fileEdit";
-import { emptyEntry, keyOf, usePanelStore, type PanelEntry } from "./panel";
+import { allTabs, emptyEntry, keyOf, usePanelStore, type PanelEntry } from "./panel";
 import { useRecentFilesStore } from "./recentFiles";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
@@ -51,7 +51,7 @@ export function newlySnoozed(prev: ThreadsData, next: ThreadsData): string[] {
 
 /** A side panel after a reset: nothing, or only its tabs with unsaved edits, showing. */
 function resetEntry(key: string, entry: PanelEntry): PanelEntry {
-  const kept = unsavedTabs(key, entry);
+  const kept = unsavedTabs(key, allTabs(entry));
   const first = kept[0];
   return first ? { open: true, groups: [{ tabs: kept, activeTabId: first.id }] } : emptyEntry;
 }

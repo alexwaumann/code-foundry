@@ -18,7 +18,7 @@ import { newWorktreeTerminal } from "./bottomActions";
 import { runCommand, runCommandForResult } from "./commands";
 import { emptyContext } from "./context";
 import { openFileInPanel } from "./filePanel";
-import { togglePanel } from "./panel";
+import { showTabs } from "@/shell/host";
 import { mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -97,7 +97,7 @@ export function openWorkspaceInstructions(workspaceId: string): boolean {
   const ws = useWorkspacesStore.getState().byId[workspaceId];
   if (!ws?.instructions) return false;
   if (!openFileInPanel("current", { project: "", base: workspaceFolder(ws), path: ws.instructions })) return false;
-  togglePanel("current", true, { focus: false });
+  showTabs("current", true, { focus: false });
   return true;
 }
 

@@ -8,7 +8,7 @@ import { threadDraftKey } from "@/lib/threadDraft";
 import { isNoProject } from "@/lib/threadRow";
 import { insertTagInto } from "./cite";
 import { openFileInPanel } from "./filePanel";
-import { keyOf } from "./panel";
+import { threadTarget } from "@/shell/host";
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -50,8 +50,7 @@ export function presentFileFinder(): boolean {
  * palette closes and the keyboard goes to the panel.
  */
 export function openFoundFile(threadId: string, f: FinderFile, line?: number): void {
-  const panelKey = keyOf({ kind: "thread", id: threadId });
-  if (panelKey !== null) openFileInPanel(panelKey, { project: f.projectId, base: f.checkout, path: f.path, ...(line === undefined ? {} : { line }) });
+  openFileInPanel(threadTarget(threadId), { project: f.projectId, base: f.checkout, path: f.path, ...(line === undefined ? {} : { line }) });
   // After the panel has the tab, so the panel that takes focus is mounted (closePalette).
   useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
   useUiStore.getState().closePalette();

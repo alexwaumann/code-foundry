@@ -15,7 +15,7 @@ import { projectPlace, type ProjectRoot } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { clearWorkRowChoices, holdEmberBoard, useEmberEnabled, useFlameState, useHeaderDot, useHeaderSummary } from "@/stores/ember";
 import { toggleEmberBoard, useEmberBoardShown } from "@/stores/emberPanel";
-import { keyOf } from "@/stores/panel";
+import { useCurrentTarget } from "@/shell/host";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadFindOpen } from "@/stores/threadFind";
 import { useThreadsStore } from "@/stores/threads";
@@ -51,7 +51,7 @@ function HeaderStatus() {
 /** Board (the side panel on the Board surface) and Show work (every work row open), then the panel toggle. */
 function HeaderActions({ threadId }: { threadId: string }) {
   const enabled = useEmberEnabled();
-  const panelKey = useUiStore((s) => keyOf(s.selection));
+  const panelKey = useCurrentTarget();
   const board = useEmberBoardShown(panelKey);
   const showWork = useUiStore((s) => s.emberShowWork);
   return (

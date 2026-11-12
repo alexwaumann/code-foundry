@@ -3,9 +3,9 @@ import { readFile } from "@/api/files";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { relativeTo, resolvePath } from "@/lib/filePath";
 import { isUnplaced } from "@/lib/threadSetup";
-import { dropPanelTabParams, replacePanelTab } from "@/stores/panel";
+import { replaceTab, setTabParams } from "@/shell/host";
 import { useThreadsStore } from "@/stores/threads";
-import { fileTab, HELD_PARAM, type FileTarget } from "@/surfaces/fileTarget";
+import { fileTab, HELD_PARAM, withoutParams, type FileTarget } from "@/surfaces/fileTarget";
 
 /** Why a held tab cannot be edited now. */
 const UNTIL_READY = "Read-only until this thread's worktree is ready";
@@ -29,7 +29,7 @@ export function useFileHold(file: FileTarget, panelKey: string): string | null {
     if (!threadId || !checkout) return;
     const tabId = fileTab({ project, base, path }).id;
     if (checkout === base) {
-      dropPanelTabParams(panelKey, tabId, [HELD_PARAM]); // the thread runs right here: it is its file
+      setTabParams(panelKey, tabId, withoutParams([HELD_PARAM])); // the thread runs right here: it is its file
       return;
     }
     const rel = relativeTo(path, base);
@@ -40,7 +40,7 @@ export function useFileHold(file: FileTarget, panelKey: string): string | null {
       (view) => {
         if (!live) return;
         if (view.notFound) setNotThere(true);
-        else replacePanelTab(panelKey, tabId, fileTab({ project, base: checkout, path: next, ...(line === undefined ? {} : { line }) }));
+        else replaceTab(panelKey, tabId, fileTab({ project, base: checkout, path: next, ...(line === undefined ? {} : { line }) }));
       },
       () => {
         if (live) setNotThere(true);

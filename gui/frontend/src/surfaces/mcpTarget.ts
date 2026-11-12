@@ -2,7 +2,7 @@
  * The MCP surface's targets: which thread a selection resolves to (whether it opens) and
  * the tab. Pure: callers feed it the threads store's current state.
  */
-import { makeTab, type Tab } from "@/stores/panel";
+import { makeTab, type Tab } from "@/shell/host";
 import type { ThreadsData } from "@/stores/threads";
 import type { Selection } from "@/stores/ui";
 

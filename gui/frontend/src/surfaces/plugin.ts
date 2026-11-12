@@ -12,7 +12,7 @@
 import { createElement, useSyncExternalStore } from "react";
 import { PluginSurface } from "@/components/plugin/PluginSurface";
 import { pluginIcon } from "@/components/plugin/icons";
-import { makeTab, type Tab } from "@/stores/panel";
+import { makeTab, type Tab } from "@/shell/host";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { surfaceManifestOf, usePluginsStore, type SurfaceManifest } from "@/stores/plugins";

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { FileDiff } from "lucide-react";
 import { DiffView } from "@/components/diff/DiffView";
 import { lastTabOf } from "@/stores/filePanel";
-import { usePanelStore } from "@/stores/panel";
+import { tabChanges } from "@/shell/host";
 import { DIFF_KIND, DIFF_TITLE, diffOfTab } from "./diffTarget";
 import { NO_PROJECT_WATCHES, noProjectNow } from "./noProject";
 import type { SurfaceSpec } from "./types";
@@ -20,7 +20,7 @@ export const diffSurface: SurfaceSpec = {
   icon: FileDiff,
   hotkey: "d",
   available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : lastTabOf(DIFF_KIND, ctx.panelKey) ? "enabled" : "disabled"),
-  watches: [...NO_PROJECT_WATCHES, usePanelStore],
+  watches: [...NO_PROJECT_WATCHES, tabChanges],
   render: (tab) => {
     const target = diffOfTab(tab);
     return target ? createElement(DiffView, { tabId: tab.id, tabTitle: tab.title, target }) : null;

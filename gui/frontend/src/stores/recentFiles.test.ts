@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { TabPlace } from "@/shell/host";
 import { fileTab } from "@/surfaces/fileTarget";
 import { openFileInPanel } from "./filePanel";
 import { closePanelTab, usePanelStore } from "./panel";
@@ -24,10 +25,11 @@ describe("newlyShownFiles", () => {
   const page = fileTab({ project: "cf", base: CF, path: "page.html", page: { title: "Page" } });
 
   it("is a group's newly active File tab, not one still active or a thread's page", () => {
-    const before = { open: true, groups: [{ tabs: [a, b, page], activeTabId: a.id }] };
-    expect(newlyShownFiles(before, { ...before, groups: [{ tabs: [a, b, page], activeTabId: b.id }] })).toEqual([file("b.ts")]);
-    expect(newlyShownFiles(before, { ...before, open: false })).toEqual([]);
-    expect(newlyShownFiles(before, { ...before, groups: [{ tabs: [a, b, page], activeTabId: page.id }] })).toEqual([]);
+    const tabs = [a, b, page];
+    const before: TabPlace = { shown: true, expanded: false, tabs, groups: [{ tabs, active: a }], focused: 0 };
+    expect(newlyShownFiles(before, { ...before, groups: [{ tabs, active: b }] })).toEqual([file("b.ts")]);
+    expect(newlyShownFiles(before, { ...before, shown: false })).toEqual([]);
+    expect(newlyShownFiles(before, { ...before, groups: [{ tabs, active: page }] })).toEqual([]);
     expect(newlyShownFiles(undefined, before)).toEqual([file("a.ts")]);
   });
 });

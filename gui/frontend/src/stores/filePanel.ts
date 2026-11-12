@@ -6,7 +6,7 @@
 import { DEFAULT_BASE, DEFAULT_HEAD, DIFF_TITLE, diffTab, type DiffTarget } from "@/surfaces/diffTarget";
 import { fileOfTab, fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { isUnplaced } from "@/lib/threadSetup";
-import { allTabs, expandPanel, getPanel, keyOf, openSurface, panelThreadId, togglePanel, usePanelStore, type PanelTarget, type Tab } from "./panel";
+import { expandTabs, findTab, openTab, showTabs, tabPlace, targetOf, threadOfTarget, type Tab, type TabTarget } from "@/shell/host";
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { HOME, PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "./ui";
@@ -20,18 +20,18 @@ import { HOME, PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "./ui
  * showing what it shows. A project's file opened on a thread with no checkout yet is held
  * (FileTarget.heldFor): it is that project's own. False with no panel.
  */
-export function openFileInPanel(target: PanelTarget, file: FileTarget, opts: { behind?: boolean } = {}): boolean {
+export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { behind?: boolean } = {}): boolean {
   const id = fileTab(file).id;
-  const old = allTabs(getPanel(target)).find((t) => t.id === id);
+  const old = findTab(target, id);
   const was = old ? fileOfTab(old) : null;
-  const thread = panelThreadId(target);
+  const thread = threadOfTarget(target);
   const held = was?.heldFor ?? (file.project && isUnplaced(useThreadsStore.getState().byId[thread]) ? thread : "");
   const keeps = {
     ...(was?.page && !file.page ? { page: was.page } : {}),
     ...(was?.ask && !file.ask ? { ask: was.ask, edit: true } : {}),
     ...(held ? { heldFor: held } : {}),
   };
-  return openSurface(target, fileTab({ ...file, ...keeps }), opts);
+  return openTab(target, fileTab({ ...file, ...keeps }), opts);
 }
 
 /**
@@ -44,16 +44,16 @@ export function openFileInPanel(target: PanelTarget, file: FileTarget, opts: { b
  */
 export function openLooseFile(dir: string, path: string): boolean {
   const ui = useUiStore.getState();
-  if (keyOf(ui.selection) === null) ui.select(HOME);
+  if (targetOf(ui.selection) === null) ui.select(HOME);
   if (!openFileInPanel("current", { project: "", base: dir, path })) return false;
   const now = useUiStore.getState();
-  if (panelMax(now.windowWidth, visibleSidebarWidth(now)) < PANEL_MIN) expandPanel("current", true, { focus: false });
+  if (panelMax(now.windowWidth, visibleSidebarWidth(now)) < PANEL_MIN) expandTabs("current", { focus: false });
   return true;
 }
 
 /** Opens (or activates) a checkout's Diff tab in a panel; an open one takes the new sources and file. */
-export function openDiffInPanel(target: PanelTarget, diff: DiffTarget, title?: string): boolean {
-  return openSurface(target, diffTab(diff, title));
+export function openDiffInPanel(target: TabTarget, diff: DiffTarget, title?: string): boolean {
+  return openTab(target, diffTab(diff, title));
 }
 
 /**
@@ -62,13 +62,13 @@ export function openDiffInPanel(target: PanelTarget, diff: DiffTarget, title?: s
  * page's checkout menus. `own`: the thread's cwd checkout, whose title names no project.
  * False with nothing selected.
  */
-export function openCheckoutDiff(target: PanelTarget, project: string, worktree: string, own = false): boolean {
+export function openCheckoutDiff(target: TabTarget, project: string, worktree: string, own = false): boolean {
   // Named at once, not when it first reads: a thread's checkouts often share a branch, and two plain "Diff" tabs tell nothing apart.
   const title = own ? DIFF_TITLE : `${DIFF_TITLE} · ${useProjectsStore.getState().byId[project]?.name ?? project}`;
   const fresh = diffTab({ project, worktree, base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own }, title);
-  const open = allTabs(getPanel(target)).find((t) => t.id === fresh.id);
-  if (!openSurface(target, open ?? fresh)) return false;
-  togglePanel(target, true, { focus: false });
+  const open = findTab(target, fresh.id);
+  if (!openTab(target, open ?? fresh)) return false;
+  showTabs(target, true, { focus: false });
   return true;
 }
 
@@ -77,8 +77,7 @@ export function openCheckoutDiff(target: PanelTarget, project: string, worktree:
  * which the surface's letter brings back; null without one.
  */
 export function lastTabOf(kind: string, panelKey: string): Tab | null {
-  const e = usePanelStore.getState().byKey[panelKey];
-  const tabs = e ? allTabs(e) : [];
+  const { tabs } = tabPlace(panelKey);
   for (let i = tabs.length - 1; i >= 0; i--) {
     const t = tabs[i];
     if (t?.kind === kind) return t;

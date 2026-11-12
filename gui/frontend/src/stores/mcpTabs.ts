@@ -7,7 +7,7 @@
 import { create } from "zustand";
 import type { McpBucket } from "@/lib/mcp";
 import { MCP_KIND } from "@/surfaces/mcpTarget";
-import { allTabs, usePanelStore, type PanelState } from "./panel";
+import { subscribeTabs, type TabPlaces } from "@/shell/host";
 
 interface McpTabsState {
   /** By panel key; absent means Connected. */
@@ -28,18 +28,15 @@ export function setMcpTab(panelKey: string, bucket: McpBucket): void {
 }
 
 /** Drops the choice of every panel that no longer holds an MCP tab. */
-export function pruneClosedMcpTabs(panels: PanelState): void {
+export function pruneClosedMcpTabs(places: TabPlaces): void {
   const byKey = useMcpTabsStore.getState().byKey;
   const keys = Object.keys(byKey);
   if (keys.length === 0) return;
   const holds = (key: string) => {
-    const e = panels.byKey[key];
-    return e !== undefined && allTabs(e).some((t) => t.kind === MCP_KIND);
+    return places[key]?.tabs.some((t) => t.kind === MCP_KIND) ?? false;
   };
   if (keys.every(holds)) return;
   useMcpTabsStore.setState({ byKey: Object.fromEntries(Object.entries(byKey).filter(([k]) => holds(k))) });
 }
 
-usePanelStore.subscribe((s, prev) => {
-  if (s.byKey !== prev.byKey) pruneClosedMcpTabs(s);
-});
+subscribeTabs(pruneClosedMcpTabs);
