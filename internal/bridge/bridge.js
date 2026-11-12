@@ -20,8 +20,10 @@
  * and 16 subscriptions; a call's args, or a stored value, may be up to 256 KiB.
  *
  * The app opens the page with a nonce in its URL's fragment (#cf=<nonce>), sent back on
- * every message (docs/notes/bridge-fix-frames.md): a page reached any other way (a link
- * followed in the frame, another tab) has no bridge, and cf.ready rejects at once.
+ * every message (docs/notes/bridge-fix-frames.md), and carried on to the page's own other
+ * files when it goes to one in its frame (the last block below). A page reached any other
+ * way (another site's or another grant's link, another tab) has no bridge, and cf.ready
+ * rejects at once.
  */
 (function () {
   "use strict";
@@ -679,5 +681,62 @@
     } catch (err) {
       // The app is gone.
     }
+  });
+})();
+
+// A page's own next document keeps the bridge (docs/notes/leftovers-pages.md). A navigation
+// the page makes to another file of its own (at this origin, under its own grant's
+// /preview/<grant>/) is sent on with the frame's nonce in its fragment, so that document's
+// bridge works too. A navigation to another site or another grant goes as it is, without
+// the nonce, so it has no bridge there. With the Navigation API every such navigation (a
+// link, location = …, location.assign or replace) is seen with where it goes; without it,
+// a followed link is. Its own block, apart from the bridge above.
+(function () {
+  "use strict";
+  var nonceMatch = /(?:^#|&)cf=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+  var grant = /^\/preview\/[^/]+\//.exec(location.pathname || "");
+  if (window.parent === window || !nonceMatch || !grant || window.__cfFollow) return;
+  window.__cfFollow = true;
+  var nonce = nonceMatch[1];
+
+  // The URL to load in place of href: the same with the nonce, or "" to let it go as it is.
+  function carried(href) {
+    var u;
+    try {
+      u = new URL(String(href), location.href);
+    } catch (_) {
+      return "";
+    }
+    if (u.origin !== location.origin || u.pathname.indexOf(grant[0]) !== 0) return "";
+    if (/(?:^#|&)cf=/.test(u.hash)) return "";
+    u.hash = u.hash ? u.hash.slice(1) + "&cf=" + nonce : "cf=" + nonce;
+    return u.href;
+  }
+
+  var nav = window.navigation;
+  if (nav && typeof nav.addEventListener === "function") {
+    nav.addEventListener("navigate", function (e) {
+      // A form's POST would turn into a GET; a reload or a step back keeps its own URL.
+      if (!e.cancelable || e.destination.sameDocument || e.formData || e.downloadRequest) return;
+      if (e.navigationType !== "push" && e.navigationType !== "replace") return;
+      var next = carried(e.destination.url);
+      if (!next) return;
+      e.preventDefault();
+      if (e.navigationType === "replace") location.replace(next);
+      else location.assign(next);
+    });
+    return;
+  }
+  // In the bubble phase, after the page's own handlers: a click the page took is the page's.
+  window.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target && typeof e.target.closest === "function" ? e.target.closest("a[href], area[href]") : null;
+    if (!a || a.hasAttribute("download")) return;
+    var target = (a.getAttribute("target") || "").toLowerCase();
+    if (target && target !== "_self") return;
+    var next = carried(a.href);
+    if (!next) return;
+    e.preventDefault();
+    location.assign(next);
   });
 })();

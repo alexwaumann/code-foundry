@@ -5,9 +5,11 @@
  * always scoped to a thread (the
  * app's selection, or --thread), a ShowView with the item in its params, and --focus an
  * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
- * its worktree for a diff, and a GitHub repository for a pull request. It does not read
- * files or diffs, and of view.panel.file --edit's refusals only --note without --edit: they are
- * Go's to test, as is cleaning the note. A page's or diff's --title is cleaned and capped as there.
+ * one of its checkouts for a diff, and a GitHub repository for a pull request. It does not
+ * read files, and of a diff only which files changed (to tell a file from a directory); of
+ * view.panel.file --edit's refusals only --note without --edit: they are Go's to test, as is
+ * cleaning the note. A page's or diff's --title is cleaned and capped as there, and a diff's
+ * params are the daemon's (commands_view_diff.go diffCheck).
  */
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { plainLine } from "../src/lib/plainText";
@@ -22,6 +24,10 @@ export interface ItemThread {
   worktreePath: string;
   /** The thread's project's GitHub repository, "" without one. */
   githubSlug: string;
+  /** The thread's other checkouts (a workspace's projects), each a project and its root. */
+  checkouts?: { projectId: string; path: string }[];
+  /** A checkout's changed files, relative to its root; undefined when the mock has none for it. */
+  changed?: (root: string) => readonly string[] | undefined;
 }
 
 type Command = {
@@ -31,6 +37,51 @@ type Command = {
 };
 
 const lead = "in a thread's side panel (from a thread: its own; in the app: the selected one): ";
+
+/** --hide's values (internal/command diffHides). */
+const DIFF_HIDES = ["compare", "files"];
+
+/**
+ * A --base or --head value as the Diff tab's param, like the daemon's diffSource: undefined
+ * for none or the side's default, a named source as itself, anything else a ref.
+ */
+function diffSource(v: string | undefined, def: string): string | undefined {
+  if (!v || v === def) return undefined;
+  return ["working", "staged", "merge-base"].includes(v) ? v : `ref:${v}`;
+}
+
+/** path relative to root ("" for root itself), or undefined when it is not in it. */
+function inCheckout(root: string, path: string): string | undefined {
+  const p = path.replace(/\/+$/, "");
+  if (p === root) return "";
+  return p.startsWith(`${root}/`) ? p.slice(root.length + 1) : undefined;
+}
+
+/**
+ * The checkout a diff's paths are in, as the daemon's resolveDiffPaths places them: the
+ * deepest of the thread's checkouts holding each, all in one; the root among them is every
+ * file.
+ */
+function diffCheckout(t: ItemThread, id: string, paths: string[]): { project: string; root: string; rels: string[] } {
+  const c = { project: t.projectId, root: t.worktreePath, rels: [] as string[] };
+  const all = [{ projectId: t.projectId, path: t.worktreePath }, ...(t.checkouts ?? [])];
+  let whole = false;
+  for (const [i, p] of paths.entries()) {
+    let found: { projectId: string; path: string; rel: string } | undefined;
+    for (const k of all) {
+      const rel = inCheckout(k.path, p);
+      if (rel !== undefined && (!found || k.path.length > found.path.length)) found = { ...k, rel };
+    }
+    if (!found) throw new CommandError("invalid", `${p} is not a file in thread ${id}'s worktree ${t.worktreePath}`);
+    if (i > 0 && found.path !== c.root) throw new CommandError("invalid", `${p} is in ${found.path} and the paths before it in ${c.root}: one tab shows one checkout, so run this once for each`);
+    c.project = found.projectId;
+    c.root = found.path;
+    if (found.rel === "") whole = true;
+    else c.rels.push(found.rel);
+  }
+  if (whole) c.rels = [];
+  return c;
+}
 
 /** The longest --title, in characters (internal/command maxDiffTitle): it is a tab's name. */
 const MAX_TITLE = 100;
@@ -146,26 +197,32 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
       run: (ctx, args) =>
         show(ctx, args, "panel.diff", (t, id) => {
           if (!t.projectId) throw new CommandError("unavailable", `thread ${id} runs in no project worktree`);
+          if (args.scope !== undefined && (args.base || args.head)) throw new CommandError("invalid", "says the same as --base and --head: give one or the other");
+          const base = diffSource(args.base, "merge-base");
+          const head = args.scope === "branch" ? "ref:HEAD" : diffSource(args.head, "working");
+          const c = diffCheckout(t, id, (args.path ?? "").split("\n").filter(Boolean));
           const title = tabTitle(args);
-          const paths = (args.path ?? "").split("\n").filter(Boolean);
-          for (const p of paths) if (!p.startsWith(t.worktreePath + "/")) throw new CommandError("invalid", `${p} is not a file in thread ${id}'s worktree ${t.worktreePath}`);
-          const rels = paths.map((p) => p.slice(t.worktreePath.length + 1));
-          const source = (v: string | undefined) => (!v ? undefined : ["working", "staged", "merge-base"].includes(v) ? v : `ref:${v}`);
-          const head = args.scope === "branch" ? "ref:HEAD" : source(args.head);
-          const base = source(args.base);
+          const hide = (args.hide ?? "").split("\n").filter(Boolean);
+          for (const h of hide) if (!DIFF_HIDES.includes(h)) throw new CommandError("invalid", `want ${DIFF_HIDES.join(" or ")}, got ${JSON.stringify(h)}`);
+          // One changed file is picked in the whole list; anything else (a directory, several) narrows it.
+          const changed = t.changed?.(c.root);
+          const [only] = c.rels;
+          const one = c.rels.length === 1 && only !== undefined && (!changed || changed.includes(only)) ? only : undefined;
+          const paths = one === undefined && c.rels.length > 0 ? c.rels.join("\n") : "";
           // Like the daemon: anything but choosing a file gets a tab of its own, the checkout's being the user's.
-          const framed = rels.length > 1 || args.base || args.head || args.scope || args.title || args.note || args.hide;
+          const framed = args.base !== undefined || args.head !== undefined || args.scope !== undefined || title || args.note || hide.length > 0 || paths;
           return {
-            project: t.projectId,
-            worktree: t.worktreePath,
-            own: "1",
+            project: c.project,
+            worktree: c.root,
+            ...(c.root === t.worktreePath ? { own: "1" } : {}),
             ...(framed ? { thread: id } : {}),
             ...(base ? { base } : {}),
             ...(head ? { head } : {}),
-            ...(rels.length === 1 ? { path: rels[0] ?? "" } : rels.length > 1 ? { paths: rels.join("\n") } : {}),
+            ...(one !== undefined ? { path: one } : {}),
+            ...(paths ? { paths } : {}),
             ...(title ? { title } : {}),
             ...(args.note ? { note: args.note } : {}),
-            ...(args.hide ? { hide: args.hide.split("\n").join(",") } : {}),
+            ...(hide.length > 0 ? { hide: hide.join(",") } : {}),
           };
         }),
     },

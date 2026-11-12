@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useHealthStore } from "@/stores/health";
-import { resizeHeight, usePreviewGrant } from "./previewGrant";
+import { pageFrameNote, resizeHeight, usePreviewGrant } from "./previewGrant";
 
 const previewFile = vi.fn();
 vi.mock("@/api/files", async (orig) => ({
@@ -53,5 +53,18 @@ describe("resizeHeight", () => {
     [null, null],
   ])("%j -> %s", (data, want) => {
     expect(resizeHeight(data)).toBe(want);
+  });
+});
+
+describe("pageFrameNote", () => {
+  it.each([
+    [{ type: "cf:here", seq: 2 }, { note: "here", seq: 2 }],
+    [{ type: "cf:here" }, null],
+    [{ type: "cf:going" }, { note: "going" }],
+    [{ type: "cf:open", url: "https://example.com" }, null],
+    ["cf:here", null],
+    [null, null],
+  ])("%j is %s", (data, want) => {
+    expect(pageFrameNote(data)).toEqual(want);
   });
 });

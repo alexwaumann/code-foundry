@@ -73,7 +73,9 @@ user's own threads on screen can still reach each other's window, read each othe
 and call each other's `cf`; the host then credits the frame that posted. A per-thread origin
 would need a listener (a port) per thread, which is not worth it for pages of the user's own
 threads. A page can also hand on its own bridge on purpose (navigate its frame to a URL with
-its own nonce in the fragment), which it could do anyway by relaying messages.
+its own nonce in the fragment), which it could do anyway by relaying messages. Since
+`leftovers-pages.md` its own navigations to another file under its grant carry the nonce on
+by themselves.
 
 ## Limits (`BRIDGE_LIMITS`)
 

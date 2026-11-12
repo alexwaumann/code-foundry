@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import SRC from "../../../../internal/preview/frame.js?raw";
 import { pageOpenUrl, pageUnsupported } from "@/components/files/previewGrant";
 
@@ -21,10 +21,14 @@ const HOST = window.location.host;
 /** The listeners a load added to the shared document, removed after each test. */
 const added: [string, EventListener, boolean | undefined][] = [];
 
-function load(opts: { embedded?: boolean } = {}) {
+function load(opts: { embedded?: boolean; navigation?: object } = {}) {
   const posted: Msg[] = [];
+  /** What the script says of the document (cf:here, cf:going), apart from the rest. */
+  const notes: string[] = [];
   let trusted = true;
   let went: string | null = null;
+  /** The source a message event shows the script. */
+  let source: unknown = null;
   const win: Record<string, unknown> = {
     // Events are dispatched untrusted in jsdom: the listener sees them as `trusted` says.
     addEventListener: (type: string, fn: (e: Event) => void, capture?: boolean) => {
@@ -33,6 +37,7 @@ function load(opts: { embedded?: boolean } = {}) {
           new Proxy(e, {
             get: (t, k) => {
               if (k === "isTrusted") return trusted;
+              if (k === "source") return source;
               const v = Reflect.get(t, k) as unknown;
               return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(t) : v;
             },
@@ -43,7 +48,17 @@ function load(opts: { embedded?: boolean } = {}) {
       document.addEventListener(type, seen, capture);
     },
   };
-  win.parent = opts.embedded === false ? win : { postMessage: (m: Msg) => posted.push(structuredClone(m)) };
+  const parent =
+    opts.embedded === false
+      ? win
+      : {
+          postMessage: (m: Msg) => {
+            if (m.type === "cf:here" || m.type === "cf:going") notes.push(m.type);
+            else posted.push(structuredClone(m));
+          },
+        };
+  win.parent = parent;
+  if (opts.navigation) win.navigation = opts.navigation;
   const location = {
     host: HOST,
     get href() {
@@ -74,15 +89,60 @@ function load(opts: { embedded?: boolean } = {}) {
     trusted = true;
     document.dispatchEvent(new Event("pointerdown", { bubbles: true }));
   };
-  return { win: win as { open: (u?: string) => unknown; alert: (t?: unknown) => void; confirm: (t?: unknown) => boolean; prompt: (t?: unknown) => string | null; __cfFrame?: boolean }, posted, link, click, press, went: () => went };
+  const form = (attrs: Record<string, string>, fields: Record<string, string> = {}) => {
+    const f = document.createElement("form");
+    for (const [k, v] of Object.entries(attrs)) f.setAttribute(k, v);
+    for (const [k, v] of Object.entries(fields)) {
+      const i = document.createElement("input");
+      i.name = k;
+      i.value = v;
+      f.append(i);
+    }
+    document.body.append(f);
+    return f;
+  };
+  const submit = (f: HTMLFormElement, by: "user" | "script" = "user", submitter?: HTMLElement) => {
+    trusted = by === "user";
+    const e = new SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: submitter ?? null });
+    f.dispatchEvent(e);
+    return e.defaultPrevented;
+  };
+  /** A message to the document, from its parent unless `from` says otherwise. */
+  const message = (data: unknown, from: unknown = parent) => {
+    source = from;
+    document.dispatchEvent(new MessageEvent("message", { data }));
+  };
+  return {
+    message,
+    win: win as { open: (u?: string) => unknown; alert: (t?: unknown) => void; confirm: (t?: unknown) => boolean; prompt: (t?: unknown) => string | null; __cfFrame?: boolean },
+    posted,
+    notes,
+    link,
+    click,
+    press,
+    form,
+    submit,
+    went: () => went,
+  };
 }
 
 // oxlint-disable-next-line typescript/unbound-method -- put back as it was, on the prototype
 const realClick = HTMLAnchorElement.prototype.click;
+// oxlint-disable-next-line typescript/unbound-method -- put back as it was, on the prototype
+const realSubmit = HTMLFormElement.prototype.submit;
+/** The forms whose submit() went through to the browser's own (stubbed: jsdom has none). */
+const submitted: string[] = [];
+beforeEach(() => {
+  HTMLFormElement.prototype.submit = function (this: HTMLFormElement) {
+    submitted.push(this.action);
+  };
+});
 afterEach(() => {
   for (const [type, fn, capture] of added.splice(0)) document.removeEventListener(type, fn, capture);
   document.body.replaceChildren();
   HTMLAnchorElement.prototype.click = realClick;
+  HTMLFormElement.prototype.submit = realSubmit;
+  submitted.length = 0;
 });
 
 describe("the frame script", () => {
@@ -163,6 +223,126 @@ describe("the frame script", () => {
     expect(f.click(f.link({ href: "https://example.com/" }))).toBe(false);
   });
 
+  it("answers the app's ping with its seq, and only the app's", () => {
+    const f = load();
+    expect(f.notes).toEqual([]);
+    const got: unknown[] = [];
+    const parent = (f.win as unknown as { parent: { postMessage: (m: unknown) => void } }).parent;
+    const post = parent.postMessage;
+    parent.postMessage = (m) => {
+      got.push(m);
+      post(m);
+    };
+    f.message({ type: "cf:ping", seq: 3 });
+    f.message({ type: "cf:ping", seq: 4 }, {});
+    f.message({ type: "cf:ping", seq: "5" });
+    f.message({ type: "cf:theme" });
+    expect(got).toEqual([{ type: "cf:here", seq: 3 }]);
+  });
+
+  it("says going before a link to its own origin, not to another site", () => {
+    const f = load();
+    f.click(f.link({ href: "https://example.com/" }));
+    expect(f.notes).toEqual([]);
+    f.click(f.link({ href: "data.json" }));
+    expect(f.notes).toEqual(["cf:going"]);
+  });
+
+  it("sends a GET form to another site to the browser with its fields; a POST cannot go there and says so", () => {
+    const f = load();
+    expect(f.submit(f.form({ action: "https://example.com/search", method: "get" }, { q: "cats & dogs" }))).toBe(true);
+    expect(f.submit(f.form({ action: "https://example.com/login", method: "post" }, { user: "me" }))).toBe(true);
+    expect(f.posted).toEqual([
+      { type: "cf:open", url: "https://example.com/search?q=cats+%26+dogs" },
+      { type: "cf:unsupported", what: "form", text: "example.com" },
+    ]);
+  });
+
+  it("takes a submit button's own action and method", () => {
+    const f = load();
+    const own = f.form({ action: "save.html", method: "post" });
+    const button = document.createElement("button");
+    button.setAttribute("formaction", "https://example.org/find");
+    button.setAttribute("formmethod", "get");
+    own.append(button);
+    expect(f.submit(own, "user", button)).toBe(true);
+    expect(f.posted).toEqual([{ type: "cf:open", url: "https://example.org/find" }]);
+  });
+
+  it("leaves the page's own forms, a form it sent itself, and a dialog's form alone", () => {
+    const f = load();
+    expect(f.submit(f.form({ action: "next.html" }, { q: "x" }))).toBe(false);
+    expect(f.submit(f.form({}))).toBe(false);
+    const taken = f.form({ action: "https://example.com/api", method: "post" });
+    taken.addEventListener("submit", (e) => {
+      e.preventDefault();
+    });
+    f.submit(taken);
+    expect(f.submit(f.form({ action: "https://example.com/", method: "dialog" }))).toBe(false);
+    expect(f.posted).toEqual([]);
+  });
+
+  it("sends a script's GET form to the browser only after a press, and reports it before one", () => {
+    const f = load();
+    expect(f.submit(f.form({ action: "https://example.com/s" }, { q: "a" }), "script")).toBe(true);
+    f.press();
+    f.submit(f.form({ action: "https://example.com/s" }, { q: "b" }), "script");
+    expect(f.posted).toEqual([
+      { type: "cf:unsupported", what: "form", text: "example.com" },
+      { type: "cf:open", url: "https://example.com/s?q=b" },
+    ]);
+  });
+
+  it("catches form.submit() to another site, which fires no submit event; the page's own goes through", () => {
+    const f = load();
+    f.form({ action: "https://example.com/login", method: "post" }).submit();
+    f.form({ action: "next.html" }).submit();
+    expect(f.posted).toEqual([{ type: "cf:unsupported", what: "form", text: "example.com" }]);
+    expect(submitted).toEqual([`http://${HOST}/next.html`]);
+  });
+
+  describe("with the Navigation API", () => {
+    function navigation() {
+      const fns: ((e: unknown) => void)[] = [];
+      const navigate = (url: string, over: Record<string, unknown> = {}) => {
+        const e = { cancelable: true, userInitiated: false, navigationType: "push", destination: { url, sameDocument: false }, formData: null, downloadRequest: null, prevented: false, preventDefault: () => (e.prevented = true), ...over };
+        for (const fn of fns) fn(e);
+        return e.prevented;
+      };
+      return { api: { addEventListener: (t: string, fn: (e: unknown) => void) => t === "navigate" && fns.push(fn) }, navigate };
+    }
+
+    it("keeps the frame from a script's or a refresh's way to another site: to the browser after a press, else reported", () => {
+      const n = navigation();
+      const f = load({ navigation: n.api });
+      expect(n.navigate("https://example.com/sso")).toBe(true);
+      expect(n.navigate("https://example.com/next", { userInitiated: true })).toBe(true);
+      expect(n.navigate("https://example.com/post", { formData: {} })).toBe(true);
+      f.press();
+      expect(n.navigate("https://example.com/later", { navigationType: "replace" })).toBe(true);
+      expect(f.posted).toEqual([
+        { type: "cf:unsupported", what: "navigation", text: "example.com" },
+        { type: "cf:open", url: "https://example.com/next" },
+        { type: "cf:unsupported", what: "form", text: "example.com" },
+        { type: "cf:open", url: "https://example.com/later" },
+      ]);
+    });
+
+    it.each([
+      ["the page's own file", `http://${HOST}/preview/g/other.html`, {}, true],
+      ["the same document", "https://example.com/#x", { destination: { url: "https://example.com/#x", sameDocument: true } }, false],
+      ["one it may not cancel (a step back)", "https://example.com/", { cancelable: false, navigationType: "traverse" }, false],
+      ["a download", "https://example.com/a.csv", { downloadRequest: "a.csv" }, false],
+      ["a URL no browser opens", "about:blank", {}, false],
+    ])("lets a navigation go: %s", (_name, url, over, going) => {
+      const n = navigation();
+      const f = load({ navigation: n.api });
+      expect(n.navigate(url, over)).toBe(false);
+      expect(f.posted).toEqual([]);
+      expect(f.notes).toEqual(going ? ["cf:going"] : []);
+    });
+  });
+
   it("posts what the app reads", () => {
     const f = load();
     f.click(f.link({ href: "https://github.com/acme/app" }));
@@ -187,7 +367,7 @@ describe("what the app reads from the frame script", () => {
   });
 
   it("names each call a page cannot make, and nothing else", () => {
-    for (const what of ["alert", "confirm", "prompt", "download"]) expect(pageUnsupported({ type: "cf:unsupported", what })?.message).toMatch(/page/);
+    for (const what of ["alert", "confirm", "prompt", "download", "form", "navigation"]) expect(pageUnsupported({ type: "cf:unsupported", what })?.message).toMatch(/page/);
     expect(pageUnsupported({ type: "cf:unsupported", what: "download" })?.message).toContain('cf.run("file.export"');
     expect(pageUnsupported({ type: "cf:unsupported", what: "toString" })).toBeNull();
     expect(pageUnsupported({ type: "cf:open", what: "alert" })).toBeNull();

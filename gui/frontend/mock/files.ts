@@ -301,6 +301,8 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/scheme.html`, text(SCHEME_PAGE_HTML, "text/html")],
     [`${CF}/docs/tall.html`, text(TALL_PAGE_HTML, "text/html")],
     [`${CF}/docs/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
+    // Another file of the same page, under the same grant (e2e/bridge.spec.ts).
+    [`${CF}/docs/bridge-next.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/probe.html`, text(PROBE_PAGE_HTML, "text/html")],
     // The page library's pages (mock/pagelib/; e2e/page-library.spec.ts).
     ...Object.entries(pagelibPages()).map(([name, html]): [string, Entry] => [`${CF}/docs/pagelib/${name}`, text(html, "text/html")]),

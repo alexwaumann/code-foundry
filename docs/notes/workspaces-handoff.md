@@ -40,7 +40,7 @@ session** in any member worktree that edits, commits, and opens PRs across all m
   cwd is a linked worktree) the main repo's shared `.git`. Unsandboxed: file tools, MCP,
   hooks. User-level sandbox/permission settings still apply alongside managed settings
   unless a managed-only lock covers them.
-* Work sandbox specifics (Alex checked on the work laptop): **Unix sockets are
+* Managed-machine sandbox specifics (Alex checked on a managed Mac): **Unix sockets are
   blocked**; `network.allowLocalBinding = true` and `allowedDomains` includes
   `localhost` / `127.0.0.1`; bind+connect on an ephemeral 127.0.0.1 port works; h2c +
   Connect over TCP works.
@@ -127,12 +127,12 @@ Each step: `make check` green, exercised end to end, a `docs/notes/` entry.
   printed `Moved to <path>` with no trust or confirmation dialog; `pwd` in the next turn
   was the new member. Typed mid-turn, Claude queues it and runs it after the turn. See
   `workspaces-2-launch.md`.
-* `--add-dir` on a sibling worktree under the work sandbox: can `git commit` there
+* `--add-dir` on a sibling worktree under the managed machine's sandbox: can `git commit` there
   write the sibling's main-repo `.git`? Alex says `permissions.additionalDirectories`
   with `~/` makes this moot on a managed Mac, and it is not sandboxed elsewhere; still worth one
   real run.
 * Loopback endpoint in session env: confirm the CLI works from inside a sandboxed
-  session on the work laptop once step 1 exists.
+  session on a managed Mac once step 1 exists.
 
 ## 7. Code pointers
 

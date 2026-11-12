@@ -219,7 +219,7 @@ adds the settings and calls `setThemeSlots` from `stores/settings.ts` the way
   gets the dark slots. Light thread status tones still mix 15% black over the (already
   guarded) tokens, a step darker than needed; thread.css's call, left as is.
 - **JSON imports** needed `resolveJsonModule` in `tsconfig.app.json`.
-- **The Haiku model id** `claude-4.5-haiku[1m]` (the work laptop's Bedrock id) is refused
+- **The Haiku model id** `claude-4.5-haiku[1m]` (a managed Mac's Bedrock id) is refused
   on this machine; the live thread used `claude-haiku-5-5[1m]`.
 - Vitest's jsdom returns CSS imports empty (theme-1's gotcha), so the drift test runs in the
   Node environment and reads files with `fs`.

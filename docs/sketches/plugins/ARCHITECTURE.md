@@ -738,7 +738,7 @@ used admin view. So:
 | **2. Surfaces + predicates (daemon)** | Instances, view validation and coalescing, `WatchSurface`/`Act`, `surface/*`, `view/*`, `context/set`; predicate compiler and evaluator (table tests), facts incl. async PR checks; `plugin.<n>.show.<s>` commands; a `pr.checks` read command (GhService.GetPullRequest; agents want it too); `UiIntent.InvokeCommand`; debug verbs `plugin surface` / `plugin act`. `plugins/examples/jenkins` v0 against `fakejenkins` (httptest: `wfapi/describe`, node logs, `/stop`, `/build`, crumbs) | `plugin surface jenkins pipeline --context-session …` prints the running, failed and needs-auth views; `plugin act … build.rebuild` hits the fake; availability flips when the PR's checks gain a Jenkins URL |
 | **3. GUI renderer** | `api/plugin.ts`, `stores/plugins.ts` + `pluginSurfaces.ts`, `surfaces/plugin.ts` + registry fall-through, `components/plugin/*` (renderers, forms, icons), the Settings Plugins section, mock-daemon plugin fixtures, Playwright shots dark and light at 400 and 280 px | The Jenkins tab live on a thread whose PR has Jenkins checks: stages, log tail, Abort (confirm), Rebuild, Open in Jenkins, "Send failure to Claude" landing in the thread. Screenshots in the PR body |
 | **4. Events + thread flags** | `api.Events.Feed`, `events/subscribe`; `Session.flags` (store, proto, acknowledge clearing); GUI `isAttention`, sort, line-2 reason, dock | Jenkins raises "Jenkins: deploy stage failed" on a background thread: sidebar group, bell, badge, bounce; opening the thread clears it (untilSeen); disabling the plugin clears it |
-| **5. Session env hook** | `session.Options.SpawnExtras`, `claudeCommand` ctx, `--mcp-config` file, reserved keys, conflicts, scope, startup grace; `settings` placement inline; `plugins/examples/entdata` with a fake device-code IdP (RFC 8628) and a fake MCP server | Sign in via the wizard (open browser, copy code, choose environment) → a new thread in a scoped project shows the `entdata` server connected in the MCP tab and the env var in `printenv`; an effort restart keeps both; sign out → the next spawn has neither. **Run it once on the work laptop** (open question 1) |
+| **5. Session env hook** | `session.Options.SpawnExtras`, `claudeCommand` ctx, `--mcp-config` file, reserved keys, conflicts, scope, startup grace; `settings` placement inline; `plugins/examples/entdata` with a fake device-code IdP (RFC 8628) and a fake MCP server | Sign in via the wizard (open browser, copy code, choose environment) → a new thread in a scoped project shows the `entdata` server connected in the MCP tab and the env var in `printenv`; an effort restart keeps both; sign out → the next spawn has neither. **Run it once on a managed Mac** (open question 1) |
 | Later | gh release install + update checks; TS SDK; `activation: onSurface`; plugin-contributed actions in the header menu; `sandbox-exec`; the iframe tier at `/plugins/<name>/` | — |
 
 PRs 4 and 5 depend only on PR 1 and can run in parallel with 2 and 3. PR 3 needs PR 2's
@@ -789,7 +789,7 @@ They meet in three places:
 
 ## I. Open questions for Alex (ranked)
 
-1. **Does `--mcp-config` survive the work laptop's managed settings?** It already
+1. **Does `--mcp-config` survive a managed Mac's managed settings?** It already
    refuses `--strict-mcp-config`. A `managed-mcp.json` or an MCP allowlist may block or
    filter added servers. If it does, the auth plugin's MCP entry must go through
    `claude mcp add --scope user` (the plugin runs as the user) and the hook shrinks to

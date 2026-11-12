@@ -1268,9 +1268,11 @@ tab's preview in the side panel) run in sandboxed frames that never touch the AP
   `/cf/theme.json` (`internal/theme`, `docs/notes/theme-css-route.md`).
 * **What a frame cannot do**: the frame has no window to open, no dialog and no download, and
   a site loaded in it cannot sign in. The daemon writes `internal/preview/frame.js` into every
-  HTML document a frame navigates to: a clicked link to another site, and `window.open`, go to
-  the browser (`view.open.url`); `alert`, `confirm`, `prompt` and downloads are reported in the
-  page's error badge (`docs/notes/page-frame-links.md`). A page saves a file with `file.export`
+  HTML document a frame navigates to: a clicked link to another site, `window.open` and a GET
+  form go to the browser (`view.open.url`); `alert`, `confirm`, `prompt`, downloads, a POST form
+  and a script's `location` to another site are reported in the page's error badge
+  (`docs/notes/page-frame-links.md`). A frame that went to another site anyway is covered with
+  Reload, and the bridge follows a page to its own other files (`docs/notes/leftovers-pages.md`). A page saves a file with `file.export`
   instead, into its thread's checkout, after the user allows it (`docs/notes/page-save.md`).
 * **Page storage**: WebKit keeps a cross-site frame's localStorage for the session only, so
   `cf.storage` writes go through the GUI to `ThreadService.SetPageStorage`, one JSON file per

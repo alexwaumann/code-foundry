@@ -8,9 +8,9 @@ from live probes against Claude Code 2.1.296 with haiku; "verified" means probed
 
 ## Constraints (Alex, 2026-10-11)
 
-* **No hooks.** Managed settings on the work laptop forbid hooks, including stream-json
+* **No hooks.** Managed settings on a managed Mac forbid hooks, including stream-json
   `hook_callback` hooks registered through `initialize`. Nothing below may depend on them.
-* **Bedrock.** Work traffic uses the Bedrock API. Prompt cache TTL is **1 hour** on the
+* **Bedrock.** Traffic on that machine uses the Bedrock API. Prompt cache TTL is **1 hour** on the
   main thread, **5 minutes** for subagents. The CLI exposes the TTL only in hook inputs
   (`PreModelSwitch.cache_ttl`, `SessionStart.prompt_cache_likely_expired`), so the daemon
   computes expiry itself.
@@ -48,7 +48,7 @@ items are built: `rendered-threads-followups-fixes.md`.
   reconnected seconds later) also hit (write 41), with argv identical but `--resume`
   and env differing only in CODE_FOUNDRY_ENDPOINT/TOKEN. This machine has no Bedrock
   config and its live daemon never spawned a rendered thread, so the report is from the
-  work laptop over Bedrock: the remaining variable. Next occurrence: read the first
+  managed Mac over Bedrock: the remaining variable. Next occurrence: read the first
   turn's cacheWriteTokens with `thread.items --json` and diff the two "session spawned"
   log lines (argv is logged).
 

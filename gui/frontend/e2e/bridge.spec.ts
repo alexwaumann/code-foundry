@@ -102,6 +102,17 @@ test("a page's Export button saves into its thread's checkout once the user allo
   await expect(dialog.getByTestId("confirm-ok")).toBeEnabled();
   await dialog.getByTestId("confirm-ok").click();
   await expect(doc(page).locator("#export-out")).toHaveText(`Saved to ${CF}/rows.csv`);
+  // The app shows where it went too (its actions: src/stores/pageSaved.test.ts).
+  const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Saved rows.csv" });
+  await expect(toast).toBeVisible();
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${shots}/page-saved-toast-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
   const saved = (await (await fetch(`${mockUrl}/__mock/fs/text?path=${encodeURIComponent(`${CF}/rows.csv`)}`)).json()) as { text: string | null };
   expect(saved.text).toBe("id,name\ns-r1,Fix stale PR badge\n");
   expect((await invocations()).filter((i) => i.name === "file.export").map((i) => i.confirmed)).toEqual([false, true]);
@@ -235,7 +246,7 @@ const NONCE = () => /(?:^#|&)cf=([^&]+)/.exec(location.hash)?.[1] ?? "";
 /** The mock's thread.wait calls, each held until its caller aborts it (mock/bridge.ts). */
 const mockWaitList = async (): Promise<unknown> => (await fetch(`${mockUrl}/__mock/waits`)).json();
 
-test("a page that leads its frame to another page, another grant's or itself without the nonce, has no bridge there", async ({ page }) => {
+test("a page that leads its frame to another grant's page, or is led to its own from outside, has no bridge there", async ({ page }) => {
   await openBridgeThread(page);
   const other = await page.evaluate(`__cfModule("/src/api/files.ts").then((m) => m.previewFile("", "/Users/dev/elsewhere/bridge.html")).then((p) => p.url)`);
   expect(other).toMatch(/\/preview\/mock-preview-\d+\/bridge\.html$/);
@@ -260,14 +271,43 @@ test("a page that leads its frame to another page, another grant's or itself wit
   await page.waitForTimeout(400);
   expect((await bridgeCounters(page)).posts).toBe(after.posts);
   expect(after.subscriptions).toBe(before.subscriptions - 1);
-  // The bridge page itself, without its fragment: the same.
+  // The bridge page itself, without its fragment, loaded by the app's document rather than by
+  // the page: the same.
   await page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row").click();
   await page.getByTestId("thread-html").filter({ hasText: "bridge.html" }).getByTestId("thread-html-row").click();
   await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
-  await doc(page).locator("body").evaluate(() => {
-    location.replace(location.pathname);
+  await card(page).locator('[data-testid="thread-html-frame"]').evaluate((f: HTMLIFrameElement) => {
+    f.src = f.src.replace(/#.*$/, "");
   });
   await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "no");
+});
+
+test("a page's own other file keeps the bridge, followed by a link or set as its location", async ({ page }) => {
+  await openBridgeThread(page);
+  const nonce = await doc(page).locator("body").evaluate(NONCE);
+  // A link the page adds, followed by the user's click.
+  await doc(page).locator("body").evaluate((b) => {
+    const a = document.createElement("a");
+    a.id = "next";
+    a.href = "bridge-next.html#rows";
+    a.textContent = "Next";
+    b.prepend(a);
+  });
+  await doc(page).locator("#next").click();
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  expect(await doc(page).locator("body").evaluate(() => location.pathname)).toMatch(/\/bridge-next\.html$/);
+  expect(await doc(page).locator("body").evaluate(() => location.hash)).toBe(`#rows&cf=${nonce}`);
+  await doc(page).locator("#list").click();
+  await expect(doc(page).locator("#list-out")).toHaveText(/"threads":\d+/);
+  // Back to the first file by script.
+  await doc(page).locator("body").evaluate(() => {
+    location.href = "bridge.html";
+  });
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  expect(await doc(page).locator("body").evaluate(() => location.pathname)).toMatch(/\/bridge\.html$/);
+  expect(await doc(page).locator("body").evaluate(NONCE)).toBe(nonce);
+  await doc(page).locator("#list").click();
+  await expect(doc(page).locator("#list-out")).toHaveText(/"threads":\d+/);
 });
 
 test("a reload keeps the frame's nonce and its bridge", async ({ page }) => {

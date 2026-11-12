@@ -59,7 +59,7 @@ Decisions the build cannot start without:
 2. **Token model:** proxy-only by default, an opt-in `api` permission hands over the
    normal endpoint and token, no scoped tokens in v1 (`ARCHITECTURE.md` §B.5). Accept?
 3. **View model as JSON end to end,** not proto (above). Accept?
-4. **`--mcp-config` on the work laptop:** does the managed settings profile let it
+4. **`--mcp-config` on a managed Mac:** does the managed settings profile let it
    through? Five-minute test before PR 5; the fallback is `claude mcp add --scope user`
    and an env-only hook.
 5. **Consent model:** new plugins disabled until enabled through a permission dialog,
