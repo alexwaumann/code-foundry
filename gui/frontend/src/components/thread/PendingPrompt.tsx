@@ -11,6 +11,7 @@ import {
   modeHint,
   NO_PICK,
   permissionChoices,
+  permissionTitle,
   pickOption,
   promptKey,
   questionsOf,
@@ -23,7 +24,7 @@ import {
   type PromptShape,
   type QuestionPick,
 } from "@/lib/threadRequest";
-import { diffStats, parseObject, relPath, str, toolDiff, toolDiffFiles, type Json } from "@/lib/toolSummary";
+import { diffStats, parseObject, relPath, str, toolDiff, toolDiffFiles } from "@/lib/toolSummary";
 import { useThreadsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
@@ -84,26 +85,6 @@ function usePromptKeys(shape: PromptShape, act: (a: PromptKeyAction) => void, ke
     e.stopPropagation();
     latest.current.act(a);
   };
-}
-
-/** The question the permission prompt asks. */
-function permissionTitle(r: ThreadRequestView, input: Json, cwd: string): string {
-  if (r.title) return r.title;
-  const path = str(input, "file_path") || str(input, "notebook_path");
-  switch (r.toolName) {
-    case "Bash":
-      return "Allow Claude to run this command?";
-    case "Edit":
-    case "MultiEdit":
-    case "NotebookEdit":
-      return path ? `Allow Claude to edit ${relPath(path, cwd)}?` : "Allow Claude to edit this file?";
-    case "Write":
-      return path ? `Allow Claude to write ${relPath(path, cwd)}?` : "Allow Claude to write this file?";
-    case "WebFetch":
-      return "Allow Claude to fetch this page?";
-    default:
-      return `Allow Claude to use ${r.displayName || r.toolName}?`;
-  }
 }
 
 /** A button's key hint, in the button's own colour. */

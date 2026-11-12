@@ -1517,6 +1517,87 @@ export class World {
     return out;
   }
 
+  /**
+   * POST /__mock/needs-you (docs/notes/shell-17-needs-you.md): three of the user's threads that
+   * wait on real asks, as the hover card and popup read them: a permission for a long command
+   * (code-foundry), a question (ghostty-playground) and a short permission without a project.
+   */
+  addNeedsYou(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const specs: { id: string; name: string; projectId: string; worktreePath: string; min: number; ask: Parameters<MockThreadLogs["seedAsk"]>[1] }[] = [
+      {
+        id: "s-ny-notes",
+        name: "Draft the 0.22 release notes",
+        projectId: "",
+        worktreePath: HOME,
+        min: 6,
+        ask: { prompt: "Draft the 0.22 release notes from the merged PRs.", intro: "I'll list the last releases first to match their format.", minutesAgo: 6, ask: { command: "gh release list --limit 5", description: "List the last five releases" } },
+      },
+      {
+        id: "s-ny-port",
+        name: "Port the renderer to libghostty-vt",
+        projectId: "repo-gp",
+        worktreePath: GP,
+        min: 4,
+        ask: {
+          prompt: "Port the grid renderer to libghostty-vt.",
+          intro: "The cell grid maps one to one. Before I start, one choice about the order.",
+          minutesAgo: 4,
+          ask: {
+            questions: [
+              {
+                question: "Which part of the renderer should I port first?",
+                header: "Order",
+                multiSelect: false,
+                options: [
+                  { label: "The cell grid (Recommended)", description: "Everything else draws on it" },
+                  { label: "The cursor", description: "Small, and shows the input path end to end" },
+                  { label: "Selection", description: "Needs the grid's coordinates first" },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        id: "s-ny-badge",
+        name: "Fix stale PR badge after a force-push to the branch",
+        projectId: "repo-cf",
+        worktreePath: CF,
+        min: 2,
+        ask: {
+          prompt: "The PR badge stays stale after a force-push. Find out why and fix it.",
+          intro: "The poller skipped PRs whose checks did not change.\n\nThe fingerprint now includes the head SHA; I'll check which open PRs moved since the last poll.",
+          minutesAgo: 2,
+          ask: {
+            command: [
+              "gh api graphql -f query='",
+              "  query($owner: String!, $name: String!) {",
+              "    repository(owner: $owner, name: $name) {",
+              "      pullRequests(states: OPEN, first: 50) {",
+              "        nodes { number headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }",
+              "      }",
+              "    }",
+              "  }' -F owner=alexwaumann -F name=code-foundry \\",
+              "  | jq '.data.repository.pullRequests.nodes[] | {number, headRefOid}' > /tmp/pr-heads.json",
+            ].join("\n"),
+            description: "List the open PRs' head commits",
+          },
+        },
+      },
+    ];
+    const out: string[] = [];
+    for (const { min, ask, ...o } of specs) {
+      out.push(o.id);
+      if (this.threads.has(o.id)) continue;
+      const s = this.addThread({ model: "claude-sonnet-5-5[1m]", effort: "medium", createdAt: ago(min + 20), lastActivityAt: ago(min), statusChangedAt: ago(min), ...o });
+      this.logs.seedAsk(s.id, ask);
+      s.statusChangedAt = ago(min);
+      this.publishThread(s);
+    }
+    return out;
+  }
+
   addLiveCount(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
     const A = ThreadStatus.NEEDS_ATTENTION;

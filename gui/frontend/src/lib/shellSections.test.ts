@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildShellSections, needsScopeOf, shellRows, shellThreadOrder, type ShellListOptions, type ShellListThread } from "./shellSections";
+import { buildShellSections, needsList, needsScopeOf, shellRows, shellThreadOrder, type ShellListOptions, type ShellListThread } from "./shellSections";
 
 /**
  * The shell sidebar's sections (docs/notes/shell-model.md, "Sidebar"). Threads come in creation
@@ -130,5 +130,24 @@ describe("the shell sidebar's sections", () => {
     expect(needsScopeOf("all")).toBe("all");
     expect(needsScopeOf(undefined)).toBe("all");
     expect(needsScopeOf("junk")).toBe("all");
+  });
+});
+
+describe("the Needs you list (the top bar's control and cmd+shift+a)", () => {
+  it("is the section's threads in its order, whether the section is collapsed or not", () => {
+    expect(needsList(WORLD, OPTS)).toEqual({ ids: ["ask-b", "ask-a"], any: true });
+    const rows = view(WORLD, { needsCollapsed: true });
+    expect(rows[0]).toBe("# Needs you 2 collapsed");
+  });
+
+  it("follows the scope: this space's only, while any space's keeps it reachable", () => {
+    expect(needsList(WORLD, { ...OPTS, needsScope: "space" })).toEqual({ ids: ["ask-a"], any: true });
+    expect(needsList(WORLD, { currentSpaceId: "C", needsScope: "space" })).toEqual({ ids: [], any: true });
+  });
+
+  it("only the user's own threads that wait, never a thread's threads, archived or snoozed ones", () => {
+    const ts = [t("mine", { group: "prompt" }), t("child", { group: "prompt", hidden: true }), t("gone", { group: "prompt", archivedAtMs: 1 }), t("later", { group: "prompt", snoozedUntilMs: Date.now() + 60_000 }), t("err", { group: "error" })];
+    expect(needsList(ts, OPTS)).toEqual({ ids: ["mine"], any: true });
+    expect(needsList([t("child", { group: "prompt", hidden: true })], OPTS)).toEqual({ ids: [], any: false });
   });
 });
