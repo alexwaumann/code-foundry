@@ -145,7 +145,7 @@ func TestTerminalNewQuick(t *testing.T) {
 		{name: "another thread's does not count", ctx: command.Context{ActiveThreadID: "s1"}, terminals: []*v1.Terminal{quickOf("t-q", "s2", running)},
 			wantCreate: true, wantMsg: "created thread s1's quick terminal t1"},
 		{name: "an ordinary shell of the thread does not count", ctx: command.Context{ActiveThreadID: "s1"},
-			terminals: []*v1.Terminal{{Id: "t-s", State: running, Labels: termlabel.Shell("s1", "r1", feat)}},
+			terminals:  []*v1.Terminal{{Id: "t-s", State: running, Labels: termlabel.Shell("s1", "r1", feat)}},
 			wantCreate: true, wantMsg: "created thread s1's quick terminal t1"},
 		{name: "without a thread", args: map[string]string{"here": feat}, wantErr: command.ErrInvalidArgs},
 	}

@@ -92,9 +92,9 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 			Description: "Replace a shell with a fresh one in its owner's folder. " +
 				"That is the thread's checkout, the worktree, or the home directory for a free shell; the old shell is closed. The new shell keeps the old one's labels (a quick terminal stays the " +
 				"thread's quick terminal) and is labelled replaces=<old id>, so a tab showing the old one can follow it.",
-			Category: "Terminal",
-			Args:     []ArgSpec{positional(idArg)},
-			When:     isShell,
+			Category:       "Terminal",
+			Args:           []ArgSpec{positional(idArg)},
+			When:           isShell,
 			WhyUnavailable: notShell,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				old, err := findShell(ctx, d.Terminal, a.String("id"), "reset")
@@ -136,7 +136,7 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 				{Name: "command", Type: String, Description: "The command line to run instead of the last command " +
 					"(a restored terminal's, which its new shell never ran)"},
 			},
-			When: isShell,
+			When:           isShell,
 			WhyUnavailable: notShell,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				t, err := findShell(ctx, d.Terminal, a.String("id"), "rerun")

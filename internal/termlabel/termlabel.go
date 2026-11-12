@@ -77,7 +77,6 @@ const (
 // SlotQuick is Slot's value on a thread's quick terminal.
 const SlotQuick = "quick"
 
-
 // KindShell is Kind's value on a shell started by terminal.new. The daemon removes such a
 // terminal as soon as it exits, and kills and removes it when its thread (Thread) or its
 // worktree (Worktree) is removed.
