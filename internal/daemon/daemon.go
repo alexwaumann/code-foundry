@@ -320,6 +320,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 			return f.Scheme, ok
 		},
 		ShippedSkills: shippedSkills(log, p.Claude()),
+		Layout:        st.layout,
 		// plugin new pins the SDK as the plugin skill does (skills.go).
 		PluginScaffolder: pluginscaffold.Scaffolder{
 			Home: st.home, Pin: skills.SDKPin(opts.Version.Commit, opts.Version.PluginSDKTag), Go: pluginscaffold.ShellGo,

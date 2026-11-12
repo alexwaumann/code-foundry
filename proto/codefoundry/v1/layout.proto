@@ -60,6 +60,20 @@ message LayoutSpace {
   string focus_pane_id = 4;
   // Tab ids of this space, most recently focused first, at most 64.
   repeated string mru_tab_ids = 5;
+  // The space's composer drafts, newest first, open in a tab or not. The empty composer is
+  // never one of them.
+  repeated LayoutDraft drafts = 6;
+}
+
+// LayoutDraft is a composer with something typed in it. Its text is not in the layout.
+message LayoutDraft {
+  // "d-" + 8 base32 characters, or an id the window chose; the "draft" param of its
+  // compose tab.
+  string id = 1;
+  // One line for lists; empty draws a placeholder.
+  string label = 2;
+  // Its tab's other params (project, workspace, like), for reopening it.
+  map<string, string> params = 3;
 }
 
 // LayoutNode is a pane or a split.
@@ -229,6 +243,24 @@ message ApplyLayoutResponse {
   // Tabs the op took out of the layout, in layout order: the caller ends what they hold
   // (an unlinked terminal) or closes what they show (a thread).
   repeated LayoutTab closed = 6;
+  // How placement chose where a tab went: "1" to "6" (the spec's rules), "pane" (the
+  // caller's pane), "focused" (the focused pane), "compose" (it replaced a composer).
+  string rule = 7;
+  // Linked tabs taken into their thread's remembered set; their terminals keep running.
+  repeated LayoutTab kept = 8;
+  // Terminal tabs whose terminals the caller ends although the op did not close them now
+  // (a snoozed or archived thread's remembered terminals).
+  repeated LayoutTab ended = 9;
+  // The remembered tabs an opened thread brought back: into their old panes, or placed
+  // fresh beside it; fresh are the terminal tabs among them that need a new shell.
+  repeated string back_tab_ids = 10;
+  repeated string placed_tab_ids = 11;
+  repeated string fresh_tab_ids = 12;
+  // The panes smart swap switched to the newly focused thread's surfaces.
+  repeated string swapped_pane_ids = 13;
+  // The composer draft the op started, opened or ended; after clear_draft, discard_draft
+  // and an open_thread that sent from a draft it is gone, and its stored text goes too.
+  string draft_id = 14;
 }
 
 message SetViewportRequest {
@@ -242,14 +274,16 @@ message SetViewportResponse {}
 
 // LayoutOp is one operation. Each case names the op of internal/layout it runs (its JSON
 // name). Cases 1 to 9 are the thread ops (placement, opening, closing and restoring a
-// thread, moving it between spaces): declared here, answered Unimplemented until the
-// daemon registers them.
+// thread, moving it between spaces, archiving and snoozing it). An op that lays panes out
+// measures in the pane area the last window reported (SetViewport), else 1180 x 820.
 message LayoutOp {
   oneof op {
     OpenThreadOp open_thread = 1;
     CloseThreadOp close_thread = 2;
     OpenSurfaceOp open_surface = 3;
     MoveThreadOp move_thread = 4;
+    ArchiveThreadOp archive_thread = 5;
+    SnoozeThreadOp snooze_thread = 6;
 
     AddTabOp add_tab = 10;
     SplitPaneOp split_pane = 11;
@@ -270,15 +304,26 @@ message LayoutOp {
     RemoveSpaceOp remove_space = 32;
     ReorderSpacesOp reorder_spaces = 33;
     SwitchSpaceOp switch_space = 34;
+
+    NewThreadOp new_thread = 40;
+    StartDraftOp start_draft = 41;
+    LabelDraftOp label_draft = 42;
+    ClearDraftOp clear_draft = 43;
+    DiscardDraftOp discard_draft = 44;
+    OpenDraftOp open_draft = 45;
   }
 }
 
 // OpenThreadOp opens a thread's tab (or focuses it), and restores its linked tabs.
 message OpenThreadOp {
   string thread_id = 1;
-  // Where its tab opens; empty is the focused pane of the thread's space.
+  // Where its tab opens; empty is the focused pane of the thread's space (or in place of
+  // that space's composer when it is the space's only tab).
   string pane_id = 2;
   bool focus = 3;
+  // The composer tab the thread was sent from: the thread's tab replaces it, and the
+  // thread lives in that composer's space.
+  string compose_tab_id = 4;
 }
 
 // CloseThreadOp closes a thread's tab and its linked tabs in its space, remembering them.
@@ -292,12 +337,29 @@ message OpenSurfaceOp {
   // The pane the "+" menu was opened in, which wins except for a linked tab already open.
   string pane_id = 2;
   bool focus = 3;
+  // The space it opens in; empty: the pane's, else a linked tab's thread's, else the
+  // current space.
+  string space_id = 4;
 }
 
 // MoveThreadOp moves a thread to another space with the linked tabs in its space.
 message MoveThreadOp {
   string thread_id = 1;
   string space_id = 2;
+}
+
+// ArchiveThreadOp closes a thread's tab and its linked tabs in every space and forgets its
+// layout (ApplyLayoutResponse.ended: its remembered terminals, for the caller to end).
+message ArchiveThreadOp {
+  string thread_id = 1;
+}
+
+// SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does, and marks its
+// remembered terminals to come back as fresh shells.
+message SnoozeThreadOp {
+  string thread_id = 1;
+  // The command each of its terminals ran last, by terminal id, shown with "Run again".
+  map<string, string> ran = 2;
 }
 
 // AddTabOp adds a tab to pane_id, else the focused pane of space_id (empty: the current
@@ -365,7 +427,8 @@ message CloseTabOp {
   string tab_id = 1;
 }
 
-// ClosePaneOp takes a pane and its tabs out of the layout.
+// ClosePaneOp takes a pane and its tabs out of the layout; each thread tab in it closes as
+// CloseThreadOp closes it (its linked tabs in its space are remembered).
 message ClosePaneOp {
   string pane_id = 1;
 }
@@ -426,4 +489,48 @@ message ReorderSpacesOp {
 
 message SwitchSpaceOp {
   string space_id = 1;
+}
+
+// NewThreadOp focuses the space's empty composer (with params when given), or opens one in
+// the focused pane (pane_id: that pane, the "+" menu's), or as the first pane of an empty
+// space.
+message NewThreadOp {
+  // Empty: the pane's space, else the current one.
+  string space_id = 1;
+  string pane_id = 2;
+  // What the composer is for (project, workspace, like); never "draft".
+  map<string, string> params = 3;
+  bool focus = 4;
+}
+
+// StartDraftOp turns the empty composer tab_id into a draft (its first text typed).
+message StartDraftOp {
+  string tab_id = 1;
+  // The draft's id, chosen by the window so it can store the text first; empty: a new one.
+  // Refused when used anywhere in the layout.
+  string draft_id = 2;
+  string label = 3;
+}
+
+// LabelDraftOp sets a draft's label.
+message LabelDraftOp {
+  string draft_id = 1;
+  string label = 2;
+}
+
+// ClearDraftOp ends a draft whose text was all deleted: its tab is the space's empty
+// composer again (or closes, when the space has one already).
+message ClearDraftOp {
+  string draft_id = 1;
+}
+
+// DiscardDraftOp ends a draft and closes its tab when open.
+message DiscardDraftOp {
+  string draft_id = 1;
+}
+
+// OpenDraftOp focuses a draft's tab, or opens it in its space's focused pane.
+message OpenDraftOp {
+  string draft_id = 1;
+  bool focus = 2;
 }

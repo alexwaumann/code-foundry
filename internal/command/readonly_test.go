@@ -48,6 +48,7 @@ var readOnly = []string{
 	"ui.presence",
 	"usage.show",
 	"workspace.list", "worktree.editors",
+	"layout.show", "space.list", "tab.list",
 }
 
 // Every registered command is classified on purpose: the read-only ones are exactly the

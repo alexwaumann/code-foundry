@@ -30,12 +30,15 @@ type Store interface {
 	// Snapshot is the layout now. Never mutate it.
 	Snapshot() *Snapshot
 	// Apply runs op. On an error (see internal/layout's errors) nothing changed. An op
-	// that changes nothing is no commit: the rev stays and no event is published.
+	// that changes nothing is no commit: the rev stays and no event is published. An op
+	// that lays panes out and names no pane area gets Viewport (core.WithArea, which sets
+	// it on op).
 	Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Commit, error)
 	// SetViewport records the pane area a window reported (layout pixels).
 	SetViewport(clientID string, v Viewport) error
-	// Viewport is the pane area the daemon lays out with: the last one reported, else
-	// DefaultViewport.
+	// Viewport is the pane area the daemon lays out with: the last one a window reported
+	// while the daemon runs (kept when the window goes), else DefaultViewport. It is not
+	// stored: a restarted daemon lays out in DefaultViewport until a window reports.
 	Viewport() Viewport
 }
 
@@ -49,6 +52,9 @@ type Snapshot struct {
 type ApplyOptions struct {
 	// ClientID names the window that asked, carried on the commit's Event.
 	ClientID string
+	// KeepFocus runs the op without moving the user's focus (core.Options.KeepFocus): a
+	// call from inside a thread.
+	KeepFocus bool
 }
 
 // Commit is what an Apply did.

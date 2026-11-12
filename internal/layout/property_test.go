@@ -275,7 +275,7 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		opts := Options{NoSmartSwap: s.n(4) == 0}
+		opts := Options{NoSmartSwap: s.n(4) == 0, KeepFocus: s.n(3) == 0}
 		next, res, err := ApplyWith(st, op, ids, opts)
 		opJSON, _ := EncodeOp(op)
 		if after, _ := Encode(st); string(after) != string(before) {

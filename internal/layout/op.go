@@ -56,6 +56,9 @@ type Result struct {
 type Options struct {
 	// NoSmartSwap turns smart swap off (the setting layout.smart_swap, on by default).
 	NoSmartSwap bool `json:"no_smart_swap,omitempty"`
+	// KeepFocus puts the user's focus back as it was after the op (keep_focus.go): a call
+	// from inside a thread, which never moves the user's focus.
+	KeepFocus bool `json:"keep_focus,omitempty"`
 }
 
 var registry = map[string]func() Op{}
@@ -180,6 +183,9 @@ func ApplyWith(st *State, op Op, ids IDs, opts Options) (*State, Result, error) 
 		return st, Result{}, fmt.Errorf("layout %s: %w", op.OpName(), err)
 	}
 	t.finish()
+	if opts.KeepFocus {
+		keepFocus(st, t.st)
+	}
 	if after := focusedThreadTab(t.st); !opts.NoSmartSwap && after.thread != "" && after != before {
 		res.Swapped = smartSwap(t.st, after.space, after.thread)
 	}

@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/layout.proto.
  */
 export const file_codefoundry_v1_layout: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9sYXlvdXQucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIhIKEEdldExheW91dFJlcXVlc3QiOwoRR2V0TGF5b3V0UmVzcG9uc2USJgoGbGF5b3V0GAEgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0IqUBCgZMYXlvdXQSCwoDcmV2GAEgASgEEisKBnNwYWNlcxgCIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwYWNlEhgKEGN1cnJlbnRfc3BhY2VfaWQYAyABKAkSGAoQZGVmYXVsdF9zcGFjZV9pZBgEIAEoCRItCgd0aHJlYWRzGAUgAygLMhwuY29kZWZvdW5kcnkudjEuVGhyZWFkTGF5b3V0In0KC0xheW91dFNwYWNlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSKAoEcm9vdBgDIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dE5vZGUSFQoNZm9jdXNfcGFuZV9pZBgEIAEoCRITCgttcnVfdGFiX2lkcxgFIAMoCSJuCgpMYXlvdXROb2RlEioKBHBhbmUYASABKAsyGi5jb2RlZm91bmRyeS52MS5MYXlvdXRQYW5lSAASLAoFc3BsaXQYAiABKAsyGy5jb2RlZm91bmRyeS52MS5MYXlvdXRTcGxpdEgAQgYKBG5vZGUiWAoKTGF5b3V0UGFuZRIKCgJpZBgBIAEoCRInCgR0YWJzGAIgAygLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEhUKDWFjdGl2ZV90YWJfaWQYAyABKAkifgoLTGF5b3V0U3BsaXQSCgoCaWQYASABKAkSJgoDZGlyGAIgASgOMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0RGlyEiwKCGNoaWxkcmVuGAMgAygLMhouY29kZWZvdW5kcnkudjEuTGF5b3V0Tm9kZRINCgVzaXplcxgEIAMoASLIAQoJTGF5b3V0VGFiEgoKAmlkGAEgASgJEgwKBGtpbmQYAiABKAkSEQoJdGhyZWFkX2lkGAMgASgJEgsKA2tleRgEIAEoCRI1CgZwYXJhbXMYBSADKAsyJS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWIuUGFyYW1zRW50cnkSDQoFdGl0bGUYBiABKAkSDAoEbmFtZRgHIAEoCRotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIrABCgxUaHJlYWRMYXlvdXQSEQoJdGhyZWFkX2lkGAEgASgJEhAKCHNwYWNlX2lkGAIgASgJEiwKBXF1aWNrGAMgASgLMh0uY29kZWZvdW5kcnkudjEuUXVpY2tUZXJtaW5hbBIxCgpyZW1lbWJlcmVkGAQgAygLMh0uY29kZWZvdW5kcnkudjEuUmVtZW1iZXJlZFRhYhIaChJyZW1lbWJlcmVkX3BhbmVfaWQYBSABKAkiLQoNUXVpY2tUZXJtaW5hbBIMCgRvcGVuGAEgASgIEg4KBmhlaWdodBgCIAEoASLVAQoNUmVtZW1iZXJlZFRhYhImCgN0YWIYASABKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISDwoHcGFuZV9pZBgCIAEoCRINCgVpbmRleBgDIAEoBRIOCgZhY3RpdmUYBCABKAgSEAoIYWRqYWNlbnQYBSABKAgSLAoGYmVzaWRlGAYgASgLMhwuY29kZWZvdW5kcnkudjEuTGF5b3V0QmVzaWRlEiwKBWZyZXNoGAcgASgLMh0uY29kZWZvdW5kcnkudjEuRnJlc2hUZXJtaW5hbCJiCgxMYXlvdXRCZXNpZGUSGgoSbmVpZ2hib3VyX3BhbmVfaWRzGAEgAygJEigKBGVkZ2UYAiABKA4yGi5jb2RlZm91bmRyeS52MS5MYXlvdXRFZGdlEgwKBGZyYWMYAyABKAEiKgoNRnJlc2hUZXJtaW5hbBIMCgRuYW1lGAEgASgJEgsKA3JhbhgCIAEoCSKRAQoLTGF5b3V0RXZlbnQSCwoDcmV2GAEgASgEEioKCHNuYXBzaG90GAIgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0SAASLAoFZGVsdGEYAyABKAsyGy5jb2RlZm91bmRyeS52MS5MYXlvdXREZWx0YUgAEhEKCWNsaWVudF9pZBgFIAEoCUIICgZjaGFuZ2Ui6QEKC0xheW91dERlbHRhEisKBnNwYWNlcxgBIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwYWNlEhkKEXJlbW92ZWRfc3BhY2VfaWRzGAIgAygJEhMKC3NwYWNlX29yZGVyGAMgAygJEhgKEGN1cnJlbnRfc3BhY2VfaWQYBCABKAkSGAoQZGVmYXVsdF9zcGFjZV9pZBgFIAEoCRItCgd0aHJlYWRzGAYgAygLMhwuY29kZWZvdW5kcnkudjEuVGhyZWFkTGF5b3V0EhoKEnJlbW92ZWRfdGhyZWFkX2lkcxgHIAMoCSJNChJBcHBseUxheW91dFJlcXVlc3QSJAoCb3AYASABKAsyGC5jb2RlZm91bmRyeS52MS5MYXlvdXRPcBIRCgljbGllbnRfaWQYAiABKAkikgEKE0FwcGx5TGF5b3V0UmVzcG9uc2USCwoDcmV2GAEgASgEEhAKCHNwYWNlX2lkGAIgASgJEg8KB3BhbmVfaWQYAyABKAkSDgoGdGFiX2lkGAQgASgJEhAKCGV4aXN0aW5nGAUgASgIEikKBmNsb3NlZBgGIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYiJGChJTZXRWaWV3cG9ydFJlcXVlc3QSEQoJY2xpZW50X2lkGAEgASgJEg0KBXdpZHRoGAIgASgBEg4KBmhlaWdodBgDIAEoASIVChNTZXRWaWV3cG9ydFJlc3BvbnNlIoMJCghMYXlvdXRPcBIzCgtvcGVuX3RocmVhZBgBIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLk9wZW5UaHJlYWRPcEgAEjUKDGNsb3NlX3RocmVhZBgCIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkNsb3NlVGhyZWFkT3BIABI1CgxvcGVuX3N1cmZhY2UYAyABKAsyHS5jb2RlZm91bmRyeS52MS5PcGVuU3VyZmFjZU9wSAASMwoLbW92ZV90aHJlYWQYBCABKAsyHC5jb2RlZm91bmRyeS52MS5Nb3ZlVGhyZWFkT3BIABIrCgdhZGRfdGFiGAogASgLMhguY29kZWZvdW5kcnkudjEuQWRkVGFiT3BIABIxCgpzcGxpdF9wYW5lGAsgASgLMhsuY29kZWZvdW5kcnkudjEuU3BsaXRQYW5lT3BIABItCghtb3ZlX3RhYhgMIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLk1vdmVUYWJPcEgAEi8KCW1vdmVfcGFuZRgNIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLk1vdmVQYW5lT3BIABIxCgptZXJnZV9wYW5lGA4gASgLMhsuY29kZWZvdW5kcnkudjEuTWVyZ2VQYW5lT3BIABIvCglzd2FwX3BhbmUYDyABKAsyGi5jb2RlZm91bmRyeS52MS5Td2FwUGFuZU9wSAASLwoJY2xvc2VfdGFiGBAgASgLMhouY29kZWZvdW5kcnkudjEuQ2xvc2VUYWJPcEgAEjEKCmNsb3NlX3BhbmUYESABKAsyGy5jb2RlZm91bmRyeS52MS5DbG9zZVBhbmVPcEgAEi8KCXNldF9zaXplcxgSIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlNldFNpemVzT3BIABIvCglmb2N1c190YWIYEyABKAsyGi5jb2RlZm91bmRyeS52MS5Gb2N1c1RhYk9wSAASMQoKZm9jdXNfcGFuZRgUIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkZvY3VzUGFuZU9wSAASOAoOc2V0X3RhYl9wYXJhbXMYFSABKAsyHi5jb2RlZm91bmRyeS52MS5TZXRUYWJQYXJhbXNPcEgAEjEKCnJlbmFtZV90YWIYFiABKAsyGy5jb2RlZm91bmRyeS52MS5SZW5hbWVUYWJPcEgAEi8KCW5ld19zcGFjZRgeIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLk5ld1NwYWNlT3BIABI1CgxyZW5hbWVfc3BhY2UYHyABKAsyHS5jb2RlZm91bmRyeS52MS5SZW5hbWVTcGFjZU9wSAASNQoMcmVtb3ZlX3NwYWNlGCAgASgLMh0uY29kZWZvdW5kcnkudjEuUmVtb3ZlU3BhY2VPcEgAEjkKDnJlb3JkZXJfc3BhY2VzGCEgASgLMh8uY29kZWZvdW5kcnkudjEuUmVvcmRlclNwYWNlc09wSAASNQoMc3dpdGNoX3NwYWNlGCIgASgLMh0uY29kZWZvdW5kcnkudjEuU3dpdGNoU3BhY2VPcEgAQgQKAm9wIkEKDE9wZW5UaHJlYWRPcBIRCgl0aHJlYWRfaWQYASABKAkSDwoHcGFuZV9pZBgCIAEoCRINCgVmb2N1cxgDIAEoCCIiCg1DbG9zZVRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCSJXCg1PcGVuU3VyZmFjZU9wEiYKA3RhYhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIPCgdwYW5lX2lkGAIgASgJEg0KBWZvY3VzGAMgASgIIjMKDE1vdmVUaHJlYWRPcBIRCgl0aHJlYWRfaWQYASABKAkSEAoIc3BhY2VfaWQYAiABKAkiggEKCEFkZFRhYk9wEhAKCHNwYWNlX2lkGAEgASgJEg8KB3BhbmVfaWQYAiABKAkSJgoDdGFiGAMgASgLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEhIKBWluZGV4GAQgASgFSACIAQESDQoFZm9jdXMYBSABKAhCCAoGX2luZGV4Io0BCgtTcGxpdFBhbmVPcBIPCgdwYW5lX2lkGAEgASgJEigKBGVkZ2UYAiABKA4yGi5jb2RlZm91bmRyeS52MS5MYXlvdXRFZGdlEiYKA3RhYhgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIMCgRmcmFjGAQgASgBEg0KBWZvY3VzGAUgASgIIpQBCglNb3ZlVGFiT3ASDgoGdGFiX2lkGAEgASgJEhAKCHNwYWNlX2lkGAIgASgJEg8KB3BhbmVfaWQYAyABKAkSEgoFaW5kZXgYBCABKAVIAIgBARIoCgRlZGdlGAUgASgOMhouY29kZWZvdW5kcnkudjEuTGF5b3V0RWRnZRIMCgRmcmFjGAYgASgBQggKBl9pbmRleCJ/CgpNb3ZlUGFuZU9wEg8KB3BhbmVfaWQYASABKAkSFgoOdGFyZ2V0X3BhbmVfaWQYAiABKAkSKAoEZWRnZRgDIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dEVkZ2USDAoEZnJhYxgEIAEoARIQCghzcGFjZV9pZBgFIAEoCSJUCgtNZXJnZVBhbmVPcBIPCgdwYW5lX2lkGAEgASgJEhYKDnRhcmdldF9wYW5lX2lkGAIgASgJEhIKBWluZGV4GAMgASgFSACIAQFCCAoGX2luZGV4IjUKClN3YXBQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCRIWCg50YXJnZXRfcGFuZV9pZBgCIAEoCSIcCgpDbG9zZVRhYk9wEg4KBnRhYl9pZBgBIAEoCSIeCgtDbG9zZVBhbmVPcBIPCgdwYW5lX2lkGAEgASgJIi0KClNldFNpemVzT3ASEAoIc3BsaXRfaWQYASABKAkSDQoFc2l6ZXMYAiADKAEiHAoKRm9jdXNUYWJPcBIOCgZ0YWJfaWQYASABKAkiHgoLRm9jdXNQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCSKpAQoOU2V0VGFiUGFyYW1zT3ASDgoGdGFiX2lkGAEgASgJEjoKBnBhcmFtcxgCIAMoCzIqLmNvZGVmb3VuZHJ5LnYxLlNldFRhYlBhcmFtc09wLlBhcmFtc0VudHJ5EhIKBXRpdGxlGAMgASgJSACIAQEaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIICgZfdGl0bGUiKwoLUmVuYW1lVGFiT3ASDgoGdGFiX2lkGAEgASgJEgwKBG5hbWUYAiABKAkiMAoKTmV3U3BhY2VPcBIMCgRuYW1lGAEgASgJEhQKDG1ha2VfY3VycmVudBgCIAEoCCIvCg1SZW5hbWVTcGFjZU9wEhAKCHNwYWNlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkiNgoNUmVtb3ZlU3BhY2VPcBIQCghzcGFjZV9pZBgBIAEoCRITCgt0b19zcGFjZV9pZBgCIAEoCSIkCg9SZW9yZGVyU3BhY2VzT3ASEQoJc3BhY2VfaWRzGAEgAygJIiEKDVN3aXRjaFNwYWNlT3ASEAoIc3BhY2VfaWQYASABKAkqTwoJTGF5b3V0RGlyEhoKFkxBWU9VVF9ESVJfVU5TUEVDSUZJRUQQABISCg5MQVlPVVRfRElSX1JPVxABEhIKDkxBWU9VVF9ESVJfQ09MEAIqgwEKCkxheW91dEVkZ2USGwoXTEFZT1VUX0VER0VfVU5TUEVDSUZJRUQQABIUChBMQVlPVVRfRURHRV9MRUZUEAESFQoRTEFZT1VUX0VER0VfUklHSFQQAhITCg9MQVlPVVRfRURHRV9UT1AQAxIWChJMQVlPVVRfRURHRV9CT1RUT00QBDKLAgoNTGF5b3V0U2VydmljZRJMCgNHZXQSIC5jb2RlZm91bmRyeS52MS5HZXRMYXlvdXRSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuR2V0TGF5b3V0UmVzcG9uc2UiABJSCgVBcHBseRIiLmNvZGVmb3VuZHJ5LnYxLkFwcGx5TGF5b3V0UmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLkFwcGx5TGF5b3V0UmVzcG9uc2UiABJYCgtTZXRWaWV3cG9ydBIiLmNvZGVmb3VuZHJ5LnYxLlNldFZpZXdwb3J0UmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlNldFZpZXdwb3J0UmVzcG9uc2UiAELDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtMYXlvdXRQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9sYXlvdXQucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIhIKEEdldExheW91dFJlcXVlc3QiOwoRR2V0TGF5b3V0UmVzcG9uc2USJgoGbGF5b3V0GAEgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0IqUBCgZMYXlvdXQSCwoDcmV2GAEgASgEEisKBnNwYWNlcxgCIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwYWNlEhgKEGN1cnJlbnRfc3BhY2VfaWQYAyABKAkSGAoQZGVmYXVsdF9zcGFjZV9pZBgEIAEoCRItCgd0aHJlYWRzGAUgAygLMhwuY29kZWZvdW5kcnkudjEuVGhyZWFkTGF5b3V0IqoBCgtMYXlvdXRTcGFjZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEigKBHJvb3QYAyABKAsyGi5jb2RlZm91bmRyeS52MS5MYXlvdXROb2RlEhUKDWZvY3VzX3BhbmVfaWQYBCABKAkSEwoLbXJ1X3RhYl9pZHMYBSADKAkSKwoGZHJhZnRzGAYgAygLMhsuY29kZWZvdW5kcnkudjEuTGF5b3V0RHJhZnQikAEKC0xheW91dERyYWZ0EgoKAmlkGAEgASgJEg0KBWxhYmVsGAIgASgJEjcKBnBhcmFtcxgDIAMoCzInLmNvZGVmb3VuZHJ5LnYxLkxheW91dERyYWZ0LlBhcmFtc0VudHJ5Gi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEibgoKTGF5b3V0Tm9kZRIqCgRwYW5lGAEgASgLMhouY29kZWZvdW5kcnkudjEuTGF5b3V0UGFuZUgAEiwKBXNwbGl0GAIgASgLMhsuY29kZWZvdW5kcnkudjEuTGF5b3V0U3BsaXRIAEIGCgRub2RlIlgKCkxheW91dFBhbmUSCgoCaWQYASABKAkSJwoEdGFicxgCIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIVCg1hY3RpdmVfdGFiX2lkGAMgASgJIn4KC0xheW91dFNwbGl0EgoKAmlkGAEgASgJEiYKA2RpchgCIAEoDjIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dERpchIsCghjaGlsZHJlbhgDIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dE5vZGUSDQoFc2l6ZXMYBCADKAEiyAEKCUxheW91dFRhYhIKCgJpZBgBIAEoCRIMCgRraW5kGAIgASgJEhEKCXRocmVhZF9pZBgDIAEoCRILCgNrZXkYBCABKAkSNQoGcGFyYW1zGAUgAygLMiUuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiLlBhcmFtc0VudHJ5Eg0KBXRpdGxlGAYgASgJEgwKBG5hbWUYByABKAkaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKwAQoMVGhyZWFkTGF5b3V0EhEKCXRocmVhZF9pZBgBIAEoCRIQCghzcGFjZV9pZBgCIAEoCRIsCgVxdWljaxgDIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlF1aWNrVGVybWluYWwSMQoKcmVtZW1iZXJlZBgEIAMoCzIdLmNvZGVmb3VuZHJ5LnYxLlJlbWVtYmVyZWRUYWISGgoScmVtZW1iZXJlZF9wYW5lX2lkGAUgASgJIi0KDVF1aWNrVGVybWluYWwSDAoEb3BlbhgBIAEoCBIOCgZoZWlnaHQYAiABKAEi1QEKDVJlbWVtYmVyZWRUYWISJgoDdGFiGAEgASgLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEg8KB3BhbmVfaWQYAiABKAkSDQoFaW5kZXgYAyABKAUSDgoGYWN0aXZlGAQgASgIEhAKCGFkamFjZW50GAUgASgIEiwKBmJlc2lkZRgGIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLkxheW91dEJlc2lkZRIsCgVmcmVzaBgHIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkZyZXNoVGVybWluYWwiYgoMTGF5b3V0QmVzaWRlEhoKEm5laWdoYm91cl9wYW5lX2lkcxgBIAMoCRIoCgRlZGdlGAIgASgOMhouY29kZWZvdW5kcnkudjEuTGF5b3V0RWRnZRIMCgRmcmFjGAMgASgBIioKDUZyZXNoVGVybWluYWwSDAoEbmFtZRgBIAEoCRILCgNyYW4YAiABKAkikQEKC0xheW91dEV2ZW50EgsKA3JldhgBIAEoBBIqCghzbmFwc2hvdBgCIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLkxheW91dEgAEiwKBWRlbHRhGAMgASgLMhsuY29kZWZvdW5kcnkudjEuTGF5b3V0RGVsdGFIABIRCgljbGllbnRfaWQYBSABKAlCCAoGY2hhbmdlIukBCgtMYXlvdXREZWx0YRIrCgZzcGFjZXMYASADKAsyGy5jb2RlZm91bmRyeS52MS5MYXlvdXRTcGFjZRIZChFyZW1vdmVkX3NwYWNlX2lkcxgCIAMoCRITCgtzcGFjZV9vcmRlchgDIAMoCRIYChBjdXJyZW50X3NwYWNlX2lkGAQgASgJEhgKEGRlZmF1bHRfc3BhY2VfaWQYBSABKAkSLQoHdGhyZWFkcxgGIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExheW91dBIaChJyZW1vdmVkX3RocmVhZF9pZHMYByADKAkiTQoSQXBwbHlMYXlvdXRSZXF1ZXN0EiQKAm9wGAEgASgLMhguY29kZWZvdW5kcnkudjEuTGF5b3V0T3ASEQoJY2xpZW50X2lkGAIgASgJIuQCChNBcHBseUxheW91dFJlc3BvbnNlEgsKA3JldhgBIAEoBBIQCghzcGFjZV9pZBgCIAEoCRIPCgdwYW5lX2lkGAMgASgJEg4KBnRhYl9pZBgEIAEoCRIQCghleGlzdGluZxgFIAEoCBIpCgZjbG9zZWQYBiADKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISDAoEcnVsZRgHIAEoCRInCgRrZXB0GAggAygLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEigKBWVuZGVkGAkgAygLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEhQKDGJhY2tfdGFiX2lkcxgKIAMoCRIWCg5wbGFjZWRfdGFiX2lkcxgLIAMoCRIVCg1mcmVzaF90YWJfaWRzGAwgAygJEhgKEHN3YXBwZWRfcGFuZV9pZHMYDSADKAkSEAoIZHJhZnRfaWQYDiABKAkiRgoSU2V0Vmlld3BvcnRSZXF1ZXN0EhEKCWNsaWVudF9pZBgBIAEoCRINCgV3aWR0aBgCIAEoARIOCgZoZWlnaHQYAyABKAEiFQoTU2V0Vmlld3BvcnRSZXNwb25zZSK1DAoITGF5b3V0T3ASMwoLb3Blbl90aHJlYWQYASABKAsyHC5jb2RlZm91bmRyeS52MS5PcGVuVGhyZWFkT3BIABI1CgxjbG9zZV90aHJlYWQYAiABKAsyHS5jb2RlZm91bmRyeS52MS5DbG9zZVRocmVhZE9wSAASNQoMb3Blbl9zdXJmYWNlGAMgASgLMh0uY29kZWZvdW5kcnkudjEuT3BlblN1cmZhY2VPcEgAEjMKC21vdmVfdGhyZWFkGAQgASgLMhwuY29kZWZvdW5kcnkudjEuTW92ZVRocmVhZE9wSAASOQoOYXJjaGl2ZV90aHJlYWQYBSABKAsyHy5jb2RlZm91bmRyeS52MS5BcmNoaXZlVGhyZWFkT3BIABI3Cg1zbm9vemVfdGhyZWFkGAYgASgLMh4uY29kZWZvdW5kcnkudjEuU25vb3plVGhyZWFkT3BIABIrCgdhZGRfdGFiGAogASgLMhguY29kZWZvdW5kcnkudjEuQWRkVGFiT3BIABIxCgpzcGxpdF9wYW5lGAsgASgLMhsuY29kZWZvdW5kcnkudjEuU3BsaXRQYW5lT3BIABItCghtb3ZlX3RhYhgMIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLk1vdmVUYWJPcEgAEi8KCW1vdmVfcGFuZRgNIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLk1vdmVQYW5lT3BIABIxCgptZXJnZV9wYW5lGA4gASgLMhsuY29kZWZvdW5kcnkudjEuTWVyZ2VQYW5lT3BIABIvCglzd2FwX3BhbmUYDyABKAsyGi5jb2RlZm91bmRyeS52MS5Td2FwUGFuZU9wSAASLwoJY2xvc2VfdGFiGBAgASgLMhouY29kZWZvdW5kcnkudjEuQ2xvc2VUYWJPcEgAEjEKCmNsb3NlX3BhbmUYESABKAsyGy5jb2RlZm91bmRyeS52MS5DbG9zZVBhbmVPcEgAEi8KCXNldF9zaXplcxgSIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlNldFNpemVzT3BIABIvCglmb2N1c190YWIYEyABKAsyGi5jb2RlZm91bmRyeS52MS5Gb2N1c1RhYk9wSAASMQoKZm9jdXNfcGFuZRgUIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkZvY3VzUGFuZU9wSAASOAoOc2V0X3RhYl9wYXJhbXMYFSABKAsyHi5jb2RlZm91bmRyeS52MS5TZXRUYWJQYXJhbXNPcEgAEjEKCnJlbmFtZV90YWIYFiABKAsyGy5jb2RlZm91bmRyeS52MS5SZW5hbWVUYWJPcEgAEi8KCW5ld19zcGFjZRgeIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLk5ld1NwYWNlT3BIABI1CgxyZW5hbWVfc3BhY2UYHyABKAsyHS5jb2RlZm91bmRyeS52MS5SZW5hbWVTcGFjZU9wSAASNQoMcmVtb3ZlX3NwYWNlGCAgASgLMh0uY29kZWZvdW5kcnkudjEuUmVtb3ZlU3BhY2VPcEgAEjkKDnJlb3JkZXJfc3BhY2VzGCEgASgLMh8uY29kZWZvdW5kcnkudjEuUmVvcmRlclNwYWNlc09wSAASNQoMc3dpdGNoX3NwYWNlGCIgASgLMh0uY29kZWZvdW5kcnkudjEuU3dpdGNoU3BhY2VPcEgAEjEKCm5ld190aHJlYWQYKCABKAsyGy5jb2RlZm91bmRyeS52MS5OZXdUaHJlYWRPcEgAEjMKC3N0YXJ0X2RyYWZ0GCkgASgLMhwuY29kZWZvdW5kcnkudjEuU3RhcnREcmFmdE9wSAASMwoLbGFiZWxfZHJhZnQYKiABKAsyHC5jb2RlZm91bmRyeS52MS5MYWJlbERyYWZ0T3BIABIzCgtjbGVhcl9kcmFmdBgrIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLkNsZWFyRHJhZnRPcEgAEjcKDWRpc2NhcmRfZHJhZnQYLCABKAsyHi5jb2RlZm91bmRyeS52MS5EaXNjYXJkRHJhZnRPcEgAEjEKCm9wZW5fZHJhZnQYLSABKAsyGy5jb2RlZm91bmRyeS52MS5PcGVuRHJhZnRPcEgAQgQKAm9wIlkKDE9wZW5UaHJlYWRPcBIRCgl0aHJlYWRfaWQYASABKAkSDwoHcGFuZV9pZBgCIAEoCRINCgVmb2N1cxgDIAEoCBIWCg5jb21wb3NlX3RhYl9pZBgEIAEoCSIiCg1DbG9zZVRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCSJpCg1PcGVuU3VyZmFjZU9wEiYKA3RhYhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIPCgdwYW5lX2lkGAIgASgJEg0KBWZvY3VzGAMgASgIEhAKCHNwYWNlX2lkGAQgASgJIjMKDE1vdmVUaHJlYWRPcBIRCgl0aHJlYWRfaWQYASABKAkSEAoIc3BhY2VfaWQYAiABKAkiJAoPQXJjaGl2ZVRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCSKFAQoOU25vb3plVGhyZWFkT3ASEQoJdGhyZWFkX2lkGAEgASgJEjQKA3JhbhgCIAMoCzInLmNvZGVmb3VuZHJ5LnYxLlNub296ZVRocmVhZE9wLlJhbkVudHJ5GioKCFJhbkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiggEKCEFkZFRhYk9wEhAKCHNwYWNlX2lkGAEgASgJEg8KB3BhbmVfaWQYAiABKAkSJgoDdGFiGAMgASgLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEhIKBWluZGV4GAQgASgFSACIAQESDQoFZm9jdXMYBSABKAhCCAoGX2luZGV4Io0BCgtTcGxpdFBhbmVPcBIPCgdwYW5lX2lkGAEgASgJEigKBGVkZ2UYAiABKA4yGi5jb2RlZm91bmRyeS52MS5MYXlvdXRFZGdlEiYKA3RhYhgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIMCgRmcmFjGAQgASgBEg0KBWZvY3VzGAUgASgIIpQBCglNb3ZlVGFiT3ASDgoGdGFiX2lkGAEgASgJEhAKCHNwYWNlX2lkGAIgASgJEg8KB3BhbmVfaWQYAyABKAkSEgoFaW5kZXgYBCABKAVIAIgBARIoCgRlZGdlGAUgASgOMhouY29kZWZvdW5kcnkudjEuTGF5b3V0RWRnZRIMCgRmcmFjGAYgASgBQggKBl9pbmRleCJ/CgpNb3ZlUGFuZU9wEg8KB3BhbmVfaWQYASABKAkSFgoOdGFyZ2V0X3BhbmVfaWQYAiABKAkSKAoEZWRnZRgDIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dEVkZ2USDAoEZnJhYxgEIAEoARIQCghzcGFjZV9pZBgFIAEoCSJUCgtNZXJnZVBhbmVPcBIPCgdwYW5lX2lkGAEgASgJEhYKDnRhcmdldF9wYW5lX2lkGAIgASgJEhIKBWluZGV4GAMgASgFSACIAQFCCAoGX2luZGV4IjUKClN3YXBQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCRIWCg50YXJnZXRfcGFuZV9pZBgCIAEoCSIcCgpDbG9zZVRhYk9wEg4KBnRhYl9pZBgBIAEoCSIeCgtDbG9zZVBhbmVPcBIPCgdwYW5lX2lkGAEgASgJIi0KClNldFNpemVzT3ASEAoIc3BsaXRfaWQYASABKAkSDQoFc2l6ZXMYAiADKAEiHAoKRm9jdXNUYWJPcBIOCgZ0YWJfaWQYASABKAkiHgoLRm9jdXNQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCSKpAQoOU2V0VGFiUGFyYW1zT3ASDgoGdGFiX2lkGAEgASgJEjoKBnBhcmFtcxgCIAMoCzIqLmNvZGVmb3VuZHJ5LnYxLlNldFRhYlBhcmFtc09wLlBhcmFtc0VudHJ5EhIKBXRpdGxlGAMgASgJSACIAQEaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIICgZfdGl0bGUiKwoLUmVuYW1lVGFiT3ASDgoGdGFiX2lkGAEgASgJEgwKBG5hbWUYAiABKAkiMAoKTmV3U3BhY2VPcBIMCgRuYW1lGAEgASgJEhQKDG1ha2VfY3VycmVudBgCIAEoCCIvCg1SZW5hbWVTcGFjZU9wEhAKCHNwYWNlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkiNgoNUmVtb3ZlU3BhY2VPcBIQCghzcGFjZV9pZBgBIAEoCRITCgt0b19zcGFjZV9pZBgCIAEoCSIkCg9SZW9yZGVyU3BhY2VzT3ASEQoJc3BhY2VfaWRzGAEgAygJIiEKDVN3aXRjaFNwYWNlT3ASEAoIc3BhY2VfaWQYASABKAkipwEKC05ld1RocmVhZE9wEhAKCHNwYWNlX2lkGAEgASgJEg8KB3BhbmVfaWQYAiABKAkSNwoGcGFyYW1zGAMgAygLMicuY29kZWZvdW5kcnkudjEuTmV3VGhyZWFkT3AuUGFyYW1zRW50cnkSDQoFZm9jdXMYBCABKAgaLQoLUGFyYW1zRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASI/CgxTdGFydERyYWZ0T3ASDgoGdGFiX2lkGAEgASgJEhAKCGRyYWZ0X2lkGAIgASgJEg0KBWxhYmVsGAMgASgJIi8KDExhYmVsRHJhZnRPcBIQCghkcmFmdF9pZBgBIAEoCRINCgVsYWJlbBgCIAEoCSIgCgxDbGVhckRyYWZ0T3ASEAoIZHJhZnRfaWQYASABKAkiIgoORGlzY2FyZERyYWZ0T3ASEAoIZHJhZnRfaWQYASABKAkiLgoLT3BlbkRyYWZ0T3ASEAoIZHJhZnRfaWQYASABKAkSDQoFZm9jdXMYAiABKAgqTwoJTGF5b3V0RGlyEhoKFkxBWU9VVF9ESVJfVU5TUEVDSUZJRUQQABISCg5MQVlPVVRfRElSX1JPVxABEhIKDkxBWU9VVF9ESVJfQ09MEAIqgwEKCkxheW91dEVkZ2USGwoXTEFZT1VUX0VER0VfVU5TUEVDSUZJRUQQABIUChBMQVlPVVRfRURHRV9MRUZUEAESFQoRTEFZT1VUX0VER0VfUklHSFQQAhITCg9MQVlPVVRfRURHRV9UT1AQAxIWChJMQVlPVVRfRURHRV9CT1RUT00QBDKLAgoNTGF5b3V0U2VydmljZRJMCgNHZXQSIC5jb2RlZm91bmRyeS52MS5HZXRMYXlvdXRSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuR2V0TGF5b3V0UmVzcG9uc2UiABJSCgVBcHBseRIiLmNvZGVmb3VuZHJ5LnYxLkFwcGx5TGF5b3V0UmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLkFwcGx5TGF5b3V0UmVzcG9uc2UiABJYCgtTZXRWaWV3cG9ydBIiLmNvZGVmb3VuZHJ5LnYxLlNldFZpZXdwb3J0UmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlNldFZpZXdwb3J0UmVzcG9uc2UiAELDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtMYXlvdXRQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message codefoundry.v1.GetLayoutRequest
@@ -131,6 +131,14 @@ export type LayoutSpace = Message<"codefoundry.v1.LayoutSpace"> & {
    * @generated from field: repeated string mru_tab_ids = 5;
    */
   mruTabIds: string[];
+
+  /**
+   * The space's composer drafts, newest first, open in a tab or not. The empty composer is
+   * never one of them.
+   *
+   * @generated from field: repeated codefoundry.v1.LayoutDraft drafts = 6;
+   */
+  drafts: LayoutDraft[];
 };
 
 /**
@@ -139,6 +147,42 @@ export type LayoutSpace = Message<"codefoundry.v1.LayoutSpace"> & {
  */
 export const LayoutSpaceSchema: GenMessage<LayoutSpace> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_layout, 3);
+
+/**
+ * LayoutDraft is a composer with something typed in it. Its text is not in the layout.
+ *
+ * @generated from message codefoundry.v1.LayoutDraft
+ */
+export type LayoutDraft = Message<"codefoundry.v1.LayoutDraft"> & {
+  /**
+   * "d-" + 8 base32 characters, or an id the window chose; the "draft" param of its
+   * compose tab.
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * One line for lists; empty draws a placeholder.
+   *
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * Its tab's other params (project, workspace, like), for reopening it.
+   *
+   * @generated from field: map<string, string> params = 3;
+   */
+  params: { [key: string]: string };
+};
+
+/**
+ * Describes the message codefoundry.v1.LayoutDraft.
+ * Use `create(LayoutDraftSchema)` to create a new message.
+ */
+export const LayoutDraftSchema: GenMessage<LayoutDraft> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 4);
 
 /**
  * LayoutNode is a pane or a split.
@@ -169,7 +213,7 @@ export type LayoutNode = Message<"codefoundry.v1.LayoutNode"> & {
  * Use `create(LayoutNodeSchema)` to create a new message.
  */
 export const LayoutNodeSchema: GenMessage<LayoutNode> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 4);
+  messageDesc(file_codefoundry_v1_layout, 5);
 
 /**
  * LayoutPane is one tile with a tab strip. It always has a tab.
@@ -200,7 +244,7 @@ export type LayoutPane = Message<"codefoundry.v1.LayoutPane"> & {
  * Use `create(LayoutPaneSchema)` to create a new message.
  */
 export const LayoutPaneSchema: GenMessage<LayoutPane> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 5);
+  messageDesc(file_codefoundry_v1_layout, 6);
 
 /**
  * LayoutSplit lays out its children in a row or a column.
@@ -240,7 +284,7 @@ export type LayoutSplit = Message<"codefoundry.v1.LayoutSplit"> & {
  * Use `create(LayoutSplitSchema)` to create a new message.
  */
 export const LayoutSplitSchema: GenMessage<LayoutSplit> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 6);
+  messageDesc(file_codefoundry_v1_layout, 7);
 
 /**
  * LayoutTab is one surface in a pane.
@@ -307,7 +351,7 @@ export type LayoutTab = Message<"codefoundry.v1.LayoutTab"> & {
  * Use `create(LayoutTabSchema)` to create a new message.
  */
 export const LayoutTabSchema: GenMessage<LayoutTab> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 7);
+  messageDesc(file_codefoundry_v1_layout, 8);
 
 /**
  * ThreadLayout is what the layout stores for one thread.
@@ -355,7 +399,7 @@ export type ThreadLayout = Message<"codefoundry.v1.ThreadLayout"> & {
  * Use `create(ThreadLayoutSchema)` to create a new message.
  */
 export const ThreadLayoutSchema: GenMessage<ThreadLayout> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 8);
+  messageDesc(file_codefoundry_v1_layout, 9);
 
 /**
  * @generated from message codefoundry.v1.QuickTerminal
@@ -379,7 +423,7 @@ export type QuickTerminal = Message<"codefoundry.v1.QuickTerminal"> & {
  * Use `create(QuickTerminalSchema)` to create a new message.
  */
 export const QuickTerminalSchema: GenMessage<QuickTerminal> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 9);
+  messageDesc(file_codefoundry_v1_layout, 10);
 
 /**
  * RememberedTab is one remembered linked tab and where it was.
@@ -436,7 +480,7 @@ export type RememberedTab = Message<"codefoundry.v1.RememberedTab"> & {
  * Use `create(RememberedTabSchema)` to create a new message.
  */
 export const RememberedTabSchema: GenMessage<RememberedTab> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 10);
+  messageDesc(file_codefoundry_v1_layout, 11);
 
 /**
  * @generated from message codefoundry.v1.LayoutBeside
@@ -463,7 +507,7 @@ export type LayoutBeside = Message<"codefoundry.v1.LayoutBeside"> & {
  * Use `create(LayoutBesideSchema)` to create a new message.
  */
 export const LayoutBesideSchema: GenMessage<LayoutBeside> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 11);
+  messageDesc(file_codefoundry_v1_layout, 12);
 
 /**
  * @generated from message codefoundry.v1.FreshTerminal
@@ -487,7 +531,7 @@ export type FreshTerminal = Message<"codefoundry.v1.FreshTerminal"> & {
  * Use `create(FreshTerminalSchema)` to create a new message.
  */
 export const FreshTerminalSchema: GenMessage<FreshTerminal> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 12);
+  messageDesc(file_codefoundry_v1_layout, 13);
 
 /**
  * LayoutEvent is EventService's layout source. On connect (and when a client missed
@@ -537,7 +581,7 @@ export type LayoutEvent = Message<"codefoundry.v1.LayoutEvent"> & {
  * Use `create(LayoutEventSchema)` to create a new message.
  */
 export const LayoutEventSchema: GenMessage<LayoutEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 13);
+  messageDesc(file_codefoundry_v1_layout, 14);
 
 /**
  * LayoutDelta is everything one commit changed, applied as one step: whole spaces and
@@ -599,7 +643,7 @@ export type LayoutDelta = Message<"codefoundry.v1.LayoutDelta"> & {
  * Use `create(LayoutDeltaSchema)` to create a new message.
  */
 export const LayoutDeltaSchema: GenMessage<LayoutDelta> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 14);
+  messageDesc(file_codefoundry_v1_layout, 15);
 
 /**
  * @generated from message codefoundry.v1.ApplyLayoutRequest
@@ -624,7 +668,7 @@ export type ApplyLayoutRequest = Message<"codefoundry.v1.ApplyLayoutRequest"> & 
  * Use `create(ApplyLayoutRequestSchema)` to create a new message.
  */
 export const ApplyLayoutRequestSchema: GenMessage<ApplyLayoutRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 15);
+  messageDesc(file_codefoundry_v1_layout, 16);
 
 /**
  * @generated from message codefoundry.v1.ApplyLayoutResponse
@@ -668,6 +712,62 @@ export type ApplyLayoutResponse = Message<"codefoundry.v1.ApplyLayoutResponse"> 
    * @generated from field: repeated codefoundry.v1.LayoutTab closed = 6;
    */
   closed: LayoutTab[];
+
+  /**
+   * How placement chose where a tab went: "1" to "6" (the spec's rules), "pane" (the
+   * caller's pane), "focused" (the focused pane), "compose" (it replaced a composer).
+   *
+   * @generated from field: string rule = 7;
+   */
+  rule: string;
+
+  /**
+   * Linked tabs taken into their thread's remembered set; their terminals keep running.
+   *
+   * @generated from field: repeated codefoundry.v1.LayoutTab kept = 8;
+   */
+  kept: LayoutTab[];
+
+  /**
+   * Terminal tabs whose terminals the caller ends although the op did not close them now
+   * (a snoozed or archived thread's remembered terminals).
+   *
+   * @generated from field: repeated codefoundry.v1.LayoutTab ended = 9;
+   */
+  ended: LayoutTab[];
+
+  /**
+   * The remembered tabs an opened thread brought back: into their old panes, or placed
+   * fresh beside it; fresh are the terminal tabs among them that need a new shell.
+   *
+   * @generated from field: repeated string back_tab_ids = 10;
+   */
+  backTabIds: string[];
+
+  /**
+   * @generated from field: repeated string placed_tab_ids = 11;
+   */
+  placedTabIds: string[];
+
+  /**
+   * @generated from field: repeated string fresh_tab_ids = 12;
+   */
+  freshTabIds: string[];
+
+  /**
+   * The panes smart swap switched to the newly focused thread's surfaces.
+   *
+   * @generated from field: repeated string swapped_pane_ids = 13;
+   */
+  swappedPaneIds: string[];
+
+  /**
+   * The composer draft the op started, opened or ended; after clear_draft, discard_draft
+   * and an open_thread that sent from a draft it is gone, and its stored text goes too.
+   *
+   * @generated from field: string draft_id = 14;
+   */
+  draftId: string;
 };
 
 /**
@@ -675,7 +775,7 @@ export type ApplyLayoutResponse = Message<"codefoundry.v1.ApplyLayoutResponse"> 
  * Use `create(ApplyLayoutResponseSchema)` to create a new message.
  */
 export const ApplyLayoutResponseSchema: GenMessage<ApplyLayoutResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 16);
+  messageDesc(file_codefoundry_v1_layout, 17);
 
 /**
  * @generated from message codefoundry.v1.SetViewportRequest
@@ -704,7 +804,7 @@ export type SetViewportRequest = Message<"codefoundry.v1.SetViewportRequest"> & 
  * Use `create(SetViewportRequestSchema)` to create a new message.
  */
 export const SetViewportRequestSchema: GenMessage<SetViewportRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 17);
+  messageDesc(file_codefoundry_v1_layout, 18);
 
 /**
  * @generated from message codefoundry.v1.SetViewportResponse
@@ -717,13 +817,13 @@ export type SetViewportResponse = Message<"codefoundry.v1.SetViewportResponse"> 
  * Use `create(SetViewportResponseSchema)` to create a new message.
  */
 export const SetViewportResponseSchema: GenMessage<SetViewportResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 18);
+  messageDesc(file_codefoundry_v1_layout, 19);
 
 /**
  * LayoutOp is one operation. Each case names the op of internal/layout it runs (its JSON
  * name). Cases 1 to 9 are the thread ops (placement, opening, closing and restoring a
- * thread, moving it between spaces): declared here, answered Unimplemented until the
- * daemon registers them.
+ * thread, moving it between spaces, archiving and snoozing it). An op that lays panes out
+ * measures in the pane area the last window reported (SetViewport), else 1180 x 820.
  *
  * @generated from message codefoundry.v1.LayoutOp
  */
@@ -755,6 +855,18 @@ export type LayoutOp = Message<"codefoundry.v1.LayoutOp"> & {
      */
     value: MoveThreadOp;
     case: "moveThread";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.ArchiveThreadOp archive_thread = 5;
+     */
+    value: ArchiveThreadOp;
+    case: "archiveThread";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.SnoozeThreadOp snooze_thread = 6;
+     */
+    value: SnoozeThreadOp;
+    case: "snoozeThread";
   } | {
     /**
      * @generated from field: codefoundry.v1.AddTabOp add_tab = 10;
@@ -863,6 +975,42 @@ export type LayoutOp = Message<"codefoundry.v1.LayoutOp"> & {
      */
     value: SwitchSpaceOp;
     case: "switchSpace";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.NewThreadOp new_thread = 40;
+     */
+    value: NewThreadOp;
+    case: "newThread";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.StartDraftOp start_draft = 41;
+     */
+    value: StartDraftOp;
+    case: "startDraft";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.LabelDraftOp label_draft = 42;
+     */
+    value: LabelDraftOp;
+    case: "labelDraft";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.ClearDraftOp clear_draft = 43;
+     */
+    value: ClearDraftOp;
+    case: "clearDraft";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.DiscardDraftOp discard_draft = 44;
+     */
+    value: DiscardDraftOp;
+    case: "discardDraft";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.OpenDraftOp open_draft = 45;
+     */
+    value: OpenDraftOp;
+    case: "openDraft";
   } | { case: undefined; value?: undefined };
 };
 
@@ -871,7 +1019,7 @@ export type LayoutOp = Message<"codefoundry.v1.LayoutOp"> & {
  * Use `create(LayoutOpSchema)` to create a new message.
  */
 export const LayoutOpSchema: GenMessage<LayoutOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 19);
+  messageDesc(file_codefoundry_v1_layout, 20);
 
 /**
  * OpenThreadOp opens a thread's tab (or focuses it), and restores its linked tabs.
@@ -885,7 +1033,8 @@ export type OpenThreadOp = Message<"codefoundry.v1.OpenThreadOp"> & {
   threadId: string;
 
   /**
-   * Where its tab opens; empty is the focused pane of the thread's space.
+   * Where its tab opens; empty is the focused pane of the thread's space (or in place of
+   * that space's composer when it is the space's only tab).
    *
    * @generated from field: string pane_id = 2;
    */
@@ -895,6 +1044,14 @@ export type OpenThreadOp = Message<"codefoundry.v1.OpenThreadOp"> & {
    * @generated from field: bool focus = 3;
    */
   focus: boolean;
+
+  /**
+   * The composer tab the thread was sent from: the thread's tab replaces it, and the
+   * thread lives in that composer's space.
+   *
+   * @generated from field: string compose_tab_id = 4;
+   */
+  composeTabId: string;
 };
 
 /**
@@ -902,7 +1059,7 @@ export type OpenThreadOp = Message<"codefoundry.v1.OpenThreadOp"> & {
  * Use `create(OpenThreadOpSchema)` to create a new message.
  */
 export const OpenThreadOpSchema: GenMessage<OpenThreadOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 20);
+  messageDesc(file_codefoundry_v1_layout, 21);
 
 /**
  * CloseThreadOp closes a thread's tab and its linked tabs in its space, remembering them.
@@ -921,7 +1078,7 @@ export type CloseThreadOp = Message<"codefoundry.v1.CloseThreadOp"> & {
  * Use `create(CloseThreadOpSchema)` to create a new message.
  */
 export const CloseThreadOpSchema: GenMessage<CloseThreadOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 21);
+  messageDesc(file_codefoundry_v1_layout, 22);
 
 /**
  * OpenSurfaceOp opens a surface by the placement rules (a linked one beside its thread).
@@ -945,6 +1102,14 @@ export type OpenSurfaceOp = Message<"codefoundry.v1.OpenSurfaceOp"> & {
    * @generated from field: bool focus = 3;
    */
   focus: boolean;
+
+  /**
+   * The space it opens in; empty: the pane's, else a linked tab's thread's, else the
+   * current space.
+   *
+   * @generated from field: string space_id = 4;
+   */
+  spaceId: string;
 };
 
 /**
@@ -952,7 +1117,7 @@ export type OpenSurfaceOp = Message<"codefoundry.v1.OpenSurfaceOp"> & {
  * Use `create(OpenSurfaceOpSchema)` to create a new message.
  */
 export const OpenSurfaceOpSchema: GenMessage<OpenSurfaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 22);
+  messageDesc(file_codefoundry_v1_layout, 23);
 
 /**
  * MoveThreadOp moves a thread to another space with the linked tabs in its space.
@@ -976,7 +1141,54 @@ export type MoveThreadOp = Message<"codefoundry.v1.MoveThreadOp"> & {
  * Use `create(MoveThreadOpSchema)` to create a new message.
  */
 export const MoveThreadOpSchema: GenMessage<MoveThreadOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 23);
+  messageDesc(file_codefoundry_v1_layout, 24);
+
+/**
+ * ArchiveThreadOp closes a thread's tab and its linked tabs in every space and forgets its
+ * layout (ApplyLayoutResponse.ended: its remembered terminals, for the caller to end).
+ *
+ * @generated from message codefoundry.v1.ArchiveThreadOp
+ */
+export type ArchiveThreadOp = Message<"codefoundry.v1.ArchiveThreadOp"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.ArchiveThreadOp.
+ * Use `create(ArchiveThreadOpSchema)` to create a new message.
+ */
+export const ArchiveThreadOpSchema: GenMessage<ArchiveThreadOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 25);
+
+/**
+ * SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does, and marks its
+ * remembered terminals to come back as fresh shells.
+ *
+ * @generated from message codefoundry.v1.SnoozeThreadOp
+ */
+export type SnoozeThreadOp = Message<"codefoundry.v1.SnoozeThreadOp"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * The command each of its terminals ran last, by terminal id, shown with "Run again".
+   *
+   * @generated from field: map<string, string> ran = 2;
+   */
+  ran: { [key: string]: string };
+};
+
+/**
+ * Describes the message codefoundry.v1.SnoozeThreadOp.
+ * Use `create(SnoozeThreadOpSchema)` to create a new message.
+ */
+export const SnoozeThreadOpSchema: GenMessage<SnoozeThreadOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 26);
 
 /**
  * AddTabOp adds a tab to pane_id, else the focused pane of space_id (empty: the current
@@ -1020,7 +1232,7 @@ export type AddTabOp = Message<"codefoundry.v1.AddTabOp"> & {
  * Use `create(AddTabOpSchema)` to create a new message.
  */
 export const AddTabOpSchema: GenMessage<AddTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 24);
+  messageDesc(file_codefoundry_v1_layout, 27);
 
 /**
  * SplitPaneOp opens a tab in a new pane on an edge of pane_id at frac of its room (0 is
@@ -1060,7 +1272,7 @@ export type SplitPaneOp = Message<"codefoundry.v1.SplitPaneOp"> & {
  * Use `create(SplitPaneOpSchema)` to create a new message.
  */
 export const SplitPaneOpSchema: GenMessage<SplitPaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 25);
+  messageDesc(file_codefoundry_v1_layout, 28);
 
 /**
  * MoveTabOp moves a tab: into a new pane on edge of pane_id; into pane_id's strip at
@@ -1106,7 +1318,7 @@ export type MoveTabOp = Message<"codefoundry.v1.MoveTabOp"> & {
  * Use `create(MoveTabOpSchema)` to create a new message.
  */
 export const MoveTabOpSchema: GenMessage<MoveTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 26);
+  messageDesc(file_codefoundry_v1_layout, 29);
 
 /**
  * MovePaneOp moves a whole pane beside target_pane_id on edge, onto an edge of the pane
@@ -1146,7 +1358,7 @@ export type MovePaneOp = Message<"codefoundry.v1.MovePaneOp"> & {
  * Use `create(MovePaneOpSchema)` to create a new message.
  */
 export const MovePaneOpSchema: GenMessage<MovePaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 27);
+  messageDesc(file_codefoundry_v1_layout, 30);
 
 /**
  * MergePaneOp moves every tab of pane_id into target_pane_id's strip at index (default:
@@ -1176,7 +1388,7 @@ export type MergePaneOp = Message<"codefoundry.v1.MergePaneOp"> & {
  * Use `create(MergePaneOpSchema)` to create a new message.
  */
 export const MergePaneOpSchema: GenMessage<MergePaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 28);
+  messageDesc(file_codefoundry_v1_layout, 31);
 
 /**
  * SwapPaneOp swaps two panes of one space.
@@ -1200,7 +1412,7 @@ export type SwapPaneOp = Message<"codefoundry.v1.SwapPaneOp"> & {
  * Use `create(SwapPaneOpSchema)` to create a new message.
  */
 export const SwapPaneOpSchema: GenMessage<SwapPaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 29);
+  messageDesc(file_codefoundry_v1_layout, 32);
 
 /**
  * CloseTabOp takes a tab out of the layout (the plain close: closing a thread with its
@@ -1220,10 +1432,11 @@ export type CloseTabOp = Message<"codefoundry.v1.CloseTabOp"> & {
  * Use `create(CloseTabOpSchema)` to create a new message.
  */
 export const CloseTabOpSchema: GenMessage<CloseTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 30);
+  messageDesc(file_codefoundry_v1_layout, 33);
 
 /**
- * ClosePaneOp takes a pane and its tabs out of the layout.
+ * ClosePaneOp takes a pane and its tabs out of the layout; each thread tab in it closes as
+ * CloseThreadOp closes it (its linked tabs in its space are remembered).
  *
  * @generated from message codefoundry.v1.ClosePaneOp
  */
@@ -1239,7 +1452,7 @@ export type ClosePaneOp = Message<"codefoundry.v1.ClosePaneOp"> & {
  * Use `create(ClosePaneOpSchema)` to create a new message.
  */
 export const ClosePaneOpSchema: GenMessage<ClosePaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 31);
+  messageDesc(file_codefoundry_v1_layout, 34);
 
 /**
  * SetSizesOp sets a split's shares, one per child, each positive.
@@ -1263,7 +1476,7 @@ export type SetSizesOp = Message<"codefoundry.v1.SetSizesOp"> & {
  * Use `create(SetSizesOpSchema)` to create a new message.
  */
 export const SetSizesOpSchema: GenMessage<SetSizesOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 32);
+  messageDesc(file_codefoundry_v1_layout, 35);
 
 /**
  * FocusTabOp makes a tab active, focuses its pane and switches to its space.
@@ -1282,7 +1495,7 @@ export type FocusTabOp = Message<"codefoundry.v1.FocusTabOp"> & {
  * Use `create(FocusTabOpSchema)` to create a new message.
  */
 export const FocusTabOpSchema: GenMessage<FocusTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 33);
+  messageDesc(file_codefoundry_v1_layout, 36);
 
 /**
  * FocusPaneOp focuses a pane and switches to its space.
@@ -1301,7 +1514,7 @@ export type FocusPaneOp = Message<"codefoundry.v1.FocusPaneOp"> & {
  * Use `create(FocusPaneOpSchema)` to create a new message.
  */
 export const FocusPaneOpSchema: GenMessage<FocusPaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 34);
+  messageDesc(file_codefoundry_v1_layout, 37);
 
 /**
  * SetTabParamsOp replaces a tab's params, and its title when set.
@@ -1330,7 +1543,7 @@ export type SetTabParamsOp = Message<"codefoundry.v1.SetTabParamsOp"> & {
  * Use `create(SetTabParamsOpSchema)` to create a new message.
  */
 export const SetTabParamsOpSchema: GenMessage<SetTabParamsOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 35);
+  messageDesc(file_codefoundry_v1_layout, 38);
 
 /**
  * RenameTabOp sets a terminal tab's manual name; empty goes back to the automatic name.
@@ -1354,7 +1567,7 @@ export type RenameTabOp = Message<"codefoundry.v1.RenameTabOp"> & {
  * Use `create(RenameTabOpSchema)` to create a new message.
  */
 export const RenameTabOpSchema: GenMessage<RenameTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 36);
+  messageDesc(file_codefoundry_v1_layout, 39);
 
 /**
  * NewSpaceOp adds an empty space after the others ("Space <n>" when name is blank).
@@ -1380,7 +1593,7 @@ export type NewSpaceOp = Message<"codefoundry.v1.NewSpaceOp"> & {
  * Use `create(NewSpaceOpSchema)` to create a new message.
  */
 export const NewSpaceOpSchema: GenMessage<NewSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 37);
+  messageDesc(file_codefoundry_v1_layout, 40);
 
 /**
  * @generated from message codefoundry.v1.RenameSpaceOp
@@ -1402,7 +1615,7 @@ export type RenameSpaceOp = Message<"codefoundry.v1.RenameSpaceOp"> & {
  * Use `create(RenameSpaceOpSchema)` to create a new message.
  */
 export const RenameSpaceOpSchema: GenMessage<RenameSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 38);
+  messageDesc(file_codefoundry_v1_layout, 41);
 
 /**
  * RemoveSpaceOp removes a space with its panes and tabs (closed lists them); its threads
@@ -1428,7 +1641,7 @@ export type RemoveSpaceOp = Message<"codefoundry.v1.RemoveSpaceOp"> & {
  * Use `create(RemoveSpaceOpSchema)` to create a new message.
  */
 export const RemoveSpaceOpSchema: GenMessage<RemoveSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 39);
+  messageDesc(file_codefoundry_v1_layout, 42);
 
 /**
  * ReorderSpacesOp puts the spaces in this order, which names each space once.
@@ -1447,7 +1660,7 @@ export type ReorderSpacesOp = Message<"codefoundry.v1.ReorderSpacesOp"> & {
  * Use `create(ReorderSpacesOpSchema)` to create a new message.
  */
 export const ReorderSpacesOpSchema: GenMessage<ReorderSpacesOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 40);
+  messageDesc(file_codefoundry_v1_layout, 43);
 
 /**
  * @generated from message codefoundry.v1.SwitchSpaceOp
@@ -1464,7 +1677,166 @@ export type SwitchSpaceOp = Message<"codefoundry.v1.SwitchSpaceOp"> & {
  * Use `create(SwitchSpaceOpSchema)` to create a new message.
  */
 export const SwitchSpaceOpSchema: GenMessage<SwitchSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 41);
+  messageDesc(file_codefoundry_v1_layout, 44);
+
+/**
+ * NewThreadOp focuses the space's empty composer (with params when given), or opens one in
+ * the focused pane (pane_id: that pane, the "+" menu's), or as the first pane of an empty
+ * space.
+ *
+ * @generated from message codefoundry.v1.NewThreadOp
+ */
+export type NewThreadOp = Message<"codefoundry.v1.NewThreadOp"> & {
+  /**
+   * Empty: the pane's space, else the current one.
+   *
+   * @generated from field: string space_id = 1;
+   */
+  spaceId: string;
+
+  /**
+   * @generated from field: string pane_id = 2;
+   */
+  paneId: string;
+
+  /**
+   * What the composer is for (project, workspace, like); never "draft".
+   *
+   * @generated from field: map<string, string> params = 3;
+   */
+  params: { [key: string]: string };
+
+  /**
+   * @generated from field: bool focus = 4;
+   */
+  focus: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.NewThreadOp.
+ * Use `create(NewThreadOpSchema)` to create a new message.
+ */
+export const NewThreadOpSchema: GenMessage<NewThreadOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 45);
+
+/**
+ * StartDraftOp turns the empty composer tab_id into a draft (its first text typed).
+ *
+ * @generated from message codefoundry.v1.StartDraftOp
+ */
+export type StartDraftOp = Message<"codefoundry.v1.StartDraftOp"> & {
+  /**
+   * @generated from field: string tab_id = 1;
+   */
+  tabId: string;
+
+  /**
+   * The draft's id, chosen by the window so it can store the text first; empty: a new one.
+   * Refused when used anywhere in the layout.
+   *
+   * @generated from field: string draft_id = 2;
+   */
+  draftId: string;
+
+  /**
+   * @generated from field: string label = 3;
+   */
+  label: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.StartDraftOp.
+ * Use `create(StartDraftOpSchema)` to create a new message.
+ */
+export const StartDraftOpSchema: GenMessage<StartDraftOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 46);
+
+/**
+ * LabelDraftOp sets a draft's label.
+ *
+ * @generated from message codefoundry.v1.LabelDraftOp
+ */
+export type LabelDraftOp = Message<"codefoundry.v1.LabelDraftOp"> & {
+  /**
+   * @generated from field: string draft_id = 1;
+   */
+  draftId: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.LabelDraftOp.
+ * Use `create(LabelDraftOpSchema)` to create a new message.
+ */
+export const LabelDraftOpSchema: GenMessage<LabelDraftOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 47);
+
+/**
+ * ClearDraftOp ends a draft whose text was all deleted: its tab is the space's empty
+ * composer again (or closes, when the space has one already).
+ *
+ * @generated from message codefoundry.v1.ClearDraftOp
+ */
+export type ClearDraftOp = Message<"codefoundry.v1.ClearDraftOp"> & {
+  /**
+   * @generated from field: string draft_id = 1;
+   */
+  draftId: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.ClearDraftOp.
+ * Use `create(ClearDraftOpSchema)` to create a new message.
+ */
+export const ClearDraftOpSchema: GenMessage<ClearDraftOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 48);
+
+/**
+ * DiscardDraftOp ends a draft and closes its tab when open.
+ *
+ * @generated from message codefoundry.v1.DiscardDraftOp
+ */
+export type DiscardDraftOp = Message<"codefoundry.v1.DiscardDraftOp"> & {
+  /**
+   * @generated from field: string draft_id = 1;
+   */
+  draftId: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.DiscardDraftOp.
+ * Use `create(DiscardDraftOpSchema)` to create a new message.
+ */
+export const DiscardDraftOpSchema: GenMessage<DiscardDraftOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 49);
+
+/**
+ * OpenDraftOp focuses a draft's tab, or opens it in its space's focused pane.
+ *
+ * @generated from message codefoundry.v1.OpenDraftOp
+ */
+export type OpenDraftOp = Message<"codefoundry.v1.OpenDraftOp"> & {
+  /**
+   * @generated from field: string draft_id = 1;
+   */
+  draftId: string;
+
+  /**
+   * @generated from field: bool focus = 2;
+   */
+  focus: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.OpenDraftOp.
+ * Use `create(OpenDraftOpSchema)` to create a new message.
+ */
+export const OpenDraftOpSchema: GenMessage<OpenDraftOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 50);
 
 /**
  * @generated from enum codefoundry.v1.LayoutDir

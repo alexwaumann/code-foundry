@@ -434,8 +434,13 @@ func (o *CloseTab) apply(t *tx) (Result, error) {
 }
 
 // ClosePane takes a pane and all its tabs out of the layout; the focus returns as CloseTab's.
+// Each thread tab in it closes as close_thread closes it, first: the thread's linked tabs in
+// its space are remembered (Result.Kept), wherever they are. W and H are the pane area that
+// measures where they were (default DefaultW x DefaultH).
 type ClosePane struct {
-	Pane string `json:"pane"`
+	Pane string  `json:"pane"`
+	W    float64 `json:"w,omitempty"`
+	H    float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -445,6 +450,18 @@ func (o *ClosePane) apply(t *tx) (Result, error) {
 	sp, pane, err := t.pane(o.Pane)
 	if err != nil {
 		return Result{}, err
+	}
+	res := Result{Space: sp.ID}
+	w, h := viewport(o.W, o.H)
+	for _, tb := range slices.Clone(pane.Tabs) {
+		if tb.Kind == "thread" {
+			r := t.closeThread(tb.Thread, tb.ID, w, h)
+			res.Closed = append(res.Closed, r.Closed...)
+			res.Kept = append(res.Kept, r.Kept...)
+		}
+	}
+	if _, pane = t.st.FindPane(o.Pane); pane == nil {
+		return res, nil
 	}
 	wasFocused := sp.Focus == pane.ID
 	ids := make([]string, len(pane.Tabs))
@@ -456,7 +473,8 @@ func (o *ClosePane) apply(t *tx) (Result, error) {
 	if wasFocused {
 		refocus(sp)
 	}
-	return Result{Space: sp.ID, Closed: pane.Tabs}, nil
+	res.Closed = append(res.Closed, pane.Tabs...)
+	return res, nil
 }
 
 // SetSizes sets a split's shares, one per child, each positive; they are scaled to sum to 1.
