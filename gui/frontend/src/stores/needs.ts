@@ -12,11 +12,14 @@ import { getNeedsIds } from "./shellList";
 import { useOpenRequests, useThreadStore } from "./thread";
 import { useUiStore } from "./ui";
 
-/** One ask's detail as a card reads it from the daemon (ListItems pages). */
+/** One ask's detail as a card read it from the daemon (ListItems pages): its request, whole, and the line before it. */
 interface AskDetail {
-  request: ThreadRequestView | null;
+  request: ThreadRequestView;
   context: string;
 }
+
+/** Why a read gave no request: it failed, or the ask was not among the thread's last tool items. */
+export type AskMiss = "failed" | "notfound";
 
 interface NeedsState {
   /** The thread whose popup is open; null when none is. */
@@ -25,13 +28,15 @@ interface NeedsState {
   dismissed: string | null;
   /** Asks read for a card, by request id; absent until read. */
   details: Readonly<Record<string, AskDetail>>;
+  /** Reads that gave no request, by request id; cleared when the next open reads again. */
+  misses: Readonly<Record<string, AskMiss>>;
   /** The sidebar list has the keyboard and its cursor moved by key: a Needs you row under it shows its card. */
   keyCursor: boolean;
   /** The top bar's Needs you popover is open (the sidebar collapsed); the popup closes it. */
   popover: boolean;
 }
 
-export const useNeedsStore = create<NeedsState>()(() => ({ popup: null, dismissed: null, details: {}, keyCursor: false, popover: false }));
+export const useNeedsStore = create<NeedsState>()(() => ({ popup: null, dismissed: null, details: {}, misses: {}, keyCursor: false, popover: false }));
 
 /** The sidebar list's cursor moved by key: the row under it shows its card, even one the popup shut. */
 export function needsKeyMove(): void {
@@ -92,17 +97,36 @@ export function goToNeedsThread(threadId: string): void {
 
 const reading = new Set<string>();
 
-/** Reads an ask's item and the last line before it, once per request (a failure is retried on the next open). */
+/** Records a read that gave no request, unless the request was read meanwhile. */
+function missed(requestId: string, why: AskMiss): void {
+  useNeedsStore.setState((s) => (requestId in s.details ? s : { misses: { ...s.misses, [requestId]: why } }));
+}
+
+/**
+ * Reads an ask's item and the last line before it, once per request. A read that failed or did
+ * not find the ask is recorded (the card says so) and tried again on the card's next open.
+ */
 function readDetail(threadId: string, p: ThreadPendingView): void {
-  if (reading.has(p.requestId) || p.requestId in useNeedsStore.getState().details) return;
+  const s = useNeedsStore.getState();
+  if (reading.has(p.requestId) || p.requestId in s.details) return;
   reading.add(p.requestId);
+  if (p.requestId in s.misses) {
+    const { [p.requestId]: _again, ...misses } = s.misses;
+    useNeedsStore.setState({ misses });
+  }
   void readAskItems(threadId, p.itemId)
     .then(({ ask, replies }) => {
-      const request = ask && (ask.kind === "permission" || ask.kind === "question") ? ask.request : null;
+      const request = ask && (ask.kind === "permission" || ask.kind === "question") && ask.request.requestId === p.requestId ? ask.request : null;
+      if (!request) {
+        missed(p.requestId, "notfound");
+        return;
+      }
       const context = contextLine(replies, ask?.ordinal ?? null);
-      useNeedsStore.setState((s) => ({ details: { ...s.details, [p.requestId]: { request, context } } }));
+      useNeedsStore.setState((st) => ({ details: { ...st.details, [p.requestId]: { request, context } } }));
     })
-    .catch(() => undefined)
+    .catch(() => {
+      missed(p.requestId, "failed");
+    })
     .finally(() => {
       reading.delete(p.requestId);
     });
@@ -111,8 +135,14 @@ function readDetail(threadId: string, p: ThreadPendingView): void {
 /** Forgets every read detail (tests). */
 export function resetNeeds(): void {
   reading.clear();
-  useNeedsStore.setState({ popup: null, dismissed: null, details: {}, keyCursor: false, popover: false });
+  useNeedsStore.setState({ popup: null, dismissed: null, details: {}, misses: {}, keyCursor: false, popover: false });
 }
+
+/**
+ * Where a card's ask stands: "known" (the whole request is on screen), "loading" (being read),
+ * "failed" or "notfound" (only the one-line summary is known), "none" (an ask without a request).
+ */
+export type AskState = "known" | "loading" | "failed" | "notfound" | "none";
 
 /** What a hover card shows of a thread's ask. */
 export interface AskView {
@@ -120,8 +150,9 @@ export interface AskView {
   pending: ThreadPendingView | null;
   /** How many requests are open. */
   count: number;
-  /** The request whole once known: from the thread's log when a view holds its Watch, else read once. */
+  /** The oldest open request whole, once known (from the thread's log when a view holds its Watch, else read); always `pending`'s own. */
   request: ThreadRequestView | null;
+  state: AskState;
   /** The last line Claude wrote before the ask; "" for none or not read yet. */
   context: string;
 }
@@ -146,13 +177,27 @@ export function useAskView(threadId: string, read: boolean): AskView {
   const open = useOpenRequests(threadId);
   const pending = open[0] ?? null;
   const itemId = pending?.itemId ?? "";
+  const requestId = pending?.requestId ?? "";
   const logItem = useThreadStore((s) => (threadId in s.synced ? s.logs[threadId]?.byId[itemId] : undefined));
   const fromLog = useThreadStore(useMemo(() => logContext(threadId, itemId), [threadId, itemId]));
-  const detail = useNeedsStore((s) => (pending ? s.details[pending.requestId] : undefined));
+  const detail = useNeedsStore((s) => (requestId ? s.details[requestId] : undefined));
+  const miss = useNeedsStore((s) => (requestId ? s.misses[requestId] : undefined));
   const logRequest = logItem && (logItem.kind === "permission" || logItem.kind === "question") ? logItem.request : null;
-  const toRead = read && !logRequest && !detail ? pending : null;
+  // Only the oldest open request's own: never another request's command under this one's buttons.
+  const known = [logRequest, detail?.request].find((r) => r != null && r.requestId === requestId) ?? null;
+  const toRead = read && !known ? pending : null;
+  // Once per open (the card's content mounts on each): a miss is read again on the next one.
   useEffect(() => {
     if (toRead) readDetail(threadId, toRead);
   }, [toRead, threadId]);
-  return { pending, count: open.length, request: logRequest ?? detail?.request ?? null, context: fromLog ?? detail?.context ?? "" };
+  const state: AskState = !pending ? "none" : known ? "known" : (miss ?? "loading");
+  return { pending, count: open.length, request: known, state, context: fromLog ?? detail?.context ?? "" };
+}
+
+/** Whether a request is still open on its thread (a click acts only on what is still asked). */
+export function requestOpen(threadId: string, requestId: string): boolean {
+  const s = useThreadStore.getState();
+  const log = s.logs[threadId];
+  const list = (log && threadId in s.synced ? log.pending : s.pending[threadId]?.pending) ?? [];
+  return list.some((p) => p.requestId === requestId) && s.answering[threadId]?.[requestId] !== true;
 }

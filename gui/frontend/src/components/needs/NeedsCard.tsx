@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowUpRight, Check, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, Check, Loader2, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PlaceIcon } from "@/components/sidebar/SidebarRow";
@@ -12,7 +12,7 @@ import { statusBadge } from "@/lib/statusRegistry";
 import { permissionTitle, questionsOf } from "@/lib/threadRequest";
 import { parseObject } from "@/lib/toolSummary";
 import { cn } from "@/lib/utils";
-import { dismissNeedsCard, goToNeedsThread, openNeedsPopup, rehoverNeedsAnchor, useAskView, useNeedsStore } from "@/stores/needs";
+import { dismissNeedsCard, goToNeedsThread, openNeedsPopup, rehoverNeedsAnchor, requestOpen, useAskView, useNeedsStore } from "@/stores/needs";
 import { respondThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import "@/components/thread/thread.css";
@@ -20,9 +20,11 @@ import "@/components/thread/thread.css";
 /**
  * The Needs-you hover card (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-17-needs-you.md):
  * the whole ask of a thread that waits on the user. A permission shows the tool, the full command
- * or file, the thread and the last line Claude wrote, with Allow, Deny and Go to thread. A
- * question is never answered here: it offers the popup and the thread. Quick actions only; the
- * popup has today's cards (the deny reason, the options).
+ * or file, the thread and the last line Claude wrote, with Allow, Deny and Go to thread, and only
+ * once that whole request is known: while it is read the card says so, and when it cannot be read
+ * it shows the one-line summary with Open… (the popup) and Go to thread. A question is never
+ * answered here: it offers the popup and the thread. Quick actions only; the popup has today's
+ * cards (the deny reason, the options).
  *
  * The card is sized by its content up to a maximum and scrolls beyond it; today's command box
  * cap is lifted inside it (thread.css `.cf-needs-card`). The pointer can move from the anchor into
@@ -83,6 +85,14 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
     </span>
   ) : null;
 
+  // The buttons answer the request whose command is on screen (`request`, the oldest open one's
+  // own), and only while it is still open: a click never lands on another request.
+  const answer = (requestId: string, decision: "allow" | "deny") => {
+    if (!requestOpen(threadId, requestId)) return;
+    dismissNeedsCard(anchor);
+    void respondThread(threadId, requestId, decision);
+  };
+
   let head: ReactNode;
   let body: ReactNode;
   if (pending && question) {
@@ -107,31 +117,60 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
           {pending.summary}
         </div>
       );
-  } else if (pending) {
-    const input = request ? parseObject(request.inputJson) : {};
-    const target = request ? askTarget(request, cwd) : null;
+  } else if (pending && request) {
+    // The whole request is known: the only state with Allow and Deny.
+    const input = parseObject(request.inputJson);
+    const target = askTarget(request, cwd);
     head = (
       <>
         <ShieldAlert aria-hidden />
-        <span>{request ? permissionTitle(request, input, cwd) : "Allow Claude to continue?"}</span>
+        <span>{permissionTitle(request, input, cwd)}</span>
         <span className="chip tool" data-testid="needs-card-tool">
-          {request?.displayName || pending.toolName}
+          {request.displayName || request.toolName}
         </span>
         {more}
       </>
     );
     body = (
-      <div className="cmdbox selectable" data-testid="needs-card-target" data-kind={target?.kind ?? "summary"}>
+      <div className="cmdbox selectable" data-testid="needs-card-target" data-kind={target?.kind ?? "none"}>
         {target?.kind === "command" ? (
           <>
             <span className="text-cf-text-muted">$ </span>
             <TokenSpans tokens={shellTokens(target.text)} />
           </>
         ) : (
-          (target?.text ?? pending.summary)
+          (target?.text ?? "")
         )}
       </div>
     );
+  } else if (pending) {
+    // Not known (yet): the summary at most, never Allow or Deny under a command not shown whole.
+    head = (
+      <>
+        <ShieldAlert aria-hidden />
+        <span>Claude asks for permission</span>
+        <span className="chip tool" data-testid="needs-card-tool">
+          {pending.toolName}
+        </span>
+        {more}
+      </>
+    );
+    body =
+      ask.state === "loading" ? (
+        <p className="mt-2 flex items-center gap-1.5 text-body-sm text-cf-text-muted" role="status" data-testid="needs-card-loading">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          Reading the request…
+        </p>
+      ) : (
+        <>
+          <div className="cmdbox selectable" data-testid="needs-card-target" data-kind="summary">
+            {pending.summary}
+          </div>
+          <p className="text-body-sm text-cf-text-muted" data-testid="needs-card-unavailable">
+            {ask.state === "failed" ? "The full request could not be read." : "The full request is not among the thread's latest items."} Open it to see it whole.
+          </p>
+        </>
+      );
   } else {
     // An ask with no request (a woken snooze, a plugin's flag): its status, then the thread.
     const badge = statusBadge(line);
@@ -146,7 +185,14 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
   }
 
   return (
-    <div className="cf-thread cf-needs-card" data-testid="needs-card-body" data-thread-id={threadId} data-ask={pending ? (question ? "question" : "permission") : "other"}>
+    <div
+      className="cf-thread cf-needs-card"
+      data-testid="needs-card-body"
+      data-thread-id={threadId}
+      data-ask={pending ? (question ? "question" : "permission") : "other"}
+      data-ask-state={ask.state}
+      data-request-id={request?.requestId}
+    >
       <div className={cn("pend", question ? "ask" : "perm")}>
         <div className="pend-h">{head}</div>
         {body}
@@ -155,15 +201,14 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
           <Context text={ask.context} />
         </div>
         <div className="acts mt-3">
-          {pending && !question && (
+          {request && !question && (
             <>
               <button
                 type="button"
                 className="btn primary"
                 data-testid="needs-card-allow"
                 onClick={() => {
-                  dismissNeedsCard(anchor);
-                  void respondThread(threadId, pending.requestId, "allow");
+                  answer(request.requestId, "allow");
                 }}
               >
                 <Check aria-hidden />
@@ -174,15 +219,14 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
                 className="btn outline"
                 data-testid="needs-card-deny"
                 onClick={() => {
-                  dismissNeedsCard(anchor);
-                  void respondThread(threadId, pending.requestId, "deny");
+                  answer(request.requestId, "deny");
                 }}
               >
                 Deny
               </button>
             </>
           )}
-          {(question || !pending) && (
+          {!(request && !question) && (
             <button
               type="button"
               className="btn primary"

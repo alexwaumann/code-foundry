@@ -16,7 +16,7 @@ const { useThreadStore } = await import("@/stores/thread");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useProjectsStore } = await import("@/stores/projects");
 const { HOME, useUiStore } = await import("@/stores/ui");
-const { closeNeedsPopup, openNeedsPopup, resetNeeds, useNeedsStore } = await import("@/stores/needs");
+const { closeNeedsPopup, openNeedsPopup, requestOpen, resetNeeds, useNeedsStore } = await import("@/stores/needs");
 
 /**
  * The Needs-you hover card (docs/notes/shell-17-needs-you.md): what it shows per kind of ask,
@@ -118,13 +118,6 @@ describe("the hover card's contents", () => {
     expect(screen.getByTestId("needs-card-body").textContent).toContain("Allow Claude to write docs/notes.md?");
   });
 
-  it("before the read lands: the thread source's one-line summary", () => {
-    waiting("s-1", PERM, []);
-    readAskItems.mockReturnValue(new Promise(() => undefined));
-    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
-    expect(screen.getByTestId("needs-card-target").textContent).toBe(PERM.summary);
-  });
-
   it("a thread whose Watch is open: the ask from its log, nothing read", () => {
     waiting("s-1", PERM, []);
     const item = permItem({ requestId: "req-1", toolName: "Bash", displayName: "Bash", inputJson: JSON.stringify({ command: "make check" }) });
@@ -162,11 +155,73 @@ describe("the hover card's contents", () => {
   });
 });
 
-describe("the hover card's buttons", () => {
-  it("Allow and Deny answer the oldest request with thread.respond, and the card shuts", async () => {
+describe("the permission's states: Allow and Deny only with the whole request on screen", () => {
+  const buttons = () => within(screen.getByTestId("needs-card-body")).getAllByRole("button").map((b) => b.textContent);
+  const state = () => screen.getByTestId("needs-card-body").getAttribute("data-ask-state");
+
+  it("loading: a quiet line, no command, no Allow or Deny", () => {
+    waiting("s-1", PERM, []);
+    readAskItems.mockReturnValue(new Promise(() => undefined));
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    expect(state()).toBe("loading");
+    expect(screen.getByTestId("needs-card-loading").textContent).toBe("Reading the request…");
+    expect(screen.queryByTestId("needs-card-target")).toBeNull();
+    expect(screen.queryByTestId("needs-card-allow")).toBeNull();
+    expect(screen.queryByTestId("needs-card-deny")).toBeNull();
+    expect(buttons()).toEqual(["Open…", "Go to thread"]);
+  });
+
+  it("failed: the summary and why, with Open… and Go to thread only; the next open reads again", async () => {
+    waiting("s-1", PERM, []);
+    readAskItems.mockRejectedValueOnce(new Error("unavailable"));
+    const { unmount } = render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    await waitFor(() => {
+      expect(state()).toBe("failed");
+    });
+    expect(screen.getByTestId("needs-card-target").textContent).toBe(PERM.summary);
+    expect(screen.getByTestId("needs-card-target").getAttribute("data-kind")).toBe("summary");
+    expect(screen.getByTestId("needs-card-unavailable").textContent).toBe("The full request could not be read. Open it to see it whole.");
+    expect(buttons()).toEqual(["Open…", "Go to thread"]);
+    expect(readAskItems).toHaveBeenCalledTimes(1);
+    unmount();
+    // The next open: read again, and this time it lands.
+    const item = permItem({ requestId: "req-1", toolName: "Bash", displayName: "Bash", inputJson: JSON.stringify({ command: "make check" }) });
+    readAskItems.mockResolvedValueOnce({ ask: item, replies: [] });
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    expect(readAskItems).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(state()).toBe("known");
+    });
+    expect(screen.getByTestId("needs-card-target").textContent).toBe("$ make check");
+    expect(buttons()).toEqual(["Allow", "Deny", "Go to thread"]);
+  });
+
+  it("not found (not among the thread's last tool items, or another request's item): the summary, Open… and Go to thread only", async () => {
+    waiting("s-1", PERM, []);
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    await waitFor(() => {
+      expect(state()).toBe("notfound");
+    });
+    expect(screen.getByTestId("needs-card-unavailable").textContent).toBe("The full request is not among the thread's latest items. Open it to see it whole.");
+    expect(buttons()).toEqual(["Open…", "Go to thread"]);
+    cleanup();
+    resetNeeds();
+    // The item under that id answers another request: not this one's command.
+    waiting("s-1", PERM, [permItem({ requestId: "req-other", toolName: "Bash", inputJson: JSON.stringify({ command: "rm -rf build" }) })]);
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    await waitFor(() => {
+      expect(state()).toBe("notfound");
+    });
+    expect(screen.getByTestId("needs-card-body").textContent).not.toContain("rm -rf build");
+    expect(screen.queryByTestId("needs-card-allow")).toBeNull();
+  });
+
+  it("known: the whole command, then Allow and Deny answer that request with thread.respond, and the card shuts", async () => {
     waiting("s-1", PERM, [permItem({ requestId: "req-1", toolName: "Bash", inputJson: JSON.stringify({ command: "ls" }) })]);
     const { unmount } = render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
-    fireEvent.click(screen.getByTestId("needs-card-allow"));
+    const allow = await screen.findByTestId("needs-card-allow");
+    expect(state()).toBe("known");
+    fireEvent.click(allow);
     await waitFor(() => {
       expect(runs).toEqual([{ name: "thread.respond", args: { id: "s-1", request: "req-1", decision: "allow" } }]);
     });
@@ -175,12 +230,83 @@ describe("the hover card's buttons", () => {
     runs.length = 0;
     useThreadStore.setState({ answering: {} });
     render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
-    fireEvent.click(screen.getByTestId("needs-card-deny"));
+    fireEvent.click(await screen.findByTestId("needs-card-deny"));
     await waitFor(() => {
       expect(runs).toEqual([{ name: "thread.respond", args: { id: "s-1", request: "req-1", decision: "deny" } }]);
     });
   });
+});
 
+describe("the oldest request changing while the card is open", () => {
+  const A: ThreadPendingView = { requestId: "req-a", itemId: "perm-a", question: false, toolName: "Bash", summary: "Bash make check" };
+  const B: ThreadPendingView = { requestId: "req-b", itemId: "perm-b", question: false, toolName: "Bash", summary: "Bash git push --force" };
+  const itemA: ThreadItemView = { ...base, id: "perm-a", ordinal: 5, kind: "permission", request: request({ requestId: "req-a", toolName: "Bash", inputJson: JSON.stringify({ command: "make check" }) }) };
+  const itemB: ThreadItemView = { ...base, id: "perm-b", ordinal: 7, kind: "permission", request: request({ requestId: "req-b", toolName: "Bash", inputJson: JSON.stringify({ command: "git push --force" }) }) };
+  const setPending = (...ps: ThreadPendingView[]) => {
+    act(() => {
+      useThreadStore.setState((s) => ({ pending: { ...s.pending, "s-1": { threadId: "s-1", seq: 3, pending: ps } } }));
+    });
+  };
+
+  it("the buttons act on the request whose command is shown: A until it goes, then nothing until B is read, then B", async () => {
+    waiting("s-1", A, [itemA]);
+    let resolveB: (v: { ask: ThreadItemView; replies: ThreadItemView[] }) => void = () => undefined;
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("needs-card-target").textContent).toBe("$ make check");
+    });
+    expect(screen.getByTestId("needs-card-body").getAttribute("data-request-id")).toBe("req-a");
+
+    // A is answered elsewhere: B is the oldest now, its command not read yet. No buttons, not A's command.
+    readAskItems.mockImplementationOnce(() => new Promise((r) => (resolveB = r)));
+    setPending(B);
+    expect(screen.getByTestId("needs-card-body").getAttribute("data-ask-state")).toBe("loading");
+    expect(screen.getByTestId("needs-card-body").textContent).not.toContain("make check");
+    expect(screen.queryByTestId("needs-card-allow")).toBeNull();
+
+    await act(async () => {
+      resolveB({ ask: itemB, replies: [] });
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("needs-card-target").textContent).toBe("$ git push --force");
+    expect(screen.getByTestId("needs-card-body").getAttribute("data-request-id")).toBe("req-b");
+    fireEvent.click(screen.getByTestId("needs-card-allow"));
+    await waitFor(() => {
+      expect(runs).toEqual([{ name: "thread.respond", args: { id: "s-1", request: "req-b", decision: "allow" } }]);
+    });
+  });
+
+  it("a new request ahead of the shown one (from the log): the card shows it, and Deny answers it, not the one shown before", async () => {
+    waiting("s-1", B, []);
+    useThreadStore.setState({
+      logs: { "s-1": { seq: 1, byId: { [itemA.id]: itemA, [itemB.id]: itemB }, order: [itemA.id, itemB.id], pending: [B], mcp: null, commands: [], agents: [] } },
+      synced: { "s-1": true },
+    });
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    expect(screen.getByTestId("needs-card-target").textContent).toBe("$ git push --force");
+    act(() => {
+      useThreadStore.setState((s) => ({ logs: { "s-1": { ...(s.logs["s-1"] as NonNullable<(typeof s.logs)[string]>), pending: [A, B] } } }));
+    });
+    expect(screen.getByTestId("needs-card-target").textContent).toBe("$ make check");
+    expect(screen.getByTestId("needs-card-body").getAttribute("data-request-id")).toBe("req-a");
+    fireEvent.click(screen.getByTestId("needs-card-deny"));
+    await waitFor(() => {
+      expect(runs).toEqual([{ name: "thread.respond", args: { id: "s-1", request: "req-a", decision: "deny" } }]);
+    });
+  });
+
+  it("a click on a request that is no longer open sends nothing", () => {
+    waiting("s-1", A, []);
+    useThreadStore.setState({ logs: { "s-1": { seq: 1, byId: { [itemA.id]: itemA }, order: [itemA.id], pending: [A], mcp: null, commands: [], agents: [] } }, synced: { "s-1": true } });
+    expect(requestOpen("s-1", "req-a")).toBe(true);
+    useThreadStore.setState({ answering: { "s-1": { "req-a": true } } });
+    expect(requestOpen("s-1", "req-a")).toBe(false);
+    useThreadStore.setState({ answering: {}, logs: { "s-1": { seq: 2, byId: { [itemA.id]: itemA }, order: [itemA.id], pending: [], mcp: null, commands: [], agents: [] } } });
+    expect(requestOpen("s-1", "req-a")).toBe(false);
+  });
+});
+
+describe("the hover card's buttons", () => {
   it("Go to thread selects the thread (the selection bridge opens its tab in its space) and runs no answer", () => {
     waiting("s-1", PERM, []);
     render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
