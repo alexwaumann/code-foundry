@@ -3920,7 +3920,14 @@ export class World {
       ...mcpCommands(this.logs, (i) => this.emit(i)),
       ...panelItemCommands((id) => {
         const t = this.threads.get(id);
-        return t ? { projectId: t.projectId, worktreePath: t.worktreePath, githubSlug: this.projects.get(t.projectId)?.githubSlug ?? "" } : undefined;
+        if (!t) return undefined;
+        return {
+          projectId: t.projectId,
+          worktreePath: t.worktreePath,
+          githubSlug: this.projects.get(t.projectId)?.githubSlug ?? "",
+          checkouts: Object.entries(t.checkoutPaths).filter(([, path]) => path).map(([projectId, path]) => ({ projectId, path })),
+          changed: (root) => this.gh.details.get(root)?.files?.map((f) => f.path ?? ""),
+        };
       }, (i) => this.emit(i)),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...shellCommands(this.logs),

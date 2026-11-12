@@ -2,7 +2,13 @@
 import { describe, expect, it } from "vitest";
 import { panelItemCommands, type ItemThread } from "./panelItemVerbs";
 
-const thread: ItemThread = { projectId: "r1", worktreePath: "/w/a", githubSlug: "" };
+const thread: ItemThread = {
+  projectId: "r1",
+  worktreePath: "/w/a",
+  githubSlug: "",
+  checkouts: [{ projectId: "r2", path: "/w/b" }],
+  changed: (root) => (root === "/w/a" ? ["x.go", "src/app.ts", "src/lib/util.ts"] : root === "/w/b" ? ["api.go"] : undefined),
+};
 const ctx = { activeThreadId: "t1" } as never;
 
 function run(name: string, args: Record<string, string>): { out: unknown; params: Record<string, string> | undefined } {
@@ -33,4 +39,36 @@ describe("the panel verbs' --title, like the daemon's", () => {
       expect(() => run(name, { ...args, title: "x".repeat(101) })).toThrow("101 characters, at most 100");
     });
   }
+});
+
+describe("view.panel.diff's params, like the daemon's (commands_view_diff.go diffCheck)", () => {
+  const diff = (args: Record<string, string>) => run("view.panel.diff", args).params;
+  const own = { project: "r1", worktree: "/w/a", own: "1" };
+
+  it.each<[string, Record<string, string>, Record<string, string>]>([
+    ["nothing: the checkout's own tab", {}, own],
+    ["one changed file: picked in the whole list", { path: "/w/a/x.go" }, { ...own, path: "x.go" }],
+    ["the checkout's root: every file", { path: "/w/a" }, own],
+    ["the root among other paths: every file", { path: "/w/a/x.go\n/w/a" }, own],
+    ["a directory: a list of its own", { path: "/w/a/src" }, { ...own, paths: "src", thread: "t1" }],
+    ["several files: a list of their own", { path: "/w/a/x.go\n/w/a/src/app.ts" }, { ...own, paths: "x.go\nsrc/app.ts", thread: "t1" }],
+    ["a file in another of its checkouts: not its own", { path: "/w/b/api.go" }, { project: "r2", worktree: "/w/b", path: "api.go" }],
+    ["the default sides named: no params, but a tab of its own", { base: "merge-base", head: "working" }, { ...own, thread: "t1" }],
+    ["other sides", { base: "staged", head: "main" }, { ...own, base: "staged", head: "ref:main", thread: "t1" }],
+    ["--scope working", { scope: "working" }, { ...own, thread: "t1" }],
+    ["--scope branch", { scope: "branch" }, { ...own, head: "ref:HEAD", thread: "t1" }],
+    ["--hide", { hide: "compare\nfiles" }, { ...own, hide: "compare,files", thread: "t1" }],
+  ])("%s", (_name, args, want) => {
+    expect(diff(args)).toEqual(want);
+  });
+
+  it.each<[string, Record<string, string>, string]>([
+    ["--scope with --base", { scope: "branch", base: "main" }, "says the same as --base and --head: give one or the other"],
+    ["--scope with --head", { scope: "working", head: "HEAD" }, "says the same as --base and --head"],
+    ["a bad --hide", { hide: "compare\ntoolbar" }, 'want compare or files, got "toolbar"'],
+    ["a path in no checkout", { path: "/w/c/x.go" }, "/w/c/x.go is not a file in thread t1's worktree /w/a"],
+    ["paths in two checkouts", { path: "/w/a/x.go\n/w/b/api.go" }, "/w/b/api.go is in /w/b and the paths before it in /w/a: one tab shows one checkout"],
+  ])("refuses %s", (_name, args, message) => {
+    expect(() => diff(args)).toThrow(message);
+  });
 });
