@@ -85,13 +85,9 @@ export async function writes(): Promise<{ id: string; data: string }[]> {
   return (await res.json()) as { id: string; data: string }[];
 }
 
-/** UiService.Emit with the Connect JSON protocol, as the CLI would. */
+/** An intent (UiIntent as Connect JSON) to every window, as a command emits it (POST /__mock/emit). */
 export async function emit(intent: Record<string, unknown>): Promise<number> {
-  const res = await fetch(`${mockUrl}/codefoundry.v1.UiService/Emit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${MOCK_TOKEN}` },
-    body: JSON.stringify({ intent }),
-  });
+  const res = await fetch(`${mockUrl}/__mock/emit`, { method: "POST", body: JSON.stringify({ intent }) });
   expect(res.ok).toBe(true);
   return ((await res.json()) as { delivered?: number }).delivered ?? 0;
 }

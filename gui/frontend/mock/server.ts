@@ -34,6 +34,8 @@
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent, explicit as thread.focus)
+ *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
+ *     command emits it; answers {"delivered": <watchers>})
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
  *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
  *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn[&queued=1]
@@ -209,7 +211,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
-import type { MessageInitShape } from "@bufbuild/protobuf";
+import { fromJson, type JsonValue, type MessageInitShape } from "@bufbuild/protobuf";
 import { durationFromMs, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
 import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
@@ -223,7 +225,7 @@ import { TerminalService, TerminalState, type AttachEventSchema } from "../src/g
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
 import { GitOpsService } from "../src/gen/codefoundry/v1/gitops_pb";
-import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
+import { UiIntentSchema, UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
@@ -1027,6 +1029,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "POST /__mock/emit": {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { intent?: JsonValue };
+          json(res, 200, { delivered: world.emit(fromJson(UiIntentSchema, body.intent ?? {})) });
+        } catch (err) {
+          json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      break;
+    }
     case "POST /__mock/terminal/print":
     case "POST /__mock/terminal/flood": {
       const flood = path.endsWith("/flood");
