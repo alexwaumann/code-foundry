@@ -85,20 +85,24 @@ test("a frame sent to another site is covered with Reload, which brings the page
   await page.waitForTimeout(600);
   await expect(left).toHaveCount(0);
 
-  // Another origin, which has no frame script: covered.
-  await page.getByTestId("file-html-frame").evaluate((el: HTMLIFrameElement, url) => {
-    if (el.contentWindow) el.contentWindow.location.href = url;
-  }, `${String(baseURL)}/appicon.png`);
-  await expect(left).toContainText("This page went to another site");
-  if (shots) {
-    for (const scheme of ["dark", "light"] as const) {
-      await page.emulateMedia({ colorScheme: scheme });
-      await page.waitForTimeout(400);
-      await page.getByTestId("side-panel").screenshot({ path: `${shots}/frame-left-${scheme}.png` });
-    }
-    await page.emulateMedia({ colorScheme: null });
-  }
-  await page.getByTestId("file-html-frame-left-reload").click();
+  // Another origin, which has no frame script: covered; Reload brings the page back. In each
+  // scheme for SHOTS, set before the frame leaves: a theme switch reloads a page that does not
+  // ack it, which brings it back too.
+  await page.getByTestId("file-refresh").click();
   await expect(f.locator("#out")).toBeVisible();
-  await expect(left).toHaveCount(0);
+  for (const scheme of shots ? (["dark", "light"] as const) : [null]) {
+    if (scheme) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(600);
+      await expect(f.locator("#out")).toBeVisible();
+    }
+    await page.getByTestId("file-html-frame").evaluate((el: HTMLIFrameElement, url) => {
+      if (el.contentWindow) el.contentWindow.location.href = url;
+    }, `${String(baseURL)}/appicon.png`);
+    await expect(left).toContainText("This page went to another site");
+    if (scheme) await page.getByTestId("side-panel").screenshot({ path: `${String(shots)}/frame-left-${scheme}.png` });
+    await page.getByTestId("file-html-frame-left-reload").click();
+    await expect(f.locator("#out")).toBeVisible();
+    await expect(left).toHaveCount(0);
+  }
 });
