@@ -5,9 +5,10 @@ import { appPath, CF, invocations, mockUrl, resetMock } from "./fixtures";
  * Dragging tabs and panes in the window shell (docs/notes/shell-14-drag.md), against the mock's
  * layout seeded per test. What only a browser shows: the pointer drag itself, the preview and the
  * insertion bar as it goes, the drop landing as one `tab.move` or `pane.move`, Escape, a drag over
- * an iframe, and the panes tiling the grid with no gap after every drop. Which zone a point is in
- * and what a drop sends are vitest's (src/shell/drag). Set SHOTS=<dir> for the PR's screenshots
- * (WebKit, 1400x900, dark and light).
+ * an iframe and over a terminal's xterm, a tab with a context menu (a terminal's) and the press
+ * that must not drag it, and the panes tiling the grid with no gap after every drop. Which zone a
+ * point is in and what a drop sends are vitest's (src/shell/drag). Set SHOTS=<dir> for the PR's
+ * screenshots (WebKit, 1400x900, dark and light).
  */
 
 type Tab = Record<string, unknown> & { id: string };
@@ -274,6 +275,64 @@ test("a drag over an iframe's body keeps tracking the pointer", async ({ page })
   await drop(page);
   await expectStored("row([t-s-1] [t-html] [t-s-3])");
   await expectTiled(page);
+});
+
+test("a drag over a terminal's body keeps tracking the pointer", async ({ page }) => {
+  // Thread s-1's shell as a terminal tab fills p-2: an xterm canvas under the pointer.
+  const term: Tab = { id: "t-term", kind: "terminal", thread: "s-1", params: { terminal: "t-s1-shell" } };
+  await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [thread("s-1"), thread("s-3")]), pane("p-2", [term])], sizes: [0.5, 0.5] }, "p-1");
+  await openShell(page);
+  const host = page.getByTestId("shell-terminal-host");
+  await expect(host).toHaveAttribute("data-attach-phase", "live");
+  const t = await boxOf(page, '[data-testid="shell-terminal-host"]');
+  // Into the terminal's middle: the pane's middle; on to its right side: that pane's right edge.
+  await lift(page, centre(await tabBox(page, "t-s-3")), { x: t.x + t.w / 2, y: t.y + t.h / 2 });
+  await expect(preview(page)).toHaveAttribute("data-kind", "pane");
+  await page.mouse.move(t.x + t.w - 20, t.y + t.h / 2, { steps: 6 });
+  await expect(preview(page)).toHaveAttribute("data-kind", "edge");
+  await drop(page);
+  await expectStored("row([t-s-1] [t-term] [t-s-3])");
+  await expectTiled(page);
+  // The terminal neither lost its stream nor took the keyboard.
+  await expect(host).toHaveAttribute("data-attach-phase", "live");
+  expect(await page.evaluate(() => document.activeElement?.closest("[data-terminal-host]") === null)).toBe(true);
+});
+
+test("a terminal tab drags like any tab; a press in its name field or its context menu does not", async ({ page }) => {
+  const term: Tab = { id: "t-term", kind: "terminal", thread: "s-1", params: { terminal: "t-s1-shell" }, name: "server" };
+  const top: Tab = { id: "t-top", kind: "terminal", params: { terminal: "t-top" } };
+  await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [thread("s-1")]), pane("p-2", [term, top])], sizes: [0.5, 0.5] }, "p-1");
+  await openShell(page);
+  // The inactive terminal tab (inside its context menu's trigger) drags into the other strip.
+  const s1 = await tabBox(page, "t-s-1");
+  await lift(page, centre(await tabBox(page, "t-top")), { x: s1.x + s1.w + 30, y: s1.y + s1.h / 2 });
+  await drop(page);
+  await expectStored("row([t-s-1,t-top] [t-term])");
+  const sent = (await moves()).length;
+
+  // A right press, moved, opens the menu and drags nothing.
+  const t = centre(await tabBox(page, "t-term"));
+  await page.mouse.move(t.x, t.y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(t.x + 40, t.y + 30, { steps: 6 });
+  await expect(page.getByTestId("shell-drag-ghost")).toHaveCount(0);
+  await page.mouse.up({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+
+  // Selecting text in the name field drags nothing either.
+  const field = page.getByTestId("shell-tab-name-field");
+  await expect(field).toBeFocused();
+  const f = await boxOf(page, '[data-testid="shell-tab-name-field"]');
+  await page.mouse.move(f.x + 4, f.y + f.h / 2);
+  await page.mouse.down();
+  await page.mouse.move(f.x + 60, f.y + f.h / 2 + 30, { steps: 8 });
+  await expect(page.getByTestId("shell-drag-ghost")).toHaveCount(0);
+  await page.mouse.up();
+  await expect(field).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(field).toHaveCount(0);
+  expect((await moves()).length).toBe(sent);
+  await expectStored("row([t-s-1,t-top] [t-term])");
 });
 
 /** SHOTS=<dir>: mid-drag over a strip (the bar), over a pane's edge and over the outer edge, dark and light. */
