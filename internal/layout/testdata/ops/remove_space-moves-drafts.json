@@ -1,0 +1,59 @@
+{
+  "doc": "Removing a space moves its drafts, closed, to the top of the target's list.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-2","label":"Other"}]
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [{"id":"t-d","kind":"compose","params":{"draft":"d-1"}}],
+          "active": "t-d"
+        },
+        "focus": "p-b",
+        "drafts": [{"id":"d-1","label":"Fix"},{"id":"d-3","label":"Third"}]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"remove_space","space":"sp-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "drafts": [
+          {"id":"d-1","label":"Fix"},
+          {"id":"d-3","label":"Third"},
+          {"id":"d-2","label":"Other"}
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","closed":["t-d"]}
+}

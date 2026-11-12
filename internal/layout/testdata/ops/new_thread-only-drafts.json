@@ -1,0 +1,69 @@
+{
+  "doc": "A space whose composers are all drafts has no empty composer: New thread opens one in the focused pane after its active tab.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"compose","params":{"draft":"d-1"}}
+              ],
+              "active": "t-a"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix the build"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"new_thread","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-n1","kind":"compose"},
+                {"id":"t-d","kind":"compose","params":{"draft":"d-1"}}
+              ],
+              "active": "t-n1"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-n1"],
+        "drafts": [{"id":"d-1","label":"Fix the build"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused"}
+}

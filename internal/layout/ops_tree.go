@@ -2,6 +2,7 @@ package layout
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -529,7 +530,8 @@ func (o *FocusPane) apply(t *tx) (Result, error) {
 }
 
 // SetTabParams replaces a tab's params (and its title when given). Its identity follows the
-// new params; one that collides with another open tab is refused.
+// new params; one that collides with another open tab is refused. A composer's "draft" param
+// is the draft ops' own: it is kept when left out, and changing it is refused.
 type SetTabParams struct {
 	Tab    string            `json:"tab"`
 	Params map[string]string `json:"params"`
@@ -546,6 +548,16 @@ func (o *SetTabParams) apply(t *tx) (Result, error) {
 	}
 	next := tb.Clone()
 	next.Params = o.Params
+	if id := draftOf(tb); tb.Kind == "compose" && o.Params[DraftParam] != id {
+		if o.Params[DraftParam] != "" || id == "" {
+			return Result{}, fmt.Errorf("a composer's draft changes only through the draft ops: %w", ErrInvalidArgument)
+		}
+		next.Params = maps.Clone(o.Params)
+		if next.Params == nil {
+			next.Params = map[string]string{}
+		}
+		next.Params[DraftParam] = id
+	}
 	if o.Title != nil {
 		next.Title = *o.Title
 	}

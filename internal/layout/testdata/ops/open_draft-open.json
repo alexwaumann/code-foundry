@@ -1,0 +1,78 @@
+{
+  "doc": "Reopening a draft whose tab is open focuses it where it is.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-d","kind":"compose","params":{"draft":"d-1"}},
+                {"id":"t-p","kind":"prs"}
+              ],
+              "active": "t-p"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_draft","draft":"d-1","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-d","kind":"compose","params":{"draft":"d-1"}},
+                {"id":"t-p","kind":"prs"}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-d"],
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-d","existing":true,"rule":"1","draft":"d-1"}
+}

@@ -1,0 +1,43 @@
+{
+  "doc": "Updating a draft's label changes only its entry; the result names its open tab.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-d","kind":"compose","params":{"draft":"d-1"}}],
+          "active": "t-d"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"label_draft","draft":"d-1","label":"Fix the flaky test"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-d","kind":"compose","params":{"draft":"d-1"}}],
+          "active": "t-d"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix the flaky test"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-d","draft":"d-1"}
+}

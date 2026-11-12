@@ -20,10 +20,11 @@ func init() {
 // OpenThread opens a thread's own tab, or focuses it when it is open. It opens in the
 // thread's space:
 //   - Compose: in place of that composer tab, which it replaces (sending from the composer);
-//     the thread then lives in the composer's space;
+//     the thread then lives in the composer's space. Sending from a draft ends the draft
+//     (Result.Draft);
 //   - Pane: in that pane, which must be in the thread's space;
-//   - otherwise in place of the space's composer when that is the space's only tab (an
-//     ephemeral composer), else in the focused pane after its active tab, else as the first
+//   - otherwise in place of the space's empty composer when that is the space's only tab (an
+//     ephemeral composer; a draft is never replaced), else in the focused pane after its active tab, else as the first
 //     pane of an empty space.
 //
 // Then the thread's remembered set comes back (Restore). W and H are the pane area for
@@ -84,7 +85,7 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		if sp, err = t.space(t.st.SpaceOf(o.Thread)); err != nil {
 			return Result{}, err
 		}
-		if ps := Panes(sp.Root); len(ps) == 1 && len(ps[0].Tabs) == 1 && ps[0].Tabs[0].Kind == "compose" {
+		if ps := Panes(sp.Root); len(ps) == 1 && len(ps[0].Tabs) == 1 && ps[0].Tabs[0].Kind == "compose" && draftOf(ps[0].Tabs[0]) == "" {
 			pane, compose, rule = ps[0], ps[0].Tabs[0], "compose"
 		} else {
 			pane = focusedPane(sp)
@@ -104,6 +105,10 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		}
 		forget(sp, compose.ID)
 		res.Closed = []*Tab{compose}
+		if id := draftOf(compose); id != "" {
+			unlistDraft(t.st, id)
+			res.Draft = id
+		}
 	case pane != nil:
 		pane.Tabs = slices.Insert(pane.Tabs, pane.TabIndex(pane.Active)+1, tb)
 	default:

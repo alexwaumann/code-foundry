@@ -3,6 +3,7 @@ package layout
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -22,18 +23,23 @@ const sizeTolerance = 1e-9
 //   - a thread tab is in its thread's space;
 //   - a space's focus names one of its panes ("" only when it has none); its MRU holds only
 //     its open tabs, each once, at most MaxMRU;
-//   - every thread state names an existing space.
+//   - every thread state names an existing space;
+//   - draft ids non-empty and listed once in the whole state, labels as draftLabel leaves
+//     them, no "draft" key in a draft's params; a composer that is a draft is listed by its
+//     own space, is the only tab of that draft anywhere, and has its entry's params.
 func Check(st *State) error {
-	c := &checker{st: st, ids: map[string]bool{}, global: map[string]string{}}
+	c := &checker{st: st, ids: map[string]bool{}, global: map[string]string{}, drafts: map[string]*Space{}, draftTabs: map[string]string{}}
 	c.run()
 	return errors.Join(c.errs...)
 }
 
 type checker struct {
-	st     *State
-	ids    map[string]bool
-	global map[string]string // key -> tab id, for global-scope kinds
-	errs   []error
+	st        *State
+	ids       map[string]bool
+	global    map[string]string // key -> tab id, for global-scope kinds
+	drafts    map[string]*Space // draft id -> the space listing it
+	draftTabs map[string]string // draft id -> its open tab
+	errs      []error
 }
 
 func (c *checker) fail(format string, a ...any) {
@@ -57,6 +63,29 @@ func (c *checker) run() {
 	}
 	if len(st.Spaces) == 0 {
 		c.fail("no space")
+	}
+	for _, sp := range st.Spaces {
+		if sp == nil {
+			continue
+		}
+		for _, d := range sp.Drafts {
+			switch {
+			case d == nil:
+				c.fail("space %s: nil draft", sp.ID)
+			case d.ID == "":
+				c.fail("space %s: draft without an id", sp.ID)
+			case c.drafts[d.ID] != nil:
+				c.fail("draft %s listed twice", d.ID)
+			default:
+				c.drafts[d.ID] = sp
+				if d.Label != draftLabel(d.Label) {
+					c.fail("draft %s: label %q is not one short line", d.ID, d.Label)
+				}
+				if _, ok := d.Params[DraftParam]; ok {
+					c.fail("draft %s: params hold a draft id", d.ID)
+				}
+			}
+		}
 	}
 	for _, sp := range st.Spaces {
 		if sp == nil {
@@ -200,5 +229,16 @@ func (c *checker) tab(sp *Space, tb *Tab, keys map[string]string) {
 	scope[key] = tb.ID
 	if tb.Kind == "thread" && c.st.SpaceOf(tb.Thread) != sp.ID {
 		c.fail("thread tab %s is in space %s, its thread lives in %s", tb.ID, sp.ID, c.st.SpaceOf(tb.Thread))
+	}
+	if id := draftOf(tb); id != "" {
+		if other, ok := c.draftTabs[id]; ok {
+			c.fail("tabs %s and %s are both draft %s", other, tb.ID, id)
+		}
+		c.draftTabs[id] = tb.ID
+		if c.drafts[id] != sp {
+			c.fail("draft tab %s: space %s does not list draft %s", tb.ID, sp.ID, id)
+		} else if _, d := findDraft(c.st, id); !maps.Equal(d.Params, draftParams(tb.Params)) {
+			c.fail("draft %s: params %v, its tab has %v", id, d.Params, draftParams(tb.Params))
+		}
 	}
 }

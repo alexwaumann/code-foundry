@@ -1,0 +1,82 @@
+{
+  "doc": "Sending from a draft turns its tab into the thread's tab and removes the draft from the list.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-d","kind":"compose","params":{"draft":"d-1"}},
+                {"id":"t-p","kind":"prs"}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "drafts": [{"id":"d-1","label":"Fix"},{"id":"d-2","label":"Other"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-n","compose":"t-d","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-n1","kind":"thread","thread":"th-n"},{"id":"t-p","kind":"prs"}],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-n1"],
+        "drafts": [{"id":"d-2","label":"Other"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {
+    "space": "sp-a",
+    "pane": "p-b",
+    "tab": "t-n1",
+    "closed": ["t-d"],
+    "rule": "compose",
+    "draft": "d-1"
+  }
+}

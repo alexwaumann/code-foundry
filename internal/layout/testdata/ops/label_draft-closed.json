@@ -1,0 +1,43 @@
+{
+  "doc": "A draft whose tab is closed can be relabelled too.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"label_draft","draft":"d-1","label":""},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","draft":"d-1"}
+}
