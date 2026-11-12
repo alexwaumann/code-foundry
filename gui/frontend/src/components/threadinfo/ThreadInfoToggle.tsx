@@ -2,7 +2,7 @@ import { SquareChartGantt } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { useThreadCtx } from "@/components/thread/context";
 import { cn } from "@/lib/utils";
-import { useCardRoom } from "@/stores/threadInfoOverlay";
+import { roomFor, useCardRoom } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
 
 /**
@@ -14,7 +14,7 @@ import { useUiStore } from "@/stores/ui";
 export function ThreadInfoToggle() {
   const { threadId } = useThreadCtx();
   const open = useUiStore((s) => s.threadInfoOpen);
-  const shown = useCardRoom((s) => (s.room ? open : s.overlayFor === threadId));
+  const shown = useCardRoom((s) => (roomFor(s, threadId) ? open : s.overlayFor === threadId));
   return (
     <CommandButton
       command="view.thread-info"

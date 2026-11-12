@@ -21,4 +21,16 @@ export interface ShellSurface {
   TabIcon?: ComponentType<{ tab: TabEntry; className?: string }>;
   /** The items of the tab's context menu (ContextMenuItems); no menu without it. */
   tabMenu?: (tab: TabEntry) => ReactNode;
+  /**
+   * A kind that can belong to a thread: the noun of the row under the strip of a linked tab
+   * ("Diff" of ● thread, components/shell/LinkedRow.tsx) and of the tab's hover.
+   */
+  linkedNoun?: string;
+  /**
+   * The right end of the row under a linked tab's strip, beside the link: a terminal's
+   * "directory differs · Reset" hint (PR 13). Nothing when absent.
+   */
+  linkedRowEnd?: (tab: TabEntry) => ReactNode;
+  /** A hook: the tab's thread needs the user, which its strip marks with the attention dot on the icon. */
+  useAttention?: (tab: TabEntry) => boolean;
 }

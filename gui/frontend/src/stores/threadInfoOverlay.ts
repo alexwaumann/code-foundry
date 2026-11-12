@@ -11,17 +11,39 @@ import { useUiStore } from "./ui";
  * measures it), and while it has none, the thread whose card floats over its conversation
  * (`overlayFor`). The overlay is transient: never saved, and threadInfoOpen stays the
  * preference for the inline card. `focusOverlay`: opened from the keyboard, it takes focus.
+ *
+ * The window shell shows several thread panes at once, each as wide as its pane: `rooms` is each
+ * thread body's own measure (a thread has one tab, so its id names its pane), and `room` the last
+ * one reported, which a body that names no thread (and the classic window, with one) reads.
  */
-export const useCardRoom = create<{ room: boolean; overlayFor: string | null; focusOverlay: boolean }>()(() => ({
+export const useCardRoom = create<{ room: boolean; rooms: Readonly<Record<string, boolean>>; overlayFor: string | null; focusOverlay: boolean }>()(() => ({
   room: true,
+  rooms: {},
   overlayFor: null,
   focusOverlay: false,
 }));
 
-export function setCardRoom(room: boolean): void {
-  if (useCardRoom.getState().room === room) return;
-  // With room again the inline card (when on) takes the overlay's place.
-  useCardRoom.setState(room ? { room, overlayFor: null } : { room });
+/** Whether the body showing `threadId` has room for the inline card. */
+export function roomFor(s: { room: boolean; rooms: Readonly<Record<string, boolean>> }, threadId: string | null): boolean {
+  return (threadId === null ? undefined : s.rooms[threadId]) ?? s.room;
+}
+
+/** A thread body measured its room (`threadId`: whose; none for the window's one body). */
+export function setCardRoom(room: boolean, threadId = ""): void {
+  const st = useCardRoom.getState();
+  if (st.room === room && (!threadId || st.rooms[threadId] === room)) return;
+  const rooms = threadId ? { ...st.rooms, [threadId]: room } : st.rooms;
+  // With room again the inline card (when on) takes that thread's overlay's place.
+  const clears = room && (!threadId || st.overlayFor === threadId);
+  useCardRoom.setState(clears ? { room, rooms, overlayFor: null } : { room, rooms });
+}
+
+/** A thread body went away: forget its measure. */
+export function dropCardRoom(threadId: string): void {
+  const st = useCardRoom.getState();
+  if (!(threadId in st.rooms)) return;
+  const { [threadId]: _gone, ...rooms } = st.rooms;
+  useCardRoom.setState({ rooms });
 }
 
 /** Hides the overlay; threadInfoOpen is left alone. */
@@ -35,7 +57,7 @@ export function hideThreadInfoOverlay(): void {
  */
 export function showThreadInfo(threadId: string, focus = false): void {
   if (!useUiStore.getState().threadInfoOpen) useUiStore.setState({ threadInfoOpen: true });
-  if (!useCardRoom.getState().room) useCardRoom.setState({ overlayFor: threadId, focusOverlay: focus });
+  if (!roomFor(useCardRoom.getState(), threadId)) useCardRoom.setState({ overlayFor: threadId, focusOverlay: focus });
 }
 
 /**
@@ -46,7 +68,9 @@ export function showThreadInfo(threadId: string, focus = false): void {
 export function toggleThreadInfo(focus = false): void {
   const sel = useUiStore.getState().selection;
   const threadId = sel.kind === "thread" ? sel.id : null;
-  const { room, overlayFor } = useCardRoom.getState();
+  const st = useCardRoom.getState();
+  const room = roomFor(st, threadId);
+  const { overlayFor } = st;
   if (room || threadId === null) {
     useUiStore.getState().toggleThreadInfo();
   } else if (overlayFor === threadId) {

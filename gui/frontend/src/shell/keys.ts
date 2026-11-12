@@ -14,6 +14,7 @@ import { focusPane, useLayoutStore } from "@/stores/layout";
 import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
 import { autoNameFocusedTab, cycleTerminals, newFreeTerminalTab, newTerminalTab, quickKey, renameFocusedTab } from "./terminalActions";
+import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
 
 export interface ShellKey {
   /** Canonical chords (keys/chord.ts). */
@@ -112,6 +113,25 @@ export const SHELL_KEYS: readonly ShellKey[] = [
   { chords: ["cmd+shift+j"], spec: "cmd+shift+j", command: "terminal.cycle", run: () => void cycleTerminals() },
   { chords: ["cmd+r"], spec: "cmd+r", command: "tab.rename", run: renameFocusedTab },
   { chords: ["cmd+shift+r"], spec: "cmd+shift+r", command: "tab.rename", run: autoNameFocusedTab },
+  {
+    chords: ["cmd+shift+d"],
+    spec: "cmd+shift+d",
+    command: "view.thread-diff",
+    // From a thread or a surface linked to it: the thread's diff; from that diff, back. The keyboard follows.
+    run: () => {
+      const tab = focusedTab(useLayoutStore.getState());
+      if (tab) void runLayoutCommand("view.thread-diff", { tab: tab.id, focus: "true" }).then((r) => thenFocus(r?.rev));
+    },
+  },
+  {
+    chords: ["cmd+shift+i"],
+    spec: "cmd+shift+i",
+    command: "view.thread-info",
+    // view.thread-info's presenter (keys/bindings.ts): the focused thread's card, or its overlay in a narrow pane, focused.
+    run: () => {
+      toggleThreadInfo(true);
+    },
+  },
   ...DIRS.flatMap(([dir, letter, arrow]): ShellKey[] => [
     { chords: [`cmd+ctrl+${letter}`, `cmd+ctrl+${arrow}`], spec: PANE_KEYS, command: `pane.focus.${dir}`, run: () => {
         focusSide(dir);

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type Ref, type SyntheticEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type Ref, type SyntheticEvent } from "react";
 import { X } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
@@ -10,8 +10,12 @@ import { fitTabs, TAB_ICON_WIDTH, type TabFit } from "@/shell/geometry/tabFit";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { usePaneDrag, useTabDrag } from "@/shell/drag/draggable";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
+import type { ShellSurface } from "@/shell/surfaces/types";
+import { dropTabCut, setTabCut } from "@/shell/tabCut";
 import { takeRenameAfterMenu, useTabRenameStore } from "@/shell/terminalActions";
+import { useThreadName } from "@/shell/useThreadName";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
+import { PanePlusMenu } from "./PanePlusMenu";
 import { TabNameField } from "./TerminalTab";
 
 /** The active tab: full tint in the focused pane, lighter in the others (the side panel's tints). */
@@ -21,6 +25,14 @@ const ACTIVE_UNFOCUSED = "bg-cf-control-hover/40 text-cf-text dark:bg-cf-control
 /** Gap between tabs and the strip's side padding, in px (gap-0.5, px-1.5). */
 const TAB_GAP = 2;
 const STRIP_PAD = 6;
+/** The "+" button after the last tab (size-7). */
+const PLUS_WIDTH = 28;
+
+/** The attention dot on a tab's icon: its thread needs the user (docs/notes/shell-model.md, "In a pane"). */
+function AttentionDot({ use, tab }: { use: NonNullable<ShellSurface["useAttention"]>; tab: TabEntry }) {
+  const on = use(tab);
+  return on ? <span role="img" aria-label="Needs you" className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-cf-warning ring-1 ring-cf-surface" data-testid="shell-tab-attention" /> : null;
+}
 
 /** A tab's icon and name; `room` keeps the close button's width (measuring a tab's natural width). */
 function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"]; room: boolean }) {
@@ -28,7 +40,10 @@ function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"
   const title = surface.useTitle(tab);
   return (
     <>
-      <TabContentIcon tab={tab} />
+      <span className="relative flex shrink-0">
+        <TabContentIcon tab={tab} />
+        {!room && surface.useAttention && <AttentionDot use={surface.useAttention} tab={tab} />}
+      </span>
       <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate")} data-testid="shell-tab-label">
         {title}
       </span>
@@ -60,6 +75,23 @@ function ShellTab({ tabId, active, paneFocused, fit, focusable }: { tabId: strin
   const tab = useTab(tabId);
   if (!tab) return null;
   return <ShellTabOf tab={tab} active={active} paneFocused={paneFocused} fit={fit} focusable={focusable} />;
+}
+
+/**
+ * A linked tab's hover names its thread (the name is nowhere else in the strip): "Diff of
+ * <thread>", after the tab's own name when that is cut short or hidden.
+ */
+function LinkedTip({ tab, tabName, cut }: { tab: TabEntry; tabName: string; cut: boolean }) {
+  const thread = useThreadName(tab.thread);
+  const phrase = `${shellSurfaceOf(tab.kind).linkedNoun ?? tab.kind} of ${thread}`;
+  return cut ? (
+    <span className="flex flex-col">
+      <span>{tabName}</span>
+      <span className="text-cf-text-muted">{phrase}</span>
+    </span>
+  ) : (
+    <>{phrase}</>
+  );
 }
 
 type Handler = (e: SyntheticEvent) => void;
@@ -115,6 +147,7 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
   const icon = label === "icon";
   const renaming = useTabRenameStore((s) => s.tabId === tab.id);
   const handlers = mergeHandlers(rest, renaming ? undefined : listeners);
+  const linked = tab.thread !== "" && tab.kind !== "thread";
   return (
     <div
       ref={(el) => {
@@ -145,7 +178,7 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
         if (e.button === 1) void closeTabNow(tab.id);
       }}
     >
-      <Tip label={title} whenTruncated side="bottom">
+      <Tip label={linked ? <LinkedTip tab={tab} tabName={title} cut={label !== "full"} /> : title} whenTruncated={!linked} side="bottom">
         <button
           type="button"
           role="tab"
@@ -219,8 +252,9 @@ function onStripKeyDown(e: KeyboardEvent<HTMLElement>): void {
  * A pane's tab strip: the tab is the title (docs/notes/shell-model.md), so nothing repeats it
  * under the strip by default. Any tab drags, and the strip's free space drags the whole pane
  * (components/shell/ShellDnd.tsx), so it no longer drags the window. `inset` keeps the strip clear
- * of the traffic lights (the pane at the window's top left with the sidebar hidden). The "+" menu
- * (PR 12) and full screen (PR 19) come later.
+ * of the traffic lights (the pane at the window's top left with the sidebar hidden). The "+" after
+ * the last tab opens the pane's menu of surfaces (PanePlusMenu) and is not part of the pane's grip.
+ * Full screen (PR 19) comes later.
  */
 export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; focused: boolean; inset?: number }) {
   const pane = usePane(paneId);
@@ -240,10 +274,12 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
       const z = zoomFactor();
       const ids = key ? key.split(",") : [];
       const widths = Array.from(row.children).map((c) => Math.ceil(c.getBoundingClientRect().width / z));
-      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - inset - TAB_GAP * Math.max(0, widths.length - 1);
+      // The "+" after the last tab keeps its room.
+      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - inset - TAB_GAP * widths.length - PLUS_WIDTH;
       if (!(avail > 0)) return;
       const next = fitTabs({ widths, active: ids.indexOf(active), avail, iconWidth: TAB_ICON_WIDTH });
       setFits((prev) => (prev && sameFits(prev, next) ? prev : next));
+      setTabCut(paneId, (next[ids.indexOf(active)]?.label ?? "full") !== "full");
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -252,7 +288,13 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
     return () => {
       ro.disconnect();
     };
-  }, [key, active, inset]);
+  }, [key, active, inset, paneId]);
+  useEffect(
+    () => () => {
+      dropTabCut(paneId);
+    },
+    [paneId],
+  );
 
   return (
     <div
@@ -272,6 +314,7 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
       {tabIds.map((id, i) => (
         <ShellTab key={id} tabId={id} active={id === active} paneFocused={focused} fit={fits?.[i]} focusable={id === active} />
       ))}
+      <PanePlusMenu paneId={paneId} />
       <div ref={measureRef} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 flex" data-testid="shell-tab-measure">
         {tabIds.map((id) => (
           <MeasureTab key={id} tabId={id} />

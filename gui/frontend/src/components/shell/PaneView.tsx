@@ -13,6 +13,7 @@ import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout"
 import { useShellViewStore } from "@/stores/shellView";
 import { useUiStore } from "@/stores/ui";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
+import { LinkedRow } from "./LinkedRow";
 import { PaneTabStrip } from "./PaneTabStrip";
 
 /** The active tab's body, under key={tab.id}: a tab that is not active mounts nothing (and holds no stream). */
@@ -82,6 +83,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
       }}
     >
       <PaneTabStrip paneId={paneId} focused={focused} inset={inset} />
+      {tab && <LinkedRow tab={tab} />}
       <div ref={bodyRef} id={shellBodyDomId(paneId)} role="tabpanel" tabIndex={-1} className="relative flex min-h-0 min-w-0 flex-1 flex-col outline-none" data-testid="shell-pane-body">
         {tab && (
           <ShellPaneContext.Provider value={ctx}>

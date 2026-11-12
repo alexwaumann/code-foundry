@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from "react";
 import { cardFits } from "@/lib/threadInfo";
 import { useWidth } from "@/lib/useWidth";
-import { hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
+import { dropCardRoom, hideThreadInfoOverlay, setCardRoom, useCardRoom } from "@/stores/threadInfoOverlay";
 
 /**
  * Whether the thread body keeps room for the inline card (lib/threadInfo cardFits: the
@@ -13,18 +13,19 @@ export function useInfoRoom(threadId: string): [ref: RefObject<HTMLDivElement | 
   const [rowRef, rowWidth] = useWidth(1280);
   const fits = cardFits(rowWidth);
   useEffect(() => {
-    setCardRoom(fits);
-  }, [fits]);
+    setCardRoom(fits, threadId);
+  }, [fits, threadId]);
   // Another thread hides the overlay (unless it was shown for that one: the sidebar's linked PRs tag).
   useEffect(() => {
     if (useCardRoom.getState().overlayFor !== threadId) hideThreadInfoOverlay();
   }, [threadId]);
   useEffect(
     () => () => {
+      dropCardRoom(threadId);
       setCardRoom(true);
-      hideThreadInfoOverlay();
+      if (useCardRoom.getState().overlayFor === threadId) hideThreadInfoOverlay();
     },
-    [],
+    [threadId],
   );
   return [rowRef, fits];
 }

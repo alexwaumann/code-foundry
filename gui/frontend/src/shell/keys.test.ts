@@ -42,6 +42,8 @@ const WANT: Readonly<Record<string, readonly string[]>> = {
   // cmd+r on a thread's tab is today's rename (thread.rename's inline field); on a terminal's, tab.rename.
   "cmd+r": ["tab.rename"],
   "cmd+shift+r": ["tab.rename"],
+  "cmd+shift+d": ["view.thread-diff"],
+  "cmd+shift+i": ["view.thread-info"],
 };
 
 describe("the interim key table against the spec's", () => {
