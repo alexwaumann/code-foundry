@@ -94,7 +94,8 @@ export const LEFT_WAIT_MS = 400;
  * frame's own window, at the origin its URL names ("null" without a thread), with that
  * nonce is heard; `cf:resize` and `cf:theme:ack` may come without one (a page without the
  * script), never with another. A frame navigated to another URL, another page's grant
- * included, loses the fragment and with it the bridge. Replies go to that window and
+ * included, loses the fragment and with it the bridge; the page's own way to another file
+ * under its grant keeps it (bridge.js carries the nonce on). Replies go to that window and
  * origin. A change of owning thread reloads the frame (its sandbox changes with it).
  * `onKey` hears this frame's own `{ type: "cf:key", key: "Escape" }`, with its nonce only:
  * Escape the page left alone (the lightbox closes on it; docs/notes/page-library-fixes-b.md).
