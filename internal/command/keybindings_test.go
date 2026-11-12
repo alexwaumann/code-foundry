@@ -23,7 +23,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.report", "search.seen", "search.stop",
 		"settings.get", "settings.path", "settings.reset", "settings.set",
 		"skill.browse",
-		"terminal.list", "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
+		"terminal.cycle", "terminal.list", "terminal.quick", "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
 		"thread.agent.open", "thread.agents", "thread.ask", "thread.checkouts", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts", "thread.search", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop", "thread.stop-waiting",
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",

@@ -20,6 +20,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
@@ -62,6 +63,10 @@ type TerminalDeps struct {
 	// command as one paste and then Return, so tabs are not completion and a multi-line
 	// block lands in the editor whole. Nil, or an error: the keys are typed one by one.
 	BracketedPaste func(ctx context.Context, id string) (bool, error)
+	// Layout is the window shell's layout: a new shell gets a tab in it, and terminal.quick
+	// and terminal.cycle act on it (commands_terminal_quick.go). Nil: no tab, and those two
+	// fail with Unimplemented.
+	Layout layoutstore.Store
 	// RunWait caps that wait (0: DefaultRunWait). When it passes, the command is typed
 	// anyway: a shell that has printed nothing yet still runs it, only echoed twice.
 	RunWait time.Duration
@@ -88,7 +93,8 @@ const notInProject = "is not inside a registered project"
 
 // RegisterTerminal registers terminal.new, terminal.list, terminal.close, terminal.kill,
 // terminal.remove, and the shell window's terminal.new-free, terminal.reset and
-// terminal.rerun (commands_terminal_shell.go).
+// terminal.rerun (commands_terminal_shell.go), and terminal.quick and terminal.cycle
+// (commands_terminal_quick.go).
 func RegisterTerminal(r *Registry, d TerminalDeps) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextTerminal, ID: TerminalID, Description: "Terminal id" + IDHelp}
 	r.SetIDLister(TerminalID, terminalIDs(d.Terminal))
@@ -173,6 +179,12 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				msg := "created terminal " + t.GetId()
 				if a.Bool("quick") {
 					msg = "created thread " + owner.thread + "'s quick terminal " + t.GetId()
+				} else {
+					tab, err := openTerminalTab(ctx, d, c, owner.thread, t.GetId())
+					if err != nil {
+						return Result{}, err
+					}
+					msg += tab
 				}
 				if run != "" {
 					if err := typeRun(ctx, d, t.GetId(), run); err != nil {
@@ -269,7 +281,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				return Result{Message: "removed terminal " + id}, nil
 			},
 		},
-	}, shellWindowTerminalCommands(d, idArg, quick)...)...)
+	}, append(shellWindowTerminalCommands(d, idArg, quick), terminalLayoutCommands(d, quick)...)...)...)
 }
 
 // runInput is terminal.new --run's value as the text to enter: CRLF becomes LF and

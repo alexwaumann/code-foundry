@@ -140,7 +140,11 @@ func threadLabel(s *v1.Thread) string {
 // thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive,
 // thread.snooze, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md).
-func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
+func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...ThreadLifecycleOption) error {
+	var o threadLifecycleOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(
 		Command{
@@ -185,6 +189,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				createdFocusArg,
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
 					"in the last 24 hours prints the thread made then and starts nothing"},
+				composeArg,
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
@@ -268,6 +273,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					// thread (like, or the creating one) works in worktrees.
 					req.CheckoutMode = true
 				}
+				if err := o.checkComposer(a.String("compose")); err != nil {
+					return Result{}, err
+				}
 				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {
 					return Result{}, err
@@ -280,6 +288,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				focusCreated(e, a, s)
 				msg := createdMessage(req, res.Msg, r.projectNamer(ctx))
+				if err := o.sentFrom(ctx, c, a.String("compose"), s.GetId()); err != nil {
+					return Result{}, fmt.Errorf("%s, but its tab could not take the composer's place: %w", msg, err)
+				}
 				if req.GetNotify() {
 					msg += "; " + notifyLine(req)
 				}

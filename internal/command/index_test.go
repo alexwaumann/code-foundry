@@ -19,6 +19,8 @@ import (
 //     pane.move.<direction>, pane.split, tab.next, tab.previous; a model names panes and tabs
 //     by id with pane.move and tab.move), focusing a pane (pane.focus: a model never takes
 //     the focus unasked) and reordering the top bar (space.move).
+//   - The shell window's terminal keys (terminal.quick, terminal.cycle): the user's view; a
+//     model starts shells with terminal.new.
 //   - The shell's composer and its drafts (composer.new, composer.draft.*): a model starts
 //     threads with thread.new.
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
@@ -28,6 +30,7 @@ var noIndex = []string{
 	"composer.draft.start", "composer.history", "composer.new", "file.export",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.move.down",
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.next", "tab.previous",
+	"terminal.cycle", "terminal.quick",
 	"thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
 	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.workspace",
 	"view.thread-info", "worktree.editors",
