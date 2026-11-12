@@ -475,6 +475,9 @@ export interface Invocation {
   at: string;
 }
 
+/** --pane of terminal.new and terminal.new-free: the pane's "+" menu (internal/command terminalPaneArg). */
+const TERMINAL_PANE_ARG = { name: "pane", type: ArgType.STRING, required: false, description: "Open the terminal's tab in this pane (the pane's + menu) instead of placing it" };
+
 /** A destructive command invoked without confirmed=true (FailedPrecondition + detail). */
 export class ConfirmNeeded extends Error {
   constructor(
@@ -3231,10 +3234,10 @@ export class World {
 
   // ---- Terminals in the window shell's layout (the daemon's glue, internal/daemon/layout.go) ----
 
-  /** A new shell's tab (internal/command openTerminalTab): linked to its thread and placed beside it, else in the focused pane; the user's call takes the focus. */
-  openTerminalTab(id: string, thread: string): void {
+  /** A new shell's tab (internal/command openTerminalTab): linked to its thread and placed beside it, else in the focused pane, or in `pane` (the "+" menu's); the user's call takes the focus. */
+  openTerminalTab(id: string, thread: string, pane = ""): void {
     try {
-      this.layout.apply({ op: "open_surface", tab: { id: "", kind: "terminal", ...(thread ? { thread } : {}), params: { terminal: id } }, focus: true });
+      this.layout.apply({ op: "open_surface", ...(pane ? { pane } : {}), tab: { id: "", kind: "terminal", ...(thread ? { thread } : {}), params: { terminal: id } }, focus: true });
     } catch {
       // No layout to open it in: the shell still runs, as the daemon's does.
     }
@@ -4064,6 +4067,7 @@ export class World {
           args: [
             { name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" },
             { name: "run", type: ArgType.STRING, required: false, description: "A command line typed into the new shell once it has printed its prompt, then Return" },
+            TERMINAL_PANE_ARG,
           ],
         },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
@@ -4078,7 +4082,7 @@ export class World {
           if (fail !== null) throw new CommandError("unavailable", fail);
           const keys = runKeys(args.run ?? "");
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
-          this.openTerminalTab(t.id, owner.labels[LABEL_THREAD] ?? "");
+          this.openTerminalTab(t.id, owner.labels[LABEL_THREAD] ?? "", args.pane ?? "");
           const resultJson = JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels });
           if (keys === "") return { message: `created terminal ${t.id}`, resultJson };
           // Like the daemon: the shell is listed at once, and the command is typed once it
@@ -4096,13 +4100,13 @@ export class World {
           description: "Start a shell in the home folder, owned by nothing.",
           noPalette: true,
           keybindings: [],
-          args: [],
+          args: [TERMINAL_PANE_ARG],
         },
         when: always,
         // Like the daemon: a free shell (kind shell, no owner labels), in the home directory.
-        run: () => {
+        run: (_ctx, args) => {
           const t = this.create(["/bin/zsh"], HOME, { [LABEL_KIND]: KIND_SHELL }, "shell");
-          this.openTerminalTab(t.id, "");
+          this.openTerminalTab(t.id, "", args.pane ?? "");
           return Promise.resolve({ message: `created terminal ${t.id} in ${HOME}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
         },
       },
@@ -4807,6 +4811,29 @@ export class World {
           if (!t) throw new CommandError("unavailable", "no active terminal");
           this.remove(t.id);
           return `Removed ${t.id}`;
+        },
+      },
+      {
+        // internal/command commands_ui.go: the terminal's tab takes the focus, opened (in --pane, else
+        // by the rules) when it has none; the classic window gets FocusTerminal. The quick slot is not ported.
+        cmd: {
+          name: "ui.focus.terminal",
+          title: "Focus Terminal",
+          category: "View",
+          description: "Show a terminal in every connected window: the shell window focuses its tab, opening it by the placement rules when it is closed (--pane: in that pane).",
+          noPalette: true,
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: true, description: "Terminal id" },
+            { name: "pane", type: ArgType.STRING, required: false, description: "A terminal with no tab opens it in this pane" },
+          ],
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const t = this.term(args.id ?? "");
+          this.openTerminalTab(t.id, t.labels[LABEL_THREAD] ?? "", args.pane ?? "");
+          this.intents.publish({ intent: { case: "focusTerminal", value: { terminalId: t.id } } });
+          return `terminal ${t.id} has the focus`;
         },
       },
       {
