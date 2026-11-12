@@ -20,6 +20,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -57,6 +58,8 @@ type EventsDeps struct {
 	Themes ThemeStore
 	// Search is agent search's activity, for the sidebar's search row.
 	Search SearchActivitySource
+	// Layout is the window shell's layout.
+	Layout layout.Store
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -140,7 +143,7 @@ type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: project, workspace, terminal, thread, thread, gh, gitops, theme, settings,
-// update, action, plugin, skill, memory, search),
+// update, action, plugin, skill, memory, search, layout),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -187,6 +190,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Search != nil {
 		out = append(out, searchSource{store: d.Search, bus: d.Bus}) // api/search_events.go
+	}
+	if d.Layout != nil {
+		out = append(out, layoutSource{store: d.Layout, bus: d.Bus}) // api/layout_events.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out

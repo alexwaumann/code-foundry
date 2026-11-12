@@ -46,6 +46,8 @@ type Client struct {
 	Dictation codefoundryv1connect.DictationServiceClient
 	// Search is for the CLI's `search agent`, which streams a search's progress.
 	Search codefoundryv1connect.SearchServiceClient
+	// Layout reads and changes the window shell's layout (LayoutService).
+	Layout codefoundryv1connect.LayoutServiceClient
 }
 
 // New returns a client for the daemon at p's Unix socket. It does not touch the
@@ -73,6 +75,7 @@ func newClient(hc *http.Client, baseURL string) *Client {
 		Plugin:    codefoundryv1connect.NewPluginServiceClient(hc, baseURL),
 		Dictation: codefoundryv1connect.NewDictationServiceClient(hc, baseURL),
 		Search:    codefoundryv1connect.NewSearchServiceClient(hc, baseURL),
+		Layout:    codefoundryv1connect.NewLayoutServiceClient(hc, baseURL),
 	}
 }
 

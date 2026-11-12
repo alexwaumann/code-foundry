@@ -24,6 +24,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -129,6 +130,9 @@ type stores struct {
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
+	// layout is the window shell's layout (spaces, panes, tabs); it reads no other store.
+	// Closed before the db, writing a focus change still waiting.
+	layout *layout.Manager
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -169,6 +173,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	if s.home, err = fsx.HomeRoot(); err != nil {
+		return nil, err
+	}
+	if s.layout, err = layout.New(ctx, layout.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "layout")}); err != nil {
 		return nil, err
 	}
 	if s.project, err = project.Start(ctx, project.Options{
@@ -490,6 +497,11 @@ func (s *stores) close() error {
 	}
 	if s.project != nil {
 		errs = append(errs, s.project.Close())
+	}
+	if s.layout != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		errs = append(errs, s.layout.Close(closeCtx))
+		cancel()
 	}
 	if s.db != nil {
 		errs = append(errs, s.db.Close())
