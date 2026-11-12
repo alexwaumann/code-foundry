@@ -4,6 +4,7 @@ import { daemon, type DaemonConnection } from "./endpoint";
 import { HEARTBEAT, isPageFocused, isPageVisible, type Heartbeat } from "./stream";
 import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
+import { toLayoutEventView, type LayoutEventView } from "./layout";
 import { toMemoryEventView, type MemoryEventView } from "./memory";
 import { toSearchActivityView, type SearchActivityView } from "./search";
 import { toPluginEventView, type PluginEventView } from "./plugin";
@@ -40,7 +41,8 @@ export type EventView =
   | { source: "skill"; event: SkillEventView }
   | { source: "memory"; event: MemoryEventView }
   | { source: "search"; event: SearchActivityView }
-  | { source: "theme"; event: ThemesSnapshotView };
+  | { source: "theme"; event: ThemesSnapshotView }
+  | { source: "layout"; event: LayoutEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -101,6 +103,10 @@ export function toEventView(ev: Event): EventView | null {
       return { source: "search", event: toSearchActivityView(e.value) };
     case "theme":
       return { source: "theme", event: toThemeEventView(e.value) };
+    case "layout": {
+      const v = toLayoutEventView(e.value);
+      return v && { source: "layout", event: v };
+    }
     default:
       return null;
   }
@@ -133,6 +139,14 @@ interface Watching {
 }
 
 let watching: Watching | null = null;
+
+/**
+ * The open stream's client id ("" while none is open): a LayoutService call sends it, so the
+ * layout source tags the commits this window made.
+ */
+export function currentClientId(): string {
+  return watching?.id ?? "";
+}
 let reports: Promise<void> = Promise.resolve();
 
 /** A fresh client id per stream (getRandomValues works outside secure contexts too). */

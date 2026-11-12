@@ -12,6 +12,7 @@ import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { useHealthStore } from "./health";
 import { applyIntent } from "./intents";
+import { applyLayoutEvent } from "./layout";
 import { applyMemoryEvent } from "./memory";
 import { applySearchActivity } from "./searchActivity";
 import { applyThemeEvent } from "./themes";
@@ -24,6 +25,7 @@ import { applyTerminalEvent, replaceTerminals, useTerminalsStore } from "./termi
 import { applyThreadSourceEvent, prunePageModals, pruneThreadLogs } from "./thread";
 import { applyUpdateEvent } from "./update";
 import { applyWorkspaceEvent, useWorkspacesStore } from "./workspaces";
+import { shellOn } from "@/shell/flag";
 import { applyProjectEventToDetails } from "./worktreeDetail";
 
 interface EventsState {
@@ -109,6 +111,10 @@ const handlers: Handlers = {
   search: applySearchActivity,
   // The user's own themes (stores/themes.ts; src/themes resolves them).
   theme: applyThemeEvent,
+  // The window shell's layout (stores/layout.ts); the classic window ignores it.
+  layout: (ev) => {
+    if (shellOn()) applyLayoutEvent(ev);
+  },
 };
 
 const taps = new Set<(ev: EventView) => void>();
