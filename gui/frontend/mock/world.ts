@@ -39,6 +39,7 @@ import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
 import { MockLayout } from "./layout";
+import { layoutCommands } from "./layoutVerbs";
 import { MockMemory } from "./memory";
 import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
@@ -4973,6 +4974,7 @@ export class World {
       }),
       ...projectCommands(this),
       ...renameCommands(this),
+      ...layoutCommands({ layout: this.layout, hasThread: (id) => this.threads.has(id) }),
       {
         cmd: { name: "view.settings", title: "Settings", category: "View", description: "Show the settings page, or close it where it already shows", keybindings: ["cmd+,"], args: [] },
         when: always,
