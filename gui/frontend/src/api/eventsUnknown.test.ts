@@ -8,7 +8,8 @@ import { toEventView } from "./events";
 // A GUI drops an event kind it does not map, so a daemon may add a source before the GUI
 // reads it (docs/notes/shell-plan.md section 2.12).
 describe("toEventView with an event kind the GUI does not map", () => {
-  it("drops the layout source's events, which this GUI does not read yet", () => {
+  it("drops a layout event whose change this build does not know", () => {
+    // A LayoutEvent with no snapshot and no delta: what a newer daemon's new change kind reads as.
     const ev = create(EventSchema, { seq: 7n, event: { case: "layout", value: create(LayoutEventSchema, { rev: 3n }) } });
     expect(toEventView(fromBinary(EventSchema, toBinary(EventSchema, ev)))).toBeNull();
   });
