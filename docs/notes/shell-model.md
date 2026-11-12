@@ -33,6 +33,11 @@ when the first working version is whole. Nothing partial is released.
   only a name that is cut off. Tabs go icon-only when the strip is tight. What a surface repeats in
   its own body is decided per surface; do not stack a second title band under the strip by default.
 - **Pull Requests and Projects are surfaces**, not sidebar rows. One of each per space.
+- **New thread** opens a composer tab, which becomes the thread's tab when the first message is
+  sent. A space with no panes draws the home composer.
+- **Removing a space** always drops its tabs and panes and ends its unlinked terminals. A dialog asks
+  what to do with its threads: move them to another space (they appear in that sidebar, nothing
+  opens) or archive them all. The last space cannot be removed.
 - **A pane's "+"** opens a menu of surfaces, built with the app's existing dropdown and submenu
   components. With a thread tab active it has a submenu for that thread's surfaces, then the general
   ones (new thread, terminal, Pull Requests, Projects). Without a thread it has only the general
@@ -71,7 +76,14 @@ when the first working version is whole. Nothing partial is released.
      column), at the surface type's default size.
   6. Otherwise: a tab in the thread's own pane.
   In 3 and 4, a pane that already holds a linked tab of this thread wins, then the nearest. A pane
-  that is joined is never resized. "Room" means the conversation keeps at least 480px of width.
+  that holds a thread tab never counts as "holding linked surfaces". A pane that is joined is never
+  resized. "Room" means the conversation keeps at least 480px of width. Terminal tabs follow these
+  same rules: there is no separate rule for terminals and no "below" default.
+- **Where a thread's own tab opens** (a sidebar click, the CLI, a new thread): the focused pane if
+  its active tab is a thread; otherwise the most recently focused pane that holds a thread tab;
+  otherwise a new pane.
+- **A surface that belongs to no thread** (a checkout's diff opened from Projects, a pull request
+  opened from Pull Requests) opens as an unlinked tab in the pane of the page it was opened from.
 - **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
   surface of the same type switches to this thread's, if that one is already open in that pane.
   Nothing is opened, moved or closed. On by default; a user setting.
@@ -99,12 +111,14 @@ when the first working version is whole. Nothing partial is released.
 - **Terminal tabs** are named by what runs in them, with an icon; idle, by shell and folder. A manual
   name sticks until the automatic name is asked for again.
 - A terminal restored after a snooze shows its idle name and one line with the last command and
-  "Run again". It never reruns by itself.
+  "Run again". It never reruns by itself. The last command is the foreground job's command line as
+  the process list gives it; there is no shell integration.
 
 ## Sidebar
 
 - Sections, in order: **Needs you**, **Active**, then **Working**, **Snoozed** and **Archived** at
-  the bottom as today. A click on a thread always adds a tab (or focuses it when it is open).
+  the bottom as today. A click on a thread always adds a tab (or focuses it when it is open). Active
+  keeps today's order (pinned, then finished, then idle) and Pin stays in the row's menu.
 - **Thread row.** Line 1: project on the left, status or time on the right; on hover the snooze and
   archive controls take that slot. Then the title at full width, up to two lines. Then the branch,
   with the pull request tag and the counts right-aligned. A thread with no project has no third line
@@ -157,11 +171,14 @@ meaning of cmd+shift+[ and ] (previous and next thread).
 ## State
 
 Spaces, pane trees, tabs and each thread's remembered set live in the daemon, so the CLI and a
-thread's model can read and change a layout. Every user action is a command.
+thread's model can read and change a layout. Every user action is a command. The model-facing verbs
+are named `view.open.*`; today's `view.panel.<item>` verbs stay as unlisted aliases for one stable
+release.
 
 ## First load for an existing user
 
-One space. Only the thread last viewed opens, with its side panel tabs and terminals placed by the
+One space. Only the thread last viewed opens (the persisted selection when there is one, otherwise
+the thread with the newest user message), with its side panel tabs and terminals placed by the
 rules. Every other thread stays closed in the sidebar with its old panel tabs and terminals stored as
 its remembered set. Running terminals keep running: a thread's first bottom terminal becomes its
 quick terminal and the others become linked terminal tabs.
@@ -171,3 +188,13 @@ quick terminal and the others become linked terminal tabs.
 Thread colours, drawers inside a thread pane, panes that follow focus, replacing a tab on a sidebar
 click, a file browser surface, content search across files, and the surface contract for plugins
 beyond the identity rule above.
+
+## Build
+
+The plan, the pull request stack and the test plan are in `docs/notes/shell-plan.md`. Where the plan
+and this file disagree, this file wins. The interactive toy the plan mentions is a reference for
+algorithms only; where it differs from this file (it placed terminals below and by family), this
+file wins. `shell-plan.md` is removed before the merge to `main`.
+
+Open: whether closing a linked terminal's tab by itself ends the terminal (plan question 6).
+
