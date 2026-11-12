@@ -3981,10 +3981,11 @@ export class World {
           keybindings: [],
           args: [],
         },
+        when: always,
         // Like the daemon: a free shell (kind shell, no owner labels), in the home directory.
         run: () => {
           const t = this.create(["/bin/zsh"], HOME, { [LABEL_KIND]: KIND_SHELL }, "shell");
-          return { message: `created terminal ${t.id} in ${HOME}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) };
+          return Promise.resolve({ message: `created terminal ${t.id} in ${HOME}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
         },
       },
       {
