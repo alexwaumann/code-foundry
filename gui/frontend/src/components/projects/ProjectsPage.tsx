@@ -1,6 +1,6 @@
 import { Folders } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { keyOf } from "@/stores/panel";
+import { targetOf } from "@/shell/host";
 import { isProjectsView, useUiStore } from "@/stores/ui";
 import { ProjectPage } from "./ProjectPage";
 import { ProjectsIndex } from "./ProjectsIndex";
@@ -15,7 +15,7 @@ import { WorkspacePage } from "./WorkspacePage";
 export function ProjectsPage() {
   const projectId = useUiStore((s) => (isProjectsView(s.selection) ? (s.selection.projectId ?? "") : ""));
   const workspaceId = useUiStore((s) => (isProjectsView(s.selection) ? (s.selection.workspaceId ?? "") : ""));
-  const pageKey = useUiStore((s) => keyOf(s.selection) ?? "view:projects");
+  const pageKey = useUiStore((s) => targetOf(s.selection) ?? "view:projects");
   if (projectId) return <ProjectPage key={pageKey} projectId={projectId} pageKey={pageKey} />;
   if (workspaceId) return <WorkspacePage key={pageKey} workspaceId={workspaceId} pageKey={pageKey} />;
   return <ProjectsIndex key={pageKey} pageKey={pageKey} />;

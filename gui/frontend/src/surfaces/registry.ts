@@ -5,7 +5,7 @@
  * hotkeys and availability through these lookups, never by switching on the kind.
  */
 import { useCallback, useSyncExternalStore } from "react";
-import type { SurfaceKind } from "@/stores/panel";
+import type { SurfaceKind } from "@/shell/host";
 import { diffSurface } from "./diff";
 import { emberSurface } from "./ember";
 import { filesSurface } from "./files";

@@ -6,7 +6,7 @@ import { REFRESH_DEBOUNCE_MS, useOnWindowVisible, useTabRead, useThrottled, useW
 import { Button } from "@/components/ui/button";
 import { useHeight, useWidth } from "@/lib/useWidth";
 import { openDiffInPanel } from "@/stores/filePanel";
-import { retitlePanelTab, setPanelTabParams } from "@/stores/panel";
+import { retitleTab, setTabParams } from "@/shell/host";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
 import { diffTab, FROM_THREAD, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
 import { CommitBand } from "./CommitBand";
@@ -80,7 +80,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const compareName = view ? diffTitle(view, { branch, remotes, ...place }) : "";
   const named = target.heading ? inProject(target.heading, place) : !view ? tabTitle : target.thread ? `${FROM_THREAD} · ${compareName}` : compareName;
   useEffect(() => {
-    if (named !== tabTitle) retitlePanelTab("current", tabId, named);
+    if (named !== tabTitle) retitleTab("current", tabId, named);
   }, [named, tabTitle, tabId]);
 
   const go = useCallback(
@@ -92,7 +92,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   // What the tab keeps as it is used: nothing about that opens or activates it.
   const keep = useCallback(
     (t: Partial<DiffTarget>) => {
-      setPanelTabParams("current", tabId, diffTab({ ...target, ...t }).params);
+      setTabParams("current", tabId, diffTab({ ...target, ...t }).params);
     },
     [target, tabId],
   );

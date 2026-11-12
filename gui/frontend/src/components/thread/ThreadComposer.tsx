@@ -34,7 +34,7 @@ const SETUP_PLACEHOLDER = "Add to your message. It goes in once Claude starts.";
 const BLOCKING_PLACEHOLDER = "You can reply once Claude has started.";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
-import { getPanel } from "@/stores/panel";
+import { tabPlace } from "@/shell/host";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -242,8 +242,8 @@ export function ThreadComposer({
     // prompt, not the palette input closing over it), else on the next frame (a composer
     // just mounted: its editor may still be replaced).
     const attempt = (): boolean => {
-      const panel = getPanel();
-      if (panel.open && panel.expanded) {
+      const tabs = tabPlace();
+      if (tabs.shown && tabs.expanded) {
         useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
         return true;
       }

@@ -6,7 +6,7 @@ import { useCommandsStore } from "@/stores/commands";
 import { allSurfaces, usePluginsStore } from "@/stores/plugins";
 import { pluginSurfaceSpec, showAvailability } from "@/surfaces/plugin";
 import type { SurfaceContext } from "@/surfaces/registry";
-import type { GroupIndex } from "@/stores/panel";
+import type { TabGroup } from "@/shell/host";
 import type { Selection } from "@/stores/ui";
 
 function subscribe(onChange: () => void): () => void {
@@ -34,7 +34,7 @@ function useAvailableSurfaces(sel: Selection): string {
  * naming the plugin. Only available ones are listed; with none, nothing (no divider).
  * They open in `group` (the group whose list this is).
  */
-export function PluginSurfaceRows({ ctx, group }: { ctx: SurfaceContext; group?: GroupIndex }) {
+export function PluginSurfaceRows({ ctx, group }: { ctx: SurfaceContext; group?: TabGroup }) {
   const kinds = useAvailableSurfaces(ctx.selection);
   const rows = kinds ? kinds.split("\u0001").map((r) => r.split("\u0000") as [string, string]) : [];
   if (rows.length === 0) return null;

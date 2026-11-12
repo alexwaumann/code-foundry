@@ -10,7 +10,7 @@
 import { toast } from "sonner";
 import { isPluginLabels } from "@/lib/termlabel";
 import { activeTabOf, bottomKeyOf, bottomTabIds, bottomVisible, forgetShown, openOn, requestBottomFocus, updateBottom, useBottomStore } from "./bottomPanel";
-import { keyOf, usePanelStore } from "./panel";
+import { targetOf, useTabPlace } from "@/shell/host";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
@@ -43,10 +43,8 @@ export function useInVisibleBottom(id: string): boolean {
   const key = useUiStore((s) => bottomKeyOf(s.selection));
   const open = useBottomStore((s) => (key === null ? false : (s.byKey[key]?.open ?? false)));
   const remembered = useBottomStore((s) => (key === null ? undefined : s.byKey[key]?.activeTerminalId));
-  const sideExpanded = usePanelStore((s) => {
-    const k = keyOf(useUiStore.getState().selection);
-    return k !== null && (s.byKey[k]?.open ?? false) && (s.byKey[k]?.expanded ?? false);
-  });
+  const sideKey = useUiStore((s) => targetOf(s.selection));
+  const sideExpanded = useTabPlace(sideKey, (p) => p.shown && p.expanded);
   const active = useTerminalsStore((s) => (key === null ? null : activeTabOf(remembered === undefined ? { open: true } : { open: true, activeTerminalId: remembered }, bottomTabIds(s, key))));
   return bottomVisible(key, open, sideExpanded) && active === id;
 }

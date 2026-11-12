@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import type { SurfaceKind, Tab } from "@/stores/panel";
+import type { SurfaceKind, Tab } from "@/shell/host";
 import type { Selection } from "@/stores/ui";
 
 /** Whether a surface can be opened for a selection: listed and clickable, dimmed, or not listed. */
@@ -9,7 +9,7 @@ export type SurfaceAvailability = "enabled" | "disabled" | "hidden";
 /** What a surface sees when deciding availability and its default tab. */
 export interface SurfaceContext {
   selection: Selection;
-  /** The panel key of `selection` (stores/panel.ts keyOf). */
+  /** The panel key of `selection` (shell/host.ts targetOf). */
   panelKey: string;
 }
 
@@ -23,7 +23,7 @@ export interface Subscribable {
  * listing it in registry.ts; components look specs up by kind, never switch on it.
  */
 export interface SurfaceSpec {
-  /** Unique across the registry; also the tab id prefix (stores/panel.ts tabId). */
+  /** Unique across the registry; also the tab id prefix (shell/host.ts tabId). */
   kind: SurfaceKind;
   title: string;
   icon: LucideIcon;

@@ -17,7 +17,7 @@ import { blankFile, canEdit, readFile, versionStamp, writeFile, type FileReadVie
 import { errorMessage } from "@/api/stream";
 import { draftText, forgetDraft, loadCodeEditor, type EditorHandle, type EditorPlace } from "@/lib/codeEditor";
 import { deepActiveElement } from "@/lib/keyTarget";
-import { activeTab, allTabs, focusedGroup, getPanel, groupOf, keyOf, setPanelTabParam, usePanelStore, type PanelEntry, type Tab } from "./panel";
+import { findTab, groupOfTab, setTabParams, shownTab, subscribeTabs, tabPlace, targetOf, type Tab, type TabPlaces } from "@/shell/host";
 import { useUiStore } from "./ui";
 
 /** What is wrong with the draft's baseline: the file was changed, or is gone. */
@@ -171,8 +171,8 @@ export function editorHasKeyboard(panelKey: string, tabId: string): boolean {
   const at = editorWithFocus();
   const s = at === null ? undefined : session(at);
   if (s?.panelKey !== panelKey || s.tabId === tabId) return false;
-  const e = getPanel(panelKey);
-  return groupOf(e, s.tabId) === (groupOf(e, tabId) ?? focusedGroup(e));
+  const p = tabPlace(panelKey);
+  return groupOfTab(p, s.tabId) === (groupOfTab(p, tabId) ?? p.focused);
 }
 
 /** The session whose editor the user was in: the palette's, while it covers the window. */
@@ -205,20 +205,20 @@ function end(key: string): void {
 
 // A tab can go without closeTab: whatever removes it, its draft goes with it. Putting a
 // thread away is not one of those: resetThreadPanels keeps dirty tabs (unsavedTabs).
-function prune(byKey: Readonly<Record<string, PanelEntry>>): void {
+function prune(places: TabPlaces): void {
   for (const [key, s] of Object.entries(useFileEditStore.getState().sessions)) {
-    const entry = byKey[s.panelKey];
-    if (s.panelKey !== "" && !(entry && allTabs(entry).some((t) => t.id === s.tabId))) end(key);
+    const place = places[s.panelKey];
+    if (s.panelKey !== "" && !place?.tabs.some((t) => t.id === s.tabId)) end(key);
   }
 }
 
-usePanelStore.subscribe((s) => {
-  prune(s.byKey);
+subscribeTabs((places) => {
+  prune(places);
 });
 
 /** The panel's tabs holding unsaved edits, which must survive a reset of the panel. */
-export function unsavedTabs(panelKey: string, entry: PanelEntry): readonly Tab[] {
-  return allTabs(entry).filter((t) => session(fileEditKey(panelKey, t.id))?.dirty === true);
+export function unsavedTabs(panelKey: string, tabs: readonly Tab[]): readonly Tab[] {
+  return tabs.filter((t) => session(fileEditKey(panelKey, t.id))?.dirty === true);
 }
 
 /** The panel's thread was removed: nothing can reach its drafts again. Removing is the user's explicit word, so they go. */
@@ -369,7 +369,7 @@ export function noteEditFailure(key: string, failure: string): void {
 
 /** The request standing on a session's tab, by its id (surfaces/fileTarget.ts FileAsk). */
 function askIdOf(s: FileEdit): string | undefined {
-  return allTabs(getPanel(s.panelKey)).find((t) => t.id === s.tabId)?.params.askId;
+  return findTab(s.panelKey, s.tabId)?.params.askId;
 }
 
 export type SaveOutcome = "saved" | "conflict" | "failed" | "skipped";
@@ -405,7 +405,7 @@ export async function saveFile(key: string, opts: { force?: boolean } = {}): Pro
   try {
     const r = await writeFile(s.base, s.path, text, view, how);
     clock += 1;
-    if (!r.conflict && ask !== undefined && askIdOf(s) === ask) setPanelTabParam(s.panelKey, s.tabId, "askSaved", versionStamp(r));
+    if (!r.conflict && ask !== undefined && askIdOf(s) === ask) setTabParams(s.panelKey, s.tabId, (params) => ({ ...params, askSaved: versionStamp(r) }));
     const now = current();
     if (!now) {
       patch(key, { busy: false, readsFrom: clock });
@@ -506,10 +506,10 @@ export function editorOpening(key: string, stateKey: string): void {
 export function focusedEdit(): string | null {
   const focused = editorInUse();
   if (focused !== null) return focused;
-  const panelKey = keyOf(useUiStore.getState().selection);
+  const panelKey = targetOf(useUiStore.getState().selection);
   if (panelKey === null) return null;
-  const entry = getPanel(panelKey);
-  const tab = entry.open ? activeTab(entry) : null;
+  const place = tabPlace(panelKey);
+  const tab = place.shown ? shownTab(place) : null;
   const key = tab ? fileEditKey(panelKey, tab.id) : null;
   return key !== null && editors.has(key) ? key : null;
 }

@@ -9,7 +9,7 @@ import type { CheckoutChanges, FinderCheckout } from "@/lib/fileFinder";
 import { normalizePath } from "@/lib/filePath";
 import { isUnplaced } from "@/lib/threadSetup";
 import { FILE_KIND } from "@/surfaces/fileTarget";
-import { usePanelStore } from "@/stores/panel";
+import { useTabPlace } from "@/shell/host";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
@@ -86,9 +86,8 @@ export function useCheckoutChanges(checkouts: readonly FinderCheckout[], git: Re
 
 /** Absolute paths of a panel's File tabs (normalized), in either group. */
 export function useOpenFilePaths(panelKey: string): ReadonlySet<string> {
-  const joined = usePanelStore((s) =>
-    (s.byKey[panelKey]?.groups ?? [])
-      .flatMap((g) => g.tabs)
+  const joined = useTabPlace(panelKey, (p) =>
+    p.tabs
       .filter((t) => t.kind === FILE_KIND && t.params.path)
       .map((t) => normalizePath(t.params.path ?? ""))
       .join("\n"),

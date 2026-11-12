@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
-import { retitlePanelTab, useCurrentPanelKey, type Tab } from "@/stores/panel";
+import { retitleTab, useCurrentTarget, type Tab } from "@/shell/host";
 import { surfaceManifestOf, usePluginsStore } from "@/stores/plugins";
 import { chooserKeyOf, startSurfaceWatch, useChoice, useSurfaceEntry, watchKeyOf } from "@/stores/pluginSurfaces";
 import { useUiStore } from "@/stores/ui";
@@ -84,7 +84,7 @@ const downWords: Partial<Record<PluginStateView, string>> = {
  * (PluginSurfaceBody) with the panel's selection, or says the surface is gone.
  */
 export function PluginSurface({ tab }: { tab: Tab }) {
-  const panelKey = useCurrentPanelKey() ?? "";
+  const panelKey = useCurrentTarget() ?? "";
   const watchKey = watchKeyOf(panelKey, tab.id);
   const { plugin, surface } = parseKind(tab.kind);
   const loaded = usePluginsStore((s) => s.loaded);
@@ -109,7 +109,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
   // The view's tab title names the tab in the strip.
   const tabTitle = useSurfaceEntry(watchKey, (e) => e?.view?.header?.tabTitle ?? "");
   useEffect(() => {
-    if (tabTitle) retitlePanelTab(panelKey, tab.id, tabTitle);
+    if (tabTitle) retitleTab(panelKey, tab.id, tabTitle);
   }, [panelKey, tab.id, tabTitle]);
 
   if (!loaded) return <Opening />;

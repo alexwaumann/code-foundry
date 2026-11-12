@@ -4,7 +4,7 @@ import { FileTab } from "@/components/files/FileTab";
 import { fileEditKey, useFileDirty } from "@/stores/fileEdit";
 import { confirmCloseFile } from "@/stores/fileRequest";
 import { lastTabOf } from "@/stores/filePanel";
-import { usePanelStore } from "@/stores/panel";
+import { tabChanges } from "@/shell/host";
 import { FILE_KIND, fileOfTab } from "./fileTarget";
 import { NO_PROJECT_WATCHES, noProjectNow } from "./noProject";
 import type { SurfaceContext, SurfaceSpec } from "./types";
@@ -24,7 +24,7 @@ export const filesSurface: SurfaceSpec = {
   icon: FileText,
   hotkey: "f",
   available: (ctx: SurfaceContext) => (lastTabOf(FILE_KIND, ctx.panelKey) ? "enabled" : noProjectNow(ctx.selection) ? "hidden" : "disabled"),
-  watches: [...NO_PROJECT_WATCHES, usePanelStore],
+  watches: [...NO_PROJECT_WATCHES, tabChanges],
   beforeClose: confirmCloseFile,
   useUnsaved: (panelKey, tab) => useFileDirty(fileEditKey(panelKey, tab.id)),
   waiting: (tab) => (fileOfTab(tab)?.ask ? "A thread asked you to edit this file" : null),

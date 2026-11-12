@@ -558,7 +558,7 @@ describe("a rolled-up terminal", () => {
 
   it("uncovers the panel: a sheet closes and the side panel leaves full width", () => {
     useViewsStore.setState({ settingsOpen: true });
-    usePanelStore.setState({ byKey: { [P]: { open: true, expanded: true } as never } });
+    usePanelStore.setState({ byKey: { [P]: { open: true, groups: [{ tabs: [], activeTabId: null }], expanded: true } } });
     showTerminalIn("dev", P);
     expect(useViewsStore.getState().settingsOpen).toBe(false);
     expect(usePanelStore.getState().byKey[P]?.expanded).toBeFalsy();

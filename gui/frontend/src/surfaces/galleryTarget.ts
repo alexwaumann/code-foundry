@@ -1,12 +1,12 @@
 /**
  * The Gallery surface's tabs (docs/notes/gallery-surface.md). One tab per title: the id comes
- * from the title alone, so opening a title again finds its tab and openTab (stores/panel.ts)
+ * from the title alone, so opening a title again finds its tab and openTab (shell/host.ts)
  * hands it the new images. The images are the daemon's JSON (view.panel.gallery) kept as it
  * came, since a tab's params are strings. Pure.
  */
 import { fileName } from "@/lib/filePath";
 import { plainLine } from "@/lib/plainText";
-import { tabId, type Tab } from "@/stores/panel";
+import { tabId, type Tab } from "@/shell/host";
 
 export const GALLERY_KIND = "gallery";
 

@@ -22,6 +22,7 @@ import {
   useFileEditStore,
 } from "./fileEdit";
 import { confirmCloseFile, presentFileSave } from "./fileRequest";
+import { tabPlace } from "@/shell/host";
 import { closePanelTab, openSurface, usePanelStore, type Tab } from "./panel";
 import { useUiStore } from "./ui";
 
@@ -526,11 +527,10 @@ describe("the tab going", () => {
 
   it("a panel names its dirty tabs, for a reset to keep", async () => {
     await editing();
-    const entry = usePanelStore.getState().byKey[PANEL];
-    if (!entry) throw new Error("no panel");
-    expect(unsavedTabs(PANEL, entry)).toEqual([]);
+    const { tabs } = tabPlace(PANEL);
+    expect(unsavedTabs(PANEL, tabs)).toEqual([]);
     noteDraft(KEY, "a=2\n");
-    expect(unsavedTabs(PANEL, entry)).toEqual([tab]);
+    expect(unsavedTabs(PANEL, tabs)).toEqual([tab]);
   });
 
   it("two panels showing one file have a draft each", async () => {

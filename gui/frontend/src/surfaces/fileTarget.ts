@@ -1,10 +1,10 @@
 /**
  * The File surface's tabs (docs/notes/file-viewer-3-tabs.md). One tab per file: a tab's id
  * comes from the params that name the file, not from the rest (the line to show), so opening
- * the same file again finds its tab and openTab (stores/panel.ts) hands it the new params.
+ * the same file again finds its tab and openTab (shell/host.ts) hands it the new params.
  * Pure.
  */
-import { tabId, type Tab } from "@/stores/panel";
+import { tabId, type Tab } from "@/shell/host";
 import { fileName, resolvePath } from "@/lib/filePath";
 
 export const FILE_KIND = "files";
@@ -54,6 +54,11 @@ export interface FileAsk {
 
 /** The params a File tab's request lives in: dropping them finishes it, for good. */
 export const ASK_PARAMS = ["edit", "askId", "asker", "note", "askSaved"] as const;
+
+/** A tab's params without `names` (for setTabParams). */
+export function withoutParams(names: readonly string[]): (params: Tab["params"]) => Tab["params"] {
+  return (params) => Object.fromEntries(Object.entries(params).filter(([k]) => !names.includes(k)));
+}
 
 /**
  * A File tab: params { project, base, path, line?, page?, title?, edit?, heldFor?, askId?, asker?, note?, askSaved? } with the path made
