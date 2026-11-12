@@ -208,9 +208,10 @@ func TestInitGit(t *testing.T) {
 			if subj := git(t, dir, "log", "--format=%s"); subj != "chore: initial commit" {
 				t.Fatalf("log = %q", subj)
 			}
-			// The watcher is live now: a commit is seen without a refresh.
+			// The routes are a git project's now: a commit is seen without a refresh.
 			git(t, dir, "add", ".")
 			git(t, dir, "commit", "-q", "-m", "todo")
+			h.fsChanged()
 			h.waitFor("commit seen", worktreeUpdated(dir, func(x Worktree) bool { return x.Head != w.Head && !x.Status.Dirty }))
 
 			if _, err := h.store.InitGit(ctx, r.ID); !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "already a git repository") {

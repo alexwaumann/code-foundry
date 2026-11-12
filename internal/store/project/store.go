@@ -82,6 +82,10 @@ type Options struct {
 	TouchDebounce time.Duration
 	// Now returns the current time. Defaults to time.Now.
 	Now func() time.Time
+
+	// streams starts the fs event stream; nil means fseventsSource. Tests set their
+	// own (fakestream_test.go).
+	streams streamSource
 }
 
 // projectMeta is a project's metadata slot, written only by Register, the project's
@@ -173,11 +177,6 @@ type Git struct {
 	// touch debounces Touch, apart from deb and treeDeb so fs events keep their
 	// shorter windows.
 	touch *debouncer
-	// ignoreStream drops the stream's batches (onStream). Tests set it when they count
-	// status runs or feed onEvents themselves: on a busy machine fseventsd delivers
-	// writes made before the stream started (a fixture's git setup) a second or more
-	// after it did, numbered after writes made later.
-	ignoreStream atomic.Bool
 
 	// live is the worktrees with a live thread (SetLiveWorktrees); pollNudge and
 	// fetchNudge wake the tier loops when a project may have turned live (activity.go).
@@ -253,7 +252,7 @@ func Start(ctx context.Context, opts Options) (*Git, error) {
 		g.log.Debug("worktree touched", "path", k.path, "debounced", true)
 		g.sched.request(k)
 	})
-	g.fs = newFSWatcher(g.log, g.streamPaths, g.onStream)
+	g.fs = newFSWatcher(g.log, opts.streams, g.streamPaths, g.onEvents)
 	g.wg.Go(func() { g.fs.run(ctx) })
 	g.wg.Go(g.fs.dispatch)
 	if t := tiers(opts.FetchInterval, opts.IdleFetchInterval, DefaultFetchInterval, DefaultIdleFetchInterval); t.live > 0 {
@@ -1146,18 +1145,13 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 	default:
 		want = map[string]watchTarget{next.Path: {kind: wkPlainRoot, projectID: id, wtPath: next.Path}}
 	}
-	routesChanged := false
 	for dir, t := range g.routes {
 		if t.projectID == id && want[dir] != t {
 			delete(g.routes, dir)
-			routesChanged = true
 		}
 	}
 	for dir, t := range want {
-		if g.routes[dir] != t {
-			g.routes[dir] = t
-			routesChanged = true
-		}
+		g.routes[dir] = t
 	}
 	g.mu.Unlock()
 	g.forgetMade(ctx, listedAt, stale...)
@@ -1165,9 +1159,11 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		g.forgetDetails(id, removed...)
 	}
 
-	if routesChanged {
-		g.fs.sync(ctx) // a worktree root may have appeared outside the stream's paths
-	}
+	// A worktree root may have appeared outside the stream's paths. Synced even when
+	// the routes did not change, so a stream that failed to start is retried; sync
+	// recreates the stream only when its paths differ, so otherwise it costs a
+	// round trip to the watcher's goroutine.
+	g.fs.sync(ctx)
 
 	if metaChanged || setChanged {
 		g.commit(func(s *Snapshot) []Event {

@@ -1073,8 +1073,10 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   edits also feed a files job that publishes the changed, non-ignored paths once per
   tree window (`WorktreeFilesChanged`, not in the snapshot;
   `docs/notes/gh-events-2-worktree-files.md`). Workers write disjoint
-  per-path snapshot pointers. The backstop poll and the background fetch run each
-  project on a live tier (a worktree with a live thread, or a detail asked for in the
+  per-path snapshot pointers. The backstop poll (a reconcile: worktrees, metadata and
+  the stream's paths re-read, then every status, so an event that is late, dropped or
+  never sent leaves nothing stale past one interval; `docs/notes/project-watcher-tests.md`)
+  and the background fetch run each project on a live tier (a worktree with a live thread, or a detail asked for in the
   last 10 minutes: poll and fetch every 2 min) or a slower idle tier (poll 10 min,
   fetch 15 min); threads' edit-tool results and turn ends refresh their worktree's
   status directly, through daemon glue on the thread events

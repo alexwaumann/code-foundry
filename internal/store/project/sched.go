@@ -176,13 +176,27 @@ func (s *scheduler) close() {
 type debouncer struct {
 	mu     sync.Mutex
 	window time.Duration
-	timers map[jobKey]*time.Timer
+	timers map[jobKey]stopper
 	fire   func(jobKey)
 	closed bool
+	// after arms a timer: time.AfterFunc, or a test's clock (setClock).
+	after func(time.Duration, func()) stopper
 }
 
+// stopper is an armed timer.
+type stopper interface{ Stop() bool }
+
 func newDebouncer(window time.Duration, fire func(jobKey)) *debouncer {
-	return &debouncer{window: window, timers: map[jobKey]*time.Timer{}, fire: fire}
+	return &debouncer{window: window, timers: map[jobKey]stopper{}, fire: fire, after: afterFunc}
+}
+
+func afterFunc(d time.Duration, f func()) stopper { return time.AfterFunc(d, f) }
+
+// setClock replaces the timers the debouncer arms from now on (tests).
+func (d *debouncer) setClock(after func(time.Duration, func()) stopper) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.after = after
 }
 
 func (d *debouncer) trigger(k jobKey) {
@@ -191,8 +205,8 @@ func (d *debouncer) trigger(k jobKey) {
 	if d.closed || d.timers[k] != nil {
 		return
 	}
-	var t *time.Timer
-	t = time.AfterFunc(d.window, func() {
+	var t stopper
+	t = d.after(d.window, func() {
 		d.mu.Lock()
 		mine := d.timers[k] == t // false once cancelled (or cancelled and re-armed)
 		if mine {

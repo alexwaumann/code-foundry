@@ -154,7 +154,8 @@ Re-measured with a scratch daemon (`--dev`) after the split:
 
 `TestStreamBurstIsBounded` (2000 files written over ~1.3 s, 200 ms test tree window):
 6 status runs against a cap of `burst/200ms + 3`. The other tests use a 50 ms tree
-window so they stay fast.
+window so they stay fast. (Since replaced by `TestTreeBurstCostsOneStatusPerWindow` on a manual clock, and most
+watcher tests by an event source the test controls: `project-watcher-tests.md`.)
 
 ## Gotchas
 

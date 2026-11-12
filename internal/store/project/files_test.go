@@ -367,12 +367,10 @@ func (h *harness) noFilesEvent(path string, d time.Duration) {
 }
 
 // The files job runs only for live worktrees, drops ignored paths, publishes nothing
-// when all were ignored, and caps the list. Events are fed to onEvents directly, and the
-// stream is ignored: it can deliver this setup's writes seconds late, while live.
+// when all were ignored, and caps the list. Events are fed to onEvents directly.
 func TestFilesEventLiveOnly(t *testing.T) {
 	f := newFixture(t)
 	h := startHarness(t, "", Options{})
-	h.store.ignoreStream.Store(true)
 	r, err := h.store.Register(context.Background(), f.project)
 	if err != nil {
 		t.Fatal(err)
@@ -424,12 +422,15 @@ func TestFilesEventLiveOnly(t *testing.T) {
 }
 
 // Real FSEvents: edits in a live worktree arrive as one files event per window, with
-// gitignored and .git paths left out.
+// gitignored and .git paths left out. This is the test of the files job against real
+// FSEvents flags, which are cumulative (a file written earlier carries a stale
+// ItemCreated); TestFilesEventLiveOnly covers the rest with events it makes itself.
 func TestStreamFilesEvent(t *testing.T) {
 	requireFSEvents(t)
 	f := newFixture(t)
 	const window = 300 * time.Millisecond
-	h := startHarness(t, "", Options{TreeDebounce: window})
+	rec := &streamRecorder{}
+	h := startHarness(t, "", Options{TreeDebounce: window, streams: rec.source})
 	if _, err := h.store.Register(context.Background(), f.project); err != nil {
 		t.Fatal(err)
 	}
@@ -443,6 +444,8 @@ func TestStreamFilesEvent(t *testing.T) {
 	if err := os.Chtimes(filepath.Join(f.project, "README.md"), past, past); err != nil {
 		t.Fatal(err)
 	}
+	rec.waitRunning(t, "the project", func(p []string) bool { return slices.Contains(p, f.project) })
+	rec.catchUp(t, filepath.Join(f.project, ".git"))
 	h.store.SetLiveWorktrees([]string{f.project})
 
 	// Collect every files event until the wanted set has been seen.
@@ -453,6 +456,7 @@ func TestStreamFilesEvent(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(f.project, "sub", "deeper"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	mark := rec.mark()
 	writeFile(t, filepath.Join(f.project, "README.md"), "changed\n")
 	writeFile(t, filepath.Join(f.project, "sub", "deeper", "new.txt"), "n\n")
 	writeFile(t, filepath.Join(f.project, "bin", "x", "out.o"), "ignored\n")
@@ -461,8 +465,13 @@ func TestStreamFilesEvent(t *testing.T) {
 	if err := os.Chtimes(filepath.Join(f.project, "old.txt"), past, past); err != nil {
 		t.Fatal(err)
 	}
+	var paths []string
+	for p := range want {
+		paths = append(paths, filepath.Join(f.project, p))
+	}
+	rec.waitDelivered(t, mark, paths...)
 	got := map[string]FileOp{}
-	deadline := time.After(20 * time.Second)
+	deadline := time.After(10 * time.Second)
 	for len(got) < len(want) || !mapsSubset(want, got) {
 		select {
 		case ev := <-h.sub.C():
@@ -477,7 +486,7 @@ func TestStreamFilesEvent(t *testing.T) {
 				got[c.Path] = c.Op
 			}
 		case <-deadline:
-			t.Fatalf("files seen %v, want %v", got, want)
+			t.Fatalf("FSEvents delivered every path, but the store's files events in 10s after: %v, want %v", got, want)
 		}
 	}
 	for p, op := range want {

@@ -26,7 +26,7 @@ Now each project is **live** or **idle**:
 
 | Loop | Live | Idle | Option (live / idle) |
 |---|---|---|---|
-| Backstop poll (`jobBase`, then status of every worktree) | 2 min | 10 min | `PollInterval` / `IdlePollInterval` |
+| Backstop poll (a reconcile since `project-watcher-tests.md`: worktrees and metadata, then `jobBase` and status of every worktree) | 2 min | 10 min | `PollInterval` / `IdlePollInterval` |
 | `git fetch --prune` | 2 min (`projects.fetch_interval_seconds`) | 15 min | `FetchInterval` / `IdleFetchInterval` |
 
 The idle interval is never shorter than the live one: a fetch interval set above 15 min

@@ -154,22 +154,20 @@ func tierName(live bool) string {
 	return "idle"
 }
 
-// poll is the backstop poll of one project.
+// poll is the backstop poll of one project: a reconcile, which re-lists its worktrees
+// and metadata, re-syncs the stream (retrying one that failed to start), then requests
+// jobBase, which re-resolves the base and refreshes every worktree's status. So nothing
+// the stream should have reported stays stale past a poll interval, whether its event
+// came late, was dropped without a rescan flag (a stream replaced while it held
+// undelivered events), or never came (a stream that failed to start). It also covers
+// ref moves the stream does not route (fsevents-watcher.md), recovers a project in
+// error, and notices .git created in a project without git. The cost is a few small
+// git commands per project per round (worktree list, remote, get-url, symbolic-ref).
 func (g *Git) poll(_ context.Context, id string) {
-	st := g.project(id)
-	if st == nil {
+	if g.project(id) == nil {
 		return
 	}
-	if m := st.meta.Load(); m.Error != "" || !m.Git {
-		// Failed projects have no watches left; retry so a moved-back project recovers.
-		// A project without git has none either: its reconcile is a stat that notices a
-		// .git created outside the app.
-		g.sched.request(jobKey{kind: jobReconcile, projectID: id})
-		return
-	}
-	// Re-resolving the base each round covers ref moves the watcher cannot see;
-	// jobBase then refreshes every worktree's status.
-	g.sched.request(jobKey{kind: jobBase, projectID: id})
+	g.sched.request(jobKey{kind: jobReconcile, projectID: id})
 }
 
 // projectLive reports whether project id has a live worktree at now: one in the live

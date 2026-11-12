@@ -42,8 +42,25 @@ const (
 	eventBuffer = 256
 )
 
+// streamSource starts an event stream over paths that sends its batches on events, and
+// returns the func that stops it. fseventsSource is the store's; tests drive the store
+// through a source they control (fakestream_test.go), so only the tests about FSEvents
+// itself wait on fseventsd.
+type streamSource func(paths []string, events chan []fsevents.Event) (stop func(), err error)
+
+// fseventsSource starts a real FSEvents stream, since now.
+func fseventsSource(paths []string, events chan []fsevents.Event) (func(), error) {
+	es := &fsevents.EventStream{Events: events, Paths: paths, Latency: streamLatency, Flags: streamFlags}
+	if err := es.Start(); err != nil {
+		return nil, err
+	}
+	return es.Stop, nil
+}
+
 type fsWatcher struct {
 	log *slog.Logger
+	// source starts the stream (fseventsSource outside tests).
+	source streamSource
 	// paths returns the stream paths the store wants now.
 	paths func() []string
 	// route handles one batch; it must not block on the watcher.
@@ -54,9 +71,13 @@ type fsWatcher struct {
 	stopped chan struct{} // closed once run has stopped the last stream
 }
 
-func newFSWatcher(log *slog.Logger, paths func() []string, route func([]fsevents.Event)) *fsWatcher {
+func newFSWatcher(log *slog.Logger, source streamSource, paths func() []string, route func([]fsevents.Event)) *fsWatcher {
+	if source == nil {
+		source = fseventsSource
+	}
 	return &fsWatcher{
 		log:     log,
+		source:  source,
 		paths:   paths,
 		route:   route,
 		events:  make(chan []fsevents.Event, eventBuffer),
@@ -68,7 +89,7 @@ func newFSWatcher(log *slog.Logger, paths func() []string, route func([]fsevents
 // run owns the stream until ctx is done.
 func (w *fsWatcher) run(ctx context.Context) {
 	var (
-		cur      *fsevents.EventStream
+		cur      func() // stops the current stream
 		curPaths []string
 	)
 	apply := func() {
@@ -76,17 +97,18 @@ func (w *fsWatcher) run(ctx context.Context) {
 		if slices.Equal(want, curPaths) {
 			return
 		}
-		var next *fsevents.EventStream
+		var next func()
 		if len(want) > 0 {
-			next = &fsevents.EventStream{Events: w.events, Paths: want, Latency: streamLatency, Flags: streamFlags}
-			if err := next.Start(); err != nil {
-				// Leave curPaths unset so the next sync retries; the poll still runs.
+			var err error
+			if next, err = w.source(want, w.events); err != nil {
+				// Leave curPaths unset so the next sync retries (the poll's reconcile
+				// syncs); the poll still refreshes everything meanwhile.
 				w.log.Warn("fsevents stream failed to start", "paths", want, "err", err)
 				return
 			}
 		}
 		if cur != nil {
-			cur.Stop()
+			cur()
 		}
 		cur, curPaths = next, want
 		w.log.Debug("fsevents stream", "paths", want)
@@ -96,7 +118,7 @@ func (w *fsWatcher) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			if cur != nil {
-				cur.Stop()
+				cur()
 			}
 			close(w.stopped)
 			return
@@ -143,15 +165,9 @@ func (g *Git) streamPaths() []string {
 	return streamRoots(g.routes, g.wtRootReal)
 }
 
-// onStream is the route func of the store's watcher.
-func (g *Git) onStream(evs []fsevents.Event) {
-	if !g.ignoreStream.Load() {
-		g.onEvents(evs)
-	}
-}
-
-// onEvents maps a batch of fs events to job keys under
-// one read lock of the routing table, then triggers each key once per debouncer. Edits
+// onEvents is the route func of the store's watcher. It maps a batch of fs events to
+// job keys under one read lock of the routing table, then triggers each key once per
+// debouncer. Edits
 // in a worktree's tree go to treeDeb (1 s), everything else to deb (300 ms). The same
 // key from both routes keeps two independent timers; the scheduler merges the requests.
 // Tree edits in a live worktree are also collected per path for its files job.

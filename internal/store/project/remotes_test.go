@@ -85,7 +85,7 @@ func TestRegisterReportsRemotes(t *testing.T) {
 	}
 }
 
-// Adding or removing a remote rewrites .git/config, which the watcher sees.
+// Adding or removing a remote rewrites .git/config, which the stream reports.
 func TestRemoteChangesAreDetected(t *testing.T) {
 	dir := newLocalProject(t)
 	h := startHarness(t, "", Options{})
@@ -100,11 +100,13 @@ func TestRemoteChangesAreDetected(t *testing.T) {
 		}
 	}
 	git(t, dir, "remote", "add", "origin", "https://github.com/acme/momentum.git")
+	h.fsChanged()
 	ev := h.waitFor("origin added", remotesAre("origin")).(ProjectUpdated)
 	if ev.Project.GitHubSlug != "acme/momentum" {
 		t.Errorf("slug = %q, want acme/momentum", ev.Project.GitHubSlug)
 	}
 	git(t, dir, "remote", "remove", "origin")
+	h.fsChanged()
 	ev = h.waitFor("origin removed", remotesAre()).(ProjectUpdated)
 	if ev.Project.GitHubSlug != "" {
 		t.Errorf("slug = %q after removing origin", ev.Project.GitHubSlug)
