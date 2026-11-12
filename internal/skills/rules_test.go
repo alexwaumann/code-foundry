@@ -45,11 +45,12 @@ var rules = []rule{
 	{note: "control-7-skill-routing", file: entryFile, description: true,
 		says: []string{"version", "model", "effort", "usage", "cost", "worktree", "file", "diff", "html", "chart", "theme", "preference", "remember", `\bprs?\b`}},
 	{note: "control-7-skill-routing", file: entryFile, says: []string{
-		`never .{0,30}skill or command names`, "memory add", `usage\.show`, `view\.panel\.file`, `view\.panel\.diff`, `view\.panel\.pr`,
+		`never .{0,30}skill or command names`, "memory add", `usage\.show`, `view\.open\.file`, `view\.open\.diff`, `view\.open\.pr`,
 		`pr\.create`, `project\.github\.publish`, "--focus", `\.html`, `threads\.default_worktree`, "/model"}},
 	{note: "control-7-skill-routing", file: helpFile, says: []string{
-		// A "show me" is the thread's own panel, with no presence check and no notification.
-		`own .{0,10}side panel`, "--focus", `view\.panel\.file`, `view\.panel\.diff`, `view\.panel\.pr`, `do not ui\.notify`, `ui\.presence`,
+		// A "show me" is a tab beside the thread (shell-7-view-open; it was "your own side panel"),
+		// with no presence check and no notification.
+		`a tab beside you`, "--focus", `view\.open\.file`, `view\.open\.diff`, `view\.open\.pr`, `do not ui\.notify`, `ui\.presence`,
 		`daemon\.capabilities --group panel`, "no window shows",
 		// Settings by the names the user sees, and nothing run before they say yes.
 		"settings page label", "user says yes"}},
@@ -74,8 +75,8 @@ var rules = []rule{
 	// localStorage does not outlive the app.
 	{note: "bridge-fix-storage", file: pagesFile, says: []string{`cf\.storage\(`, `localstorage.{0,40}cleared`}},
 	// A model told the user to paste a key into the file by hand.
-	{note: "file-edit-3-agent", file: entryFile, says: []string{`never ask for it in chat`, `view\.panel\.file.{0,60}--edit`}},
-	{note: "file-edit-3-agent", file: helpFile, says: []string{`view\.panel\.file --edit`}},
+	{note: "file-edit-3-agent", file: entryFile, says: []string{`never ask for it in chat`, `view\.open\.file.{0,60}--edit`}},
+	{note: "file-edit-3-agent", file: helpFile, says: []string{`view\.open\.file --edit`}},
 	// Unthemed pages in the repo, and hand-posted cf:resize.
 	{note: "page-library-fixes-b", file: entryFile, says: []string{"code-foundry-pages skill first", `view\.inline`, `/cf/theme\.css`, `/cf/bridge\.js`, "sizes its card"}},
 	{note: "page-library-fixes-b", file: helpFile, says: []string{"code-foundry-pages skill", `view\.inline`, `/cf/theme\.css`, `/cf/bridge\.js`, "sizes its card"}},
