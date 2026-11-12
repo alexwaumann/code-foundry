@@ -182,7 +182,7 @@ gui/
   build/                   Wails build assets; darwin Taskfile builds the bare GUI executable
 scripts/                   install.sh (embedded in the binary), package.sh, release.sh,
                            next-version.sh, ghostty-vt.sh, whisper-cpp.sh, attest.sh, drive.sh,
-                           guide-eval/
+                           sweep-report.sh, guide-eval/
 docs/                      this file, GETTING-STARTED.md and THEMES.md (embedded by embed.go,
                            package docs, for the help skill), notes/ (decisions and gotchas, a note per step)
 ```

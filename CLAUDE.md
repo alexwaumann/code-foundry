@@ -112,6 +112,8 @@ changed, why, and for a UI change what the app looks like before and after.
 Each push to main gets a sweep: the full suite on the merged tree, one run at a time, each
 covering every merge since the last. A green sweep publishes the tip release from that
 commit; a red one publishes nothing, so main stays red and tips stop until it is fixed.
+A red sweep opens (or comments on) the one issue labelled `main-red`, with the failing
+tests and the pull requests merged since the last green sweep; the next green sweep closes it.
 Fix forward, fast: a red sweep is first checked for a timing flake (fix the test so it
 waits for or controls what it raced, `docs/notes/flaky-ci-tests.md`; never a longer
 timeout, a sleep, a retry or a skip), then for a real break. `make promote` tags the

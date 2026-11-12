@@ -113,6 +113,11 @@ case "${1:-}" in
       -f target_url="https://github.com/${GITHUB_REPOSITORY:-alexwaumann/code-foundry}/blob/main/docs/notes/ci-attest.md"
     echo "attested $sha (tree $head_tree, checked $recorded_at)"
     sync_ci "$sha" || true
+    # The order is attest, then open: a pull request opened first shows a red check
+    # until the re-run above.
+    if ! gh pr view --json number >/dev/null 2>&1; then
+      echo "no pull request for this branch yet; next: gh pr create"
+    fi
     ;;
   *)
     echo "usage: attest.sh start|record|post" >&2
