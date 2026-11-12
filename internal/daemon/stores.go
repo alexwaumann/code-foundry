@@ -81,7 +81,7 @@ type stores struct {
 	memory *memory.Store
 	// themes is the user's colour themes (<home>/themes/, docs/notes/user-themes.md): the
 	// theme.* commands write it, the settings store validates the theme slots against it
-	// (OnChange, before it publishes), ThemeService and EventService watch its snapshots.
+	// (OnChange, before it publishes) and EventService watches its snapshots.
 	// Its watch ends with the daemon's context.
 	themes *usertheme.Store
 	// update checks for and installs new releases (disabled in dev builds).

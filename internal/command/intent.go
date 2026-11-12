@@ -29,8 +29,8 @@ type Emitter interface {
 	Windows() int
 }
 
-// BusEmitter publishes intents as IntentEvent on a bus. UiService.Emit and the ui.*
-// commands share it, so both count the same watchers.
+// BusEmitter publishes intents as IntentEvent on a bus, for the ui.* commands and every
+// other command that steers the GUI.
 type BusEmitter struct {
 	Bus *bus.Bus
 	// CountWindows counts the app windows connected (api.Clients.Windows). Nil: none.

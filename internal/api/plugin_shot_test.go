@@ -25,7 +25,7 @@ func newShotServer(t *testing.T, b *shot.Broker) (codefoundryv1connect.PluginSer
 	bs := bus.New()
 	mux := http.NewServeMux()
 	for _, r := range []Route{
-		NewPlugin(plugintest.New(bs), bs).WithShots(b).Route(),
+		NewPlugin(plugintest.New(bs)).WithShots(b).Route(),
 		NewUI(bs, theme.NewLive(), theme.NewReports()).WithShots(b).Route(),
 	} {
 		mux.Handle(r.Path, r.Handler)

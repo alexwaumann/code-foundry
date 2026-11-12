@@ -53,8 +53,6 @@ const (
 	WorkspaceServiceSetRootProcedure = "/codefoundry.v1.WorkspaceService/SetRoot"
 	// WorkspaceServiceRemoveProcedure is the fully-qualified name of the WorkspaceService's Remove RPC.
 	WorkspaceServiceRemoveProcedure = "/codefoundry.v1.WorkspaceService/Remove"
-	// WorkspaceServiceWatchProcedure is the fully-qualified name of the WorkspaceService's Watch RPC.
-	WorkspaceServiceWatchProcedure = "/codefoundry.v1.WorkspaceService/Watch"
 )
 
 // WorkspaceServiceClient is a client for the codefoundry.v1.WorkspaceService service.
@@ -85,10 +83,6 @@ type WorkspaceServiceClient interface {
 	// not archived runs in it); a rooted one loses only the symlinks (the root is the
 	// user's). Threads that reference it keep running without it.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
-	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot. Subscribing reads every workspace's folder again first (instructions,
-	// skills, links), so hand edits show without a spawn.
-	Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest]) (*connect.ServerStreamForClient[v1.WorkspaceEvent], error)
 }
 
 // NewWorkspaceServiceClient constructs a client for the codefoundry.v1.WorkspaceService service. By
@@ -150,12 +144,6 @@ func NewWorkspaceServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(workspaceServiceMethods.ByName("Remove")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchWorkspacesRequest, v1.WorkspaceEvent](
-			httpClient,
-			baseURL+WorkspaceServiceWatchProcedure,
-			connect.WithSchema(workspaceServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -169,7 +157,6 @@ type workspaceServiceClient struct {
 	setDefaultPrimary *connect.Client[v1.SetWorkspaceDefaultPrimaryRequest, v1.SetWorkspaceDefaultPrimaryResponse]
 	setRoot           *connect.Client[v1.SetWorkspaceRootRequest, v1.SetWorkspaceRootResponse]
 	remove            *connect.Client[v1.RemoveWorkspaceRequest, v1.RemoveWorkspaceResponse]
-	watch             *connect.Client[v1.WatchWorkspacesRequest, v1.WorkspaceEvent]
 }
 
 // List calls codefoundry.v1.WorkspaceService.List.
@@ -212,11 +199,6 @@ func (c *workspaceServiceClient) Remove(ctx context.Context, req *connect.Reques
 	return c.remove.CallUnary(ctx, req)
 }
 
-// Watch calls codefoundry.v1.WorkspaceService.Watch.
-func (c *workspaceServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchWorkspacesRequest]) (*connect.ServerStreamForClient[v1.WorkspaceEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
-}
-
 // WorkspaceServiceHandler is an implementation of the codefoundry.v1.WorkspaceService service.
 type WorkspaceServiceHandler interface {
 	// List returns every workspace, sorted by name.
@@ -245,10 +227,6 @@ type WorkspaceServiceHandler interface {
 	// not archived runs in it); a rooted one loses only the symlinks (the root is the
 	// user's). Threads that reference it keep running without it.
 	Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error)
-	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot. Subscribing reads every workspace's folder again first (instructions,
-	// skills, links), so hand edits show without a spawn.
-	Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest], *connect.ServerStream[v1.WorkspaceEvent]) error
 }
 
 // NewWorkspaceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -306,12 +284,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 		connect.WithSchema(workspaceServiceMethods.ByName("Remove")),
 		connect.WithHandlerOptions(opts...),
 	)
-	workspaceServiceWatchHandler := connect.NewServerStreamHandler(
-		WorkspaceServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(workspaceServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/codefoundry.v1.WorkspaceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case WorkspaceServiceListProcedure:
@@ -330,8 +302,6 @@ func NewWorkspaceServiceHandler(svc WorkspaceServiceHandler, opts ...connect.Han
 			workspaceServiceSetRootHandler.ServeHTTP(w, r)
 		case WorkspaceServiceRemoveProcedure:
 			workspaceServiceRemoveHandler.ServeHTTP(w, r)
-		case WorkspaceServiceWatchProcedure:
-			workspaceServiceWatchHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -371,8 +341,4 @@ func (UnimplementedWorkspaceServiceHandler) SetRoot(context.Context, *connect.Re
 
 func (UnimplementedWorkspaceServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveWorkspaceRequest]) (*connect.Response[v1.RemoveWorkspaceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Remove is not implemented"))
-}
-
-func (UnimplementedWorkspaceServiceHandler) Watch(context.Context, *connect.Request[v1.WatchWorkspacesRequest], *connect.ServerStream[v1.WorkspaceEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.WorkspaceService.Watch is not implemented"))
 }

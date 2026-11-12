@@ -21,7 +21,7 @@ func newActionServer(t *testing.T) (*actiontest.Fake, codefoundryv1connect.Actio
 	t.Helper()
 	b := bus.New()
 	fake := actiontest.New(b)
-	route := NewAction(fake, b).Route()
+	route := NewAction(fake).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewUnstartedServer(mux)
@@ -147,17 +147,15 @@ func TestActionUnary(t *testing.T) {
 	}
 }
 
-func TestActionWatch(t *testing.T) {
-	fake, c := newActionServer(t)
+func TestActionEvents(t *testing.T) {
+	b := bus.New()
+	fake := actiontest.New(b)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if _, err := fake.Create(ctx, action.CreateOptions{ProjectID: "web", Name: "Lint", Command: "make lint"}); err != nil {
 		t.Fatal(err)
 	}
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchActionsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	stream := watchSource(t, ctx, EventsDeps{Bus: b, Action: fake}, v1.EventSource_EVENT_SOURCE_ACTION, (*v1.Event).GetAction)
 	next := func() *v1.ActionEvent {
 		t.Helper()
 		if !stream.Receive() {

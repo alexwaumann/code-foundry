@@ -38,8 +38,6 @@ function detail(projectId: string, path: string, files: { path: string; status: 
     head: "",
     files: files.map((f) => ({ ...f, oldPath: "", added: 1, deleted: 0, binary: false, uncommitted: true })),
     filesTruncated: false,
-    log: [],
-    logTotal: 0,
     computedAtMs: Date.now(),
     error: "",
   };

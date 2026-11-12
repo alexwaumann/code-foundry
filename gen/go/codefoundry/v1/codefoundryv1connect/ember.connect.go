@@ -33,20 +33,12 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// EmberServiceGetStatusProcedure is the fully-qualified name of the EmberService's GetStatus RPC.
-	EmberServiceGetStatusProcedure = "/codefoundry.v1.EmberService/GetStatus"
-	// EmberServiceListTasksProcedure is the fully-qualified name of the EmberService's ListTasks RPC.
-	EmberServiceListTasksProcedure = "/codefoundry.v1.EmberService/ListTasks"
 	// EmberServiceWatchBoardProcedure is the fully-qualified name of the EmberService's WatchBoard RPC.
 	EmberServiceWatchBoardProcedure = "/codefoundry.v1.EmberService/WatchBoard"
 )
 
 // EmberServiceClient is a client for the codefoundry.v1.EmberService service.
 type EmberServiceClient interface {
-	// GetStatus is Ember's state now.
-	GetStatus(context.Context, *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error)
-	// ListTasks lists the board's tasks, each with its worker thread's progress.
-	ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error)
 	// WatchBoard sends the whole board (status, every task and Ember's timers) at once,
 	// then again on every change: a task, Ember's state, a task's worker thread (its
 	// status or report), or one of Ember's timers (added, fired, cancelled). A quiet
@@ -65,18 +57,6 @@ func NewEmberServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 	baseURL = strings.TrimRight(baseURL, "/")
 	emberServiceMethods := v1.File_codefoundry_v1_ember_proto.Services().ByName("EmberService").Methods()
 	return &emberServiceClient{
-		getStatus: connect.NewClient[v1.GetEmberStatusRequest, v1.GetEmberStatusResponse](
-			httpClient,
-			baseURL+EmberServiceGetStatusProcedure,
-			connect.WithSchema(emberServiceMethods.ByName("GetStatus")),
-			connect.WithClientOptions(opts...),
-		),
-		listTasks: connect.NewClient[v1.ListEmberTasksRequest, v1.ListEmberTasksResponse](
-			httpClient,
-			baseURL+EmberServiceListTasksProcedure,
-			connect.WithSchema(emberServiceMethods.ByName("ListTasks")),
-			connect.WithClientOptions(opts...),
-		),
 		watchBoard: connect.NewClient[v1.WatchEmberBoardRequest, v1.EmberBoard](
 			httpClient,
 			baseURL+EmberServiceWatchBoardProcedure,
@@ -88,19 +68,7 @@ func NewEmberServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // emberServiceClient implements EmberServiceClient.
 type emberServiceClient struct {
-	getStatus  *connect.Client[v1.GetEmberStatusRequest, v1.GetEmberStatusResponse]
-	listTasks  *connect.Client[v1.ListEmberTasksRequest, v1.ListEmberTasksResponse]
 	watchBoard *connect.Client[v1.WatchEmberBoardRequest, v1.EmberBoard]
-}
-
-// GetStatus calls codefoundry.v1.EmberService.GetStatus.
-func (c *emberServiceClient) GetStatus(ctx context.Context, req *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error) {
-	return c.getStatus.CallUnary(ctx, req)
-}
-
-// ListTasks calls codefoundry.v1.EmberService.ListTasks.
-func (c *emberServiceClient) ListTasks(ctx context.Context, req *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error) {
-	return c.listTasks.CallUnary(ctx, req)
 }
 
 // WatchBoard calls codefoundry.v1.EmberService.WatchBoard.
@@ -110,10 +78,6 @@ func (c *emberServiceClient) WatchBoard(ctx context.Context, req *connect.Reques
 
 // EmberServiceHandler is an implementation of the codefoundry.v1.EmberService service.
 type EmberServiceHandler interface {
-	// GetStatus is Ember's state now.
-	GetStatus(context.Context, *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error)
-	// ListTasks lists the board's tasks, each with its worker thread's progress.
-	ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error)
 	// WatchBoard sends the whole board (status, every task and Ember's timers) at once,
 	// then again on every change: a task, Ember's state, a task's worker thread (its
 	// status or report), or one of Ember's timers (added, fired, cancelled). A quiet
@@ -128,18 +92,6 @@ type EmberServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewEmberServiceHandler(svc EmberServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	emberServiceMethods := v1.File_codefoundry_v1_ember_proto.Services().ByName("EmberService").Methods()
-	emberServiceGetStatusHandler := connect.NewUnaryHandler(
-		EmberServiceGetStatusProcedure,
-		svc.GetStatus,
-		connect.WithSchema(emberServiceMethods.ByName("GetStatus")),
-		connect.WithHandlerOptions(opts...),
-	)
-	emberServiceListTasksHandler := connect.NewUnaryHandler(
-		EmberServiceListTasksProcedure,
-		svc.ListTasks,
-		connect.WithSchema(emberServiceMethods.ByName("ListTasks")),
-		connect.WithHandlerOptions(opts...),
-	)
 	emberServiceWatchBoardHandler := connect.NewServerStreamHandler(
 		EmberServiceWatchBoardProcedure,
 		svc.WatchBoard,
@@ -148,10 +100,6 @@ func NewEmberServiceHandler(svc EmberServiceHandler, opts ...connect.HandlerOpti
 	)
 	return "/codefoundry.v1.EmberService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case EmberServiceGetStatusProcedure:
-			emberServiceGetStatusHandler.ServeHTTP(w, r)
-		case EmberServiceListTasksProcedure:
-			emberServiceListTasksHandler.ServeHTTP(w, r)
 		case EmberServiceWatchBoardProcedure:
 			emberServiceWatchBoardHandler.ServeHTTP(w, r)
 		default:
@@ -162,14 +110,6 @@ func NewEmberServiceHandler(svc EmberServiceHandler, opts ...connect.HandlerOpti
 
 // UnimplementedEmberServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedEmberServiceHandler struct{}
-
-func (UnimplementedEmberServiceHandler) GetStatus(context.Context, *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.EmberService.GetStatus is not implemented"))
-}
-
-func (UnimplementedEmberServiceHandler) ListTasks(context.Context, *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.EmberService.ListTasks is not implemented"))
-}
 
 func (UnimplementedEmberServiceHandler) WatchBoard(context.Context, *connect.Request[v1.WatchEmberBoardRequest], *connect.ServerStream[v1.EmberBoard]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.EmberService.WatchBoard is not implemented"))

@@ -22,11 +22,6 @@ service SkillService {
   rpc Installed(ListInstalledSkillsRequest) returns (ListInstalledSkillsResponse) {}
   // Registries lists the marketplaces as last read.
   rpc Registries(ListSkillRegistriesRequest) returns (ListSkillRegistriesResponse) {}
-  // Watch sends the current epoch, then each new one: every read of the marketplaces
-  // and the installed state (start-up, the hourly refresh, each skill.* operation)
-  // publishes one, and an open page re-reads what it shows. The GUI gets the same
-  // events from EventService (EVENT_SOURCE_SKILL).
-  rpc Watch(WatchSkillsRequest) returns (stream SkillEvent) {}
 }
 
 enum SkillKind {
@@ -219,8 +214,6 @@ message ListSkillRegistriesResponse {
   string expected_marketplace = 3;
   uint64 epoch = 4;
 }
-
-message WatchSkillsRequest {}
 
 message SkillEvent {
   // Grows by one per read in this daemon's lifetime: re-read Search, Installed and

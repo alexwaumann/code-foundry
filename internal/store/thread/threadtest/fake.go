@@ -509,21 +509,6 @@ func (f *Fake) Close(_ context.Context, id string) error {
 	return err
 }
 
-// Reconnect requires DISCONNECTED and moves the thread to STARTING, unarchived and
-// unsnoozed.
-func (f *Fake) Reconnect(_ context.Context, id string) (thread.Thread, error) {
-	return f.mutate("Reconnect "+id, id, func(s *thread.Thread) error {
-		if s.State != thread.StateDisconnected {
-			return fmt.Errorf("%w: thread %s is %s", thread.ErrFailedPrecondition, id, s.State)
-		}
-		if err := refuseTranscriptMissing(*s); err != nil {
-			return err
-		}
-		s.State, s.DisconnectReason, s.ArchivedAt, s.SnoozedUntil, s.SavedAt = thread.StateStarting, "", time.Time{}, time.Time{}, time.Time{}
-		return nil
-	})
-}
-
 // RunIn records "RunIn <id> <project> <path>". It requires a thread with a project. A
 // disconnected thread moves at once to the path (else /worktrees/<project>); a live one
 // gets it as PendingWorktreePath.

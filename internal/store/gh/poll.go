@@ -1145,40 +1145,6 @@ func (s *Store) fetchPullRequest(ctx context.Context, slug string, number int) (
 	return d, nil
 }
 
-func (s *Store) fetchChecks(ctx context.Context, slug, ref string) (RefChecks, error) {
-	owner, name := splitSlug(slug)
-	var (
-		out   RefChecks
-		after string
-	)
-	for range s.opts.MaxPages {
-		vars := map[string]any{"owner": owner, "name": name, "ref": ref}
-		if after != "" {
-			vars["after"] = after
-		}
-		data, err := s.call(ctx, queryChecks, vars)
-		if err != nil {
-			return RefChecks{}, err
-		}
-		page, err := decodeChecks(data)
-		if err != nil {
-			return RefChecks{}, err
-		}
-		out.SHA, out.Rollup = page.SHA, page.Rollup
-		out.Runs = append(out.Runs, page.Runs...)
-		if !page.Next.HasNextPage || page.Next.EndCursor == "" {
-			break
-		}
-		after = page.Next.EndCursor
-	}
-	sortRuns(out.Runs)
-	out.FetchedAt = s.opts.Now()
-	if err := s.cache.saveChecks(ctx, slug, ref, out); err != nil {
-		s.log.Warn("gh cache write failed", "err", err)
-	}
-	return out, nil
-}
-
 // ---- snapshot ------------------------------------------------------------------
 
 // updateSnapshot applies fn to a copy of the snapshot and publishes it.

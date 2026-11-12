@@ -64,9 +64,6 @@ const (
 	// ProjectServiceGetWorktreeDetailProcedure is the fully-qualified name of the ProjectService's
 	// GetWorktreeDetail RPC.
 	ProjectServiceGetWorktreeDetailProcedure = "/codefoundry.v1.ProjectService/GetWorktreeDetail"
-	// ProjectServiceGetWorktreeFileDiffProcedure is the fully-qualified name of the ProjectService's
-	// GetWorktreeFileDiff RPC.
-	ProjectServiceGetWorktreeFileDiffProcedure = "/codefoundry.v1.ProjectService/GetWorktreeFileDiff"
 	// ProjectServiceCompareWorktreeProcedure is the fully-qualified name of the ProjectService's
 	// CompareWorktree RPC.
 	ProjectServiceCompareWorktreeProcedure = "/codefoundry.v1.ProjectService/CompareWorktree"
@@ -149,15 +146,6 @@ type ProjectServiceClient interface {
 	// worktree has been asked about in the last 10 minutes, every status refresh of it
 	// recomputes the detail and announces changes as worktree_detail_updated.
 	GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error)
-	// GetWorktreeFileDiff returns both sides of one file of a worktree for a diff view,
-	// against the same base and merge base GetWorktreeDetail uses. WORKING: the merge
-	// base's version against the file on disk (untracked files included); a worktree
-	// without a base compares with HEAD (the empty tree on an unborn branch), as the
-	// detail's file list does. BRANCH: the merge base's version against HEAD's; without
-	// a base, error says so. Each side is at most 1 MiB. Computed on every call (not
-	// cached); NotFound for an unknown worktree, InvalidArgument for a file path that
-	// leaves the worktree, FailedPrecondition for a project without git.
-	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
 	// CompareWorktree lists what differs between two sources of one checkout: the merge
 	// base, the working tree, the index or any commit a ref names, either way round. Only
 	// the file list and its line counts: GetWorktreeCompareFile reads one file's two sides
@@ -319,12 +307,6 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(projectServiceMethods.ByName("GetWorktreeDetail")),
 			connect.WithClientOptions(opts...),
 		),
-		getWorktreeFileDiff: connect.NewClient[v1.GetWorktreeFileDiffRequest, v1.GetWorktreeFileDiffResponse](
-			httpClient,
-			baseURL+ProjectServiceGetWorktreeFileDiffProcedure,
-			connect.WithSchema(projectServiceMethods.ByName("GetWorktreeFileDiff")),
-			connect.WithClientOptions(opts...),
-		),
 		compareWorktree: connect.NewClient[v1.CompareWorktreeRequest, v1.CompareWorktreeResponse](
 			httpClient,
 			baseURL+ProjectServiceCompareWorktreeProcedure,
@@ -426,7 +408,6 @@ type projectServiceClient struct {
 	refresh                *connect.Client[v1.RefreshProjectRequest, v1.RefreshProjectResponse]
 	watch                  *connect.Client[v1.WatchProjectsRequest, v1.ProjectEvent]
 	getWorktreeDetail      *connect.Client[v1.GetWorktreeDetailRequest, v1.GetWorktreeDetailResponse]
-	getWorktreeFileDiff    *connect.Client[v1.GetWorktreeFileDiffRequest, v1.GetWorktreeFileDiffResponse]
 	compareWorktree        *connect.Client[v1.CompareWorktreeRequest, v1.CompareWorktreeResponse]
 	getWorktreeCompareFile *connect.Client[v1.GetWorktreeCompareFileRequest, v1.GetWorktreeCompareFileResponse]
 	listCompareCommits     *connect.Client[v1.ListCompareCommitsRequest, v1.ListCompareCommitsResponse]
@@ -501,11 +482,6 @@ func (c *projectServiceClient) Watch(ctx context.Context, req *connect.Request[v
 // GetWorktreeDetail calls codefoundry.v1.ProjectService.GetWorktreeDetail.
 func (c *projectServiceClient) GetWorktreeDetail(ctx context.Context, req *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error) {
 	return c.getWorktreeDetail.CallUnary(ctx, req)
-}
-
-// GetWorktreeFileDiff calls codefoundry.v1.ProjectService.GetWorktreeFileDiff.
-func (c *projectServiceClient) GetWorktreeFileDiff(ctx context.Context, req *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error) {
-	return c.getWorktreeFileDiff.CallUnary(ctx, req)
 }
 
 // CompareWorktree calls codefoundry.v1.ProjectService.CompareWorktree.
@@ -623,15 +599,6 @@ type ProjectServiceHandler interface {
 	// worktree has been asked about in the last 10 minutes, every status refresh of it
 	// recomputes the detail and announces changes as worktree_detail_updated.
 	GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error)
-	// GetWorktreeFileDiff returns both sides of one file of a worktree for a diff view,
-	// against the same base and merge base GetWorktreeDetail uses. WORKING: the merge
-	// base's version against the file on disk (untracked files included); a worktree
-	// without a base compares with HEAD (the empty tree on an unborn branch), as the
-	// detail's file list does. BRANCH: the merge base's version against HEAD's; without
-	// a base, error says so. Each side is at most 1 MiB. Computed on every call (not
-	// cached); NotFound for an unknown worktree, InvalidArgument for a file path that
-	// leaves the worktree, FailedPrecondition for a project without git.
-	GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error)
 	// CompareWorktree lists what differs between two sources of one checkout: the merge
 	// base, the working tree, the index or any commit a ref names, either way round. Only
 	// the file list and its line counts: GetWorktreeCompareFile reads one file's two sides
@@ -789,12 +756,6 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		connect.WithSchema(projectServiceMethods.ByName("GetWorktreeDetail")),
 		connect.WithHandlerOptions(opts...),
 	)
-	projectServiceGetWorktreeFileDiffHandler := connect.NewUnaryHandler(
-		ProjectServiceGetWorktreeFileDiffProcedure,
-		svc.GetWorktreeFileDiff,
-		connect.WithSchema(projectServiceMethods.ByName("GetWorktreeFileDiff")),
-		connect.WithHandlerOptions(opts...),
-	)
 	projectServiceCompareWorktreeHandler := connect.NewUnaryHandler(
 		ProjectServiceCompareWorktreeProcedure,
 		svc.CompareWorktree,
@@ -905,8 +866,6 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 			projectServiceWatchHandler.ServeHTTP(w, r)
 		case ProjectServiceGetWorktreeDetailProcedure:
 			projectServiceGetWorktreeDetailHandler.ServeHTTP(w, r)
-		case ProjectServiceGetWorktreeFileDiffProcedure:
-			projectServiceGetWorktreeFileDiffHandler.ServeHTTP(w, r)
 		case ProjectServiceCompareWorktreeProcedure:
 			projectServiceCompareWorktreeHandler.ServeHTTP(w, r)
 		case ProjectServiceGetWorktreeCompareFileProcedure:
@@ -990,10 +949,6 @@ func (UnimplementedProjectServiceHandler) Watch(context.Context, *connect.Reques
 
 func (UnimplementedProjectServiceHandler) GetWorktreeDetail(context.Context, *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.GetWorktreeDetail is not implemented"))
-}
-
-func (UnimplementedProjectServiceHandler) GetWorktreeFileDiff(context.Context, *connect.Request[v1.GetWorktreeFileDiffRequest]) (*connect.Response[v1.GetWorktreeFileDiffResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.GetWorktreeFileDiff is not implemented"))
 }
 
 func (UnimplementedProjectServiceHandler) CompareWorktree(context.Context, *connect.Request[v1.CompareWorktreeRequest]) (*connect.Response[v1.CompareWorktreeResponse], error) {

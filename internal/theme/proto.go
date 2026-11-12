@@ -7,7 +7,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// ToProto is f as the API's UserTheme (ThemeService's snapshot, a thread's theme card),
+// ToProto is f as the API's UserTheme (the theme events' snapshot, a thread's theme card),
 // with its file's path ("" for none) and version.
 func ToProto(f File, path string) *v1.UserTheme {
 	b := f.Base

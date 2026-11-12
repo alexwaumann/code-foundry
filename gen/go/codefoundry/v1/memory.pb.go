@@ -341,42 +341,6 @@ func (x *GetMemoryResponse) GetMemory() *MemorySnapshot {
 	return nil
 }
 
-type WatchMemoryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WatchMemoryRequest) Reset() {
-	*x = WatchMemoryRequest{}
-	mi := &file_codefoundry_v1_memory_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WatchMemoryRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WatchMemoryRequest) ProtoMessage() {}
-
-func (x *WatchMemoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_memory_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WatchMemoryRequest.ProtoReflect.Descriptor instead.
-func (*WatchMemoryRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_memory_proto_rawDescGZIP(), []int{4}
-}
-
 // MemoryEvent carries the whole memory, on connect and per change.
 type MemoryEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -387,7 +351,7 @@ type MemoryEvent struct {
 
 func (x *MemoryEvent) Reset() {
 	*x = MemoryEvent{}
-	mi := &file_codefoundry_v1_memory_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_memory_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +363,7 @@ func (x *MemoryEvent) String() string {
 func (*MemoryEvent) ProtoMessage() {}
 
 func (x *MemoryEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_memory_proto_msgTypes[5]
+	mi := &file_codefoundry_v1_memory_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +376,7 @@ func (x *MemoryEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoryEvent.ProtoReflect.Descriptor instead.
 func (*MemoryEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_memory_proto_rawDescGZIP(), []int{5}
+	return file_codefoundry_v1_memory_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MemoryEvent) GetSnapshot() *MemorySnapshot {
@@ -451,13 +415,11 @@ const file_codefoundry_v1_memory_proto_rawDesc = "" +
 	"\aversion\x18\t \x01(\x04R\aversion\"\x12\n" +
 	"\x10GetMemoryRequest\"K\n" +
 	"\x11GetMemoryResponse\x126\n" +
-	"\x06memory\x18\x01 \x01(\v2\x1e.codefoundry.v1.MemorySnapshotR\x06memory\"\x14\n" +
-	"\x12WatchMemoryRequest\"I\n" +
+	"\x06memory\x18\x01 \x01(\v2\x1e.codefoundry.v1.MemorySnapshotR\x06memory\"I\n" +
 	"\vMemoryEvent\x12:\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\x1e.codefoundry.v1.MemorySnapshotR\bsnapshot2\xab\x01\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\x1e.codefoundry.v1.MemorySnapshotR\bsnapshot2]\n" +
 	"\rMemoryService\x12L\n" +
-	"\x03Get\x12 .codefoundry.v1.GetMemoryRequest\x1a!.codefoundry.v1.GetMemoryResponse\"\x00\x12L\n" +
-	"\x05Watch\x12\".codefoundry.v1.WatchMemoryRequest\x1a\x1b.codefoundry.v1.MemoryEvent\"\x000\x01B\xc3\x01\n" +
+	"\x03Get\x12 .codefoundry.v1.GetMemoryRequest\x1a!.codefoundry.v1.GetMemoryResponse\"\x00B\xc3\x01\n" +
 	"\x12com.codefoundry.v1B\vMemoryProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -472,27 +434,24 @@ func file_codefoundry_v1_memory_proto_rawDescGZIP() []byte {
 	return file_codefoundry_v1_memory_proto_rawDescData
 }
 
-var file_codefoundry_v1_memory_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_codefoundry_v1_memory_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_codefoundry_v1_memory_proto_goTypes = []any{
 	(*MemoryEntry)(nil),           // 0: codefoundry.v1.MemoryEntry
 	(*MemorySnapshot)(nil),        // 1: codefoundry.v1.MemorySnapshot
 	(*GetMemoryRequest)(nil),      // 2: codefoundry.v1.GetMemoryRequest
 	(*GetMemoryResponse)(nil),     // 3: codefoundry.v1.GetMemoryResponse
-	(*WatchMemoryRequest)(nil),    // 4: codefoundry.v1.WatchMemoryRequest
-	(*MemoryEvent)(nil),           // 5: codefoundry.v1.MemoryEvent
-	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*MemoryEvent)(nil),           // 4: codefoundry.v1.MemoryEvent
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_memory_proto_depIdxs = []int32{
-	6, // 0: codefoundry.v1.MemoryEntry.created:type_name -> google.protobuf.Timestamp
+	5, // 0: codefoundry.v1.MemoryEntry.created:type_name -> google.protobuf.Timestamp
 	0, // 1: codefoundry.v1.MemorySnapshot.entries:type_name -> codefoundry.v1.MemoryEntry
 	1, // 2: codefoundry.v1.GetMemoryResponse.memory:type_name -> codefoundry.v1.MemorySnapshot
 	1, // 3: codefoundry.v1.MemoryEvent.snapshot:type_name -> codefoundry.v1.MemorySnapshot
 	2, // 4: codefoundry.v1.MemoryService.Get:input_type -> codefoundry.v1.GetMemoryRequest
-	4, // 5: codefoundry.v1.MemoryService.Watch:input_type -> codefoundry.v1.WatchMemoryRequest
-	3, // 6: codefoundry.v1.MemoryService.Get:output_type -> codefoundry.v1.GetMemoryResponse
-	5, // 7: codefoundry.v1.MemoryService.Watch:output_type -> codefoundry.v1.MemoryEvent
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
+	3, // 5: codefoundry.v1.MemoryService.Get:output_type -> codefoundry.v1.GetMemoryResponse
+	5, // [5:6] is the sub-list for method output_type
+	4, // [4:5] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
 	4, // [4:4] is the sub-list for extension extendee
 	0, // [0:4] is the sub-list for field type_name
@@ -509,7 +468,7 @@ func file_codefoundry_v1_memory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_memory_proto_rawDesc), len(file_codefoundry_v1_memory_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

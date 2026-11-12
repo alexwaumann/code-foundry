@@ -1,6 +1,6 @@
 /**
  * The user's own themes in the mock daemon (docs/notes/user-themes.md): the themes
- * directory as ThemeService's snapshot, the EventService theme source and the theme.*
+ * directory as the EventService theme source's snapshot and the theme.*
  * verbs that write it (show, save, duplicate, delete). Seeded with three: Ocean Dusk
  * (dark, from Catppuccin Mocha, written by thread s-1), Mocha, warmer (dark, from
  * Catppuccin Mocha, three slots pinned) and Latte, softer (light, from Catppuccin Latte,
@@ -147,7 +147,7 @@ function reportLines(id: string, r: MockReport | undefined, full: boolean): stri
   return [...out, stale.length ? `stale pins: ${String(stale.length)} — ${stale.join(", ")}` : "stale pins: 0"];
 }
 
-/** A user theme as ThemeService's (and a theme card's) UserTheme. */
+/** A user theme as the theme events' (and a theme card's) UserTheme. */
 function protoOf(t: MockUserTheme, path: string): UserThemeInit {
   return {
     id: t.id,

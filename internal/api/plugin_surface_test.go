@@ -24,7 +24,7 @@ func newSurfaceServer(t *testing.T) (*plugintest.Fake, *plugintest.Surfaces, cod
 	t.Helper()
 	b := bus.New()
 	fake, surfaces := plugintest.New(b), plugintest.NewSurfaces()
-	h := NewPlugin(fake, b).WithSurfaces(surfaces)
+	h := NewPlugin(fake).WithSurfaces(surfaces)
 	h.beat = 50 * time.Millisecond
 	route := h.Route()
 	mux := http.NewServeMux()

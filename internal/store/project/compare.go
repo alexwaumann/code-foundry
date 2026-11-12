@@ -757,7 +757,9 @@ func (g *Git) readSide(ctx context.Context, c *comparison, s ResolvedSource, fil
 	return g.readRevSide(ctx, c.dir, s.SHA, file)
 }
 
-// readRevSide is readBlob, with a submodule at the path as the commit it points at.
+// readRevSide reads file at rev: `ls-tree` for its type and size (exit 0 with no output
+// when the path is not there), then the blob, or a submodule at the path as the commit it
+// points at. A tree at the path is not present.
 func (g *Git) readRevSide(ctx context.Context, dir, rev, file string) (FileVersion, error) {
 	out, err := g.runner.Run(ctx, dir, "--literal-pathspecs", "ls-tree", "-z", "--long", "--full-tree", rev, "--", file)
 	if err != nil {

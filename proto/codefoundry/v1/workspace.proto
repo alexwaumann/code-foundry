@@ -36,10 +36,6 @@ service WorkspaceService {
   // not archived runs in it); a rooted one loses only the symlinks (the root is the
   // user's). Threads that reference it keep running without it.
   rpc Remove(RemoveWorkspaceRequest) returns (RemoveWorkspaceResponse) {}
-  // Watch sends a snapshot, then every change. A client that falls behind gets a new
-  // snapshot. Subscribing reads every workspace's folder again first (instructions,
-  // skills, links), so hand edits show without a spawn.
-  rpc Watch(WatchWorkspacesRequest) returns (stream WorkspaceEvent) {}
 }
 
 message Workspace {
@@ -68,7 +64,7 @@ message Workspace {
   // regular file), in root_path when set, else in the managed dir. Empty when there is
   // neither. Read from disk when the store builds the snapshot entry, at every
   // EnsureDirs (start, a spawn of a thread that references it), when such a thread ends
-  // a turn and when a client subscribes to Watch.
+  // a turn and when a client subscribes to the workspace events.
   string instructions = 10;
   // The skills in .claude/skills of the same folder: the names of its folders that hold
   // a SKILL.md, sorted. Read like instructions.
@@ -168,8 +164,6 @@ message RemoveWorkspaceRequest {
 }
 
 message RemoveWorkspaceResponse {}
-
-message WatchWorkspacesRequest {}
 
 message WorkspaceEvent {
   oneof event {

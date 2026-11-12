@@ -5,7 +5,7 @@
  *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
  * Serves Health, Terminal, Project, Filesystem, Gh, Command, Settings, Ui, Thread, Action, GitOps, Update,
- * Plugin, Skill, Memory, Theme, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
+ * Plugin, Skill, Memory, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
@@ -34,6 +34,8 @@
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent, explicit as thread.focus)
+ *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
+ *     command emits it; answers {"delivered": <watchers>})
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
  *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
  *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn[&queued=1]
@@ -117,7 +119,7 @@
  *                                                 none; reset restores DEFAULT_FILES; several
  *                                                 projects: project=a&path=x&project=b&path=y)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
- *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
+ *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeCompareFile: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, docs/; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
  *   POST /__mock/compare/commits?count=800[&subject=N]   (that many more commits on every comparison's list, older than the rest;
@@ -176,7 +178,7 @@
  *                                                 700-character entry threads do not get)
  *   POST /__mock/memory?drop=<file>&quiet=1      (a file removed by hand, no event: a stale page)
  *   GET  /__mock/memory                          ({ entries, calls })
- *   ThemeService, the theme event source and theme.show/save/duplicate/delete (mock/userThemes.ts):
+ *   The theme event source and theme.show/save/duplicate/delete (mock/userThemes.ts):
  *        three user themes (Ocean Dusk and Mocha, warmer dark, Latte, softer light) and a file that
  *        does not load; reset restores them.
  *   POST /__mock/themes/card?thread=s-1&theme=ocean-dusk[&apply=true]   (theme save from that thread:
@@ -209,7 +211,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Code, ConnectError, cors as connectCors, type ConnectRouter } from "@connectrpc/connect";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
-import type { MessageInitShape } from "@bufbuild/protobuf";
+import { fromJson, type JsonValue, type MessageInitShape } from "@bufbuild/protobuf";
 import { durationFromMs, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { CommandService, ConfirmationRequiredSchema } from "../src/gen/codefoundry/v1/command_pb";
 import { SettingsService, SettingsValidationErrorsSchema } from "../src/gen/codefoundry/v1/settings_pb";
@@ -223,11 +225,10 @@ import { TerminalService, TerminalState, type AttachEventSchema } from "../src/g
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
 import { GitOpsService } from "../src/gen/codefoundry/v1/gitops_pb";
-import { UiService } from "../src/gen/codefoundry/v1/ui_pb";
+import { UiIntentSchema, UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
-import { ThemeService } from "../src/gen/codefoundry/v1/theme_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
@@ -249,7 +250,6 @@ import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage } from "./usage";
 import { ageMcp, keepMcpServers, reconnectMcp, refreshMcp } from "./mcp";
-import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
 import { listPrompts } from "./prompts";
 import { listItems, searchThreads } from "./search";
@@ -342,7 +342,6 @@ function routes(router: ConnectRouter): void {
     kill: (req) => guard(() => (world.kill(req.id), {})),
     remove: (req) => guard(() => (world.remove(req.id), {})),
     close: (req) => guard(() => (world.close(req.id), {})),
-    watch: (_req, ctx) => tracked("TerminalService/Watch", world.termEvents.subscribe(ctx.signal)),
   });
 
   router.service(ProjectService, {
@@ -403,7 +402,6 @@ function routes(router: ConnectRouter): void {
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
       return { detail };
     },
-    getWorktreeFileDiff: (req) => mockFiles.fileDiff(req.path, req.file, req.oldPath, req.scope),
     compareWorktree: (req) => mockFiles.compare(req.path, req.base, req.head),
     getWorktreeCompareFile: (req) => mockFiles.compareFile(req.path, req.base, req.head, req.file, req.oldPath),
     listCompareCommits: (req) => mockFiles.compareCommits(req.path),
@@ -431,7 +429,6 @@ function routes(router: ConnectRouter): void {
       if (!req.headRef) throw new ConnectError("head_ref is required", Code.InvalidArgument);
       return world.gh.getBranchPullRequests(req.repoSlug.toLowerCase(), req.headRef);
     },
-    refresh: () => ({}),
     getPullRequestDetail: (req) => world.gh.prDetails.delayed(() => prDetailCall(() => ({ detail: world.gh.prDetails.get(req.repoSlug, req.number, req.refresh) }))),
     listReviewerCandidates: (req) => prDetailCall(() => world.gh.prDetails.listCandidates(req.repoSlug, req.number, req.query)),
     setReviewRequest: (req) =>
@@ -481,17 +478,10 @@ function routes(router: ConnectRouter): void {
       return {};
     }),
     readBackdrop: (req) => guard(() => world.backdrops.read(req.name)),
-    watch: async function* (_req, ctx) {
-      yield { event: { case: "snapshot" as const, value: world.settings.snapshot() } };
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.SETTINGS && event.event?.case === "settings") yield event.event.value;
-      }
-    },
   });
 
   router.service(UiService, {
     watchIntents: (_req, ctx) => tracked("UiService/WatchIntents", world.intents.subscribe(ctx.signal)),
-    emit: (req) => ({ delivered: req.intent ? world.emit(req.intent) : 0 }),
     publishTheme: (req) => {
       try {
         publishMockTheme({ id: req.id, scheme: req.scheme, vars: req.vars });
@@ -528,14 +518,6 @@ function routes(router: ConnectRouter): void {
     rename: () => {
       throw new ConnectError("use the thread.rename command in the mock", Code.Unimplemented);
     },
-    // Kept in the proto for compatibility; the daemon starts and stops threads itself and no
-    // command calls them (docs/notes/thread-lifecycle.md).
-    close: () => {
-      throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
-    },
-    reconnect: () => {
-      throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
-    },
     remove: () => {
       throw new ConnectError("use the thread.remove command in the mock", Code.Unimplemented);
     },
@@ -568,7 +550,6 @@ function routes(router: ConnectRouter): void {
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
-    watch: (_req, ctx) => tracked("ThreadService/Watch", world.threadListEvents.subscribe(ctx.signal, [world.threadListSnapshot()])),
     checkPlacement: (req) => world.checkPlacement(req.projectIds, req.branch, req.checkoutMode),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.
@@ -623,7 +604,6 @@ function routes(router: ConnectRouter): void {
         throw rpcError(err);
       }
     },
-    watch: (_req, ctx) => tracked("ActionService/Watch", actionEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } }]))),
   });
 
   // GitOpsService: the GUI runs git operations through the git.*/worktree.* commands
@@ -658,16 +638,9 @@ function routes(router: ConnectRouter): void {
     logs: (req) => guard(() => world.plugins.logs(req.name)),
     environment: () => ({ environments: world.plugins.environment() }),
     browse: (req) => world.plugins.registry.browse(req.refresh),
-    refreshRegistries: () => ({ registries: world.plugins.registry.browse(true).registries }),
     listSecrets: (req) => guard(() => ({ secrets: world.plugins.listSecrets(req.name) })),
     deleteSecret: (req) => guard(() => (world.plugins.deleteSecret(req.name, req.key), {})),
     reload: () => ({}),
-    watch: async function* (_req, ctx) {
-      yield world.plugins.snapshot();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.PLUGIN && event.event?.case === "plugin") yield event.event.value;
-      }
-    },
     watchSurface: (req, ctx) => {
       if (!req.ref) throw new ConnectError("a surface ref is required", Code.InvalidArgument);
       const ref = req.ref;
@@ -681,40 +654,15 @@ function routes(router: ConnectRouter): void {
     search: (req) => world.skills.search(req),
     installed: () => world.skills.list(),
     registries: () => world.skills.registries(),
-    watch: async function* (_req, ctx) {
-      yield world.skills.event();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.SKILL && event.event?.case === "skill") yield event.event.value;
-      }
-    },
   });
 
   // The app memory (mock/memory.ts): reads only; writes are the memory.* commands.
   router.service(MemoryService, {
     get: () => ({ memory: world.memory.snapshot() }),
-    watch: async function* (_req, ctx) {
-      yield world.memory.event();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.MEMORY && event.event?.case === "memory") yield event.event.value;
-      }
-    },
-  });
-
-  // The user's themes (mock/userThemes.ts): reads only; writes are the theme.* commands.
-  router.service(ThemeService, {
-    list: () => ({ themes: world.themes.snapshot() }),
-    watch: async function* (_req, ctx) {
-      yield world.themes.event();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.THEME && event.event?.case === "theme") yield event.event.value;
-      }
-    },
   });
 
   // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.
   router.service(EmberService, {
-    getStatus: () => ({ status: world.ember.status() }),
-    listTasks: (req) => ({ tasks: world.ember.list(req.open) }),
     watchBoard: (_req, ctx) => tracked("EmberService/WatchBoard", world.ember.watch(ctx.signal)),
   });
 
@@ -804,12 +752,6 @@ function routes(router: ConnectRouter): void {
       });
     },
   });
-}
-
-async function* actionEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>): AsyncGenerator<ActionEventInit> {
-  for await (const { source, event } of src) {
-    if (source === EventSource.ACTION && event.event?.case === "action") yield event.event.value;
-  }
 }
 
 /** Action controls: POST /__mock/action/setup. */
@@ -1087,6 +1029,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "POST /__mock/emit": {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { intent?: JsonValue };
+          json(res, 200, { delivered: world.emit(fromJson(UiIntentSchema, body.intent ?? {})) });
+        } catch (err) {
+          json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      break;
+    }
     case "POST /__mock/terminal/print":
     case "POST /__mock/terminal/flood": {
       const flood = path.endsWith("/flood");

@@ -12,8 +12,8 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
 )
 
-// PluginService's registry half (docs/notes/plugins-7-registry.md): Browse,
-// RefreshRegistries, Install, Update, Uninstall. The store implements plugin.Installer;
+// PluginService's registry half (docs/notes/plugins-7-registry.md): Browse, Install,
+// Update, Uninstall. The store implements plugin.Installer;
 // one that does not answers Unimplemented.
 
 func (h *Plugin) installer() (plugin.Installer, error) {
@@ -38,19 +38,6 @@ func (h *Plugin) Browse(ctx context.Context, req *connect.Request[v1.BrowsePlugi
 		out.Entries = append(out.Entries, indexEntryToProto(e))
 	}
 	return connect.NewResponse(out), nil
-}
-
-// RefreshRegistries reads every registry again.
-func (h *Plugin) RefreshRegistries(ctx context.Context, _ *connect.Request[v1.RefreshPluginRegistriesRequest]) (*connect.Response[v1.RefreshPluginRegistriesResponse], error) {
-	inst, err := h.installer()
-	if err != nil {
-		return nil, err
-	}
-	res, err := inst.Browse(ctx, true)
-	if err != nil {
-		return nil, pluginError(err)
-	}
-	return connect.NewResponse(&v1.RefreshPluginRegistriesResponse{Registries: registriesToProto(res.Registries)}), nil
 }
 
 // Install installs a plugin.

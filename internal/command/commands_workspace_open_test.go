@@ -49,7 +49,7 @@ func TestWorkspaceOpenEditor(t *testing.T) {
 			}
 			reg := command.NewRegistry()
 			editors := &commandtest.GitOps{Apps: []*v1.EditorApp{{Name: "VS Code", BundleId: vscode}}, Op: tt.op}
-			if err := command.RegisterWorkspaceOpen(reg, command.WorkspaceOpenDeps{Workspace: api.NewWorkspace(fake, b), Editors: editors}); err != nil {
+			if err := command.RegisterWorkspaceOpen(reg, command.WorkspaceOpenDeps{Workspace: api.NewWorkspace(fake), Editors: editors}); err != nil {
 				t.Fatal(err)
 			}
 			opened := func() []*v1.OpenEditorRequest {

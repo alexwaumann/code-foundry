@@ -51,7 +51,7 @@ func detailFixture(at time.Time) gh.FullPullRequest {
 }
 
 func TestGhGetPullRequestDetail(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 9, 6, 0, 0, 0, time.UTC)
 	store.SetFullPullRequest("o/r", detailFixture(at))
@@ -153,7 +153,7 @@ func TestGhGetPullRequestDetail(t *testing.T) {
 }
 
 func TestGhReviewerCandidatesAndRequests(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client, b := newGhTestBus(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	store.SetReviewerCandidates("o/r", 7, gh.ReviewerCandidates{Candidates: []gh.ReviewerCandidate{
@@ -198,10 +198,7 @@ func TestGhReviewerCandidatesAndRequests(t *testing.T) {
 		t.Errorf("unknown PR err = %v", err)
 	}
 
-	stream, err := client.Watch(ctx, connect.NewRequest(&v1.WatchGhRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	stream := ghEvents(t, ctx, store, b)
 	tests := []struct {
 		name string
 		req  *v1.SetReviewRequestRequest
@@ -249,7 +246,7 @@ func TestGhReviewerCandidatesAndRequests(t *testing.T) {
 }
 
 func TestGhRevertPullRequest(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 9, 6, 0, 0, 0, time.UTC)
 	store.SetFullPullRequest("o/r", detailFixture(at)) // #7 open

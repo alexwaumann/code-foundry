@@ -35,18 +35,12 @@ const (
 const (
 	// MemoryServiceGetProcedure is the fully-qualified name of the MemoryService's Get RPC.
 	MemoryServiceGetProcedure = "/codefoundry.v1.MemoryService/Get"
-	// MemoryServiceWatchProcedure is the fully-qualified name of the MemoryService's Watch RPC.
-	MemoryServiceWatchProcedure = "/codefoundry.v1.MemoryService/Watch"
 )
 
 // MemoryServiceClient is a client for the codefoundry.v1.MemoryService service.
 type MemoryServiceClient interface {
 	// Get reads the memory now (a hand edit since the last read shows up here).
 	Get(context.Context, *connect.Request[v1.GetMemoryRequest]) (*connect.Response[v1.GetMemoryResponse], error)
-	// Watch sends the memory as read now, then the whole memory again on every change a
-	// read or write sees. The GUI gets the same events from EventService
-	// (EVENT_SOURCE_MEMORY).
-	Watch(context.Context, *connect.Request[v1.WatchMemoryRequest]) (*connect.ServerStreamForClient[v1.MemoryEvent], error)
 }
 
 // NewMemoryServiceClient constructs a client for the codefoundry.v1.MemoryService service. By
@@ -66,19 +60,12 @@ func NewMemoryServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(memoryServiceMethods.ByName("Get")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchMemoryRequest, v1.MemoryEvent](
-			httpClient,
-			baseURL+MemoryServiceWatchProcedure,
-			connect.WithSchema(memoryServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // memoryServiceClient implements MemoryServiceClient.
 type memoryServiceClient struct {
-	get   *connect.Client[v1.GetMemoryRequest, v1.GetMemoryResponse]
-	watch *connect.Client[v1.WatchMemoryRequest, v1.MemoryEvent]
+	get *connect.Client[v1.GetMemoryRequest, v1.GetMemoryResponse]
 }
 
 // Get calls codefoundry.v1.MemoryService.Get.
@@ -86,19 +73,10 @@ func (c *memoryServiceClient) Get(ctx context.Context, req *connect.Request[v1.G
 	return c.get.CallUnary(ctx, req)
 }
 
-// Watch calls codefoundry.v1.MemoryService.Watch.
-func (c *memoryServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchMemoryRequest]) (*connect.ServerStreamForClient[v1.MemoryEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
-}
-
 // MemoryServiceHandler is an implementation of the codefoundry.v1.MemoryService service.
 type MemoryServiceHandler interface {
 	// Get reads the memory now (a hand edit since the last read shows up here).
 	Get(context.Context, *connect.Request[v1.GetMemoryRequest]) (*connect.Response[v1.GetMemoryResponse], error)
-	// Watch sends the memory as read now, then the whole memory again on every change a
-	// read or write sees. The GUI gets the same events from EventService
-	// (EVENT_SOURCE_MEMORY).
-	Watch(context.Context, *connect.Request[v1.WatchMemoryRequest], *connect.ServerStream[v1.MemoryEvent]) error
 }
 
 // NewMemoryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -114,18 +92,10 @@ func NewMemoryServiceHandler(svc MemoryServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(memoryServiceMethods.ByName("Get")),
 		connect.WithHandlerOptions(opts...),
 	)
-	memoryServiceWatchHandler := connect.NewServerStreamHandler(
-		MemoryServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(memoryServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/codefoundry.v1.MemoryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MemoryServiceGetProcedure:
 			memoryServiceGetHandler.ServeHTTP(w, r)
-		case MemoryServiceWatchProcedure:
-			memoryServiceWatchHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -137,8 +107,4 @@ type UnimplementedMemoryServiceHandler struct{}
 
 func (UnimplementedMemoryServiceHandler) Get(context.Context, *connect.Request[v1.GetMemoryRequest]) (*connect.Response[v1.GetMemoryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.MemoryService.Get is not implemented"))
-}
-
-func (UnimplementedMemoryServiceHandler) Watch(context.Context, *connect.Request[v1.WatchMemoryRequest], *connect.ServerStream[v1.MemoryEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.MemoryService.Watch is not implemented"))
 }

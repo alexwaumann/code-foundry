@@ -39,8 +39,6 @@ const (
 	SkillServiceInstalledProcedure = "/codefoundry.v1.SkillService/Installed"
 	// SkillServiceRegistriesProcedure is the fully-qualified name of the SkillService's Registries RPC.
 	SkillServiceRegistriesProcedure = "/codefoundry.v1.SkillService/Registries"
-	// SkillServiceWatchProcedure is the fully-qualified name of the SkillService's Watch RPC.
-	SkillServiceWatchProcedure = "/codefoundry.v1.SkillService/Watch"
 )
 
 // SkillServiceClient is a client for the codefoundry.v1.SkillService service.
@@ -54,11 +52,6 @@ type SkillServiceClient interface {
 	Installed(context.Context, *connect.Request[v1.ListInstalledSkillsRequest]) (*connect.Response[v1.ListInstalledSkillsResponse], error)
 	// Registries lists the marketplaces as last read.
 	Registries(context.Context, *connect.Request[v1.ListSkillRegistriesRequest]) (*connect.Response[v1.ListSkillRegistriesResponse], error)
-	// Watch sends the current epoch, then each new one: every read of the marketplaces
-	// and the installed state (start-up, the hourly refresh, each skill.* operation)
-	// publishes one, and an open page re-reads what it shows. The GUI gets the same
-	// events from EventService (EVENT_SOURCE_SKILL).
-	Watch(context.Context, *connect.Request[v1.WatchSkillsRequest]) (*connect.ServerStreamForClient[v1.SkillEvent], error)
 }
 
 // NewSkillServiceClient constructs a client for the codefoundry.v1.SkillService service. By
@@ -90,12 +83,6 @@ func NewSkillServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(skillServiceMethods.ByName("Registries")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchSkillsRequest, v1.SkillEvent](
-			httpClient,
-			baseURL+SkillServiceWatchProcedure,
-			connect.WithSchema(skillServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -104,7 +91,6 @@ type skillServiceClient struct {
 	search     *connect.Client[v1.SearchSkillsRequest, v1.SearchSkillsResponse]
 	installed  *connect.Client[v1.ListInstalledSkillsRequest, v1.ListInstalledSkillsResponse]
 	registries *connect.Client[v1.ListSkillRegistriesRequest, v1.ListSkillRegistriesResponse]
-	watch      *connect.Client[v1.WatchSkillsRequest, v1.SkillEvent]
 }
 
 // Search calls codefoundry.v1.SkillService.Search.
@@ -122,11 +108,6 @@ func (c *skillServiceClient) Registries(ctx context.Context, req *connect.Reques
 	return c.registries.CallUnary(ctx, req)
 }
 
-// Watch calls codefoundry.v1.SkillService.Watch.
-func (c *skillServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchSkillsRequest]) (*connect.ServerStreamForClient[v1.SkillEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
-}
-
 // SkillServiceHandler is an implementation of the codefoundry.v1.SkillService service.
 type SkillServiceHandler interface {
 	// Search is Browse: the entries matching a query, best first, at most limit of them
@@ -138,11 +119,6 @@ type SkillServiceHandler interface {
 	Installed(context.Context, *connect.Request[v1.ListInstalledSkillsRequest]) (*connect.Response[v1.ListInstalledSkillsResponse], error)
 	// Registries lists the marketplaces as last read.
 	Registries(context.Context, *connect.Request[v1.ListSkillRegistriesRequest]) (*connect.Response[v1.ListSkillRegistriesResponse], error)
-	// Watch sends the current epoch, then each new one: every read of the marketplaces
-	// and the installed state (start-up, the hourly refresh, each skill.* operation)
-	// publishes one, and an open page re-reads what it shows. The GUI gets the same
-	// events from EventService (EVENT_SOURCE_SKILL).
-	Watch(context.Context, *connect.Request[v1.WatchSkillsRequest], *connect.ServerStream[v1.SkillEvent]) error
 }
 
 // NewSkillServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -170,12 +146,6 @@ func NewSkillServiceHandler(svc SkillServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(skillServiceMethods.ByName("Registries")),
 		connect.WithHandlerOptions(opts...),
 	)
-	skillServiceWatchHandler := connect.NewServerStreamHandler(
-		SkillServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(skillServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/codefoundry.v1.SkillService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SkillServiceSearchProcedure:
@@ -184,8 +154,6 @@ func NewSkillServiceHandler(svc SkillServiceHandler, opts ...connect.HandlerOpti
 			skillServiceInstalledHandler.ServeHTTP(w, r)
 		case SkillServiceRegistriesProcedure:
 			skillServiceRegistriesHandler.ServeHTTP(w, r)
-		case SkillServiceWatchProcedure:
-			skillServiceWatchHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -205,8 +173,4 @@ func (UnimplementedSkillServiceHandler) Installed(context.Context, *connect.Requ
 
 func (UnimplementedSkillServiceHandler) Registries(context.Context, *connect.Request[v1.ListSkillRegistriesRequest]) (*connect.Response[v1.ListSkillRegistriesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SkillService.Registries is not implemented"))
-}
-
-func (UnimplementedSkillServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSkillsRequest], *connect.ServerStream[v1.SkillEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SkillService.Watch is not implemented"))
 }

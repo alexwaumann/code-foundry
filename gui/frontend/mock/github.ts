@@ -353,7 +353,7 @@ export class GhWorld {
         { path: "README.md", status: "M", added: 3, deleted: 1, uncommitted: true },
         { path: "notes/plan.md", status: "?", added: 12, uncommitted: true },
         { path: "notes/todo.md", status: "?", added: 4, uncommitted: true },
-      ], [])],
+      ])],
       [`${CFW}/feat-sidebar`, this.detail(`${CFW}/feat-sidebar`, "origin/main", [
         { path: "gui/frontend/src/components/sidebar/Sidebar.tsx", status: "M", added: 120, deleted: 44 },
         { path: "gui/frontend/src/components/sidebar/SidebarRow.tsx", status: "A", added: 96 },
@@ -363,13 +363,9 @@ export class GhWorld {
         { path: "docs/notes/sidebar.md", status: "R", oldPath: "docs/sidebar.md", added: 4, deleted: 1 },
         { path: "scratch.txt", status: "?", added: 3, uncommitted: true },
         { path: "assets/icon.png", status: "A", binary: true },
-      ], [
-        ["9a8b7c6d1e", "feat(gui): row virtualization", 2 * HOUR],
-        ["4f3e2d1c0b", "refactor(tree): flatten placement", 5 * HOUR],
-        ["8e7d6c5b4a", "feat(gui): thread rows in the sidebar", DAY],
-      ])],
-      [`${CFW}/fix-resize`, this.detail(`${CFW}/fix-resize`, "origin/main", manyFiles(), Array.from({ length: 12 }, (_, i): [string, string, number] => [`${(0x1f2e3d4c + i * 7919).toString(16)}aa`, `fix(terminal): step ${String(12 - i)} of the resize rework`, (i + 1) * 3 * HOUR]))],
-      [GP, this.detail(GP, "origin/main", [{ path: "src/renderer/atlas.zig", status: "M", added: 12, deleted: 3, uncommitted: true }], [])],
+      ], "9a8b7c6d1e")],
+      [`${CFW}/fix-resize`, this.detail(`${CFW}/fix-resize`, "origin/main", manyFiles(), "1f2e3d4caa")],
+      [GP, this.detail(GP, "origin/main", [{ path: "src/renderer/atlas.zig", status: "M", added: 12, deleted: 3, uncommitted: true }])],
     ]);
     this.prDiffs = new PrDiffWorld({ shas: (slug, number) => this.prDetails.shas(slug, number), count: (rpc) => { this.count(rpc); } });
     this.prDetails = new PrDetailWorld({
@@ -438,7 +434,7 @@ export class GhWorld {
 
   /** The thread info card's fixtures: a worktree's changes against its base (its detail's files). */
   setCardDetail(projectId: string, path: string, files: { path: string; added: number; deleted: number; uncommitted?: boolean }[]): void {
-    const d = this.detail(path, "origin/main", files.map((f) => ({ status: f.added > 0 && f.deleted === 0 ? "A" : "M", ...f })), []);
+    const d = this.detail(path, "origin/main", files.map((f) => ({ status: f.added > 0 && f.deleted === 0 ? "A" : "M", ...f })));
     this.details.set(path, { ...d, projectId });
     this.publishProjectEvent({ event: { case: "worktreeDetailUpdated", value: { projectId, path, computedAt: d.computedAt } } });
   }
@@ -450,17 +446,15 @@ export class GhWorld {
     return all.find((p) => p.repoSlug.toLowerCase() === slug.toLowerCase() && p.number === number);
   }
 
-  private detail(path: string, baseRef: string, files: FileInit[], log: [string, string, number][]): DetailInit {
+  private detail(path: string, baseRef: string, files: FileInit[], head = "3c3c4651aa"): DetailInit {
     return {
       projectId: path.startsWith(GP) ? "repo-gp" : "repo-cf",
       path,
       baseRef,
       mergeBase: "3c3c4651aa",
-      head: log[0]?.[0] ?? "3c3c4651aa",
+      head,
       files: files.map((f) => ({ oldPath: "", added: 0, deleted: 0, binary: false, uncommitted: false, ...f })),
       filesTruncated: false,
-      log: log.map(([sha, subject, ago]) => ({ sha: `${sha}${"0".repeat(40 - sha.length)}`, shortSha: sha.slice(0, 7), subject, authorName: "Alex", authorEmail: "alex@example.com", authoredAt: this.at(ago) })),
-      logTotal: log.length,
       computedAt: this.at(5_000),
       error: "",
     };
@@ -505,7 +499,7 @@ export class GhWorld {
 
   getWorktreeDetail(projectId: string, path: string): DetailInit | null {
     this.count("GetWorktreeDetail");
-    return this.details.get(path) ?? (path.startsWith(HOME) ? { projectId, path, baseRef: "", files: [], log: [], computedAt: timestampFromDate(new Date()) } : null);
+    return this.details.get(path) ?? (path.startsWith(HOME) ? { projectId, path, baseRef: "", files: [], computedAt: timestampFromDate(new Date()) } : null);
   }
 
   // ---- controls (POST /__mock/gh/...) -------------------------------------------------

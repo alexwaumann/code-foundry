@@ -61,41 +61,27 @@ func emberFixture() *ember.Snapshot {
 
 func TestEmberService(t *testing.T) {
 	f, c := newEmberServer(t)
-	ctx := context.Background()
-	st, err := c.GetStatus(ctx, connect.NewRequest(&v1.GetEmberStatusRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s := st.Msg.GetStatus(); !s.GetEnabled() || s.GetThreadId() != "s-e" || s.GetEpoch() != 3 || !s.GetEpochStartedAt().AsTime().Equal(emberAt) ||
-		s.GetCounts().GetTodo() != 1 || s.GetEpochContextTokens() != 400000 || s.GetLastConsolidatedAt() != nil {
-		t.Errorf("status = %v", s)
-	}
-	all, err := c.ListTasks(ctx, connect.NewRequest(&v1.ListEmberTasksRequest{}))
-	if err != nil || len(all.Msg.GetTasks()) != 2 {
-		t.Fatalf("ListTasks = %v, %v", all, err)
-	}
-	tk := all.Msg.GetTasks()[0]
-	if tk.GetState() != v1.EmberTaskState_EMBER_TASK_STATE_TODO || tk.GetThread().GetStatus() != v1.ThreadStatus_THREAD_STATUS_BUSY ||
-		tk.GetThread().GetReportStatus() != v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED || tk.GetThread().GetReportSummary() != "needs a token" ||
-		tk.GetDoneAt() != nil {
-		t.Errorf("task = %v", tk)
-	}
-	if done := all.Msg.GetTasks()[1]; done.GetState() != v1.EmberTaskState_EMBER_TASK_STATE_DONE || done.GetThread() != nil || done.GetDoneAt() == nil || done.GetBranch() != "cf/old" {
-		t.Errorf("done task = %v", done)
-	}
-	open, err := c.ListTasks(ctx, connect.NewRequest(&v1.ListEmberTasksRequest{Open: true}))
-	if err != nil || len(open.Msg.GetTasks()) != 1 || open.Msg.GetTasks()[0].GetId() != "t-00000001" {
-		t.Errorf("open tasks = %v, %v", open, err)
-	}
-
-	wctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := c.WatchBoard(wctx, connect.NewRequest(&v1.WatchEmberBoardRequest{}))
+	stream, err := c.WatchBoard(ctx, connect.NewRequest(&v1.WatchEmberBoardRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !stream.Receive() || len(stream.Msg().GetTasks()) != 2 {
 		t.Fatalf("first board: %v, %v", stream.Msg(), stream.Err())
+	}
+	if s := stream.Msg().GetStatus(); !s.GetEnabled() || s.GetThreadId() != "s-e" || s.GetEpoch() != 3 || !s.GetEpochStartedAt().AsTime().Equal(emberAt) ||
+		s.GetCounts().GetTodo() != 1 || s.GetEpochContextTokens() != 400000 || s.GetLastConsolidatedAt() != nil {
+		t.Errorf("status = %v", s)
+	}
+	tk := stream.Msg().GetTasks()[0]
+	if tk.GetState() != v1.EmberTaskState_EMBER_TASK_STATE_TODO || tk.GetThread().GetStatus() != v1.ThreadStatus_THREAD_STATUS_BUSY ||
+		tk.GetThread().GetReportStatus() != v1.ThreadReportStatus_THREAD_REPORT_STATUS_BLOCKED || tk.GetThread().GetReportSummary() != "needs a token" ||
+		tk.GetDoneAt() != nil {
+		t.Errorf("task = %v", tk)
+	}
+	if done := stream.Msg().GetTasks()[1]; done.GetState() != v1.EmberTaskState_EMBER_TASK_STATE_DONE || done.GetThread() != nil || done.GetDoneAt() == nil || done.GetBranch() != "cf/old" {
+		t.Errorf("done task = %v", done)
 	}
 	if len(stream.Msg().GetTimers()) != 0 {
 		t.Errorf("timers on the first board: %v", stream.Msg().GetTimers())

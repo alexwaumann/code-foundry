@@ -110,7 +110,7 @@ func TestTranscriptMissingRefuses(t *testing.T) {
 			return err
 		}},
 		{name: "reconnect", call: func(e *env, id string) error {
-			_, err := e.m.Reconnect(e.ctx(), id)
+			_, err := e.m.reconnect(e.ctx(), id)
 			return err
 		}},
 		{name: "mcp refresh", call: func(e *env, id string) error {

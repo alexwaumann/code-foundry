@@ -9,8 +9,8 @@ import "codefoundry/v1/project.proto";
 
 // Thread lifecycle messages: the thread record (Thread), its state and status, and the
 // requests and events of ThreadService's lifecycle RPCs (Create, Fork, List, Get, Rename,
-// Close, Reconnect, Remove, RunIn, Pin, Archive, Snooze, Label, Report, SetBudget, Watch,
-// StageAttachment, ReadAttachment). The service itself is in thread.proto.
+// Remove, RunIn, Pin, Archive, Snooze, Label, Report, SetBudget, StageAttachment,
+// ReadAttachment) and the thread list's events. The service itself is in thread.proto.
 
 // PermissionMode maps to claude --permission-mode. Full access (bypassPermissions) is
 // deliberately not offered.
@@ -215,7 +215,7 @@ message Thread {
   // its own, or IDLE "archived" or "snoozed" when an archive or a snooze stopped it), across daemon restarts. Empty when
   // unknown.
   string status_reason = 18;
-  // Permission mode passed to claude; re-passed on Reconnect.
+  // Permission mode passed to claude; re-passed on every spawn.
   PermissionMode permission_mode = 19;
   // Ref the thread's worktree branch was created from, when Create made the worktree.
   string base_ref = 20;
@@ -305,14 +305,14 @@ message Thread {
   ApiRetry retry = 36;
   // When the user archived the thread (ThreadService.Archive); unset when it is not
   // archived. An archived thread is disconnected, unpinned and has no shells; the GUI
-  // lists it apart. Reconnect, Pin (pinned) and Send clear it. Persisted.
+  // lists it apart. Pin (pinned) and Send clear it. Persisted.
   google.protobuf.Timestamp archived_at = 37;
   // When a snoozed thread wakes (ThreadService.Snooze); unset when it is not snoozed.
   // A snoozed thread is disconnected, unpinned, not archived and has no shells; the GUI
   // lists it apart. The daemon checks the wall clock (every 30 s and at startup, so a
   // snooze that ended while the Mac slept or the daemon was stopped wakes as soon as it
   // can): waking clears this field and sets status NEEDS_ATTENTION with status_reason
-  // "snooze ended". Reconnect, Pin (pinned), Send and Archive (archived) clear it.
+  // "snooze ended". Pin (pinned), Send and Archive (archived) clear it.
   // Persisted.
   google.protobuf.Timestamp snoozed_until = 38;
   // Subagent runs still running: all of them (nested ones too), and those the thread
@@ -472,8 +472,8 @@ message Thread {
   // no wake time, so snoozed_until stays unset and the daemon never wakes it. Unset when
   // it is not saved. Otherwise like a snoozed thread: disconnected, unpinned, not
   // archived, no shells, listed apart with the snoozed ones. A timed snooze replaces it;
-  // Snooze with neither until nor save, Reconnect, Pin (pinned), Send and Archive
-  // (archived) clear it. Persisted. See docs/notes/save-for-later-1-daemon.md.
+  // Snooze with neither until nor save, Pin (pinned), Send and Archive (archived)
+  // clear it. Persisted. See docs/notes/save-for-later-1-daemon.md.
   google.protobuf.Timestamp saved_at = 76;
   // What Create is doing or did to set the thread up (internal/store/thread/setup.go):
   // the steps between the user's message and Claude starting. Set on every thread Create
@@ -700,7 +700,7 @@ message CreateThreadRequest {
   // When set, the thread has no project: it runs in the daemon's home directory with an
   // empty project_id and workspace_id (see the ownership rule on Thread). Exclusive with
   // project_id, worktree_path, new_worktree and workspace_id
-  // (InvalidArgument). RunIn refuses such a thread; Fork and Reconnect keep its cwd.
+  // (InvalidArgument). RunIn refuses such a thread; Fork keeps its cwd.
   bool no_project = 14;
   // The thread whose agent asks for this one (Thread.created_by); it must exist
   // (INVALID_ARGUMENT otherwise). The CLI sends $CODE_FOUNDRY_THREAD; the GUI never
@@ -1130,20 +1130,6 @@ message RegenerateNameResponse {
   Thread thread = 1;
 }
 
-message CloseThreadRequest {
-  string id = 1;
-}
-
-message CloseThreadResponse {}
-
-message ReconnectThreadRequest {
-  string id = 1;
-}
-
-message ReconnectThreadResponse {
-  Thread thread = 1;
-}
-
 message RemoveThreadRequest {
   string id = 1;
 }
@@ -1476,8 +1462,6 @@ message SetThreadBudgetRequest {
 message SetThreadBudgetResponse {
   Thread thread = 1;
 }
-
-message WatchThreadsRequest {}
 
 message ThreadListEvent {
   oneof event {

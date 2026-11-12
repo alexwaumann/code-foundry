@@ -23,7 +23,7 @@ func newPluginServer(t *testing.T) (*plugintest.Fake, codefoundryv1connect.Plugi
 	t.Helper()
 	b := bus.New()
 	fake := plugintest.New(b)
-	route := NewPlugin(fake, b).Route()
+	route := NewPlugin(fake).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewUnstartedServer(mux)
@@ -116,16 +116,13 @@ func TestPluginService(t *testing.T) {
 	}
 }
 
-func TestPluginWatch(t *testing.T) {
-	fake, c := newPluginServer(t)
+func TestPluginEvents(t *testing.T) {
+	b := bus.New()
+	fake := plugintest.New(b)
 	fake.Put(helloPlugin())
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchPluginsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = stream.Close() }()
+	stream := watchSource(t, ctx, EventsDeps{Bus: b, Plugin: fake}, v1.EventSource_EVENT_SOURCE_PLUGIN, (*v1.Event).GetPlugin)
 	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetPlugins()) != 1 {
 		t.Fatalf("first = %v, %v", stream.Msg(), stream.Err())
 	}
@@ -145,8 +142,8 @@ func TestPluginListDirs(t *testing.T) {
 		h             *Plugin
 		plugins, data string
 	}{
-		{"unset", NewPlugin(fake, b), "", ""},
-		{"set", NewPlugin(fake, b).WithDirs("/home/u/.cf/plugins", "/home/u/.cf/plugin-data"), "/home/u/.cf/plugins", "/home/u/.cf/plugin-data"},
+		{"unset", NewPlugin(fake), "", ""},
+		{"set", NewPlugin(fake).WithDirs("/home/u/.cf/plugins", "/home/u/.cf/plugin-data"), "/home/u/.cf/plugins", "/home/u/.cf/plugin-data"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := tc.h.List(context.Background(), connect.NewRequest(&v1.ListPluginsRequest{}))

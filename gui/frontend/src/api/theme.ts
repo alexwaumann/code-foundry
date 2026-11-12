@@ -1,7 +1,7 @@
 /**
  * The colour themes (docs/notes/user-themes.md) as view models: the user's own theme
- * files with their contents, from the EventService theme source (ThemeService.Watch's
- * events; the GUI holds one events stream). The GUI resolves a user theme's slots
+ * files with their contents, from the EventService theme source (the GUI holds one
+ * events stream). The GUI resolves a user theme's slots
  * with the same rules as the catalog's (src/themes); the daemon derives no colour. Saving,
  * copying and deleting are the theme.* commands.
  */

@@ -18,9 +18,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/theme"
 )
 
-// newThemeServer serves ThemeService and EventService (the theme source only) over a
-// themes directory holding a copy of Nord, made by a thread, and a broken file.
-func newThemeServer(t *testing.T) (*usertheme.Store, codefoundryv1connect.ThemeServiceClient, codefoundryv1connect.EventServiceClient) {
+// newThemeServer serves EventService (the theme source only) over a themes directory
+// holding a copy of Nord, made by a thread, and a broken file.
+func newThemeServer(t *testing.T) (*usertheme.Store, codefoundryv1connect.EventServiceClient) {
 	t.Helper()
 	b := bus.New()
 	s := usertheme.New(usertheme.Options{Dir: filepath.Join(t.TempDir(), "themes"), Bus: b, Log: slog.New(slog.DiscardHandler)})
@@ -34,23 +34,18 @@ func newThemeServer(t *testing.T) (*usertheme.Store, codefoundryv1connect.ThemeS
 	done := make(chan struct{})
 	t.Cleanup(func() { close(done) })
 	mux := http.NewServeMux()
-	for _, r := range []Route{NewTheme(s, b).Route(), NewEvents(EventsDeps{Bus: b, Themes: s, Done: done}).Route()} {
-		mux.Handle(r.Path, r.Handler)
-	}
+	r := NewEvents(EventsDeps{Bus: b, Themes: s, Done: done}).Route()
+	mux.Handle(r.Path, r.Handler)
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
-	return s, codefoundryv1connect.NewThemeServiceClient(srv.Client(), srv.URL), codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)
+	return s, codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL)
 }
 
-func TestThemeList(t *testing.T) {
-	s, c, _ := newThemeServer(t)
-	res, err := c.List(context.Background(), connect.NewRequest(&v1.ListThemesRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := res.Msg.GetThemes()
+func TestThemeSnapshotToProto(t *testing.T) {
+	s, _ := newThemeServer(t)
+	m := themeSnapshotToProto(s, s.Snapshot())
 	if len(m.GetCurated()) != len(theme.Themes()) || m.GetCurated()[0].GetId() != "github-dark" || m.GetCurated()[0].GetPair() != "github-light" || m.GetDir() != s.Dir() || m.GetVersion() == 0 {
 		t.Errorf("snapshot = %v", m)
 	}
@@ -77,33 +72,18 @@ func TestThemeList(t *testing.T) {
 	if _, err := s.Save(f); err != nil {
 		t.Fatal(err)
 	}
-	res, err = c.List(context.Background(), connect.NewRequest(&v1.ListThemesRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if h := res.Msg.GetThemes().GetUser()[0].GetHistory(); len(h) != 1 || h[0] != was {
+	if h := themeSnapshotToProto(s, s.Snapshot()).GetUser()[0].GetHistory(); len(h) != 1 || h[0] != was {
 		t.Errorf("history = %v, want [%s]", h, was)
 	}
 }
 
-func TestThemeWatchAndEvents(t *testing.T) {
-	s, c, ev := newThemeServer(t)
+func TestThemeEvents(t *testing.T) {
+	s, ev := newThemeServer(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThemesRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
 	events, err := ev.Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: []v1.EventSource{v1.EventSource_EVENT_SOURCE_THEME}}))
 	if err != nil {
 		t.Fatal(err)
-	}
-	next := func() *v1.ThemeSnapshot {
-		t.Helper()
-		if !stream.Receive() {
-			t.Fatalf("stream ended: %v", stream.Err())
-		}
-		return stream.Msg().GetSnapshot()
 	}
 	nextEvent := func() *v1.Event {
 		t.Helper()
@@ -115,20 +95,15 @@ func TestThemeWatchAndEvents(t *testing.T) {
 		t.Fatalf("events ended: %v", events.Err())
 		return nil
 	}
-	first := next()
-	if len(first.GetUser()) != 1 {
-		t.Fatalf("first = %v", first)
-	}
-	if e := nextEvent(); e.GetSeq() != 0 || len(e.GetTheme().GetSnapshot().GetUser()) != 1 {
-		t.Fatalf("snapshot event = %v", e)
+	first := nextEvent()
+	if first.GetSeq() != 0 || len(first.GetTheme().GetSnapshot().GetUser()) != 1 {
+		t.Fatalf("snapshot event = %v", first)
 	}
 	if _, err := s.Delete("nord-copy"); err != nil {
 		t.Fatal(err)
 	}
-	if m := next(); len(m.GetUser()) != 0 || m.GetVersion() != first.GetVersion()+1 {
-		t.Errorf("after delete = %v", m)
-	}
-	if e := nextEvent(); e.GetSeq() == 0 || len(e.GetTheme().GetSnapshot().GetUser()) != 0 {
+	if e := nextEvent(); e.GetSeq() == 0 || len(e.GetTheme().GetSnapshot().GetUser()) != 0 ||
+		e.GetTheme().GetSnapshot().GetVersion() != first.GetTheme().GetSnapshot().GetVersion()+1 {
 		t.Errorf("live event = %v", e)
 	}
 }

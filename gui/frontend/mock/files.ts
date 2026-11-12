@@ -1,5 +1,5 @@
 /**
- * FilesystemService.ReadFile and ProjectService.GetWorktreeFileDiff for the mock daemon
+ * FilesystemService.ReadFile and ProjectService.GetWorktreeCompareFile for the mock daemon
  * (the File and Diff panel tabs, docs/notes/file-viewer-3-tabs.md). A small fixed disk in
  * the code-foundry main worktree (a README, a TypeScript file, HTML pages, images, PDFs and
  * a folder), and every changed file of a worktree detail (mock/github.ts)
@@ -12,9 +12,9 @@
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { timestampFromMs, type Timestamp } from "@bufbuild/protobuf/wkt";
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
-import { DiffScope, DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type GetWorktreeFileDiffResponseSchema, type ListCompareCommitsResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
+import { DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type ListCompareCommitsResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
@@ -24,7 +24,6 @@ import { testPdf } from "./pdf";
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
 type WriteInit = MessageInitShape<typeof WriteFileResponseSchema>;
 type PreviewInit = MessageInitShape<typeof PreviewFileResponseSchema>;
-type DiffInit = MessageInitShape<typeof GetWorktreeFileDiffResponseSchema>;
 type CompareInit = MessageInitShape<typeof CompareWorktreeResponseSchema>;
 type CompareLogInit = MessageInitShape<typeof ListCompareCommitsResponseSchema>;
 
@@ -50,7 +49,6 @@ export interface DetailFiles {
   projectId: string;
   baseRef?: string;
   files?: ChangedFile[];
-  log?: { sha?: string; shortSha?: string; subject?: string; authoredAt?: Timestamp }[];
 }
 
 const CF = `${HOME}/src/code-foundry`;
@@ -521,19 +519,17 @@ export class MockFiles {
     return { ...meta, files, totalFiles: files.length, totalAdded: files.reduce((n, f) => n + f.added, 0), totalDeleted: files.reduce((n, f) => n + f.deleted, 0) };
   }
 
-  /** The commits of a comparison: the worktree's log whatever the sides, each the next one's child; the last is a root. */
+  /** The commits of a comparison, whatever the sides (the count compare/commits sets), each the next one's child; the last is a root. */
   compareCommits(worktree: string): CompareLogInit {
     const log = this.compareLog(worktree);
-    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject ?? ""}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
+    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
     return { commits, total: commits.length };
   }
 
-  /** The worktree's log and the older commits asked for. */
+  /** The commits asked for, newest first. */
   private compareLog(worktree: string) {
-    const detail = this.detailOf(worktree);
-    if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
-    const older = Array.from({ length: this.extraCompareCommits }, (_, i) => ({ sha: `e${String(i).padStart(39, "0")}`, shortSha: `e${String(i).padStart(6, "0")}`, subject: `Older commit ${String(i).padStart(4, "0")}`, authoredAt: timestampFromMs(Date.now() - (i + 1) * 3_600_000) }));
-    return [...(detail.log ?? []), ...older];
+    if (!this.detailOf(worktree)) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
+    return Array.from({ length: this.extraCompareCommits }, (_, i) => ({ sha: `e${String(i).padStart(39, "0")}`, shortSha: `e${String(i).padStart(6, "0")}`, subject: `Older commit ${String(i).padStart(4, "0")}`, authoredAt: timestampFromMs(Date.now() - (i + 1) * 3_600_000) }));
   }
 
   /** The message under a commit's subject: the newest commit has one. */
@@ -546,18 +542,15 @@ export class MockFiles {
   compareFile(worktree: string, base: CompareSide, head: CompareSide, file: string, oldPath: string): CompareFileInit {
     const missing = [base, head].find((s) => s?.kind === DiffSourceKind.REF && s.ref.startsWith("gone/"));
     if (missing) return { error: `${missing.ref} does not name a commit in this checkout` };
-    const d = this.fileDiff(worktree, file, oldPath, head?.kind === DiffSourceKind.REF && !isCommit(head) ? DiffScope.BRANCH : DiffScope.WORKING);
-    return { old: d.old, new: d.new, status: d.status, error: d.error };
+    return this.fileDiff(worktree, file, oldPath, head?.kind === DiffSourceKind.REF && !isCommit(head));
   }
 
-  fileDiff(worktree: string, file: string, oldPath: string, scope: DiffScope): DiffInit {
+  /** A file's two sides against the merge base: the branch's (branch) or the working tree's. */
+  fileDiff(worktree: string, file: string, oldPath: string, branch: boolean): CompareFileInit {
     if (!file || file.startsWith("/") || file.split("/").includes("..")) throw new ConnectError(`file ${JSON.stringify(file)} must be a path inside the worktree`, Code.InvalidArgument);
     const detail = this.detailOf(worktree);
     if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
-    const branch = scope === DiffScope.BRANCH;
-    const baseRef = detail.baseRef ?? "";
-    const meta = { baseRef, mergeBase: baseRef ? "c6d3bc2477aa" : "", head: "ddc0461310bb" };
-    if (branch && !baseRef) return { ...meta, error: "the worktree has no base branch to compare with" };
+    if (branch && !detail.baseRef) return { error: "the worktree has no base branch to compare with" };
     const change = detail.files?.find((f) => f.path === file);
     const disk = this.onDisk(`${worktree}/${file}`);
     const nowText = disk && !disk.binary ? new TextDecoder().decode(disk.data) : "";
@@ -565,27 +558,27 @@ export class MockFiles {
     const absent = { present: false };
     if (!change) {
       // Unchanged (or unknown): both sides the file as it is.
-      return disk ? { ...meta, old: side(true, nowText, disk.binary), new: side(true, nowText, disk.binary), status: "" } : { ...meta, old: absent, new: absent, status: "" };
+      return disk ? { old: side(true, nowText, disk.binary), new: side(true, nowText, disk.binary), status: "" } : { old: absent, new: absent, status: "" };
     }
     // Only in the working tree: the branch has nothing of it (untracked) or the base's version (modified).
     if (branch && change.uncommitted) {
-      if (change.status === "?" || change.status === "A") return { ...meta, old: absent, new: absent, status: "" };
+      if (change.status === "?" || change.status === "A") return { old: absent, new: absent, status: "" };
       const base = olderOf(file, nowText);
-      return { ...meta, old: side(true, base), new: side(true, base), status: "" };
+      return { old: side(true, base), new: side(true, base), status: "" };
     }
     const binary = change.binary ?? false;
     switch (change.status) {
       case "A":
       case "?":
-        return { ...meta, old: absent, new: side(true, nowText, binary), status: "A" };
+        return { old: absent, new: side(true, nowText, binary), status: "A" };
       case "D": {
         const gone = generated(file);
-        return { ...meta, old: side(true, gone, binary), new: absent, status: "D" };
+        return { old: side(true, gone, binary), new: absent, status: "D" };
       }
       case "R":
-        return { ...meta, old: side(true, olderOf(oldPath || file, nowText)), new: side(true, nowText), status: oldPath && oldPath !== file ? "R" : "M" };
+        return { old: side(true, olderOf(oldPath || file, nowText)), new: side(true, nowText), status: oldPath && oldPath !== file ? "R" : "M" };
       default:
-        return { ...meta, old: side(true, olderOf(file, nowText), binary), new: side(true, nowText, binary), status: "M" };
+        return { old: side(true, olderOf(file, nowText), binary), new: side(true, nowText, binary), status: "M" };
     }
   }
 }

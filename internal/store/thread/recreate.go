@@ -15,7 +15,7 @@ import (
 // Recreating a cleaned-up worktree (docs/notes/recreate-worktree.md). A cleanup
 // (project.worktree.cleanup) removes merged worktrees the app made and keeps their
 // branches. A thread whose worktree went that way is made whole again when something
-// starts its Claude (a message, Reconnect, running): the worktree is made again at the
+// starts its Claude (a message, running): the worktree is made again at the
 // same path, so Claude's transcript (keyed by the path) is found and --resume keeps its
 // memory. Viewing a thread never recreates anything.
 //

@@ -41,16 +41,6 @@ service ThreadService {
   // for a resident thread, a thread with no user message yet, or one already being
   // renamed. See docs/notes/regenerate-thread-name.md.
   rpc RegenerateName(RegenerateNameRequest) returns (RegenerateNameResponse) {}
-  // Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-  // then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
-  // since 2026-10-15: the daemon starts a thread's process when a message is sent
-  // (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
-  // Kept for compatibility.
-  rpc Close(CloseThreadRequest) returns (CloseThreadResponse) {}
-  // Reconnect resumes a DISCONNECTED thread in a new claude process, without a
-  // prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
-  // Kept for compatibility.
-  rpc Reconnect(ReconnectThreadRequest) returns (ReconnectThreadResponse) {}
   // Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
   // the same way and first, every thread below it (ThreadFilter.archive_cascade_of lists
   // them, with include_archived), archived ones included. A thread of those that fails
@@ -134,11 +124,11 @@ service ThreadService {
   // Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
   // the GUI's thread list. Persisted; any state.
   rpc Pin(PinThreadRequest) returns (PinThreadResponse) {}
-  // Archive archives or unarchives a thread. Archiving ends Claude gracefully like
-  // Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
-  // it and records archived_at (kept when it is already archived). Unarchiving only
-  // clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
-  // Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+  // Archive archives or unarchives a thread. Archiving ends Claude gracefully
+  // (interrupt, stdin closed, bounded wait, then kill; the thread is DISCONNECTED), kills
+  // and removes the thread's shells, unpins it and records archived_at (kept when it is
+  // already archived). Unarchiving only clears archived_at: the thread stays disconnected
+  // until a message starts it. Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
   // Archiving also archives, the same way and first, every thread below it (created by
   // it, by those, and so on: ThreadFilter.archive_cascade_of lists them). A thread of
   // those that fails is skipped and named in the error, which then comes after the
@@ -153,14 +143,14 @@ service ThreadService {
   // a workspace_id), whose cwd is that folder.
   rpc SetWorkspace(SetThreadWorkspaceRequest) returns (SetThreadWorkspaceResponse) {}
   // Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
-  // Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+  // Claude gracefully like Archive (the thread is DISCONNECTED), kills and removes the
   // thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
   // replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
   // time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
   // still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
   // wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
-  // before then only clears snoozed_until. Reconnect, Pin
-  // (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+  // before then only clears snoozed_until. Pin (pinned), Send and Archive (archived)
+  // clear a snooze implicitly. Persisted.
   // With save instead of until it is the same with no wake time: saved_at is set,
   // snoozed_until stays unset and the daemon never wakes it; a request with neither, and
   // those implicit clears, end it too.
@@ -196,9 +186,6 @@ service ThreadService {
   // way to it, and stops its background shells. Child threads and subagents run on
   // (docs/notes/wait-list-daemon.md).
   rpc StopWaiting(StopThreadWaitingRequest) returns (StopThreadWaitingResponse) {}
-  // Watch streams changes to the thread list (every thread's record, not its items).
-  // The first event is a snapshot. WatchThread streams one thread's conversation.
-  rpc Watch(WatchThreadsRequest) returns (stream ThreadListEvent) {}
   // StageAttachment stores an image or PDF a message refers to and returns its path.
   // The file comes as bytes or as an absolute path the daemon reads (a file dropped on
   // or picked in the GUI). Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>

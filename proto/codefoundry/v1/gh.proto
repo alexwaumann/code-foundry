@@ -23,20 +23,6 @@ service GhService {
   // otherwise fetched through the paced queue; on fetch failure the stale cached copy
   // is returned with last_error set.
   rpc GetPullRequest(GetPullRequestRequest) returns (GetPullRequestResponse) {}
-  // ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
-  // caching rules as GetPullRequest.
-  rpc ListChecks(ListChecksRequest) returns (ListChecksResponse) {}
-  // Refresh polls now. With a repo_slug it returns when that poll has completed (with
-  // its error); an empty repo_slug only marks the poll due and returns without waiting.
-  rpc Refresh(RefreshGhRequest) returns (RefreshGhResponse) {}
-  // Track adds a repository to the poll (its default branch CI; the dashboards count
-  // its pull requests as tracked). The GitHub repositories of registered projects are
-  // tracked automatically; this is exposed for the CLI and debugging.
-  rpc Track(TrackGhRepoRequest) returns (TrackGhRepoResponse) {}
-  // Untrack removes a repository from the poll. Its cache is kept.
-  rpc Untrack(UntrackGhRepoRequest) returns (UntrackGhRepoResponse) {}
-  // Watch streams change notifications. Clients re-read with the Get RPCs.
-  rpc Watch(WatchGhRequest) returns (stream GhEvent) {}
   // GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
   // PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
   // involving them) and their monthly stats across GitHub, from the last poll. The
@@ -341,41 +327,6 @@ message GetPullRequestResponse {
   string last_error = 4;
 }
 
-message ListChecksRequest {
-  string repo_slug = 1;
-  // Branch name, tag, or commit SHA.
-  string ref = 2;
-}
-
-message ListChecksResponse {
-  // The commit the ref resolved to.
-  string sha = 1;
-  CheckRollup rollup = 2;
-  repeated CheckRun checks = 3;
-  google.protobuf.Timestamp fetched_at = 4;
-  string last_error = 5;
-}
-
-message RefreshGhRequest {
-  string repo_slug = 1;
-}
-
-message RefreshGhResponse {}
-
-message TrackGhRepoRequest {
-  string repo_slug = 1;
-}
-
-message TrackGhRepoResponse {}
-
-message UntrackGhRepoRequest {
-  string repo_slug = 1;
-}
-
-message UntrackGhRepoResponse {}
-
-message WatchGhRequest {}
-
 message GhEvent {
   reserved 1;
   reserved "pull_requests_updated";
@@ -535,9 +486,8 @@ message ActivityStats {
 }
 
 message GetDashboardRequest {
-  // Deprecated: ignored. The lists always hold every repository (they were filtered to
-  // tracked ones unless this was set).
-  bool include_untracked = 1;
+  reserved 1;
+  reserved "include_untracked";
 }
 
 message GetDashboardResponse {

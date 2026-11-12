@@ -174,7 +174,7 @@ func TestUnsnooze(t *testing.T) {
 			return s
 		}},
 		{name: "reconnect", wantState: StateConnected, act: func(e *env, id string) Thread {
-			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
+			if _, err := e.m.reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
 			return e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected })
@@ -196,7 +196,7 @@ func TestUnsnooze(t *testing.T) {
 		{name: "send", wantState: StateConnected, act: func(e *env, id string) Thread {
 			// Snooze only commits on a disconnected thread; a live snoozed one is what
 			// a send would meet after a race, so mark it by hand.
-			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
+			if _, err := e.m.reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
 			e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })
@@ -323,7 +323,7 @@ func TestSnoozeWakes(t *testing.T) {
 	}
 
 	// A reconnect clears the attention like a finished turn's on a disconnected thread.
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	got = e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })

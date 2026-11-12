@@ -203,12 +203,12 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Log: log.With("component", "page-fetch")})
 	defer pageFetch.Close()
 	threadAPI := api.NewThread(st.thread, events).WithFetch(pageFetch)
-	gitopsAPI := api.NewGitOps(st.gitops, events, ctx.Done())
-	ghAPI := api.NewGh(st.gh, events, ctx.Done())
+	gitopsAPI := api.NewGitOps(st.gitops)
+	ghAPI := api.NewGh(st.gh)
 	settingsAPI := api.NewSettings(st.settings).WithBackdrops(st.backdrops)
 	updateAPI := api.NewUpdate(st.update, events, ctx.Done())
-	workspaceAPI := api.NewWorkspace(st.workspace, events)
-	actionAPI := api.NewAction(st.action, events)
+	workspaceAPI := api.NewWorkspace(st.workspace)
+	actionAPI := api.NewAction(st.action)
 	dictationAPI := api.NewDictation(st.dictation, events)
 	searchAPI := api.NewSearch(st.search, events)
 	// The file viewer also reads the temp folders, where agents write; nothing else does.
@@ -243,7 +243,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	defer func() { _ = plugins.Close() }()
-	pluginAPI := api.NewPlugin(plugins, events).WithSurfaces(plugins).WithShots(shots).WithDirs(p.Plugins(), p.PluginData())
+	pluginAPI := api.NewPlugin(plugins).WithSurfaces(plugins).WithShots(shots).WithDirs(p.Plugins(), p.PluginData())
 	// Every claude spawn gets the plugins' session environments (plugin_hooks.go), and
 	// so does every new bottom-panel shell, without the add-dirs (plugin_env.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
@@ -360,9 +360,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		workspaceAPI.Route(),
 		actionAPI.Route(),
 		pluginAPI.Route(),
-		api.NewSkill(st.skills, events).Route(),
-		api.NewMemory(st.memory, events).Route(),
-		api.NewTheme(st.themes, events).Route(),
+		api.NewSkill(st.skills).Route(),
+		api.NewMemory(st.memory).Route(),
 		api.NewEmber(st.ember, events).Route(),
 		dictationAPI.Route(),
 		searchAPI.Route(),

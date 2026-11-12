@@ -11,7 +11,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin/plugintest"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
@@ -51,7 +50,7 @@ func (f *installFake) Uninstall(_ context.Context, name string, purge bool) (plu
 
 func newRegistryServer(t *testing.T, store plugin.Store) codefoundryv1connect.PluginServiceClient {
 	t.Helper()
-	route := NewPlugin(store, bus.New()).Route()
+	route := NewPlugin(store).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewUnstartedServer(mux)
@@ -121,9 +120,6 @@ func TestPluginRegistryService(t *testing.T) {
 	un, err := c.Uninstall(ctx, connect.NewRequest(&v1.UninstallPluginRequest{Name: "hello", Purge: true}))
 	if err != nil || un.Msg.GetRemoved() != "/p/hello" || un.Msg.GetPurged()[0] != "its logs" {
 		t.Errorf("uninstall = %v, %v", un, err)
-	}
-	if _, err := c.RefreshRegistries(ctx, connect.NewRequest(&v1.RefreshPluginRegistriesRequest{})); err != nil {
-		t.Error(err)
 	}
 
 	// A store without the registry half answers Unimplemented.

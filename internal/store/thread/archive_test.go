@@ -172,7 +172,7 @@ func TestUnarchive(t *testing.T) {
 			return s
 		}},
 		{name: "reconnect", wantState: StateConnected, act: func(e *env, id string) Thread {
-			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
+			if _, err := e.m.reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
 			return e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected })
@@ -187,7 +187,7 @@ func TestUnarchive(t *testing.T) {
 		{name: "send", wantState: StateConnected, act: func(e *env, id string) Thread {
 			// Archive only commits on a disconnected thread; a live archived one is
 			// what a send would meet after a race, so mark it by hand.
-			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
+			if _, err := e.m.reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
 			e.waitFor(id, "connected", func(s Thread) bool { return s.State == StateConnected && s.Status != StatusUnknown })

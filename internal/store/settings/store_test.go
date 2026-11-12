@@ -181,11 +181,44 @@ func TestUpdateRejects(t *testing.T) {
 	}
 }
 
+// watch returns the current snapshot followed by every change until ctx ends. If the
+// consumer falls behind, intermediate snapshots are skipped, never the latest.
+func (s *Store) watch(ctx context.Context) <-chan *Snapshot {
+	sub := bus.Subscribe[Changed](s.opts.Bus, 16)
+	out := make(chan *Snapshot, 1)
+	out <- s.Snapshot()
+	go func() {
+		defer close(out)
+		defer sub.Close()
+		dropped := uint64(0)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case ev, ok := <-sub.C():
+				if !ok {
+					return
+				}
+				snap := ev.Snapshot
+				if d := sub.Dropped(); d != dropped {
+					dropped, snap = d, s.Snapshot()
+				}
+				select {
+				case out <- snap:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return out
+}
+
 func TestExternalEdits(t *testing.T) {
 	s, _, path := openTest(t, "[appearance]\nfont_size = 14\n")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ch := s.Watch(ctx)
+	ch := s.watch(ctx)
 	if first := <-ch; first.Values[KeyFontSize] != "14" {
 		t.Fatalf("first snapshot font size = %s", first.Values[KeyFontSize])
 	}

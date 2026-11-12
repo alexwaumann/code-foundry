@@ -71,7 +71,7 @@ func TestFirstPromptSurvivesStop(t *testing.T) {
 			}
 		}, []string{"write the tests", "continue"}, []string{"write the tests", "continue"}},
 		{"a reconnect", func(e *env, id string) {
-			if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
+			if _, err := e.m.reconnect(e.ctx(), id); err != nil {
 				e.t.Fatal(err)
 			}
 		}, []string{"write the tests"}, []string{"write the tests"}},

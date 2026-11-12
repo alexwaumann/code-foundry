@@ -3,14 +3,12 @@ package api
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"slices"
 
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/workspace"
 )
 
@@ -18,15 +16,14 @@ import (
 // workspace.Store.
 type Workspace struct {
 	store workspace.Store
-	bus   *bus.Bus
 }
 
 var _ codefoundryv1connect.WorkspaceServiceHandler = (*Workspace)(nil)
 
 // NewWorkspace returns a WorkspaceService handler. b must be the bus the store
 // publishes workspace.Event on.
-func NewWorkspace(store workspace.Store, b *bus.Bus) *Workspace {
-	return &Workspace{store: store, bus: b}
+func NewWorkspace(store workspace.Store) *Workspace {
+	return &Workspace{store: store}
 }
 
 // Route mounts the service.
@@ -101,42 +98,6 @@ func (h *Workspace) Remove(ctx context.Context, req *connect.Request[v1.RemoveWo
 		return nil, workspaceError(err)
 	}
 	return connect.NewResponse(&v1.RemoveWorkspaceResponse{}), nil
-}
-
-// Watch sends a snapshot, then every workspace event. If the client falls behind and
-// events are dropped, it sends a fresh snapshot. Subscribing has the store read every
-// workspace's folder again (EnsureDirs), so the Projects page shows hand edits.
-func (h *Workspace) Watch(ctx context.Context, _ *connect.Request[v1.WatchWorkspacesRequest], stream *connect.ServerStream[v1.WorkspaceEvent]) error {
-	// Subscribe first so nothing published between snapshot and stream is lost. Each
-	// event carries full state, so applying queued older events still converges.
-	sub := bus.Subscribe[workspace.Event](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := h.store.EnsureDirs(ctx, ""); err != nil {
-		slog.WarnContext(ctx, "workspace folders on watch", "err", err)
-	}
-	if err := stream.Send(workspaceEventToProto(h.store.Snapshot())); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				ev = h.store.Snapshot()
-			}
-			if msg := workspaceEventToProto(ev); msg != nil {
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			}
-		}
-	}
 }
 
 // workspaceEventToProto converts a bus event (or a *workspace.Snapshot) to the wire

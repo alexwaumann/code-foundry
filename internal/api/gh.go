@@ -11,7 +11,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 )
 
@@ -22,16 +21,13 @@ const ghWatchBuffer = 64
 // Gh implements codefoundryv1connect.GhServiceHandler over a gh.Service.
 type Gh struct {
 	store gh.Service
-	bus   *bus.Bus
-	done  <-chan struct{}
 }
 
 var _ codefoundryv1connect.GhServiceHandler = (*Gh)(nil)
 
-// NewGh returns a GhService handler. Watch streams end when their request is cancelled
-// or done is closed (daemon shutdown); done may be nil.
-func NewGh(store gh.Service, b *bus.Bus, done <-chan struct{}) *Gh {
-	return &Gh{store: store, bus: b, done: done}
+// NewGh returns a GhService handler.
+func NewGh(store gh.Service) *Gh {
+	return &Gh{store: store}
 }
 
 // Route mounts the service.
@@ -67,95 +63,6 @@ func (h *Gh) GetPullRequest(ctx context.Context, req *connect.Request[v1.GetPull
 		FetchedAt:   timestamp(d.FetchedAt),
 		LastError:   d.LastError,
 	}), nil
-}
-
-// ListChecks returns the checks on a ref.
-func (h *Gh) ListChecks(ctx context.Context, req *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error) {
-	c, err := h.store.Checks(ctx, req.Msg.GetRepoSlug(), req.Msg.GetRef())
-	if err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.ListChecksResponse{
-		Sha:       c.SHA,
-		Rollup:    rollupToProto(c.Rollup),
-		Checks:    checkRunsToProto(c.Runs),
-		FetchedAt: timestamp(c.FetchedAt),
-		LastError: c.LastError,
-	}), nil
-}
-
-// Refresh forwards to the store.
-func (h *Gh) Refresh(ctx context.Context, req *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error) {
-	if err := h.store.Refresh(ctx, req.Msg.GetRepoSlug()); err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.RefreshGhResponse{}), nil
-}
-
-// Track forwards to the store.
-func (h *Gh) Track(_ context.Context, req *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error) {
-	if err := h.store.Track(req.Msg.GetRepoSlug()); err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.TrackGhRepoResponse{}), nil
-}
-
-// Untrack forwards to the store.
-func (h *Gh) Untrack(_ context.Context, req *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error) {
-	if err := h.store.Untrack(req.Msg.GetRepoSlug()); err != nil {
-		return nil, ghError(err)
-	}
-	return connect.NewResponse(&v1.UntrackGhRepoResponse{}), nil
-}
-
-// Watch streams change notifications until the client cancels or the daemon stops.
-func (h *Gh) Watch(ctx context.Context, _ *connect.Request[v1.WatchGhRequest], stream *connect.ServerStream[v1.GhEvent]) error {
-	polled := bus.Subscribe[gh.Polled](h.bus, ghWatchBuffer)
-	defer polled.Close()
-	viewer := bus.Subscribe[gh.ViewerUpdated](h.bus, ghWatchBuffer)
-	defer viewer.Close()
-	dash := bus.Subscribe[gh.DashboardUpdated](h.bus, ghWatchBuffer)
-	defer dash.Close()
-	act := bus.Subscribe[gh.RepoActivityUpdated](h.bus, ghWatchBuffer)
-	defer act.Close()
-	branch := bus.Subscribe[gh.BranchPullRequestsUpdated](h.bus, ghWatchBuffer)
-	defer branch.Close()
-	detail := bus.Subscribe[gh.PullRequestDetailUpdated](h.bus, ghWatchBuffer)
-	defer detail.Close()
-	changed := bus.Subscribe[gh.PullRequestChanged](h.bus, ghChangedBuffer)
-	defer changed.Close()
-	// Flush response headers now: clients (connect-go and connect-web) block until they
-	// arrive, and the first event may be a poll interval away. Subscribing first means
-	// nothing published after the client sees the stream open is missed.
-	if err := stream.Send(nil); err != nil {
-		return err
-	}
-	for {
-		var ev *v1.GhEvent
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-h.done:
-			return nil
-		case e := <-polled.C():
-			ev = ghPolledEvent(e)
-		case e := <-viewer.C():
-			ev = ghViewerEvent(e)
-		case e := <-dash.C():
-			ev = ghDashboardEvent(e)
-		case e := <-act.C():
-			ev = ghRepoActivityEvent(e)
-		case e := <-branch.C():
-			ev = ghBranchEvent(e)
-		case e := <-detail.C():
-			ev = ghDetailEvent(e)
-		case e := <-changed.C():
-			ev = ghPullRequestChangedEvent(e)
-		}
-		if err := stream.Send(ev); err != nil {
-			return err
-		}
-	}
 }
 
 // ghPolledEvent and ghViewerEvent map gh bus events; shared with EventService.

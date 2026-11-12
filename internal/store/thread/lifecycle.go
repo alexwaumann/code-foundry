@@ -126,7 +126,7 @@ type startOpts struct {
 	// into the timeline at once, and a failure to start is told there too (an error
 	// item, status error) instead of failing the call. nil starts without a prompt.
 	first *outgoing
-	// backToList unarchives and unsnoozes the thread (a message, Reconnect).
+	// backToList unarchives and unsnoozes the thread (a message).
 	backToList bool
 	// move starts the thread for a Move (move.go): the destination's --add-dir list.
 	move *moveJob

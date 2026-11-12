@@ -9,21 +9,19 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 )
 
 // Action implements codefoundryv1connect.ActionServiceHandler over an action.Store.
 type Action struct {
 	store action.Store
-	bus   *bus.Bus
 }
 
 var _ codefoundryv1connect.ActionServiceHandler = (*Action)(nil)
 
 // NewAction returns an ActionService handler. b must be the bus the store publishes
 // action.Event on.
-func NewAction(store action.Store, b *bus.Bus) *Action { return &Action{store: store, bus: b} }
+func NewAction(store action.Store) *Action { return &Action{store: store} }
 
 // Route mounts the service.
 func (h *Action) Route(opts ...connect.HandlerOption) Route {
@@ -160,35 +158,6 @@ func (h *Action) StopRun(ctx context.Context, req *connect.Request[v1.StopAction
 		return nil, actionError(err)
 	}
 	return connect.NewResponse(&v1.StopActionRunResponse{Run: actionRunToProto(r)}), nil
-}
-
-// Watch sends a snapshot, then every action event; a fresh snapshot after drops.
-func (h *Action) Watch(ctx context.Context, _ *connect.Request[v1.WatchActionsRequest], stream *connect.ServerStream[v1.ActionEvent]) error {
-	sub := bus.Subscribe[action.Event](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := stream.Send(actionEventToProto(h.store.Snapshot())); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				ev = h.store.Snapshot()
-			}
-			if msg := actionEventToProto(ev); msg != nil {
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			}
-		}
-	}
 }
 
 // actionEventToProto converts a bus event (or a *action.Snapshot) to the wire event.

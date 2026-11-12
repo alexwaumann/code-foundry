@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/memory.proto.
  */
 export const file_codefoundry_v1_memory: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9tZW1vcnkucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIr0BCgtNZW1vcnlFbnRyeRINCgVpbmRleBgBIAEoBRIMCgR0ZXh0GAIgASgJEgwKBGZpbGUYAyABKAkSKwoHY3JlYXRlZBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEQoJdGhyZWFkX2lkGAUgASgJEhMKC3RocmVhZF9uYW1lGAYgASgJEhAKCGluamVjdGVkGAcgASgIEgoKAmlkGAggASgJEhAKCGxlZnRfb3V0GAkgASgJItYBCg5NZW1vcnlTbmFwc2hvdBIsCgdlbnRyaWVzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RW50cnkSEAoIaW5qZWN0ZWQYAiABKAUSFgoOaW5qZWN0ZWRfYnl0ZXMYAyABKAUSEwoLbWF4X2VudHJpZXMYBCABKAUSEQoJbWF4X2J5dGVzGAUgASgFEhcKD21heF9lbnRyeV9jaGFycxgGIAEoBRILCgNkaXIYByABKAkSDQoFZXJyb3IYCCABKAkSDwoHdmVyc2lvbhgJIAEoBCISChBHZXRNZW1vcnlSZXF1ZXN0IkMKEUdldE1lbW9yeVJlc3BvbnNlEi4KBm1lbW9yeRgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90IhQKEldhdGNoTWVtb3J5UmVxdWVzdCI/CgtNZW1vcnlFdmVudBIwCghzbmFwc2hvdBgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90MqsBCg1NZW1vcnlTZXJ2aWNlEkwKA0dldBIgLmNvZGVmb3VuZHJ5LnYxLkdldE1lbW9yeVJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRNZW1vcnlSZXNwb25zZSIAEkwKBVdhdGNoEiIuY29kZWZvdW5kcnkudjEuV2F0Y2hNZW1vcnlSZXF1ZXN0GhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RXZlbnQiADABQsMBChJjb20uY29kZWZvdW5kcnkudjFCC01lbW9yeVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9tZW1vcnkucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIr0BCgtNZW1vcnlFbnRyeRINCgVpbmRleBgBIAEoBRIMCgR0ZXh0GAIgASgJEgwKBGZpbGUYAyABKAkSKwoHY3JlYXRlZBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASEQoJdGhyZWFkX2lkGAUgASgJEhMKC3RocmVhZF9uYW1lGAYgASgJEhAKCGluamVjdGVkGAcgASgIEgoKAmlkGAggASgJEhAKCGxlZnRfb3V0GAkgASgJItYBCg5NZW1vcnlTbmFwc2hvdBIsCgdlbnRyaWVzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuTWVtb3J5RW50cnkSEAoIaW5qZWN0ZWQYAiABKAUSFgoOaW5qZWN0ZWRfYnl0ZXMYAyABKAUSEwoLbWF4X2VudHJpZXMYBCABKAUSEQoJbWF4X2J5dGVzGAUgASgFEhcKD21heF9lbnRyeV9jaGFycxgGIAEoBRILCgNkaXIYByABKAkSDQoFZXJyb3IYCCABKAkSDwoHdmVyc2lvbhgJIAEoBCISChBHZXRNZW1vcnlSZXF1ZXN0IkMKEUdldE1lbW9yeVJlc3BvbnNlEi4KBm1lbW9yeRgBIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLk1lbW9yeVNuYXBzaG90Ij8KC01lbW9yeUV2ZW50EjAKCHNuYXBzaG90GAEgASgLMh4uY29kZWZvdW5kcnkudjEuTWVtb3J5U25hcHNob3QyXQoNTWVtb3J5U2VydmljZRJMCgNHZXQSIC5jb2RlZm91bmRyeS52MS5HZXRNZW1vcnlSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuR2V0TWVtb3J5UmVzcG9uc2UiAELDAQoSY29tLmNvZGVmb3VuZHJ5LnYxQgtNZW1vcnlQcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * MemoryEntry is one remembered preference.
@@ -198,19 +198,6 @@ export const GetMemoryResponseSchema: GenMessage<GetMemoryResponse> = /*@__PURE_
   messageDesc(file_codefoundry_v1_memory, 3);
 
 /**
- * @generated from message codefoundry.v1.WatchMemoryRequest
- */
-export type WatchMemoryRequest = Message<"codefoundry.v1.WatchMemoryRequest"> & {
-};
-
-/**
- * Describes the message codefoundry.v1.WatchMemoryRequest.
- * Use `create(WatchMemoryRequestSchema)` to create a new message.
- */
-export const WatchMemoryRequestSchema: GenMessage<WatchMemoryRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_memory, 4);
-
-/**
  * MemoryEvent carries the whole memory, on connect and per change.
  *
  * @generated from message codefoundry.v1.MemoryEvent
@@ -227,7 +214,7 @@ export type MemoryEvent = Message<"codefoundry.v1.MemoryEvent"> & {
  * Use `create(MemoryEventSchema)` to create a new message.
  */
 export const MemoryEventSchema: GenMessage<MemoryEvent> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_memory, 5);
+  messageDesc(file_codefoundry_v1_memory, 4);
 
 /**
  * MemoryService reads the app memory (docs/notes/memory-dir.md): the user's standing
@@ -248,18 +235,6 @@ export const MemoryService: GenService<{
     methodKind: "unary";
     input: typeof GetMemoryRequestSchema;
     output: typeof GetMemoryResponseSchema;
-  },
-  /**
-   * Watch sends the memory as read now, then the whole memory again on every change a
-   * read or write sees. The GUI gets the same events from EventService
-   * (EVENT_SOURCE_MEMORY).
-   *
-   * @generated from rpc codefoundry.v1.MemoryService.Watch
-   */
-  watch: {
-    methodKind: "server_streaming";
-    input: typeof WatchMemoryRequestSchema;
-    output: typeof MemoryEventSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_memory, 0);

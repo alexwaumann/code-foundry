@@ -417,7 +417,7 @@ export enum EventSource {
    * Workspaces (branch sets). Sent right after project, before terminal: members name
    * projects, and threads name workspaces. Connecting (with the snapshot or a resume)
    * reads every workspace's folder again first (instructions, skills, links), so hand
-   * edits show without a spawn, as with WorkspaceService.Watch.
+   * edits show without a spawn.
    *
    * @generated from enum value: EVENT_SOURCE_WORKSPACE = 11;
    */
@@ -450,7 +450,7 @@ export enum EventSource {
 
   /**
    * The Skills marketplace: a SkillEvent with the current epoch (after plugin), then
-   * each new epoch (SkillService.Watch).
+   * each new epoch.
    *
    * @generated from enum value: EVENT_SOURCE_SKILL = 15;
    */
@@ -458,7 +458,7 @@ export enum EventSource {
 
   /**
    * The app memory: a MemoryEvent with the whole memory (after skill), then the whole
-   * memory again per change (MemoryService.Watch).
+   * memory again per change.
    *
    * @generated from enum value: EVENT_SOURCE_MEMORY = 16;
    */
@@ -466,7 +466,7 @@ export enum EventSource {
 
   /**
    * The colour themes: a ThemeEvent with every theme (after gitops, before settings,
-   * which name them), then all of them again per change (ThemeService.Watch).
+   * which name them), then all of them again per change.
    *
    * @generated from enum value: EVENT_SOURCE_THEME = 17;
    */
@@ -488,10 +488,10 @@ export const EventSourceSchema: GenEnum<EventSource> = /*@__PURE__*/
   enumDesc(file_codefoundry_v1_events, 1);
 
 /**
- * EventService multiplexes every store's Watch stream and UI intents onto one server
- * stream. Browsers reach the daemon over HTTP/1.1 with a 6-connection-per-origin limit,
- * so the GUI holds exactly one of these instead of one Watch per service. The per-service
- * Watch RPCs remain for the CLI and tests.
+ * EventService multiplexes every store's events and UI intents onto one server stream.
+ * Browsers reach the daemon over HTTP/1.1 with a 6-connection-per-origin limit, so the
+ * GUI holds exactly one of these instead of one stream per service; the CLI's `events`
+ * verb reads the same stream.
  *
  * @generated from service codefoundry.v1.EventService
  */

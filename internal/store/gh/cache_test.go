@@ -86,12 +86,9 @@ func TestCacheRoundTrip(t *testing.T) {
 		t.Errorf("missing detail ok=%v err=%v", ok, err)
 	}
 
-	rc := RefChecks{SHA: "abc", Runs: []CheckRun{{Name: "x"}}, FetchedAt: at}
-	if err := c.saveChecks(ctx, "o/r", "main", rc); err != nil {
+	// Prune also drops old rows of gh_ref_checks, which only older daemons wrote.
+	if _, err := c.db.ExecContext(ctx, `INSERT INTO gh_ref_checks (slug, ref, fetched_at, payload) VALUES ('o/r', 'main', ?, '{}')`, toMillis(at)); err != nil {
 		t.Fatal(err)
-	}
-	if got, ok, err := c.loadChecks(ctx, "o/r", "main"); err != nil || !ok || got.SHA != "abc" {
-		t.Errorf("checks = %+v ok=%v err=%v", got, ok, err)
 	}
 
 	// Prune drops old on-demand rows only.
@@ -101,8 +98,9 @@ func TestCacheRoundTrip(t *testing.T) {
 	if _, ok, _ := c.loadDetail(ctx, "o/r", 1); ok {
 		t.Error("detail survived prune")
 	}
-	if _, ok, _ := c.loadChecks(ctx, "o/r", "main"); ok {
-		t.Error("checks survived prune")
+	var checks int
+	if err := c.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM gh_ref_checks`).Scan(&checks); err != nil || checks != 0 {
+		t.Errorf("checks rows after prune = %d, %v", checks, err)
 	}
 	if snap, _ := c.loadSnapshot(ctx); snap.Viewer.Viewer == nil {
 		t.Error("prune dropped the viewer")

@@ -2624,7 +2624,7 @@ export class World {
     if (args.focus !== "false" && !s.createdBy) this.focusThread(s.id);
   }
 
-  /** UiService.Emit: delivered to UiService watchers and EventService watchers with UI. */
+  /** An intent as a command emits it: delivered to WatchIntents watchers and EventService watchers with UI. */
   emit(intent: UiIntentInit): number {
     return this.intents.publish(intent) + this.uiEventWatchers;
   }

@@ -50,7 +50,7 @@ func TestGhMergePullRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, client, _ := newGhTest(t)
+			store, client := newGhTest(t)
 			open := detailFixture(at) // #7 open
 			open.PullRequest.HeadRef, open.PullRequest.HeadSHA = "fix", "head-7"
 			store.SetFullPullRequest("o/r", open)
@@ -87,7 +87,7 @@ func TestGhMergePullRequest(t *testing.T) {
 }
 
 func TestGhDetailMergeFields(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	d := detailFixture(time.Date(2026, 10, 9, 6, 0, 0, 0, time.UTC))
 	d.MergeMethods = []gh.MergeMethod{gh.MergeCommit, gh.MergeRebase}
 	d.AutoMerge = true

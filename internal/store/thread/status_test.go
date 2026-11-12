@@ -196,7 +196,7 @@ func TestReconnectResetsTheStatus(t *testing.T) {
 	e, s := questionSetup.start(t)
 	e.exit(s.ID, 1)
 	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
-	r, err := e.m.Reconnect(e.ctx(), s.ID)
+	r, err := e.m.reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

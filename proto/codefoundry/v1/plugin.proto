@@ -40,9 +40,6 @@ service PluginService {
   rpc ListSecrets(ListPluginSecretsRequest) returns (ListPluginSecretsResponse) {}
   // DeleteSecret removes one of a plugin's secrets from the Keychain.
   rpc DeleteSecret(DeletePluginSecretRequest) returns (DeletePluginSecretResponse) {}
-  // Watch sends a snapshot, then every change. A client that falls behind gets a new
-  // snapshot.
-  rpc Watch(WatchPluginsRequest) returns (stream PluginEvent) {}
   // WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
   // first watcher opens it in the plugin (surface/open), the last one leaving hides it
   // and, after a grace, closes it. It sends the instance's state first, then its current
@@ -75,8 +72,6 @@ service PluginService {
   // and every registry's state. Indexes come from the cache (1 h) unless refresh.
   // docs/notes/plugins-7-registry.md.
   rpc Browse(BrowsePluginsRequest) returns (BrowsePluginsResponse) {}
-  // RefreshRegistries reads every registry again and returns their state.
-  rpc RefreshRegistries(RefreshPluginRegistriesRequest) returns (RefreshPluginRegistriesResponse) {}
   // Install installs a plugin from a registry, a GitHub release or a folder (see
   // InstallPluginRequest.ref): it downloads this platform's tarball, checks its SHA-256,
   // validates the package and swaps it in for plugins/<name> (the data dir stays). A new
@@ -385,8 +380,6 @@ message DeletePluginSecretRequest {
 
 message DeletePluginSecretResponse {}
 
-message WatchPluginsRequest {}
-
 message PluginEvent {
   oneof event {
     // Every plugin.
@@ -590,12 +583,13 @@ message PluginEnvironmentRequest {
   string name = 1;
 }
 
-// PluginEnvVar is one environment variable a plugin contributes.
+// PluginEnvVar is one environment variable a plugin contributes, its key only: a plugin
+// may push a token, so values stay in the daemon (and the threads it spawns)
+// (docs/notes/plugins-8-secrets-hardening.md).
 message PluginEnvVar {
   string key = 1;
-  // Never filled: a plugin may push a token, so values stay in the daemon (and the
-  // threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
-  string value = 2;
+  reserved 2;
+  reserved "value";
 }
 
 // PluginEnvironment is one plugin's contribution to new Claude threads, as applied.
@@ -742,12 +736,6 @@ message BrowsePluginsResponse {
   repeated PluginRegistry registries = 2;
   // This machine's platform ("darwin/arm64").
   string platform = 3;
-}
-
-message RefreshPluginRegistriesRequest {}
-
-message RefreshPluginRegistriesResponse {
-  repeated PluginRegistry registries = 1;
 }
 
 message InstallPluginRequest {

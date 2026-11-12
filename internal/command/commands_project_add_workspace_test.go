@@ -110,7 +110,7 @@ func TestProjectAddWorkspace(t *testing.T) {
 				backend = refusingRegister{Project: api.NewProject(projects, b), fail: tt.fail}
 			}
 			reg := command.NewRegistry()
-			if err := command.RegisterProjectAddWorkspace(reg, backend, api.NewWorkspace(spaces, b)); err != nil {
+			if err := command.RegisterProjectAddWorkspace(reg, backend, api.NewWorkspace(spaces)); err != nil {
 				t.Fatal(err)
 			}
 			res, err := reg.Invoke(context.Background(), command.Context{}, "project.add-workspace", map[string]string{"folder": tt.folder})

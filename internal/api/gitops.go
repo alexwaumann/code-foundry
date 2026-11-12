@@ -8,7 +8,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
 )
 
@@ -19,16 +18,13 @@ const gitopsWatchBuffer = 64
 // GitOps implements codefoundryv1connect.GitOpsServiceHandler over a gitops.Store.
 type GitOps struct {
 	store gitops.Store
-	bus   *bus.Bus
-	done  <-chan struct{}
 }
 
 var _ codefoundryv1connect.GitOpsServiceHandler = (*GitOps)(nil)
 
-// NewGitOps returns a GitOpsService handler. Watch streams end when done closes (daemon
-// shutdown); done may be nil.
-func NewGitOps(store gitops.Store, b *bus.Bus, done <-chan struct{}) *GitOps {
-	return &GitOps{store: store, bus: b, done: done}
+// NewGitOps returns a GitOpsService handler.
+func NewGitOps(store gitops.Store) *GitOps {
+	return &GitOps{store: store}
 }
 
 // Route mounts the service.
@@ -140,45 +136,6 @@ func (h *GitOps) OpenUrl(ctx context.Context, req *connect.Request[v1.OpenUrlReq
 	return connect.NewResponse(&v1.OpenUrlResponse{Op: gitOpToProto(op)}), nil
 }
 
-// List implements GitOpsServiceHandler.
-func (h *GitOps) List(context.Context, *connect.Request[v1.ListGitOpsRequest]) (*connect.Response[v1.ListGitOpsResponse], error) {
-	return connect.NewResponse(&v1.ListGitOpsResponse{Ops: gitOpsToProto(h.store.Snapshot().Ops)}), nil
-}
-
-// Watch implements GitOpsServiceHandler: a snapshot, then queued/started/finished
-// events. A client that falls behind gets a fresh snapshot instead of the missed events.
-func (h *GitOps) Watch(ctx context.Context, _ *connect.Request[v1.WatchGitOpsRequest], stream *connect.ServerStream[v1.GitOpsEvent]) error {
-	sub := bus.Subscribe[gitops.Event](h.bus, gitopsWatchBuffer)
-	defer sub.Close()
-	if err := stream.Send(gitopsSnapshotEvent(h.store.Snapshot())); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-h.done:
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			msg := gitopsEventToProto(ev)
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				msg = gitopsSnapshotEvent(h.store.Snapshot())
-			}
-			if msg == nil {
-				continue
-			}
-			if err := stream.Send(msg); err != nil {
-				return err
-			}
-		}
-	}
-}
-
 func gitopsError(err error) error {
 	code := connect.CodeInternal
 	switch {
@@ -200,7 +157,7 @@ func gitopsSnapshotEvent(s *gitops.Snapshot) *v1.GitOpsEvent {
 	return &v1.GitOpsEvent{Event: &v1.GitOpsEvent_Snapshot{Snapshot: &v1.GitOpsSnapshot{Ops: gitOpsToProto(s.Ops)}}}
 }
 
-// gitopsEventToProto maps a bus event; shared by Watch and the EventService source.
+// gitopsEventToProto maps a bus event for the EventService source.
 func gitopsEventToProto(ev gitops.Event) *v1.GitOpsEvent {
 	op := gitOpToProto(ev.Op)
 	switch ev.Type {

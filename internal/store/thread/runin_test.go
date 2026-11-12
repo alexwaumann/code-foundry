@@ -127,7 +127,7 @@ func TestRunInWithoutAProcess(t *testing.T) {
 	if err != nil || got.WorktreePath != e.wt || got.ProjectID != "r1" || got.PendingWorktreePath != "" {
 		t.Fatalf("disconnected move = %+v, %v", got, err)
 	}
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	spec := e.spec(s.ID)

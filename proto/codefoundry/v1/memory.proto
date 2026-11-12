@@ -12,10 +12,6 @@ import "google/protobuf/timestamp.proto";
 service MemoryService {
   // Get reads the memory now (a hand edit since the last read shows up here).
   rpc Get(GetMemoryRequest) returns (GetMemoryResponse) {}
-  // Watch sends the memory as read now, then the whole memory again on every change a
-  // read or write sees. The GUI gets the same events from EventService
-  // (EVENT_SOURCE_MEMORY).
-  rpc Watch(WatchMemoryRequest) returns (stream MemoryEvent) {}
 }
 
 // MemoryEntry is one remembered preference.
@@ -70,8 +66,6 @@ message GetMemoryRequest {}
 message GetMemoryResponse {
   MemorySnapshot memory = 1;
 }
-
-message WatchMemoryRequest {}
 
 // MemoryEvent carries the whole memory, on connect and per change.
 message MemoryEvent {

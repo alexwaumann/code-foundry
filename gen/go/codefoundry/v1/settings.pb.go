@@ -1036,42 +1036,6 @@ func (x *UpdateSettingsResponse) GetSettings() *SettingsSnapshot {
 	return nil
 }
 
-type WatchSettingsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WatchSettingsRequest) Reset() {
-	*x = WatchSettingsRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WatchSettingsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WatchSettingsRequest) ProtoMessage() {}
-
-func (x *WatchSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WatchSettingsRequest.ProtoReflect.Descriptor instead.
-func (*WatchSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{14}
-}
-
 // Backdrop is one image in the backdrops directory.
 type Backdrop struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1089,7 +1053,7 @@ type Backdrop struct {
 
 func (x *Backdrop) Reset() {
 	*x = Backdrop{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1101,7 +1065,7 @@ func (x *Backdrop) String() string {
 func (*Backdrop) ProtoMessage() {}
 
 func (x *Backdrop) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1114,7 +1078,7 @@ func (x *Backdrop) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Backdrop.ProtoReflect.Descriptor instead.
 func (*Backdrop) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{15}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Backdrop) GetName() string {
@@ -1160,7 +1124,7 @@ type ListBackdropsRequest struct {
 
 func (x *ListBackdropsRequest) Reset() {
 	*x = ListBackdropsRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1172,7 +1136,7 @@ func (x *ListBackdropsRequest) String() string {
 func (*ListBackdropsRequest) ProtoMessage() {}
 
 func (x *ListBackdropsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1149,7 @@ func (x *ListBackdropsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBackdropsRequest.ProtoReflect.Descriptor instead.
 func (*ListBackdropsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{15}
 }
 
 type ListBackdropsResponse struct {
@@ -1197,7 +1161,7 @@ type ListBackdropsResponse struct {
 
 func (x *ListBackdropsResponse) Reset() {
 	*x = ListBackdropsResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1209,7 +1173,7 @@ func (x *ListBackdropsResponse) String() string {
 func (*ListBackdropsResponse) ProtoMessage() {}
 
 func (x *ListBackdropsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1222,7 +1186,7 @@ func (x *ListBackdropsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBackdropsResponse.ProtoReflect.Descriptor instead.
 func (*ListBackdropsResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListBackdropsResponse) GetBackdrops() []*Backdrop {
@@ -1242,7 +1206,7 @@ type ImportBackdropRequest struct {
 
 func (x *ImportBackdropRequest) Reset() {
 	*x = ImportBackdropRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1254,7 +1218,7 @@ func (x *ImportBackdropRequest) String() string {
 func (*ImportBackdropRequest) ProtoMessage() {}
 
 func (x *ImportBackdropRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1267,7 +1231,7 @@ func (x *ImportBackdropRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportBackdropRequest.ProtoReflect.Descriptor instead.
 func (*ImportBackdropRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ImportBackdropRequest) GetPath() string {
@@ -1286,7 +1250,7 @@ type ImportBackdropResponse struct {
 
 func (x *ImportBackdropResponse) Reset() {
 	*x = ImportBackdropResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1298,7 +1262,7 @@ func (x *ImportBackdropResponse) String() string {
 func (*ImportBackdropResponse) ProtoMessage() {}
 
 func (x *ImportBackdropResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1311,7 +1275,7 @@ func (x *ImportBackdropResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImportBackdropResponse.ProtoReflect.Descriptor instead.
 func (*ImportBackdropResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ImportBackdropResponse) GetBackdrop() *Backdrop {
@@ -1330,7 +1294,7 @@ type RemoveBackdropRequest struct {
 
 func (x *RemoveBackdropRequest) Reset() {
 	*x = RemoveBackdropRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1342,7 +1306,7 @@ func (x *RemoveBackdropRequest) String() string {
 func (*RemoveBackdropRequest) ProtoMessage() {}
 
 func (x *RemoveBackdropRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1355,7 +1319,7 @@ func (x *RemoveBackdropRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBackdropRequest.ProtoReflect.Descriptor instead.
 func (*RemoveBackdropRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RemoveBackdropRequest) GetName() string {
@@ -1373,7 +1337,7 @@ type RemoveBackdropResponse struct {
 
 func (x *RemoveBackdropResponse) Reset() {
 	*x = RemoveBackdropResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1385,7 +1349,7 @@ func (x *RemoveBackdropResponse) String() string {
 func (*RemoveBackdropResponse) ProtoMessage() {}
 
 func (x *RemoveBackdropResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1398,7 +1362,7 @@ func (x *RemoveBackdropResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveBackdropResponse.ProtoReflect.Descriptor instead.
 func (*RemoveBackdropResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{20}
 }
 
 type ReadBackdropRequest struct {
@@ -1410,7 +1374,7 @@ type ReadBackdropRequest struct {
 
 func (x *ReadBackdropRequest) Reset() {
 	*x = ReadBackdropRequest{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1422,7 +1386,7 @@ func (x *ReadBackdropRequest) String() string {
 func (*ReadBackdropRequest) ProtoMessage() {}
 
 func (x *ReadBackdropRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1435,7 +1399,7 @@ func (x *ReadBackdropRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadBackdropRequest.ProtoReflect.Descriptor instead.
 func (*ReadBackdropRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ReadBackdropRequest) GetName() string {
@@ -1456,7 +1420,7 @@ type ReadBackdropResponse struct {
 
 func (x *ReadBackdropResponse) Reset() {
 	*x = ReadBackdropResponse{}
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1468,7 +1432,7 @@ func (x *ReadBackdropResponse) String() string {
 func (*ReadBackdropResponse) ProtoMessage() {}
 
 func (x *ReadBackdropResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_settings_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_settings_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1481,7 +1445,7 @@ func (x *ReadBackdropResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadBackdropResponse.ProtoReflect.Descriptor instead.
 func (*ReadBackdropResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_settings_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ReadBackdropResponse) GetData() []byte {
@@ -1575,8 +1539,7 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"V\n" +
 	"\x16UpdateSettingsResponse\x12<\n" +
-	"\bsettings\x18\x01 \x01(\v2 .codefoundry.v1.SettingsSnapshotR\bsettings\"\x16\n" +
-	"\x14WatchSettingsRequest\"\x97\x01\n" +
+	"\bsettings\x18\x01 \x01(\v2 .codefoundry.v1.SettingsSnapshotR\bsettings\"\x97\x01\n" +
 	"\bBackdrop\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x14\n" +
@@ -1605,12 +1568,11 @@ const file_codefoundry_v1_settings_proto_rawDesc = "" +
 	"\x11SETTING_TYPE_BOOL\x10\x03\x12\x15\n" +
 	"\x11SETTING_TYPE_ENUM\x10\x04\x12\x15\n" +
 	"\x11SETTING_TYPE_PATH\x10\x05\x12\x1b\n" +
-	"\x17SETTING_TYPE_KEYBINDING\x10\x062\xf7\x05\n" +
+	"\x17SETTING_TYPE_KEYBINDING\x10\x062\xa5\x05\n" +
 	"\x0fSettingsService\x12b\n" +
 	"\tGetSchema\x12(.codefoundry.v1.GetSettingsSchemaRequest\x1a).codefoundry.v1.GetSettingsSchemaResponse\"\x00\x12P\n" +
 	"\x03Get\x12\".codefoundry.v1.GetSettingsRequest\x1a#.codefoundry.v1.GetSettingsResponse\"\x00\x12Y\n" +
-	"\x06Update\x12%.codefoundry.v1.UpdateSettingsRequest\x1a&.codefoundry.v1.UpdateSettingsResponse\"\x00\x12P\n" +
-	"\x05Watch\x12$.codefoundry.v1.WatchSettingsRequest\x1a\x1d.codefoundry.v1.SettingsEvent\"\x000\x01\x12^\n" +
+	"\x06Update\x12%.codefoundry.v1.UpdateSettingsRequest\x1a&.codefoundry.v1.UpdateSettingsResponse\"\x00\x12^\n" +
 	"\rListBackdrops\x12$.codefoundry.v1.ListBackdropsRequest\x1a%.codefoundry.v1.ListBackdropsResponse\"\x00\x12a\n" +
 	"\x0eImportBackdrop\x12%.codefoundry.v1.ImportBackdropRequest\x1a&.codefoundry.v1.ImportBackdropResponse\"\x00\x12a\n" +
 	"\x0eRemoveBackdrop\x12%.codefoundry.v1.RemoveBackdropRequest\x1a&.codefoundry.v1.RemoveBackdropResponse\"\x00\x12[\n" +
@@ -1630,7 +1592,7 @@ func file_codefoundry_v1_settings_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_settings_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_codefoundry_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_codefoundry_v1_settings_proto_goTypes = []any{
 	(SettingType)(0),                  // 0: codefoundry.v1.SettingType
 	(*SettingField)(nil),              // 1: codefoundry.v1.SettingField
@@ -1647,24 +1609,23 @@ var file_codefoundry_v1_settings_proto_goTypes = []any{
 	(*GetSettingsResponse)(nil),       // 12: codefoundry.v1.GetSettingsResponse
 	(*UpdateSettingsRequest)(nil),     // 13: codefoundry.v1.UpdateSettingsRequest
 	(*UpdateSettingsResponse)(nil),    // 14: codefoundry.v1.UpdateSettingsResponse
-	(*WatchSettingsRequest)(nil),      // 15: codefoundry.v1.WatchSettingsRequest
-	(*Backdrop)(nil),                  // 16: codefoundry.v1.Backdrop
-	(*ListBackdropsRequest)(nil),      // 17: codefoundry.v1.ListBackdropsRequest
-	(*ListBackdropsResponse)(nil),     // 18: codefoundry.v1.ListBackdropsResponse
-	(*ImportBackdropRequest)(nil),     // 19: codefoundry.v1.ImportBackdropRequest
-	(*ImportBackdropResponse)(nil),    // 20: codefoundry.v1.ImportBackdropResponse
-	(*RemoveBackdropRequest)(nil),     // 21: codefoundry.v1.RemoveBackdropRequest
-	(*RemoveBackdropResponse)(nil),    // 22: codefoundry.v1.RemoveBackdropResponse
-	(*ReadBackdropRequest)(nil),       // 23: codefoundry.v1.ReadBackdropRequest
-	(*ReadBackdropResponse)(nil),      // 24: codefoundry.v1.ReadBackdropResponse
-	nil,                               // 25: codefoundry.v1.SettingsSnapshot.ValuesEntry
-	nil,                               // 26: codefoundry.v1.UpdateSettingsRequest.ValuesEntry
-	(*timestamppb.Timestamp)(nil),     // 27: google.protobuf.Timestamp
+	(*Backdrop)(nil),                  // 15: codefoundry.v1.Backdrop
+	(*ListBackdropsRequest)(nil),      // 16: codefoundry.v1.ListBackdropsRequest
+	(*ListBackdropsResponse)(nil),     // 17: codefoundry.v1.ListBackdropsResponse
+	(*ImportBackdropRequest)(nil),     // 18: codefoundry.v1.ImportBackdropRequest
+	(*ImportBackdropResponse)(nil),    // 19: codefoundry.v1.ImportBackdropResponse
+	(*RemoveBackdropRequest)(nil),     // 20: codefoundry.v1.RemoveBackdropRequest
+	(*RemoveBackdropResponse)(nil),    // 21: codefoundry.v1.RemoveBackdropResponse
+	(*ReadBackdropRequest)(nil),       // 22: codefoundry.v1.ReadBackdropRequest
+	(*ReadBackdropResponse)(nil),      // 23: codefoundry.v1.ReadBackdropResponse
+	nil,                               // 24: codefoundry.v1.SettingsSnapshot.ValuesEntry
+	nil,                               // 25: codefoundry.v1.UpdateSettingsRequest.ValuesEntry
+	(*timestamppb.Timestamp)(nil),     // 26: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_settings_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.SettingField.type:type_name -> codefoundry.v1.SettingType
 	4,  // 1: codefoundry.v1.SettingPage.sections:type_name -> codefoundry.v1.SettingSection
-	25, // 2: codefoundry.v1.SettingsSnapshot.values:type_name -> codefoundry.v1.SettingsSnapshot.ValuesEntry
+	24, // 2: codefoundry.v1.SettingsSnapshot.values:type_name -> codefoundry.v1.SettingsSnapshot.ValuesEntry
 	5,  // 3: codefoundry.v1.SettingsSnapshot.issues:type_name -> codefoundry.v1.SettingIssue
 	5,  // 4: codefoundry.v1.SettingsValidationErrors.errors:type_name -> codefoundry.v1.SettingIssue
 	6,  // 5: codefoundry.v1.SettingsEvent.snapshot:type_name -> codefoundry.v1.SettingsSnapshot
@@ -1672,29 +1633,27 @@ var file_codefoundry_v1_settings_proto_depIdxs = []int32{
 	1,  // 7: codefoundry.v1.GetSettingsSchemaResponse.fields:type_name -> codefoundry.v1.SettingField
 	3,  // 8: codefoundry.v1.GetSettingsSchemaResponse.pages:type_name -> codefoundry.v1.SettingPage
 	6,  // 9: codefoundry.v1.GetSettingsResponse.settings:type_name -> codefoundry.v1.SettingsSnapshot
-	26, // 10: codefoundry.v1.UpdateSettingsRequest.values:type_name -> codefoundry.v1.UpdateSettingsRequest.ValuesEntry
+	25, // 10: codefoundry.v1.UpdateSettingsRequest.values:type_name -> codefoundry.v1.UpdateSettingsRequest.ValuesEntry
 	6,  // 11: codefoundry.v1.UpdateSettingsResponse.settings:type_name -> codefoundry.v1.SettingsSnapshot
-	27, // 12: codefoundry.v1.Backdrop.added_at:type_name -> google.protobuf.Timestamp
-	16, // 13: codefoundry.v1.ListBackdropsResponse.backdrops:type_name -> codefoundry.v1.Backdrop
-	16, // 14: codefoundry.v1.ImportBackdropResponse.backdrop:type_name -> codefoundry.v1.Backdrop
+	26, // 12: codefoundry.v1.Backdrop.added_at:type_name -> google.protobuf.Timestamp
+	15, // 13: codefoundry.v1.ListBackdropsResponse.backdrops:type_name -> codefoundry.v1.Backdrop
+	15, // 14: codefoundry.v1.ImportBackdropResponse.backdrop:type_name -> codefoundry.v1.Backdrop
 	9,  // 15: codefoundry.v1.SettingsService.GetSchema:input_type -> codefoundry.v1.GetSettingsSchemaRequest
 	11, // 16: codefoundry.v1.SettingsService.Get:input_type -> codefoundry.v1.GetSettingsRequest
 	13, // 17: codefoundry.v1.SettingsService.Update:input_type -> codefoundry.v1.UpdateSettingsRequest
-	15, // 18: codefoundry.v1.SettingsService.Watch:input_type -> codefoundry.v1.WatchSettingsRequest
-	17, // 19: codefoundry.v1.SettingsService.ListBackdrops:input_type -> codefoundry.v1.ListBackdropsRequest
-	19, // 20: codefoundry.v1.SettingsService.ImportBackdrop:input_type -> codefoundry.v1.ImportBackdropRequest
-	21, // 21: codefoundry.v1.SettingsService.RemoveBackdrop:input_type -> codefoundry.v1.RemoveBackdropRequest
-	23, // 22: codefoundry.v1.SettingsService.ReadBackdrop:input_type -> codefoundry.v1.ReadBackdropRequest
-	10, // 23: codefoundry.v1.SettingsService.GetSchema:output_type -> codefoundry.v1.GetSettingsSchemaResponse
-	12, // 24: codefoundry.v1.SettingsService.Get:output_type -> codefoundry.v1.GetSettingsResponse
-	14, // 25: codefoundry.v1.SettingsService.Update:output_type -> codefoundry.v1.UpdateSettingsResponse
-	8,  // 26: codefoundry.v1.SettingsService.Watch:output_type -> codefoundry.v1.SettingsEvent
-	18, // 27: codefoundry.v1.SettingsService.ListBackdrops:output_type -> codefoundry.v1.ListBackdropsResponse
-	20, // 28: codefoundry.v1.SettingsService.ImportBackdrop:output_type -> codefoundry.v1.ImportBackdropResponse
-	22, // 29: codefoundry.v1.SettingsService.RemoveBackdrop:output_type -> codefoundry.v1.RemoveBackdropResponse
-	24, // 30: codefoundry.v1.SettingsService.ReadBackdrop:output_type -> codefoundry.v1.ReadBackdropResponse
-	23, // [23:31] is the sub-list for method output_type
-	15, // [15:23] is the sub-list for method input_type
+	16, // 18: codefoundry.v1.SettingsService.ListBackdrops:input_type -> codefoundry.v1.ListBackdropsRequest
+	18, // 19: codefoundry.v1.SettingsService.ImportBackdrop:input_type -> codefoundry.v1.ImportBackdropRequest
+	20, // 20: codefoundry.v1.SettingsService.RemoveBackdrop:input_type -> codefoundry.v1.RemoveBackdropRequest
+	22, // 21: codefoundry.v1.SettingsService.ReadBackdrop:input_type -> codefoundry.v1.ReadBackdropRequest
+	10, // 22: codefoundry.v1.SettingsService.GetSchema:output_type -> codefoundry.v1.GetSettingsSchemaResponse
+	12, // 23: codefoundry.v1.SettingsService.Get:output_type -> codefoundry.v1.GetSettingsResponse
+	14, // 24: codefoundry.v1.SettingsService.Update:output_type -> codefoundry.v1.UpdateSettingsResponse
+	17, // 25: codefoundry.v1.SettingsService.ListBackdrops:output_type -> codefoundry.v1.ListBackdropsResponse
+	19, // 26: codefoundry.v1.SettingsService.ImportBackdrop:output_type -> codefoundry.v1.ImportBackdropResponse
+	21, // 27: codefoundry.v1.SettingsService.RemoveBackdrop:output_type -> codefoundry.v1.RemoveBackdropResponse
+	23, // 28: codefoundry.v1.SettingsService.ReadBackdrop:output_type -> codefoundry.v1.ReadBackdropResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
 	15, // [15:15] is the sub-list for extension extendee
 	0,  // [0:15] is the sub-list for field type_name
@@ -1714,7 +1673,7 @@ func file_codefoundry_v1_settings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_settings_proto_rawDesc), len(file_codefoundry_v1_settings_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   26,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

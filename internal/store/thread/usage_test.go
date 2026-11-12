@@ -293,7 +293,7 @@ func TestUsageRescanOnReconnect(t *testing.T) {
 	e.writeTranscript(cid, c[3:]...)
 	stale := []UsageBucket{{Model: "claude-opus-5-5", Day: "2026-10-06", Requests: 99, Input: 99}}
 	e.m.setUsage(s.ID, usageUpdate{total: stale})
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	var whole usageFold
@@ -344,7 +344,7 @@ func TestForkSkipsParentUsage(t *testing.T) {
 	e.exit(f.ID, 0)
 	e.waitFor(f.ID, "fork disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	e.m.setUsage(f.ID, usageUpdate{})
-	if _, err := e.m.Reconnect(e.ctx(), f.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), f.ID); err != nil {
 		t.Fatal(err)
 	}
 	got = e.waitFor(f.ID, "fork rescan", func(s Thread) bool { return len(s.Usage) > 0 })

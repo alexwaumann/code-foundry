@@ -18,21 +18,38 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gh/ghtest"
 )
 
-func newGhTest(t *testing.T) (*ghtest.Store, codefoundryv1connect.GhServiceClient, chan struct{}) {
+func newGhTest(t *testing.T) (*ghtest.Store, codefoundryv1connect.GhServiceClient) {
+	t.Helper()
+	store, client, _ := newGhTestBus(t)
+	return store, client
+}
+
+// newGhTestBus is newGhTest with the bus, for EventService's gh source (ghEvents).
+func newGhTestBus(t *testing.T) (*ghtest.Store, codefoundryv1connect.GhServiceClient, *bus.Bus) {
 	t.Helper()
 	b := bus.New()
 	store := ghtest.New(b)
-	done := make(chan struct{})
-	route := NewGh(store, b, done).Route()
+	route := NewGh(store).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	return store, codefoundryv1connect.NewGhServiceClient(srv.Client(), srv.URL), done
+	return store, codefoundryv1connect.NewGhServiceClient(srv.Client(), srv.URL), b
+}
+
+// ghEvents is EventService's gh source; it returns once the stream is joined (its first
+// snapshot event read), so nothing published after it is missed.
+func ghEvents(t *testing.T, ctx context.Context, store *ghtest.Store, b *bus.Bus) *sourceStream[*v1.GhEvent] {
+	t.Helper()
+	s := watchSource(t, ctx, EventsDeps{Bus: b, Gh: store}, v1.EventSource_EVENT_SOURCE_GH, (*v1.Event).GetGh)
+	if !s.Receive() {
+		t.Fatalf("no snapshot: %v", s.Err())
+	}
+	return s
 }
 
 func TestGhReads(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 8, 6, 0, 0, 0, time.UTC)
 
@@ -110,16 +127,10 @@ func TestGhReads(t *testing.T) {
 		checks[2].GetStatus() != v1.CheckStatus_CHECK_STATUS_UNSPECIFIED {
 		t.Errorf("detail = %v", d.Msg)
 	}
-
-	store.SetChecks("ghostty-org/ghostty", "main", gh.RefChecks{SHA: "a60e9e2", Rollup: gh.CheckRollup{State: gh.RollupSuccess, Total: 1, Passed: 1}, FetchedAt: at})
-	c, err := client.ListChecks(ctx, connect.NewRequest(&v1.ListChecksRequest{RepoSlug: "ghostty-org/ghostty", Ref: "main"}))
-	if err != nil || c.Msg.GetSha() != "a60e9e2" || c.Msg.GetRollup().GetState() != v1.CheckRollupState_CHECK_ROLLUP_STATE_SUCCESS {
-		t.Errorf("checks = %v, %v", c.Msg, err)
-	}
 }
 
 func TestGhErrorCodes(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	tests := []struct {
 		err  error
@@ -144,70 +155,5 @@ func TestGhErrorCodes(t *testing.T) {
 		if got := connect.CodeOf(err); got != tt.want {
 			t.Errorf("%v: code = %v, want %v", tt.err, got, tt.want)
 		}
-		_, err = client.Refresh(ctx, connect.NewRequest(&v1.RefreshGhRequest{RepoSlug: "a/b"}))
-		if got := connect.CodeOf(err); got != tt.want {
-			t.Errorf("refresh %v: code = %v, want %v", tt.err, got, tt.want)
-		}
-	}
-}
-
-func TestGhTrackAndWatch(t *testing.T) {
-	store, client, done := newGhTest(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	stream, err := client.Watch(ctx, connect.NewRequest(&v1.WatchGhRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Watch returns once headers arrive, which the handler sends after subscribing.
-	at := time.Date(2026, 10, 8, 6, 0, 0, 0, time.UTC)
-	store.SetViewer(gh.ViewerState{Authenticated: true, FetchedAt: at})
-	if !stream.Receive() {
-		t.Fatalf("no event: %v", stream.Err())
-	}
-	if got := stream.Msg().GetViewerUpdated().GetFetchedAt().AsTime(); !got.Equal(at) {
-		t.Errorf("viewer event fetched_at = %v", got)
-	}
-
-	if _, err := client.Track(ctx, connect.NewRequest(&v1.TrackGhRepoRequest{RepoSlug: "Ghostty-Org/Ghostty"})); err != nil {
-		t.Fatal(err)
-	}
-	for stream.Receive() {
-		if ev := stream.Msg().GetRepoActivityUpdated(); ev != nil {
-			if ev.GetRepoSlug() != "ghostty-org/ghostty" || ev.GetFetchedAt() != nil {
-				t.Errorf("activity event = %v", ev)
-			}
-			break
-		}
-	}
-	store.SetProjects(gh.ProjectPullRequests{FetchedAt: at.Add(-time.Minute), LastError: "busy"})
-	store.SetPoll(gh.PollState{FetchedAt: at, LastError: "boom"})
-	for stream.Receive() {
-		if ev := stream.Msg().GetPolled(); ev != nil {
-			if !ev.GetFetchedAt().AsTime().Equal(at) || ev.GetLastError() != "boom" ||
-				!ev.GetProjectsFetchedAt().AsTime().Equal(at.Add(-time.Minute)) || ev.GetProjectsLastError() != "busy" {
-				t.Errorf("polled event = %v", ev)
-			}
-			break
-		}
-	}
-	if _, err := client.Untrack(ctx, connect.NewRequest(&v1.UntrackGhRepoRequest{RepoSlug: "ghostty-org/ghostty"})); err != nil {
-		t.Fatal(err)
-	}
-	_, err = client.Track(ctx, connect.NewRequest(&v1.TrackGhRepoRequest{RepoSlug: "bad"}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument {
-		t.Errorf("bad slug err = %v", err)
-	}
-	if got := fmt.Sprint(store.Calls()); got != "[track ghostty-org/ghostty untrack ghostty-org/ghostty]" {
-		t.Errorf("calls = %s", got)
-	}
-
-	// Daemon shutdown ends the stream cleanly.
-	close(done)
-	for stream.Receive() {
-	}
-	if err := stream.Err(); err != nil {
-		t.Errorf("stream ended with %v, want clean end", err)
 	}
 }

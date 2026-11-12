@@ -11,7 +11,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/model"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 )
@@ -216,25 +215,6 @@ func (h *Thread) snoozeSelf(ctx context.Context, id string, p thread.PutAway) (*
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s), Deferred: deferred}), nil
 }
 
-// Close ends the process gracefully; it returns once the thread is DISCONNECTED. No
-// command calls it (docs/notes/thread-lifecycle.md); kept for compatibility.
-func (h *Thread) Close(ctx context.Context, req *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
-	if err := h.store.Close(ctx, req.Msg.GetId()); err != nil {
-		return nil, threadError(err)
-	}
-	return connect.NewResponse(&v1.CloseThreadResponse{}), nil
-}
-
-// Reconnect resumes a DISCONNECTED thread without a prompt. No command calls it (a
-// message starts a stopped thread); kept for compatibility.
-func (h *Thread) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
-	s, err := h.store.Reconnect(ctx, req.Msg.GetId())
-	if err != nil {
-		return nil, threadError(err)
-	}
-	return connect.NewResponse(&v1.ReconnectThreadResponse{Thread: threadToProto(s)}), nil
-}
-
 // Remove forgets a thread, closing it first if needed.
 func (h *Thread) Remove(ctx context.Context, req *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
 	if err := h.store.Remove(ctx, req.Msg.GetId()); err != nil {
@@ -251,38 +231,6 @@ func (h *Thread) RunIn(ctx context.Context, req *connect.Request[v1.RunInThreadR
 		return nil, threadError(err)
 	}
 	return connect.NewResponse(&v1.RunInThreadResponse{Thread: threadToProto(s)}), nil
-}
-
-// Watch sends a snapshot, then every thread event. If the client falls behind and
-// events are dropped, it sends a fresh snapshot.
-func (h *Thread) Watch(ctx context.Context, _ *connect.Request[v1.WatchThreadsRequest], stream *connect.ServerStream[v1.ThreadListEvent]) error {
-	// Subscribe first so nothing published between snapshot and stream is lost. Each
-	// event carries full state, so applying queued older events still converges.
-	sub := bus.Subscribe[thread.Event](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := stream.Send(threadListEventToProto(h.store.Snapshot())); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				ev = h.store.Snapshot()
-			}
-			if msg := threadListEventToProto(ev); msg != nil {
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			}
-		}
-	}
 }
 
 // threadListEventToProto converts a bus event (or a *thread.Snapshot) to the wire event.

@@ -41,22 +41,6 @@ func (h *Ember) Route(opts ...connect.HandlerOption) Route {
 	return Route{Path: path, Handler: handler}
 }
 
-// GetStatus is Ember's state.
-func (h *Ember) GetStatus(context.Context, *connect.Request[v1.GetEmberStatusRequest]) (*connect.Response[v1.GetEmberStatusResponse], error) {
-	return connect.NewResponse(&v1.GetEmberStatusResponse{Status: emberStatusToProto(h.store.Snapshot().Status)}), nil
-}
-
-// ListTasks lists the tasks (open ones only with open), in board order.
-func (h *Ember) ListTasks(_ context.Context, req *connect.Request[v1.ListEmberTasksRequest]) (*connect.Response[v1.ListEmberTasksResponse], error) {
-	out := &v1.ListEmberTasksResponse{}
-	for _, t := range h.store.Snapshot().Tasks {
-		if !req.Msg.GetOpen() || t.State.Open() {
-			out.Tasks = append(out.Tasks, emberTaskToProto(t))
-		}
-	}
-	return connect.NewResponse(out), nil
-}
-
 // WatchBoard sends the board, then the board again after every change, and a heartbeat
 // after HeartbeatInterval without one (see heartbeat.proto).
 func (h *Ember) WatchBoard(ctx context.Context, _ *connect.Request[v1.WatchEmberBoardRequest], stream *connect.ServerStream[v1.EmberBoard]) error {

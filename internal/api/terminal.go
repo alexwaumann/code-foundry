@@ -154,34 +154,7 @@ func (h *Terminal) Close(ctx context.Context, req *connect.Request[v1.CloseTermi
 	return connect.NewResponse(&v1.CloseTerminalResponse{}), nil
 }
 
-// Watch first sends every current terminal as `updated`, then live changes. It
-// subscribes before listing, so nothing is missed; a terminal may appear twice.
-func (h *Terminal) Watch(ctx context.Context, _ *connect.Request[v1.WatchTerminalsRequest], stream *connect.ServerStream[v1.TerminalEvent]) error {
-	events, err := h.store.Watch(ctx)
-	if err != nil {
-		return terminalError(err)
-	}
-	for _, t := range h.store.List(ctx) {
-		if err := stream.Send(&v1.TerminalEvent{Event: &v1.TerminalEvent_Updated{Updated: terminalToProto(t)}}); err != nil {
-			return err
-		}
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-events:
-			if !ok {
-				return nil
-			}
-			if err := stream.Send(terminalEventToProto(ev)); err != nil {
-				return err
-			}
-		}
-	}
-}
-
-// terminalEventToProto maps one Watch item; shared with EventService.
+// terminalEventToProto maps one terminal event for EventService.
 func terminalEventToProto(ev terminal.Event) *v1.TerminalEvent {
 	if ev.Updated != nil {
 		return &v1.TerminalEvent{Event: &v1.TerminalEvent_Updated{Updated: terminalToProto(*ev.Updated)}}

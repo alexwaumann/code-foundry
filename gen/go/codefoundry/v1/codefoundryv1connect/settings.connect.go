@@ -40,8 +40,6 @@ const (
 	SettingsServiceGetProcedure = "/codefoundry.v1.SettingsService/Get"
 	// SettingsServiceUpdateProcedure is the fully-qualified name of the SettingsService's Update RPC.
 	SettingsServiceUpdateProcedure = "/codefoundry.v1.SettingsService/Update"
-	// SettingsServiceWatchProcedure is the fully-qualified name of the SettingsService's Watch RPC.
-	SettingsServiceWatchProcedure = "/codefoundry.v1.SettingsService/Watch"
 	// SettingsServiceListBackdropsProcedure is the fully-qualified name of the SettingsService's
 	// ListBackdrops RPC.
 	SettingsServiceListBackdropsProcedure = "/codefoundry.v1.SettingsService/ListBackdrops"
@@ -68,9 +66,6 @@ type SettingsServiceClient interface {
 	// on failure nothing is written and the error (InvalidArgument) carries a
 	// SettingsValidationErrors detail with one entry per rejected key.
 	Update(context.Context, *connect.Request[v1.UpdateSettingsRequest]) (*connect.Response[v1.UpdateSettingsResponse], error)
-	// Watch streams the current snapshot, then one snapshot per change. The GUI receives
-	// the same events on EventService instead.
-	Watch(context.Context, *connect.Request[v1.WatchSettingsRequest]) (*connect.ServerStreamForClient[v1.SettingsEvent], error)
 	// Backdrop images: copies of pictures the user added, in the backdrops directory of
 	// the Code Foundry home, that appearance.backdrop = custom shows (the one named by
 	// appearance.backdrop_file).
@@ -120,12 +115,6 @@ func NewSettingsServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(settingsServiceMethods.ByName("Update")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchSettingsRequest, v1.SettingsEvent](
-			httpClient,
-			baseURL+SettingsServiceWatchProcedure,
-			connect.WithSchema(settingsServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 		listBackdrops: connect.NewClient[v1.ListBackdropsRequest, v1.ListBackdropsResponse](
 			httpClient,
 			baseURL+SettingsServiceListBackdropsProcedure,
@@ -158,7 +147,6 @@ type settingsServiceClient struct {
 	getSchema      *connect.Client[v1.GetSettingsSchemaRequest, v1.GetSettingsSchemaResponse]
 	get            *connect.Client[v1.GetSettingsRequest, v1.GetSettingsResponse]
 	update         *connect.Client[v1.UpdateSettingsRequest, v1.UpdateSettingsResponse]
-	watch          *connect.Client[v1.WatchSettingsRequest, v1.SettingsEvent]
 	listBackdrops  *connect.Client[v1.ListBackdropsRequest, v1.ListBackdropsResponse]
 	importBackdrop *connect.Client[v1.ImportBackdropRequest, v1.ImportBackdropResponse]
 	removeBackdrop *connect.Client[v1.RemoveBackdropRequest, v1.RemoveBackdropResponse]
@@ -178,11 +166,6 @@ func (c *settingsServiceClient) Get(ctx context.Context, req *connect.Request[v1
 // Update calls codefoundry.v1.SettingsService.Update.
 func (c *settingsServiceClient) Update(ctx context.Context, req *connect.Request[v1.UpdateSettingsRequest]) (*connect.Response[v1.UpdateSettingsResponse], error) {
 	return c.update.CallUnary(ctx, req)
-}
-
-// Watch calls codefoundry.v1.SettingsService.Watch.
-func (c *settingsServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchSettingsRequest]) (*connect.ServerStreamForClient[v1.SettingsEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
 }
 
 // ListBackdrops calls codefoundry.v1.SettingsService.ListBackdrops.
@@ -217,9 +200,6 @@ type SettingsServiceHandler interface {
 	// on failure nothing is written and the error (InvalidArgument) carries a
 	// SettingsValidationErrors detail with one entry per rejected key.
 	Update(context.Context, *connect.Request[v1.UpdateSettingsRequest]) (*connect.Response[v1.UpdateSettingsResponse], error)
-	// Watch streams the current snapshot, then one snapshot per change. The GUI receives
-	// the same events on EventService instead.
-	Watch(context.Context, *connect.Request[v1.WatchSettingsRequest], *connect.ServerStream[v1.SettingsEvent]) error
 	// Backdrop images: copies of pictures the user added, in the backdrops directory of
 	// the Code Foundry home, that appearance.backdrop = custom shows (the one named by
 	// appearance.backdrop_file).
@@ -265,12 +245,6 @@ func NewSettingsServiceHandler(svc SettingsServiceHandler, opts ...connect.Handl
 		connect.WithSchema(settingsServiceMethods.ByName("Update")),
 		connect.WithHandlerOptions(opts...),
 	)
-	settingsServiceWatchHandler := connect.NewServerStreamHandler(
-		SettingsServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(settingsServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	settingsServiceListBackdropsHandler := connect.NewUnaryHandler(
 		SettingsServiceListBackdropsProcedure,
 		svc.ListBackdrops,
@@ -303,8 +277,6 @@ func NewSettingsServiceHandler(svc SettingsServiceHandler, opts ...connect.Handl
 			settingsServiceGetHandler.ServeHTTP(w, r)
 		case SettingsServiceUpdateProcedure:
 			settingsServiceUpdateHandler.ServeHTTP(w, r)
-		case SettingsServiceWatchProcedure:
-			settingsServiceWatchHandler.ServeHTTP(w, r)
 		case SettingsServiceListBackdropsProcedure:
 			settingsServiceListBackdropsHandler.ServeHTTP(w, r)
 		case SettingsServiceImportBackdropProcedure:
@@ -332,10 +304,6 @@ func (UnimplementedSettingsServiceHandler) Get(context.Context, *connect.Request
 
 func (UnimplementedSettingsServiceHandler) Update(context.Context, *connect.Request[v1.UpdateSettingsRequest]) (*connect.Response[v1.UpdateSettingsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.Update is not implemented"))
-}
-
-func (UnimplementedSettingsServiceHandler) Watch(context.Context, *connect.Request[v1.WatchSettingsRequest], *connect.ServerStream[v1.SettingsEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.SettingsService.Watch is not implemented"))
 }
 
 func (UnimplementedSettingsServiceHandler) ListBackdrops(context.Context, *connect.Request[v1.ListBackdropsRequest]) (*connect.Response[v1.ListBackdropsResponse], error) {

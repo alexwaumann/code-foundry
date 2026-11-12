@@ -155,35 +155,6 @@ func (c cache) saveDetail(ctx context.Context, slug string, d PullRequestDetail)
 	return nil
 }
 
-func (c cache) loadChecks(ctx context.Context, slug, ref string) (RefChecks, bool, error) {
-	var payload string
-	err := c.db.QueryRowContext(ctx,
-		`SELECT payload FROM gh_ref_checks WHERE slug = ? AND ref = ?`, slug, ref).Scan(&payload)
-	if errors.Is(err, sql.ErrNoRows) {
-		return RefChecks{}, false, nil
-	}
-	if err != nil {
-		return RefChecks{}, false, fmt.Errorf("gh: load checks: %w", err)
-	}
-	d, ok := decodePayload[RefChecks](payload)
-	return d, ok, nil
-}
-
-func (c cache) saveChecks(ctx context.Context, slug, ref string, d RefChecks) error {
-	payload, err := encodePayload(d)
-	if err != nil {
-		return err
-	}
-	_, err = c.db.ExecContext(ctx,
-		`INSERT INTO gh_ref_checks (slug, ref, fetched_at, payload) VALUES (?, ?, ?, ?)
-		 ON CONFLICT (slug, ref) DO UPDATE SET fetched_at = excluded.fetched_at, payload = excluded.payload`,
-		slug, ref, toMillis(d.FetchedAt), payload)
-	if err != nil {
-		return fmt.Errorf("gh: save checks: %w", err)
-	}
-	return nil
-}
-
 // prune drops on-demand rows older than cacheRetention.
 func (c cache) prune(ctx context.Context, now time.Time) error {
 	cutoff := toMillis(now.Add(-cacheRetention))

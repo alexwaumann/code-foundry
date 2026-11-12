@@ -550,7 +550,7 @@ func TestRenderedStartCrash(t *testing.T) {
 	if !ok || !strings.HasPrefix(errItem.Text, "Claude did not start: exit code 2: fake claude") {
 		t.Errorf("items:\n%s", describeItems(items))
 	}
-	if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
+	if _, err := re.m.reconnect(re.ctx(), s.ID); err != nil {
 		t.Fatalf("reconnect after a crash: %v", err)
 	}
 }

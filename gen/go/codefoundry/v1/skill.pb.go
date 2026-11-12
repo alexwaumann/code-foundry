@@ -1197,42 +1197,6 @@ func (x *ListSkillRegistriesResponse) GetEpoch() uint64 {
 	return 0
 }
 
-type WatchSkillsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WatchSkillsRequest) Reset() {
-	*x = WatchSkillsRequest{}
-	mi := &file_codefoundry_v1_skill_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WatchSkillsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WatchSkillsRequest) ProtoMessage() {}
-
-func (x *WatchSkillsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_skill_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WatchSkillsRequest.ProtoReflect.Descriptor instead.
-func (*WatchSkillsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_skill_proto_rawDescGZIP(), []int{10}
-}
-
 type SkillEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Grows by one per read in this daemon's lifetime: re-read Search, Installed and
@@ -1244,7 +1208,7 @@ type SkillEvent struct {
 
 func (x *SkillEvent) Reset() {
 	*x = SkillEvent{}
-	mi := &file_codefoundry_v1_skill_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_skill_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1256,7 +1220,7 @@ func (x *SkillEvent) String() string {
 func (*SkillEvent) ProtoMessage() {}
 
 func (x *SkillEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_skill_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_skill_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1269,7 +1233,7 @@ func (x *SkillEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SkillEvent.ProtoReflect.Descriptor instead.
 func (*SkillEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_skill_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_skill_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SkillEvent) GetEpoch() uint64 {
@@ -1370,8 +1334,7 @@ const file_codefoundry_v1_skill_proto_rawDesc = "" +
 	"registries\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x121\n" +
 	"\x14expected_marketplace\x18\x03 \x01(\tR\x13expectedMarketplace\x12\x14\n" +
-	"\x05epoch\x18\x04 \x01(\x04R\x05epoch\"\x14\n" +
-	"\x12WatchSkillsRequest\"\"\n" +
+	"\x05epoch\x18\x04 \x01(\x04R\x05epoch\"\"\n" +
 	"\n" +
 	"SkillEvent\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\x04R\x05epoch*T\n" +
@@ -1392,13 +1355,12 @@ const file_codefoundry_v1_skill_proto_rawDesc = "" +
 	"!INSTALLED_SKILL_STATE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fINSTALLED_SKILL_STATE_INSTALLED\x10\x01\x12\x1f\n" +
 	"\x1bINSTALLED_SKILL_STATE_LOCAL\x10\x02\x12!\n" +
-	"\x1dINSTALLED_SKILL_STATE_MISSING\x10\x032\x83\x03\n" +
+	"\x1dINSTALLED_SKILL_STATE_MISSING\x10\x032\xb6\x02\n" +
 	"\fSkillService\x12U\n" +
 	"\x06Search\x12#.codefoundry.v1.SearchSkillsRequest\x1a$.codefoundry.v1.SearchSkillsResponse\"\x00\x12f\n" +
 	"\tInstalled\x12*.codefoundry.v1.ListInstalledSkillsRequest\x1a+.codefoundry.v1.ListInstalledSkillsResponse\"\x00\x12g\n" +
 	"\n" +
-	"Registries\x12*.codefoundry.v1.ListSkillRegistriesRequest\x1a+.codefoundry.v1.ListSkillRegistriesResponse\"\x00\x12K\n" +
-	"\x05Watch\x12\".codefoundry.v1.WatchSkillsRequest\x1a\x1a.codefoundry.v1.SkillEvent\"\x000\x01B\xc2\x01\n" +
+	"Registries\x12*.codefoundry.v1.ListSkillRegistriesRequest\x1a+.codefoundry.v1.ListSkillRegistriesResponse\"\x00B\xc2\x01\n" +
 	"\x12com.codefoundry.v1B\n" +
 	"SkillProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
@@ -1415,7 +1377,7 @@ func file_codefoundry_v1_skill_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_skill_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_codefoundry_v1_skill_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_codefoundry_v1_skill_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_codefoundry_v1_skill_proto_goTypes = []any{
 	(SkillKind)(0),                      // 0: codefoundry.v1.SkillKind
 	(SkillTier)(0),                      // 1: codefoundry.v1.SkillTier
@@ -1431,38 +1393,35 @@ var file_codefoundry_v1_skill_proto_goTypes = []any{
 	(*SkillRegistry)(nil),               // 11: codefoundry.v1.SkillRegistry
 	(*ListSkillRegistriesRequest)(nil),  // 12: codefoundry.v1.ListSkillRegistriesRequest
 	(*ListSkillRegistriesResponse)(nil), // 13: codefoundry.v1.ListSkillRegistriesResponse
-	(*WatchSkillsRequest)(nil),          // 14: codefoundry.v1.WatchSkillsRequest
-	(*SkillEvent)(nil),                  // 15: codefoundry.v1.SkillEvent
-	(*timestamppb.Timestamp)(nil),       // 16: google.protobuf.Timestamp
+	(*SkillEvent)(nil),                  // 14: codefoundry.v1.SkillEvent
+	(*timestamppb.Timestamp)(nil),       // 15: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_skill_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.SkillEntry.kind:type_name -> codefoundry.v1.SkillKind
 	1,  // 1: codefoundry.v1.SkillEntry.tier:type_name -> codefoundry.v1.SkillTier
-	16, // 2: codefoundry.v1.SkillEntry.last_updated:type_name -> google.protobuf.Timestamp
+	15, // 2: codefoundry.v1.SkillEntry.last_updated:type_name -> google.protobuf.Timestamp
 	2,  // 3: codefoundry.v1.SkillEntry.state:type_name -> codefoundry.v1.SkillEntryState
 	1,  // 4: codefoundry.v1.SearchSkillsRequest.tier:type_name -> codefoundry.v1.SkillTier
 	0,  // 5: codefoundry.v1.SearchSkillsRequest.kind:type_name -> codefoundry.v1.SkillKind
 	4,  // 6: codefoundry.v1.SearchSkillsResponse.entries:type_name -> codefoundry.v1.SkillEntry
-	16, // 7: codefoundry.v1.SkillOffer.last_updated:type_name -> google.protobuf.Timestamp
+	15, // 7: codefoundry.v1.SkillOffer.last_updated:type_name -> google.protobuf.Timestamp
 	0,  // 8: codefoundry.v1.InstalledSkill.kind:type_name -> codefoundry.v1.SkillKind
 	1,  // 9: codefoundry.v1.InstalledSkill.tier:type_name -> codefoundry.v1.SkillTier
-	16, // 10: codefoundry.v1.InstalledSkill.last_updated:type_name -> google.protobuf.Timestamp
+	15, // 10: codefoundry.v1.InstalledSkill.last_updated:type_name -> google.protobuf.Timestamp
 	3,  // 11: codefoundry.v1.InstalledSkill.state:type_name -> codefoundry.v1.InstalledSkillState
 	7,  // 12: codefoundry.v1.InstalledSkill.update:type_name -> codefoundry.v1.SkillOffer
 	8,  // 13: codefoundry.v1.ListInstalledSkillsResponse.installed:type_name -> codefoundry.v1.InstalledSkill
-	16, // 14: codefoundry.v1.SkillRegistry.read_at:type_name -> google.protobuf.Timestamp
-	16, // 15: codefoundry.v1.SkillRegistry.refreshed_at:type_name -> google.protobuf.Timestamp
+	15, // 14: codefoundry.v1.SkillRegistry.read_at:type_name -> google.protobuf.Timestamp
+	15, // 15: codefoundry.v1.SkillRegistry.refreshed_at:type_name -> google.protobuf.Timestamp
 	11, // 16: codefoundry.v1.ListSkillRegistriesResponse.registries:type_name -> codefoundry.v1.SkillRegistry
 	5,  // 17: codefoundry.v1.SkillService.Search:input_type -> codefoundry.v1.SearchSkillsRequest
 	9,  // 18: codefoundry.v1.SkillService.Installed:input_type -> codefoundry.v1.ListInstalledSkillsRequest
 	12, // 19: codefoundry.v1.SkillService.Registries:input_type -> codefoundry.v1.ListSkillRegistriesRequest
-	14, // 20: codefoundry.v1.SkillService.Watch:input_type -> codefoundry.v1.WatchSkillsRequest
-	6,  // 21: codefoundry.v1.SkillService.Search:output_type -> codefoundry.v1.SearchSkillsResponse
-	10, // 22: codefoundry.v1.SkillService.Installed:output_type -> codefoundry.v1.ListInstalledSkillsResponse
-	13, // 23: codefoundry.v1.SkillService.Registries:output_type -> codefoundry.v1.ListSkillRegistriesResponse
-	15, // 24: codefoundry.v1.SkillService.Watch:output_type -> codefoundry.v1.SkillEvent
-	21, // [21:25] is the sub-list for method output_type
-	17, // [17:21] is the sub-list for method input_type
+	6,  // 20: codefoundry.v1.SkillService.Search:output_type -> codefoundry.v1.SearchSkillsResponse
+	10, // 21: codefoundry.v1.SkillService.Installed:output_type -> codefoundry.v1.ListInstalledSkillsResponse
+	13, // 22: codefoundry.v1.SkillService.Registries:output_type -> codefoundry.v1.ListSkillRegistriesResponse
+	20, // [20:23] is the sub-list for method output_type
+	17, // [17:20] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
 	17, // [17:17] is the sub-list for extension extendee
 	0,  // [0:17] is the sub-list for field type_name
@@ -1479,7 +1438,7 @@ func file_codefoundry_v1_skill_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_skill_proto_rawDesc), len(file_codefoundry_v1_skill_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   12,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

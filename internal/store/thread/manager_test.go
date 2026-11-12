@@ -561,10 +561,22 @@ func TestFollowsClearViaPidFile(t *testing.T) {
 	e.waitFor(s.ID, "rotated id", func(s Thread) bool { return s.ClaudeSessionID == "rotated-id" })
 }
 
+// reconnect starts a stopped thread without a prompt, unarchived and unsnoozed: without a
+// conversation to resume it starts a new one and says so in LastError.
+func (m *Manager) reconnect(ctx context.Context, id string) (Thread, error) {
+	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
+		if errors.Is(err, errNotStopped) {
+			return Thread{}, fmt.Errorf("%w: thread %s is not stopped; only a stopped thread can be started this way", ErrFailedPrecondition, id)
+		}
+		return Thread{}, err
+	}
+	return m.Get(ctx, id)
+}
+
 func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	e := newEnv(t)
 	s := e.connected(CreateOptions{Model: "opus", Effort: "low"})
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("reconnect while connected: %v", err)
 	}
 	cid := argOf(e.spec(s.ID).Argv, "--session-id")
@@ -573,7 +585,7 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 
-	r, err := e.m.Reconnect(e.ctx(), s.ID)
+	r, err := e.m.reconnect(e.ctx(), s.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -591,7 +603,7 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	s2 := e.connected(CreateOptions{})
 	e.exit(s2.ID, 0)
 	e.waitFor(s2.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
-	r2, err := e.m.Reconnect(e.ctx(), s2.ID)
+	r2, err := e.m.reconnect(e.ctx(), s2.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -599,7 +611,7 @@ func TestReconnectResumesOrStartsFresh(t *testing.T) {
 	if slices.Contains(argv, "--resume") || argOf(argv, "--session-id") == "" || !strings.Contains(r2.LastError, "started a new conversation") {
 		t.Errorf("fresh reconnect argv=%q last_error=%q", argv, r2.LastError)
 	}
-	if _, err := e.m.Reconnect(e.ctx(), "s-nope"); !errors.Is(err, ErrNotFound) {
+	if _, err := e.m.reconnect(e.ctx(), "s-nope"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown id: %v", err)
 	}
 }
@@ -683,7 +695,7 @@ func TestThreadsSurviveRestartAsDisconnected(t *testing.T) {
 	if got, _ := e.m.Get(e.ctx(), live.ID); got.State != StateDisconnected || got.DisconnectReason != ReasonDaemonRestarts {
 		t.Errorf("after crash restart = %+v", got)
 	}
-	if _, err := e.m.Reconnect(e.ctx(), live.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), live.ID); err != nil {
 		t.Fatal(err)
 	}
 	if argv := e.spec(live.ID).Argv; argOf(argv, "--resume") != cid {
@@ -706,7 +718,7 @@ func TestPermissionModeIsKeptForReconnectAndFork(t *testing.T) {
 	if got.PermissionMode != PermissionAcceptEdits {
 		t.Fatalf("after restart = %+v", got)
 	}
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	argv = e.spec(s.ID).Argv

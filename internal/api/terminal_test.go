@@ -159,33 +159,6 @@ func TestTerminalServiceErrors(t *testing.T) {
 	}
 }
 
-func TestTerminalServiceWatchReplaysThenStreams(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	c, fake := newTerminalClient(t)
-	existing, _ := fake.Create(ctx, terminal.Spec{Argv: []string{"sh"}})
-
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchTerminalsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() || stream.Msg().GetUpdated().GetId() != existing.ID {
-		t.Fatalf("first watch event = %v (%v)", stream.Msg(), stream.Err())
-	}
-	_ = fake.SetTitle(existing.ID, "vim")
-	_ = fake.Exit(existing.ID, 0)
-	_ = fake.Remove(ctx, existing.ID)
-	var sawTitle, sawRemove bool
-	for !sawRemove && stream.Receive() {
-		ev := stream.Msg()
-		sawTitle = sawTitle || ev.GetUpdated().GetTitle() == "vim"
-		sawRemove = ev.GetRemovedId() == existing.ID
-	}
-	if !sawTitle || !sawRemove {
-		t.Fatalf("title=%v remove=%v err=%v", sawTitle, sawRemove, stream.Err())
-	}
-}
-
 func TestTerminalServiceCloseKillsThenRemoves(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

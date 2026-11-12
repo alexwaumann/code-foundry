@@ -357,13 +357,9 @@ type Store interface {
 	ListRefs(ctx context.Context, projectID string) (Refs, error)
 	// Refresh reconciles one project (or all when id is empty) and waits for its status.
 	Refresh(ctx context.Context, id string) error
-	// WorktreeDetail returns the files changed and commits on a worktree against its
-	// base (detail.go), computing them if needed.
+	// WorktreeDetail returns the files changed on a worktree against its base
+	// (detail.go), computing them if needed.
 	WorktreeDetail(ctx context.Context, projectID, path string) (WorktreeDetail, error)
-	// WorktreeFileDiff returns both sides of one file of a worktree against the
-	// detail's base (filediff.go), read now. ErrInvalidArgument for a file path that
-	// leaves the worktree, ErrFailedPrecondition for a project without git.
-	WorktreeFileDiff(ctx context.Context, req FileDiffRequest) (WorktreeFileDiff, error)
 	// CompareWorktree lists what differs between two sources of a worktree (compare.go):
 	// the list and its counts, no contents. ErrInvalidArgument for a ref that cannot be
 	// one or a path that leaves the worktree or enters .git, ErrFailedPrecondition for a

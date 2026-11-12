@@ -19,23 +19,21 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/gitops/gitopstest"
 )
 
-func newGitOpsFixture(t *testing.T) (*gitopstest.Fake, codefoundryv1connect.GitOpsServiceClient, chan struct{}) {
+func newGitOpsFixture(t *testing.T) (*gitopstest.Fake, codefoundryv1connect.GitOpsServiceClient) {
 	t.Helper()
-	b := bus.New()
-	fake := gitopstest.New(b)
-	done := make(chan struct{})
-	route := NewGitOps(fake, b, done).Route()
+	fake := gitopstest.New(bus.New())
+	route := NewGitOps(fake).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
-	return fake, codefoundryv1connect.NewGitOpsServiceClient(srv.Client(), srv.URL), done
+	return fake, codefoundryv1connect.NewGitOpsServiceClient(srv.Client(), srv.URL)
 }
 
 type gitOpResponse interface{ GetOp() *v1.GitOp }
 
 func TestGitOpsRPCs(t *testing.T) {
-	fake, c, _ := newGitOpsFixture(t)
+	fake, c := newGitOpsFixture(t)
 	fake.URL = "https://github.com/o/r/pull/1"
 	ctx := context.Background()
 	call := func(r gitOpResponse, err error) *v1.GitOp {
@@ -98,11 +96,6 @@ func TestGitOpsRPCs(t *testing.T) {
 		})
 	}
 
-	list, err := c.List(ctx, connect.NewRequest(&v1.ListGitOpsRequest{}))
-	if err != nil || len(list.Msg.GetOps()) != len(tests) {
-		t.Fatalf("List = %v, %v", list, err)
-	}
-
 	// A failed op is a response, not an RPC error.
 	fake.Fail = "rejected"
 	op := call(unwrap(c.Push(ctx, connect.NewRequest(&v1.GitPushRequest{WorktreePath: "/w"}))))
@@ -123,7 +116,7 @@ func TestGitOpsErrors(t *testing.T) {
 		{errors.New("boom"), connect.CodeInternal},
 	}
 	for _, tt := range tests {
-		fake, c, _ := newGitOpsFixture(t)
+		fake, c := newGitOpsFixture(t)
 		fake.Err = tt.err
 		_, err := c.Fetch(context.Background(), connect.NewRequest(&v1.GitFetchRequest{WorktreePath: "/w"}))
 		if connect.CodeOf(err) != tt.code {
@@ -132,16 +125,13 @@ func TestGitOpsErrors(t *testing.T) {
 	}
 }
 
-func TestGitOpsWatch(t *testing.T) {
-	fake, c, done := newGitOpsFixture(t)
+func TestGitOpsEvents(t *testing.T) {
+	b := bus.New()
+	fake := gitopstest.New(b)
 	fake.Put(gitops.Op{ID: "op-old", Kind: gitops.KindFetch, State: gitops.StateSucceeded})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	s, err := c.Watch(ctx, connect.NewRequest(&v1.WatchGitOpsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
+	s := watchSource(t, ctx, EventsDeps{Bus: b, GitOps: fake}, v1.EventSource_EVENT_SOURCE_GITOPS, (*v1.Event).GetGitops)
 	recv := func() *v1.GitOpsEvent {
 		t.Helper()
 		if !s.Receive() {
@@ -161,10 +151,6 @@ func TestGitOpsWatch(t *testing.T) {
 	}
 	if recv().GetStarted() == nil || recv().GetFinished().GetSummary() != "reveal ok" {
 		t.Fatal("want started then finished")
-	}
-	close(done)
-	if s.Receive() {
-		t.Fatalf("stream should end after done, got %v", s.Msg())
 	}
 }
 
@@ -204,7 +190,7 @@ func TestGitOpsListAppIcons(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fake, c, _ := newGitOpsFixture(t)
+			fake, c := newGitOpsFixture(t)
 			fake.Icons = map[string][]byte{"com.apple.finder": finder, "com.microsoft.VSCode": code, "com.example.empty": {}}
 			res, err := c.ListAppIcons(context.Background(), connect.NewRequest(&v1.ListAppIconsRequest{BundleIds: tt.ids}))
 			if err != nil {

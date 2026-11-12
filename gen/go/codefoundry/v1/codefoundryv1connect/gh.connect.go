@@ -38,16 +38,6 @@ const (
 	// GhServiceGetPullRequestProcedure is the fully-qualified name of the GhService's GetPullRequest
 	// RPC.
 	GhServiceGetPullRequestProcedure = "/codefoundry.v1.GhService/GetPullRequest"
-	// GhServiceListChecksProcedure is the fully-qualified name of the GhService's ListChecks RPC.
-	GhServiceListChecksProcedure = "/codefoundry.v1.GhService/ListChecks"
-	// GhServiceRefreshProcedure is the fully-qualified name of the GhService's Refresh RPC.
-	GhServiceRefreshProcedure = "/codefoundry.v1.GhService/Refresh"
-	// GhServiceTrackProcedure is the fully-qualified name of the GhService's Track RPC.
-	GhServiceTrackProcedure = "/codefoundry.v1.GhService/Track"
-	// GhServiceUntrackProcedure is the fully-qualified name of the GhService's Untrack RPC.
-	GhServiceUntrackProcedure = "/codefoundry.v1.GhService/Untrack"
-	// GhServiceWatchProcedure is the fully-qualified name of the GhService's Watch RPC.
-	GhServiceWatchProcedure = "/codefoundry.v1.GhService/Watch"
 	// GhServiceGetDashboardProcedure is the fully-qualified name of the GhService's GetDashboard RPC.
 	GhServiceGetDashboardProcedure = "/codefoundry.v1.GhService/GetDashboard"
 	// GhServiceGetRepoActivityProcedure is the fully-qualified name of the GhService's GetRepoActivity
@@ -103,20 +93,6 @@ type GhServiceClient interface {
 	// otherwise fetched through the paced queue; on fetch failure the stale cached copy
 	// is returned with last_error set.
 	GetPullRequest(context.Context, *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error)
-	// ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
-	// caching rules as GetPullRequest.
-	ListChecks(context.Context, *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error)
-	// Refresh polls now. With a repo_slug it returns when that poll has completed (with
-	// its error); an empty repo_slug only marks the poll due and returns without waiting.
-	Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error)
-	// Track adds a repository to the poll (its default branch CI; the dashboards count
-	// its pull requests as tracked). The GitHub repositories of registered projects are
-	// tracked automatically; this is exposed for the CLI and debugging.
-	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
-	// Untrack removes a repository from the poll. Its cache is kept.
-	Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error)
-	// Watch streams change notifications. Clients re-read with the Get RPCs.
-	Watch(context.Context, *connect.Request[v1.WatchGhRequest]) (*connect.ServerStreamForClient[v1.GhEvent], error)
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
 	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
 	// involving them) and their monthly stats across GitHub, from the last poll. The
@@ -239,36 +215,6 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("GetPullRequest")),
 			connect.WithClientOptions(opts...),
 		),
-		listChecks: connect.NewClient[v1.ListChecksRequest, v1.ListChecksResponse](
-			httpClient,
-			baseURL+GhServiceListChecksProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("ListChecks")),
-			connect.WithClientOptions(opts...),
-		),
-		refresh: connect.NewClient[v1.RefreshGhRequest, v1.RefreshGhResponse](
-			httpClient,
-			baseURL+GhServiceRefreshProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("Refresh")),
-			connect.WithClientOptions(opts...),
-		),
-		track: connect.NewClient[v1.TrackGhRepoRequest, v1.TrackGhRepoResponse](
-			httpClient,
-			baseURL+GhServiceTrackProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("Track")),
-			connect.WithClientOptions(opts...),
-		),
-		untrack: connect.NewClient[v1.UntrackGhRepoRequest, v1.UntrackGhRepoResponse](
-			httpClient,
-			baseURL+GhServiceUntrackProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("Untrack")),
-			connect.WithClientOptions(opts...),
-		),
-		watch: connect.NewClient[v1.WatchGhRequest, v1.GhEvent](
-			httpClient,
-			baseURL+GhServiceWatchProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 		getDashboard: connect.NewClient[v1.GetDashboardRequest, v1.GetDashboardResponse](
 			httpClient,
 			baseURL+GhServiceGetDashboardProcedure,
@@ -366,11 +312,6 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 type ghServiceClient struct {
 	getViewer               *connect.Client[v1.GetViewerRequest, v1.GetViewerResponse]
 	getPullRequest          *connect.Client[v1.GetPullRequestRequest, v1.GetPullRequestResponse]
-	listChecks              *connect.Client[v1.ListChecksRequest, v1.ListChecksResponse]
-	refresh                 *connect.Client[v1.RefreshGhRequest, v1.RefreshGhResponse]
-	track                   *connect.Client[v1.TrackGhRepoRequest, v1.TrackGhRepoResponse]
-	untrack                 *connect.Client[v1.UntrackGhRepoRequest, v1.UntrackGhRepoResponse]
-	watch                   *connect.Client[v1.WatchGhRequest, v1.GhEvent]
 	getDashboard            *connect.Client[v1.GetDashboardRequest, v1.GetDashboardResponse]
 	getRepoActivity         *connect.Client[v1.GetRepoActivityRequest, v1.GetRepoActivityResponse]
 	getBranchPullRequests   *connect.Client[v1.GetBranchPullRequestsRequest, v1.GetBranchPullRequestsResponse]
@@ -396,31 +337,6 @@ func (c *ghServiceClient) GetViewer(ctx context.Context, req *connect.Request[v1
 // GetPullRequest calls codefoundry.v1.GhService.GetPullRequest.
 func (c *ghServiceClient) GetPullRequest(ctx context.Context, req *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error) {
 	return c.getPullRequest.CallUnary(ctx, req)
-}
-
-// ListChecks calls codefoundry.v1.GhService.ListChecks.
-func (c *ghServiceClient) ListChecks(ctx context.Context, req *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error) {
-	return c.listChecks.CallUnary(ctx, req)
-}
-
-// Refresh calls codefoundry.v1.GhService.Refresh.
-func (c *ghServiceClient) Refresh(ctx context.Context, req *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error) {
-	return c.refresh.CallUnary(ctx, req)
-}
-
-// Track calls codefoundry.v1.GhService.Track.
-func (c *ghServiceClient) Track(ctx context.Context, req *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error) {
-	return c.track.CallUnary(ctx, req)
-}
-
-// Untrack calls codefoundry.v1.GhService.Untrack.
-func (c *ghServiceClient) Untrack(ctx context.Context, req *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error) {
-	return c.untrack.CallUnary(ctx, req)
-}
-
-// Watch calls codefoundry.v1.GhService.Watch.
-func (c *ghServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchGhRequest]) (*connect.ServerStreamForClient[v1.GhEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
 }
 
 // GetDashboard calls codefoundry.v1.GhService.GetDashboard.
@@ -507,20 +423,6 @@ type GhServiceHandler interface {
 	// otherwise fetched through the paced queue; on fetch failure the stale cached copy
 	// is returned with last_error set.
 	GetPullRequest(context.Context, *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error)
-	// ListChecks returns the checks for a ref (branch name, tag, or commit SHA). Same
-	// caching rules as GetPullRequest.
-	ListChecks(context.Context, *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error)
-	// Refresh polls now. With a repo_slug it returns when that poll has completed (with
-	// its error); an empty repo_slug only marks the poll due and returns without waiting.
-	Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error)
-	// Track adds a repository to the poll (its default branch CI; the dashboards count
-	// its pull requests as tracked). The GitHub repositories of registered projects are
-	// tracked automatically; this is exposed for the CLI and debugging.
-	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
-	// Untrack removes a repository from the poll. Its cache is kept.
-	Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error)
-	// Watch streams change notifications. Clients re-read with the Get RPCs.
-	Watch(context.Context, *connect.Request[v1.WatchGhRequest], *connect.ServerStream[v1.GhEvent]) error
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
 	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
 	// involving them) and their monthly stats across GitHub, from the last poll. The
@@ -639,36 +541,6 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("GetPullRequest")),
 		connect.WithHandlerOptions(opts...),
 	)
-	ghServiceListChecksHandler := connect.NewUnaryHandler(
-		GhServiceListChecksProcedure,
-		svc.ListChecks,
-		connect.WithSchema(ghServiceMethods.ByName("ListChecks")),
-		connect.WithHandlerOptions(opts...),
-	)
-	ghServiceRefreshHandler := connect.NewUnaryHandler(
-		GhServiceRefreshProcedure,
-		svc.Refresh,
-		connect.WithSchema(ghServiceMethods.ByName("Refresh")),
-		connect.WithHandlerOptions(opts...),
-	)
-	ghServiceTrackHandler := connect.NewUnaryHandler(
-		GhServiceTrackProcedure,
-		svc.Track,
-		connect.WithSchema(ghServiceMethods.ByName("Track")),
-		connect.WithHandlerOptions(opts...),
-	)
-	ghServiceUntrackHandler := connect.NewUnaryHandler(
-		GhServiceUntrackProcedure,
-		svc.Untrack,
-		connect.WithSchema(ghServiceMethods.ByName("Untrack")),
-		connect.WithHandlerOptions(opts...),
-	)
-	ghServiceWatchHandler := connect.NewServerStreamHandler(
-		GhServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(ghServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	ghServiceGetDashboardHandler := connect.NewUnaryHandler(
 		GhServiceGetDashboardProcedure,
 		svc.GetDashboard,
@@ -765,16 +637,6 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceGetViewerHandler.ServeHTTP(w, r)
 		case GhServiceGetPullRequestProcedure:
 			ghServiceGetPullRequestHandler.ServeHTTP(w, r)
-		case GhServiceListChecksProcedure:
-			ghServiceListChecksHandler.ServeHTTP(w, r)
-		case GhServiceRefreshProcedure:
-			ghServiceRefreshHandler.ServeHTTP(w, r)
-		case GhServiceTrackProcedure:
-			ghServiceTrackHandler.ServeHTTP(w, r)
-		case GhServiceUntrackProcedure:
-			ghServiceUntrackHandler.ServeHTTP(w, r)
-		case GhServiceWatchProcedure:
-			ghServiceWatchHandler.ServeHTTP(w, r)
 		case GhServiceGetDashboardProcedure:
 			ghServiceGetDashboardHandler.ServeHTTP(w, r)
 		case GhServiceGetRepoActivityProcedure:
@@ -820,26 +682,6 @@ func (UnimplementedGhServiceHandler) GetViewer(context.Context, *connect.Request
 
 func (UnimplementedGhServiceHandler) GetPullRequest(context.Context, *connect.Request[v1.GetPullRequestRequest]) (*connect.Response[v1.GetPullRequestResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.GetPullRequest is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) ListChecks(context.Context, *connect.Request[v1.ListChecksRequest]) (*connect.Response[v1.ListChecksResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.ListChecks is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) Refresh(context.Context, *connect.Request[v1.RefreshGhRequest]) (*connect.Response[v1.RefreshGhResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.Refresh is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.Track is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.Untrack is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) Watch(context.Context, *connect.Request[v1.WatchGhRequest], *connect.ServerStream[v1.GhEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.Watch is not implemented"))
 }
 
 func (UnimplementedGhServiceHandler) GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {

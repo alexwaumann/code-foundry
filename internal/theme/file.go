@@ -370,7 +370,7 @@ func (f File) Marshal() []byte {
 }
 
 // Version identifies the file's contents: the first 16 bytes of the SHA-256 of Marshal,
-// in hex. ThemeService sends it with each user theme and the GUI keys its contrast report
+// in hex. The theme events send it with each user theme and the GUI keys its contrast report
 // on it (Reports), so theme save can wait for the report on the file it just wrote.
 func (f File) Version() string {
 	sum := sha256.Sum256(f.Marshal())

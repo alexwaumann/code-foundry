@@ -473,7 +473,7 @@ func (e *env) reconnect(id string) {
 		e.exit(id, 0)
 		e.waitFor(id, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
 	}
-	if _, err := e.m.Reconnect(e.ctx(), id); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), id); err != nil {
 		e.t.Fatal(err)
 	}
 }

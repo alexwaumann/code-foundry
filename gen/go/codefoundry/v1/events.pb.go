@@ -90,7 +90,7 @@ const (
 	// Workspaces (branch sets). Sent right after project, before terminal: members name
 	// projects, and threads name workspaces. Connecting (with the snapshot or a resume)
 	// reads every workspace's folder again first (instructions, skills, links), so hand
-	// edits show without a spawn, as with WorkspaceService.Watch.
+	// edits show without a spawn.
 	EventSource_EVENT_SOURCE_WORKSPACE EventSource = 11
 	// Rendered threads' pending requests (permission prompts and questions), for
 	// every rendered thread: a ThreadPendingSnapshot (right after the thread list), then a
@@ -103,13 +103,13 @@ const (
 	// Plugins: a PluginEvent snapshot (after action), then updated / removed_name.
 	EventSource_EVENT_SOURCE_PLUGIN EventSource = 14
 	// The Skills marketplace: a SkillEvent with the current epoch (after plugin), then
-	// each new epoch (SkillService.Watch).
+	// each new epoch.
 	EventSource_EVENT_SOURCE_SKILL EventSource = 15
 	// The app memory: a MemoryEvent with the whole memory (after skill), then the whole
-	// memory again per change (MemoryService.Watch).
+	// memory again per change.
 	EventSource_EVENT_SOURCE_MEMORY EventSource = 16
 	// The colour themes: a ThemeEvent with every theme (after gitops, before settings,
-	// which name them), then all of them again per change (ThemeService.Watch).
+	// which name them), then all of them again per change.
 	EventSource_EVENT_SOURCE_THEME EventSource = 17
 	// Agent searches, for the sidebar's search row: a SearchActivity (after memory), then
 	// the whole of it again per change. Never a run's steps or hits (SearchService.Watch).

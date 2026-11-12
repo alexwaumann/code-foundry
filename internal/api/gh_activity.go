@@ -11,7 +11,7 @@ import (
 )
 
 // GetDashboard returns the viewer's dashboards and global stats from the snapshot. The
-// lists are viewer-wide (every repository); include_untracked is ignored.
+// lists are viewer-wide (every repository).
 func (h *Gh) GetDashboard(_ context.Context, _ *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {
 	snap := h.store.Snapshot()
 	d := snap.Dashboard
