@@ -1,67 +1,41 @@
 /**
  * Live e2e: a workspace thread started from the composer against a REAL daemon and real
- * Claude Code (docs/notes/workspaces-3-composer.md). Opt-in (LIVE_DAEMON=1), run with
- * playwright.live.config.ts, which starts nothing: bring up an isolated daemon
- * (CODE_FOUNDRY_HOME) with two registered projects and one workspace (LIVE_WORKSPACE, its
- * name), and the Vite dev server pointed at it (recipe in docs/notes/phase2-integration.md).
+ * Claude Code (docs/notes/workspaces-3-composer.md). Opt-in; how to run it:
+ * docs/notes/live-e2e.md. Needs a workspace (LIVE_WORKSPACE, default demo) of at least two
+ * registered projects.
  *
- * It spends one short haiku turn ("say hi and stop") and closes the thread at the end.
+ * It picks the workspace in the new-thread picker, makes its second project the one the
+ * thread runs in ("Run in"), spends one short turn ("say hi and stop") and archives the thread.
  */
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { archiveThreads, composeIn, liveWorkspace, openApp, pickCheapModel, requireLive, selectedThreadId, shot, threadInfo } from "./live";
 
-const LIVE = process.env.LIVE_DAEMON === "1";
-const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const WORKSPACE = process.env.LIVE_WORKSPACE ?? "demo";
-const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
-const SHOTS = process.env.LIVE_SHOTS ?? "";
+requireLive();
 
-function cli(...args: string[]): string {
-  return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 30_000 });
-}
+test("composer: pick a workspace, run in its second project, start a thread", async ({ page }) => {
+  const { workspace, members } = liveWorkspace(process.env.LIVE_WORKSPACE ?? "demo");
+  const second = members[1];
+  if (!second) throw new Error(`workspace ${workspace.name} needs two projects`);
 
-interface LiveThread {
-  id: string;
-  projectId?: string;
-  worktreePath?: string;
-  workspaceId?: string;
-  state?: string;
-  status?: string;
-}
-
-test.skip(!LIVE || !HOME, "LIVE_DAEMON=1 and CODE_FOUNDRY_HOME are required");
-
-test("composer: pick a workspace, make the second member primary, start a haiku thread", async ({ page }) => {
-  const members = JSON.parse(cli("workspace", "members", WORKSPACE, "--json")) as {
-    workspace: { id: string; name: string };
-    members: { projectId: string; projectName: string; worktreePath: string }[];
-  };
-  const second = members.members[1];
-  if (!second) throw new Error(`workspace ${WORKSPACE} needs two members`);
-
-  await page.goto("/");
-  await page.keyboard.press("Meta+n");
-  const palette = page.getByTestId("palette");
-  await palette.locator(`[data-workspace="${members.workspace.id}"]`).click();
-  await expect(page.getByTestId("composer-heading")).toHaveText(`What should we build in ${members.workspace.name}?`);
+  await openApp(page);
+  await composeIn(page, { workspace: workspace.id });
+  await expect(page.getByTestId("composer-heading")).toHaveText(`What should we build in ${workspace.name}?`);
   await page.getByTestId("composer-primary").click();
-  await page.getByTestId("composer-primary-list").getByRole("option").nth(1).click();
-  await page.getByTestId("composer-model").click();
-  await page.getByTestId("composer-model-list").getByRole("option", { name: /Haiku/ }).click();
-  await page.getByTestId("composer-effort").click();
-  await page.getByTestId("composer-effort-list").getByRole("option", { name: /Medium/ }).click();
+  await page.getByTestId("composer-primary-list").getByRole("option", { name: second.name }).click();
+  await expect(page.getByTestId("composer-primary")).toContainText(second.name);
+  await pickCheapModel(page);
   await page.getByTestId("composer-input").click();
   await page.keyboard.type("say hi and stop");
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-workspace-composer.png") });
+  await shot(page, "live-workspace-composer");
   await page.keyboard.press("Enter");
 
-  const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
-  await expect(created).toBeVisible({ timeout: 30_000 });
-  const id = ((await created.getAttribute("data-row-key")) ?? "").slice(2);
-  const find = () => ((JSON.parse(cli("thread", "list", "--json")) as { threads?: LiveThread[] }).threads ?? []).find((s) => s.id === id);
-  expect(find()).toMatchObject({ workspaceId: members.workspace.id, projectId: second.projectId, worktreePath: second.worktreePath });
-  await expect.poll(() => find()?.status, { timeout: 120_000 }).toBe("THREAD_STATUS_IDLE");
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "live-workspace-thread.png") });
-  cli("thread", "archive", "--id", id, "--yes");
+  const id = await selectedThreadId(page, 30_000);
+  try {
+    await expect.poll(() => threadInfo(id)?.worktreePath, { timeout: 60_000 }).toBe(second.path);
+    expect(threadInfo(id)).toMatchObject({ workspaceId: workspace.id, projectId: second.id, worktreePath: second.path });
+    await expect.poll(() => threadInfo(id)?.status, { timeout: 120_000 }).toMatch(/IDLE|NEEDS_ATTENTION/);
+    await shot(page, "live-workspace-thread");
+  } finally {
+    archiveThreads(id);
+  }
 });

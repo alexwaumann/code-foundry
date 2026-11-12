@@ -1,12 +1,26 @@
+import { readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Opt-in e2e against a REAL daemon and real Claude Code (e2e/live.spec.ts). Nothing is
- * started for you: run an isolated daemon and the Vite dev server pointed at it first.
- * See docs/notes/phase2-integration.md for the recipe:
+ * Opt-in e2e against a REAL daemon and real Claude Code (e2e/live*.spec.ts, helpers in
+ * e2e/live.ts). Not part of `make check` or `make gui-e2e`, and it starts nothing: bring up
+ * a scratch daemon and the Vite dev server with `make drive DAEMON=dev` first. How to run
+ * it, what each spec needs and what it costs: docs/notes/live-e2e.md.
  *
- *   LIVE_DAEMON=1 CODE_FOUNDRY_HOME=/tmp/cf-live bun run e2e:live
+ *   . .playwright/drive.env && LIVE_DAEMON=1 bun run e2e:live e2e/live.spec.ts
  */
+
+/** The Vite port `make drive` wrote to .playwright/drive.env, when LIVE_APP_URL is unset. */
+function driveUrl(): string {
+  try {
+    const port = /^DRIVE_VITE_PORT=(\d+)$/m.exec(readFileSync(".playwright/drive.env", "utf8"))?.[1];
+    if (port) return `http://127.0.0.1:${port}`;
+  } catch {
+    // no drive running
+  }
+  return "http://127.0.0.1:9246";
+}
+
 export default defineConfig({
   testDir: "e2e",
   testMatch: /live(-[a-z]+)?\.spec\.ts$/,
@@ -15,7 +29,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.LIVE_APP_URL ?? "http://127.0.0.1:9246",
+    baseURL: process.env.LIVE_APP_URL ?? driveUrl(),
     viewport: { width: 1200, height: 720 },
     colorScheme: "dark",
     trace: "retain-on-failure",

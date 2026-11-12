@@ -1,67 +1,17 @@
 /**
- * Live e2e: the GUI against a real daemon running real Claude Code. Opt-in (LIVE_DAEMON=1)
- * and run with playwright.live.config.ts, which starts nothing: bring up an isolated
- * daemon (CODE_FOUNDRY_HOME), register the worktree, and run the Vite dev server pointed
- * at it first (recipe in docs/notes/phase2-integration.md).
+ * Live e2e: threads end to end, the GUI against a real daemon running real Claude Code.
+ * Opt-in; how to run it: docs/notes/live-e2e.md (helpers in e2e/live.ts).
  *
- * It spends two short Claude turns (opus "pong", haiku "ping"), writes their transcripts
- * under ~/.claude/projects/, and closes its threads at the end.
- *
- * Env: LIVE_DAEMON=1, CODE_FOUNDRY_HOME (required); LIVE_BIN, LIVE_WORKTREE,
- * LIVE_APP_URL, LIVE_MODEL (default opus), LIVE_SHOTS (screenshot dir; unset = no
- * screenshots).
+ * It starts two threads in the scratch project (LIVE_PROJECT, else the first registered)
+ * and spends three short turns ("pong", "ping", "ping") on LIVE_MODEL (default Haiku 5.5),
+ * writes their transcripts under ~/.claude/projects/, and archives its threads at the end.
  */
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { row, threadPrompt } from "./fixtures";
-
-const LIVE = process.env.LIVE_DAEMON === "1";
-const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const ROOT = path.resolve(process.cwd(), "../..");
-const BIN = process.env.LIVE_BIN ?? path.join(ROOT, "bin/code-foundry");
-const WORKTREE = process.env.LIVE_WORKTREE ?? ROOT;
-const SHOTS = process.env.LIVE_SHOTS ?? "";
-// Model for the watched turn (LIVE_MODEL, default opus; haiku keeps a test run cheap).
-const MODEL = process.env.LIVE_MODEL ?? "opus";
-
-interface LiveThread {
-  id: string;
-  state?: string;
-  status?: string;
-  statusReason?: string;
-  disconnectReason?: string;
-  claudeSessionId?: string;
-}
-
-function cli(...args: string[]): string {
-  return execFileSync(BIN, args, {
-    env: { ...process.env, CODE_FOUNDRY_HOME: HOME },
-    encoding: "utf8",
-    timeout: 30_000,
-  });
-}
-
-function listThreads(): LiveThread[] {
-  return (
-    (
-      JSON.parse(cli("thread", "list", "--json")) as {
-        threads?: LiveThread[];
-      }
-    ).threads ?? []
-  );
-}
-
-function threadInfo(id: string): LiveThread | undefined {
-  return listThreads().find((s) => s.id === id);
-}
+import { archiveThreads, cli, cliJson, listThreads, liveProject, MODEL, openApp, requireLive, shot, threadInfo, type LiveThread } from "./live";
 
 function badge(page: Page, id: string) {
   return row(page, `s:${id}`).locator("[data-thread-badge]");
-}
-
-async function shot(page: Page, name: string): Promise<void> {
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, name) });
 }
 
 /** Records every distinct badge value of a thread row, sampled every 50 ms in the page. */
@@ -92,26 +42,15 @@ function pane(page: Page) {
   return page.getByTestId("thread-pane");
 }
 
-async function openApp(page: Page): Promise<void> {
-  await page.goto("/");
-  await expect(page.getByTestId("thread-list")).toBeVisible({
-    timeout: 15_000,
-  });
-}
-
-test.skip(
-  !LIVE,
-  "live daemon e2e: set LIVE_DAEMON=1 (see playwright.live.config.ts)",
-);
+requireLive();
 
 test("threads end to end against the real daemon", async ({ page }) => {
-  expect(HOME, "CODE_FOUNDRY_HOME").not.toBe("");
+  const project = liveProject();
+  const worktree = process.env.LIVE_WORKTREE ?? project.path;
   const created: string[] = [];
   try {
     // (a) A thread created from the CLI shows up in the sidebar, idle.
-    const s1 = JSON.parse(
-      cli("thread", "new", "--worktree", WORKTREE, "--model", MODEL, "--json"),
-    ) as LiveThread;
+    const s1 = cliJson("thread", "new", "--worktree", worktree, "--model", MODEL, "--effort", "medium") as LiveThread;
     created.push(s1.id);
     await test.step("a: CLI-created thread is listed idle", async () => {
       await openApp(page);
@@ -173,21 +112,7 @@ test("threads end to end against the real daemon", async ({ page }) => {
     // "finished" in the CLI; showing the thread in the GUI clears it to idle.
     await test.step("c': an unwatched turn needs attention until viewed", async () => {
       await page.goto("about:blank"); // no GUI attached (thread.new would focus it)
-      const s2 = JSON.parse(
-        cli(
-          "thread",
-          "new",
-          "--worktree",
-          WORKTREE,
-          "--model",
-          "haiku",
-          "--name",
-          "unwatched",
-          "--prompt",
-          "reply with the single word ping",
-          "--json",
-        ),
-      ) as LiveThread;
+      const s2 = cliJson("thread", "new", "--worktree", worktree, "--model", MODEL, "--effort", "medium", "--name", "unwatched", "--prompt", "reply with the single word ping") as LiveThread;
       created.push(s2.id);
       await expect
         .poll(
@@ -198,9 +123,7 @@ test("threads end to end against the real daemon", async ({ page }) => {
           { timeout: 90_000 },
         )
         .toBe("THREAD_STATUS_NEEDS_ATTENTION finished");
-      expect(cli("thread", "list")).toMatch(
-        /unwatched\s+needs_attention\s+finished/,
-      );
+      expect(cli("thread", "list")).toMatch(/attention \(finished\)\s+unwatched/);
       await openApp(page);
       await expect(badge(page, s2.id)).toHaveAttribute(
         "data-thread-badge",
@@ -221,16 +144,17 @@ test("threads end to end against the real daemon", async ({ page }) => {
       await expect(page).toHaveTitle("Code Foundry");
     });
 
-    // (d) Archiving from the CLI stops Claude; the pane looks the same (no card, the
-    // composer), and a message starts it again with the conversation kept.
-    await test.step("d: a stopped thread keeps its composer; a message continues it", async () => {
-      await row(page, `s:${s1.id}`).click();
-      await expect(pane(page)).toHaveAttribute("data-thread-id", s1.id);
-      cli("thread", "archive", "--id", s1.id, "--yes");
+    // (d) Archiving from the CLI stops Claude and lists the thread apart (the GUI's selection
+    // leaves it). Opened from the Archived section, the pane looks the same (the composer, no
+    // reconnect card), and a message starts Claude again with the conversation kept.
+    await test.step("d: an archived thread keeps its composer; a message continues it", async () => {
+      cli("thread", "archive", "--id", s1.id, "--archived", "--yes");
       await expect
         .poll(() => threadInfo(s1.id)?.state, { timeout: 20_000 })
         .toBe("THREAD_STATE_DISCONNECTED");
-      await expect(page.getByTestId("thread-disconnected")).toHaveCount(0);
+      await page.getByTestId("thread-list").getByRole("button", { name: /^Archived/ }).click();
+      await row(page, `s:${s1.id}`).click();
+      await expect(pane(page)).toHaveAttribute("data-thread-id", s1.id);
       await expect(page.getByTestId("thread-composer")).toBeVisible();
       await expect(pane(page)).not.toContainText(/Not connected|Reconnect/);
       await shot(page, "stopped.png");
@@ -252,7 +176,8 @@ test("threads end to end against the real daemon", async ({ page }) => {
     });
 
     // (e) cmd+n (from the focused prompt) opens the project picker, then the new-thread
-    // composer for the picked project; Escape leaves without creating anything.
+    // composer for the picked project, which offers the model families; Escape leaves
+    // without creating anything.
     await test.step("e: cmd+n opens the picker, then the composer", async () => {
       const before = listThreads().length;
       await threadPrompt(page).click();
@@ -261,17 +186,18 @@ test("threads end to end against the real daemon", async ({ page }) => {
       await expect(palette).toHaveAttribute("data-mode", "projects");
       await page.waitForTimeout(400); // let the palette's open animation finish
       await shot(page, "new-thread-picker.png");
-      await page.keyboard.press("Enter");
+      // The top row is No project; the project rows follow the workspaces.
+      await palette.locator(`[data-project="${project.id}"]`).click();
       await expect(palette).toHaveCount(0);
-      await expect(page.getByTestId("composer-heading")).toContainText(
-        "What should we build in",
+      await expect(page.getByTestId("composer-heading")).toHaveText(
+        `What should we build in ${project.name}?`,
       );
       await expect(page.getByTestId("composer-input")).toBeFocused();
       await page.getByTestId("composer-model").click();
       const models = page
         .getByTestId("composer-model-list")
         .getByRole("option");
-      for (const m of ["Fable", "Opus", "Sonnet", "Haiku"])
+      for (const m of ["Opus", "Sonnet", "Haiku"])
         await expect(models.filter({ hasText: m }).first()).toBeVisible();
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
@@ -293,19 +219,8 @@ test("threads end to end against the real daemon", async ({ page }) => {
       await expect(pane(page)).toHaveAttribute("data-thread-id", s1.id);
     });
   } finally {
-    for (const id of created) {
-      if (threadInfo(id)?.state !== "THREAD_STATE_DISCONNECTED")
-        cli("thread", "archive", "--id", id, "--yes");
-    }
+    archiveThreads(...created);
     // For the caller's cleanup of ~/.claude/projects/<slug>/<id>.jsonl.
-    console.log(
-      "live threads:",
-      JSON.stringify(
-        listThreads().map((s) => ({
-          id: s.id,
-          claudeSessionId: s.claudeSessionId,
-        })),
-      ),
-    );
+    console.log("live threads:", created.join(" "));
   }
 });

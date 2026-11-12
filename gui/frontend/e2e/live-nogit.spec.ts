@@ -1,64 +1,62 @@
 /**
  * Live e2e: a project without git against a REAL daemon (docs/notes/add-project-2-nogit.md).
- * Opt-in (LIVE_DAEMON=1), run with playwright.live.config.ts, which starts nothing: bring
- * up an isolated daemon (CODE_FOUNDRY_HOME) and the Vite dev server pointed at it (recipe
- * in docs/notes/phase2-integration.md), and name an existing plain folder under $HOME
- * that is not inside a git repository (LIVE_NOGIT_DIR).
+ * Opt-in; how to run it: docs/notes/live-e2e.md. Needs LIVE_NOGIT_DIR: an existing plain
+ * folder under ~ that is not inside a git repository. No Claude turns.
  *
- * It registers the folder with the CLI, checks the Projects page, the overview and a
- * terminal's sidebar row, runs `project git init` with the CLI, and checks that the project
- * turned into a git repository on its default branch. No Claude turns. The folder is
- * left as a git repository with one empty commit; the terminal is killed.
+ * It registers the folder with the CLI, checks the Projects index row and the project page
+ * read as a folder without git, opens a terminal there from the page, runs `project git
+ * init` with the CLI, and checks the open page follows: checkouts, and Publish (no remote).
+ * At the end it closes the terminal, unregisters the project and removes the .git it made,
+ * so the folder can be used again.
  */
-import { execFileSync } from "node:child_process";
+import { rmSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { openProjectPage, openProjects } from "./fixtures";
+import { cli, cliJson, openApp, requireLive, shot, type LiveProject } from "./live";
 
-const LIVE = process.env.LIVE_DAEMON === "1";
-const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
 const DIR = process.env.LIVE_NOGIT_DIR ?? "";
-const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
-const SHOTS = process.env.LIVE_SHOTS ?? "";
 
-function cli(...args: string[]): string {
-  return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 60_000 });
-}
+requireLive("LIVE_NOGIT_DIR");
 
-test.skip(!LIVE || !HOME || !DIR, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_NOGIT_DIR are required");
-
-test("register a plain folder, see No git everywhere, then project git init turns it into a git project", async ({ page }) => {
-  const project = JSON.parse(cli("project", "add", DIR, "--json")) as { id: string; name: string; git?: boolean };
+test("register a plain folder, see it without git, then project git init turns it into a git project", async ({ page }) => {
+  const project = cliJson("project", "add", "--path", DIR) as LiveProject;
   expect(project.git ?? false).toBe(false);
-  const term = JSON.parse(cli("terminal", "new", "--cwd", DIR, "--json")) as { id: string };
-
+  let terminal = "";
   try {
-    await page.goto("/");
-    await page.getByTestId("nav-projects").click();
-    // The shell belongs to the folder: the Projects page's bottom panel, titled by the folder.
-    await page.keyboard.press("Meta+j");
-    await expect(page.getByTestId("bottom-panel").locator(`[data-tab-id="${term.id}"]`)).toContainText(path.basename(DIR));
-    const card = page.locator(`[data-testid="project"][data-project="${project.id}"]`);
-    await expect(card).toHaveAttribute("data-git", "false");
-    await expect(card.getByTestId("no-git-badge")).toBeVisible();
-    await expect(card.getByTestId("worktree-branch")).toHaveCount(0);
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-projects.png") });
+    await openApp(page);
+    await openProjects(page);
+    await expect(page.locator(`[data-testid="index-project"][data-project="${project.id}"]`)).toHaveAttribute("data-kind", "nogit");
+    await shot(page, "nogit-projects");
 
-    await page.locator(`[data-nav-key="p:${project.id}"]`).dblclick();
-    await expect(page.getByTestId("diff-nogit")).toContainText("Not a git repository");
-    await expect(page.getByTestId("diff-compare-bar")).toHaveCount(0);
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-overview.png") });
+    await openProjectPage(page, project.id);
+    const projectPage = page.locator(`[data-testid="projects-page"][data-project="${project.id}"]`);
+    await expect(projectPage).toHaveAttribute("data-kind", "nogit");
+    await expect(page.getByTestId("project-init-git")).toBeVisible();
+    await expect(page.getByTestId("project-checkouts")).toHaveCount(0);
 
-    const after = JSON.parse(cli("project", "git", "init", "--project", project.id, "--json")) as { git?: boolean; defaultBranch?: string };
+    // A terminal in the folder, from the page: its bottom panel, the shell in the folder.
+    await page.getByTestId("project-threads-terminal").click();
+    const host = page.getByTestId("bottom-terminal-host");
+    await expect(host).toHaveAttribute("data-attach-phase", "live");
+    terminal = (await host.getAttribute("data-terminal-id")) ?? "";
+    const terminals = (cliJson("terminal", "list") as { terminals?: { id: string; cwd?: string }[] }).terminals ?? [];
+    expect(terminals.find((t) => t.id === terminal)?.cwd).toBe(DIR);
+    await shot(page, "nogit-project");
+
+    const after = cliJson("project", "git", "init", "--project", project.id) as { git?: boolean; defaultBranch?: string };
     expect(after.git).toBe(true);
-    const branch = after.defaultBranch ?? "";
-    expect(branch).not.toBe("");
+    expect(after.defaultBranch ?? "").not.toBe("");
 
-    // The open Diff tab follows the project event: the lists, and the row offers Publish (no remote).
-    await expect(page.getByTestId("diff-nogit")).toHaveCount(0);
-    await expect(page.getByTestId("diff-compare-bar")).toBeVisible();
-    await expect(card.getByTestId("project-publish")).toBeVisible();
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "nogit-after-init.png") });
+    // The open page follows the project event: a git repository without a remote.
+    await expect(projectPage).not.toHaveAttribute("data-kind", "nogit");
+    await expect(page.getByTestId("project-init-git")).toHaveCount(0);
+    await expect(page.getByTestId("project-checkouts")).toBeVisible();
+    await expect(page.getByTestId("project-publish")).toBeVisible();
+    await shot(page, "nogit-after-init");
   } finally {
-    cli("terminal", "kill", "--id", term.id, "--yes");
+    if (terminal) cli("terminal", "close", "--id", terminal);
+    cli("project", "unregister", "--project", project.id, "--yes");
+    rmSync(path.join(DIR, ".git"), { recursive: true, force: true });
   }
 });
