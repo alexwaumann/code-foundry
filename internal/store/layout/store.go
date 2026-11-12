@@ -1,0 +1,216 @@
+package layout
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"log/slog"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	core "github.com/alexwaumann/code-foundry/internal/layout"
+)
+
+// FirstSpaceName is the name of the space a new database starts with (internal/layout's
+// Sanitize gives a state with no space one of that name).
+const FirstSpaceName = "Main"
+
+// Options configures a Manager. DB is required.
+type Options struct {
+	DB  *sql.DB
+	Bus *bus.Bus     // default: a private bus
+	Log *slog.Logger // default: slog.Default()
+	Now func() time.Time
+	// IDs makes new ids; default core.RandomIDs.
+	IDs core.IDs
+	// FocusDelay is how long a focus-only change waits before it is written (structural
+	// changes are written at once, with any focus change still waiting). Default 1s.
+	FocusDelay time.Duration
+}
+
+// Manager is the Store backed by SQLite.
+type Manager struct {
+	opts Options
+	log  *slog.Logger
+
+	// mu serialises Apply, the focus write and Close. Reads use snap.
+	mu    sync.Mutex
+	state *core.State
+	rev   uint64
+	// disk is the state the tables hold (at diskRev); nil: they must be rewritten whole.
+	disk    *core.State
+	diskRev uint64
+	// timer writes a waiting focus-only change; nil when none waits.
+	timer  *time.Timer
+	closed bool
+
+	vpMu sync.Mutex
+	vp   Viewport
+
+	snap atomic.Pointer[Snapshot]
+}
+
+var _ Store = (*Manager)(nil)
+
+// New loads the layout. Every document is repaired into normal form (a corrupt one is
+// dropped to an empty one) and the repairs are logged; a new database gets one space,
+// FirstSpaceName. Only a database error fails.
+func New(ctx context.Context, opts Options) (*Manager, error) {
+	if opts.DB == nil {
+		return nil, errors.New("layout: Options.DB is required")
+	}
+	if opts.Bus == nil {
+		opts.Bus = bus.New()
+	}
+	if opts.Log == nil {
+		opts.Log = slog.Default()
+	}
+	if opts.Now == nil {
+		opts.Now = time.Now
+	}
+	if opts.IDs == nil {
+		opts.IDs = core.RandomIDs()
+	}
+	if opts.FocusDelay <= 0 {
+		opts.FocusDelay = time.Second
+	}
+	m := &Manager{opts: opts, log: opts.Log, vp: DefaultViewport}
+	got, err := load(ctx, opts.DB)
+	if err != nil {
+		return nil, err
+	}
+	st := got.state
+	repairs := append(got.repairs, core.Sanitize(st, opts.IDs)...)
+	if err := core.Check(st); err != nil {
+		// Sanitize always ends in normal form; this is a bug, never a reason not to start.
+		m.log.Error("layout: repaired layout is not in normal form; starting over with one space", "err", err)
+		st = core.NewState(opts.IDs.NewID("sp-"), FirstSpaceName)
+		repairs = append(repairs, "started over")
+	}
+	if got.fresh {
+		m.log.Info("layout: first space", "space", st.Spaces[0].ID)
+	} else if len(repairs) > 0 {
+		m.log.Warn("layout: repaired the stored layout", "repairs", repairs)
+	}
+	m.state, m.rev = st, got.rev
+	if got.fresh || len(repairs) > 0 {
+		if err := save(ctx, opts.DB, nil, st, m.rev, opts.Now()); err != nil {
+			return nil, err
+		}
+	}
+	m.disk, m.diskRev = st, m.rev
+	m.snap.Store(&Snapshot{Rev: m.rev, State: st})
+	return m, nil
+}
+
+// Bus returns the bus events are published on.
+func (m *Manager) Bus() *bus.Bus { return m.opts.Bus }
+
+// Snapshot implements Store.
+func (m *Manager) Snapshot() *Snapshot { return m.snap.Load() }
+
+// Apply implements Store. The op runs on the current state; a structural change is
+// written before it is published, a focus-only one within FocusDelay.
+func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Commit, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return Commit{}, ErrClosed
+	}
+	prev := m.state
+	next, res, err := core.Apply(prev, op, m.opts.IDs)
+	if err != nil {
+		return Commit{}, err
+	}
+	if Unchanged(prev, next) {
+		return Commit{Rev: m.rev, Result: res}, nil
+	}
+	rev := m.rev + 1
+	if FocusOnly(prev, next) {
+		m.later()
+	} else {
+		if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, m.opts.Now()); err != nil {
+			return Commit{}, err
+		}
+		m.disk, m.diskRev = next, rev
+		m.stopTimer()
+	}
+	m.state, m.rev = next, rev
+	m.snap.Store(&Snapshot{Rev: rev, State: next})
+	bus.Publish(m.opts.Bus, Event{Rev: rev, ClientID: opts.ClientID, Delta: Diff(prev, next)})
+	return Commit{Rev: rev, Changed: true, Result: res}, nil
+}
+
+// later makes sure a write of the state is coming. Callers hold m.mu.
+func (m *Manager) later() {
+	if m.timer == nil {
+		m.timer = time.AfterFunc(m.opts.FocusDelay, m.flushLater)
+	}
+}
+
+func (m *Manager) stopTimer() {
+	if m.timer != nil {
+		m.timer.Stop()
+		m.timer = nil
+	}
+}
+
+func (m *Manager) flushLater() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.timer = nil
+	if m.closed {
+		return
+	}
+	if err := m.flush(context.Background()); err != nil {
+		m.log.Warn("layout: writing focus", "err", err)
+	}
+}
+
+// flush writes the state when the tables are behind it. Callers hold m.mu.
+func (m *Manager) flush(ctx context.Context) error {
+	if m.disk == m.state && m.diskRev == m.rev {
+		return nil
+	}
+	if err := save(ctx, m.opts.DB, m.disk, m.state, m.rev, m.opts.Now()); err != nil {
+		return err
+	}
+	m.disk, m.diskRev = m.state, m.rev
+	return nil
+}
+
+// Close writes a focus change still waiting and refuses later Applies.
+func (m *Manager) Close(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return nil
+	}
+	m.closed = true
+	m.stopTimer()
+	if err := m.flush(ctx); err != nil {
+		return fmt.Errorf("layout: close: %w", err)
+	}
+	return nil
+}
+
+// SetViewport implements Store.
+func (m *Manager) SetViewport(clientID string, v Viewport) error {
+	if err := CheckViewport(v); err != nil {
+		return err
+	}
+	m.vpMu.Lock()
+	defer m.vpMu.Unlock()
+	m.vp = v
+	return nil
+}
+
+// Viewport implements Store.
+func (m *Manager) Viewport() Viewport {
+	m.vpMu.Lock()
+	defer m.vpMu.Unlock()
+	return m.vp
+}
