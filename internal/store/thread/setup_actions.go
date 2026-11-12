@@ -438,7 +438,7 @@ func (m *Manager) DiscardSetup(ctx context.Context, id string) (SetupDraft, erro
 	rec.s.Removing = true
 	m.commitLocked(rec, false)
 	m.mu.Unlock()
-	if err := m.removeShells(ctx, id); err != nil {
+	if err := m.removeShells(ctx, id, ShellsRemoved); err != nil {
 		_ = m.setRemoving(id, false)
 		return SetupDraft{}, err
 	}
