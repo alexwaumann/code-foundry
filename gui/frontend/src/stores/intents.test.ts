@@ -17,6 +17,7 @@ const { useTerminalsStore } = await import("./terminals");
 const { HOME, useUiStore } = await import("./ui");
 const { getDraft, updateDraft } = await import("./compose");
 const { threadDraftKey } = await import("./threadActions");
+const { setShellMode } = await import("./shellView");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
@@ -39,6 +40,26 @@ beforeEach(() => {
   setTerminals([term("sh", shell), term("raw", {})]);
   useUiStore.setState({ selection: HOME, promptFocusSeq: 0, bottomFocusSeq: 0 });
   clearPendingFocus();
+});
+
+describe("focusTerminal in the window shell", () => {
+  afterEach(() => {
+    setShellMode("classic");
+  });
+
+  it("does nothing: the layout already shows the terminal's tab with the focus", () => {
+    setShellMode("shell");
+    focusTerminal("sh");
+    focusTerminal("raw");
+    expect(useUiStore.getState().selection).toEqual(HOME);
+    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+    expect(toastInfo).not.toHaveBeenCalled();
+  });
+
+  it("with the classic window, still reveals a shell in its owner's panel", () => {
+    focusTerminal("sh");
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
+  });
 });
 
 describe("a pending focusTerminal", () => {

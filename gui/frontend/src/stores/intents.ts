@@ -9,6 +9,7 @@ import { getUiContext } from "./context";
 import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { usePluginsStore } from "./plugins";
 import { PENDING_FOCUS_MS } from "./bottomPanel";
+import { shellDrawn } from "./shellView";
 import { showAgentRun } from "./subagentView";
 import { useTerminalsStore } from "./terminals";
 import { showThreadView } from "./threadPanelIntent";
@@ -112,6 +113,9 @@ export function applyIntent(intent: UiIntentView): void {
   const ui = useUiStore.getState();
   switch (intent.kind) {
     case "focusTerminal":
+      // The window shell shows a terminal through the layout (ui.focus.terminal's tab, with the
+      // focus): the classic bottom panel's reveal would open the Projects page over it.
+      if (shellDrawn()) break;
       focusTerminal(intent.terminalId);
       break;
     case "focusThread":
