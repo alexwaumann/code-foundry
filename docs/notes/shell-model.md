@@ -33,11 +33,20 @@ when the first working version is whole. Nothing partial is released.
   only a name that is cut off. Tabs go icon-only when the strip is tight. What a surface repeats in
   its own body is decided per surface; do not stack a second title band under the strip by default.
 - **Pull Requests and Projects are surfaces**, not sidebar rows. One of each per space.
-- **The composer** is a tab, at most one per space. New thread focuses the space's composer tab if
-  it has one, and otherwise opens one in the focused pane. Sending from it turns it into the thread's
-  tab. An empty space shows just the composer. A composer that is the only tab in its space is
-  ephemeral: opening a thread replaces it. Once the space has other tabs or panes, the composer tab
-  stays when focus moves away.
+- **The composer** is a tab. Each space has at most one EMPTY composer: New thread focuses it if
+  the space has one, and otherwise opens one in the focused pane. Sending from a composer turns it
+  into the thread's tab.
+  - **Drafts.** Once something is typed, the composer is a draft with its own identity: New thread
+    then opens another, empty composer, so a space can hold several drafts. A draft that is emptied
+    again is the space's empty composer again (if the space already has another empty one, the one
+    without focus closes). Drafts and their text survive a restart.
+  - **In the sidebar**, a space's drafts are listed at the top of Active, below the pinned threads,
+    and are drawn so that they read as drafts. A click focuses the draft's tab, or opens it in the
+    focused pane when its tab is closed. Closing a draft's tab keeps the draft; the row can discard
+    it. The empty composer is not listed.
+  - An empty composer that is the only tab in its space is ephemeral: opening a thread replaces it.
+    Once the space has other tabs or panes, it stays when focus moves away. A draft is never
+    replaced.
 - **Removing a space** always drops its tabs and panes and ends its unlinked terminals. A dialog asks
   what to do with its threads: move them to another space (they appear in that sidebar, nothing
   opens) or archive them all. The last space cannot be removed.
@@ -174,6 +183,8 @@ meaning of cmd+shift+[ and ] (previous and next thread).
 
 ## State
 
+The space the user is in is remembered: the app reopens in it, with its layout as it was.
+
 Spaces, pane trees, tabs and each thread's remembered set live in the daemon, so the CLI and a
 thread's model can read and change a layout. Every user action is a command. The model-facing verbs
 are named `view.open.*`; today's `view.panel.<item>` verbs stay as unlisted aliases for one stable
@@ -198,6 +209,10 @@ The plan, the pull request stack and the test plan are in `docs/notes/shell-plan
 and this file disagree, this file wins. The interactive toy the plan mentions is a reference for
 algorithms only; where it differs from this file (it placed terminals below and by family), this
 file wins. `shell-plan.md` is removed before the merge to `main`.
+
+Composer drafts and remembering the current space were added to this file after PRs 1 and 2
+were briefed: a small layout PR after PR 2 gives drafts their identity, and the sidebar PR lists
+them.
 
 Answers to the plan's open questions that differ from its recommendations: placement may join a pane
 that holds a thread tab (question 5); a thread's tab opens in the focused pane (question 2); closing
