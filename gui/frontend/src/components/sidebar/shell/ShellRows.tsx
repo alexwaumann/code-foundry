@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useContext } from "react";
 import { ChevronDown, ChevronRight, GitBranch, Layers, PencilLine, Square, X } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { Tip } from "@/components/ui/tooltip";
@@ -21,6 +21,9 @@ import { useUiStore } from "@/stores/ui";
 import { linkedPrTag } from "../linkedPrTag";
 import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, ThreadTooltip } from "../SidebarRow";
 import { useLinkedPrFacts, useLinkKeys } from "../useLinkedPrs";
+import { RowTooltipsEnabled } from "../rowTooltips";
+import { NeedsHoverCard } from "@/components/needs/NeedsCard";
+import { openNeedsPopup, useNeedsStore } from "@/stores/needs";
 
 /**
  * The shell sidebar's rows (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-16-sidebar.md):
@@ -153,15 +156,28 @@ function AskKind({ id }: { id: string }) {
   );
 }
 
-/** A Needs you row: the place and the kind of ask, then the title. No controls: a click opens the thread. */
-function NeedsLines({ id }: { id: string }) {
+/**
+ * A Needs you row's lines: the place and the kind of ask, then the title. No controls: a click on
+ * the title opens the thread's popup (`anchor` names the hover card it shuts until the next
+ * hover), a click elsewhere goes to the thread (the row's own click). Also the top bar's popover rows.
+ */
+export function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
   return (
     <span className="flex min-w-0 flex-col" data-testid="thread-body" data-needs>
       <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-1">
         <PlaceLabel id={id} />
         <AskKind id={id} />
       </span>
-      <Title id={id} />
+      <span
+        className="flex min-w-0 cursor-pointer"
+        data-testid="needs-title"
+        onClick={(e) => {
+          e.stopPropagation();
+          openNeedsPopup(id, anchor);
+        }}
+      >
+        <Title id={id} />
+      </span>
     </span>
   );
 }
@@ -175,12 +191,15 @@ interface RowProps<R> {
 
 /**
  * A thread row of the main list or the Working footer. It drags into the pane grid (ShellDnd)
- * while the thread lives in the current space, and onto a space tab whatever its space. Live rows keep the classic hover card; a Needs you
- * row has none until the inbox's own card (PR 17).
+ * while the thread lives in the current space, and onto a space tab whatever its space. Live rows
+ * keep the classic hover card; a Needs you row has the inbox's (components/needs/NeedsCard.tsx).
  */
 export const ShellThreadRowView = memo(function ShellThreadRowView({ row, selected, cursor, onActivate }: RowProps<ShellThreadRow>) {
   const id = row.threadId;
   const needs = row.section === "needs";
+  const anchor = `sidebar:${id}`;
+  const cards = useContext(RowTooltipsEnabled);
+  const keyCursor = useNeedsStore((s) => s.keyCursor);
   const elsewhere = useLayoutStore((s) => spaceOfThread(s, id) !== s.currentSpaceId);
   // A thread of another space drags too: only a space tab in the top bar takes it (ShellDnd).
   const { setNodeRef, listeners, describedBy, dragging } = useThreadDrag(id);
@@ -205,10 +224,16 @@ export const ShellThreadRowView = memo(function ShellThreadRowView({ row, select
         useUiStore.getState().setRenaming(id);
       }}
     >
-      {needs ? <NeedsLines id={id} /> : <ThreadLines id={id} cursor={cursor} />}
+      {needs ? <NeedsLines id={id} anchor={anchor} /> : <ThreadLines id={id} cursor={cursor} />}
     </div>
   );
-  return needs ? body : <ThreadTooltip id={id}>{body}</ThreadTooltip>;
+  if (!needs) return <ThreadTooltip id={id}>{body}</ThreadTooltip>;
+  // The Needs-you card: on hover anywhere on the row, or while the list's keyboard cursor is on it.
+  return (
+    <NeedsHoverCard threadId={id} anchor={anchor} keyboardOpen={cursor && keyCursor} enabled={cards}>
+      {body}
+    </NeedsHoverCard>
+  );
 });
 
 /** The draft's project, when it starts in one. */
@@ -278,7 +303,7 @@ const SCOPE_LOOK: Readonly<Record<NeedsScope, { icon: typeof Layers; label: stri
  * one) and switches it (settings.set sidebar.needs_scope, a global setting). Small enough for
  * the header's line at the sidebar's narrowest width.
  */
-function NeedsScopeToggle() {
+export function NeedsScopeToggle() {
   const scope = useNeedsScope();
   const look = SCOPE_LOOK[scope];
   const Icon = look.icon;

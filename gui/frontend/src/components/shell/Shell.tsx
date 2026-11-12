@@ -6,6 +6,7 @@ import { startFocusHistory } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
 import { setShellMode, useShellViewStore } from "@/stores/shellView";
 import { escapeLeaves, fullscreenOn, leaveFullscreen } from "@/shell/fullscreen";
+import { NeedsPopup } from "@/components/needs/NeedsPopup";
 import { PaneGrid } from "./PaneGrid";
 
 /** How long the window waits for the daemon's layout before it falls back to the classic window. */
@@ -59,6 +60,8 @@ export function Shell() {
     // The top bar (TopBar) is the gap above the panes: they start right under it.
     <div className="m-shell mt-0 flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
       {mode === "shell" && <PaneGrid />}
+      {/* The Needs-you popup (components/needs/NeedsPopup.tsx): one per window, over everything. */}
+      {mode === "shell" && <NeedsPopup />}
     </div>
   );
 }

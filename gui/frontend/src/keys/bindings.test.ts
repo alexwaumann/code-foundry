@@ -10,7 +10,9 @@ import { useSubagentViewStore } from "@/stores/subagentView";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
-import { chordFires, commandBindings, handleKeyDown, inPalette, installKeybindings, isGlobalChord, openRunInPicker } from "./bindings";
+import { resetNeeds, useNeedsStore } from "@/stores/needs";
+import { setShellMode } from "@/stores/shellView";
+import { chordFires, commandBindings, handleKeyDown, inPalette, installKeybindings, isGlobalChord, nextAttention, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 // The re-list a chord on a stale list waits for: a test sets what it lists.
@@ -380,6 +382,48 @@ describe("handleKeyDown precedence", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "a" });
     jump();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "c" });
+  });
+
+  describe("cmd+shift+a in the window shell: the popup of the next thread that needs the user", () => {
+    beforeEach(() => {
+      setShellMode("shell");
+      resetNeeds();
+    });
+    afterEach(() => {
+      setShellMode("waiting");
+      resetNeeds();
+    });
+
+    it("opens the popups in the Needs you order (most recent ask first), wrapping, and selects nothing", () => {
+      useThreadsStore.setState({
+        byId: {
+          a: thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }),
+          b: thread("b"),
+          c: thread("c", { status: "attention", statusReason: "question: Which?", statusChangedAtMs: 20 }),
+          d: thread("d", { status: "attention", statusReason: "finished", statusChangedAtMs: 30 }),
+        },
+        order: ["a", "b", "c", "d"],
+      });
+      const before = useUiStore.getState().selection;
+      const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      const seen: (string | null)[] = [];
+      for (let i = 0; i < 3; i++) {
+        jump();
+        seen.push(useNeedsStore.getState().popup);
+      }
+      // d finished a turn: Active's, not Needs you's.
+      expect(seen).toEqual(["c", "a", "c"]);
+      expect(useUiStore.getState().selection).toEqual(before);
+    });
+
+    it("does nothing visible when no thread needs the user", () => {
+      useThreadsStore.setState({ byId: { b: thread("b") }, order: ["b"] });
+      const before = useUiStore.getState().selection;
+      press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBeNull();
+      expect(useUiStore.getState().selection).toEqual(before);
+      expect(nextAttention()).toBe(false);
+    });
   });
 
   it("cmd+shift+a visits prompts before finished turns, as the sidebar lists them", () => {

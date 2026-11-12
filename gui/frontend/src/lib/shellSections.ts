@@ -114,6 +114,21 @@ function waitsOnUser(t: ListThread): boolean {
   return t.hidden !== true && t.archivedAtMs === null && !isSnoozed(t) && t.group === "prompt";
 }
 
+/** Needs you's threads in its order (most recent ask first), in the scope in force, from those waiting on the user. */
+function needsOf<T extends ShellListThread>(waiting: readonly T[], opts: Pick<ShellListOptions, "needsScope" | "currentSpaceId">): T[] {
+  return byRecent([...waiting].reverse().filter((t) => opts.needsScope === "all" || t.spaceId === opts.currentSpaceId), (t) => t.statusChangedAtMs);
+}
+
+/**
+ * The Needs you list (docs/notes/shell-17-needs-you.md): its thread ids in order, collapsed or
+ * not, in the scope in force (the top bar's control and cmd+shift+a); `any` is whether some
+ * thread in any space waits on the user (the section and the control show while one does).
+ */
+export function needsList(threads: readonly ShellListThread[], opts: Pick<ShellListOptions, "needsScope" | "currentSpaceId">): { ids: string[]; any: boolean } {
+  const waiting = threads.filter(waitsOnUser);
+  return { ids: needsOf(waiting, opts).map((t) => t.id), any: waiting.length > 0 };
+}
+
 /**
  * The shell sidebar's rows by panel (`threads` in creation order, the threads store's order).
  * Needs you has a header only while some thread in any space waits on the user, so its scope
@@ -122,7 +137,7 @@ function waitsOnUser(t: ListThread): boolean {
 export function buildShellSections(threads: readonly ShellListThread[], opts: ShellListOptions): ShellSections {
   const here = (t: ShellListThread) => t.spaceId === opts.currentSpaceId;
   const waiting = threads.filter(waitsOnUser);
-  const needs = byRecent([...waiting].reverse().filter((t) => opts.needsScope === "all" || here(t)), (t) => t.statusChangedAtMs);
+  const needs = needsOf(waiting, opts);
   // The space's threads for Active, Working and Snoozed; those waiting on the user are Needs you's.
   const space = threads.filter(here).map((t) => (waitsOnUser(t) ? { ...t, hidden: true } : t));
   const local = buildSections(space, opts);

@@ -5,11 +5,12 @@
  * which follows the shell's list while the shell draws the window.
  * See docs/notes/shell-16-sidebar.md.
  */
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
+import { needsList, needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
 import { threadOrder } from "@/lib/tree";
-import { getListOptions, getListThreads } from "./context";
-import { spaceOfThread, useLayoutStore } from "./layout";
+import { decodeThreadListKeys, getListOptions, getListThreads, useThreadListKeys } from "./context";
+import { spaceOfThread, useCurrentSpaceId, useLayoutStore } from "./layout";
 import { useSettingsStore, useSettingValue } from "./settings";
 import { useShellSidebarStore } from "./shellSidebar";
 import { shellDrawn } from "./shellView";
@@ -63,4 +64,22 @@ export function getShellListOptions(): ShellListOptions {
 /** Thread ids in the sidebar's order as drawn: the shell's while it draws the window, else the classic list's. */
 export function sidebarThreadOrder(): string[] {
   return shellDrawn() ? shellThreadOrder(getShellListThreads(), getShellListOptions()) : threadOrder(getListThreads(), getListOptions());
+}
+
+/**
+ * The Needs you list as the sidebar's section draws it, collapsed or not: its ids in order in
+ * the scope in force, and whether any thread in any space waits on the user (the top bar's
+ * control for a collapsed sidebar; docs/notes/shell-17-needs-you.md).
+ */
+export function useNeedsList(): { ids: readonly string[]; any: boolean } {
+  const keys = useThreadListKeys();
+  const spaces = useThreadSpaces();
+  const currentSpaceId = useCurrentSpaceId();
+  const needsScope = useNeedsScope();
+  return useMemo(() => needsList(decodeThreadListKeys(keys).map((t, i) => ({ ...t, spaceId: spaces[i] ?? "" })), { currentSpaceId, needsScope }), [keys, spaces, currentSpaceId, needsScope]);
+}
+
+/** The Needs you list's ids read imperatively (cmd+shift+a). */
+export function getNeedsIds(): string[] {
+  return needsList(getShellListThreads(), getShellListOptions()).ids;
 }

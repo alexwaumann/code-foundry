@@ -30,6 +30,9 @@ const { useSettingsStore } = await import("@/stores/settings");
 const { useShellSidebarStore } = await import("@/stores/shellSidebar");
 const { HOME, useUiStore } = await import("@/stores/ui");
 const { startSelectionBridge } = await import("@/stores/selectionBridge");
+const { resetNeeds, useNeedsStore } = await import("@/stores/needs");
+// The Needs-you card reads its ask without a Watch: nothing comes back here.
+vi.mock("@/api/threadSearch", async (orig) => ({ ...(await orig<typeof import("@/api/threadSearch")>()), readAskItems: () => new Promise(() => undefined) }));
 
 /**
  * The shell's sidebar list (docs/notes/shell-16-sidebar.md): which rows it draws with which lines,
@@ -86,6 +89,7 @@ beforeEach(async () => {
   Element.prototype.scrollIntoView = vi.fn();
   resetLayout();
   useShellSidebarStore.setState({ needsCollapsed: false, activeCollapsed: false });
+  resetNeeds();
   useSettingsStore.setState({ snapshot: null });
   useUiStore.setState({ selection: HOME, cursorKey: null, workingCollapsed: false, snoozedCollapsed: true, archivedCollapsed: true });
   useProjectsStore.setState({ byId: { api: PROJECT } as never, order: ["api"] });
@@ -187,6 +191,44 @@ describe("the shell sidebar list", () => {
     fireEvent.click(rowOf("s:s-2"));
     await settle();
     expect(runs.at(-1)).toEqual({ name: "thread.open", args: { id: "s-2", focus: "true" } });
+  });
+
+  it("a Needs you row's title opens its popup instead (docs/notes/shell-17-needs-you.md); its first line still goes to the thread", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    fireEvent.click(within(rowOf("s:s-2")).getByTestId("thread-name"));
+    await settle();
+    expect(useNeedsStore.getState().popup).toBe("s-2");
+    expect(useNeedsStore.getState().dismissed).toBe("sidebar:s-2");
+    expect(runs).toEqual([]);
+    act(() => {
+      useNeedsStore.setState({ popup: null });
+    });
+    fireEvent.click(within(rowOf("s:s-2")).getByTestId("row-line-1"));
+    await settle();
+    expect(runs).toEqual([{ name: "thread.open", args: { id: "s-2", focus: "true" } }]);
+    expect(useNeedsStore.getState().popup).toBeNull();
+  });
+
+  it("the keyboard on a Needs you row shows its card, and Enter opens its popup", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    list().focus();
+    // Home: the first row, s-2.
+    fireEvent.keyDown(list(), { key: "Home" });
+    expect(useUiStore.getState().cursorKey).toBe("s:s-2");
+    expect((await screen.findByTestId("needs-card")).getAttribute("data-thread-id")).toBe("s-2");
+    fireEvent.keyDown(list(), { key: "Enter" });
+    expect(useNeedsStore.getState().popup).toBe("s-2");
+    expect(runs).toEqual([]);
+    expect(screen.queryByTestId("needs-card")).toBeNull();
+    // A press in the list puts the pointer in charge again: no card follows the cursor.
+    act(() => {
+      useNeedsStore.setState({ popup: null });
+    });
+    fireEvent.keyDown(list(), { key: "ArrowDown" });
+    fireEvent.keyDown(list(), { key: "ArrowUp" });
+    expect(await screen.findByTestId("needs-card")).toBeTruthy();
+    fireEvent.pointerDown(list());
+    expect(screen.queryByTestId("needs-card")).toBeNull();
   });
 
   it("drafts read as drafts: the mark, the label or a placeholder; a click opens it, Discard ends it", async () => {

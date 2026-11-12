@@ -13,6 +13,7 @@ import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
 import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useCurrentSpaceId, useLayoutStore } from "@/stores/layout";
+import { needsKeyLeave, needsKeyMove, openNeedsPopup } from "@/stores/needs";
 import { useCurrentDrafts, useNeedsScope, useThreadSpaces } from "@/stores/shellList";
 import { useShellSidebarStore } from "@/stores/shellSidebar";
 import { useThreadsStore } from "@/stores/threads";
@@ -284,6 +285,7 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
   const moveCursor = (i: number) => {
     const row = rows[i];
     if (!row || !isPickable(row)) return;
+    needsKeyMove();
     useUiStore.getState().setCursor(row.key);
     const panel = panels[panelOf(row)];
     const local = panel.rows.indexOf(row);
@@ -321,6 +323,9 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
         if (onEmber) {
           ui.setCursor(EMBER_ROW_KEY);
           openEmber(emberId);
+        } else if (row?.kind === "thread" && row.section === "needs") {
+          // A Needs you row's ask is answered in its popup (the card cannot take the keyboard).
+          openNeedsPopup(row.threadId, `sidebar:${row.threadId}`);
         } else if (row) activate(row);
         break;
       case "F2":
@@ -397,6 +402,8 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
             aria-activedescendant={onEmber ? `row-${EMBER_ROW_KEY}` : activeRow ? `row-${activeRow.key}` : undefined}
             className="group flex min-h-0 flex-1 flex-col outline-none"
             onKeyDown={onKeyDown}
+            onBlur={needsKeyLeave}
+            onPointerDown={needsKeyLeave}
             onContextMenu={onContextMenu}
           >
             <PanelRows

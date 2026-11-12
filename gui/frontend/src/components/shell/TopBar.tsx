@@ -9,6 +9,7 @@ import { newSpace } from "@/shell/spaceActions";
 import { useCanStepFocus } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
 import { useUiStore } from "@/stores/ui";
+import { NeedsPopover } from "@/components/needs/NeedsPopover";
 import { SpaceTabs } from "./SpaceTabs";
 
 /**
@@ -55,6 +56,8 @@ export function TopBar() {
             </Button>
           </Tip>
         </span>
+        {/* While the sidebar is collapsed: the Needs you count and its list (components/needs/NeedsPopover.tsx). */}
+        {loaded && <NeedsPopover />}
         <FocusHistoryButtons />
         {loaded && (
           <>

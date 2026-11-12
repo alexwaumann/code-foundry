@@ -50,6 +50,7 @@ import { FailedPromptNote } from "./FailedPromptNote";
 import { RetryNote } from "./RetryNote";
 import { SetupNote } from "./SetupNote";
 import { TranscriptDeletedNote } from "./TranscriptDeleted";
+import { AskStrip } from "@/components/needs/AskStrip";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
@@ -133,6 +134,7 @@ export function ThreadComposer({
   placeholder,
   busyPlaceholder,
   focusRequests = true,
+  askStrip = null,
 }: {
   threadId: string;
   pending: readonly ThreadPendingView[];
@@ -143,6 +145,8 @@ export function ThreadComposer({
   busyPlaceholder?: string | undefined;
   /** Whether focus requests for the content pane land here: the content pane's composer only, not a plugin's thread node's. */
   focusRequests?: boolean;
+  /** A shell pane too short for the full ask (shell/askStrip.ts): that pane's id, and the ask docks as one line (AskStrip). */
+  askStrip?: string | null;
 }) {
   const draftKey = threadDraftKey(threadId);
   const text = useDraft(draftKey, "text");
@@ -359,7 +363,7 @@ export function ThreadComposer({
           attach(files);
         }}
       >
-        {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
+        {docked && (askStrip !== null ? <AskStrip threadId={threadId} pending={pending} paneId={askStrip} /> : <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />)}
         <SnoozeNote threadId={threadId} />
         <SetupNote threadId={threadId} />
         <RetryNote threadId={threadId} />

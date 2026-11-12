@@ -38,6 +38,7 @@ import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, sho
 import { shellKeyFor } from "@/shell/keys";
 import { presentFullscreen } from "@/shell/fullscreen";
 import { shellDrawn } from "@/stores/shellView";
+import { openNextNeedsPopup } from "@/stores/needs";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -74,6 +75,15 @@ export function jumpToAttention(): boolean {
   return true;
 }
 
+/**
+ * cmd+shift+a. In the window shell: the popup of the next thread in the Needs you list
+ * (stores/needs.ts; nothing visible when none waits). In the classic window: the next thread
+ * needing attention, selected. True when it went somewhere.
+ */
+export function nextAttention(): boolean {
+  return shellDrawn() ? openNextNeedsPopup() : jumpToAttention();
+}
+
 function togglePalette(): void {
   const ui = useUiStore.getState();
   if (ui.palette.open) ui.closePalette();
@@ -105,7 +115,7 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+k", title: "Command palette", run: togglePalette },
   { chord: "cmd+shift+p", title: "Command palette", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
-  { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void jumpToAttention() },
+  { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void nextAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
     title: `Jump to thread ${String(i + 1)}`,
