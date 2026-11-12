@@ -197,8 +197,10 @@ release.
 
 One empty space, showing the composer. No thread is opened for the user. Every thread stays in the
 sidebar with its old side panel tabs and terminals stored as its remembered set, so they come back
-when the thread is opened. Running terminals keep running: a thread's first bottom terminal becomes
-its quick terminal and the others become linked terminal tabs.
+when the thread is opened. A terminal that is still running when the import runs keeps running: a
+thread's first bottom terminal becomes its quick terminal and the others become linked terminal
+tabs. An update restarts the daemon, which ends its terminals, as it always has; a terminal that no
+longer exists is not carried over, and no fresh shell is started in its place.
 
 ## Not in this change
 
