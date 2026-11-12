@@ -55,6 +55,21 @@ describe("cmd+shift+a's next thread", () => {
   it("none when nothing waits", () => {
     expect(nextNeedsThread([], "a")).toBeNull();
   });
+
+  it.each([
+    ["Ember first, as its row is above the list", null, "e"],
+    ["from Ember, the list's first", "e", "a"],
+    ["from the list's last, back to Ember", "b", "e"],
+    ["from a thread not in the round, Ember", "z", "e"],
+  ])("Ember waiting: %s", (_, from, want) => {
+    expect(nextNeedsThread(["a", "b"], from, "e")).toBe(want);
+  });
+
+  it("Ember alone, and never twice in the round", () => {
+    expect(nextNeedsThread([], null, "e")).toBe("e");
+    expect(nextNeedsThread(["a", "e"], "a", "e")).toBe("e");
+    expect(nextNeedsThread(["a", "e"], "e", "e")).toBe("a");
+  });
 });
 
 describe("the ask as a strip in a short pane", () => {

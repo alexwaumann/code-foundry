@@ -7,7 +7,7 @@
  */
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { needsList, needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
+import { needsBySpace, needsList, needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
 import { threadOrder } from "@/lib/tree";
 import { decodeThreadListKeys, getListOptions, getListThreads, useThreadListKeys } from "./context";
 import { spaceOfThread, useCurrentSpaceId, useLayoutStore } from "./layout";
@@ -82,4 +82,15 @@ export function useNeedsList(): { ids: readonly string[]; any: boolean } {
 /** The Needs you list's ids read imperatively (cmd+shift+a). */
 export function getNeedsIds(): string[] {
   return needsList(getShellListThreads(), getShellListOptions()).ids;
+}
+
+/**
+ * The count each space tab shows: the threads in that space that Needs you lists for it
+ * (lib/shellSections.ts needsBySpace), by space id. Rebuilt when a thread's list key or space
+ * changes, as the sidebar is.
+ */
+export function useNeedsBySpace(): Readonly<Record<string, number>> {
+  const keys = useThreadListKeys();
+  const spaces = useThreadSpaces();
+  return useMemo(() => needsBySpace(decodeThreadListKeys(keys).map((t, i) => ({ ...t, spaceId: spaces[i] ?? "" }))), [keys, spaces]);
 }

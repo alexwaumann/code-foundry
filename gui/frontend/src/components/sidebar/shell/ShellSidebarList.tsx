@@ -11,7 +11,7 @@ import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useShownEmberThreadId } from "@/stores/ember";
 import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
 import { useEventsStore } from "@/stores/events";
-import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
+import { selectThreadAndFlag } from "@/stores/flagSurface";
 import { useCurrentSpaceId, useLayoutStore } from "@/stores/layout";
 import { needsKeyLeave, needsKeyMove, openNeedsPopup } from "@/stores/needs";
 import { useCurrentDrafts, useNeedsScope, useThreadSpaces } from "@/stores/shellList";
@@ -273,9 +273,7 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
       void openDraft(row.draftId);
       return;
     }
-    const flag = shownFlag(useThreadsStore.getState().byId[row.threadId]);
-    ui.select({ kind: "thread", id: row.threadId }, { focusPrompt: true });
-    if (flag) void openFlagSurface(row.threadId, flag.plugin);
+    selectThreadAndFlag(row.threadId);
   }, []);
 
   const panels: Readonly<Record<Panel, { rows: readonly ShellRow[]; scrollTo: RefObject<ScrollTo | null> }>> = {

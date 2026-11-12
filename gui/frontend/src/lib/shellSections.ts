@@ -130,6 +130,18 @@ export function needsList(threads: readonly ShellListThread[], opts: Pick<ShellL
 }
 
 /**
+ * How many threads wait on the user in each space, by space id (no entry for none): the count a
+ * space tab shows. The same threads Needs you lists for that space with "This space" in force
+ * (needsList with `needsScope: "space"`), so the tab and the section never disagree: a finished
+ * turn, a thread another thread started, an archived or snoozed one count in neither.
+ */
+export function needsBySpace(threads: readonly ShellListThread[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const t of threads) if (waitsOnUser(t)) out[t.spaceId] = (out[t.spaceId] ?? 0) + 1;
+  return out;
+}
+
+/**
  * The shell sidebar's rows by panel (`threads` in creation order, the threads store's order).
  * Needs you has a header only while some thread in any space waits on the user, so its scope
  * button stays reachable when this space has none; Active has one while it has a row.

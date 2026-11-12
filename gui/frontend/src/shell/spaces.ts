@@ -1,7 +1,8 @@
 /**
  * Spaces in the top bar (docs/notes/shell-model.md, "Structure"): pure functions the top bar, its
  * dialogs and the drag layer read. A space tab shows a small glyph drawn from the space's real pane
- * layout, its name, and the count of the user's own threads in it that need them. A tab or a pane
+ * layout, its name, and the count of the user's own threads in it that need them (that count is
+ * lib/shellSections.ts needsBySpace, the Needs you section's own membership). A tab or a pane
  * dropped on a space tab moves there as the daemon's verbs move it.
  * See docs/notes/shell-15-spaces.md.
  */
@@ -31,19 +32,6 @@ export function spaceGlyph(root: GeoNode | null): Rect[] {
   if (!root) return [{ x: 0, y: 0, w: GLYPH.w, h: GLYPH.h }];
   const f = plainRects(root, GLYPH.w * GLYPH_SCALE, GLYPH.h * GLYPH_SCALE);
   return Object.values(f.rects).map((r) => ({ x: q(r.x / GLYPH_SCALE), y: q(r.y / GLYPH_SCALE), w: q(r.w / GLYPH_SCALE), h: q(r.h / GLYPH_SCALE) }));
-}
-
-/**
- * How many of `attention` (the user's own threads that need them: stores/threads.ts attentionIds,
- * which leaves out archived, snoozed and thread-started threads) live in each space.
- */
-export function spaceAttentionCounts(attention: readonly string[], s: Pick<LayoutState, "threads" | "defaultSpaceId">): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const id of attention) {
-    const sp = spaceOfThread(s, id);
-    out[sp] = (out[sp] ?? 0) + 1;
-  }
-  return out;
 }
 
 /** A layout verb and its arguments. */

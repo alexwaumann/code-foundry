@@ -4,6 +4,7 @@ import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
 import { zoomFactor } from "@/lib/zoom";
 import { useCodeFind } from "./useFileFind";
+import { useKeepTopLine } from "./useKeepTopLine";
 
 /** Above this many lines the file lays out only its visible lines (the library's virtualizer). */
 export const VIRTUALIZE_LINES = 400;
@@ -60,6 +61,7 @@ export function CodeBody({ name, text, lines, line, edit, findKey }: { name: str
   const virtual = lines > VIRTUALIZE_LINES;
   const selected = useMemo(() => (line ? { start: line, end: line } : null), [line]);
   useScrollToLine(box, line, virtual);
+  useKeepTopLine(box, virtual);
   useCodeFind(findKey, box, virtual, text, edit?.active ? edit.stateKey : undefined);
   const focusable = findKey !== undefined ? -1 : undefined;
   const code = edit ? <CodeFile name={name} contents={text} selectedLines={selected} edit={edit} /> : <CodeFile name={name} contents={text} selectedLines={selected} />;

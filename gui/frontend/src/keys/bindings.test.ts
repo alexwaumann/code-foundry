@@ -12,6 +12,7 @@ import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { resetNeeds, useNeedsStore } from "@/stores/needs";
 import { setShellMode } from "@/stores/shellView";
+import { EMBER_THREAD, putEmberThread, setEmberEnabled } from "@/test/emberBoard";
 import { chordFires, commandBindings, handleKeyDown, inPalette, installKeybindings, isGlobalChord, nextAttention, openRunInPicker } from "./bindings";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
@@ -414,6 +415,30 @@ describe("handleKeyDown precedence", () => {
       // d finished a turn: Active's, not Needs you's.
       expect(seen).toEqual(["c", "a", "c"]);
       expect(useUiStore.getState().selection).toEqual(before);
+    });
+
+    it("goes to Ember's chat first while Ember waits on the user, then the popups, and back to Ember", () => {
+      setEmberEnabled(true);
+      // A finished turn is Ember's "reply not seen yet": it counts for Ember (stores/ember.ts emberAttentionId).
+      putEmberThread({ status: "attention", statusReason: "finished" }, [
+        thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }),
+        thread("c", { status: "attention", statusReason: "question: Which?", statusChangedAtMs: 20 }),
+      ]);
+      const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      jump();
+      expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: EMBER_THREAD });
+      expect(useNeedsStore.getState().popup).toBeNull();
+      jump();
+      expect(useNeedsStore.getState().popup).toBe("c");
+      jump();
+      expect(useNeedsStore.getState().popup).toBe("a");
+      jump();
+      // Back to Ember: the popup closes and its chat is selected.
+      expect(useNeedsStore.getState().popup).toBeNull();
+      expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: EMBER_THREAD });
+      setEmberEnabled(false);
+      jump();
+      expect(useNeedsStore.getState().popup).toBe("c");
     });
 
     it("does nothing visible when no thread needs the user", () => {

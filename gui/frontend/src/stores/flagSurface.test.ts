@@ -4,7 +4,10 @@ import type { PluginView } from "@/api/plugin";
 import type { ThreadFlagView } from "@/api/threads";
 import { useCommandsStore } from "./commands";
 import { contextKey, getUiContext } from "./context";
-import { flagSurfaceFor, flagSurfaces, openFlagSurface, shownFlag } from "./flagSurface";
+import type { ThreadView } from "@/api/threads";
+import { flagSurfaceFor, flagSurfaces, openFlagSurface, selectThreadAndFlag, shownFlag } from "./flagSurface";
+import { goToNeedsThread, openNeedsPopup, resetNeeds, useNeedsStore } from "./needs";
+import { useThreadsStore } from "./threads";
 import { getPanel } from "./panel";
 import { applyPluginEvent, usePluginsStore } from "./plugins";
 import { useUiStore, type Selection } from "./ui";
@@ -108,5 +111,41 @@ describe("openFlagSurface", () => {
     const opened = openFlagSurface("s-1", "test-watcher", 1000);
     vi.advanceTimersByTime(1000);
     await expect(opened).resolves.toBeNull();
+  });
+});
+
+describe("opening a thread from a row, a Needs you card or its popup (selectThreadAndFlag)", () => {
+  const flagged = (id: string, flags: ThreadFlagView[]) => ({ id, name: id, projectId: "", worktreePath: "", workspaceId: "", projectIds: [], checkoutPaths: [], status: "idle", state: "connected", statusReason: "", statusChangedAtMs: null, flags, archivedAtMs: null, snoozedUntilMs: null }) as unknown as ThreadView;
+
+  beforeEach(() => {
+    useUiStore.setState({ selection: { kind: "view", name: "prs" } });
+    useThreadsStore.setState({ byId: { "s-1": flagged("s-1", [flag("attention", "test-watcher")]), "s-2": flagged("s-2", []) }, order: ["s-1", "s-2"] });
+    resetNeeds();
+  });
+
+  it("selects a flagged thread and opens its plugin's surface for it", async () => {
+    listed(thread, [cmd("plugin.test-watcher.show.tests", true)]);
+    selectThreadAndFlag("s-1");
+    expect(useUiStore.getState().selection).toEqual(thread);
+    await vi.waitFor(() => {
+      expect(getPanel("thread:s-1").groups[0]?.activeTabId).toBe("plugin.test-watcher.tests");
+    });
+  });
+
+  it("only selects a thread without a flag", () => {
+    selectThreadAndFlag("s-2");
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-2" });
+    expect(getPanel("thread:s-2").groups[0]?.tabs ?? []).toHaveLength(0);
+  });
+
+  it("is what Go to thread does from the card and the popup: the popup closes, the surface opens", async () => {
+    listed(thread, [cmd("plugin.test-watcher.show.tests", true)]);
+    openNeedsPopup("s-1");
+    goToNeedsThread("s-1");
+    expect(useNeedsStore.getState().popup).toBeNull();
+    expect(useUiStore.getState().selection).toEqual(thread);
+    await vi.waitFor(() => {
+      expect(getPanel("thread:s-1").groups[0]?.activeTabId).toBe("plugin.test-watcher.tests");
+    });
   });
 });

@@ -231,11 +231,7 @@ export const CLASSIC_ONLY: readonly CutoverSkip[] = [
 ];
 
 /** Shell gaps these tests found, reported in the PR and the note; not the classic window's. */
-export const REPORTED: readonly CutoverSkip[] = [
-  { at: "e2e/ember.spec.ts:140", title: "a worker waiting on the user: cmd+shift+a goes to Ember first (its row is the first that needs the user)", why: "cmd+shift+a no longer reaches Ember: it opens the Needs-you popup of a thread, and Ember is not in Needs you (reported; PR 24, Ember's chat)" },
-  { at: "e2e/file-zoom-scroll.spec.ts:84", title: "in edit mode at 125% the end of a long file shows, and a zoom change keeps the line on top", why: "the File tab keeps its top line within 2 lines, not 1, across zoom changes at the shell pane's width; the File tab's anchoring, not a shell rule (reported; PR 24's zoom pass)" },
-  { at: "e2e/plugin-gaps.spec.ts:17", title: "a row that shows a plugin's flag opens the thread and the plugin's surface for it", why: "a thread a plugin flags for attention is listed under Needs you, whose click opens the popup: nothing opens the plugin's surface from the row any more (reported; owner's decision)" },
-];
+export const REPORTED: readonly CutoverSkip[] = [];
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

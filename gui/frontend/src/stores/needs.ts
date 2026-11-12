@@ -8,6 +8,8 @@ import { create } from "zustand";
 import { readAskItems } from "@/api/threadSearch";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { contextLine, nextNeedsThread } from "@/lib/needsAsk";
+import { getEmberAttentionId } from "./ember";
+import { selectThreadAndFlag } from "./flagSurface";
 import { getNeedsIds } from "./shellList";
 import { useOpenRequests, useThreadStore } from "./thread";
 import { useUiStore } from "./ui";
@@ -74,25 +76,32 @@ export function dismissNeedsCard(anchor: string): void {
 
 /**
  * cmd+shift+a in the window shell: the popup of the next thread in the Needs you list after the
- * popup's (else the focused thread), wrapping. False, and nothing visible, when none waits.
+ * popup's (else the focused thread), wrapping. Ember, while it waits on the user, comes first in
+ * the round (its row is above the list): its chat opens, as its row's click does, since what it
+ * waits on (often a worker's question) is answered there. False, and nothing visible, when
+ * nothing waits.
  */
 export function openNextNeedsPopup(): boolean {
   const sel = useUiStore.getState().selection;
   const from = useNeedsStore.getState().popup ?? (sel.kind === "thread" ? sel.id : null);
-  const next = nextNeedsThread(getNeedsIds(), from);
+  const ember = getEmberAttentionId();
+  const next = nextNeedsThread(getNeedsIds(), from, ember);
   if (next === null) return false;
-  openNeedsPopup(next);
+  if (next === ember) goToNeedsThread(ember);
+  else openNeedsPopup(next);
   return true;
 }
 
 /**
  * "Go to thread": the thread's space and its tab, focused or opened in the focused pane
- * (select(), which the selection bridge turns into thread.open --focus). The popup closes.
+ * (select(), which the selection bridge turns into thread.open --focus). The popup closes. A
+ * thread a plugin flagged also opens that plugin's surface for it, as a tab placed by the rules
+ * for linked surfaces (stores/flagSurface.ts), as the row's own click does.
  */
 export function goToNeedsThread(threadId: string): void {
   closeNeedsPopup();
   setNeedsPopover(false);
-  useUiStore.getState().select({ kind: "thread", id: threadId }, { focusPrompt: true });
+  selectThreadAndFlag(threadId);
 }
 
 const reading = new Set<string>();

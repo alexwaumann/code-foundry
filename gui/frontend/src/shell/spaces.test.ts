@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GeoNode } from "@/shell/geometry/types";
 import type { LayoutState, PaneEntry, TabEntry } from "@/stores/layout";
-import { defaultRemoveTarget, GLYPH, removeSpaceArgs, reorderIndex, spaceAtIndex, spaceAttentionCounts, spaceDropCommands, spaceGlyph, threadsOfSpace } from "./spaces";
+import { defaultRemoveTarget, GLYPH, removeSpaceArgs, reorderIndex, spaceAtIndex, spaceDropCommands, spaceGlyph, threadsOfSpace } from "./spaces";
 
 const p = (id: string): GeoNode => ({ t: "pane", id, tabs: [] });
 
@@ -43,20 +43,6 @@ describe("spaceGlyph", () => {
       expect(r.x + r.w).toBeLessThanOrEqual(GLYPH.w);
       expect(r.y + r.h).toBeLessThanOrEqual(GLYPH.h);
     }
-  });
-});
-
-describe("spaceAttentionCounts", () => {
-  it("counts the threads that need the user by the space each lives in, the default space for those with no record", () => {
-    const s = {
-      defaultSpaceId: "sp-a",
-      threads: {
-        "s-2": { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
-        "s-3": { threadId: "s-3", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
-      },
-    };
-    expect(spaceAttentionCounts(["s-1", "s-2", "s-3"], s)).toEqual({ "sp-a": 1, "sp-b": 2 });
-    expect(spaceAttentionCounts([], s)).toEqual({});
   });
 });
 
