@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"reflect"
 	"regexp"
 	"slices"
@@ -1034,14 +1035,18 @@ func (c *checker) utf8(path []string, v reflect.Value) {
 
 // nestedQuantifier returns the offset of the first group that holds a repeating
 // quantifier and is itself quantified with one ("(a+)+", "(x*)*", "(-[a-z]+)*",
-// "((ab)+c)*", "(a+){2,}", "(a{1,3})+"), or -1. A repeating quantifier is +, *, {n,} or
-// {n,m} with m > 1. Backtracking engines (the GUI's JavaScript) can take exponential time
-// on those. The check is syntactic and conservative: escapes and character classes are
-// skipped, and it does not ask whether the repetition is actually ambiguous.
+// "((ab)+c)*", "(a+){2,}", "(a{1,3})+"), or that holds an unbounded quantifier and
+// repeats a fixed number of times ("(a+){30}"), or -1. A repeating quantifier is +, *,
+// {n,} or {n,m} with m > 1 and m != n; an unbounded one is +, * or {n,}. A group of
+// bounded ones repeated a fixed number of times ("([0-9]{1,3}\.){3}") passes.
+// Backtracking engines (the GUI's JavaScript) can take exponential time on the others.
+// The check is syntactic and conservative: escapes and character classes are skipped,
+// and it does not ask whether the repetition is actually ambiguous.
 func nestedQuantifier(pattern string) int {
 	type group struct {
 		start      int
 		quantified bool // holds a repeating quantifier
+		unbounded  bool // holds an unbounded quantifier
 	}
 	var stack []group
 	inClass := false
@@ -1070,12 +1075,18 @@ func nestedQuantifier(pattern string) int {
 			if g.quantified && repeats(pattern, i+1) {
 				return g.start
 			}
-			if len(stack) > 0 && g.quantified {
-				stack[len(stack)-1].quantified = true
+			if n, m, ok := bounds(pattern, i+1); g.unbounded && ok && n == m && n > 1 {
+				return g.start
+			}
+			if len(stack) > 0 {
+				stack[len(stack)-1].quantified = stack[len(stack)-1].quantified || g.quantified
+				stack[len(stack)-1].unbounded = stack[len(stack)-1].unbounded || g.unbounded
 			}
 		case repeats(pattern, i):
 			if len(stack) > 0 {
+				_, m, _ := bounds(pattern, i)
 				stack[len(stack)-1].quantified = true
+				stack[len(stack)-1].unbounded = stack[len(stack)-1].unbounded || m < 0
 			}
 		}
 	}
@@ -1083,17 +1094,27 @@ func nestedQuantifier(pattern string) int {
 }
 
 // repeats reports whether pattern[i:] starts a repeating quantifier: +, *, {n,} or
-// {n,m} with m > 1.
+// {n,m} with m > 1 and m != n (a fixed count, {n} or {n,n}, is not one).
 func repeats(pattern string, i int) bool {
+	n, m, ok := bounds(pattern, i)
+	return ok && (m < 0 || m > 1 && m != n)
+}
+
+// bounds parses a quantifier at pattern[i:] other than ?: + (1, -1), * (0, -1), {n} (n,
+// n), {n,} (n, -1) or {n,m}; ok is false when there is none. A count too large for an
+// int reads as math.MaxInt.
+func bounds(pattern string, i int) (n, m int, ok bool) {
 	if i >= len(pattern) {
-		return false
+		return 0, 0, false
 	}
 	switch pattern[i] {
-	case '+', '*':
-		return true
+	case '+':
+		return 1, -1, true
+	case '*':
+		return 0, -1, true
 	case '{':
 	default:
-		return false
+		return 0, 0, false
 	}
 	digits := func(j int) int {
 		for j < len(pattern) && pattern[j] >= '0' && pattern[j] <= '9' {
@@ -1101,17 +1122,31 @@ func repeats(pattern string, i int) bool {
 		}
 		return j
 	}
+	count := func(s string) int {
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return math.MaxInt
+		}
+		return v
+	}
 	comma := digits(i + 1)
-	if comma == i+1 || comma >= len(pattern) || pattern[comma] != ',' {
-		return false // not a quantifier, or {n}
+	if comma == i+1 || comma >= len(pattern) {
+		return 0, 0, false
+	}
+	n = count(pattern[i+1 : comma])
+	switch pattern[comma] {
+	case '}':
+		return n, n, true
+	case ',':
+	default:
+		return 0, 0, false
 	}
 	end := digits(comma + 1)
 	if end >= len(pattern) || pattern[end] != '}' {
-		return false
+		return 0, 0, false
 	}
 	if end == comma+1 {
-		return true // {n,}
+		return n, -1, true // {n,}
 	}
-	m, err := strconv.Atoi(pattern[comma+1 : end])
-	return err != nil || m > 1
+	return n, count(pattern[comma+1 : end]), true
 }

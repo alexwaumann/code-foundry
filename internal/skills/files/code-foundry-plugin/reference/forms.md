@@ -39,8 +39,9 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
   `maxLength` or `mono`; it fits a toolbar or footer at its own width, and in the panel's
   column it is as wide as the form. `value` (never for a secret),
   `placeholder`, `maxLength`, `pattern` (a regular expression, at most 256 characters,
-  no quantified group holding a quantifier such as `(a+)+` or `(-[a-z]+)*`: the GUI's
-  JavaScript could take exponential time on it) with `patternMessage`, `mono`.
+  no quantified group holding a quantifier such as `(a+)+`, `(-[a-z]+)*` or `(a+){30}`
+  (a fixed count over bounded ones, `([0-9]{1,3}\.){3}`, is fine): the GUI's JavaScript
+  could take exponential time on it) with `patternMessage`, `mono`.
   `required`, `maxLength` and `pattern` are checked by the GUI as the user types;
   `plugin act --values` and other clients skip them, so the plugin validates every value
   again (and answers with a field `error` or an error).
