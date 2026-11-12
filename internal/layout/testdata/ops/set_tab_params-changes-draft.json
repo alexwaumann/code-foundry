@@ -1,0 +1,19 @@
+{
+  "doc": "A tab's draft id changes only through the draft ops.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-c","kind":"compose"}],"active":"t-c"},
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"set_tab_params","tab":"t-c","params":{"draft":"d-1"}},
+  "error": "invalid_argument"
+}

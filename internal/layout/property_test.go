@@ -7,11 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
 // seedState is the state every random op sequence starts from: two spaces, nested splits,
-// threads, linked and unlinked tabs.
+// threads, linked and unlinked tabs, an empty composer.
 const seedState = `{"v":1,"spaces":[
  {"id":"sp-a","name":"Main","root":{"t":"split","id":"s-r","dir":"row","sizes":[0.55,0.45],"kids":[
    {"t":"split","id":"s-c","dir":"col","sizes":[0.62,0.38],"kids":[
@@ -19,7 +20,7 @@ const seedState = `{"v":1,"spaces":[
      {"t":"pane","id":"p-t","tabs":[{"id":"t-t","kind":"terminal","thread":"th-1","params":{"terminal":"term-1"}}],"active":"t-t"}]},
    {"t":"pane","id":"p-b","tabs":[{"id":"t-d","kind":"diff","thread":"th-1","params":{"project":"pj","worktree":"w"}},{"id":"t-f","kind":"file","thread":"th-1","params":{"path":"/a"}}],"active":"t-d"}]},
   "focus":"p-a","mru":["t-a","t-d"]},
- {"id":"sp-b","name":"Second","root":{"t":"pane","id":"p-c","tabs":[{"id":"t-b","kind":"thread","thread":"th-3"},{"id":"t-prs","kind":"prs"}],"active":"t-b"},"focus":"p-c"}],
+ {"id":"sp-b","name":"Second","root":{"t":"pane","id":"p-c","tabs":[{"id":"t-b","kind":"thread","thread":"th-3"},{"id":"t-prs","kind":"prs"},{"id":"t-c","kind":"compose"}],"active":"t-b"},"focus":"p-c"}],
  "current_space":"sp-a","default_space":"sp-a","threads":{"th-3":{"space":"sp-b"}}}`
 
 // bytesrc turns fuzz input into choices; past its end every choice is 0.
@@ -60,7 +61,8 @@ func stateIDs(st *State) (spaces, panes, splits, tabs []string) {
 	return
 }
 
-func randomTab(s *bytesrc) *Tab {
+// randomTab is a tab of any kind; a compose tab may name one of the drafts of st.
+func randomTab(s *bytesrc, st *State) *Tab {
 	thread := pick(s, "", "th-1", "th-2", "th-3", "th-4")
 	switch s.n(12) {
 	case 11:
@@ -78,7 +80,11 @@ func randomTab(s *bytesrc) *Tab {
 	case 5:
 		return &Tab{Kind: pick(s, "prs", "projects"), Thread: pick(s, "", "", "th-1")}
 	case 6:
-		return &Tab{Kind: "compose", Params: map[string]string{"project": pick(s, "", "pj")}}
+		params := map[string]string{"project": pick(s, "", "pj")}
+		if s.n(3) == 0 {
+			params[DraftParam] = pick(s, draftIDs(st)...)
+		}
+		return &Tab{Kind: "compose", Params: params}
 	case 7:
 		return &Tab{Kind: pick(s, "mcp", "ember.board"), Thread: thread}
 	case 8:
@@ -88,6 +94,35 @@ func randomTab(s *bytesrc) *Tab {
 	default:
 		return &Tab{ID: pick(s, "t-a", "p-a", "t-new"), Kind: pick(s, "prs", "nope")}
 	}
+}
+
+// draftIDs lists the drafts of st, plus some that name nothing.
+func draftIDs(st *State) []string {
+	out := []string{"", "d-zz", "t-a"}
+	if st == nil {
+		return out
+	}
+	for _, sp := range st.Spaces {
+		for _, d := range sp.Drafts {
+			out = append(out, d.ID, d.ID, d.ID, d.ID, d.ID, d.ID)
+		}
+	}
+	return out
+}
+
+// composeTabs lists the compose tab ids of st, plus one that names nothing.
+func composeTabs(st *State) []string {
+	out := []string{"t-zz"}
+	for _, sp := range st.Spaces {
+		for _, p := range Panes(sp.Root) {
+			for _, tb := range p.Tabs {
+				if tb.Kind == "compose" {
+					out = append(out, tb.ID)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // randomOp makes one op of any registered kind, naming mostly things that exist in st.
@@ -105,9 +140,9 @@ func randomOp(s *bytesrc, st *State) Op {
 	op, _ := NewOp(pick(s, OpNames()...))
 	switch o := op.(type) {
 	case *AddTab:
-		o.Space, o.Pane, o.Tab, o.Index, o.Focus = pick(s, spaces...), pick(s, panes...), randomTab(s), index(), s.n(2) == 0
+		o.Space, o.Pane, o.Tab, o.Index, o.Focus = pick(s, spaces...), pick(s, panes...), randomTab(s, st), index(), s.n(2) == 0
 	case *SplitPane:
-		o.Pane, o.Edge, o.Tab, o.Frac, o.Focus = pick(s, panes...), edge(), randomTab(s), frac(), s.n(2) == 0
+		o.Pane, o.Edge, o.Tab, o.Frac, o.Focus = pick(s, panes...), edge(), randomTab(s, st), frac(), s.n(2) == 0
 	case *MoveTab:
 		o.Tab, o.Space, o.Pane, o.Index, o.Edge, o.Frac = pick(s, tabs...), pick(s, spaces...), pick(s, panes...), index(), edge(), frac()
 	case *MovePane:
@@ -139,7 +174,7 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Pane = pick(s, panes...)
 	case *SetTabParams:
 		o.Tab = pick(s, tabs...)
-		o.Params = randomTab(s).Params
+		o.Params = randomTab(s, st).Params
 		if s.n(2) == 0 {
 			title := "T"
 			o.Title = &title
@@ -166,7 +201,7 @@ func randomOp(s *bytesrc, st *State) Op {
 	case *SwitchSpace:
 		o.Space = pick(s, spaces...)
 	case *OpenSurface:
-		o.Space, o.Tab, o.Focus = pick(s, "", "", "", spaces[len(spaces)-1]), randomTab(s), s.n(2) == 0
+		o.Space, o.Tab, o.Focus = pick(s, "", "", "", spaces[len(spaces)-1]), randomTab(s, st), s.n(2) == 0
 		if s.n(4) == 0 {
 			o.Pane = pick(s, panes...)
 		}
@@ -178,6 +213,8 @@ func randomOp(s *bytesrc, st *State) Op {
 			o.Pane = pick(s, panes...)
 		case 1:
 			o.Compose = pick(s, tabs...)
+		case 2:
+			o.Compose = pick(s, composeTabs(st)...)
 		}
 		o.W, o.H = viewportOf(s)
 	case *CloseThread:
@@ -192,6 +229,24 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Thread = pick(s, threads...)
 		o.Ran = map[string]string{"term-1": "make dev"}
 		o.W, o.H = viewportOf(s)
+	case *NewThread:
+		o.Space, o.Focus = pick(s, "", "", spaces[len(spaces)-1]), s.n(2) == 0
+		if s.n(4) == 0 {
+			o.Pane = pick(s, panes...)
+		}
+		if s.n(3) == 0 {
+			o.Params = map[string]string{"project": "pj"}
+		}
+	case *StartDraft:
+		o.Tab, o.Draft, o.Label = pick(s, append(composeTabs(st), composeTabs(st)[1:]...)...), pick(s, "", "", "", "d-mine", "t-a", " x"), pick(s, "", "Fix\nit", strings.Repeat("é", 90))
+	case *LabelDraft:
+		o.Draft, o.Label = pick(s, draftIDs(st)...), pick(s, "", "Fix it")
+	case *ClearDraft:
+		o.Draft = pick(s, draftIDs(st)...)
+	case *DiscardDraft:
+		o.Draft = pick(s, draftIDs(st)...)
+	case *OpenDraft:
+		o.Draft, o.Focus = pick(s, draftIDs(st)...), s.n(2) == 0
 	}
 	return op
 }
@@ -244,6 +299,7 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 			}
 		}
 		checkPlacement(t, step, string(opJSON), st, next, res)
+		checkDrafts(t, step, string(opJSON), next, res)
 		enc, err := Encode(next)
 		if err != nil {
 			t.Fatal(err)
@@ -278,6 +334,48 @@ func checkPlacement(t *testing.T, step int, opJSON string, before, after *State,
 	for _, id := range append(slices.Clone(res.Back), res.Placed...) {
 		if _, _, tb := after.FindTab(id); tb == nil {
 			t.Fatalf("step %d %s: restored tab %s is not open", step, opJSON, id)
+		}
+	}
+}
+
+// checkDrafts pins the composer rules on any state, besides Check: at most one empty composer
+// per space; each draft listed once, and its tab, when open, the only one and in the space
+// that lists it; a draft the op ended (Result.Draft with nothing left) is gone everywhere.
+func checkDrafts(t *testing.T, step int, opJSON string, st *State, res Result) {
+	t.Helper()
+	listed := map[string]string{}
+	for _, sp := range st.Spaces {
+		for _, d := range sp.Drafts {
+			if _, ok := listed[d.ID]; ok {
+				t.Fatalf("step %d %s: draft %s listed twice", step, opJSON, d.ID)
+			}
+			listed[d.ID] = sp.ID
+		}
+	}
+	open := map[string]bool{}
+	for _, sp := range st.Spaces {
+		empty := 0
+		for _, p := range Panes(sp.Root) {
+			for _, tb := range p.Tabs {
+				id := draftOf(tb)
+				switch {
+				case tb.Kind != "compose":
+				case id == "":
+					empty++
+				case open[id] || listed[id] != sp.ID:
+					t.Fatalf("step %d %s: draft tab %s of %s is a second one or not listed by %s", step, opJSON, tb.ID, id, sp.ID)
+				default:
+					open[id] = true
+				}
+			}
+		}
+		if empty > 1 {
+			t.Fatalf("step %d %s: space %s has %d empty composers", step, opJSON, sp.ID, empty)
+		}
+	}
+	if name := strings.SplitN(strings.TrimPrefix(opJSON, `{"op":"`), `"`, 2)[0]; res.Draft != "" && (name == "clear_draft" || name == "discard_draft" || name == "open_thread") {
+		if _, ok := listed[res.Draft]; ok || open[res.Draft] {
+			t.Fatalf("step %d %s: draft %s ended but is still there", step, opJSON, res.Draft)
 		}
 	}
 }

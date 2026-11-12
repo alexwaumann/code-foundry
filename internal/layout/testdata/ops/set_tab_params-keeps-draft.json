@@ -1,0 +1,43 @@
+{
+  "doc": "New params for a draft's tab keep its draft id, and its list entry takes them.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-d","kind":"compose","params":{"draft":"d-1"}}],
+          "active": "t-d"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"set_tab_params","tab":"t-d","params":{"project":"pk"}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-d","kind":"compose","params":{"draft":"d-1","project":"pk"}}],
+          "active": "t-d"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix","params":{"project":"pk"}}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-d"}
+}

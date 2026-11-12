@@ -1,0 +1,66 @@
+{
+  "doc": "Reopening a draft whose tab is closed opens it in the focused pane after the active tab, with the params it had.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"},{"id":"t-p","kind":"prs"}],
+              "active": "t-a"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1","label":"Fix","params":{"project":"pj"}}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_draft","draft":"d-1","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-n1","kind":"compose","params":{"draft":"d-1","project":"pj"}},
+                {"id":"t-p","kind":"prs"}
+              ],
+              "active": "t-n1"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-n1"],
+        "drafts": [{"id":"d-1","label":"Fix","params":{"project":"pj"}}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused","draft":"d-1"}
+}

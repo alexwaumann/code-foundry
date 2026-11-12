@@ -1,0 +1,46 @@
+{
+  "doc": "A label is cut to MaxDraftLabel runes.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-c","kind":"compose"}],"active":"t-c"},
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "start_draft",
+    "tab": "t-c",
+    "label": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé and more words after it"
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-c","kind":"compose","params":{"draft":"d-n1"}}],
+          "active": "t-c"
+        },
+        "focus": "p-a",
+        "drafts": [
+          {
+            "id": "d-n1",
+            "label": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-c","draft":"d-n1"}
+}

@@ -1,0 +1,24 @@
+{
+  "doc": "A composer that is already a draft cannot start another.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-d","kind":"compose","params":{"draft":"d-1"}}],
+          "active": "t-d"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-1"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"start_draft","tab":"t-d"},
+  "error": "failed_precondition"
+}
