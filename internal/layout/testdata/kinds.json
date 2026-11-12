@@ -1,11 +1,5 @@
 [
-  {
-    "kind": "compose",
-    "link": "none",
-    "scope": "space",
-    "key_params": ["project","workspace","like"],
-    "default_frac": 0.5
-  },
+  {"kind":"compose","link":"none","scope":"space","default_frac":0.5},
   {
     "kind": "diff",
     "link": "optional",
