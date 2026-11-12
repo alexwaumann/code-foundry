@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockUrl, openStreams, resetMock } from "./fixtures";
+import { appPath, invocations, mockUrl, openStreams, resetMock } from "./fixtures";
 
 /**
  * The window shell's pane grid behind the shell flag (docs/notes/shell-11-pane-grid.md), against
@@ -171,6 +171,23 @@ test("two panes showing two threads hold two WatchThread streams; a hidden tab h
   await page.keyboard.press("Meta+Shift+w");
   await expect(page.getByTestId("shell-pane")).toHaveCount(1);
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
+});
+
+test("sending from a composer tab turns it into the new thread's tab, in place", async ({ page }) => {
+  await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [thread("s-1"), { id: "t-c", kind: "compose", params: { project: "repo-cf" } }], "t-c"), pane("p-2", [thread("s-5")])], sizes: [0.5, 0.5] }, "p-1");
+  await openShell(page);
+  const input = paneEl(page, "p-1").getByTestId("composer-input");
+  await input.click();
+  await page.keyboard.type("Tidy the README");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.new")?.args.compose).toBe("t-c");
+  // The thread's tab is where the composer was, active, in the focused pane.
+  await expect(paneEl(page, "p-1").getByTestId("thread-pane")).toBeVisible();
+  const tabs = paneEl(page, "p-1").getByTestId("shell-tab");
+  await expect(tabs).toHaveCount(2);
+  await expect(tabs.nth(1)).toHaveAttribute("data-kind", "thread");
+  await expect(tabs.nth(1)).toHaveAttribute("data-active", "true");
+  await expect(paneEl(page, "p-1")).toHaveAttribute("data-focused", "true");
 });
 
 /** SHOTS=<dir>: the grid with three panes and the empty space, dark and light. */

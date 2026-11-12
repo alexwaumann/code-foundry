@@ -109,7 +109,10 @@ export type RouteAction =
   | { kind: "focus"; tab: string; params?: Record<string, string> }
   /** Set the focused tab's params (the Projects tab moving between its pages). */
   | { kind: "params"; tab: string; params: Record<string, string> }
-  /** The thread replaces the composer it was sent from. */
+  /**
+   * The thread replaces the composer it was sent from. A send through thread.new does this itself
+   * (--compose, shell/composerTab.ts); "New thread on this branch" (thread.new-like) has no such arg.
+   */
   | { kind: "replace-composer"; thread: string; compose: string }
   /** Open a page's tab in the focused pane (view.open.* arrives with PR 7). */
   | { kind: "open"; tabKind: string; params: Record<string, string> }

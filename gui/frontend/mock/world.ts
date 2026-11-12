@@ -4023,12 +4023,18 @@ export class World {
             { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)", defaultToThreadEnv: true },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves). Never for a thread another thread created (created-by): thread focus shows one on request", defaultValue: "true" },
+            { name: "compose", type: ArgType.STRING, required: false, description: "The composer tab it is sent from (the shell window sets it): the thread's tab takes its place, in its space" },
           ],
         },
         // Like the daemon: also in the composer, whose no-project target has no project, and from a thread's CLI or page.
         when: (ctx) =>
           this.worktreeOf(ctx) !== null || Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)) || ctx?.activeView === "compose" || (ctx?.activeView === "" && activeThread(ctx) !== undefined),
-        run: (ctx, args) => this.newThread(ctx, args),
+        run: async (ctx, args) => {
+          const out = await this.newThread(ctx, args);
+          // --compose (the shell's composer, internal/command commands_thread_compose.go): the thread's tab takes that composer's place.
+          if (args.compose) this.layout.apply({ op: "open_thread", thread: (JSON.parse(out.resultJson) as { id: string }).id, compose: args.compose, focus: true });
+          return out;
+        },
       },
       ...(
         [

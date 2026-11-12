@@ -17,13 +17,14 @@ space's pane grid; with it off nothing changes. The sidebar is still the classic
 | `shell/surfaces/*` | the shell's surface registry: `thread`, `compose`, `prs`, `projects`, and `file`, `diff`, `pullrequest`, `mcp`, `gallery`, `ember.board` and `plugin.*` wrapping the side panel's `SurfaceSpec.render`; unknown kinds draw a placeholder |
 | `shell/hostShell.ts`, `shell/host.ts` | the seam's shell half and its dispatch |
 | `shell/kinds.ts`, `shell/domIds.ts`, `shell/paneContext.ts` | kind names between layout and panel; DOM ids; the pane a surface is in |
+| `shell/composerTab.ts` | the composer tab a send comes from, for `thread.new --compose` |
 | `shell/commands.ts` | the layout verbs run quietly, their `LayoutResult` JSON, optimistic focus through a command, `afterRev` |
 | `shell/resize.ts` | the gutter drag's arithmetic (pure) |
 | `shell/keys.ts` | the interim key table |
 | `stores/selectionBridge.ts` | the selection from the focused tab; `select()` to the layout |
 | `stores/shellView.ts` | window-only state: mode, the drawn frame, focus requests |
 | `mock/layoutVerbs.ts` | the mock's command-level layout verbs |
-| `e2e/shell-grid.spec.ts` | gutter drag, focus by press and keys, stream counts, SHOTS |
+| `e2e/shell-grid.spec.ts` | gutter drag, focus by press and keys, stream counts, a composer tab's send, SHOTS |
 
 ## Decisions
 
@@ -34,18 +35,21 @@ space's pane grid; with it off nothing changes. The sidebar is still the classic
   `tab.close`, a gutter drag `pane.resize`, a sidebar click `thread.open`, New thread
   `composer.new`. Focus stays optimistic: the slice's `focusTab`/`focusPane` now take a runner, and
   `shell/commands.ts` passes one that invokes the command and answers the `rev` from its JSON.
-  Three routes have no verb yet and apply the op through `LayoutService` directly: a composer's send
-  (`open_thread` with `compose`, which `thread.open` does not take), and opening Pull Requests or
-  Projects (`open_surface`; `view.open.*` is PR 7). The seam's own operations (a surface's
+  A composer's send passes `thread.new --compose <tab>` (PR 6), so the thread's tab takes the
+  composer's place in the daemon's own commit (`shell/composerTab.ts`: the focused tab when it is a
+  composer); the mock's `thread.new` does the same. Three routes have no verb yet and apply the op
+  through `LayoutService` directly: a send from a "New thread on this branch" composer
+  (`thread.new-like` takes no `--compose`, so the bridge applies `open_thread` with `compose`), and
+  opening Pull Requests or Projects (`open_surface`; `view.open.*` is PR 7). The seam's own operations (a surface's
   `setTabParams`, `openTab`) are not user actions and also go straight to `LayoutService`.
 - **The selection bridge** writes `ui.selection` from the current space's focused tab (thread and
   linked tabs: the thread; `prs`; `projects` with its `project`/`workspace` params; `compose`; an
   unlinked tab: `none`; no pane: home). `ui.select()` goes through a route (`setSelectRoute`): it
   sets the selection at once, runs the action, and does not mirror the layout over it until the
   action settles, then mirrors again (a refusal puts back what the window shows). `select()` has a
-  new `sent` option: `compose.ts`'s send passes it, so a thread replaces the composer it was sent
-  from, while a sidebar click with a composer focused opens beside it (the spec's "stays when focus
-  moves away"). Back and forward set the selection as before, then route it. A New thread pick
+  new `sent` option: `compose.ts`'s send passes it when the daemon did not already put the thread
+  in the composer's place (a like send), so the bridge does; a sidebar click with a composer focused
+  opens beside it (the spec's "stays when focus moves away"). Back and forward set the selection as before, then route it. A New thread pick
   sets the focused empty composer's params to what was picked (`new_thread` focuses an existing
   empty composer without changing them).
 - **The Projects tab's page is in its params**, not the selection: `ProjectsPageAt` takes the
@@ -115,12 +119,13 @@ space's pane grid; with it off nothing changes. The sidebar is still the classic
   unknown kind, position, focus by press), `selectionBridge.test.ts` (each tab kind's selection,
   every route, the bridge mirroring and routing, no layout), `keys.test.ts` (against the spec's
   table), `hostShell.test.ts` (places, identity, ids, open, params, subscribe), `resize.test.ts`,
-  `registry.test.ts` (kinds.json), `mock/layoutVerbs.test.ts`.
+  `registry.test.ts` (kinds.json), `composerTab.test.ts`, `mock/layoutVerbs.test.ts`.
 - e2e `shell-grid.spec.ts` (WebKit, mock): a gutter drag previews, stores the sizes, keeps the
   tiling and the panes where they were dropped, also down a column; focus by a press and by
   `ctrl+cmd+h/j/k/l` and an arrow, with the keyboard following (into a thread's prompt); two panes
   with two threads hold two `WatchThread`s, switching a pane to its hidden thread tab keeps two, and
-  closing a pane leaves one.
+  closing a pane leaves one. Sending from a composer tab runs `thread.new --compose <tab>` and the
+  thread's tab takes the composer's place, active, in the focused pane.
 - `make gui-e2e` with the flag off: the existing suite unaffected (numbers in the PR).
 - End to end with `make drive DAEMON=dev` and `?shell=1` on a scratch home under /tmp (removed
   after): two threads made with `thread new --no-project`, opened from the sidebar (the second
@@ -147,7 +152,8 @@ space's pane grid; with it off nothing changes. The sidebar is still the classic
   the strip and the body, from `ShellSurface` (add `linkedRow`); the "+" menu after the last tab in
   `PaneTabStrip` (its free space then stops dragging the window only where the menu sits); the thread
   header replaces `ThreadPane`'s; the attention mark on a tab opened behind uses `SurfaceSpec.waiting`.
-  `thread.open` could take the composer it replaces (`compose`) so the composer's send is a verb.
+  `thread.new-like` could take `--compose` as `thread.new` does, and the bridge's direct
+  `open_thread` would go.
 - **PR 13 (terminals)**: add `shell/surfaces/terminal.tsx` (and drop `terminal` from `LATER` in
   `registry.test.ts` and from `NOT_PANEL` in `hostShell.ts` if it should join a place); the quick
   terminal mounts inside the thread surface only while its tab is active; `cmd+t`, `cmd+shift+t`,

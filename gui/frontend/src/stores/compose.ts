@@ -57,6 +57,7 @@ import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, st
 import type { Citation } from "@/lib/citation";
 import { toast } from "sonner";
 import { readAttachmentFile } from "./attachments";
+import { composerTabSentFrom } from "@/shell/composerTab";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
@@ -1015,6 +1016,9 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (draftJson) args["draft-json"] = draftJson;
     // "New thread on this branch" is its own command (the daemon copies the thread's set, branch, workspace and mode).
     const command = place.kind === "like" ? THREAD_COMMANDS.newLike : THREAD_COMMANDS.create;
+    // In the window shell the thread's tab takes the composer tab's place (thread.new --compose; new-like has no such arg).
+    const composeTab = place.kind === "like" ? "" : composerTabSentFrom();
+    if (composeTab) args.compose = composeTab;
     const res = await invokeConfirmed(command, args, getUiContext(composeSelection(target, place)));
     if (!res) {
       updateDraft(key, { phase: "idle" });
@@ -1028,7 +1032,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (id) noteSentFrom(id, target);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
-    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true, sent: true });
+    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true, sent: !composeTab });
     return true;
   } catch (err) {
     updateDraft(key, { phase: "idle", error: sendErrorMessage(err) });
