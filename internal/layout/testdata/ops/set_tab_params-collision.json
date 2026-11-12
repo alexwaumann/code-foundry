@@ -1,0 +1,47 @@
+{
+  "doc": "Params that name a surface open in another tab are refused.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}},
+                {"id":"t-g","kind":"file","thread":"th-a","params":{"path":"/r/b.go"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"set_tab_params","tab":"t-f","params":{"path":"/r/b.go"}},
+  "error": "already_exists"
+}

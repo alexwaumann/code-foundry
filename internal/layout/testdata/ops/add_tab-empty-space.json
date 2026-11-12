@@ -1,0 +1,24 @@
+{
+  "doc": "Adding to a space with no panes makes its first pane.",
+  "state": {
+    "v": 1,
+    "spaces": [{"id":"sp-a","name":"Main","root":null}],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"add_tab","tab":{"id":"","kind":"prs"}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-n1","tabs":[{"id":"t-n1","kind":"prs"}],"active":"t-n1"},
+        "focus": "p-n1"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1"}
+}

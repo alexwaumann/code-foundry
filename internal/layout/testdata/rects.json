@@ -1,0 +1,201 @@
+[
+  {
+    "doc": "one pane fills the area",
+    "root": {"t":"pane","id":"p-a"},
+    "w": 1180,
+    "h": 820,
+    "rects": {"p-a":{"x":0,"y":0,"w":1180,"h":820}}
+  },
+  {
+    "doc": "two equal columns share the width minus one gutter",
+    "root": {
+      "t": "split",
+      "id": "s-r",
+      "dir": "row",
+      "kids": [{"t":"pane","id":"p-a"},{"t":"pane","id":"p-b"}],
+      "sizes": [0.5,0.5]
+    },
+    "w": 1000,
+    "h": 600,
+    "rects": {"p-a":{"x":0,"y":0,"w":494,"h":600},"p-b":{"x":506,"y":0,"w":494,"h":600}},
+    "gutters": [{"split":"s-r","i":0,"row":true,"x":494,"y":0,"w":12,"h":600}],
+    "neighbours": {"p-a":{"right":["p-b"]},"p-b":{"left":["p-a"]}},
+    "adjacent": [["p-a","p-b"]]
+  },
+  {
+    "doc": "edges round to whole px and the last pane runs to the far edge",
+    "root": {
+      "t": "split",
+      "id": "s-r",
+      "dir": "row",
+      "kids": [{"t":"pane","id":"p-a"},{"t":"pane","id":"p-b"},{"t":"pane","id":"p-c"}],
+      "sizes": [0.6,0.25,0.15]
+    },
+    "w": 1001,
+    "h": 600,
+    "rects": {
+      "p-a": {"x":0,"y":0,"w":586,"h":600},
+      "p-b": {"x":598,"y":0,"w":244,"h":600},
+      "p-c": {"x":854,"y":0,"w":147,"h":600}
+    },
+    "gutters": [
+      {"split":"s-r","i":0,"row":true,"x":586,"y":0,"w":12,"h":600},
+      {"split":"s-r","i":1,"row":true,"x":842,"y":0,"w":12,"h":600}
+    ],
+    "neighbours": {
+      "p-a": {"right":["p-b"]},
+      "p-b": {"left":["p-a"],"right":["p-c"]},
+      "p-c": {"left":["p-b"]}
+    },
+    "adjacent": [["p-a","p-b"],["p-b","p-c"]]
+  },
+  {
+    "doc": "three rows",
+    "root": {
+      "t": "split",
+      "id": "s-c",
+      "dir": "col",
+      "kids": [{"t":"pane","id":"p-a"},{"t":"pane","id":"p-b"},{"t":"pane","id":"p-c"}],
+      "sizes": [0.5,0.3,0.2]
+    },
+    "w": 800,
+    "h": 1000,
+    "rects": {
+      "p-a": {"x":0,"y":0,"w":800,"h":488},
+      "p-b": {"x":0,"y":500,"w":800,"h":293},
+      "p-c": {"x":0,"y":805,"w":800,"h":195}
+    },
+    "gutters": [
+      {"split":"s-c","i":0,"row":false,"x":0,"y":488,"w":800,"h":12},
+      {"split":"s-c","i":1,"row":false,"x":0,"y":793,"w":800,"h":12}
+    ],
+    "neighbours": {
+      "p-a": {"bottom":["p-b"]},
+      "p-b": {"bottom":["p-c"],"top":["p-a"]},
+      "p-c": {"top":["p-b"]}
+    },
+    "adjacent": [["p-a","p-b"],["p-b","p-c"]]
+  },
+  {
+    "doc": "a thread with a pane of two stacked panes on its right: both are its right neighbours, the taller shared edge first",
+    "root": {
+      "t": "split",
+      "id": "s-r",
+      "dir": "row",
+      "kids": [
+        {"t":"pane","id":"p-a"},
+        {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [{"t":"pane","id":"p-b"},{"t":"pane","id":"p-c"}],
+          "sizes": [0.7,0.3]
+        }
+      ],
+      "sizes": [0.55,0.45]
+    },
+    "w": 1180,
+    "h": 820,
+    "rects": {
+      "p-a": {"x":0,"y":0,"w":642,"h":820},
+      "p-b": {"x":654,"y":0,"w":526,"h":566},
+      "p-c": {"x":654,"y":578,"w":526,"h":242}
+    },
+    "gutters": [
+      {"split":"s-r","i":0,"row":true,"x":642,"y":0,"w":12,"h":820},
+      {"split":"s-c","i":0,"row":false,"x":654,"y":566,"w":526,"h":12}
+    ],
+    "neighbours": {
+      "p-a": {"right":["p-b","p-c"]},
+      "p-b": {"bottom":["p-c"],"left":["p-a"]},
+      "p-c": {"left":["p-a"],"top":["p-b"]}
+    },
+    "adjacent": [["p-a","p-b"],["p-a","p-c"],["p-b","p-c"]]
+  },
+  {
+    "doc": "the reference toy's first space: two rows of nested splits",
+    "root": {
+      "t": "split",
+      "id": "s-1",
+      "dir": "col",
+      "kids": [
+        {
+          "t": "split",
+          "id": "s-2",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "split",
+              "id": "s-3",
+              "dir": "col",
+              "kids": [{"t":"pane","id":"p-ab"},{"t":"pane","id":"p-t"}],
+              "sizes": [0.62,0.38]
+            },
+            {"t":"pane","id":"p-diff"}
+          ],
+          "sizes": [0.55,0.45]
+        },
+        {
+          "t": "split",
+          "id": "s-4",
+          "dir": "row",
+          "kids": [{"t":"pane","id":"p-v"},{"t":"pane","id":"p-dk"},{"t":"pane","id":"p-c"}],
+          "sizes": [0.262,0.369,0.369]
+        }
+      ],
+      "sizes": [0.62,0.38]
+    },
+    "w": 1180,
+    "h": 820,
+    "rects": {
+      "p-ab": {"x":0,"y":0,"w":642,"h":303},
+      "p-c": {"x":753,"y":513,"w":427,"h":307},
+      "p-diff": {"x":654,"y":0,"w":526,"h":501},
+      "p-dk": {"x":315,"y":513,"w":426,"h":307},
+      "p-t": {"x":0,"y":315,"w":642,"h":186},
+      "p-v": {"x":0,"y":513,"w":303,"h":307}
+    },
+    "gutters": [
+      {"split":"s-3","i":0,"row":false,"x":0,"y":303,"w":642,"h":12},
+      {"split":"s-2","i":0,"row":true,"x":642,"y":0,"w":12,"h":501},
+      {"split":"s-1","i":0,"row":false,"x":0,"y":501,"w":1180,"h":12},
+      {"split":"s-4","i":0,"row":true,"x":303,"y":513,"w":12,"h":307},
+      {"split":"s-4","i":1,"row":true,"x":741,"y":513,"w":12,"h":307}
+    ],
+    "neighbours": {
+      "p-ab": {"bottom":["p-t"],"right":["p-diff"]},
+      "p-c": {"left":["p-dk"],"top":["p-diff"]},
+      "p-diff": {"bottom":["p-c","p-dk"],"left":["p-ab","p-t"]},
+      "p-dk": {"left":["p-v"],"right":["p-c"],"top":["p-t","p-diff"]},
+      "p-t": {"bottom":["p-dk","p-v"],"right":["p-diff"],"top":["p-ab"]},
+      "p-v": {"right":["p-dk"],"top":["p-t"]}
+    },
+    "adjacent": [
+      ["p-ab","p-t"],
+      ["p-ab","p-diff"],
+      ["p-t","p-diff"],
+      ["p-t","p-v"],
+      ["p-t","p-dk"],
+      ["p-diff","p-dk"],
+      ["p-diff","p-c"],
+      ["p-v","p-dk"],
+      ["p-dk","p-c"]
+    ]
+  },
+  {
+    "doc": "a fractional area (page zoom): the last pane ends on the fractional edge",
+    "root": {
+      "t": "split",
+      "id": "s-r",
+      "dir": "row",
+      "kids": [{"t":"pane","id":"p-a"},{"t":"pane","id":"p-b"}],
+      "sizes": [0.5,0.5]
+    },
+    "w": 1180.5,
+    "h": 820.25,
+    "rects": {"p-a":{"x":0,"y":0,"w":584,"h":820.25},"p-b":{"x":596,"y":0,"w":584.5,"h":820.25}},
+    "gutters": [{"split":"s-r","i":0,"row":true,"x":584,"y":0,"w":12,"h":820.25}],
+    "neighbours": {"p-a":{"right":["p-b"]},"p-b":{"left":["p-a"]}},
+    "adjacent": [["p-a","p-b"]]
+  }
+]
