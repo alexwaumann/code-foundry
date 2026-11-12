@@ -311,6 +311,10 @@ message LayoutOp {
     ClearDraftOp clear_draft = 43;
     DiscardDraftOp discard_draft = 44;
     OpenDraftOp open_draft = 45;
+
+    SetQuickOp set_quick = 50;
+    ReplaceTerminalOp replace_terminal = 51;
+    DropTerminalOp drop_terminal = 52;
   }
 }
 
@@ -360,6 +364,28 @@ message SnoozeThreadOp {
   string thread_id = 1;
   // The command each of its terminals ran last, by terminal id, shown with "Run again".
   map<string, string> ran = 2;
+}
+
+// SetQuickOp opens or closes a thread's quick terminal (LayoutThread.quick); height above
+// zero sets its height in layout pixels, zero keeps it.
+message SetQuickOp {
+  string thread_id = 1;
+  bool open = 2;
+  double height = 3;
+}
+
+// ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
+// still running) at terminal new_id: a reset terminal's tab follows the fresh shell. The
+// daemon applies it itself when a shell labelled replaces=<old id> starts.
+message ReplaceTerminalOp {
+  string old_id = 1;
+  string new_id = 2;
+}
+
+// DropTerminalOp is a terminal that went away: its open tab closes, and a remembered tab
+// of it still running is forgotten. The daemon applies it itself when a terminal is removed.
+message DropTerminalOp {
+  string terminal_id = 1;
 }
 
 // AddTabOp adds a tab to pane_id, else the focused pane of space_id (empty: the current

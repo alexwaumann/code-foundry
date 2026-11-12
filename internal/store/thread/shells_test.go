@@ -91,3 +91,53 @@ func TestRemoveFailsWhileAShellWillNotDie(t *testing.T) {
 		t.Errorf("shell after a failed Remove: %v, want it still there", err)
 	}
 }
+
+// Options.ShellsGoing hears of an archive, a snooze, a save for later and a removal before
+// the thread's shells go: a shell is still running when it is called (the layout glue
+// reads what runs in it then; docs/notes/shell-6-lifecycle.md), and gone after.
+func TestShellsGoingBeforeTheShellsGo(t *testing.T) {
+	type call struct {
+		why     ShellsGo
+		running bool
+	}
+	for _, tc := range []struct {
+		name string
+		act  func(e *env, id string) error
+		want ShellsGo
+	}{
+		{"archive", func(e *env, id string) error { _, err := e.m.Archive(e.ctx(), id, true); return err }, ShellsArchived},
+		{"snooze", func(e *env, id string) error {
+			_, err := e.m.Snooze(e.ctx(), id, e.m.opts.Now().Add(time.Hour))
+			return err
+		}, ShellsSnoozed},
+		{"save for later", func(e *env, id string) error { _, err := e.m.SaveForLater(e.ctx(), id); return err }, ShellsSnoozed},
+		{"remove", func(e *env, id string) error { return e.m.Remove(e.ctx(), id) }, ShellsRemoved},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []call
+			var shell string
+			var e *env
+			e = newEnv(t, func(o *Options) {
+				o.ShellsGoing = func(ctx context.Context, id string, why ShellsGo) {
+					got, err := e.terms.Get(ctx, shell)
+					calls = append(calls, call{why, err == nil && got.State == terminal.StateRunning})
+				}
+			})
+			s := e.connected(CreateOptions{})
+			term, err := e.terms.Create(e.ctx(), terminal.Spec{Argv: []string{"zsh"}, Cwd: e.wt, Labels: termlabel.Shell(s.ID, "r1", e.wt)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			shell = term.ID
+			if err := tc.act(e, s.ID); err != nil {
+				t.Fatal(err)
+			}
+			if len(calls) != 1 || calls[0] != (call{tc.want, true}) {
+				t.Errorf("calls %+v, want one %v with the shell running", calls, tc.want)
+			}
+			if _, err := e.terms.Get(e.ctx(), shell); !errors.Is(err, terminal.ErrNotFound) {
+				t.Errorf("the shell is still there: %v", err)
+			}
+		})
+	}
+}

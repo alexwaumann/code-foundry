@@ -177,6 +177,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	defer func() { _ = st.close() }() // after the servers have shut down
+	// The layout lays panes out in the pane area of a visible window when one reported it.
+	st.layout.SetWindowVisible(clients.Visible)
 	pres.Subscribe(func(from, to presence.State) {
 		if from.Kind != to.Kind {
 			st.gh.PresenceChanged(from.Kind, to.Kind)

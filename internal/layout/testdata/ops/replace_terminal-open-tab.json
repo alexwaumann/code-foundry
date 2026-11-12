@@ -1,0 +1,87 @@
+{
+  "doc": "A reset terminal's tab follows the new shell: same tab, place, name and other params; only the terminal and the key change.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-x",
+                  "kind": "terminal",
+                  "thread": "th-a",
+                  "params": {"terminal":"term-x"},
+                  "name": "dev"
+                },
+                {"id":"t-p","kind":"prs"}
+              ],
+              "active": "t-x"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"replace_terminal","old":"term-x","new":"term-n"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-x",
+                  "kind": "terminal",
+                  "thread": "th-a",
+                  "params": {"terminal":"term-n"},
+                  "name": "dev"
+                },
+                {"id":"t-p","kind":"prs"}
+              ],
+              "active": "t-x"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-x"}
+}

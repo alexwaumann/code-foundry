@@ -183,7 +183,7 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 	if err := m.closeAway(ctx, id, closing); err != nil {
 		return Thread{}, false, err
 	}
-	if err := m.removeShells(ctx, id); err != nil {
+	if err := m.removeShells(ctx, id, ShellsArchived); err != nil {
 		return Thread{}, false, err
 	}
 	m.stopStrays(ctx, id) // what its Bash calls left running in its worktree (strays.go)

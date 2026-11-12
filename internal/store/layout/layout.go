@@ -77,6 +77,11 @@ type Event struct {
 	Rev      uint64
 	ClientID string
 	Delta    Delta
+	// Op is the name of the op that made the commit, and Result what it reported: the
+	// daemon's glue ends the terminals of the tabs it closed and starts the fresh shells it
+	// restored (docs/notes/shell-6-lifecycle.md). Neither reaches a client.
+	Op     string
+	Result core.Result
 }
 
 // Delta is what one commit changed: whole spaces and whole thread records. Order,

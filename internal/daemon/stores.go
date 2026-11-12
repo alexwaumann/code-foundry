@@ -133,6 +133,9 @@ type stores struct {
 	// layout is the window shell's layout (spaces, panes, tabs); it reads no other store.
 	// Closed before the db, writing a focus change still waiting.
 	layout *layout.Manager
+	// stopLayout stops the glue that keeps the layout true to threads and terminals
+	// (layout.go).
+	stopLayout func()
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -314,6 +317,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// An open thread view counts as the user seeing the thread only while a GUI
 		// window is visible and key (docs/notes/alerts-foreground.md).
 		Attended: func() bool { return pres.Current().Attended },
+		// Before a thread's shells go, the layout closes its tabs; a snooze keeps its
+		// terminal tabs to come back as fresh shells (layout.go).
+		ShellsGoing: layoutShellsGoing(log.With("store", "layout"), s.layout, s.terminal),
 	}); err != nil {
 		return nil, err
 	}
@@ -348,6 +354,12 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 			snap := s.thread.Snapshot()
 			return snap == nil || slices.ContainsFunc(snap.Threads, func(x thread.Thread) bool { return x.ID == id })
 		},
+	}); err != nil {
+		return nil, err
+	}
+	// After thread and terminal: the layout follows their lifecycles (layout.go).
+	if s.stopLayout, err = startLayoutGlue(ctx, layoutGlueOptions{
+		Log: log.With("store", "layout"), Layout: s.layout, Terminals: s.terminal, Bus: s.bus, Threads: s.thread.Snapshot,
 	}); err != nil {
 		return nil, err
 	}
@@ -440,6 +452,9 @@ func (s *stores) close() error {
 	}
 	if s.stopShells != nil {
 		s.stopShells()
+	}
+	if s.stopLayout != nil {
+		s.stopLayout()
 	}
 	if s.stopActions != nil {
 		s.stopActions()

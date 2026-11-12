@@ -463,6 +463,7 @@ func (l layout) show(ctx context.Context, _ Context, a Args) (Result, error) {
 		}
 		writeNode(&b, sp, sp.Root, 1, names)
 	}
+	writeThreads(&b, view.Threads, st.DefaultSpace, names)
 	return Result{Message: strings.TrimRight(b.String(), "\n"), JSON: view}, nil
 }
 
@@ -509,6 +510,9 @@ func tabWords(tb *core.Tab, names map[string]string) string {
 		if n := names[tb.Thread]; n != "" {
 			w += fmt.Sprintf(" %q", n)
 		}
+	}
+	if id := tb.Params[core.TerminalParam]; tb.Kind == "terminal" && id != "" {
+		w += " terminal " + id
 	}
 	switch {
 	case tb.Name != "":
