@@ -11,7 +11,8 @@ name: ci
 #   push to main   The sweep: go-test, go-lint (macOS) and frontend (Linux) on the merged
 #                  tree. Runs queue instead of cancelling, so a run always finishes and
 #                  the next one covers every merge that landed meanwhile. A green sweep
-#                  starts the tip release (release.yml).
+#                  starts the tip release (release.yml). A red one opens or updates the
+#                  one "main-red" issue, which the next green sweep closes (`report`).
 #   manual         `gh workflow run ci.yml --ref <branch>` runs the sweep's jobs on any
 #                  branch, for a clean-machine run on request.
 
@@ -96,3 +97,23 @@ jobs:
           key: bun-${{ runner.os }}-${{ hashFiles('gui/frontend/bun.lock') }}
       # typecheck + lint + vitest. Generated code is committed, so no buf or wails3.
       - run: make frontend-check
+
+  # The sweep's result as one issue (scripts/sweep-report.sh): opened when main goes red,
+  # commented on while it stays red, closed when it is green again. Never part of the
+  # run's result: a report that fails must not hold back the tip of a green sweep.
+  report:
+    if: always() && github.event_name == 'push'
+    needs: [go-test, go-lint, frontend]
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: go-test=${{ needs.go-test.result }} go-lint=${{ needs.go-lint.result }} frontend=${{ needs.frontend.result }}
+        run: scripts/sweep-report.sh

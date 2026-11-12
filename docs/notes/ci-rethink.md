@@ -64,6 +64,17 @@ tree, with fast follow-up instead of a gate in between.
   `lockf` lock in `~/Library/Caches/code-foundry/` and a second check waits its turn; the
   kernel frees the lock when a check dies. A queue of checks that pass beats parallel
   checks that fail and re-run. `CHECK_LOCK=` runs without it.
+- **A red sweep is one issue.** The sweep's last job (`report`, `scripts/sweep-report.sh`)
+  opens an issue labelled `main-red` when a sweep is red, comments on it while main stays
+  red, and closes it on the next green sweep, so a red stretch is one issue however many
+  sweeps fail. It carries the failed jobs, the failing tests pulled from their logs, the
+  run, and the pull requests merged since the last green sweep (whose threads are the ones
+  to hand it to). GitHub's notification for the issue is the alert; nothing wakes a thread
+  yet, the user hands it off. The job is `continue-on-error`: a report that fails must not
+  turn a green sweep red and hold back its tip. A cancelled or timed out job counts as red.
+- **`make attest` names the next step.** With no pull request on the branch it prints
+  `next: gh pr create`. The intended order is attest, then open; opening first only costs
+  a red check for the seconds until `make attest` re-runs it.
 - **Every change is still a pull request.** Pushing to main directly was considered and
   dropped: once the check is the attestation a pull request costs seconds, and it keeps the
   readable record (what, why, before and after), the link from a merge back to its thread,
@@ -96,5 +107,10 @@ tree, with fast follow-up instead of a gate in between.
   triggering run's branch, so pull request runs never start a release run.
 - The `attested` job needs the PR head checked out (not the merge commit): the status
   names the head's tree.
+- `gh api` refuses to print a response with terminal escape sequences, and prints an
+  error's JSON body on stdout. The report reads job logs with `curl` for the first and
+  drops a failed call's output for the second.
+- A job's log is served by the API once the job has finished, while the run is still going,
+  which is what lets the `report` job read the failed jobs' logs.
 - Workflows cannot be exercised locally. `actionlint` and `shellcheck` pass; the first
   pull request and the first sweep after the merge are the end-to-end check.
