@@ -522,7 +522,7 @@ export class MockFiles {
   /** The commits of a comparison, whatever the sides (the count compare/commits sets), each the next one's child; the last is a root. */
   compareCommits(worktree: string): CompareLogInit {
     const log = this.compareLog(worktree);
-    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject ?? ""}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
+    const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
     return { commits, total: commits.length };
   }
 
