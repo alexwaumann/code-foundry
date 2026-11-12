@@ -35,7 +35,8 @@ export function SidebarNewThread() {
 }
 
 /**
- * The menu pane right under the title band: New thread, Pull Requests, Projects and,
+ * The menu pane right under the title band: New thread, Pull Requests and Projects (not in the
+ * shell, `pages`: they are tabs there) and,
  * while an agent search has something to say, its row, in a small pane drawn like the content pane beside it (surface fill, divider border, pane
  * radius), so the app's pages read apart from the thread list below. It runs from the
  * body's left gutter to the sidebar's edge, a shell gap from the window and from the
@@ -43,13 +44,14 @@ export function SidebarNewThread() {
  * radius scale does not have. 8px below it (mb-2) comes Ember's row when it shows, then the
  * thread list, whose 4px paddingStart sits above its first row. docs/notes/sidebar-menu-pane.md.
  */
-export function SidebarMenu() {
+export function SidebarMenu({ pages = true }: { pages?: boolean }) {
   return (
     <div className="mb-2 flex shrink-0 flex-col rounded-pane border border-cf-divider bg-cf-surface p-1 [--wails-draggable:no-drag]" data-testid="sidebar-menu">
       <SidebarNewThread />
       <nav className="flex shrink-0 flex-col" aria-label="Pages">
-        <PullRequestsNav />
-        <ProjectsNav />
+        {/* The shell opens Pull Requests and Projects as tabs, from a pane's "+" and the palette. */}
+        {pages && <PullRequestsNav />}
+        {pages && <ProjectsNav />}
         <SearchNav />
       </nav>
     </div>

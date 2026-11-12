@@ -1,0 +1,66 @@
+/**
+ * What the shell's sidebar is built from (lib/shellSections.ts): the classic list's keys
+ * (stores/context.ts) with each thread's space, the current space's drafts, and the options.
+ * Also the sidebar's thread order for the keys (cmd+1..9, thread.next/previous, cmd+shift+a),
+ * which follows the shell's list while the shell draws the window.
+ * See docs/notes/shell-16-sidebar.md.
+ */
+import { useShallow } from "zustand/react/shallow";
+import { needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
+import { threadOrder } from "@/lib/tree";
+import { getListOptions, getListThreads } from "./context";
+import { spaceOfThread, useLayoutStore } from "./layout";
+import { useSettingsStore, useSettingValue } from "./settings";
+import { useShellSidebarStore } from "./shellSidebar";
+import { shellDrawn } from "./shellView";
+import { useThreadsStore } from "./threads";
+
+/** The setting the Needs you section's scope is stored in. */
+export const NEEDS_SCOPE_KEY = "sidebar.needs_scope";
+
+/** Each thread's space, in the threads store's order (a primitive per thread, so moves rebuild and nothing else does). */
+export function useThreadSpaces(): string[] {
+  const order = useThreadsStore((s) => s.order);
+  return useLayoutStore(useShallow((s) => order.map((id) => spaceOfThread(s, id))));
+}
+
+const NO_DRAFTS: readonly ShellDraft[] = [];
+
+/** The current space's drafts, newest first: id and label only (a param change does not rebuild the list). */
+export function useCurrentDrafts(): readonly ShellDraft[] {
+  const keys = useLayoutStore(useShallow((s) => (s.spaces[s.currentSpaceId]?.drafts ?? NO_DRAFTS).map((d) => `${d.id}\u0001${d.label}`)));
+  return keys.length === 0
+    ? NO_DRAFTS
+    : keys.map((k) => {
+        const [id = "", label = ""] = k.split("\u0001");
+        return { id, label };
+      });
+}
+
+export function useNeedsScope(): "all" | "space" {
+  return needsScopeOf(useSettingValue(NEEDS_SCOPE_KEY));
+}
+
+/** The shell list's threads read imperatively. */
+export function getShellListThreads(): ShellListThread[] {
+  const layout = useLayoutStore.getState();
+  return getListThreads().map((t) => ({ ...t, spaceId: spaceOfThread(layout, t.id) }));
+}
+
+/** The shell list's options read imperatively, as the sidebar renders them. */
+export function getShellListOptions(): ShellListOptions {
+  const layout = useLayoutStore.getState();
+  const prefs = useShellSidebarStore.getState();
+  return {
+    ...getListOptions(),
+    currentSpaceId: layout.currentSpaceId,
+    needsScope: needsScopeOf(useSettingsStore.getState().snapshot?.values[NEEDS_SCOPE_KEY]),
+    needsCollapsed: prefs.needsCollapsed,
+    activeCollapsed: prefs.activeCollapsed,
+  };
+}
+
+/** Thread ids in the sidebar's order as drawn: the shell's while it draws the window, else the classic list's. */
+export function sidebarThreadOrder(): string[] {
+  return shellDrawn() ? shellThreadOrder(getShellListThreads(), getShellListOptions()) : threadOrder(getListThreads(), getListOptions());
+}

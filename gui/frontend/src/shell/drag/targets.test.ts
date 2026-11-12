@@ -156,6 +156,15 @@ describe("dropTarget: what a drop could do", () => {
     expect(dropTarget(lone, { kind: "tab", tab: "t-1", pane: "p-o" }, { x: 40, y: 300 })).toBeNull();
   });
 
+  it("takes a sidebar thread anywhere: a strip, a middle, an edge, the outer edge of a lone pane", () => {
+    const thread: DragSource = { kind: "thread", thread: "s-1" };
+    const lone = sceneOf(plainRects(pane("p-o", "thread"), 800, 600), { "p-o": ["t-1"] });
+    expect(dropTarget(lone, thread, { x: 3, y: 300 })).toEqual({ kind: "outer", edge: "left" });
+    expect(dropTarget(lone, thread, { x: 400, y: 300 })).toEqual({ kind: "pane", pane: "p-o" });
+    expect(dropTarget(lone, thread, { x: 780, y: 300 })).toEqual({ kind: "edge", pane: "p-o", edge: "right" });
+    expect(dropTarget(SCENE, thread, { x: 520, y: 20 })).toEqual({ kind: "strip", pane: "p-2", index: 0 });
+  });
+
   it("finds nothing in an empty frame", () => {
     const empty = sceneOf(plainRects(null, 800, 600), {});
     expect(dropTarget(empty, tabA, { x: 400, y: 300 })).toBeNull();

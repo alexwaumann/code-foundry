@@ -6,6 +6,7 @@ const names: DragNames = {
   tab: (id) => ({ "t-a": "Fix login", "t-d": "Diff" })[id] ?? id,
   pane: (id) => ({ "p-1": "Fix login", "p-2": "Diff" })[id] ?? id,
   tabCount: (id) => ({ "p-1": 3, "p-2": 1 })[id] ?? 0,
+  thread: (id) => ({ "th-1": "Plan the trip" })[id] ?? id,
 };
 const tab: DragSource = { kind: "tab", tab: "t-a", pane: "p-1" };
 const pane: DragSource = { kind: "pane", pane: "p-1" };
@@ -30,5 +31,13 @@ describe("drag announcements", () => {
     expect(droppedText(tab, { kind: "edge", pane: "p-2", edge: "right" }, names)).toBe("Tab Fix login was dropped on the right edge of the pane of Diff.");
     expect(droppedText(tab, null, names)).toBe("Tab Fix login was put back.");
     expect(cancelledText(pane, names)).toBe("Moving the pane of Fix login (3 tabs) was cancelled.");
+  });
+
+  it("name a thread dragged from the sidebar, which joins a strip as a new tab", () => {
+    const thread: DragSource = { kind: "thread", thread: "th-1" };
+    expect(pickedUpText(thread, names)).toMatch(/^Picked up thread Plan the trip\./);
+    expect(overText(thread, { kind: "strip", pane: "p-2", index: 1 }, names)).toBe("Thread Plan the trip is over position 2 of 2 in the pane of Diff.");
+    expect(droppedText(thread, { kind: "outer", edge: "right" }, names)).toBe("Thread Plan the trip was dropped on the right edge of the whole pane area.");
+    expect(droppedText(thread, null, names)).toBe("Thread Plan the trip was not opened.");
   });
 });

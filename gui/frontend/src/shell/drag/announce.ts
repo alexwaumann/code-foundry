@@ -10,6 +10,8 @@ export interface DragNames {
   tab: (id: string) => string;
   pane: (id: string) => string;
   tabCount: (pane: string) => number;
+  /** A sidebar thread's name. */
+  thread: (id: string) => string;
 }
 
 const EDGE_SIDE = {
@@ -21,6 +23,7 @@ const EDGE_SIDE = {
 
 export function sourceText(source: DragSource, names: DragNames): string {
   if (source.kind === "tab") return `Tab ${names.tab(source.tab)}`;
+  if (source.kind === "thread") return `Thread ${names.thread(source.thread)}`;
   const n = names.tabCount(source.pane);
   return `The pane of ${names.pane(source.pane)}${n > 1 ? ` (${String(n)} tabs)` : ""}`;
 }
@@ -54,7 +57,7 @@ export function overText(source: DragSource, target: DropTarget | null, names: D
 
 export function droppedText(source: DragSource, target: DropTarget | null, names: DragNames): string {
   const what = sourceText(source, names);
-  if (!target) return `${what} was put back.`;
+  if (!target) return source.kind === "thread" ? `${what} was not opened.` : `${what} was put back.`;
   return `${what} was dropped on ${targetText(source, target, names)}.`;
 }
 
@@ -63,6 +66,7 @@ export function cancelledText(source: DragSource, names: DragNames): string {
 }
 
 function lower(s: string): string {
+  if (s.startsWith("Thread ")) return `thread ${s.slice(7)}`;
   return s.startsWith("The ") ? `the ${s.slice(4)}` : s.startsWith("Tab ") ? `tab ${s.slice(4)}` : s;
 }
 

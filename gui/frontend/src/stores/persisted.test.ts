@@ -6,6 +6,7 @@ import { addRecentFile, useRecentFilesStore } from "./recentFiles";
 import { addRecentReviewer, useReviewerRecentsStore } from "./reviewerRecents";
 import { lastSearchMode, setSearchMode, useSearchDialogStore } from "./searchDialog";
 import { useSettingsPrefsStore } from "./settingsPrefs";
+import { toggleNeedsCollapsed, useShellSidebarStore } from "./shellSidebar";
 import { FONT_MAX, FONT_DEFAULT, HOME, SIDEBAR_DEFAULT, SIDEBAR_MIN, useUiStore, ZOOM_DEFAULT, ZOOM_MAX } from "./ui";
 
 // Every persisted store, with what a well-formed state must look like after loading and a
@@ -83,6 +84,17 @@ const stores: Persisted[] = [
     fields: ["boundOnly"],
     use: () => {
       expect(typeof useSettingsPrefsStore.getState().boundOnly).toBe("boolean");
+    },
+  },
+  {
+    name: "code-foundry.shellSidebar",
+    version: 1,
+    rehydrate: () => useShellSidebarStore.persist.rehydrate(),
+    fields: ["needsCollapsed", "activeCollapsed"],
+    use: () => {
+      toggleNeedsCollapsed();
+      expect(typeof useShellSidebarStore.getState().needsCollapsed).toBe("boolean");
+      expect(typeof useShellSidebarStore.getState().activeCollapsed).toBe("boolean");
     },
   },
   {

@@ -21,6 +21,8 @@ export interface DropCommand {
  * place. `ownTabs` is the source pane's tab ids in strip order.
  */
 export function dropCommand(source: DragSource, target: DropTarget, ownTabs: readonly string[]): DropCommand | null {
+  // A sidebar thread opens first (threadDropSteps).
+  if (source.kind === "thread") return null;
   if (source.kind === "pane") {
     const pane = source.pane;
     switch (target.kind) {
@@ -194,6 +196,9 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
     if (!pane) return null;
     moved = pane;
     tree = removeNode(tree, pane.id);
+  } else if (source.kind === "thread") {
+    // Opened from the sidebar: a new pane with its tab, nothing leaves the tree.
+    moved = { t: "pane", id: PREVIEW_PANE, tabs: [{ id: PREVIEW_PANE, kind: "thread", thread: source.thread }], active: PREVIEW_PANE };
   } else {
     const from = findPane(tree, source.pane);
     const tab = from?.tabs.find((t) => t.id === source.tab);

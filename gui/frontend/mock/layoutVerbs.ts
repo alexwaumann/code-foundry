@@ -461,6 +461,21 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         );
       },
     },
+    {
+      cmd: { name: "composer.draft.start", title: "Start Draft", category: CATEGORY, description: "Turn an empty composer tab into a draft (its first text was typed). Prints the draft's id.", keybindings: [], noPalette: true, args: [str("tab", "The empty composer's tab", { required: true }), str("id", "The draft's id, when the caller chose one"), str("label", "Its label: the text's first line")] },
+      when: always,
+      run: (_c, a) => run({ op: "start_draft", tab: a.tab ?? "", ...(a.id ? { draft: a.id } : {}), ...(a.label ? { label: a.label } : {}) }, (r) => `draft ${r.result.draft ?? ""}`),
+    },
+    {
+      cmd: { name: "composer.draft.discard", title: "Discard Draft", category: CATEGORY, description: "End a draft and close its tab when it is open.", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true })] },
+      when: always,
+      run: (_c, a) => run({ op: "discard_draft", draft: a.draft ?? "" }, () => `discarded draft ${a.draft ?? ""}`),
+    },
+    {
+      cmd: { name: "composer.draft.open", title: "Open Draft", category: CATEGORY, description: "Focus a draft's tab, or open it in its space's focused pane.", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true }), focusArg] },
+      when: always,
+      run: (_c, a) => run({ op: "open_draft", draft: a.draft ?? "", focus: a.focus !== "false" }, (r) => `draft ${r.result.draft ?? ""} is tab ${r.result.tab ?? ""}`),
+    },
   ];
   return entries;
 }

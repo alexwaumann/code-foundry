@@ -52,3 +52,8 @@ export function usePaneDragged(paneId: string): boolean {
 export function useSpaceDropTarget(spaceId: string): boolean {
   return useShellDragStore((s) => s.space !== "" && s.space === spaceId);
 }
+
+/** Whether this sidebar thread is being dragged (as its row, or as its open tab). */
+export function useThreadDragged(threadId: string): boolean {
+  return useShellDragStore((s) => s.source?.kind === "thread" && s.source.thread === threadId);
+}

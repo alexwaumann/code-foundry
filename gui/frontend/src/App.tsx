@@ -23,6 +23,7 @@ import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SidePanel } from "@/components/panel/SidePanel";
 import { RemoveSpaceDialog } from "@/components/shell/RemoveSpaceDialog";
 import { Shell } from "@/components/shell/Shell";
+import { ShellDndRoot } from "@/components/shell/ShellDnd";
 import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ThreadPane } from "@/components/thread/ThreadPane";
@@ -232,23 +233,27 @@ export function App() {
             headers do), so a page without a header (the composer) still has a drag
             surface when the sidebar is hidden. It is the shell gap tall: the sheet above the panes. */}
         <div className="absolute inset-x-0 top-0 h-shell [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
-        {/* The window shell's top bar spans the window above the sidebar and the panes (shell-model.md, "Structure"). */}
-        {shell && <TopBar />}
-        <div className="flex min-h-0 flex-1">
-          <Sidebar />
-          {shell ? (
-            <Shell />
-          ) : (
-            <>
-              <ContentColumn hidden={panelExpanded}>
-                <ContentPane>
-                  <Content />
-                </ContentPane>
-              </ContentColumn>
-              <SidePanel />
-            </>
-          )}
-        </div>
+        {/* With the shell, the drag layer spans the top bar and the sidebar too: the bar's space
+            tabs take drops, and the sidebar's thread rows drag into the grid and onto them. */}
+        <ShellDndRoot on={shell}>
+          {/* The window shell's top bar spans the window above the sidebar and the panes (shell-model.md, "Structure"). */}
+          {shell && <TopBar />}
+          <div className="flex min-h-0 flex-1">
+            <Sidebar />
+            {shell ? (
+              <Shell />
+            ) : (
+              <>
+                <ContentColumn hidden={panelExpanded}>
+                  <ContentPane>
+                    <Content />
+                  </ContentPane>
+                </ContentColumn>
+                <SidePanel />
+              </>
+            )}
+          </div>
+        </ShellDndRoot>
         <SettingsSheet />
         <UsageSheet />
         <CommandPalette />

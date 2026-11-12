@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { contextMenuKit, keepFocusAfterMenu } from "@/components/thread/menuKit";
 import { ThreadMenuItems } from "@/components/thread/ThreadMenuItems";
@@ -10,9 +11,10 @@ import { useThreadsStore } from "@/stores/threads";
  * The context menu of a thread row: the thread's menu items, shared verbatim with the
  * thread header's title menu (ThreadMenuItems), then what only the row offers: a new
  * terminal in the thread's checkout, Fork and Remove. A setup that did not finish forks
- * nothing, and a terminal needs a checkout.
+ * nothing, and a terminal needs a checkout. The shell's row (sidebar/shell) puts its Open ▸ first
+ * (`lead`) and leaves out the bottom panel's terminal (`terminal`), which Open ▸ has as a tab.
  */
-export function RowMenu({ id }: { id: string }) {
+export function RowMenu({ id, lead, terminal = true, keepFocus }: { id: string; lead?: ReactNode; terminal?: boolean; keepFocus?: () => boolean }) {
   const transcriptMissing = useThreadsStore((s) => s.byId[id]?.transcriptMissing === true);
   const unplaced = useThreadsStore((s) => isUnplaced(s.byId[id]));
   const unfinished = useThreadsStore((s) => setupUnfinished(s.byId[id]?.setup));
@@ -21,12 +23,14 @@ export function RowMenu({ id }: { id: string }) {
       data-testid="row-menu"
       data-thread={id}
       onCloseAutoFocus={(e) => {
-        if (keepFocusAfterMenu(id)) e.preventDefault();
+        // keepFocus: an item of `lead` moved the keyboard (into a tab it opened or focused).
+        if (keepFocus?.() || keepFocusAfterMenu(id)) e.preventDefault();
       }}
     >
+      {lead}
       <ThreadMenuItems id={id} kit={contextMenuKit} />
       <ContextMenuSeparator />
-      {!unplaced && (
+      {terminal && !unplaced && (
         <ContextMenuItem
           onSelect={() => {
             void newThreadTerminal(id);

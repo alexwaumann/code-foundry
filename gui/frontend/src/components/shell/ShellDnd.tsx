@@ -12,11 +12,13 @@ import { fullscreenOn } from "@/shell/fullscreen";
 import { shellFrame } from "@/shell/geometry/rails";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
+import { threadDropPlan } from "@/shell/drag/threadDrop";
 import type { GeoNode } from "@/shell/geometry/types";
 import { runSpaceDrop } from "@/shell/spaceActions";
 import { spaceDropCommands } from "@/shell/spaces";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { geoTree, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
+import { geoTree, spaceOfThread, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
+import { useThreadsStore } from "@/stores/threads";
 import { useShellViewStore } from "@/stores/shellView";
 
 /** A box in viewport px. */
@@ -84,6 +86,7 @@ function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
     tab: (id) => titles.get(id) || "untitled",
     pane: (id) => titles.get(layout.panes[id]?.active ?? "") || "untitled",
     tabCount: (id) => strips[id]?.length ?? 0,
+    thread: (id) => useThreadsStore.getState().byId[id]?.name || "untitled",
   };
   const g = grid.getBoundingClientRect();
   const z = zoomFactor();
@@ -109,7 +112,7 @@ function previewLabel(source: DragSource, target: DropTarget): string {
     case "edge":
       return source.kind === "pane" ? "Move pane here" : "New pane";
     case "pane":
-      return source.kind === "pane" ? "Merge tabs" : "Add to this pane";
+      return source.kind === "pane" ? "Merge tabs" : source.kind === "thread" ? "Open here" : "Add to this pane";
     case "strip":
       return "";
   }
@@ -159,6 +162,8 @@ function DragGhost() {
   const client = useShellDragStore((s) => s.client);
   const tab = useLayoutStore((s) => {
     if (!source) return undefined;
+    // A sidebar thread has no tab yet: the ghost draws the one it will open.
+    if (source.kind === "thread") return threadGhostTab(source.thread);
     return s.tabs[source.kind === "tab" ? source.tab : (s.panes[source.pane]?.active ?? "")];
   });
   const more = useLayoutStore((s) => (source?.kind === "pane" ? (s.panes[source.pane]?.tabIds.length ?? 1) - 1 : 0));
@@ -181,9 +186,46 @@ function DragGhost() {
   );
 }
 
+const ghostTabs = new Map<string, TabEntry>();
+
+/** The tab a sidebar thread's drop opens, as the ghost draws it (one object per thread, for the selector). */
+function threadGhostTab(thread: string): TabEntry {
+  let t = ghostTabs.get(thread);
+  if (!t) {
+    t = { id: "", kind: "thread", thread, key: "", params: {}, title: "", name: "", paneId: "" };
+    ghostTabs.set(thread, t);
+  }
+  return t;
+}
+
 function GhostTitle({ tab }: { tab: TabEntry }) {
   const title = shellSurfaceOf(tab.kind).useTitle(tab);
   return <span className="truncate">{title}</span>;
+}
+
+/**
+ * A sidebar thread whose tab is open in the space drags as that tab (a move, never a second
+ * tab). One of another space (a Needs you row) stays a thread: it can only go to a space tab.
+ */
+function openThreadAsTab(src: DragSource | null, spaceId: string): DragSource | null {
+  if (src?.kind !== "thread") return src;
+  const s = useLayoutStore.getState();
+  if (spaceOfThread(s, src.thread) !== spaceId) return src;
+  const tab = Object.values(s.tabs).find((t) => t.kind === "thread" && t.thread === src.thread && s.panes[t.paneId]?.spaceId === spaceId);
+  return tab ? { kind: "tab", tab: tab.id, pane: tab.paneId } : src;
+}
+
+/** Opens a sidebar thread where it was dropped (shell/drag/threadDrop.ts): thread.open, then the tab's move. */
+async function dropThread(thread: string, target: DropTarget): Promise<void> {
+  const plan = threadDropPlan(thread, target);
+  const opened = await runLayoutCommand("thread.open", plan.open);
+  if (!opened?.tab || !opened.pane) return;
+  await afterRev(opened.rev);
+  if (!plan.then || opened.rule === "compose") return;
+  const at = useLayoutStore.getState().panes[opened.pane]?.tabIds.indexOf(opened.tab) ?? -1;
+  const cmd = plan.then(opened.tab, at < 0 ? Number.MAX_SAFE_INTEGER : at);
+  const moved = await runLayoutCommand(cmd.name, cmd.args);
+  if (moved) await afterRev(moved.rev);
 }
 
 /**
@@ -191,9 +233,10 @@ function GhostTitle({ tab }: { tab: TabEntry }) {
  * not) to a place in a strip, onto a pane, onto a pane's edge, or onto the grid's outer edge; a
  * whole pane drags by its strip's free space to the same places. Hit-testing is
  * shell/drag/targets.ts on the drawn frame; the drop is one `tab.move` or `pane.move`
- * (shell/drag/drop.ts). While a drag is on, a transparent shield over the window takes the
+ * (shell/drag/drop.ts); a thread row from the sidebar opens where it lands (shell/drag/threadDrop.ts),
+ * so the context wraps the sidebar too (ShellDndRoot). While a drag is on, a transparent shield over the window takes the
  * pointer, so a terminal or an iframe under it never swallows the moves. Escape cancels
- * (dnd-kit's pointer sensor). It wraps the pane grid (Shell.tsx) and finds it inside itself.
+ * (dnd-kit's pointer sensor). It wraps the sidebar and the shell (App.tsx) and finds the grid inside itself.
  * See docs/notes/shell-14-drag.md.
  */
 export function ShellDnd({ children }: { children: ReactNode }) {
@@ -245,6 +288,11 @@ export function ShellDnd({ children }: { children: ReactNode }) {
       return;
     }
     if (st.space) useShellDragStore.setState({ space: "" });
+    // A thread of another space has no place in this grid: only a space tab takes it.
+    if (st.source.kind === "thread" && spaceOfThread(useLayoutStore.getState(), st.source.thread) !== spaceId) {
+      useShellDragStore.setState({ client, target: null, preview: null, bar: null });
+      return;
+    }
     const z = zoomFactor();
     const found = dropTarget(s.scene, st.source, { x: client.x / z - s.origin.x, y: client.y / z - s.origin.y });
     // In full screen a tab only moves within its strip (or to a space): a new pane would be out of sight.
@@ -262,7 +310,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
   };
 
   const onDragStart = ({ active, activatorEvent }: DragStartEvent) => {
-    const src = sourceOf(active.data.current);
+    const src = openThreadAsTab(sourceOf(active.data.current), spaceId);
     snap.current = snapshot(gridEl(), spaceId);
     if (!src || !snap.current) return;
     const p = activatorEvent as PointerEvent;
@@ -274,8 +322,23 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     topBar.current = measureTopBar();
     useShellDragStore.setState({ source: src, target: null, client: origin.current, origin: snap.current.origin, preview: null, bar: null });
   };
+  // The pointer as the window sees it. dnd-kit's move delta adds the scroll of the source's scroll
+  // containers, so a sidebar row whose list scrolls under the drag (a row re-measured) would aim
+  // somewhere the pointer is not.
+  const pointer = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!source) return;
+    const onMove = (e: PointerEvent) => {
+      pointer.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener("pointermove", onMove, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove, true);
+      pointer.current = null;
+    };
+  }, [source]);
   const onDragMove = ({ delta }: DragMoveEvent) => {
-    retarget({ x: origin.current.x + delta.x, y: origin.current.y + delta.y });
+    retarget(pointer.current ?? { x: origin.current.x + delta.x, y: origin.current.y + delta.y });
   };
   const onDragEnd = () => {
     const { source: src, target, space } = useShellDragStore.getState();
@@ -289,6 +352,10 @@ export function ShellDnd({ children }: { children: ReactNode }) {
       return;
     }
     if (!target) return;
+    if (src.kind === "thread") {
+      void dropThread(src.thread, target);
+      return;
+    }
     const layout = useLayoutStore.getState();
     // The layout as it is now: a dragged tab or pane closed mid-drag moves nothing.
     if (src.kind === "tab" ? !layout.tabs[src.tab] : !layout.panes[src.pane]) return;
@@ -308,6 +375,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
         tab: () => "untitled",
         pane: () => "untitled",
         tabCount: () => 0,
+        thread: () => "untitled",
       };
     return {
       onDragStart: () => {
@@ -361,4 +429,9 @@ export function ShellDnd({ children }: { children: ReactNode }) {
         )}
     </DndContext>
   );
+}
+
+/** The drag layer around the sidebar and the shell while the shell flag is on; nothing otherwise. */
+export function ShellDndRoot({ on, children }: { on: boolean; children: ReactNode }) {
+  return on ? <ShellDnd>{children}</ShellDnd> : children;
 }
