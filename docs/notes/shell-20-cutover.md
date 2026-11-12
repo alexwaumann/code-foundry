@@ -105,6 +105,11 @@ Running the whole e2e suite with the shell as the default found these shell bugs
   open dialog leaves the keyboard there.
 - **The prompt history closed on the first key typed in a new composer** (the draft's id changed
   its key); the composer's skills loaded twice for the same reason.
+- **A thread's request to edit a file came back after the save.** A save sends two updates of the
+  tab's params at once (the request stamped as saved, then ended). In the shell each was computed
+  from the layout's last confirmed params and sent as its own call, so the daemon could apply them
+  in either order (the side panel's store was synchronous). A tab's params updates, retitles
+  included, now go in order, each computed from the one before it (`hostShell.ts queueParams`).
 - **Home in the sidebar** left the Needs you header scrolled out.
 - **The keyboard help** ran its columns sideways once the key table had chords: View and Worktree
   were out of reach.
@@ -189,9 +194,8 @@ are not listed: they run only with SHOTS and drive the same classic parts.
    its top line within 2 lines, not 1, across zoom changes at the shell pane's width. The File
    tab's own anchoring; for PR 24's zoom pass.
 
-Known flaky on `shell` and seen here: `file-request.spec.ts` "--focus puts the caret at the end of
-the line" failed once in a run of only the failing set under load and passes alone and in the full
-runs; not skipped.
+`file-request.spec.ts` "--focus puts the caret at the end of the line" failed one run in about six:
+a shell race, fixed here (below), not a flake. 56 repeated runs of the spec pass after the fix.
 
 ## The migration rehearsal
 
