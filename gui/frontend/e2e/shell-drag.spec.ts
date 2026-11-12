@@ -73,10 +73,11 @@ const paneBox = (page: Page, id: string) => boxOf(page, `[data-testid="shell-pan
 const tabBox = (page: Page, id: string) => boxOf(page, `[data-testid="shell-tab"][data-tab-id="${id}"]`);
 const centre = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
-/** The empty part of a pane's strip, where the whole pane drags from. */
+/** The empty part of a pane's strip, where the whole pane drags from: between the "+" after the last tab (not a grip) and the strip's end. */
 async function stripGrip(page: Page, id: string): Promise<{ x: number; y: number }> {
   const s = await boxOf(page, `[data-testid="shell-pane"][data-pane-id="${id}"] [data-testid="shell-tab-strip"]`);
-  return { x: s.x + s.w - 24, y: s.y + s.h / 2 };
+  const plus = await boxOf(page, `[data-testid="shell-pane"][data-pane-id="${id}"] [data-testid="pane-plus"]`);
+  return { x: (plus.x + plus.w + s.x + s.w) / 2, y: s.y + s.h / 2 };
 }
 
 /** Presses at `from` and moves to `to` in steps, holding the button (call `drop` or press Escape after). */

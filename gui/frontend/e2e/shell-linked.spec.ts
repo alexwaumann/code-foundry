@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, mockUrl, resetMock } from "./fixtures";
+import { appPath, mockPost, mockUrl, resetMock } from "./fixtures";
 
 /**
  * Linked tabs in the window shell (docs/notes/shell-12-linked-tabs.md), against the mock's layout
@@ -17,7 +17,8 @@ const SLUG = "alexwaumann/code-foundry";
 const thread = (id: string) => ({ id: `t-${id}`, kind: "thread", thread: id });
 const diff = { id: "t-diff", kind: "diff", thread: "s-1", params: { project: "repo-cf", worktree: WT, own: "1" }, title: "Diff" };
 const pr = { id: "t-pr", kind: "pullrequest", thread: "s-1", params: { slug: SLUG, number: "1853" }, title: "#1853" };
-const term = { id: "t-term", kind: "terminal", thread: "s-1", params: { terminal: "t-none" }, name: "make dev" };
+// s-1's shell in the mock (mock/world.ts t-s1-shell); its facts are set per test.
+const term = { id: "t-term", kind: "terminal", thread: "s-1", params: { terminal: "t-s1-shell" } };
 const pane = (id: string, tabs: Record<string, unknown>[], active = String(tabs[0]?.id)): Node => ({ t: "pane", id, tabs, active });
 const two = (left: Node, right: Node, sizes = [0.55, 0.45]): Node => ({ t: "split", id: "s-r", dir: "row", kids: [left, right], sizes });
 
@@ -104,6 +105,47 @@ test("the + menu's thread submenu opens on hover, and the whole path works from 
   await expect.poll(() => activeTab(page, "p-2")).toBe("t-diff");
 });
 
+test("the + is not the pane's drag grip: a press and move there opens the menu, the strip's free space drags the pane", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await seed(two(pane("p-1", [thread("s-1")]), pane("p-2", [diff])), "p-1");
+  await openShell(page);
+  const ghost = page.getByTestId("shell-drag-ghost");
+  const twoFrames = () =>
+    page.evaluate(
+      () =>
+        new Promise<void>((r) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              r();
+            });
+          });
+        }),
+    );
+  const plus = await paneEl(page, "p-1").getByTestId("pane-plus").boundingBox();
+  const strip = await paneEl(page, "p-1").getByTestId("shell-tab-strip").boundingBox();
+  if (!plus || !strip) throw new Error("no + or strip");
+
+  // From the "+": well past dnd-kit's 4px activation, and no drag starts; the menu is open.
+  await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(plus.x + plus.width / 2 + 80, plus.y + 120, { steps: 6 });
+  await twoFrames();
+  await expect(page.getByTestId("pane-plus-menu")).toBeVisible();
+  await expect(ghost).toHaveCount(0);
+  await page.mouse.up();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pane-plus-menu")).toBeHidden();
+
+  // The same move from the strip's free space, right of the "+", lifts the pane (and Escape puts it back).
+  await page.mouse.move(strip.x + strip.width - 30, strip.y + strip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(strip.x + strip.width - 30 + 80, strip.y + 120, { steps: 6 });
+  await expect(ghost).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(ghost).toHaveCount(0);
+});
+
 test("the header's submenus follow the pointer, Open to Move to space", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await seed(two(pane("p-1", [thread("s-1")]), pane("p-2", [diff])), "p-1");
@@ -145,6 +187,8 @@ for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1400, height: 900 });
     await linkPr();
+    // The linked terminal runs make dev and has left its thread's directory: its row shows the hint.
+    await mockPost("terminal/facts?id=t-s1-shell&foreground=make%20dev&liveCwd=/tmp");
     // s-2 waits on a permission: its tab's icon has the attention dot.
     await seed(two(pane("p-1", [thread("s-1"), thread("s-2")]), pane("p-2", [diff, pr, term, { id: "t-prs", kind: "prs", title: "Pull Requests" }])), "p-1");
     await openShell(page);
@@ -183,6 +227,13 @@ for (const scheme of ["dark", "light"] as const) {
     await still(page);
     await page.screenshot({ path: at("plus-menu-no-thread") });
     await page.keyboard.press("Escape");
+
+    // The linked terminal's row: "Terminal of ● thread" and, at its right, the directory hint.
+    await paneEl(page, "p-2").locator('[data-tab-id="t-term"] [role="tab"]').click();
+    await expect(paneEl(page, "p-2").getByTestId("terminal-cwd-hint")).toBeVisible();
+    await page.mouse.move(700, 880);
+    await still(page);
+    await page.screenshot({ path: at("linked-row-terminal") });
 
     // The dormant row: the diff's thread is not open in the space.
     await seed(two(pane("p-1", [thread("s-3")]), pane("p-2", [diff])), "p-1");
