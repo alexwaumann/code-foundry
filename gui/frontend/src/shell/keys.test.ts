@@ -47,6 +47,7 @@ const WANT: Readonly<Record<string, readonly string[]>> = {
   "cmd+shift+i": ["view.thread-info"],
   "cmd+[ / cmd+]": ["view.back", "view.forward"],
   "ctrl+cmd+1…9": ["space.switch"],
+  "cmd+shift+enter": ["pane.fullscreen"],
 };
 
 describe("the interim key table against the spec's", () => {

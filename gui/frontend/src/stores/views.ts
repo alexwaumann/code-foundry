@@ -34,6 +34,7 @@ import { themeById } from "@/themes";
 import { canStepFocus, stepFocus, useFocusHistoryStore } from "./focusHistory";
 import { useLayoutStore } from "./layout";
 import { shellDrawn } from "./shellView";
+import { presentFullscreen } from "@/shell/fullscreen";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -204,6 +205,9 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       // view.thread-info: the thread info card beside every thread in this window (its overlay on a narrow pane).
       toggleThreadInfo();
       return true;
+    case "pane.fullscreen":
+      // pane.fullscreen: the shell window's full screen pane (shell/fullscreen.ts); the classic window has none.
+      return !shellDrawn() || presentFullscreen(params);
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();

@@ -184,3 +184,22 @@ describe("sameTarget", () => {
     expect(sameTarget({ kind: "pane", pane: "p" }, null)).toBe(false);
   });
 });
+
+describe("dropTarget: a rail", () => {
+  // p-2 folded to a rail: the frame of a small window (shell/geometry/rails.ts).
+  const railed: Frame = { ...FRAME, rects: { ...FRAME.rects, "p-2": { ...(FRAME.rects["p-2"] ?? { x: 0, y: 0, w: 0, h: 0 }), rail: true } } };
+  const scene = sceneOf(railed, { "p-1": ["t-a", "t-b"], "p-2": ["t-c"], "p-3": ["t-d"] });
+
+  it.each<[string, { x: number; y: number }]>([
+    ["where its strip would be", { x: 520, y: 20 }],
+    ["near its edge", { x: 520, y: 200 }],
+    ["in its middle", { x: 750, y: 150 }],
+  ])("is one target as a whole: a tab joins it (%s)", (_name, p) => {
+    expect(dropTarget(scene, tabA, p)).toEqual({ kind: "pane", pane: "p-2" });
+  });
+
+  it("takes no tab of its own, and not itself", () => {
+    expect(dropTarget(scene, tabC, { x: 750, y: 150 })).toBeNull();
+    expect(dropTarget(scene, paneP2, { x: 750, y: 150 })).toBeNull();
+  });
+});

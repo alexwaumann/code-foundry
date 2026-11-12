@@ -9,7 +9,11 @@
  *   neighbours on it (shell/keys.ts), as the spec says they do on the rendered frame.
  * - `focusRequest`: asks a pane to take the keyboard into its active tab (a key or a command
  *   moved the focus; a click puts the keyboard where it clicked by itself).
- * See docs/notes/shell-11-pane-grid.md.
+ * - `fullscreen`: the space full screen was turned on in ("" off). The pane it shows is always
+ *   that space's focused pane (shell/fullscreen.ts); it ends when the window leaves the space.
+ * - `floating`: the floating composer of a full-screened linked tab: expanded or a pill, and
+ *   where it was dragged from its spot. Back to the start whenever full screen ends.
+ * See docs/notes/shell-11-pane-grid.md and docs/notes/shell-19-rails-fullscreen.md.
  */
 import { create } from "zustand";
 import { shellOn } from "@/shell/flag";
@@ -23,9 +27,21 @@ interface ShellViewState {
   frame: Frame | null;
   /** The pane asked to take the keyboard, and a counter so the same pane can be asked again. */
   focusRequest: { paneId: string; seq: number };
+  /** The space full screen is on in; "" when it is off. */
+  fullscreen: string;
+  floating: FloatingState;
 }
 
-const INITIAL: ShellViewState = { mode: "waiting", frame: null, focusRequest: { paneId: "", seq: 0 } };
+/** The floating composer: expanded or a pill, and its drag from the spot it opens at (layout px). */
+export interface FloatingState {
+  expanded: boolean;
+  x: number;
+  y: number;
+}
+
+export const FLOATING_START: FloatingState = { expanded: false, x: 0, y: 0 };
+
+const INITIAL: ShellViewState = { mode: "waiting", frame: null, focusRequest: { paneId: "", seq: 0 }, fullscreen: "", floating: FLOATING_START };
 
 export const useShellViewStore = create<ShellViewState>()(() => INITIAL);
 
@@ -54,6 +70,17 @@ export function setShellFrame(frame: Frame | null): void {
 /** Asks a pane to move the keyboard into its active tab. */
 export function requestPaneFocus(paneId: string): void {
   useShellViewStore.setState((s) => ({ focusRequest: { paneId, seq: s.focusRequest.seq + 1 } }));
+}
+
+/** Full screen on in a space, or off (""); turning it off or on again puts the floating composer back at its start. */
+export function setFullscreen(spaceId: string): void {
+  const s = useShellViewStore.getState();
+  if (s.fullscreen === spaceId) return;
+  useShellViewStore.setState({ fullscreen: spaceId, floating: FLOATING_START });
+}
+
+export function setFloating(change: Partial<FloatingState>): void {
+  useShellViewStore.setState((s) => ({ floating: { ...s.floating, ...change } }));
 }
 
 /** Back to the start (tests). */

@@ -35,6 +35,7 @@ import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, showBottomIfUnplaced, toggleBottomFromHere } from "@/stores/bottomActions";
 import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView } from "@/stores/views";
 import { shellKeyFor } from "@/shell/keys";
+import { presentFullscreen } from "@/shell/fullscreen";
 import { shellDrawn } from "@/stores/shellView";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
@@ -484,6 +485,9 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
     toggleThreadInfo(lastInputWasKeyboard());
     return true;
   },
+  // Window-local: the shell window's full screen pane (shell/fullscreen.ts); the CLI's reaches
+  // every window through ShowView. The classic window has no panes: it does nothing.
+  "pane.fullscreen": (args) => !shellDrawn() || presentFullscreen(args),
   // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,
   // the palette, a button), the shell it starts takes focus in the bottom panel. A thread
   // with no checkout yet has none to start one in: its panel says so.

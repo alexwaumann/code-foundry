@@ -119,6 +119,8 @@ function zoneAt(scene: DragScene, p: Point): DropTarget | null {
   if (outer) return { kind: "outer", edge: outer };
   for (const [pane, r] of Object.entries(scene.frame.rects)) {
     if (!inside(r, p)) continue;
+    // A rail (a folded pane) is one target as a whole: a tab joins the end of its tabs.
+    if (r.rail) return { kind: "pane", pane };
     const strip = Math.min(scene.stripHeight, r.h);
     if (p.y < r.y + strip)
       return {

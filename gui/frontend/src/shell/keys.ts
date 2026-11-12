@@ -17,6 +17,7 @@ import { autoNameFocusedTab, cycleTerminals, newFreeTerminalTab, newTerminalTab,
 import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
 import { stepFocus } from "@/stores/focusHistory";
 import { switchSpaceAt } from "./spaceActions";
+import { fullscreenOn, toggleFullscreen } from "./fullscreen";
 
 export interface ShellKey {
   /** Canonical chords (keys/chord.ts). */
@@ -42,8 +43,9 @@ async function thenFocus(rev: number | undefined): Promise<void> {
   if (pane) requestPaneFocus(pane);
 }
 
-/** Focuses the neighbour on that side of the drawn frame (rails included), and moves the keyboard there. */
+/** Focuses the neighbour on that side of the drawn frame (rails included), and moves the keyboard there. Nothing in full screen. */
 function focusSide(dir: Direction): void {
+  if (fullscreenOn()) return;
   const from = focusedPane();
   const frame = useShellViewStore.getState().frame;
   const to = frame && from ? neighbour(frame, from, dir) : null;
@@ -52,8 +54,9 @@ function focusSide(dir: Direction): void {
   requestPaneFocus(to);
 }
 
-/** Swaps the focused pane with its neighbour on that side of the drawn frame. */
+/** Swaps the focused pane with its neighbour on that side of the drawn frame. Nothing in full screen. */
 function moveSide(dir: Direction): void {
+  if (fullscreenOn()) return;
   const from = focusedPane();
   const frame = useShellViewStore.getState().frame;
   const to = frame && from ? neighbour(frame, from, dir) : null;
@@ -132,6 +135,11 @@ export const SHELL_KEYS: readonly ShellKey[] = [
     // view.thread-info's presenter (keys/bindings.ts): the focused thread's card, or its overlay in a narrow pane, focused.
     run: () => {
       toggleThreadInfo(true);
+    },
+  },
+  // Full screen the focused pane, or leave it (Escape leaves too: components/shell/Shell.tsx).
+  { chords: ["cmd+shift+enter"], spec: "cmd+shift+enter", command: "pane.fullscreen", run: () => {
+      toggleFullscreen();
     },
   },
   // Back and forward through what was focused, across panes and spaces (stores/focusHistory.ts).
