@@ -112,5 +112,17 @@ tree, with fast follow-up instead of a gate in between.
   drops a failed call's output for the second.
 - A job's log is served by the API once the job has finished, while the run is still going,
   which is what lets the `report` job read the failed jobs' logs.
+- **The workflow's token cannot tag every commit.** The first tip under this scheme
+  failed at the tag push: `refusing to allow a GitHub App to create or update workflow
+  .github/workflows/ci.yml without workflows permission`. The sweep's commit was #656's
+  merge; by the time it was green, main's head was #657's, which changed `ci.yml`. GitHub
+  compares the tagged commit's workflow files with the default branch's, and
+  `GITHUB_TOKEN` cannot be granted `workflows`. Per-push releases never met this because
+  they tagged the head. Now a `pick` job (Linux, seconds) compares the `.github/workflows`
+  tree of the commit with main's: for a sweep's tip that differs it skips with a warning,
+  and the sweep of the workflow-changing merge (or any later one) publishes everything; a
+  promotion fails with the same reason and "wait for the next sweep". Workflow files
+  change a few times a month, so the gap is one or two tips. A token with `workflows`
+  (a fine-grained PAT or an App) would remove the gap; not worth a secret yet.
 - Workflows cannot be exercised locally. `actionlint` and `shellcheck` pass; the first
   pull request and the first sweep after the merge are the end-to-end check.
