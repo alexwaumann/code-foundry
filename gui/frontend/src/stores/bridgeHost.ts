@@ -38,6 +38,9 @@
  * counts with the runs, `cf:cancel` and a new document abort it, and only its `invalid`,
  * `failed` and `timeout` answers reach the error strip.
  *
+ * A run that saved a file (file.export) is shown to the user too, with a way to the file
+ * (stores/pageSaved.ts); every other answer goes to the page only.
+ *
  * Page storage (docs/notes/bridge-fix-storage.md): `cf:ready` carries the thread's stored
  * map and every `cf:store` goes to the daemon (ThreadService.SetPageStorage), one at a time
  * per thread in the order sent; every other frame of the thread hears the map after.
@@ -76,6 +79,7 @@ import { invokeConfirmed } from "./commands";
 import { requestConfirm, withdrawConfirm, type ConfirmRequest } from "./confirm";
 import { isAbort } from "@/api/stream";
 import { emptyContext } from "./context";
+import { noticePageResult } from "./pageSaved";
 import { useThreadsStore } from "./threads";
 
 declare global {
@@ -360,7 +364,10 @@ export function createBridgeHost(frame: BridgeFrame): BridgeHost {
       });
       if (asked.refused) fail(forDoc, id, verb, asked.refused);
       else if (asked.declined) fail(forDoc, id, verb, { code: "declined", message: "the user declined" }, res);
-      else post(forDoc, okResult(id, res ?? { message: "", resultJson: "" }));
+      else {
+        post(forDoc, okResult(id, res ?? { message: "", resultJson: "" }));
+        noticePageResult(threadId, verb, res);
+      }
     } catch (err) {
       // An aborted call's page gave up on it, or is gone: nobody to answer.
       if (!(abort.signal.aborted && isAbort(err))) fail(forDoc, id, verb, bridgeErrorOf(err));

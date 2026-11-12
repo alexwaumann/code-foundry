@@ -34,6 +34,8 @@ vi.mock("@/api/pageStorage", () => ({
 // The daemon's ProxyFetch: what each call asked, answered by the test.
 const proxyFetch = vi.hoisted(() => vi.fn());
 vi.mock("@/api/proxyFetch", () => ({ proxyFetch }));
+const noticePageResult = vi.hoisted(() => vi.fn());
+vi.mock("./pageSaved", () => ({ noticePageResult }));
 const { createBridgeHost, BRIDGE_DEBOUNCE_MS, PAGE_ASKS } = await import("./bridgeHost");
 const { EMBER_OFF_SCREEN } = await import("./bridgeSources");
 
@@ -86,6 +88,7 @@ function hanging() {
 }
 
 beforeEach(() => {
+  noticePageResult.mockReset();
   proxyFetch.mockReset();
   invokeCommand.mockReset();
   listCommands.mockReset();
@@ -124,6 +127,19 @@ describe("bridge host", () => {
     });
     // focus=false: a page's thread.new does not move the view (unless the page passes focus).
     expect(invokeCommand).toHaveBeenCalledWith("thread.new", expect.objectContaining({ activeThreadId: "t-1" }), { prompt: "hi", "created-by": "t-1", focus: "false" }, ...signalled);
+  });
+
+  it("hands a run that succeeded, and only that, to the app's notice for saved files", async () => {
+    const saved = { message: "saved /wt/rows.csv (3 bytes)", resultJson: '{"path":"/wt/rows.csv","size":3}' };
+    invokeCommand.mockResolvedValueOnce(saved).mockRejectedValueOnce(new ConnectError("rows.csv exists now", Code.FailedPrecondition));
+    const { h, posts } = host();
+    h.receive(run("r1", "file.export", { path: "rows.csv", text: "a,b" }));
+    h.receive(run("r2", "file.export", { path: "rows.csv", text: "a,b" }));
+    await vi.waitFor(() => {
+      expect(posts.filter((p) => p.type === "cf:result")).toHaveLength(2);
+    });
+    expect(noticePageResult).toHaveBeenCalledTimes(1);
+    expect(noticePageResult).toHaveBeenCalledWith("t-1", "file.export", saved);
   });
 
   it("sends the thread's checkout for an arg that defaults to the CLI's cwd", async () => {

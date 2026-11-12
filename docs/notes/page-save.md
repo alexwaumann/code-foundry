@@ -57,9 +57,8 @@ are reported, not built"). The owner chose a bridge verb that saves into the thr
 - **`--text` or `--base64`, exactly one.** Empty text is a valid, empty file (`Args.Blank`).
 - **New files are 0600**, the writer's rule (a file may be a secret). Git tracks only the
   executable bit, so a committed export is unaffected.
-- **No toast.** The bridge host answers a page's run to the page only; it has no pattern for
-  showing a command's result to the user. The path comes back in the result, and the
-  example shows it in the page.
+- **No toast** at first: the path came back to the page only. Since `leftovers-pages.md` the
+  app shows "Saved <name>" with Open and Show in Finder too; the page still shows the path.
 
 ## Gotchas
 
