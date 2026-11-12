@@ -30,6 +30,8 @@
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; every child out of the
  *        sidebar while its creator exists; World.addLineage)
+ *   POST /__mock/shell-sidebar                    (the shell sidebar's rows: asks, a long title, threads without a
+ *        project with and without counts: World.addShellSidebar)
  *   POST /__mock/live-count                       (the sidebar's live count: a working thread with background
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
@@ -1295,6 +1297,9 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());
+      break;
+    case "POST /__mock/shell-sidebar":
+      json(res, 200, world.addShellSidebar());
       break;
     case "POST /__mock/live-count":
       json(res, 200, world.addLiveCount());

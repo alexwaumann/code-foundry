@@ -132,6 +132,8 @@ const (
 	GroupProjects    = "projects"
 	GroupGitOps      = "gitops"
 	GroupAppearance  = "appearance"
+	GroupLayout      = "layout"
+	GroupSidebar     = "sidebar"
 	GroupNotify      = "notifications"
 	GroupKeybindings = "keybindings"
 	GroupUpdate      = "update"
@@ -168,6 +170,7 @@ var Pages = []Page{
 	{ID: PageAppearance, Title: "Appearance", Description: "Applied live in every window.", Sections: []Section{
 		{ID: "theme", Title: "Theme"},
 		{ID: "window", Title: "Window"},
+		{ID: "panes", Title: "Panes and sidebar"},
 		{ID: "terminal", Title: "Terminal"},
 	}},
 	{ID: PageNotifications, Title: "Notifications",
@@ -201,6 +204,8 @@ var Groups = []Group{
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window."},
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
+	{GroupLayout, "Layout", "How the window's panes follow the thread you focus."},
+	{GroupSidebar, "Sidebar", "What the sidebar lists."},
 	{GroupKeybindings, "Keybindings", `Override a command's chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.`},
 	{GroupUpdate, "Updates", "Which releases the app checks for and offers to install."},
 	{GroupDictation, "Dictation", "Voice dictation into the composers, transcribed on this Mac."},
@@ -239,6 +244,8 @@ const (
 	KeyBackdrop                  = "appearance.backdrop"
 	KeyBackdropFile              = "appearance.backdrop_file"
 	KeyPanelKeepOpen             = "appearance.panel_keep_open"
+	KeySmartSwap                 = "layout.smart_swap"
+	KeyNeedsScope                = "sidebar.needs_scope"
 	KeyDockBadge                 = "notifications.dock_badge"
 	KeyBounce                    = "notifications.bounce"
 	KeySound                     = "notifications.sound"
@@ -316,6 +323,13 @@ const (
 	BackdropForest = "forest"
 	BackdropNone   = "none"
 	BackdropCustom = "custom"
+)
+
+// sidebar.needs_scope values: the Needs you section lists the threads of every space, or of
+// the current one.
+const (
+	NeedsScopeAll   = "all"
+	NeedsScopeSpace = "space"
 )
 
 // threads.default_worktree values: a new worktree, or the project's main checkout.
@@ -529,6 +543,19 @@ var staticFields = []Field{
 		Description: "Keep the side panel open on its new tab page after its last tab closes.",
 		Default:     "false",
 		bind:        func(s *Settings) any { return &s.Appearance.PanelKeepOpen },
+	},
+	// Appearance › Panes and sidebar.
+	{
+		Key: KeySmartSwap, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Smart swap",
+		Description: "When a thread's tab gains focus, panes showing another thread's diff, pull request or terminal switch to this thread's, if it is already open there. Nothing opens or closes.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Layout.SmartSwap },
+	},
+	{
+		Key: KeyNeedsScope, Group: GroupSidebar, Page: PageAppearance, Section: "panes", Type: Enum, Title: "Needs you lists",
+		Description: "Which threads the sidebar's Needs you section lists: those of every space, or only the current space's. Its header's button switches it too.",
+		Enum:        []string{NeedsScopeAll, NeedsScopeSpace}, EnumLabels: []string{"All spaces", "This space"}, Default: NeedsScopeAll,
+		bind: func(s *Settings) any { return &s.Sidebar.NeedsScope },
 	},
 	// Appearance › Terminal.
 	{

@@ -26,6 +26,7 @@ const { Sidebar } = await import("./Sidebar");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useThreadsStore } = await import("@/stores/threads");
 const { HOME, useUiStore } = await import("@/stores/ui");
+const { useShellViewStore } = await import("@/stores/shellView");
 const { daemon, lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
 const { addThreads, seedWorld, thread } = await import("@/test/projectsWorld");
 const { EMBER_THREAD, putEmberThread, setEmberEnabled, EmberWorld } = await import("@/test/emberBoard");
@@ -457,6 +458,25 @@ describe("Sidebar: the menu pane", () => {
       useUiStore.getState().select({ kind: "compose", projectId: "repo-cf" } as never);
     });
     expect(current()).toEqual(["sidebar-new-thread"]);
+  });
+});
+
+describe("Sidebar: with the shell drawing the window", () => {
+  afterEach(() => {
+    useShellViewStore.setState({ mode: "waiting" });
+  });
+
+  it("is the shell's sections, and the menu pane keeps New thread but not Pull Requests or Projects", () => {
+    render(<Sidebar />);
+    expect(screen.getByTestId("nav-pullrequests")).toBeTruthy();
+    expect(list().hasAttribute("data-shell-list")).toBe(false);
+    cleanup();
+    useShellViewStore.setState({ mode: "shell" });
+    render(<Sidebar />);
+    expect(list().hasAttribute("data-shell-list")).toBe(true);
+    expect(screen.getByTestId("sidebar-new-thread")).toBeTruthy();
+    expect(screen.queryByTestId("nav-pullrequests")).toBeNull();
+    expect(screen.queryByTestId("nav-projects")).toBeNull();
   });
 });
 

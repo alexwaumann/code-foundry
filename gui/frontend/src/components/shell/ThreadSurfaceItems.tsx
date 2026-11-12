@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { GitPullRequest, Plus, SquareTerminal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { dropdownMenuKit, type MenuKit } from "@/components/thread/menuKit";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { moveToSpaceAction, newTerminalAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces, type LinkedAction, type ThreadSurfaceItem } from "@/shell/linked";
 import { moveToNewSpace } from "@/shell/spaceActions";
@@ -51,10 +51,10 @@ function TerminalTabLabel({ tabId }: { tabId: string }) {
   );
 }
 
-function SurfaceItem({ item, onPick }: { item: ThreadSurfaceItem; onPick: () => void }) {
+function SurfaceItem({ item, kit, onPick }: { item: ThreadSurfaceItem; kit: MenuKit; onPick: () => void }) {
   const Icon = item.kind === "pullrequest" ? GitPullRequest : shellSurfaceOf("diff").icon;
   return (
-    <DropdownMenuItem onSelect={onPick} data-testid="thread-surface-item" data-kind={item.kind} data-key={item.key} data-open={item.openTab ? "" : undefined}>
+    <kit.Item onSelect={onPick} data-testid="thread-surface-item" data-kind={item.kind} data-key={item.key} data-open={item.openTab ? "" : undefined}>
       {item.kind === "terminal" ? (
         <TerminalTabLabel tabId={item.tabId} />
       ) : (
@@ -64,7 +64,7 @@ function SurfaceItem({ item, onPick }: { item: ThreadSurfaceItem; onPick: () => 
         </>
       )}
       <OpenMark open={item.openTab !== ""} />
-    </DropdownMenuItem>
+    </kit.Item>
   );
 }
 
@@ -73,9 +73,23 @@ function SurfaceItem({ item, onPick }: { item: ThreadSurfaceItem; onPick: () => 
  * (docs/notes/shell-model.md): its diff of each checkout and its pull requests, each marked
  * "open" when its tab is open in the space; then its terminal tabs there and New terminal tab.
  * Picking an open one focuses it where it is; another opens in `pane` (the "+" menu's) or, with
- * none, by the placement rules (shell/linked.ts surfaceAction). `onPick` runs the action.
+ * none, by the placement rules (shell/linked.ts surfaceAction), which open a closed thread's in the
+ * focused pane. `onPick` runs the action. `kit` is the menu's parts: a dropdown's (the header, the
+ * "+") or a context menu's (the sidebar row).
  */
-export function ThreadSurfaceItems({ threadId, spaceId, pane = "", onPick }: { threadId: string; spaceId: string; pane?: string; onPick: (a: LinkedAction) => void }) {
+export function ThreadSurfaceItems({
+  threadId,
+  spaceId,
+  pane = "",
+  kit = dropdownMenuKit,
+  onPick,
+}: {
+  threadId: string;
+  spaceId: string;
+  pane?: string;
+  kit?: MenuKit;
+  onPick: (a: LinkedAction) => void;
+}) {
   const { diffs, prs, terminals } = useThreadSurfaces(threadId, spaceId);
   const views = [...diffs, ...prs];
   return (
@@ -84,23 +98,25 @@ export function ThreadSurfaceItems({ threadId, spaceId, pane = "", onPick }: { t
         <SurfaceItem
           key={item.key}
           item={item}
+          kit={kit}
           onPick={() => {
             onPick(surfaceAction(threadId, item, pane));
           }}
         />
       ))}
-      {views.length > 0 && <DropdownMenuSeparator />}
-      <DropdownMenuLabel className="text-caption text-cf-text-muted">Terminals</DropdownMenuLabel>
+      {views.length > 0 && <kit.Separator />}
+      <kit.Label className="text-caption text-cf-text-muted">Terminals</kit.Label>
       {terminals.map((item) => (
         <SurfaceItem
           key={item.key}
           item={item}
+          kit={kit}
           onPick={() => {
             onPick(surfaceAction(threadId, item, pane));
           }}
         />
       ))}
-      <DropdownMenuItem
+      <kit.Item
         data-testid="thread-surface-new-terminal"
         onSelect={() => {
           onPick(newTerminalAction(threadId, pane));
@@ -108,7 +124,7 @@ export function ThreadSurfaceItems({ threadId, spaceId, pane = "", onPick }: { t
       >
         <Plus />
         New terminal tab
-      </DropdownMenuItem>
+      </kit.Item>
     </>
   );
 }
@@ -118,14 +134,14 @@ export function ThreadSurfaceItems({ threadId, spaceId, pane = "", onPick }: { t
  * marked "here" and disabled; then New space, which makes one (without showing it) and moves the
  * thread there. thread.space.move takes the thread's linked tabs in its space along.
  */
-export function MoveToSpaceItems({ threadId, onPick }: { threadId: string; onPick: (a: LinkedAction) => void }) {
+export function MoveToSpaceItems({ threadId, kit = dropdownMenuKit, onPick }: { threadId: string; kit?: MenuKit; onPick: (a: LinkedAction) => void }) {
   const spaces = useLayoutStore(useShallow((s) => spaceChoices(s, threadId).map((c) => [c.id, c.name, c.here ? "1" : ""].join(SEP))));
   return (
     <>
       {spaces.map((k) => {
         const [id = "", name = "", here = ""] = k.split(SEP);
         return (
-          <DropdownMenuItem
+          <kit.Item
             key={id}
             disabled={here !== ""}
             data-testid="move-to-space-item"
@@ -137,11 +153,11 @@ export function MoveToSpaceItems({ threadId, onPick }: { threadId: string; onPic
             <SpaceIcon spaceId={id} />
             <span className="truncate">{name}</span>
             {here && <span className="ml-auto pl-4 text-caption text-cf-text-muted">here</span>}
-          </DropdownMenuItem>
+          </kit.Item>
         );
       })}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
+      <kit.Separator />
+      <kit.Item
         data-testid="move-to-new-space"
         onSelect={() => {
           void moveToNewSpace(threadId);
@@ -149,7 +165,7 @@ export function MoveToSpaceItems({ threadId, onPick }: { threadId: string; onPic
       >
         <Plus />
         New space
-      </DropdownMenuItem>
+      </kit.Item>
     </>
   );
 }

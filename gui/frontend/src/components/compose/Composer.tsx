@@ -276,7 +276,19 @@ export const SEND_DISABLED = "disabled:bg-cf-surface-sunken disabled:text-cf-tex
  * A like draft ("New thread on this branch") shows what thread.new-like copies (the set,
  * branch, workspace and mode, read-only) and lets only the primary change.
  */
-function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: ComposeTarget; set: ResolvedSet; workspaceName: string; promptFocusRef: RefObject<() => void> }) {
+function ComposerCard({
+  target,
+  set,
+  workspaceName,
+  promptFocusRef,
+  onTextChange,
+}: {
+  target: ComposeTarget;
+  set: ResolvedSet;
+  workspaceName: string;
+  promptFocusRef: RefObject<() => void>;
+  onTextChange?: (text: string) => void;
+}) {
   const draftKey = keyOf(target);
   const defaults = useDefaults();
   const modelChoices = useModelChoices();
@@ -520,6 +532,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               placeholder={picker.placeholder ?? (dictation.listening ? LISTENING_PLACEHOLDER : like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands")}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
+                onTextChange?.(t);
               }}
               onSubmit={send}
               onEscape={() => {
@@ -780,11 +793,29 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
  * workspace with workspaceId, no project with noProject, or "New thread on this branch"
  * with likeThreadId (Selection kind "compose").
  */
-export function Composer({ projectId, workspaceId, noProject = false, likeThreadId }: { projectId: string; workspaceId?: string; noProject?: boolean; likeThreadId?: string }) {
-  const target = useMemo<ComposeTarget>(
-    () => (likeThreadId ? { kind: "like", threadId: likeThreadId } : workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", projectId }),
-    [projectId, workspaceId, noProject, likeThreadId],
-  );
+/**
+ * `draftId`: the window shell's composer draft this is (its text has its own key, lib/compose
+ * draftKey). `onTextChange`: the user changed the text (typing, a paste, a tag), not a prefill.
+ */
+export function Composer({
+  projectId,
+  workspaceId,
+  noProject = false,
+  likeThreadId,
+  draftId,
+  onTextChange,
+}: {
+  projectId: string;
+  workspaceId?: string;
+  noProject?: boolean;
+  likeThreadId?: string;
+  draftId?: string;
+  onTextChange?: (text: string) => void;
+}) {
+  const target = useMemo<ComposeTarget>(() => {
+    const t: ComposeTarget = likeThreadId ? { kind: "like", threadId: likeThreadId } : workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", projectId };
+    return draftId ? { ...t, draft: draftId } : t;
+  }, [projectId, workspaceId, noProject, likeThreadId, draftId]);
   const key = keyOf(target);
   const { set, workspaceName } = useDraftSet(target, key);
   // Set by ComposerCard once the prompt is mounted; the heading's picker focuses it at once.
@@ -870,7 +901,7 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
                 </>
               )}
             </h1>
-            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} />
+            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} onTextChange={onTextChange} />
           </div>
         )}
       </section>

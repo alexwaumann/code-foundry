@@ -1,5 +1,6 @@
 import { SquarePen } from "lucide-react";
 import { ComposeTab } from "@/components/shell/ComposeTab";
+import { useLayoutStore } from "@/stores/layout";
 import type { ShellSurface } from "./types";
 
 /**
@@ -9,6 +10,18 @@ import type { ShellSurface } from "./types";
 export const composeSurface: ShellSurface = {
   kind: "compose",
   icon: SquarePen,
-  useTitle: (tab) => tab.name || tab.title || "New thread",
+  // A draft's tab is named by its label in the space's draft list (the sidebar's row shows it too).
+  useTitle: (tab) => {
+    const label = useLayoutStore((s) => {
+      const id = tab.params.draft;
+      if (!id) return "";
+      for (const sp of Object.values(s.spaces)) {
+        const d = sp.drafts.find((x) => x.id === id);
+        if (d) return d.label;
+      }
+      return "";
+    });
+    return tab.name || label || tab.title || "New thread";
+  },
   render: (tab) => <ComposeTab tab={tab} />,
 };

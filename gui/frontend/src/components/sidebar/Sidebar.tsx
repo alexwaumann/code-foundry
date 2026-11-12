@@ -3,7 +3,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
 import { HistoryButtons } from "@/components/sidebar/HistoryButtons";
-import { useShellChrome } from "@/stores/shellView";
 import { useBranchlessRows } from "@/components/thread/useThreadPlace";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
@@ -16,6 +15,7 @@ import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
 import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
+import { useShellChrome, useShellViewStore } from "@/stores/shellView";
 import { useUiStore } from "@/stores/ui";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
@@ -25,6 +25,7 @@ import { RowTooltipsEnabled } from "./rowTooltips";
 import { SidebarRow } from "./SidebarRow";
 import { SidebarStatus } from "./SidebarStatus";
 import { SidebarMenu } from "./SidebarMenu";
+import { ShellSidebarList } from "./shell/ShellSidebarList";
 
 /** The most of the sidebar body a footer (header and rows) takes before its rows scroll. */
 const FOOTER_CAPS: Readonly<Record<FooterSection, number>> = { working: 0.4, snoozed: 0.25, archived: 0.3 };
@@ -454,6 +455,8 @@ function SidebarShown({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyHeight = useHeight(bodyRef, 0);
   const shellChrome = useShellChrome();
+  // While the shell draws the window, its sections and rows (sidebar/shell; docs/notes/shell-16-sidebar.md).
+  const shell = useShellViewStore((s) => s.mode === "shell");
   useSidebarDashboard();
   return (
     <aside className="relative flex shrink-0 flex-col bg-cf-sidebar" style={{ width }} data-testid="sidebar">
@@ -463,9 +466,9 @@ function SidebarShown({ width }: { width: number }) {
           m-shell). Rows run to the sidebar's edges, so the same gap on the left (pl-shell)
           keeps them as far from the window edge as from the pane. */}
       <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col pl-shell" data-testid="sidebar-body">
-        <SidebarMenu />
+        <SidebarMenu pages={!shell} />
         <EmberRow />
-        <SidebarList bodyHeight={bodyHeight} />
+        {shell ? <ShellSidebarList bodyHeight={bodyHeight} /> : <SidebarList bodyHeight={bodyHeight} />}
         <SidebarStatus />
       </div>
       <ResizeHandle />

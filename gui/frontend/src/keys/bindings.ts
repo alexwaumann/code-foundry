@@ -4,9 +4,10 @@ import { sidebarAnchor } from "@/lib/inSidebar";
 import { lastInputWasKeyboard } from "@/lib/inputModality";
 import { keyTarget } from "@/lib/keyTarget";
 import { canNewLike, canRunElsewhere } from "@/lib/threadRow";
-import { nextAfter, threadOrder } from "@/lib/tree";
+import { nextAfter } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
+import { contextKey, getUiContext } from "@/stores/context";
+import { sidebarThreadOrder } from "@/stores/shellList";
 import { openAddProject } from "@/stores/addProject";
 import { composeLike, openNewThreadPicker } from "@/stores/compose";
 import { getEmberAttentionId } from "@/stores/ember";
@@ -52,7 +53,7 @@ export interface ViewAction {
 
 /** Selects the Nth thread in sidebar order: only rows on screen count (not a collapsed section's, but for the open thread's, nor hidden threads). */
 function jumpTo(n: number): void {
-  const id = threadOrder(getListThreads(), getListOptions())[n - 1];
+  const id = sidebarThreadOrder()[n - 1];
   if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
@@ -62,7 +63,7 @@ export function jumpToAttention(): boolean {
   const sel = useUiStore.getState().selection;
   // Threads that need attention are never in the collapsible Working section (threadGroup).
   // A hidden thread selected (from its creator's thread info card) starts from its creator's row.
-  const order = threadOrder(getListThreads(), getListOptions());
+  const order = sidebarThreadOrder();
   const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id) : null;
   // Ember's row is the sidebar's first; it counts while it waits on the user (stores/ember.ts).
   const ember = getEmberAttentionId();

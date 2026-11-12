@@ -227,9 +227,9 @@ export function buildRows(threads: readonly ListThread[], opts: ListOptions = {}
 }
 
 /** Same row content: every field equal (rows are flat objects of strings, numbers and booleans). */
-function sameRow(a: Row, b: Row): boolean {
-  const ra: Record<string, unknown> = a;
-  const rb: Record<string, unknown> = b;
+function sameRow(a: object, b: object): boolean {
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
   const keys = Object.keys(ra);
   return keys.length === Object.keys(rb).length && keys.every((k) => ra[k] === rb[k]);
 }
@@ -241,7 +241,12 @@ function sameRow(a: Row, b: Row): boolean {
  * components see the same prop and skip rendering.
  */
 export function rowCache(): (rows: readonly Row[]) => Row[] {
-  let prev = new Map<string, Row>();
+  return keyedRowCache<Row>();
+}
+
+/** rowCache for any flat rows with a key (the shell sidebar's, lib/shellSections.ts). */
+export function keyedRowCache<R extends { key: string }>(): (rows: readonly R[]) => R[] {
+  let prev = new Map<string, R>();
   return (rows) => {
     const out = rows.map((r) => {
       const old = prev.get(r.key);

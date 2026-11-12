@@ -61,8 +61,10 @@ describe("spaceAttentionCounts", () => {
 });
 
 /** A layout slice of panes and tabs in two spaces. */
-function slice(panes: [string, string, [string, string, string][]][]): Pick<LayoutState, "panes" | "tabs"> {
-  const out: { panes: Record<string, PaneEntry>; tabs: Record<string, TabEntry> } = { panes: {}, tabs: {} };
+function slice(panes: [string, string, [string, string, string][]][]): Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId"> {
+  // s-7 lives in sp-b; every other thread in the default space, sp-a.
+  const threads = { "s-7": { threadId: "s-7", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" } };
+  const out: { panes: Record<string, PaneEntry>; tabs: Record<string, TabEntry>; threads: typeof threads; defaultSpaceId: string } = { panes: {}, tabs: {}, threads, defaultSpaceId: "sp-a" };
   for (const [id, spaceId, tabs] of panes) {
     out.panes[id] = { id, spaceId, tabIds: tabs.map((t) => t[0]), active: tabs[0]?.[0] ?? "" };
     for (const [tid, kind, thread] of tabs) out.tabs[tid] = { id: tid, kind, thread, key: `${kind}:${tid}`, params: {}, title: "", name: "", paneId: id };
@@ -115,6 +117,13 @@ describe("spaceDropCommands", () => {
 
   it("moves only the thread when nothing else would be left in the pane", () => {
     expect(spaceDropCommands({ kind: "pane", pane: "p-3" }, "sp-b", s)).toEqual([{ name: "thread.space.move", args: { id: "s-3", space: "sp-b" } }]);
+  });
+
+  it("moves a sidebar row's thread, open or not, to the space it is dropped on; not to its own", () => {
+    expect(spaceDropCommands({ kind: "thread", thread: "s-5" }, "sp-b", s)).toEqual([{ name: "thread.space.move", args: { id: "s-5", space: "sp-b" } }]);
+    expect(spaceDropCommands({ kind: "thread", thread: "s-7" }, "sp-a", s)).toEqual([{ name: "thread.space.move", args: { id: "s-7", space: "sp-a" } }]);
+    expect(spaceDropCommands({ kind: "thread", thread: "s-5" }, "sp-a", s)).toBeNull();
+    expect(spaceDropCommands({ kind: "thread", thread: "s-7" }, "sp-b", s)).toBeNull();
   });
 
   it("does nothing on its own space, or for a source that went", () => {

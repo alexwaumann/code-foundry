@@ -500,3 +500,42 @@ func TestReopensInTheCurrentSpace(t *testing.T) {
 		t.Errorf("reopened in %q after removing the current space; want %q", got, main)
 	}
 }
+
+// layout.smart_swap (Options.SmartSwap) is read at every op: with it on, focusing thread b
+// switches the pane beside it from a's diff to b's; with it off nothing else changes.
+func TestSmartSwapSetting(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		on   bool
+		want string // the side pane's active tab after b is focused: "b" or "a"
+	}{
+		{"on", true, "b"},
+		{"off", false, "a"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			on := true
+			opts := Options{DB: dbtest.Open(t), IDs: &core.SeqIDs{}, FocusDelay: time.Hour, Log: slog.New(slog.DiscardHandler),
+				SmartSwap: func() bool { return on }}
+			m, err := New(context.Background(), opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = m.Close(context.Background()) })
+			diff := func(thread string) *core.Tab {
+				return &core.Tab{Kind: "diff", Thread: thread, Params: map[string]string{"project": "pj", "worktree": thread}}
+			}
+			a := apply(t, m, &core.OpenThread{Thread: "th-a", Focus: true}).Result
+			b := apply(t, m, &core.OpenThread{Thread: "th-b", Focus: true}).Result
+			side := apply(t, m, &core.SplitPane{Pane: a.Pane, Edge: "right", Tab: diff("th-b"), Focus: true}).Result
+			da := apply(t, m, &core.OpenSurface{Pane: side.Pane, Tab: diff("th-a"), Focus: true}).Result
+			apply(t, m, &core.FocusTab{Tab: a.Tab})
+			on = tc.on
+			apply(t, m, &core.FocusTab{Tab: b.Tab})
+			_, p, _ := m.Snapshot().State.FindTab(da.Tab)
+			got := map[string]string{side.Tab: "b", da.Tab: "a"}[p.Active]
+			if got != tc.want {
+				t.Errorf("side pane shows %s's diff; want %s's", got, tc.want)
+			}
+		})
+	}
+}

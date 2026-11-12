@@ -382,14 +382,17 @@ func TestLayoutGlueTerminalGoneAndReset(t *testing.T) {
 	if err := terminal.KillAndRemove(e.ctx, e.terms, reset1); err != nil {
 		t.Fatal(err)
 	}
-	// The old one gone before the glue saw the new shell: the removal finds it by its label.
-	if err := terminal.KillAndRemove(e.ctx, e.terms, reset2); err != nil {
-		t.Fatal(err)
-	}
+	// A free shell's reset, in the same order: the new shell exists before the old one goes, so
+	// whichever event the glue takes first, the tab follows (the removal finds the new shell by
+	// its label). Killing the old one first raced: a removal handled before the new shell existed
+	// rightly closes the tab.
 	l2 := termlabel.Free()
 	l2[termlabel.Replaces] = reset2
 	n2, err := e.terms.Create(e.ctx, terminal.Spec{Argv: []string{"zsh"}, Labels: l2})
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := terminal.KillAndRemove(e.ctx, e.terms, reset2); err != nil {
 		t.Fatal(err)
 	}
 	e.eventually("both tabs follow", func() bool {

@@ -52,8 +52,9 @@ export interface SpaceCommand {
   args: Record<string, string>;
 }
 
-/** The space a tab or a pane is in; "" when it is gone. */
-function spaceOfSource(source: DragSource, s: Pick<LayoutState, "panes" | "tabs">): string {
+/** The space a tab, a pane or a sidebar thread is in; "" when the tab or pane is gone. */
+function spaceOfSource(source: DragSource, s: Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId">): string {
+  if (source.kind === "thread") return spaceOfThread(s, source.thread);
   const pane = source.kind === "tab" ? s.tabs[source.tab]?.paneId : source.pane;
   return s.panes[pane ?? ""]?.spaceId ?? "";
 }
@@ -64,11 +65,14 @@ function spaceOfSource(source: DragSource, s: Pick<LayoutState, "panes" | "tabs"
  * (`thread.space.move`); any other tab moves by itself (`tab.move --space`): a linked one waits
  * there, dormant. A pane moves whole (`pane.move --space`); the daemon moves no thread tab that
  * way, so each thread in it moves first with its linked tabs, and the pane follows with what is
- * left, when anything is. Null when the drop does nothing: its own space, or a source that went.
+ * left, when anything is. A sidebar row's thread moves as its tab would, open or not
+ * (docs/notes/shell-16-sidebar.md). Null when the drop does nothing: its own space, or a source
+ * that went.
  */
-export function spaceDropCommands(source: DragSource, space: string, s: Pick<LayoutState, "panes" | "tabs">): SpaceCommand[] | null {
+export function spaceDropCommands(source: DragSource, space: string, s: Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId">): SpaceCommand[] | null {
   const from = spaceOfSource(source, s);
   if (!from || from === space) return null;
+  if (source.kind === "thread") return [{ name: "thread.space.move", args: { id: source.thread, space } }];
   if (source.kind === "tab") {
     const tab = s.tabs[source.tab];
     if (!tab) return null;

@@ -20,8 +20,11 @@ import type { Frame, Rect } from "@/shell/geometry/types";
 
 export type Edge = "left" | "right" | "top" | "bottom";
 
-/** What is dragged: one tab (from its pane), or a whole pane by its strip. */
-export type DragSource = { kind: "tab"; tab: string; pane: string } | { kind: "pane"; pane: string };
+/**
+ * What is dragged: one tab (from its pane), a whole pane by its strip, or a sidebar row's thread
+ * whose tab is not open in the space (docs/notes/shell-16-sidebar.md; an open one drags as its tab).
+ */
+export type DragSource = { kind: "tab"; tab: string; pane: string } | { kind: "pane"; pane: string } | { kind: "thread"; thread: string };
 
 /** Where it lands. */
 export type DropTarget =
@@ -143,6 +146,8 @@ function zoneAt(scene: DragScene, p: Point): DropTarget | null {
  */
 function allowed(scene: DragScene, source: DragSource, t: DropTarget): boolean {
   const panes = Object.keys(scene.frame.rects);
+  // A thread from the sidebar comes from no pane: every place takes it.
+  if (source.kind === "thread") return true;
   if (source.kind === "pane") {
     if (t.kind === "outer") return panes.length > 1;
     return t.pane !== source.pane;

@@ -356,6 +356,16 @@ describe("switchDraftTarget", () => {
     expect(useUiStore.getState().composerFocusSeq).toBe(seq + 1);
   });
 
+  it("a shell composer draft stays itself on another target: its own key, its text rewritten, the new target shown", async () => {
+    updateDraft("draft:d-1", { text: "hi", model: "haiku", projects: ["repo-cf", "repo-sk"] });
+    updateDraft("repo-gp", { text: "the project's own" });
+    await expect(switchDraftTarget({ ...cf, draft: "d-1" }, gp)).resolves.toBe(true);
+    expect(getDraft("draft:d-1")).toMatchObject({ text: "hi", model: "haiku", projects: null });
+    expect(getDraft("repo-gp").text).toBe("the project's own");
+    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-gp" });
+    await expect(switchDraftTarget({ ...gp, draft: "d-1" }, gp)).resolves.toBe(false);
+  });
+
   it("to a workspace: selects it with its first member for the context", async () => {
     updateDraft("repo-cf", { text: "hi", projects: ["repo-cf", "repo-sk"] });
     await switchDraftTarget(cf, login);

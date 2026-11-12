@@ -126,6 +126,14 @@ describe("dropPreview", () => {
     expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "strip", pane: "p-2", index: 0 })).toBeNull();
   });
 
+  it("is a new pane beside the target for a sidebar thread, which leaves nothing behind; no single command opens it", () => {
+    const thread: DragSource = { kind: "thread", thread: "s-9" };
+    // p-1 splits in two: the thread's pane takes the right half of p-1's room.
+    expect(dropPreview(TREE, FRAME, thread, { kind: "edge", pane: "p-1", edge: "right" })).toEqual({ x: 406, y: 0, w: 394, h: 900 });
+    expect(dropPreview(TREE, FRAME, thread, { kind: "pane", pane: "p-2" })).toEqual(FRAME.rects["p-2"]);
+    expect(dropCommand(thread, { kind: "pane", pane: "p-2" }, [])).toBeNull();
+  });
+
   it("is nothing for a tab the tree does not hold", () => {
     expect(dropPreview(TREE, FRAME, tab("t-gone", "p-1"), { kind: "outer", edge: "left" })).toBeNull();
     expect(dropPreview(null, FRAME, tab("p-1/1", "p-1"), { kind: "outer", edge: "left" })).toBeNull();

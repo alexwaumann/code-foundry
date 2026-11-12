@@ -1485,6 +1485,38 @@ export class World {
    * "Watch the e2e run" waits on a shell alone ("waiting on 1 shell", no badge). All
    * held. POST /__mock/live-count. Idempotent; returns the ids.
    */
+  /**
+   * Scenario: the shell sidebar's rows (docs/notes/shell-16-sidebar.md): asks of each kind, one
+   * without a project; a long title; threads without a project with and without counts.
+   * Idempotent; returns the ids.
+   */
+  addShellSidebar(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const A = ThreadStatus.NEEDS_ATTENTION;
+    type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
+    const specs: Spec[] = [
+      { id: "s-sb-badge", name: "Fix stale PR badge after a force-push to the branch", status: A, statusReason: "permission: Bash git push --force-with-lease", min: 2 },
+      { id: "s-sb-notes", name: "Draft the 0.22 release notes", projectId: "", worktreePath: HOME, status: A, statusReason: "permission: Bash gh release list", min: 4 },
+      { id: "s-sb-flaky", name: "Investigate the flaky e2e run that only fails on the 4-worker WebKit job", worktreePath: `${CFW}/feat-sidebar`, status: ThreadStatus.IDLE, statusReason: "at prompt", min: 23 },
+      { id: "s-sb-trip", name: "Plan the spring trip", projectId: "", worktreePath: HOME, status: ThreadStatus.IDLE, statusReason: "at prompt", min: 41 },
+      { id: "s-sb-charts", name: "Compare three charting libraries", projectId: "", worktreePath: HOME, status: ThreadStatus.IDLE, statusReason: "at prompt", min: 62 },
+    ];
+    const runs: Record<string, AgentRunInit[]> = {
+      "s-sb-flaky": [backgroundRun("sb-a1", "Rerun the WebKit job", "Running make gui-e2e", 6), backgroundRun("sb-a2", "Bisect the flake", "Reading shell-drag.spec.ts", 5)],
+      "s-sb-charts": [backgroundRun("sb-a3", "Benchmark the libraries", "Running bun run bench", 4)],
+    };
+    const out: string[] = [];
+    for (const { min, ...o } of specs) {
+      out.push(o.id);
+      if (this.threads.has(o.id)) continue;
+      const s = this.addThread({ projectId: "repo-cf", worktreePath: CF, model: "claude-sonnet-5-5[1m]", effort: "medium", createdAt: ago(min + 20), lastActivityAt: ago(min), statusChangedAt: ago(min), held: true, ...o });
+      const r = runs[s.id];
+      if (r) this.logs.setAgents(s.id, r);
+      this.publishThread(s);
+    }
+    return out;
+  }
+
   addLiveCount(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
     const A = ThreadStatus.NEEDS_ATTENTION;
@@ -5288,6 +5320,26 @@ export class World {
         cmd: { name: "settings.path", noPalette: true, title: "Settings File Path", category: "Settings", description: "Print the settings file's path", keybindings: [], args: [] },
         when: always,
         run: () => this.settings.snapshot().path ?? "",
+      },
+      {
+        cmd: {
+          name: "settings.set",
+          noPalette: true,
+          title: "Change Setting",
+          category: "Settings",
+          description: "Set one setting. The value is validated against the setting's type and written to the settings file.",
+          keybindings: [],
+          args: [
+            { name: "key", type: ArgType.STRING, required: true, positional: true, description: 'Setting key, e.g. "appearance.font_size"' },
+            { name: "value", type: ArgType.STRING, required: true, positional: true, description: "New value" },
+          ],
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const key = args.key ?? "";
+          const snap = this.settings.update({ [key]: args.value ?? "" });
+          return `${key} = ${JSON.stringify(snap.values?.[key] ?? "")}`;
+        },
       },
       {
         cmd: {
