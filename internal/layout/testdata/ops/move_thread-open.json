@@ -1,0 +1,111 @@
+{
+  "doc": "Moving an open thread takes it and its linked tabs in its space to the target: the thread opens in the target's focused pane and its tabs are placed beside it; a tab dragged to a third space stays.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"},{"id":"t-p","kind":"prs"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {"t":"pane","id":"p-x","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"},
+        "focus": "p-x"
+      },
+      {
+        "id": "sp-c",
+        "name": "Space C",
+        "root": {
+          "t": "pane",
+          "id": "p-z",
+          "tabs": [{"id":"t-z","kind":"terminal","thread":"th-a","params":{"terminal":"term-z"}}],
+          "active": "t-z"
+        },
+        "focus": "p-z"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"move_thread","thread":"th-a","space":"sp-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-x",
+              "tabs": [{"id":"t-q","kind":"projects"},{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}}
+              ],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-x"
+      },
+      {
+        "id": "sp-c",
+        "name": "Space C",
+        "root": {
+          "t": "pane",
+          "id": "p-z",
+          "tabs": [{"id":"t-z","kind":"terminal","thread":"th-a","params":{"terminal":"term-z"}}],
+          "active": "t-z"
+        },
+        "focus": "p-z"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-b"}}
+  },
+  "result": {"space":"sp-b","pane":"p-x","tab":"t-a","placed":["t-d","t-f"]}
+}

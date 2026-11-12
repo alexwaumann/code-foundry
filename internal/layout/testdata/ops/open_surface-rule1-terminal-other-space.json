@@ -1,0 +1,68 @@
+{
+  "doc": "Rule 1 for a terminal (one tab per terminal in the whole layout): open in another space, it is focused there and that space becomes current.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-x",
+          "tabs": [{"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}}],
+          "active": "t-x"
+        },
+        "focus": "p-x"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}},
+    "focus": true
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-x",
+          "tabs": [{"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}}],
+          "active": "t-x"
+        },
+        "focus": "p-x",
+        "mru": ["t-x"]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-b","pane":"p-x","tab":"t-x","existing":true,"rule":"1"}
+}

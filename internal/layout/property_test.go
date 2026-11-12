@@ -2,6 +2,7 @@ package layout
 
 import (
 	"errors"
+	"maps"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -61,7 +62,9 @@ func stateIDs(st *State) (spaces, panes, splits, tabs []string) {
 
 func randomTab(s *bytesrc) *Tab {
 	thread := pick(s, "", "th-1", "th-2", "th-3", "th-4")
-	switch s.n(11) {
+	switch s.n(12) {
+	case 11:
+		return &Tab{Kind: "terminal", Thread: thread, Params: map[string]string{"terminal": pick(s, "term-1", "term-4", "term-5")}}
 	case 0:
 		return &Tab{Kind: "thread", Thread: pick(s, "th-1", "th-2", "th-3", "th-4", "")}
 	case 1:
@@ -162,8 +165,43 @@ func randomOp(s *bytesrc, st *State) Op {
 		}
 	case *SwitchSpace:
 		o.Space = pick(s, spaces...)
+	case *OpenSurface:
+		o.Space, o.Tab, o.Focus = pick(s, "", "", "", spaces[len(spaces)-1]), randomTab(s), s.n(2) == 0
+		if s.n(4) == 0 {
+			o.Pane = pick(s, panes...)
+		}
+		o.W, o.H = viewportOf(s)
+	case *OpenThread:
+		o.Thread, o.Focus = pick(s, threads...), s.n(3) != 0
+		switch s.n(5) {
+		case 0:
+			o.Pane = pick(s, panes...)
+		case 1:
+			o.Compose = pick(s, tabs...)
+		}
+		o.W, o.H = viewportOf(s)
+	case *CloseThread:
+		o.Thread = pick(s, threads...)
+		o.W, o.H = viewportOf(s)
+	case *MoveThreadToSpace:
+		o.Thread, o.Space = pick(s, threads...), pick(s, spaces...)
+		o.W, o.H = viewportOf(s)
+	case *ArchiveThread:
+		o.Thread = pick(s, threads...)
+	case *SnoozeThread:
+		o.Thread = pick(s, threads...)
+		o.Ran = map[string]string{"term-1": "make dev"}
+		o.W, o.H = viewportOf(s)
 	}
 	return op
+}
+
+// threads are the thread ids random ops name, "" among them.
+var threads = []string{"th-1", "th-2", "th-3", "th-4", ""}
+
+// viewportOf is a pane area for placement: wide, narrow, odd, or the default.
+func viewportOf(s *bytesrc) (float64, float64) {
+	return pick(s, 0, 1180, 700, 2400, 333.5, -1), pick[float64](s, 0, 820, 400)
 }
 
 // runOps applies ops drawn from data to the seed state and checks every step: no op leaves
@@ -182,7 +220,8 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		next, res, err := Apply(st, op, ids)
+		opts := Options{NoSmartSwap: s.n(4) == 0}
+		next, res, err := ApplyWith(st, op, ids, opts)
 		opJSON, _ := EncodeOp(op)
 		if after, _ := Encode(st); string(after) != string(before) {
 			t.Fatalf("step %d %s mutated its input", step, opJSON)
@@ -199,11 +238,12 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 		if err := Check(next); err != nil {
 			t.Fatalf("step %d %s: %v", step, opJSON, err)
 		}
-		for _, tb := range res.Closed {
+		for _, tb := range append(slices.Clone(res.Closed), res.Kept...) {
 			if _, _, still := next.FindTab(tb.ID); still != nil {
 				t.Fatalf("step %d %s: closed tab %s is still open", step, opJSON, tb.ID)
 			}
 		}
+		checkPlacement(t, step, string(opJSON), st, next, res)
 		enc, err := Encode(next)
 		if err != nil {
 			t.Fatal(err)
@@ -217,6 +257,42 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 		}
 		st = next
 	}
+}
+
+// checkPlacement pins what placement and the thread ops promise on any state: a pane that is
+// joined is never resized (rules 2, 3, 4, 6 and the caller's or focused pane change no split),
+// a kept tab is in its thread's remembered set, and the tabs a thread brought back are open.
+func checkPlacement(t *testing.T, step int, opJSON string, before, after *State, res Result) {
+	t.Helper()
+	if _, ok := map[string]bool{"2": true, "3": true, "4": true, "6": true, "pane": true, "focused": true}[res.Rule]; ok && len(res.Back)+len(res.Placed) == 0 {
+		if b, a := splitSizes(before), splitSizes(after); !maps.EqualFunc(b, a, slices.Equal[[]float64]) {
+			t.Fatalf("step %d %s: rule %s resized a split:\n%v\n%v", step, opJSON, res.Rule, b, a)
+		}
+	}
+	for _, tb := range res.Kept {
+		ts := after.Threads[tb.Thread]
+		if ts == nil || ts.Remembered == nil || !slices.ContainsFunc(ts.Remembered.Tabs, func(rt RememberedTab) bool { return rt.Tab.ID == tb.ID }) {
+			t.Fatalf("step %d %s: kept tab %s is not remembered", step, opJSON, tb.ID)
+		}
+	}
+	for _, id := range append(slices.Clone(res.Back), res.Placed...) {
+		if _, _, tb := after.FindTab(id); tb == nil {
+			t.Fatalf("step %d %s: restored tab %s is not open", step, opJSON, id)
+		}
+	}
+}
+
+// splitSizes is every split's sizes by id, in all spaces.
+func splitSizes(st *State) map[string][]float64 {
+	out := map[string][]float64{}
+	for _, sp := range st.Spaces {
+		walk(sp.Root, func(n *Node) {
+			if n.T == NodeSplit {
+				out[n.ID] = n.Sizes
+			}
+		})
+	}
+	return out
 }
 
 // TestOpSequencesKeepNormalForm is the property test: many random op sequences.

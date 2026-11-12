@@ -107,17 +107,9 @@ var kinds = map[string]*Kind{
 	"prs":         {Link: LinkNone, Scope: ScopeSpace, DefaultFrac: 0.5, key: kindKey("prs")},
 	"projects":    {Link: LinkNone, Scope: ScopeSpace, DefaultFrac: 0.5, key: kindKey("projects")},
 	"ember.board": {Link: LinkRequired, Scope: ScopeSpace, DefaultFrac: 0.5, key: kindKey("ember.board")},
-	"compose": {
-		Link: LinkNone, Scope: ScopeSpace, KeyParams: []string{"project", "workspace", "like"}, DefaultFrac: 0.5,
-		key: func(t *Tab) (string, error) {
-			for _, p := range []string{"project", "workspace", "like"} {
-				if v := t.Params[p]; v != "" {
-					return "compose:" + p + ":" + v, nil
-				}
-			}
-			return "compose:home", nil
-		},
-	},
+	// The composer is at most one per space (docs/notes/shell-model.md): its params (project,
+	// workspace, like) say what the next thread starts from, never which composer it is.
+	"compose": {Link: LinkNone, Scope: ScopeSpace, DefaultFrac: 0.5, key: kindKey("compose")},
 	"mcp": {
 		Link: LinkRequired, Scope: ScopeSpace, DefaultFrac: 0.35,
 		key: func(t *Tab) (string, error) { return "mcp:" + t.Thread, nil },

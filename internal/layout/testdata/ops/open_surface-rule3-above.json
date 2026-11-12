@@ -1,0 +1,94 @@
+{
+  "doc": "Rule 3: a neighbour above holding linked surfaces is joined before any new pane is made.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-t","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-t"
+            },
+            {
+              "t": "split",
+              "id": "s-m",
+              "dir": "row",
+              "kids": [
+                {"t":"pane","id":"p-l","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"},
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {"t":"pane","id":"p-r","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+              ],
+              "sizes": [0.2,0.4,0.4]
+            }
+          ],
+          "sizes": [0.3,0.7]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_surface","tab":{"kind":"file","thread":"th-a","params":{"path":"/r/new"}}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-t","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-n1","kind":"file","thread":"th-a","params":{"path":"/r/new"}}
+              ],
+              "active": "t-n1"
+            },
+            {
+              "t": "split",
+              "id": "s-m",
+              "dir": "row",
+              "kids": [
+                {"t":"pane","id":"p-l","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"},
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {"t":"pane","id":"p-r","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+              ],
+              "sizes": [0.2,0.4,0.4]
+            }
+          ],
+          "sizes": [0.3,0.7]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-t","tab":"t-n1","rule":"3"}
+}
