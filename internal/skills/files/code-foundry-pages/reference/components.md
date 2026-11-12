@@ -93,6 +93,9 @@ These draw inside the page's card, never over the app: give the page room for a 
 - `PopoverTrigger`: what opens it (`asChild`).
 - `PopoverAnchor`: positions it against another element.
 - `PopoverContent`: the floating panel, 240px wide, no padding of its own: `className="p-3"` (`w-72` wider); `align`, `side`, `sideOffset`.
+- `HoverCard`: a card that opens while the pointer rests on (or the keyboard focuses) its trigger, and stays while the pointer moves into it; `openDelay`, `closeDelay`; `open` + `onOpenChange` or uncontrolled.
+- `HoverCardTrigger`: what opens it (`asChild`).
+- `HoverCardContent`: the card, no width or padding of its own: `className="w-72 p-3"`; `align`, `side`, `sideOffset`.
 - `DropdownMenu`: a menu on a button.
 - `DropdownMenuTrigger`: what opens it (`asChild` around a `Button`).
 - `DropdownMenuContent`: the menu; `align` start, center or end.
