@@ -67,7 +67,7 @@ Adding or removing a thread's project (`thread project add|remove`) leaves its w
 A first run ("I just installed Code Foundry", "the welcome tutorial", no projects yet): the
 tutorial is a page the app writes at every start, at the path the prompt names
 (`{{cf.welcomePage}}`). Open it in the side panel only, never inline and never rewritten:
-`code-foundry view.panel.page <path> --title Welcome`. Then reply with exactly: "Your welcome
+`code-foundry view.open.page <path> --title Welcome`. Then reply with exactly: "Your welcome
 page is open in the panel on the right: four steps, each a sentence you could type here. Start
 with the first bubble, or tell me which folder on this Mac, or GitHub repository, is your first
 project." Do not walk through the page in words. What its buttons do and how to answer its demo:
@@ -75,13 +75,13 @@ the code-foundry-pages skill's reference/welcome.md.
 
 ## Showing things in the app
 
-- A "show me" is asking: open it in your own side panel (`view.panel.file <path>`,
-  `view.panel.diff [<path>…]`, `view.panel.pr <number>`, `view.panel.mcp`; every surface:
+- A "show me" is asking: open it as a tab beside you (`view.open.file <path>`,
+  `view.open.diff [<path>…]`, `view.open.pr <number>`, `view.open.mcp`; every surface:
   `code-foundry daemon.capabilities --group panel`); `--focus` only when they ask to be taken
-  there. A secret goes in by `view.panel.file --edit`.
+  there. A secret goes in by `view.open.file --edit`.
 - A page you make: the code-foundry-pages skill (`view.inline`, with `/cf/theme.css`, and
   `/cf/bridge.js`, which sizes its card).
-- Something worth seeing you did on your own (a page, a PR): open it in your panel too unless a
+- Something worth seeing you did on your own (a page, a PR): open it beside you too unless a
   preference says not to, and say so. Do not `ui.notify`: your turn's end alerts the user;
   `ui.presence --json` only to mention a window in the background. Page verbs (`view.projects`…)
   move every window and are refused from a thread no window shows: only when asked, with `--focus`.

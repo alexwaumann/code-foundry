@@ -11,10 +11,11 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // A thread's MCP servers (docs/notes/mcp-panel.md): thread.mcp prints them,
-// thread.mcp-reconnect reconnects one, view.panel.mcp opens the GUI's MCP surface.
+// thread.mcp-reconnect reconnects one, view.open.mcp (view.panel.mcp) opens the GUI's MCP surface.
 
 // McpBackend is the slice of ThreadService the MCP commands need, in generated Connect
 // signatures. The API handler, any ThreadServiceHandler and a ThreadServiceClient
@@ -22,7 +23,7 @@ import (
 type McpBackend interface {
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
-	// view.panel.mcp --thread checks the thread exists.
+	// view.open.mcp --thread checks the thread exists.
 	ThreadGetter
 }
 
@@ -37,11 +38,25 @@ var (
 // not a thread ignores it.
 const ViewPanelMcp = "panel.mcp"
 
-// RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.panel.mcp.
-func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
+// McpOption configures RegisterMcp.
+type McpOption func(*tabs)
+
+// WithMcpLayout gives view.open.mcp the shell window's layout, where it opens the thread's MCP
+// tab as well as the classic window's side panel tab.
+func WithMcpLayout(l layoutstore.Store) McpOption {
+	return func(o *tabs) { o.store = l }
+}
+
+// RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.open.mcp with its classic
+// alias view.panel.mcp.
+func RegisterMcp(r *Registry, b McpBackend, e Emitter, opts ...McpOption) error {
+	var o tabs
+	for _, opt := range opts {
+		opt(&o)
+	}
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
-	return r.RegisterAll(
-		Command{
+	cmds := []Command{
+		{
 			Name:      "thread.mcp",
 			Page:      PageDrives,
 			NoPalette: true,
@@ -97,21 +112,29 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 				return Result{Message: msg, JSON: res.Msg}, nil
 			},
 		},
-		Command{
-			Name:  "view.panel.mcp",
-			Page:  PageState,
-			Title: "Show MCP Servers",
-			Description: "Open the MCP surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the thread's MCP servers with status, errors and tools, and Reconnect.",
-			Category: "View",
-			// No default chord: in the app the thread info card's MCP row opens it.
-			When: hasThread,
-			Args: panelThreadArgs(),
-			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
-				return showPanel(ctx, b, e, uctx, a, ViewPanelMcp, nil)
-			},
+	}
+	return r.RegisterAll(append(cmds, withAliases(mcpOpenCommand(o, b, e))...)...)
+}
+
+// mcpOpenCommand is view.open.mcp.
+func mcpOpenCommand(o tabs, b McpBackend, e Emitter) Command {
+	thread := panelThreadArgs()[0]
+	thread.Description = "Thread the tab belongs to; it opens beside it without taking the user's focus " +
+		"(default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app and outside a thread: the selected thread)" + IDHelp
+	return Command{
+		Name:  "view.open.mcp",
+		Page:  PageState,
+		Title: "Show MCP Servers",
+		Description: "Open the MCP surface " + openLead +
+			"the thread's MCP servers with status, errors and tools, and Reconnect.",
+		Category: "View",
+		// No default chord: in the app the thread info card's MCP row opens it.
+		When: hasThread,
+		Args: []ArgSpec{thread, openFocusArg, openPaneArg},
+		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			return showPanelTab(ctx, o, b, e, uctx, a, ViewPanelMcp, tabMcp)
 		},
-	)
+	}
 }
 
 var mcpStatusWords = map[v1.McpServerStatus]string{

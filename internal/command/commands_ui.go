@@ -36,6 +36,15 @@ func (r EmitResult) Message() string {
 	return fmt.Sprintf("windows=%d", r.Windows)
 }
 
+// windows ends a message about a change the layout made: "windows=N", or that no window is
+// open (the layout keeps the change; NoWindowMessage would say nothing happened).
+func (r EmitResult) windows() string {
+	if r.Windows == 0 {
+		return "no app window is open"
+	}
+	return fmt.Sprintf("windows=%d", r.Windows)
+}
+
 // Result is r as a command result with its Message.
 func (r EmitResult) Result() Result { return Result{Message: r.Message(), JSON: r} }
 
@@ -57,7 +66,11 @@ var notifyLevels = map[string]v1.UiIntent_Notify_Level{
 
 // RegisterUI registers the ui.* commands, which steer connected GUIs through e. They
 // need no store and are always available; with no app window open they say so.
-func RegisterUI(r *Registry, e Emitter) error {
+func RegisterUI(r *Registry, e Emitter, opts ...UIOption) error {
+	var o uiOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	emit := func(intent *v1.UiIntent) Result { return EmitTo(e, intent).Result() }
 	return r.RegisterAll(
 		Command{
@@ -111,7 +124,7 @@ func RegisterUI(r *Registry, e Emitter) error {
 			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Terminal",
-			Description:  "Show a terminal in every connected window.",
+			Description:  "Show a terminal in every connected window: the shell window focuses its tab, opening it by the placement rules when it is closed; a quick terminal opens under its thread.",
 			Category:     "View",
 			NoKeybinding: true,
 			Args: []ArgSpec{
@@ -121,9 +134,18 @@ func RegisterUI(r *Registry, e Emitter) error {
 				if err := r.known(ctx, TerminalID, a.String("id")); err != nil {
 					return Result{}, err
 				}
-				return emit(&v1.UiIntent{Intent: &v1.UiIntent_FocusTerminal_{
+				tab, err := o.focusTerminalTab(ctx, a.String("id"))
+				if err != nil {
+					return Result{}, err
+				}
+				sent := EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusTerminal_{
 					FocusTerminal: &v1.UiIntent_FocusTerminal{TerminalId: a.String("id")},
-				}}), nil
+				}})
+				res := sent.Result()
+				if tab != "" {
+					res.Message = tab + sent.windows()
+				}
+				return res, nil
 			},
 		},
 		Command{

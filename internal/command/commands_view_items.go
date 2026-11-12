@@ -16,11 +16,12 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 )
 
-// The panel verbs that open one item in a thread's side panel: a file (File tab), a
-// changed file's diff (Diff tab) and a pull request (Pull request tab)
-// (docs/notes/control-5-fixes.md). They are always scoped to a thread, the app's
-// selection included (its context names it): the item is the thread's. Each checks the
-// item first, so a call that would show nothing fails instead.
+// The item verbs that open one item of a thread: a file (File tab), a changed file's diff
+// (Diff tab) and a pull request (Pull request tab) (docs/notes/control-5-fixes.md), as a tab
+// linked to the thread in the shell window and in the thread's side panel in the classic one
+// (commands_view_open.go). They are always scoped to a thread, the app's selection included
+// (its context names it): the item is the thread's. Each checks the item first, so a call that
+// would show nothing fails instead.
 
 // ShowView names of the item verbs. Their ShowView carries the item in params.
 const (
@@ -66,30 +67,26 @@ var (
 	_ ProjectLister    = codefoundryv1connect.ProjectServiceHandler(nil)
 )
 
-// itemCommands are view.panel.file, view.panel.diff and view.panel.pr.
+// itemCommands are view.open.file, view.open.diff and view.open.pr, each with its classic
+// view.panel.<item> alias (commands_view_open.go).
 func (d ViewDeps) itemCommands() []Command {
-	focus := panelThreadArgs()[1]
-	thread := ArgSpec{
-		Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
-		Description: "Thread whose side panel it opens in, without changing what any window shows " +
-			"(default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app: the selected thread)" + IDHelp,
-	}
-	item := func(name string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
+	thread := openThreadArg
+	item := func(name, kind string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
 		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			id := a.String("thread")
 			if id == "" {
-				return Result{}, InvalidArg("thread", "needs a thread whose panel to open it in (--thread, or run it inside a thread)")
+				return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
 			}
-			return showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, name, check)
+			return d.showItem(ctx, uctx, a, id, name, kind, check)
 		}
 	}
-	return []Command{
-		{
-			Name:      "view.panel.file",
+	return withAliases(
+		Command{
+			Name:      "view.open.file",
 			Page:      PageState,
 			NoPalette: true,
-			Title:     "Show File in Side Panel",
-			Description: "Open a file in a File tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
+			Title:     "Open File Tab",
+			Description: "Open a file in a File tab " + openLead +
 				"text with syntax colours and an optional line marked, markdown rendered, images, PDFs, and HTML pages run interactively. " +
 				"With --edit the user edits it instead: for a secret, or a file you cannot read, never ask for the value in chat or try to read the file; " +
 				"run this with --line and a --note saying what to put where, then end your turn: a message tells you when it is saved, and you continue without reading its values. " +
@@ -103,31 +100,31 @@ func (d ViewDeps) itemCommands() []Command {
 				{Name: "line", Type: Int, Description: "1-based line to scroll to and mark"},
 				{Name: "edit", Type: Bool, Description: "Ask the user to edit the file: the tab opens editing, with a band naming this thread and Save and tell thread, whose message says only that it was saved"},
 				{Name: "note", Type: String, Description: fmt.Sprintf("With --edit: what to put where, shown as one plain paragraph in the band, quoted as yours; at most %d characters", maxEditNote)},
-				thread, focus,
+				thread, openFocusArg, openPaneArg,
 			},
 			Run: d.runPanelFile,
 		},
-		{
-			Name:      "view.panel.diff",
+		Command{
+			Name:      "view.open.diff",
 			Page:      PageState,
 			NoPalette: true,
-			Title:     "Show Diff in Side Panel",
-			Description: "Open a Diff tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
+			Title:     "Open Diff Tab",
+			Description: "Open a Diff tab " + openLead +
 				"any two of the working tree, the index, or a ref, compared file by file, side by side or unified. " +
-				"With no flags, what the branch changed. Narrow it to the files you mean with --path, and say why with --title and --note: those get a tab of their own, and the checkout's stays the user's. " +
+				"With no flags, what the branch changed. Narrow it to the files you mean with --path and say why with --note; --title names a tab of your own, so the checkout's stays the user's. " +
 				"The user can change what it compares; --hide takes the controls away for a focused view, and they can bring them back.",
 			Category:     "View",
 			NoKeybinding: true,
 			When:         func(c Context) bool { return hasWorktreeThreadContext(c) || cliThread(c) },
-			Args:         append(diffArgs(), thread, focus),
+			Args:         append(diffArgs(), thread, openFocusArg, openPaneArg),
 			Run:          d.runPanelDiff,
 		},
-		{
-			Name:      "view.panel.pr",
+		Command{
+			Name:      "view.open.pr",
 			Page:      PageState,
 			NoPalette: true,
-			Title:     "Show Pull Request in Side Panel",
-			Description: "Open a pull request in a thread's side panel (from a thread: its own; in the app: the selected one): " +
+			Title:     "Open Pull Request Tab",
+			Description: "Open a pull request in a tab " + openLead +
 				"the pull request's summary, checks, reviews, timeline and changed files, with Merge and Review.",
 			Category:     "View",
 			NoKeybinding: true,
@@ -135,28 +132,28 @@ func (d ViewDeps) itemCommands() []Command {
 			Args: []ArgSpec{
 				{Name: "number", Type: Int, Required: true, Positional: true,
 					Description: "Pull request number: one the thread links, else one in its project's GitHub repository"},
-				thread, focus,
+				thread, openFocusArg, openPaneArg,
 			},
-			Run: item(ViewPanelPR, d.prCheck),
+			Run: item(ViewPanelPR, tabPR, d.prCheck),
 		},
-	}
+	)
 }
 
 // maxEditNote is the longest --note, in characters: a band above a file, not a message.
 const maxEditNote = 500
 
-// runPanelFile is view.panel.file. An --edit is asked by the thread running it, which may
-// not be the thread whose panel opens: the message goes back to the one that asked.
+// runPanelFile is view.open.file. An --edit is asked by the thread running it, which may
+// not be the thread whose tab opens: the message goes back to the one that asked.
 func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Result, error) {
 	id := a.String("thread")
 	if id == "" {
-		return Result{}, InvalidArg("thread", "needs a thread whose panel to open it in (--thread, or run it inside a thread)")
+		return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
 	}
 	asker := id
 	if uctx.ActiveView == "" && uctx.CallerThreadID != "" {
 		asker = uctx.CallerThreadID
 	}
-	res, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := d.showItem(ctx, uctx, a, id, ViewPanelFile, tabFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		switch {
 		case a.Bool("edit"):
 			return d.editCheck(ctx, t, a, asker)

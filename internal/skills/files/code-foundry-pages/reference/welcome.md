@@ -11,7 +11,7 @@ if that file is missing, copy `welcome.html` beside this file to
 nothing else; show it, then stop:
 
 ```sh
-code-foundry view.panel.page "<the path>" --title "Welcome"
+code-foundry view.open.page "<the path>" --title "Welcome"
 ```
 
 It opens in the side panel beside this conversation, not as an inline card (never

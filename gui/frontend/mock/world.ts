@@ -3937,7 +3937,9 @@ export class World {
           checkouts: Object.entries(t.checkoutPaths).filter(([, path]) => path).map(([projectId, path]) => ({ projectId, path })),
           changed: (root) => this.gh.details.get(root)?.files?.map((f) => f.path ?? ""),
         };
-      }, (i) => this.emit(i)),
+      }, (i) => this.emit(i), (op, keepFocus) => {
+        this.layout.apply(op, "", { keep_focus: keepFocus });
+      }),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...shellCommands(this.logs),
       ...this.actions.commands(),

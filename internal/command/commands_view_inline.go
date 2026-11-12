@@ -19,7 +19,8 @@ import (
 // view.inline: an HTML page shown inline in a thread's conversation
 // (docs/notes/inline-html.md). The daemon appends an html item at the thread's current
 // position (ThreadService.ShowHtml); the GUI renders it as a sandboxed frame, the File
-// tab's. --panel also opens the file in the thread's side panel (view.panel.file).
+// tab's. --panel also opens the file as a tab beside the thread (view.open.file's tab; the
+// classic window: its side panel).
 
 // HTMLShower appends an html item to a thread (ThreadService.ShowHtml).
 type HTMLShower interface {
@@ -208,7 +209,7 @@ func (d ViewDeps) inlineCommand() Command {
 			{Name: "path", Type: Path, Required: true, Positional: true,
 				Description: "The .html or .htm file, under the home directory"},
 			{Name: "title", Type: String, Description: "Shown on its row"},
-			{Name: "panel", Type: Bool, Description: "Also open it in the thread's side panel"},
+			{Name: "panel", Type: Bool, Description: "Also open it as a tab beside the thread (view.open.page; the classic window: its side panel)"},
 			{Name: "again", Type: Bool, Description: "A second card though one is live (if the user asked)"},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
 				Description: "Thread to show it in (default: yours)"},
@@ -251,7 +252,7 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 			"the change there and no card was added; run view.inline only for a new file", name, out.Path)
 	}
 	if a.Bool("panel") {
-		pr, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, d.fileCheck)
+		pr, err := d.showItem(ctx, uctx, a, id, ViewPanelFile, tabFile, d.fileCheck)
 		if err != nil {
 			return Result{}, fmt.Errorf("shown inline, but not in the side panel: %w", err)
 		}

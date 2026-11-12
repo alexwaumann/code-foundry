@@ -129,7 +129,7 @@ func TestRepeatableArgsAreListed(t *testing.T) {
 	if err := WriteTopic(&thread, cmds, "thread"); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"`view.panel.diff [<path>…]`", "- `<path>…`: A changed file", "- `--hide string`: Take away a part of the tab"} {
+	for _, want := range []string{"`view.open.diff [<path>…]`", "- `<path>…`: A changed file", "- `--hide string`: Take away a part of the tab"} {
 		if !strings.Contains(view.String(), want) {
 			t.Errorf("the View topic has no %q", want)
 		}

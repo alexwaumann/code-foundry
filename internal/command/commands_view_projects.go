@@ -29,7 +29,7 @@ func (d ViewDeps) projectsCommand() Command {
 		Name:  "view.projects",
 		Page:  PageState,
 		Title: "Show Projects",
-		Description: "Show the Projects page in every app window: each project's worktrees and each workspace's members, with their git state and actions; " +
+		Description: "Show the Projects page in every app window (the shell window: its tab in the current space): each project's worktrees and each workspace's members, with their git state and actions; " +
 			"--project or --workspace opens that one's page.",
 		Category:    "View",
 		Keybindings: []string{"cmd+shift+j"},
@@ -38,6 +38,7 @@ func (d ViewDeps) projectsCommand() Command {
 			// No Context: the palette and the chord keep showing the page the window showed last.
 			{Name: ViewProjectsProjectParam, Type: String, ID: ProjectID, Description: "Open this project's page: " + ProjectRefHelp},
 			{Name: ViewProjectsWorkspaceParam, Type: String, Description: "Open this workspace's page: its id or name"},
+			openPaneArg,
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			project, ws := a.String(ViewProjectsProjectParam), strings.TrimSpace(a.String(ViewProjectsWorkspaceParam))
@@ -45,18 +46,18 @@ func (d ViewDeps) projectsCommand() Command {
 			case project != "" && ws != "":
 				return Result{}, InvalidArg(ViewProjectsWorkspaceParam, "give --project or --workspace, not both")
 			case project != "":
-				return d.showPageWith(uctx, a, ViewProjects, map[string]string{ViewProjectsProjectParam: project})
+				return d.showPageTab(ctx, uctx, a, ViewProjects, tabProjs, map[string]string{ViewProjectsProjectParam: project})
 			case ws != "":
 				if d.Workspaces == nil {
-					return d.showPageWith(uctx, a, ViewProjects, map[string]string{ViewProjectsWorkspaceParam: ws})
+					return d.showPageTab(ctx, uctx, a, ViewProjects, tabProjs, map[string]string{ViewProjectsWorkspaceParam: ws})
 				}
 				w, err := findWorkspace(ctx, d.Workspaces, ws)
 				if err != nil {
 					return Result{}, err
 				}
-				return d.showPageWith(uctx, a, ViewProjects, map[string]string{ViewProjectsWorkspaceParam: w.GetId()})
+				return d.showPageTab(ctx, uctx, a, ViewProjects, tabProjs, map[string]string{ViewProjectsWorkspaceParam: w.GetId()})
 			}
-			return d.showPage(uctx, a, ViewProjects)
+			return d.showPageTab(ctx, uctx, a, ViewProjects, tabProjs, nil)
 		},
 	}
 }

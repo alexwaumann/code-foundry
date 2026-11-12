@@ -23,6 +23,10 @@ import (
 //     model starts shells with terminal.new.
 //   - The shell's composer and its drafts (composer.new, composer.draft.*): a model starts
 //     threads with thread.new.
+//   - The classic names of the view.open.* verbs (view.panel.diff, .file, .gallery, .mcp,
+//     .page, .pr): aliases kept for one stable release; the index lists the new names.
+//   - The shell window's key between a thread and its diff (view.thread-diff): the user's
+//     view; a model opens a diff with view.open.diff.
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
 //     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe).
 var noIndex = []string{
@@ -33,7 +37,8 @@ var noIndex = []string{
 	"terminal.cycle", "terminal.quick",
 	"thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
 	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.workspace",
-	"view.thread-info", "worktree.editors",
+	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",
+	"view.thread-diff", "view.thread-info", "worktree.editors",
 }
 
 func TestNoIndexCommandsAreTheList(t *testing.T) {

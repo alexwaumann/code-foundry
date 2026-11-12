@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
@@ -19,8 +20,8 @@ type threadLifecycleOptions struct {
 	layout layoutstore.Store
 }
 
-// WithLayout gives thread.new the layout store, for --compose. Without it --compose is
-// refused.
+// WithLayout gives thread.new the layout store, for --compose (without it --compose is
+// refused), and thread.focus, which also focuses the thread's tab there.
 func WithLayout(l layoutstore.Store) ThreadLifecycleOption {
 	return func(o *threadLifecycleOptions) { o.layout = l }
 }
@@ -55,4 +56,19 @@ func (o threadLifecycleOptions) sentFrom(ctx context.Context, uctx Context, comp
 	focus := uctx.FromUser()
 	_, err := layout{store: o.layout}.apply(ctx, &core.OpenThread{Thread: id, Compose: compose, Focus: focus}, !focus)
 	return err
+}
+
+// focusThreadTab is thread.focus's half in the shell window's layout: thread.open --focus, which
+// switches to the thread's space and focuses its tab, opening it (and its remembered tabs) when
+// it is closed. It works with no window open: the layout shows it when one opens. It returns a
+// phrase for the message; without a layout it does nothing.
+func (o threadLifecycleOptions) focusThreadTab(ctx context.Context, id string) (string, error) {
+	if o.layout == nil {
+		return "", nil
+	}
+	c, err := layout{store: o.layout}.apply(ctx, &core.OpenThread{Thread: id, Focus: true}, false)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("thread %s has the focus as tab %s in pane %s of space %s; ", id, c.Result.Tab, c.Result.Pane, c.Result.Space), nil
 }

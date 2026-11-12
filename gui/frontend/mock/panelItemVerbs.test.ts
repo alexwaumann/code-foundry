@@ -72,3 +72,58 @@ describe("view.panel.diff's params, like the daemon's (commands_view_diff.go dif
     expect(() => diff(args)).toThrow(message);
   });
 });
+
+describe("view.open.* in the mock: a linked tab in the layout, and the classic ShowView", () => {
+  type Placed = { op: Record<string, unknown>; keepFocus: boolean };
+  function open(name: string, args: Record<string, string>, from: unknown = ctx): { placed: Placed[]; shown: string[] } {
+    const placed: Placed[] = [];
+    const shown: string[] = [];
+    const cmds = panelItemCommands(
+      (id) => (id === "t1" ? thread : undefined),
+      (i) => {
+        if (i.intent?.case === "showView") shown.push(i.intent.value.name ?? "");
+        return 1;
+      },
+      (op, keepFocus) => placed.push({ op, keepFocus }),
+    );
+    const cmd = cmds.find((c) => c.cmd.name === name);
+    if (!cmd) throw new Error(`no ${name}`);
+    void cmd.run(from as never, args);
+    return { placed, shown };
+  }
+
+  it.each<[string, Record<string, string>, string, string]>([
+    ["view.open.file", { path: "/w/a/x.go" }, "file", "panel.file"],
+    ["view.open.page", { path: "/w/a/p.html" }, "file", "panel.file"],
+    ["view.open.diff", {}, "diff", "panel.diff"],
+    ["view.open.gallery", { title: "Shots", images: "[]" }, "gallery", "panel.gallery"],
+  ])("%s opens a %s tab linked to the thread and still shows %s", (name, args, kind, view) => {
+    for (const verb of [name, name.replace("view.open.", "view.panel.")]) {
+      const { placed, shown } = open(verb, args);
+      expect(placed).toHaveLength(1);
+      expect(placed[0]?.op).toMatchObject({ op: "open_surface", tab: { kind, thread: "t1" } });
+      expect(shown).toEqual([view]);
+    }
+  });
+
+  it("the alias is unlisted, the new name is not", () => {
+    const cmds = panelItemCommands(() => thread, () => 1);
+    expect(cmds.find((c) => c.cmd.name === "view.panel.diff")?.cmd.noPalette).toBe(true);
+    expect(cmds.find((c) => c.cmd.name === "view.panel.diff")?.cmd.description).toMatch(/^The old name of view.open.diff/);
+  });
+
+  it("from the app it takes the focus; from a caller with no view only with --focus; --pane goes along", () => {
+    expect(open("view.open.file", { path: "/w/a/x.go" }, { activeThreadId: "t1", activeView: "thread" }).placed[0]).toMatchObject({ op: { focus: true }, keepFocus: false });
+    expect(open("view.open.file", { path: "/w/a/x.go" }).placed[0]).toMatchObject({ op: { focus: false }, keepFocus: true });
+    expect(open("view.open.file", { path: "/w/a/x.go", focus: "true" }).placed[0]).toMatchObject({ op: { focus: true }, keepFocus: false });
+    expect(open("view.open.file", { path: "/w/a/x.go", pane: "p-1" }).placed[0]?.op.pane).toBe("p-1");
+  });
+
+  it("a refused call opens nothing", () => {
+    expect(() => open("view.open.page", { path: "/w/a/p.txt" })).toThrow("is not an .html or .htm file");
+    const placed: unknown[] = [];
+    const cmds = panelItemCommands(() => thread, () => 1, (op) => placed.push(op));
+    expect(() => cmds.find((c) => c.cmd.name === "view.open.page")?.run(ctx, { path: "/w/a/p.txt" })).toThrow();
+    expect(placed).toEqual([]);
+  });
+});
