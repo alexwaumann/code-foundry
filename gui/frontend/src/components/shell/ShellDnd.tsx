@@ -1,0 +1,297 @@
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { DndContext, PointerSensor, useSensor, useSensors, type Announcements, type DragMoveEvent, type DragStartEvent } from "@dnd-kit/core";
+import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
+import { cn } from "@/lib/utils";
+import { zoomFactor } from "@/lib/zoom";
+import { afterRev, runLayoutCommand } from "@/shell/commands";
+import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, type DragNames } from "@/shell/drag/announce";
+import { sourceOf } from "@/shell/drag/draggable";
+import { dropCommand, dropPreview } from "@/shell/drag/drop";
+import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
+import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
+import type { GeoNode } from "@/shell/geometry/types";
+import { shellSurfaceOf } from "@/shell/surfaces/registry";
+import { geoTree, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
+import { useShellViewStore } from "@/stores/shellView";
+
+/** What a drag reads at its start (and again when the grid redraws under it). */
+interface Snapshot {
+  /** The grid's top left in the viewport, in layout px (where the preview's coordinates start). */
+  origin: { x: number; y: number };
+  scene: DragScene;
+  tree: GeoNode | null;
+  names: DragNames;
+}
+
+/** The strips as drawn: each pane's tabs with their extents in the grid's layout px, and their names. */
+function measureStrips(grid: HTMLElement): Record<string, StripTab[]> {
+  const g = grid.getBoundingClientRect();
+  const z = zoomFactor();
+  const out: Record<string, StripTab[]> = {};
+  for (const pane of Array.from(grid.querySelectorAll<HTMLElement>('[data-testid="shell-pane"]'))) {
+    const id = pane.dataset.paneId ?? "";
+    out[id] = Array.from(pane.querySelectorAll<HTMLElement>('[data-testid="shell-tab"]')).map((t) => {
+      const r = t.getBoundingClientRect();
+      return {
+        id: t.dataset.tabId ?? "",
+        x: (r.left - g.left) / z,
+        w: r.width / z,
+        title: t.querySelector('[data-testid="shell-tab-label"]')?.textContent ?? "",
+      };
+    });
+  }
+  return out;
+}
+
+function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
+  const frame = useShellViewStore.getState().frame;
+  if (!grid || !frame) return null;
+  const strips = measureStrips(grid);
+  const layout = useLayoutStore.getState();
+  const titles = new Map(Object.values(strips).flatMap((tabs) => tabs.map((t) => [t.id, t.title] as const)));
+  const names: DragNames = {
+    tab: (id) => titles.get(id) || "untitled",
+    pane: (id) => titles.get(layout.panes[id]?.active ?? "") || "untitled",
+    tabCount: (id) => strips[id]?.length ?? 0,
+  };
+  const g = grid.getBoundingClientRect();
+  const z = zoomFactor();
+  return {
+    origin: { x: g.left / z, y: g.top / z },
+    scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT },
+    tree: geoTree(layout, spaceId),
+    names,
+  };
+}
+
+/** The label on a preview: what the drop makes. */
+function previewLabel(source: DragSource, target: DropTarget): string {
+  switch (target.kind) {
+    case "outer":
+      return target.edge === "left" || target.edge === "right" ? "Full-height column" : "Full-width row";
+    case "edge":
+      return source.kind === "pane" ? "Move pane here" : "New pane";
+    case "pane":
+      return source.kind === "pane" ? "Merge tabs" : "Add to this pane";
+    case "strip":
+      return "";
+  }
+}
+
+/** What the drag layer draws over the grid: the drop's rectangle with its label, or a strip's insertion bar. */
+function DropPreview() {
+  const origin = useShellDragStore((s) => s.origin);
+  const preview = useShellDragStore((s) => s.preview);
+  const bar = useShellDragStore((s) => s.bar);
+  const target = useShellDragStore((s) => s.target);
+  const source = useShellDragStore((s) => s.source);
+  const outer = target?.kind === "outer";
+  return (
+    <>
+      {preview && target && source && (
+        <div
+          aria-hidden
+          data-testid="shell-drop-preview"
+          data-kind={target.kind}
+          className={cn(
+            "pointer-events-none fixed z-[55] flex items-center justify-center rounded-pane border-2 transition-[left,top,width,height] duration-75",
+            outer ? "border-dashed border-cf-accent bg-cf-accent/15" : "border-cf-focus bg-cf-focus/15",
+          )}
+          style={{ left: origin.x + preview.x, top: origin.y + preview.y, width: preview.w, height: preview.h }}
+        >
+          <span className={cn("rounded-md bg-cf-surface-overlay px-2 py-0.5 text-caption font-medium shadow-sm ring-1", outer ? "text-cf-accent ring-cf-accent" : "text-cf-focus ring-cf-focus")}>
+            {previewLabel(source, target)}
+          </span>
+        </div>
+      )}
+      {bar && (
+        <div
+          aria-hidden
+          data-testid="shell-drop-bar"
+          className="pointer-events-none fixed z-[55] w-0.5 rounded-full bg-cf-focus"
+          style={{ left: origin.x + bar.x, top: origin.y + bar.y, height: bar.h }}
+        />
+      )}
+    </>
+  );
+}
+
+/** The lifted tab (or pane, named by its active tab), under the pointer. Not a tab to assistive tech. */
+function DragGhost() {
+  const source = useShellDragStore((s) => s.source);
+  const client = useShellDragStore((s) => s.client);
+  const tab = useLayoutStore((s) => {
+    if (!source) return undefined;
+    return s.tabs[source.kind === "tab" ? source.tab : (s.panes[source.pane]?.active ?? "")];
+  });
+  const more = useLayoutStore((s) => (source?.kind === "pane" ? (s.panes[source.pane]?.tabIds.length ?? 1) - 1 : 0));
+  if (!source || !client || !tab) return null;
+  const surface = shellSurfaceOf(tab.kind);
+  const Icon = surface.icon;
+  const z = zoomFactor();
+  return (
+    <div
+      aria-hidden
+      data-testid="shell-drag-ghost"
+      data-kind={source.kind}
+      className="pointer-events-none fixed z-[60] flex h-7 max-w-64 items-center gap-1.5 rounded-md bg-cf-surface-overlay pr-3 pl-2 text-body-sm text-cf-text shadow-md ring-1 ring-cf-border"
+      style={{ left: client.x / z + 12, top: client.y / z + 10 }}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <GhostTitle tab={tab} />
+      {more > 0 && <span className="shrink-0 text-cf-text-muted">+{more}</span>}
+    </div>
+  );
+}
+
+function GhostTitle({ tab }: { tab: TabEntry }) {
+  const title = shellSurfaceOf(tab.kind).useTitle(tab);
+  return <span className="truncate">{title}</span>;
+}
+
+/**
+ * The pane grid's drag layer (docs/notes/shell-model.md, "Structure"): any tab drags (active or
+ * not) to a place in a strip, onto a pane, onto a pane's edge, or onto the grid's outer edge; a
+ * whole pane drags by its strip's free space to the same places. Hit-testing is
+ * shell/drag/targets.ts on the drawn frame; the drop is one `tab.move` or `pane.move`
+ * (shell/drag/drop.ts). While a drag is on, a transparent shield over the window takes the
+ * pointer, so a terminal or an iframe under it never swallows the moves. Escape cancels
+ * (dnd-kit's pointer sensor). It wraps the pane grid (Shell.tsx) and finds it inside itself.
+ * See docs/notes/shell-14-drag.md.
+ */
+export function ShellDnd({ children }: { children: ReactNode }) {
+  const spaceId = useCurrentSpaceId();
+  const wrap = useRef<HTMLDivElement>(null);
+  const gridEl = () => wrap.current?.querySelector<HTMLElement>('[data-testid="shell-grid"]') ?? null;
+  // A drag starts after 4px of travel, so a click, the × and a middle click stay what they are.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const snap = useRef<Snapshot | null>(null);
+  const origin = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  // The last drop, for the announcement dnd-kit makes after onDragEnd has cleared the state.
+  const ended = useRef<{
+    source: DragSource;
+    target: DropTarget | null;
+  } | null>(null);
+  const announced = useRef<DropTarget | null>(null);
+  const source = useShellDragStore((s) => s.source);
+
+  // The grid redrawn under a drag (a tab opened elsewhere, the window resized): measure again.
+  useEffect(() => {
+    if (!source) return;
+    return useShellViewStore.subscribe((s, prev) => {
+      if (s.frame !== prev.frame) snap.current = snapshot(gridEl(), spaceId);
+    });
+    // oxlint-disable-next-line react/exhaustive-deps
+  }, [source, spaceId]);
+  useEffect(
+    () => () => {
+      resetShellDrag();
+    },
+    [],
+  );
+
+  const retarget = (client: { x: number; y: number }) => {
+    const st = useShellDragStore.getState();
+    const s = snap.current;
+    if (!st.source || !s) return;
+    const z = zoomFactor();
+    const target = dropTarget(s.scene, st.source, { x: client.x / z - s.origin.x, y: client.y / z - s.origin.y });
+    if (sameTarget(target, st.target)) {
+      useShellDragStore.setState({ client });
+      return;
+    }
+    useShellDragStore.setState({
+      client,
+      target,
+      preview: target ? dropPreview(s.tree, s.scene.frame, st.source, target) : null,
+      bar: target?.kind === "strip" ? insertionBar(s.scene, target.pane, target.index) : null,
+    });
+  };
+
+  const onDragStart = ({ active, activatorEvent }: DragStartEvent) => {
+    const src = sourceOf(active.data.current);
+    snap.current = snapshot(gridEl(), spaceId);
+    if (!src || !snap.current) return;
+    const p = activatorEvent as PointerEvent;
+    origin.current = { x: p.clientX, y: p.clientY };
+    ended.current = null;
+    announced.current = null;
+    useShellDragStore.setState({ source: src, target: null, client: origin.current, origin: snap.current.origin, preview: null, bar: null });
+  };
+  const onDragMove = ({ delta }: DragMoveEvent) => {
+    retarget({ x: origin.current.x + delta.x, y: origin.current.y + delta.y });
+  };
+  const onDragEnd = () => {
+    const { source: src, target } = useShellDragStore.getState();
+    resetShellDrag();
+    if (!src) return;
+    ended.current = { source: src, target };
+    if (!target) return;
+    const layout = useLayoutStore.getState();
+    // The layout as it is now: a dragged tab or pane closed mid-drag moves nothing.
+    if (src.kind === "tab" ? !layout.tabs[src.tab] : !layout.panes[src.pane]) return;
+    const cmd = dropCommand(src, target, layout.panes[src.pane]?.tabIds ?? []);
+    if (!cmd) return;
+    void runLayoutCommand(cmd.name, cmd.args).then((res) => (res ? afterRev(res.rev) : undefined));
+  };
+  const onDragCancel = () => {
+    const { source: src } = useShellDragStore.getState();
+    resetShellDrag();
+    if (src) ended.current = { source: src, target: null };
+  };
+
+  const announcements = useMemo<Announcements>(() => {
+    const names = (): DragNames =>
+      snap.current?.names ?? {
+        tab: () => "untitled",
+        pane: () => "untitled",
+        tabCount: () => 0,
+      };
+    return {
+      onDragStart: () => {
+        const src = useShellDragStore.getState().source;
+        return src ? pickedUpText(src, names()) : undefined;
+      },
+      onDragMove: () => {
+        const { source: src, target } = useShellDragStore.getState();
+        if (!src || sameTarget(target, announced.current)) return undefined;
+        announced.current = target;
+        return overText(src, target, names());
+      },
+      onDragOver: () => undefined,
+      onDragEnd: () => (ended.current ? droppedText(ended.current.source, ended.current.target, names()) : undefined),
+      onDragCancel: () => (ended.current ? cancelledText(ended.current.source, names()) : undefined),
+    };
+  }, []);
+
+  return (
+    <DndContext
+      sensors={sensors}
+      autoScroll={false}
+      accessibility={{
+        announcements,
+        screenReaderInstructions: { draggable: DRAG_INSTRUCTIONS },
+      }}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      onDragCancel={onDragCancel}
+    >
+      <div ref={wrap} className="contents">
+        {children}
+      </div>
+      {/* In document.body: the shield takes the pointer from everything under it (a terminal, an
+          iframe) for the whole drag, and nothing drawn for the drag is clipped by a pane. */}
+      {source &&
+        createPortal(
+          <>
+            <div aria-hidden data-testid="shell-drag-shield" className="fixed inset-0 z-50 cursor-grabbing" />
+            <DropPreview />
+            <DragGhost />
+          </>,
+          document.body,
+        )}
+    </DndContext>
+  );
+}

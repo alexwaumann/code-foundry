@@ -4,6 +4,7 @@ import { startSelectionBridge } from "@/stores/selectionBridge";
 import { useLayoutStore } from "@/stores/layout";
 import { setShellMode, useShellViewStore } from "@/stores/shellView";
 import { PaneGrid } from "./PaneGrid";
+import { ShellDnd } from "./ShellDnd";
 
 /** How long the window waits for the daemon's layout before it falls back to the classic window. */
 export const LAYOUT_WAIT_MS = 5000;
@@ -13,7 +14,8 @@ export const LAYOUT_WAIT_MS = 5000;
  * current space's pane grid. It draws once the daemon's layout arrived; a daemon without one (an
  * older build) never sends it, and the window then stays classic and says so once (plan 2.12).
  * While it draws, the selection bridge runs: select() opens tabs and the selection follows the
- * focused tab. The sidebar is still the classic one. See docs/notes/shell-11-pane-grid.md.
+ * focused tab. Tabs and panes drag inside ShellDnd. The sidebar is still the classic one.
+ * See docs/notes/shell-11-pane-grid.md.
  */
 export function Shell() {
   const loaded = useLayoutStore((s) => s.loaded);
@@ -35,7 +37,11 @@ export function Shell() {
   useEffect(() => (mode === "shell" ? startSelectionBridge() : undefined), [mode]);
   return (
     <div className="m-shell flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
-      {mode === "shell" && <PaneGrid />}
+      {mode === "shell" && (
+        <ShellDnd>
+          <PaneGrid />
+        </ShellDnd>
+      )}
     </div>
   );
 }
