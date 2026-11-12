@@ -15,7 +15,7 @@ import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
 import { useEventsStore } from "@/stores/events";
 import { openFlagSurface, shownFlag } from "@/stores/flagSurface";
 import { useThreadsStore } from "@/stores/threads";
-import { useShellChrome, useShellViewStore } from "@/stores/shellView";
+import { useShellChrome } from "@/stores/shellView";
 import { useUiStore } from "@/stores/ui";
 import { RowMenu } from "./RowMenu";
 import { ResizeHandle } from "./ResizeHandle";
@@ -454,9 +454,11 @@ export function Sidebar() {
 function SidebarShown({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyHeight = useHeight(bodyRef, 0);
-  const shellChrome = useShellChrome();
-  // While the shell draws the window, its sections and rows (sidebar/shell; docs/notes/shell-16-sidebar.md).
-  const shell = useShellViewStore((s) => s.mode === "shell");
+  // The shell's sections and rows (sidebar/shell; docs/notes/shell-16-sidebar.md) whenever the
+  // window wears its chrome: while the shell draws, and while it waits for its first draw (the
+  // first-load import), so the classic list never shows under the shell's top bar.
+  const shell = useShellChrome();
+  const shellChrome = shell;
   useSidebarDashboard();
   return (
     <aside className="relative flex shrink-0 flex-col bg-cf-sidebar" style={{ width }} data-testid="sidebar">

@@ -27,6 +27,7 @@ const { useCommandsStore } = await import("@/stores/commands");
 const { useThreadsStore } = await import("@/stores/threads");
 const { HOME, useUiStore } = await import("@/stores/ui");
 const { useShellViewStore } = await import("@/stores/shellView");
+const { resetShellFlag, SHELL_FLAG_KEY } = await import("@/shell/flag");
 const { daemon, lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
 const { addThreads, seedWorld, thread } = await import("@/test/projectsWorld");
 const { EMBER_THREAD, putEmberThread, setEmberEnabled, EmberWorld } = await import("@/test/emberBoard");
@@ -45,6 +46,10 @@ function cmd(name: string, title: string): CommandView {
 }
 
 beforeEach(() => {
+  // The classic window's list (until PR 21 removes it): the shell flag off. The shell's
+  // sections are sidebar/shell's tests, and the switch between them the describe at the end.
+  localStorage.setItem(SHELL_FLAG_KEY, "0");
+  resetShellFlag();
   resetDaemon();
   seedWorld();
   // The mock's s-6 has a last activity a minute ago, which puts it first among the idle threads.
@@ -57,7 +62,11 @@ beforeEach(() => {
   useCommandsStore.setState({ commands: [cmd("thread.new", "New Thread"), cmd("thread.pin", "Pin Thread")] });
   daemon.commands = [...useCommandsStore.getState().commands];
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem(SHELL_FLAG_KEY);
+  resetShellFlag();
+});
 
 const list = () => screen.getByTestId("thread-list");
 const rowOf = (key: string) => list().querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`);
@@ -85,8 +94,7 @@ describe("Sidebar: the thread list", () => {
     expect(list().getAttribute("aria-label")).toBe("Threads");
     // No project, worktree or terminal rows: only threads and the footers' headers.
     expect(list().querySelectorAll('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveLength(0);
-    // The window shell is the default: its top bar names the app, the sidebar has no band.
-    expect(screen.queryByTestId("sidebar-band")).toBeNull();
+    expect(screen.getByTestId("sidebar-band").textContent).toContain("Code Foundry");
   });
 
   it("the keyboard: Home is the first row, ↓ moves, Enter selects; End is the last row; ↑ skips the Working header", () => {
@@ -471,6 +479,13 @@ describe("Sidebar: with the shell drawing the window", () => {
     render(<Sidebar />);
     expect(screen.getByTestId("nav-pullrequests")).toBeTruthy();
     expect(list().hasAttribute("data-shell-list")).toBe(false);
+    cleanup();
+    // The flag on (the default): the shell's sections while the first draw waits (the import), and once it draws.
+    localStorage.removeItem(SHELL_FLAG_KEY);
+    resetShellFlag();
+    render(<Sidebar />);
+    expect(list().hasAttribute("data-shell-list")).toBe(true);
+    expect(screen.queryByTestId("sidebar-band")).toBeNull();
     cleanup();
     useShellViewStore.setState({ mode: "shell" });
     render(<Sidebar />);

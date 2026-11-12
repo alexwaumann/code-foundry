@@ -65,24 +65,27 @@ function Shortcuts() {
   const sections = useMemo(() => helpSections(commands ?? [], [...viewActions, ...extraChords]), [commands]);
 
   return (
-    <section aria-label="Keyboard shortcuts" data-testid="help-shortcuts" data-help-scroll tabIndex={-1} className="h-full columns-2 gap-8 overflow-y-auto px-5 py-4 outline-none">
-      {error && <p className="mb-4 text-caption text-cf-error-text">Cannot list commands: {error}</p>}
-      {sections.map((s) => (
-        <div key={s.title} data-help-section={s.title} className="mb-4 break-inside-avoid">
-          <h4 className="mb-1 text-overline">{s.title}</h4>
-          <ul className="space-y-0.5">
-            {s.items.map((i) => (
-              // The tooltip names the command (and why a dimmed one is dimmed).
-              <Tip key={`${i.command ?? ""}:${i.label}`} label={i.command && (i.available ? i.command : `${i.command} (not available here)`)} align="start">
-                <li className="flex items-center justify-between gap-3 text-body" data-help-command={i.command}>
-                  <span className={i.available ? "truncate" : "truncate text-cf-text-muted"}>{i.label}</span>
-                  <Keys keys={i.keys} />
-                </li>
-              </Tip>
-            ))}
-          </ul>
-        </div>
-      ))}
+    <section aria-label="Keyboard shortcuts" data-testid="help-shortcuts" data-help-scroll tabIndex={-1} className="h-full overflow-y-auto px-5 py-4 outline-none">
+      {/* The columns on an inner block: on the scrolling section itself they would run on sideways past its height. */}
+      <div className="columns-2 gap-8">
+        {error && <p className="mb-4 text-caption text-cf-error-text">Cannot list commands: {error}</p>}
+        {sections.map((s) => (
+          <div key={s.title} data-help-section={s.title} className="mb-4 break-inside-avoid">
+            <h4 className="mb-1 text-overline">{s.title}</h4>
+            <ul className="space-y-0.5">
+              {s.items.map((i) => (
+                // The tooltip names the command (and why a dimmed one is dimmed).
+                <Tip key={`${i.command ?? ""}:${i.label}`} label={i.command && (i.available ? i.command : `${i.command} (not available here)`)} align="start">
+                  <li className="flex items-center justify-between gap-3 text-body" data-help-command={i.command}>
+                    <span className={i.available ? "truncate" : "truncate text-cf-text-muted"}>{i.label}</span>
+                    <Keys keys={i.keys} />
+                  </li>
+                </Tip>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
