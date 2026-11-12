@@ -204,4 +204,8 @@ type Store interface {
 	// in ESC[200~ … ESC[201~ is then inserted as is (tabs are not completion, newlines
 	// do not run lines one by one). Must not be called from an Observer.
 	BracketedPaste(ctx context.Context, id string) (bool, error)
+	// SetLabels replaces a terminal's labels (Terminal.Labels) and publishes the change. The
+	// process is not touched. The first-load import uses it to make a running shell a
+	// thread's quick terminal (docs/notes/shell-18-legacy-import.md).
+	SetLabels(ctx context.Context, id string, labels map[string]string) (Terminal, error)
 }

@@ -294,6 +294,23 @@ func (m *Manager) Kill(ctx context.Context, id string) error {
 	return kerr
 }
 
+// SetLabels implements Store: the labels change on the actor, which publishes them.
+func (m *Manager) SetLabels(ctx context.Context, id string, labels map[string]string) (Terminal, error) {
+	a, err := m.actor(id)
+	if err != nil {
+		return Terminal{}, err
+	}
+	var out Terminal
+	if err := a.call(ctx, func() {
+		a.cur.Labels = maps.Clone(labels)
+		a.publish()
+		out = *a.info.Load()
+	}); err != nil {
+		return Terminal{}, err
+	}
+	return out, nil
+}
+
 // Remove forgets an exited terminal.
 func (m *Manager) Remove(ctx context.Context, id string) error {
 	a, err := m.actor(id)

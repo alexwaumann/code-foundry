@@ -17,7 +17,20 @@ import (
 // Layout implements codefoundryv1connect.LayoutServiceHandler over a layout.Store. The ops
 // it runs are converted by the registry in layout_ops.go.
 type Layout struct {
-	store layout.Store
+	store    layout.Store
+	importer LegacyImporter
+}
+
+// LegacyImporter runs the first-load import with what the daemon knows of threads and
+// terminals, and marks the shells it makes quick terminals (internal/daemon).
+type LegacyImporter interface {
+	ImportLegacy(ctx context.Context, panelJSON, bottomJSON, clientID string) (layout.ImportCommit, error)
+}
+
+// WithImporter sets what runs ImportLegacy; without one it is Unimplemented.
+func (h *Layout) WithImporter(imp LegacyImporter) *Layout {
+	h.importer = imp
+	return h
 }
 
 var _ codefoundryv1connect.LayoutServiceHandler = (*Layout)(nil)
@@ -76,6 +89,33 @@ func (h *Layout) SetViewport(_ context.Context, req *connect.Request[v1.SetViewp
 	return connect.NewResponse(&v1.SetViewportResponse{}), nil
 }
 
+// ImportLegacy runs the first-load import, once.
+func (h *Layout) ImportLegacy(ctx context.Context, req *connect.Request[v1.ImportLegacyRequest]) (*connect.Response[v1.ImportLegacyResponse], error) {
+	if h.importer == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("this daemon has no first-load import"))
+	}
+	m := req.Msg
+	c, err := h.importer.ImportLegacy(ctx, m.GetPanelJson(), m.GetBottomJson(), m.GetClientId())
+	if err != nil {
+		return nil, layoutError(err)
+	}
+	ids := func(tabs []*core.Tab) []string {
+		var out []string
+		for _, tb := range tabs {
+			out = append(out, tb.ID)
+		}
+		return out
+	}
+	out := &v1.ImportLegacyResponse{
+		Layout: layoutToProto(h.store.Snapshot()), Imported: c.Imported,
+		RemovedTabIds: ids(c.Result.Removed), FoldedTabIds: ids(c.Result.Folded), Dropped: c.Result.Dropped,
+	}
+	for _, r := range c.Result.Threads {
+		out.Threads = append(out.Threads, &v1.LegacyImportedThread{ThreadId: r.Thread, TabIds: r.Tabs, QuickTerminalId: r.Quick})
+	}
+	return connect.NewResponse(out), nil
+}
+
 // layoutError maps internal/layout's errors (and the store's) to Connect codes.
 func layoutError(err error) error {
 	code := connect.CodeInternal
@@ -100,7 +140,7 @@ func layoutError(err error) error {
 
 func layoutToProto(snap *layout.Snapshot) *v1.Layout {
 	st := snap.State
-	out := &v1.Layout{Rev: snap.Rev, CurrentSpaceId: st.CurrentSpace, DefaultSpaceId: st.DefaultSpace}
+	out := &v1.Layout{Rev: snap.Rev, CurrentSpaceId: st.CurrentSpace, DefaultSpaceId: st.DefaultSpace, LegacyImported: snap.LegacyImported}
 	for _, sp := range st.Spaces {
 		out.Spaces = append(out.Spaces, layoutSpaceToProto(sp))
 	}
@@ -117,6 +157,7 @@ func layoutDeltaToProto(d layout.Delta) *v1.LayoutDelta {
 		CurrentSpaceId:   d.CurrentSpace,
 		DefaultSpaceId:   d.DefaultSpace,
 		RemovedThreadIds: d.RemovedThreads,
+		LegacyImported:   d.LegacyImported,
 	}
 	for _, sp := range d.Spaces {
 		out.Spaces = append(out.Spaces, layoutSpaceToProto(sp))

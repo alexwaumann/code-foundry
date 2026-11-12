@@ -20,12 +20,13 @@ type Fake struct {
 	// Err, when set, is returned by every Apply and SetViewport.
 	Err error
 
-	mu    sync.Mutex
-	ids   core.SeqIDs
-	snap  *layout.Snapshot
-	ops   []string
-	vp    layout.Viewport
-	vpSet bool
+	mu       sync.Mutex
+	ids      core.SeqIDs
+	snap     *layout.Snapshot
+	imported bool
+	ops      []string
+	vp       layout.Viewport
+	vpSet    bool
 }
 
 var _ layout.Store = (*Fake)(nil)
@@ -84,12 +85,33 @@ func (f *Fake) Apply(_ context.Context, op core.Op, opts layout.ApplyOptions) (l
 	return layout.Commit{Rev: f.commit(next, opts.ClientID, op.OpName(), res), Changed: true, Result: res}, nil
 }
 
+// ImportLegacy implements layout.Store.
+func (f *Fake) ImportLegacy(_ context.Context, in core.LegacyInput, opts layout.ApplyOptions) (layout.ImportCommit, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ops = append(f.ops, layout.ImportOp)
+	if f.Err != nil {
+		return layout.ImportCommit{}, f.Err
+	}
+	if f.imported {
+		return layout.ImportCommit{Rev: f.snap.Rev}, nil
+	}
+	next, res, err := core.ImportLegacy(f.snap.State, in, &f.ids)
+	if err != nil {
+		return layout.ImportCommit{}, err
+	}
+	f.imported = true
+	return layout.ImportCommit{Rev: f.commit(next, opts.ClientID, layout.ImportOp, core.Result{}), Imported: true, Result: res}, nil
+}
+
 // commit swaps in next and publishes it. Callers hold f.mu.
 func (f *Fake) commit(next *core.State, client, op string, res core.Result) uint64 {
 	prev := f.snap
 	rev := prev.Rev + 1
-	f.snap = &layout.Snapshot{Rev: rev, State: next}
-	bus.Publish(f.bus, layout.Event{Rev: rev, ClientID: client, Delta: layout.Diff(prev.State, next), Op: op, Result: res})
+	f.snap = &layout.Snapshot{Rev: rev, State: next, LegacyImported: f.imported}
+	d := layout.Diff(prev.State, next)
+	d.LegacyImported = f.imported
+	bus.Publish(f.bus, layout.Event{Rev: rev, ClientID: client, Delta: d, Op: op, Result: res})
 	return rev
 }
 

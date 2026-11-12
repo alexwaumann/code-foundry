@@ -19,12 +19,16 @@ const (
 	metaRev          = "rev"
 	metaCurrentSpace = "current_space"
 	metaDefaultSpace = "default_space"
+	// metaLegacyImport is "" until the first-load import ran, then "done:<unix ms>".
+	metaLegacyImport = "legacy_import"
 )
 
 // stored is what the tables hold, decoded as far as it decodes.
 type stored struct {
 	state *core.State
 	rev   uint64
+	// imported is metaLegacyImport's value.
+	imported string
 	// fresh: no row in any of the tables (a new database).
 	fresh bool
 	// repairs are the documents that did not decode, kept as empty ones.
@@ -104,6 +108,8 @@ func load(ctx context.Context, db *sql.DB) (stored, error) {
 			out.state.CurrentSpace = v
 		case metaDefaultSpace:
 			out.state.DefaultSpace = v
+		case metaLegacyImport:
+			out.imported = v
 		}
 	}
 	if err := mrows.Err(); err != nil {
@@ -113,9 +119,9 @@ func load(ctx context.Context, db *sql.DB) (stored, error) {
 	return out, nil
 }
 
-// save writes what changed from prev (what the tables hold) to next, and rev, in one
-// transaction. A nil prev rewrites every row.
-func save(ctx context.Context, db *sql.DB, prev, next *core.State, rev uint64, now time.Time) (err error) {
+// save writes what changed from prev (what the tables hold) to next, rev, and the import
+// mark when it is set, in one transaction. A nil prev rewrites every row.
+func save(ctx context.Context, db *sql.DB, prev, next *core.State, rev uint64, imported string, now time.Time) (err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("layout: save: %w", err)
@@ -177,11 +183,15 @@ func save(ctx context.Context, db *sql.DB, prev, next *core.State, rev uint64, n
 			}
 		}
 	}
-	for k, v := range map[string]string{
+	meta := map[string]string{
 		metaRev:          strconv.FormatUint(rev, 10),
 		metaCurrentSpace: next.CurrentSpace,
 		metaDefaultSpace: next.DefaultSpace,
-	} {
+	}
+	if imported != "" {
+		meta[metaLegacyImport] = imported
+	}
+	for k, v := range meta {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO layout_meta (key, value) VALUES (?, ?)
 			ON CONFLICT (key) DO UPDATE SET value = excluded.value`, k, v); err != nil {
 			return fmt.Errorf("layout: save %s: %w", k, err)

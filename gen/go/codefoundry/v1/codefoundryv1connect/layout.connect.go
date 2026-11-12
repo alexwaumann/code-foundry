@@ -40,6 +40,9 @@ const (
 	// LayoutServiceSetViewportProcedure is the fully-qualified name of the LayoutService's SetViewport
 	// RPC.
 	LayoutServiceSetViewportProcedure = "/codefoundry.v1.LayoutService/SetViewport"
+	// LayoutServiceImportLegacyProcedure is the fully-qualified name of the LayoutService's
+	// ImportLegacy RPC.
+	LayoutServiceImportLegacyProcedure = "/codefoundry.v1.LayoutService/ImportLegacy"
 )
 
 // LayoutServiceClient is a client for the codefoundry.v1.LayoutService service.
@@ -59,6 +62,14 @@ type LayoutServiceClient interface {
 	// (1180 x 820 before any) where a rule needs pixels: placing a linked surface,
 	// restoring one, a direction verb.
 	SetViewport(context.Context, *connect.Request[v1.SetViewportRequest]) (*connect.Response[v1.SetViewportResponse], error)
+	// ImportLegacy is the first-load import (docs/notes/shell-18-legacy-import.md): the
+	// classic window's side panel and bottom panel stores, which live in the window's
+	// localStorage, become each thread's remembered set and quick terminal. No thread is
+	// opened; a classic user's layout is left as one empty space. Running terminals keep
+	// running: a thread's first shell becomes its quick terminal (labelled slot=quick), its
+	// other terminals remembered terminal tabs. It runs once in the life of the database:
+	// later calls change nothing and answer imported false with the layout as it is.
+	ImportLegacy(context.Context, *connect.Request[v1.ImportLegacyRequest]) (*connect.Response[v1.ImportLegacyResponse], error)
 }
 
 // NewLayoutServiceClient constructs a client for the codefoundry.v1.LayoutService service. By
@@ -90,14 +101,21 @@ func NewLayoutServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(layoutServiceMethods.ByName("SetViewport")),
 			connect.WithClientOptions(opts...),
 		),
+		importLegacy: connect.NewClient[v1.ImportLegacyRequest, v1.ImportLegacyResponse](
+			httpClient,
+			baseURL+LayoutServiceImportLegacyProcedure,
+			connect.WithSchema(layoutServiceMethods.ByName("ImportLegacy")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // layoutServiceClient implements LayoutServiceClient.
 type layoutServiceClient struct {
-	get         *connect.Client[v1.GetLayoutRequest, v1.GetLayoutResponse]
-	apply       *connect.Client[v1.ApplyLayoutRequest, v1.ApplyLayoutResponse]
-	setViewport *connect.Client[v1.SetViewportRequest, v1.SetViewportResponse]
+	get          *connect.Client[v1.GetLayoutRequest, v1.GetLayoutResponse]
+	apply        *connect.Client[v1.ApplyLayoutRequest, v1.ApplyLayoutResponse]
+	setViewport  *connect.Client[v1.SetViewportRequest, v1.SetViewportResponse]
+	importLegacy *connect.Client[v1.ImportLegacyRequest, v1.ImportLegacyResponse]
 }
 
 // Get calls codefoundry.v1.LayoutService.Get.
@@ -113,6 +131,11 @@ func (c *layoutServiceClient) Apply(ctx context.Context, req *connect.Request[v1
 // SetViewport calls codefoundry.v1.LayoutService.SetViewport.
 func (c *layoutServiceClient) SetViewport(ctx context.Context, req *connect.Request[v1.SetViewportRequest]) (*connect.Response[v1.SetViewportResponse], error) {
 	return c.setViewport.CallUnary(ctx, req)
+}
+
+// ImportLegacy calls codefoundry.v1.LayoutService.ImportLegacy.
+func (c *layoutServiceClient) ImportLegacy(ctx context.Context, req *connect.Request[v1.ImportLegacyRequest]) (*connect.Response[v1.ImportLegacyResponse], error) {
+	return c.importLegacy.CallUnary(ctx, req)
 }
 
 // LayoutServiceHandler is an implementation of the codefoundry.v1.LayoutService service.
@@ -132,6 +155,14 @@ type LayoutServiceHandler interface {
 	// (1180 x 820 before any) where a rule needs pixels: placing a linked surface,
 	// restoring one, a direction verb.
 	SetViewport(context.Context, *connect.Request[v1.SetViewportRequest]) (*connect.Response[v1.SetViewportResponse], error)
+	// ImportLegacy is the first-load import (docs/notes/shell-18-legacy-import.md): the
+	// classic window's side panel and bottom panel stores, which live in the window's
+	// localStorage, become each thread's remembered set and quick terminal. No thread is
+	// opened; a classic user's layout is left as one empty space. Running terminals keep
+	// running: a thread's first shell becomes its quick terminal (labelled slot=quick), its
+	// other terminals remembered terminal tabs. It runs once in the life of the database:
+	// later calls change nothing and answer imported false with the layout as it is.
+	ImportLegacy(context.Context, *connect.Request[v1.ImportLegacyRequest]) (*connect.Response[v1.ImportLegacyResponse], error)
 }
 
 // NewLayoutServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -159,6 +190,12 @@ func NewLayoutServiceHandler(svc LayoutServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(layoutServiceMethods.ByName("SetViewport")),
 		connect.WithHandlerOptions(opts...),
 	)
+	layoutServiceImportLegacyHandler := connect.NewUnaryHandler(
+		LayoutServiceImportLegacyProcedure,
+		svc.ImportLegacy,
+		connect.WithSchema(layoutServiceMethods.ByName("ImportLegacy")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.LayoutService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LayoutServiceGetProcedure:
@@ -167,6 +204,8 @@ func NewLayoutServiceHandler(svc LayoutServiceHandler, opts ...connect.HandlerOp
 			layoutServiceApplyHandler.ServeHTTP(w, r)
 		case LayoutServiceSetViewportProcedure:
 			layoutServiceSetViewportHandler.ServeHTTP(w, r)
+		case LayoutServiceImportLegacyProcedure:
+			layoutServiceImportLegacyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -186,4 +225,8 @@ func (UnimplementedLayoutServiceHandler) Apply(context.Context, *connect.Request
 
 func (UnimplementedLayoutServiceHandler) SetViewport(context.Context, *connect.Request[v1.SetViewportRequest]) (*connect.Response[v1.SetViewportResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.LayoutService.SetViewport is not implemented"))
+}
+
+func (UnimplementedLayoutServiceHandler) ImportLegacy(context.Context, *connect.Request[v1.ImportLegacyRequest]) (*connect.Response[v1.ImportLegacyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.LayoutService.ImportLegacy is not implemented"))
 }
