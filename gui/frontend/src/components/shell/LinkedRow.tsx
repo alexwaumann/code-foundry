@@ -35,7 +35,7 @@ export function LinkedRow({ tab }: { tab: TabEntry }) {
         className="flex h-6 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-left outline-none hover:bg-cf-control-hover/50 focus-visible:ring-1 focus-visible:ring-cf-focus"
         data-testid="shell-linked-row-link"
         onClick={() => {
-          void runLinked(rowAction(row, tab.paneId, { thread: name, space: spaceName }));
+          void runLinked(rowAction(row, tab.paneId));
         }}
       >
         <span className="shrink-0 text-cf-text-muted">{surface.linkedNoun ?? tab.kind} of </span>

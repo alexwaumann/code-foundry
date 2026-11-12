@@ -1063,6 +1063,57 @@ const ops = {
     return ops.close_tab(t, { op: "close_tab", tab: own.id });
   },
 
+  /**
+   * Simplified (plan 2.14): the thread's tab and its linked tabs in its space go to the target
+   * space; the thread's tab after the target's focused pane's active tab (a new pane when the space
+   * has none), each linked tab by the mock's placement beside it. Linked tabs dragged to another
+   * space stay there. The current space does not change.
+   */
+  move_thread(t: Tx, o: Op): Result {
+    const thread = str(o, "thread");
+    if (!thread) fail("invalid_argument", "no thread given");
+    const to = t.spaceByID(str(o, "space"));
+    const from = t.space(t.spaceOf(thread));
+    if (from === to) fail("invalid_argument", `thread ${thread} already lives in space ${to.id}`);
+    const linked: Tab[] = [];
+    let own: Tab | null = null;
+    let wasFocused = false;
+    for (const p of panes(from.root))
+      for (const tb of p.tabs ?? []) {
+        if (tb.kind === "thread" && tb.thread === thread) own = tb;
+        else if (isLinked(tb) && tb.thread === thread) linked.push(tb);
+      }
+    for (const tb of [...linked, ...(own ? [own] : [])]) {
+      const at = t.findTab(tb.id);
+      wasFocused ||= focusedTab(from) === tb.id;
+      detach(from, at.pane, tb.id);
+      forget(from, tb.id);
+    }
+    if (wasFocused) refocus(from);
+    ((t.st.threads ??= {})[thread] ??= { space: to.id }).space = to.id;
+    const res: Result = { space: to.id };
+    if (own) {
+      let pane = panes(to.root).find((p) => p.id === to.focus);
+      if (!pane) {
+        pane = { t: "pane", id: t.newID("p-"), tabs: [own] };
+        to.root = pane;
+      } else (pane.tabs ??= []).splice(tabIndex(pane, pane.active) + 1, 0, own);
+      focusTab(to, pane, own.id);
+      res.pane = pane.id;
+      res.tab = own.id;
+    }
+    const closed: Tab[] = [];
+    for (const tb of linked) {
+      if (t.sameTab(to, identify(tb).kind, tb.key ?? "", tb.id)) {
+        closed.push(tb);
+        continue;
+      }
+      place(t, to, null, tb, false);
+    }
+    if (closed.length) res.closed = closed;
+    return res;
+  },
+
   open_surface(t: Tx, o: Op): Result {
     const tb = tabArg(o);
     if (tb.kind === "thread") fail("invalid_argument", "a thread's own tab opens with open_thread");
@@ -1220,7 +1271,7 @@ function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean): 
 const opTable: Readonly<Record<string, OpFn | undefined>> = ops;
 
 /** The ops the mock runs that are a port of Go's and pinned to its cases. */
-export const PORTED_OPS = Object.keys(ops).filter((n) => !["open_thread", "close_thread"].includes(n));
+export const PORTED_OPS = Object.keys(ops).filter((n) => !["open_thread", "close_thread", "move_thread"].includes(n));
 
 /** The ops the mock runs, Go's or simplified. */
 export function mockRuns(op: string): boolean {

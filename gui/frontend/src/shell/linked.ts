@@ -177,12 +177,12 @@ export function linkedRowOf(s: Pick<LayoutState, "panes" | "tabs" | "threads" | 
 /**
  * The row's link: to the thread's tab when it is open in this space; else, when the thread
  * lives here, its tab opens by the thread-tab rule (the focused pane, which the press on the
- * row just made this one); a thread living in another space is only named (until the window
- * switches spaces, PR 15).
+ * row just made this one); a thread living in another space is shown there: its tab opens or is
+ * focused in its own space, and the window switches to it (thread.open --focus).
  */
-export function rowAction(row: LinkedRowState, pane: string, names: { thread: string; space: string }): LinkedAction {
+export function rowAction(row: LinkedRowState, pane: string): LinkedAction {
   if (row.threadTab) return { focus: row.threadTab };
-  if (row.elsewhere) return { say: `“${names.thread}” is in the space “${names.space}”` };
+  if (row.elsewhere) return { run: "thread.open", args: { id: row.thread, focus: "true" } };
   return { run: "thread.open", args: { id: row.thread, pane, focus: "true" } };
 }
 

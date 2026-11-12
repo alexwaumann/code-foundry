@@ -251,12 +251,11 @@ function onStripKeyDown(e: KeyboardEvent<HTMLElement>): void {
 /**
  * A pane's tab strip: the tab is the title (docs/notes/shell-model.md), so nothing repeats it
  * under the strip by default. Any tab drags, and the strip's free space drags the whole pane
- * (components/shell/ShellDnd.tsx), so it no longer drags the window. `inset` keeps the strip clear
- * of the traffic lights (the pane at the window's top left with the sidebar hidden). The "+" after
+ * (components/shell/ShellDnd.tsx), so it no longer drags the window (the top bar does). The "+" after
  * the last tab opens the pane's menu of surfaces (PanePlusMenu) and is not part of the pane's grip.
  * Full screen (PR 19) comes later.
  */
-export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; focused: boolean; inset?: number }) {
+export function PaneTabStrip({ paneId, focused }: { paneId: string; focused: boolean }) {
   const pane = usePane(paneId);
   const tabIds = pane?.tabIds ?? [];
   const active = pane?.active ?? "";
@@ -275,7 +274,7 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
       const ids = key ? key.split(",") : [];
       const widths = Array.from(row.children).map((c) => Math.ceil(c.getBoundingClientRect().width / z));
       // The "+" after the last tab keeps its room.
-      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - inset - TAB_GAP * widths.length - PLUS_WIDTH;
+      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH;
       if (!(avail > 0)) return;
       const next = fitTabs({ widths, active: ids.indexOf(active), avail, iconWidth: TAB_ICON_WIDTH });
       setFits((prev) => (prev && sameFits(prev, next) ? prev : next));
@@ -288,7 +287,7 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
     return () => {
       ro.disconnect();
     };
-  }, [key, active, inset, paneId]);
+  }, [key, active, paneId]);
   useEffect(
     () => () => {
       dropTabCut(paneId);
@@ -308,7 +307,7 @@ export function PaneTabStrip({ paneId, focused, inset = 0 }: { paneId: string; f
       aria-orientation="horizontal"
       data-testid="shell-tab-strip"
       className="relative flex shrink-0 items-center gap-0.5 overflow-hidden border-b border-cf-divider px-1.5 [--wails-draggable:no-drag]"
-      style={{ height: PANE_HEADER_HEIGHT, paddingLeft: STRIP_PAD + inset }}
+      style={{ height: PANE_HEADER_HEIGHT, paddingLeft: STRIP_PAD }}
       onKeyDown={onStripKeyDown}
     >
       {tabIds.map((id, i) => (

@@ -1,13 +1,15 @@
 import { useMemo } from "react";
-import { GitPullRequest, LayoutGrid, Plus, SquareTerminal } from "lucide-react";
+import { GitPullRequest, Plus, SquareTerminal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { moveToSpaceAction, newTerminalAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces, type LinkedAction, type ThreadSurfaceItem } from "@/shell/linked";
+import { moveToNewSpace } from "@/shell/spaceActions";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, useTab } from "@/stores/layout";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
+import { SpaceIcon } from "./SpaceIcon";
 
 const SEP = "\u0001";
 
@@ -112,8 +114,9 @@ export function ThreadSurfaceItems({ threadId, spaceId, pane = "", onPick }: { t
 }
 
 /**
- * Move to space ▸: the spaces in the top bar's order, the thread's own marked "here" and
- * disabled. Until the top bar (PR 15) there is one space, and the submenu shows it anyway.
+ * Move to space ▸: the spaces in the top bar's order, each with its layout glyph, the thread's own
+ * marked "here" and disabled; then New space, which makes one (without showing it) and moves the
+ * thread there. thread.space.move takes the thread's linked tabs in its space along.
  */
 export function MoveToSpaceItems({ threadId, onPick }: { threadId: string; onPick: (a: LinkedAction) => void }) {
   const spaces = useLayoutStore(useShallow((s) => spaceChoices(s, threadId).map((c) => [c.id, c.name, c.here ? "1" : ""].join(SEP))));
@@ -131,12 +134,22 @@ export function MoveToSpaceItems({ threadId, onPick }: { threadId: string; onPic
               onPick(moveToSpaceAction(threadId, id));
             }}
           >
-            <LayoutGrid />
+            <SpaceIcon spaceId={id} />
             <span className="truncate">{name}</span>
             {here && <span className="ml-auto pl-4 text-caption text-cf-text-muted">here</span>}
           </DropdownMenuItem>
         );
       })}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        data-testid="move-to-new-space"
+        onSelect={() => {
+          void moveToNewSpace(threadId);
+        }}
+      >
+        <Plus />
+        New space
+      </DropdownMenuItem>
     </>
   );
 }

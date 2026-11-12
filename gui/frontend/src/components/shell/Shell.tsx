@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { startSelectionBridge } from "@/stores/selectionBridge";
+import { startFocusHistory } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
 import { setShellMode, useShellViewStore } from "@/stores/shellView";
 import { PaneGrid } from "./PaneGrid";
@@ -35,8 +36,10 @@ export function Shell() {
     };
   }, [loaded]);
   useEffect(() => (mode === "shell" ? startSelectionBridge() : undefined), [mode]);
+  useEffect(() => (mode === "shell" ? startFocusHistory() : undefined), [mode]);
   return (
-    <div className="m-shell flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
+    // The top bar (TopBar) is the gap above the panes: they start right under it.
+    <div className="m-shell mt-0 flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
       {mode === "shell" && (
         <ShellDnd>
           <PaneGrid />

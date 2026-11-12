@@ -18,6 +18,8 @@ export interface ShellDragState {
   preview: Rect | null;
   /** A strip target's insertion bar, in the grid's layout px. */
   bar: { x: number; y: number; h: number } | null;
+  /** The space whose tab in the top bar is under the pointer, when a drop there moves the source; "" otherwise (`target` is then null). */
+  space: string;
 }
 
 const IDLE: ShellDragState = {
@@ -27,6 +29,7 @@ const IDLE: ShellDragState = {
   origin: { x: 0, y: 0 },
   preview: null,
   bar: null,
+  space: "",
 };
 
 export const useShellDragStore = create<ShellDragState>()(() => IDLE);
@@ -43,4 +46,9 @@ export function useTabDragged(tabId: string): boolean {
 /** Whether this pane is being dragged whole. */
 export function usePaneDragged(paneId: string): boolean {
   return useShellDragStore((s) => s.source?.kind === "pane" && s.source.pane === paneId);
+}
+
+/** Whether a drag is over this space's tab in the top bar, ready to move there. */
+export function useSpaceDropTarget(spaceId: string): boolean {
+  return useShellDragStore((s) => s.space !== "" && s.space === spaceId);
 }

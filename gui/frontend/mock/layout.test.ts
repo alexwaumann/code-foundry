@@ -146,7 +146,7 @@ describe("the mock's LayoutService", () => {
     const { layout } = service();
     layout.seed("one-thread");
     expect(() => layout.apply({ op: "close_tab", tab: "t-gone" })).toThrow(expect.objectContaining({ code: "not_found" }) as Error);
-    expect(() => layout.apply({ op: "move_thread", thread: "s-1", space: "sp-main" })).toThrow(expect.objectContaining({ code: "unimplemented" }) as Error);
+    expect(() => layout.apply({ op: "archive_thread", thread: "s-1" })).toThrow(expect.objectContaining({ code: "unimplemented" }) as Error);
     expect(layout.rev).toBe(1);
   });
 

@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { EmberRow } from "@/components/ember/EmberRow";
 import { HistoryButtons } from "@/components/sidebar/HistoryButtons";
+import { useShellChrome } from "@/stores/shellView";
 import { useBranchlessRows } from "@/components/thread/useThreadPlace";
 import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { buildSections, FOOTERS, isThreadRow, rowCache, threadKey, type FooterSection, type HeaderRow, type Row, type ThreadRow } from "@/lib/tree";
@@ -452,10 +453,12 @@ export function Sidebar() {
 function SidebarShown({ width }: { width: number }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyHeight = useHeight(bodyRef, 0);
+  const shellChrome = useShellChrome();
   useSidebarDashboard();
   return (
     <aside className="relative flex shrink-0 flex-col bg-cf-sidebar" style={{ width }} data-testid="sidebar">
-      <SidebarBand />
+      {/* The window shell's top bar holds the app name and back and forward (components/shell/TopBar.tsx). */}
+      {!shellChrome && <SidebarBand />}
       {/* The content pane floats a shell gap (12px) off the sidebar (App.tsx ContentColumn's
           m-shell). Rows run to the sidebar's edges, so the same gap on the left (pl-shell)
           keeps them as far from the window edge as from the pane. */}
