@@ -1,58 +1,36 @@
 /**
  * Live e2e: the Add Project dialog's GitHub tab against a REAL daemon and GitHub
- * (docs/notes/add-project-3-dialog.md). Opt-in (LIVE_DAEMON=1), run with
- * playwright.live.config.ts, which starts nothing: bring up an isolated daemon whose
- * CODE_FOUNDRY_HOME is under $HOME (clones must land under home) and the Vite dev server
- * pointed at it (recipe in docs/notes/phase2-integration.md), and name a small
- * repository you can clone (LIVE_CLONE_REPO=owner/name) that is not cloned there yet.
+ * (docs/notes/add-project-3-dialog.md). Opt-in; how to run it: docs/notes/live-e2e.md.
+ * The scratch home must be under ~ (clones land in <home>/projects), `gh` must be logged in,
+ * and LIVE_CLONE_REPO names a small public repository to clone read-only (owner/name, e.g.
+ * octocat/Hello-World) that is not cloned there yet. No Claude turns.
  *
  * It searches for the repository, looks it up by URL, clones it with the dialog (gh's
  * progress streams in), checks the new project opens, then unregisters it and deletes
  * the clone.
  */
-import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { expectProjectRevealed } from "./fixtures";
+import { expectProjectRevealed, openAddProjectDialog } from "./fixtures";
+import { cli, HOME, openApp, projectAt, requireLive, shot } from "./live";
 
-const LIVE = process.env.LIVE_DAEMON === "1";
-const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
 const REPO = process.env.LIVE_CLONE_REPO ?? "";
-const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
-const SHOTS = process.env.LIVE_SHOTS ?? "";
 
-function cli(...args: string[]): string {
-  return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 60_000 });
-}
-
-/** The registered project at dir, over the daemon's loopback listener. */
-async function projectAt(dir: string): Promise<string> {
-  const read = (f: string) => readFileSync(path.join(HOME, f), "utf8").trim();
-  const res = await fetch(`http://127.0.0.1:${read("daemon.port")}/codefoundry.v1.ProjectService/List`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${read("daemon.token")}` },
-    body: "{}",
-  });
-  const { projects: projects = [] } = (await res.json()) as { projects?: { id: string; path: string }[] };
-  return projects.find((r) => r.path.toLowerCase() === dir.toLowerCase())?.id ?? "";
-}
-
-test.skip(!LIVE || !HOME || !REPO, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_CLONE_REPO are required");
+requireLive("LIVE_CLONE_REPO");
 
 test("search, look up and clone a GitHub repository with the dialog", async ({ page }) => {
   const [owner = "", name = ""] = REPO.split("/");
   const dest = path.join(HOME, "projects", owner, name);
-  await page.goto("/");
-  await page.getByTestId("sidebar-new-thread").click();
-  await page.getByTestId("picker-add-project").click();
+  await openApp(page);
+  await openAddProjectDialog(page);
   await page.getByTestId("add-project-tab-github").click();
   const input = page.getByTestId("add-project-github-input");
 
   await input.fill(`${name} user:${owner}`);
   await input.press("Enter");
   await expect(page.getByTestId("add-project-github-result").and(page.locator(`[data-slug="${REPO}" i]`))).toBeVisible();
-  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "addproject-search.png") });
+  await shot(page, "addproject-search");
 
   await input.fill(`https://github.com/${REPO}.git`);
   await input.press("Enter");
@@ -63,14 +41,14 @@ test("search, look up and clone a GitHub repository with the dialog", async ({ p
   try {
     await card.getByTestId("add-project-clone").click();
     await expect(card.getByTestId("add-project-clone-line").first()).toContainText("Cloning into");
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "addproject-cloning.png") });
+    await shot(page, "addproject-cloning");
     await expect(page.getByTestId("add-project-dialog")).toHaveCount(0, { timeout: 120_000 });
     await expectProjectRevealed(page, name);
-    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "addproject-cloned.png") });
-    expect(await projectAt(dest)).not.toBe("");
+    await shot(page, "addproject-cloned");
+    expect(projectAt(dest)).not.toBe("");
   } finally {
-    const id = await projectAt(dest);
-    if (id) cli("project", "unregister", "--context-project", id, "--yes");
+    const id = projectAt(dest);
+    if (id) cli("project", "unregister", "--project", id, "--yes");
     rmSync(dest, { recursive: true, force: true });
   }
 });

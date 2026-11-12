@@ -1,29 +1,36 @@
 /**
- * Live e2e: a code block's "Run in terminal" against a REAL daemon
- * (docs/notes/code-block-actions.md). Opt-in (LIVE_DAEMON=1), run with
- * playwright.live.config.ts, which starts nothing: bring up an isolated daemon
- * (CODE_FOUNDRY_HOME) and the Vite dev server pointed at it, and name a thread
- * (LIVE_THREAD) whose last reply has a bash block running `echo run-$((6*7))` and `pwd`,
- * and that owns no shells yet.
+ * Live e2e: a code block's "Run in terminal" against a REAL daemon and real Claude Code
+ * (docs/notes/code-block-actions.md). Opt-in; how to run it: docs/notes/live-e2e.md. The
+ * thread is LIVE_THREAD (its last reply has a bash block running `echo run-$((6*7))` and
+ * `pwd`, and it owns no shells yet), else one it starts in the scratch project, asks for
+ * that block (one short turn) and archives at the end.
  *
  * It hovers the block (Copy and Run show), clicks Run: one new shell in the thread's
  * bottom panel, with the keyboard, that ran both lines once (each echoed once, after the
  * prompt) and is still running afterwards. With LIVE_SHOTS it saves the block on hover
  * and the terminal after the run, dark and light.
  */
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { archiveThreads, cli, cliJson, liveProject, MODEL, openApp, requireLive, shot, threadInfo, waitThread, type LiveThread } from "./live";
 
-const LIVE = process.env.LIVE_DAEMON === "1";
-const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const THREAD = process.env.LIVE_THREAD ?? "";
-const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
-const SHOTS = process.env.LIVE_SHOTS ?? "";
+requireLive();
 
-function cli(...args: string[]): string {
-  return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 60_000 });
-}
+const BLOCK = "```bash\necho run-$((6*7))\npwd\n```";
+
+/** LIVE_THREAD, else a thread of the scratch project asked for the block (one short turn). */
+let THREAD = process.env.LIVE_THREAD ?? "";
+let started = "";
+test.beforeAll(() => {
+  test.setTimeout(180_000);
+  if (THREAD) return;
+  const prompt = `Reply with exactly this fenced code block and nothing else. Do not run it, use no tools.\n\n${BLOCK}`;
+  started = (cliJson("thread", "new", "--worktree", liveProject().path, "--model", MODEL, "--effort", "medium", "--name", "live-codeblock", "--focus=false", "--prompt", prompt) as LiveThread).id;
+  THREAD = started;
+  waitThread(started);
+});
+test.afterAll(() => {
+  if (started) archiveThreads(started);
+});
 
 /** The thread's running shells, from the daemon. */
 function shellsOf(thread: string): string[] {
@@ -38,20 +45,18 @@ function screenText(page: Page): Promise<string> {
 const count = (s: string, sub: string) => s.split(sub).length - 1;
 
 async function shots(page: Page, name: string): Promise<void> {
-  if (!SHOTS) return;
+  if (!process.env.LIVE_SHOTS) return;
   for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.waitForTimeout(400);
-    await page.screenshot({ path: path.join(SHOTS, `${name}-${scheme}.png`) });
+    await shot(page, `${name}-${scheme}`);
   }
   await page.emulateMedia({ colorScheme: "dark" });
 }
 
-test.skip(!LIVE || !HOME || !THREAD, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_THREAD are required");
-
 test("Run in terminal runs the block once in a new shell of the thread, which stays open", async ({ page }) => {
   expect(shellsOf(THREAD)).toEqual([]);
-  await page.goto("/");
+  await openApp(page);
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   const block = page.locator('[data-testid="thread-text"]').last().locator(".cf-code").filter({ has: page.locator('pre[data-lang="bash"]') });
@@ -71,7 +76,8 @@ test("Run in terminal runs the block once in a new shell of the thread, which st
   const id = await host.getAttribute("data-terminal-id");
   expect(shellsOf(THREAD)).toEqual([id]);
   await expect.poll(() => screenText(page), { timeout: 15_000 }).toContain("run-42");
-  await expect.poll(() => screenText(page)).toContain("/cf-cba-scratch");
+  // pwd: the shell runs in the thread's checkout.
+  await expect.poll(() => screenText(page)).toContain(threadInfo(THREAD)?.worktreePath ?? "-");
   // Typed after the prompt: each line echoed once, not once more above the prompt.
   const text = await screenText(page);
   expect(count(text, "echo run-$((6*7))")).toBe(1);

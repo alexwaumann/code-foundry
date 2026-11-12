@@ -74,6 +74,14 @@ that help most when driving by hand:
 A control the session needs and the mock lacks is added in `mock/server.ts` (its `control`
 function and the header list), with the World method it calls.
 
+## Live e2e suite
+
+The opt-in specs `gui/frontend/e2e/live*.spec.ts` run on the same dev drive: `DRIVE_HOME=~/cf-live-scratch/home
+make drive DAEMON=dev`, register scratch projects, then `. .playwright/drive.env && LIVE_DAEMON=1 bun run
+e2e:live e2e/live.spec.ts`, one spec at a time. They start real Claude threads (Haiku 5.5, a few short
+turns per spec) and some read GitHub through `gh`; they are not part of `make check`. Fixtures, what
+each spec needs and costs: `docs/notes/live-e2e.md`.
+
 ## Stop
 
 Stop the background `make drive` task (or send it SIGTERM) when done. It kills the daemon and

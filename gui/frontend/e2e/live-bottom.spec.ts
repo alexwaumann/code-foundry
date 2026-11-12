@@ -1,10 +1,9 @@
 /**
  * Live e2e: cmd+j starts a shell in a thread's empty bottom panel, and the last shell's
  * exit hides the panel (docs/notes/bottom-panel-autoshell.md), against a REAL daemon.
- * Opt-in (LIVE_DAEMON=1), run with playwright.live.config.ts, which starts nothing: bring
- * up an isolated daemon (CODE_FOUNDRY_HOME) and the Vite dev server pointed at it (recipe
- * in docs/notes/phase2-integration.md), and name a thread of that daemon (LIVE_THREAD)
- * that owns no shells yet.
+ * Opt-in; how to run it: docs/notes/live-e2e.md. The thread is LIVE_THREAD (one that owns
+ * no shells yet), else an idle thread it starts in the scratch project and archives at the
+ * end; no Claude turns.
  *
  * It presses cmd+j (a real terminal.new; the shell takes the keyboard), types into the
  * shell, types `exit` (the daemon reaps the shell; the panel hides), presses cmd+j again
@@ -14,19 +13,22 @@
  * List on connect finds no shell, so the persisted open panel stays closed (what a daemon
  * restart, which prunes every shell, looks like to the GUI).
  */
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { archiveThreads, cli, cliJson, liveProject, MODEL, openApp, requireLive, shot, type LiveThread } from "./live";
 
-const LIVE = process.env.LIVE_DAEMON === "1";
-const HOME = process.env.CODE_FOUNDRY_HOME ?? "";
-const THREAD = process.env.LIVE_THREAD ?? "";
-const BIN = process.env.LIVE_BIN ?? path.join(path.resolve(process.cwd(), "../.."), "bin/code-foundry");
-const SHOTS = process.env.LIVE_SHOTS ?? "";
+requireLive();
 
-function cli(...args: string[]): string {
-  return execFileSync(BIN, args, { env: { ...process.env, CODE_FOUNDRY_HOME: HOME }, encoding: "utf8", timeout: 60_000 });
-}
+/** LIVE_THREAD, else an idle thread of the scratch project started for this file (no turn). */
+let THREAD = process.env.LIVE_THREAD ?? "";
+let started = "";
+test.beforeAll(() => {
+  if (THREAD) return;
+  started = (cliJson("thread", "new", "--worktree", liveProject().path, "--model", MODEL, "--name", "live-bottom", "--focus=false") as LiveThread).id;
+  THREAD = started;
+});
+test.afterAll(() => {
+  if (started) archiveThreads(started);
+});
 
 /** The thread's shells, from the daemon. */
 function shellsOf(thread: string): string[] {
@@ -45,11 +47,9 @@ function focusInBottomTerminal(page: Page) {
   return page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') !== null);
 }
 
-test.skip(!LIVE || !HOME || !THREAD, "LIVE_DAEMON=1, CODE_FOUNDRY_HOME and LIVE_THREAD are required");
-
 test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one", async ({ page }) => {
   expect(shellsOf(THREAD)).toEqual([]);
-  await page.goto("/");
+  await openApp(page);
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   await expect(bottom(page)).toHaveCount(0);
@@ -69,11 +69,11 @@ test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one"
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __cfTerminal?: { renderer: { getText(): string } } }).__cfTerminal?.renderer.getText() ?? ""))
     .toContain("autoshell-42");
-  if (SHOTS) {
+  if (process.env.LIVE_SHOTS) {
     for (const scheme of ["dark", "light"] as const) {
       await page.emulateMedia({ colorScheme: scheme });
       await page.waitForTimeout(400);
-      await page.screenshot({ path: path.join(SHOTS, `thread-${scheme}.png`) });
+      await shot(page, `thread-${scheme}`);
     }
     await page.emulateMedia({ colorScheme: "dark" });
     await host(page).click();
@@ -101,7 +101,7 @@ test("cmd+j starts a real shell, exit hides the panel, cmd+j starts a fresh one"
 
 test("a panel whose shells went while the page was away comes back closed", async ({ page }) => {
   expect(shellsOf(THREAD)).toEqual([]);
-  await page.goto("/");
+  await openApp(page);
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
   await page.keyboard.press("Meta+j");
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
@@ -109,7 +109,7 @@ test("a panel whose shells went while the page was away comes back closed", asyn
   await page.goto("about:blank");
   cli("terminal", "close", "--id", id);
   await expect.poll(() => shellsOf(THREAD)).toEqual([]);
-  await page.goto("/");
+  await openApp(page);
   await page.locator(`[data-row-key="s:${THREAD}"]`).click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", THREAD);
   await expect(page.getByTestId("thread-header").getByTestId("bottom-toggle")).toHaveAttribute("aria-pressed", "false");
