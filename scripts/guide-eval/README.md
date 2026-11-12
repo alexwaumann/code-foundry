@@ -5,9 +5,11 @@ the built-in skills, and how many guidance tokens that takes. Any PR that change
 `ThreadPrompt`, a skill or the guide runs it before and after. The baseline is in
 `docs/notes/guide-eval-baseline.md`.
 
-It spends real money, so it is not part of `make check`: 27 tasks, 3 runs. The cost figures
-are from smaller task sets: 23 tasks were about $20 on Opus 5.5, and 19 without the overlap
-tasks were $6 on Sonnet 5.5. Run the scorer's tests with `python3 scripts/guide-eval/score_test.py`.
+It spends real money, so it is not part of `make check`: 27 tasks, 3 runs. One measured run of
+the 27 tasks (2026-11-11, by the daemon's count, seed threads included) cost $4.05 on Sonnet 5.5
+and $7.34 on Opus 5.5. The default three runs are that times three, about $12.15 on Sonnet and
+$22.02 on Opus (one measured run times three, not three measured runs). Run the scorer's tests
+with `python3 scripts/guide-eval/score_test.py`.
 
 ## Run
 
@@ -22,7 +24,7 @@ make guide-eval-compare BEFORE=<dir> AFTER=<dir>
 - `BIN` is the build under test; the skills and guide are embedded in it.
 - `TASKS=t1-setting,p4-show-file` runs a subset. A subset cannot pass the gate against a full
   report.
-- `MAX_COST` (USD, default 24, above a full Opus side) stops launching runs once spent.
+- `MAX_COST` (USD, default 26: a full default Opus side, $22.02, plus about 20%) stops launching runs once spent.
   The runs in flight finish, and each thread also has a $4 budget the daemon enforces.
 - `eval.py --heavy-runs N` runs the heavy tasks fewer times; `--first-round N --out <dir>`
   adds rounds to an existing report.

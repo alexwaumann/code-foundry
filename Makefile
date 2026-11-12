@@ -132,13 +132,13 @@ attest:
 
 ## guide-eval: run the agent guide and skill eval on a scratch home and write a scored report
 ## (scripts/guide-eval/README.md). It spends real money and is not part of check.
-##   make guide-eval MODEL=opus|sonnet [EFFORT=medium] [RUNS=3] [BIN=path] [LABEL=x] [TASKS=a,b] [MAX_COST=24]
+##   make guide-eval MODEL=opus|sonnet [EFFORT=medium] [RUNS=3] [BIN=path] [LABEL=x] [TASKS=a,b] [MAX_COST=26]
 ## guide-eval-compare: compare two reports and apply the merge gate.
 ##   make guide-eval-compare BEFORE=<dir> AFTER=<dir>
 MODEL    ?= opus
 EFFORT   ?= medium
 RUNS     ?= 3
-MAX_COST ?= 24
+MAX_COST ?= 26
 LABEL    ?= eval
 guide-eval: $(if $(BIN),,build)
 	python3 scripts/guide-eval/eval.py --bin $(or $(BIN),bin/code-foundry) --model $(MODEL) --effort $(EFFORT) \
