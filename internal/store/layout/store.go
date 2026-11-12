@@ -47,8 +47,7 @@ type Manager struct {
 	timer  *time.Timer
 	closed bool
 
-	vpMu sync.Mutex
-	vp   Viewport
+	vps Viewports
 
 	snap atomic.Pointer[Snapshot]
 }
@@ -77,7 +76,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if opts.FocusDelay <= 0 {
 		opts.FocusDelay = time.Second
 	}
-	m := &Manager{opts: opts, log: opts.Log, vp: DefaultViewport}
+	m := &Manager{opts: opts, log: opts.Log}
 	got, err := load(ctx, opts.DB)
 	if err != nil {
 		return nil, err
@@ -142,7 +141,7 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	}
 	m.state, m.rev = next, rev
 	m.snap.Store(&Snapshot{Rev: rev, State: next})
-	bus.Publish(m.opts.Bus, Event{Rev: rev, ClientID: opts.ClientID, Delta: Diff(prev, next)})
+	bus.Publish(m.opts.Bus, Event{Rev: rev, ClientID: opts.ClientID, Delta: Diff(prev, next), Op: op.OpName(), Result: res})
 	return Commit{Rev: rev, Changed: true, Result: res}, nil
 }
 
@@ -201,18 +200,14 @@ func (m *Manager) Close(ctx context.Context) error {
 
 // SetViewport implements Store.
 func (m *Manager) SetViewport(clientID string, v Viewport) error {
-	if err := CheckViewport(v); err != nil {
-		return err
-	}
-	m.vpMu.Lock()
-	defer m.vpMu.Unlock()
-	m.vp = v
-	return nil
+	return m.vps.Set(clientID, v)
 }
+
+// SetWindowVisible sets how the store tells whether a window (by client id) is visible:
+// the newest report of a visible window is the viewport (Viewports).
+func (m *Manager) SetWindowVisible(f func(clientID string) bool) { m.vps.SetVisible(f) }
 
 // Viewport implements Store.
 func (m *Manager) Viewport() Viewport {
-	m.vpMu.Lock()
-	defer m.vpMu.Unlock()
-	return m.vp
+	return m.vps.Current()
 }

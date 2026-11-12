@@ -53,6 +53,15 @@ func (c *Clients) Windows() int {
 	return len(c.byID) + len(c.anon)
 }
 
+// Visible reports whether the GUI client with that id holds a stream and reports its window
+// visible. The layout store prefers a visible window's pane area (layout.Viewports).
+func (c *Clients) Visible(id string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	g := c.byID[id]
+	return id != "" && g != nil && g.state.Visible
+}
+
 func (c *Clients) presenceLocked() presence.State {
 	all := make([]presence.Client, 0, len(c.byID)+len(c.anon))
 	for _, g := range c.byID {

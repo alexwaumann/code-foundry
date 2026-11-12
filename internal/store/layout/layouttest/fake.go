@@ -47,7 +47,7 @@ func (f *Fake) Bus() *bus.Bus { return f.bus }
 func (f *Fake) Put(st *core.State) uint64 {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.commit(st, "")
+	return f.commit(st, "", "", core.Result{})
 }
 
 // Ops lists the names of the ops applied so far, failed ones too.
@@ -81,15 +81,15 @@ func (f *Fake) Apply(_ context.Context, op core.Op, opts layout.ApplyOptions) (l
 	if layout.Unchanged(f.snap.State, next) {
 		return layout.Commit{Rev: f.snap.Rev, Result: res}, nil
 	}
-	return layout.Commit{Rev: f.commit(next, opts.ClientID), Changed: true, Result: res}, nil
+	return layout.Commit{Rev: f.commit(next, opts.ClientID, op.OpName(), res), Changed: true, Result: res}, nil
 }
 
 // commit swaps in next and publishes it. Callers hold f.mu.
-func (f *Fake) commit(next *core.State, client string) uint64 {
+func (f *Fake) commit(next *core.State, client, op string, res core.Result) uint64 {
 	prev := f.snap
 	rev := prev.Rev + 1
 	f.snap = &layout.Snapshot{Rev: rev, State: next}
-	bus.Publish(f.bus, layout.Event{Rev: rev, ClientID: client, Delta: layout.Diff(prev.State, next)})
+	bus.Publish(f.bus, layout.Event{Rev: rev, ClientID: client, Delta: layout.Diff(prev.State, next), Op: op, Result: res})
 	return rev
 }
 
