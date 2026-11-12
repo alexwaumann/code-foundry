@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { startComposerDrafts } from "@/shell/composerDrafts";
 import { startSelectionBridge } from "@/stores/selectionBridge";
 import { startFocusHistory } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
@@ -36,6 +37,8 @@ export function Shell() {
     };
   }, [loaded]);
   useEffect(() => (mode === "shell" ? startSelectionBridge() : undefined), [mode]);
+  // Composer drafts' text back from storage, kept there, dropped with the draft (shell/composerDrafts.ts).
+  useEffect(() => (mode === "shell" ? startComposerDrafts() : undefined), [mode]);
   useEffect(() => (mode === "shell" ? startFocusHistory() : undefined), [mode]);
   // Escape leaves full screen when nothing before it took the key (a menu, a popover, the
   // floating composer collapsing, a terminal): this listener bubbles last, after the keymap's.

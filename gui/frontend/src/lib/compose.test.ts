@@ -158,6 +158,11 @@ describe("project sets", () => {
     expect(draftKey({ kind: "home" })).toBe(HOME_KEY);
   });
 
+  it("a shell composer draft's key is its own, whatever it starts from", () => {
+    expect(draftKey({ kind: "project", projectId: "web", draft: "d-1" })).toBe("draft:d-1");
+    expect(draftKey({ kind: "home", draft: "d-1" })).toBe("draft:d-1");
+  });
+
   it.each<[string, PlaceInput, Partial<PlaceEnv>, ThreadPlace | null]>([
     ["a project, new worktree, nothing picked: no base (the daemon's default)", project, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "" }],
     ["a project, new worktree from a picked branch", { ...project, base: "develop" }, {}, { kind: "project", projectId: "web", worktree: { kind: "new" }, base: "develop" }],

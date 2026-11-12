@@ -467,6 +467,16 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       run: (_c, a) => run({ op: "start_draft", tab: a.tab ?? "", ...(a.id ? { draft: a.id } : {}), ...(a.label ? { label: a.label } : {}) }, (r) => `draft ${r.result.draft ?? ""}`),
     },
     {
+      cmd: { name: "composer.draft.label", title: "Label Draft", category: CATEGORY, description: "Set a draft's label (one line, at most 80 characters).", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true }), str("label", "The label", { positional: true })] },
+      when: always,
+      run: (_c, a) => run({ op: "label_draft", draft: a.draft ?? "", label: a.label ?? "" }, () => `labelled draft ${a.draft ?? ""}`),
+    },
+    {
+      cmd: { name: "composer.draft.clear", title: "Clear Draft", category: CATEGORY, description: "End a draft whose text was deleted: its tab is the space's empty composer again, or closes when the space has one already.", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true })] },
+      when: always,
+      run: (_c, a) => run({ op: "clear_draft", draft: a.draft ?? "" }, () => `cleared draft ${a.draft ?? ""}`),
+    },
+    {
       cmd: { name: "composer.draft.discard", title: "Discard Draft", category: CATEGORY, description: "End a draft and close its tab when it is open.", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true })] },
       when: always,
       run: (_c, a) => run({ op: "discard_draft", draft: a.draft ?? "" }, () => `discarded draft ${a.draft ?? ""}`),
