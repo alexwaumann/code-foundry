@@ -105,8 +105,12 @@ exactly today's.
 
 ## Verification
 
-- `make check` green (one unrelated timing failure, `plugin/tablenode.test.tsx`, passed on its own
-  rerun while the machine was loaded).
+- `make check` green. It failed twice first on `TestLayoutGlueTerminalGoneAndReset`
+  (internal/daemon), which also fails on `origin/shell` (1 run in 3 of the glue tests under
+  `-race`): it killed a free shell before creating its replacement, so a removal the glue handled
+  before the new shell existed rightly closed the tab. The test now creates the new shell first,
+  as `terminal.reset` does (15 of 15 runs). A vitest run while the machine was loaded also timed
+  out once in `plugin/tablenode.test.tsx`, which passed on its own.
 - vitest: `lib/shellSections.test.ts` (order, membership, Needs you never also under Active, own
   threads only, scope both ways and the header kept for the button, current space only, Archived
   shared, drafts below the pinned, collapsing, the keys' order), `ShellSidebarList.test.tsx` (the
