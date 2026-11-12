@@ -9,7 +9,7 @@ import { useTerminalsStore } from "./terminals";
 import { HOME, useUiStore } from "./ui";
 
 function term(id: string, labels: Record<string, string>): TerminalView {
-  return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels };
+  return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
 }
 
 const shell = { kind: "shell", thread: "s1", project: "r1", worktree: "/src/app" };

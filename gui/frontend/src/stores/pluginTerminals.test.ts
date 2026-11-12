@@ -11,7 +11,7 @@ const { useTerminalsStore } = await import("./terminals");
 const { useUiStore } = await import("./ui");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
-  return { id, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels };
+  return { id, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
 }
 
 const shell = term("t-shell", { kind: "shell", project: "r1", worktree: "/w", thread: "s-1" });

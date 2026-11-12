@@ -76,6 +76,9 @@
  *                                                 does until the shell reads ^C)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
  *                                                 fails with that reason; reset: at once, no failure)
+ *   POST /__mock/terminal/facts?id=t-new-1[&liveCwd=/tmp][&foreground=make dev][&lastCommand=…]
+ *                                                (what the process table says of a terminal: its
+ *                                                 directory, its foreground job, its last command)
  *   POST /__mock/daemon/restart                   (every shell goes without a removed event and the
  *                                                 event streams end: the GUI reconnects and Lists)
  *   POST /__mock/thread/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
@@ -1104,6 +1107,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       });
       break;
     }
+    case "POST /__mock/terminal/facts":
+      try {
+        const facts: { liveCwd?: string; foreground?: string; lastCommand?: string } = {};
+        for (const k of ["liveCwd", "foreground", "lastCommand"] as const) {
+          const v = q.get(k);
+          if (v !== null) facts[k] = v;
+        }
+        world.setTerminalFacts(q.get("id") ?? "", facts);
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/terminal/new":
       if (q.has("delay")) world.terminalNewDelayMs = Number(q.get("delay"));
       if (q.has("fail")) world.terminalNewFail = q.get("fail") ?? "";

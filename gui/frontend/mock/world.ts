@@ -38,8 +38,9 @@ import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
-import { MockLayout } from "./layout";
+import { MockLayout, panes as layoutPanes } from "./layout";
 import { layoutCommands } from "./layoutVerbs";
+import { terminalShellCommands } from "./terminalVerbs";
 import { MockMemory } from "./memory";
 import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
@@ -404,6 +405,10 @@ interface MockTerm {
   attach: Hub<AttachItem>;
   /** A flood printing until ^C (flood()), else null. */
   flood: ReturnType<typeof setInterval> | null;
+  /** The process table's facts (Terminal.live_cwd, foreground, last_command): a `cd` moves liveCwd, a line typed becomes lastCommand. */
+  liveCwd: string;
+  foreground: string;
+  lastCommand: string;
 }
 
 interface MockWorktree {
@@ -924,6 +929,9 @@ export class World {
   /** The window shell's layout (mock/layout.ts); LayoutService and the EventService layout source. */
   readonly layout = new MockLayout({
     publish: (v) => this.events.publish({ source: EventSource.LAYOUT, event: { event: { case: "layout", value: v } } }),
+    applied: (op, result) => {
+      this.endClosedTerminals(op, result);
+    },
   });
   /** The user's themes (mock/userThemes.ts); the EventService theme source. */
   readonly themes: MockThemes = new MockThemes({
@@ -2891,6 +2899,9 @@ export class World {
       tick: 0,
       attach: new Hub<AttachItem>(),
       flood: null,
+      liveCwd: o.cwd,
+      foreground: "",
+      lastCommand: "",
     };
     switch (o.kind) {
       case "top":
@@ -3000,8 +3011,10 @@ export class World {
       exitedAt: t.exitedAt ? timestampFromDate(t.exitedAt) : undefined,
       altScreen: t.altScreen,
       labels: t.labels,
-      // The daemon reads these from the process table; a mock shell never moves or runs a job.
-      liveCwd: t.cwd,
+      // The daemon reads these from the process table; the mock keeps them by hand (a `cd`, a line typed, /__mock/terminal/facts).
+      liveCwd: t.liveCwd,
+      foreground: t.foreground,
+      lastCommand: t.lastCommand,
     };
   }
 
@@ -3053,7 +3066,19 @@ export class World {
         const cmd = t.line.trim();
         t.line = "";
         out += "\r\n";
-        out += cmd ? `zsh: command not found: ${cmd.split(" ")[0] ?? ""}\r\n${prompt(t.cwd)}` : prompt(t.cwd);
+        const cd = /^cd(?:\s+(\S+))?$/.exec(cmd);
+        if (cd) {
+          // A `cd` moves the shell (an absolute path or home), as the process table would show.
+          t.liveCwd = cd[1]?.startsWith("/") ? cd[1] : HOME;
+          out += prompt(t.liveCwd);
+          this.publishTerm(t);
+        } else {
+          if (cmd) {
+            t.lastCommand = cmd;
+            this.publishTerm(t);
+          }
+          out += cmd ? `zsh: command not found: ${cmd.split(" ")[0] ?? ""}\r\n${prompt(t.liveCwd)}` : prompt(t.liveCwd);
+        }
       } else if (ch === "\x7f") {
         if (t.line.length > 0) {
           t.line = t.line.slice(0, -1);
@@ -3201,6 +3226,83 @@ export class World {
     t.attach.publish("end");
     this.termEvents.publish({ event: { case: "removedId", value: id } });
     this.actions.terminalRemoved(id);
+    this.dropTerminalTab(id);
+  }
+
+  // ---- Terminals in the window shell's layout (the daemon's glue, internal/daemon/layout.go) ----
+
+  /** A new shell's tab (internal/command openTerminalTab): linked to its thread and placed beside it, else in the focused pane; the user's call takes the focus. */
+  openTerminalTab(id: string, thread: string): void {
+    try {
+      this.layout.apply({ op: "open_surface", tab: { id: "", kind: "terminal", ...(thread ? { thread } : {}), params: { terminal: id } }, focus: true });
+    } catch {
+      // No layout to open it in: the shell still runs, as the daemon's does.
+    }
+  }
+
+  /** A terminal gone closes its tab (drop_terminal, simplified: an open tab only). */
+  private dropTerminalTab(id: string): void {
+    for (const sp of this.layout.state().spaces) {
+      for (const p of layoutPanes(sp.root)) {
+        const tab = (p.tabs ?? []).find((t) => t.kind === "terminal" && t.params?.terminal === id);
+        if (tab) {
+          this.layout.apply({ op: "close_tab", tab: tab.id });
+          return;
+        }
+      }
+    }
+  }
+
+  /** A terminal tab closed by itself (close_tab, close_pane, remove_space) ends its shell; one closed with its thread keeps running. */
+  private endClosedTerminals(op: { op: string }, result: { closed?: { kind: string; params?: Record<string, string> }[] }): void {
+    if (!["close_tab", "close_pane", "remove_space"].includes(op.op)) return;
+    for (const tab of result.closed ?? []) {
+      const id = tab.kind === "terminal" ? (tab.params?.terminal ?? "") : "";
+      const t = id ? this.terms.get(id) : undefined;
+      if (t && isPanel(t.labels)) this.close(id);
+    }
+  }
+
+  /** The thread's running quick shell, else a new one in its checkout (terminal.quick). */
+  ensureQuick(threadId: string): MockTerm {
+    for (const t of this.terms.values()) if (t.state === TerminalState.RUNNING && t.labels[LABEL_THREAD] === threadId && t.labels.slot === "quick") return t;
+    const s = this.threads.get(threadId);
+    if (!s) throw new CommandError("notfound", `thread ${threadId} not found`);
+    return this.create(["/bin/zsh"], s.worktreePath || HOME, { ...shellLabels(s.id, s.projectId, s.worktreePath), slot: "quick" }, "shell");
+  }
+
+  /** terminal.reset: a fresh shell in the owner's directory under the same tab, then the old one closes. */
+  resetShell(id: string): MockTerm {
+    const old = this.term(id);
+    if (old.labels[LABEL_KIND] !== KIND_SHELL) throw new CommandError("unavailable", `terminal ${id} is not a shell`);
+    const thread = this.threads.get(old.labels[LABEL_THREAD] ?? "");
+    const cwd = thread ? thread.worktreePath || HOME : old.labels[LABEL_WORKTREE] || HOME;
+    const fresh = this.create(old.argv, cwd, { ...old.labels, replaces: id }, "shell");
+    for (const sp of this.layout.state().spaces)
+      for (const p of layoutPanes(sp.root))
+        for (const tab of p.tabs ?? []) if (tab.kind === "terminal" && tab.params?.terminal === id) this.layout.apply({ op: "set_tab_params", tab: tab.id, params: { ...tab.params, terminal: fresh.id } });
+    this.close(id);
+    return fresh;
+  }
+
+  /** terminal.rerun: types a command line into a shell at its prompt. */
+  rerun(id: string, command: string): string {
+    const t = this.term(id);
+    if (t.state !== TerminalState.RUNNING) throw new CommandError("unavailable", `terminal ${id} has exited`);
+    if (t.foreground) throw new CommandError("unavailable", `terminal ${id} is running ${t.foreground}; run it again once that has ended`);
+    const line = command || t.lastCommand;
+    if (!line.trim()) throw new CommandError("unavailable", `terminal ${id} has no last command`);
+    this.write(id, enc.encode(`${line}\r`));
+    return line;
+  }
+
+  /** POST /__mock/terminal/facts: what the process table would say (any of liveCwd, foreground, lastCommand). */
+  setTerminalFacts(id: string, facts: { liveCwd?: string; foreground?: string; lastCommand?: string }): void {
+    const t = this.term(id);
+    if (facts.liveCwd !== undefined) t.liveCwd = facts.liveCwd;
+    if (facts.foreground !== undefined) t.foreground = facts.foreground;
+    if (facts.lastCommand !== undefined) t.lastCommand = facts.lastCommand;
+    this.publishTerm(t);
   }
 
   /**
@@ -3971,6 +4073,7 @@ export class World {
           if (fail !== null) throw new CommandError("unavailable", fail);
           const keys = runKeys(args.run ?? "");
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
+          this.openTerminalTab(t.id, owner.labels[LABEL_THREAD] ?? "");
           const resultJson = JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels });
           if (keys === "") return { message: `created terminal ${t.id}`, resultJson };
           // Like the daemon: the shell is listed at once, and the command is typed once it
@@ -3994,6 +4097,7 @@ export class World {
         // Like the daemon: a free shell (kind shell, no owner labels), in the home directory.
         run: () => {
           const t = this.create(["/bin/zsh"], HOME, { [LABEL_KIND]: KIND_SHELL }, "shell");
+          this.openTerminalTab(t.id, "");
           return Promise.resolve({ message: `created terminal ${t.id} in ${HOME}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
         },
       },
@@ -4983,6 +5087,12 @@ export class World {
       ...projectCommands(this),
       ...renameCommands(this),
       ...layoutCommands({ layout: this.layout, hasThread: (id) => this.threads.has(id) }),
+      ...terminalShellCommands({
+        layout: this.layout,
+        ensureQuick: (thread) => this.ensureQuick(thread).id,
+        reset: (id) => this.resetShell(id).id,
+        rerun: (id, command) => this.rerun(id, command),
+      }),
       {
         cmd: { name: "view.settings", title: "Settings", category: "View", description: "Show the settings page, or close it where it already shows", keybindings: ["cmd+,"], args: [] },
         when: always,

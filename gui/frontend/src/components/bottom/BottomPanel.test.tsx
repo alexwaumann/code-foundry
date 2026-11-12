@@ -43,7 +43,7 @@ const S1_SHELL = "t-s1-shell";
 function shell(id: string, o: { thread?: string; project?: string; worktree: string }, extra: Partial<TerminalView> = {}): TerminalView {
   const labels: Record<string, string> = { kind: "shell", project: o.project ?? "repo-cf", worktree: o.worktree };
   if (o.thread) labels.thread = o.thread;
-  return { id, argv: ["/bin/zsh", "-l"], cwd: o.worktree, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: Date.now(), exitedAtMs: null, altScreen: false, labels, ...extra };
+  return { id, argv: ["/bin/zsh", "-l"], cwd: o.worktree, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: Date.now(), exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels, ...extra };
 }
 
 /** The mock's seeded shells: s-1's, and one of the feat/sidebar worktree (the Projects page's). */

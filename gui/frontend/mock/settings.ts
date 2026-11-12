@@ -123,7 +123,7 @@ export const NO_KEYBINDING = new Set([
   "search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.seen", "search.stop",
   "pane.focus", "pane.move", "pane.resize",
   "settings.get", "settings.path", "settings.reset", "settings.set", "skill.browse", "terminal.list",
-  "space.move", "space.rename", "space.switch", "tab.focus", "tab.move",
+  "space.move", "space.rename", "space.switch", "tab.focus", "tab.move", "tab.rename", "terminal.cycle", "terminal.quick",
   "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
   "thread.agent.open", "thread.agents", "thread.open", "thread.space.move", "thread.checkouts", "thread.commands", "thread.flag.clear", "thread.focus", "thread.items", "thread.list", "thread.mcp",
   "thread.move.open", "thread.new-like", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop",

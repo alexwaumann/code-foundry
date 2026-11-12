@@ -35,6 +35,13 @@ const WANT: Readonly<Record<string, readonly string[]>> = {
   "cmd+shift+w": ["pane.close"],
   "cmd+shift+[ / cmd+shift+]": ["tab.previous", "tab.next"],
   "ctrl+cmd+h j k l, ctrl+cmd+arrows": ["pane.focus.left", "pane.focus.down", "pane.focus.up", "pane.focus.right"],
+  "cmd+t": ["terminal.new"],
+  "cmd+shift+t": ["terminal.new-free"],
+  "cmd+j": ["terminal.quick"],
+  "cmd+shift+j": ["terminal.cycle"],
+  // cmd+r on a thread's tab is today's rename (thread.rename's inline field); on a terminal's, tab.rename.
+  "cmd+r": ["tab.rename"],
+  "cmd+shift+r": ["tab.rename"],
 };
 
 describe("the interim key table against the spec's", () => {

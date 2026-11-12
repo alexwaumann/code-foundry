@@ -3,7 +3,7 @@ import kindsJson from "../../../../../internal/layout/testdata/kinds.json?raw";
 import { shellSurfaceOf, shellSurfaces } from "./registry";
 
 /** Kinds whose surface arrives with a later PR. */
-const LATER: Readonly<Record<string, string>> = { terminal: "PR 13: terminal tabs" };
+const LATER: Readonly<Record<string, string>> = {};
 
 describe("the shell's surfaces", () => {
   const kinds = (JSON.parse(kindsJson) as { kind: string; prefix?: boolean }[]).map((k) => k.kind);

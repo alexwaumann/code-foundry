@@ -13,6 +13,7 @@ import { neighbour, type Direction } from "./geometry/neighbours";
 import { focusPane, useLayoutStore } from "@/stores/layout";
 import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
+import { autoNameFocusedTab, cycleTerminals, newFreeTerminalTab, newTerminalTab, quickKey, renameFocusedTab } from "./terminalActions";
 
 export interface ShellKey {
   /** Canonical chords (keys/chord.ts). */
@@ -105,6 +106,12 @@ export const SHELL_KEYS: readonly ShellKey[] = [
       stepTab(1);
     },
   },
+  { chords: ["cmd+t"], spec: "cmd+t", command: "terminal.new", run: () => void newTerminalTab() },
+  { chords: ["cmd+shift+t"], spec: "cmd+shift+t", command: "terminal.new-free", run: () => void newFreeTerminalTab() },
+  { chords: ["cmd+j"], spec: "cmd+j", command: "terminal.quick", run: () => void quickKey() },
+  { chords: ["cmd+shift+j"], spec: "cmd+shift+j", command: "terminal.cycle", run: () => void cycleTerminals() },
+  { chords: ["cmd+r"], spec: "cmd+r", command: "tab.rename", run: renameFocusedTab },
+  { chords: ["cmd+shift+r"], spec: "cmd+shift+r", command: "tab.rename", run: autoNameFocusedTab },
   ...DIRS.flatMap(([dir, letter, arrow]): ShellKey[] => [
     { chords: [`cmd+ctrl+${letter}`, `cmd+ctrl+${arrow}`], spec: PANE_KEYS, command: `pane.focus.${dir}`, run: () => {
         focusSide(dir);
