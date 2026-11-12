@@ -303,11 +303,28 @@ describe("the thread's header in a shell pane", () => {
     expect(got.at(-1)).toBe("Close⌘W");
     fireEvent.keyDown(within(menu).getByTestId("menu-move-to-space"), { key: "ArrowRight" });
     const spaces = await screen.findByTestId("menu-move-to-space-spaces");
-    // One space until the top bar: shown anyway, marked here and disabled.
-    expect(entries(spaces)).toEqual(["Mainhere"]);
+    // One space: shown anyway, marked here and disabled; then New space.
+    expect(entries(spaces)).toEqual(["Mainhere", "—", "New space"]);
     expect(within(spaces).getByTestId("move-to-space-item").getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(within(menu).getByTestId("menu-close"));
     await settle();
     expect(runs).toEqual([{ name: "thread.close", args: { id: "s-1" }, thread: "" }]);
+  });
+
+  it("Move to space ▸ lists the real spaces with their glyphs and moves the thread with thread.space.move", async () => {
+    await seedLayout({ ...LAYOUT, rev: 2, spaces: [...LAYOUT.spaces, space(pane("p-9", [tab("t-9", "prs")]), "p-9", { id: "sp-b", name: "Review" })] });
+    render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+    fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
+    const menu = screen.getByTestId("thread-header-menu");
+    fireEvent.keyDown(within(menu).getByTestId("menu-move-to-space"), { key: "ArrowRight" });
+    const spaces = await screen.findByTestId("menu-move-to-space-spaces");
+    expect(entries(spaces)).toEqual(["Mainhere", "Review", "—", "New space"]);
+    // Each space's glyph is drawn from its own panes: two in Main, one in Review.
+    expect(within(spaces).getAllByTestId("space-icon").map((g) => g.getAttribute("data-panes"))).toEqual(["2", "1"]);
+    const review = within(spaces).getAllByTestId("move-to-space-item")[1];
+    if (!review) throw new Error("no Review item");
+    fireEvent.click(review);
+    await settle();
+    expect(runs).toEqual([{ name: "thread.space.move", args: { id: "s-1", space: "sp-b" }, thread: "" }]);
   });
 });

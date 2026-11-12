@@ -21,7 +21,9 @@ import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ProjectsPage } from "@/components/projects/ProjectsPage";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SidePanel } from "@/components/panel/SidePanel";
+import { RemoveSpaceDialog } from "@/components/shell/RemoveSpaceDialog";
 import { Shell } from "@/components/shell/Shell";
+import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ThreadPane } from "@/components/thread/ThreadPane";
 import { Toaster } from "@/components/ui/sonner";
@@ -49,8 +51,7 @@ import { startWelcomeSync } from "@/stores/welcome";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
 import { startRecentFiles } from "@/stores/recentFiles";
-import { useShellViewStore } from "@/stores/shellView";
-import { shellOn } from "@/shell/flag";
+import { useShellChrome } from "@/stores/shellView";
 import { EmberView } from "@/components/ember/EmberView";
 import { EMBER_VIEW } from "@/surfaces/emberTarget";
 
@@ -213,7 +214,7 @@ export function App() {
   useWindowTitle(useAttentionCount());
   // The shell flag (shell/flag.ts) draws the window shell instead of the content column and the
   // side panel, unless the daemon has no layout (Shell falls back, then this draws the classic).
-  const shell = useShellViewStore((s) => shellOn() && s.mode !== "classic");
+  const shell = useShellChrome();
 
   return (
     // The sheet: one background under the sidebar. The content area is a pane floating
@@ -231,6 +232,8 @@ export function App() {
             headers do), so a page without a header (the composer) still has a drag
             surface when the sidebar is hidden. It is the shell gap tall: the sheet above the panes. */}
         <div className="absolute inset-x-0 top-0 h-shell [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
+        {/* The window shell's top bar spans the window above the sidebar and the panes (shell-model.md, "Structure"). */}
+        {shell && <TopBar />}
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           {shell ? (
@@ -262,6 +265,7 @@ export function App() {
         <SaveWorkspaceDialog />
         <ActionDialog />
         <ActionRunDialog />
+        {shell && <RemoveSpaceDialog />}
         <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
       </div>
     </TooltipProvider>

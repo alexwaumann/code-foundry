@@ -5,15 +5,40 @@ import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { afterRev, runLayoutCommand } from "@/shell/commands";
-import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, type DragNames } from "@/shell/drag/announce";
+import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, sourceText, type DragNames } from "@/shell/drag/announce";
 import { sourceOf } from "@/shell/drag/draggable";
 import { dropCommand, dropPreview } from "@/shell/drag/drop";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
 import type { GeoNode } from "@/shell/geometry/types";
+import { runSpaceDrop } from "@/shell/spaceActions";
+import { spaceDropCommands } from "@/shell/spaces";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { geoTree, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
 import { useShellViewStore } from "@/stores/shellView";
+
+/** A box in viewport px. */
+interface ClientBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** The top bar and its space tabs as drawn (viewport px): the tabs are drop targets, the rest of the bar is none. */
+interface TopBarBoxes {
+  bar: ClientBox | null;
+  spaces: { id: string; box: ClientBox }[];
+}
+
+function measureTopBar(): TopBarBoxes {
+  const bar = document.querySelector<HTMLElement>('[data-testid="top-bar"]');
+  if (!bar) return { bar: null, spaces: [] };
+  const spaces = Array.from(bar.querySelectorAll<HTMLElement>('[data-testid="space-tab"]')).map((el) => ({ id: el.dataset.spaceId ?? "", box: el.getBoundingClientRect() }));
+  return { bar: bar.getBoundingClientRect(), spaces };
+}
+
+const within = (b: ClientBox, p: { x: number; y: number }) => p.x >= b.left && p.x < b.right && p.y >= b.top && p.y < b.bottom;
 
 /** What a drag reads at its start (and again when the grid redraws under it). */
 interface Snapshot {
@@ -63,6 +88,11 @@ function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
     tree: geoTree(layout, spaceId),
     names,
   };
+}
+
+/** A space's name for the announcements. */
+function spaceName(id: string): string {
+  return useLayoutStore.getState().spaces[id]?.name ?? id;
 }
 
 /** The label on a preview: what the drop makes. */
@@ -174,6 +204,10 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     target: DropTarget | null;
   } | null>(null);
   const announced = useRef<DropTarget | null>(null);
+  const announcedSpace = useRef("");
+  const topBar = useRef<TopBarBoxes>({ bar: null, spaces: [] });
+  // The drop on a space tab, for the announcement after onDragEnd cleared the state.
+  const endedSpace = useRef("");
   const source = useShellDragStore((s) => s.source);
 
   // The grid redrawn under a drag (a tab opened elsewhere, the window resized): measure again.
@@ -195,6 +229,16 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     const st = useShellDragStore.getState();
     const s = snap.current;
     if (!st.source || !s) return;
+    // The top bar: a space tab that would take the source is the target; the rest of the bar is
+    // none (the grid's outer band above the panes stops at the bar).
+    const tb = topBar.current;
+    if (tb.bar && within(tb.bar, client)) {
+      const hit = tb.spaces.find((x) => within(x.box, client));
+      const space = hit && spaceDropCommands(st.source, hit.id, useLayoutStore.getState()) ? hit.id : "";
+      useShellDragStore.setState({ client, target: null, preview: null, bar: null, space });
+      return;
+    }
+    if (st.space) useShellDragStore.setState({ space: "" });
     const z = zoomFactor();
     const target = dropTarget(s.scene, st.source, { x: client.x / z - s.origin.x, y: client.y / z - s.origin.y });
     if (sameTarget(target, st.target)) {
@@ -217,16 +261,25 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     origin.current = { x: p.clientX, y: p.clientY };
     ended.current = null;
     announced.current = null;
+    announcedSpace.current = "";
+    endedSpace.current = "";
+    topBar.current = measureTopBar();
     useShellDragStore.setState({ source: src, target: null, client: origin.current, origin: snap.current.origin, preview: null, bar: null });
   };
   const onDragMove = ({ delta }: DragMoveEvent) => {
     retarget({ x: origin.current.x + delta.x, y: origin.current.y + delta.y });
   };
   const onDragEnd = () => {
-    const { source: src, target } = useShellDragStore.getState();
+    const { source: src, target, space } = useShellDragStore.getState();
     resetShellDrag();
     if (!src) return;
     ended.current = { source: src, target };
+    if (space) {
+      const cmds = spaceDropCommands(src, space, useLayoutStore.getState());
+      endedSpace.current = cmds ? space : "";
+      if (cmds) void runSpaceDrop(cmds);
+      return;
+    }
     if (!target) return;
     const layout = useLayoutStore.getState();
     // The layout as it is now: a dragged tab or pane closed mid-drag moves nothing.
@@ -254,13 +307,19 @@ export function ShellDnd({ children }: { children: ReactNode }) {
         return src ? pickedUpText(src, names()) : undefined;
       },
       onDragMove: () => {
-        const { source: src, target } = useShellDragStore.getState();
-        if (!src || sameTarget(target, announced.current)) return undefined;
+        const { source: src, target, space } = useShellDragStore.getState();
+        if (!src || (sameTarget(target, announced.current) && space === announcedSpace.current)) return undefined;
         announced.current = target;
+        announcedSpace.current = space;
+        if (space) return `${sourceText(src, names())} is over the space ${spaceName(space)}.`;
         return overText(src, target, names());
       },
       onDragOver: () => undefined,
-      onDragEnd: () => (ended.current ? droppedText(ended.current.source, ended.current.target, names()) : undefined),
+      onDragEnd: () => {
+        if (!ended.current) return undefined;
+        if (endedSpace.current) return `${sourceText(ended.current.source, names())} was moved to the space ${spaceName(endedSpace.current)}.`;
+        return droppedText(ended.current.source, ended.current.target, names());
+      },
       onDragCancel: () => (ended.current ? cancelledText(ended.current.source, names()) : undefined),
     };
   }, []);

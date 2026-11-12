@@ -12,6 +12,7 @@
  * See docs/notes/shell-11-pane-grid.md.
  */
 import { create } from "zustand";
+import { shellOn } from "@/shell/flag";
 import type { Frame } from "@/shell/geometry/types";
 
 export type ShellMode = "waiting" | "shell" | "classic";
@@ -35,6 +36,15 @@ export function setShellMode(mode: ShellMode): void {
 /** Whether the shell draws this window (the flag is on and the layout arrived). */
 export function shellDrawn(): boolean {
   return useShellViewStore.getState().mode === "shell";
+}
+
+/**
+ * Whether the window wears the shell's chrome (the top bar, no sidebar band): the flag is on and
+ * the window has not fallen back to the classic one. True while it waits for the layout too, so
+ * the band does not flash in and out.
+ */
+export function useShellChrome(): boolean {
+  return useShellViewStore((s) => shellOn() && s.mode !== "classic");
 }
 
 export function setShellFrame(frame: Frame | null): void {

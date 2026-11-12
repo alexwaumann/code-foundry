@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { PaneError } from "@/components/error/fallbacks";
-import { trafficLightGutter } from "@/components/window/titleBand";
 import { lastInputWasKeyboard } from "@/lib/inputModality";
 import { cn } from "@/lib/utils";
 import { focusPaneNow } from "@/shell/commands";
@@ -48,8 +47,6 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
   const pane = usePane(paneId);
   const tab = useTab(pane?.active ?? "");
   const bodyRef = useRef<HTMLDivElement>(null);
-  // With the sidebar hidden, the pane in the window's top left corner sits under the traffic lights.
-  const inset = useUiStore((s) => (!s.sidebarVisible && rect.x === 0 && rect.y === 0 ? trafficLightGutter(s.zoom) - 6 : 0));
   const request = useShellViewStore((s) => (s.focusRequest.paneId === paneId ? s.focusRequest.seq : 0));
   const kind = tab?.kind ?? "";
   const dragged = usePaneDragged(paneId);
@@ -82,7 +79,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
         if (lastInputWasKeyboard()) takeFocus();
       }}
     >
-      <PaneTabStrip paneId={paneId} focused={focused} inset={inset} />
+      <PaneTabStrip paneId={paneId} focused={focused} />
       {tab && <LinkedRow tab={tab} />}
       <div ref={bodyRef} id={shellBodyDomId(paneId)} role="tabpanel" tabIndex={-1} className="relative flex min-h-0 min-w-0 flex-1 flex-col outline-none" data-testid="shell-pane-body">
         {tab && (

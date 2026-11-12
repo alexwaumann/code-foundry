@@ -96,7 +96,7 @@ describe("the row under a linked tab", () => {
     const row = linkedRowOf(s, diff);
     expect(row).toEqual({ thread: "s-1", threadTab: "t-th", live: true, elsewhere: "" });
     if (!row) throw new Error("row");
-    expect(rowAction(row, "p-2", { thread: "T", space: "" })).toEqual({ focus: "t-th" });
+    expect(rowAction(row, "p-2")).toEqual({ focus: "t-th" });
   });
 
   it("is dormant when the thread is not open here; its link opens the thread in this pane", () => {
@@ -104,15 +104,16 @@ describe("the row under a linked tab", () => {
     const row = linkedRowOf(s, diff);
     expect(row).toEqual({ thread: "s-1", threadTab: "", live: false, elsewhere: "" });
     if (!row) throw new Error("row");
-    expect(rowAction(row, "p-2", { thread: "T", space: "" })).toEqual({ run: "thread.open", args: { id: "s-1", pane: "p-2", focus: "true" } });
+    expect(rowAction(row, "p-2")).toEqual({ run: "thread.open", args: { id: "s-1", pane: "p-2", focus: "true" } });
   });
 
-  it("names the space of a thread that lives in another, and only says where it is", () => {
+  it("names the space of a thread that lives in another, and takes the window there", () => {
     const s = slice([diff], { "s-1": { threadId: "s-1", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" } });
     const row = linkedRowOf(s, diff);
     expect(row).toMatchObject({ live: false, elsewhere: "sp-b" });
     if (!row) throw new Error("row");
-    expect(rowAction(row, "p-2", { thread: "Fix it", space: "Review" })).toEqual({ say: "“Fix it” is in the space “Review”" });
+    // The window switches to the thread's space, where its tab opens or is focused.
+    expect(rowAction(row, "p-2")).toEqual({ run: "thread.open", args: { id: "s-1", focus: "true" } });
   });
 
   it("is not drawn for a thread's own tab or an unlinked one", () => {

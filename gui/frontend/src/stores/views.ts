@@ -31,6 +31,9 @@ import { isActingWindow } from "./windowFocus";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
+import { canStepFocus, stepFocus, useFocusHistoryStore } from "./focusHistory";
+import { useLayoutStore } from "./layout";
+import { shellDrawn } from "./shellView";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -288,7 +291,8 @@ function pageSelection(name: string, params: Readonly<Record<string, string>> | 
  * not history entries: back with one of them up closes it like its Esc or × (the Themes
  * page opened from Settings goes back to Settings), revealing what was on screen before
  * it, and does not step. Stepping to another selection closes such a page anyway
- * (startViewSync). Returns whether anything changed.
+ * (startViewSync). Returns whether anything changed. While the window shell draws the window, it
+ * steps through the shell's focus history instead (stores/focusHistory.ts).
  */
 export function historyCommand(by: 1 | -1): boolean {
   if (by === -1) {
@@ -298,6 +302,12 @@ export function historyCommand(by: 1 | -1): boolean {
       close();
       return true;
     }
+  }
+  // The window shell steps through what was focused, across panes and spaces (focusHistory.ts).
+  if (shellDrawn()) {
+    const can = canStepFocus(useFocusHistoryStore.getState(), useLayoutStore.getState(), by);
+    if (can) void stepFocus(by);
+    return can;
   }
   const ui = useUiStore.getState();
   return by === -1 ? ui.back() : ui.forward();

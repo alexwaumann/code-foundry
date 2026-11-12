@@ -15,6 +15,8 @@ import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
 import { autoNameFocusedTab, cycleTerminals, newFreeTerminalTab, newTerminalTab, quickKey, renameFocusedTab } from "./terminalActions";
 import { toggleThreadInfo } from "@/stores/threadInfoOverlay";
+import { stepFocus } from "@/stores/focusHistory";
+import { switchSpaceAt } from "./spaceActions";
 
 export interface ShellKey {
   /** Canonical chords (keys/chord.ts). */
@@ -132,6 +134,18 @@ export const SHELL_KEYS: readonly ShellKey[] = [
       toggleThreadInfo(true);
     },
   },
+  // Back and forward through what was focused, across panes and spaces (stores/focusHistory.ts).
+  // The registry binds the same chords to view.back and view.forward; here they step at once.
+  { chords: ["cmd+["], spec: "cmd+[ / cmd+]", command: "view.back", run: () => void stepFocus(-1) },
+  { chords: ["cmd+]"], spec: "cmd+[ / cmd+]", command: "view.forward", run: () => void stepFocus(1) },
+  ...Array.from({ length: 9 }, (_, i): ShellKey => ({
+    chords: [`cmd+ctrl+${String(i + 1)}`],
+    spec: "ctrl+cmd+1…9",
+    command: "space.switch",
+    run: () => {
+      switchSpaceAt(i + 1);
+    },
+  })),
   ...DIRS.flatMap(([dir, letter, arrow]): ShellKey[] => [
     { chords: [`cmd+ctrl+${letter}`, `cmd+ctrl+${arrow}`], spec: PANE_KEYS, command: `pane.focus.${dir}`, run: () => {
         focusSide(dir);

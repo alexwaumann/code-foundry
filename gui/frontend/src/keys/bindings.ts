@@ -83,7 +83,8 @@ function focusThreadPrompt(): void {
   if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
-function toggleSidebar(): void {
+/** cmd+b (a GUI view action), and the top bar's sidebar toggle. */
+export function toggleSidebar(): void {
   const ui = useUiStore.getState();
   if (ui.sidebarVisible) {
     ui.toggleSidebar();

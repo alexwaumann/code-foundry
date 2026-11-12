@@ -22,6 +22,7 @@ function chordsOf(cell: string): string[] {
     const letters = /^(.*\+)([a-z])((?: [a-z])+)$/.exec(part);
     if (letters) return [letters[2] ?? "", ...(letters[3] ?? "").trim().split(" ")].map((k) => `${letters[1] ?? ""}${k}`);
     if (part.endsWith("+arrows")) return ["left", "down", "up", "right"].map((a) => part.replace(/arrows$/, a));
+    if (part.endsWith("+1…9")) return Array.from({ length: 9 }, (_, i) => part.replace(/1…9$/, String(i + 1)));
     return [part];
   });
 }
@@ -44,6 +45,8 @@ const WANT: Readonly<Record<string, readonly string[]>> = {
   "cmd+shift+r": ["tab.rename"],
   "cmd+shift+d": ["view.thread-diff"],
   "cmd+shift+i": ["view.thread-info"],
+  "cmd+[ / cmd+]": ["view.back", "view.forward"],
+  "ctrl+cmd+1…9": ["space.switch"],
 };
 
 describe("the interim key table against the spec's", () => {
