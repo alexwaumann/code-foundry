@@ -228,7 +228,7 @@ Services (v1):
   thread's shells, unpin, unarchive, set `snoozed_until`; the store wakes it on the wall
   clock into NEEDS_ATTENTION "snooze ended"; `docs/notes/snooze-threads-1-daemon.md`;
   with `save` the same with no wake time, `saved_at` instead of `snoozed_until`;
-  `docs/notes/save-for-later-1-daemon.md`), Watch (server stream of every thread), Wait (block until a thread settles, by default: idle or needs attention, a pending prompt included; or until it is idle, needs attention, has an error or is disconnected; `thread.wait`, `docs/notes/agents-1-wait-events.md`, `docs/notes/thread-wait-settled.md`), Label, Report and SetBudget (agent metadata: labels, a report, a spending limit whose budget stop interrupts Claude into NEEDS_ATTENTION "budget reached"; with Create's created_by and brief, `docs/notes/agents-2-metadata.md`), Subscribe, Unsubscribe and ListSubscriptions (wake subscriptions: the daemon sends a thread a wake message, a user message with origin WAKE, when a target thread settles or meets another condition, or an action run finishes; persisted, edge-triggered from the thread store's commit and again on each new pending request, 60 per subscriber per hour; `thread.new --notify`; `docs/notes/agents-4-wake.md`, `docs/notes/wake-detail.md` for what a settled wake says; WatchThread carries the watched thread's list; StopWaiting removes its wakes and stops its background shells: `docs/notes/wait-list-daemon.md`), StageAttachment (images and PDFs a message refers to, as bytes or an absolute path the daemon reads; `docs/notes/pdf-attachments-1-daemon.md`, `docs/notes/attach-by-path.md`) and ReadAttachment (a staged file's bytes).
+  `docs/notes/save-for-later-1-daemon.md`), Wait (block until a thread settles, by default: idle or needs attention, a pending prompt included; or until it is idle, needs attention, has an error or is disconnected; `thread.wait`, `docs/notes/agents-1-wait-events.md`, `docs/notes/thread-wait-settled.md`), Label, Report and SetBudget (agent metadata: labels, a report, a spending limit whose budget stop interrupts Claude into NEEDS_ATTENTION "budget reached"; with Create's created_by and brief, `docs/notes/agents-2-metadata.md`), Subscribe, Unsubscribe and ListSubscriptions (wake subscriptions: the daemon sends a thread a wake message, a user message with origin WAKE, when a target thread settles or meets another condition, or an action run finishes; persisted, edge-triggered from the thread store's commit and again on each new pending request, 60 per subscriber per hour; `thread.new --notify`; `docs/notes/agents-4-wake.md`, `docs/notes/wake-detail.md` for what a settled wake says; WatchThread carries the watched thread's list; StopWaiting removes its wakes and stops its background shells: `docs/notes/wait-list-daemon.md`), StageAttachment (images and PDFs a message refers to, as bytes or an absolute path the daemon reads; `docs/notes/pdf-attachments-1-daemon.md`, `docs/notes/attach-by-path.md`) and ReadAttachment (a staged file's bytes).
   Also RegenerateName (a new name from the last three turns, `docs/notes/regenerate-thread-name.md`),
   RetrySetup, CancelSetup and DiscardSetup (a background setup's ways out, §6), AddProject and
   RemoveProject (a thread's project set, `docs/notes/thread-project-set.md`), LinkPullRequest
@@ -236,10 +236,10 @@ Services (v1):
   `docs/notes/pr-daemon-actions.md`, `docs/notes/pr-task-forward.md`), CheckPlacement (where a
   new thread would go, nothing made; `docs/notes/thread-info-facts.md`) and Ask (a created
   thread asks its creator, who gets a wake; `docs/notes/thread-ask.md`).
-  Close and Reconnect remain in the proto for compatibility; no command calls them: the
-  daemon starts a thread's process when a message is sent and stops it once the thread
-  has idled at its prompt past its prompt cache expiry
-  (`docs/notes/thread-lifecycle.md`). Create takes a project set (`project_ids`), can
+  The daemon starts a thread's process when a message is sent and stops it once the
+  thread has idled at its prompt past its prompt cache expiry
+  (`docs/notes/thread-lifecycle.md`); the thread list reaches clients through
+  EventService's thread list source. Create takes a project set (`project_ids`), can
   copy another thread's placement (`like_thread_id`, `new_branch`; a creating thread's
   is copied the same way) and answers collision hints; Checkouts lists a thread's
   checkouts (`docs/notes/workspaces-v2-1-threads.md`); SetWorkspace sets or clears a
@@ -303,7 +303,7 @@ Services (v1):
   takes a note (`--note`, why: in a timer's wake header, every wake's JSON and the
   listings); a thread wake's JSON has the turn's `started_at` and `ran_for`
   (`docs/notes/ember-fixes-2-timers.md`).
-* `EmberService` — GetStatus, ListTasks, WatchBoard (server stream: the whole board, then
+* `EmberService` — WatchBoard (server stream: the whole board, then
   again on every change of a task, of Ember's state, of a task's worker thread or of its
   timers, and a heartbeat when quiet): Ember, the resident agent, and its task board,
   each task with its worker's derived status and report (`docs/notes/ember-2-store.md`),
@@ -315,8 +315,7 @@ Services (v1):
   (`CreateThreadRequest.model_defaulted`: the CLI's settings default counts as none).
 * `TerminalService` — Create, List, Get, Attach (server stream: initial screen snapshot then
   live output chunks; cancelling it detaches), Write (input bytes), Resize, Kill, Remove,
-  Close (kill, wait for the exit, remove; shells, action runs and skill setups only) and
-  Watch.
+  and Close (kill, wait for the exit, remove; shells, action runs and skill setups only).
 * `ProjectService` — Register (a git repository, or any folder as a project without git;
   "~" expands, the path must be absolute; the Add Project dialog's Local folder tab calls
   it directly, the CLI through `project add <folder>`), InspectFolder (what Register would
@@ -337,8 +336,7 @@ Services (v1):
   `docs/notes/projects-polish-3.md`, `docs/notes/cleanup-eligibility.md`,
   `docs/notes/projects-redesign-2-leftovers.md`),
   Refresh (a status reconcile now), Rename (the display name only; nothing on disk), ListRefs,
-  Watch, GetWorktreeDetail (files and log against the base branch, Phase 3a), GetWorktreeFileDiff
-  (one file's two sides),
+  Watch, GetWorktreeDetail (the files changed against the base branch, Phase 3a),
   InitGit (`git init` and an empty first commit in a project without git;
   `docs/notes/add-project-2-nogit.md`), SearchGitHub and LookupGitHub (GraphQL through
   the gh store, for the Add Project dialog), Clone (server stream: `gh repo clone` into
@@ -357,8 +355,9 @@ Services (v1):
   refs and paths from callers never reach git as given (`docs/notes/diff-viewer-1.md`).
 * `GhService` — GetViewer, GetDashboard, GetRepoActivity, GetBranchPullRequests (the
   viewer's PR dashboards, six months of stats (`docs/notes/gh-stats-six-months.md`),
-  default-branch CI, the viewer's PRs on a branch), GetPullRequest and ListChecks (on demand), Refresh, Track, Untrack, Watch.
-  Data events go out only when data changed; `Polled` after every poll carries the
+  default-branch CI, the viewer's PRs on a branch), GetPullRequest (on demand). The daemon
+  tracks the GitHub repositories of registered projects itself. Its events are
+  EventService's `gh` source: data events go out only when data changed; `Polled` after every poll carries the
   freshness time. The PR detail panel: GetPullRequestDetail (on demand, cached per PR,
   invalidated by the poll's fingerprints), ListReviewerCandidates, SetReviewRequest,
   RevertPullRequest (`docs/notes/gh-pr-detail.md`), MergePullRequest, SetPullRequestDraft,
@@ -368,7 +367,7 @@ Services (v1):
   `docs/notes/pr-review-submit-1-daemon.md`), and GetPullRequestDiff and GetPullRequestFile
   for the panel's Code tab (§7).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
-  Reveal, OpenUrl, List, Watch. One operation at a time per worktree; a failed operation
+  Reveal, OpenUrl. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
   the git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url commands, plus
   two direct reads: ListEditorApps and ListAppIcons (Finder's and the editors' icons,
@@ -385,7 +384,7 @@ Services (v1):
   published, for the dictation overlay's page); PublishThemeReport (the GUI's contrast
   report on a user theme, which `theme save` and `theme check` print); WatchShots and
   PublishShot (the app's host is the one capturer of `plugin surface --shot`'s PNGs,
-  `internal/shot`; it holds WatchShots and answers one request at a time, `gui/shot.go`); Emit (from CLI). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
+  `internal/shot`; it holds WatchShots and answers one request at a time, `gui/shot.go`). Commands emit intents in-process (`command.BusEmitter`). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
   changes only that thread's side panel and never a window's selection; `ui.presence`
   tells a thread's model whether the user is looking and whether a window shows its
   thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
@@ -395,7 +394,7 @@ Services (v1):
   settings, update, action, plugin, skill, memory, search, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
-  stream; the per-service Watch RPCs remain for the CLI and tests. Live events pass
+  stream, and `code-foundry events --source …` reads the same one. Live events pass
   through one hub that numbers them (`Event.seq`, one daemon-wide sequence) and keeps
   the last 4096; `since_seq` resumes a stream without snapshots while they cover it
   (`code-foundry events --since`; `docs/notes/agents-1-wait-events.md`). Every event
@@ -407,7 +406,7 @@ Services (v1):
   visible and key), which any store can read and subscribe to: its kind paces the
   GitHub poll (`docs/notes/gh-poll-tiers.md`), attended decides whether an open thread
   view counts as seen (`docs/notes/alerts-foreground.md`).
-* `SettingsService` — GetSchema, Get, Update, Watch over `$CONFIG/settings.toml` (TOML,
+* `SettingsService` — GetSchema, Get, Update over `$CONFIG/settings.toml` (TOML,
   hand-editable, reloaded on change). See `docs/notes/phase3b-settings.md`. ListBackdrops,
   ImportBackdrop, RemoveBackdrop and ReadBackdrop keep the user's backdrop images (copies in
   `$CONFIG/backdrops`, internal/store/backdrop) that `appearance.backdrop = custom` shows
@@ -428,7 +427,7 @@ Services (v1):
   the halves separately and install nothing. See `docs/notes/update-restart.md`,
   `docs/notes/update-download-then-install.md` and `docs/notes/release-channels.md`.
 * `WorkspaceService` — List, Create, AddProject, RemoveProject, Rename, SetDefaultPrimary,
-  SetRoot, Remove, Watch. A workspace is a saved set of projects (`members`, sorted ids), a
+  SetRoot, Remove. A workspace is a saved set of projects (`members`, sorted ids), a
   `default_primary` (a member or `workspace`; a project named "workspace" wins over the
   keyword), an optional `root_path` (under home, never home itself nor inside a
   registered project; `root_missing` when it moved, which SetRoot repairs) and a managed
@@ -437,7 +436,7 @@ Services (v1):
   its root's, re-checked at every spawn, and its files are read from the root itself.
   Names are NFC and never look like an id. The daemon drops unregistered projects from
   every workspace and refuses removing a synthetic one while a thread that is not
-  archived runs in its managed dir; Watch reads every folder again on subscribe. No
+  archived runs in its managed dir; the workspace events source reads every folder again on connect. No
   branch, no worktrees. See `docs/notes/workspaces-v2-2-workspaces.md` and
   `docs/notes/workspaces-v2-fix-1-workspace.md`. The GUI gets workspaces from
   EventService's `workspace` source (a `workspaces` slice).
@@ -460,7 +459,7 @@ Services (v1):
   verb refuses what the tab could not edit, nothing from inside the file reaches its answer, and
   the tab's Save and tell thread sends one ordinary message after the write
   (`docs/notes/file-edit-3-agent.md`).
-* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, LastRun, Watch. Per-project
+* `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, LastRun. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and
   their runs (in memory, 50 per project; a record of each run, 500 per project, persists
@@ -474,7 +473,7 @@ Services (v1):
   (`docs/notes/actions-1-daemon.md`). The action.* commands are the CLI's surface.
 * `PluginService` — List, Enable (with consent, else the text to consent to), Disable,
   Restart, Dev (link a folder and enable it), Reload, Logs, FollowLogs, ListSecrets,
-  DeleteSecret, Watch, and the registry's Browse, RefreshRegistries, Install, Update and
+  DeleteSecret, and the registry's Browse (`refresh` reads every registry again), Install, Update and
   Uninstall (`docs/notes/plugins-7-registry.md`). Plugins are executables in `$CONFIG/plugins/<name>` the daemon runs
   and speaks newline-delimited JSON-RPC 2.0 with over stdio; their manifest commands are
   `plugin.<name>.<command>` (§10; `docs/notes/plugins-1-core.md`; design in
@@ -490,10 +489,10 @@ Services (v1):
   `api.PluginFeed` on the same loop as Watch, a bounded drop-oldest queue per plugin) and
   raise flags on threads (`thread/setFlag`; `Thread.flags`, ThreadService.ClearFlags,
   `thread flags`); `docs/notes/plugins-3-events-flags-env.md`.
-* `SkillService` — Search, Installed, Registries, Watch (the epoch): the Skills
+* `SkillService` — Search, Installed, Registries: the Skills
   marketplace, read only; its actions are the `skill.*` commands (§10;
   `docs/notes/skills-3-api.md`).
-* `MemoryService` — Get, Watch (the whole memory with provenance and caps): the app
+* `MemoryService` — Get (the whole memory with provenance and caps): the app
   memory, read only; its actions are the `memory.*` commands (`docs/notes/memory-dir.md`).
   The GUI shows it on Settings › Memory, fed by the EventService memory source
   (`docs/notes/memory-page.md`).
@@ -511,12 +510,12 @@ Services (v1):
   search, a hidden claude -p run on the utility model that searches the user's threads with
   the CLI and reports quote-verified hits; Promote continues it as a thread
   (`docs/notes/search-5-agent-daemon.md`).
-* `ThemeService` — List, Watch: the curated catalog's ids and the user's theme files with
-  their contents (`internal/theme`, `internal/store/usertheme`, files in `<config
-  home>/themes`), read only; the `theme.*` commands save, copy and delete, and the
-  `appearance.theme_dark` / `theme_light` settings pick. The daemon derives no colour: the
-  GUI resolves every theme's slots (`docs/notes/user-themes.md`, `docs/THEMES.md`). The GUI
-  gets it from EventService's `theme` source.
+* The colour themes have no service of their own: EventService's `theme` source carries
+  the curated catalog's ids and the user's theme files with their contents
+  (`internal/theme`, `internal/store/usertheme`, files in `<config home>/themes`); the
+  `theme.*` commands save, copy and delete, and the `appearance.theme_dark` /
+  `theme_light` settings pick. The daemon derives no colour: the GUI resolves every
+  theme's slots (`docs/notes/user-themes.md`, `docs/THEMES.md`).
 * `HealthService` — Ping, Version.
 
 Rules:
@@ -701,7 +700,7 @@ Owns the Claude processes. It uses the terminal store only to reap a thread's sh
   `docs/notes/recreate-last-head.md`).
   A conversation whose transcript Claude Code deleted (its `cleanupPeriodDays`) cannot
   continue: the start is refused (`ErrTranscriptMissing`, FAILED_PRECONDITION, nothing
-  written; Send, Reconnect, Fork and the MCP and slash command queries alike) and
+  written; Send, Fork and the MCP and slash command queries alike) and
   `Thread.transcript_missing` says so, checked at daemon start, when a process ends and on
   a refusal, never per snapshot; a reseed is the one way to start over, and a resident
   thread starts a new conversation as before (`transcriptmissing.go`,
@@ -1025,7 +1024,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   resident thread exists, a pinned row above New thread (the flame glyph,
   `components/ember/Flame.tsx`, in its idle, thinking, working or attention state; "Ember"
   and a status line; the thread list's arrows reach it) opens Ember's chat in the content
-  pane. The chat is the resident thread's own Watch and timeline list (ThreadPane routes a
+  pane. The chat is the resident thread's own WatchThread and timeline list (ThreadPane routes a
   resident `ember` thread to `components/ember/EmberPane.tsx`) with its own rows
   (`lib/ember.ts` `buildEmberRows`): the user's messages and Ember's text show, and every
   run of work between them (tool calls, subagents, wakes) folds into one "Worked for" row;
@@ -1217,8 +1216,8 @@ the store's too: a plugin is `claude plugin install|enable|disable|update|uninst
 renamed), moves to and from `<home>/skills/disabled` and records; a setup script runs
 only in a visible `kind=setup` bottom-panel terminal (`skill.setup`), whose exit 0 the
 daemon records. The `skill.*` commands drive it. `SkillService`
-(`docs/notes/skills-3-api.md`) only reads (`Search`, `Installed`, `Registries`; `Watch`
-and the EventService skill source carry the epoch); the GUI's `stores/skill.ts` re-reads
+(`docs/notes/skills-3-api.md`) only reads (`Search`, `Installed`, `Registries`; the
+EventService skill source carries the epoch); the GUI's `stores/skill.ts` re-reads
 on a new epoch while the page is open and runs the `skill.*` commands for every action.
 
 ## 11. Conventions
