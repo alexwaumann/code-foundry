@@ -9,7 +9,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 )
 
-// GetWorktreeDetail returns a worktree's files and log against its base.
+// GetWorktreeDetail returns a worktree's files against its base.
 func (h *Project) GetWorktreeDetail(ctx context.Context, req *connect.Request[v1.GetWorktreeDetailRequest]) (*connect.Response[v1.GetWorktreeDetailResponse], error) {
 	d, err := h.store.WorktreeDetail(ctx, req.Msg.GetProjectId(), req.Msg.GetPath())
 	if err != nil {
@@ -23,8 +23,6 @@ func worktreeDetailToProto(d project.WorktreeDetail) *v1.WorktreeDetail {
 		ProjectId: d.ProjectID, Path: d.Path, BaseRef: d.BaseRef, MergeBase: d.MergeBase, Head: d.Head,
 		Files:          make([]*v1.FileChange, len(d.Files)),
 		FilesTruncated: d.FilesTruncated,
-		Log:            make([]*v1.LogEntry, len(d.Log)),
-		LogTotal:       int32(d.LogTotal),
 		ComputedAt:     timestamp(d.ComputedAt),
 		Error:          d.Error,
 	}
@@ -33,12 +31,6 @@ func worktreeDetailToProto(d project.WorktreeDetail) *v1.WorktreeDetail {
 			Path: f.Path, OldPath: f.OldPath, Status: f.Status,
 			Added: int32(f.Added), Deleted: int32(f.Deleted),
 			Binary: f.Binary, Uncommitted: f.Uncommitted,
-		}
-	}
-	for i, e := range d.Log {
-		p.Log[i] = &v1.LogEntry{
-			Sha: e.SHA, ShortSha: e.ShortSHA, Subject: e.Subject,
-			AuthorName: e.AuthorName, AuthorEmail: e.AuthorEmail, AuthoredAt: timestamp(e.AuthoredAt),
 		}
 	}
 	return p

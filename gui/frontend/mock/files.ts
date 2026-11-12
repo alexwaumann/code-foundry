@@ -12,7 +12,7 @@
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
-import { timestampFromMs, type Timestamp } from "@bufbuild/protobuf/wkt";
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type ListCompareCommitsResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
@@ -49,7 +49,6 @@ export interface DetailFiles {
   projectId: string;
   baseRef?: string;
   files?: ChangedFile[];
-  log?: { sha?: string; shortSha?: string; subject?: string; authoredAt?: Timestamp }[];
 }
 
 const CF = `${HOME}/src/code-foundry`;
@@ -520,19 +519,17 @@ export class MockFiles {
     return { ...meta, files, totalFiles: files.length, totalAdded: files.reduce((n, f) => n + f.added, 0), totalDeleted: files.reduce((n, f) => n + f.deleted, 0) };
   }
 
-  /** The commits of a comparison: the worktree's log whatever the sides, each the next one's child; the last is a root. */
+  /** The commits of a comparison, whatever the sides (the count compare/commits sets), each the next one's child; the last is a root. */
   compareCommits(worktree: string): CompareLogInit {
     const log = this.compareLog(worktree);
     const commits = log.map((e, i) => ({ sha: e.sha, shortSha: e.shortSha, subject: i === 0 ? `${e.subject ?? ""}${" long".repeat(this.longCommitSubject / 5)}` : e.subject, authoredAt: e.authoredAt, parent: log[i + 1]?.sha ?? "" }));
     return { commits, total: commits.length };
   }
 
-  /** The worktree's log and the older commits asked for. */
+  /** The commits asked for, newest first. */
   private compareLog(worktree: string) {
-    const detail = this.detailOf(worktree);
-    if (!detail) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
-    const older = Array.from({ length: this.extraCompareCommits }, (_, i) => ({ sha: `e${String(i).padStart(39, "0")}`, shortSha: `e${String(i).padStart(6, "0")}`, subject: `Older commit ${String(i).padStart(4, "0")}`, authoredAt: timestampFromMs(Date.now() - (i + 1) * 3_600_000) }));
-    return [...(detail.log ?? []), ...older];
+    if (!this.detailOf(worktree)) throw new ConnectError(`worktree ${worktree} not found`, Code.NotFound);
+    return Array.from({ length: this.extraCompareCommits }, (_, i) => ({ sha: `e${String(i).padStart(39, "0")}`, shortSha: `e${String(i).padStart(6, "0")}`, subject: `Older commit ${String(i).padStart(4, "0")}`, authoredAt: timestampFromMs(Date.now() - (i + 1) * 3_600_000) }));
   }
 
   /** The message under a commit's subject: the newest commit has one. */

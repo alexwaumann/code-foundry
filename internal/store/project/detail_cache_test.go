@@ -34,7 +34,7 @@ func (r *recordingRunner) take() []string {
 }
 
 // gitLabel names a git command by its subcommand and the flag that tells same-named
-// commands apart: "diff --name-status", "rev-list --count".
+// commands apart: "diff --name-status", "rev-list --left-right".
 func gitLabel(args []string) string {
 	switch args[0] {
 	case "diff":
@@ -55,14 +55,12 @@ const (
 	gAheadBhd   = "rev-list --left-right"
 	gMergeBase  = "merge-base"
 	gNameStatus = "diff --name-status"
-	gLog        = "log"
-	gLogTotal   = "rev-list --count"
 	gNumstat    = "diff --numstat"
 	gMergeTree  = "merge-tree"
 )
 
 // headOnly is what a changed (HEAD, base) key costs a clean worktree's detail.
-var headOnly = []string{gMergeBase, gNameStatus, gLog, gLogTotal, gNumstat}
+var headOnly = []string{gMergeBase, gNameStatus, gNumstat}
 
 // workingTree is what every recompute of a dirty worktree's detail costs: the
 // uncommitted letters and untracked files come from the status job's entries.
@@ -167,7 +165,7 @@ func TestDetailCache(t *testing.T) {
 				name: "unchanged", mutate: noop,
 				wantBase: []string{gRevParse}, wantStatus: []string{gStatus},
 				check: func(t *testing.T, wt Worktree, d WorktreeDetail) {
-					if wt.Status.BaseAhead != 1 || d.LogTotal != 1 ||
+					if wt.Status.BaseAhead != 1 ||
 						!slices.Equal(d.Files, []FileChange{{Path: "a.txt", Status: "A", Added: 2}}) {
 						t.Errorf("status %+v, detail %+v", wt.Status, d)
 					}
@@ -188,7 +186,7 @@ func TestDetailCache(t *testing.T) {
 				wantBase: []string{gRevParse}, wantStatus: []string{gStatus}, wantDetail: workingTree,
 				wantWorktreeEv: true, wantDetailEv: true,
 				check: func(t *testing.T, wt Worktree, d WorktreeDetail) {
-					if wt.Status.Untracked != 2 || len(d.Files) != 3 || d.LogTotal != 1 {
+					if wt.Status.Untracked != 2 || len(d.Files) != 3 {
 						t.Errorf("status %+v, files %+v", wt.Status, d.Files)
 					}
 				},
@@ -202,7 +200,7 @@ func TestDetailCache(t *testing.T) {
 				wantBase: []string{gRevParse}, wantStatus: []string{gStatus, gAheadBhd}, wantDetail: headOnly,
 				wantWorktreeEv: true, wantDetailEv: true,
 				check: func(t *testing.T, wt Worktree, d WorktreeDetail) {
-					if wt.Status.BaseAhead != 2 || d.Head != wt.Head || d.LogTotal != 2 || len(d.Files) != 2 {
+					if wt.Status.BaseAhead != 2 || d.Head != wt.Head || len(d.Files) != 2 {
 						t.Errorf("status %+v, detail %+v", wt.Status, d)
 					}
 				},
@@ -223,14 +221,14 @@ func TestDetailCache(t *testing.T) {
 					git(t, c.f.other, "push", "-q")
 					git(t, c.f.project, "fetch", "-q")
 				},
-				// Everything is recomputed for the new base sha; the merge base, files,
-				// and log come out the same, so only the status announces a change. Now
+				// Everything is recomputed for the new base sha; the merge base and files
+				// come out the same, so only the status announces a change. Now
 				// ahead and behind, the status also checks whether a copy of the branch
 				// landed (merged.go: the base tree, then a merge-tree).
 				wantBase: []string{gRevParse}, wantStatus: []string{gStatus, gAheadBhd, gRevParse, gMergeTree}, wantDetail: headOnly,
 				wantWorktreeEv: true, wantDetailEv: false,
 				check: func(t *testing.T, wt Worktree, d WorktreeDetail) {
-					if wt.Status.BaseAhead != 1 || wt.Status.BaseBehind != 1 || d.LogTotal != 1 ||
+					if wt.Status.BaseAhead != 1 || wt.Status.BaseBehind != 1 ||
 						!slices.Equal(d.Files, []FileChange{{Path: "a.txt", Status: "A", Added: 2}}) {
 						t.Errorf("status %+v, detail %+v", wt.Status, d)
 					}
@@ -318,7 +316,7 @@ func TestDetailCache(t *testing.T) {
 				// The local base is resolved per detail; the head part is reused.
 				wantBase: []string{gRevParse}, wantStatus: []string{gStatus}, wantDetail: []string{gRevParse},
 				check: func(t *testing.T, wt Worktree, d WorktreeDetail) {
-					if d.BaseRef != "main" || d.LogTotal != 1 || wt.Status.BaseRef != "" {
+					if d.BaseRef != "main" || d.MergeBase == "" || wt.Status.BaseRef != "" {
 						t.Errorf("status %+v, detail %+v", wt.Status, d)
 					}
 				},
@@ -331,7 +329,7 @@ func TestDetailCache(t *testing.T) {
 				},
 				wantBase: []string{gRevParse}, wantStatus: []string{gStatus},
 				wantDetail:   append([]string{gRevParse}, headOnly...),
-				wantDetailEv: false, // same merge base, files, and log
+				wantDetailEv: false, // same merge base and files
 			}},
 		},
 	}

@@ -486,9 +486,8 @@ message ActivityStats {
 }
 
 message GetDashboardRequest {
-  // Deprecated: ignored. The lists always hold every repository (they were filtered to
-  // tracked ones unless this was set).
-  bool include_untracked = 1;
+  reserved 1;
+  reserved "include_untracked";
 }
 
 message GetDashboardResponse {

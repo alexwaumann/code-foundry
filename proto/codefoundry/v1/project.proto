@@ -701,8 +701,7 @@ message WorktreeDetail {
   string project_id = 1;
   string path = 2;
   // The ref compared against ("origin/main", or "main" without a remote). Empty when
-  // there is none (or HEAD is unborn): files then hold only uncommitted changes and
-  // log is empty.
+  // there is none (or HEAD is unborn): files then hold only uncommitted changes.
   string base_ref = 3;
   // `git merge-base HEAD <base_ref>`.
   string merge_base = 4;
@@ -712,14 +711,12 @@ message WorktreeDetail {
   repeated FileChange files = 6;
   // More than the cap (2000) changed; files holds the first ones by path.
   bool files_truncated = 7;
-  // Commits on HEAD not on base_ref, newest first, at most 100.
-  repeated LogEntry log = 8;
-  // How many commits are on HEAD and not on base_ref.
-  int32 log_total = 9;
   google.protobuf.Timestamp computed_at = 10;
   // Non-empty when computing failed; the other fields are then from the last success
   // (or empty).
   string error = 11;
+  reserved 8, 9;
+  reserved "log", "log_total";
 }
 
 message FileChange {
@@ -741,15 +738,6 @@ message FileChange {
   // directories are expanded to their files now.
   reserved 8;
   reserved "is_dir";
-}
-
-message LogEntry {
-  string sha = 1;
-  string short_sha = 2;
-  string subject = 3;
-  string author_name = 4;
-  string author_email = 5;
-  google.protobuf.Timestamp authored_at = 6;
 }
 
 message ProjectSnapshot {

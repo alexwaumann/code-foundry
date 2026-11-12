@@ -3698,13 +3698,12 @@ func (x *PluginEnvironmentRequest) GetName() string {
 	return ""
 }
 
-// PluginEnvVar is one environment variable a plugin contributes.
+// PluginEnvVar is one environment variable a plugin contributes, its key only: a plugin
+// may push a token, so values stay in the daemon (and the threads it spawns)
+// (docs/notes/plugins-8-secrets-hardening.md).
 type PluginEnvVar struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	// Never filled: a plugin may push a token, so values stay in the daemon (and the
-	// threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
-	Value         string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3742,13 +3741,6 @@ func (*PluginEnvVar) Descriptor() ([]byte, []int) {
 func (x *PluginEnvVar) GetKey() string {
 	if x != nil {
 		return x.Key
-	}
-	return ""
-}
-
-func (x *PluginEnvVar) GetValue() string {
-	if x != nil {
-		return x.Value
 	}
 	return ""
 }
@@ -5290,10 +5282,9 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\x06height\x18\x03 \x01(\x05R\x06height\x12%\n" +
 	"\x0econtent_height\x18\x04 \x01(\x05R\rcontentHeight\".\n" +
 	"\x18PluginEnvironmentRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"6\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"-\n" +
 	"\fPluginEnvVar\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\xa7\x02\n" +
+	"\x03key\x18\x01 \x01(\tR\x03keyJ\x04\b\x02\x10\x03R\x05value\"\xa7\x02\n" +
 	"\x11PluginEnvironment\x12\x16\n" +
 	"\x06plugin\x18\x01 \x01(\tR\x06plugin\x12.\n" +
 	"\x03env\x18\x02 \x03(\v2\x1c.codefoundry.v1.PluginEnvVarR\x03env\x12!\n" +

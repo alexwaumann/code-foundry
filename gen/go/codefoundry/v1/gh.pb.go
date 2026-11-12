@@ -2185,12 +2185,9 @@ func (x *ActivityStats) GetLastError() string {
 }
 
 type GetDashboardRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Deprecated: ignored. The lists always hold every repository (they were filtered to
-	// tracked ones unless this was set).
-	IncludeUntracked bool `protobuf:"varint,1,opt,name=include_untracked,json=includeUntracked,proto3" json:"include_untracked,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetDashboardRequest) Reset() {
@@ -2221,13 +2218,6 @@ func (x *GetDashboardRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetDashboardRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardRequest) Descriptor() ([]byte, []int) {
 	return file_codefoundry_v1_gh_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *GetDashboardRequest) GetIncludeUntracked() bool {
-	if x != nil {
-		return x.IncludeUntracked
-	}
-	return false
 }
 
 type GetDashboardResponse struct {
@@ -5810,9 +5800,8 @@ const file_codefoundry_v1_gh_proto_rawDesc = "" +
 	"\n" +
 	"last_error\x18\x05 \x01(\tR\tlastErrorJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\n" +
 	"this_monthR\n" +
-	"last_month\"B\n" +
-	"\x13GetDashboardRequest\x12+\n" +
-	"\x11include_untracked\x18\x01 \x01(\bR\x10includeUntracked\"\xe3\x06\n" +
+	"last_month\".\n" +
+	"\x13GetDashboardRequestJ\x04\b\x01\x10\x02R\x11include_untracked\"\xe3\x06\n" +
 	"\x14GetDashboardResponse\x120\n" +
 	"\x06viewer\x18\x01 \x01(\v2\x18.codefoundry.v1.GhViewerR\x06viewer\x12$\n" +
 	"\rauthenticated\x18\x02 \x01(\bR\rauthenticated\x127\n" +

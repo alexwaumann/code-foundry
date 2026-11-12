@@ -14,8 +14,8 @@ import (
 	"unicode/utf8"
 )
 
-// Worktree detail: the files changed and commits on a worktree against its base, computed
-// by git on demand. A worktree someone asked about within DetailWatch is recomputed after
+// Worktree detail: the files changed on a worktree against its base, computed by git on
+// demand. A worktree someone asked about within DetailWatch is recomputed after
 // each of its status refreshes (fs events, the backstop poll, Refresh), so the Changes
 // list and the file finder stay live; others cost nothing.
 
@@ -24,8 +24,6 @@ const (
 	// DetailWatch is how long after a GetWorktreeDetail call status refreshes also
 	// recompute the detail.
 	DetailWatch = 10 * time.Minute
-	// DetailLogMax caps WorktreeDetail.Log.
-	DetailLogMax = 100
 	// DetailFilesMax caps WorktreeDetail.Files.
 	DetailFilesMax = 2000
 	// untrackedReadMax bounds how much of an untracked file is read to count lines.
@@ -51,13 +49,6 @@ type FileChange struct {
 	Uncommitted bool
 }
 
-// LogEntry is one commit.
-type LogEntry struct {
-	SHA, ShortSHA, Subject  string
-	AuthorName, AuthorEmail string
-	AuthoredAt              time.Time
-}
-
 // WorktreeDetail is a worktree compared with its base.
 type WorktreeDetail struct {
 	ProjectID string
@@ -70,8 +61,6 @@ type WorktreeDetail struct {
 	Head           string
 	Files          []FileChange
 	FilesTruncated bool
-	Log            []LogEntry // newest first, at most DetailLogMax
-	LogTotal       int
 	ComputedAt     time.Time
 	Error          string // last computation error; other fields are from the last success
 }
@@ -117,15 +106,13 @@ type headKey struct {
 }
 
 // headPart is the part of a detail that is a pure function of its key: the merge
-// base, the committed changes and the log (merge-base, diff --name-status <mb> <head>,
-// log, rev-list --count), plus, once a clean recompute needed them, the files of a
-// clean worktree (diff --numstat <mb> <head>). Immutable once stored.
+// base and the committed changes (merge-base, diff --name-status <mb> <head>), plus,
+// once a clean recompute needed them, the files of a clean worktree (diff --numstat
+// <mb> <head>). Immutable once stored.
 type headPart struct {
 	key       headKey
 	mergeBase string
 	committed []nameStatus
-	log       []LogEntry
-	logTotal  int
 	// clean is the file list of a clean worktree at key; nil until first needed.
 	clean *cleanFiles
 }
@@ -321,7 +308,7 @@ func gitDiff(extra ...string) []string {
 	return append(args, extra...)
 }
 
-// fillDetail fills d's merge base, files, and log, and returns the head part it used
+// fillDetail fills d's merge base and files, and returns the head part it used
 // (hp when its key still matches, else a fresh one) and how many git commands ran.
 // d.BaseRef and d.Head are set; baseSHA is d.BaseRef resolved.
 //
@@ -355,7 +342,7 @@ func (g *Git) fillDetail(ctx context.Context, d *WorktreeDetail, baseSHA string,
 			return nil, runs, err
 		}
 	}
-	d.MergeBase, d.Log, d.LogTotal = hp.mergeBase, hp.log, hp.logTotal
+	d.MergeBase = hp.mergeBase
 
 	if clean && d.Head != "" {
 		if hp.clean == nil {
@@ -483,8 +470,8 @@ func countUntracked(dir string, files []FileChange, prev lineMemo) (lineMemo, in
 	return next, reads
 }
 
-// computeHeadPart runs the HEAD-only commands for key: merge-base, the committed
-// name-status, the log, and its total. No base (or no merge base) leaves them empty.
+// computeHeadPart runs the HEAD-only commands for key: merge-base and the committed
+// name-status. No base (or no merge base) leaves them empty.
 func computeHeadPart(key headKey, run func(...string) ([]byte, error)) (*headPart, error) {
 	hp := &headPart{key: key}
 	if key.baseSHA == "" {
@@ -505,15 +492,6 @@ func computeHeadPart(key headKey, run func(...string) ([]byte, error)) (*headPar
 		return nil, err
 	}
 	hp.committed = parseNameStatusZ(out)
-	rng := key.baseSHA + ".." + key.head
-	if out, err = run("log", "-n", strconv.Itoa(DetailLogMax), "--no-color", "--format="+logFormat, rng); err != nil {
-		return nil, err
-	}
-	hp.log = parseLog(out)
-	if out, err = run("rev-list", "--count", rng); err != nil {
-		return nil, err
-	}
-	hp.logTotal, _ = strconv.Atoi(string(trimNL(out)))
 	return hp, nil
 }
 
@@ -565,8 +543,7 @@ func mergeFiles(committed, uncommitted []nameStatus, counts map[string]numstat, 
 
 func sameDetail(a, b WorktreeDetail) bool {
 	return a.BaseRef == b.BaseRef && a.MergeBase == b.MergeBase && a.Head == b.Head && a.Error == b.Error &&
-		a.FilesTruncated == b.FilesTruncated && a.LogTotal == b.LogTotal &&
-		slices.Equal(a.Files, b.Files) && slices.Equal(a.Log, b.Log)
+		a.FilesTruncated == b.FilesTruncated && slices.Equal(a.Files, b.Files)
 }
 
 // ---- parsers ---------------------------------------------------------------------
@@ -637,33 +614,6 @@ func parseNumstatZ(out []byte) map[string]numstat {
 			i += 2
 		}
 		res[path] = n
-	}
-	return res
-}
-
-// logFormat separates fields with US (0x1f) and records with RS (0x1e).
-const logFormat = "%H%x1f%h%x1f%an%x1f%ae%x1f%at%x1f%s%x1e"
-
-// validUTF8 replaces what is not UTF-8 (a commit with no encoding header passes through
-// raw), which would fail the whole response.
-func validUTF8(s string) string { return strings.ToValidUTF8(s, "\uFFFD") }
-
-func parseLog(out []byte) []LogEntry {
-	var res []LogEntry
-	for rec := range strings.SplitSeq(string(out), "\x1e") {
-		rec = strings.TrimLeft(rec, "\n")
-		if rec == "" {
-			continue
-		}
-		f := strings.SplitN(rec, "\x1f", 6)
-		if len(f) != 6 {
-			continue
-		}
-		e := LogEntry{SHA: f[0], ShortSHA: f[1], AuthorName: validUTF8(f[2]), AuthorEmail: validUTF8(f[3]), Subject: validUTF8(f[5])}
-		if sec, err := strconv.ParseInt(f[4], 10, 64); err == nil {
-			e.AuthoredAt = time.Unix(sec, 0)
-		}
-		res = append(res, e)
 	}
 	return res
 }

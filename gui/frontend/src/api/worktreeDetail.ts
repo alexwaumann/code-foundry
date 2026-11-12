@@ -13,15 +13,6 @@ export interface FileChangeView {
   uncommitted: boolean;
 }
 
-export interface LogEntryView {
-  sha: string;
-  shortSha: string;
-  subject: string;
-  authorName: string;
-  authorEmail: string;
-  authoredAtMs: number | null;
-}
-
 /** ProjectService.GetWorktreeDetail: a worktree against its base. */
 export interface WorktreeDetailView {
   projectId: string;
@@ -31,8 +22,6 @@ export interface WorktreeDetailView {
   head: string;
   files: FileChangeView[];
   filesTruncated: boolean;
-  log: LogEntryView[];
-  logTotal: number;
   computedAtMs: number | null;
   error: string;
 }
@@ -54,15 +43,6 @@ export function toWorktreeDetailView(d: WorktreeDetail): WorktreeDetailView {
       uncommitted: f.uncommitted,
     })),
     filesTruncated: d.filesTruncated,
-    log: d.log.map((l) => ({
-      sha: l.sha,
-      shortSha: l.shortSha,
-      subject: l.subject,
-      authorName: l.authorName,
-      authorEmail: l.authorEmail,
-      authoredAtMs: ms(l.authoredAt),
-    })),
-    logTotal: d.logTotal,
     computedAtMs: ms(d.computedAt),
     error: d.error,
   };

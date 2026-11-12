@@ -54,29 +54,6 @@ func TestParseNumstatZ(t *testing.T) {
 	}
 }
 
-func TestParseLog(t *testing.T) {
-	in := "abc123\x1fabc\x1fAda\x1fada@x.org\x1f1700000000\x1ffeat: x | y\x1e\n" +
-		"def456\x1fdef\x1fBob\x1fbob@x.org\x1f1700000100\x1fsubject with \x1f inside\x1e\n"
-	got := parseLog([]byte(in))
-	if len(got) != 2 {
-		t.Fatalf("got %d entries", len(got))
-	}
-	want0 := LogEntry{SHA: "abc123", ShortSHA: "abc", AuthorName: "Ada", AuthorEmail: "ada@x.org",
-		AuthoredAt: time.Unix(1700000000, 0), Subject: "feat: x | y"}
-	if got[0] != want0 {
-		t.Errorf("entry 0 = %+v", got[0])
-	}
-	if got[1].Subject != "subject with \x1f inside" {
-		t.Errorf("entry 1 subject = %q", got[1].Subject)
-	}
-
-	// A commit with no encoding header passes through raw; a response must be UTF-8.
-	got = parseLog([]byte("abc123\x1fabc\x1fJos\xe9\x1fj\xe9@x.org\x1f1700000000\x1fcaf\xe9\x1e\n"))
-	if len(got) != 1 || got[0].AuthorName != "Jos\uFFFD" || got[0].AuthorEmail != "j\uFFFD@x.org" || got[0].Subject != "caf\uFFFD" {
-		t.Errorf("latin-1 entry = %+v", got)
-	}
-}
-
 func TestMergeFiles(t *testing.T) {
 	committed := []nameStatus{{status: "A", path: "new.go"}, {status: "M", path: "both.go"}, {status: "R", oldPath: "a", path: "b"}}
 	uncommitted := []nameStatus{{status: "M", path: "both.go"}, {status: "D", path: "wt-deleted.go"}}
@@ -207,17 +184,13 @@ func TestWorktreeDetail(t *testing.T) {
 	if !slices.Equal(d.Files, want) {
 		t.Errorf("files:\n got %+v\nwant %+v", d.Files, want)
 	}
-	if d.LogTotal != 2 || len(d.Log) != 2 || d.Log[0].Subject != "chore: rename x" || d.Log[1].Subject != "feat: add F" ||
-		d.Log[0].AuthorName != "Test" || d.Log[0].ShortSHA == "" || d.Log[0].AuthoredAt.IsZero() {
-		t.Errorf("log = %d %+v", d.LogTotal, d.Log)
-	}
 
 	// Main worktree, clean and level with origin/main: nothing changed.
 	m, err := h.store.WorktreeDetail(ctx, r.ID, f.project)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.BaseRef != "origin/main" || len(m.Files) != 0 || len(m.Log) != 0 || m.LogTotal != 0 {
+	if m.BaseRef != "origin/main" || len(m.Files) != 0 {
 		t.Errorf("main detail = %+v", m)
 	}
 
@@ -461,7 +434,7 @@ func TestWorktreeDetailCleanUsesTreeDiff(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []FileChange{{Path: "a.txt", Status: "A", Added: 3}}
-	if !slices.Equal(d.Files, want) || d.LogTotal != 1 {
+	if !slices.Equal(d.Files, want) {
 		t.Errorf("clean detail = %+v", d)
 	}
 }

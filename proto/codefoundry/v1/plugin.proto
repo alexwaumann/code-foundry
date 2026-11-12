@@ -583,12 +583,13 @@ message PluginEnvironmentRequest {
   string name = 1;
 }
 
-// PluginEnvVar is one environment variable a plugin contributes.
+// PluginEnvVar is one environment variable a plugin contributes, its key only: a plugin
+// may push a token, so values stay in the daemon (and the threads it spawns)
+// (docs/notes/plugins-8-secrets-hardening.md).
 message PluginEnvVar {
   string key = 1;
-  // Never filled: a plugin may push a token, so values stay in the daemon (and the
-  // threads it spawns); clients show the key (docs/notes/plugins-8-secrets-hardening.md).
-  string value = 2;
+  reserved 2;
+  reserved "value";
 }
 
 // PluginEnvironment is one plugin's contribution to new Claude threads, as applied.

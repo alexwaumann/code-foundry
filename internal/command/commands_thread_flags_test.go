@@ -82,7 +82,7 @@ func TestPluginEnvCommand(t *testing.T) {
 	if res, err := reg.Invoke(context.Background(), command.Context{}, "plugin.env", nil); err != nil || res.Message != "no plugin adds anything to new threads" {
 		t.Fatalf("empty = %q, %v", res.Message, err)
 	}
-	b.Envs = []*v1.PluginEnvironment{{Plugin: "hello", Env: []*v1.PluginEnvVar{{Key: "CF_HELLO", Value: "1"}}, PathPrepend: []string{"/h/bin"},
+	b.Envs = []*v1.PluginEnvironment{{Plugin: "hello", Env: []*v1.PluginEnvVar{{Key: "CF_HELLO"}}, PathPrepend: []string{"/h/bin"},
 		AddDirs: []string{"/h/data"}, Projects: []string{"p1"}, NoProject: true, Issues: []string{"env PATH is reserved for Code Foundry and Claude"}}}
 	res, err := reg.Invoke(context.Background(), command.Context{}, "plugin.env", map[string]string{"name": "hello"})
 	want := "plugin hello\n  scope: projects p1, and threads without a project\n  env CF_HELLO\n  PATH += /h/bin\n  --add-dir /h/data\n" +

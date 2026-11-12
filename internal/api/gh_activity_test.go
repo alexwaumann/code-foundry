@@ -106,17 +106,6 @@ func TestGhDashboardListsEveryRepository(t *testing.T) {
 		t.Errorf("stats = %v", s)
 	}
 
-	//lint:ignore SA1019 the deprecated field must still be accepted, and change nothing
-	all, err := client.GetDashboard(ctx, connect.NewRequest(&v1.GetDashboardRequest{IncludeUntracked: true}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	// include_untracked is deprecated and changes nothing.
-	if numbers(all.Msg.GetAuthored()) != numbers(m.GetAuthored()) || numbers(all.Msg.GetReviewRequested()) != numbers(m.GetReviewRequested()) ||
-		numbers(all.Msg.GetReviewed()) != numbers(m.GetReviewed()) || numbers(all.Msg.GetRecentlyMerged()) != numbers(m.GetRecentlyMerged()) {
-		t.Errorf("include_untracked lists differ: %s %s", numbers(all.Msg.GetAuthored()), numbers(all.Msg.GetReviewed()))
-	}
-
 	// A renamed repository: search results carry its new name; they are the tracked
 	// slug's, under that slug.
 	store.SetCanonicalSlug("o/tracked", "neworg/tracked")
@@ -219,18 +208,17 @@ func TestProjectGetWorktreeDetail(t *testing.T) {
 	id := reg.Msg.GetProject().GetId()
 	at := time.Unix(1700000000, 0)
 	fake.SetDetail(project.WorktreeDetail{
-		ProjectID: id, Path: "/code/proj", BaseRef: "origin/main", MergeBase: "m", Head: "h", LogTotal: 101, ComputedAt: at,
+		ProjectID: id, Path: "/code/proj", BaseRef: "origin/main", MergeBase: "m", Head: "h", ComputedAt: at,
 		Files: []project.FileChange{{Path: "b", OldPath: "a", Status: "R", Added: 1, Deleted: 2, Uncommitted: true},
 			{Path: "d/notes.md", Status: "?", Added: 3, Uncommitted: true}},
-		Log: []project.LogEntry{{SHA: "h", ShortSHA: "h", Subject: "s", AuthorName: "A", AuthorEmail: "a@x", AuthoredAt: at}},
 	})
 	res, err := c.GetWorktreeDetail(ctx, connect.NewRequest(&v1.GetWorktreeDetailRequest{ProjectId: id, Path: "/code/proj"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	d := res.Msg.GetDetail()
-	if d.GetBaseRef() != "origin/main" || d.GetLogTotal() != 101 || len(d.GetFiles()) != 2 || len(d.GetLog()) != 1 ||
-		d.GetFiles()[0].GetOldPath() != "a" || d.GetFiles()[1].GetStatus() != "?" || d.GetFiles()[1].GetAdded() != 3 || d.GetLog()[0].GetAuthoredAt() == nil ||
+	if d.GetBaseRef() != "origin/main" || len(d.GetFiles()) != 2 ||
+		d.GetFiles()[0].GetOldPath() != "a" || d.GetFiles()[1].GetStatus() != "?" || d.GetFiles()[1].GetAdded() != 3 ||
 		!d.GetComputedAt().AsTime().Equal(at) {
 		t.Errorf("detail = %v", d)
 	}
