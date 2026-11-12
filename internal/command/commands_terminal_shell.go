@@ -46,10 +46,8 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 			Description: "Start a shell in the home folder, owned by nothing. " +
 				"It belongs to no thread or project: it ends when it exits or is closed, never because a thread or project goes. " +
 				"--argv runs something else; with --run, a command line is typed into it once it has printed its prompt.",
-			Category: "Terminal",
-			// The classic window shows it only on the Projects page's bottom panel; the
-			// shell window's terminal tabs list it (docs/notes/shell-5-terminal.md).
-			NoPalette: true,
+			Category:    "Terminal",
+			Keybindings: []string{"cmd+shift+t"},
 			Args: []ArgSpec{
 				{Name: "argv", Type: String, PageAsks: true, Description: `Command line, split like a shell would (e.g. "htop -d 5")`},
 				{Name: "run", Type: String, PageAsks: true, Description: "A command line typed into the new shell once it has printed its prompt, then Return"},

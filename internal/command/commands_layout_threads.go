@@ -38,7 +38,13 @@ func writeThreads(b *strings.Builder, threads map[string]*core.ThreadState, defa
 			continue
 		}
 		for _, rt := range ts.Remembered.Tabs {
-			fmt.Fprintf(b, "    remembered %s %s in pane %s", rt.Tab.ID, tabWords(rt.Tab, nil), rt.Pane)
+			fmt.Fprintf(b, "    remembered %s %s", rt.Tab.ID, tabWords(rt.Tab, nil))
+			if rt.Pane != "" {
+				fmt.Fprintf(b, " in pane %s", rt.Pane)
+			} else {
+				// No pane (the first-load import's records): opening the thread places it fresh.
+				b.WriteString(", placed fresh beside the thread")
+			}
 			if rt.Fresh != nil {
 				b.WriteString(" (comes back as a fresh shell")
 				if ran := rt.Fresh.Ran; ran != "" {
