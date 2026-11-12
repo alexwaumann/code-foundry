@@ -58,8 +58,6 @@ type Service interface {
 	// already in the file that the app cannot use stay in it and in the returned
 	// snapshot's Issues.
 	Update(ctx context.Context, partial map[string]string) (*Snapshot, error)
-	// Watch returns the current snapshot followed by every change until ctx ends.
-	Watch(ctx context.Context) <-chan *Snapshot
 }
 
 // Options configures Open.
@@ -458,37 +456,4 @@ func (s *Store) startWatcher(ctx context.Context) error {
 		}
 	}()
 	return nil
-}
-
-// Watch returns the current snapshot followed by every change until ctx ends. If the
-// consumer falls behind, intermediate snapshots are skipped, never the latest.
-func (s *Store) Watch(ctx context.Context) <-chan *Snapshot {
-	sub := bus.Subscribe[Changed](s.opts.Bus, 16)
-	out := make(chan *Snapshot, 1)
-	out <- s.Snapshot()
-	go func() {
-		defer close(out)
-		defer sub.Close()
-		dropped := uint64(0)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case ev, ok := <-sub.C():
-				if !ok {
-					return
-				}
-				snap := ev.Snapshot
-				if d := sub.Dropped(); d != dropped {
-					dropped, snap = d, s.Snapshot()
-				}
-				select {
-				case out <- snap:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-	return out
 }

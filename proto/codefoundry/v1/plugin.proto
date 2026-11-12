@@ -40,9 +40,6 @@ service PluginService {
   rpc ListSecrets(ListPluginSecretsRequest) returns (ListPluginSecretsResponse) {}
   // DeleteSecret removes one of a plugin's secrets from the Keychain.
   rpc DeleteSecret(DeletePluginSecretRequest) returns (DeletePluginSecretResponse) {}
-  // Watch sends a snapshot, then every change. A client that falls behind gets a new
-  // snapshot.
-  rpc Watch(WatchPluginsRequest) returns (stream PluginEvent) {}
   // WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
   // first watcher opens it in the plugin (surface/open), the last one leaving hides it
   // and, after a grace, closes it. It sends the instance's state first, then its current
@@ -384,8 +381,6 @@ message DeletePluginSecretRequest {
 }
 
 message DeletePluginSecretResponse {}
-
-message WatchPluginsRequest {}
 
 message PluginEvent {
   oneof event {

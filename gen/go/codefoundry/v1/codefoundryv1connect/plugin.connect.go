@@ -56,8 +56,6 @@ const (
 	// PluginServiceDeleteSecretProcedure is the fully-qualified name of the PluginService's
 	// DeleteSecret RPC.
 	PluginServiceDeleteSecretProcedure = "/codefoundry.v1.PluginService/DeleteSecret"
-	// PluginServiceWatchProcedure is the fully-qualified name of the PluginService's Watch RPC.
-	PluginServiceWatchProcedure = "/codefoundry.v1.PluginService/Watch"
 	// PluginServiceWatchSurfaceProcedure is the fully-qualified name of the PluginService's
 	// WatchSurface RPC.
 	PluginServiceWatchSurfaceProcedure = "/codefoundry.v1.PluginService/WatchSurface"
@@ -112,9 +110,6 @@ type PluginServiceClient interface {
 	ListSecrets(context.Context, *connect.Request[v1.ListPluginSecretsRequest]) (*connect.Response[v1.ListPluginSecretsResponse], error)
 	// DeleteSecret removes one of a plugin's secrets from the Keychain.
 	DeleteSecret(context.Context, *connect.Request[v1.DeletePluginSecretRequest]) (*connect.Response[v1.DeletePluginSecretResponse], error)
-	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot.
-	Watch(context.Context, *connect.Request[v1.WatchPluginsRequest]) (*connect.ServerStreamForClient[v1.PluginEvent], error)
 	// WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
 	// first watcher opens it in the plugin (surface/open), the last one leaving hides it
 	// and, after a grace, closes it. It sends the instance's state first, then its current
@@ -236,12 +231,6 @@ func NewPluginServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(pluginServiceMethods.ByName("DeleteSecret")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchPluginsRequest, v1.PluginEvent](
-			httpClient,
-			baseURL+PluginServiceWatchProcedure,
-			connect.WithSchema(pluginServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 		watchSurface: connect.NewClient[v1.WatchSurfaceRequest, v1.SurfaceUpdate](
 			httpClient,
 			baseURL+PluginServiceWatchSurfaceProcedure,
@@ -317,7 +306,6 @@ type pluginServiceClient struct {
 	followLogs        *connect.Client[v1.FollowPluginLogsRequest, v1.PluginLogLine]
 	listSecrets       *connect.Client[v1.ListPluginSecretsRequest, v1.ListPluginSecretsResponse]
 	deleteSecret      *connect.Client[v1.DeletePluginSecretRequest, v1.DeletePluginSecretResponse]
-	watch             *connect.Client[v1.WatchPluginsRequest, v1.PluginEvent]
 	watchSurface      *connect.Client[v1.WatchSurfaceRequest, v1.SurfaceUpdate]
 	getSurface        *connect.Client[v1.GetSurfaceRequest, v1.GetSurfaceResponse]
 	act               *connect.Client[v1.SurfaceActRequest, v1.SurfaceActResponse]
@@ -378,11 +366,6 @@ func (c *pluginServiceClient) ListSecrets(ctx context.Context, req *connect.Requ
 // DeleteSecret calls codefoundry.v1.PluginService.DeleteSecret.
 func (c *pluginServiceClient) DeleteSecret(ctx context.Context, req *connect.Request[v1.DeletePluginSecretRequest]) (*connect.Response[v1.DeletePluginSecretResponse], error) {
 	return c.deleteSecret.CallUnary(ctx, req)
-}
-
-// Watch calls codefoundry.v1.PluginService.Watch.
-func (c *pluginServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchPluginsRequest]) (*connect.ServerStreamForClient[v1.PluginEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
 }
 
 // WatchSurface calls codefoundry.v1.PluginService.WatchSurface.
@@ -462,9 +445,6 @@ type PluginServiceHandler interface {
 	ListSecrets(context.Context, *connect.Request[v1.ListPluginSecretsRequest]) (*connect.Response[v1.ListPluginSecretsResponse], error)
 	// DeleteSecret removes one of a plugin's secrets from the Keychain.
 	DeleteSecret(context.Context, *connect.Request[v1.DeletePluginSecretRequest]) (*connect.Response[v1.DeletePluginSecretResponse], error)
-	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot.
-	Watch(context.Context, *connect.Request[v1.WatchPluginsRequest], *connect.ServerStream[v1.PluginEvent]) error
 	// WatchSurface holds one surface instance open (docs/notes/plugins-2-surfaces.md): the
 	// first watcher opens it in the plugin (surface/open), the last one leaving hides it
 	// and, after a grace, closes it. It sends the instance's state first, then its current
@@ -582,12 +562,6 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(pluginServiceMethods.ByName("DeleteSecret")),
 		connect.WithHandlerOptions(opts...),
 	)
-	pluginServiceWatchHandler := connect.NewServerStreamHandler(
-		PluginServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(pluginServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	pluginServiceWatchSurfaceHandler := connect.NewServerStreamHandler(
 		PluginServiceWatchSurfaceProcedure,
 		svc.WatchSurface,
@@ -670,8 +644,6 @@ func NewPluginServiceHandler(svc PluginServiceHandler, opts ...connect.HandlerOp
 			pluginServiceListSecretsHandler.ServeHTTP(w, r)
 		case PluginServiceDeleteSecretProcedure:
 			pluginServiceDeleteSecretHandler.ServeHTTP(w, r)
-		case PluginServiceWatchProcedure:
-			pluginServiceWatchHandler.ServeHTTP(w, r)
 		case PluginServiceWatchSurfaceProcedure:
 			pluginServiceWatchSurfaceHandler.ServeHTTP(w, r)
 		case PluginServiceGetSurfaceProcedure:
@@ -739,10 +711,6 @@ func (UnimplementedPluginServiceHandler) ListSecrets(context.Context, *connect.R
 
 func (UnimplementedPluginServiceHandler) DeleteSecret(context.Context, *connect.Request[v1.DeletePluginSecretRequest]) (*connect.Response[v1.DeletePluginSecretResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.DeleteSecret is not implemented"))
-}
-
-func (UnimplementedPluginServiceHandler) Watch(context.Context, *connect.Request[v1.WatchPluginsRequest], *connect.ServerStream[v1.PluginEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.PluginService.Watch is not implemented"))
 }
 
 func (UnimplementedPluginServiceHandler) WatchSurface(context.Context, *connect.Request[v1.WatchSurfaceRequest], *connect.ServerStream[v1.SurfaceUpdate]) error {

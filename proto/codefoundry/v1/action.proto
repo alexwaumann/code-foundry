@@ -44,9 +44,6 @@ service ActionService {
   // count (not on_worktree_create runs), and only actions that still exist. Read from
   // the run records, which outlive a daemon restart.
   rpc LastRun(LastActionRunRequest) returns (LastActionRunResponse) {}
-  // Watch sends a snapshot, then every change. A client that falls behind gets a new
-  // snapshot.
-  rpc Watch(WatchActionsRequest) returns (stream ActionEvent) {}
 }
 
 // ActionIcon is the icon an action shows with.
@@ -274,8 +271,6 @@ message StopActionRunRequest {
 message StopActionRunResponse {
   ActionRun run = 1;
 }
-
-message WatchActionsRequest {}
 
 message ActionEvent {
   oneof event {

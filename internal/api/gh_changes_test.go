@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -103,25 +102,6 @@ func TestPullRequestChangedJSON(t *testing.T) {
 	}
 }
 
-func TestGhWatchPullRequestChanged(t *testing.T) {
-	store, client, _ := newGhTest(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	stream, err := client.Watch(ctx, connect.NewRequest(&v1.WatchGhRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	store.ChangePullRequest(changedEvent())
-	if !stream.Receive() {
-		t.Fatalf("no event: %v", stream.Err())
-	}
-	ev := stream.Msg().GetPullRequestChanged()
-	if ev.GetNumber() != 7 || ev.GetPullRequest().GetTitle() != "Fix the login redirect" ||
-		ev.GetChanges()[0].GetNewChecks().GetState() != v1.CheckRollupState_CHECK_ROLLUP_STATE_SUCCESS {
-		t.Errorf("event %v", stream.Msg())
-	}
-}
-
 func TestEventsPullRequestChanged(t *testing.T) {
 	f := newEventsFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -134,7 +114,8 @@ func TestEventsPullRequestChanged(t *testing.T) {
 	}
 	f.gh.ChangePullRequest(changedEvent())
 	ev := s.next()
-	if p := ev.GetGh().GetPullRequestChanged(); p.GetRepoSlug() != "o/r" || p.GetNumber() != 7 || ev.GetSeq() == 0 {
+	if p := ev.GetGh().GetPullRequestChanged(); p.GetRepoSlug() != "o/r" || p.GetNumber() != 7 || ev.GetSeq() == 0 ||
+		p.GetPullRequest().GetTitle() != "Fix the login redirect" || p.GetChanges()[0].GetNewChecks().GetState() != v1.CheckRollupState_CHECK_ROLLUP_STATE_SUCCESS {
 		t.Errorf("event %v", ev)
 	}
 }

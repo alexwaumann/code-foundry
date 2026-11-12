@@ -43,7 +43,7 @@ func TestWorkspaceReveal(t *testing.T) {
 			}
 			var revealed []string
 			reg := command.NewRegistry()
-			if err := command.RegisterWorkspaceReveal(reg, api.NewWorkspace(fake, b), func(_ context.Context, p string) error {
+			if err := command.RegisterWorkspaceReveal(reg, api.NewWorkspace(fake), func(_ context.Context, p string) error {
 				revealed = append(revealed, p)
 				return nil
 			}); err != nil {
@@ -83,7 +83,7 @@ func TestWorkspaceRevealNilFunc(t *testing.T) {
 		t.Fatal(err)
 	}
 	reg := command.NewRegistry()
-	if err := command.RegisterWorkspaceReveal(reg, api.NewWorkspace(fake, b), nil); err != nil {
+	if err := command.RegisterWorkspaceReveal(reg, api.NewWorkspace(fake), nil); err != nil {
 		t.Fatal(err)
 	}
 	_, err := reg.Invoke(ctx, command.Context{}, "workspace.reveal", map[string]string{"workspace": "mono"})

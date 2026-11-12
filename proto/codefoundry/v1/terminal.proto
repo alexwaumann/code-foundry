@@ -29,13 +29,11 @@ service TerminalService {
   // Close kills a shell terminal (labels kind=shell), an action run (kind=action) or a
   // skill's setup (kind=setup) like
   // Kill, waits for it to exit, and removes it. It returns once the terminal is gone
-  // (Watch has sent `updated` with state EXITED, then `removed_id`). Closing an exited
+  // (the terminal events have carried `updated` with state EXITED, then `removed_id`). Closing an exited
   // shell or action run just removes it. Any other
   // terminal (one created through Create without those labels) is refused with
   // FailedPrecondition; an unknown id is NotFound.
   rpc Close(CloseTerminalRequest) returns (CloseTerminalResponse) {}
-  // Watch streams lifecycle and metadata changes for all terminals.
-  rpc Watch(WatchTerminalsRequest) returns (stream TerminalEvent) {}
 }
 
 enum TerminalState {
@@ -184,8 +182,6 @@ message CloseTerminalRequest {
 }
 
 message CloseTerminalResponse {}
-
-message WatchTerminalsRequest {}
 
 message TerminalEvent {
   oneof event {

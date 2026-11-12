@@ -31,7 +31,7 @@ func TestGhSetPullRequestCheckbox(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, client, _ := newGhTest(t)
+			store, client := newGhTest(t)
 			store.SetFullPullRequest("o/r", gh.FullPullRequest{PullRequest: gh.PullRequest{ID: "PR_7", Number: 7, State: gh.PullRequestOpen}, Body: "- [x] a\n- [ ] b\n"})
 			res, err := client.SetPullRequestCheckbox(ctx, connect.NewRequest(tt.req))
 			if rec := callsWithPrefix(store.Calls(), "checkbox "); tt.wantRec == "" && len(rec) != 0 || tt.wantRec != "" && !slices.Equal(rec, []string{tt.wantRec}) {

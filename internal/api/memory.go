@@ -28,14 +28,13 @@ var _ MemoryStore = (*memory.Store)(nil)
 // (docs/notes/memory-dir.md).
 type Memory struct {
 	store MemoryStore
-	bus   *bus.Bus
 }
 
 var _ codefoundryv1connect.MemoryServiceHandler = (*Memory)(nil)
 
 // NewMemory returns a MemoryService handler. b must be the bus the store publishes
 // memory.Event on.
-func NewMemory(store MemoryStore, b *bus.Bus) *Memory { return &Memory{store: store, bus: b} }
+func NewMemory(store MemoryStore) *Memory { return &Memory{store: store} }
 
 // Route mounts the service.
 func (h *Memory) Route(opts ...connect.HandlerOption) Route {
@@ -46,35 +45,6 @@ func (h *Memory) Route(opts ...connect.HandlerOption) Route {
 // Get reads the memory now.
 func (h *Memory) Get(context.Context, *connect.Request[v1.GetMemoryRequest]) (*connect.Response[v1.GetMemoryResponse], error) {
 	return connect.NewResponse(&v1.GetMemoryResponse{Memory: memorySnapshotToProto(h.store.Load(), h.store.Dir())}), nil
-}
-
-// Watch sends the memory as read now, then the whole memory per change.
-func (h *Memory) Watch(ctx context.Context, _ *connect.Request[v1.WatchMemoryRequest], stream *connect.ServerStream[v1.MemoryEvent]) error {
-	sub := bus.Subscribe[memory.Event](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := stream.Send(memoryEventToProto(h.store.Load(), h.store.Dir())); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				ev = h.store.Snapshot()
-			}
-			if msg := memoryEventToProto(ev, h.store.Dir()); msg != nil {
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			}
-		}
-	}
 }
 
 // memorySource is EventService's memory source: the whole memory, on connect and per

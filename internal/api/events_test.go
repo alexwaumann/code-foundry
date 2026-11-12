@@ -102,6 +102,46 @@ func (e *eventStream) next() *v1.Event {
 	return e.s.Msg()
 }
 
+// sourceStream is EventService.Watch on one source of deps, the stream the GUI and
+// `code-foundry events --source` read: Receive skips heartbeats and Msg is the source's
+// own event.
+type sourceStream[T any] struct {
+	s    *connect.ServerStreamForClient[v1.Event]
+	pick func(*v1.Event) T
+	msg  T
+}
+
+func watchSource[T any](t *testing.T, ctx context.Context, deps EventsDeps, src v1.EventSource, pick func(*v1.Event) T) *sourceStream[T] {
+	t.Helper()
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done) })
+	deps.Done = done
+	route := NewEvents(deps).Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	s, err := codefoundryv1connect.NewEventServiceClient(srv.Client(), srv.URL).Watch(ctx, connect.NewRequest(&v1.WatchEventsRequest{Sources: []v1.EventSource{src}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return &sourceStream[T]{s: s, pick: pick}
+}
+
+func (e *sourceStream[T]) Receive() bool {
+	for e.s.Receive() {
+		if e.s.Msg().GetHeartbeat() == nil {
+			e.msg = e.pick(e.s.Msg())
+			return true
+		}
+	}
+	return false
+}
+
+func (e *sourceStream[T]) Msg() T     { return e.msg }
+func (e *sourceStream[T]) Err() error { return e.s.Err() }
+
 // describe renders an event compactly for order assertions.
 func describe(ev *v1.Event) string {
 	switch e := ev.GetEvent().(type) {

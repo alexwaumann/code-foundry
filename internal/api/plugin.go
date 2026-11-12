@@ -10,7 +10,6 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
-	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/shot"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
@@ -19,7 +18,6 @@ import (
 // Plugin implements codefoundryv1connect.PluginServiceHandler over a plugin.Store.
 type Plugin struct {
 	store    plugin.Store
-	bus      *bus.Bus
 	surfaces plugin.Surfaces // nil: WatchSurface, GetSurface and Act are unimplemented
 	shots    *shot.Broker    // nil: ShotSurface is unimplemented (WithShots)
 	beat     time.Duration   // WatchSurface's heartbeat interval; zero is HeartbeatInterval
@@ -31,7 +29,7 @@ var _ codefoundryv1connect.PluginServiceHandler = (*Plugin)(nil)
 
 // NewPlugin returns a PluginService handler. b must be the bus the store publishes
 // plugin.Event on.
-func NewPlugin(store plugin.Store, b *bus.Bus) *Plugin { return &Plugin{store: store, bus: b} }
+func NewPlugin(store plugin.Store) *Plugin { return &Plugin{store: store} }
 
 // WithDirs sets the directories List reports: the packages' (paths.Plugins) and the parent
 // of each plugin's data dir (paths.PluginData), so the GUI names the real ones.
@@ -180,35 +178,6 @@ func (h *Plugin) DeleteSecret(ctx context.Context, req *connect.Request[v1.Delet
 		return nil, pluginError(err)
 	}
 	return connect.NewResponse(&v1.DeletePluginSecretResponse{}), nil
-}
-
-// Watch sends a snapshot, then every change.
-func (h *Plugin) Watch(ctx context.Context, _ *connect.Request[v1.WatchPluginsRequest], stream *connect.ServerStream[v1.PluginEvent]) error {
-	sub := bus.Subscribe[plugin.Event](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := stream.Send(pluginEventToProto(h.store.Snapshot())); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				ev = h.store.Snapshot()
-			}
-			if msg := pluginEventToProto(ev); msg != nil {
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			}
-		}
-	}
 }
 
 // pluginEventToProto converts a bus event (or a *plugin.Snapshot) to the wire event.

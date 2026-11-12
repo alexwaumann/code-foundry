@@ -46,8 +46,6 @@ const (
 	GhServiceTrackProcedure = "/codefoundry.v1.GhService/Track"
 	// GhServiceUntrackProcedure is the fully-qualified name of the GhService's Untrack RPC.
 	GhServiceUntrackProcedure = "/codefoundry.v1.GhService/Untrack"
-	// GhServiceWatchProcedure is the fully-qualified name of the GhService's Watch RPC.
-	GhServiceWatchProcedure = "/codefoundry.v1.GhService/Watch"
 	// GhServiceGetDashboardProcedure is the fully-qualified name of the GhService's GetDashboard RPC.
 	GhServiceGetDashboardProcedure = "/codefoundry.v1.GhService/GetDashboard"
 	// GhServiceGetRepoActivityProcedure is the fully-qualified name of the GhService's GetRepoActivity
@@ -115,8 +113,6 @@ type GhServiceClient interface {
 	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
 	// Untrack removes a repository from the poll. Its cache is kept.
 	Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error)
-	// Watch streams change notifications. Clients re-read with the Get RPCs.
-	Watch(context.Context, *connect.Request[v1.WatchGhRequest]) (*connect.ServerStreamForClient[v1.GhEvent], error)
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
 	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
 	// involving them) and their monthly stats across GitHub, from the last poll. The
@@ -263,12 +259,6 @@ func NewGhServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...c
 			connect.WithSchema(ghServiceMethods.ByName("Untrack")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchGhRequest, v1.GhEvent](
-			httpClient,
-			baseURL+GhServiceWatchProcedure,
-			connect.WithSchema(ghServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 		getDashboard: connect.NewClient[v1.GetDashboardRequest, v1.GetDashboardResponse](
 			httpClient,
 			baseURL+GhServiceGetDashboardProcedure,
@@ -370,7 +360,6 @@ type ghServiceClient struct {
 	refresh                 *connect.Client[v1.RefreshGhRequest, v1.RefreshGhResponse]
 	track                   *connect.Client[v1.TrackGhRepoRequest, v1.TrackGhRepoResponse]
 	untrack                 *connect.Client[v1.UntrackGhRepoRequest, v1.UntrackGhRepoResponse]
-	watch                   *connect.Client[v1.WatchGhRequest, v1.GhEvent]
 	getDashboard            *connect.Client[v1.GetDashboardRequest, v1.GetDashboardResponse]
 	getRepoActivity         *connect.Client[v1.GetRepoActivityRequest, v1.GetRepoActivityResponse]
 	getBranchPullRequests   *connect.Client[v1.GetBranchPullRequestsRequest, v1.GetBranchPullRequestsResponse]
@@ -416,11 +405,6 @@ func (c *ghServiceClient) Track(ctx context.Context, req *connect.Request[v1.Tra
 // Untrack calls codefoundry.v1.GhService.Untrack.
 func (c *ghServiceClient) Untrack(ctx context.Context, req *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error) {
 	return c.untrack.CallUnary(ctx, req)
-}
-
-// Watch calls codefoundry.v1.GhService.Watch.
-func (c *ghServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchGhRequest]) (*connect.ServerStreamForClient[v1.GhEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
 }
 
 // GetDashboard calls codefoundry.v1.GhService.GetDashboard.
@@ -519,8 +503,6 @@ type GhServiceHandler interface {
 	Track(context.Context, *connect.Request[v1.TrackGhRepoRequest]) (*connect.Response[v1.TrackGhRepoResponse], error)
 	// Untrack removes a repository from the poll. Its cache is kept.
 	Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error)
-	// Watch streams change notifications. Clients re-read with the Get RPCs.
-	Watch(context.Context, *connect.Request[v1.WatchGhRequest], *connect.ServerStream[v1.GhEvent]) error
 	// GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
 	// PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
 	// involving them) and their monthly stats across GitHub, from the last poll. The
@@ -663,12 +645,6 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 		connect.WithSchema(ghServiceMethods.ByName("Untrack")),
 		connect.WithHandlerOptions(opts...),
 	)
-	ghServiceWatchHandler := connect.NewServerStreamHandler(
-		GhServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(ghServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	ghServiceGetDashboardHandler := connect.NewUnaryHandler(
 		GhServiceGetDashboardProcedure,
 		svc.GetDashboard,
@@ -773,8 +749,6 @@ func NewGhServiceHandler(svc GhServiceHandler, opts ...connect.HandlerOption) (s
 			ghServiceTrackHandler.ServeHTTP(w, r)
 		case GhServiceUntrackProcedure:
 			ghServiceUntrackHandler.ServeHTTP(w, r)
-		case GhServiceWatchProcedure:
-			ghServiceWatchHandler.ServeHTTP(w, r)
 		case GhServiceGetDashboardProcedure:
 			ghServiceGetDashboardHandler.ServeHTTP(w, r)
 		case GhServiceGetRepoActivityProcedure:
@@ -836,10 +810,6 @@ func (UnimplementedGhServiceHandler) Track(context.Context, *connect.Request[v1.
 
 func (UnimplementedGhServiceHandler) Untrack(context.Context, *connect.Request[v1.UntrackGhRepoRequest]) (*connect.Response[v1.UntrackGhRepoResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.Untrack is not implemented"))
-}
-
-func (UnimplementedGhServiceHandler) Watch(context.Context, *connect.Request[v1.WatchGhRequest], *connect.ServerStream[v1.GhEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.GhService.Watch is not implemented"))
 }
 
 func (UnimplementedGhServiceHandler) GetDashboard(context.Context, *connect.Request[v1.GetDashboardRequest]) (*connect.Response[v1.GetDashboardResponse], error) {

@@ -67,7 +67,7 @@ type EventsDeps struct {
 }
 
 // Events implements codefoundryv1connect.EventServiceHandler: one server stream that
-// carries every store's Watch events and UI intents, so a browser holds one connection
+// carries every store's events and UI intents, so a browser holds one connection
 // instead of one per service. Live events pass through one hub (events_hub.go) that
 // numbers them (Event.seq) and keeps the last ones for clients that resume. Every event
 // carries the epoch, so a client resuming across a daemon restart is told apart.
@@ -537,9 +537,9 @@ func (s workspaceSource) topics() []topic {
 	return []topic{busTopic(s.bus, watchBuffer, workspaceWrap)}
 }
 
-// snapshot and resume read every workspace's folder again first (EnsureDirs), as
-// WorkspaceService.Watch does, so hand edits to its instructions and skills show on
-// connect: in the snapshot, or as an event after a resume.
+// snapshot and resume read every workspace's folder again first (EnsureDirs), so hand
+// edits to its instructions and skills show on connect: in the snapshot, or as an event
+// after a resume.
 func (s workspaceSource) snapshot(ctx context.Context) []*v1.Event {
 	s.resume(ctx)
 	return []*v1.Event{workspaceWrap(s.store.Snapshot())}

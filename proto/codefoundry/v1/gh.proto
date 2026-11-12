@@ -35,8 +35,6 @@ service GhService {
   rpc Track(TrackGhRepoRequest) returns (TrackGhRepoResponse) {}
   // Untrack removes a repository from the poll. Its cache is kept.
   rpc Untrack(UntrackGhRepoRequest) returns (UntrackGhRepoResponse) {}
-  // Watch streams change notifications. Clients re-read with the Get RPCs.
-  rpc Watch(WatchGhRequest) returns (stream GhEvent) {}
   // GetDashboard returns the viewer's pull request dashboards (open PRs they authored,
   // PRs awaiting their review, open PRs they reviewed, PRs merged in the last 7 days
   // involving them) and their monthly stats across GitHub, from the last poll. The
@@ -373,8 +371,6 @@ message UntrackGhRepoRequest {
 }
 
 message UntrackGhRepoResponse {}
-
-message WatchGhRequest {}
 
 message GhEvent {
   reserved 1;

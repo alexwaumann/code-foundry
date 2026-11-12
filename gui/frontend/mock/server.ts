@@ -249,7 +249,6 @@ import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
 import { retiredUsage } from "./usage";
 import { ageMcp, keepMcpServers, reconnectMcp, refreshMcp } from "./mcp";
-import type { ActionEventInit } from "./actions";
 import { pageStorageOf, resetPageStorage, setPageStorage } from "./pageStorage";
 import { listPrompts } from "./prompts";
 import { listItems, searchThreads } from "./search";
@@ -342,7 +341,6 @@ function routes(router: ConnectRouter): void {
     kill: (req) => guard(() => (world.kill(req.id), {})),
     remove: (req) => guard(() => (world.remove(req.id), {})),
     close: (req) => guard(() => (world.close(req.id), {})),
-    watch: (_req, ctx) => tracked("TerminalService/Watch", world.termEvents.subscribe(ctx.signal)),
   });
 
   router.service(ProjectService, {
@@ -481,12 +479,6 @@ function routes(router: ConnectRouter): void {
       return {};
     }),
     readBackdrop: (req) => guard(() => world.backdrops.read(req.name)),
-    watch: async function* (_req, ctx) {
-      yield { event: { case: "snapshot" as const, value: world.settings.snapshot() } };
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.SETTINGS && event.event?.case === "settings") yield event.event.value;
-      }
-    },
   });
 
   router.service(UiService, {
@@ -614,7 +606,6 @@ function routes(router: ConnectRouter): void {
         throw rpcError(err);
       }
     },
-    watch: (_req, ctx) => tracked("ActionService/Watch", actionEvents(world.events.subscribe(ctx.signal, [{ source: EventSource.ACTION, event: { event: { case: "action", value: world.actions.snapshot() } } }]))),
   });
 
   // GitOpsService: the GUI runs git operations through the git.*/worktree.* commands
@@ -653,12 +644,6 @@ function routes(router: ConnectRouter): void {
     listSecrets: (req) => guard(() => ({ secrets: world.plugins.listSecrets(req.name) })),
     deleteSecret: (req) => guard(() => (world.plugins.deleteSecret(req.name, req.key), {})),
     reload: () => ({}),
-    watch: async function* (_req, ctx) {
-      yield world.plugins.snapshot();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.PLUGIN && event.event?.case === "plugin") yield event.event.value;
-      }
-    },
     watchSurface: (req, ctx) => {
       if (!req.ref) throw new ConnectError("a surface ref is required", Code.InvalidArgument);
       const ref = req.ref;
@@ -672,23 +657,11 @@ function routes(router: ConnectRouter): void {
     search: (req) => world.skills.search(req),
     installed: () => world.skills.list(),
     registries: () => world.skills.registries(),
-    watch: async function* (_req, ctx) {
-      yield world.skills.event();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.SKILL && event.event?.case === "skill") yield event.event.value;
-      }
-    },
   });
 
   // The app memory (mock/memory.ts): reads only; writes are the memory.* commands.
   router.service(MemoryService, {
     get: () => ({ memory: world.memory.snapshot() }),
-    watch: async function* (_req, ctx) {
-      yield world.memory.event();
-      for await (const { source, event } of world.events.subscribe(ctx.signal)) {
-        if (source === EventSource.MEMORY && event.event?.case === "memory") yield event.event.value;
-      }
-    },
   });
 
   // The user's themes (mock/userThemes.ts): reads only; writes are the theme.* commands.
@@ -795,12 +768,6 @@ function routes(router: ConnectRouter): void {
       });
     },
   });
-}
-
-async function* actionEvents(src: AsyncGenerator<{ source: EventSource; event: EventInit }>): AsyncGenerator<ActionEventInit> {
-  for await (const { source, event } of src) {
-    if (source === EventSource.ACTION && event.event?.case === "action") yield event.event.value;
-  }
 }
 
 /** Action controls: POST /__mock/action/setup. */

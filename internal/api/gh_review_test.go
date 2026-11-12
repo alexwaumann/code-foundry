@@ -64,16 +64,12 @@ func TestGhSubmitPullRequestReview(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, client, _ := newGhTest(t)
+			store, client, b := newGhTestBus(t)
 			store.SetViewer(gh.ViewerState{Authenticated: true, Viewer: &gh.Viewer{Login: "octocat"}})
 			store.SetFullPullRequest("o/r", detailFixture(time.Time{})) // #7 by octocat, two comments
 			store.SetFullPullRequest("o/r", gh.FullPullRequest{PullRequest: gh.PullRequest{ID: "PR_8", Number: 8, Author: "kim", State: gh.PullRequestOpen}})
 			store.SetError(tt.storeEr)
-			stream, err := client.Watch(ctx, connect.NewRequest(&v1.WatchGhRequest{}))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer stream.Close()
+			stream := ghEvents(t, ctx, store, b)
 			res, err := client.SubmitPullRequestReview(ctx, connect.NewRequest(tt.req))
 			if rec := reviewCalls(store.Calls()); tt.wantRec == "" && len(rec) != 0 || tt.wantRec != "" && !slices.Equal(rec, []string{tt.wantRec}) {
 				t.Errorf("store calls = %q, want %q", rec, tt.wantRec)
@@ -118,13 +114,9 @@ func TestGhAddPullRequestComment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, client, _ := newGhTest(t)
+			store, client, b := newGhTestBus(t)
 			store.SetFullPullRequest("o/r", detailFixture(time.Time{}))
-			stream, err := client.Watch(ctx, connect.NewRequest(&v1.WatchGhRequest{}))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer stream.Close()
+			stream := ghEvents(t, ctx, store, b)
 			res, err := client.AddPullRequestComment(ctx, connect.NewRequest(tt.req))
 			if rec := reviewCalls(store.Calls()); tt.wantRec == "" && len(rec) != 0 || tt.wantRec != "" && !slices.Equal(rec, []string{tt.wantRec}) {
 				t.Errorf("store calls = %q, want %q", rec, tt.wantRec)
@@ -166,8 +158,8 @@ func reviewCalls(calls []string) []string {
 	return out
 }
 
-// waitDetailEvent reads the Watch stream until pull_request_detail_updated for o/r#n.
-func waitDetailEvent(t *testing.T, stream *connect.ServerStreamForClient[v1.GhEvent], n int32) {
+// waitDetailEvent reads the gh events until pull_request_detail_updated for o/r#n.
+func waitDetailEvent(t *testing.T, stream *sourceStream[*v1.GhEvent], n int32) {
 	t.Helper()
 	for stream.Receive() {
 		if ev := stream.Msg().GetPullRequestDetailUpdated(); ev != nil && ev.GetNumber() == n {

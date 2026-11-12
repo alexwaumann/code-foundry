@@ -4,9 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -20,7 +18,7 @@ func newWorkspaceServer(t *testing.T) (*workspacetest.Fake, codefoundryv1connect
 	t.Helper()
 	b := bus.New()
 	fake := workspacetest.New(b)
-	route := NewWorkspace(fake, b).Route()
+	route := NewWorkspace(fake).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewUnstartedServer(mux)
@@ -80,37 +78,5 @@ func TestWorkspaceUnaryAndErrorCodes(t *testing.T) {
 				t.Errorf("call %d = %q, want %q", i, got[i], want[i])
 			}
 		}
-	}
-}
-
-func TestWorkspaceWatchSendsSnapshotThenEvents(t *testing.T) {
-	fake, c := newWorkspaceServer(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if _, err := c.Create(ctx, connect.NewRequest(&v1.CreateWorkspaceRequest{Name: "a", Members: []string{"r"}})); err != nil {
-		t.Fatal(err)
-	}
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchWorkspacesRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetWorkspaces()) != 1 {
-		t.Fatalf("first event = %v (%v)", stream.Msg(), stream.Err())
-	}
-	// Subscribing read every workspace's folder again first (hand edits show).
-	if !slices.Contains(fake.Calls(), "EnsureDirs") {
-		t.Errorf("calls %v: want EnsureDirs of every workspace on subscribe", fake.Calls())
-	}
-	if _, err := fake.AddProject(ctx, "a", "s"); err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() || len(stream.Msg().GetUpdated().GetMembers()) != 2 {
-		t.Fatalf("second event = %v (%v)", stream.Msg(), stream.Err())
-	}
-	if _, err := c.Remove(ctx, connect.NewRequest(&v1.RemoveWorkspaceRequest{Workspace: "a"})); err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() || stream.Msg().GetRemovedId() != "w-1" {
-		t.Fatalf("third event = %v (%v)", stream.Msg(), stream.Err())
 	}
 }

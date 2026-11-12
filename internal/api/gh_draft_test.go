@@ -32,7 +32,7 @@ func TestGhSetPullRequestDraft(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, client, _ := newGhTest(t)
+			store, client := newGhTest(t)
 			store.SetFullPullRequest("o/r", detailFixture(time.Date(2026, 10, 9, 6, 0, 0, 0, time.UTC))) // #7 open
 			store.SetFullPullRequest("o/r", gh.FullPullRequest{PullRequest: gh.PullRequest{ID: "PR_8", Number: 8, State: gh.PullRequestMerged}})
 			store.SetFullPullRequest("o/r", gh.FullPullRequest{PullRequest: gh.PullRequest{ID: "PR_9", Number: 9, State: gh.PullRequestOpen, Draft: true}})
@@ -76,7 +76,7 @@ func TestGhSetPullRequestAutoMerge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store, client, _ := newGhTest(t)
+			store, client := newGhTest(t)
 			d := detailFixture(time.Date(2026, 10, 9, 6, 0, 0, 0, time.UTC))
 			d.PullRequest.HeadSHA = "head-7"
 			d.AutoMergeAllowed, d.AutoMerge = tt.allowed, tt.on
@@ -100,7 +100,7 @@ func TestGhSetPullRequestAutoMerge(t *testing.T) {
 }
 
 func TestGhDetailAutoMergeFields(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	d := detailFixture(time.Date(2026, 10, 9, 6, 0, 0, 0, time.UTC))
 	d.AutoMergeAllowed, d.AutoMerge, d.AutoMergeMethod = true, true, gh.MergeRebase
 	store.SetFullPullRequest("o/r", d)

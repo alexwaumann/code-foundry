@@ -1664,42 +1664,6 @@ func (x *StopActionRunResponse) GetRun() *ActionRun {
 	return nil
 }
 
-type WatchActionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *WatchActionsRequest) Reset() {
-	*x = WatchActionsRequest{}
-	mi := &file_codefoundry_v1_action_proto_msgTypes[21]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *WatchActionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*WatchActionsRequest) ProtoMessage() {}
-
-func (x *WatchActionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_action_proto_msgTypes[21]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use WatchActionsRequest.ProtoReflect.Descriptor instead.
-func (*WatchActionsRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{21}
-}
-
 type ActionEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
@@ -1717,7 +1681,7 @@ type ActionEvent struct {
 
 func (x *ActionEvent) Reset() {
 	*x = ActionEvent{}
-	mi := &file_codefoundry_v1_action_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_action_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1729,7 +1693,7 @@ func (x *ActionEvent) String() string {
 func (*ActionEvent) ProtoMessage() {}
 
 func (x *ActionEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_action_proto_msgTypes[22]
+	mi := &file_codefoundry_v1_action_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1742,7 +1706,7 @@ func (x *ActionEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionEvent.ProtoReflect.Descriptor instead.
 func (*ActionEvent) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{22}
+	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ActionEvent) GetEvent() isActionEvent_Event {
@@ -1863,7 +1827,7 @@ type ActionSnapshot struct {
 
 func (x *ActionSnapshot) Reset() {
 	*x = ActionSnapshot{}
-	mi := &file_codefoundry_v1_action_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_action_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1875,7 +1839,7 @@ func (x *ActionSnapshot) String() string {
 func (*ActionSnapshot) ProtoMessage() {}
 
 func (x *ActionSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_action_proto_msgTypes[23]
+	mi := &file_codefoundry_v1_action_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1888,7 +1852,7 @@ func (x *ActionSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionSnapshot.ProtoReflect.Descriptor instead.
 func (*ActionSnapshot) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{23}
+	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ActionSnapshot) GetActions() []*Action {
@@ -1923,7 +1887,7 @@ type ActionRunFinished struct {
 
 func (x *ActionRunFinished) Reset() {
 	*x = ActionRunFinished{}
-	mi := &file_codefoundry_v1_action_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_action_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1935,7 +1899,7 @@ func (x *ActionRunFinished) String() string {
 func (*ActionRunFinished) ProtoMessage() {}
 
 func (x *ActionRunFinished) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_action_proto_msgTypes[24]
+	mi := &file_codefoundry_v1_action_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1948,7 +1912,7 @@ func (x *ActionRunFinished) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionRunFinished.ProtoReflect.Descriptor instead.
 func (*ActionRunFinished) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{24}
+	return file_codefoundry_v1_action_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ActionRunFinished) GetRunId() string {
@@ -2136,8 +2100,7 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x14StopActionRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\"D\n" +
 	"\x15StopActionRunResponse\x12+\n" +
-	"\x03run\x18\x01 \x01(\v2\x19.codefoundry.v1.ActionRunR\x03run\"\x15\n" +
-	"\x13WatchActionsRequest\"\xd7\x02\n" +
+	"\x03run\x18\x01 \x01(\v2\x19.codefoundry.v1.ActionRunR\x03run\"\xd7\x02\n" +
 	"\vActionEvent\x12<\n" +
 	"\bsnapshot\x18\x01 \x01(\v2\x1e.codefoundry.v1.ActionSnapshotH\x00R\bsnapshot\x122\n" +
 	"\aupdated\x18\x02 \x01(\v2\x16.codefoundry.v1.ActionH\x00R\aupdated\x12\x1f\n" +
@@ -2189,7 +2152,7 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x1eACTION_PICK_SOURCE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19ACTION_PICK_SOURCE_THREAD\x10\x01\x12\x1e\n" +
 	"\x1aACTION_PICK_SOURCE_PROJECT\x10\x02\x12\x1c\n" +
-	"\x18ACTION_PICK_SOURCE_FIRST\x10\x032\xe9\x06\n" +
+	"\x18ACTION_PICK_SOURCE_FIRST\x10\x032\x9a\x06\n" +
 	"\rActionService\x12Q\n" +
 	"\x04List\x12\".codefoundry.v1.ListActionsRequest\x1a#.codefoundry.v1.ListActionsResponse\"\x00\x12U\n" +
 	"\x06Create\x12#.codefoundry.v1.CreateActionRequest\x1a$.codefoundry.v1.CreateActionResponse\"\x00\x12U\n" +
@@ -2199,8 +2162,7 @@ const file_codefoundry_v1_action_proto_rawDesc = "" +
 	"\x06GetRun\x12#.codefoundry.v1.GetActionRunRequest\x1a$.codefoundry.v1.GetActionRunResponse\"\x00\x12X\n" +
 	"\aWaitRun\x12$.codefoundry.v1.WaitActionRunRequest\x1a%.codefoundry.v1.WaitActionRunResponse\"\x00\x12X\n" +
 	"\aStopRun\x12$.codefoundry.v1.StopActionRunRequest\x1a%.codefoundry.v1.StopActionRunResponse\"\x00\x12X\n" +
-	"\aLastRun\x12$.codefoundry.v1.LastActionRunRequest\x1a%.codefoundry.v1.LastActionRunResponse\"\x00\x12M\n" +
-	"\x05Watch\x12#.codefoundry.v1.WatchActionsRequest\x1a\x1b.codefoundry.v1.ActionEvent\"\x000\x01B\xc3\x01\n" +
+	"\aLastRun\x12$.codefoundry.v1.LastActionRunRequest\x1a%.codefoundry.v1.LastActionRunResponse\"\x00B\xc3\x01\n" +
 	"\x12com.codefoundry.v1B\vActionProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -2216,7 +2178,7 @@ func file_codefoundry_v1_action_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_action_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_codefoundry_v1_action_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_codefoundry_v1_action_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_codefoundry_v1_action_proto_goTypes = []any{
 	(ActionIcon)(0),               // 0: codefoundry.v1.ActionIcon
 	(ActionRunMode)(0),            // 1: codefoundry.v1.ActionRunMode
@@ -2244,27 +2206,26 @@ var file_codefoundry_v1_action_proto_goTypes = []any{
 	(*WaitActionRunResponse)(nil), // 23: codefoundry.v1.WaitActionRunResponse
 	(*StopActionRunRequest)(nil),  // 24: codefoundry.v1.StopActionRunRequest
 	(*StopActionRunResponse)(nil), // 25: codefoundry.v1.StopActionRunResponse
-	(*WatchActionsRequest)(nil),   // 26: codefoundry.v1.WatchActionsRequest
-	(*ActionEvent)(nil),           // 27: codefoundry.v1.ActionEvent
-	(*ActionSnapshot)(nil),        // 28: codefoundry.v1.ActionSnapshot
-	(*ActionRunFinished)(nil),     // 29: codefoundry.v1.ActionRunFinished
-	(*timestamppb.Timestamp)(nil), // 30: google.protobuf.Timestamp
+	(*ActionEvent)(nil),           // 26: codefoundry.v1.ActionEvent
+	(*ActionSnapshot)(nil),        // 27: codefoundry.v1.ActionSnapshot
+	(*ActionRunFinished)(nil),     // 28: codefoundry.v1.ActionRunFinished
+	(*timestamppb.Timestamp)(nil), // 29: google.protobuf.Timestamp
 }
 var file_codefoundry_v1_action_proto_depIdxs = []int32{
 	0,  // 0: codefoundry.v1.Action.icon:type_name -> codefoundry.v1.ActionIcon
-	30, // 1: codefoundry.v1.Action.created_at:type_name -> google.protobuf.Timestamp
-	30, // 2: codefoundry.v1.Action.updated_at:type_name -> google.protobuf.Timestamp
+	29, // 1: codefoundry.v1.Action.created_at:type_name -> google.protobuf.Timestamp
+	29, // 2: codefoundry.v1.Action.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 3: codefoundry.v1.ActionRun.mode:type_name -> codefoundry.v1.ActionRunMode
 	2,  // 4: codefoundry.v1.ActionRun.state:type_name -> codefoundry.v1.ActionRunState
-	30, // 5: codefoundry.v1.ActionRun.started_at:type_name -> google.protobuf.Timestamp
-	30, // 6: codefoundry.v1.ActionRun.finished_at:type_name -> google.protobuf.Timestamp
+	29, // 5: codefoundry.v1.ActionRun.started_at:type_name -> google.protobuf.Timestamp
+	29, // 6: codefoundry.v1.ActionRun.finished_at:type_name -> google.protobuf.Timestamp
 	3,  // 7: codefoundry.v1.ActionRun.trigger:type_name -> codefoundry.v1.ActionRunTrigger
 	5,  // 8: codefoundry.v1.ListActionsResponse.actions:type_name -> codefoundry.v1.Action
 	6,  // 9: codefoundry.v1.ListActionsResponse.runs:type_name -> codefoundry.v1.ActionRun
 	9,  // 10: codefoundry.v1.ListActionsResponse.last_runs:type_name -> codefoundry.v1.ActionRunRecord
 	1,  // 11: codefoundry.v1.ActionRunRecord.mode:type_name -> codefoundry.v1.ActionRunMode
 	3,  // 12: codefoundry.v1.ActionRunRecord.trigger:type_name -> codefoundry.v1.ActionRunTrigger
-	30, // 13: codefoundry.v1.ActionRunRecord.started_at:type_name -> google.protobuf.Timestamp
+	29, // 13: codefoundry.v1.ActionRunRecord.started_at:type_name -> google.protobuf.Timestamp
 	4,  // 14: codefoundry.v1.LastActionRunResponse.source:type_name -> codefoundry.v1.ActionPickSource
 	5,  // 15: codefoundry.v1.LastActionRunResponse.action:type_name -> codefoundry.v1.Action
 	9,  // 16: codefoundry.v1.LastActionRunResponse.last:type_name -> codefoundry.v1.ActionRunRecord
@@ -2277,10 +2238,10 @@ var file_codefoundry_v1_action_proto_depIdxs = []int32{
 	6,  // 23: codefoundry.v1.GetActionRunResponse.run:type_name -> codefoundry.v1.ActionRun
 	6,  // 24: codefoundry.v1.WaitActionRunResponse.run:type_name -> codefoundry.v1.ActionRun
 	6,  // 25: codefoundry.v1.StopActionRunResponse.run:type_name -> codefoundry.v1.ActionRun
-	28, // 26: codefoundry.v1.ActionEvent.snapshot:type_name -> codefoundry.v1.ActionSnapshot
+	27, // 26: codefoundry.v1.ActionEvent.snapshot:type_name -> codefoundry.v1.ActionSnapshot
 	5,  // 27: codefoundry.v1.ActionEvent.updated:type_name -> codefoundry.v1.Action
 	6,  // 28: codefoundry.v1.ActionEvent.run_updated:type_name -> codefoundry.v1.ActionRun
-	29, // 29: codefoundry.v1.ActionEvent.run_finished:type_name -> codefoundry.v1.ActionRunFinished
+	28, // 29: codefoundry.v1.ActionEvent.run_finished:type_name -> codefoundry.v1.ActionRunFinished
 	5,  // 30: codefoundry.v1.ActionSnapshot.actions:type_name -> codefoundry.v1.Action
 	6,  // 31: codefoundry.v1.ActionSnapshot.runs:type_name -> codefoundry.v1.ActionRun
 	1,  // 32: codefoundry.v1.ActionRunFinished.mode:type_name -> codefoundry.v1.ActionRunMode
@@ -2294,19 +2255,17 @@ var file_codefoundry_v1_action_proto_depIdxs = []int32{
 	22, // 40: codefoundry.v1.ActionService.WaitRun:input_type -> codefoundry.v1.WaitActionRunRequest
 	24, // 41: codefoundry.v1.ActionService.StopRun:input_type -> codefoundry.v1.StopActionRunRequest
 	10, // 42: codefoundry.v1.ActionService.LastRun:input_type -> codefoundry.v1.LastActionRunRequest
-	26, // 43: codefoundry.v1.ActionService.Watch:input_type -> codefoundry.v1.WatchActionsRequest
-	8,  // 44: codefoundry.v1.ActionService.List:output_type -> codefoundry.v1.ListActionsResponse
-	13, // 45: codefoundry.v1.ActionService.Create:output_type -> codefoundry.v1.CreateActionResponse
-	15, // 46: codefoundry.v1.ActionService.Update:output_type -> codefoundry.v1.UpdateActionResponse
-	17, // 47: codefoundry.v1.ActionService.Delete:output_type -> codefoundry.v1.DeleteActionResponse
-	19, // 48: codefoundry.v1.ActionService.Run:output_type -> codefoundry.v1.RunActionResponse
-	21, // 49: codefoundry.v1.ActionService.GetRun:output_type -> codefoundry.v1.GetActionRunResponse
-	23, // 50: codefoundry.v1.ActionService.WaitRun:output_type -> codefoundry.v1.WaitActionRunResponse
-	25, // 51: codefoundry.v1.ActionService.StopRun:output_type -> codefoundry.v1.StopActionRunResponse
-	11, // 52: codefoundry.v1.ActionService.LastRun:output_type -> codefoundry.v1.LastActionRunResponse
-	27, // 53: codefoundry.v1.ActionService.Watch:output_type -> codefoundry.v1.ActionEvent
-	44, // [44:54] is the sub-list for method output_type
-	34, // [34:44] is the sub-list for method input_type
+	8,  // 43: codefoundry.v1.ActionService.List:output_type -> codefoundry.v1.ListActionsResponse
+	13, // 44: codefoundry.v1.ActionService.Create:output_type -> codefoundry.v1.CreateActionResponse
+	15, // 45: codefoundry.v1.ActionService.Update:output_type -> codefoundry.v1.UpdateActionResponse
+	17, // 46: codefoundry.v1.ActionService.Delete:output_type -> codefoundry.v1.DeleteActionResponse
+	19, // 47: codefoundry.v1.ActionService.Run:output_type -> codefoundry.v1.RunActionResponse
+	21, // 48: codefoundry.v1.ActionService.GetRun:output_type -> codefoundry.v1.GetActionRunResponse
+	23, // 49: codefoundry.v1.ActionService.WaitRun:output_type -> codefoundry.v1.WaitActionRunResponse
+	25, // 50: codefoundry.v1.ActionService.StopRun:output_type -> codefoundry.v1.StopActionRunResponse
+	11, // 51: codefoundry.v1.ActionService.LastRun:output_type -> codefoundry.v1.LastActionRunResponse
+	43, // [43:52] is the sub-list for method output_type
+	34, // [34:43] is the sub-list for method input_type
 	34, // [34:34] is the sub-list for extension type_name
 	34, // [34:34] is the sub-list for extension extendee
 	0,  // [0:34] is the sub-list for field type_name
@@ -2318,7 +2277,7 @@ func file_codefoundry_v1_action_proto_init() {
 		return
 	}
 	file_codefoundry_v1_action_proto_msgTypes[9].OneofWrappers = []any{}
-	file_codefoundry_v1_action_proto_msgTypes[22].OneofWrappers = []any{
+	file_codefoundry_v1_action_proto_msgTypes[21].OneofWrappers = []any{
 		(*ActionEvent_Snapshot)(nil),
 		(*ActionEvent_Updated)(nil),
 		(*ActionEvent_RemovedId)(nil),
@@ -2332,7 +2291,7 @@ func file_codefoundry_v1_action_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_action_proto_rawDesc), len(file_codefoundry_v1_action_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   25,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

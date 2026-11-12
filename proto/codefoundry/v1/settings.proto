@@ -22,9 +22,6 @@ service SettingsService {
   // on failure nothing is written and the error (InvalidArgument) carries a
   // SettingsValidationErrors detail with one entry per rejected key.
   rpc Update(UpdateSettingsRequest) returns (UpdateSettingsResponse) {}
-  // Watch streams the current snapshot, then one snapshot per change. The GUI receives
-  // the same events on EventService instead.
-  rpc Watch(WatchSettingsRequest) returns (stream SettingsEvent) {}
 
   // Backdrop images: copies of pictures the user added, in the backdrops directory of
   // the Code Foundry home, that appearance.backdrop = custom shows (the one named by
@@ -195,8 +192,6 @@ message UpdateSettingsRequest {
 message UpdateSettingsResponse {
   SettingsSnapshot settings = 1;
 }
-
-message WatchSettingsRequest {}
 
 // Backdrop is one image in the backdrops directory.
 message Backdrop {

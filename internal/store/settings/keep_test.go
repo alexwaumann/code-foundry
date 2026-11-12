@@ -266,7 +266,7 @@ func TestSymlinkedFile(t *testing.T) {
 	t.Cleanup(func() { _ = s.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ch := s.Watch(ctx)
+	ch := s.watch(ctx)
 
 	if _, err := s.Update(context.Background(), map[string]string{KeyZoom: "110"}); err != nil {
 		t.Fatal(err)

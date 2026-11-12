@@ -14,7 +14,7 @@ import (
 )
 
 func TestGhDashboardListsEveryRepository(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 8, 6, 0, 0, 0, time.UTC)
 	store.SetViewer(gh.ViewerState{Viewer: &gh.Viewer{Login: "octocat"}, Authenticated: true, FetchedAt: at})
@@ -147,7 +147,7 @@ func TestGhDashboardListsEveryRepository(t *testing.T) {
 }
 
 func TestGhRepoActivityAndBranch(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 8, 6, 0, 0, 0, time.UTC)
 
@@ -282,7 +282,7 @@ func TestStatsToProto(t *testing.T) {
 }
 
 func TestGhDashboardProjectLists(t *testing.T) {
-	store, client, _ := newGhTest(t)
+	store, client := newGhTest(t)
 	ctx := context.Background()
 	at := time.Date(2026, 11, 2, 6, 0, 0, 0, time.UTC)
 	_ = store.Track("o/tracked")

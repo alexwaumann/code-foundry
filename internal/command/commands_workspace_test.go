@@ -18,7 +18,7 @@ func newWorkspaceRegistry(t *testing.T) (*command.Registry, *workspacetest.Fake)
 	b := bus.New()
 	fake := workspacetest.New(b)
 	reg := command.NewRegistry()
-	if err := command.RegisterWorkspace(reg, api.NewWorkspace(fake, b)); err != nil {
+	if err := command.RegisterWorkspace(reg, api.NewWorkspace(fake)); err != nil {
 		t.Fatal(err)
 	}
 	return reg, fake

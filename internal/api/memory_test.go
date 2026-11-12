@@ -33,7 +33,7 @@ func newMemoryServer(t *testing.T) (*memory.Store, codefoundryv1connect.MemorySe
 	done := make(chan struct{})
 	t.Cleanup(func() { close(done) })
 	mux := http.NewServeMux()
-	for _, r := range []Route{NewMemory(s, b).Route(), NewEvents(EventsDeps{Bus: b, Memory: s, Done: done}).Route()} {
+	for _, r := range []Route{NewMemory(s).Route(), NewEvents(EventsDeps{Bus: b, Memory: s, Done: done}).Route()} {
 		mux.Handle(r.Path, r.Handler)
 	}
 	srv := httptest.NewUnstartedServer(mux)
@@ -73,33 +73,6 @@ func TestMemoryGet(t *testing.T) {
 	}
 	if es := res.Msg.GetMemory().GetEntries(); len(es) != 2 || es[1].GetCreated() != nil || es[1].GetThreadId() != "" {
 		t.Errorf("after a hand edit: %v", es)
-	}
-}
-
-func TestMemoryWatch(t *testing.T) {
-	s, c, _ := newMemoryServer(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchMemoryRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	next := func() *v1.MemorySnapshot {
-		t.Helper()
-		if !stream.Receive() {
-			t.Fatalf("stream ended: %v", stream.Err())
-		}
-		return stream.Msg().GetSnapshot()
-	}
-	first := next()
-	if len(first.GetEntries()) != 1 || first.GetVersion() == 0 {
-		t.Fatalf("first = %v", first)
-	}
-	if _, err := s.Remove("1", ""); err != nil {
-		t.Fatal(err)
-	}
-	if m := next(); len(m.GetEntries()) != 0 || m.GetVersion() != first.GetVersion()+1 {
-		t.Errorf("after remove = %v", m)
 	}
 }
 

@@ -26,14 +26,13 @@ var _ SkillStore = (*skill.Store)(nil)
 // (docs/notes/skills-3-api.md).
 type Skill struct {
 	store SkillStore
-	bus   *bus.Bus
 }
 
 var _ codefoundryv1connect.SkillServiceHandler = (*Skill)(nil)
 
 // NewSkill returns a SkillService handler. b must be the bus the store publishes
 // skill.Event on.
-func NewSkill(store SkillStore, b *bus.Bus) *Skill { return &Skill{store: store, bus: b} }
+func NewSkill(store SkillStore) *Skill { return &Skill{store: store} }
 
 // Route mounts the service.
 func (h *Skill) Route(opts ...connect.HandlerOption) Route {
@@ -86,35 +85,6 @@ func (h *Skill) Registries(context.Context, *connect.Request[v1.ListSkillRegistr
 		})
 	}
 	return connect.NewResponse(out), nil
-}
-
-// Watch sends the current epoch, then each new one.
-func (h *Skill) Watch(ctx context.Context, _ *connect.Request[v1.WatchSkillsRequest], stream *connect.ServerStream[v1.SkillEvent]) error {
-	sub := bus.Subscribe[skill.Event](h.bus, watchBuffer)
-	defer sub.Close()
-	if err := stream.Send(&v1.SkillEvent{Epoch: h.store.Snapshot().Epoch}); err != nil {
-		return err
-	}
-	var dropped uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case ev, ok := <-sub.C():
-			if !ok {
-				return nil
-			}
-			if d := sub.Dropped(); d != dropped {
-				dropped = d
-				ev = h.store.Snapshot()
-			}
-			if msg := skillEventToProto(ev); msg != nil {
-				if err := stream.Send(msg); err != nil {
-					return err
-				}
-			}
-		}
-	}
 }
 
 // skillEventToProto converts a bus event (or a *skill.Snapshot) to the wire event.

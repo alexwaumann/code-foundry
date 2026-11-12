@@ -74,16 +74,6 @@ func (h *Settings) Update(ctx context.Context, req *connect.Request[v1.UpdateSet
 	return connect.NewResponse(&v1.UpdateSettingsResponse{Settings: settingsSnapshotToProto(snap)}), nil
 }
 
-// Watch streams the current snapshot, then every change.
-func (h *Settings) Watch(ctx context.Context, _ *connect.Request[v1.WatchSettingsRequest], stream *connect.ServerStream[v1.SettingsEvent]) error {
-	for snap := range h.store.Watch(ctx) {
-		if err := stream.Send(settingsEvent(snap)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 var settingTypes = map[settings.Type]v1.SettingType{
 	settings.String:     v1.SettingType_SETTING_TYPE_STRING,
 	settings.Int:        v1.SettingType_SETTING_TYPE_INT,

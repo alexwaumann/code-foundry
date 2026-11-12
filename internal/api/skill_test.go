@@ -28,7 +28,7 @@ import (
 // marketplace through the fake claude, with enterprise-data 1.3.0 installed (its
 // checkout's plugin.json says 1.3.9: an update), pr-review installed (it has a setup
 // script), sql-helper installed and disabled, and a local skill "mine".
-func newSkillServer(t *testing.T) (*skill.Store, *skilltest.Claude, codefoundryv1connect.SkillServiceClient) {
+func newSkillServer(t *testing.T) (*skill.Store, *skilltest.Claude, codefoundryv1connect.SkillServiceClient, *bus.Bus) {
 	t.Helper()
 	ctx := context.Background()
 	b := bus.New()
@@ -55,14 +55,14 @@ func newSkillServer(t *testing.T) (*skill.Store, *skilltest.Claude, codefoundryv
 	if _, err := s.Disable(ctx, "sql-helper", marketplace.KindSkill); err != nil {
 		t.Fatal(err)
 	}
-	route := NewSkill(s, b).Route()
+	route := NewSkill(s).Route()
 	mux := http.NewServeMux()
 	mux.Handle(route.Path, route.Handler)
 	srv := httptest.NewUnstartedServer(mux)
 	srv.EnableHTTP2 = true
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
-	return s, claude, codefoundryv1connect.NewSkillServiceClient(srv.Client(), srv.URL)
+	return s, claude, codefoundryv1connect.NewSkillServiceClient(srv.Client(), srv.URL), b
 }
 
 func writeFile(t *testing.T, p, content string) {
@@ -84,7 +84,7 @@ func entryNames(es []*v1.SkillEntry) []string {
 }
 
 func TestSkillSearch(t *testing.T) {
-	s, claude, c := newSkillServer(t)
+	s, claude, c, _ := newSkillServer(t)
 	ctx := context.Background()
 	tests := []struct {
 		name      string
@@ -174,7 +174,7 @@ func TestSkillSearch(t *testing.T) {
 }
 
 func TestSkillInstalledAndRegistries(t *testing.T) {
-	s, claude, c := newSkillServer(t)
+	s, claude, c, _ := newSkillServer(t)
 	ctx := context.Background()
 	res, err := c.Installed(ctx, connect.NewRequest(&v1.ListInstalledSkillsRequest{}))
 	if err != nil {
@@ -255,14 +255,11 @@ func TestSkillInstalledAndRegistries(t *testing.T) {
 	}
 }
 
-func TestSkillWatch(t *testing.T) {
-	s, _, c := newSkillServer(t)
+func TestSkillEvents(t *testing.T) {
+	s, _, _, b := newSkillServer(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchSkillsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	stream := watchSource(t, ctx, EventsDeps{Bus: b, Skill: s}, v1.EventSource_EVENT_SOURCE_SKILL, (*v1.Event).GetSkill)
 	next := func() uint64 {
 		t.Helper()
 		if !stream.Receive() {

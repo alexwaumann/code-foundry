@@ -51,8 +51,6 @@ const (
 	ActionServiceStopRunProcedure = "/codefoundry.v1.ActionService/StopRun"
 	// ActionServiceLastRunProcedure is the fully-qualified name of the ActionService's LastRun RPC.
 	ActionServiceLastRunProcedure = "/codefoundry.v1.ActionService/LastRun"
-	// ActionServiceWatchProcedure is the fully-qualified name of the ActionService's Watch RPC.
-	ActionServiceWatchProcedure = "/codefoundry.v1.ActionService/Watch"
 )
 
 // ActionServiceClient is a client for the codefoundry.v1.ActionService service.
@@ -87,9 +85,6 @@ type ActionServiceClient interface {
 	// count (not on_worktree_create runs), and only actions that still exist. Read from
 	// the run records, which outlive a daemon restart.
 	LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error)
-	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot.
-	Watch(context.Context, *connect.Request[v1.WatchActionsRequest]) (*connect.ServerStreamForClient[v1.ActionEvent], error)
 }
 
 // NewActionServiceClient constructs a client for the codefoundry.v1.ActionService service. By
@@ -157,12 +152,6 @@ func NewActionServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(actionServiceMethods.ByName("LastRun")),
 			connect.WithClientOptions(opts...),
 		),
-		watch: connect.NewClient[v1.WatchActionsRequest, v1.ActionEvent](
-			httpClient,
-			baseURL+ActionServiceWatchProcedure,
-			connect.WithSchema(actionServiceMethods.ByName("Watch")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -177,7 +166,6 @@ type actionServiceClient struct {
 	waitRun *connect.Client[v1.WaitActionRunRequest, v1.WaitActionRunResponse]
 	stopRun *connect.Client[v1.StopActionRunRequest, v1.StopActionRunResponse]
 	lastRun *connect.Client[v1.LastActionRunRequest, v1.LastActionRunResponse]
-	watch   *connect.Client[v1.WatchActionsRequest, v1.ActionEvent]
 }
 
 // List calls codefoundry.v1.ActionService.List.
@@ -225,11 +213,6 @@ func (c *actionServiceClient) LastRun(ctx context.Context, req *connect.Request[
 	return c.lastRun.CallUnary(ctx, req)
 }
 
-// Watch calls codefoundry.v1.ActionService.Watch.
-func (c *actionServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchActionsRequest]) (*connect.ServerStreamForClient[v1.ActionEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
-}
-
 // ActionServiceHandler is an implementation of the codefoundry.v1.ActionService service.
 type ActionServiceHandler interface {
 	// List returns a project's actions in order (every project's when project_id is empty)
@@ -262,9 +245,6 @@ type ActionServiceHandler interface {
 	// count (not on_worktree_create runs), and only actions that still exist. Read from
 	// the run records, which outlive a daemon restart.
 	LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error)
-	// Watch sends a snapshot, then every change. A client that falls behind gets a new
-	// snapshot.
-	Watch(context.Context, *connect.Request[v1.WatchActionsRequest], *connect.ServerStream[v1.ActionEvent]) error
 }
 
 // NewActionServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -328,12 +308,6 @@ func NewActionServiceHandler(svc ActionServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(actionServiceMethods.ByName("LastRun")),
 		connect.WithHandlerOptions(opts...),
 	)
-	actionServiceWatchHandler := connect.NewServerStreamHandler(
-		ActionServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(actionServiceMethods.ByName("Watch")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/codefoundry.v1.ActionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ActionServiceListProcedure:
@@ -354,8 +328,6 @@ func NewActionServiceHandler(svc ActionServiceHandler, opts ...connect.HandlerOp
 			actionServiceStopRunHandler.ServeHTTP(w, r)
 		case ActionServiceLastRunProcedure:
 			actionServiceLastRunHandler.ServeHTTP(w, r)
-		case ActionServiceWatchProcedure:
-			actionServiceWatchHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -399,8 +371,4 @@ func (UnimplementedActionServiceHandler) StopRun(context.Context, *connect.Reque
 
 func (UnimplementedActionServiceHandler) LastRun(context.Context, *connect.Request[v1.LastActionRunRequest]) (*connect.Response[v1.LastActionRunResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ActionService.LastRun is not implemented"))
-}
-
-func (UnimplementedActionServiceHandler) Watch(context.Context, *connect.Request[v1.WatchActionsRequest], *connect.ServerStream[v1.ActionEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ActionService.Watch is not implemented"))
 }
