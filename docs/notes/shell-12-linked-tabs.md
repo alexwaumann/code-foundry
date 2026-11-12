@@ -24,6 +24,10 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
 | `stores/threadInfoOverlay.ts`, `components/threadinfo/*` | the card's room per thread |
 | `shell/keys.ts` | cmd+shift+d (`view.thread-diff`), cmd+shift+i (`view.thread-info`) |
 | `internal/command/commands_terminal*.go` | `--pane` on `terminal.new` and `terminal.new-free` |
+| `internal/command/commands_ui*.go` | `--pane` on `ui.focus.terminal`: a running terminal with no tab gets one in that pane |
+| `shell/terminalActions.ts` (PR 13's) | `newTerminalTab({thread, pane})`, `newFreeTerminalTab(pane)`, `openTerminalIn(id, pane)` |
+| `shell/surfaces/terminal.tsx` (PR 13's) | `linkedNoun` "Terminal" and `linkedRowEnd`: `TerminalCwdHint` |
+| `stores/intents.ts` | the classic `focusTerminal` intent does nothing while the shell draws |
 | `mock/layoutVerbs.ts`, `mock/github.ts`, `mock/world.ts` | the mock's `view.thread-diff`; `--pane` on its `view.pullrequests` and `view.projects` |
 | `e2e/shell-linked.spec.ts` | the submenus' pointer and keyboard paths, the narrow pane's overlay, SHOTS |
 
@@ -74,6 +78,31 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
 - **`--pane` on the terminal verbs**: `terminal.new` and `terminal.new-free` had none, so the "+"
   menu's terminals would have been placed elsewhere. `openTerminalTab` takes the pane and passes
   it to `open_surface`. A small additive change in PR 13's area.
+- **The menus' terminals are cmd+t's and cmd+shift+t's.** "New terminal tab" and the "+" menu's
+  Terminal run PR 13's own `newTerminalTab` / `newFreeTerminalTab` (shell/terminalActions.ts),
+  which now take an optional thread and pane: the same verbs (`terminal.new` with the thread's
+  context, `terminal.new-free`), and the keyboard goes into the new tab as after the keys. A
+  `LinkedAction` of kind `terminal` carries them, so the menus' actions stay pure and tested.
+- **Running terminals with no tab** (the owner's open question, built as the likely answer): under
+  the "+" menu's Terminal, each running terminal that belongs to no thread and has no tab in any
+  space (a shell, an action run or a setup the classic window's Projects bottom panel started, or
+  one made through `TerminalService.Create`), named as its tab would be (`terminalName`, with its
+  icon). A pick gives it a tab in that pane. A thread's terminals are not listed: its quick
+  terminal is not a tab, and the tabs its close put away come back with the thread. Plugins' own
+  terminals are not listed either. The daemon could already give a terminal a tab
+  (`ui.focus.terminal` opens one by the rules when it has none), so the smallest addition was
+  `--pane` on that verb, not a new one; a terminal that has a tab is still focused where it is.
+- **The classic `focusTerminal` intent is ignored in the shell.** `ui.focus.terminal` also sends
+  it for the classic window; the shell's handler revealed the shell in the classic bottom panel,
+  which for a shell of a checkout routed to the Projects page and opened a Projects tab over the
+  new terminal tab (seen end to end). PR 7's note had asked for this.
+- **The linked terminal row**: "Terminal of ● thread", and PR 13's `TerminalCwdHint` in the slot
+  at its right. The link button shrinks first, so the hint's Reset stays visible.
+- **The "+" is not the pane's grip** (PR 14 made the strip's free space drag the pane): its
+  pointer down stops at the button, as PR 13's name field does, so a press and move there opens
+  the menu and never lifts the pane. PR 14's `shell-drag.spec.ts` pressed 24 px from the strip's
+  end for its grip, which in a narrow pane is the "+"; its helper now presses between the "+" and
+  the strip's end.
 - **Focus after a pick**: an item that focuses or opens a tab keeps the keyboard where the action
   put it (the menu's `onCloseAutoFocus` is prevented); a focus action requests the pane's focus.
 - **Attention dot**: `ShellSurface.useAttention` (thread tabs: `isAttention` and not archived)
@@ -94,7 +123,8 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
 - **Mock**: `view.thread-diff` (the same three cases as Go: back from the diff, focus an open
   one, else open it); `view.pullrequests` and `view.projects` open their tab only with `--pane`
   (without one they still only send the classic ShowView, so the existing suite's flows are
-  unchanged). The mock's terminal verbs still open no tab (PR 13).
+  unchanged). Since the rebase onto PR 13, the mock's `terminal.new` and `terminal.new-free` take
+  `--pane`, and the mock has `ui.focus.terminal` (`--pane`; the quick slot not ported).
 
 ## Visible differences from the sketches (01, 04a-04d)
 
@@ -103,12 +133,12 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
 - The header shows the thread info toggle beside the three dots; the sketch shows only the dots.
 - The menu ends with Close ⌘W; the sketch has no Close (the spec lists it).
 - Open ▸ has no "Files…" item; cmd+p is the file finder.
-- Open ▸ lists only terminal tabs, each marked "open"; the sketch also lists a running shell with
-  no tab. Terminals without tabs are PR 13's.
+- Open ▸ lists only the thread's terminal tabs, each marked "open"; the sketch also lists a
+  running shell of the thread with no tab. Untabbed terminals of no thread are listed under the
+  "+" menu's Terminal instead (not in any sketch).
 - Move to space ▸ shows one space and no "New space"; the spaces' icon is a generic grid, not
   each space's layout glyph (PR 15 has that glyph).
 - The attention dot is on the tab's icon, not after its name (the spec's placement).
-- Terminal tabs show the unknown-surface icon and a placeholder body until PR 13.
 - No full-screen button at the strip's right (PR 19).
 
 ## Verification
@@ -122,12 +152,19 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
   verb or focus each item runs; the row's text, live link, dormant link, rename; the header's
   name only while the tab is cut, its menu's order, Move to space, Close), `PaneTabStrip.test.tsx`
   (the attention dot, active or not, never archived; the linked tab's hover; the cut published),
-  `threadInfoOverlay.test.ts` (rooms per thread), `keys.test.ts` (the two rows).
-- Go: `TestTerminalNewOpensATab` gained `--pane` for a thread's shell and a free one.
+  `threadInfoOverlay.test.ts` (rooms per thread), `keys.test.ts` (the two rows). After the
+  rebase: `untabbedTerminals` (which terminals are listed), the "+" menu listing them under
+  Terminal and a pick running `ui.focus.terminal --id --pane`, the linked terminal row with the
+  hint once the shell left, and `intents.test.ts` (the shell ignores `focusTerminal`; the classic
+  window still reveals).
+- Go: `TestTerminalNewOpensATab` gained `--pane` for a thread's shell and a free one;
+  `TestFocusTerminalInAPane` (a tab in another space's pane; a second call keeps it there).
 - e2e `shell-linked.spec.ts` (WebKit, mock): the "+" thread submenu opens on hover and its open
   diff is focused in the other pane; the same path by Enter, ArrowRight, Enter; the header's Open
   to Move to space by the pointer; thread info floats over a narrow pane (about 360px) until a press in its
-  conversation while the wide pane shows the card inline.
+  conversation while the wide pane shows the card inline; a press and move on the "+" opens the
+  menu and lifts nothing, while the same move from the strip's free space lifts the pane. The four
+  shell specs (grid, drag, terminal, linked) pass together.
 - End to end with `make drive DAEMON=dev` and `?shell=1` on a scratch home and a scratch repository
   under the home folder (both removed after): two threads made with `thread new --project repo`,
   the first opened from the CLI. cmd+shift+d in the window opened its diff in a new pane to the
@@ -137,6 +174,10 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
   tab's row read "Diff of Second thread", dormant, and its link opened Second thread in that
   pane. "+" › Terminal in the other pane put an unlinked terminal tab there, and "+" › Second
   thread › New terminal tab a linked one in the "+"'s pane.
+- After the rebase, again on a dev daemon: a shell made with `TerminalService.Create` (labels
+  `kind=shell` only, as the classic bottom panel makes them) showed under "+" › Terminal as
+  "zsh · tmp"; a pick gave it a tab in that pane, active, with the keyboard in its xterm, and
+  `layout show` listed it. The first attempt, before the intent fix, also opened a Projects tab.
 
 ## Gotchas
 
@@ -149,12 +190,6 @@ cmd+shift+d and cmd+shift+i are in the interim key table. With the flag off noth
 
 ## For later PRs
 
-- **PR 13 (terminals)**: set `linkedRowEnd` on the terminal surface for the "directory differs ·
-  Reset" hint; it mounts at the right of the row (`shell-linked-row-end`). Give the terminal
-  surface a `linkedNoun` ("Terminal") and an icon; the Open ▸ list reads the tab's title through
-  the surface's `useTitle`, so terminal names follow. If running shells without a tab should be
-  listed (the sketch), add them to `threadSurfaces` with an empty `openTab` and an action. The
-  mock's `terminal.new`/`terminal.new-free` should take `--pane` when they open tabs.
 - **PR 15 (spaces)**: a dormant row of a thread in another space should switch to it; Move to
   space ▸ can gain "New space" and the spaces' layout glyphs.
 - **PR 16 (sidebar)**: the row menu's Open ▸ for a thread whose tab is not open is the same
