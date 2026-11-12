@@ -220,7 +220,7 @@ setup in /private/tmp/cfa.npt5/worktrees/_local/cf-actions-e2e.lUOL/cf-actions-e
 Setup exited with code 0 (run r-a739609864e5)
 ```
 
-(The thread was first created with `claude-4.5-haiku[1m]`, the work laptop's Bedrock id,
+(The thread was first created with `claude-4.5-haiku[1m]`, a managed Mac's Bedrock id,
 which this machine's Claude does not have; it was switched with `thread set-model` and the
 prompt re-sent.) The agent's reply:
 

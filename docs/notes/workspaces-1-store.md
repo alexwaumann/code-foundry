@@ -145,7 +145,7 @@ scratch daemon (below). Design record: `workspaces-handoff.md` (sections 3, 5, 7
     reference"; the web worktree and its new branch were rolled back.
   * Daemon log: no warnings or errors outside the gh poller. Scratch daemon stopped.
 
-## To check on the work laptop
+## To check on a managed Mac
 
 Use a scratch home so the installed daemon is untouched. `ui` and `service` stand for two
 of your repos; replace the paths.
@@ -162,7 +162,7 @@ UI=<ui worktree path>; SVC=<service worktree path>
 ```
 
 **(a) Loopback CLI from inside a sandboxed session.** The session's Bash runs in the
-work sandbox (Unix sockets blocked):
+managed machine's sandbox (Unix sockets blocked):
 
 ```sh
 ./bin/code-foundry session new --worktree "$UI" --model haiku --effort medium --name ws-check \

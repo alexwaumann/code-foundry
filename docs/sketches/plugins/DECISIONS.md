@@ -31,9 +31,9 @@ per-line log tone adopted, ANSI deferred).
 
 ### Session environment hook: env, PATH and add-dirs only
 
-Custom MCP configuration does not work on Alex's work laptop (managed settings), so the
+Custom MCP configuration does not work on Alex's managed laptop (managed settings), so the
 `mcpServers` contribution is **dropped** entirely, along with the `--mcp-config` file and
-the "test on the work laptop" open question. The hook contributes `env`, `pathPrepend`
+the "test on a managed Mac" open question. The hook contributes `env`, `pathPrepend`
 and `addDirs` with the rules in §C.7 (reserved keys, limits, name-order conflicts, scope,
 2 s startup grace, push not request). It plugs into the same spawn-extras slot the
 daemon's own skills `--add-dir` already uses (`docs/notes/agent-skills.md`); extend that

@@ -33,7 +33,7 @@ this branch.
   page, be polled by the repo store and its watcher, offer Initialize Git on `~`, and be
   indexed for `@` file completion. The thread simply has no owner instead.
 * **Trust**: the home directory is pre-trusted like every other cwd (`trustWorktree` in
-  `spawn`), with no special case. Accepted because the work laptop is a managed device
+  `spawn`), with no special case. Accepted because the user's machine is a managed device
   with a locked-down, sandboxed Claude. Note Claude's trust check walks up to trusted
   parents, so a trusted `~` covers every folder under it.
 * **RunIn** refuses a thread without a workspace already (`FailedPrecondition`, "does not
