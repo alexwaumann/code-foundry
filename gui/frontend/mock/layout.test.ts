@@ -29,9 +29,13 @@ const cases = Object.entries(files).map(([path, raw]) => ({ name: path.replace(/
  * Why a case is not run against the mock. The mock does not port the rules, which are tested in
  * Go: the thread ops (open_thread with its restore, close_thread, move_thread, archive, snooze),
  * placement rules 2 to 6 for a linked surface beside its open thread, a thread's remembered
- * set, and smart swap.
+ * set, and smart swap. Nor the terminal ops the daemon's lifecycle glue applies itself
+ * (internal/daemon/layout.go; docs/notes/shell-6-lifecycle.md): no GUI sends them yet.
  */
+const TERMINAL_GLUE_OPS = ["drop_terminal", "replace_terminal", "set_quick"];
+
 function notPorted(c: OpCase): string | null {
+  if (TERMINAL_GLUE_OPS.includes(c.op.op)) return "the daemon's terminal glue";
   if (!PORTED_OPS.includes(c.op.op)) return `${c.op.op} is a rule`;
   if (c.result?.swapped?.length) return "smart swap";
   if (c.result?.rule && /^[2-6]$/.test(c.result.rule)) return "placement rules 2 to 6";
