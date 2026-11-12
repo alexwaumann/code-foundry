@@ -8,6 +8,7 @@ const runLayoutCommand = vi.fn<(name: string, args: Record<string, string>) => P
 vi.mock("@/shell/commands", () => ({
   runLayoutCommand: (name: string, args: Record<string, string>) => runLayoutCommand(name, args),
   focusTabNow: (id: string) => runLayoutCommand("tab.focus", { tab: id, focus: "true" }),
+  afterRev: () => Promise.resolve(),
 }));
 
 const { composeParamsOf, composeSelectionOf, focusedTab, planRoute, selectionOfTab, startSelectionBridge } = await import("./selectionBridge");
@@ -152,11 +153,40 @@ describe("the bridge", () => {
     });
   });
 
+  it("a select() asking for the prompt moves the keyboard into the focused pane once the opened tab is in the layout", async () => {
+    const { useShellViewStore } = await import("./shellView");
+    await seedLayout(layoutOf([space(pane("p-1", [tab("t-s1", "thread", "s-1")]), "p-1")]));
+    stop = startSelectionBridge();
+    const before = useShellViewStore.getState().focusRequest.seq;
+    runLayoutCommand.mockResolvedValue({ rev: 2, changed: true, tab: "t-s4" });
+    useUiStore.getState().select({ kind: "thread", id: "s-4" }, { focusPrompt: true });
+    await vi.waitFor(() => {
+      expect(useShellViewStore.getState().focusRequest).toEqual({ paneId: "p-1", seq: before + 1 });
+    });
+  });
+
   it("without a layout (an older daemon) select() is the store's", () => {
     stop = startSelectionBridge();
     useUiStore.getState().select({ kind: "thread", id: "s-4" });
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-4" });
     expect(runLayoutCommand).not.toHaveBeenCalled();
+  });
+
+  it("a thread selected before the shell first drew (a click while the import ran) opens when it does", async () => {
+    // The sidebar is up before the pane grid: the click selects the thread the store's way.
+    useUiStore.getState().select({ kind: "thread", id: "s-4" });
+    await seedLayout(layoutOf([space(null, "")]));
+    runLayoutCommand.mockResolvedValue({ rev: 2, changed: true });
+    stop = startSelectionBridge();
+    expect(runLayoutCommand).toHaveBeenCalledWith("thread.open", { id: "s-4", focus: "true" });
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-4" });
+  });
+
+  it("with nothing selected before, the first draw opens no thread: the selection follows the empty space", async () => {
+    await seedLayout(layoutOf([space(null, "")]));
+    stop = startSelectionBridge();
+    expect(runLayoutCommand).not.toHaveBeenCalled();
+    expect(useUiStore.getState().selection).toEqual(HOME);
   });
 
   it("a stopped bridge leaves select() to the store", async () => {

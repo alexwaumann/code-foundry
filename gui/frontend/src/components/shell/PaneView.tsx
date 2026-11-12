@@ -37,8 +37,22 @@ function focusInto(body: HTMLElement, kind: string): void {
     useUiStore.getState().focusComposer();
     return;
   }
-  const root = body.querySelector<HTMLElement>("[data-focus-root]") ?? body;
-  root.focus({ preventScroll: true });
+  const root = body.querySelector<HTMLElement>("[data-focus-root]");
+  if (root) {
+    root.focus({ preventScroll: true });
+    return;
+  }
+  // The body itself takes the keyboard only for this request: focusable for good, any press on a
+  // blank spot of a tab (a composer's heading) would take the keyboard out of its prompt.
+  body.tabIndex = -1;
+  body.addEventListener(
+    "blur",
+    () => {
+      body.removeAttribute("tabindex");
+    },
+    { once: true },
+  );
+  body.focus({ preventScroll: true });
 }
 
 /**
@@ -96,7 +110,7 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
     >
       <PaneTabStrip paneId={paneId} focused={focused} fullscreen={full} />
       {tab && <LinkedRow tab={tab} />}
-      <div ref={bodyRef} id={shellBodyDomId(paneId)} role="tabpanel" tabIndex={-1} className="relative flex min-h-0 min-w-0 flex-1 flex-col outline-none" data-testid="shell-pane-body">
+      <div ref={bodyRef} id={shellBodyDomId(paneId)} role="tabpanel" className="relative flex min-h-0 min-w-0 flex-1 flex-col outline-none" data-testid="shell-pane-body">
         {tab && (
           <ShellPaneContext.Provider value={ctx}>
             <ErrorBoundary key={tab.id} label={`${tab.kind} tab`} fallback={PaneError}>

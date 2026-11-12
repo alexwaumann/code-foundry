@@ -14,9 +14,10 @@
  * - a space with no pane: home (the empty space shows the composer).
  */
 import { applyLayoutOp } from "@/api/layout";
-import { focusTabNow, runLayoutCommand } from "@/shell/commands";
+import { afterRev, focusTabNow, runLayoutCommand } from "@/shell/commands";
 import { emberThreadOf } from "./ember";
 import { useLayoutStore, type LayoutState, type TabEntry } from "./layout";
+import { requestPaneFocus } from "./shellView";
 import { useThreadsStore } from "./threads";
 import { HOME, mirrorSelection, sameSelection, setSelectRoute, useUiStore, type SelectOptions, type Selection } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
@@ -166,30 +167,31 @@ function mirror(opts: { focusPrompt?: boolean } = {}): void {
   if (!sameSelection(useUiStore.getState().selection, next) || opts.focusPrompt) mirrorSelection(next, opts);
 }
 
-async function run(action: RouteAction): Promise<void> {
+/** Runs a route; the rev of the commit that opened a tab, when it was a command that did (null otherwise). */
+async function run(action: RouteAction): Promise<number | null> {
   switch (action.kind) {
     case "stay":
     case "none":
-      return;
+      return null;
     case "command": {
       const res = await runLayoutCommand(action.name, action.args);
       // New thread focuses the space's empty composer: it now starts from what was picked.
       if (res?.tab && action.params) await applyLayoutOp({ op: "set_tab_params", tab: res.tab, params: action.params });
-      return;
+      return res?.rev ?? null;
     }
     case "focus":
       await focusTabNow(action.tab);
       if (action.params) await applyLayoutOp({ op: "set_tab_params", tab: action.tab, params: action.params });
-      return;
+      return null;
     case "params":
       await applyLayoutOp({ op: "set_tab_params", tab: action.tab, params: action.params });
-      return;
+      return null;
     case "replace-composer":
       await applyLayoutOp({ op: "open_thread", thread: action.thread, compose: action.compose, focus: true });
-      return;
+      return null;
     case "open":
       await applyLayoutOp({ op: "open_surface", tab: { kind: action.tabKind, params: action.params }, focus: true });
-      return;
+      return null;
   }
 }
 
@@ -207,6 +209,15 @@ export function routeSelect(sel: Selection, opts: SelectOptions): boolean {
   if (action.kind === "stay") return true;
   routing++;
   void run(action)
+    .then(async (rev) => {
+      // The prompt asked for (a sidebar click) is the new tab's: it takes the keyboard once its
+      // pane draws it. Asked for at once, it reached the tab that was still showing.
+      if (!opts.focusPrompt || rev === null) return;
+      await afterRev(rev);
+      const s = useLayoutStore.getState();
+      const pane = s.spaces[s.currentSpaceId]?.focus ?? "";
+      if (pane) requestPaneFocus(pane);
+    })
     .catch(() => {
       // A refusal was toasted by the command; the selection goes back to the layout's.
     })
@@ -227,7 +238,10 @@ export function startSelectionBridge(): () => void {
     if (s.currentSpaceId === prev.currentSpaceId && s.spaces === prev.spaces && s.panes === prev.panes && s.tabs === prev.tabs && s.loaded === prev.loaded) return;
     mirror();
   });
-  mirror();
+  // A thread selected before the shell first drew (a sidebar click or a thread.focus while the
+  // first-load import ran) opens now, as it would have; otherwise the selection follows the layout.
+  const early = useUiStore.getState().selection;
+  if (early.kind !== "thread" || !routeSelect(early, { focusPrompt: true })) mirror();
   return () => {
     unsub();
     setSelectRoute(null);
