@@ -77,6 +77,9 @@ func (a *actor) viewUpdate(_ context.Context, params json.RawMessage) (any, erro
 	case floodStarted:
 		a.hostLog("%s sends more than %d views a second: showing at most one a second", p.Instance, floodRate)
 		a.m.surf.setIssue(a.name, in.surfaceID+" flood", fmt.Sprintf("more than %d views a second for %ds; shown at most one a second", floodRate, floodSeconds))
+		in.mu.Lock()
+		a.m.surf.liftFloodLocked(in)
+		in.mu.Unlock()
 	case floodEnded:
 		a.hostLog("%s is back under %d views a second: showing every view", p.Instance, floodRate)
 		a.m.surf.setIssue(a.name, in.surfaceID+" flood", "")

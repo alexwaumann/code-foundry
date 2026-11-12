@@ -150,6 +150,9 @@ func (h *surfaceHub) closeNow(in *instance, reason pluginsdk.CloseReason, why st
 	h.mu.Lock()
 	if reason == pluginsdk.CloseContextGone && !watched {
 		delete(h.inst, in.key)
+		in.mu.Lock()
+		in.stopTimer(&in.flood)
+		in.mu.Unlock()
 	}
 	h.evictLocked()
 	h.mu.Unlock()

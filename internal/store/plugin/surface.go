@@ -36,15 +36,16 @@ const (
 	DefaultFirstViewTimeout = 10 * time.Second
 	DefaultCoalesce         = 100 * time.Millisecond
 	DefaultActTimeout       = 10 * time.Second
+	DefaultFloodQuiet       = time.Minute
 )
 
 const (
 	surfaceOpenTimeout = 5 * time.Second
 	// A plugin sending more than floodRate views a second for floodSeconds seconds is
-	// throttled to one a second, until floodQuiet has passed without such a second.
+	// throttled to one a second, until Options.FloodQuiet has passed without such a
+	// second.
 	floodRate         = 50
 	floodSeconds      = 10
-	floodQuiet        = time.Minute
 	throttledInterval = time.Second
 	// maxRawView bounds view/update's view before decoding (the 256 KB limit excludes
 	// up to four 64 KB logs).
@@ -289,6 +290,7 @@ func (h *surfaceHub) close() {
 	for _, in := range all {
 		in.mu.Lock()
 		in.stopTimersLocked()
+		in.stopTimer(&in.flood)
 		in.mu.Unlock()
 	}
 }
@@ -392,6 +394,9 @@ type instance struct {
 	floodWins int
 	lastFlood time.Time
 	throttled bool
+	// flood lifts the throttle a quiet FloodQuiet after the last flooding second
+	// (liftFloodLocked).
+	flood *time.Timer
 }
 
 type appendRec struct {
@@ -635,6 +640,9 @@ func (h *surfaceHub) evictLocked() {
 	slices.SortFunc(closed, func(a, b *instance) int { return a.closedAt.Compare(b.closedAt) })
 	for _, in := range closed[:len(closed)-maxClosed] {
 		delete(h.inst, in.key)
+		in.mu.Lock()
+		in.stopTimer(&in.flood)
+		in.mu.Unlock()
 	}
 }
 
@@ -1056,11 +1064,51 @@ func (in *instance) countLocked(now time.Time) floodChange {
 	case !in.throttled && in.floodWins >= floodSeconds:
 		in.throttled = true
 		return floodStarted
-	case in.throttled && now.Sub(in.lastFlood) >= floodQuiet:
+	case in.throttled && now.Sub(in.lastFlood) >= in.floodQuiet():
 		in.throttled = false
+		in.stopTimer(&in.flood)
 		return floodEnded
 	}
 	return floodSame
+}
+
+// floodQuiet is Options.FloodQuiet (DefaultFloodQuiet for an instance without a hub:
+// tests).
+func (in *instance) floodQuiet() time.Duration {
+	if in.h != nil && in.h.m != nil {
+		return in.h.m.opts.FloodQuiet
+	}
+	return DefaultFloodQuiet
+}
+
+// liftFloodLocked arms in's flood timer: a quiet FloodQuiet after its last flooding
+// second it lifts the throttle and clears the surface's flood issue, for a surface that
+// has gone silent (one that sends again is let go as its view arrives, countLocked).
+// Callers hold in.mu.
+func (h *surfaceHub) liftFloodLocked(in *instance) {
+	in.stopTimer(&in.flood)
+	if !in.throttled {
+		return
+	}
+	var t *time.Timer
+	t = time.AfterFunc(in.lastFlood.Add(h.m.opts.FloodQuiet).Sub(h.m.opts.Now()), func() {
+		in.mu.Lock()
+		if in.flood != t { // stopped, or armed again since
+			in.mu.Unlock()
+			return
+		}
+		in.flood = nil
+		if h.m.opts.Now().Sub(in.lastFlood) < h.m.opts.FloodQuiet { // a flooding second since
+			h.liftFloodLocked(in)
+			in.mu.Unlock()
+			return
+		}
+		in.throttled = false
+		in.mu.Unlock()
+		h.m.surfLog(in.plugin, "%s is back under %d views a second: showing every view", in.key, floodRate)
+		h.setIssue(in.plugin, in.surfaceID+" flood", "")
+	})
+	in.flood = t
 }
 
 func hasLogContent(v *ui.View) bool {
