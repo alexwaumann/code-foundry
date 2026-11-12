@@ -33,7 +33,8 @@ const branchDeleteTimeout = 30 * time.Second
 // r.ExpectedHeadSHA (the head the client showed) the merge is refused unless the head
 // is still that commit, so a detail refetched since cannot slip unseen commits in.
 // Merges of one pull request run one at a time; within writeMemoTTL of a merge,
-// another call returns the first's outcome instead of sending the mutation again.
+// another call returns the first's outcome instead of sending the mutation again, also
+// when it arrives while that merge is still in flight.
 func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r MergeRequest) (MergeResult, error) {
 	k, err := fullKeyOf(slug, number)
 	if err != nil {
@@ -63,7 +64,13 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		// The cached copy may be behind (marked ready, reopened, settings changed,
 		// pushed to, a row cached before the default branch was fetched): only a fresh
 		// look may refuse, and it must succeed.
-		if d, err = s.fetchFullJob(ctx, k); err != nil {
+		d, err = s.fetchFullJob(ctx, k)
+		// The fetch ran on the worker after any merge of k that was in flight: one that
+		// landed meanwhile answers, not the merged state it left.
+		if m, ok := s.full.merges.recent(k, s.opts.Now()); ok {
+			return repeatMerge(m, r)
+		}
+		if err != nil {
 			return MergeResult{}, fmt.Errorf("pull request #%d: cannot confirm it can be merged: %w", k.number, err)
 		}
 	}
@@ -85,6 +92,11 @@ func (s *Store) MergePullRequest(ctx context.Context, slug string, number int, r
 		head = r.ExpectedHeadSHA
 	}
 	return submitFunc(ctx, s, "merge|"+k.String(), func(ctx context.Context) (MergeResult, error) {
+		// A merge of k that was in flight when this call looked (its caller had left) has
+		// finished on the worker by now: share its outcome instead of sending a second.
+		if m, ok := s.full.merges.recent(k, s.opts.Now()); ok {
+			return repeatMerge(m, r)
+		}
 		data, err := s.call(ctx, queryMergePullRequest, map[string]any{"id": pr.ID, "method": string(r.Method), "head": head})
 		var pe *PartialError
 		switch {

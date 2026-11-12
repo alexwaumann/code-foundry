@@ -105,6 +105,9 @@ type Options struct {
 	// Surface timing; zero values take DefaultSurfaceGrace, DefaultFirstViewTimeout,
 	// DefaultCoalesce and DefaultActTimeout (how long an act waits for the plugin).
 	SurfaceGrace, FirstViewTimeout, CoalesceInterval, ActTimeout time.Duration
+	// FloodQuiet is how long a throttled surface stays under the flood rate before its
+	// throttle lifts; zero takes DefaultFloodQuiet.
+	FloodQuiet time.Duration
 
 	// Registry reads the plugin registries for install, update and browse (install.go,
 	// updates.go); nil refuses installing from a registry or a release.
@@ -141,6 +144,7 @@ func (o *Options) defaults() {
 	d(&o.FirstViewTimeout, DefaultFirstViewTimeout)
 	d(&o.CoalesceInterval, DefaultCoalesce)
 	d(&o.ActTimeout, DefaultActTimeout)
+	d(&o.FloodQuiet, DefaultFloodQuiet)
 	d(&o.DevWatchInterval, DefaultDevWatchInterval)
 	d(&o.DevBuildTimeout, DefaultDevBuildTimeout)
 	if o.CrashLimit <= 0 {

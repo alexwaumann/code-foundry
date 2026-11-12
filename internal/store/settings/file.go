@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
@@ -66,7 +68,9 @@ func ThemeSlots(path string) []string {
 // Values are stringified leniently (14 and "14" both work for an int); type errors are
 // found by Field.parse. Nested tables are flattened to dotted keys: under
 // [keybindings], unquoted dotted keys (thread.new = ...) parse as nested tables, and an
-// unknown sub-table ([threads.experimental]) is kept, key by key, for the next save.
+// unknown sub-table ([threads.experimental]) is kept, key by key, for the next save. An
+// unknown key whose value TOML has no string form for (an array of tables, a table in a
+// list, a date or time) keeps its value as TOML text (rawValue).
 func decode(data []byte) (map[string]string, error) {
 	var doc map[string]any
 	if _, err := toml.Decode(string(data), &doc); err != nil {
@@ -76,7 +80,7 @@ func decode(data []byte) (map[string]string, error) {
 	for group, v := range doc {
 		tbl, ok := v.(map[string]any)
 		if !ok {
-			raw[group] = stringify(v)
+			raw[group] = rawValue(group, v)
 			continue
 		}
 		flatten(raw, group, tbl)
@@ -137,8 +141,87 @@ func flatten(raw map[string]string, prefix string, tbl map[string]any) {
 			flatten(raw, key, sub)
 			continue
 		}
-		raw[key] = stringify(v)
+		raw[key] = rawValue(key, v)
 	}
+}
+
+// verbatimPrefix marks a raw value that is TOML text, written back as it is
+// (encodeLiteral). Only unknown keys hold one: no setting accepts it.
+const verbatimPrefix = "\x00toml:"
+
+// rawValue is v as the raw value of key: stringify's text, or for an unknown key whose
+// value stringify would lose the shape of (structured), the value as inline TOML after
+// verbatimPrefix. A known key keeps stringify's text, which its validation reports.
+func rawValue(key string, v any) string {
+	if !structured(v) || isKeybindingKey(key) || movedKeys[key] != "" ||
+		slices.ContainsFunc(staticFields, func(f Field) bool { return f.Key == key }) {
+		return stringify(v)
+	}
+	return verbatimPrefix + inlineTOML(v)
+}
+
+// structured reports whether v is more than a scalar other than a date or time, or a
+// list of such scalars.
+func structured(v any) bool {
+	switch v := v.(type) {
+	case []any:
+		return slices.ContainsFunc(v, structured)
+	case string, int64, bool, float64:
+		return false
+	}
+	return true
+}
+
+// inlineTOML writes a decoded value as TOML on one line: tables inline, keys sorted.
+func inlineTOML(v any) string {
+	switch v := v.(type) {
+	case string:
+		return tomlString(v)
+	case float64:
+		switch {
+		case math.IsNaN(v):
+			return "nan"
+		case math.IsInf(v, 1):
+			return "inf"
+		case math.IsInf(v, -1):
+			return "-inf"
+		}
+		f := strconv.FormatFloat(v, 'g', -1, 64)
+		if !strings.ContainsAny(f, ".e") {
+			f += ".0"
+		}
+		return f
+	case time.Time:
+		// The decoder marks TOML's local date-times, dates and times by location name.
+		switch v.Location().String() {
+		case "datetime-local":
+			return v.Format("2006-01-02T15:04:05.999999999")
+		case "date-local":
+			return v.Format(time.DateOnly)
+		case "time-local":
+			return v.Format("15:04:05.999999999")
+		}
+		return v.Format(time.RFC3339Nano)
+	case []any:
+		parts := make([]string, len(v))
+		for i, x := range v {
+			parts[i] = inlineTOML(x)
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	case []map[string]any:
+		parts := make([]string, len(v))
+		for i, x := range v {
+			parts[i] = inlineTOML(x)
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	case map[string]any:
+		parts := make([]string, 0, len(v))
+		for _, k := range slices.Sorted(maps.Keys(v)) {
+			parts = append(parts, tomlKey(k)+" = "+inlineTOML(v[k]))
+		}
+		return "{" + strings.Join(parts, ", ") + "}"
+	}
+	return stringify(v)
 }
 
 func stringify(v any) string {
@@ -283,10 +366,13 @@ func render(values map[string]string, issues []Issue) []byte {
 	return b.Bytes()
 }
 
-// encodeLiteral writes a raw value of an unknown key: a bare integer or boolean when
-// that reads back as the same string, else a string. (The raw values are strings, so
-// either way the file reads back as it was.)
+// encodeLiteral writes a raw value of an unknown key: TOML text as it is, a bare
+// integer or boolean when that reads back as the same string, else a string. (The raw
+// values are strings, so either way the file reads back as it was.)
 func encodeLiteral(v string) string {
+	if text, ok := strings.CutPrefix(v, verbatimPrefix); ok {
+		return text
+	}
 	if n, err := strconv.ParseInt(v, 10, 64); err == nil && strconv.FormatInt(n, 10) == v {
 		return v
 	}

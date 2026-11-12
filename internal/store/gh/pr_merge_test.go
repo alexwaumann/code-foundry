@@ -515,6 +515,91 @@ func TestMergePullRequestConcurrent(t *testing.T) {
 	}
 }
 
+// Merges that arrive while one of the same pull request is in flight (its caller left)
+// share its outcome: one mutation, one branch delete.
+func TestMergePullRequestWhileInFlight(t *testing.T) {
+	unknown := fmt.Errorf("%w: Bad Gateway (HTTP 502)", ErrServerTimeout)
+	cases := []struct {
+		name    string
+		fail    error // the in-flight mutation's error, if any
+		deletes int
+	}{
+		{name: "merged", deletes: 1},
+		{name: "outcome unknown", fail: unknown},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			g, w, s, _, _ := mergeWorld(t)
+			if _, err := s.FullPullRequest(context.Background(), "o/r", 1, false); err != nil {
+				t.Fatal(err)
+			}
+			started, release := make(chan struct{}), make(chan struct{})
+			var mu sync.Mutex
+			sent := 0
+			w.setDoc(func(op, doc string, vars map[string]any) (json.RawMessage, error) {
+				if op == "MergePullRequest" {
+					mu.Lock()
+					sent++
+					first := sent == 1
+					mu.Unlock()
+					if first {
+						close(started)
+						<-release
+						if tc.fail != nil {
+							return nil, tc.fail
+						}
+					}
+				}
+				return g.respond(op, doc, vars)
+			})
+			req := MergeRequest{Method: MergeSquash, DeleteBranch: true}
+			ctx, cancel := context.WithCancel(context.Background())
+			left := make(chan error, 1)
+			go func() {
+				_, err := s.MergePullRequest(ctx, "o/r", 1, req)
+				left <- err
+			}()
+			<-started
+			cancel()
+			if err := <-left; !errors.Is(err, context.Canceled) {
+				t.Fatalf("first caller: %v, want context.Canceled", err)
+			}
+			type outcome struct {
+				res MergeResult
+				err error
+			}
+			out := make(chan outcome, 2)
+			merge := func() {
+				res, err := s.MergePullRequest(context.Background(), "o/r", 1, req)
+				out <- outcome{res, err}
+			}
+			go merge()
+			waitFor(t, "the retry's merge in the queue", func() bool {
+				s.mu.Lock()
+				defer s.mu.Unlock()
+				return slices.ContainsFunc(s.queue, func(j *job) bool { return strings.HasPrefix(j.id, "merge|") })
+			})
+			go merge()
+			close(release)
+			a, b := <-out, <-out
+			if tc.fail != nil {
+				for _, o := range []outcome{a, b} {
+					if !errors.Is(o.err, ErrServerTimeout) || !strings.Contains(o.err.Error(), "it may have merged") {
+						t.Errorf("retry: %+v, %v; want the first merge's unknown outcome", o.res, o.err)
+					}
+				}
+			} else if a.err != nil || b.err != nil || !a.res.Merged || !a.res.BranchDeleted || a.res != b.res {
+				t.Errorf("retries: %+v, %v and %+v, %v; want the first merge's result", a.res, a.err, b.res, b.err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if sent != 1 || len(w.calls()) != tc.deletes {
+				t.Errorf("mutations %d, branch deletes %d; want 1, %d", sent, len(w.calls()), tc.deletes)
+			}
+		})
+	}
+}
+
 func TestKeepBranch(t *testing.T) {
 	pr := func(head, base, def string) *FullPullRequest {
 		return &FullPullRequest{PullRequest: PullRequest{HeadRef: head, BaseRef: base}, DefaultBranch: def}
