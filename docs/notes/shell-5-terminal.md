@@ -86,6 +86,9 @@ before. Nothing here touches the layout (PRs 1-4); PR 6 wires the two together.
 
 ## Gotchas
 
+- staticcheck marks `unix.SYS_PROC_INFO` deprecated (SA1019): x/sys wants libSystem wrappers
+  on darwin, and the wrapper, libproc's `proc_pidinfo`, needs cgo. The call carries the repo's
+  first `//lint:ignore`, with the reason; `TestCwdOf` pins the syscall's behaviour.
 - A forked child shows its parent's argv in `kern.procargs2` until it has exec'd. The group
   fallback test waits for the member to become `sleep` rather than reading once.
 - A plain `go test` or `go build` of the terminal store needs `PKG_CONFIG_PATH` (and the macOS

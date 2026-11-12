@@ -38,6 +38,10 @@ func cwdOf(pid int) (string, error) {
 		return "", fmt.Errorf("cwd of pid %d: %w", pid, unix.ESRCH)
 	}
 	var buf [procVnodePathInfoSize]byte
+	// x/sys deprecates the darwin syscall numbers in favour of libSystem wrappers; the
+	// wrapper here is libproc's proc_pidinfo, which would need cgo outside its owning
+	// goroutine. proc_info has been 336 since 10.5, and TestCwdOf pins the call.
+	//lint:ignore SA1019 no cgo wrapper for proc_pidinfo; see above
 	n, _, errno := unix.Syscall6(unix.SYS_PROC_INFO, procInfoCallPidinfo, uintptr(pid), procPidVnodePathInfo, 0,
 		uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
 	if errno != 0 {
