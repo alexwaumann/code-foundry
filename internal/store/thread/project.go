@@ -95,7 +95,7 @@ type openBlock struct {
 
 // newProjector projects onto w's log the events of a process that starts from base
 // (restoredTotals). The log's last turn end from a result, if any, is the previous
-// process's (a Reconnect, a daemon restart); one the daemon wrote for a process that
+// process's (a later start, a daemon restart); one the daemon wrote for a process that
 // ended without a result (turnclose.go) carries no totals and is skipped.
 func newProjector(w itemWriter, base runningTotals) *projector {
 	p := &projector{w: w, open: map[string][]openBlock{}, async: map[string]bool{}}

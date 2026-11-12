@@ -26,7 +26,7 @@ func (s Thread) Snoozed() bool { return !s.SnoozedUntil.IsZero() || !s.SavedAt.I
 // removes its shells like Remove, then, under m.mu, unpins and unarchives it and sets
 // SnoozedUntil (replacing an earlier snooze, or a save for later). until must be after
 // Options.Now. As with Archive, a turn the close cut off leaves the thread idle
-// ReasonSnoozed instead of error ReasonInterrupted, and a Reconnect that wins the race
+// ReasonSnoozed instead of error ReasonInterrupted, and a start that wins the race
 // between the close and that last step makes Snooze fail rather than snooze a live
 // thread. Unsnoozing only clears SnoozedUntil and SavedAt: the thread stays disconnected
 // and gets no attention.
@@ -131,7 +131,7 @@ func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set f
 }
 
 // unsnoozeLocked clears rec's SnoozedUntil and SavedAt and reports whether either was
-// set, so the caller commits. Reconnect, Pin(true), Send and Archive(true) unsnooze
+// set, so the caller commits. Pin(true), Send and Archive(true) unsnooze
 // implicitly, at the same spots that unarchive. Callers hold m.mu.
 func (m *Manager) unsnoozeLocked(rec *record) bool {
 	if !rec.s.Snoozed() {
@@ -154,7 +154,7 @@ func clearSnoozeEnded(s *Thread, now time.Time) bool {
 
 // wakeSnoozed wakes every thread whose SnoozedUntil is not after Options.Now: it
 // clears SnoozedUntil and, for a disconnected thread (every snoozed thread is one;
-// Reconnect unsnoozes), sets StatusNeedsAttention ReasonSnoozeEnded stamped with the
+// a start unsnoozes), sets StatusNeedsAttention ReasonSnoozeEnded stamped with the
 // wake time, persisted and published. The status is stamped even when it already
 // reads "snooze ended" (a re-snoozed thread that was never reconnected), so the GUI's
 // "ended … ago" counts from this wake.

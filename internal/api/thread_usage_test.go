@@ -89,25 +89,12 @@ func TestThreadUsageOnTheWire(t *testing.T) {
 		t.Errorf("listed retired = %v", r)
 	}
 
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadsRequest{}))
-	if err != nil {
-		t.Fatal(err)
+	if r := threadListEventToProto(fake.Snapshot()).GetSnapshot().GetRetiredUsage(); len(r) != 1 {
+		t.Errorf("snapshot retired = %v", r)
 	}
-	if !stream.Receive() || len(stream.Msg().GetSnapshot().GetRetiredUsage()) != 1 {
-		t.Fatalf("snapshot = %v (%v)", stream.Msg(), stream.Err())
-	}
-	if err := fake.Remove(ctx, "s-a"); err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() || stream.Msg().GetRemovedId() != "s-a" {
-		t.Fatalf("removed = %v (%v)", stream.Msg(), stream.Err())
-	}
-	if !stream.Receive() {
-		t.Fatal(stream.Err())
-	}
-	retired := stream.Msg().GetRetiredUsage().GetBuckets()
-	if len(retired) != 2 || retired[0].GetModel() != "claude-haiku-5-5" || retired[1].GetModel() != "claude-opus-5-5" {
-		t.Errorf("retired event = %v", stream.Msg())
+	ev := threadListEventToProto(thread.RetiredUsage{Buckets: []thread.UsageBucket{{Model: "claude-haiku-5-5", Day: "2026-10-08", Requests: 1, Output: 2_000_000}}})
+	if r := ev.GetRetiredUsage().GetBuckets(); len(r) != 1 || r[0].GetModel() != "claude-haiku-5-5" || !near(r[0].GetCostUsd(), 1) {
+		t.Errorf("retired event = %v", ev)
 	}
 }
 

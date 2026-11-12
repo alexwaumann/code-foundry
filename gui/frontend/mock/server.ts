@@ -528,14 +528,6 @@ function routes(router: ConnectRouter): void {
     rename: () => {
       throw new ConnectError("use the thread.rename command in the mock", Code.Unimplemented);
     },
-    // Kept in the proto for compatibility; the daemon starts and stops threads itself and no
-    // command calls them (docs/notes/thread-lifecycle.md).
-    close: () => {
-      throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
-    },
-    reconnect: () => {
-      throw new ConnectError("the daemon starts and stops threads itself", Code.Unimplemented);
-    },
     remove: () => {
       throw new ConnectError("use the thread.remove command in the mock", Code.Unimplemented);
     },
@@ -568,7 +560,6 @@ function routes(router: ConnectRouter): void {
       if (req.path === MOCK_ATTACHMENT || world.attachments.has(req.path)) return { data: new Uint8Array(MOCK_ATTACHMENT_PNG), mimeType: "image/png" };
       throw new ConnectError(`attachment ${req.path} not found`, Code.NotFound);
     },
-    watch: (_req, ctx) => tracked("ThreadService/Watch", world.threadListEvents.subscribe(ctx.signal, [world.threadListSnapshot()])),
     checkPlacement: (req) => world.checkPlacement(req.projectIds, req.branch, req.checkoutMode),
     // The conversation (mock/thread.ts). The GUI goes through the thread.* commands for
     // Send / Interrupt / Respond / SetModel / SetPermissionMode / SetEffort; these serve the RPCs themselves.

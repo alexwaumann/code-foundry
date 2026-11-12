@@ -19,7 +19,7 @@ func TestSpawnPassesEnv(t *testing.T) {
 	}
 	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	if got := e.spec(s.ID).Env; !hasAll(got, env) {

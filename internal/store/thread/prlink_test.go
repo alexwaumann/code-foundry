@@ -233,7 +233,7 @@ func TestLinkedPullRequestsBackfillOnReconnect(t *testing.T) {
 	// History the daemon never saw: written while disconnected, or before pr-link
 	// records were read at all.
 	e.writeTranscript(cid, lines[:22]...) // through the flip back to #11
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	if argv := e.spec(s.ID).Argv; argOf(argv, "--resume") != cid {

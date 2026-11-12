@@ -9,7 +9,7 @@ import (
 // only running totals (total_cost_usd and modelUsage) for the process, so a turn's cost
 // is the difference from the previous result of the same process. A process's first
 // result is measured from what the process started with: zero for a new conversation;
-// on --resume (an effort restart, a Reconnect, a fork, a daemon restart) Claude restores
+// on --resume (an effort restart, a later start, a fork, a daemon restart) Claude restores
 // the totals of the last "cost-state" record in the resumed transcript (written when a
 // process exits cleanly; a killed process writes none, so the restore can be older than
 // the thread's last turn end) and keeps adding to them. The daemon reads that record at

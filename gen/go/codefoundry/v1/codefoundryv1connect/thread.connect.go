@@ -48,10 +48,6 @@ const (
 	// ThreadServiceRegenerateNameProcedure is the fully-qualified name of the ThreadService's
 	// RegenerateName RPC.
 	ThreadServiceRegenerateNameProcedure = "/codefoundry.v1.ThreadService/RegenerateName"
-	// ThreadServiceCloseProcedure is the fully-qualified name of the ThreadService's Close RPC.
-	ThreadServiceCloseProcedure = "/codefoundry.v1.ThreadService/Close"
-	// ThreadServiceReconnectProcedure is the fully-qualified name of the ThreadService's Reconnect RPC.
-	ThreadServiceReconnectProcedure = "/codefoundry.v1.ThreadService/Reconnect"
 	// ThreadServiceRemoveProcedure is the fully-qualified name of the ThreadService's Remove RPC.
 	ThreadServiceRemoveProcedure = "/codefoundry.v1.ThreadService/Remove"
 	// ThreadServiceRetrySetupProcedure is the fully-qualified name of the ThreadService's RetrySetup
@@ -115,8 +111,6 @@ const (
 	// ThreadServiceStopWaitingProcedure is the fully-qualified name of the ThreadService's StopWaiting
 	// RPC.
 	ThreadServiceStopWaitingProcedure = "/codefoundry.v1.ThreadService/StopWaiting"
-	// ThreadServiceWatchProcedure is the fully-qualified name of the ThreadService's Watch RPC.
-	ThreadServiceWatchProcedure = "/codefoundry.v1.ThreadService/Watch"
 	// ThreadServiceStageAttachmentProcedure is the fully-qualified name of the ThreadService's
 	// StageAttachment RPC.
 	ThreadServiceStageAttachmentProcedure = "/codefoundry.v1.ThreadService/StageAttachment"
@@ -204,16 +198,6 @@ type ThreadServiceClient interface {
 	// for a resident thread, a thread with no user message yet, or one already being
 	// renamed. See docs/notes/regenerate-thread-name.md.
 	RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error)
-	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-	// then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
-	// since 2026-10-15: the daemon starts a thread's process when a message is sent
-	// (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
-	// Kept for compatibility.
-	Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error)
-	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
-	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
-	// Kept for compatibility.
-	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
 	// Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
 	// the same way and first, every thread below it (ThreadFilter.archive_cascade_of lists
 	// them, with include_archived), archived ones included. A thread of those that fails
@@ -297,11 +281,11 @@ type ThreadServiceClient interface {
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
-	// Archive archives or unarchives a thread. Archiving ends Claude gracefully like
-	// Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
-	// it and records archived_at (kept when it is already archived). Unarchiving only
-	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
-	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	// Archive archives or unarchives a thread. Archiving ends Claude gracefully
+	// (interrupt, stdin closed, bounded wait, then kill; the thread is DISCONNECTED), kills
+	// and removes the thread's shells, unpins it and records archived_at (kept when it is
+	// already archived). Unarchiving only clears archived_at: the thread stays disconnected
+	// until a message starts it. Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
 	// Archiving also archives, the same way and first, every thread below it (created by
 	// it, by those, and so on: ThreadFilter.archive_cascade_of lists them). A thread of
 	// those that fails is skipped and named in the error, which then comes after the
@@ -316,14 +300,14 @@ type ThreadServiceClient interface {
 	// a workspace_id), whose cwd is that folder.
 	SetWorkspace(context.Context, *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error)
 	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
-	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+	// Claude gracefully like Archive (the thread is DISCONNECTED), kills and removes the
 	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
 	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
 	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
 	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
 	// wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
-	// before then only clears snoozed_until. Reconnect, Pin
-	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	// before then only clears snoozed_until. Pin (pinned), Send and Archive (archived)
+	// clear a snooze implicitly. Persisted.
 	// With save instead of until it is the same with no wake time: saved_at is set,
 	// snoozed_until stays unset and the daemon never wakes it; a request with neither, and
 	// those implicit clears, end it too.
@@ -359,9 +343,6 @@ type ThreadServiceClient interface {
 	// way to it, and stops its background shells. Child threads and subagents run on
 	// (docs/notes/wait-list-daemon.md).
 	StopWaiting(context.Context, *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error)
-	// Watch streams changes to the thread list (every thread's record, not its items).
-	// The first event is a snapshot. WatchThread streams one thread's conversation.
-	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error)
 	// StageAttachment stores an image or PDF a message refers to and returns its path.
 	// The file comes as bytes or as an absolute path the daemon reads (a file dropped on
 	// or picked in the GUI). Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
@@ -570,18 +551,6 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("RegenerateName")),
 			connect.WithClientOptions(opts...),
 		),
-		close: connect.NewClient[v1.CloseThreadRequest, v1.CloseThreadResponse](
-			httpClient,
-			baseURL+ThreadServiceCloseProcedure,
-			connect.WithSchema(threadServiceMethods.ByName("Close")),
-			connect.WithClientOptions(opts...),
-		),
-		reconnect: connect.NewClient[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse](
-			httpClient,
-			baseURL+ThreadServiceReconnectProcedure,
-			connect.WithSchema(threadServiceMethods.ByName("Reconnect")),
-			connect.WithClientOptions(opts...),
-		),
 		remove: connect.NewClient[v1.RemoveThreadRequest, v1.RemoveThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceRemoveProcedure,
@@ -730,12 +699,6 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+ThreadServiceStopWaitingProcedure,
 			connect.WithSchema(threadServiceMethods.ByName("StopWaiting")),
-			connect.WithClientOptions(opts...),
-		),
-		watch: connect.NewClient[v1.WatchThreadsRequest, v1.ThreadListEvent](
-			httpClient,
-			baseURL+ThreadServiceWatchProcedure,
-			connect.WithSchema(threadServiceMethods.ByName("Watch")),
 			connect.WithClientOptions(opts...),
 		),
 		stageAttachment: connect.NewClient[v1.StageAttachmentRequest, v1.StageAttachmentResponse](
@@ -900,8 +863,6 @@ type threadServiceClient struct {
 	wait              *connect.Client[v1.WaitThreadRequest, v1.WaitThreadResponse]
 	rename            *connect.Client[v1.RenameThreadRequest, v1.RenameThreadResponse]
 	regenerateName    *connect.Client[v1.RegenerateNameRequest, v1.RegenerateNameResponse]
-	close             *connect.Client[v1.CloseThreadRequest, v1.CloseThreadResponse]
-	reconnect         *connect.Client[v1.ReconnectThreadRequest, v1.ReconnectThreadResponse]
 	remove            *connect.Client[v1.RemoveThreadRequest, v1.RemoveThreadResponse]
 	retrySetup        *connect.Client[v1.RetryThreadSetupRequest, v1.RetryThreadSetupResponse]
 	cancelSetup       *connect.Client[v1.CancelThreadSetupRequest, v1.CancelThreadSetupResponse]
@@ -927,7 +888,6 @@ type threadServiceClient struct {
 	unsubscribe       *connect.Client[v1.UnsubscribeThreadRequest, v1.UnsubscribeThreadResponse]
 	listSubscriptions *connect.Client[v1.ListThreadSubscriptionsRequest, v1.ListThreadSubscriptionsResponse]
 	stopWaiting       *connect.Client[v1.StopThreadWaitingRequest, v1.StopThreadWaitingResponse]
-	watch             *connect.Client[v1.WatchThreadsRequest, v1.ThreadListEvent]
 	stageAttachment   *connect.Client[v1.StageAttachmentRequest, v1.StageAttachmentResponse]
 	readAttachment    *connect.Client[v1.ReadAttachmentRequest, v1.ReadAttachmentResponse]
 	listItems         *connect.Client[v1.ListThreadItemsRequest, v1.ListThreadItemsResponse]
@@ -988,16 +948,6 @@ func (c *threadServiceClient) Rename(ctx context.Context, req *connect.Request[v
 // RegenerateName calls codefoundry.v1.ThreadService.RegenerateName.
 func (c *threadServiceClient) RegenerateName(ctx context.Context, req *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
 	return c.regenerateName.CallUnary(ctx, req)
-}
-
-// Close calls codefoundry.v1.ThreadService.Close.
-func (c *threadServiceClient) Close(ctx context.Context, req *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
-	return c.close.CallUnary(ctx, req)
-}
-
-// Reconnect calls codefoundry.v1.ThreadService.Reconnect.
-func (c *threadServiceClient) Reconnect(ctx context.Context, req *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
-	return c.reconnect.CallUnary(ctx, req)
 }
 
 // Remove calls codefoundry.v1.ThreadService.Remove.
@@ -1123,11 +1073,6 @@ func (c *threadServiceClient) ListSubscriptions(ctx context.Context, req *connec
 // StopWaiting calls codefoundry.v1.ThreadService.StopWaiting.
 func (c *threadServiceClient) StopWaiting(ctx context.Context, req *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error) {
 	return c.stopWaiting.CallUnary(ctx, req)
-}
-
-// Watch calls codefoundry.v1.ThreadService.Watch.
-func (c *threadServiceClient) Watch(ctx context.Context, req *connect.Request[v1.WatchThreadsRequest]) (*connect.ServerStreamForClient[v1.ThreadListEvent], error) {
-	return c.watch.CallServerStream(ctx, req)
 }
 
 // StageAttachment calls codefoundry.v1.ThreadService.StageAttachment.
@@ -1280,16 +1225,6 @@ type ThreadServiceHandler interface {
 	// for a resident thread, a thread with no user message yet, or one already being
 	// renamed. See docs/notes/regenerate-thread-name.md.
 	RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error)
-	// Close ends the Claude process gracefully (interrupt, stdin closed, bounded wait,
-	// then kill). The thread remains, DISCONNECTED, until Remove. No command calls it
-	// since 2026-10-15: the daemon starts a thread's process when a message is sent
-	// (Send) and stops it at the prompt cache expiry (docs/notes/thread-lifecycle.md).
-	// Kept for compatibility.
-	Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error)
-	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
-	// prompt. No command calls it since 2026-10-15 (a message starts a stopped thread).
-	// Kept for compatibility.
-	Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error)
 	// Remove forgets a thread. Stops its Claude first if it runs. Removing also removes,
 	// the same way and first, every thread below it (ThreadFilter.archive_cascade_of lists
 	// them, with include_archived), archived ones included. A thread of those that fails
@@ -1373,11 +1308,11 @@ type ThreadServiceHandler interface {
 	// Pin pins or unpins a thread. Pinned threads sit in their own section at the top of
 	// the GUI's thread list. Persisted; any state.
 	Pin(context.Context, *connect.Request[v1.PinThreadRequest]) (*connect.Response[v1.PinThreadResponse], error)
-	// Archive archives or unarchives a thread. Archiving ends Claude gracefully like
-	// Close (the thread is DISCONNECTED), kills and removes the thread's shells, unpins
-	// it and records archived_at (kept when it is already archived). Unarchiving only
-	// clears archived_at: the thread stays disconnected until a Reconnect. Reconnect,
-	// Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
+	// Archive archives or unarchives a thread. Archiving ends Claude gracefully
+	// (interrupt, stdin closed, bounded wait, then kill; the thread is DISCONNECTED), kills
+	// and removes the thread's shells, unpins it and records archived_at (kept when it is
+	// already archived). Unarchiving only clears archived_at: the thread stays disconnected
+	// until a message starts it. Pin (pinned) and Send unarchive a thread implicitly. Persisted; any state.
 	// Archiving also archives, the same way and first, every thread below it (created by
 	// it, by those, and so on: ThreadFilter.archive_cascade_of lists them). A thread of
 	// those that fails is skipped and named in the error, which then comes after the
@@ -1392,14 +1327,14 @@ type ThreadServiceHandler interface {
 	// a workspace_id), whose cwd is that folder.
 	SetWorkspace(context.Context, *connect.Request[v1.SetThreadWorkspaceRequest]) (*connect.Response[v1.SetThreadWorkspaceResponse], error)
 	// Snooze snoozes a thread until a time, or unsnoozes it (until unset). Snoozing ends
-	// Claude gracefully like Close (the thread is DISCONNECTED), kills and removes the
+	// Claude gracefully like Archive (the thread is DISCONNECTED), kills and removes the
 	// thread's shells, unpins and unarchives it and records snoozed_until (a re-snooze
 	// replaces it). until must be in the future (INVALID_ARGUMENT otherwise). When the
 	// time comes the daemon wakes the thread: snoozed_until is cleared and the thread,
 	// still disconnected, becomes NEEDS_ATTENTION "snooze ended" (status_changed_at = the
 	// wake time; a later Snooze or Archive turns it into IDLE "at prompt"). Unsnoozing
-	// before then only clears snoozed_until. Reconnect, Pin
-	// (pinned), Send and Archive (archived) clear a snooze implicitly. Persisted.
+	// before then only clears snoozed_until. Pin (pinned), Send and Archive (archived)
+	// clear a snooze implicitly. Persisted.
 	// With save instead of until it is the same with no wake time: saved_at is set,
 	// snoozed_until stays unset and the daemon never wakes it; a request with neither, and
 	// those implicit clears, end it too.
@@ -1435,9 +1370,6 @@ type ThreadServiceHandler interface {
 	// way to it, and stops its background shells. Child threads and subagents run on
 	// (docs/notes/wait-list-daemon.md).
 	StopWaiting(context.Context, *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error)
-	// Watch streams changes to the thread list (every thread's record, not its items).
-	// The first event is a snapshot. WatchThread streams one thread's conversation.
-	Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error
 	// StageAttachment stores an image or PDF a message refers to and returns its path.
 	// The file comes as bytes or as an absolute path the daemon reads (a file dropped on
 	// or picked in the GUI). Create and Send append an "Attached image: <path>" or "Attached PDF: <path> (<N>
@@ -1642,18 +1574,6 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("RegenerateName")),
 		connect.WithHandlerOptions(opts...),
 	)
-	threadServiceCloseHandler := connect.NewUnaryHandler(
-		ThreadServiceCloseProcedure,
-		svc.Close,
-		connect.WithSchema(threadServiceMethods.ByName("Close")),
-		connect.WithHandlerOptions(opts...),
-	)
-	threadServiceReconnectHandler := connect.NewUnaryHandler(
-		ThreadServiceReconnectProcedure,
-		svc.Reconnect,
-		connect.WithSchema(threadServiceMethods.ByName("Reconnect")),
-		connect.WithHandlerOptions(opts...),
-	)
 	threadServiceRemoveHandler := connect.NewUnaryHandler(
 		ThreadServiceRemoveProcedure,
 		svc.Remove,
@@ -1802,12 +1722,6 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		ThreadServiceStopWaitingProcedure,
 		svc.StopWaiting,
 		connect.WithSchema(threadServiceMethods.ByName("StopWaiting")),
-		connect.WithHandlerOptions(opts...),
-	)
-	threadServiceWatchHandler := connect.NewServerStreamHandler(
-		ThreadServiceWatchProcedure,
-		svc.Watch,
-		connect.WithSchema(threadServiceMethods.ByName("Watch")),
 		connect.WithHandlerOptions(opts...),
 	)
 	threadServiceStageAttachmentHandler := connect.NewUnaryHandler(
@@ -1976,10 +1890,6 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceRenameHandler.ServeHTTP(w, r)
 		case ThreadServiceRegenerateNameProcedure:
 			threadServiceRegenerateNameHandler.ServeHTTP(w, r)
-		case ThreadServiceCloseProcedure:
-			threadServiceCloseHandler.ServeHTTP(w, r)
-		case ThreadServiceReconnectProcedure:
-			threadServiceReconnectHandler.ServeHTTP(w, r)
 		case ThreadServiceRemoveProcedure:
 			threadServiceRemoveHandler.ServeHTTP(w, r)
 		case ThreadServiceRetrySetupProcedure:
@@ -2030,8 +1940,6 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceListSubscriptionsHandler.ServeHTTP(w, r)
 		case ThreadServiceStopWaitingProcedure:
 			threadServiceStopWaitingHandler.ServeHTTP(w, r)
-		case ThreadServiceWatchProcedure:
-			threadServiceWatchHandler.ServeHTTP(w, r)
 		case ThreadServiceStageAttachmentProcedure:
 			threadServiceStageAttachmentHandler.ServeHTTP(w, r)
 		case ThreadServiceReadAttachmentProcedure:
@@ -2117,14 +2025,6 @@ func (UnimplementedThreadServiceHandler) Rename(context.Context, *connect.Reques
 
 func (UnimplementedThreadServiceHandler) RegenerateName(context.Context, *connect.Request[v1.RegenerateNameRequest]) (*connect.Response[v1.RegenerateNameResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.RegenerateName is not implemented"))
-}
-
-func (UnimplementedThreadServiceHandler) Close(context.Context, *connect.Request[v1.CloseThreadRequest]) (*connect.Response[v1.CloseThreadResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Close is not implemented"))
-}
-
-func (UnimplementedThreadServiceHandler) Reconnect(context.Context, *connect.Request[v1.ReconnectThreadRequest]) (*connect.Response[v1.ReconnectThreadResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Reconnect is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Remove(context.Context, *connect.Request[v1.RemoveThreadRequest]) (*connect.Response[v1.RemoveThreadResponse], error) {
@@ -2225,10 +2125,6 @@ func (UnimplementedThreadServiceHandler) ListSubscriptions(context.Context, *con
 
 func (UnimplementedThreadServiceHandler) StopWaiting(context.Context, *connect.Request[v1.StopThreadWaitingRequest]) (*connect.Response[v1.StopThreadWaitingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.StopWaiting is not implemented"))
-}
-
-func (UnimplementedThreadServiceHandler) Watch(context.Context, *connect.Request[v1.WatchThreadsRequest], *connect.ServerStream[v1.ThreadListEvent]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Watch is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) StageAttachment(context.Context, *connect.Request[v1.StageAttachmentRequest]) (*connect.Response[v1.StageAttachmentResponse], error) {

@@ -221,7 +221,7 @@ func TestReconnectRecreatesRemovedWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 	re.refs.set([]string{"refs/heads/" + s.Branch}, nil)
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	e.waitFor(s.ID, "connected", func(s Thread) bool { return s.State == StateConnected })

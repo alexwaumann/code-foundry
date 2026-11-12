@@ -213,7 +213,7 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
   // per-service Watch at all, only the visible thread's Watch is still open, and no
   // terminal is attached (threads have none; the bottom panel is closed).
   expect(started.get("EventService/Watch")).toBe(1);
-  for (const legacy of ["ProjectService/Watch", "TerminalService/Watch", "UiService/WatchIntents", "ThreadService/Watch", "GhService/Watch"]) {
+  for (const legacy of ["ProjectService/Watch", "TerminalService/Watch", "UiService/WatchIntents", "GhService/Watch"]) {
     expect(started.get(legacy) ?? 0, legacy).toBe(0);
   }
   await expect.poll(() => open.get("EventService/Watch")).toBe(1);

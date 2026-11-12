@@ -404,7 +404,7 @@ func TestRenderedSetEffortGap(t *testing.T) {
 				if got.State != StateDisconnected || got.DisconnectReason != ReasonDaemonStopped || got.Effort != "high" || got.EffortPending {
 					t.Errorf("after the daemon restart %+v", got)
 				}
-				if _, err := re.m.Reconnect(re.ctx(), s.ID); err != nil {
+				if _, err := re.m.reconnect(re.ctx(), s.ID); err != nil {
 					t.Fatal(err)
 				}
 				argv := re.waitArgv("the reconnect", func(a []string) bool { return argOf(a, "--resume") != "" && argOf(a, "--effort") == "high" })

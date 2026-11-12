@@ -32,10 +32,7 @@ func TestThreadUnaryAndErrorCodes(t *testing.T) {
 	if calls := fake.Calls(); len(calls) != 1 || calls[0] != "Create r1 /w opus high" {
 		t.Errorf("calls = %q", calls)
 	}
-	if _, err := c.Reconnect(ctx, connect.NewRequest(&v1.ReconnectThreadRequest{Id: "s-1"})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Errorf("Reconnect while starting: %v", err)
-	}
-	if _, err := c.Close(ctx, connect.NewRequest(&v1.CloseThreadRequest{Id: "s-1"})); err != nil {
+	if err := fake.Close(ctx, "s-1"); err != nil {
 		t.Fatal(err)
 	}
 	got, err := c.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: "s-1"}))
@@ -285,34 +282,6 @@ func TestThreadReadAttachment(t *testing.T) {
 	}
 	if calls := fake.Calls(); len(calls) != 1 || calls[0] != "ReadAttachment /attachments/1-shot.png" {
 		t.Errorf("calls = %q", calls)
-	}
-}
-
-func TestThreadWatchSendsSnapshotThenEvents(t *testing.T) {
-	fake, c := newThreadServer(t)
-	fake.Put(thread.Thread{ID: "s-a", Name: "a", CreatedAt: time.Unix(1, 0)})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	stream, err := c.Watch(ctx, connect.NewRequest(&v1.WatchThreadsRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() {
-		t.Fatal(stream.Err())
-	}
-	snap := stream.Msg().GetSnapshot()
-	if snap == nil || len(snap.GetThreads()) != 1 || snap.GetThreads()[0].GetId() != "s-a" {
-		t.Fatalf("first event = %v", stream.Msg())
-	}
-	fake.Put(thread.Thread{ID: "s-a", Name: "renamed", CreatedAt: time.Unix(1, 0)})
-	if !stream.Receive() || stream.Msg().GetUpdated().GetName() != "renamed" {
-		t.Fatalf("second event = %v (%v)", stream.Msg(), stream.Err())
-	}
-	if err := fake.Remove(ctx, "s-a"); err != nil {
-		t.Fatal(err)
-	}
-	if !stream.Receive() || stream.Msg().GetRemovedId() != "s-a" {
-		t.Fatalf("third event = %v (%v)", stream.Msg(), stream.Err())
 	}
 }
 

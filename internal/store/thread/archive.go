@@ -157,7 +157,7 @@ func (e *CascadeError) Unwrap() error { return ErrFailedPrecondition }
 // (clearSnoozeEnded), and stamps
 // ArchivedAt unless it already has one (a second archive keeps the first time). A turn
 // the close cut off leaves the thread idle ReasonArchived instead of error
-// ReasonInterrupted. A Reconnect that wins the race between the close and that last
+// ReasonInterrupted. A start that wins the race between the close and that last
 // step makes it fail rather than archive a live thread.
 func (m *Manager) archiveOne(ctx context.Context, id, by string, closing *runner) (Thread, bool, error) {
 	wasInterrupted, err := m.interrupted(id)
@@ -243,7 +243,7 @@ func (m *Manager) interrupted(id string) (bool, error) {
 }
 
 // unarchiveLocked clears rec's ArchivedAt and reports whether it was set, so the
-// caller commits. Reconnect, Pin(true) and Send unarchive implicitly: a thread the user
+// caller commits. Pin(true) and Send unarchive implicitly: a thread the user
 // works with again belongs in the main list. Callers hold m.mu.
 func (m *Manager) unarchiveLocked(rec *record) bool {
 	if rec.s.ArchivedAt.IsZero() {

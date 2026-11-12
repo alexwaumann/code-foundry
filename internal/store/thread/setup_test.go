@@ -536,7 +536,7 @@ func TestSetupRestartFailsAThreadInSetup(t *testing.T) {
 	if !slices.ContainsFunc(e.items(s.ID).Items, func(it Item) bool { return it.Kind == KindTurnEnd }) {
 		t.Errorf("its turn stayed open:\n%s", describeItems(e.items(s.ID).Items))
 	}
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); !errors.Is(err, ErrFailedPrecondition) {
 		t.Errorf("Reconnect = %v", err)
 	}
 	// Once more: it stays failed, with nothing new.
@@ -670,7 +670,7 @@ var refusedWithoutProcess = []struct {
 		return err
 	}},
 	{"reconnect", func(e *env, id string) error {
-		_, err := e.m.Reconnect(e.ctx(), id)
+		_, err := e.m.reconnect(e.ctx(), id)
 		return err
 	}},
 	{"workspace", func(e *env, id string) error {
@@ -811,7 +811,7 @@ func TestSetupRefusalsAfterItFailed(t *testing.T) {
 		})
 	}
 	t.Run("what says to try again", func(t *testing.T) {
-		_, err := e.m.Reconnect(e.ctx(), s.ID)
+		_, err := e.m.reconnect(e.ctx(), s.ID)
 		if !errors.Is(err, ErrFailedPrecondition) || !strings.Contains(err.Error(), "try its setup again") {
 			t.Errorf("Reconnect = %v", err)
 		}

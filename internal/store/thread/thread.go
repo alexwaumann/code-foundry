@@ -189,7 +189,7 @@ type Thread struct {
 	DisconnectReason string
 	LastError        string
 	ParentID         string
-	// PermissionMode is passed to claude on every spawn (Create, Reconnect, Fork).
+	// PermissionMode is passed to claude on every spawn (Create, a start, Fork).
 	PermissionMode PermissionMode
 	// BaseRef is the ref the worktree's branch was created from, when Create made the
 	// worktree (CreatedWorktree).
@@ -221,11 +221,11 @@ type Thread struct {
 	// Pinned is the user's pin (Store.Pin). Persisted.
 	Pinned bool
 	// ArchivedAt is when the user archived the thread (Store.Archive); zero when it is
-	// not archived. Reconnect, Pin(true), Send and Snooze clear it. Persisted.
+	// not archived. Pin(true), Send and Snooze clear it. Persisted.
 	ArchivedAt time.Time
 	// SnoozedUntil is when a snoozed thread wakes (Store.Snooze); zero when it is not
 	// snoozed. Waking clears it and sets StatusNeedsAttention ReasonSnoozeEnded.
-	// Reconnect, Pin(true), Send and Archive(true) clear it. Persisted.
+	// Pin(true), Send and Archive(true) clear it. Persisted.
 	SnoozedUntil time.Time
 	// SavedAt is when the thread was saved for later (Store.SaveForLater): a snooze with
 	// no wake time, so SnoozedUntil stays zero. Zero when it is not saved. The same calls
@@ -642,9 +642,6 @@ type Store interface {
 	// DISCONNECTED (bounded by the store's close timeout plus the kill grace). No
 	// command calls it: archive, snooze and remove close through it.
 	Close(ctx context.Context, id string) error
-	// Reconnect resumes a DISCONNECTED thread in a new claude process, without a
-	// prompt. No command calls it: a message starts a stopped thread (Send).
-	Reconnect(ctx context.Context, id string) (Thread, error)
 	// Remove closes the thread if needed and forgets it. Removing also removes, first
 	// and the same way, the threads below it (ArchiveCascade, as Archive does), archived
 	// ones included; one that fails is skipped (shown in the sidebar once its creator is

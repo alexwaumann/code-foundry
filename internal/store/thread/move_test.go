@@ -153,7 +153,7 @@ func TestMoveStoppedIntoNewWorktree(t *testing.T) {
 		t.Errorf("after the stop = %+v", after)
 	}
 	// It is the project's thread now: the next start is there.
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	if spec := e.spec(s.ID); !samePath(spec.Cwd, wt) || argOf(spec.Argv, "--resume") != cid {
@@ -809,7 +809,7 @@ func TestFailedMoveStopsItsStart(t *testing.T) {
 					t.Fatal("the move's start does not know its move")
 				}
 				defer func() { _ = os.WriteFile(gate, nil, 0o644) }()
-			} else if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+			} else if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 				t.Fatal(err)
 			}
 			e.m.stopMoveStart(s.ID, job)

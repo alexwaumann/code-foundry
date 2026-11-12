@@ -124,7 +124,7 @@ type Options struct {
 	// Empty: the thread's pages cannot store anything.
 	PageStorageRoot string
 	// Env entries ("KEY=VALUE") are added to every claude process's environment
-	// (Create, Reconnect, Fork). The daemon passes its loopback endpoint and token so
+	// (Create, a start, Fork). The daemon passes its loopback endpoint and token so
 	// the CLI inside a thread reaches it without the Unix socket. Every process also
 	// gets its own thread's id as paths.EnvThread (CODE_FOUNDRY_THREAD), which the CLI
 	// sends as its default --context-thread.
@@ -982,21 +982,6 @@ func (m *Manager) Fork(ctx context.Context, id, name string) (Thread, error) {
 		}
 	}
 	return m.Get(ctx, newID)
-}
-
-// Reconnect resumes a DISCONNECTED thread without a prompt. Without a conversation to
-// resume (no Claude session id yet) it starts a new one in the same worktree and says
-// so in LastError; one whose transcript is gone is ErrTranscriptMissing. It unarchives and
-// unsnoozes the thread. No command calls it any more (a message starts a stopped
-// thread: Send); it stays for ThreadService.Reconnect and tests.
-func (m *Manager) Reconnect(ctx context.Context, id string) (Thread, error) {
-	if _, err := m.startStopped(ctx, id, startOpts{backToList: true}); err != nil {
-		if errors.Is(err, errNotStopped) {
-			return Thread{}, fmt.Errorf("%w: thread %s is not stopped; only a stopped thread can be started this way", ErrFailedPrecondition, id)
-		}
-		return Thread{}, err
-	}
-	return m.Get(ctx, id)
 }
 
 // spawn starts claude for record id (claude -p over stream-json, stream.go) and its

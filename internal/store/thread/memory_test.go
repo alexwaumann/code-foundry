@@ -70,7 +70,7 @@ func TestSpawnReadsMemory(t *testing.T) {
 	mu.Unlock()
 	e.exit(s.ID, 0)
 	e.waitFor(s.ID, "disconnected", func(s Thread) bool { return s.State == StateDisconnected })
-	if _, err := e.m.Reconnect(e.ctx(), s.ID); err != nil {
+	if _, err := e.m.reconnect(e.ctx(), s.ID); err != nil {
 		t.Fatal(err)
 	}
 	if got := argOf(e.spec(s.ID).Argv, "--append-system-prompt"); !strings.HasSuffix(got, "\n- Always open PRs as drafts\n- Never open the side panel on your own") {
