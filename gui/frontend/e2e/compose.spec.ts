@@ -75,7 +75,8 @@ test("cmd+n: project picker, cmd+1, type, Enter starts a thread in a new worktre
   // Unnamed at first: the id stands in until the daemon names it.
   await expect(created.getByTestId("thread-name")).toHaveText(key.slice(2));
   await expect(created.getByTestId("thread-name")).toHaveText("Add a dark mode", { timeout: 5000 });
-  expect((await invocations()).at(-1)?.args.prompt).toBe("Add a dark mode toggle\nin settings");
+  // The window shell runs layout verbs after the send: the send is the last thread.new.
+  expect((await invocations()).filter((i) => i.name === "thread.new").at(-1)?.args.prompt).toBe("Add a dark mode toggle\nin settings");
   // The prompt goes out as the thread's first message once Claude is up.
   await expect(page.getByTestId("thread-user").first()).toContainText("Add a dark mode toggle", { timeout: 8000 });
   // The thread's row names its project and the new worktree's branch; it is the newest thread.
@@ -162,8 +163,8 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
   await page.keyboard.press("Tab");
   await expect(page.getByTestId("composer-send")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
-  expect((await invocations()).at(-1)?.args).toEqual({
+  await expect.poll(async () => (await invocations()).some((i) => i.name === "thread.new")).toBe(true);
+  expect((await invocations()).filter((i) => i.name === "thread.new").at(-1)?.args).toEqual({
     ...BACKGROUND,
     project: "repo-cf",
     "new-worktree": "true",
@@ -172,6 +173,8 @@ test("pickers are keyboard operable; Tab goes prompt → pickers → send", asyn
     effort: "high",
     permission: "supervised",
     prompt: "Refactor the sidebar",
+    // The window shell's composer tab, which becomes the thread's tab.
+    compose: expect.any(String),
   });
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toBeVisible();
 });

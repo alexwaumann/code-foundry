@@ -416,9 +416,9 @@ for (const scheme of ["dark", "light"] as const) {
 }
 
 test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
-  // Tall enough for the whole folded thread: the list sits at the bottom (pinned) with the
-  // first turn's header (9 steps) on screen.
-  await page.setViewportSize({ width: 1280, height: 1100 });
+  // Tall enough for the whole folded thread under the window shell's top bar and tab strip: the
+  // list sits at the bottom (pinned) with the first turn's header (9 steps) on screen.
+  await page.setViewportSize({ width: 1280, height: 1200 });
   await openThread(page, "idle");
   const timeline = page.getByTestId("thread-timeline");
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");

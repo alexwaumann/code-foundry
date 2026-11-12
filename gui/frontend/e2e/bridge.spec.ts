@@ -163,7 +163,9 @@ test("storage is the daemon's: a fresh browser profile reads what the page store
   const fresh = await browser.newContext({ baseURL: test.info().project.use.baseURL });
   try {
     const again = await fresh.newPage();
-    await openBridgeThread(again);
+    // The layout is the daemon's: the new window opens on the thread's tab the first one opened.
+    await again.setViewportSize({ width: 1300, height: 900 });
+    await openApp(again);
     await expect(doc(again).locator("#visits")).toHaveText("2");
   } finally {
     await fresh.close();
@@ -439,6 +441,8 @@ test("Escape inside the lightbox's page closes the lightbox unless the page cons
 // (a filtered list shrinking slid the card ~130 px under the pointer: page-library-fixes-b).
 test("a card that shrinks under the pointer keeps its top; without the pointer the timeline keeps its bottom", async ({ page }) => {
   await openBridgeThread(page);
+  // The card's height is capped by the pane's: room for the 300 px block under the window shell's top bar and tab strip.
+  await page.setViewportSize({ width: 1300, height: 1000 });
   const top = async () => (await card(page).boundingBox())?.y ?? NaN;
   const height = async () => (await card(page).boundingBox())?.height ?? NaN;
   const short = await height();
