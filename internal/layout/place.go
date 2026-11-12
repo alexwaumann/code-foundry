@@ -255,14 +255,21 @@ func roomBeside(width float64, kind string) (float64, bool) {
 	if room <= 0 {
 		return 0, false
 	}
-	px := k.DefaultFrac * room
-	if k.FloorPx > 0 && px < k.FloorPx && room-k.FloorPx >= KeepPx {
-		px = k.FloorPx
-	}
+	px := k.sizeIn(room)
 	if room-px < KeepPx {
 		return 0, false
 	}
 	return px / room, true
+}
+
+// sizeIn is the px a new pane of kind k takes of room px: its default share, raised to its
+// floor when the rest still keeps KeepPx.
+func (k *Kind) sizeIn(room float64) float64 {
+	px := k.DefaultFrac * room
+	if k.FloorPx > 0 && px < k.FloorPx && room-k.FloorPx >= KeepPx {
+		px = k.FloorPx
+	}
+	return px
 }
 
 // lastLinkedOf is the index of the last linked tab of thread in pane p, or -1.

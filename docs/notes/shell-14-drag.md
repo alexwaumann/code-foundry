@@ -57,6 +57,7 @@ in its own place sends nothing (`dropCommand` returns null).
 - **Default share.** A drop takes the daemon's default (`frac` omitted: half). The prototype gave
   an outer drop the kind's default size (`kinds.json` `default_frac`); the daemon does not apply
   it for `move_tab`/`move_pane`, and the preview must match the commit, so half it is.
+  (Superseded for the outer edge by `shell-14b-outer-edge-size.md`: it now takes the kind's size.)
 - **A shield while dragging.** Once a drag starts, a transparent fixed layer over the window takes
   the pointer until it ends, so an xterm canvas or an iframe under the pointer never swallows the
   moves (the side panel solved iframes with `[data-dragging] iframe { pointer-events: none }`; the

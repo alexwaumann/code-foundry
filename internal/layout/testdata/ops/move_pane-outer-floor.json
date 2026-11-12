@@ -1,0 +1,109 @@
+{
+  "doc": "A pane on the outer bottom edge takes its active tab's kind's default share of the grid's height less its gutters, raised to the kind's floor: it joins the root column as its third pane, so 1024px less two gutters is 1000; a diff's 0.45 of that is 450, under its 480px floor, and the rest keeps 520 (at least 480), so 0.48. The width plays no part.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-t",
+                  "tabs": [
+                    {"id":"t-t","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+                  ],
+                  "active": "t-t"
+                }
+              ],
+              "sizes": [0.62,0.38]
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"move_pane","pane":"p-b","edge":"bottom","w":400,"h":1024},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-t","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+              ],
+              "active": "t-t"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.3224,0.1976,0.48]
+        },
+        "focus": "p-b",
+        "mru": ["t-d","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-d"}
+}

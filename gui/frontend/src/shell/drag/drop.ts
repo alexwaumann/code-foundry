@@ -7,6 +7,7 @@
  */
 import { frameRects } from "@/shell/geometry/rects";
 import type { Frame, GeoNode, GeoTab, Rect } from "@/shell/geometry/types";
+import { outerFrac } from "./outerFrac";
 import type { DragSource, DropTarget, Edge } from "./targets";
 
 /** A layout verb and its arguments. */
@@ -63,7 +64,8 @@ export function dropCommand(source: DragSource, target: DropTarget, ownTabs: rea
   }
 }
 
-const FRAC = 0.5;
+/** The share a drop beside a pane takes of it: half (tree.go defaultFrac). */
+const HALF = 0.5;
 const PREVIEW_PANE = "drop-preview-pane";
 const PREVIEW_SPLIT = "drop-preview-split";
 
@@ -179,12 +181,14 @@ function findPane(root: Mut | null, id: string): Extract<Mut, { t: "pane" }> | n
  * The tree after the drop of an edge or outer target, and the id of the pane that holds what
  * was dropped; null for a target that is not a new place (a strip, a pane's middle), a drop
  * that changes nothing (a pane's only tab on its own edge) or a tree that does not hold the
- * source. A drop takes the daemon's default share (`frac`, half); tests pass the fixtures'.
+ * source. A drop takes the daemon's default share: half beside a pane, and on an outer edge the
+ * size of the dropped tab's kind (a pane's: its active tab's) in the `w` x `h` pane area
+ * (`outerFrac`); a `frac` given (the fixtures') replaces it.
  */
-export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTarget, frac = FRAC): { root: GeoNode; pane: string } | null {
+export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTarget, area: { w: number; h: number }, frac?: number): { root: GeoNode; pane: string } | null {
   if (target.kind !== "edge" && target.kind !== "outer") return null;
   let tree: Mut | null = copy(root);
-  let moved: Mut;
+  let moved: Extract<Mut, { t: "pane" }>;
   if (source.kind === "pane") {
     const pane = findPane(tree, source.pane);
     if (!pane) return null;
@@ -201,10 +205,14 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
     moved = { t: "pane", id: PREVIEW_PANE, tabs: [tab], active: tab.id };
     if (rest.length === 0) tree = removeNode(tree, from.id);
   }
-  const anchor = target.kind === "edge" ? target.pane : tree?.id;
-  if (target.kind === "edge" && (!tree || !findPane(tree, target.pane))) return null;
-  const out = anchor ? insertBeside(tree, anchor, target.edge, moved, frac) : moved;
-  return { root: out as GeoNode, pane: moved.id };
+  if (target.kind === "edge") {
+    if (!tree || !findPane(tree, target.pane)) return null;
+    return { root: insertBeside(tree, target.pane, target.edge, moved, frac || HALF) as GeoNode, pane: moved.id };
+  }
+  if (!tree) return { root: moved as GeoNode, pane: moved.id };
+  const kind = moved.tabs.find((t) => t.id === moved.active)?.kind;
+  const share = outerFrac(tree, kind, target.edge, frac, area.w, area.h);
+  return { root: insertBeside(tree, tree.id, target.edge, moved, share) as GeoNode, pane: moved.id };
 }
 
 /**
@@ -215,7 +223,7 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
 export function dropPreview(root: GeoNode | null, frame: Frame, source: DragSource, target: DropTarget): Rect | null {
   if (target.kind === "pane") return frame.rects[target.pane] ?? null;
   if (!root || target.kind === "strip") return null;
-  const after = treeAfterDrop(root, source, target);
+  const after = treeAfterDrop(root, source, target, frame);
   if (!after) return null;
   const r = frameRects(after.root, frame.w, frame.h).rects[after.pane];
   return r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;

@@ -54,7 +54,8 @@ type Kind struct {
 }
 
 // kinds is the identity table (docs/notes/shell-plan.md section 2.7). A new surface kind adds
-// an entry here and one in the GUI's registry; testdata/kinds.json pins that the two agree.
+// an entry here, one in the GUI's registry and its size in gui/frontend/src/shell/drag/outerFrac.ts;
+// testdata/kinds.json pins that they agree.
 var kinds = map[string]*Kind{
 	"thread": {
 		Link: LinkSelf, Scope: ScopeGlobal, DefaultFrac: 0.5,

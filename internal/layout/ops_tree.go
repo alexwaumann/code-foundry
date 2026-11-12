@@ -139,7 +139,7 @@ func (o *SplitPane) apply(t *tx) (Result, error) {
 //     tab dropped on its own edge stays where it is.
 //   - Pane: into that pane's strip at Index (default: the end); in its own pane, a reorder.
 //   - Edge alone: into a new pane on that edge of the whole pane area of Space ("" is the
-//     tab's own space).
+//     tab's own space), at Frac of it (default: the tab's kind's size, outerFrac).
 //   - Space alone: into that space's focused pane after its active tab, or a new pane.
 //
 // A thread tab never changes space here (moving a thread is its own op); a tab whose identity
@@ -151,6 +151,9 @@ type MoveTab struct {
 	Index *int    `json:"index,omitempty"`
 	Edge  Edge    `json:"edge,omitempty"`
 	Frac  float64 `json:"frac,omitempty"`
+	// W and H are the pane area in layout px, which an outer edge's default size measures.
+	W float64 `json:"w,omitempty"`
+	H float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -223,7 +226,7 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 	case o.Edge != "":
 		detach(from, src, tb.ID)
 		target = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
-		if err := toOuter(t, to, target, o.Edge, o.Frac); err != nil {
+		if err := toOuter(t, to, target, o.Edge, o.Frac, o.W, o.H); err != nil {
 			return Result{}, err
 		}
 	default:
@@ -253,18 +256,52 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 	return Result{Space: to.ID, Pane: target.ID, Tab: tb.ID}, nil
 }
 
-// toOuter puts node on an edge of the whole pane area of sp.
-func toOuter(t *tx, sp *Space, node *Node, edge Edge, frac float64) error {
+// outerFrac is the share pane node takes on an edge of the whole pane area of sp: frac when
+// one is given; otherwise the default size of the kind of its active tab, as a share of the
+// area along that edge's axis less its gutters, raised to the kind's floor when the area
+// (w x h; 0 when unknown) is known and the rest still keeps KeepPx. A drop beside a pane splits
+// it in half; only the outer edge takes a kind's size (docs/notes/shell-14b-outer-edge-size.md).
+func outerFrac(sp *Space, node *Node, edge Edge, frac, w, h float64) float64 {
+	if frac != 0 {
+		return frac
+	}
+	var k *Kind
+	if i := node.TabIndex(node.Active); i >= 0 {
+		k, _ = KindOf(node.Tabs[i].Kind)
+	}
+	if k == nil {
+		return defaultFrac
+	}
+	length := w
+	if edge.dir() == Col {
+		length = h
+	}
+	// The panes along the axis once node is in: it joins a root split that runs that way.
+	count := 2
+	if r := sp.Root; r != nil && !r.IsPane() && r.Dir == edge.dir() {
+		count = len(r.Kids) + 1
+	}
+	room := length - Gutter*float64(count-1)
+	if !(room > 0) || math.IsInf(room, 0) {
+		return k.DefaultFrac
+	}
+	return k.sizeIn(room) / room
+}
+
+// toOuter puts node on an edge of the whole pane area of sp (w x h), at frac of it or, for
+// 0, its kind's size (outerFrac).
+func toOuter(t *tx, sp *Space, node *Node, edge Edge, frac, w, h float64) error {
 	if sp.Root == nil {
 		sp.Root = node
 		return nil
 	}
-	return insertBeside(sp, sp.Root.ID, edge, node, frac, t.newID("s-"))
+	return insertBeside(sp, sp.Root.ID, edge, node, outerFrac(sp, node, edge, frac, w, h), t.newID("s-"))
 }
 
 // MovePane moves a whole pane, which then has the focus:
 //   - Target and Edge: beside Target on that edge, at Frac of its room.
-//   - Edge alone: on that edge of the whole pane area.
+//   - Edge alone: on that edge of the whole pane area, at Frac of it (default: the size of
+//     its active tab's kind, outerFrac).
 //   - Space: to the right of that space's focused pane (or as its only pane). A pane holding a
 //     thread tab does not change space here (moving a thread is its own op).
 type MovePane struct {
@@ -273,6 +310,9 @@ type MovePane struct {
 	Edge   Edge    `json:"edge,omitempty"`
 	Frac   float64 `json:"frac,omitempty"`
 	Space  string  `json:"space,omitempty"`
+	// W and H are the pane area in layout px, which an outer edge's default size measures.
+	W float64 `json:"w,omitempty"`
+	H float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -294,7 +334,7 @@ func (o *MovePane) apply(t *tx) (Result, error) {
 	}
 	if o.Target == "" {
 		removeNode(from, pane.ID)
-		if err := toOuter(t, from, pane, o.Edge, o.Frac); err != nil {
+		if err := toOuter(t, from, pane, o.Edge, o.Frac, o.W, o.H); err != nil {
 			return Result{}, err
 		}
 	} else {

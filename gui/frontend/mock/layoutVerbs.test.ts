@@ -83,6 +83,24 @@ describe("the mock's layout verbs", () => {
     await expect(w.run("pane.move", { pane: "p-2", beside: "p-1" })).rejects.toThrow(/needs --edge/);
   });
 
+  it("put a pane on the outer edge at its kind's size in the reported area, and split a pane in half", async () => {
+    // p-2's active tab is a diff (0.45, at least 480px): with no area reported, 0.45.
+    const w = world();
+    await w.run("pane.move", { pane: "p-2", outer: "bottom" });
+    expect(w.st().spaces[0]?.root?.sizes?.at(-1)).toBeCloseTo(0.45, 9);
+    // In a 1600x1000 area, 0.45 of 1000 less a gutter is 445: raised to 480, as the rest keeps 508.
+    const v = world();
+    v.layout.setViewport("c-1", 1600, 1000);
+    await v.run("pane.move", { pane: "p-2", outer: "bottom" });
+    expect(v.st().spaces[0]?.root?.sizes?.at(-1)).toBeCloseTo(480 / 988, 9);
+    // The area is the op's, not recorded as sent.
+    expect(v.layout.applied.at(-1)?.op).not.toHaveProperty("w");
+    // Beside a pane: half of it, whatever the kind and the area.
+    await v.run("tab.move", { tab: "t-diff-s-3", split: "p-1", edge: "right" });
+    const row = v.st().spaces[0]?.root?.kids?.[0];
+    expect(row?.sizes?.slice(0, 2).map((x) => x / (row.sizes?.[0] ?? 1))).toEqual([1, 1]);
+  });
+
   it("New thread opens the space's composer for what was picked", async () => {
     const w = world("empty");
     const r = await w.run("composer.new", { project: "repo-cf", focus: "true" });

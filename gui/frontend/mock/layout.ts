@@ -14,6 +14,7 @@
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { LayoutDir, LayoutEdge, type LayoutEventSchema, type LayoutOp, type LayoutSchema, type LayoutSpaceSchema, type LayoutTab, type LayoutTabSchema, type LayoutNodeSchema, type ThreadLayoutSchema } from "../src/gen/codefoundry/v1/layout_pb";
+import { outerFrac } from "../src/shell/drag/outerFrac";
 
 // ---- The model (internal/layout/model.go's JSON) ----
 
@@ -637,12 +638,14 @@ function tabArg(o: Op): Tab {
   return structuredClone(t as Tab);
 }
 
-function toOuter(t: Tx, sp: Space, node: Node, edge: Edge, frac: number | undefined): void {
+/** Puts node on an edge of the whole pane area (w x h) of sp, at frac of it or, for none, its active tab's kind's size (outerFrac). */
+function toOuter(t: Tx, sp: Space, node: Node, edge: Edge, frac: number | undefined, w: number, h: number): void {
   if (!sp.root) {
     sp.root = node;
     return;
   }
-  insertBeside(sp, sp.root.id, edge, node, frac, t.newID("s-"));
+  const kind = (node.tabs ?? []).find((tb) => tb.id === node.active)?.kind;
+  insertBeside(sp, sp.root.id, edge, node, outerFrac(sp.root, kind, edge, frac, w, h), t.newID("s-"));
 }
 
 type OpFn = (t: Tx, o: Op) => Result;
@@ -737,7 +740,7 @@ const ops = {
     } else if (edge) {
       detach(from, src, tb.id);
       target = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
-      toOuter(t, to, target, edge, num(o, "frac"));
+      toOuter(t, to, target, edge, num(o, "frac"), num(o, "w") ?? 0, num(o, "h") ?? 0);
     } else {
       if (to === from) fail("invalid_argument", "move_tab needs a pane, an edge or another space");
       detach(from, src, tb.id);
@@ -783,7 +786,7 @@ const ops = {
     const edge = edgeOf(o, true) as Edge;
     if (!str(o, "target")) {
       removeNode(from, pane.id);
-      toOuter(t, from, pane, edge, num(o, "frac"));
+      toOuter(t, from, pane, edge, num(o, "frac"), num(o, "w") ?? 0, num(o, "h") ?? 0);
     } else {
       const { sp: tsp, pane: target } = t.pane(str(o, "target"));
       if (tsp !== from || target === pane) fail("invalid_argument", `pane ${pane.id} cannot move beside ${target.id}`);
@@ -1547,6 +1550,17 @@ export const SEEDS: Record<string, () => State> = {
   }),
 };
 
+/** The ops that lay panes out with the pane area here (a subset of internal/layout's measured ops: the mock ports no placement rules). */
+const MEASURED_OPS = ["move_tab", "move_pane"];
+
+/** op with the reported pane area when it measures one and names none (internal/layout area.go WithArea). */
+function withArea(op: Op, vp: { width: number; height: number } | null): Op {
+  if (!vp || !MEASURED_OPS.includes(op.op)) return op;
+  const w = num(op, "w") ?? 0;
+  const h = num(op, "h") ?? 0;
+  return w > 0 && h > 0 ? op : { ...op, w: vp.width, h: vp.height };
+}
+
 // ---- The service ----
 
 /** LayoutService and the layout source over one state, as internal/store/layout serves it. */
@@ -1587,6 +1601,7 @@ export class MockLayout {
   /** Runs an op; a change is one commit (the next rev, one delta event). keep_focus is a call from inside a thread (the commands'). */
   apply(op: Op, clientId = "", opts: Options = {}): { rev: number; result: Result } {
     this.applied.push({ op, clientId });
+    op = withArea(op, this.viewport);
     const { state, result } = applyOp(this.st, op, this.deps.ids ?? randomIds, opts);
     this.commit(state, clientId);
     const rev = this.revision;

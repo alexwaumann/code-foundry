@@ -28,7 +28,10 @@ when the first working version is whole. Nothing partial is released.
   proportions; resizing the window only scales it, and there are no per-display snapshots.
 - **Any surface can be a tab in any pane.** Tabs drag to reorder, to another strip, or to a pane's
   edge to split. A whole pane drags by its strip: onto an edge, onto another strip to merge, onto the
-  outer edge of the grid, or onto a space tab. Any tab is draggable, active or not.
+  outer edge of the grid, or onto a space tab. Any tab is draggable, active or not. A drop on a
+  pane's edge splits that pane in half; a tab or pane dropped on the grid's outer edge takes its
+  kind's default size (a pane's: its active tab's kind) as a share of the grid along that axis,
+  raised to the kind's pixel floor while the rest keeps room. A pane that is joined is never resized.
 - **The tab is the title.** The active tab shows its full name; others may shorten. A tooltip shows
   only a name that is cut off. Tabs go icon-only when the strip is tight. What a surface repeats in
   its own body is decided per surface; do not stack a second title band under the strip by default.

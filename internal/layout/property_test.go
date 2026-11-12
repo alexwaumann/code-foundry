@@ -130,6 +130,7 @@ func randomOp(s *bytesrc, st *State) Op {
 	spaces, panes, splits, tabs := stateIDs(st)
 	edge := func() Edge { return pick(s, Left, Right, Top, Bottom, Right, Edge(""), Edge("middle")) }
 	frac := func() float64 { return pick(s, 0, 0.05, 0.3, 0.5, 0.95, 1.5, -1) }
+	length := func() float64 { return pick[float64](s, 0, 0, 300, 900, 1400, 2600, -5) }
 	index := func() *int {
 		if s.n(2) == 0 {
 			return nil
@@ -145,8 +146,10 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Pane, o.Edge, o.Tab, o.Frac, o.Focus = pick(s, panes...), edge(), randomTab(s, st), frac(), s.n(2) == 0
 	case *MoveTab:
 		o.Tab, o.Space, o.Pane, o.Index, o.Edge, o.Frac = pick(s, tabs...), pick(s, spaces...), pick(s, panes...), index(), edge(), frac()
+		o.W, o.H = length(), length()
 	case *MovePane:
 		o.Pane, o.Target, o.Edge, o.Frac = pick(s, panes...), pick(s, panes...), edge(), frac()
+		o.W, o.H = length(), length()
 		if s.n(3) == 0 {
 			o.Target, o.Edge, o.Space = "", "", pick(s, spaces...)
 		}
