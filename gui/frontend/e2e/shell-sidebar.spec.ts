@@ -1,0 +1,208 @@
+import { expect, test, type Page } from "@playwright/test";
+import { appPath, invocations, mockPost, mockUrl, resetMock } from "./fixtures";
+
+/**
+ * The shell's sidebar (docs/notes/shell-16-sidebar.md), what only a browser shows: a title
+ * wrapping to two lines at full width and cut after them, the hover controls taking the status's
+ * place without moving the title, and a row dragged into the pane grid. Which rows, lines and
+ * verbs are vitest's (lib/shellSections.test.ts, sidebar/shell/ShellSidebarList.test.tsx).
+ * SHOTS=<dir> for the PR's screenshots (WebKit, at the sidebar's narrowest width, dark and light).
+ */
+
+type Tab = Record<string, unknown> & { id: string };
+type Node = { t: "pane"; id: string; tabs: Tab[]; active: string } | { t: "split"; id: string; dir: "row" | "col"; kids: Node[]; sizes: number[] };
+type Draft = { id: string; label: string; params: Record<string, string> };
+
+const thread = (id: string): Tab => ({ id: `t-${id}`, kind: "thread", thread: id });
+const pane = (id: string, tabs: Tab[], active = tabs[0]?.id ?? ""): Node => ({ t: "pane", id, tabs, active });
+
+/** One space, "Main", with that tree and drafts; `elsewhere` threads live in a second space, "Review". */
+async function seed(root: Node | null, focus: string, drafts: Draft[] = [], elsewhere: string[] = []): Promise<void> {
+  const spaces = [{ id: "sp-main", name: "Main", root, focus, mru: [], drafts }, ...(elsewhere.length > 0 ? [{ id: "sp-review", name: "Review", root: null, focus: "", mru: [], drafts: [] }] : [])];
+  const threads = Object.fromEntries(elsewhere.map((id) => [id, { space: "sp-review" }]));
+  const state = { v: 1, spaces, current_space: "sp-main", default_space: "sp-main", threads };
+  const res = await fetch(`${mockUrl}/__mock/layout`, { method: "POST", body: JSON.stringify(state) });
+  expect(res.ok).toBe(true);
+}
+
+async function storedRoot(): Promise<Node | null> {
+  const res = await fetch(`${mockUrl}/__mock/layout`);
+  return ((await res.json()) as { state: { spaces: { root: Node | null }[] } }).state.spaces[0]?.root ?? null;
+}
+
+/** The stored tree by the threads its tabs show: `row([s-1] [s-sb-trip])`. */
+function outline(n: Node | null): string {
+  if (!n) return "";
+  if (n.t === "pane") return `[${n.tabs.map((t) => String(t.thread ?? t.kind)).join(",")}]`;
+  return `${n.dir}(${n.kids.map(outline).join(" ")})`;
+}
+
+async function openShell(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto(`${appPath}&shell=1`);
+  await expect(page.getByTestId("shell-grid")).toBeVisible();
+  await expect(page.locator("[data-shell-list]")).toBeVisible();
+}
+
+const rowEl = (page: Page, id: string) => page.locator(`[data-row-key="s:${id}"]`);
+
+type Box = { x: number; y: number; width: number; height: number };
+async function box(page: Page, selector: string): Promise<Box> {
+  const b = await page.locator(selector).first().boundingBox();
+  if (!b) throw new Error(`${selector} has no box`);
+  return b;
+}
+
+/** Wait out finite animations (a menu's or tooltip's fade); a spinner runs for ever. */
+async function still(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
+}
+
+test.beforeEach(async () => {
+  await resetMock();
+  await mockPost("shell-sidebar");
+});
+
+test("a title wraps at the row's full width and is cut after two lines", async ({ page }) => {
+  await seed(pane("p-1", [thread("s-1")]), "p-1");
+  await openShell(page);
+  const long = rowEl(page, "s-sb-flaky");
+  await expect(long).toBeVisible();
+  const name = long.getByTestId("thread-name");
+  const lines = await name.evaluate((el) => {
+    const lh = parseFloat(getComputedStyle(el).lineHeight);
+    return { lh, h: el.getBoundingClientRect().height, clipped: el.scrollHeight > el.clientHeight + 1 };
+  });
+  // Two lines, cut: more text than fits.
+  expect(lines.h).toBeCloseTo(2 * lines.lh, 0);
+  expect(lines.clipped).toBe(true);
+  // At full width: the row's content box, nothing beside it.
+  const row = await box(page, '[data-row-key="s:s-sb-flaky"]');
+  const title = await name.boundingBox();
+  expect(title?.width).toBeGreaterThan(row.width - 2 * 8 - 1);
+  // A short title is one line.
+  const short = await rowEl(page, "s-sb-trip").getByTestId("thread-name").evaluate((el) => el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight));
+  expect(Math.round(short)).toBe(1);
+});
+
+test("on hover the snooze and archive controls take the status's slot in line 1; the title does not move", async ({ page }) => {
+  await seed(pane("p-1", [thread("s-1")]), "p-1");
+  await openShell(page);
+  const row = rowEl(page, "s-sb-flaky");
+  await page.mouse.move(700, 450);
+  const before = await row.getByTestId("thread-name").boundingBox();
+  const status = await row.getByTestId("row-line-1").boundingBox();
+  await row.hover();
+  const actions = row.getByTestId("row-actions");
+  await expect(actions).toHaveCSS("opacity", "1");
+  const after = await row.getByTestId("thread-name").boundingBox();
+  expect(after).toEqual(before);
+  const a = await actions.boundingBox();
+  // Inside line 1, at its right end.
+  expect(a && status && a.y >= status.y - 3 && a.y + a.height <= status.y + status.height + 3).toBe(true);
+  expect(a && status && Math.abs(a.x + a.width - (status.x + status.width)) <= 1).toBe(true);
+});
+
+/** Presses on a sidebar row and moves to `to`, holding the button; the ghost names the thread. */
+async function liftRow(page: Page, id: string, name: string, to: { x: number; y: number }): Promise<void> {
+  await page.locator(`[data-row-key="s:${id}"]`).scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getTiming().iterations === Infinity));
+  const from = await box(page, `[data-row-key="s:${id}"]`);
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 8, from.y + from.height / 2 + 4, { steps: 2 });
+  await expect(page.getByTestId("shell-drag-ghost")).toContainText(name);
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+}
+
+test("a row dragged onto a pane's edge opens its thread in a new pane there", async ({ page }) => {
+  await seed(pane("p-1", [thread("s-1")]), "p-1");
+  await openShell(page);
+  const p1 = await box(page, '[data-testid="shell-pane"][data-pane-id="p-1"]');
+  await liftRow(page, "s-sb-trip", "Plan the spring trip", { x: p1.x + p1.width - 30, y: p1.y + p1.height / 2 });
+  await expect(page.getByTestId("shell-drop-preview")).toHaveAttribute("data-kind", "edge");
+  await page.mouse.up();
+  await expect.poll(async () => outline(await storedRoot())).toBe("row([s-1] [s-sb-trip])");
+  expect((await invocations()).filter((i) => i.name === "thread.open" || i.name === "tab.move").map((i) => i.name)).toEqual(["thread.open", "tab.move"]);
+  await expect(page.getByTestId("shell-drag-shield")).toHaveCount(0);
+});
+
+test("a row dragged into a strip opens its thread at the place the bar shows", async ({ page }) => {
+  await seed(pane("p-1", [thread("s-1")]), "p-1");
+  await openShell(page);
+  // In the strip (the pane's top 44px), left of the first tab's centre and clear of the grid's
+  // outer band (10px in from its left edge).
+  const p1 = await box(page, '[data-testid="shell-pane"][data-pane-id="p-1"]');
+  await liftRow(page, "s-sb-charts", "Compare three charting libraries", { x: p1.x + 30, y: p1.y + 22 });
+  await expect(page.getByTestId("shell-drop-bar")).toBeVisible();
+  await page.mouse.up();
+  await expect.poll(async () => outline(await storedRoot())).toBe("[s-sb-charts,s-1]");
+});
+
+/** SHOTS=<dir>: the whole sidebar, a hovered row, rows without a project, drafts, the scope button both ways; dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`shell sidebar screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    // Port renderer (s-2) asks from the other space: "This space" leaves it out.
+    await seed(
+      pane("p-1", [thread("s-1"), { id: "t-c", kind: "compose", params: { draft: "d-notes" } }], "t-c"),
+      "p-1",
+      [
+        { id: "d-notes", label: "Write up the shell's sidebar for the release notes, every section and what moved", params: { project: "repo-cf" } },
+        { id: "d-empty", label: "", params: {} },
+      ],
+      ["s-2"],
+    );
+    await openShell(page);
+    await page.setViewportSize({ width: 1400, height: 1100 });
+    await expect(rowEl(page, "s-sb-flaky")).toBeVisible();
+    const sidebar = page.getByTestId("sidebar");
+    await page.mouse.move(800, 600);
+    await still(page);
+    await sidebar.screenshot({ path: at("sidebar") });
+
+    await rowEl(page, "s-sb-flaky").hover();
+    await expect(rowEl(page, "s-sb-flaky").getByTestId("row-actions")).toHaveCSS("opacity", "1");
+    await still(page);
+    await sidebar.screenshot({ path: at("sidebar-hover") });
+
+    // Rows without a project, with and without a third line.
+    await page.mouse.move(800, 600);
+    const clipOf = async (ids: string[]) => {
+      const boxes = await Promise.all(ids.map((id) => box(page, `[data-row-key="${id}"]`)));
+      const x = Math.min(...boxes.map((b) => b.x)) - 4;
+      const y = Math.min(...boxes.map((b) => b.y)) - 4;
+      const r = Math.max(...boxes.map((b) => b.x + b.width)) + 4;
+      const bottom = Math.max(...boxes.map((b) => b.y + b.height)) + 4;
+      return { x, y, width: r - x, height: bottom - y };
+    };
+    await still(page);
+    await page.screenshot({ path: at("no-project-rows"), clip: await clipOf(["s:s-sb-trip", "s:s-sb-charts"]) });
+    await rowEl(page, "s-sb-notes").scrollIntoViewIfNeeded();
+    await page.locator('[data-row-key="d:d-notes"]').hover();
+    await still(page);
+    await page.screenshot({ path: at("drafts"), clip: await clipOf(["h:active", "d:d-notes", "d:d-empty"]) });
+
+    await page.mouse.move(800, 600);
+    const header = page.locator('[data-row-key="h:needs"]');
+    await still(page);
+    await header.screenshot({ path: at("scope-all") });
+    await page.getByTestId("needs-scope").click();
+    await expect(page.getByTestId("needs-scope")).toHaveAttribute("data-scope", "space");
+    await page.mouse.move(800, 600);
+    await still(page);
+    await expect(page.locator('[data-row-key="s:s-2"]')).toHaveCount(0);
+    await header.screenshot({ path: at("scope-space") });
+    await sidebar.screenshot({ path: at("sidebar-this-space") });
+  });
+}
