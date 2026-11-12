@@ -30,9 +30,10 @@ const cases = Object.entries(files).map(([path, raw]) => ({ name: path.replace(/
  * Go: the thread ops (open_thread with its restore, close_thread, move_thread, archive, snooze),
  * placement rules 2 to 6 for a linked surface beside its open thread, a thread's remembered
  * set, and smart swap. Nor the terminal ops the daemon's lifecycle glue applies itself
- * (internal/daemon/layout.go; docs/notes/shell-6-lifecycle.md): no GUI sends them yet.
+ * (internal/daemon/layout.go; docs/notes/shell-6-lifecycle.md): no GUI sends them. set_quick is
+ * ported: the quick terminal's height drag sends it (docs/notes/shell-13-terminals.md).
  */
-const TERMINAL_GLUE_OPS = ["drop_terminal", "replace_terminal", "set_quick"];
+const TERMINAL_GLUE_OPS = ["drop_terminal", "replace_terminal"];
 
 function notPorted(c: OpCase): string | null {
   if (TERMINAL_GLUE_OPS.includes(c.op.op)) return "the daemon's terminal glue";

@@ -17,4 +17,8 @@ export interface ShellSurface {
    * a tab that is not showing holds no stream.
    */
   render: (tab: TabEntry) => ReactNode;
+  /** An icon that follows the tab (a terminal's: what runs in it); drawn instead of `icon`. */
+  TabIcon?: ComponentType<{ tab: TabEntry; className?: string }>;
+  /** The items of the tab's context menu (ContextMenuItems); no menu without it. */
+  tabMenu?: (tab: TabEntry) => ReactNode;
 }

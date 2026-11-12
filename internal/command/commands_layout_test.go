@@ -486,3 +486,53 @@ func TestLayoutComposerDrafts(t *testing.T) {
 		t.Errorf("clear a discarded draft: %v", err)
 	}
 }
+
+// tab.rename gives a terminal tab a name of its own and --auto (or an empty name) gives it back
+// its automatic one. Other kinds take no name; the two flags together are refused; from inside
+// a thread the tab must be named.
+func TestTabRename(t *testing.T) {
+	f := newLayoutFixture(t)
+	if _, err := f.store.Apply(context.Background(), &core.AddTab{Pane: "p-right", Tab: &core.Tab{ID: "t-term", Kind: "terminal", Thread: "s-aaaa00000001",
+		Params: map[string]string{core.TerminalParam: "t-1"}}, Focus: true}, layoutApply()); err != nil {
+		t.Fatal(err)
+	}
+	name := func() string {
+		_, _, tb := f.state().FindTab("t-term")
+		return tb.Name
+	}
+	f.must(t, fromApp, "tab.rename", map[string]string{"name": "  dev server "})
+	if got := name(); got != "dev server" {
+		t.Fatalf("name %q", got)
+	}
+	f.must(t, fromCLI, "tab.rename", map[string]string{"tab": "t-term", "auto": "true"})
+	if got := name(); got != "" {
+		t.Fatalf("after --auto: %q", got)
+	}
+	f.must(t, fromThread, "tab.rename", map[string]string{"tab": "t-term", "name": "logs"})
+	f.must(t, fromCLI, "tab.rename", map[string]string{"tab": "t-term"})
+	if got := name(); got != "" {
+		t.Fatalf("after an empty name: %q", got)
+	}
+	for _, tc := range []struct {
+		name string
+		uctx command.Context
+		args map[string]string
+		code connect.Code
+		is   error
+	}{
+		{"a thread's tab", fromCLI, map[string]string{"tab": "t-a", "name": "x"}, connect.CodeFailedPrecondition, nil},
+		{"both flags", fromCLI, map[string]string{"tab": "t-term", "name": "x", "auto": "true"}, 0, command.ErrInvalidArgs},
+		{"from a thread, no tab", fromThread, map[string]string{"name": "x"}, 0, command.ErrInvalidArgs},
+		{"no such tab", fromCLI, map[string]string{"tab": "t-zzz", "name": "x"}, connect.CodeNotFound, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := f.run(t, tc.uctx, "tab.rename", tc.args)
+			switch {
+			case tc.is != nil && !errors.Is(err, tc.is):
+				t.Errorf("err = %v, want %v", err, tc.is)
+			case tc.is == nil && connect.CodeOf(err) != tc.code:
+				t.Errorf("err = %v, want %v", err, tc.code)
+			}
+		})
+	}
+}

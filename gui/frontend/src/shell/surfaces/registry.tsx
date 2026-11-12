@@ -10,12 +10,13 @@ import { isPluginKind } from "@/surfaces/plugin";
 import { composeSurface } from "./compose";
 import { prsSurface, projectsSurface } from "./pages";
 import { panelSurfaces, pluginShellSurface } from "./panel";
+import { terminalSurface } from "./terminal";
 import { threadSurface } from "./thread";
 import type { ShellSurface } from "./types";
 
 export type { ShellSurface } from "./types";
 
-export const shellSurfaces: readonly ShellSurface[] = [threadSurface, composeSurface, prsSurface, projectsSurface, ...panelSurfaces];
+export const shellSurfaces: readonly ShellSurface[] = [threadSurface, composeSurface, prsSurface, projectsSurface, terminalSurface, ...panelSurfaces];
 
 const byKind = new Map(shellSurfaces.map((s) => [s.kind, s]));
 const plugins = new Map<string, ShellSurface>();

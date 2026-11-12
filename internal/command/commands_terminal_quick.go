@@ -37,6 +37,8 @@ func openTerminalTab(ctx context.Context, d TerminalDeps, uctx Context, thread, 
 
 // QuickResult is terminal.quick's JSON.
 type QuickResult struct {
+	// Rev is the layout commit's (the window waits for it before it moves the keyboard).
+	Rev        uint64 `json:"rev"`
 	ThreadID   string `json:"thread_id"`
 	Open       bool   `json:"open"`
 	TerminalID string `json:"terminal_id,omitempty"`
@@ -57,6 +59,7 @@ func terminalLayoutCommands(d TerminalDeps, quick *sync.Mutex) []Command {
 				layoutThreadArg(false),
 				{Name: "open", Type: Bool, Description: "Open it (default: toggle)"},
 				{Name: "close", Type: Bool, Description: "Close it (default: toggle)"},
+				{Name: "height", Type: Int, Description: "Its height in layout px; alone, it sets the height and keeps it open or closed"},
 				focusArg,
 			},
 			// The classic window has no quick terminal; the shell window's lists it (PR 13).
@@ -87,7 +90,20 @@ func terminalLayoutCommands(d TerminalDeps, quick *sync.Mutex) []Command {
 					open = ts.Quick.Open
 				}
 				want := !open
+				height := a.Int("height")
+				if height < 0 {
+					return Result{}, InvalidArg("height", "a height below zero")
+				}
 				switch {
+				case a.Has("height") && !a.Bool("open") && !a.Bool("close"):
+					// A height drag: the open state stays as it is.
+					c, err := l.apply(ctx, &core.SetQuick{Thread: thread, Open: open, Height: float64(height)}, !uctx.FromUser())
+					if err != nil {
+						return Result{}, err
+					}
+					out := layoutResult(uctx, c, fmt.Sprintf("thread %s's quick terminal is %d px high", thread, height))
+					out.JSON = QuickResult{Rev: c.Rev, ThreadID: thread, Open: open}
+					return out, nil
 				case a.Bool("open"):
 					want = true
 				case a.Bool("close"):
@@ -112,11 +128,12 @@ func terminalLayoutCommands(d TerminalDeps, quick *sync.Mutex) []Command {
 						}
 					}
 				}
-				c, err := l.apply(ctx, &core.SetQuick{Thread: thread, Open: want}, !focus)
+				c, err := l.apply(ctx, &core.SetQuick{Thread: thread, Open: want, Height: float64(height)}, !focus)
 				if err != nil {
 					return Result{}, err
 				}
 				out := layoutResult(uctx, c, msg)
+				res.Rev = c.Rev
 				out.JSON = res
 				return out, nil
 			},

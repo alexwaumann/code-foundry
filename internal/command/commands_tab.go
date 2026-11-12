@@ -11,7 +11,7 @@ func tabIDArg(desc string) ArgSpec {
 	return ArgSpec{Name: "tab", Type: String, ID: TabID, Description: desc + IDHelp}
 }
 
-// tabCommands are tab.focus, tab.move, tab.close, tab.next and tab.previous.
+// tabCommands are tab.focus, tab.move, tab.close, tab.rename, tab.next and tab.previous.
 func (l layout) tabCommands() []Command {
 	return []Command{
 		{
@@ -71,6 +71,40 @@ func (l layout) tabCommands() []Command {
 				msg := "closed tab " + tb.ID
 				if n := len(c.Result.Kept); n > 0 {
 					msg += fmt.Sprintf("; %s of its thread remembered", plural(n, "linked tab"))
+				}
+				return layoutResult(uctx, c, msg), nil
+			},
+		},
+		{
+			Name: "tab.rename", Title: "Rename Tab", Category: layoutCategory, Page: PageState,
+			Description: "Give a tab a name of your own (default: the focused tab), or with --auto go back to its automatic name. " +
+				"Only a terminal tab takes a name; a thread is renamed with thread.rename.",
+			Args: []ArgSpec{
+				positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)")),
+				{Name: "name", Type: String, Description: "The name; empty or --auto goes back to the automatic name"},
+				{Name: "auto", Type: Bool, Description: "Go back to the automatic name (what runs in the terminal)"},
+			},
+			NoPalette: true, NoKeybinding: true, NoIndex: true,
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				if a.Bool("auto") && a.String("name") != "" {
+					return Result{}, InvalidArg("auto", "--auto and --name together")
+				}
+				snap, err := l.state()
+				if err != nil {
+					return Result{}, err
+				}
+				_, _, tb, err := l.tab(snap.State, uctx, a, "tab")
+				if err != nil {
+					return Result{}, err
+				}
+				name := a.String("name")
+				c, err := l.apply(ctx, &core.RenameTab{Tab: tb.ID, Name: name}, !uctx.FromUser())
+				if err != nil {
+					return Result{}, err
+				}
+				msg := "tab " + tb.ID + " goes by its automatic name"
+				if name != "" {
+					msg = fmt.Sprintf("renamed tab %s to %q", tb.ID, name)
 				}
 				return layoutResult(uctx, c, msg), nil
 			},

@@ -905,6 +905,36 @@ const ops = {
     return { space: sp.id, pane: pane.id, tab: tab.id };
   },
 
+  // ---- Terminals (internal/layout/terminals.go) ----
+
+  set_quick(t: Tx, o: Op): Result {
+    const thread = str(o, "thread");
+    if (!thread) fail("invalid_argument", "no thread given");
+    const height = num(o, "height") ?? 0;
+    if (height < 0 || !Number.isFinite(height) || height > 1e6) fail("invalid_argument", `quick terminal height ${String(height)}`);
+    const open = o.open === true;
+    const threads = t.st.threads ?? {};
+    let ts = threads[thread];
+    if (!ts && !open && height === 0) return {};
+    if (!ts) {
+      ts = { space: t.spaceOf(thread) };
+      t.st.threads = { ...threads, [thread]: ts };
+    }
+    const q: { open: boolean; height?: number } = { open };
+    const kept = ts.quick?.height ?? 0;
+    if (height > 0) q.height = height;
+    else if (kept > 0) q.height = kept;
+    if (q.open || q.height) ts.quick = q;
+    else delete ts.quick;
+    // Go's prune: a record that stores nothing the default would not give goes.
+    if (!ts.quick && !ts.remembered && Object.keys(ts.last ?? {}).length === 0 && ts.space === t.st.default_space) {
+      const rest = Object.fromEntries(Object.entries(t.st.threads ?? {}).filter(([id]) => id !== thread));
+      if (Object.keys(rest).length > 0) t.st.threads = rest;
+      else delete t.st.threads;
+    }
+    return {};
+  },
+
   new_space(t: Tx, o: Op): Result {
     let name = str(o, "name").trim();
     if (!name) {
@@ -1402,6 +1432,8 @@ export function opFromProto(m: LayoutOp | undefined): Op {
       return { op: "discard_draft", draft: c.value.draftId };
     case "openDraft":
       return { op: "open_draft", draft: c.value.draftId, focus: c.value.focus };
+    case "setQuick":
+      return { op: "set_quick", thread: c.value.threadId, open: c.value.open, height: c.value.height };
     default:
       return fail("unimplemented", `layout op ${c.case} is not available in the mock`);
   }
@@ -1527,7 +1559,12 @@ export class MockLayout {
   applied: { op: Op; clientId: string }[] = [];
 
   constructor(
-    private readonly deps: { publish: (ev: LayoutEventInit) => void; ids?: IdSource },
+    private readonly deps: {
+      publish: (ev: LayoutEventInit) => void;
+      ids?: IdSource;
+      /** After an op's commit, as the daemon's lifecycle glue hears it (mock/world.ts ends a closed terminal tab's shell). */
+      applied?: (op: Op, result: Result) => void;
+    },
   ) {}
 
   get rev(): number {
@@ -1552,7 +1589,9 @@ export class MockLayout {
     this.applied.push({ op, clientId });
     const { state, result } = applyOp(this.st, op, this.deps.ids ?? randomIds, opts);
     this.commit(state, clientId);
-    return { rev: this.revision, result };
+    const rev = this.revision;
+    this.deps.applied?.(op, result);
+    return { rev, result };
   }
 
   setViewport(clientId: string, width: number, height: number): void {

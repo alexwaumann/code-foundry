@@ -41,6 +41,9 @@ export function sameTerminal(a: TerminalView, b: TerminalView): boolean {
     a.startedAtMs === b.startedAtMs &&
     a.exitedAtMs === b.exitedAtMs &&
     a.altScreen === b.altScreen &&
+    a.liveCwd === b.liveCwd &&
+    a.foreground === b.foreground &&
+    a.lastCommand === b.lastCommand &&
     a.argv.length === b.argv.length &&
     a.argv.every((v, i) => v === b.argv[i]) &&
     sameRecord(a.labels, b.labels)

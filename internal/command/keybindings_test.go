@@ -30,7 +30,7 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"usage.show", "view.inline", "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url",
 		"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.page", "view.panel.pr", "view.thread-diff",
 		"workspace.list", "worktree.editors",
-		"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "space.rename", "space.switch", "tab.focus", "tab.list", "tab.move", "thread.open", "thread.space.move",
+		"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "space.rename", "space.switch", "tab.focus", "tab.list", "tab.move", "tab.rename", "thread.open", "thread.space.move",
 		"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start",
 	}
 	var got []string

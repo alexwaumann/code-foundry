@@ -48,7 +48,7 @@ let seq = 0;
 export function actionTerminal(id: string, a: ActionView, runId: string, owner: RunOwner, o: Partial<TerminalView> = {}): TerminalView {
   const labels: Record<string, string> = { kind: "action", project: owner.projectId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": runId };
   if (owner.threadId) labels.thread = owner.threadId;
-  return { id, argv: ["/bin/zsh", "-lc", a.command], cwd: owner.worktree, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: Date.now(), exitedAtMs: null, altScreen: false, labels, ...o };
+  return { id, argv: ["/bin/zsh", "-lc", a.command], cwd: owner.worktree, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: Date.now(), exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels, ...o };
 }
 
 /** A terminal event, as the daemon sends one (stores/events.ts opens or hides panels). */

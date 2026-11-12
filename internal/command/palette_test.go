@@ -48,7 +48,7 @@ var noPalette = []string{
 	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr", "view.thread-diff",
 	"workspace.add-project", "workspace.list", "workspace.remove", "workspace.remove-project",
 	"workspace.open.editor", "workspace.set-primary", "worktree.editors",
-	"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "tab.focus", "tab.list", "tab.move", "thread.open",
+	"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "tab.focus", "tab.list", "tab.move", "tab.rename", "thread.open",
 	"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "composer.new",
 }
 

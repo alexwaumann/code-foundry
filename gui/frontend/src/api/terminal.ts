@@ -25,6 +25,12 @@ export interface TerminalView {
   exitedAtMs: number | null;
   altScreen: boolean;
   labels: Readonly<Record<string, string>>;
+  /** The shell's current directory as the process table gives it (Terminal.live_cwd); "" when unknown. */
+  liveCwd: string;
+  /** The foreground job's command line when it is not the shell (Terminal.foreground); "" at the prompt. */
+  foreground: string;
+  /** The last foreground command that ended (Terminal.last_command); "" for none. */
+  lastCommand: string;
 }
 
 export type TerminalEventView = { kind: "updated"; terminal: TerminalView } | { kind: "removed"; id: string };
@@ -55,6 +61,9 @@ export function toTerminalView(t: Terminal): TerminalView {
     exitedAtMs: ms(t.exitedAt),
     altScreen: t.altScreen,
     labels: { ...t.labels },
+    liveCwd: t.liveCwd,
+    foreground: t.foreground,
+    lastCommand: t.lastCommand,
   };
 }
 

@@ -72,7 +72,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
 }
 
 function term(id: string, labels: Record<string, string> = {}): TerminalView {
-  return { id, argv: ["claude"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels };
+  return { id, argv: ["claude"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
 }
 
 describe("thread reducers", () => {

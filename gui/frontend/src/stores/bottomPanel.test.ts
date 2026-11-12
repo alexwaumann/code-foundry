@@ -36,7 +36,7 @@ import type { TerminalsData } from "./terminals";
 import { HOME, useUiStore, type Selection } from "./ui";
 
 function term(id: string, labels: Record<string, string>, extra: Partial<TerminalView> = {}): TerminalView {
-  return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels, ...extra };
+  return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels, ...extra };
 }
 
 const shell = (thread: string, worktree = "/src/app") => ({ kind: "shell", project: "r", worktree, ...(thread ? { thread } : {}) });

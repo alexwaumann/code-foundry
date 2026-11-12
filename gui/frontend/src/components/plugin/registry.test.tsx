@@ -96,7 +96,7 @@ describe("node renderer registry", () => {
     cleanup();
     useThreadsStore.setState({ byId: { [threadId]: { id: threadId, owner: "plugin:hello", worktreePath: "/h", state: "disconnected", status: "idle" } as ThreadView }, order: [], owned: [threadId] });
     useTerminalsStore.setState({
-      byId: { [terminalId]: { id: terminalId, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels: { kind: "plugin", plugin: "hello", title: "Clock" } } },
+      byId: { [terminalId]: { id: terminalId, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels: { kind: "plugin", plugin: "hello", title: "Clock" } } },
       order: [terminalId],
     });
     inView(<NodeList nodes={[...assistant, ...shell]} />, { viewTab: "assistant" });

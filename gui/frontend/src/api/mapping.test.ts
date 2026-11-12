@@ -51,6 +51,9 @@ describe("terminal mapping", () => {
       exitedAt: timestampFromMs(5000),
       altScreen: true,
       labels: { worktree: "/src" },
+      liveCwd: "/tmp",
+      foreground: "make dev",
+      lastCommand: "git status",
     });
     expect(toTerminalView(t)).toEqual({
       id: "t1",
@@ -65,8 +68,11 @@ describe("terminal mapping", () => {
       exitedAtMs: 5000,
       altScreen: true,
       labels: { worktree: "/src" },
+      liveCwd: "/tmp",
+      foreground: "make dev",
+      lastCommand: "git status",
     });
-    expect(toTerminalView(create(TerminalSchema, { id: "x" }))).toMatchObject({ state: "unknown", startedAtMs: null, exitedAtMs: null });
+    expect(toTerminalView(create(TerminalSchema, { id: "x" }))).toMatchObject({ state: "unknown", startedAtMs: null, exitedAtMs: null, liveCwd: "", foreground: "", lastCommand: "" });
   });
 
   it.each([

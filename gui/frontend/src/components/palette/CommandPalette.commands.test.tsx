@@ -121,7 +121,7 @@ describe("what the palette lists", () => {
 
     // A thread's shell with the keyboard in it: the shell is the context's terminal.
     useTerminalsStore.setState({
-      byId: { "t-s1-shell": { id: "t-s1-shell", argv: ["/bin/zsh"], cwd: CF, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels: { kind: "shell", thread: "s-1", project: "repo-cf", worktree: CF } } },
+      byId: { "t-s1-shell": { id: "t-s1-shell", argv: ["/bin/zsh"], cwd: CF, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels: { kind: "shell", thread: "s-1", project: "repo-cf", worktree: CF } } },
       order: ["t-s1-shell"],
       loaded: true,
     });

@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type Ref, type SyntheticEvent } from "react";
 import { X } from "lucide-react";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,9 @@ import { fitTabs, TAB_ICON_WIDTH, type TabFit } from "@/shell/geometry/tabFit";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { usePaneDrag, useTabDrag } from "@/shell/drag/draggable";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
+import { takeRenameAfterMenu, useTabRenameStore } from "@/shell/terminalActions";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
+import { TabNameField } from "./TerminalTab";
 
 /** The active tab: full tint in the focused pane, lighter in the others (the side panel's tints). */
 const ACTIVE_FOCUSED = "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50";
@@ -23,16 +26,23 @@ const STRIP_PAD = 6;
 function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"]; room: boolean }) {
   const surface = shellSurfaceOf(tab.kind);
   const title = surface.useTitle(tab);
-  const Icon = surface.icon;
   return (
     <>
-      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <TabContentIcon tab={tab} />
       <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate")} data-testid="shell-tab-label">
         {title}
       </span>
       {room && <span className="size-4 shrink-0" aria-hidden />}
     </>
   );
+}
+
+/** A tab's icon: its surface's, or one that follows the tab (a terminal's). */
+function TabContentIcon({ tab }: { tab: TabEntry }) {
+  const surface = shellSurfaceOf(tab.kind);
+  const TabIcon = surface.TabIcon;
+  const Icon = surface.icon;
+  return TabIcon ? <TabIcon tab={tab} className="size-3.5 shrink-0" /> : <Icon className="size-3.5 shrink-0" aria-hidden />;
 }
 
 /** A tab's name, for a close button's label and the tooltip (a hook per tab, so a thread's rename shows). */
@@ -52,15 +62,68 @@ function ShellTab({ tabId, active, paneFocused, fit, focusable }: { tabId: strin
   return <ShellTabOf tab={tab} active={active} paneFocused={paneFocused} fit={fit} focusable={focusable} />;
 }
 
-function ShellTabOf({ tab, active, paneFocused, fit, focusable }: { tab: TabEntry; active: boolean; paneFocused: boolean; fit: TabFit | undefined; focusable: boolean }) {
+type Handler = (e: SyntheticEvent) => void;
+
+/** Each of `extra`'s handlers (dnd-kit's listeners) called after the one `props` has for the same event. */
+function mergeHandlers(props: object, extra: object | undefined): Record<string, Handler> {
+  const out: Record<string, Handler> = {};
+  const own = props as Record<string, unknown>;
+  for (const [name, fn] of Object.entries(extra ?? {}) as [string, unknown][]) {
+    if (typeof fn !== "function") continue;
+    const next = fn as Handler;
+    const first = own[name];
+    out[name] =
+      typeof first === "function"
+        ? (e) => {
+            (first as Handler)(e);
+            next(e);
+          }
+        : next;
+  }
+  return out;
+}
+
+function ShellTabOf(props: { tab: TabEntry; active: boolean; paneFocused: boolean; fit: TabFit | undefined; focusable: boolean }) {
+  const menu = shellSurfaceOf(props.tab.kind).tabMenu;
+  if (!menu) return <ShellTabBox {...props} />;
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <ShellTabBox {...props} />
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        onCloseAutoFocus={(e) => {
+          // A rename picked in the menu starts now, and its field takes the keyboard.
+          if (takeRenameAfterMenu(props.tab.id)) e.preventDefault();
+        }}
+      >
+        {menu(props.tab)}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+/**
+ * The tab's element takes two sets of props: a context menu trigger's (Radix's Slot: its ref and
+ * handlers, for a surface with `tabMenu`) and the drag's (dnd-kit's ref and pointer listener).
+ * Both get the element and every event. While the tab's name is being edited it does not drag.
+ */
+function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef, ...rest }: { tab: TabEntry; active: boolean; paneFocused: boolean; fit: TabFit | undefined; focusable: boolean; ref?: Ref<HTMLDivElement> } & HTMLAttributes<HTMLDivElement>) {
   const title = useTabTitle(tab);
   const { setNodeRef, listeners, describedBy, dragging } = useTabDrag(tab.id, tab.paneId);
   const label = fit?.label ?? "full";
   const icon = label === "icon";
+  const renaming = useTabRenameStore((s) => s.tabId === tab.id);
+  const handlers = mergeHandlers(rest, renaming ? undefined : listeners);
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
+      ref={(el) => {
+        setNodeRef(el);
+        if (typeof triggerRef === "function") triggerRef(el);
+        else if (triggerRef) triggerRef.current = el;
+      }}
+      {...rest}
+      {...handlers}
       role="presentation"
       data-testid="shell-tab"
       data-dragging={dragging || undefined}
@@ -102,7 +165,8 @@ function ShellTabOf({ tab, active, paneFocused, fit, focusable }: { tab: TabEntr
           <TabContent tab={tab} label={label} room={false} />
         </button>
       </Tip>
-      {!icon && (
+      {renaming && <TabNameField tab={tab} className="absolute inset-y-1 right-1 left-7" />}
+      {!icon && !renaming && (
         <Tip label="Close tab">
           <button
             type="button"
