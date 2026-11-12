@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useServesFocusRequests } from "@/shell/paneContext";
 import { ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
@@ -232,8 +233,10 @@ export function ThreadComposer({
     };
   }, []);
   const inRoot = (el: Element | null): boolean => el !== null && rootRef.current?.contains(el) === true;
+  // In the window shell only the focused pane's thread takes a request (shell/paneContext.ts).
+  const serves = useServesFocusRequests();
   useEffect(() => {
-    if (!focusRequests) return;
+    if (!focusRequests || !serves) return;
     if (handledPromptSeq === focusSeq && seenContent.current === contentFocusSeq) return;
     const key = `${String(focusSeq)}:${String(contentFocusSeq)}`;
     if (request.current?.key !== key) request.current = { key, before: document.activeElement };
@@ -269,7 +272,7 @@ export function ThreadComposer({
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [focusSeq, contentFocusSeq, threadId, focusRequests]);
+  }, [focusSeq, contentFocusSeq, threadId, focusRequests, serves]);
 
   // The editor turns read-only while a send is in flight. Chromium drops its focus then;
   // WebKit keeps the element focused but no longer edits in it, and the editor's focus()

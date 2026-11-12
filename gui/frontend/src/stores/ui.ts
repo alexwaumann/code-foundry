@@ -228,7 +228,7 @@ interface UiState {
   threadInfoOpen: boolean;
 
   /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
-  select: (sel: Selection, opts?: { focusPrompt?: boolean }) => void;
+  select: (sel: Selection, opts?: SelectOptions) => void;
   /**
    * view.back: selects the entry before the current one in `history`, skipping (and
    * dropping) ones whose thread, project or workspace is gone. False when there is none.
@@ -414,6 +414,37 @@ export function pruneHistory(history: readonly Selection[], index: number, isGon
 }
 
 /**
+ * How a selection is asked for. `sent`: the composer that showed sent its thread, which takes
+ * its place (the window shell turns the composer's tab into the thread's).
+ */
+export interface SelectOptions {
+  focusPrompt?: boolean;
+  sent?: boolean;
+}
+
+/**
+ * Takes a select() instead of the store: with the window shell on, the selection bridge
+ * (stores/selectionBridge.ts) opens or focuses the selection's tab, and the selection follows
+ * the focused tab (mirrorSelection). Answers false to leave the selection to the store.
+ */
+export type SelectRoute = (sel: Selection, opts: SelectOptions) => boolean;
+
+let selectRoute: SelectRoute | null = null;
+
+/** Installs (or with null removes) the route select() goes through first. */
+export function setSelectRoute(route: SelectRoute | null): void {
+  selectRoute = route;
+}
+
+/**
+ * Sets the selection without the route, recorded in the history like a select(): the selection
+ * bridge mirrors the focused tab with it.
+ */
+export function mirrorSelection(sel: Selection, opts: { focusPrompt?: boolean } = {}): void {
+  useUiStore.setState((s) => selectionUpdate(s, sel, { focusPrompt: opts.focusPrompt, push: true }));
+}
+
+/**
  * The state a selection change sets. `push` (a normal select) records it after the current
  * history entry, dropping the forward ones, unless it is the current entry already; back
  * and forward move the index themselves and do not push.
@@ -461,6 +492,7 @@ export const useUiStore = create<UiState>()(
       threadInfoOpen: false,
 
       select: (sel, opts) => {
+        if (selectRoute?.(sel, opts ?? {})) return;
         set((s) => selectionUpdate(s, sel, { focusPrompt: opts?.focusPrompt, push: true }));
       },
       back: () => stepHistory(-1),
@@ -630,5 +662,7 @@ function stepHistory(by: 1 | -1): boolean {
     return false;
   }
   useUiStore.setState((cur) => ({ ...selectionUpdate(cur, target, { focusPrompt: true, push: false }), history, historyIndex: index + by }));
+  // In the window shell, going back opens or focuses that selection's tab (its own focus history is PR 15's).
+  selectRoute?.(target, { focusPrompt: true });
   return true;
 }

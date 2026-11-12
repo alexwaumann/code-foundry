@@ -57,6 +57,7 @@ import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrde
 import { useWorkspaceTerminal } from "./workspaceHooks";
 import { WORKSPACE_MENU_PARTS } from "./WorkspaceMenuParts";
 import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 const SEP = "\u0001";
 
@@ -400,8 +401,11 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
   const workspaceCols = useMemo(() => workspaceColumns(columns), [columns]);
   const projectTemplate = template(projectCols);
   const workspaceTemplate = template(workspaceCols);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
   const empty = loaded && order.length === 0;
   return (

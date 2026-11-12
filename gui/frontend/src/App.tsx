@@ -21,6 +21,7 @@ import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ProjectsPage } from "@/components/projects/ProjectsPage";
 import { PullRequestsPage } from "@/components/prs/PullRequestsPage";
 import { SidePanel } from "@/components/panel/SidePanel";
+import { Shell } from "@/components/shell/Shell";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { ThreadPane } from "@/components/thread/ThreadPane";
 import { Toaster } from "@/components/ui/sonner";
@@ -48,6 +49,8 @@ import { startWelcomeSync } from "@/stores/welcome";
 import { startDockAlerts } from "@/stores/dockAlerts";
 import { startUpdateSync } from "@/stores/update";
 import { startRecentFiles } from "@/stores/recentFiles";
+import { useShellViewStore } from "@/stores/shellView";
+import { shellOn } from "@/shell/flag";
 import { EmberView } from "@/components/ember/EmberView";
 import { EMBER_VIEW } from "@/surfaces/emberTarget";
 
@@ -208,6 +211,9 @@ export function App() {
   // UsageSheet), which stays laid out under them: no page replaces the content pane.
   const panelExpanded = usePanelExpanded();
   useWindowTitle(useAttentionCount());
+  // The shell flag (shell/flag.ts) draws the window shell instead of the content column and the
+  // side panel, unless the daemon has no layout (Shell falls back, then this draws the classic).
+  const shell = useShellViewStore((s) => shellOn() && s.mode !== "classic");
 
   return (
     // The sheet: one background under the sidebar. The content area is a pane floating
@@ -227,12 +233,18 @@ export function App() {
         <div className="absolute inset-x-0 top-0 h-shell [--wails-draggable:drag]" data-testid="window-drag-edge" aria-hidden />
         <div className="flex min-h-0 flex-1">
           <Sidebar />
-          <ContentColumn hidden={panelExpanded}>
-            <ContentPane>
-              <Content />
-            </ContentPane>
-          </ContentColumn>
-          <SidePanel />
+          {shell ? (
+            <Shell />
+          ) : (
+            <>
+              <ContentColumn hidden={panelExpanded}>
+                <ContentPane>
+                  <Content />
+                </ContentPane>
+              </ContentColumn>
+              <SidePanel />
+            </>
+          )}
         </div>
         <SettingsSheet />
         <UsageSheet />

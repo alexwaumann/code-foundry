@@ -21,6 +21,7 @@ import { Freshness } from "./PrBits";
 import { AuthoredPrRow, MergedRow, NeedsReviewRow, OtherPrRow, PrTable, ReviewedByYouRow } from "./PrRows";
 import { needsReviewCount } from "./reviewQueue";
 import { SummaryCards } from "./SummaryCards";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 /** The daemon polls every minute by default; older than a few polls plus slack is stale. */
 const STALE_AFTER_MS = 5 * 60_000;
@@ -91,8 +92,11 @@ function Body({ d }: { d: DashboardView }) {
     };
   }, [cursorPr]);
   const rootRef = useRef<HTMLDivElement>(null);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
   const has = (s: Section) => shown.includes(s);
   return (

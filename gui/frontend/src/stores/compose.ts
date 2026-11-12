@@ -1028,7 +1028,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (id) noteSentFrom(id, target);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
-    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true });
+    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true, sent: true });
     return true;
   } catch (err) {
     updateDraft(key, { phase: "idle", error: sendErrorMessage(err) });

@@ -194,30 +194,41 @@ export function applyLayout(op: LayoutOpView): Promise<LayoutApplyView> {
 }
 
 /**
+ * Runs a focus op another way than LayoutService.Apply (a command: pane.focus, tab.focus) and
+ * answers the rev of the commit it made, or null when it was refused or failed.
+ */
+export type FocusRunner = () => Promise<number | null>;
+
+/**
  * Focuses a tab (its pane and space) at once; the daemon's next event confirms or corrects it.
  * Resolves false when the daemon refused it (the tab went) or the call failed: the slice is
- * back to what the daemon holds.
+ * back to what the daemon holds. `run` sends it (default: LayoutService.Apply).
  */
-export function focusTab(tabId: string): Promise<boolean> {
-  return optimistic({ op: "focus_tab", tab: tabId });
+export function focusTab(tabId: string, run?: FocusRunner): Promise<boolean> {
+  return optimistic({ op: "focus_tab", tab: tabId }, run);
 }
 
 /** Focuses a pane at once, as focusTab. */
-export function focusPane(paneId: string): Promise<boolean> {
-  return optimistic({ op: "focus_pane", pane: paneId });
+export function focusPane(paneId: string, run?: FocusRunner): Promise<boolean> {
+  return optimistic({ op: "focus_pane", pane: paneId }, run);
 }
 
-async function optimistic(op: FocusOp): Promise<boolean> {
+async function optimistic(op: FocusOp, run: FocusRunner = async () => (await applyLayoutOp(op)).rev): Promise<boolean> {
   const p: Pending = { op, rev: null };
   pending.push(p);
   publish();
+  let rev: number | null;
   try {
-    p.rev = (await applyLayoutOp(op)).rev;
+    rev = await run();
   } catch {
+    rev = null;
+  }
+  if (rev === null) {
     pending = pending.filter((q) => q !== p);
     publish();
     return false;
   }
+  p.rev = rev;
   publish();
   return true;
 }

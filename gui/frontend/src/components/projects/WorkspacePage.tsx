@@ -23,6 +23,7 @@ import { WorkspaceProjects } from "./WorkspaceProjects";
 import { openThread, useWorkspaceThreads } from "./workspaceHooks";
 import { WorkspaceThreads } from "./WorkspaceThreads";
 import { WorkspaceTitle } from "./WorkspaceTitle";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 /** The workspace's member ids by project name (lib/workspaceCard.ts membersByName); the stored order is by id. */
 function useMembersByName(workspaceId: string): string[] {
@@ -84,8 +85,11 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
   const [widthRef, width] = useWidth(1200);
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   const scrollRef = usePageScroll(pageKey, widthRef);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
   return (
