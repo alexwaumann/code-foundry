@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createBridgeHost, type BridgeHost } from "@/stores/bridgeHost";
 import { watchFrameAttention } from "@/lib/frameAttention";
 import { frameNonce, nonceMatches, withNonce } from "@/lib/bridge";
@@ -8,7 +9,7 @@ import { activeThemeSlots, onThemePublished, subscribeThemeSlots, themeFrameMess
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { openUrl } from "@/stores/gh";
-import { isThemeAck, pageKey, pageOpenUrl, pageUnsupported, resizeHeight, themedUrl } from "./previewGrant";
+import { isThemeAck, pageFrameNote, pageKey, pageOpenUrl, pageUnsupported, resizeHeight, themedUrl } from "./previewGrant";
 
 /**
  * The sandbox of a frame with no owning thread (a File tab on an arbitrary HTML file):
@@ -48,6 +49,12 @@ export const FRAME_REVEAL_MS = 1000;
 
 /** The least time between two links a frame sends to the browser. */
 export const OPEN_GAP_MS = 500;
+
+/**
+ * How long after a `load` a frame waits for its document's answer to `cf:ping` before it
+ * takes the document for another site's.
+ */
+export const LEFT_WAIT_MS = 400;
 
 /**
  * An HTML page in a sandboxed frame at a granted URL (usePreviewGrant). The File tab's
@@ -101,6 +108,15 @@ export const OPEN_GAP_MS = 500;
  * `alert`, `confirm`, `prompt` or download arrives as `cf:unsupported` and joins the
  * page's errors. Neither needs the nonce: a page that left for another document of its
  * own keeps them.
+ *
+ * A frame that went to another site anyway (docs/notes/leftovers-pages.md): after each
+ * `load` the frame posts `{ type: "cf:ping", seq }`, which the script in every document the
+ * daemon serves answers `{ type: "cf:here", seq }`; a document says `cf:going` before it
+ * goes on to one at its own origin. A load whose document answers nothing in LEFT_WAIT_MS,
+ * with no `cf:going` before it, after a document of the page's answered, is another site's
+ * (or anything else the frame cannot show as the page): the frame is covered by "This page
+ * went to another site" and Reload, which loads the page again. The answer, not a message
+ * the document sends as it starts, because the frame's `load` may come before that.
  */
 export function HtmlFrame({
   url,
@@ -201,6 +217,16 @@ export function HtmlFrame({
   const target = opaque ? "*" : pageOrigin;
   const [nonce] = useState(frameNonce);
   const src = useMemo(() => withNonce(opaque ? url : themedUrl(url), nonce), [url, nonce, opaque]);
+  // Whether a document of the page answered in this load of the frame, the last ping and the
+  // last one answered, and whether a document said it went on to its own origin.
+  const here = useRef({ seen: false, ping: 0, answered: 0, going: false });
+  const leftTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(leftTimer.current);
+    },
+    [],
+  );
   const host = useRef<BridgeHost | null>(null);
   const present = useRef<() => boolean>(() => false);
   const openedAt = useRef(Number.NEGATIVE_INFINITY);
@@ -265,6 +291,13 @@ export function HtmlFrame({
         report(addPageError(errors.current, { ...cannot, code: "unavailable", atMs: Date.now() }));
         return;
       }
+      const note = pageFrameNote(e.data);
+      if (note) {
+        const h = here.current;
+        if (note.note === "going") h.going = true;
+        else if (note.seq === h.ping) here.current = { ...h, seen: true, answered: note.seq, going: false };
+        return;
+      }
       const key = pageKey(e.data);
       if (key !== null) {
         if (nonceMatches(e.data, nonce)) keyRef.current?.(key);
@@ -281,6 +314,29 @@ export function HtmlFrame({
   // URL for the same frame (a daemon restart) keeps it visible: that page is up.
   const frameKey = `${String(load)}:${thread ?? ""}`;
   const [visibleKey, setVisibleKey] = useState<string | null>(null);
+  // The frame load whose document went to another site.
+  const [leftKey, setLeftKey] = useState<string | null>(null);
+  const left = leftKey === frameKey;
+  const frameKeyRef = useRef(frameKey);
+  useEffect(() => {
+    frameKeyRef.current = frameKey;
+    here.current = { seen: false, ping: 0, answered: 0, going: false };
+    clearTimeout(leftTimer.current);
+  }, [frameKey]);
+  const loaded = () => {
+    const seq = here.current.ping + 1;
+    here.current.ping = seq;
+    if (target) frameRef.current?.contentWindow?.postMessage({ type: "cf:ping", seq }, target);
+    const key = frameKey;
+    clearTimeout(leftTimer.current);
+    leftTimer.current = setTimeout(() => {
+      const h = here.current;
+      const excused = h.going;
+      h.going = false;
+      if (h.ping !== seq || h.answered === seq || !h.seen || excused || frameKeyRef.current !== key) return;
+      setLeftKey(key);
+    }, LEFT_WAIT_MS);
+  };
   const visible = visibleKey === frameKey;
   useEffect(() => {
     if (visible) return;
@@ -301,6 +357,7 @@ export function HtmlFrame({
           post();
           if (errors.current.length > 0) report([]);
           host.current?.loaded();
+          loaded();
         }}
         aria-label={`${name} (rendered)`}
         src={src}
@@ -318,6 +375,22 @@ export function HtmlFrame({
         data-load={load}
         data-shown={visible || undefined}
       />
+      {left && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-cf-surface p-4 text-center" role="status" data-testid={`${testId}-left`}>
+          <p className="text-body font-medium">This page went to another site</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLoad((n) => n + 1);
+            }}
+            data-testid={`${testId}-left-reload`}
+          >
+            <RotateCw />
+            Reload
+          </Button>
+        </div>
+      )}
       {!visible && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-cf-text-muted" data-testid={`${testId}-loading`}>
           <LoaderCircle className="size-4 animate-spin" aria-label="Loading" />

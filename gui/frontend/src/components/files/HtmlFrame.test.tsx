@@ -23,7 +23,7 @@ vi.mock("@/stores/gh", () => ({
     return Promise.resolve();
   },
 }));
-const { FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, OPEN_GAP_MS, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
+const { FRAME_REVEAL_MS, HTML_PREVIEW_SANDBOX, HtmlFrame, LEFT_WAIT_MS, OPEN_GAP_MS, THREAD_PAGE_SANDBOX } = await import("./HtmlFrame");
 
 const URL_ = "http://127.0.0.1:4100/preview/g1/page.html";
 const PAGES = "http://127.0.0.1:4100";
@@ -140,11 +140,123 @@ describe("HtmlFrame", () => {
     send({ type: "cf:unsupported", what: "confirm", text: "Delete it?" });
     send({ type: "cf:unsupported", what: "confirm", text: "Delete it?" });
     send({ type: "cf:unsupported", what: "download", text: "rows.csv" });
+    send({ type: "cf:unsupported", what: "form", text: "example.com" });
+    send({ type: "cf:unsupported", what: "navigation", text: "example.com" });
     send({ type: "cf:unsupported", what: "nothing" });
     expect(seen.at(-1)).toEqual([
       { call: "confirm()", code: "unavailable", count: 2 },
       { call: "download", code: "unavailable", count: 1 },
+      { call: "form", code: "unavailable", count: 1 },
+      { call: "location", code: "unavailable", count: 1 },
     ]);
+  });
+
+  describe("a frame that went to another site", () => {
+    const wait = (ms: number) => {
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
+    };
+    const left = () => screen.queryByTestId("frame-left");
+    /** Mounts a frame whose loads are seen: each load's ping to the frame's window, with its target. */
+    function watched(thread: string | null) {
+      const f = mount(thread);
+      const pings: { seq: number; target: string }[] = [];
+      const win = f.frame().contentWindow;
+      if (!win) throw new Error("no frame window");
+      vi.spyOn(win, "postMessage").mockImplementation((m: unknown, target?: unknown) => {
+        const msg = m as { type?: string; seq?: number };
+        if (msg.type === "cf:ping") pings.push({ seq: msg.seq ?? -1, target: String(target) });
+      });
+      /** A load of the frame, and its document's answer when it has the frame script. */
+      const loads = (answer: boolean) => {
+        fireEvent.load(f.frame());
+        if (answer) f.send({ type: "cf:here", seq: pings.at(-1)?.seq });
+      };
+      return { ...f, pings, loads };
+    }
+
+    it.each([
+      ["a thread's page", "t-1", PAGES],
+      ["an opaque page", null, "*"],
+    ])("pings each load, and covers a frame whose document did not answer with a line and Reload (%s)", (_name, thread, target) => {
+      vi.useFakeTimers();
+      try {
+        const f = watched(thread);
+        f.loads(true);
+        wait(LEFT_WAIT_MS);
+        expect(left()).toBeNull();
+        // A document of another site: nothing answers.
+        f.loads(false);
+        wait(LEFT_WAIT_MS - 1);
+        expect(left()).toBeNull();
+        wait(1);
+        expect(left()?.textContent).toContain("This page went to another site");
+        expect(f.pings).toEqual([
+          { seq: 1, target },
+          { seq: 2, target },
+        ]);
+        const before = f.frame();
+        fireEvent.click(screen.getByTestId("frame-left-reload"));
+        expect(f.frame()).not.toBe(before);
+        expect(left()).toBeNull();
+        expect(f.frame().getAttribute("src")).toContain("/preview/g1/page.html");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each([
+      ["its first document never answered (it did not load)", (f: ReturnType<typeof watched>) => {
+        f.loads(false);
+      }],
+      ["the document answered late, within the wait", (f: ReturnType<typeof watched>) => {
+        f.loads(true);
+        fireEvent.load(f.frame());
+        wait(LEFT_WAIT_MS - 1);
+        f.send({ type: "cf:here", seq: 2 });
+      }],
+      ["the page said it went on to a file at its own origin, which has no script", (f: ReturnType<typeof watched>) => {
+        f.loads(true);
+        f.send({ type: "cf:going" });
+        f.loads(false);
+      }],
+      ["it was the page's going that came after the load", (f: ReturnType<typeof watched>) => {
+        f.loads(true);
+        f.loads(false);
+        f.send({ type: "cf:going" });
+      }],
+    ])("is not covered when %s", (_name, steps) => {
+      vi.useFakeTimers();
+      try {
+        const f = watched("t-1");
+        steps(f);
+        wait(LEFT_WAIT_MS);
+        expect(left()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("takes no answer to an older ping, nor one from another window or origin, and a going excuses one load only", () => {
+      vi.useFakeTimers();
+      try {
+        const f = watched("t-1");
+        f.loads(true);
+        f.send({ type: "cf:going" });
+        f.loads(false);
+        wait(LEFT_WAIT_MS);
+        expect(left()).toBeNull();
+        fireEvent.load(f.frame());
+        f.send({ type: "cf:here", seq: 2 });
+        f.send({ type: "cf:here", seq: 3 }, { source: window });
+        f.send({ type: "cf:here", seq: 3 }, { origin: "http://example.com" });
+        wait(LEFT_WAIT_MS);
+        expect(left()).not.toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it("asks for a thread's page painted in the theme (cf-page=1) and any other page as written", () => {

@@ -41,7 +41,7 @@ export function pageOpenUrl(data: unknown): string | null {
 }
 
 /** What a frame cannot do for a page (internal/preview/frame.js). */
-export type PageUnsupported = "alert" | "confirm" | "prompt" | "download";
+export type PageUnsupported = "alert" | "confirm" | "prompt" | "download" | "form" | "navigation";
 
 const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: string }>> = {
   alert: { call: "alert()", message: "alert() shows nothing in a page here: show the message in the page itself" },
@@ -50,6 +50,14 @@ const UNSUPPORTED: Readonly<Record<PageUnsupported, { call: string; message: str
   download: {
     call: "download",
     message: 'a download saves nothing in a page here: in the click\'s handler, save the file into the thread\'s checkout with cf.run("file.export", { path, text }) (base64 for bytes) and show the path it answers',
+  },
+  form: {
+    call: "form",
+    message: "a form sent to another site goes nowhere from a page here (a GET opens in the browser only from the user's press): send it with cf.fetch in the submit handler and call preventDefault",
+  },
+  navigation: {
+    call: "location",
+    message: "a page here cannot send its frame to another site, which could not sign in: link to it, and the user's click opens it in the browser",
   },
 };
 
@@ -62,6 +70,20 @@ export function pageUnsupported(data: unknown): { call: string; message: string 
   const m = data as { type?: unknown; what?: unknown };
   if (m.type !== "cf:unsupported" || typeof m.what !== "string" || !Object.hasOwn(UNSUPPORTED, m.what)) return null;
   return UNSUPPORTED[m.what as PageUnsupported];
+}
+
+/** What a document's frame script says of it (internal/preview/frame.js). */
+export type PageFrameNote = { note: "here"; seq: number } | { note: "going" };
+
+/**
+ * `cf:here` (its answer to the frame's `cf:ping` of that seq) or `cf:going` (it goes on to a
+ * document at its own origin); null for any other message.
+ */
+export function pageFrameNote(data: unknown): PageFrameNote | null {
+  if (typeof data !== "object" || data === null) return null;
+  const m = data as { type?: unknown; seq?: unknown };
+  if (m.type === "cf:going") return { note: "going" };
+  return m.type === "cf:here" && typeof m.seq === "number" ? { note: "here", seq: m.seq } : null;
 }
 
 /** A page's answer to `cf:theme`, `{ type: "cf:theme:ack" }`: it applied the theme itself, so its frame need not reload. */

@@ -102,6 +102,17 @@ test("a page's Export button saves into its thread's checkout once the user allo
   await expect(dialog.getByTestId("confirm-ok")).toBeEnabled();
   await dialog.getByTestId("confirm-ok").click();
   await expect(doc(page).locator("#export-out")).toHaveText(`Saved to ${CF}/rows.csv`);
+  // The app shows where it went too (its actions: src/stores/pageSaved.test.ts).
+  const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Saved rows.csv" });
+  await expect(toast).toBeVisible();
+  if (shots) {
+    for (const scheme of ["dark", "light"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${shots}/page-saved-toast-${scheme}.png` });
+    }
+    await page.emulateMedia({ colorScheme: null });
+  }
   const saved = (await (await fetch(`${mockUrl}/__mock/fs/text?path=${encodeURIComponent(`${CF}/rows.csv`)}`)).json()) as { text: string | null };
   expect(saved.text).toBe("id,name\ns-r1,Fix stale PR badge\n");
   expect((await invocations()).filter((i) => i.name === "file.export").map((i) => i.confirmed)).toEqual([false, true]);
