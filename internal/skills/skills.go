@@ -103,6 +103,7 @@ var references = []reference{
 	}},
 	{Plugin + "/reference/cli.md", pluginCLIReference},
 	{Plugin + "/reference/host-commands.md", hostCommandsReference},
+	{Plugin + "/reference/host-commands-thread-view.md", hostThreadViewCommandsReference},
 }
 
 func init() { references = append(references, exampleReferences()...) }

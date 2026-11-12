@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -86,11 +87,15 @@ func canStartShell(c Context) bool {
 const notInProject = "is not inside a registered project"
 
 // RegisterTerminal registers terminal.new, terminal.list, terminal.close, terminal.kill,
-// and terminal.remove.
+// terminal.remove, and the shell window's terminal.new-free, terminal.reset and
+// terminal.rerun (commands_terminal_shell.go).
 func RegisterTerminal(r *Registry, d TerminalDeps) error {
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextTerminal, ID: TerminalID, Description: "Terminal id" + IDHelp}
 	r.SetIDLister(TerminalID, terminalIDs(d.Terminal))
-	return r.RegisterAll(
+	// quick serializes finding and starting a thread's quick terminal (terminal.new
+	// --quick, terminal.reset of one), so a thread never gets two.
+	quick := &sync.Mutex{}
+	return r.RegisterAll(append([]Command{
 		Command{
 			Name:  "terminal.new",
 			Page:  PageState,
@@ -98,7 +103,8 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Description: "Start a shell (or argv) that belongs to the active thread, else to the active worktree, " +
 				"else to the registered worktree containing --cwd (from the CLI: the working directory). " +
 				"It starts in --cwd, else in the CLI's working directory when that chose the owner, else in the thread's or worktree's directory. " +
-				"With --run, a command line is typed into it once it has printed its prompt (the shell stays open).",
+				"With --run, a command line is typed into it once it has printed its prompt (the shell stays open). " +
+				"With --quick it is the thread's quick terminal: a thread has one, and when it is running that one is returned instead.",
 			Category:    "Terminal",
 			Keybindings: []string{"cmd+t"},
 			Args: []ArgSpec{
@@ -108,6 +114,8 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 					"the shell stays open after it. A multi-line value is pasted whole where the shell supports bracketed paste, else typed line by line"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread, worktree or --cwd, " +
 					"the registered worktree containing it owns the shell, which starts there (CLI default: the working directory)"},
+				{Name: "quick", Type: Bool, Description: "The thread's quick terminal (needs a thread): one per thread; " +
+					"when it is running it is returned, and --run types into it"},
 			},
 			When: canStartShell,
 			WhyUnavailable: func(Context) string {
@@ -125,19 +133,47 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if err != nil {
 					return Result{}, err
 				}
+				if a.Bool("quick") {
+					if c.ActiveThreadID == "" {
+						return Result{}, InvalidArg("quick", "the quick terminal belongs to a thread: run it with a thread (--context-thread)")
+					}
+					quick.Lock()
+					defer quick.Unlock()
+					running, err := quickTerminal(ctx, d.Terminal, c.ActiveThreadID)
+					if err != nil {
+						return Result{}, err
+					}
+					if running != nil {
+						msg := "thread " + c.ActiveThreadID + "'s quick terminal is " + running.GetId()
+						if run != "" {
+							if err := typeRun(ctx, d, running.GetId(), run); err != nil {
+								return Result{}, err
+							}
+							msg += "; ran the command in it"
+						}
+						return Result{Message: msg, JSON: running}, nil
+					}
+				}
 				owner, err := shellOwner(ctx, d.Project, d.Thread, c, a.Path("cwd"), a.Path("here"),
 					"terminal.new needs a thread, a worktree, or --cwd inside a registered project")
 				if err != nil {
 					return Result{}, err
 				}
+				labels := termlabel.Shell(owner.thread, owner.project, owner.worktree)
+				if a.Bool("quick") {
+					labels = termlabel.QuickShell(owner.thread, owner.project, owner.worktree)
+				}
 				res, err := d.Terminal.Create(ctx, connect.NewRequest(&v1.CreateTerminalRequest{
-					Argv: argv, Cwd: owner.cwd, Labels: termlabel.Shell(owner.thread, owner.project, owner.worktree),
+					Argv: argv, Cwd: owner.cwd, Labels: labels,
 				}))
 				if err != nil {
 					return Result{}, err
 				}
 				t := res.Msg.GetTerminal()
 				msg := "created terminal " + t.GetId()
+				if a.Bool("quick") {
+					msg = "created thread " + owner.thread + "'s quick terminal " + t.GetId()
+				}
 				if run != "" {
 					if err := typeRun(ctx, d, t.GetId(), run); err != nil {
 						return Result{}, err
@@ -152,7 +188,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			NoPalette:    true,
 			ReadOnly:     true,
 			Title:        "List Terminals",
-			Description:  "List every terminal with its state, working directory and labels (who it belongs to).",
+			Description:  "List every terminal with its state, working directory now, what runs in it, and labels (who it belongs to).",
 			Category:     "Terminal",
 			NoKeybinding: true,
 			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
@@ -162,9 +198,10 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				}
 				var sb strings.Builder
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
-				_, _ = fmt.Fprintln(tw, "ID\tSTATE\tCWD\tLABELS")
+				_, _ = fmt.Fprintln(tw, "ID\tSTATE\tCWD\tRUNNING\tLABELS")
 				for _, t := range res.Msg.GetTerminals() {
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.GetId(), terminalState(t), t.GetCwd(), formatLabels(t.GetLabels()))
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", t.GetId(), terminalState(t), cmp.Or(t.GetLiveCwd(), t.GetCwd()),
+						cmp.Or(t.GetForeground(), "-"), formatLabels(t.GetLabels()))
 				}
 				_ = tw.Flush()
 				return Result{Message: strings.TrimRight(sb.String(), "\n"), JSON: res.Msg}, nil
@@ -232,7 +269,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				return Result{Message: "removed terminal " + id}, nil
 			},
 		},
-	)
+	}, shellWindowTerminalCommands(d, idArg, quick)...)...)
 }
 
 // runInput is terminal.new --run's value as the text to enter: CRLF becomes LF and

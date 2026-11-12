@@ -32,7 +32,7 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 | Debug the wire: lifecycle, process, errors, timeouts, crashes | `protocol.md` |
 | Write tests, drive it against the daemon | `testing.md` |
 | Release, runners, the registry | `publishing.md` |
-| Look up a CLI flag, or a host command it may run | `cli.md`, `host-commands.md` |
+| Look up a CLI flag, or a host command it may run | `cli.md`, `host-commands.md` (threads, views: `host-commands-thread-view.md`) |
 
 `example/` is the plugin to copy. `go doc github.com/alexwaumann/code-foundry/pluginsdk`
 (`/ui`, `/plugintest`) has every type. For a working use of any component, `code-foundry

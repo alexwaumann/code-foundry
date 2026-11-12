@@ -34,7 +34,8 @@ res, err := h.Invoke(ctx, "thread.send", map[string]string{"text": "The deploy f
 
 - The command must match a glob in `permissions.commands`; `plugin.<verb>` management
   commands never do. The list of commands and their positional args:
-  `reference/host-commands.md`; every flag of one: `code-foundry help <command>`.
+  `reference/host-commands.md` (thread and view ones: `host-commands-thread-view.md`); every
+  flag of one: `code-foundry help <command>`.
 - `args` are the command's arg names (its flags) as strings; booleans "true"/"false".
   The context (`UiContext{ThreadID, ProjectID, WorktreePath, TerminalID, WorkspaceID}`)
   is what "the active thread" etc. means to the command: pass the thread the user is

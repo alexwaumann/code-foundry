@@ -21,7 +21,7 @@ var pageRuns = []string{
 	"project.add-workspace", "project.branch.delete", "project.clone", "project.delete", "project.git.init",
 	"project.github.publish", "project.worktree.cleanup", "project.worktree.new",
 	"project.worktree.remove", "skill.disable", "skill.enable", "skill.install", "skill.remove",
-	"skill.setup", "skill.uninstall", "skill.update", "thread.setup.retry", "workspace.open.editor",
+	"skill.setup", "skill.uninstall", "skill.update", "terminal.rerun", "thread.setup.retry", "workspace.open.editor",
 	"worktree.open.editor",
 }
 
@@ -52,8 +52,8 @@ var pageState = []string{
 	"search.find", "search.forget", "search.open", "search.open-hit", "search.promote",
 	"search.report", "search.seen", "search.stop", "settings.reset", "settings.reveal",
 	"settings.set", "skill.browse", "skill.refresh", "terminal.close", "terminal.find",
-	"terminal.find.next", "terminal.find.previous", "terminal.kill", "terminal.new",
-	"terminal.remove", "theme.delete", "theme.duplicate", "theme.edit", "theme.pick", "theme.reset",
+	"terminal.find.next", "terminal.find.previous", "terminal.kill", "terminal.new", "terminal.new-free",
+	"terminal.remove", "terminal.reset", "theme.delete", "theme.duplicate", "theme.edit", "theme.pick", "theme.reset",
 	"theme.restore", "theme.save", "theme.set-dark", "theme.set-light", "theme.set-scheme",
 	"thread.agent.open", "thread.agent.up", "thread.archive", "thread.budget", "thread.find",
 	"thread.find.next", "thread.find.previous", "thread.flag.clear", "thread.focus", "thread.fork",
@@ -72,8 +72,9 @@ var pageState = []string{
 
 // pageAskFlags are the flags that make a pageState verb ask a page.
 var pageAskFlags = map[string][]string{
-	"project.add":  {"path"},
-	"terminal.new": {"argv", "run"},
+	"project.add":       {"path"},
+	"terminal.new":      {"argv", "run"},
+	"terminal.new-free": {"argv", "run"},
 }
 
 func TestEveryCommandHasAPageClass(t *testing.T) {

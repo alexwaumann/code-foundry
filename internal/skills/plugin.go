@@ -322,7 +322,12 @@ string in `+"`view.viewJson`"+` (decode it twice, or use the text output).
 	}
 }
 
-// hostCommandsReference renders every command a plugin may ask the host to run.
+// hostSplitCategories are the categories host-commands-thread-view.md lists, apart from
+// host-commands.md: one file of every command outgrew its read budget.
+var hostSplitCategories = []string{"Thread", "View"}
+
+// hostCommandsReference renders every command a plugin may ask the host to run, apart
+// from hostSplitCategories' (hostThreadViewCommandsReference).
 func hostCommandsReference(w io.Writer, src Sources) {
 	header(w, "Commands a plugin may run (host/invoke, command buttons)", "commands", src)
 	fmt.Fprint(w, `
@@ -333,11 +338,30 @@ Args travel as strings by name: the flag names `+"`code-foundry help <command>`"
 "false"). Commands shown with `+"`--yes`"+` ask the user first: Invoke fails with -32003 and InvokeAsk hands
 the question to the GUI. A plugin's own commands (`+"`plugin.<name>.<command>`"+`) need no permission in its
 own views.
+
+The thread and view commands (`+"`thread.*`, `view.*`"+` and others in those categories) are in
+`+"`host-commands-thread-view.md`"+`.
 `)
+	writeHostCommands(w, src, func(cat string) bool { return !slices.Contains(hostSplitCategories, cat) })
+}
+
+// hostThreadViewCommandsReference renders the commands of hostSplitCategories a plugin
+// may ask the host to run.
+func hostThreadViewCommandsReference(w io.Writer, src Sources) {
+	header(w, "Thread and view commands a plugin may run", "commands", src)
+	fmt.Fprint(w, `
+The rest, and how a plugin may run them (permissions, args, `+"`--yes`"+`): `+"`host-commands.md`"+`.
+`)
+	writeHostCommands(w, src, func(cat string) bool { return slices.Contains(hostSplitCategories, cat) })
+}
+
+// writeHostCommands lists the commands outside the plugin namespace whose category keep
+// takes, by category.
+func writeHostCommands(w io.Writer, src Sources, keep func(cat string) bool) {
 	var cmds []*v1.Command
 	cats := map[string]bool{}
 	for _, c := range src.Commands {
-		if !strings.HasPrefix(c.GetName(), "plugin.") {
+		if !strings.HasPrefix(c.GetName(), "plugin.") && keep(c.GetCategory()) {
 			cmds = append(cmds, c)
 			cats[c.GetCategory()] = true
 		}
