@@ -38,6 +38,10 @@ interface Entry {
 /** What the verbs need of the world. */
 export interface LayoutVerbsWorld {
   readonly layout: MockLayout;
+  /** The user's own threads that are not archived (space.remove moves or archives those in the space). */
+  userThreads?(): string[];
+  /** Archives a thread (space.remove --archive). */
+  archiveThread?(id: string): void;
   /** Whether a thread exists. */
   hasThread(id: string): boolean;
   /** A thread's project and worktree ("" without one): its own diff's checkout (view.thread-diff). */
@@ -91,6 +95,14 @@ function resolveTab(st: State, given: string | undefined): { sp: Space; pane: No
   const tab = (pane.tabs ?? []).find((t) => t.id === pane.active) ?? pane.tabs?.[0];
   if (!tab) refuse("failed precondition: the pane has no tab", "unavailable");
   return { sp, pane, tab };
+}
+
+/** A space by id, unique id suffix or name (any case), as internal/command's SpaceID. */
+function resolveSpace(st: State, given: string): Space {
+  const hit = st.spaces.filter((s) => s.id === given || s.id.endsWith(given) || s.name.toLowerCase() === given.toLowerCase());
+  const one = hit.length === 1 ? hit[0] : hit.find((s) => s.id === given);
+  if (!one) refuse(`invalid argument: no space "${given}"`);
+  return one;
 }
 
 const DIRS: { name: Direction; title: string; words: string }[] = [
@@ -373,6 +385,60 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         const sp = a.index ? st.spaces[Number(a.index) - 1] : st.spaces.find((s) => s.id === a.space || s.name.toLowerCase() === (a.space ?? "").toLowerCase());
         if (!sp) refuse(`invalid argument: no space "${a.space ?? a.index ?? ""}"`);
         return run({ op: "switch_space", space: sp.id }, () => `switched to space ${sp.id}`);
+      },
+    },
+    {
+      cmd: { name: "space.rename", title: "Rename Space", category: CATEGORY, description: "Rename a space (default: the current one).", keybindings: [], args: [str("name", "The new name", { required: true, positional: true }), str("space", "The space to rename")] },
+      when: always,
+      run: (_c, a) => {
+        const sp = a.space ? resolveSpace(L.state(), a.space) : currentSpace(L.state());
+        return run({ op: "rename_space", space: sp.id, name: a.name ?? "" }, () => `space ${sp.id} is "${a.name ?? ""}"`);
+      },
+    },
+    {
+      cmd: { name: "space.move", title: "Move Space", category: CATEGORY, description: "Move a space to another place in the top bar (--index, from 1).", keybindings: [], noPalette: true, args: [str("space", "The space", { required: true, positional: true }), { name: "index", type: ArgType.INT, required: true, description: "Its new place, from 1" }] },
+      when: always,
+      run: (_c, a) => {
+        const st = L.state();
+        const sp = resolveSpace(st, a.space ?? "");
+        const i = Number(a.index);
+        if (!(i >= 1 && i <= st.spaces.length)) refuse(`invalid argument: index ${a.index ?? ""}: there are ${String(st.spaces.length)} spaces`);
+        const order = st.spaces.map((s) => s.id).filter((id) => id !== sp.id);
+        order.splice(i - 1, 0, sp.id);
+        return run({ op: "reorder_spaces", order }, () => `space ${sp.id} is now ${String(i)} of ${String(order.length)}`);
+      },
+    },
+    {
+      cmd: {
+        name: "space.remove",
+        title: "Remove Space",
+        category: CATEGORY,
+        description: "Remove a space: its tabs and panes close, and its threads move to another space (--to) or are archived (--archive). The last space cannot be removed.",
+        keybindings: [],
+        args: [str("space", "The space", { positional: true }), str("to", "The space its threads move to"), { name: "archive", type: ArgType.BOOL, required: false, description: "Archive its threads instead" }],
+      },
+      when: always,
+      run: (_c, a) => {
+        const st = L.state();
+        const sp = a.space ? resolveSpace(st, a.space) : currentSpace(st);
+        if (st.spaces.length < 2) refuse(`failed precondition: space ${sp.id} is the last space`, "unavailable");
+        const archive = a.archive === "true";
+        const to = archive ? "" : a.to ? resolveSpace(st, a.to).id : "";
+        if (archive) {
+          const ids = (world.userThreads?.() ?? []).filter((id) => (st.threads?.[id]?.space ?? st.default_space) === sp.id);
+          for (const id of ids) world.archiveThread?.(id);
+        }
+        return run({ op: "remove_space", space: sp.id, ...(to ? { to } : {}) }, () => `removed space ${sp.id} "${sp.name}"`);
+      },
+    },
+    {
+      cmd: { name: "thread.space.move", title: "Move Thread to Space", category: CATEGORY, description: "Move a thread to another space, with its linked tabs there.", keybindings: [], args: [str("id", "The thread (default: the active one)", { positional: true }), str("space", "The space", { required: true })] },
+      when: always,
+      run: (c, a) => {
+        const thread = a.id || c?.activeThreadId || "";
+        if (!thread) refuse("invalid argument: name a thread");
+        const sp = resolveSpace(L.state(), a.space ?? "");
+        return run({ op: "move_thread", thread, space: sp.id }, () => `thread ${thread} is in space ${sp.id} "${sp.name}"`);
       },
     },
     {
