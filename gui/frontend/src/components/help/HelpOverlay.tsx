@@ -22,20 +22,14 @@ import { guideMarkdown, guideToc } from "./guide";
 const extraChords: LocalChord[] = [
   { chord: "f2", title: "Rename the selected thread" },
   { chord: "escape", title: "Close the palette, dialog, or settings" },
+  { chord: "escape", title: "Leave full screen" },
   { chord: "arrowup", title: "Move in the sidebar and lists" },
   { chord: "arrowdown", title: "Move in the sidebar and lists" },
   { chord: "enter", title: "Open the highlighted row" },
   { chord: "arrowleft", title: "Fold or unfold a sidebar row" },
   { chord: "arrowright", title: "Fold or unfold a sidebar row" },
-  { chord: "cmd+enter", title: "Pull request rows: open on GitHub (Enter opens them in the side panel)" },
-  { chord: "cmd+w", title: "Side panel: close the active tab (hides an empty panel)" },
-  { chord: "escape", title: "Side panel, surface list after +: back to the tab" },
-  { chord: "cmd+w", title: "Side panel, surface list after +: back to the tab" },
-  { chord: "alt+arrowleft", title: "Side panel, focused tab: move it left or right" },
-  { chord: "alt+arrowright", title: "Side panel, focused tab: move it left or right" },
-  { chord: "cmd+shift+c", title: "Side panel, pull request: copy its link" },
-  { chord: "cmd+alt+\\", title: "Side panel, split: focus the other tab group" },
-  { chord: "cmd+w", title: "Bottom panel: close the active terminal (hides an empty panel)" },
+  { chord: "cmd+enter", title: "Pull request rows: open on GitHub (Enter opens them in a tab)" },
+  { chord: "cmd+shift+c", title: "Pull request tab: copy its link" },
 ];
 
 function Keys({ keys }: { keys: string[] }) {

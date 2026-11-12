@@ -126,13 +126,13 @@ export const NO_KEYBINDING = new Set([
   "search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.seen", "search.stop",
   "pane.focus", "pane.move", "pane.resize",
   "settings.get", "settings.path", "settings.reset", "settings.set", "skill.browse", "terminal.list",
-  "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "space.move", "space.rename", "space.switch", "tab.focus", "tab.move", "tab.rename", "terminal.cycle", "terminal.quick",
+  "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "space.move", "space.rename", "space.switch", "tab.focus", "tab.move",
   "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
   "thread.agent.open", "thread.agents", "thread.open", "thread.space.move", "thread.checkouts", "thread.commands", "thread.flag.clear", "thread.focus", "thread.items", "thread.list", "thread.mcp",
   "thread.move.open", "thread.new-like", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop",
   "thread.stop-waiting", "thread.unsubscribe", "thread.wait",
   "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show",
-  "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url", "view.panel.gallery", "view.panel.page", "view.thread-diff", "workspace.list",
+  "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url", "view.panel.gallery", "view.panel.page", "workspace.list",
 ]);
 
 /** A category's keybindings section id ("Pull Request" -> "pull-request"). */
@@ -327,7 +327,8 @@ const staticFields: FieldInit[] = [
 
 const reserved = new Set([
   "cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
-  "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+w", "cmd+shift+c", "cmd+alt+\\", "cmd+q",
+  "cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
+  "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+shift+c", "cmd+q",
   "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 ]);
 

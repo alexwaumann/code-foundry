@@ -105,11 +105,12 @@ function resolveSpace(st: State, given: string): Space {
   return one;
 }
 
-const DIRS: { name: Direction; title: string; words: string }[] = [
-  { name: "left", title: "Left", words: "left of" },
-  { name: "down", title: "Down", words: "below" },
-  { name: "up", title: "Up", words: "above" },
-  { name: "right", title: "Right", words: "right of" },
+// key: ctrl+cmd+<letter> and ctrl+cmd+<arrow> focus that way; with shift they move the pane (internal/command commands_pane.go).
+const DIRS: { name: Direction; title: string; words: string; letter: string; arrow: string }[] = [
+  { name: "left", title: "Left", words: "left of", letter: "h", arrow: "arrowleft" },
+  { name: "down", title: "Down", words: "below", letter: "j", arrow: "arrowdown" },
+  { name: "up", title: "Up", words: "above", letter: "k", arrow: "arrowup" },
+  { name: "right", title: "Right", words: "right of", letter: "l", arrow: "arrowright" },
 ];
 
 /** The verbs as the world registers them (a result with JSON is a promise there). */
@@ -183,11 +184,10 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       // internal/command commands_view_open.go threadDiffCommand: the thread's diff, focused; from that diff, the thread.
       cmd: {
         name: "view.thread-diff",
-        title: "Thread Diff",
+        title: "Toggle Thread Diff",
         category: "View",
         description: "Go to the focused thread's diff, opening it beside the thread when it is not open; from that diff, go back to the thread.",
-        keybindings: [],
-        noPalette: true,
+        keybindings: ["cmd+shift+d"],
         args: [str("tab", "The tab to start from (default: the focused tab)"), focusArg],
       },
       when: always,
@@ -237,7 +237,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       },
     },
     {
-      cmd: { name: "tab.close", title: "Close Tab", category: CATEGORY, description: "Close a tab (default: the focused tab); the focus returns to what had it before. A thread's tab closes the thread from its space.", keybindings: [], args: [str("tab", "The tab (default: the focused one)", { positional: true })] },
+      cmd: { name: "tab.close", title: "Close Tab", category: CATEGORY, description: "Close a tab (default: the focused tab); the focus returns to what had it before. A thread's tab closes the thread from its space.", keybindings: ["cmd+w"], args: [str("tab", "The tab (default: the focused one)", { positional: true })] },
       when: always,
       run: (_c, a) => {
         const { tab } = resolveTab(L.state(), a.tab);
@@ -245,10 +245,10 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       },
     },
     ...([
-      ["tab.next", "Next Tab", 1],
-      ["tab.previous", "Previous Tab", -1],
-    ] as const).map(([name, title, step]): Entry => ({
-      cmd: { name, title, category: CATEGORY, description: `Focus the ${step > 0 ? "next" : "previous"} tab in the pane (default: the focused pane), going round the strip.`, keybindings: [], args: [str("pane", "The pane (default: the focused one)"), focusArg] },
+      ["tab.next", "Next Tab", 1, "cmd+shift+]"],
+      ["tab.previous", "Previous Tab", -1, "cmd+shift+["],
+    ] as const).map(([name, title, step, chord]): Entry => ({
+      cmd: { name, title, category: CATEGORY, description: `Focus the ${step > 0 ? "next" : "previous"} tab in the pane (default: the focused pane), going round the strip.`, keybindings: [chord], args: [str("pane", "The pane (default: the focused one)"), focusArg] },
       when: always,
       run: (_c, a) => {
         const { pane } = resolvePane(L.state(), a.pane);
@@ -267,14 +267,14 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         return run({ op: "focus_pane", pane: pane.id }, () => `focused pane ${pane.id}`);
       },
     },
-    ...DIRS.flatMap(({ name, title, words }): Entry[] => [
+    ...DIRS.flatMap(({ name, title, words, letter, arrow }): Entry[] => [
       {
         cmd: {
           name: `pane.focus.${name}`,
           title: `Focus Pane ${title}`,
           category: CATEGORY,
           description: `Give the focus to the pane ${words} the focused pane (of several, the one focused last).`,
-          keybindings: [],
+          keybindings: [`cmd+ctrl+${letter}`, `cmd+ctrl+${arrow}`],
           args: [str("pane", "The pane to look from (default: the focused one)"), str("to", "The neighbour, when the caller has resolved it"), focusArg],
         },
         when: always,
@@ -286,7 +286,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         },
       },
       {
-        cmd: { name: `pane.move.${name}`, title: `Move Pane ${title}`, category: CATEGORY, description: `Swap the focused pane with the pane ${words} it: each takes the other's place and size.`, keybindings: [], args: [str("pane", "The pane to move from (default: the focused one)"), str("to", "The neighbour, when the caller has resolved it")] },
+        cmd: { name: `pane.move.${name}`, title: `Move Pane ${title}`, category: CATEGORY, description: `Swap the focused pane with the pane ${words} it: each takes the other's place and size.`, keybindings: [`cmd+ctrl+shift+${letter}`, `cmd+ctrl+shift+${arrow}`], args: [str("pane", "The pane to move from (default: the focused one)"), str("to", "The neighbour, when the caller has resolved it")] },
         when: always,
         run: (_c, a) => {
           const { sp, pane } = resolvePane(L.state(), a.pane);
@@ -356,7 +356,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       },
     },
     {
-      cmd: { name: "pane.close", title: "Close Pane", category: CATEGORY, description: "Close a pane and its tabs (default: the focused pane). Each thread in it closes as thread.close closes it.", keybindings: [], args: [str("pane", "The pane (default: the focused one)", { positional: true })] },
+      cmd: { name: "pane.close", title: "Close Pane", category: CATEGORY, description: "Close a pane and its tabs (default: the focused pane). Each thread in it closes as thread.close closes it.", keybindings: ["cmd+shift+w"], args: [str("pane", "The pane (default: the focused one)", { positional: true })] },
       when: always,
       run: (_c, a) => {
         const { pane } = resolvePane(L.state(), a.pane);

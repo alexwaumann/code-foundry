@@ -6,7 +6,7 @@
  * - `mode`: the shell flag is on (shell/flag.ts) and this window waits for the daemon's layout,
  *   draws the shell, or fell back to the classic window (an older daemon sent no layout).
  * - `frame`: the pane grid as last drawn (rectangles in layout px): the direction keys find
- *   neighbours on it (shell/keys.ts), as the spec says they do on the rendered frame.
+ *   neighbours on it (shell/keyPresenters.ts), as the spec says they do on the rendered frame.
  * - `focusRequest`: asks a pane to take the keyboard into its active tab (a key or a command
  *   moved the focus; a click puts the keyboard where it clicked by itself).
  * - `fullscreen`: the space full screen was turned on in ("" off). The pane it shows is always

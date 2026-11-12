@@ -35,8 +35,9 @@ import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, showBottomIfUnplaced, toggleBottomFromHere } from "@/stores/bottomActions";
 import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView } from "@/stores/views";
-import { shellKeyFor } from "@/shell/keys";
+import { presentShellCommand, SHELL_PRESENTERS } from "@/shell/keyPresenters";
 import { presentFullscreen } from "@/shell/fullscreen";
+import { switchSpaceAt } from "@/shell/spaceActions";
 import { shellDrawn } from "@/stores/shellView";
 import { openNextNeedsPopup } from "@/stores/needs";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
@@ -121,6 +122,14 @@ export const viewActions: readonly ViewAction[] = [
     title: `Jump to thread ${String(i + 1)}`,
     run: () => {
       jumpTo(i + 1);
+    },
+  })),
+  // space.switch --index n: a chord cannot carry an argument (internal/command chord.go ReservedChords).
+  ...Array.from({ length: 9 }, (_, i) => ({
+    chord: `cmd+ctrl+${String(i + 1)}`,
+    title: `Switch to space ${String(i + 1)}`,
+    run: () => {
+      if (shellDrawn()) switchSpaceAt(i + 1);
     },
   })),
   { chord: "cmd+=", title: "Zoom in", run: () => { zoom(1); } },
@@ -578,8 +587,34 @@ function presentInterrupt(): boolean {
   return true;
 }
 
+/**
+ * The key table's commands in the classic window (`?shell=0`, until it is removed): it has no
+ * panes, so most do nothing there. cmd+r renames the selected thread and cmd+j toggles the
+ * bottom panel, as before; terminal.new, view.back, view.forward, view.thread-info and
+ * pane.fullscreen have presenters of their own (commandPresenters).
+ */
+const classicPresenters: Readonly<Record<string, () => boolean>> = {
+  "tab.rename": () => beginRename(),
+  "terminal.quick": () => {
+    toggleBottomFromHere();
+    return true;
+  },
+};
+
+/** Whether this window presents the command itself in the shell (a presenter here or in shell/keyPresenters.ts). */
+export function hasShellPresenter(name: string): boolean {
+  return name in SHELL_PRESENTERS || name in commandPresenters;
+}
+
 /** Runs the command's presenter, if it has one; false means "invoke it normally". */
 export function presentCommand(name: string, args?: Readonly<Record<string, string>>): boolean {
+  // The window shell's key table (shell/keyPresenters.ts).
+  if (shellDrawn()) {
+    const shell = presentShellCommand(name, args);
+    if (shell !== undefined) return shell;
+  } else if (name in SHELL_PRESENTERS && !(name in commandPresenters)) {
+    return classicPresenters[name]?.() ?? true;
+  }
   return commandPresenters[name]?.(args) ?? presentPluginShow(name);
 }
 
@@ -637,9 +672,8 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
- *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
- *     (cmd+1..9 belong to the project picker while it is open). Then, while the window shell
- *     draws the window, its interim key table (shell/keys.ts), outside dialogs.
+ *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, ctrl+cmd+1..9,
+ *     zoom) always win (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
  *     editor consumes everything else, except cmd chords bound to commands (see
  *     terminalYields); the editor keeps its own (see codeEditorChords). In a terminal its
@@ -667,14 +701,6 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
-  // The window shell's keys (shell/keys.ts) come before the registry's bindings, outside dialogs.
-  const shellKey = shellDrawn() && !target?.closest('[role="dialog"], [role="alertdialog"]') ? shellKeyFor(chord) : undefined;
-  if (shellKey) {
-    e.preventDefault();
-    e.stopPropagation();
-    shellKey.run();
-    return;
-  }
   const shell = Boolean(target?.closest("[data-terminal-host]"));
   const code = inCodeEditor(e, target);
   const inFile = useUiStore.getState().palette.open ? undefined : fileCommand(e, target, code, chord);

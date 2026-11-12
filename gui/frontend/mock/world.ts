@@ -4211,8 +4211,7 @@ export class World {
           title: "New Terminal in Home Folder",
           category: "Terminal",
           description: "Start a shell in the home folder, owned by nothing.",
-          noPalette: true,
-          keybindings: [],
+          keybindings: ["cmd+shift+t"],
           args: [TERMINAL_PANE_ARG],
         },
         when: always,
@@ -4304,7 +4303,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the thread's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
+        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the thread's name", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
@@ -5265,12 +5264,12 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: ["cmd+shift+e"], args: panelThreadArgs },
+        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: [], args: panelThreadArgs },
         when: always,
         run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.toggle", args),
       },
       {
-        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: ["cmd+j"], args: [] },
+        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
       },
@@ -5281,7 +5280,7 @@ export class World {
       },
       {
         // internal/command pane.fullscreen: window state, a ShowView the shell window presents.
-        cmd: { name: "pane.fullscreen", title: "Toggle Full Screen Pane", category: "View", description: "Show one pane over the whole pane area of the window, the top bar and the sidebar staying, or every pane again. Window state: the stored layout does not change. Default: the focused pane, toggled.", keybindings: [], args: [] },
+        cmd: { name: "pane.fullscreen", title: "Toggle Full Screen Pane", category: "View", description: "Show one pane over the whole pane area of the window, the top bar and the sidebar staying, or every pane again. Window state: the stored layout does not change. Default: the focused pane, toggled.", keybindings: ["cmd+shift+enter"], args: [] },
         when: always,
         run: (_ctx, args) => {
           const mode = args.off === "true" ? "off" : args.on === "true" ? "on" : "toggle";
@@ -5356,27 +5355,27 @@ export class World {
         run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.new-tab", args),
       },
       {
-        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: ["cmd+\\"], args: panelThreadArgs },
+        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: [], args: panelThreadArgs },
         when: always,
         run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.split", args),
       },
       {
-        cmd: { name: "view.back", title: "Back", category: "View", description: "Return to the previously selected thread or page.", keybindings: ["cmd+["], args: [] },
+        cmd: { name: "view.back", title: "Back", category: "View", description: "Go back to what was focused before: a tab, a pane, a space.", keybindings: ["cmd+["], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "back" } } }))}`,
       },
       {
-        cmd: { name: "view.forward", title: "Forward", category: "View", description: "Go to the thread or page selected before going back.", keybindings: ["cmd+]"], args: [] },
+        cmd: { name: "view.forward", title: "Forward", category: "View", description: "Go forward again to what was focused before going back.", keybindings: ["cmd+]"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "forward" } } }))}`,
       },
       {
-        cmd: { name: "thread.previous", title: "Previous Thread", category: "View", description: "Select the thread above the current one in the sidebar.", keybindings: ["cmd+shift+["], args: [] },
+        cmd: { name: "thread.previous", title: "Previous Thread", category: "View", description: "Select the thread above the current one in the sidebar.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.previous" } } }))}`,
       },
       {
-        cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: ["cmd+shift+]"], args: [] },
+        cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.next" } } }))}`,
       },
