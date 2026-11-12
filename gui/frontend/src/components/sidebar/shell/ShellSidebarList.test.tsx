@@ -13,7 +13,7 @@ vi.mock("@tanstack/react-virtual", () => ({
       items.push({ index: i, key: o.getItemKey(i), start: at, size, end: at + size });
       at += size + (o.gap ?? 0);
     }
-    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, measureElement: () => undefined, scrollToIndex: () => undefined };
+    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, measureElement: () => undefined, scrollToIndex: () => undefined, scrollToOffset: () => undefined };
   },
 }));
 vi.mock("@/stores/ember", async (orig) => ({ ...(await orig<typeof import("@/stores/ember")>()), holdEmberBoard: () => () => undefined }));

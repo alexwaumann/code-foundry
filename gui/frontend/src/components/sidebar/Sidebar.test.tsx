@@ -14,7 +14,7 @@ vi.mock("@tanstack/react-virtual", () => ({
       items.push({ index: i, key: o.getItemKey(i), start: at, size, end: at + size });
       at += size + (o.gap ?? 0);
     }
-    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, scrollToIndex: () => undefined };
+    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, scrollToIndex: () => undefined, scrollToOffset: () => undefined };
   },
 }));
 // The board stream and the viewer's dashboard are the stores'; nothing here reads them.
