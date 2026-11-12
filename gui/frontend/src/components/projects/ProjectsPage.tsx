@@ -1,7 +1,7 @@
 import { Folders } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { targetOf } from "@/shell/host";
-import { isProjectsView, useUiStore } from "@/stores/ui";
+import { isProjectsView, projectPage, PROJECTS_INDEX, useUiStore, workspacePage } from "@/stores/ui";
 import { ProjectPage } from "./ProjectPage";
 import { ProjectsIndex } from "./ProjectsIndex";
 import { WorkspacePage } from "./WorkspacePage";
@@ -15,7 +15,15 @@ import { WorkspacePage } from "./WorkspacePage";
 export function ProjectsPage() {
   const projectId = useUiStore((s) => (isProjectsView(s.selection) ? (s.selection.projectId ?? "") : ""));
   const workspaceId = useUiStore((s) => (isProjectsView(s.selection) ? (s.selection.workspaceId ?? "") : ""));
-  const pageKey = useUiStore((s) => targetOf(s.selection) ?? "view:projects");
+  return <ProjectsPageAt projectId={projectId} workspaceId={workspaceId} />;
+}
+
+/**
+ * One of the Projects pages by its location rather than the selection: the window shell's
+ * Projects tab says which page it shows in its params (shell/surfaces/pages.tsx).
+ */
+export function ProjectsPageAt({ projectId, workspaceId }: { projectId: string; workspaceId: string }) {
+  const pageKey = targetOf(projectId ? projectPage(projectId) : workspaceId ? workspacePage(workspaceId) : PROJECTS_INDEX) ?? "view:projects";
   if (projectId) return <ProjectPage key={pageKey} projectId={projectId} pageKey={pageKey} />;
   if (workspaceId) return <WorkspacePage key={pageKey} workspaceId={workspaceId} pageKey={pageKey} />;
   return <ProjectsIndex key={pageKey} pageKey={pageKey} />;

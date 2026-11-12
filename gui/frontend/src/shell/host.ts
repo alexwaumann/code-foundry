@@ -1,9 +1,10 @@
 /**
  * The host seam: how a surface (a file, a diff, a pull request, MCP, a plugin's view, Ember's
  * board) and the code around it reach the tabs it lives in, without knowing what draws them.
- * Today every operation delegates to the classic side panel (stores/panel.ts); the shell
- * (docs/notes/shell-model.md) will switch this file to the daemon's layout and leave its
- * callers alone. Only the side panel's own code (components/panel, the bottom panel, the
+ * With the classic window every operation delegates to the side panel (stores/panel.ts); while
+ * the window shell draws the window (docs/notes/shell-model.md, the shell flag) each goes to the
+ * daemon's layout instead (shell/hostShell.ts, docs/notes/shell-11-pane-grid.md), and the callers
+ * stay as they are. Only the side panel's own code (components/panel, the bottom panel, the
  * panel's commands) imports stores/panel.ts; host.guard.test.ts keeps it that way.
  * See docs/notes/shell-8-host-seam.md.
  *
@@ -35,11 +36,25 @@ import {
   type Tab,
 } from "@/stores/panel";
 import type { Selection } from "@/stores/ui";
+import { useLayoutStore } from "@/stores/layout";
+import { shellDrawn, useShellViewStore } from "@/stores/shellView";
+import {
+  findShellTab,
+  shellActivateTab,
+  shellOpenTab,
+  shellPlace,
+  shellPlaces,
+  shellReplaceTab,
+  shellRetitleTab,
+  shellSetTabParams,
+  threadOfShellTarget,
+} from "./hostShell";
+import { seamTab } from "./kinds";
 
 export type { SurfaceKind, Tab };
 export { makeTab, pullRequestTabId, tabId };
 
-/** Where tabs go: "current", `thread:<id>`, or a key from targetOf. */
+/** Where tabs go: "current", `thread:<id>`, a key from targetOf, or in the shell `pane:<id>`. */
 export type TabTarget = string;
 
 /** One group of a place's tabs (a group of the split side panel): the group a surface's own picker opens into. */
@@ -57,7 +72,7 @@ export function threadTarget(threadId: string): TabTarget {
 
 /** The thread a target's tabs belong to ("current" resolved); "" for any other target. */
 export function threadOfTarget(target: TabTarget): string {
-  return panelThreadId(target);
+  return shellDrawn() ? threadOfShellTarget(target) : panelThreadId(target);
 }
 
 /** The target of what the window shows (a string, so the selector is cheap and stable). */
@@ -129,11 +144,15 @@ function placesOf(byKey: Readonly<Record<string, PanelEntry>>): TabPlaces {
 
 /** A target's tabs now (default: what the window shows); an empty, hidden place when it has none. */
 export function tabPlace(target: TabTarget = "current"): TabPlace {
-  return placeOf(getPanel(target));
+  return shellDrawn() ? shellPlace(useLayoutStore.getState(), target) : placeOf(getPanel(target));
 }
 
 /** A target's tab with this id, if it holds one. */
 export function findTab(target: TabTarget, id: string): Tab | undefined {
+  if (shellDrawn()) {
+    const t = findShellTab(useLayoutStore.getState(), target, id);
+    return t ? seamTab(t) : undefined;
+  }
   return tabPlace(target).tabs.find((t) => t.id === id);
 }
 
@@ -154,7 +173,10 @@ export function groupOfTab(place: TabPlace, id: string): number | null {
  * (useCurrentTarget), not "current"; null selects from an empty place.
  */
 export function useTabPlace<T>(target: TabTarget | null, select: (place: TabPlace) => T): T {
-  return usePanelStore((s) => select(placeOf(target === null ? undefined : s.byKey[target])));
+  const shell = useShellViewStore((s) => s.mode === "shell");
+  const classic = usePanelStore((s) => (shell ? null : select(placeOf(target === null ? undefined : s.byKey[target]))));
+  const inShell = useLayoutStore((s) => (shell ? select(target === null ? placeOf(undefined) : shellPlace(s, target)) : null));
+  return (shell ? inShell : classic) as T;
 }
 
 /**
@@ -162,13 +184,29 @@ export function useTabPlace<T>(target: TabTarget | null, select: (place: TabPlac
  * with every place now and before. Returns the unsubscribe.
  */
 export function subscribeTabs(listener: (now: TabPlaces, prev: TabPlaces) => void): () => void {
-  return usePanelStore.subscribe((s, prev) => {
-    if (s.byKey !== prev.byKey) listener(placesOf(s.byKey), placesOf(prev.byKey));
+  const a = usePanelStore.subscribe((s, prev) => {
+    if (!shellDrawn() && s.byKey !== prev.byKey) listener(placesOf(s.byKey), placesOf(prev.byKey));
   });
+  const b = useLayoutStore.subscribe((s, prev) => {
+    if (shellDrawn() && (s.tabs !== prev.tabs || s.panes !== prev.panes || s.trees !== prev.trees || s.spaces !== prev.spaces)) listener(shellPlaces(s), shellPlaces(prev));
+  });
+  return () => {
+    a();
+    b();
+  };
 }
 
 /** For a SurfaceSpec's `watches`: notified whenever any tabs change. */
-export const tabChanges = { subscribe: (listener: () => void): (() => void) => usePanelStore.subscribe(listener) };
+export const tabChanges = {
+  subscribe: (listener: () => void): (() => void) => {
+    const a = usePanelStore.subscribe(listener);
+    const b = useLayoutStore.subscribe(listener);
+    return () => {
+      a();
+      b();
+    };
+  },
+};
 
 /**
  * Opens a tab, or activates the one with its id where it is (its title and params refreshed),
@@ -178,17 +216,20 @@ export const tabChanges = { subscribe: (listener: () => void): (() => void) => u
  * target (nothing selected).
  */
 export function openTab(target: TabTarget, tab: Tab, opts: { group?: TabGroup; behind?: boolean } = {}): boolean {
+  if (shellDrawn()) return shellOpenTab(target, tab, opts);
   return openSurface(target, tab, opts);
 }
 
 /** Activates a tab where it is, focusing its group; an unknown id changes nothing. */
 export function activateTab(target: TabTarget, id: string): void {
-  activatePanelTab(target, id);
+  if (shellDrawn()) shellActivateTab(target, id);
+  else activatePanelTab(target, id);
 }
 
 /** Renames a tab; an unknown id, an empty or the same title changes nothing. */
 export function retitleTab(target: TabTarget, id: string, title: string): void {
-  retitlePanelTab(target, id, title);
+  if (shellDrawn()) shellRetitleTab(target, id, title);
+  else retitlePanelTab(target, id, title);
 }
 
 /**
@@ -196,6 +237,10 @@ export function retitleTab(target: TabTarget, id: string, title: string): void {
  * activates, opens or takes focus. An unknown id or the same params change nothing.
  */
 export function setTabParams(target: TabTarget, id: string, params: Tab["params"] | ((old: Tab["params"]) => Tab["params"])): void {
+  if (shellDrawn()) {
+    shellSetTabParams(target, id, params);
+    return;
+  }
   if (typeof params !== "function") {
     setPanelTabParams(target, id, params);
     return;
@@ -206,7 +251,8 @@ export function setTabParams(target: TabTarget, id: string, params: Tab["params"
 
 /** Puts `tab` where tab `id` is, active if that one was (a tab that became another file); if `tab` is already open, `id` just closes. */
 export function replaceTab(target: TabTarget, id: string, tab: Tab): void {
-  replacePanelTab(target, id, tab);
+  if (shellDrawn()) shellReplaceTab(target, id, tab);
+  else replacePanelTab(target, id, tab);
 }
 
 /**
@@ -214,10 +260,14 @@ export function replaceTab(target: TabTarget, id: string, tab: Tab): void {
  * false. Returns whether they are shown now.
  */
 export function showTabs(target: TabTarget, shown: boolean, opts: { focus?: boolean } = {}): boolean {
+  // In the shell a tab is always in a pane: there is nothing to show or hide.
+  if (shellDrawn()) return shown && tabPlace(target).tabs.length > 0;
   return togglePanel(target, shown, opts);
 }
 
 /** Makes a target's tabs fill the content area (expands the side panel). Returns whether they do. */
 export function expandTabs(target: TabTarget, opts: { focus?: boolean } = {}): boolean {
+  // Full screen (the shell's expand) is PR 19's.
+  if (shellDrawn()) return false;
   return expandPanel(target, true, opts);
 }

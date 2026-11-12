@@ -25,6 +25,7 @@ import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { ProjectTitle } from "./ProjectTitle";
 import { openCursorRowMenu } from "./rowMenu";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 /** A note card at the top of a project page (no remote, no git) with its setup button. */
 function KindNote({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action: React.ReactNode }) {
@@ -121,8 +122,11 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   }, [reveal, navItems, setCursor]);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = usePageScroll(pageKey, widthRef);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
   return (

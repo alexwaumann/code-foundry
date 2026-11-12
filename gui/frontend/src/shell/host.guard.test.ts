@@ -13,6 +13,7 @@ const PANEL = "src/stores/panel.ts";
 /** What may import stores/panel.ts: a folder (ends in "/") or a file, with why. */
 const ALLOWED: Readonly<Record<string, string>> = {
   "src/shell/host.ts": "the seam: its classic half delegates to the store",
+  "src/shell/hostShell.ts": "the seam's shell half: a target is the panel's key (keyOf), a seam id is tabId's",
   "src/components/panel/": "the side panel itself",
   "src/components/bottom/": "the bottom panel: it hides while the side panel is expanded",
   "src/stores/bottomPanel.ts": "the bottom panel's store: its keys are the side panel's",

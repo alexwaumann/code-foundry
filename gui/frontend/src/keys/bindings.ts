@@ -34,6 +34,8 @@ import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
 import { markTerminalNewFromHere, showBottomIfUnplaced, toggleBottomFromHere } from "@/stores/bottomActions";
 import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView } from "@/stores/views";
+import { shellKeyFor } from "@/shell/keys";
+import { shellDrawn } from "@/stores/shellView";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
@@ -620,7 +622,8 @@ function isEditable(el: Element | null): boolean {
 /**
  * Key precedence:
  *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
- *     (cmd+1..9 belong to the project picker while it is open).
+ *     (cmd+1..9 belong to the project picker while it is open). Then, while the window shell
+ *     draws the window, its interim key table (shell/keys.ts), outside dialogs.
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
  *     editor consumes everything else, except cmd chords bound to commands (see
  *     terminalYields); the editor keeps its own (see codeEditorChords). In a terminal its
@@ -648,6 +651,14 @@ export function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
   const target = e.target instanceof Element ? e.target : null;
+  // The window shell's keys (shell/keys.ts) come before the registry's bindings, outside dialogs.
+  const shellKey = shellDrawn() && !target?.closest('[role="dialog"], [role="alertdialog"]') ? shellKeyFor(chord) : undefined;
+  if (shellKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    shellKey.run();
+    return;
+  }
   const shell = Boolean(target?.closest("[data-terminal-host]"));
   const code = inCodeEditor(e, target);
   const inFile = useUiStore.getState().palette.open ? undefined : fileCommand(e, target, code, chord);

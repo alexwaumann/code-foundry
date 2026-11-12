@@ -1422,7 +1422,9 @@ export function layoutRpcError(err: unknown): unknown {
 
 // ---- Seeds ----
 
-const diffTab = (thread: string): Tab => ({ id: `t-diff-${thread}`, kind: "diff", thread, params: { project: "repo-cf", worktree: "/Users/dev/code-foundry" }, title: "Diff" });
+/** The seed threads' checkouts (mock/world.ts), so a seeded Diff tab shows that thread's changes. */
+const SEED_WORKTREES: Readonly<Record<string, string>> = { "s-1": "/Users/dev/src/code-foundry", "s-3": "/Users/dev/src/code-foundry.worktrees/fix-resize" };
+const diffTab = (thread: string): Tab => ({ id: `t-diff-${thread}`, kind: "diff", thread, params: { project: "repo-cf", worktree: SEED_WORKTREES[thread] ?? "/Users/dev/src/code-foundry" }, title: "Diff" });
 
 /**
  * Named layouts for e2e and `make drive`, over the mock world's threads (s-1 ... s-6). "empty"
