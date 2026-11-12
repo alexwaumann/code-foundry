@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -9,19 +9,11 @@ import { cn } from "@/lib/utils";
 import { afterRev } from "@/shell/commands";
 import { useSpaceDropTarget } from "@/shell/drag/state";
 import { moveSpace, renameSpace, switchSpace } from "@/shell/spaceActions";
-import { reorderIndex, spaceAttentionCounts } from "@/shell/spaces";
+import { reorderIndex } from "@/shell/spaces";
 import { useLayoutStore } from "@/stores/layout";
 import { openRemoveSpaceDialog } from "@/stores/removeSpaceDialog";
-import { attentionIds, useThreadsStore } from "@/stores/threads";
+import { useNeedsBySpace } from "@/stores/shellList";
 import { SpaceIcon } from "./SpaceIcon";
-
-/** The user's own threads that need them, in each space, as "space=n" lines (a narrow, primitive selector). */
-function useAttentionBySpace(): Readonly<Record<string, number>> {
-  const ids = useThreadsStore((s) => attentionIds(s).join("\n"));
-  const threads = useLayoutStore((s) => s.threads);
-  const fallback = useLayoutStore((s) => s.defaultSpaceId);
-  return useMemo(() => spaceAttentionCounts(ids ? ids.split("\n") : [], { threads, defaultSpaceId: fallback }), [ids, threads, fallback]);
-}
 
 /** The name field over a tab being renamed: Enter or leaving it renames, Escape keeps the name. */
 function NameField({ spaceId, name, onDone }: { spaceId: string; name: string; onDone: () => void }) {
@@ -179,7 +171,7 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
 export function SpaceTabs({ renaming, onRenaming }: { renaming: string; onRenaming: (id: string) => void }) {
   const stored = useLayoutStore((s) => s.spaceOrder);
   const current = useLayoutStore((s) => s.currentSpaceId);
-  const counts = useAttentionBySpace();
+  const counts = useNeedsBySpace();
   const [moved, setMoved] = useState<readonly string[] | null>(null);
   const order = moved ?? stored;
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));

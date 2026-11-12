@@ -47,12 +47,14 @@ export function contextLine(items: readonly ThreadItemView[], askOrdinal: number
 }
 
 /**
- * The thread whose popup cmd+shift+a opens: the Needs you list's next after `from` (the popup's
- * thread, else the focused one), wrapping; the first when `from` is not in the list. null when
- * the list is empty.
+ * Where cmd+shift+a goes: the Needs you list's next after `from` (the popup's thread, else the
+ * focused one), wrapping; the first when `from` is not in the list. `ember` is Ember's thread
+ * while it waits on the user ("" otherwise, stores/ember.ts emberAttentionId): its row sits above
+ * the list in the sidebar, so it comes first in the round. null when nothing waits.
  */
-export function nextNeedsThread(needs: readonly string[], from: string | null): string | null {
-  return nextAfter(needs, from !== null && needs.includes(from) ? from : null, () => true);
+export function nextNeedsThread(needs: readonly string[], from: string | null, ember = ""): string | null {
+  const round = ember ? [ember, ...needs.filter((id) => id !== ember)] : needs;
+  return nextAfter(round, from !== null && round.includes(from) ? from : null, () => true);
 }
 
 /** The least of a pane's body the conversation keeps beside the full ask and the composer. */

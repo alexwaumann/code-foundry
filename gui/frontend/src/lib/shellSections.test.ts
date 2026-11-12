@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildShellSections, needsList, needsScopeOf, shellRows, shellThreadOrder, type ShellListOptions, type ShellListThread } from "./shellSections";
+import { buildShellSections, needsBySpace, needsList, needsScopeOf, shellRows, shellThreadOrder, type ShellListOptions, type ShellListThread } from "./shellSections";
 
 /**
  * The shell sidebar's sections (docs/notes/shell-model.md, "Sidebar"). Threads come in creation
@@ -149,5 +149,18 @@ describe("the Needs you list (the top bar's control and cmd+shift+a)", () => {
     const ts = [t("mine", { group: "prompt" }), t("child", { group: "prompt", hidden: true }), t("gone", { group: "prompt", archivedAtMs: 1 }), t("later", { group: "prompt", snoozedUntilMs: Date.now() + 60_000 }), t("err", { group: "error" })];
     expect(needsList(ts, OPTS)).toEqual({ ids: ["mine"], any: true });
     expect(needsList([t("child", { group: "prompt", hidden: true })], OPTS)).toEqual({ ids: [], any: false });
+  });
+});
+
+describe("a space tab's count (needsBySpace)", () => {
+  it("is, for each space, the threads Needs you lists for that space: a finished turn counts in neither", () => {
+    const ts = [...WORLD, t("child-b", { group: "prompt", hidden: true, spaceId: "B" }), t("done-b", { group: "done", spaceId: "B", statusChangedAtMs: 40 })];
+    const counts = needsBySpace(ts);
+    expect(counts).toEqual({ A: 1, B: 1 });
+    for (const space of ["A", "B", "C"]) expect(counts[space] ?? 0).toBe(needsList(ts, { currentSpaceId: space, needsScope: "space" }).ids.length);
+  });
+
+  it("has no entry for a space where nothing waits", () => {
+    expect(needsBySpace([t("done-a", { group: "done" }), t("idle-b", { spaceId: "B" })])).toEqual({});
   });
 });

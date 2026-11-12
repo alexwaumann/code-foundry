@@ -89,13 +89,16 @@ beforeEach(async () => {
   resetFocusHistory();
   resetShellDrag();
   useCommandsStore.setState({ commands: [command("view.back", "Back"), command("view.forward", "Forward")] });
-  // s-1 needs the user in Main, s-2 and s-3 in Release; s-4 too but another thread started it; s-5 is archived.
+  // s-1 needs the user in Main, s-2 and s-3 in Release; s-4 too but another thread started it; s-5 is archived;
+  // s-6 in Main finished its turn (Active's, not Needs you's).
+  const ask = { status: "attention", statusReason: "permission: Bash ls" } as const;
   setThreads(
-    thread("s-1", { status: "attention" }),
-    thread("s-2", { status: "attention" }),
-    thread("s-3", { status: "attention" }),
-    thread("s-4", { status: "attention", createdBy: "s-1" }),
-    thread("s-5", { status: "attention", archivedAtMs: 1 }),
+    thread("s-1", ask),
+    thread("s-2", ask),
+    thread("s-3", { status: "attention", statusReason: "question: Which?" }),
+    thread("s-4", { ...ask, createdBy: "s-1" }),
+    thread("s-5", { ...ask, archivedAtMs: 1 }),
+    thread("s-6", { status: "attention", statusReason: "finished" }),
   );
   await seedLayout(LAYOUT);
 });
@@ -123,7 +126,7 @@ describe("the top bar", () => {
     expect(screen.getByTestId("top-bar-new-space")).toBeTruthy();
   });
 
-  it("counts the user's own threads that need them in each space, not a thread's threads nor archived ones", () => {
+  it("counts the threads Needs you lists for each space: not a thread's threads, archived ones nor a finished turn", () => {
     render(<TopBar />);
     expect(within(tabOf("sp-a")).getByTestId("space-tab-count").textContent).toBe("1");
     expect(within(tabOf("sp-b")).getByTestId("space-tab-count").getAttribute("aria-label")).toBe("2 threads need you");
