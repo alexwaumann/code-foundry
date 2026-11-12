@@ -72,20 +72,23 @@ describe("HtmlPreview", () => {
     const win = frame.contentWindow;
     if (!win) throw new Error("no contentWindow");
     const post = vi.spyOn(win, "postMessage").mockImplementation(() => undefined);
+    // The frame also pings each load (HtmlFrame's check that the page is still there).
+    const themes = () => post.mock.calls.filter(([m]) => (m as { type?: string }).type === "cf:theme");
     fireEvent.load(frame);
-    const [msg, target] = post.mock.lastCall ?? [];
+    expect(post.mock.calls.filter(([m]) => (m as { type?: string }).type === "cf:ping")).toEqual([[{ type: "cf:ping", seq: 1 }, "*"]]);
+    const [msg, target] = themes().at(-1) ?? [];
     expect(target).toBe("*");
     expect(msg).toMatchObject({ type: "cf:theme", id: "github-dark", scheme: "dark" });
     expect((msg as { vars: Record<string, string> }).vars["--cf-text"]).toMatch(/^#/);
     act(() => {
       setThemeSlots({ dark: "nord" });
     });
-    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ type: "cf:theme", id: "nord", scheme: "dark" }), "*");
+    expect(themes().at(-1)).toEqual([expect.objectContaining({ type: "cf:theme", id: "nord", scheme: "dark" }), "*"]);
     act(() => {
       setThemePreference("light");
     });
-    expect(post).toHaveBeenLastCalledWith(expect.objectContaining({ type: "cf:theme", id: "github-light", scheme: "light" }), "*");
-    expect(post).toHaveBeenCalledTimes(3);
+    expect(themes().at(-1)).toEqual([expect.objectContaining({ type: "cf:theme", id: "github-light", scheme: "light" }), "*"]);
+    expect(themes()).toHaveLength(3);
   });
 
   it("gives the frame the app's color-scheme, which WebKit hands the page as prefers-color-scheme", async () => {
