@@ -78,6 +78,23 @@ cmd+shift+r work. With the flag off nothing changes.
   would list three verbs whose result it does not draw. They go into the palette with the
   cutover (PR 20), when the chords move into `Command.Keybindings` too.
 
+## With PR 14's drags (rebased onto it)
+
+- **One element, two sets of props.** A tab whose surface has `tabMenu` is wrapped in a Radix
+  context menu trigger (`asChild`), and the same element is dnd-kit's draggable. `ShellTabBox`
+  sets both refs and calls both handlers for an event they share (`mergeHandlers`: the trigger's,
+  then the drag's). A terminal tab drags like any tab, active or not.
+- **What does not drag.** A right press opens the menu: dnd-kit's pointer sensor starts only on the
+  primary button. The name field takes no drag: the strip drops the drag listeners while the tab is
+  renamed, and the field stops its pointer down.
+- **Rename… from the menu starts once the menu has closed** (`renameAfterMenuCloses`, then
+  `takeRenameAfterMenu` in the menu's `onCloseAutoFocus`). Started at once, the field mounted inside
+  the menu's focus trap and lost the keyboard; the WebKit spec caught it, jsdom did not.
+- **The drag shield over a terminal**: `shell-drag.spec.ts` drags a tab across a terminal tab's
+  xterm to that pane's edge; the preview follows, the drop lands, and the terminal keeps its stream
+  and never takes the keyboard. Another case drags an inactive terminal tab into another strip and
+  checks that a moved right press and a drag inside the name field start nothing.
+
 ## Visible differences from the sketches (05a, 05b, 05c, 01)
 
 - The hint reads "· thread is in ~/… · Reset" (05c: "thread is now in"), and it sits at the right
@@ -135,9 +152,6 @@ cmd+shift+r work. With the flag off nothing changes.
   when there is nothing to say, shortens its directory first, and Reset is `terminal.reset`.
   `useTerminalCwdHint(terminalId)` is the hook if the row wants its own layout. The pane's "+" menu
   can call `newTerminalTab()` / `newFreeTerminalTab()` from `shell/terminalActions.ts`.
-- **PR 14 (drag)**: `ShellTabOf` now wraps a tab with a context menu trigger when its surface has
-  `tabMenu`; the drag listeners go on the same element (`ShellTabBox`), which spreads the props it
-  is given.
 - **PR 19 (rails, full screen)**: a folded pane mounts no body, so its quick terminal detaches too.
 - **PR 20 (cutover)**: drop `NoPalette` from `terminal.quick`, `terminal.cycle` and
   `terminal.new-free`; the six chords move into `Command.Keybindings` (cmd+t and cmd+r are today's
