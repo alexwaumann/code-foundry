@@ -2,7 +2,6 @@ package project
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -17,9 +16,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 )
 
-// One file of a worktree, both sides, for the file viewer's diff (GetWorktreeFileDiff).
-// Computed on every call through the runner; the base and merge base are the detail's
-// (detailBase, mergeBaseOf), so the diff agrees with the detail's file list.
+// Reading one side of a file for a comparison (compare.go): a blob at a commit or the
+// file on disk, and the worktree's current HEAD, base and merge base, which are the
+// detail's (detailBase, mergeBaseOf), so a comparison agrees with the detail's file list.
 
 const (
 	// FileDiffMax caps each side's contents.
@@ -29,26 +28,6 @@ const (
 	blobReadMax = 32 << 20
 )
 
-// DiffScope is what WorktreeFileDiff compares.
-type DiffScope int
-
-const (
-	// DiffWorking compares the merge base with the file on disk.
-	DiffWorking DiffScope = iota
-	// DiffBranch compares the merge base with HEAD.
-	DiffBranch
-)
-
-// FileDiffRequest names one file of a worktree.
-type FileDiffRequest struct {
-	ProjectID string
-	Path      string // the worktree
-	// File is the worktree-relative path of the new side; OldPath, of the old side
-	// (a rename's source), defaults to File.
-	File, OldPath string
-	Scope         DiffScope
-}
-
 // FileVersion is one side of a file diff.
 type FileVersion struct {
 	Present   bool
@@ -56,75 +35,8 @@ type FileVersion struct {
 	Truncated bool
 	Binary    bool
 	// Submodule: a submodule at the path, in a comparison (compare.go); Contents is then
-	// "Subproject commit <sha>\n". WorktreeFileDiff calls it absent.
+	// "Subproject commit <sha>\n".
 	Submodule bool
-}
-
-// WorktreeFileDiff is both sides of one file.
-type WorktreeFileDiff struct {
-	// BaseRef, MergeBase and Head are as in WorktreeDetail (Head resolved now).
-	BaseRef, MergeBase, Head string
-	Old, New                 FileVersion
-	// Status is A, D, M, R, or "" (unchanged or absent on both sides); see diffStatus.
-	Status string
-	// Error says why the scope cannot be compared (DiffBranch without a merge base).
-	Error string
-}
-
-// WorktreeFileDiff implements Store.
-func (g *Git) WorktreeFileDiff(ctx context.Context, req FileDiffRequest) (WorktreeFileDiff, error) {
-	file, err := comparePath(req.File)
-	if err != nil {
-		return WorktreeFileDiff{}, err
-	}
-	oldPath := file
-	if req.OldPath != "" {
-		if oldPath, err = comparePath(req.OldPath); err != nil {
-			return WorktreeFileDiff{}, err
-		}
-	}
-	st, slot, path, err := g.gitWorktree(req.ProjectID, req.Path)
-	if err != nil {
-		return WorktreeFileDiff{}, err
-	}
-	run := func(args ...string) ([]byte, error) { return g.runner.Run(ctx, path, args...) }
-	b, err := g.currentBase(ctx, st, slot, req.ProjectID, path, run)
-	if err != nil {
-		return WorktreeFileDiff{}, err
-	}
-	d := WorktreeFileDiff{Head: b.head, BaseRef: b.baseRef, MergeBase: b.mergeBase}
-
-	var oldRev string
-	switch req.Scope {
-	case DiffBranch:
-		switch {
-		case d.Head == "":
-			d.Error = "the branch has no commits yet"
-		case d.BaseRef == "":
-			d.Error = "the worktree has no base branch to compare with"
-		case d.MergeBase == "":
-			d.Error = fmt.Sprintf("HEAD has no merge base with %s", d.BaseRef)
-		}
-		if d.Error != "" {
-			return d, nil
-		}
-		oldRev = d.MergeBase
-		if d.New, err = g.readBlob(ctx, path, d.Head, file); err != nil {
-			return WorktreeFileDiff{}, err
-		}
-	default:
-		oldRev = cmp.Or(d.MergeBase, d.Head) // no base: the detail lists changes against HEAD
-		if d.New, err = readWorktreeFile(path, file); err != nil {
-			return WorktreeFileDiff{}, err
-		}
-	}
-	if oldRev != "" { // an unborn branch's old side is the empty tree
-		if d.Old, err = g.readBlob(ctx, path, oldRev, oldPath); err != nil {
-			return WorktreeFileDiff{}, err
-		}
-	}
-	d.Status = diffStatus(d.Old, d.New, oldPath != file)
-	return d, nil
 }
 
 // gitWorktree finds the git worktree at path, symlinks resolved: its project, its slot
@@ -208,21 +120,6 @@ func worktreeRelative(p string) (string, error) {
 		return "", fmt.Errorf("%w: file %q must be a path inside the worktree", ErrInvalidArgument, p)
 	}
 	return filepath.ToSlash(c), nil
-}
-
-// readBlob reads file at rev: `ls-tree` for its type and size (exit 0 with no output
-// when the path is not there), then `cat-file blob`. A tree or submodule at the path
-// is not present.
-func (g *Git) readBlob(ctx context.Context, dir, rev, file string) (FileVersion, error) {
-	out, err := g.runner.Run(ctx, dir, "--literal-pathspecs", "ls-tree", "-z", "--long", "--full-tree", rev, "--", file)
-	if err != nil {
-		return FileVersion{}, err
-	}
-	e, ok := parseLsTree(out, file)
-	if !ok || e.kind != "blob" {
-		return FileVersion{}, nil
-	}
-	return g.readObject(ctx, dir, e.oid, e.size)
 }
 
 // readObject reads a blob of the given size, up to FileDiffMax of it.

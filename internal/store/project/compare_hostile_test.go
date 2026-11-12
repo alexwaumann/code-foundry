@@ -58,7 +58,7 @@ func link(t *testing.T, target, name string) {
 }
 
 // TestCompareRefusesLinksIntoGit: .git is refused where a path leads, not only as it is
-// written, and by both RPCs. os.Root follows these, since they stay inside the checkout.
+// written, on either side of CompareFile. os.Root follows these, since they stay inside the checkout.
 // A linked worktree's .git is a file with nothing under it, and is refused all the same.
 func TestCompareRefusesLinksIntoGit(t *testing.T) {
 	const token = "TOKEN123"
@@ -93,16 +93,6 @@ func TestCompareRefusesLinksIntoGit(t *testing.T) {
 						t.Errorf("CompareFile %s gave the token", file)
 					}
 				}
-				d, err := f.h.store.WorktreeFileDiff(ctx, FileDiffRequest{ProjectID: f.id, Path: f.path, File: file})
-				if !errors.Is(err, ErrInvalidArgument) {
-					t.Errorf("WorktreeFileDiff %s: err = %v, %+v", file, err, d)
-				}
-			}
-			if _, err := f.h.store.WorktreeFileDiff(ctx, FileDiffRequest{ProjectID: f.id, Path: f.path, File: "keep.txt", OldPath: ".git/config"}); !errors.Is(err, ErrInvalidArgument) {
-				t.Errorf("WorktreeFileDiff old path: err = %v", err)
-			}
-			if _, err := f.h.store.WorktreeFileDiff(ctx, FileDiffRequest{ProjectID: f.id, Path: f.path, File: ".git/config", Scope: DiffBranch}); !errors.Is(err, ErrInvalidArgument) {
-				t.Errorf("WorktreeFileDiff, no side on disk: err = %v", err)
 			}
 		})
 	}

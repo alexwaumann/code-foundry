@@ -145,3 +145,7 @@ func (h *Project) GetCompareCommit(ctx context.Context, req *connect.Request[v1.
 	}
 	return connect.NewResponse(&v1.GetCompareCommitResponse{Body: c.Body, Error: c.Error}), nil
 }
+
+func fileVersionToProto(v project.FileVersion) *v1.FileVersion {
+	return &v1.FileVersion{Present: v.Present, Contents: v.Contents, Truncated: v.Truncated, Binary: v.Binary, Submodule: v.Submodule}
+}

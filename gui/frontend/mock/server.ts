@@ -117,7 +117,7 @@
  *                                                 none; reset restores DEFAULT_FILES; several
  *                                                 projects: project=a&path=x&project=b&path=y)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
- *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeFileDiff: mock/files.ts (code-foundry's README.md,
+ *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeCompareFile: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, docs/; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
  *   POST /__mock/compare/commits?count=800[&subject=N]   (that many more commits on every comparison's list, older than the rest;
@@ -400,7 +400,6 @@ function routes(router: ConnectRouter): void {
       if (!detail) throw new ConnectError(`worktree ${req.path} not found`, Code.NotFound);
       return { detail };
     },
-    getWorktreeFileDiff: (req) => mockFiles.fileDiff(req.path, req.file, req.oldPath, req.scope),
     compareWorktree: (req) => mockFiles.compare(req.path, req.base, req.head),
     getWorktreeCompareFile: (req) => mockFiles.compareFile(req.path, req.base, req.head, req.file, req.oldPath),
     listCompareCommits: (req) => mockFiles.compareCommits(req.path),
