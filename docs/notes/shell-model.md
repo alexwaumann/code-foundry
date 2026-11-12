@@ -1,0 +1,173 @@
+# The shell: spaces, panes and linked surfaces
+
+The agreed model for the window shell that replaces the main pane, the side panel and the bottom
+panel. It was settled over six throwaway prototypes and two rounds of in-app sketches. This file is
+the specification the build works from: a change to behaviour changes this file first.
+
+The work lands on the `shell` branch as a series of pull requests and reaches `main` in one merge,
+when the first working version is whole. Nothing partial is released.
+
+## Words
+
+- **Space**: a named layout with its own thread list. The top bar switches between spaces.
+- **Pane**: one tile of a space. It has a tab strip.
+- **Tab**: one surface in a pane.
+- **Surface**: what a tab shows: a thread, a diff, a file, a pull request, a terminal, the Pull
+  Requests page, the Projects page, and later a plugin's.
+- **Linked surface**: a surface that belongs to a thread (its diff, its files, its pull requests,
+  its terminal tabs).
+
+## Structure
+
+- **Top bar**, always visible, laid out on its own (no alignment to the sidebar): app name, sidebar
+  toggle, back and forward, then the space tabs, then "+". A space tab shows a small icon drawn from
+  that space's real pane layout, its name, and a count when threads in it need the user.
+- **A space** owns a pane layout and a thread list. A thread lives in exactly one space. Archived
+  threads are shared by all spaces.
+- **Panes** tile the whole content area: no operation leaves a gap. The layout is one tree of
+  proportions; resizing the window only scales it, and there are no per-display snapshots.
+- **Any surface can be a tab in any pane.** Tabs drag to reorder, to another strip, or to a pane's
+  edge to split. A whole pane drags by its strip: onto an edge, onto another strip to merge, onto the
+  outer edge of the grid, or onto a space tab. Any tab is draggable, active or not.
+- **The tab is the title.** The active tab shows its full name; others may shorten. A tooltip shows
+  only a name that is cut off. Tabs go icon-only when the strip is tight. What a surface repeats in
+  its own body is decided per surface; do not stack a second title band under the strip by default.
+- **Pull Requests and Projects are surfaces**, not sidebar rows. One of each per space.
+- **A pane's "+"** opens a menu of surfaces, built with the app's existing dropdown and submenu
+  components. With a thread tab active it has a submenu for that thread's surfaces, then the general
+  ones (new thread, terminal, Pull Requests, Projects). Without a thread it has only the general
+  ones. The choice always opens in that pane, except that a linked surface which is already open is
+  focused where it is.
+- **Small windows.** When the panes cannot all keep their minimum size, panes fold to narrow rails
+  that show their tabs' icons and mark the selected one. Panes without a thread tab fold first, least
+  recently focused first; the pane of the focused thread never folds. Rails unfold when there is room.
+  The stored layout does not change.
+- **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus
+  and move keys do nothing while it is on. When the tab is a linked surface, the thread's own composer
+  floats over it: collapsed to a pill, expanded on demand, with the thread's chip centred above it as
+  the drag handle. It always opens at the same spot; a drag lasts until full screen ends; the draft is
+  kept per thread.
+
+## Linked surfaces
+
+- A linked surface is an ordinary tab. Its title is its own name. A quiet row under the strip names
+  its thread ("Diff of ● thread") and is the link back; a hover on the tab names the thread too. Names
+  are always looked up from the thread id.
+- **Identity.** Each surface type says what makes two of its tabs the same, and opening one that is
+  already open focuses it: a diff is one per thread and checkout (a workspace thread has one per
+  repository), a pull request tab one per pull request, a file tab one per path. "New terminal" always
+  makes a new tab. The quick terminal is one per thread.
+- **Live and dormant.** The link is by thread id and never needs repair. It is live while the thread
+  is open in the same space: smart swap, closing with the thread, and restoring apply. Otherwise it is
+  dormant: the row still names the thread and takes you to it. A linked tab may be dragged to another
+  space by itself and waits there.
+- **Placement** of a linked surface opened by a key, a menu or the palette, in order:
+  1. It is already open in this space: focus it.
+  2. A pane holds this thread's linked tabs: add a tab there.
+  3. A pane next to the thread's pane holds linked surfaces (any thread): add a tab there. Sides in
+     order: right, left, below, above.
+  4. Any pane in the space holds linked surfaces: add a tab there.
+  5. There is room: a new pane to the right of the thread's pane (a split of that pane, not of its
+     column), at the surface type's default size.
+  6. Otherwise: a tab in the thread's own pane.
+  In 3 and 4, a pane that already holds a linked tab of this thread wins, then the nearest. A pane
+  that is joined is never resized. "Room" means the conversation keeps at least 480px of width.
+- **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
+  surface of the same type switches to this thread's, if that one is already open in that pane.
+  Nothing is opened, moved or closed. On by default; a user setting.
+- **Closing a thread** (its tab) closes the linked tabs in its space and remembers which were open and
+  where. Opening it again restores them: into their old panes when the thread is back in the pane it
+  was in, otherwise placed fresh beside it. Terminals closed this way keep running. No settings.
+- **A thread whose tab is not open** can still have its surfaces opened from its sidebar menu
+  (Open ▸ …); they go to the focused pane. For an open thread the same menu follows the placement
+  rules. Plugins will add thread actions to this menu.
+- **Moving a thread** to another space takes the linked tabs that are in its space. Archiving closes
+  its linked tabs everywhere and ends its terminals. Snoozing closes them, ends its terminals and
+  keeps the set, so the terminals come back as fresh shells in the same places.
+- **The thread's header** in a pane holds the branch chip, the thread info toggle and one three-dot
+  menu with submenus (Open, Move to space, rename, snooze, archive, close). Thread info toggles a
+  card when the pane is wide and opens as a temporary overlay when it is narrow.
+
+## Terminals
+
+- **Quick terminal.** One per thread, inside the thread's pane under the conversation and composer.
+  It pushes the content up while the composer and part of the conversation still fit, and overlays the
+  bottom of the pane when they do not. Its header shows its directory; when that differs from the
+  thread's, a quiet hint offers Reset, which starts a fresh shell in the thread's directory. It never
+  resets by itself. The hint is right-aligned and the path shortens so Reset is always visible. Linked
+  terminal tabs show the same hint in the row under the strip.
+- **Terminal tabs** are named by what runs in them, with an icon; idle, by shell and folder. A manual
+  name sticks until the automatic name is asked for again.
+- A terminal restored after a snooze shows its idle name and one line with the last command and
+  "Run again". It never reruns by itself.
+
+## Sidebar
+
+- Sections, in order: **Needs you**, **Active**, then **Working**, **Snoozed** and **Archived** at
+  the bottom as today. A click on a thread always adds a tab (or focuses it when it is open).
+- **Thread row.** Line 1: project on the left, status or time on the right; on hover the snooze and
+  archive controls take that slot. Then the title at full width, up to two lines. Then the branch,
+  with the pull request tag and the counts right-aligned. A thread with no project has no third line
+  unless it has a tag or counts.
+- **Needs you** lists the user's own threads that wait on them (never threads started by threads),
+  from every space, and such a thread is not also listed under Active. One toggle button switches
+  between all spaces and this space; the choice is global. A row is the project and the kind of ask,
+  then the same title. It has no buttons.
+  - Hovering a row shows a card with the whole ask. A permission has Allow, Deny and "Go to thread".
+    A question is never answered in the card: it offers the popup and the thread. The card can be
+    entered with the pointer, grows with its content up to a maximum, and then scrolls.
+  - Clicking the title opens the popup: recent messages, the ask with today's card (its own field for
+    a deny reason), and "Go to thread". It dismisses the hover card until the row is hovered again.
+  - With the sidebar collapsed, a control with the count appears in the top bar and opens the same
+    list as a popover.
+- **In a pane**, a thread that needs the user marks its tab icon with the attention dot, in a strip
+  and in a rail. When the pane is too short for the full ask, the ask shows as a one-line strip above
+  the composer with the same hover card and popup.
+
+## Keys
+
+| Key | Does |
+| --- | --- |
+| cmd+n | New thread |
+| cmd+t | New terminal tab linked to the current thread |
+| cmd+shift+t | New terminal tab linked to nothing, in the home directory |
+| cmd+j | Quick terminal of the thread: open and focus, focus when open, close when focused. From a linked surface: go to its thread and open it |
+| cmd+shift+j | Ring: the thread, each of its terminal tabs, the thread. From a view it starts at the first terminal |
+| cmd+shift+d | The thread's diff; again from the diff, back to the thread |
+| cmd+shift+i | Thread info |
+| cmd+p | Find a file; it opens as a tab |
+| cmd+k | Palette, which opens every surface |
+| cmd+w | Close the focused tab (a thread is closed from the space, never archived); focus returns to what had it before |
+| cmd+shift+w | Close the focused pane |
+| cmd+[ / cmd+] | Back and forward through what was focused, across panes and spaces |
+| cmd+shift+[ / cmd+shift+] | Previous and next tab in the pane |
+| ctrl+cmd+h j k l, ctrl+cmd+arrows | Focus the pane to the left, below, above, right; with shift, move the pane |
+| ctrl+cmd+1…9 | Switch to that space |
+| cmd+1…9 | Jump to that thread of the list, as today |
+| cmd+shift+enter | Full screen the pane; escape leaves |
+| cmd+shift+a | The popup of the next thread that needs the user |
+| cmd+r | Rename the focused tab, where it can be renamed |
+| cmd+shift+r | Automatic name: a thread's is generated again, a terminal goes back to its automatic name |
+| cmd+b | Sidebar |
+
+Retired: cmd+shift+e (side panel), cmd+\ and cmd+alt+\ (panel split and its other group), the
+bindings for Show Pull Requests and Show Projects (the palette and "+" open them), and the old
+meaning of cmd+shift+[ and ] (previous and next thread).
+
+## State
+
+Spaces, pane trees, tabs and each thread's remembered set live in the daemon, so the CLI and a
+thread's model can read and change a layout. Every user action is a command.
+
+## First load for an existing user
+
+One space. Only the thread last viewed opens, with its side panel tabs and terminals placed by the
+rules. Every other thread stays closed in the sidebar with its old panel tabs and terminals stored as
+its remembered set. Running terminals keep running: a thread's first bottom terminal becomes its
+quick terminal and the others become linked terminal tabs.
+
+## Not in this change
+
+Thread colours, drawers inside a thread pane, panes that follow focus, replacing a tab on a sidebar
+click, a file browser surface, content search across files, and the surface contract for plugins
+beyond the identity rule above.
