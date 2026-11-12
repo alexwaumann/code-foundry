@@ -5,7 +5,7 @@
  *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
  * Serves Health, Terminal, Project, Filesystem, Gh, Command, Settings, Ui, Thread, Action, GitOps, Update,
- * Plugin, Skill, Memory, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
+ * Plugin, Skill, Memory, Ember, Dictation, Search, Layout and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
@@ -34,6 +34,10 @@
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent, explicit as thread.focus)
+ *   GET  /__mock/layout                           ({rev, state, viewport, applied, seeds}: the layout as internal/layout's
+ *        JSON, the last SetViewport, every Apply as an op and client id; mock/layout.ts)
+ *   POST /__mock/layout?seed=empty|one-thread|thread-and-diff|grid|spaces   (that layout as one commit; or
+ *        the body's state, internal/layout's JSON, for any other tree)
  *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
  *     command emits it; answers {"delivered": <watchers>})
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
@@ -233,10 +237,12 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { EmberService } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
 import { SearchService } from "../src/gen/codefoundry/v1/search_pb";
+import { LayoutService } from "../src/gen/codefoundry/v1/layout_pb";
 import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
+import { layoutRpcError, opFromProto, SEEDS, tabMsg, type State as LayoutState } from "./layout";
 import { frameTag, navigated } from "./frame";
 import { insertInHead, mockPaintTag, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
@@ -715,16 +721,37 @@ function routes(router: ConnectRouter): void {
     },
   });
 
+  // The window shell's layout (mock/layout.ts): Go's mechanical ops, simplified thread ops.
+  router.service(LayoutService, {
+    get: () => ({ layout: world.layout.get() }),
+    apply: (req) => {
+      try {
+        const { rev, result } = world.layout.apply(opFromProto(req.op), req.clientId);
+        return { rev: BigInt(rev), spaceId: result.space ?? "", paneId: result.pane ?? "", tabId: result.tab ?? "", existing: result.existing ?? false, closed: (result.closed ?? []).map(tabMsg), rule: result.rule ?? "", draftId: result.draft ?? "" };
+      } catch (err) {
+        throw layoutRpcError(err);
+      }
+    },
+    setViewport: (req) => {
+      try {
+        world.layout.setViewport(req.clientId, req.width, req.height);
+        return {};
+      } catch (err) {
+        throw layoutRpcError(err);
+      }
+    },
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search), then everything published, filtered by `sources`.
+    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH, EventSource.LAYOUT],
       );
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.projects.values()].map((r) => world.projectMsg(r)) } } } } } },
@@ -742,6 +769,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.SKILL, event: { event: { case: "skill", value: world.skills.event() } } },
         { source: EventSource.MEMORY, event: { event: { case: "memory", value: world.memory.event() } } },
         { source: EventSource.SEARCH, event: { event: { case: "search", value: world.searches.activity() } } },
+        { source: EventSource.LAYOUT, event: { event: { case: "layout", value: world.layout.snapshotEvent() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -1029,6 +1057,23 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "GET /__mock/layout":
+      json(res, 200, { rev: world.layout.rev, state: world.layout.state(), viewport: world.layout.viewport, applied: world.layout.applied, seeds: Object.keys(SEEDS) });
+      break;
+    case "POST /__mock/layout": {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        try {
+          const text = Buffer.concat(chunks).toString("utf8").trim();
+          world.layout.seed(text ? (JSON.parse(text) as LayoutState) : (q.get("seed") ?? "empty"));
+          json(res, 200, { rev: world.layout.rev, state: world.layout.state() });
+        } catch (err) {
+          json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      break;
+    }
     case "POST /__mock/emit": {
       const chunks: Buffer[] = [];
       req.on("data", (c: Buffer) => chunks.push(c));

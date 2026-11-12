@@ -38,6 +38,7 @@ import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
+import { MockLayout } from "./layout";
 import { MockMemory } from "./memory";
 import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
@@ -919,6 +920,10 @@ export class World {
     publish: (v) => this.events.publish({ source: EventSource.MEMORY, event: { event: { case: "memory", value: v } } }),
     emit: (i) => this.emit(i),
   });
+  /** The window shell's layout (mock/layout.ts); LayoutService and the EventService layout source. */
+  readonly layout = new MockLayout({
+    publish: (v) => this.events.publish({ source: EventSource.LAYOUT, event: { event: { case: "layout", value: v } } }),
+  });
   /** The user's themes (mock/userThemes.ts); the EventService theme source. */
   readonly themes: MockThemes = new MockThemes({
     publish: (v) => this.events.publish({ source: EventSource.THEME, event: { event: { case: "theme", value: v } } }),
@@ -1019,6 +1024,7 @@ export class World {
     this.skills.reset();
     this.memory.reset();
     this.themes.reset();
+    this.layout.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
