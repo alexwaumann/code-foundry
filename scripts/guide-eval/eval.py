@@ -549,7 +549,7 @@ def main():
     p.add_argument("--tasks", default="", help="comma-separated task ids (default: all)")
     p.add_argument("--jobs", type=int, default=6)
     p.add_argument("--task-timeout", type=int, default=1200, help="seconds per run")
-    p.add_argument("--max-cost", type=float, default=24, help="stop launching runs at this spend, in USD")
+    p.add_argument("--max-cost", type=float, default=26, help="stop launching runs at this spend, in USD")
     p.add_argument("--label", default="eval")
     p.add_argument("--out", type=Path, help="results folder (default: under ~/.cache/code-foundry/guide-eval)")
     args = p.parse_args()
