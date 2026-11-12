@@ -91,7 +91,7 @@ describe("PaneTabStrip", () => {
     ]);
   });
 
-  /** Every tab is 150px by nature; the strip is `width` wide (its padding, gaps and the "+" take 48px of it). */
+  /** Every tab is 150px by nature; the strip is `width` wide (its padding, gaps, the "+" and the full screen button take 80px of it). */
   function stripOf(width: number): void {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
       if (this.getAttribute("data-testid") === "shell-tab-strip") return new DOMRect(0, 0, width, 44);
@@ -101,13 +101,13 @@ describe("PaneTabStrip", () => {
   }
 
   it("fits tabs to the strip: the active tab keeps its whole name, the others shorten", () => {
-    stripOf(468);
+    stripOf(500);
     render(<PaneTabStrip paneId="p-1" focused />);
     expect(tabs().map((t) => t.getAttribute("data-label"))).toEqual(["short", "full", "short", "short"]);
   });
 
   it("tight, tabs go icon-only, the farthest from the active tab first, with no × and the name kept for a screen reader", () => {
-    stripOf(300);
+    stripOf(332);
     render(<PaneTabStrip paneId="p-1" focused />);
     const labels = tabs().map((t) => t.getAttribute("data-label"));
     expect(labels[3]).toBe("icon");

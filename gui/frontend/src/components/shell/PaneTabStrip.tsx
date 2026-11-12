@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type Ref, type SyntheticEvent } from "react";
-import { X } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
@@ -16,6 +16,8 @@ import { takeRenameAfterMenu, useTabRenameStore } from "@/shell/terminalActions"
 import { useThreadName } from "@/shell/useThreadName";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
 import { PanePlusMenu } from "./PanePlusMenu";
+import { Kbd } from "@/components/ui/kbd";
+import { toggleFullscreen } from "@/shell/fullscreen";
 import { TabNameField } from "./TerminalTab";
 
 /** The active tab: full tint in the focused pane, lighter in the others (the side panel's tints). */
@@ -27,9 +29,12 @@ const TAB_GAP = 2;
 const STRIP_PAD = 6;
 /** The "+" button after the last tab (size-7). */
 const PLUS_WIDTH = 28;
+/** The full screen button at the strip's right end (size-7 and its gap); in full screen the exit control is wider. */
+const FULL_WIDTH = 32;
+const EXIT_WIDTH = 150;
 
 /** The attention dot on a tab's icon: its thread needs the user (docs/notes/shell-model.md, "In a pane"). */
-function AttentionDot({ use, tab }: { use: NonNullable<ShellSurface["useAttention"]>; tab: TabEntry }) {
+export function AttentionDot({ use, tab }: { use: NonNullable<ShellSurface["useAttention"]>; tab: TabEntry }) {
   const on = use(tab);
   return on ? <span role="img" aria-label="Needs you" className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-cf-warning ring-1 ring-cf-surface" data-testid="shell-tab-attention" /> : null;
 }
@@ -53,7 +58,7 @@ function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"
 }
 
 /** A tab's icon: its surface's, or one that follows the tab (a terminal's). */
-function TabContentIcon({ tab }: { tab: TabEntry }) {
+export function TabContentIcon({ tab }: { tab: TabEntry }) {
   const surface = shellSurfaceOf(tab.kind);
   const TabIcon = surface.TabIcon;
   const Icon = surface.icon;
@@ -81,7 +86,7 @@ function ShellTab({ tabId, active, paneFocused, fit, focusable }: { tabId: strin
  * A linked tab's hover names its thread (the name is nowhere else in the strip): "Diff of
  * <thread>", after the tab's own name when that is cut short or hidden.
  */
-function LinkedTip({ tab, tabName, cut }: { tab: TabEntry; tabName: string; cut: boolean }) {
+export function LinkedTip({ tab, tabName, cut }: { tab: TabEntry; tabName: string; cut: boolean }) {
   const thread = useThreadName(tab.thread);
   const phrase = `${shellSurfaceOf(tab.kind).linkedNoun ?? tab.kind} of ${thread}`;
   return cut ? (
@@ -220,6 +225,44 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
   );
 }
 
+/**
+ * The strip's right end: full screen for this pane, or, while it is full screen, a labelled exit
+ * with its key (Escape) so leaving is never a guess.
+ */
+function FullscreenButton({ paneId, on }: { paneId: string; on: boolean }) {
+  if (on) {
+    return (
+      <button
+        type="button"
+        data-testid="shell-fullscreen-exit"
+        className="ml-auto flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-md px-2 text-body-sm text-cf-text-muted outline-none hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus [--wails-draggable:no-drag]"
+        onClick={() => {
+          toggleFullscreen(paneId);
+        }}
+      >
+        <Minimize2 className="size-3.5" aria-hidden />
+        Exit full screen
+        <Kbd size="sm">esc</Kbd>
+      </button>
+    );
+  }
+  return (
+    <Tip label="Full screen">
+      <button
+        type="button"
+        aria-label="Full screen"
+        data-testid="shell-fullscreen"
+        className="ml-auto flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus [--wails-draggable:no-drag]"
+        onClick={() => {
+          toggleFullscreen(paneId);
+        }}
+      >
+        <Maximize2 className="size-3.5" aria-hidden />
+      </button>
+    </Tip>
+  );
+}
+
 /** A tab at its natural width, for measuring: the same content and padding, never shortened. */
 function MeasureTab({ tabId }: { tabId: string }) {
   const tab = useTab(tabId);
@@ -253,9 +296,9 @@ function onStripKeyDown(e: KeyboardEvent<HTMLElement>): void {
  * under the strip by default. Any tab drags, and the strip's free space drags the whole pane
  * (components/shell/ShellDnd.tsx), so it no longer drags the window (the top bar does). The "+" after
  * the last tab opens the pane's menu of surfaces (PanePlusMenu) and is not part of the pane's grip.
- * Full screen (PR 19) comes later.
+ * The right end shows the pane full screen; in full screen it is the exit control (Escape too).
  */
-export function PaneTabStrip({ paneId, focused }: { paneId: string; focused: boolean }) {
+export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: string; focused: boolean; fullscreen?: boolean }) {
   const pane = usePane(paneId);
   const tabIds = pane?.tabIds ?? [];
   const active = pane?.active ?? "";
@@ -274,7 +317,7 @@ export function PaneTabStrip({ paneId, focused }: { paneId: string; focused: boo
       const ids = key ? key.split(",") : [];
       const widths = Array.from(row.children).map((c) => Math.ceil(c.getBoundingClientRect().width / z));
       // The "+" after the last tab keeps its room.
-      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH;
+      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH - (fullscreen ? EXIT_WIDTH : FULL_WIDTH);
       if (!(avail > 0)) return;
       const next = fitTabs({ widths, active: ids.indexOf(active), avail, iconWidth: TAB_ICON_WIDTH });
       setFits((prev) => (prev && sameFits(prev, next) ? prev : next));
@@ -287,7 +330,7 @@ export function PaneTabStrip({ paneId, focused }: { paneId: string; focused: boo
     return () => {
       ro.disconnect();
     };
-  }, [key, active, paneId]);
+  }, [key, active, paneId, fullscreen]);
   useEffect(
     () => () => {
       dropTabCut(paneId);
@@ -314,6 +357,7 @@ export function PaneTabStrip({ paneId, focused }: { paneId: string; focused: boo
         <ShellTab key={id} tabId={id} active={id === active} paneFocused={focused} fit={fits?.[i]} focusable={id === active} />
       ))}
       <PanePlusMenu paneId={paneId} />
+      <FullscreenButton paneId={paneId} on={fullscreen} />
       <div ref={measureRef} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 flex" data-testid="shell-tab-measure">
         {tabIds.map((id) => (
           <MeasureTab key={id} tabId={id} />

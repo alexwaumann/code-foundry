@@ -10,10 +10,13 @@ import { ShellPaneContext, type ShellPane } from "@/shell/paneContext";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
 import { useShellViewStore } from "@/stores/shellView";
+import { floatingThreadOf, useFullscreenPane } from "@/shell/fullscreen";
 import { useUiStore } from "@/stores/ui";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { LinkedRow } from "./LinkedRow";
 import { PaneTabStrip } from "./PaneTabStrip";
+import { PaneRail } from "./PaneRail";
+import { FloatingComposer } from "./FloatingComposer";
 
 /** The active tab's body, under key={tab.id}: a tab that is not active mounts nothing (and holds no stream). */
 function SurfaceBody({ tab }: { tab: TabEntry }) {
@@ -39,17 +42,28 @@ function focusInto(body: HTMLElement, kind: string): void {
 }
 
 /**
- * One pane of the grid at its drawn rectangle: its tab strip, then its active tab's body. A
- * pointer press or the keyboard (Tab) entering it focuses it (pane.focus, shown at once); a focus
- * request (a direction key, a closed tab) moves the keyboard into its active tab.
+ * One pane of the grid at its drawn rectangle: folded to a rail (PaneRail: no body, no stream), or
+ * open (OpenPane). Switching between the two unmounts the other.
  */
 export function PaneView({ paneId, rect, focused }: { paneId: string; rect: PaneRect; focused: boolean }) {
+  return rect.rail ? <PaneRail paneId={paneId} rect={rect} /> : <OpenPane paneId={paneId} rect={rect} focused={focused} />;
+}
+
+/**
+ * An open pane: its tab strip, then its active tab's body. A pointer press or the keyboard (Tab)
+ * entering it focuses it (pane.focus, shown at once); a focus request (a direction key, a closed
+ * tab, a click on a rail's icon) moves the keyboard into its active tab. Full screen, a linked
+ * tab's thread composer floats over the body (FloatingComposer).
+ */
+function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; focused: boolean }) {
   const pane = usePane(paneId);
   const tab = useTab(pane?.active ?? "");
   const bodyRef = useRef<HTMLDivElement>(null);
   const request = useShellViewStore((s) => (s.focusRequest.paneId === paneId ? s.focusRequest.seq : 0));
   const kind = tab?.kind ?? "";
   const dragged = usePaneDragged(paneId);
+  const full = useFullscreenPane() === paneId;
+  const floating = full ? floatingThreadOf(tab) : "";
   useEffect(() => {
     if (request === 0 || !bodyRef.current) return;
     focusInto(bodyRef.current, kind);
@@ -72,6 +86,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
       data-testid="shell-pane"
       data-pane-id={paneId}
       data-focused={focused || undefined}
+      data-fullscreen={full || undefined}
       data-dragging={dragged || undefined}
       onPointerDownCapture={takeFocus}
       // The keyboard entering the pane (Tab) focuses it; a surface focusing itself as it mounts does not.
@@ -79,7 +94,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
         if (lastInputWasKeyboard()) takeFocus();
       }}
     >
-      <PaneTabStrip paneId={paneId} focused={focused} />
+      <PaneTabStrip paneId={paneId} focused={focused} fullscreen={full} />
       {tab && <LinkedRow tab={tab} />}
       <div ref={bodyRef} id={shellBodyDomId(paneId)} role="tabpanel" tabIndex={-1} className="relative flex min-h-0 min-w-0 flex-1 flex-col outline-none" data-testid="shell-pane-body">
         {tab && (
@@ -90,6 +105,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
           </ShellPaneContext.Provider>
         )}
       </div>
+      {floating && <FloatingComposer key={floating} threadId={floating} paneId={paneId} />}
     </section>
   );
 }

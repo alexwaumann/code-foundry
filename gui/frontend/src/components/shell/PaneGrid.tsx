@@ -1,32 +1,34 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { zoomFactor } from "@/lib/zoom";
 import { afterRev, runLayoutCommand } from "@/shell/commands";
-import { frameRects } from "@/shell/geometry/rects";
+import { leaveFullscreen, useFullscreenPane } from "@/shell/fullscreen";
+import { shellFrame } from "@/shell/geometry/rails";
 import { panesOf, type Frame, type GeoNode } from "@/shell/geometry/types";
 import { dragSizes, sizesArg, startDrag, withSizes, type GutterDrag } from "@/shell/resize";
 import { reportViewport } from "@/shell/viewport";
-import { useCurrentSpaceId, useLayoutStore, useTree, type LayoutState, type TreeNode } from "@/stores/layout";
-import { setShellFrame } from "@/stores/shellView";
+import { geoTree, useCurrentSpaceId, useLayoutStore, useTree, type LayoutState } from "@/stores/layout";
+import { setShellFrame, useShellViewStore } from "@/stores/shellView";
 import { EmptySpace } from "./EmptySpace";
 import { Gutter } from "./Gutter";
 import { PaneView } from "./PaneView";
 
 /**
- * Each pane's active tab kind, in one string: the pane minimums depend on it and nothing else in
- * the tabs does (rails, which read the rest, are PR 19's), so the grid lays out again only then.
+ * What the drawn frame depends on beyond the tree's shape, in one string: each pane's tabs (kind
+ * and thread: the minimums go by the active tab's kind, the fold order by whether a pane holds a
+ * thread's tab and which thread the focused tab belongs to) and its active tab. The grid lays out
+ * again only when it changes, not when a tab is renamed.
  */
-function activeKinds(s: LayoutState, spaceId: string): string {
+function tabsKey(s: LayoutState, spaceId: string): string {
   return Object.values(s.panes)
     .filter((p) => p.spaceId === spaceId)
-    .map((p) => `${p.id}=${s.tabs[p.active]?.kind ?? ""}`)
+    .map((p) => `${p.id}=${p.active}|${p.tabIds.map((id) => `${id}:${s.tabs[id]?.kind ?? ""}:${s.tabs[id]?.thread ?? ""}`).join(",")}`)
     .sort()
     .join("\n");
 }
 
-/** A space's tree as the geometry reads it: each pane with its active tab's kind. */
-function geoOf(n: TreeNode, kinds: ReadonlyMap<string, string>): GeoNode {
-  if (n.t === "split") return { t: "split", id: n.id, dir: n.dir, kids: n.kids.map((k) => geoOf(k, kinds)), sizes: n.sizes };
-  return { t: "pane", id: n.id, tabs: [{ id: "active", kind: kinds.get(n.id) ?? "" }], active: "active" };
+/** The frame of full screen: the one pane over the whole area, no gutter. */
+function fullscreenFrame(pane: string, w: number, h: number): Frame {
+  return { w, h, rects: { [pane]: { x: 0, y: 0, w, h, rail: false } }, gutters: [] };
 }
 
 /**
@@ -34,13 +36,18 @@ function geoOf(n: TreeNode, kinds: ReadonlyMap<string, string>): GeoNode {
  * the layout's tree laid out with pane minimums (shell/geometry), each pane absolutely placed at
  * its rectangle, 12px gutters between them that resize by drag. The area's size goes to the
  * daemon (SetViewport) for placement. A space with no pane shows the composer (EmptySpace).
- * Rails (small windows) are PR 19's: every pane is drawn open for now.
+ * When the area cannot keep every pane at its minimum, panes fold to rails (shell/geometry/rails:
+ * derived per frame, the stored layout unchanged). In full screen only the focused pane is drawn,
+ * over the whole area; the others mount nothing. See docs/notes/shell-19-rails-fullscreen.md.
  */
 export function PaneGrid() {
   const spaceId = useCurrentSpaceId();
   const tree = useTree(spaceId);
-  const kinds = useLayoutStore((s) => activeKinds(s, spaceId));
+  const tabs = useLayoutStore((s) => tabsKey(s, spaceId));
   const focus = useLayoutStore((s) => s.spaces[spaceId]?.focus ?? "");
+  const mru = useLayoutStore((s) => s.spaces[spaceId]?.mru);
+  const full = useFullscreenPane();
+  const fullscreenSpace = useShellViewStore((s) => s.fullscreen);
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [drag, setDrag] = useState<{ d: GutterDrag; sizes: number[] } | null>(null);
@@ -62,14 +69,23 @@ export function PaneGrid() {
     };
   }, []);
 
-  // The tree with its tabs (for the minimums), and the gutter being dragged's sizes on top.
-  const stored = useMemo<GeoNode | null>(() => {
-    if (!tree) return null;
-    const byPane = new Map(kinds.split("\n").map((line) => line.split("=") as [string, string]));
-    return geoOf(tree, byPane);
-  }, [tree, kinds]);
+  // The tree with its tabs (minimums and fold order), and the gutter being dragged's sizes on top.
+  const stored = useMemo<GeoNode | null>(
+    () => (tree ? geoTree(useLayoutStore.getState(), spaceId) : null),
+    // `tabs` stands for what the tree reads from the panes and tabs.
+    // oxlint-disable-next-line react/exhaustive-deps
+    [tree, tabs, spaceId],
+  );
   const shown = useMemo(() => (drag ? withSizes(stored, drag.d.split, drag.sizes) : stored), [stored, drag]);
-  const frame = useMemo<Frame | null>(() => (size && shown ? frameRects(shown, size.w, size.h) : null), [shown, size]);
+  const frame = useMemo<Frame | null>(() => {
+    if (!size || !shown) return null;
+    if (full) return fullscreenFrame(full, size.w, size.h);
+    return shellFrame({ root: shown, w: size.w, h: size.h, focus, mru });
+  }, [shown, size, full, focus, mru]);
+  // Full screen ends when its space is left or has no pane to show.
+  useEffect(() => {
+    if (fullscreenSpace && !full) leaveFullscreen();
+  }, [fullscreenSpace, full]);
   useEffect(() => {
     setShellFrame(frame);
   }, [frame]);
@@ -80,7 +96,7 @@ export function PaneGrid() {
     [],
   );
 
-  const panes = useMemo(() => panesOf(shown).map((p) => p.id), [shown]);
+  const panes = useMemo(() => (full ? [full] : panesOf(shown).map((p) => p.id)), [shown, full]);
   return (
     <div ref={ref} className="relative min-h-0 min-w-0 flex-1" data-testid="shell-grid" data-space-id={spaceId}>
       {tree === null && <EmptySpace />}

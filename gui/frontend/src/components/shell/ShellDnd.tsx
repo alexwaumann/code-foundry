@@ -7,7 +7,9 @@ import { zoomFactor } from "@/lib/zoom";
 import { afterRev, runLayoutCommand } from "@/shell/commands";
 import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, sourceText, type DragNames } from "@/shell/drag/announce";
 import { sourceOf } from "@/shell/drag/draggable";
-import { dropCommand, dropPreview } from "@/shell/drag/drop";
+import { dropCommand, dropPreview, type DropLayout } from "@/shell/drag/drop";
+import { fullscreenOn } from "@/shell/fullscreen";
+import { shellFrame } from "@/shell/geometry/rails";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
 import type { GeoNode } from "@/shell/geometry/types";
@@ -46,6 +48,8 @@ interface Snapshot {
   origin: { x: number; y: number };
   scene: DragScene;
   tree: GeoNode | null;
+  /** How the grid lays out a tree: with its rails, the dropped pane holding the focus. */
+  lay: DropLayout;
   names: DragNames;
 }
 
@@ -54,9 +58,10 @@ function measureStrips(grid: HTMLElement): Record<string, StripTab[]> {
   const g = grid.getBoundingClientRect();
   const z = zoomFactor();
   const out: Record<string, StripTab[]> = {};
-  for (const pane of Array.from(grid.querySelectorAll<HTMLElement>('[data-testid="shell-pane"]'))) {
+  // A rail's tabs too: their names and count (a rail is one target as a whole, so their places are not used).
+  for (const pane of Array.from(grid.querySelectorAll<HTMLElement>('[data-testid="shell-pane"], [data-testid="shell-rail"]'))) {
     const id = pane.dataset.paneId ?? "";
-    out[id] = Array.from(pane.querySelectorAll<HTMLElement>('[data-testid="shell-tab"]')).map((t) => {
+    out[id] = Array.from(pane.querySelectorAll<HTMLElement>('[data-testid="shell-tab"], [data-testid="shell-rail-tab"]')).map((t) => {
       const r = t.getBoundingClientRect();
       return {
         id: t.dataset.tabId ?? "",
@@ -86,6 +91,7 @@ function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
     origin: { x: g.left / z, y: g.top / z },
     scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT },
     tree: geoTree(layout, spaceId),
+    lay: (root, w, h, moved) => shellFrame({ root, w, h, focus: moved, mru: layout.spaces[spaceId]?.mru }),
     names,
   };
 }
@@ -240,7 +246,9 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     }
     if (st.space) useShellDragStore.setState({ space: "" });
     const z = zoomFactor();
-    const target = dropTarget(s.scene, st.source, { x: client.x / z - s.origin.x, y: client.y / z - s.origin.y });
+    const found = dropTarget(s.scene, st.source, { x: client.x / z - s.origin.x, y: client.y / z - s.origin.y });
+    // In full screen a tab only moves within its strip (or to a space): a new pane would be out of sight.
+    const target = found && fullscreenOn() && found.kind !== "strip" ? null : found;
     if (sameTarget(target, st.target)) {
       useShellDragStore.setState({ client });
       return;
@@ -248,7 +256,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     useShellDragStore.setState({
       client,
       target,
-      preview: target ? dropPreview(s.tree, s.scene.frame, st.source, target) : null,
+      preview: target ? dropPreview(s.tree, s.scene.frame, st.source, target, s.lay) : null,
       bar: target?.kind === "strip" ? insertionBar(s.scene, target.pane, target.index) : null,
     });
   };

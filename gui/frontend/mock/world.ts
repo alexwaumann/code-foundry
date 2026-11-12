@@ -5167,6 +5167,16 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread-info" } } }))}`,
       },
       {
+        // internal/command pane.fullscreen: window state, a ShowView the shell window presents.
+        cmd: { name: "pane.fullscreen", title: "Toggle Full Screen Pane", category: "View", description: "Show one pane over the whole pane area of the window, the top bar and the sidebar staying, or every pane again. Window state: the stored layout does not change. Default: the focused pane, toggled.", keybindings: [], args: [] },
+        when: always,
+        run: (_ctx, args) => {
+          const mode = args.off === "true" ? "off" : args.on === "true" ? "on" : "toggle";
+          const params: Record<string, string> = args.pane ? { mode, pane: args.pane } : { mode };
+          return `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "pane.fullscreen", params } } }))}`;
+        },
+      },
+      {
         // internal/command canFindFiles: a thread view with a project or workspace; the CLI always.
         cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it in the thread's side panel (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
         when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),

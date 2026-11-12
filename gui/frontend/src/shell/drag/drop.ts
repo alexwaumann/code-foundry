@@ -215,16 +215,22 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
   return { root: insertBeside(tree, tree.id, target.edge, moved, share) as GeoNode, pane: moved.id };
 }
 
+/** Lays out a tree after a drop: `moved` is the pane the drop makes or moves (it takes the focus). */
+export type DropLayout = (root: GeoNode, w: number, h: number, moved: string) => Frame;
+
+const plainDropLayout: DropLayout = (root, w, h) => frameRects(root, w, h);
+
 /**
  * The rectangle the dropped tab or pane will take, in the frame's coordinates: for an edge or
- * the outer edge, its pane in the tree after the drop laid out at the frame's size; for a pane's
- * middle, that pane as it is; for a strip, null (the insertion bar shows the place).
+ * the outer edge, its pane in the tree after the drop laid out at the frame's size (by `lay`: the
+ * grid passes its own, rails included); for a pane's middle, that pane as it is; for a strip,
+ * null (the insertion bar shows the place).
  */
-export function dropPreview(root: GeoNode | null, frame: Frame, source: DragSource, target: DropTarget): Rect | null {
+export function dropPreview(root: GeoNode | null, frame: Frame, source: DragSource, target: DropTarget, lay: DropLayout = plainDropLayout): Rect | null {
   if (target.kind === "pane") return frame.rects[target.pane] ?? null;
   if (!root || target.kind === "strip") return null;
   const after = treeAfterDrop(root, source, target, frame);
   if (!after) return null;
-  const r = frameRects(after.root, frame.w, frame.h).rects[after.pane];
+  const r = lay(after.root, frame.w, frame.h, after.pane).rects[after.pane];
   return r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
 }
