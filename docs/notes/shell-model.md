@@ -64,7 +64,8 @@ when the first working version is whole. Nothing partial is released.
 - **Small windows.** When the panes cannot all keep their minimum size, panes fold to narrow rails
   that show their tabs' icons and mark the selected one. Panes without a thread tab fold first, least
   recently focused first; the pane of the focused thread never folds. Rails unfold when there is room.
-  The stored layout does not change.
+  The stored layout does not change. A thread's pane left narrower than a thread's minimum keeps its
+  header on top: what does not fit under it (the composer too) is cut, never drawn over it.
 - **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus
   and move keys do nothing while it is on. When the tab is a linked surface, the thread's own composer
   floats over it: collapsed to a pill, expanded on demand, with the thread's chip centred above it as
@@ -109,10 +110,14 @@ when the first working version is whole. Nothing partial is released.
   was in, otherwise placed fresh beside it. Terminals closed this way keep running. No settings.
 - **A thread whose tab is not open** can still have its surfaces opened from its sidebar menu
   (Open ▸ …); they go to the focused pane. For an open thread the same menu follows the placement
-  rules. Plugins will add thread actions to this menu.
+  rules. Plugins will add thread actions to this menu. A thread's own call for its surface while its
+  tab is not open goes the same way, to the focused pane of the thread's space, behind the tab shown
+  there, and the thread is told so; before any window has loaded the layout, the first load takes it
+  into the thread's remembered set instead, and the thread is told that.
 - **Moving a thread** to another space takes the linked tabs that are in its space. Archiving closes
   its linked tabs everywhere and ends its terminals. Snoozing closes them, ends its terminals and
-  keeps the set, so the terminals come back as fresh shells in the same places.
+  keeps the set, so the terminals come back as fresh shells in the same places; an open quick
+  terminal comes back open, as a fresh shell, when the thread's tab opens.
 - **The thread's header** in a pane holds the branch chip, the thread info toggle and one three-dot
   menu with submenus (Open, Move to space, rename, snooze, archive, close). Thread info toggles a
   card when the pane is wide and opens as a temporary overlay when it is narrow.
