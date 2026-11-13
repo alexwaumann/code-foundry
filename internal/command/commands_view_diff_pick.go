@@ -71,24 +71,56 @@ func setOrDrop(params map[string]string, k, v string) {
 	params[k] = v
 }
 
+// pickTries bounds how often intoUsersDiff starts over because the user changed their tab
+// while it compared.
+const pickTries = 3
+
 // intoUsersDiff is the tab params of a view.open.diff for thread id whose check gave asked.
 // A call that frames nothing (asked names no asker) while the checkout's tab is open in the
 // thread's space gets that tab as the user has it: with its own flag from the call and, when
 // the call names a file, that file picked in the sides the user's tab compares (a commit the
 // user was in is left for its All changes), or a tab of asker's own when those sides do not
 // list it. Any other call is asked as it is.
+//
+// Asking whether the user's sides list the file runs git, and the user may change the tab in
+// the meantime (another file, a filter, other sides). The tab is read again after it, and a
+// change starts the pick over from what the user has now, so the params it gives never write
+// the tab as it was over what the user did. A tab the user keeps changing gives the call a tab
+// of its own.
 func (d ViewDeps) intoUsersDiff(ctx context.Context, id, asker string, asked map[string]string) map[string]string {
 	if d.Layout == nil || asked[core.DiffAskerParam] != "" {
 		return asked
 	}
+	for range pickTries {
+		open := d.usersDiff(id, asked)
+		if open == nil {
+			return asked
+		}
+		mine, done := d.pickIn(ctx, open, asker, asked)
+		if done {
+			return mine
+		}
+		if now := d.usersDiff(id, asked); now != nil && maps.Equal(now.Params, open.Params) {
+			return mine
+		}
+	}
+	own := maps.Clone(asked)
+	own[core.DiffAskerParam] = asker
+	return own
+}
+
+// usersDiff is the checkout's Diff tab of thread id open in its space now; nil for none.
+func (d ViewDeps) usersDiff(id string, asked map[string]string) *core.Tab {
 	snap := d.Layout.Snapshot()
 	if snap == nil {
-		return asked
+		return nil
 	}
-	open := openLinked(snap.State, itemTab(tabDiff, id, asked))
-	if open == nil {
-		return asked
-	}
+	return openLinked(snap.State, itemTab(tabDiff, id, asked))
+}
+
+// pickIn is intoUsersDiff's pick in the user's tab open; done when it asked the checkout
+// nothing, so the tab could not have changed under it.
+func (d ViewDeps) pickIn(ctx context.Context, open *core.Tab, asker string, asked map[string]string) (_ map[string]string, done bool) {
 	mine := maps.Clone(open.Params)
 	if mine == nil {
 		mine = map[string]string{}
@@ -96,19 +128,21 @@ func (d ViewDeps) intoUsersDiff(ctx context.Context, id, asker string, asked map
 	setOrDrop(mine, "own", asked["own"])
 	file, oldPath := asked["path"], asked["oldPath"]
 	if file == "" {
-		return mine
+		return mine, true
 	}
 	base, head := mine["base"], mine["head"]
 	if mine["commit"] != "" {
 		base, head = mine["backBase"], mine["backHead"]
 	}
 	base, head = sideParam(base, diffBaseDefault), sideParam(head, diffHeadDefault)
+	done = true
 	if base != sideParam(asked["base"], diffBaseDefault) || head != sideParam(asked["head"], diffHeadDefault) {
+		done = false
 		row := d.listedIn(ctx, mine["project"], mine["worktree"], base, head, file)
 		if row == nil {
 			own := maps.Clone(asked)
 			own[core.DiffAskerParam] = asker
-			return own
+			return own, false
 		}
 		file, oldPath = row.GetPath(), row.GetOldPath()
 	}
@@ -122,7 +156,7 @@ func (d ViewDeps) intoUsersDiff(ctx context.Context, id, asker string, asked map
 		oldPath = ""
 	}
 	setOrDrop(mine, "oldPath", oldPath)
-	return mine
+	return mine, done
 }
 
 // listedIn is file's row in what the checkout at worktree differs by between base and head
