@@ -20,7 +20,7 @@ interface OpCase {
   options?: { keep_focus?: boolean; no_smart_swap?: boolean };
   want?: State;
   error?: string;
-  result?: { space?: string; pane?: string; tab?: string; existing?: boolean; closed?: string[]; rule?: string; draft?: string; kept?: string[]; swapped?: string[] };
+  result?: { space?: string; pane?: string; tab?: string; existing?: boolean; closed?: string[]; rule?: string; draft?: string; kept?: string[]; swapped?: string[]; placed?: string[] };
 }
 
 const cases = Object.entries(files).map(([path, raw]) => ({ name: path.replace(/^.*\//, "").replace(/\.json$/, ""), c: JSON.parse(raw) as OpCase }));
@@ -40,6 +40,8 @@ function notPorted(c: OpCase): string | null {
   if (!PORTED_OPS.includes(c.op.op)) return `${c.op.op} is a rule`;
   if (c.result?.swapped?.length) return "smart swap";
   if (c.result?.rule && /^[2-6]$/.test(c.result.rule)) return "placement rules 2 to 6";
+  // A pane moved to another space with threads places their other linked tabs by the rules.
+  if (c.op.op === "move_pane" && c.result?.placed?.length) return "linked tabs placed by the rules";
   const remembers = Object.values(c.state.threads ?? {}).some((ts) => ts.remembered);
   if (c.result?.kept?.length || (c.op.op === "open_surface" && remembers)) return "a remembered set";
   return null;
@@ -76,6 +78,7 @@ describe("the mock's layout ops against internal/layout's cases", () => {
     expect(skipped("smart swap")).toEqual(["close_tab-smart-swap-on-return", "focus_tab-smart-swap", "focus_tab-smart-swap-last", "focus_tab-smart-swap-mru"]);
     expect(skipped("a remembered set")).toEqual(["close_pane-closes-threads", "open_surface-drops-remembered"]);
     expect(skipped("placement rules 2 to 6").every((n) => /^open_surface-rule[2-6]-/.test(n))).toBe(true);
+    expect(skipped("linked tabs placed by the rules")).toEqual(["move_pane-thread-to-space"]);
   });
 
   it.each(run.map(({ name, c }) => [name, c] as const))("%s", (_name, c) => {

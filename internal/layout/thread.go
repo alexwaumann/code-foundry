@@ -196,6 +196,13 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 		}
 		rest = append([]item{{rec, tb}}, rest...)
 	}
+	// Each pane the rest land in shows the tab that was active when the set was remembered,
+	// else the first that landed there (placing one by one would leave the last). The pane the
+	// user was in keeps its tab: what lands there waits behind it.
+	userPane := sp.Focus
+	shows := map[string]string{}
+	wasActive := map[string]bool{}
+	var order []string
 	for _, it := range rest {
 		r, err := t.place(sp, nil, it.tab, false, w, h)
 		if err != nil {
@@ -204,6 +211,17 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 		res.Placed = append(res.Placed, r.Tab)
 		if it.rec.Fresh != nil {
 			res.Fresh = append(res.Fresh, r.Tab)
+		}
+		if _, ok := shows[r.Pane]; !ok {
+			order = append(order, r.Pane)
+		}
+		if _, ok := shows[r.Pane]; !ok || (it.rec.Active && !wasActive[r.Pane]) {
+			shows[r.Pane], wasActive[r.Pane] = r.Tab, it.rec.Active
+		}
+	}
+	for _, id := range order {
+		if _, p := t.st.FindPane(id); p != nil && id != userPane && p.TabIndex(shows[id]) >= 0 {
+			p.Active = shows[id]
 		}
 	}
 	return nil

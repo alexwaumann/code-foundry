@@ -708,21 +708,48 @@ const ops = {
       if (str(o, "target") || str(o, "edge")) fail("invalid_argument", "move_pane takes a space or a target and edge, not both");
       const to = t.space(str(o, "space"));
       if (to === from) fail("invalid_argument", `pane ${pane.id} is already in space ${to.id}`);
+      // Whole, in one step: each thread whose tab it holds lives in the target now and takes its
+      // other linked tabs in the old space along, placed by the rules (internal/layout ops_tree.go).
       const ids: string[] = [];
+      const threads: string[] = [];
       for (const tb of pane.tabs ?? []) {
-        if (tb.kind === "thread") fail("failed_precondition", `pane ${pane.id} holds thread tab ${tb.id}: a thread moves to another space with its linked tabs`);
+        if (tb.kind === "thread") threads.push(tb.thread ?? "");
         const same = t.sameTab(to, identify(tb).kind, tb.key ?? "", tb.id);
         if (same) fail("already_exists", `${tb.key ?? ""} is already open in space ${to.id} as ${same.id}`);
         ids.push(tb.id);
       }
-      const wasFocused = from.focus === pane.id;
+      let wasFocused = from.focus === pane.id;
       dropPane(from, pane.id);
       forget(from, ...ids);
+      const follow: Tab[] = [];
+      for (const th of threads) {
+        if (t.spaceOf(th) !== from.id) continue;
+        for (const p of panes(from.root))
+          for (const tb of [...(p.tabs ?? [])]) {
+            if (!isLinked(tb) || tb.thread !== th) continue;
+            wasFocused ||= focusedTab(from) === tb.id;
+            detach(from, p, tb.id);
+            forget(from, tb.id);
+            follow.push(tb);
+          }
+        ((t.st.threads ??= {})[th] ??= { space: to.id }).space = to.id;
+      }
       if (wasFocused) refocus(from);
       if (!to.root) to.root = pane;
       else insertBeside(to, to.focus ?? "", "right", pane, DEFAULT_FRAC, t.newID("s-"));
       focusTab(to, pane, pane.active ?? "");
-      return { space: to.id, pane: pane.id, tab: pane.active };
+      const res: Result = { space: to.id, pane: pane.id, tab: pane.active };
+      const closed: Tab[] = [];
+      for (const tb of follow) {
+        if (t.sameTab(to, identify(tb).kind, tb.key ?? "", tb.id)) {
+          closed.push(tb);
+          continue;
+        }
+        place(t, to, null, tb, false);
+      }
+      focusTab(to, pane, pane.active ?? "");
+      if (closed.length) res.closed = closed;
+      return res;
     }
     const edge = edgeOf(o, true) as Edge;
     if (!str(o, "target")) {

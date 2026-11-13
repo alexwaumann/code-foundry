@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // Registry holds all commands. It is safe for concurrent use. Registration normally
@@ -216,6 +218,11 @@ func (r *Registry) Invoke(ctx context.Context, uctx Context, name string, raw ma
 	}
 	if o.confirmed {
 		ctx = context.WithValue(ctx, confirmedKey{}, true)
+	}
+	if eff.FromWindow() {
+		// A window's own controls: the layout store tells what such a call opens before the
+		// first-load import from what the CLI or a model arranges (layoutstore.FromWindow).
+		ctx = layoutstore.FromWindow(ctx)
 	}
 	res, err := c.Run(ctx, eff, args)
 	return res, shortIDHint(c.Args, args, err)

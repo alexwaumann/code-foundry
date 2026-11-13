@@ -1,5 +1,5 @@
 {
-  "doc": "A pane holding a thread tab does not change space here.",
+  "doc": "A pane holding thread tabs moves to another space whole, in one op: each thread lives there now and takes its other linked tabs in the old space along, placed by the rules; one whose identity is open there already is closed in favour of it.",
   "state": {
     "v": 1,
     "spaces": [
@@ -14,7 +14,11 @@
             {
               "t": "pane",
               "id": "p-a",
-              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-c","kind":"thread","thread":"th-c"},
+                {"id":"t-g","kind":"projects"}
+              ],
               "active": "t-a"
             },
             {
@@ -27,7 +31,8 @@
                   "thread": "th-a",
                   "params": {"project":"pj-1","worktree":"w-1"}
                 },
-                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}},
+                {"id":"t-tc","kind":"terminal","thread":"th-c","params":{"terminal":"term-c"}}
               ],
               "active": "t-d"
             }
@@ -71,6 +76,61 @@
     "default_space": "sp-a",
     "threads": {"th-b":{"space":"sp-b"}}
   },
-  "op": {"op":"move_pane","pane":"p-a","space":"sp-b"},
-  "error": "failed_precondition"
+  "op": {"op":"move_pane","pane":"p-a","space":"sp-b","w":1600,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {"id":"sp-a","name":"Main","root":null},
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "split",
+          "id": "s-b",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-b","kind":"thread","thread":"th-b"},{"id":"t-prs","kind":"prs"}],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-c","kind":"thread","thread":"th-c"},
+                {"id":"t-g","kind":"projects"},
+                {"id":"t-tc","kind":"terminal","thread":"th-c","params":{"terminal":"term-c"}}
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-e",
+              "tabs": [
+                {"id":"t-f2","kind":"file","params":{"path":"/r/a.go"}},
+                {"id":"t-t2","kind":"terminal","params":{"terminal":"term-2"}}
+              ],
+              "active": "t-f2"
+            }
+          ],
+          "sizes": [0.25,0.25,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-b"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-b"},"th-b":{"space":"sp-b"},"th-c":{"space":"sp-b"}}
+  },
+  "result": {"space":"sp-b","pane":"p-a","tab":"t-a","closed":["t-f"],"placed":["t-d","t-tc"]}
 }

@@ -1,14 +1,20 @@
 package daemon
 
 import (
+	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
+	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
 // The first-load import with the glue running: classic shells' automatic tabs leave the
@@ -84,5 +90,55 @@ func TestLegacyImportEndsNothing(t *testing.T) {
 	}
 	if !found || !e.running(a2) {
 		t.Errorf("a2 has no tab after the thread opened, or is not running")
+	}
+}
+
+// The import reads the registered projects and the installed plugins' surfaces: a diff of a
+// project that is gone and a surface no installed plugin offers are dropped and listed
+// (docs/notes/shell-24a-import-moves.md, item 1).
+func TestLegacyImportDropsGoneProjectsAndPlugins(t *testing.T) {
+	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
+	imp := legacyImport{log: slog.New(slog.DiscardHandler), layout: e.layout, terminals: e.terms,
+		threads:  func() *thread.Snapshot { return &thread.Snapshot{Threads: []thread.Thread{th("th-a")}} },
+		projects: func() *project.Snapshot { return &project.Snapshot{Projects: []project.Project{{ID: "pj"}}} },
+		plugins: func() *plugin.Snapshot {
+			return &plugin.Snapshot{Plugins: []plugin.Plugin{{Name: "notes", Manifest: pluginsdk.Manifest{Surfaces: []pluginsdk.SurfaceSpec{{ID: "pad"}}}}}}
+		},
+	}
+	panel := `{"version":6,"state":{"byKey":{"thread:th-a":{"open":true,"groups":[{"tabs":[
+		{"id":"d1","kind":"diff","title":"Diff","params":{"project":"pj","worktree":"/w"}},
+		{"id":"d2","kind":"diff","title":"Diff","params":{"project":"gone","worktree":"/g"}},
+		{"id":"p1","kind":"plugin.notes.pad","title":"Pad","params":{}},
+		{"id":"p2","kind":"plugin.weather.radar","title":"Radar","params":{}}],"activeTabId":"d1"}]}}}}`
+	c, err := imp.ImportLegacy(e.ctx, panel, "", "win")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for _, rt := range e.state().Threads["th-a"].Remembered.Tabs {
+		kinds = append(kinds, rt.Tab.Kind+":"+rt.Tab.Params["project"])
+	}
+	if strings.Join(kinds, " ") != "diff:pj plugin.notes.pad:" {
+		t.Errorf("remembered %v", kinds)
+	}
+	want := []string{
+		"thread th-a: side panel tab d2: project gone is not registered",
+		"thread th-a: side panel tab p2: no installed plugin offers plugin.weather.radar",
+	}
+	if !slices.Equal(c.Result.Dropped, want) {
+		t.Errorf("dropped %q", c.Result.Dropped)
+	}
+}
+
+func TestKnownProjectsAndSurfaces(t *testing.T) {
+	if got := knownProjects(nil); len(got) != 0 {
+		t.Errorf("no snapshot: %v", got)
+	}
+	if got := knownSurfaces(&plugin.Snapshot{Plugins: []plugin.Plugin{
+		{Name: "a", Manifest: pluginsdk.Manifest{Surfaces: []pluginsdk.SurfaceSpec{{ID: "x"}, {ID: "y"}}}},
+		{Name: "b", Enabled: false, Manifest: pluginsdk.Manifest{Surfaces: []pluginsdk.SurfaceSpec{{ID: "z"}}}},
+		{Name: "broken"},
+	}}); fmt.Sprint(got) != "map[plugin.a.x:true plugin.a.y:true plugin.b.z:true]" {
+		t.Errorf("surfaces %v", got)
 	}
 }

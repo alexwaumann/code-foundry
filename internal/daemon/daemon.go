@@ -371,6 +371,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		filesystemAPI.Route(),
 		api.NewLayout(st.layout).WithImporter(legacyImport{
 			log: log.With("store", "layout"), layout: st.layout, terminals: st.terminal, threads: st.thread.Snapshot,
+			projects: st.project.Snapshot, plugins: plugins.Snapshot,
 		}).Route(),
 		eventsAPI.Route(),
 	}

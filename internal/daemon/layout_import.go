@@ -8,6 +8,8 @@ import (
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
+	"github.com/alexwaumann/code-foundry/internal/store/plugin"
+	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/terminal"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
@@ -24,6 +26,35 @@ type legacyImport struct {
 	layout    layoutstore.Store
 	terminals terminal.Store
 	threads   func() *thread.Snapshot
+	// projects and plugins say what a tab may still show: a diff of a project no longer
+	// registered, or a surface no installed plugin offers, is dropped. Nil: not checked.
+	projects func() *project.Snapshot
+	plugins  func() *plugin.Snapshot
+}
+
+// knownProjects is every registered project's id.
+func knownProjects(snap *project.Snapshot) map[string]bool {
+	out := map[string]bool{}
+	if snap != nil {
+		for _, p := range snap.Projects {
+			out[p.ID] = true
+		}
+	}
+	return out
+}
+
+// knownSurfaces is every surface an installed plugin offers, as a tab kind. A disabled plugin's
+// surfaces count: its tab says why it shows nothing, and enabling it brings it back.
+func knownSurfaces(snap *plugin.Snapshot) map[string]bool {
+	out := map[string]bool{}
+	if snap != nil {
+		for _, p := range snap.Plugins {
+			for _, s := range p.Manifest.Surfaces {
+				out[plugin.SurfaceKind(p.Name, s.ID)] = true
+			}
+		}
+	}
+	return out
 }
 
 // ImportLegacy implements api.LegacyImporter.
@@ -38,6 +69,12 @@ func (l legacyImport) ImportLegacy(ctx context.Context, panelJSON, bottomJSON, c
 				in.Threads = append(in.Threads, core.LegacyThread{ID: t.ID, Archived: !t.ArchivedAt.IsZero()})
 			}
 		}
+	}
+	if l.projects != nil {
+		in.Projects = knownProjects(l.projects())
+	}
+	if l.plugins != nil {
+		in.Surfaces = knownSurfaces(l.plugins())
 	}
 	for _, t := range l.terminals.List(ctx) {
 		in.Terminals = append(in.Terminals, core.LegacyTerminal{

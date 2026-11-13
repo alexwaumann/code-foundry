@@ -302,8 +302,10 @@ func toOuter(t *tx, sp *Space, node *Node, edge Edge, frac, w, h float64) error 
 //   - Target and Edge: beside Target on that edge, at Frac of its room.
 //   - Edge alone: on that edge of the whole pane area, at Frac of it (default: the size of
 //     its active tab's kind, outerFrac).
-//   - Space: to the right of that space's focused pane (or as its only pane). A pane holding a
-//     thread tab does not change space here (moving a thread is its own op).
+//   - Space: to the right of that space's focused pane (or as its only pane), whole, in one
+//     step. Each thread whose tab it holds then lives in that space and takes its other linked
+//     tabs in the old space along, placed by the rules beside it, as move_thread does (one of
+//     those whose identity is open there already is closed in favour of it: Result.Closed).
 type MovePane struct {
 	Pane   string  `json:"pane"`
 	Target string  `json:"target,omitempty"`
@@ -363,9 +365,10 @@ func (o *MovePane) toSpace(t *tx, from *Space, pane *Node) (Result, error) {
 		return Result{}, fmt.Errorf("pane %s is already in space %s: %w", pane.ID, to.ID, ErrInvalidArgument)
 	}
 	ids := make([]string, 0, len(pane.Tabs))
+	var threads []string
 	for _, tb := range pane.Tabs {
 		if tb.Kind == "thread" {
-			return Result{}, fmt.Errorf("pane %s holds thread tab %s: a thread moves to another space with its linked tabs: %w", pane.ID, tb.ID, ErrFailedPrecondition)
+			threads = append(threads, tb.Thread)
 		}
 		k, _ := KindOf(tb.Kind)
 		if same := t.sameTab(to, k, tb.Key, tb.ID); same != nil {
@@ -376,6 +379,24 @@ func (o *MovePane) toSpace(t *tx, from *Space, pane *Node) (Result, error) {
 	wasFocused := from.Focus == pane.ID
 	dropPane(from, pane.ID)
 	forget(from, ids...)
+	// The threads' other linked tabs in the old space go with them.
+	var follow []*Tab
+	for _, th := range threads {
+		if t.st.SpaceOf(th) != from.ID {
+			continue // a thread living elsewhere: its tab was dragged here by hand
+		}
+		for _, p := range Panes(from.Root) {
+			for _, tb := range slices.Clone(p.Tabs) {
+				if tb.IsLinked() && tb.Thread == th {
+					wasFocused = wasFocused || focusedTab(from) == tb.ID
+					detach(from, p, tb.ID)
+					forget(from, tb.ID)
+					follow = append(follow, tb)
+				}
+			}
+		}
+		t.setThreadSpace(th, to.ID)
+	}
 	if wasFocused {
 		refocus(from)
 	}
@@ -385,7 +406,22 @@ func (o *MovePane) toSpace(t *tx, from *Space, pane *Node) (Result, error) {
 		return Result{}, err
 	}
 	focusTab(to, pane, pane.Active)
-	return Result{Space: to.ID, Pane: pane.ID, Tab: pane.Active}, nil
+	res := Result{Space: to.ID, Pane: pane.ID, Tab: pane.Active}
+	w, h := viewport(o.W, o.H)
+	for _, tb := range follow {
+		k, _ := KindOf(tb.Kind)
+		if t.sameTab(to, k, tb.Key, tb.ID) != nil {
+			res.Closed = append(res.Closed, tb)
+			continue
+		}
+		r, err := t.place(to, nil, tb, false, w, h)
+		if err != nil {
+			return Result{}, err
+		}
+		res.Placed = append(res.Placed, r.Tab)
+	}
+	focusTab(to, pane, pane.Active)
+	return res, nil
 }
 
 // MergePane moves every tab of Pane into Target's strip at Index (default: the end). Pane's

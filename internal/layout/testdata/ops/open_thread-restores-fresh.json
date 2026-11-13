@@ -1,5 +1,5 @@
 {
-  "doc": "A thread opened in another pane than the one it was in gets its set placed fresh by the rules beside it, in the old order.",
+  "doc": "A thread opened in another pane than the one it was in gets its set placed fresh by the rules beside it, in the old order; the pane shows the first tab that was active when the set was remembered.",
   "state": {
     "v": 1,
     "spaces": [
@@ -85,7 +85,7 @@
                 {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
                 {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}}
               ],
-              "active": "t-x"
+              "active": "t-f"
             }
           ],
           "sizes": [0.5,0.275,0.22499999999999998]

@@ -51,9 +51,9 @@ function spaceOfSource(source: DragSource, s: Pick<LayoutState, "panes" | "tabs"
  * What dropping a tab or a pane on a space tab runs, in order (shell-model.md, "Linked surfaces"):
  * a thread's tab moves the thread, which takes its linked tabs in its space along
  * (`thread.space.move`); any other tab moves by itself (`tab.move --space`): a linked one waits
- * there, dormant. A pane moves whole (`pane.move --space`); the daemon moves no thread tab that
- * way, so each thread in it moves first with its linked tabs, and the pane follows with what is
- * left, when anything is. A sidebar row's thread moves as its tab would, open or not
+ * there, dormant. A pane moves whole (`pane.move --space`), in one step: each thread whose tab it
+ * holds moves with it and takes its other linked tabs along, so a drop never ends half moved.
+ * A sidebar row's thread moves as its tab would, open or not
  * (docs/notes/shell-16-sidebar.md). Null when the drop does nothing: its own space, or a source
  * that went.
  */
@@ -69,12 +69,7 @@ export function spaceDropCommands(source: DragSource, space: string, s: Pick<Lay
   }
   const pane = s.panes[source.pane];
   if (!pane) return null;
-  const tabs = pane.tabIds.flatMap((id) => (s.tabs[id] ? [s.tabs[id]] : []));
-  const threads = [...new Set(tabs.filter((t) => t.kind === "thread").map((t) => t.thread))];
-  const left = tabs.filter((t) => t.kind !== "thread" && !(t.thread && threads.includes(t.thread)));
-  const out: SpaceCommand[] = threads.map((id) => ({ name: "thread.space.move", args: { id, space } }));
-  if (left.length > 0) out.push({ name: "pane.move", args: { pane: pane.id, space } });
-  return out;
+  return [{ name: "pane.move", args: { pane: pane.id, space } }];
 }
 
 /** The two ways a space's threads go when it is removed. */

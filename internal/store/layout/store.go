@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -44,6 +45,9 @@ type Manager struct {
 	rev   uint64
 	// imported is the import mark (metaLegacyImport): "" until ImportLegacy ran.
 	imported string
+	// windowTabs are, until the import, the thread tabs a window's command opened
+	// (window.go, core.TrackWindowTabs).
+	windowTabs []string
 	// disk is the state the tables hold (at diskRev); nil: they must be rewritten whole.
 	disk    *core.State
 	diskRev uint64
@@ -98,9 +102,12 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	} else if len(repairs) > 0 {
 		m.log.Warn("layout: repaired the stored layout", "repairs", repairs)
 	}
-	m.state, m.rev, m.imported = st, got.rev, got.imported
+	m.state, m.rev, m.imported, m.windowTabs = st, got.rev, got.imported, got.windowTabs
+	if m.imported != "" {
+		m.windowTabs = nil
+	}
 	if got.fresh || len(repairs) > 0 {
-		if err := save(ctx, opts.DB, nil, st, m.rev, m.imported, opts.Now()); err != nil {
+		if err := save(ctx, opts.DB, nil, st, m.rev, m.marks(), opts.Now()); err != nil {
 			return nil, err
 		}
 	}
@@ -130,14 +137,26 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	if err != nil {
 		return Commit{}, err
 	}
+	marked := m.windowTabs
+	if m.imported == "" {
+		marked = core.TrackWindowTabs(m.windowTabs, prev, next, res, IsWindowCall(ctx))
+	}
 	if Unchanged(prev, next) {
+		if !slices.Equal(marked, m.windowTabs) {
+			// Someone else acted on a tab a window opened: it is arranged now, and kept.
+			m.windowTabs = marked
+			if err := m.flushMarks(context.WithoutCancel(ctx)); err != nil {
+				return Commit{}, err
+			}
+		}
 		return Commit{Rev: m.rev, Result: res}, nil
 	}
+	m.windowTabs = marked
 	rev := m.rev + 1
 	if FocusOnly(prev, next) {
 		m.later()
 	} else {
-		if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, m.imported, m.opts.Now()); err != nil {
+		if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, m.marks(), m.opts.Now()); err != nil {
 			return Commit{}, err
 		}
 		m.disk, m.diskRev = next, rev
@@ -160,18 +179,19 @@ func (m *Manager) ImportLegacy(ctx context.Context, in core.LegacyInput, opts Ap
 		return ImportCommit{Rev: m.rev}, nil
 	}
 	prev := m.state
+	in.WindowTabs = slices.Clone(m.windowTabs)
 	next, res, err := core.ImportLegacy(prev, in, m.opts.IDs)
 	if err != nil {
 		return ImportCommit{}, err
 	}
 	rev := m.rev + 1
 	imported := fmt.Sprintf("done:%d", m.opts.Now().UnixMilli())
-	if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, imported, m.opts.Now()); err != nil {
+	if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, marks{imported: imported}, m.opts.Now()); err != nil {
 		return ImportCommit{}, err
 	}
 	m.stopTimer()
 	m.disk, m.diskRev = next, rev
-	m.state, m.rev, m.imported = next, rev, imported
+	m.state, m.rev, m.imported, m.windowTabs = next, rev, imported, nil
 	m.snap.Store(m.snapshot())
 	m.publish(prev, opts.ClientID, ImportOp, core.Result{})
 	return ImportCommit{Rev: rev, Imported: true, Result: res}, nil
@@ -220,12 +240,20 @@ func (m *Manager) flush(ctx context.Context) error {
 	if m.disk == m.state && m.diskRev == m.rev {
 		return nil
 	}
-	if err := save(ctx, m.opts.DB, m.disk, m.state, m.rev, m.imported, m.opts.Now()); err != nil {
+	return m.flushMarks(ctx)
+}
+
+// flushMarks writes the state and the import's marks. Callers hold m.mu.
+func (m *Manager) flushMarks(ctx context.Context) error {
+	if err := save(ctx, m.opts.DB, m.disk, m.state, m.rev, m.marks(), m.opts.Now()); err != nil {
 		return err
 	}
 	m.disk, m.diskRev = m.state, m.rev
 	return nil
 }
+
+// marks are the import's keys as they are now. Callers hold m.mu.
+func (m *Manager) marks() marks { return marks{imported: m.imported, windowTabs: m.windowTabs} }
 
 // Close writes a focus change still waiting and refuses later Applies.
 func (m *Manager) Close(ctx context.Context) error {

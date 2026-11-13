@@ -71,7 +71,8 @@ func (l layout) paneCommands() []Command {
 			Name: "pane.move", Title: "Move Pane", Category: layoutCategory, Page: PageState,
 			Description: "Move a whole pane: beside another pane (--beside with --edge), into another pane's strip (--into, " +
 				"its tabs join at --index), onto an edge of the whole pane area (--outer), or to another space (--space). " +
-				"A pane holding a thread's tab does not change space: move the thread (thread.space.move).",
+				"A pane moved to another space goes whole: each thread whose tab it holds moves there too, with its " +
+				"linked tabs (as thread.space.move).",
 			Args: []ArgSpec{
 				func() ArgSpec {
 					s := paneIDArg("pane", "The pane to move")
