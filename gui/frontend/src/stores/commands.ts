@@ -4,6 +4,7 @@ import { confirmationOf, confirmButtonLabel, invokeCommand, listCommands, type C
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
+import { guardCommand } from "./commandGuards";
 import { confirmPresenter, requestConfirm, secondStagePresenter, type ConfirmPresenter } from "./confirm";
 import { contextKey, getUiContext } from "./context";
 import { useLayoutStore } from "./layout";
@@ -158,7 +159,11 @@ export async function runCommandForResult(
 ): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
-    const res = await invokeConfirmed(name, args, opts.ctx ?? getUiContext(), opts.caller);
+    const ctx = opts.ctx ?? getUiContext();
+    // A plugin's call (`caller`) is not the user's: what it would end is kept, not asked about.
+    const guarded = opts.caller === undefined ? guardCommand(name, args, ctx) : true;
+    if (guarded !== true && !(await guarded)) return null;
+    const res = await invokeConfirmed(name, args, ctx, opts.caller);
     if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
     if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);

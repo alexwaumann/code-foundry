@@ -1,6 +1,13 @@
 /**
- * Editing a file in the File tab (docs/notes/file-edit-2-gui.md): one session per tab per
- * panel, so two panels showing a file never share a draft.
+ * Editing a file in the File tab (docs/notes/file-edit-2-gui.md): one session per file per
+ * thread (its key is the thread's panel key, "" for an unlinked tab, and the file's path), so
+ * the session follows the file's identity, not its place: a tab that moves to another pane or
+ * space, or is put away with its thread and comes back, finds its draft again.
+ *
+ * Unsaved edits are never discarded unless the user says so (docs/notes/shell-review-fixes-gui.md):
+ * a session whose tab is gone ends only when it is clean. A dirty one waits for its file to be
+ * opened again for that thread; the user's own closes that would end it for good ask first
+ * (stores/fileRequest.ts confirmCloseFile, confirmEndEdits).
  *
  * Memory only, by design: file contents are often secrets, so unsaved edits are lost on
  * quit. This store is never persisted, the panel state never holds a draft, and nothing
@@ -17,7 +24,9 @@ import { blankFile, canEdit, readFile, versionStamp, writeFile, type FileReadVie
 import { errorMessage } from "@/api/stream";
 import { draftText, forgetDraft, loadCodeEditor, type EditorHandle, type EditorPlace } from "@/lib/codeEditor";
 import { deepActiveElement } from "@/lib/keyTarget";
-import { findTab, setTabParams, shownTab, subscribeTabs, tabPlace, targetOf, type Tab, type TabPlaces } from "@/shell/host";
+import { findTab, setTabParams, shownTab, tabPlace, targetOf } from "@/shell/host";
+import { fileOfTab, fileTab } from "@/surfaces/fileTarget";
+import { useLayoutStore, type LayoutState, type TabEntry } from "./layout";
 import { useUiStore } from "./ui";
 
 /** What is wrong with the draft's baseline: the file was changed, or is gone. */
@@ -61,9 +70,16 @@ interface FileEditState {
 
 export const useFileEditStore = create<FileEditState>()(() => ({ sessions: {} }));
 
-/** A tab's session key. */
+/** A tab's session key: the panel key of its thread ("" for none) and the File tab's seam id (its path). */
 export function fileEditKey(panelKey: string, tabId: string): string {
   return `${panelKey}\u0000${tabId}`;
+}
+
+/** The session key of a layout File tab, wherever it is; null for any other tab. */
+export function fileEditKeyOfTab(tab: Pick<TabEntry, "kind" | "thread" | "params">): string | null {
+  if (tab.kind !== "file") return null;
+  const target = fileOfTab(tab);
+  return target ? fileEditKey(tab.thread ? `thread:${tab.thread}` : "", fileTab(target).id) : null;
 }
 
 /** The tab's session, for its body (a session changes when its state does, not per keystroke). */
@@ -200,23 +216,50 @@ function end(key: string): void {
   forgetDraft(was.stateKey);
 }
 
-// A tab can go without closeTab: whatever removes it, its draft goes with it. Putting a
-// thread away is not one of those: resetThreadPanels keeps dirty tabs (unsavedTabs).
-function prune(places: TabPlaces): void {
+/**
+ * The user said to throw the session's unsaved edits away (Discard in a close question): it ends,
+ * draft and all, whether or not its tab is open.
+ */
+export function discardEdit(key: string): void {
+  end(key);
+}
+
+/** The sessions with unsaved edits whose keys `keep` accepts (a thread's: its panel key). */
+export function dirtyEdits(keep: (s: FileEdit) => boolean): string[] {
+  return Object.entries(useFileEditStore.getState().sessions).flatMap(([key, s]) => (s.dirty && keep(s) ? [key] : []));
+}
+
+/** The session keys of every File tab in the layout, in any space. */
+function liveKeys(l: Pick<LayoutState, "tabs">): Set<string> {
+  const out = new Set<string>();
+  for (const t of Object.values(l.tabs)) {
+    const key = fileEditKeyOfTab(t);
+    if (key !== null) out.add(key);
+  }
+  return out;
+}
+
+/**
+ * Whatever removes a File tab (a close, its thread put away, a model's tab.close, a removed
+ * space), a clean session goes with it. A dirty one stays: its draft waits in the library for the
+ * file to be opened again for the same thread. Run when the tabs change and when a session does
+ * (a save leaves a tab-less session clean).
+ */
+function prune(): void {
+  const l = useLayoutStore.getState();
+  if (!l.loaded) return;
+  const live = liveKeys(l);
   for (const [key, s] of Object.entries(useFileEditStore.getState().sessions)) {
-    const place = places[s.panelKey];
-    if (s.panelKey !== "" && !place?.tabs.some((t) => t.id === s.tabId)) end(key);
+    if (!s.dirty && !s.busy && !live.has(key)) end(key);
   }
 }
 
-subscribeTabs((places) => {
-  prune(places);
+useLayoutStore.subscribe((l, prev) => {
+  if (l.tabs !== prev.tabs) prune();
 });
-
-/** The panel's tabs holding unsaved edits, which must survive a reset of the panel. */
-export function unsavedTabs(panelKey: string, tabs: readonly Tab[]): readonly Tab[] {
-  return tabs.filter((t) => session(fileEditKey(panelKey, t.id))?.dirty === true);
-}
+useFileEditStore.subscribe((s, prev) => {
+  if (s.sessions !== prev.sessions && Object.entries(s.sessions).some(([key, x]) => !x.dirty && !x.busy && (prev.sessions[key]?.dirty === true || prev.sessions[key]?.busy === true))) prune();
+});
 
 /** The panel's thread was removed: nothing can reach its drafts again. Removing is the user's explicit word, so they go. */
 export function dropPanelDrafts(panelKey: string): void {

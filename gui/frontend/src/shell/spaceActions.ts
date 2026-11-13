@@ -4,6 +4,7 @@
  * commands_pane.go), invoked from the window as a key or the palette would.
  * See docs/notes/shell-15-spaces.md.
  */
+import { guardRemoveSpaceArchive } from "@/stores/fileEditGuards";
 import { toast } from "sonner";
 import { errorMessage } from "@/api/stream";
 import { invokeConfirmed } from "@/stores/commands";
@@ -68,6 +69,8 @@ export function moveSpace(id: string, index: number): Promise<LayoutCommandResul
  * Resolves whether it was removed.
  */
 export async function removeSpace(id: string, choice: RemoveChoice): Promise<boolean> {
+  // Archiving its threads ends their files' unsaved edits for good: asked first. Moving them keeps them.
+  if (choice.kind === "archive" && !(await guardRemoveSpaceArchive(id))) return false;
   try {
     const res = await invokeConfirmed("space.remove", removeSpaceArgs(id, choice), getUiContext(), undefined, { ask: () => Promise.resolve(true) });
     return res !== null;

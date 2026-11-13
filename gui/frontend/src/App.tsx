@@ -37,6 +37,7 @@ import { useAttentionCount } from "@/stores/threads";
 import { startZoomSync } from "@/lib/zoom";
 import { useUiStore, type FocusRegion } from "@/stores/ui";
 import { startViewSync } from "@/stores/views";
+import { startFileEditGuards } from "@/stores/fileEditGuards";
 import { startArchiveCleanup } from "@/stores/archiveCleanup";
 import { startWelcomeSync } from "@/stores/welcome";
 import { startDockAlerts } from "@/stores/dockAlerts";
@@ -72,6 +73,7 @@ function startApp(): () => void {
     installKeybindings(),
     startViewSync(),
     startArchiveCleanup(),
+    startFileEditGuards(),
     startWelcomeSync(),
     startUpdateSync(),
     startMenuCommands(),
