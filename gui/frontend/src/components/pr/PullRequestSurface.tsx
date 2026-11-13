@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey, useViewerLogin } from "@/stores/gh";
 import { useCurrentTarget } from "@/shell/host";
 import { pullRequestDiffResource, warmPullRequestDiff } from "@/stores/prDiff";
-import { prTabKey, setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
+import { setInnerTab, usePrPanelStore, type PrInnerTab } from "@/stores/prPanel";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
 import { Banner } from "./Banner";
 import { ago, timeline } from "./model";
@@ -190,13 +190,14 @@ function Centered({ icon: Icon, title, children, testId }: { icon: typeof Search
 /**
  * The Pull request surface: one tab of the side panel showing a pull request's detail
  * (GhService.GetPullRequestDetail through pullRequestDetailResource), modeled on T3
- * Code's panel. Inner view state lives in stores/prPanel.ts per panel tab. While the detail
+ * Code's panel. Inner view state lives in stores/prPanel.ts per tab. While the detail
  * is on its way the row the GUI already holds paints the header and what it can of the box
  * (seed.ts), and no action shows; with no row, the skeleton.
  */
 export function PullRequestSurface({ tabId, slug, number }: { tabId: string; slug: string; number: number }) {
   const panelKey = useCurrentTarget() ?? "";
-  const tabKey = prTabKey(panelKey, tabId);
+  // Inner view state is the tab's own (stores/prPanel.ts), linked to a thread or not.
+  const tabKey = tabId;
   const prRef = useMemo<PrRef>(() => ({ slug, number }), [slug, number]);
   const key = pullRequestKey(slug, number);
   useEffect(() => pullRequestDetailResource.watch(key), [key]);

@@ -139,7 +139,6 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
         collisionPadding={POPUP_COLLISION_PADDING}
         className={cn("w-80", POPUP_FIT)}
         data-testid="pr-menu"
-        data-region="panel"
         onKeyDown={stopPlainKeys}
         onPointerDownOutside={(e) => {
           // The ⋯ button toggles the menu itself. While the menu fades out its layer is

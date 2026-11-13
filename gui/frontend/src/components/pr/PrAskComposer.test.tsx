@@ -63,13 +63,15 @@ describe("composerKeyAction", () => {
 describe("PrAskComposer", () => {
   const input = () => screen.getByTestId("pr-ask-input");
 
-  it("Enter sends the question through startPrThread, closes on success and hands focus to the panel", async () => {
+  it("Enter sends the question through startPrThread, closes on success and hands focus to its pane", async () => {
     startPrThread.mockResolvedValueOnce("s-1");
     const onClose = vi.fn();
     render(
-      <aside data-region="panel" tabIndex={-1} data-testid="panel">
-        <PrAskComposer prRef={REF} focusRequest={1} onClose={onClose} />
-      </aside>,
+      <section data-pane-box>
+        <div role="tabpanel" data-testid="pane-body">
+          <PrAskComposer prRef={REF} focusRequest={1} onClose={onClose} />
+        </div>
+      </section>,
     );
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(input());
@@ -80,8 +82,8 @@ describe("PrAskComposer", () => {
     await vi.waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-    // If the daemon's FocusThread never arrives, panel keys still work.
-    expect(document.activeElement).toBe(screen.getByTestId("panel"));
+    // If the daemon's FocusThread never arrives, the pane's keys still work.
+    expect(document.activeElement).toBe(screen.getByTestId("pane-body"));
   });
 
   it("an IME Enter (keyCode 229) does not send", () => {

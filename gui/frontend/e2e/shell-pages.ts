@@ -56,9 +56,7 @@ export async function openPrBesidePage(page: Page, n: number, width?: number): P
 
 /**
  * Thread `thread` (pane p-1) with pull request `n` as its linked tab in a pane to its right
- * (PR_PANE), that pane focused; `width` sizes it. A linked tab keeps its inner state (the Code
- * tab, a section folded) across a layout change; an unlinked one does not (pr-panel.spec.ts's
- * shell gap).
+ * (PR_PANE), that pane focused; `width` sizes it.
  */
 export async function openPrBesideThread(page: Page, thread: string, n: number, width?: number): Promise<void> {
   await openLayout(page, rowNode([paneNode("p-1", [{ id: `t-${thread}`, kind: "thread", thread }]), paneNode(PR_PANE, [prTab(n, thread)])], [0.55, 0.45]), PR_PANE);

@@ -24,9 +24,7 @@ async function openPr145(page: Page): Promise<void> {
   await expect(page.getByTestId("pr-surface")).toBeVisible();
 }
 
-// Shell gap: a panel surface in a shell pane has no scroll area (the pane body is not the side panel
-// body's [data-scroll-root] with overflow auto): the pull request is cut at the pane's foot and never scrolls.
-test.fixme("the fetch landing behind a stale copy leaves the panel where it was scrolled", async ({ page }) => {
+test("the fetch landing behind a stale copy leaves the panel where it was scrolled", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 500 });
   await openPrBesidePage(page, 145);
   await page.getByTestId("pr-tab-activity").click();

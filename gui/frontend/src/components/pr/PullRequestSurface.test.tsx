@@ -234,8 +234,7 @@ describe("Activity", () => {
     expect(byTestId("pr-timeline").dataset.order).toBe("oldest");
   });
 
-  // Shell gap: prPanel's pruneClosedTabs keeps state by place target (pane:<id>), but an unlinked tab's surface keys it by "" (panelKeyOfTab), so any layout change drops it.
-  it.skip("inner tabs stay per tab on the Pull Requests page too (an unlinked tab)", async () => {
+  it("inner tabs stay per tab on the Pull Requests page too (an unlinked tab)", async () => {
     renderPrPanel();
     await openPr(145);
     fireEvent.click(byTestId("pr-tab-activity"));
@@ -457,6 +456,18 @@ describe("the ⋯ menu", () => {
     expect(urlsOpened().at(-1)).toBe(`https://github.com/${SLUG}/pull/145`);
   });
 
+  it("the pane dispatches the surface's own key: shift+cmd+c copies the link, not from a text field", async () => {
+    renderPrPanel();
+    await openPr(145);
+    fireEvent.keyDown(byTestId("pr-title"), { key: "c", code: "KeyC", metaKey: true, shiftKey: true });
+    expect(copyText).toHaveBeenCalledExactlyOnceWith(`https://github.com/${SLUG}/pull/145`);
+    await expectToast("Link copied");
+    openMenu();
+    await pick(byTestId("pr-menu-ask"));
+    fireEvent.keyDown(input("pr-ask-input"), { key: "c", code: "KeyC", metaKey: true, shiftKey: true });
+    expect(copyText).toHaveBeenCalledTimes(1);
+  });
+
   it("#138 (merged) offers Revert: it confirms, runs pr.revert and opens the new pull request as a tab", async () => {
     renderPrPanel();
     await openPr(138);
@@ -593,8 +604,7 @@ describe("threads about a pull request", () => {
     expect(queryTestId("pr-ask")).toBeNull();
   });
 
-  // Shell gap: PanelComposer's close focuses the closest [data-region="panel"], which a shell pane does not have, so focus falls to the body.
-  it.skip("Escape from the Ask composer hands focus back to the tab's pane, so its keys keep working", async () => {
+  it("Escape from the Ask composer hands focus back to the tab's pane, so its keys keep working", async () => {
     renderPrPanel();
     await openPr(145);
     openMenu();
