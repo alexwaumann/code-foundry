@@ -295,7 +295,8 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     });
 
     it.each([
-      ["woken", "s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() }, "snoozed", "needs"],
+      // Woken: the top of Active, not Needs you (docs/notes/shell-model.md, "Sidebar").
+      ["woken", "s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() }, "snoozed", "attention"],
       ["unarchived", "s-7", { archivedAtMs: null, statusReason: "finished" }, "archived", "done"],
     ])("%s while open, it just moves to the main list", (_name, id, change, from, to) => {
       render(<Sidebar />);

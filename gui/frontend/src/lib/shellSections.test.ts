@@ -164,3 +164,50 @@ describe("a space tab's count (needsBySpace)", () => {
     expect(needsBySpace([t("done-a", { group: "done" }), t("idle-b", { spaceId: "B" })])).toEqual({});
   });
 });
+
+describe("a thread woken from a snooze (docs/notes/shell-25a-test-feedback.md)", () => {
+  const woke = (id: string, o: Partial<ShellListThread> = {}) => t(id, { group: "prompt", woke: true, ...o });
+  const W: ShellListThread[] = [
+    t("idle-a", { lastActivityAtMs: 100 }),
+    t("ask-a", { group: "prompt", statusChangedAtMs: 10 }),
+    woke("woke-old", { statusChangedAtMs: 30 }),
+    woke("woke-new", { statusChangedAtMs: 40 }),
+    woke("woke-b", { statusChangedAtMs: 50, spaceId: "B" }),
+    woke("woke-pin", { pinned: true, statusChangedAtMs: 60 }),
+    t("err-a", { group: "error", statusChangedAtMs: 1 }),
+    t("pin-a", { pinned: true }),
+  ];
+
+  it("is not under Needs you: it tops Active below the pinned threads and the drafts, most recently woken first", () => {
+    expect(view(W, { drafts: [{ id: "d-1", label: "x" }] })).toEqual([
+      "# Needs you 1",
+      "needs:ask-a",
+      "# Active 7",
+      "pinned:pin-a",
+      "pinned:woke-pin",
+      "draft:d-1",
+      "attention:woke-new",
+      "attention:woke-old",
+      "attention:err-a",
+      "idle:idle-a",
+    ]);
+  });
+
+  it("stays in its own space's Active, whatever the Needs you scope", () => {
+    expect(view(W, { currentSpaceId: "B" })).toEqual(["# Needs you 1", "needs:ask-a", "# Active 1", "attention:woke-b"]);
+  });
+
+  it("counts in no Needs you number: the list, the space tabs, the top bar's control, cmd+shift+a", () => {
+    expect(needsList(W, OPTS)).toEqual({ ids: ["ask-a"], any: true });
+    expect(needsBySpace(W)).toEqual({ A: 1 });
+    // Only woken threads: nothing waits on the user, so Needs you has no header and the top bar no control.
+    const only = [woke("w-1", { statusChangedAtMs: 1 }), t("i")];
+    expect(needsList(only, OPTS)).toEqual({ ids: [], any: false });
+    expect(needsBySpace(only)).toEqual({});
+    expect(view(only)).toEqual(["# Active 2", "attention:w-1", "idle:i"]);
+  });
+
+  it("walks in the keys' order where it is drawn", () => {
+    expect(shellThreadOrder(W, OPTS)).toEqual(["ask-a", "pin-a", "woke-pin", "woke-new", "woke-old", "err-a", "idle-a"]);
+  });
+});

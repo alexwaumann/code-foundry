@@ -6,7 +6,7 @@ import { useProjectsStore, type ProjectsData } from "./projects";
 import { getViewing, SUBAGENT_VIEW } from "./subagentView";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { inSidebar, type ThreadsById } from "@/lib/inSidebar";
-import { isThreadGroup, threadGroup } from "@/lib/thread";
+import { isThreadGroup, statusKind, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
 import { PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
 import { quickTerminalOf } from "@/shell/quickTerminal";
@@ -126,7 +126,7 @@ const SEP = "\u0001";
 /**
  * One string per thread for the sidebar list: id + pin + group + archive time + snooze
  * end + hidden + its band's sort time (lib/tree.ts bandSortTimes: the status change for
- * attention and done, the last activity for idle). Name, model, a working thread's activity
+ * attention and done, the last activity for idle) + woken from a snooze. Name, model, a working thread's activity
  * and the status line's text don't rebuild the list; a question turning into a finished
  * turn, an idle thread starting work, a new prompt, archiving, snoozing, its creator
  * being removed (lib/inSidebar.ts) and their undoing do, since it moves. In the store's
@@ -145,12 +145,13 @@ export function encodeThreadListKey(id: string, x: ThreadView | undefined, byId:
   const hidden = x !== undefined && !inSidebar(x, byId);
   const group = x ? threadGroup(x) : "idle";
   const times = x ? bandSortTimes({ ...x, group }) : { statusChangedAtMs: null, lastActivityAtMs: null };
-  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), ms(x?.savedAtMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs)].join(SEP);
+  const woke = x !== undefined && statusKind(x) === "snoozeEnded";
+  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), ms(x?.savedAtMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs), woke ? "1" : ""].join(SEP);
 }
 
 export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   return keys.map((k) => {
-    const [id = "", pinned = "", group = "", archived = "", snoozed = "", saved = "", hidden = "", statusChanged = "", lastActivity = ""] = k.split(SEP);
+    const [id = "", pinned = "", group = "", archived = "", snoozed = "", saved = "", hidden = "", statusChanged = "", lastActivity = "", woke = ""] = k.split(SEP);
     return {
       id,
       pinned: pinned === "1",
@@ -161,6 +162,7 @@ export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
       lastActivityAtMs: lastActivity === "" ? null : Number(lastActivity),
       ...(saved === "" ? {} : { savedAtMs: Number(saved) }),
       ...(hidden === "1" ? { hidden: true } : {}),
+      ...(woke === "1" ? { woke: true } : {}),
     };
   });
 }

@@ -91,7 +91,7 @@ describe("the terminal the user is on, in the command context", () => {
 describe("the sidebar list's keys", () => {
   const thread = (o: Partial<ThreadView>) =>
     ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", statusChangedAtMs: 100, lastActivityAtMs: 200, ...o }) as ThreadView;
-  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null; statusChangedAtMs: number | null; lastActivityAtMs: number | null; hidden?: true };
+  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null; statusChangedAtMs: number | null; lastActivityAtMs: number | null; hidden?: true; woke?: true };
   // The keys carry only the band's sort time: the last activity for idle, the status change for attention and done.
   const IDLE = { statusChangedAtMs: null, lastActivityAtMs: 200 };
   const BY_STATUS = { statusChangedAtMs: 100, lastActivityAtMs: null };
@@ -108,13 +108,13 @@ describe("the sidebar list's keys", () => {
     ["idle, times unknown", { statusChangedAtMs: null, lastActivityAtMs: null }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...NONE }],
     ["pinned and busy", { pinned: true, status: "busy" }, { pinned: true, group: "working", archivedAtMs: null, snoozedUntilMs: null, ...NONE }],
     // Needs you lists a pinned thread that asks by its ask's time, like any other.
-    ["pinned and asking", { pinned: true, status: "attention", statusReason: "snooze ended" }, { pinned: true, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS }],
+    ["pinned and asking", { pinned: true, status: "attention", statusReason: "permission: Bash" }, { pinned: true, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS }],
     ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123, snoozedUntilMs: null, ...NONE }],
     ["snoozed", { state: "disconnected", snoozedUntilMs: 1760518800000 }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 1760518800000, ...NONE }],
     [
-      "woken (snooze ended)",
+      "woken (snooze ended): marked, for the top of Active rather than Needs you",
       { state: "disconnected", status: "attention", statusReason: "snooze ended" },
-      { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS },
+      { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS, woke: true },
     ],
     ["created by a thread, its creator present: hidden", { createdBy: "p" }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...IDLE, hidden: true }],
     ["created by a thread, its creator removed: shown", { createdBy: "gone" }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...IDLE }],
@@ -145,7 +145,7 @@ describe("the sidebar list's keys", () => {
   });
 
   it("Needs you is one order, drawn and walked by the keys: most recent ask first, a pinned asker too", () => {
-    const ask = (id: string, at: number, pinned = false) => thread({ id, pinned, status: "attention", statusReason: "snooze ended", statusChangedAtMs: at });
+    const ask = (id: string, at: number, pinned = false) => thread({ id, pinned, status: "attention", statusReason: "question: Which?", statusChangedAtMs: at });
     useThreadsStore.setState({ byId: { a: ask("a", 100), b: ask("b", 300, true), c: ask("c", 200) }, order: ["a", "b", "c"] });
     const opts = { needsScope: "all" as const, currentSpaceId: "sp" };
     const s = useThreadsStore.getState();

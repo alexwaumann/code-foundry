@@ -43,6 +43,11 @@ export interface ListThread {
   statusChangedAtMs?: number | null;
   /** When it last did something (epoch ms): the idle band sorts by it, most recent first. Null or absent as for statusChangedAtMs. */
   lastActivityAtMs?: number | null;
+  /**
+   * Woken from a snooze and not yet opened (lib/thread.ts statusKind "snoozeEnded"): the shell's
+   * sidebar lists it at the top of Active, not under Needs you (lib/shellSections.ts). Absent: not.
+   */
+  woke?: boolean;
 }
 
 /**
