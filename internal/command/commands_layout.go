@@ -41,12 +41,16 @@ type LayoutDeps struct {
 	// being removed, and names threads in layout.show. Nil: unchecked, nothing archived,
 	// threads shown by id.
 	Thread ThreadBackend
+	// Settings reads layout.thread_info, the info card of a thread never toggled, for
+	// thread.info's toggle. Nil: shown.
+	Settings SettingsBackend
 }
 
 // layout is what every layout command runs against.
 type layout struct {
-	store  layoutstore.Store
-	thread ThreadBackend
+	store    layoutstore.Store
+	thread   ThreadBackend
+	settings SettingsBackend
 }
 
 var errNoLayout = connect.NewError(connect.CodeUnimplemented, errors.New("this daemon keeps no layout"))
@@ -282,7 +286,7 @@ func (l layout) resolveSpace(_ context.Context, arg, ref string) (string, error)
 // thread.open, thread.close, thread.space.move, composer.new and composer.draft.*, and the
 // tab, pane, split, space and draft id kinds they take.
 func RegisterLayout(r *Registry, d LayoutDeps) error {
-	l := layout{store: d.Layout, thread: d.Thread}
+	l := layout{store: d.Layout, thread: d.Thread, settings: d.Settings}
 	r.SetIDLister(TabID, l.ids(func(st *core.State, add func(string)) {
 		eachNode(st, func(n *core.Node) {
 			for _, tb := range n.Tabs {
@@ -313,7 +317,7 @@ func RegisterLayout(r *Registry, d LayoutDeps) error {
 	}))
 	r.SetRefResolver(SpaceID, l.resolveSpace)
 	var errs []error
-	for _, c := range slices.Concat(l.readCommands(), l.spaceCommands(), l.paneCommands(), l.tabCommands(), l.threadCommands(), l.composerCommands()) {
+	for _, c := range slices.Concat(l.readCommands(), l.spaceCommands(), l.paneCommands(), l.tabCommands(), l.threadCommands(), l.composerCommands(), []Command{l.threadInfoCommand()}) {
 		errs = append(errs, r.Register(c))
 	}
 	return errors.Join(errs...)

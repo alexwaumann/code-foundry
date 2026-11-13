@@ -94,7 +94,7 @@ func TestAllRegistersEveryDomain(t *testing.T) {
 		"pane.focus", "pane.move", "pane.split", "pane.close", "pane.resize",
 		"pane.focus.left", "pane.focus.down", "pane.focus.up", "pane.focus.right",
 		"pane.move.left", "pane.move.down", "pane.move.up", "pane.move.right",
-		"tab.focus", "tab.move", "tab.close", "tab.rename", "tab.auto-name", "tab.next", "tab.previous", "thread.open", "thread.close", "thread.space.move",
+		"tab.focus", "tab.move", "tab.close", "tab.rename", "tab.auto-name", "tab.next", "tab.previous", "thread.open", "thread.close", "thread.space.move", "thread.info",
 		"composer.new", "composer.draft.start", "composer.draft.label", "composer.draft.clear", "composer.draft.discard", "composer.draft.open",
 		"search.agent", "search.stop", "search.recent", "search.get", "search.open-hit", "search.seen", "search.find", "search.forget", "search.clear", "search.promote", "search.report",
 	}

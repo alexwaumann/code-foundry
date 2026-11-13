@@ -244,6 +244,7 @@ const (
 	KeyBackdrop                  = "appearance.backdrop"
 	KeyBackdropFile              = "appearance.backdrop_file"
 	KeySmartSwap                 = "layout.smart_swap"
+	KeyThreadInfo                = "layout.thread_info"
 	KeyNeedsScope                = "sidebar.needs_scope"
 	KeyDockBadge                 = "notifications.dock_badge"
 	KeyBounce                    = "notifications.bounce"
@@ -543,6 +544,12 @@ var staticFields = []Field{
 		Description: "When a thread's tab gains focus, panes showing another thread's diff, pull request or terminal switch to this thread's, if it is already open there. Nothing opens or closes.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Layout.SmartSwap },
+	},
+	{
+		Key: KeyThreadInfo, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Thread info by default",
+		Description: "Show the thread info card beside a thread's conversation when its pane is wide enough, for every thread you have not toggled it on. The header's button and ⌘⇧I show or hide it for one thread, and that thread keeps its choice.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Layout.ThreadInfo },
 	},
 	{
 		Key: KeyNeedsScope, Group: GroupSidebar, Page: PageAppearance, Section: "panes", Type: Enum, Title: "Needs you lists",

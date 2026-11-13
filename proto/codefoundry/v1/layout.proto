@@ -170,6 +170,9 @@ message ThreadLayout {
   // The pane its own tab was in when it closed; empty when the remembered tabs are to be
   // placed fresh.
   string remembered_pane_id = 5;
+  // Whether it shows its info card, as the user last toggled it; unset: never toggled (the
+  // setting layout.thread_info decides).
+  optional bool info = 6;
 }
 
 message QuickTerminal {
@@ -377,6 +380,8 @@ message LayoutOp {
     SetQuickOp set_quick = 50;
     ReplaceTerminalOp replace_terminal = 51;
     DropTerminalOp drop_terminal = 52;
+
+    SetInfoOp set_info = 60;
   }
 }
 
@@ -446,6 +451,12 @@ message SetQuickOp {
   double height = 3;
   // Drop its "Run again" line (QuickTerminal.ran): it ran, or the user dismissed it.
   bool forget_ran = 4;
+}
+
+// SetInfoOp shows or hides a thread's info card (ThreadLayout.info), kept with the thread.
+message SetInfoOp {
+  string thread_id = 1;
+  bool open = 2;
 }
 
 // ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs

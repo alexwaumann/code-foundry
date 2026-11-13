@@ -105,6 +105,8 @@ export interface ThreadLayoutView {
   quick: { open: boolean; height: number; ran: string } | null;
   remembered: readonly RememberedTabView[];
   rememberedPaneId: string;
+  /** Its info card shown or hidden as the user last toggled it (thread.info); null: never toggled, the setting layout.thread_info decides. */
+  info: boolean | null;
 }
 
 /** The whole layout at one rev. */
@@ -211,6 +213,7 @@ export function toThreadLayoutView(t: ThreadLayout): ThreadLayoutView {
     threadId: t.threadId,
     spaceId: t.spaceId,
     quick: t.quick ? { open: t.quick.open, height: t.quick.height, ran: t.quick.ran } : null,
+    info: t.info ?? null,
     remembered: t.remembered.map((r) => ({
       tab: toTab(r.tab),
       paneId: r.paneId,

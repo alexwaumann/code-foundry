@@ -206,7 +206,7 @@ func layoutTabToProto(tb *core.Tab) *v1.LayoutTab {
 }
 
 func threadLayoutToProto(id string, ts *core.ThreadState) *v1.ThreadLayout {
-	out := &v1.ThreadLayout{ThreadId: id, SpaceId: ts.Space}
+	out := &v1.ThreadLayout{ThreadId: id, SpaceId: ts.Space, Info: ts.Info}
 	if q := ts.Quick; q != nil {
 		out.Quick = &v1.QuickTerminal{Open: q.Open, Height: q.Height, Ran: q.Ran}
 	}

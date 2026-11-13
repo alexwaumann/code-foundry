@@ -48,6 +48,8 @@ export interface LayoutVerbsWorld {
   hasThread(id: string): boolean;
   /** A thread's project and worktree ("" without one): its own diff's checkout (view.thread-diff). */
   threadCheckout?(id: string): { projectId: string; worktreePath: string };
+  /** The setting layout.thread_info: the info card of a thread never toggled (thread.info's toggle). Absent: shown. */
+  threadInfoDefault?(): boolean;
 }
 
 const CATEGORY = "Layout";
@@ -191,6 +193,34 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         const id = a.id || ctx?.activeThreadId || "";
         if (!id) refuse("invalid argument: name a thread");
         return run({ op: "close_thread", thread: id }, () => `closed thread ${id}`);
+      },
+    },
+    {
+      // internal/command commands_thread_info.go: a thread's info card, kept with the thread.
+      cmd: {
+        name: "thread.info",
+        title: "Show or Hide Thread Info",
+        category: CATEGORY,
+        description: "Show or hide a thread's info card beside its conversation, kept with the thread. Default: toggle.",
+        keybindings: [],
+        noPalette: true,
+        args: [
+          str("id", "The thread (default: the focused tab's)", { positional: true }),
+          { name: "open", type: ArgType.BOOL, required: false, description: "Show it (default: toggle)" },
+          { name: "close", type: ArgType.BOOL, required: false, description: "Hide it (default: toggle)" },
+        ],
+      },
+      when: always,
+      run: (ctx, a) => {
+        if (a.open === "true" && a.close === "true") refuse("invalid argument: open: --open and --close together");
+        const st = L.state();
+        const id = a.id || ctx?.activeThreadId || "";
+        if (!id) refuse("invalid argument: id: the focused tab belongs to no thread: name one");
+        const now = st.threads?.[id]?.info ?? world.threadInfoDefault?.() ?? true;
+        const open = a.open === "true" ? true : a.close === "true" ? false : !now;
+        const out = run({ op: "set_info", thread: id, open }, () => `thread ${id}'s info card is ${open ? "shown" : "hidden"}`);
+        const parsed = JSON.parse(out.resultJson) as { rev: number };
+        return { ...out, resultJson: JSON.stringify({ rev: parsed.rev, thread_id: id, open }) };
       },
     },
     {

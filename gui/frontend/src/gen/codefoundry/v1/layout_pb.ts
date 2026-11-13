@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/layout.proto.
  */
 export const file_codefoundry_v1_layout: GenFile = /*@__PURE__*/
-  fileDesc("Chtjb2RlZm91bmRyeS92MS9sYXlvdXQucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIhIKEEdldExheW91dFJlcXVlc3QiOwoRR2V0TGF5b3V0UmVzcG9uc2USJgoGbGF5b3V0GAEgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0Is0BCgZMYXlvdXQSCwoDcmV2GAEgASgEEisKBnNwYWNlcxgCIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwYWNlEhgKEGN1cnJlbnRfc3BhY2VfaWQYAyABKAkSGAoQZGVmYXVsdF9zcGFjZV9pZBgEIAEoCRItCgd0aHJlYWRzGAUgAygLMhwuY29kZWZvdW5kcnkudjEuVGhyZWFkTGF5b3V0EhcKD2xlZ2FjeV9pbXBvcnRlZBgGIAEoCBINCgVuZXdlchgHIAMoCSKqAQoLTGF5b3V0U3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIoCgRyb290GAMgASgLMhouY29kZWZvdW5kcnkudjEuTGF5b3V0Tm9kZRIVCg1mb2N1c19wYW5lX2lkGAQgASgJEhMKC21ydV90YWJfaWRzGAUgAygJEisKBmRyYWZ0cxgGIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dERyYWZ0IpABCgtMYXlvdXREcmFmdBIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRI3CgZwYXJhbXMYAyADKAsyJy5jb2RlZm91bmRyeS52MS5MYXlvdXREcmFmdC5QYXJhbXNFbnRyeRotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIm4KCkxheW91dE5vZGUSKgoEcGFuZRgBIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dFBhbmVIABIsCgVzcGxpdBgCIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwbGl0SABCBgoEbm9kZSJYCgpMYXlvdXRQYW5lEgoKAmlkGAEgASgJEicKBHRhYnMYAiADKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISFQoNYWN0aXZlX3RhYl9pZBgDIAEoCSJ+CgtMYXlvdXRTcGxpdBIKCgJpZBgBIAEoCRImCgNkaXIYAiABKA4yGS5jb2RlZm91bmRyeS52MS5MYXlvdXREaXISLAoIY2hpbGRyZW4YAyADKAsyGi5jb2RlZm91bmRyeS52MS5MYXlvdXROb2RlEg0KBXNpemVzGAQgAygBIsgBCglMYXlvdXRUYWISCgoCaWQYASABKAkSDAoEa2luZBgCIAEoCRIRCgl0aHJlYWRfaWQYAyABKAkSCwoDa2V5GAQgASgJEjUKBnBhcmFtcxgFIAMoCzIlLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYi5QYXJhbXNFbnRyeRINCgV0aXRsZRgGIAEoCRIMCgRuYW1lGAcgASgJGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEisAEKDFRocmVhZExheW91dBIRCgl0aHJlYWRfaWQYASABKAkSEAoIc3BhY2VfaWQYAiABKAkSLAoFcXVpY2sYAyABKAsyHS5jb2RlZm91bmRyeS52MS5RdWlja1Rlcm1pbmFsEjEKCnJlbWVtYmVyZWQYBCADKAsyHS5jb2RlZm91bmRyeS52MS5SZW1lbWJlcmVkVGFiEhoKEnJlbWVtYmVyZWRfcGFuZV9pZBgFIAEoCSI6Cg1RdWlja1Rlcm1pbmFsEgwKBG9wZW4YASABKAgSDgoGaGVpZ2h0GAIgASgBEgsKA3JhbhgDIAEoCSLnAQoNUmVtZW1iZXJlZFRhYhImCgN0YWIYASABKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISDwoHcGFuZV9pZBgCIAEoCRINCgVpbmRleBgDIAEoBRIOCgZhY3RpdmUYBCABKAgSEAoIYWRqYWNlbnQYBSABKAgSLAoGYmVzaWRlGAYgASgLMhwuY29kZWZvdW5kcnkudjEuTGF5b3V0QmVzaWRlEiwKBWZyZXNoGAcgASgLMh0uY29kZWZvdW5kcnkudjEuRnJlc2hUZXJtaW5hbBIQCghzcGFjZV9pZBgIIAEoCSJiCgxMYXlvdXRCZXNpZGUSGgoSbmVpZ2hib3VyX3BhbmVfaWRzGAEgAygJEigKBGVkZ2UYAiABKA4yGi5jb2RlZm91bmRyeS52MS5MYXlvdXRFZGdlEgwKBGZyYWMYAyABKAEiKgoNRnJlc2hUZXJtaW5hbBIMCgRuYW1lGAEgASgJEgsKA3JhbhgCIAEoCSKRAQoLTGF5b3V0RXZlbnQSCwoDcmV2GAEgASgEEioKCHNuYXBzaG90GAIgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0SAASLAoFZGVsdGEYAyABKAsyGy5jb2RlZm91bmRyeS52MS5MYXlvdXREZWx0YUgAEhEKCWNsaWVudF9pZBgFIAEoCUIICgZjaGFuZ2UiggIKC0xheW91dERlbHRhEisKBnNwYWNlcxgBIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwYWNlEhkKEXJlbW92ZWRfc3BhY2VfaWRzGAIgAygJEhMKC3NwYWNlX29yZGVyGAMgAygJEhgKEGN1cnJlbnRfc3BhY2VfaWQYBCABKAkSGAoQZGVmYXVsdF9zcGFjZV9pZBgFIAEoCRItCgd0aHJlYWRzGAYgAygLMhwuY29kZWZvdW5kcnkudjEuVGhyZWFkTGF5b3V0EhoKEnJlbW92ZWRfdGhyZWFkX2lkcxgHIAMoCRIXCg9sZWdhY3lfaW1wb3J0ZWQYCCABKAgiTQoSQXBwbHlMYXlvdXRSZXF1ZXN0EiQKAm9wGAEgASgLMhguY29kZWZvdW5kcnkudjEuTGF5b3V0T3ASEQoJY2xpZW50X2lkGAIgASgJIoMDChNBcHBseUxheW91dFJlc3BvbnNlEgsKA3JldhgBIAEoBBIQCghzcGFjZV9pZBgCIAEoCRIPCgdwYW5lX2lkGAMgASgJEg4KBnRhYl9pZBgEIAEoCRIQCghleGlzdGluZxgFIAEoCBIpCgZjbG9zZWQYBiADKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISDAoEcnVsZRgHIAEoCRInCgRrZXB0GAggAygLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEigKBWVuZGVkGAkgAygLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEhQKDGJhY2tfdGFiX2lkcxgKIAMoCRIWCg5wbGFjZWRfdGFiX2lkcxgLIAMoCRIVCg1mcmVzaF90YWJfaWRzGAwgAygJEh0KFWZyZXNoX3F1aWNrX3RocmVhZF9pZBgPIAEoCRIYChBzd2FwcGVkX3BhbmVfaWRzGA0gAygJEhAKCGRyYWZ0X2lkGA4gASgJIkYKElNldFZpZXdwb3J0UmVxdWVzdBIRCgljbGllbnRfaWQYASABKAkSDQoFd2lkdGgYAiABKAESDgoGaGVpZ2h0GAMgASgBIhUKE1NldFZpZXdwb3J0UmVzcG9uc2UiUQoTSW1wb3J0TGVnYWN5UmVxdWVzdBISCgpwYW5lbF9qc29uGAEgASgJEhMKC2JvdHRvbV9qc29uGAIgASgJEhEKCWNsaWVudF9pZBgDIAEoCSLJAQoUSW1wb3J0TGVnYWN5UmVzcG9uc2USJgoGbGF5b3V0GAEgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0EhAKCGltcG9ydGVkGAIgASgIEjUKB3RocmVhZHMYAyADKAsyJC5jb2RlZm91bmRyeS52MS5MZWdhY3lJbXBvcnRlZFRocmVhZBIXCg9yZW1vdmVkX3RhYl9pZHMYBCADKAkSFgoOZm9sZGVkX3RhYl9pZHMYBSADKAkSDwoHZHJvcHBlZBgGIAMoCSJVChRMZWdhY3lJbXBvcnRlZFRocmVhZBIRCgl0aHJlYWRfaWQYASABKAkSDwoHdGFiX2lkcxgCIAMoCRIZChFxdWlja190ZXJtaW5hbF9pZBgDIAEoCSLeDQoITGF5b3V0T3ASMwoLb3Blbl90aHJlYWQYASABKAsyHC5jb2RlZm91bmRyeS52MS5PcGVuVGhyZWFkT3BIABI1CgxjbG9zZV90aHJlYWQYAiABKAsyHS5jb2RlZm91bmRyeS52MS5DbG9zZVRocmVhZE9wSAASNQoMb3Blbl9zdXJmYWNlGAMgASgLMh0uY29kZWZvdW5kcnkudjEuT3BlblN1cmZhY2VPcEgAEjMKC21vdmVfdGhyZWFkGAQgASgLMhwuY29kZWZvdW5kcnkudjEuTW92ZVRocmVhZE9wSAASOQoOYXJjaGl2ZV90aHJlYWQYBSABKAsyHy5jb2RlZm91bmRyeS52MS5BcmNoaXZlVGhyZWFkT3BIABI3Cg1zbm9vemVfdGhyZWFkGAYgASgLMh4uY29kZWZvdW5kcnkudjEuU25vb3plVGhyZWFkT3BIABIrCgdhZGRfdGFiGAogASgLMhguY29kZWZvdW5kcnkudjEuQWRkVGFiT3BIABIxCgpzcGxpdF9wYW5lGAsgASgLMhsuY29kZWZvdW5kcnkudjEuU3BsaXRQYW5lT3BIABItCghtb3ZlX3RhYhgMIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLk1vdmVUYWJPcEgAEi8KCW1vdmVfcGFuZRgNIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLk1vdmVQYW5lT3BIABIxCgptZXJnZV9wYW5lGA4gASgLMhsuY29kZWZvdW5kcnkudjEuTWVyZ2VQYW5lT3BIABIvCglzd2FwX3BhbmUYDyABKAsyGi5jb2RlZm91bmRyeS52MS5Td2FwUGFuZU9wSAASLwoJY2xvc2VfdGFiGBAgASgLMhouY29kZWZvdW5kcnkudjEuQ2xvc2VUYWJPcEgAEjEKCmNsb3NlX3BhbmUYESABKAsyGy5jb2RlZm91bmRyeS52MS5DbG9zZVBhbmVPcEgAEi8KCXNldF9zaXplcxgSIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlNldFNpemVzT3BIABIvCglmb2N1c190YWIYEyABKAsyGi5jb2RlZm91bmRyeS52MS5Gb2N1c1RhYk9wSAASMQoKZm9jdXNfcGFuZRgUIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkZvY3VzUGFuZU9wSAASOAoOc2V0X3RhYl9wYXJhbXMYFSABKAsyHi5jb2RlZm91bmRyeS52MS5TZXRUYWJQYXJhbXNPcEgAEjEKCnJlbmFtZV90YWIYFiABKAsyGy5jb2RlZm91bmRyeS52MS5SZW5hbWVUYWJPcEgAEi8KCW5ld19zcGFjZRgeIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLk5ld1NwYWNlT3BIABI1CgxyZW5hbWVfc3BhY2UYHyABKAsyHS5jb2RlZm91bmRyeS52MS5SZW5hbWVTcGFjZU9wSAASNQoMcmVtb3ZlX3NwYWNlGCAgASgLMh0uY29kZWZvdW5kcnkudjEuUmVtb3ZlU3BhY2VPcEgAEjkKDnJlb3JkZXJfc3BhY2VzGCEgASgLMh8uY29kZWZvdW5kcnkudjEuUmVvcmRlclNwYWNlc09wSAASNQoMc3dpdGNoX3NwYWNlGCIgASgLMh0uY29kZWZvdW5kcnkudjEuU3dpdGNoU3BhY2VPcEgAEjEKCm5ld190aHJlYWQYKCABKAsyGy5jb2RlZm91bmRyeS52MS5OZXdUaHJlYWRPcEgAEjMKC3N0YXJ0X2RyYWZ0GCkgASgLMhwuY29kZWZvdW5kcnkudjEuU3RhcnREcmFmdE9wSAASMwoLbGFiZWxfZHJhZnQYKiABKAsyHC5jb2RlZm91bmRyeS52MS5MYWJlbERyYWZ0T3BIABIzCgtjbGVhcl9kcmFmdBgrIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLkNsZWFyRHJhZnRPcEgAEjcKDWRpc2NhcmRfZHJhZnQYLCABKAsyHi5jb2RlZm91bmRyeS52MS5EaXNjYXJkRHJhZnRPcEgAEjEKCm9wZW5fZHJhZnQYLSABKAsyGy5jb2RlZm91bmRyeS52MS5PcGVuRHJhZnRPcEgAEi8KCXNldF9xdWljaxgyIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLlNldFF1aWNrT3BIABI9ChByZXBsYWNlX3Rlcm1pbmFsGDMgASgLMiEuY29kZWZvdW5kcnkudjEuUmVwbGFjZVRlcm1pbmFsT3BIABI3Cg1kcm9wX3Rlcm1pbmFsGDQgASgLMh4uY29kZWZvdW5kcnkudjEuRHJvcFRlcm1pbmFsT3BIAEIECgJvcCKhAQoMT3BlblRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCRIPCgdwYW5lX2lkGAIgASgJEg0KBWZvY3VzGAMgASgIEhYKDmNvbXBvc2VfdGFiX2lkGAQgASgJEhIKBWluZGV4GAUgASgFSACIAQESKAoEZWRnZRgGIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dEVkZ2VCCAoGX2luZGV4IiIKDUNsb3NlVGhyZWFkT3ASEQoJdGhyZWFkX2lkGAEgASgJIoABCg1PcGVuU3VyZmFjZU9wEiYKA3RhYhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIPCgdwYW5lX2lkGAIgASgJEg0KBWZvY3VzGAMgASgIEhAKCHNwYWNlX2lkGAQgASgJEhUKDWJlaGluZF90YWJfaWQYBSABKAkiMwoMTW92ZVRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCRIQCghzcGFjZV9pZBgCIAEoCSIkCg9BcmNoaXZlVGhyZWFkT3ASEQoJdGhyZWFkX2lkGAEgASgJIpgBCg5Tbm9vemVUaHJlYWRPcBIRCgl0aHJlYWRfaWQYASABKAkSNAoDcmFuGAIgAygLMicuY29kZWZvdW5kcnkudjEuU25vb3plVGhyZWFkT3AuUmFuRW50cnkSEQoJcXVpY2tfcmFuGAMgASgJGioKCFJhbkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiUQoKU2V0UXVpY2tPcBIRCgl0aHJlYWRfaWQYASABKAkSDAoEb3BlbhgCIAEoCBIOCgZoZWlnaHQYAyABKAESEgoKZm9yZ2V0X3JhbhgEIAEoCCIzChFSZXBsYWNlVGVybWluYWxPcBIOCgZvbGRfaWQYASABKAkSDgoGbmV3X2lkGAIgASgJIiUKDkRyb3BUZXJtaW5hbE9wEhMKC3Rlcm1pbmFsX2lkGAEgASgJIoIBCghBZGRUYWJPcBIQCghzcGFjZV9pZBgBIAEoCRIPCgdwYW5lX2lkGAIgASgJEiYKA3RhYhgDIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhISCgVpbmRleBgEIAEoBUgAiAEBEg0KBWZvY3VzGAUgASgIQggKBl9pbmRleCKNAQoLU3BsaXRQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCRIoCgRlZGdlGAIgASgOMhouY29kZWZvdW5kcnkudjEuTGF5b3V0RWRnZRImCgN0YWIYAyABKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISDAoEZnJhYxgEIAEoARINCgVmb2N1cxgFIAEoCCKUAQoJTW92ZVRhYk9wEg4KBnRhYl9pZBgBIAEoCRIQCghzcGFjZV9pZBgCIAEoCRIPCgdwYW5lX2lkGAMgASgJEhIKBWluZGV4GAQgASgFSACIAQESKAoEZWRnZRgFIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dEVkZ2USDAoEZnJhYxgGIAEoAUIICgZfaW5kZXgifwoKTW92ZVBhbmVPcBIPCgdwYW5lX2lkGAEgASgJEhYKDnRhcmdldF9wYW5lX2lkGAIgASgJEigKBGVkZ2UYAyABKA4yGi5jb2RlZm91bmRyeS52MS5MYXlvdXRFZGdlEgwKBGZyYWMYBCABKAESEAoIc3BhY2VfaWQYBSABKAkiVAoLTWVyZ2VQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCRIWCg50YXJnZXRfcGFuZV9pZBgCIAEoCRISCgVpbmRleBgDIAEoBUgAiAEBQggKBl9pbmRleCI1CgpTd2FwUGFuZU9wEg8KB3BhbmVfaWQYASABKAkSFgoOdGFyZ2V0X3BhbmVfaWQYAiABKAkiHAoKQ2xvc2VUYWJPcBIOCgZ0YWJfaWQYASABKAkiHgoLQ2xvc2VQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCSItCgpTZXRTaXplc09wEhAKCHNwbGl0X2lkGAEgASgJEg0KBXNpemVzGAIgAygBIhwKCkZvY3VzVGFiT3ASDgoGdGFiX2lkGAEgASgJIh4KC0ZvY3VzUGFuZU9wEg8KB3BhbmVfaWQYASABKAkiqQEKDlNldFRhYlBhcmFtc09wEg4KBnRhYl9pZBgBIAEoCRI6CgZwYXJhbXMYAiADKAsyKi5jb2RlZm91bmRyeS52MS5TZXRUYWJQYXJhbXNPcC5QYXJhbXNFbnRyeRISCgV0aXRsZRgDIAEoCUgAiAEBGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAFCCAoGX3RpdGxlIisKC1JlbmFtZVRhYk9wEg4KBnRhYl9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIjAKCk5ld1NwYWNlT3ASDAoEbmFtZRgBIAEoCRIUCgxtYWtlX2N1cnJlbnQYAiABKAgiLwoNUmVuYW1lU3BhY2VPcBIQCghzcGFjZV9pZBgBIAEoCRIMCgRuYW1lGAIgASgJIjYKDVJlbW92ZVNwYWNlT3ASEAoIc3BhY2VfaWQYASABKAkSEwoLdG9fc3BhY2VfaWQYAiABKAkiJAoPUmVvcmRlclNwYWNlc09wEhEKCXNwYWNlX2lkcxgBIAMoCSIhCg1Td2l0Y2hTcGFjZU9wEhAKCHNwYWNlX2lkGAEgASgJIqcBCgtOZXdUaHJlYWRPcBIQCghzcGFjZV9pZBgBIAEoCRIPCgdwYW5lX2lkGAIgASgJEjcKBnBhcmFtcxgDIAMoCzInLmNvZGVmb3VuZHJ5LnYxLk5ld1RocmVhZE9wLlBhcmFtc0VudHJ5Eg0KBWZvY3VzGAQgASgIGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiPwoMU3RhcnREcmFmdE9wEg4KBnRhYl9pZBgBIAEoCRIQCghkcmFmdF9pZBgCIAEoCRINCgVsYWJlbBgDIAEoCSIvCgxMYWJlbERyYWZ0T3ASEAoIZHJhZnRfaWQYASABKAkSDQoFbGFiZWwYAiABKAkiIAoMQ2xlYXJEcmFmdE9wEhAKCGRyYWZ0X2lkGAEgASgJIiIKDkRpc2NhcmREcmFmdE9wEhAKCGRyYWZ0X2lkGAEgASgJIi4KC09wZW5EcmFmdE9wEhAKCGRyYWZ0X2lkGAEgASgJEg0KBWZvY3VzGAIgASgIKk8KCUxheW91dERpchIaChZMQVlPVVRfRElSX1VOU1BFQ0lGSUVEEAASEgoOTEFZT1VUX0RJUl9ST1cQARISCg5MQVlPVVRfRElSX0NPTBACKoMBCgpMYXlvdXRFZGdlEhsKF0xBWU9VVF9FREdFX1VOU1BFQ0lGSUVEEAASFAoQTEFZT1VUX0VER0VfTEVGVBABEhUKEUxBWU9VVF9FREdFX1JJR0hUEAISEwoPTEFZT1VUX0VER0VfVE9QEAMSFgoSTEFZT1VUX0VER0VfQk9UVE9NEAQy6AIKDUxheW91dFNlcnZpY2USTAoDR2V0EiAuY29kZWZvdW5kcnkudjEuR2V0TGF5b3V0UmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLkdldExheW91dFJlc3BvbnNlIgASUgoFQXBwbHkSIi5jb2RlZm91bmRyeS52MS5BcHBseUxheW91dFJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5BcHBseUxheW91dFJlc3BvbnNlIgASWAoLU2V0Vmlld3BvcnQSIi5jb2RlZm91bmRyeS52MS5TZXRWaWV3cG9ydFJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5TZXRWaWV3cG9ydFJlc3BvbnNlIgASWwoMSW1wb3J0TGVnYWN5EiMuY29kZWZvdW5kcnkudjEuSW1wb3J0TGVnYWN5UmVxdWVzdBokLmNvZGVmb3VuZHJ5LnYxLkltcG9ydExlZ2FjeVJlc3BvbnNlIgBCwwEKEmNvbS5jb2RlZm91bmRyeS52MUILTGF5b3V0UHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Chtjb2RlZm91bmRyeS92MS9sYXlvdXQucHJvdG8SDmNvZGVmb3VuZHJ5LnYxIhIKEEdldExheW91dFJlcXVlc3QiOwoRR2V0TGF5b3V0UmVzcG9uc2USJgoGbGF5b3V0GAEgASgLMhYuY29kZWZvdW5kcnkudjEuTGF5b3V0Is0BCgZMYXlvdXQSCwoDcmV2GAEgASgEEisKBnNwYWNlcxgCIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwYWNlEhgKEGN1cnJlbnRfc3BhY2VfaWQYAyABKAkSGAoQZGVmYXVsdF9zcGFjZV9pZBgEIAEoCRItCgd0aHJlYWRzGAUgAygLMhwuY29kZWZvdW5kcnkudjEuVGhyZWFkTGF5b3V0EhcKD2xlZ2FjeV9pbXBvcnRlZBgGIAEoCBINCgVuZXdlchgHIAMoCSKqAQoLTGF5b3V0U3BhY2USCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIoCgRyb290GAMgASgLMhouY29kZWZvdW5kcnkudjEuTGF5b3V0Tm9kZRIVCg1mb2N1c19wYW5lX2lkGAQgASgJEhMKC21ydV90YWJfaWRzGAUgAygJEisKBmRyYWZ0cxgGIAMoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dERyYWZ0IpABCgtMYXlvdXREcmFmdBIKCgJpZBgBIAEoCRINCgVsYWJlbBgCIAEoCRI3CgZwYXJhbXMYAyADKAsyJy5jb2RlZm91bmRyeS52MS5MYXlvdXREcmFmdC5QYXJhbXNFbnRyeRotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIm4KCkxheW91dE5vZGUSKgoEcGFuZRgBIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dFBhbmVIABIsCgVzcGxpdBgCIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLkxheW91dFNwbGl0SABCBgoEbm9kZSJYCgpMYXlvdXRQYW5lEgoKAmlkGAEgASgJEicKBHRhYnMYAiADKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISFQoNYWN0aXZlX3RhYl9pZBgDIAEoCSJ+CgtMYXlvdXRTcGxpdBIKCgJpZBgBIAEoCRImCgNkaXIYAiABKA4yGS5jb2RlZm91bmRyeS52MS5MYXlvdXREaXISLAoIY2hpbGRyZW4YAyADKAsyGi5jb2RlZm91bmRyeS52MS5MYXlvdXROb2RlEg0KBXNpemVzGAQgAygBIsgBCglMYXlvdXRUYWISCgoCaWQYASABKAkSDAoEa2luZBgCIAEoCRIRCgl0aHJlYWRfaWQYAyABKAkSCwoDa2V5GAQgASgJEjUKBnBhcmFtcxgFIAMoCzIlLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYi5QYXJhbXNFbnRyeRINCgV0aXRsZRgGIAEoCRIMCgRuYW1lGAcgASgJGi0KC1BhcmFtc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEizAEKDFRocmVhZExheW91dBIRCgl0aHJlYWRfaWQYASABKAkSEAoIc3BhY2VfaWQYAiABKAkSLAoFcXVpY2sYAyABKAsyHS5jb2RlZm91bmRyeS52MS5RdWlja1Rlcm1pbmFsEjEKCnJlbWVtYmVyZWQYBCADKAsyHS5jb2RlZm91bmRyeS52MS5SZW1lbWJlcmVkVGFiEhoKEnJlbWVtYmVyZWRfcGFuZV9pZBgFIAEoCRIRCgRpbmZvGAYgASgISACIAQFCBwoFX2luZm8iOgoNUXVpY2tUZXJtaW5hbBIMCgRvcGVuGAEgASgIEg4KBmhlaWdodBgCIAEoARILCgNyYW4YAyABKAki5wEKDVJlbWVtYmVyZWRUYWISJgoDdGFiGAEgASgLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEg8KB3BhbmVfaWQYAiABKAkSDQoFaW5kZXgYAyABKAUSDgoGYWN0aXZlGAQgASgIEhAKCGFkamFjZW50GAUgASgIEiwKBmJlc2lkZRgGIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLkxheW91dEJlc2lkZRIsCgVmcmVzaBgHIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLkZyZXNoVGVybWluYWwSEAoIc3BhY2VfaWQYCCABKAkiYgoMTGF5b3V0QmVzaWRlEhoKEm5laWdoYm91cl9wYW5lX2lkcxgBIAMoCRIoCgRlZGdlGAIgASgOMhouY29kZWZvdW5kcnkudjEuTGF5b3V0RWRnZRIMCgRmcmFjGAMgASgBIioKDUZyZXNoVGVybWluYWwSDAoEbmFtZRgBIAEoCRILCgNyYW4YAiABKAkikQEKC0xheW91dEV2ZW50EgsKA3JldhgBIAEoBBIqCghzbmFwc2hvdBgCIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLkxheW91dEgAEiwKBWRlbHRhGAMgASgLMhsuY29kZWZvdW5kcnkudjEuTGF5b3V0RGVsdGFIABIRCgljbGllbnRfaWQYBSABKAlCCAoGY2hhbmdlIoICCgtMYXlvdXREZWx0YRIrCgZzcGFjZXMYASADKAsyGy5jb2RlZm91bmRyeS52MS5MYXlvdXRTcGFjZRIZChFyZW1vdmVkX3NwYWNlX2lkcxgCIAMoCRITCgtzcGFjZV9vcmRlchgDIAMoCRIYChBjdXJyZW50X3NwYWNlX2lkGAQgASgJEhgKEGRlZmF1bHRfc3BhY2VfaWQYBSABKAkSLQoHdGhyZWFkcxgGIAMoCzIcLmNvZGVmb3VuZHJ5LnYxLlRocmVhZExheW91dBIaChJyZW1vdmVkX3RocmVhZF9pZHMYByADKAkSFwoPbGVnYWN5X2ltcG9ydGVkGAggASgIIk0KEkFwcGx5TGF5b3V0UmVxdWVzdBIkCgJvcBgBIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLkxheW91dE9wEhEKCWNsaWVudF9pZBgCIAEoCSKDAwoTQXBwbHlMYXlvdXRSZXNwb25zZRILCgNyZXYYASABKAQSEAoIc3BhY2VfaWQYAiABKAkSDwoHcGFuZV9pZBgDIAEoCRIOCgZ0YWJfaWQYBCABKAkSEAoIZXhpc3RpbmcYBSABKAgSKQoGY2xvc2VkGAYgAygLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEgwKBHJ1bGUYByABKAkSJwoEa2VwdBgIIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIoCgVlbmRlZBgJIAMoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIUCgxiYWNrX3RhYl9pZHMYCiADKAkSFgoOcGxhY2VkX3RhYl9pZHMYCyADKAkSFQoNZnJlc2hfdGFiX2lkcxgMIAMoCRIdChVmcmVzaF9xdWlja190aHJlYWRfaWQYDyABKAkSGAoQc3dhcHBlZF9wYW5lX2lkcxgNIAMoCRIQCghkcmFmdF9pZBgOIAEoCSJGChJTZXRWaWV3cG9ydFJlcXVlc3QSEQoJY2xpZW50X2lkGAEgASgJEg0KBXdpZHRoGAIgASgBEg4KBmhlaWdodBgDIAEoASIVChNTZXRWaWV3cG9ydFJlc3BvbnNlIlEKE0ltcG9ydExlZ2FjeVJlcXVlc3QSEgoKcGFuZWxfanNvbhgBIAEoCRITCgtib3R0b21fanNvbhgCIAEoCRIRCgljbGllbnRfaWQYAyABKAkiyQEKFEltcG9ydExlZ2FjeVJlc3BvbnNlEiYKBmxheW91dBgBIAEoCzIWLmNvZGVmb3VuZHJ5LnYxLkxheW91dBIQCghpbXBvcnRlZBgCIAEoCBI1Cgd0aHJlYWRzGAMgAygLMiQuY29kZWZvdW5kcnkudjEuTGVnYWN5SW1wb3J0ZWRUaHJlYWQSFwoPcmVtb3ZlZF90YWJfaWRzGAQgAygJEhYKDmZvbGRlZF90YWJfaWRzGAUgAygJEg8KB2Ryb3BwZWQYBiADKAkiVQoUTGVnYWN5SW1wb3J0ZWRUaHJlYWQSEQoJdGhyZWFkX2lkGAEgASgJEg8KB3RhYl9pZHMYAiADKAkSGQoRcXVpY2tfdGVybWluYWxfaWQYAyABKAkijQ4KCExheW91dE9wEjMKC29wZW5fdGhyZWFkGAEgASgLMhwuY29kZWZvdW5kcnkudjEuT3BlblRocmVhZE9wSAASNQoMY2xvc2VfdGhyZWFkGAIgASgLMh0uY29kZWZvdW5kcnkudjEuQ2xvc2VUaHJlYWRPcEgAEjUKDG9wZW5fc3VyZmFjZRgDIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLk9wZW5TdXJmYWNlT3BIABIzCgttb3ZlX3RocmVhZBgEIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLk1vdmVUaHJlYWRPcEgAEjkKDmFyY2hpdmVfdGhyZWFkGAUgASgLMh8uY29kZWZvdW5kcnkudjEuQXJjaGl2ZVRocmVhZE9wSAASNwoNc25vb3plX3RocmVhZBgGIAEoCzIeLmNvZGVmb3VuZHJ5LnYxLlNub296ZVRocmVhZE9wSAASKwoHYWRkX3RhYhgKIAEoCzIYLmNvZGVmb3VuZHJ5LnYxLkFkZFRhYk9wSAASMQoKc3BsaXRfcGFuZRgLIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLlNwbGl0UGFuZU9wSAASLQoIbW92ZV90YWIYDCABKAsyGS5jb2RlZm91bmRyeS52MS5Nb3ZlVGFiT3BIABIvCgltb3ZlX3BhbmUYDSABKAsyGi5jb2RlZm91bmRyeS52MS5Nb3ZlUGFuZU9wSAASMQoKbWVyZ2VfcGFuZRgOIAEoCzIbLmNvZGVmb3VuZHJ5LnYxLk1lcmdlUGFuZU9wSAASLwoJc3dhcF9wYW5lGA8gASgLMhouY29kZWZvdW5kcnkudjEuU3dhcFBhbmVPcEgAEi8KCWNsb3NlX3RhYhgQIAEoCzIaLmNvZGVmb3VuZHJ5LnYxLkNsb3NlVGFiT3BIABIxCgpjbG9zZV9wYW5lGBEgASgLMhsuY29kZWZvdW5kcnkudjEuQ2xvc2VQYW5lT3BIABIvCglzZXRfc2l6ZXMYEiABKAsyGi5jb2RlZm91bmRyeS52MS5TZXRTaXplc09wSAASLwoJZm9jdXNfdGFiGBMgASgLMhouY29kZWZvdW5kcnkudjEuRm9jdXNUYWJPcEgAEjEKCmZvY3VzX3BhbmUYFCABKAsyGy5jb2RlZm91bmRyeS52MS5Gb2N1c1BhbmVPcEgAEjgKDnNldF90YWJfcGFyYW1zGBUgASgLMh4uY29kZWZvdW5kcnkudjEuU2V0VGFiUGFyYW1zT3BIABIxCgpyZW5hbWVfdGFiGBYgASgLMhsuY29kZWZvdW5kcnkudjEuUmVuYW1lVGFiT3BIABIvCgluZXdfc3BhY2UYHiABKAsyGi5jb2RlZm91bmRyeS52MS5OZXdTcGFjZU9wSAASNQoMcmVuYW1lX3NwYWNlGB8gASgLMh0uY29kZWZvdW5kcnkudjEuUmVuYW1lU3BhY2VPcEgAEjUKDHJlbW92ZV9zcGFjZRggIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlJlbW92ZVNwYWNlT3BIABI5Cg5yZW9yZGVyX3NwYWNlcxghIAEoCzIfLmNvZGVmb3VuZHJ5LnYxLlJlb3JkZXJTcGFjZXNPcEgAEjUKDHN3aXRjaF9zcGFjZRgiIAEoCzIdLmNvZGVmb3VuZHJ5LnYxLlN3aXRjaFNwYWNlT3BIABIxCgpuZXdfdGhyZWFkGCggASgLMhsuY29kZWZvdW5kcnkudjEuTmV3VGhyZWFkT3BIABIzCgtzdGFydF9kcmFmdBgpIAEoCzIcLmNvZGVmb3VuZHJ5LnYxLlN0YXJ0RHJhZnRPcEgAEjMKC2xhYmVsX2RyYWZ0GCogASgLMhwuY29kZWZvdW5kcnkudjEuTGFiZWxEcmFmdE9wSAASMwoLY2xlYXJfZHJhZnQYKyABKAsyHC5jb2RlZm91bmRyeS52MS5DbGVhckRyYWZ0T3BIABI3Cg1kaXNjYXJkX2RyYWZ0GCwgASgLMh4uY29kZWZvdW5kcnkudjEuRGlzY2FyZERyYWZ0T3BIABIxCgpvcGVuX2RyYWZ0GC0gASgLMhsuY29kZWZvdW5kcnkudjEuT3BlbkRyYWZ0T3BIABIvCglzZXRfcXVpY2sYMiABKAsyGi5jb2RlZm91bmRyeS52MS5TZXRRdWlja09wSAASPQoQcmVwbGFjZV90ZXJtaW5hbBgzIAEoCzIhLmNvZGVmb3VuZHJ5LnYxLlJlcGxhY2VUZXJtaW5hbE9wSAASNwoNZHJvcF90ZXJtaW5hbBg0IAEoCzIeLmNvZGVmb3VuZHJ5LnYxLkRyb3BUZXJtaW5hbE9wSAASLQoIc2V0X2luZm8YPCABKAsyGS5jb2RlZm91bmRyeS52MS5TZXRJbmZvT3BIAEIECgJvcCKhAQoMT3BlblRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCRIPCgdwYW5lX2lkGAIgASgJEg0KBWZvY3VzGAMgASgIEhYKDmNvbXBvc2VfdGFiX2lkGAQgASgJEhIKBWluZGV4GAUgASgFSACIAQESKAoEZWRnZRgGIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dEVkZ2VCCAoGX2luZGV4IiIKDUNsb3NlVGhyZWFkT3ASEQoJdGhyZWFkX2lkGAEgASgJIoABCg1PcGVuU3VyZmFjZU9wEiYKA3RhYhgBIAEoCzIZLmNvZGVmb3VuZHJ5LnYxLkxheW91dFRhYhIPCgdwYW5lX2lkGAIgASgJEg0KBWZvY3VzGAMgASgIEhAKCHNwYWNlX2lkGAQgASgJEhUKDWJlaGluZF90YWJfaWQYBSABKAkiMwoMTW92ZVRocmVhZE9wEhEKCXRocmVhZF9pZBgBIAEoCRIQCghzcGFjZV9pZBgCIAEoCSIkCg9BcmNoaXZlVGhyZWFkT3ASEQoJdGhyZWFkX2lkGAEgASgJIpgBCg5Tbm9vemVUaHJlYWRPcBIRCgl0aHJlYWRfaWQYASABKAkSNAoDcmFuGAIgAygLMicuY29kZWZvdW5kcnkudjEuU25vb3plVGhyZWFkT3AuUmFuRW50cnkSEQoJcXVpY2tfcmFuGAMgASgJGioKCFJhbkVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiUQoKU2V0UXVpY2tPcBIRCgl0aHJlYWRfaWQYASABKAkSDAoEb3BlbhgCIAEoCBIOCgZoZWlnaHQYAyABKAESEgoKZm9yZ2V0X3JhbhgEIAEoCCIsCglTZXRJbmZvT3ASEQoJdGhyZWFkX2lkGAEgASgJEgwKBG9wZW4YAiABKAgiMwoRUmVwbGFjZVRlcm1pbmFsT3ASDgoGb2xkX2lkGAEgASgJEg4KBm5ld19pZBgCIAEoCSIlCg5Ecm9wVGVybWluYWxPcBITCgt0ZXJtaW5hbF9pZBgBIAEoCSKCAQoIQWRkVGFiT3ASEAoIc3BhY2VfaWQYASABKAkSDwoHcGFuZV9pZBgCIAEoCRImCgN0YWIYAyABKAsyGS5jb2RlZm91bmRyeS52MS5MYXlvdXRUYWISEgoFaW5kZXgYBCABKAVIAIgBARINCgVmb2N1cxgFIAEoCEIICgZfaW5kZXgijQEKC1NwbGl0UGFuZU9wEg8KB3BhbmVfaWQYASABKAkSKAoEZWRnZRgCIAEoDjIaLmNvZGVmb3VuZHJ5LnYxLkxheW91dEVkZ2USJgoDdGFiGAMgASgLMhkuY29kZWZvdW5kcnkudjEuTGF5b3V0VGFiEgwKBGZyYWMYBCABKAESDQoFZm9jdXMYBSABKAgilAEKCU1vdmVUYWJPcBIOCgZ0YWJfaWQYASABKAkSEAoIc3BhY2VfaWQYAiABKAkSDwoHcGFuZV9pZBgDIAEoCRISCgVpbmRleBgEIAEoBUgAiAEBEigKBGVkZ2UYBSABKA4yGi5jb2RlZm91bmRyeS52MS5MYXlvdXRFZGdlEgwKBGZyYWMYBiABKAFCCAoGX2luZGV4In8KCk1vdmVQYW5lT3ASDwoHcGFuZV9pZBgBIAEoCRIWCg50YXJnZXRfcGFuZV9pZBgCIAEoCRIoCgRlZGdlGAMgASgOMhouY29kZWZvdW5kcnkudjEuTGF5b3V0RWRnZRIMCgRmcmFjGAQgASgBEhAKCHNwYWNlX2lkGAUgASgJIlQKC01lcmdlUGFuZU9wEg8KB3BhbmVfaWQYASABKAkSFgoOdGFyZ2V0X3BhbmVfaWQYAiABKAkSEgoFaW5kZXgYAyABKAVIAIgBAUIICgZfaW5kZXgiNQoKU3dhcFBhbmVPcBIPCgdwYW5lX2lkGAEgASgJEhYKDnRhcmdldF9wYW5lX2lkGAIgASgJIhwKCkNsb3NlVGFiT3ASDgoGdGFiX2lkGAEgASgJIh4KC0Nsb3NlUGFuZU9wEg8KB3BhbmVfaWQYASABKAkiLQoKU2V0U2l6ZXNPcBIQCghzcGxpdF9pZBgBIAEoCRINCgVzaXplcxgCIAMoASIcCgpGb2N1c1RhYk9wEg4KBnRhYl9pZBgBIAEoCSIeCgtGb2N1c1BhbmVPcBIPCgdwYW5lX2lkGAEgASgJIqkBCg5TZXRUYWJQYXJhbXNPcBIOCgZ0YWJfaWQYASABKAkSOgoGcGFyYW1zGAIgAygLMiouY29kZWZvdW5kcnkudjEuU2V0VGFiUGFyYW1zT3AuUGFyYW1zRW50cnkSEgoFdGl0bGUYAyABKAlIAIgBARotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQggKBl90aXRsZSIrCgtSZW5hbWVUYWJPcBIOCgZ0YWJfaWQYASABKAkSDAoEbmFtZRgCIAEoCSIwCgpOZXdTcGFjZU9wEgwKBG5hbWUYASABKAkSFAoMbWFrZV9jdXJyZW50GAIgASgIIi8KDVJlbmFtZVNwYWNlT3ASEAoIc3BhY2VfaWQYASABKAkSDAoEbmFtZRgCIAEoCSI2Cg1SZW1vdmVTcGFjZU9wEhAKCHNwYWNlX2lkGAEgASgJEhMKC3RvX3NwYWNlX2lkGAIgASgJIiQKD1Jlb3JkZXJTcGFjZXNPcBIRCglzcGFjZV9pZHMYASADKAkiIQoNU3dpdGNoU3BhY2VPcBIQCghzcGFjZV9pZBgBIAEoCSKnAQoLTmV3VGhyZWFkT3ASEAoIc3BhY2VfaWQYASABKAkSDwoHcGFuZV9pZBgCIAEoCRI3CgZwYXJhbXMYAyADKAsyJy5jb2RlZm91bmRyeS52MS5OZXdUaHJlYWRPcC5QYXJhbXNFbnRyeRINCgVmb2N1cxgEIAEoCBotCgtQYXJhbXNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIj8KDFN0YXJ0RHJhZnRPcBIOCgZ0YWJfaWQYASABKAkSEAoIZHJhZnRfaWQYAiABKAkSDQoFbGFiZWwYAyABKAkiLwoMTGFiZWxEcmFmdE9wEhAKCGRyYWZ0X2lkGAEgASgJEg0KBWxhYmVsGAIgASgJIiAKDENsZWFyRHJhZnRPcBIQCghkcmFmdF9pZBgBIAEoCSIiCg5EaXNjYXJkRHJhZnRPcBIQCghkcmFmdF9pZBgBIAEoCSIuCgtPcGVuRHJhZnRPcBIQCghkcmFmdF9pZBgBIAEoCRINCgVmb2N1cxgCIAEoCCpPCglMYXlvdXREaXISGgoWTEFZT1VUX0RJUl9VTlNQRUNJRklFRBAAEhIKDkxBWU9VVF9ESVJfUk9XEAESEgoOTEFZT1VUX0RJUl9DT0wQAiqDAQoKTGF5b3V0RWRnZRIbChdMQVlPVVRfRURHRV9VTlNQRUNJRklFRBAAEhQKEExBWU9VVF9FREdFX0xFRlQQARIVChFMQVlPVVRfRURHRV9SSUdIVBACEhMKD0xBWU9VVF9FREdFX1RPUBADEhYKEkxBWU9VVF9FREdFX0JPVFRPTRAEMugCCg1MYXlvdXRTZXJ2aWNlEkwKA0dldBIgLmNvZGVmb3VuZHJ5LnYxLkdldExheW91dFJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5HZXRMYXlvdXRSZXNwb25zZSIAElIKBUFwcGx5EiIuY29kZWZvdW5kcnkudjEuQXBwbHlMYXlvdXRSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuQXBwbHlMYXlvdXRSZXNwb25zZSIAElgKC1NldFZpZXdwb3J0EiIuY29kZWZvdW5kcnkudjEuU2V0Vmlld3BvcnRSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2V0Vmlld3BvcnRSZXNwb25zZSIAElsKDEltcG9ydExlZ2FjeRIjLmNvZGVmb3VuZHJ5LnYxLkltcG9ydExlZ2FjeVJlcXVlc3QaJC5jb2RlZm91bmRyeS52MS5JbXBvcnRMZWdhY3lSZXNwb25zZSIAQsMBChJjb20uY29kZWZvdW5kcnkudjFCC0xheW91dFByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
 
 /**
  * @generated from message codefoundry.v1.GetLayoutRequest
@@ -410,6 +410,14 @@ export type ThreadLayout = Message<"codefoundry.v1.ThreadLayout"> & {
    * @generated from field: string remembered_pane_id = 5;
    */
   rememberedPaneId: string;
+
+  /**
+   * Whether it shows its info card, as the user last toggled it; unset: never toggled (the
+   * setting layout.thread_info decides).
+   *
+   * @generated from field: optional bool info = 6;
+   */
+  info?: boolean | undefined;
 };
 
 /**
@@ -1199,6 +1207,12 @@ export type LayoutOp = Message<"codefoundry.v1.LayoutOp"> & {
      */
     value: DropTerminalOp;
     case: "dropTerminal";
+  } | {
+    /**
+     * @generated from field: codefoundry.v1.SetInfoOp set_info = 60;
+     */
+    value: SetInfoOp;
+    case: "setInfo";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1446,6 +1460,30 @@ export const SetQuickOpSchema: GenMessage<SetQuickOp> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_layout, 30);
 
 /**
+ * SetInfoOp shows or hides a thread's info card (ThreadLayout.info), kept with the thread.
+ *
+ * @generated from message codefoundry.v1.SetInfoOp
+ */
+export type SetInfoOp = Message<"codefoundry.v1.SetInfoOp"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: bool open = 2;
+   */
+  open: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.SetInfoOp.
+ * Use `create(SetInfoOpSchema)` to create a new message.
+ */
+export const SetInfoOpSchema: GenMessage<SetInfoOp> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_layout, 31);
+
+/**
  * ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
  * still running) at terminal new_id: a reset terminal's tab follows the fresh shell. The
  * daemon applies it itself when a shell labelled replaces=<old id> starts.
@@ -1469,7 +1507,7 @@ export type ReplaceTerminalOp = Message<"codefoundry.v1.ReplaceTerminalOp"> & {
  * Use `create(ReplaceTerminalOpSchema)` to create a new message.
  */
 export const ReplaceTerminalOpSchema: GenMessage<ReplaceTerminalOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 31);
+  messageDesc(file_codefoundry_v1_layout, 32);
 
 /**
  * DropTerminalOp is a terminal that went away: its open tab closes, and a remembered tab
@@ -1489,7 +1527,7 @@ export type DropTerminalOp = Message<"codefoundry.v1.DropTerminalOp"> & {
  * Use `create(DropTerminalOpSchema)` to create a new message.
  */
 export const DropTerminalOpSchema: GenMessage<DropTerminalOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 32);
+  messageDesc(file_codefoundry_v1_layout, 33);
 
 /**
  * AddTabOp adds a tab to pane_id, else the focused pane of space_id (empty: the current
@@ -1533,7 +1571,7 @@ export type AddTabOp = Message<"codefoundry.v1.AddTabOp"> & {
  * Use `create(AddTabOpSchema)` to create a new message.
  */
 export const AddTabOpSchema: GenMessage<AddTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 33);
+  messageDesc(file_codefoundry_v1_layout, 34);
 
 /**
  * SplitPaneOp opens a tab in a new pane on an edge of pane_id at frac of its room (0 is
@@ -1573,7 +1611,7 @@ export type SplitPaneOp = Message<"codefoundry.v1.SplitPaneOp"> & {
  * Use `create(SplitPaneOpSchema)` to create a new message.
  */
 export const SplitPaneOpSchema: GenMessage<SplitPaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 34);
+  messageDesc(file_codefoundry_v1_layout, 35);
 
 /**
  * MoveTabOp moves a tab: into a new pane on edge of pane_id; into pane_id's strip at
@@ -1619,7 +1657,7 @@ export type MoveTabOp = Message<"codefoundry.v1.MoveTabOp"> & {
  * Use `create(MoveTabOpSchema)` to create a new message.
  */
 export const MoveTabOpSchema: GenMessage<MoveTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 35);
+  messageDesc(file_codefoundry_v1_layout, 36);
 
 /**
  * MovePaneOp moves a whole pane beside target_pane_id on edge, onto an edge of the pane
@@ -1659,7 +1697,7 @@ export type MovePaneOp = Message<"codefoundry.v1.MovePaneOp"> & {
  * Use `create(MovePaneOpSchema)` to create a new message.
  */
 export const MovePaneOpSchema: GenMessage<MovePaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 36);
+  messageDesc(file_codefoundry_v1_layout, 37);
 
 /**
  * MergePaneOp moves every tab of pane_id into target_pane_id's strip at index (default:
@@ -1689,7 +1727,7 @@ export type MergePaneOp = Message<"codefoundry.v1.MergePaneOp"> & {
  * Use `create(MergePaneOpSchema)` to create a new message.
  */
 export const MergePaneOpSchema: GenMessage<MergePaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 37);
+  messageDesc(file_codefoundry_v1_layout, 38);
 
 /**
  * SwapPaneOp swaps two panes of one space.
@@ -1713,7 +1751,7 @@ export type SwapPaneOp = Message<"codefoundry.v1.SwapPaneOp"> & {
  * Use `create(SwapPaneOpSchema)` to create a new message.
  */
 export const SwapPaneOpSchema: GenMessage<SwapPaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 38);
+  messageDesc(file_codefoundry_v1_layout, 39);
 
 /**
  * CloseTabOp takes a tab out of the layout (the plain close: closing a thread with its
@@ -1733,7 +1771,7 @@ export type CloseTabOp = Message<"codefoundry.v1.CloseTabOp"> & {
  * Use `create(CloseTabOpSchema)` to create a new message.
  */
 export const CloseTabOpSchema: GenMessage<CloseTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 39);
+  messageDesc(file_codefoundry_v1_layout, 40);
 
 /**
  * ClosePaneOp takes a pane and its tabs out of the layout; each thread tab in it closes as
@@ -1753,7 +1791,7 @@ export type ClosePaneOp = Message<"codefoundry.v1.ClosePaneOp"> & {
  * Use `create(ClosePaneOpSchema)` to create a new message.
  */
 export const ClosePaneOpSchema: GenMessage<ClosePaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 40);
+  messageDesc(file_codefoundry_v1_layout, 41);
 
 /**
  * SetSizesOp sets a split's shares, one per child, each positive.
@@ -1777,7 +1815,7 @@ export type SetSizesOp = Message<"codefoundry.v1.SetSizesOp"> & {
  * Use `create(SetSizesOpSchema)` to create a new message.
  */
 export const SetSizesOpSchema: GenMessage<SetSizesOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 41);
+  messageDesc(file_codefoundry_v1_layout, 42);
 
 /**
  * FocusTabOp makes a tab active, focuses its pane and switches to its space.
@@ -1796,7 +1834,7 @@ export type FocusTabOp = Message<"codefoundry.v1.FocusTabOp"> & {
  * Use `create(FocusTabOpSchema)` to create a new message.
  */
 export const FocusTabOpSchema: GenMessage<FocusTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 42);
+  messageDesc(file_codefoundry_v1_layout, 43);
 
 /**
  * FocusPaneOp focuses a pane and switches to its space.
@@ -1815,7 +1853,7 @@ export type FocusPaneOp = Message<"codefoundry.v1.FocusPaneOp"> & {
  * Use `create(FocusPaneOpSchema)` to create a new message.
  */
 export const FocusPaneOpSchema: GenMessage<FocusPaneOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 43);
+  messageDesc(file_codefoundry_v1_layout, 44);
 
 /**
  * SetTabParamsOp replaces a tab's params, and its title when set.
@@ -1844,7 +1882,7 @@ export type SetTabParamsOp = Message<"codefoundry.v1.SetTabParamsOp"> & {
  * Use `create(SetTabParamsOpSchema)` to create a new message.
  */
 export const SetTabParamsOpSchema: GenMessage<SetTabParamsOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 44);
+  messageDesc(file_codefoundry_v1_layout, 45);
 
 /**
  * RenameTabOp sets a terminal tab's manual name; empty goes back to the automatic name.
@@ -1868,7 +1906,7 @@ export type RenameTabOp = Message<"codefoundry.v1.RenameTabOp"> & {
  * Use `create(RenameTabOpSchema)` to create a new message.
  */
 export const RenameTabOpSchema: GenMessage<RenameTabOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 45);
+  messageDesc(file_codefoundry_v1_layout, 46);
 
 /**
  * NewSpaceOp adds an empty space after the others ("Space <n>" when name is blank).
@@ -1894,7 +1932,7 @@ export type NewSpaceOp = Message<"codefoundry.v1.NewSpaceOp"> & {
  * Use `create(NewSpaceOpSchema)` to create a new message.
  */
 export const NewSpaceOpSchema: GenMessage<NewSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 46);
+  messageDesc(file_codefoundry_v1_layout, 47);
 
 /**
  * @generated from message codefoundry.v1.RenameSpaceOp
@@ -1916,7 +1954,7 @@ export type RenameSpaceOp = Message<"codefoundry.v1.RenameSpaceOp"> & {
  * Use `create(RenameSpaceOpSchema)` to create a new message.
  */
 export const RenameSpaceOpSchema: GenMessage<RenameSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 47);
+  messageDesc(file_codefoundry_v1_layout, 48);
 
 /**
  * RemoveSpaceOp removes a space with its panes and tabs (closed lists them); its threads
@@ -1942,7 +1980,7 @@ export type RemoveSpaceOp = Message<"codefoundry.v1.RemoveSpaceOp"> & {
  * Use `create(RemoveSpaceOpSchema)` to create a new message.
  */
 export const RemoveSpaceOpSchema: GenMessage<RemoveSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 48);
+  messageDesc(file_codefoundry_v1_layout, 49);
 
 /**
  * ReorderSpacesOp puts the spaces in this order, which names each space once.
@@ -1961,7 +1999,7 @@ export type ReorderSpacesOp = Message<"codefoundry.v1.ReorderSpacesOp"> & {
  * Use `create(ReorderSpacesOpSchema)` to create a new message.
  */
 export const ReorderSpacesOpSchema: GenMessage<ReorderSpacesOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 49);
+  messageDesc(file_codefoundry_v1_layout, 50);
 
 /**
  * @generated from message codefoundry.v1.SwitchSpaceOp
@@ -1978,7 +2016,7 @@ export type SwitchSpaceOp = Message<"codefoundry.v1.SwitchSpaceOp"> & {
  * Use `create(SwitchSpaceOpSchema)` to create a new message.
  */
 export const SwitchSpaceOpSchema: GenMessage<SwitchSpaceOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 50);
+  messageDesc(file_codefoundry_v1_layout, 51);
 
 /**
  * NewThreadOp focuses the space's empty composer (with params when given), or opens one in
@@ -2018,7 +2056,7 @@ export type NewThreadOp = Message<"codefoundry.v1.NewThreadOp"> & {
  * Use `create(NewThreadOpSchema)` to create a new message.
  */
 export const NewThreadOpSchema: GenMessage<NewThreadOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 51);
+  messageDesc(file_codefoundry_v1_layout, 52);
 
 /**
  * StartDraftOp turns the empty composer tab_id into a draft (its first text typed).
@@ -2050,7 +2088,7 @@ export type StartDraftOp = Message<"codefoundry.v1.StartDraftOp"> & {
  * Use `create(StartDraftOpSchema)` to create a new message.
  */
 export const StartDraftOpSchema: GenMessage<StartDraftOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 52);
+  messageDesc(file_codefoundry_v1_layout, 53);
 
 /**
  * LabelDraftOp sets a draft's label.
@@ -2074,7 +2112,7 @@ export type LabelDraftOp = Message<"codefoundry.v1.LabelDraftOp"> & {
  * Use `create(LabelDraftOpSchema)` to create a new message.
  */
 export const LabelDraftOpSchema: GenMessage<LabelDraftOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 53);
+  messageDesc(file_codefoundry_v1_layout, 54);
 
 /**
  * ClearDraftOp ends a draft whose text was all deleted: its tab is the space's empty
@@ -2094,7 +2132,7 @@ export type ClearDraftOp = Message<"codefoundry.v1.ClearDraftOp"> & {
  * Use `create(ClearDraftOpSchema)` to create a new message.
  */
 export const ClearDraftOpSchema: GenMessage<ClearDraftOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 54);
+  messageDesc(file_codefoundry_v1_layout, 55);
 
 /**
  * DiscardDraftOp ends a draft and closes its tab when open.
@@ -2113,7 +2151,7 @@ export type DiscardDraftOp = Message<"codefoundry.v1.DiscardDraftOp"> & {
  * Use `create(DiscardDraftOpSchema)` to create a new message.
  */
 export const DiscardDraftOpSchema: GenMessage<DiscardDraftOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 55);
+  messageDesc(file_codefoundry_v1_layout, 56);
 
 /**
  * OpenDraftOp focuses a draft's tab, or opens it in its space's focused pane.
@@ -2137,7 +2175,7 @@ export type OpenDraftOp = Message<"codefoundry.v1.OpenDraftOp"> & {
  * Use `create(OpenDraftOpSchema)` to create a new message.
  */
 export const OpenDraftOpSchema: GenMessage<OpenDraftOp> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_layout, 56);
+  messageDesc(file_codefoundry_v1_layout, 57);
 
 /**
  * @generated from enum codefoundry.v1.LayoutDir

@@ -11,14 +11,15 @@ import (
 
 // writeThreads writes, for layout.show, what the layout stores per thread beside its tabs:
 // its space (listed when it is not the default space, or with any of the rest), its quick
-// terminal open (or to open again as a fresh shell, after a snooze), and the linked tabs it
+// terminal open (or to open again as a fresh shell, after a snooze), its info card shown or
+// hidden when the user toggled it (thread.info), and the linked tabs it
 // remembers (closed with it, to come back when it opens; a terminal marked fresh comes back
 // as a new shell, with the command it ran for "Run again").
 func writeThreads(b *strings.Builder, threads map[string]*core.ThreadState, defaultSpace string, names map[string]string) {
 	ids := slices.Sorted(maps.Keys(threads))
 	ids = slices.DeleteFunc(ids, func(id string) bool {
 		ts := threads[id]
-		return ts.Space == defaultSpace && (ts.Quick == nil || (!ts.Quick.Open && !ts.Quick.Fresh)) && ts.Remembered == nil
+		return ts.Space == defaultSpace && (ts.Quick == nil || (!ts.Quick.Open && !ts.Quick.Fresh)) && ts.Remembered == nil && ts.Info == nil
 	})
 	if len(ids) == 0 {
 		return
@@ -39,6 +40,13 @@ func writeThreads(b *strings.Builder, threads map[string]*core.ThreadState, defa
 		}
 		if q := ts.Quick; q != nil && q.Ran != "" {
 			fmt.Fprintf(b, " (ran %q)", q.Ran)
+		}
+		if ts.Info != nil {
+			if *ts.Info {
+				b.WriteString(", info card shown")
+			} else {
+				b.WriteString(", info card hidden")
+			}
 		}
 		b.WriteString("\n")
 		if ts.Remembered == nil {

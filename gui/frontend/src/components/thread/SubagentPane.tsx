@@ -18,6 +18,7 @@ import { goUpFromSubagent } from "@/stores/subagentActions";
 import { useRunTimelineKeys, useSubagentViewStore } from "@/stores/subagentView";
 import { setTurnFolded, useThreadItem, useThreadLoaded, useThreadStore, useTimelineKeys, useTurnFolds } from "@/stores/thread";
 import { useThreadsStore } from "@/stores/threads";
+import { useThreadInfoOpen } from "@/stores/threadInfoOverlay";
 import { useUiStore } from "@/stores/ui";
 import { useElementHeight } from "./activity";
 import { ThreadMarkdown } from "./Code";
@@ -306,7 +307,7 @@ export function SubagentPane({ threadId, runId }: { threadId: string; runId: str
   const rootRef = useRef<HTMLElement>(null);
   const focusSeq = useSubagentViewStore((s) => s.focusSeq);
   const promptAsked = useUiStore((s) => s.promptFocusSeq + s.contentFocusSeq);
-  const infoOpen = useUiStore((s) => s.threadInfoOpen);
+  const infoOpen = useThreadInfoOpen(threadId);
   const [rowRef, infoFits] = useInfoRoom(threadId);
   // A run that opens takes the keyboard (Escape goes back up), unless the palette has it.
   useEffect(() => {

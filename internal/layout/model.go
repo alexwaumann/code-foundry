@@ -151,6 +151,9 @@ type ThreadState struct {
 	Quick      *Quick            `json:"quick,omitempty"`
 	Remembered *Remembered       `json:"remembered,omitempty"`
 	Last       map[string]string `json:"last,omitempty"` // kind -> this thread's tab last active (smart swap)
+	// Info is whether the thread shows its info card, as the user last toggled it (info.go);
+	// nil: never toggled, so the setting layout.thread_info decides.
+	Info *bool `json:"info,omitempty"`
 }
 
 // Quick is the thread's quick terminal slot.
@@ -378,6 +381,10 @@ func (ts *ThreadState) clone() *ThreadState {
 		return nil
 	}
 	c := &ThreadState{Space: ts.Space, Last: maps.Clone(ts.Last)}
+	if ts.Info != nil {
+		v := *ts.Info
+		c.Info = &v
+	}
 	if ts.Quick != nil {
 		q := *ts.Quick
 		c.Quick = &q
