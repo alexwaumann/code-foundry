@@ -144,6 +144,42 @@ describe("applying the layout source", () => {
     expect(getLayout).toHaveBeenCalledTimes(1);
   });
 
+  it("a snapshot that arrives while a Get runs wins: the older Get never lands on it, and later deltas apply", async () => {
+    applyLayoutEvent(snapshot(layout(4)));
+    let answer: (l: LayoutView) => void = () => undefined;
+    getLayout.mockReturnValue(new Promise((r) => (answer = r)));
+    applyLayoutEvent(delta(7, { spaces: [mainSpace({ name: "Seven" })] }));
+    expect(getLayout).toHaveBeenCalledTimes(1);
+    // A reconnect: the stream's snapshot is newer than what the Get will answer.
+    applyLayoutEvent(snapshot(layout(10, [mainSpace({ name: "Ten" }), review])));
+    expect(state().rev).toBe(10);
+    // The next delta is not held behind the Get.
+    applyLayoutEvent(delta(11, { spaces: [mainSpace({ name: "Eleven" })] }));
+    expect(state().rev).toBe(11);
+    await act(async () => {
+      answer(layout(7, [mainSpace({ name: "Seven" }), review]));
+      await Promise.resolve();
+    });
+    expect(state().rev).toBe(11);
+    expect(state().spaces["sp-a"]?.name).toBe("Eleven");
+  });
+
+  it("a Get never takes the slice back to an older revision", async () => {
+    applyLayoutEvent(snapshot(layout(4)));
+    let answer: (l: LayoutView) => void = () => undefined;
+    getLayout.mockReturnValue(new Promise((r) => (answer = r)));
+    applyLayoutEvent(delta(7, { spaces: [mainSpace({ name: "Seven" })] }));
+    // The first-load import's answer moved the slice on meanwhile (applyImportedLayout's path).
+    const { applyImportedLayout } = await import("./layout");
+    applyImportedLayout(layout(9, [mainSpace({ name: "Nine" }), review]));
+    await act(async () => {
+      answer(layout(6, [mainSpace({ name: "Six" }), review]));
+      await Promise.resolve();
+    });
+    expect(state().rev).toBeGreaterThanOrEqual(9);
+    expect(state().spaces["sp-a"]?.name).not.toBe("Six");
+  });
+
   it("replaces everything on a snapshot, even at a lower rev (a daemon that restarted)", () => {
     applyLayoutEvent(snapshot(layout(9)));
     applyLayoutEvent(snapshot(layout(2, [review])));
