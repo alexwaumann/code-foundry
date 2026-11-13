@@ -113,9 +113,11 @@ function ThreadBody({ threadId }: { threadId: string }) {
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
         {shellPane && <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />}
-        {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating. */}
+        {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating.
+            Clipped: in a pane narrower than a thread's minimum (200% zoom in a small window) the composer's
+            footer stacks and its dock grows taller than this box; it would cover the header above. */}
         <div
-          className="relative flex min-h-0 flex-1"
+          className="relative flex min-h-0 flex-1 overflow-hidden"
           ref={rowRef}
           data-testid="thread-pane-body"
           data-info-room={infoFits ? "" : undefined}
