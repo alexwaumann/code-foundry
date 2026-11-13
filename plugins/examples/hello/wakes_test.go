@@ -44,8 +44,11 @@ func TestTick(t *testing.T) {
 		t.Fatal(err)
 	}
 	fires := func(every string) (n, delivered int) {
+		// Fires first: the host records a fire and its count together, so the counts read
+		// after cover every fire read before (a tick can land between the two reads).
+		fs := h.WakeFires()
 		d := h.WakeDelivered()
-		for i, f := range h.WakeFires() {
+		for i, f := range fs {
 			if f.Match["every"] == every {
 				n++
 				delivered += d[i]

@@ -150,7 +150,7 @@ func (m *Manager) releaseGroupWakeLocked(w groupWake, group string, gone []wakeS
 		return
 	}
 	kids := m.childrenLocked(t.ID)
-	d := delivery{sub: sub.ID, of: sub, queued: time.Now(), thread: func(ctx context.Context) threadWakePart {
+	d := delivery{sub: sub.ID, of: sub, queued: m.opts.batchClock.Now(), thread: func(ctx context.Context) threadWakePart {
 		p := m.threadPart(ctx, sub, t, now, kids)
 		p.released, p.d.archived = true, gone
 		return p

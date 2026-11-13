@@ -237,7 +237,7 @@ func (m *Manager) releaseLocked(t Thread, h map[string]Subscription) {
 			m.log.Warn("held wake dropped: the subscriber reached the wake limit", "thread", sub.SubscriberID, "subscription", id, "target", t.ID)
 			continue
 		}
-		d := delivery{sub: id, of: sub, queued: time.Now(), thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, sub, t, now, kids) }}
+		d := delivery{sub: id, of: sub, queued: m.opts.batchClock.Now(), thread: func(ctx context.Context) threadWakePart { return m.threadPart(ctx, sub, t, now, kids) }}
 		if !joins {
 			d.slot = now
 		}

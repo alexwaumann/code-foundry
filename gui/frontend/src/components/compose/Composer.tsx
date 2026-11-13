@@ -399,12 +399,16 @@ function ComposerCard({
 
   // Focus on mount and on request (the picker, the sidebar "+"). Deferred a frame so the
   // closing palette dialog has released focus. On mount under an open dialog (the palette, opened
-  // before the window first drew), the dialog keeps the keyboard.
+  // before the window first drew), the dialog keeps the keyboard; so does a text field that took
+  // it within that frame (the top bar's "+" shows a new space's composer and opens its name field).
   const mountSeq = useRef(focusSeq);
   useEffect(() => {
     const onMount = focusSeq === mountSeq.current;
+    const before = document.activeElement;
     const raf = requestAnimationFrame(() => {
       if (onMount && document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return;
+      const now = document.activeElement;
+      if (onMount && now !== before && (now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement)) return;
       editorRef.current?.focus();
     });
     return () => {

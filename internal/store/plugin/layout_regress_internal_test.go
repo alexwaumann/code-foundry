@@ -22,7 +22,9 @@ import (
 
 // A 978 KB view of 3300 nested tabs nodes (8 tabs each) took 1.7 GB of heap in
 // validateView when Validate built and kept every level's full path; the refused
-// subtree is no longer walked.
+// subtree is no longer walked. The work is counted, not timed: under -race on a busy
+// machine the wall clock measures the machine. Decoding takes about 2.3 allocations a
+// node; a walk that built each level's path would take one a node per level above it.
 func TestValidateViewDeepIsCheap(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(`{"nodes":[`)
@@ -46,23 +48,23 @@ func TestValidateViewDeepIsCheap(t *testing.T) {
 	if len(raw) > maxRawView {
 		t.Fatalf("%d bytes", len(raw))
 	}
+	const nodes = levels*9 + 1 // each level's tabs node and its 8 tabs, and the leaf
 	var before, after runtime.MemStats
 	runtime.GC()
 	runtime.ReadMemStats(&before)
-	start := time.Now()
 	v, _, errs := validateView(raw, "p", fuzzPerms)
-	took := time.Since(start)
 	runtime.ReadMemStats(&after)
 	mb := (after.TotalAlloc - before.TotalAlloc) >> 20
-	t.Logf("validateView of a %d KB view: %d MB allocated in %s", len(raw)>>10, mb, took)
+	mallocs := after.Mallocs - before.Mallocs
+	t.Logf("validateView of a %d KB view (%d nodes): %d MB in %d allocations", len(raw)>>10, nodes, mb, mallocs)
 	if v != nil || len(errs) == 0 || !strings.Contains(errs[0], "inside 5 containers (tabs > tabs > tabs > tabs > tabs), at most 4") {
 		t.Fatalf("errs %q", errs)
 	}
 	if mb > 64 { // decoding the view is most of it
 		t.Errorf("validateView allocated %d MB", mb)
 	}
-	if took > 5*time.Second {
-		t.Errorf("validateView took %s", took)
+	if mallocs > 4*nodes {
+		t.Errorf("validateView made %d allocations for %d nodes, want at most %d", mallocs, nodes, 4*nodes)
 	}
 }
 

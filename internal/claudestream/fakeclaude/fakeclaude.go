@@ -35,7 +35,10 @@
 // answer initialize. CF_FAKE_CLAUDE_ONCE=<path> limits RESUME_EXIT and RESUME_HANG to the
 // first resumed process (the one that creates <path>); later ones start normally.
 // CF_FAKE_CLAUDE_INIT_GATE=<path> holds the initialize answer until <path> exists (the
-// lifecycle tests' slow start).
+// lifecycle tests' slow start). CF_FAKE_CLAUDE_RESUME_FIXTURE=<capture> makes a process
+// started with --resume replay that capture instead of CF_FAKE_CLAUDE: a capture that
+// asks a permission would otherwise ask it again, under the same request id, for the
+// first message the resumed process gets.
 //
 // set_cwd: answered ok with transcript_relocated (Claude moves the transcript; the fake
 // writes none). With CF_FAKE_CLAUDE_SET_CWD_REFUSE=<message> it is refused with status
@@ -185,6 +188,9 @@ func Run(fixture string) int {
 		fmt.Fprintln(os.Stderr, "fake claude: cannot resume")
 		n, _ := strconv.Atoi(resumeExit)
 		return n
+	}
+	if p := os.Getenv("CF_FAKE_CLAUDE_RESUME_FIXTURE"); p != "" && slices.Contains(os.Args, "--resume") {
+		fixture = p
 	}
 	turns, err := Turns(fixture)
 	if err != nil {

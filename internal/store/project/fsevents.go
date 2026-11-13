@@ -223,9 +223,12 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		}
 	}
 	// A live worktree's tree hits also feed its file changes (files.go), flushed on the
-	// same tree window.
+	// same tree window. A delivery's hits go in together and trigger once: a window that
+	// closed partway through them would split one delivery into two files events.
 	live := map[string]bool{}
 	now := time.Now() // compared with file birth times: the wall clock, not g.now
+	files := map[jobKey][]fileHit{}
+	var filesOrder []jobKey
 	for _, h := range treeHits {
 		isLive, ok := live[h.key.path]
 		if !ok {
@@ -237,9 +240,15 @@ func (g *Git) onEvents(evs []fsevents.Event) {
 		}
 		if rel, ok := treeFile(h.key.path, h.path); ok {
 			fk := filesJob(h.key.projectID, h.key.path)
-			g.files.add(fk, rel, h.flags, now)
-			g.treeDeb.trigger(fk)
+			if _, ok := files[fk]; !ok {
+				filesOrder = append(filesOrder, fk)
+			}
+			files[fk] = append(files[fk], fileHit{rel, h.flags})
 		}
+	}
+	for _, fk := range filesOrder {
+		g.files.addAll(fk, files[fk], now)
+		g.treeDeb.trigger(fk)
 	}
 }
 

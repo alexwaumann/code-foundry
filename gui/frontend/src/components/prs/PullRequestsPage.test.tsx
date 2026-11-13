@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { it, trackTests } from "@/test/isolate";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
@@ -25,6 +26,9 @@ const { PullRequestsPage } = await import("./PullRequestsPage");
  */
 
 let world: ReturnType<typeof seedPrWorld>;
+
+// A test that times out under load must not run on into the next (src/test/isolate.ts).
+trackTests();
 
 beforeEach(async () => {
   resetDaemon();

@@ -204,3 +204,34 @@ connections in TIME_WAIT).
 
 The flaky tests in internal/store/plugin that CI hit from 2026-11-05 to 2026-11-11 are in
 `docs/notes/flaky-plugin-tests.md`.
+
+# Round 3: the shell branch (2026-11-13)
+
+Seventeen tests from the shell build, in `docs/notes/shell-24b-flakes.md` with their before and
+after rates. What they add to the rounds above:
+
+- **A real time window in a test is a race with the machine.** The wake batch tests settled three
+  children inside a 100 ms window; a busy machine took longer between two settles. Give the code
+  under test a clock the test moves (`Options.batchClock` beside `Options.Now`), as round 1 did for
+  the plugin flood.
+- **Wait for what the next step reads, not for something near it.** Busy is set before Claude's
+  handshake, connected after; a row's step runs after the projects fake starts; a fake's stdin log
+  trails the store's write; a snapshot runs ahead of its bus event. Each test waited for the near
+  thing and read the far one.
+- **A fake that replays a capture can replay too much.** A resumed fake process starts the capture
+  over and re-asked a withdrawn request under the same id. Give the fake the next process's
+  answer (`CF_FAKE_CLAUDE_RESUME_FIXTURE`) rather than racing the replay.
+- **"Which one failed" is not "the first failed".** Steps that run side by side can fail together;
+  check the one the case is about.
+- **Speed limits become counts.** A wall-clock bound in a test (250 ms, 5 s) measures the
+  machine. Count the work that would blow up if the code regressed: allocations per node,
+  characters read per character.
+- **A vitest timeout does not stop the body.** Vitest fails the test and runs the next, while the
+  old body keeps going against module-level fakes and with `act` scopes open, and the next tests
+  fail to find their elements. One slow test under load failed dozens after it. Make the next
+  test wait for the old body (`src/test/isolate.ts`), and make the slow one cheap; a tight
+  `--testTimeout` shows whether a file cascades.
+- **Some flakes are the app's.** Two of these were: a new space's composer took the keyboard
+  from its name field when its focus frame came second, and one fs event delivery could be split
+  into two files events. Fix those in the app and say so.
+

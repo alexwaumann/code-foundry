@@ -81,3 +81,6 @@ works around it today; the file named is a place to copy from.
   `toast.dismiss()` in `afterEach` (`actions/ActionRunDialog.test.tsx`).
 - A store fed by a fake stream gets a published snapshot a tick later: wait until the store
   holds it before asserting (`settings/DictationSettings.test.tsx`).
+- A test that times out keeps running after vitest moved on: with module-level fakes its late
+  steps break the next tests ("Unable to find"). Use `it` from `src/test/isolate.ts` and call
+  `trackTests()` before the file's hooks (`pr/PullRequestSurface.test.tsx`).

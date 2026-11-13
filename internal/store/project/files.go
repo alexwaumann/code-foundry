@@ -123,10 +123,28 @@ type fileCollector struct {
 	seen map[jobKey]map[string]time.Time
 }
 
+// fileHit is an event on a worktree-relative path.
+type fileHit struct {
+	rel   string
+	flags fsevents.EventFlags
+}
+
 // add records an event on rel (worktree-relative) for k, received at now.
 func (c *fileCollector) add(k jobKey, rel string, flags fsevents.EventFlags, now time.Time) {
+	c.addAll(k, []fileHit{{rel, flags}}, now)
+}
+
+// addAll records one delivery's events for k, received at now, at once: a files job
+// that takes k meanwhile gets all of them or none.
+func (c *fileCollector) addAll(k jobKey, hits []fileHit, now time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	for _, h := range hits {
+		c.addLocked(k, h.rel, h.flags, now)
+	}
+}
+
+func (c *fileCollector) addLocked(k jobKey, rel string, flags fsevents.EventFlags, now time.Time) {
 	if c.pending == nil {
 		c.pending = map[jobKey]*pendingFiles{}
 	}
