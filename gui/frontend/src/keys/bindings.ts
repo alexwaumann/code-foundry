@@ -158,13 +158,6 @@ const notInSubagent: ReadonlySet<string> = new Set([
   "thread.stop-waiting",
 ]);
 
-/**
- * The classic side and bottom panels' verbs, which the daemon still lists until PR 22 retires
- * them: this window has neither panel (docs/notes/shell-21-remove-classic.md), so they are
- * presented as nothing and left out of the palette.
- */
-const classicVerbs: ReadonlySet<string> = new Set(["view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.bottom.toggle"]);
-
 /** Whether the GUI can start this command here (see contextSupplied, notInSubagent). */
 export function isStartable(c: CommandView): boolean {
   if (notInSubagent.has(c.name) && getViewing() !== null) return false;
@@ -181,7 +174,6 @@ export function isStartable(c: CommandView): boolean {
  * takes (lib/move canMove), file.save only over a tab that is editing.
  */
 export function inPalette(c: CommandView): boolean {
-  if (classicVerbs.has(c.name)) return false;
   if (c.name === "thread.run-in" && !canRunElsewhere(activeThread())) return false;
   if (c.name === "thread.new-like" && !canNewLike(activeThread())) return false;
   // thread.move.open: not for an archived, resident or moving thread either (lib/move canMove).
@@ -435,9 +427,6 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
     toggleHelp();
     return true;
   },
-  // The classic side and bottom panels' verbs: the window has neither any more, so they do
-  // nothing here and the palette leaves them out (classicVerbs). PR 22 retires them.
-  ...Object.fromEntries([...classicVerbs].map((name) => [name, () => true])),
   // Window-local: this window's own focus history (shell/focusHistory.ts; the CLI's view.back
   // and view.forward reach every window through ShowView).
   "view.back": () => {

@@ -144,7 +144,7 @@ describe("the focusThread intent (child threads, docs/notes/no-sidebar-override-
     expect(selected()).toEqual({ kind: "view", name: "projects" });
 
     applyIntent({ kind: "focusThread", threadId: "later" });
-    applyIntent({ kind: "showView", name: "projects" });
+    applyIntent({ kind: "showView", name: "help" });
     useThreadsStore.setState((s) => ({ byId: { ...s.byId, later: made("later", {}) }, order: [...s.order, "later"] }));
     expect(selected()).not.toEqual({ kind: "thread", id: "later" });
 
@@ -255,7 +255,7 @@ describe("showView from the daemon", () => {
 });
 
 describe("the classic panels' ShowViews (view.panel.toggle, .expand, .new-tab, .split, view.bottom.toggle)", () => {
-  it("change nothing: this window has neither panel (PR 22 retires them)", () => {
+  it("are gone with their verbs (shell-22-retire-verbs.md): one from an older daemon changes nothing", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "content" });
     const before = useUiStore.getState();
     for (const name of ["panel.toggle", "panel.expand", "panel.new-tab", "panel.split", "bottom.toggle"]) applyIntent({ kind: "showView", name });

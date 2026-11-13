@@ -185,11 +185,8 @@ type Appearance struct {
 	// BackdropFile is the image custom shows: a file name in the backdrops directory
 	// (paths.Backdrops, internal/store/backdrop).
 	BackdropFile string
-	// PanelKeepOpen keeps the side panel open on its new tab page when its last tab
-	// closes, instead of hiding it.
-	PanelKeepOpen bool
-	// ScrollbackLines is the rows of history each terminal (the bottom panel's shells)
-	// keeps; the daemon's emulators read it at start.
+	// ScrollbackLines is the rows of history each terminal keeps; the daemon's emulators
+	// read it at start.
 	ScrollbackLines int
 }
 

@@ -1420,7 +1420,7 @@ export class MockPlugins {
       if (!p.enabled) continue;
       for (const s of p.surfaces) {
         out.push({
-          cmd: { name: `plugin.${p.name}.show.${s.id}`, title: `Show ${s.title}`, category: p.displayName, description: `Open ${s.title} in the side panel.`, keybindings: [], args: s.scope === "thread" ? [{ name: "thread", type: ArgType.STRING, required: false, description: "The thread" }] : [] },
+          cmd: { name: `plugin.${p.name}.show.${s.id}`, title: `Show ${s.title}`, category: p.displayName, description: `Open ${s.title} as a tab.`, keybindings: [], args: s.scope === "thread" ? [{ name: "thread", type: ArgType.STRING, required: false, description: "The thread" }] : [] },
           when: (ctx) => this.surfaceAvailable(p, s, ctx),
           run: (ctx, a) => {
             const id = a.thread || ctx?.activeThreadId || "";

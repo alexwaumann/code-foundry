@@ -2,8 +2,11 @@ package command
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,24 +21,16 @@ import (
 
 // The item verbs that open one item of a thread: a file (File tab), a changed file's diff
 // (Diff tab) and a pull request (Pull request tab) (docs/notes/control-5-fixes.md), as a tab
-// linked to the thread in the shell window and in the thread's side panel in the classic one
-// (commands_view_open.go). They are always scoped to a thread, the app's selection included
-// (its context names it): the item is the thread's. Each checks the item first, so a call that
-// would show nothing fails instead.
-
-// ShowView names of the item verbs. Their ShowView carries the item in params.
-const (
-	// ViewPanelFile opens a file's File tab: params path (absolute), line (1-based,
-	// optional), project and base (the thread's project and checkout). --edit adds edit
-	// and thread (who asked), and note and focus when they apply.
-	ViewPanelFile = "panel.file"
-	// ViewPanelDiff opens a checkout's Diff tab: params project and worktree, with what
-	// the call set of own, thread, base, head, path, oldPath, paths, title, note and hide
-	// (commands_view_diff.go). An older daemon sends scope instead of base and head.
-	ViewPanelDiff = "panel.diff"
-	// ViewPanelPR opens a pull request's tab: params slug ("owner/name") and number.
-	ViewPanelPR = "panel.pr"
-)
+// linked to the thread (commands_view_open.go). They are always scoped to a thread, the app's
+// selection included (its context names it): the item is the thread's. Each checks the item
+// first, so a call that would show nothing fails instead.
+//
+// The tabs' params are what the window's surfaces read:
+//   - a File tab: path (absolute), line (1-based, optional), project and base (the thread's
+//     project and checkout); --edit adds the request (fileAskParams);
+//   - a Diff tab: project and worktree, with what the call set of own, thread, base, head,
+//     path, oldPath, paths, title, note and hide (commands_view_diff.go);
+//   - a Pull request tab: slug ("owner/name") and number.
 
 // FileReader reads a file the way the File tab does (FilesystemService.ReadFile): under
 // the home directory or a temp folder only, relative paths against a base directory.
@@ -71,13 +66,13 @@ var (
 // view.panel.<item> alias (commands_view_open.go).
 func (d ViewDeps) itemCommands() []Command {
 	thread := openThreadArg
-	item := func(name, kind string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
+	item := func(kind string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
 		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			id := a.String("thread")
 			if id == "" {
 				return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
 			}
-			return d.showItem(ctx, uctx, a, id, name, kind, check)
+			return d.showItem(ctx, uctx, a, id, kind, check)
 		}
 	}
 	return withAliases(
@@ -134,7 +129,7 @@ func (d ViewDeps) itemCommands() []Command {
 					Description: "Pull request number: one the thread links, else one in its project's GitHub repository"},
 				thread, openFocusArg, openPaneArg,
 			},
-			Run: item(ViewPanelPR, tabPR, d.prCheck),
+			Run: item(tabPR, d.prCheck),
 		},
 	)
 }
@@ -153,7 +148,7 @@ func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Resul
 	if uctx.ActiveView == "" && uctx.CallerThreadID != "" {
 		asker = uctx.CallerThreadID
 	}
-	res, err := d.showItem(ctx, uctx, a, id, ViewPanelFile, tabFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := d.showItem(ctx, uctx, a, id, tabFile, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		switch {
 		case a.Bool("edit"):
 			return d.editCheck(ctx, t, a, asker)
@@ -171,7 +166,7 @@ func (d ViewDeps) runPanelFile(ctx context.Context, uctx Context, a Args) (Resul
 // editNext follows --edit's message: what the model does now.
 const editNext = "; the user is asked to edit it: end your turn, a message says when it is saved; then continue without reading its values"
 
-// editCheck is view.panel.file --edit's check: the tab could edit and save the file, or
+// editCheck is view.open.file --edit's check: the tab could edit and save the file, or
 // make it (docs/notes/file-edit-3-agent.md). A file the agent may not read comes through
 // here, so nothing from inside it reaches the params, the result or an error.
 func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker string) (map[string]string, error) {
@@ -201,17 +196,35 @@ func (d ViewDeps) editCheck(ctx context.Context, t *v1.Thread, a Args, asker str
 	if res.Msg.GetOutsideHome() {
 		return nil, InvalidArg("path", "%s is reached through a temp folder, so the tab cannot edit it: pass the path it leads to", path)
 	}
-	params := map[string]string{"path": path, "project": t.GetProjectId(), "base": base, "edit": "1", "thread": asker}
+	params := map[string]string{"path": path, "project": t.GetProjectId(), "base": base}
 	if line > 0 {
 		params["line"] = strconv.Itoa(line)
 	}
-	if note != "" {
-		params["note"] = note
-	}
-	if a.Bool("focus") {
-		params["focus"] = "1"
-	}
+	maps.Copy(params, fileAskParams(asker, note, a.Bool("focus")))
 	return params, nil
+}
+
+// fileAskParams are a request to edit a file, as its File tab's params
+// (gui/frontend/src/surfaces/fileTarget.ts ASK_PARAMS): edit, the thread that asked (asker),
+// the request's own id (askId: two requests are two, the same note or not), the note when
+// there is one, and focus=1 when the user asked to be taken there (the window then puts the
+// caret on the line). The window only reads them; its Save and tell answers the asker.
+func fileAskParams(asker, note string, focus bool) map[string]string {
+	p := map[string]string{"edit": "1", "asker": asker, "askId": newAskID()}
+	if note != "" {
+		p["note"] = note
+	}
+	if focus {
+		p["focus"] = "1"
+	}
+	return p
+}
+
+// newAskID is a fresh request id: 12 random hex digits.
+func newAskID() string {
+	b := make([]byte, 6)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // maxNoteMarks is the most combining marks a note's character keeps: enough for any script,
@@ -257,7 +270,7 @@ func fileLine(a Args) (int, error) {
 	return line, nil
 }
 
-// fileCheck is view.panel.file's check: the file exists (and is not a directory) where
+// fileCheck is view.open.file's check: the file exists (and is not a directory) where
 // the File tab would read it, under the home directory or in a temp folder (ReadFile
 // refuses anything else, symlinks followed). The path is absolute: the CLI resolves a
 // relative one against its own directory, a thread's worktree when the model runs it.
@@ -291,7 +304,7 @@ func (d ViewDeps) readCheck(ctx context.Context, t *v1.Thread, a Args) (params m
 	return params, res.Msg.GetOutsideHome(), nil
 }
 
-// prCheck is view.panel.pr's check: the number names a pull request the thread links
+// prCheck is view.open.pr's check: the number names a pull request the thread links
 // (in whichever repository), else one in the thread's project's GitHub repository, and
 // the gh store can read it (from its cache, else GitHub).
 func (d ViewDeps) prCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {

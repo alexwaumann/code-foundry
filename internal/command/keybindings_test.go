@@ -253,13 +253,20 @@ func TestRetiredChords(t *testing.T) {
 			t.Errorf("ValidateBinding(%q) = %q, %v; want it free", c, got, err)
 		}
 	}
-	for _, name := range []string{"view.pullrequests", "view.projects", "thread.previous", "thread.next", "view.panel.toggle", "view.panel.split", "view.bottom.toggle", "thread.rename"} {
+	for _, name := range []string{"view.pullrequests", "view.projects", "thread.previous", "thread.next", "thread.rename"} {
 		c, ok := f.reg.Get(name)
 		if !ok {
 			t.Fatalf("%s not registered", name)
 		}
 		if len(c.Keybindings) != 0 {
 			t.Errorf("%s keybindings = %v, want none", name, c.Keybindings)
+		}
+	}
+	// The side and bottom panel verbs went with their panels (docs/notes/shell-22-retire-verbs.md):
+	// a chord can name none of them.
+	for _, name := range []string{"view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.bottom.toggle"} {
+		if _, ok := f.reg.Get(name); ok {
+			t.Errorf("%s is still registered", name)
 		}
 	}
 }

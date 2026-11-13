@@ -41,7 +41,7 @@ func TestThreadMoveOpen(t *testing.T) {
 				t.Fatal(err)
 			}
 			got := e.Intents()
-			if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewThreadMove || got[0].GetShowView().GetParams()["id"] != tt.want || got[0].GetShowView().GetThreadId() != "" {
+			if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewThreadMove || got[0].GetShowView().GetParams()["id"] != tt.want {
 				t.Fatalf("intents = %v, want one ShowView %q for %s", got, command.ViewThreadMove, tt.want)
 			}
 		})

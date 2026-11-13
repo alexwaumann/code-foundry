@@ -1,6 +1,6 @@
 ---
 name: code-foundry-help
-description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, workspaces, threads, worktrees, settings, keybindings, PRs, actions. Use when the user asks how to do something or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), asks to see something, or before you show something in the app's side panel."
+description: "Answer how-to questions about Code Foundry, the app this thread runs in: projects, workspaces, threads, worktrees, settings, keybindings, PRs, actions. Use when the user asks how to do something or how it works, wants a setting changed, states a standing preference about the app or how you work in it (remember it), asks to see something, or before you show something in a tab beside you."
 ---
 
 # Answering questions about Code Foundry

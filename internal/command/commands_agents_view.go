@@ -19,7 +19,7 @@ import (
 const ViewSubagent = "thread.agent"
 
 // ViewAgentUp is the ShowView name that leaves the subagent view for its parent thread
-// (thread.agent.up from the CLI). Like ViewPanelToggle it is an action on the window's
+// (thread.agent.up from the CLI). It is an action on the window's
 // own state, not a page; a window that shows no subagent ignores it.
 const ViewAgentUp = "agent.up"
 

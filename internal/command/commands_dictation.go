@@ -160,7 +160,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				if d.Emitter == nil {
 					return Result{}, fmt.Errorf("%w: no app windows to dictate in", ErrUnavailable)
 				}
-				return EmitTo(d.Emitter, showViewIntent(ViewDictationToggle, "", nil)).CLIResult(uctx), nil
+				return EmitTo(d.Emitter, showViewIntent(ViewDictationToggle, nil)).CLIResult(uctx), nil
 			},
 		},
 		Command{
@@ -181,7 +181,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				if d.Emitter == nil {
 					return Result{}, fmt.Errorf("%w: no app windows to dictate in", ErrUnavailable)
 				}
-				return EmitTo(d.Emitter, showViewIntent(ViewDictationHold, "", map[string]string{"phase": phase})).CLIResult(uctx), nil
+				return EmitTo(d.Emitter, showViewIntent(ViewDictationHold, map[string]string{"phase": phase})).CLIResult(uctx), nil
 			},
 		},
 		Command{
@@ -208,7 +208,7 @@ func RegisterDictation(r *Registry, d DictationDeps) error {
 				if d.Emitter == nil {
 					return Result{}, fmt.Errorf("%w: no app to ask from", ErrUnavailable)
 				}
-				return EmitTo(d.Emitter, showViewIntent(ViewDictationAllow, "", nil)).CLIResult(uctx), nil
+				return EmitTo(d.Emitter, showViewIntent(ViewDictationAllow, nil)).CLIResult(uctx), nil
 			},
 		},
 		Command{

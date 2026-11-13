@@ -27,7 +27,7 @@ func (d ViewDeps) searchOpenCommand() Command {
 			if id := a.String("id"); id != "" {
 				params = map[string]string{"id": id}
 			}
-			return EmitTo(d.Emitter, showViewIntent(ViewSearch, "", params)).CLIResult(uctx), nil
+			return EmitTo(d.Emitter, showViewIntent(ViewSearch, params)).CLIResult(uctx), nil
 		},
 	}
 }

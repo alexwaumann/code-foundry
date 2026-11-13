@@ -13,15 +13,8 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 		command, view string
 	}{
 		{command: "view.usage", view: command.ViewUsage},
-		{command: "view.pullrequests", view: command.ViewPullRequests},
-		{command: "view.projects", view: command.ViewProjects},
 		{command: "view.settings", view: command.ViewSettings},
 		{command: "view.help", view: command.ViewHelp},
-		{command: "view.panel.toggle", view: command.ViewPanelToggle},
-		{command: "view.bottom.toggle", view: command.ViewBottomToggle},
-		{command: "view.panel.expand", view: command.ViewPanelExpand},
-		{command: "view.panel.new-tab", view: command.ViewPanelNewTab},
-		{command: "view.panel.split", view: command.ViewPanelSplit},
 		{command: "view.back", view: command.ViewBack},
 		{command: "view.forward", view: command.ViewForward},
 		{command: "thread.previous", view: command.ViewThreadPrevious},
@@ -47,7 +40,7 @@ func TestViewCommandsEmitShowView(t *testing.T) {
 			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit, Thread: &commandtest.Thread{}}); err != nil {
 				t.Fatal(err)
 			}
-			// A thread in a worktree, the keyboard in a shell of its bottom panel.
+			// A thread in a worktree, the keyboard in a shell of its terminal tab.
 			uctx := command.Context{ActiveThreadID: "s1", ActiveWorkspaceID: "w1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "thread", ActiveTerminalID: "t1"}
 			res, err := reg.Invoke(context.Background(), uctx, tt.command, nil)
 			if err != nil {

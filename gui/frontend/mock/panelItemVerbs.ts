@@ -1,13 +1,12 @@
 /**
  * view.open.file, view.open.diff, view.open.pr, view.open.page and view.open.gallery in the
- * mock daemon, with their classic names view.panel.<item> as unlisted aliases, like the
+ * mock daemon, with their old names view.panel.<item> as unlisted aliases, like the
  * daemon's (internal/command/commands_view_items.go, commands_view_panel_page.go,
- * commands_view_panel_gallery.go, commands_view_open.go). Each opens the thread's tab in the
- * mock layout (open_surface, linked to the thread; from the app it takes the focus, from a
- * caller without a view only with --focus) and still sends the classic window its ShowView:
- * always scoped to a thread (the
- * app's selection, or --thread), a ShowView with the item in its params, and --focus an
- * explicit FocusThread first. The mock checks only what it knows: the thread, a path in
+ * commands_view_panel_gallery.go, commands_view_open.go). Each opens the thread's tab (the
+ * app's selection, or --thread) in the mock layout: open_surface, linked to the thread, with
+ * the item in the tab's params; from the app it takes the focus, from a caller without a view
+ * only with --focus. The tab is the whole effect: no intent goes out
+ * (docs/notes/shell-22-retire-verbs.md). The mock checks only what it knows: the thread, a path in
  * one of its checkouts for a diff, and a GitHub repository for a pull request. It does not
  * read files, and of a diff only which files changed (to tell a file from a directory); of
  * view.panel.file --edit's refusals only --note without --edit: they are Go's to test, as is
@@ -20,8 +19,23 @@ import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 import { panes, type Op, type State, type Tab } from "./layout";
 import { DIFF_ASKER_PARAM, identityKey } from "../src/shell/identity";
-import { panelThreadArgs } from "./panelVerbs";
-import type { UiIntentInit } from "./world";
+
+/** The item verbs' --thread and --focus (internal/command openThreadArg, openFocusArg). */
+const itemThreadArgs = [
+  {
+    name: "thread",
+    type: ArgType.STRING,
+    required: false,
+    description:
+      "Thread the tab belongs to; it opens beside it without taking the user's focus (default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app: the selected thread) (or a unique suffix of 4+ characters)",
+  },
+  { name: "focus", type: ArgType.BOOL, required: false, description: "Also take the user's focus to the tab; only when the user asked to be taken there" },
+];
+
+/** A fresh request id for a file request (internal/command newAskID). */
+function newAskId(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 /** What the item verbs read about a thread; undefined for one the mock does not know. */
 export interface ItemThread {
@@ -41,7 +55,7 @@ type Command = {
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
 
-const lead = "beside a thread (from a thread: its own; in the app: the selected one; the classic window: its side panel): ";
+const lead = "beside a thread (from a thread: its own; in the app: the selected one): ";
 
 /** --hide's values (internal/command diffHides). */
 const DIFF_HIDES = ["compare", "files"];
@@ -99,22 +113,58 @@ function tabTitle(args: Record<string, string>): string {
   return title;
 }
 
+/** A diff tab's side param as the window reads it (internal/command sideParam): "" for the side's default. */
+function sideParam(v: string | undefined, def: string): string {
+  if (!v || v === def) return "";
+  if (["working", "staged", "merge-base"].includes(v) || (v.startsWith("ref:") && v.length > 4)) return v;
+  return "";
+}
+
+/** A Diff tab's params while it shows one commit from its Commits list (internal/command diffCommitParams). */
+const COMMIT_PARAMS = ["commit", "backBase", "backHead", "backPath", "backOldPath"];
+
 /**
- * Like the daemon's tabs.open (internal/command/commands_view_open.go): a diff that frames nothing
- * (no asker) shows an open checkout tab of its identity as the user has it, its params kept; the
- * window picks the file there (stores/threadPanelIntent.ts).
+ * Like the daemon's intoUsersDiff (internal/command/commands_view_diff_pick.go): a diff that frames
+ * nothing (no asker) while the checkout's own tab is open is that tab as the user has it, with the
+ * call's file picked there (out of a commit the user was in). When the user's tab compares other
+ * sides, the file is picked only if `listed` says those sides list it (the mock does not compare:
+ * the world says whether the checkout changed the file); otherwise it opens in a tab of `asker`'s own.
  */
-export function keepUsersDiff(st: State, op: Op): Op {
+export function intoUsersDiff(st: State, op: Op, asker: string, listed: (root: string, file: string) => boolean = () => true): Op {
   const tab = op.op === "open_surface" ? (op.tab as Tab | undefined) : undefined;
   if (tab?.kind !== "diff" || tab.params?.[DIFF_ASKER_PARAM]) return op;
   const thread = tab.thread ?? "";
-  const key = identityKey("diff", thread, tab.params ?? {});
+  const asked = tab.params ?? {};
+  const key = identityKey("diff", thread, asked);
   const space = st.spaces.find((sp) => sp.id === (st.threads?.[thread]?.space ?? st.default_space));
-  for (const p of panes(space?.root)) {
-    const open = (p.tabs ?? []).find((t) => t.kind === "diff" && identityKey("diff", t.thread ?? "", t.params ?? {}) === key);
-    if (key !== null && open) return { ...op, tab: { ...tab, params: { ...open.params } } };
+  const open = key === null ? undefined : panes(space?.root).flatMap((p) => p.tabs ?? []).find((t) => t.kind === "diff" && identityKey("diff", t.thread ?? "", t.params ?? {}) === key);
+  if (!open) return op;
+  const kept = Object.entries(open.params ?? {}).filter(([k]) => !COMMIT_PARAMS.includes(k));
+  const mine: Record<string, string> = { ...open.params };
+  if (asked.own) mine.own = asked.own;
+  else delete mine.own;
+  const file = asked.path;
+  if (!file) return { ...op, tab: { ...tab, params: mine } };
+  const base = sideParam(mine.commit ? mine.backBase : mine.base, "merge-base");
+  const head = sideParam(mine.commit ? mine.backHead : mine.head, "working");
+  if ((base !== sideParam(asked.base, "merge-base") || head !== sideParam(asked.head, "working")) && !listed(mine.worktree ?? "", file)) {
+    return { ...op, tab: { ...tab, params: { ...asked, [DIFF_ASKER_PARAM]: asker } } };
   }
-  return op;
+  // The commit's params go: the file is picked in the sides the commit was opened from.
+  const { base: _b, head: _h, path: _p, oldPath: _o, ...rest } = Object.fromEntries(kept);
+  const picked: Record<string, string> = { ...rest, path: file };
+  if (asked.own) picked.own = asked.own;
+  else delete picked.own;
+  if (base) picked.base = base;
+  if (head) picked.head = head;
+  if (asked.oldPath && asked.oldPath !== file) picked.oldPath = asked.oldPath;
+  return { ...op, tab: { ...tab, params: picked } };
+}
+
+/** A tab's title as the daemon gives it (internal/command itemTab): a file's name or a page's title, "#n", a gallery's or diff's title. */
+function itemTitle(kind: string, p: Record<string, string>): { title?: string } {
+  const title = kind === "file" ? p.title || (p.path ?? "").split("/").pop() || "" : kind === "pullrequest" ? `#${p.number ?? ""}` : p.title ?? "";
+  return title ? { title } : {};
 }
 
 /** Applies a layout op; keepFocus runs it without moving the user's focus (a thread's call). */
@@ -128,21 +178,19 @@ function alias(c: Command): Command {
   return { ...c, cmd: { ...c.cmd, name: c.cmd.name.replace("view.open.", "view.panel."), noPalette: true, description: `The old name of ${c.cmd.name}, kept for one stable release. ${c.cmd.description}` } };
 }
 
-/** The item verbs over `lookup`, emitting through `emit` and opening their tabs through `place`. */
-export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, emit: (i: UiIntentInit) => number, place?: PlaceTab): Command[] {
+/** The item verbs over `lookup`, opening their tabs through `place`. */
+export function panelItemCommands(lookup: (id: string) => ItemThread | undefined, place?: PlaceTab): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
-  const show = (ctx: UiContext | undefined, args: Record<string, string>, name: string, kind: string, params: (t: ItemThread, id: string) => Record<string, string>): string => {
+  const show = (ctx: UiContext | undefined, args: Record<string, string>, kind: string, params: (t: ItemThread, id: string) => Record<string, string>): string => {
     const id = args.thread || ctx?.activeThreadId || "";
     const t = lookup(id);
     if (!t) throw new CommandError("notfound", `thread not found: ${id}`);
     const p = params(t, id);
     // Like the daemon's wantsFocus: the user's call (the app) takes the focus, a thread's only with --focus.
     const focus = args.focus === undefined ? Boolean(ctx?.activeView) : args.focus === "true";
-    place?.({ op: "open_surface", tab: { id: "", kind, thread: id, params: p }, focus, ...(args.pane ? { pane: args.pane } : {}) }, !focus);
-    if (args.focus === "true") emit({ intent: { case: "focusThread", value: { threadId: id, explicit: true } } });
-    const n = emit({ intent: { case: "showView", value: { name, threadId: id, params: p } } });
+    place?.({ op: "open_surface", tab: { id: "", kind, thread: id, params: p, ...itemTitle(kind, p) }, focus, ...(args.pane ? { pane: args.pane } : {}) }, !focus);
     // Like the daemon: a message for the CLI only (the app toasts non-empty ones).
-    return ctx?.activeView ? "" : `windows=${String(n)} thread=${id}`;
+    return ctx?.activeView ? "" : `opened a ${kind} tab for thread ${id}`;
   };
   const verbs: Command[] = [
     {
@@ -157,19 +205,19 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           { name: "line", type: ArgType.INT, required: false, description: "1-based line to scroll to and mark" },
           { name: "edit", type: ArgType.BOOL, required: false, description: "Ask the user to edit the file" },
           { name: "note", type: ArgType.STRING, required: false, description: "With --edit: what to put where" },
-          ...panelThreadArgs,
+          ...itemThreadArgs,
           paneArg,
         ],
       },
       when,
       run: (ctx, args) =>
-        show(ctx, args, "panel.file", "file", (t, id) => {
+        show(ctx, args, "file", (t, id) => {
           const path = args.path ?? "";
           if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
           if (args.note && args.edit !== "true") throw new CommandError("invalid", "only with --edit");
           const asked =
             args.edit === "true"
-              ? { edit: "1", thread: id, ...(args.note ? { note: args.note } : {}), ...(args.focus === "true" ? { focus: "1" } : {}) }
+              ? { edit: "1", asker: id, askId: newAskId(), ...(args.note ? { note: args.note } : {}), ...(args.focus === "true" ? { focus: "1" } : {}) }
               : {};
           return { path, project: t.projectId, base: t.worktreePath, ...(args.line ? { line: args.line } : {}), ...asked };
         }),
@@ -184,13 +232,13 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         args: [
           { name: "path", type: ArgType.PATH, required: true, description: "The .html or .htm file: absolute, ~/…, or relative to the current directory; under the home directory" },
           { name: "title", type: ArgType.STRING, required: false, description: "The tab's title (default: the file's name), at most 100 characters" },
-          ...panelThreadArgs,
+          ...itemThreadArgs,
           paneArg,
         ],
       },
       when,
       run: (ctx, args) =>
-        show(ctx, args, "panel.file", "file", (t) => {
+        show(ctx, args, "file", (t) => {
           const path = args.path ?? "";
           if (!path.startsWith("/")) throw new CommandError("invalid", `want an absolute path, got "${path}"`);
           if (!/\.html?$/i.test(path)) throw new CommandError("invalid", `${path} is not an .html or .htm file (view.open.file shows any file)`);
@@ -208,12 +256,12 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         args: [
           { name: "title", type: ArgType.STRING, required: true, description: "The tab's title; the same title updates the same tab" },
           { name: "images", type: ArgType.STRING, required: true, description: "The images in order, a JSON array of path and caption" },
-          ...panelThreadArgs,
+          ...itemThreadArgs,
           paneArg,
         ],
       },
       when,
-      run: (ctx, args) => show(ctx, args, "panel.gallery", "gallery", (t) => ({ title: args.title ?? "", images: args.images ?? "", project: t.projectId, base: t.worktreePath })),
+      run: (ctx, args) => show(ctx, args, "gallery", (t) => ({ title: args.title ?? "", images: args.images ?? "", project: t.projectId, base: t.worktreePath })),
     },
     {
       cmd: {
@@ -230,13 +278,13 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
           { name: "title", type: ArgType.STRING, required: false, description: "The tab's name, at most 100 characters" },
           { name: "note", type: ArgType.STRING, required: false, description: "A line under the title" },
           { name: "hide", type: ArgType.STRING, required: false, description: "compare or files" },
-          ...panelThreadArgs,
+          ...itemThreadArgs,
           paneArg,
         ],
       },
       when,
       run: (ctx, args) =>
-        show(ctx, args, "panel.diff", "diff", (t, id) => {
+        show(ctx, args, "diff", (t, id) => {
           if (!t.projectId) throw new CommandError("unavailable", `thread ${id} runs in no project worktree`);
           if (args.scope !== undefined && (args.base || args.head)) throw new CommandError("invalid", "says the same as --base and --head: give one or the other");
           const base = diffSource(args.base, "merge-base");
@@ -274,11 +322,11 @@ export function panelItemCommands(lookup: (id: string) => ItemThread | undefined
         category: "View",
         description: `Open a pull request ${lead}its summary, checks, reviews, timeline and changed files, with Merge and Review.`,
         keybindings: [],
-        args: [{ name: "number", type: ArgType.INT, required: true, description: "Pull request number: one the thread links, else one in its project's GitHub repository" }, ...panelThreadArgs, paneArg],
+        args: [{ name: "number", type: ArgType.INT, required: true, description: "Pull request number: one the thread links, else one in its project's GitHub repository" }, ...itemThreadArgs, paneArg],
       },
       when,
       run: (ctx, args) =>
-        show(ctx, args, "panel.pr", "pullrequest", (t, id) => {
+        show(ctx, args, "pullrequest", (t, id) => {
           if (!t.githubSlug) throw new CommandError("unavailable", `thread ${id} links no pull request #${args.number ?? ""} and its project has no GitHub repository`);
           return { slug: t.githubSlug, number: args.number ?? "" };
         }),

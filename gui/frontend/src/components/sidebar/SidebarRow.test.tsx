@@ -7,8 +7,8 @@ const renameThread = vi.hoisted(() => vi.fn<(id: string, name: string) => Promis
 const archiveThread = vi.hoisted(() => vi.fn<(id: string, archived: boolean) => Promise<boolean>>(() => Promise.resolve(true)));
 const snoozeThread = vi.hoisted(() => vi.fn<(id: string, untilMs: number | null) => Promise<boolean>>(() => Promise.resolve(true)));
 vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread, archiveThread, snoozeThread }));
-const showThreadView = vi.hoisted(() => vi.fn<(name: string, threadId: string, params?: Record<string, string>) => boolean>(() => true));
-vi.mock("@/stores/threadPanelIntent", () => ({ showThreadView }));
+const openPr = vi.hoisted(() => vi.fn<(ref: { slug: string; number: number }, target?: string, opts?: { focus?: boolean }) => boolean>(() => true));
+vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel: openPr }));
 const showThreadInfo = vi.hoisted(() => vi.fn<(threadId: string, focus?: boolean) => void>());
 vi.mock("@/stores/threadInfoOverlay", async (orig) => ({ ...(await orig<typeof import("@/stores/threadInfoOverlay")>()), showThreadInfo }));
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -852,7 +852,7 @@ describe("SidebarRow linked PR tag click", () => {
   beforeEach(() => {
     pullRequestDetailResource.store.setState({ entries: {} });
     dashboardResource.store.setState({ entries: {} });
-    showThreadView.mockClear();
+    openPr.mockClear();
     showThreadInfo.mockClear();
   });
 
@@ -868,13 +868,13 @@ describe("SidebarRow linked PR tag click", () => {
     return onActivate;
   }
 
-  it("one PR: selects the thread and opens the PR in its panel (the link's slug), not the row's click", () => {
+  it("one PR: selects the thread and opens the PR in a tab linked to it (the link's slug), without the focus, not the row's click", () => {
     const onActivate = renderWith({ linkedPullRequests: [link("Owner/Repo", 142)] });
     fireEvent.click(screen.getByTestId("row-linked-prs"));
     expect(onActivate).not.toHaveBeenCalled();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
     expect(useUiStore.getState().cursorKey).toBe("s:s-1");
-    expect(showThreadView).toHaveBeenCalledWith("panel.pr", "s-1", { slug: "Owner/Repo", number: "142" });
+    expect(openPr).toHaveBeenCalledWith({ slug: "Owner/Repo", number: 142 }, "thread:s-1", { focus: false });
     expect(showThreadInfo).not.toHaveBeenCalled();
   });
 
@@ -886,9 +886,9 @@ describe("SidebarRow linked PR tag click", () => {
     fireEvent.click(screen.getByTestId("row-linked-prs"));
     expect(onActivate).not.toHaveBeenCalled();
     expect(showThreadInfo).not.toHaveBeenCalled();
-    expect(showThreadView.mock.calls).toEqual([
-      ["panel.pr", "s-1", { slug: "o/r", number: "2" }],
-      ["panel.pr", "s-1", { slug: "o/r", number: "1" }],
+    expect(openPr.mock.calls).toEqual([
+      [{ slug: "o/r", number: 2 }, "thread:s-1", { focus: false }],
+      [{ slug: "o/r", number: 1 }, "thread:s-1", { focus: false }],
     ]);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
   });
@@ -897,8 +897,8 @@ describe("SidebarRow linked PR tag click", () => {
     const readOnce = vi.spyOn(pullRequestDetailResource, "readOnce").mockResolvedValue();
     renderWith({ linkedPullRequests: [link("o/r", 1), link("o/r", 2)] });
     fireEvent.click(screen.getByTestId("row-linked-prs"));
-    const shown = showThreadView.mock.calls.at(-1)?.[2] as { number: string };
-    expect(readOnce.mock.calls[0]).toEqual([pullRequestKey("o/r", Number(shown.number))]);
+    const shown = openPr.mock.calls.at(-1)?.[0] as { number: number };
+    expect(readOnce.mock.calls[0]).toEqual([pullRequestKey("o/r", shown.number)]);
     expect(readOnce).toHaveBeenCalledTimes(2);
     readOnce.mockRestore();
   });
@@ -911,8 +911,8 @@ describe("SidebarRow linked PR tag click", () => {
       expect(readOnce).toHaveBeenCalledTimes(1);
     });
     fireEvent.click(screen.getByTestId("row-linked-prs"));
-    const shown = showThreadView.mock.calls.at(-1)?.[2] as { number: string };
-    expect(readOnce.mock.calls[0]).toEqual([pullRequestKey("o/r", Number(shown.number))]);
+    const shown = openPr.mock.calls.at(-1)?.[0] as { number: number };
+    expect(readOnce.mock.calls[0]).toEqual([pullRequestKey("o/r", shown.number)]);
     readOnce.mockRestore();
   });
 
@@ -921,7 +921,7 @@ describe("SidebarRow linked PR tag click", () => {
     renderWith({ linkedPullRequests: [link("o/r", 7)] }, { kind: "thread", id: "s-1" });
     fireEvent.click(screen.getByTestId("row-linked-prs"));
     expect(select).not.toHaveBeenCalled();
-    expect(showThreadView).toHaveBeenCalledWith("panel.pr", "s-1", { slug: "o/r", number: "7" });
+    expect(openPr).toHaveBeenCalledWith({ slug: "o/r", number: 7 }, "thread:s-1", { focus: false });
     select.mockRestore();
   });
 });

@@ -202,7 +202,7 @@ var Groups = []Group{
 	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
 	{GroupProjects, "Projects", "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
-	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window."},
+	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
 	{GroupLayout, "Layout", "How the window's panes follow the thread you focus."},
 	{GroupSidebar, "Sidebar", "What the sidebar lists."},
@@ -243,7 +243,6 @@ const (
 	KeyThreadWidth               = "appearance.thread_width"
 	KeyBackdrop                  = "appearance.backdrop"
 	KeyBackdropFile              = "appearance.backdrop_file"
-	KeyPanelKeepOpen             = "appearance.panel_keep_open"
 	KeySmartSwap                 = "layout.smart_swap"
 	KeyNeedsScope                = "sidebar.needs_scope"
 	KeyDockBadge                 = "notifications.dock_badge"
@@ -537,12 +536,6 @@ var staticFields = []Field{
 		Description: "The file the Custom backdrop shows, from the backdrops folder of the Code Foundry home. Add and remove images on the settings page.",
 		check:       checkBackdropFile,
 		bind:        func(s *Settings) any { return &s.Appearance.BackdropFile },
-	},
-	{
-		Key: KeyPanelKeepOpen, Group: GroupAppearance, Page: PageAppearance, Section: "window", Type: Bool, Title: "Keep side panel open",
-		Description: "Keep the side panel open on its new tab page after its last tab closes.",
-		Default:     "false",
-		bind:        func(s *Settings) any { return &s.Appearance.PanelKeepOpen },
 	},
 	// Appearance › Panes and sidebar.
 	{

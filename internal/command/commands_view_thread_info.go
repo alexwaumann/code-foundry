@@ -21,7 +21,7 @@ func (d ViewDeps) threadInfoCommand() Command {
 		Category:    "View",
 		Keybindings: []string{"cmd+shift+i"},
 		Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
-			return EmitTo(d.Emitter, showViewIntent(ViewThreadInfo, "", nil)).CLIResult(uctx), nil
+			return EmitTo(d.Emitter, showViewIntent(ViewThreadInfo, nil)).CLIResult(uctx), nil
 		},
 	}
 }

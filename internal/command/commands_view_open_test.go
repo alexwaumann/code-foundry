@@ -52,6 +52,7 @@ type openFixture struct {
 	reg   *command.Registry
 	emit  *commandtest.Emitter
 	store *layouttest.Fake
+	diffs *commandtest.FileDiffs
 }
 
 func newOpenFixture(t *testing.T, terms ...*v1.Terminal) openFixture {
@@ -61,16 +62,17 @@ func newOpenFixture(t *testing.T, terms ...*v1.Terminal) openFixture {
 	th.CheckoutPaths = []*v1.ThreadCheckoutPath{{ProjectId: "r1", Path: "/wt"}, {ProjectId: "r2", Path: "/api"}}
 	store := layouttest.New(nil)
 	store.Put(threadPane())
+	diffs := &commandtest.FileDiffs{}
 	reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: th}, panelDeps{
 		windows:  1,
 		files:    &commandtest.Files{Files: []string{"/wt/a.go", "/wt/b.go", "/wt/p.html", "/wt/shot.png"}, Mime: map[string]string{"/wt/shot.png": "image/png"}},
-		diffs:    &commandtest.FileDiffs{},
+		diffs:    diffs,
 		projects: &commandtest.Project{Projects: []*v1.Project{{Id: "r1", GithubSlug: "owner/repo"}}},
 		prs:      &commandtest.PullRequestChecks{Res: &v1.GetPullRequestResponse{PullRequest: &v1.PullRequest{}}},
 		layout:   store,
 		terms:    &commandtest.Terminal{Terminals: terms},
 	})
-	return openFixture{reg: reg, emit: emit, store: store}
+	return openFixture{reg: reg, emit: emit, store: store, diffs: diffs}
 }
 
 func (f openFixture) run(t *testing.T, uctx command.Context, name string, args map[string]string) command.Result {
@@ -107,25 +109,23 @@ func (f openFixture) tabsOf(kind string) []*core.Tab {
 	return out
 }
 
-// openVerbs are the item verbs, each with args that show something, the tab kind it opens and
-// the ShowView the classic window gets.
+// openVerbs are the item verbs, each with args that show something and the tab kind it opens.
 var openVerbs = []struct {
 	item string
 	args map[string]string
 	kind string
-	view string
 }{
-	{"file", map[string]string{"path": "/wt/a.go"}, "file", command.ViewPanelFile},
-	{"page", map[string]string{"path": "/wt/p.html"}, "file", command.ViewPanelFile},
-	{"diff", map[string]string{}, "diff", command.ViewPanelDiff},
-	{"pr", map[string]string{"number": "7"}, "pullrequest", command.ViewPanelPR},
-	{"gallery", map[string]string{"title": "Shots", "images": `[{"path":"/wt/shot.png"}]`}, "gallery", command.ViewPanelGallery},
-	{"mcp", map[string]string{}, "mcp", command.ViewPanelMcp},
+	{"file", map[string]string{"path": "/wt/a.go"}, "file"},
+	{"page", map[string]string{"path": "/wt/p.html"}, "file"},
+	{"diff", map[string]string{}, "diff"},
+	{"pr", map[string]string{"number": "7"}, "pullrequest"},
+	{"gallery", map[string]string{"title": "Shots", "images": `[{"path":"/wt/shot.png"}]`}, "gallery"},
+	{"mcp", map[string]string{}, "mcp"},
 }
 
 // Each view.open verb and its view.panel alias, from the thread's CLI: one open_surface of a
 // tab linked to the thread, placed beside it (a new pane on its right: there is room), the
-// user's focus where it was, and the classic window's ShowView as before.
+// user's focus where it was, and no intent: the tab is the whole effect.
 func TestViewOpenPlacesALinkedTab(t *testing.T) {
 	for _, v := range openVerbs {
 		for _, name := range []string{"view.open." + v.item, "view.panel." + v.item} {
@@ -146,10 +146,7 @@ func TestViewOpenPlacesALinkedTab(t *testing.T) {
 				if got := f.focus(); got != "sp-main/p-main/t-a" {
 					t.Errorf("focus = %s, want the user's, unmoved", got)
 				}
-				intents := f.emit.Intents()
-				if len(intents) != 1 || intents[0].GetShowView().GetName() != v.view || intents[0].GetShowView().GetThreadId() != self {
-					t.Errorf("intents = %v, want the classic %s ShowView for %s", intents, v.view, self)
-				}
+				sameIntents(t, f.emit.Intents(), nil)
 				out, ok := res.JSON.(command.PanelResult)
 				if !ok || out.Tab != tabs[0].ID || out.Pane != p.ID || out.Rule != "5" || out.TabFocused {
 					t.Errorf("JSON = %+v, want tab %s in pane %s by rule 5, unfocused", res.JSON, tabs[0].ID, p.ID)
@@ -159,7 +156,7 @@ func TestViewOpenPlacesALinkedTab(t *testing.T) {
 					t.Errorf("message = %q, want %q", res.Message, want)
 				}
 				if v.kind != "mcp" && maps2(tabs[0].Params) == "" {
-					t.Errorf("tab params empty, want the ShowView's")
+					t.Errorf("tab params empty, want the item's")
 				}
 			})
 		}
@@ -176,8 +173,9 @@ func maps2(m map[string]string) string {
 	return strings.Join(out, " ")
 }
 
-// Who takes the focus: the user's call (the app) does, a thread's only with --focus, and then
-// the classic window also selects the thread first. --pane puts the tab in that pane.
+// Who takes the focus: the user's call (the app) does, a thread's only with --focus. The layout
+// is the whole effect: no FocusThread, which would take the window to the thread's own tab.
+// --pane puts the tab in that pane.
 func TestViewOpenFocus(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -212,10 +210,7 @@ func TestViewOpenFocus(t *testing.T) {
 			if out := res.JSON.(command.PanelResult); out.Rule != tt.wantRule || out.TabFocused != tt.wantFocus {
 				t.Errorf("JSON = %+v, want rule %s, focused %v", out, tt.wantRule, tt.wantFocus)
 			}
-			selects := slices.ContainsFunc(f.emit.Intents(), func(i *v1.UiIntent) bool { return i.GetFocusThread() != nil })
-			if want := tt.args["focus"] == "true"; selects != want {
-				t.Errorf("classic FocusThread sent = %v, want %v", selects, want)
-			}
+			sameIntents(t, f.emit.Intents(), nil)
 		})
 	}
 }
@@ -281,23 +276,77 @@ func TestViewOpenIdentity(t *testing.T) {
 	}
 }
 
-// The checkout's own diff is the user's: a thread's call that only picks a file shows it as the
-// user has it (its sides, filter, folds, file), and the window picks the file there.
-func TestViewOpenDiffKeepsTheUsersTab(t *testing.T) {
-	f := newOpenFixture(t)
-	f.run(t, selfCLI, "view.open.diff", nil)
-	tabs := f.tabsOf("diff")
-	if len(tabs) != 1 {
-		t.Fatalf("diff tabs = %+v", tabs)
+// The checkout's own diff is the user's: a thread's call that only picks a file (no asker) shows
+// it as the user has it (filter, folds) with the file picked there when the user's sides list it
+// (asked only when they differ from the call's), out of a commit the user was in; otherwise the
+// file opens in a tab of the thread's own and the user's stays as it was. A call with no file
+// leaves the user's tab as it is.
+func TestViewOpenDiffPicksInTheUsersTab(t *testing.T) {
+	tests := []struct {
+		name     string
+		mine     map[string]string
+		args     map[string]string
+		unlisted bool
+		want     map[string]string // the user's tab after the call
+		own      map[string]string // the thread's own tab, nil for none
+		compares int
+	}{
+		{name: "the same sides: picked at once",
+			mine: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "filter": "go", "fold": "1", "path": "b.go"},
+			args: map[string]string{"path": "/wt/a.go"},
+			want: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "filter": "go", "fold": "1", "path": "a.go"}},
+		{name: "other sides that list it: picked there",
+			mine: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "b.go"},
+			args: map[string]string{"path": "/wt/a.go"}, compares: 1,
+			want: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "a.go"}},
+		{name: "other sides that do not list it: a tab of the thread's own",
+			mine: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "b.go"},
+			args: map[string]string{"path": "/wt/a.go"}, unlisted: true, compares: 1,
+			want: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "b.go"},
+			own:  map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "path": "a.go", "thread": self}},
+		{name: "in a commit: back to the sides it came from, the file picked",
+			mine: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "commit": "abc", "backBase": "merge-base", "backHead": "working", "backPath": "b.go", "commits": "1"},
+			args: map[string]string{"path": "/wt/a.go"},
+			want: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "commits": "1", "path": "a.go"}},
+		{name: "no file: the user's tab as it is",
+			mine: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "staged", "filter": "x", "commit": "abc", "backBase": "merge-base"},
+			want: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "staged", "filter": "x", "commit": "abc", "backBase": "merge-base"}},
 	}
-	mine := map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "filter": "go", "fold": "1", "path": "b.go"}
-	if _, err := f.store.Apply(context.Background(), &core.SetTabParams{Tab: tabs[0].ID, Params: mine}, layoutstore.ApplyOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	out := f.run(t, selfCLI, "view.open.diff", map[string]string{"path": "/wt/a.go"}).JSON.(command.PanelResult)
-	tabs = f.tabsOf("diff")
-	if len(tabs) != 1 || !out.Existing || !maps.Equal(tabs[0].Params, mine) {
-		t.Errorf("diff tabs = %+v (existing %v), want the user's one with its params %v", tabs, out.Existing, mine)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newOpenFixture(t)
+			f.run(t, selfCLI, "view.open.diff", nil)
+			tabs := f.tabsOf("diff")
+			if len(tabs) != 1 {
+				t.Fatalf("diff tabs = %+v", tabs)
+			}
+			if _, err := f.store.Apply(context.Background(), &core.SetTabParams{Tab: tabs[0].ID, Params: tt.mine}, layoutstore.ApplyOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			diffs := f.diffs
+			before := len(diffs.Requests())
+			if tt.unlisted {
+				diffs.Unlisted = func(base, path string) bool { return base == "v1" && path == "a.go" }
+			}
+			out := f.run(t, selfCLI, "view.open.diff", tt.args).JSON.(command.PanelResult)
+			// The call's own check compares once; the pick asks again only for other sides.
+			if n := len(diffs.Requests()) - before - 1; n != tt.compares {
+				t.Errorf("%d comparisons for the pick, want %d", n, tt.compares)
+			}
+			tabs = f.tabsOf("diff")
+			if !maps.Equal(tabs[0].Params, tt.want) {
+				t.Errorf("the user's tab = %v, want %v", tabs[0].Params, tt.want)
+			}
+			if tt.own == nil {
+				if len(tabs) != 1 || !out.Existing {
+					t.Errorf("diff tabs = %+v (existing %v), want only the user's", tabs, out.Existing)
+				}
+				return
+			}
+			if len(tabs) != 2 || !maps.Equal(tabs[1].Params, tt.own) || out.Existing {
+				t.Errorf("diff tabs = %+v, want the thread's own with %v", tabs, tt.own)
+			}
+		})
 	}
 }
 
@@ -325,7 +374,8 @@ func TestViewInlinePanelOpensATab(t *testing.T) {
 }
 
 // thread.focus is thread.open --focus in the layout: the thread's space becomes current and its
-// tab takes the focus, opened when it is closed; the classic window still gets FocusThread.
+// tab takes the focus, opened when it is closed. Its FocusThread stays: it is what puts the
+// keyboard in the thread's prompt, which the layout does not carry.
 func TestThreadFocusOpensItsTab(t *testing.T) {
 	f := newOpenFixture(t)
 	f.run(t, selfCLI, "space.switch", map[string]string{"space": "sp-two", "focus": "true"})
@@ -338,7 +388,7 @@ func TestThreadFocusOpensItsTab(t *testing.T) {
 	}
 	intents := f.emit.Intents()
 	if len(intents) != 1 || intents[0].GetFocusThread().GetThreadId() != self {
-		t.Errorf("intents = %v, want the classic FocusThread", intents)
+		t.Errorf("intents = %v, want the FocusThread", intents)
 	}
 
 	// Closed: it opens (in the focused pane of its space).
@@ -387,8 +437,7 @@ func TestFocusTerminalOpensItsTab(t *testing.T) {
 }
 
 // view.pullrequests and view.projects open their page's tab in the current space (one each),
-// focusing the one already open; from a thread they leave the focus; the classic window still
-// gets the ShowView.
+// focusing the one already open; from a thread they leave the focus. No intent goes out.
 func TestPageVerbsOpenTheirTab(t *testing.T) {
 	f := newOpenFixture(t)
 	res := f.run(t, fromCLI, "view.pullrequests", nil)
@@ -416,19 +465,12 @@ func TestPageVerbsOpenTheirTab(t *testing.T) {
 	if got := f.focus(); got != "sp-main/p-main/t-a" {
 		t.Errorf("focus = %s, want the user's, unmoved", got)
 	}
-	// Plain view.projects keeps the page the tab shows.
+	// Plain view.projects shows the index: the open tab leaves the project's page.
 	f.run(t, fromCLI, "view.projects", nil)
-	if projs := f.tabsOf("projects"); projs[0].Params["project"] != "r1" {
-		t.Errorf("params %v, want the project page kept", projs[0].Params)
+	if projs := f.tabsOf("projects"); len(projs) != 1 || len(projs[0].Params) != 0 {
+		t.Errorf("projects tabs %+v, want the one tab, on the index", projs)
 	}
-	want := []string{command.ViewPullRequests, command.ViewPullRequests, command.ViewProjects, command.ViewProjects}
-	var got []string
-	for _, i := range f.emit.Intents() {
-		got = append(got, i.GetShowView().GetName())
-	}
-	if !slices.Equal(got, want) {
-		t.Errorf("ShowViews = %v, want %v", got, want)
-	}
+	sameIntents(t, f.emit.Intents(), nil)
 }
 
 // view.thread-diff: from the thread's tab, its diff (opened beside it, focused); from that

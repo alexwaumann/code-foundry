@@ -13,7 +13,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 )
 
-// view.panel.diff (docs/notes/diff-viewer-3.md): what a thread shows in a Diff tab. Its
+// view.open.diff (docs/notes/diff-viewer-3.md): what a thread shows in a Diff tab. Its
 // check is the tab's own read (ProjectService.CompareWorktree), so a call that would show
 // nothing fails instead. The checkout's own tab is the user's: a call that names a side,
 // narrows the list, says something or hides a control gets a tab of its own (the "thread" param).
@@ -29,7 +29,7 @@ const (
 // always bring them back from the tab.
 var diffHides = []string{"compare", "files"}
 
-// diffArgs are view.panel.diff's flags, before thread and focus.
+// diffArgs are view.open.diff's flags, before thread and focus.
 func diffArgs() []ArgSpec {
 	return []ArgSpec{
 		{Name: "path", Type: Path, Positional: true, Repeatable: true, Description: "A changed file or directory in one of the thread's checkouts: absolute, or relative to the current directory. " +
@@ -225,16 +225,19 @@ func (d ViewDeps) runPanelDiff(ctx context.Context, uctx Context, a Args) (Resul
 		asker = uctx.CallerThreadID
 	}
 	var warnings []string
-	res, err := d.showItem(ctx, uctx, a, id, ViewPanelDiff, tabDiff, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := d.showItem(ctx, uctx, a, id, tabDiff, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		params, w, err := d.diffCheck(ctx, t, a, asker)
 		warnings = w
-		return params, err
+		if err != nil {
+			return nil, err
+		}
+		return d.intoUsersDiff(ctx, id, asker, params), nil
 	})
 	res.Warnings = warnings
 	return res, err
 }
 
-// diffCheck is view.panel.diff's check: the thread runs in a project worktree, its paths
+// diffCheck is view.open.diff's check: the thread runs in a project worktree, its paths
 // are in one of its checkouts, and the two sides differ there. Refs go to the daemon as
 // given: it is the boundary, and refuses what cannot be one. It gives the tab's params and
 // the paths it left out, as warnings.

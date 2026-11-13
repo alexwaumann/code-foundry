@@ -92,7 +92,7 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 			NoPalette: true,
 			Title:     "Show Plugin Surface View",
 			Description: "Open a plugin surface for a context (a thread for a thread scoped one: --context-thread) as the " +
-				"side panel would, wait for its view, and print the view's JSON and the elements that act " +
+				"tab would, wait for its view, and print the view's JSON and the elements that act " +
 				"(code-foundry plugin act). It returns at the first view; --settle 2s waits until no new view has " +
 				"come for 2 s (a surface that shows \"Loading\" first). --watch keeps printing new views, log appends " +
 				"and toasts (CLI). --shot out.png then writes a PNG of the surface as the open app draws it (CLI).",
@@ -131,8 +131,8 @@ func RegisterPluginSurface(r *Registry, b PluginSurfaceBackend) error {
 			Description: "Act on an element of a plugin surface's current view as a click would: a button, row, chip, tab, a " +
 				"field's change, or a form's submit with --values '{\"field\": \"value\"}'. Name the element by its event " +
 				"or command (the positional action) or --key (code-foundry plugin surface lists them). An event goes to the " +
-				"plugin (its error is the command's); a command button runs its command with the panel's context, as the " +
-				"side panel does (a form's values become its args; a command that asks first needs --yes). Then it prints " +
+				"plugin (its error is the command's); a command button runs its command with the surface's context, as its " +
+				"tab does (a form's values become its args; a command that asks first needs --yes). Then it prints " +
 				"the view once no new one has come for --settle (default 500ms); --quiet prints only what happened.",
 			Category:     "Plugin",
 			NoKeybinding: true,

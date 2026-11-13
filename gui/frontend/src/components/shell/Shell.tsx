@@ -3,6 +3,7 @@ import { startComposerDrafts } from "@/shell/composerDrafts";
 import { importSettled, runLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
 import { startSelectionBridge } from "@/stores/selectionBridge";
 import { startFocusHistory } from "@/stores/focusHistory";
+import { startFileRequests } from "@/stores/fileRequestArrivals";
 import { useLayoutStore } from "@/stores/layout";
 import { setShellMode, useShellViewStore } from "@/stores/shellView";
 import { escapeLeaves, fullscreenOn, leaveFullscreen } from "@/shell/fullscreen";
@@ -52,6 +53,8 @@ export function Shell() {
   // Composer drafts' text back from storage, kept there, dropped with the draft (shell/composerDrafts.ts).
   useEffect(() => (mode === "shell" ? startComposerDrafts() : undefined), [mode]);
   useEffect(() => (mode === "shell" ? startFocusHistory() : undefined), [mode]);
+  // A thread's request to edit a file: the caret on its line with --focus, else behind the editor in use.
+  useEffect(() => (mode === "shell" ? startFileRequests() : undefined), [mode]);
   // Escape leaves full screen when nothing before it took the key (a menu, a popover, the
   // floating composer collapsing, a terminal): this listener bubbles last, after the keymap's.
   useEffect(() => {

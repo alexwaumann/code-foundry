@@ -38,7 +38,7 @@ func threadMoveOpen(e Emitter, idArg ArgSpec) Command {
 			return "no thread is active"
 		},
 		Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
-			return EmitTo(e, showViewIntent(ViewThreadMove, "", map[string]string{"id": a.String("id")})).CLIResult(uctx), nil
+			return EmitTo(e, showViewIntent(ViewThreadMove, map[string]string{"id": a.String("id")})).CLIResult(uctx), nil
 		},
 	}
 }

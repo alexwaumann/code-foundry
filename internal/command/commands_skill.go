@@ -233,7 +233,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			Name:      "skill.setup",
 			NoPalette: true,
 			Title:     "Run Skill Setup",
-			Description: "Run a skill's setup script (/bin/sh <script> in the skill's directory) in a terminal in the bottom panel " +
+			Description: "Run a skill's setup script (/bin/sh <script> in the skill's directory) in a terminal tab " +
 				"of the active thread or worktree; when it exits 0 the skill no longer needs setup.",
 			Category: "Skill",
 			Args:     []ArgSpec{{Name: "name", Type: String, Required: true, Positional: true, Description: "The skill's name"}},

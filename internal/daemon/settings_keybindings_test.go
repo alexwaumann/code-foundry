@@ -16,9 +16,10 @@ import (
 )
 
 // A settings file written for the classic window (docs/notes/shell-20-cutover.md) keeps
-// working with the shell's keymap: an override that names a command that is gone, or whose
-// chord is now another command's default, is reported as an issue and dropped, the command it
-// collides with keeps its chord, and the rest of the file applies. Nothing is fatal.
+// working with the shell's keymap: an override that names a command that is gone (the side and
+// bottom panel verbs, docs/notes/shell-22-retire-verbs.md), or whose chord is now another
+// command's default, is reported as an issue and dropped, the command it collides with keeps
+// its chord, and the rest of the file applies. Nothing is fatal.
 func TestStaleKeybindingOverrides(t *testing.T) {
 	reg := command.NewRegistry()
 	if err := all.Register(reg, all.Deps{Emitter: &commandtest.Emitter{}}); err != nil {
@@ -31,6 +32,10 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 "view.pullrequests" = "cmd+shift+w"
 "view.panel.gone" = "cmd+y"
 "view.panel.toggle" = "cmd+shift+e"
+"view.panel.expand" = "cmd+shift+x"
+"view.panel.new-tab" = "cmd+shift+n"
+"view.panel.split" = "cmd+\\"
+"view.help" = "cmd+alt+\\"
 "thread.rename" = "f2+cmd"
 "view.projects" = "cmd+ctrl+1"
 "view.usage" = "cmd+shift+u"
@@ -50,7 +55,11 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 		issues[strings.TrimPrefix(is.Key, "keybindings.")] = is.Message
 	}
 	wantIssue := map[string]string{
-		"view.bottom.toggle": "cmd+j is already bound to terminal.quick",
+		"view.bottom.toggle": `unknown command "view.bottom.toggle"`,
+		"view.panel.toggle":  `unknown command "view.panel.toggle"`,
+		"view.panel.expand":  `unknown command "view.panel.expand"`,
+		"view.panel.new-tab": `unknown command "view.panel.new-tab"`,
+		"view.panel.split":   `unknown command "view.panel.split"`,
 		"thread.previous":    "cmd+shift+[ is already bound to tab.previous",
 		"view.pullrequests":  "cmd+shift+w is already bound to pane.close",
 		"view.panel.gone":    `unknown command "view.panel.gone"`,
@@ -62,7 +71,7 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 			t.Errorf("%s: issue %q, want one containing %q (issues: %v)", name, got, want, issues)
 		}
 	}
-	for _, name := range []string{"view.panel.toggle", "view.usage"} {
+	for _, name := range []string{"view.help", "view.usage"} {
 		if msg, ok := issues[name]; ok {
 			t.Errorf("%s: unexpected issue %q", name, msg)
 		}
@@ -81,13 +90,12 @@ func TestStaleKeybindingOverrides(t *testing.T) {
 		"tab.previous":   {"cmd+shift+["},
 		"pane.close":     {"cmd+shift+w"},
 		// Rejected overrides leave the command on its own default (none, since the shell).
-		"view.bottom.toggle": nil,
-		"thread.previous":    nil,
-		"view.pullrequests":  nil,
-		"view.projects":      nil,
+		"thread.previous":   nil,
+		"view.pullrequests": nil,
+		"view.projects":     nil,
 		// A free retired chord may be bound again; an unrelated override applies.
-		"view.panel.toggle": {"cmd+shift+e"},
-		"view.usage":        {"cmd+shift+u"},
+		"view.help":  {"cmd+alt+\\"},
+		"view.usage": {"cmd+shift+u"},
 	} {
 		if got := chords(name); !slices.Equal(got, want) && (len(got) != 0 || len(want) != 0) {
 			t.Errorf("%s keybindings = %v, want %v", name, got, want)

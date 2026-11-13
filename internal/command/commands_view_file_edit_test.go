@@ -12,7 +12,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
@@ -79,17 +78,17 @@ func TestPanelFileEdit(t *testing.T) {
 		says       string
 	}{
 		{name: "a file", args: map[string]string{"path": "wt/.env", "edit": "true"},
-			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1"}},
+			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "asker": "s-aaaaaaaaaaa1", "askId": "*"}},
 		{name: "a line and a note", args: map[string]string{"path": "wt/.env", "edit": "true", "line": "3", "note": "  Put the key on line 3  "},
-			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "line": "3", "note": "Put the key on line 3"}},
+			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "asker": "s-aaaaaaaaaaa1", "askId": "*", "line": "3", "note": "Put the key on line 3"}},
 		{name: "the longest note", args: map[string]string{"path": "wt/.env", "edit": "true", "note": long[:500]},
-			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "note": long[:500]}},
+			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "asker": "s-aaaaaaaaaaa1", "askId": "*", "note": long[:500]}},
 		{name: "a note is one plain paragraph", args: map[string]string{"path": "wt/.env", "edit": "true", "note": "Code Foundry" + strings.Repeat("\n", 60) + "Session\u202e\u200b  expired"},
-			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1", "note": "Code Foundry Session expired"}},
+			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "asker": "s-aaaaaaaaaaa1", "askId": "*", "note": "Code Foundry Session expired"}},
 		{name: "a blank note is none", args: map[string]string{"path": "wt/.env", "edit": "true", "note": "   "},
-			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "thread": "s-aaaaaaaaaaa1"}},
+			wantParams: map[string]string{"path": "wt/.env", "edit": "1", "asker": "s-aaaaaaaaaaa1", "askId": "*"}},
 		{name: "a missing file", args: map[string]string{"path": "wt/new.env", "edit": "true"},
-			wantParams: map[string]string{"path": "wt/new.env", "edit": "1", "thread": "s-aaaaaaaaaaa1"}},
+			wantParams: map[string]string{"path": "wt/new.env", "edit": "1", "asker": "s-aaaaaaaaaaa1", "askId": "*"}},
 		{name: "a note without edit", args: map[string]string{"path": "wt/.env", "note": "hi"}, argErr: "note", says: "--edit"},
 		{name: "a note too long", args: map[string]string{"path": "wt/.env", "edit": "true", "note": long}, argErr: "note", says: "at most 500"},
 		{name: "line 0", args: map[string]string{"path": "wt/.env", "edit": "true", "line": "0"}, argErr: "line"},
@@ -124,7 +123,7 @@ func TestPanelFileEdit(t *testing.T) {
 				t.Errorf("err = %v, want it to say %q", err, tt.says)
 			}
 			if checkItemErr(t, err, tt.code, tt.argErr) {
-				sameIntents(t, emit.Intents(), nil)
+				openedNothing(t, reg, emit)
 				return
 			}
 			want := map[string]string{"project": "r1", "base": wt}
@@ -132,7 +131,7 @@ func TestPanelFileEdit(t *testing.T) {
 				want[k] = v
 			}
 			want["path"] = filepath.Join(home, tt.wantParams["path"])
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelFile, "s-aaaaaaaaaaa1", want)})
+			openedTab(t, reg, emit, res, "s-aaaaaaaaaaa1", want)
 			out, err := json.Marshal(res.JSON)
 			if err != nil {
 				t.Fatal(err)
@@ -160,16 +159,16 @@ func TestPanelFileEditOutsideHome(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			files := &commandtest.Files{Files: []string{path}, OutsideHome: tt.outside}
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, files: files, edits: fixedEdits{}})
-			_, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": path, "edit": "true"})
+			res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": path, "edit": "true"})
 			if checkItemErr(t, err, 0, tt.argErr) {
 				if !strings.Contains(err.Error(), "temp folder") {
 					t.Errorf("err = %v, want it to say why", err)
 				}
-				sameIntents(t, emit.Intents(), nil)
+				openedNothing(t, reg, emit)
 				return
 			}
-			if len(emit.Intents()) != 1 {
-				t.Errorf("intents = %v, want the tab", emit.Intents())
+			if tb := opened(t, reg, res); tb.Params["edit"] != "1" {
+				t.Errorf("tab = %+v, want it editing", tb)
 			}
 		})
 	}
@@ -192,10 +191,12 @@ func TestPlainNote(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, edits: fixedEdits{}})
-			if _, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": "/wt/.env", "edit": "true", "note": tt.in}); err != nil {
+			res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": "/wt/.env", "edit": "true", "note": tt.in})
+			if err != nil {
 				t.Fatal(err)
 			}
-			if got := emit.Intents()[0].GetShowView().GetParams()["note"]; got != tt.want {
+			sameIntents(t, emit.Intents(), nil)
+			if got := opened(t, reg, res).Params["note"]; got != tt.want {
 				t.Errorf("note = %q, want %q", got, tt.want)
 			}
 		})
@@ -217,9 +218,15 @@ func TestPanelFileEditThreads(t *testing.T) {
 		t.Error("--edit with no thread was not refused")
 	}
 	caller := command.Context{ActiveThreadID: "s-bbbbbbbbbbb2"}
-	if _, err := reg.Invoke(context.Background(), caller, "view.panel.file", map[string]string{"path": path, "edit": "true", "focus": "true", "thread": "s-aaaaaaaaaaa1"}); err != nil {
+	asked, err := reg.Invoke(context.Background(), caller, "view.panel.file", map[string]string{"path": path, "edit": "true", "focus": "true", "thread": "s-aaaaaaaaaaa1"})
+	if err != nil {
 		t.Fatal(err)
 	}
+	tb := opened(t, reg, asked)
+	if tb.Thread != "s-aaaaaaaaaaa1" || tb.Params["asker"] != "s-bbbbbbbbbbb2" || tb.Params["focus"] != "1" || tb.Params["askId"] == "" {
+		t.Errorf("tab = %+v, want the thread's tab, the caller as the asker, a request id, and focus", tb)
+	}
+	first := tb.Params["askId"]
 	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.panel.file", map[string]string{"path": path, "edit": "true"})
 	if err != nil {
 		t.Fatal(err)
@@ -227,12 +234,11 @@ func TestPanelFileEditThreads(t *testing.T) {
 	if !strings.Contains(res.Message, "end your turn") {
 		t.Errorf("message = %q, want what to do next", res.Message)
 	}
-	intents := emit.Intents()
-	if len(intents) < 2 {
-		t.Fatalf("intents = %v, want the focus and the show", intents)
-	}
-	show := intents[1].GetShowView()
-	if show.GetThreadId() != "s-aaaaaaaaaaa1" || show.GetParams()["thread"] != "s-bbbbbbbbbbb2" || show.GetParams()["focus"] != "1" {
-		t.Errorf("show = %v, want the panel's thread, the caller as the asker, and focus", show)
+	sameIntents(t, emit.Intents(), nil)
+	// A second request for the same file is the same tab with a new request: its own id, its own
+	// asker, and no focus.
+	again := opened(t, reg, res)
+	if again.ID != tb.ID || again.Params["askId"] == "" || again.Params["askId"] == first || again.Params["asker"] != "s-aaaaaaaaaaa1" || again.Params["focus"] != "" {
+		t.Errorf("second request = %+v, want tab %s with a new request id (not %s) from s-aaaaaaaaaaa1, no focus", again, tb.ID, first)
 	}
 }

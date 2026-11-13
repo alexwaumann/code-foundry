@@ -32,17 +32,11 @@ var (
 	_ McpBackend = codefoundryv1connect.ThreadServiceClient(nil)
 )
 
-// ViewPanelMcp is the ShowView name that opens (or reveals) the MCP surface in the side
-// panel of the selected thread: its MCP servers with status, tools and Reconnect. An
-// action on per-selection GUI state like ViewPanelToggle; a window whose selection is
-// not a thread ignores it.
-const ViewPanelMcp = "panel.mcp"
-
 // McpOption configures RegisterMcp.
 type McpOption func(*tabs)
 
-// WithMcpLayout gives view.open.mcp the shell window's layout, where it opens the thread's MCP
-// tab as well as the classic window's side panel tab.
+// WithMcpLayout gives view.open.mcp the window's layout, where it opens the thread's MCP tab.
+// Without it view.open.mcp refuses: there is nowhere to open the tab.
 func WithMcpLayout(l layoutstore.Store) McpOption {
 	return func(o *tabs) { o.store = l }
 }
@@ -86,7 +80,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter, opts ...McpOption) error 
 			NoPalette: true,
 			Title:     "Reconnect Thread MCP Server",
 			Description: "Reconnect one of a thread's MCP servers (starting Claude if it is not running), then check them again. " +
-				"It picks up a login made with /mcp in an interactive claude (a bottom-panel shell).",
+				"It picks up a login made with /mcp in an interactive claude (a terminal tab).",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -118,9 +112,6 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter, opts ...McpOption) error 
 
 // mcpOpenCommand is view.open.mcp.
 func mcpOpenCommand(o tabs, b McpBackend, e Emitter) Command {
-	thread := panelThreadArgs()[0]
-	thread.Description = "Thread the tab belongs to; it opens beside it without taking the user's focus " +
-		"(default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app and outside a thread: the selected thread)" + IDHelp
 	return Command{
 		Name:  "view.open.mcp",
 		Page:  PageState,
@@ -130,9 +121,13 @@ func mcpOpenCommand(o tabs, b McpBackend, e Emitter) Command {
 		Category: "View",
 		// No default chord: in the app the thread info card's MCP row opens it.
 		When: hasThread,
-		Args: []ArgSpec{thread, openFocusArg, openPaneArg},
+		Args: []ArgSpec{openThreadArg, openFocusArg, openPaneArg},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
-			return showPanelTab(ctx, o, b, e, uctx, a, ViewPanelMcp, tabMcp)
+			id := a.String("thread")
+			if id == "" {
+				return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
+			}
+			return showTab(ctx, o, b, e, uctx, a, id, tabMcp, nil)
 		},
 	}
 }

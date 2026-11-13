@@ -25,9 +25,8 @@ import (
 // flag's values are joined by newlines, so two of them would lose the pairing at the first
 // image without a caption, and a newline in a caption would start another image.
 
-// ViewPanelGallery opens a Gallery tab: params title, images (a JSON list of galleryImage),
-// project and base (the thread's project and checkout, which relative paths read against).
-const ViewPanelGallery = "panel.gallery"
+// A Gallery tab's params: title, images (a JSON list of galleryImage), project and base (the
+// thread's project and checkout, which relative paths read against).
 
 const (
 	// maxGalleryImages is the most images in a gallery. Tiles are virtualized, so it is not
@@ -92,7 +91,7 @@ func (d ViewDeps) runPanelGallery(ctx context.Context, uctx Context, a Args) (Re
 		return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
 	}
 	var warnings []string
-	res, err := d.showItem(ctx, uctx, a, id, ViewPanelGallery, tabGallery, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := d.showItem(ctx, uctx, a, id, tabGallery, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		params, failed, err := d.galleryCheck(ctx, t, a)
 		warnings = failed
 		return params, err
@@ -104,7 +103,7 @@ func (d ViewDeps) runPanelGallery(ctx context.Context, uctx Context, a Args) (Re
 	return res, nil
 }
 
-// galleryCheck is view.panel.gallery's check: the arguments are good and at least one image
+// galleryCheck is view.open.gallery's check: the arguments are good and at least one image
 // can show. The rest are warnings, not a refusal: their tiles say what went wrong, and a
 // thread can fix one path without losing the others.
 func (d ViewDeps) galleryCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, []string, error) {

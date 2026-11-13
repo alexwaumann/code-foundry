@@ -64,8 +64,6 @@ func TestFieldParse(t *testing.T) {
 		{key: KeyBackdropFile, in: "../settings.toml", err: `want a file name in the backdrops folder, got "../settings.toml"`},
 		{key: KeyBackdropFile, in: "/etc/hosts", err: `want a file name in the backdrops folder, got "/etc/hosts"`},
 		{key: KeyBackdropFile, in: ".hidden.png", err: `want a file name in the backdrops folder, got ".hidden.png"`},
-		{key: KeyPanelKeepOpen, in: "true", want: "true"},
-		{key: KeyPanelKeepOpen, in: "yes", err: `want true or false, got "yes"`},
 		{key: KeyThreadWidth, in: "full", want: "full"},
 		{key: KeyThreadWidth, in: "wide", err: `want one of "compact", "comfortable", "full", got "wide"`},
 		{key: KeyClaudePath, in: "wt", err: `want an absolute path, got "wt"`},
@@ -129,7 +127,7 @@ func TestSchemaShape(t *testing.T) {
 	}
 	d := Defaults()
 	if d.Appearance.FontSize != 13 || !d.Threads.AutoName || d.Appearance.ScrollbackLines != 30000 || d.Appearance.Theme != "system" || d.Appearance.Backdrop != "forest" ||
-		d.Appearance.ThreadWidth != "comfortable" || d.Appearance.PanelKeepOpen ||
+		d.Appearance.ThreadWidth != "comfortable" ||
 		d.GitHub.PollIntervalSeconds != 60 || d.Projects.FetchIntervalSeconds != 120 || d.Advanced.LogLevel != "info" {
 		t.Errorf("Defaults() = %+v", d)
 	}

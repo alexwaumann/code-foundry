@@ -11,10 +11,11 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 )
 
-// view.projects shows the Projects page; --project or --workspace says which page in the
-// ShowView's params (a workspace by its id, from its id or name).
+// view.projects shows the Projects page's tab; --project or --workspace says which page in the
+// tab's params (a workspace by its id, from its id or name). No intent goes out.
 func TestViewProjectsPage(t *testing.T) {
 	ws := listWorkspaces{ws: []*v1.Workspace{{Id: "w-1", Name: "Platform"}}}
 	tests := []struct {
@@ -34,10 +35,11 @@ func TestViewProjectsPage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := command.NewRegistry()
 			emit := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
-			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit, Workspaces: ws}); err != nil {
+			store := layouttest.New(nil)
+			if err := command.RegisterView(reg, command.ViewDeps{Emitter: emit, Workspaces: ws, Layout: store}); err != nil {
 				t.Fatal(err)
 			}
-			_, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, "view.projects", tt.args)
+			res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s1", ActiveView: "thread"}, "view.projects", tt.args)
 			if tt.wantErr != "" {
 				var ce *connect.Error
 				var ae *command.ArgError
@@ -47,17 +49,20 @@ func TestViewProjectsPage(t *testing.T) {
 				if n := len(emit.Intents()); n != 0 {
 					t.Errorf("emitted %d intents on an error", n)
 				}
+				if ops := store.Ops(); len(ops) != 0 {
+					t.Errorf("ops = %v on an error, want none", ops)
+				}
 				return
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := emit.Intents()
-			if len(got) != 1 || got[0].GetShowView().GetName() != command.ViewProjects {
-				t.Fatalf("intents = %v, want one ShowView %q", got, command.ViewProjects)
+			if got := emit.Intents(); len(got) != 0 {
+				t.Fatalf("intents = %v, want none", got)
 			}
-			if p := got[0].GetShowView().GetParams(); !maps.Equal(p, tt.want) {
-				t.Errorf("params = %v, want %v", p, tt.want)
+			_, _, tb := store.Snapshot().State.FindTab(res.JSON.(command.PageTabResult).Tab)
+			if tb == nil || tb.Kind != "projects" || !maps.Equal(tb.Params, tt.want) && (len(tb.Params) != 0 || len(tt.want) != 0) {
+				t.Errorf("tab = %+v, want projects with %v", tb, tt.want)
 			}
 		})
 	}

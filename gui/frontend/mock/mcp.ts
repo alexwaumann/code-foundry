@@ -12,8 +12,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { McpCheckTrigger, McpServerStatus, type McpServerSchema, type ThreadMcpStatusSchema } from "../src/gen/codefoundry/v1/thread_pb";
-import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
-import type { UiIntentInit } from "./world";
+import type { PlaceTab } from "./panelItemVerbs";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
 
@@ -158,8 +157,12 @@ type Command = {
   run: (ctx: UiContext | undefined, args: Record<string, string>) => string | Promise<InvokeOut>;
 };
 
-/** thread.mcp, thread.mcp-reconnect and view.panel.mcp, like the daemon's (any active thread). */
-export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => number): Command[] {
+/**
+ * thread.mcp, thread.mcp-reconnect and view.open.mcp with its old name view.panel.mcp, like the
+ * daemon's (any active thread). view.open.mcp opens the thread's MCP tab through `place`, as the
+ * other item verbs do (panelItemVerbs.ts), and sends no intent.
+ */
+export function mcpCommands(threads: McpThreads, place?: PlaceTab): Command[] {
   const when = (ctx: UiContext | undefined) => Boolean(ctx?.activeThreadId);
   const id = { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" };
   const sid = (ctx: UiContext | undefined, a: Record<string, string>) => a.id || ctx?.activeThreadId || "";
@@ -204,17 +207,33 @@ export function mcpCommands(threads: McpThreads, emit: (i: UiIntentInit) => numb
         return { message: error ? `reconnect ${server} failed: ${error} (${word})` : `reconnected ${server}: ${word}`, resultJson: JSON.stringify(error ? { error } : {}) };
       },
     },
-    {
-      cmd: {
-        name: "view.panel.mcp",
-        title: "Show MCP Servers",
-        category: "View",
-        description: "Open the MCP surface in the selected thread's side panel: its MCP servers with status, errors and tools, and Reconnect.",
-        keybindings: [],
-        args: panelThreadArgs,
-      },
-      when,
-      run: (_ctx, args) => runPanelVerb(emit, "panel.mcp", args),
-    },
+    ...[
+      { name: "view.open.mcp", noPalette: false, description: "Open the MCP surface beside a thread (from a thread: its own; in the app: the selected one): its MCP servers with status, errors and tools, and Reconnect." },
+      { name: "view.panel.mcp", noPalette: true, description: "The old name of view.open.mcp, kept for one stable release." },
+    ].map(
+      (v): Command => ({
+        cmd: {
+          name: v.name,
+          noPalette: v.noPalette,
+          title: "Show MCP Servers",
+          category: "View",
+          description: v.description,
+          keybindings: [],
+          args: [
+            { name: "thread", type: ArgType.STRING, required: false, description: "Thread the tab belongs to (default: the thread this runs in; in the app: the selected thread)" },
+            { name: "focus", type: ArgType.BOOL, required: false, description: "Also take the user's focus to the tab; only when the user asked to be taken there" },
+          ],
+        },
+        when,
+        run: (ctx, args) => {
+          const t = args.thread || ctx?.activeThreadId || "";
+          if (!t) throw new CommandError("invalid", "invalid argument: --thread: needs a thread whose tab to open");
+          // Like the daemon's wantsFocus: the user's call (the app) takes the focus, a thread's only with --focus.
+          const focus = args.focus === undefined ? Boolean(ctx?.activeView) : args.focus === "true";
+          place?.({ op: "open_surface", tab: { id: "", kind: "mcp", thread: t, params: {} }, focus }, !focus);
+          return ctx?.activeView ? "" : `opened the MCP tab for thread ${t}`;
+        },
+      }),
+    ),
   ];
 }
