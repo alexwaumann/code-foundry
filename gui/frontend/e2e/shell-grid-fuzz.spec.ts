@@ -79,7 +79,8 @@ async function settle(page: Page): Promise<void> {
 /** What the drawn grid breaks, as text; empty when it holds. */
 function gridErrors(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
-    const mod = (window as unknown as { __cfModule: (p: string) => Promise<Record<string, { getState: () => Record<string, unknown> }>> }).__cfModule;
+    type Store = { getState: () => unknown };
+    const mod = (window as unknown as { __cfModule: (p: string) => Promise<{ useLayoutStore: Store; useShellViewStore: Store }> }).__cfModule;
     const L = (await mod("/src/stores/layout.ts")).useLayoutStore.getState() as {
       currentSpaceId: string;
       spaces: Record<string, { focus: string }>;
