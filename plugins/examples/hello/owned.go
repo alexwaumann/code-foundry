@@ -158,7 +158,7 @@ func assistantNodes(threadID string, err error) []ui.Node {
 
 // shellNodes is the Shell tab: the clock terminal with a Restart button.
 func shellNodes(termID string, err error) []ui.Node {
-	intro := ui.NewText("shell-intro", ui.Plain("A terminal the plugin owns, printing the date every two seconds. Open it in the bottom panel to keep it in view while you work."))
+	intro := ui.NewText("shell-intro", ui.Plain("A terminal the plugin owns, printing the date every two seconds. Open it in a tab to keep it in view while you work."))
 	if err != nil {
 		return []ui.Node{intro, ui.NewNotice("shell-error", ui.ToneError, "No terminal", ui.Plain(err.Error()))}
 	}

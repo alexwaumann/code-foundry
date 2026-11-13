@@ -40,7 +40,7 @@ type shellReaperOptions struct {
 	ThreadExists  func(id string) bool
 }
 
-// shellReaper removes the bottom panel's terminals (termlabel.IsPanel: the shells
+// shellReaper removes the terminals tabs show (termlabel.IsPanel: the shells
 // terminal.new starts and the action runs the action store starts in a terminal) once
 // nothing shows them. Other terminals (unlabelled ones) are never touched.
 //

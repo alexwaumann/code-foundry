@@ -1,5 +1,5 @@
 /**
- * The shell's surfaces by kind (docs/notes/shell-plan.md 2.7). A kind is listed here once; the
+ * The shell's surfaces by kind (docs/notes/shell-11-pane-grid.md). A kind is listed here once; the
  * pane, its strip and the selection bridge look a tab's surface up and never switch on its kind.
  * A plugin kind (`plugin.<plugin>.<surface>`) falls through to the plugin surface; a kind this
  * build does not know (a newer daemon's) draws a quiet placeholder rather than failing.

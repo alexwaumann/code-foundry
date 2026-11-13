@@ -79,7 +79,7 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
     clearProjectsPageReveal(reveal);
   }, [reveal, navItems, setCursor]);
   const rootRef = useRef<HTMLDivElement>(null);
-  // The content pane's width (the side panel takes from it): the scroll box's.
+  // The pane's width: the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   const scrollRef = usePageScroll(pageKey, widthRef);

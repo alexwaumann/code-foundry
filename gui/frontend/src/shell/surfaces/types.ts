@@ -1,5 +1,5 @@
 /**
- * One kind of tab in the window shell (docs/notes/shell-plan.md 2.7): what its strip shows and
+ * One kind of tab in the window shell (docs/notes/shell-11-pane-grid.md): what its strip shows and
  * the body its pane mounts. A kind is one file under src/shell/surfaces listed in registry.ts;
  * the pane and its strip look surfaces up by kind and never switch on it.
  */

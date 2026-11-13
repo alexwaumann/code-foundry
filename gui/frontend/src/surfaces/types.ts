@@ -19,7 +19,7 @@ export interface Subscribable {
 }
 
 /**
- * One kind of side-panel content. Add a surface by adding a file that exports a spec and
+ * One kind of panel surface (drawn in a tab, shell/surfaces/panel.ts). Add a surface by adding a file that exports a spec and
  * listing it in registry.ts; components look specs up by kind, never switch on it.
  */
 export interface SurfaceSpec {

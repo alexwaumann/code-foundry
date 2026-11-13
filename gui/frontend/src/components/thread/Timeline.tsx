@@ -213,7 +213,7 @@ export function TimelineList<R extends ListRow>({
   citable?: boolean;
   /** Opens what folds the item away (Ember's work row, a thread's folded turn), for the cite layer and the find bar; false when nothing hides it. */
   unfold?: (rows: readonly R[], itemId: string) => boolean;
-  /** The rows' left and right inset in px (40 in the content pane, less in a narrow side panel). */
+  /** The rows' left and right inset in px (40 in a thread's tab, less in a plugin's thread node). */
   inset?: number | undefined;
   /** A layer over the list, outside the scroller (the thread's prompt rail in the left gutter). */
   overlay?: ((o: TimelineOverlay<R>) => ReactNode) | undefined;
@@ -394,7 +394,7 @@ export function TimelineList<R extends ListRow>({
   );
 
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
-  // text streaming in, the composer growing), or the list's own (the bottom panel opening
+  // text streaming in, the composer growing), or the list's own (a quick terminal opening
   // under the pane, e.g. a code block's Run in terminal).
   useLayoutEffect(() => {
     const inner = innerRef.current;

@@ -4,8 +4,8 @@
 //
 // It does no I/O and imports no store. Operations are values (Op) applied by Apply to a copy
 // of a State; the result is always in normal form (Check), or the operation fails and the
-// State it was given is untouched. The specification is docs/notes/shell-model.md; the build
-// plan is docs/notes/shell-plan.md; this package's decisions and its JSON test case format are
+// State it was given is untouched. The specification is docs/notes/shell-model.md; the build is
+// summed up in docs/notes/shell-build.md; this package's decisions and its JSON test case format are
 // in docs/notes/shell-1-layout-model.md.
 package layout
 

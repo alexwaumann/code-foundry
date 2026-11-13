@@ -8,7 +8,7 @@ const maxViewports = 16
 // Viewports keeps the pane area each window reported (SetViewport) and answers the one the
 // daemon lays out in: the newest report from a window that is visible now, else the newest
 // report from any window (kept when the window goes), else DefaultViewport
-// (docs/notes/shell-plan.md section 2.4; docs/notes/shell-6-lifecycle.md). Which windows are
+// (docs/notes/shell-4-commands.md; docs/notes/shell-6-lifecycle.md). Which windows are
 // visible is the daemon's presence, handed in with SetVisible. The zero value is ready.
 type Viewports struct {
 	mu      sync.Mutex

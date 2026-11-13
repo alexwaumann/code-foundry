@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// The first-load import (legacy.go), adapted from docs/notes/shell-plan.md section 3's table
+// The first-load import (legacy.go), adapted from the build plan's import table (docs/notes/shell-18-legacy-import.md)
 // to the specification's empty space: captured stores of several versions, threads with zero,
 // one and three terminals, archived and snoozed threads, and a layout that is not empty.
 

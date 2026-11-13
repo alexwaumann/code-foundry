@@ -165,7 +165,7 @@ export async function deliverThreadPrompt(threadId: string, text: string): Promi
 /**
  * Runs an action from the card, for the thread: an action of any project of its set runs
  * in the thread's checkout of that project (the daemon's action/thread_run.go), in the
- * thread's bottom panel, and counts for the card's last-run pick.
+ * thread's terminal tab, and counts for the card's last-run pick.
  */
 export async function runCardAction(actionId: string, threadId: string): Promise<void> {
   await runAction(actionId, { kind: "thread", threadId });

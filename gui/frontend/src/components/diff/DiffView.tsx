@@ -244,7 +244,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
 }
 
 /**
- * The side panel's Diff surface (surfaces/diff.ts): two sources of one checkout, compared
+ * The Diff surface (surfaces/diff.ts): two sources of one checkout, compared
  * file by file. The list comes from ProjectService.CompareWorktree and only the file on
  * screen is read. It is a rail beside the diff when the panel is wide and a list above it
  * when narrow. It does not take focus when it mounts. docs/notes/diff-viewer-2.md.

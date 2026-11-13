@@ -154,7 +154,7 @@ export interface PluginSurfaceBodyProps {
  * nodes scrolling between them (the surface's own scroll area, [data-scroll-root]: fill
  * nodes fill it and live nodes count as on screen in it), and the host's states around it
  * (opening, not responding, the plugin down with its last view dimmed, failed, not
- * available here). docs/notes/plugins-layout-3-chrome.md has the strips. The side panel's
+ * available here). docs/notes/plugins-layout-3-chrome.md has the strips. A plugin
  * tab (PluginSurface) and the shot page (src/shot) draw it.
  */
 export function PluginSurfaceBody({ watchKey, plugin, surface, context: uiContext, unavailable = false }: PluginSurfaceBodyProps) {

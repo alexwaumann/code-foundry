@@ -14,7 +14,7 @@ import (
 // CommandFunc runs one of the manifest's commands.
 type CommandFunc func(ctx context.Context, h *Host, req CommandRequest) (CommandResult, error)
 
-// SurfaceFactory opens one instance of a surface (a side-panel tab for one thread, say).
+// SurfaceFactory opens one instance of a surface (a tab for one thread, say).
 // The surface then pushes views with Host.UpdateView(open.Instance, view).
 type SurfaceFactory func(ctx context.Context, h *Host, open SurfaceOpen) (Surface, error)
 

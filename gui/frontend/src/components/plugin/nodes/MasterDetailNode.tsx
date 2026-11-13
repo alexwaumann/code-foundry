@@ -28,7 +28,7 @@ function chooses(r: Row): boolean {
  * list at listWidth on the left and the detail filling the rest, each scrolling on its
  * own, the node as tall as the taller side and never taller than the rest of its box
  * (height.ts: the nearest sized pane, else the surface's scroll area) below its top.
- * Narrow (the side panel), the list alone; choosing a row shows the detail alone under a
+ * Narrow (a pane beside a thread), the list alone; choosing a row shows the detail alone under a
  * back button with the row's title. Whether it shows the detail is the surface store's
  * (per instance, view tab and node: openDetail, reconcileDetails), so it survives
  * re-renders and remounts and goes back to the list when the plugin's selected row stops
@@ -205,7 +205,7 @@ export function MasterDetailNode({ node, data }: NodeProps<"masterDetail">) {
 /**
  * Whether focus may move inside `root`: nothing has it (the element that had it went), it
  * is already inside, or a box around root has it (WebKit does not focus a clicked button:
- * the nearest focusable box around it, the side panel, takes focus instead).
+ * the nearest focusable box around it, the pane's scroll box, takes focus instead).
  */
 function focusFree(root: HTMLElement): boolean {
   const a = document.activeElement;

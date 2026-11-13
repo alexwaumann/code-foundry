@@ -1,6 +1,6 @@
 /**
  * Tells the daemon the size of the pane area (LayoutService.SetViewport), which placement,
- * restore and the direction verbs lay out with (docs/notes/shell-plan.md 2.4). The pane grid
+ * restore and the direction verbs lay out with (docs/notes/shell-10-layout-slice.md). The pane grid
  * reports its box as it resizes; a burst sends one call once the size holds still, in layout px
  * (viewport px divided by the page zoom). The daemon forgets the size when it restarts, so the
  * layout slice sends the last one again on each snapshot.

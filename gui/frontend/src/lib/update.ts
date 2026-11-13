@@ -65,7 +65,7 @@ export function predatesTunnel(daemon: string): boolean {
  * The first release whose daemon has the window layout (LayoutService and its event source, with
  * the first-load import). The window shell cannot draw without it and has no fallback, so a window
  * on anything older gets the update dialog with Restart Now, as on a daemon from before the tunnel
- * (docs/notes/shell-plan.md 2.12). The shell reaches `main` as one `feat!` merge, the first minor
+ * (docs/notes/shell-20-cutover.md). The shell reaches `main` as one `feat!` merge, the first minor
  * after v0.21; if another `feat` reaches `main` first, the merge (plan PR 25) sets this to the tip
  * tag `scripts/next-version.sh --tip` prints for it.
  */

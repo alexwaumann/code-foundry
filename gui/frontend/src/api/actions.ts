@@ -1,5 +1,5 @@
 /**
- * Actions: per-project command lines run in a thread's (or a worktree's) bottom panel
+ * Actions: per-project command lines run in a thread's (or a worktree's) terminal tab
  * (docs/notes/actions-1-daemon.md, actions-2-gui.md). View models for ActionService's
  * messages and the EventService action source; generated types stay inside src/api.
  */
@@ -31,7 +31,7 @@ export interface ActionView {
   name: string;
   command: string;
   icon: ActionIconName;
-  /** Runs open as a terminal in the bottom panel (the GUI always runs them there). */
+  /** Runs open as a terminal tab (the GUI always runs them there). */
   inTerminal: boolean;
   /** Runs (in the background) when a new thread creates its worktree in the project. */
   onWorktreeCreate: boolean;

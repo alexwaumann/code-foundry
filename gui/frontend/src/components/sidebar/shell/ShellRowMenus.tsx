@@ -12,8 +12,8 @@ import { RowMenu } from "../RowMenu";
  * A shell thread row's context menu: Open ▸ first (the thread's diff per checkout, its pull
  * requests, its terminal tabs and New terminal tab: the thread header's items, ThreadSurfaceItems),
  * Move to space ▸ (the header's MoveToSpaceItems: thread.space.move, its linked tabs go along; or
- * New space), then the classic row's items (RowMenu: rename, pin, snooze, archive, …, fork, remove) without the
- * bottom panel's terminal. For a thread whose tab is open the items follow the placement rules;
+ * New space), then the classic row's items (RowMenu: rename, pin, snooze, archive, …, fork, remove) without its old
+ * "New terminal here" (Open ▸ has New terminal tab). For a thread whose tab is open the items follow the placement rules;
  * for a closed one they open in the focused pane (the daemon's rule for a thread not open).
  * Plugins will add thread actions here.
  */

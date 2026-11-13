@@ -8,7 +8,7 @@ import { WorkspacePage } from "./WorkspacePage";
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (every project
  * and workspace as a row), or a project's or workspace's page, by the selection
  * (stores/ui.ts projectPage / workspacePage). Each page is its own selection with its own
- * side panel and scroll position; keyed by it so a page switch starts fresh.
+ * scroll position; keyed by it so a page switch starts fresh.
  */
 export function ProjectsPage() {
   const projectId = useUiStore((s) => (isProjectsView(s.selection) ? (s.selection.projectId ?? "") : ""));

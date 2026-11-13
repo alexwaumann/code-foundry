@@ -1,5 +1,5 @@
 /**
- * The mock daemon's layout (docs/notes/shell-plan.md 2.14): LayoutService, the layout event
+ * The mock daemon's layout (docs/notes/shell-10-layout-slice.md): LayoutService, the layout event
  * source, and seeds that give the GUI and e2e any tree they need.
  *
  * The state and its ops follow internal/layout's JSON (docs/notes/shell-1-layout-model.md). The

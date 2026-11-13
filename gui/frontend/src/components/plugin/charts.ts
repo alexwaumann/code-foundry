@@ -69,7 +69,7 @@ export function figureEm(text: string): number {
 /**
  * The least width of a stats node whose figures may take the display role: the row is
  * then a page's (or an expanded panel's) headline figures, as the Pull Requests page's
- * counts are; in the side panel (about 360 px) they are title at most.
+ * counts are; in a narrow pane (about 360 px) they are title at most.
  */
 export const STATS_DISPLAY_WIDTH = 560;
 

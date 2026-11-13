@@ -332,7 +332,7 @@ function Composer() {
 
 const ansi = (n: number): CSSProperties => ({ color: `var(--terminal-ansi-${String(n)})` });
 
-/** The bottom panel's shell, without xterm: a prompt, some status words and ANSI 0-15 as cells. */
+/** A terminal tab's shell, without xterm: a prompt, some status words and ANSI 0-15 as cells. */
 function TerminalStrip() {
   return (
     <div className="rounded-lg border border-cf-divider bg-cf-surface px-3 py-2 text-caption-sm font-mono leading-5" style={{ color: "var(--terminal-fg)" }} data-testid="gallery-terminal">

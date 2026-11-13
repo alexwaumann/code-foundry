@@ -16,7 +16,7 @@ import (
 )
 
 // view.open.*: a thread's surfaces as tabs of the shell window's layout (docs/notes/shell-model.md,
-// "Linked surfaces"; docs/notes/shell-plan.md section 2.9; docs/notes/shell-7-view-open.md).
+// "Linked surfaces"; docs/notes/shell-7-view-open.md).
 //
 // Each verb checks its item as it always has, then opens a tab linked to the thread through the
 // layout's open_surface, placed by the rules (or focused where it is, when a tab of the same

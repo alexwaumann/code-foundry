@@ -9,7 +9,7 @@ import (
 // Stats is a row of figure cards, drawn like the app's own Pull Requests counts: each card
 // a label, a figure (Value, a string the plugin formats: "86%", "4m 12s", "1,288") in the
 // card's tone, and a subtitle. MinStatCards..MaxStatCards cards share the row equally; when
-// they do not fit at StatCardMinWidth px each (the side panel, about 360 px, fits three)
+// they do not fit at StatCardMinWidth px each (a narrow pane, about 360 px, fits three)
 // they wrap onto balanced rows (four cards: two by two) rather than shrink, and the figures
 // step down a type size so a value never wraps. A card with an Action is a toggle (a
 // filter): Pressed draws it pressed and dims the others, as the Pull Requests page's cards
@@ -48,7 +48,7 @@ const (
 // title and subtitle, an optional reference line (a dashed line at Reference.Value, its
 // label in the card's top right: "median 4m 12s"), up to MaxBars bars from left to right
 // and the axis' first and last labels under them (StartLabel, EndLabel: "#1259", "#1288").
-// Bars share the width (a bar is at most BarMaxWidth px; 120 bars in the side panel are a
+// Bars share the width (a bar is at most BarMaxWidth px; 120 bars in a narrow pane are a
 // few px each) and the height scales to the largest value or the reference, whichever is
 // higher. Pointing at a bar (or the arrow keys, once the chart has focus) shows one
 // tooltip with its Title and Meta and dims the other bars; a bar with an Action acts on a

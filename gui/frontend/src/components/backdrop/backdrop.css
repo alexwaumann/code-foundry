@@ -1,7 +1,7 @@
 /*
  * The backdrop ("glow"): a soft oval of artwork behind the centred content of a pane;
  * the rest of the pane stays plain. The layer is its own size container, so the art
- * follows the pane's shape (the window, the side panel), not the viewport's.
+ * follows the pane's shape (the window, a pane), not the viewport's.
  */
 .cf-backdrop {
   position: absolute;

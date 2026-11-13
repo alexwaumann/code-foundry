@@ -6,7 +6,7 @@ import { LayoutEventSchema } from "@/gen/codefoundry/v1/layout_pb";
 import { toEventView } from "./events";
 
 // A GUI drops an event kind it does not map, so a daemon may add a source before the GUI
-// reads it (docs/notes/shell-plan.md section 2.12).
+// reads it (docs/notes/shell-3-layout-store.md, "Version window").
 describe("toEventView with an event kind the GUI does not map", () => {
   it("drops a layout event whose change this build does not know", () => {
     // A LayoutEvent with no snapshot and no delta: what a newer daemon's new change kind reads as.

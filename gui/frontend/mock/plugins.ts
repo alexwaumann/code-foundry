@@ -883,7 +883,7 @@ function seedPlugins(): MockPlugin[] {
       name: "test-watcher",
       displayName: "Test Watcher",
       version: "0.0.9",
-      description: "Runs the project's tests in a thread's worktree whenever files change, shows failures and output in the side panel, flags the thread while tests fail, and sends failures to Claude.",
+      description: "Runs the project's tests in a thread's worktree whenever files change, shows failures and output in a tab beside the thread, flags the thread while tests fail, and sends failures to Claude.",
       state: PluginState.RUNNING,
       enabled: true,
       dev: false,
@@ -902,7 +902,7 @@ function seedPlugins(): MockPlugin[] {
     // A longer list for Settings → Plugins: no commands or surfaces, so nothing else sees them.
     ...[
       ["linear-sync", "Linear Sync", "1.2.0", "Mirrors a thread's linked issues and posts when a pull request merges."],
-      ["sentry-feed", "Sentry Feed", "0.4.2", "Shows new issues for the thread's project in the side panel."],
+      ["sentry-feed", "Sentry Feed", "0.4.2", "Shows new issues for the thread's project in a tab beside it."],
       ["disk-watch", "Disk Watch", "0.2.1", "Warns before a worktree fills the disk."],
       ["pager-bridge", "Pager Bridge", "2.0.3", "Opens a thread when an incident pages you and links it back."],
       ["flag-audit", "Flag Audit", "0.7.0", "Lists feature flags a branch touches and who owns them."],

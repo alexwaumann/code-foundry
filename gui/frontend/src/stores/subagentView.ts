@@ -1,7 +1,7 @@
 /**
  * The read-only subagent view's window state: which of the selected thread's own subagent
  * runs (spawn depth 1) the content pane shows instead of the thread's timeline. The
- * selection stays the thread (its sidebar row, its Watch, its side panel), so this is
+ * selection stays the thread (its sidebar row, its Watch, its linked tabs), so this is
  * extra UI state, `{ threadId, runId }`, dropped when the selection leaves the thread and
  * when the run leaves the thread's list (or turns out to be a nested one).
  *

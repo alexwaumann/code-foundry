@@ -620,7 +620,7 @@ export class MockSkills {
         },
       },
       {
-        cmd: cmd("skill.setup", "Run Skill Setup", "Run a skill's setup script in a terminal in the bottom panel of the active thread or worktree.", [
+        cmd: cmd("skill.setup", "Run Skill Setup", "Run a skill's setup script in a terminal tab of the active thread or worktree.", [
           { name: "name", type: ArgType.STRING, required: true, description: "The skill's name" },
         ]),
         when: always,

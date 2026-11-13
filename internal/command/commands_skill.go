@@ -22,7 +22,7 @@ import (
 // the marketplaces Claude Code has; install, enable, disable, update and uninstall act
 // on a marketplace plugin (through `claude plugin`) or a standalone skill (a directory
 // in ~/.claude/skills); remove deletes a local skill; setup runs a skill's setup script
-// in a bottom-panel terminal. The plugin.* commands (Code Foundry's own plugins) are
+// in a terminal tab. The plugin.* commands (Code Foundry's own plugins) are
 // another thing.
 
 // SkillBackend is the skill store (*skill.Store) as the skill.* commands use it.

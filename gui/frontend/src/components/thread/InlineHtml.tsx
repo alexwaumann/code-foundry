@@ -38,7 +38,7 @@ import { HoldTopContext, PaneOverlayContext, useThreadCtx } from "./context";
 /**
  * A page the model showed inline (code-foundry view.inline; docs/notes/inline-html.md),
  * sketch variant A (docs/sketches/model-phase1): a work-log row "Showed <file> <dir>" and,
- * while open, a card: a strip (the path, then open in the side panel, reload, expand and
+ * while open, a card: a strip (the path, then open as a tab, reload, expand and
  * source) over the page in the same sandboxed frame as the File tab's preview
  * (HtmlFrame). The page may ask for its height (`{ type: "cf:resize", height }`); the card
  * follows it up to 60% of the pane, else 420px (lib/inlinePage.ts). Open by default, and
@@ -455,7 +455,7 @@ function PageModalBox({ scope, threadId, item, source }: { scope: string; thread
 
 /**
  * The page over the thread pane's body (the conversation and its composer; not its header,
- * the sidebar or the side panel, which stay usable), dimming it; Esc (pressed in that body,
+ * the sidebar or the other panes, which stay usable), dimming it; Esc (pressed in that body,
  * or with nothing focused), Close or a click on the dimmed edge closes it, and its frame
  * goes with it. Opening moves focus to Close, not
  * the frame: keys inside the frame never reach the app (it is another document), so ⌘[ works
@@ -481,7 +481,7 @@ function Lightbox({ onClose, returnFocus, children }: { onClose: () => void; ret
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // Only a press in the pane it covers, or with nothing focused: the bottom terminal, the
-      // side panel and a layer opened over the app keep their own Escape.
+      // other panes and a layer opened over the app keep their own Escape.
       const t = e.target;
       if (t instanceof Element && t !== document.body && t !== document.documentElement && !pane?.contains(t)) return;
       e.preventDefault();

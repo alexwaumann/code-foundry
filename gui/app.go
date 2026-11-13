@@ -169,7 +169,7 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // here in command.ReservedChords.
 //
 // The File menu is custom too: the default role binds Close Window to cmd+w, and the
-// side panel owns cmd+w (close the active tab). With the role, any cmd+w the page left
+// page owns cmd+w (tab.close: close the focused tab). With the role, any cmd+w the page left
 // unhandled closed the only window, which quits the app
 // (ApplicationShouldTerminateAfterLastWindowClosed; with dictation.anywhere on the window
 // hides instead, menubar.go). Close Window stays in the menu,

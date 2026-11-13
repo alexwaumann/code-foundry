@@ -18,7 +18,7 @@ import (
 )
 
 // The glue between the thread and terminal stores and the layout store
-// (docs/notes/shell-plan.md section 2.2, docs/notes/shell-6-lifecycle.md). The layout store
+// (docs/ARCHITECTURE.md §14, docs/notes/shell-6-lifecycle.md). The layout store
 // never looks at threads or terminals; this file turns their events into layout ops, and the
 // layout's commits into what they mean for terminals:
 //

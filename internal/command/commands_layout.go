@@ -15,8 +15,8 @@ import (
 	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
-// The window shell's layout as commands (docs/notes/shell-model.md, docs/notes/shell-plan.md
-// section 2.8, docs/notes/shell-4-commands.md): spaces, panes, tabs and a thread's own tab.
+// The window shell's layout as commands (docs/notes/shell-model.md, docs/ARCHITECTURE.md
+// §7, docs/notes/shell-4-commands.md): spaces, panes, tabs and a thread's own tab.
 // Every verb runs one op of internal/layout through the layout store, which serialises them,
 // lays panes out in the viewport the last window reported and publishes the result; the
 // window only renders it.

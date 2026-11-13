@@ -9,7 +9,7 @@ import (
 
 // A run a thread owns (docs/notes/thread-project-set.md): the action may belong to any
 // project of the thread's set, and runs in the thread's checkout of that project, with
-// the thread as its owner (its bottom panel, its run records). Before, only the cwd's
+// the thread as its owner (its terminal tabs, its run records). Before, only the cwd's
 // project's actions ran for a thread; another member's ran as a worktree's run the
 // thread never saw.
 

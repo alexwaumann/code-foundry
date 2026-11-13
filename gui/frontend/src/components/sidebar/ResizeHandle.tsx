@@ -3,7 +3,7 @@ import { SIDEBAR_DEFAULT, useUiStore } from "@/stores/ui";
 
 /**
  * Drag handle filling the shell gap right of the sidebar, its hairline in the middle (as
- * the side and bottom panels' handles fill theirs), so it covers nothing in the sidebar:
+ * the old side and bottom panels' handles filled theirs), so it covers nothing in the sidebar:
  * the status row's last button reaches the sidebar's edge (SidebarStatus). Double-click
  * resets the width.
  */

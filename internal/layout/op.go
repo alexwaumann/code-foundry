@@ -354,7 +354,7 @@ func focusTab(sp *Space, pane *Node, id string) {
 
 // show applies the focus rule to a tab just placed in pane: with focus, it takes the focus;
 // without, it becomes active in its pane unless that pane is the focused one, where it waits
-// behind the active tab (docs/notes/shell-plan.md section 2.6).
+// behind the active tab (docs/notes/shell-1-layout-model.md, the focus rule).
 func (t *tx) show(sp *Space, pane *Node, id string, focus bool) {
 	switch {
 	case focus:

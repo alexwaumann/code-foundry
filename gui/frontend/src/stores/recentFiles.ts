@@ -1,5 +1,5 @@
 /**
- * Files each side panel showed in a File tab, most recent first: the file finder's
+ * Files each thread showed in a File tab, most recent first: the file finder's
  * "Recently opened" group (lib/fileFinder.ts emptyGroups). A file counts when its tab
  * becomes the active tab of one of the panel's groups (opened, or switched to), however
  * that happened (a path chip, the finder, view.panel.file), and stays after its tab

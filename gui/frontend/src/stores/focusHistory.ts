@@ -1,6 +1,6 @@
 /**
  * Back and forward through what was focused (docs/notes/shell-model.md, "Keys": cmd+[ and cmd+],
- * across panes and spaces; docs/notes/shell-plan.md 2.5 and 2.6). One window's list of
+ * across panes and spaces; docs/notes/shell-15-spaces.md). One window's list of
  * (space, pane, tab) entries, oldest first, with browser semantics: a new focus drops the entries
  * after the current one. Per window and not persisted, as the classic window's selection history.
  *

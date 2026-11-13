@@ -5,7 +5,7 @@
  * src/test/daemonFakes.ts (the invocations) and src/test/projectsWorld.ts (the projects).
  *
  * A run's terminal arrives the way the daemon sends it, as a terminal event through
- * stores/events.ts (so the bottom panel opens on it), and leaves the same way.
+ * stores/events.ts (so its terminal tab opens), and leaves the same way.
  */
 import { act } from "@testing-library/react";
 import type { ActionIconName, ActionRunView, ActionView } from "@/api/actions";

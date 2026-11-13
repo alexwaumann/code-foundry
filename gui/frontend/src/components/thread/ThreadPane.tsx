@@ -123,7 +123,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
         >
           {/* The card lays over this column's right side (inside the list's scroller): the list, the dock, the chips and the page modal keep clear of it (--ti-inset) and the list's scrollbar stays at the pane's edge. */}
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef} data-ask-strip={askStrip || undefined} style={{ "--ti-inset": infoOpen && infoFits ? "var(--ti-card)" : "0px" } as CSSProperties}>
-            {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
+            {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and other panes stay usable. */}
             <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
               {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
               {loaded && catchingUp && (

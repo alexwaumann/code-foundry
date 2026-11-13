@@ -247,7 +247,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer func() { _ = plugins.Close() }()
 	pluginAPI := api.NewPlugin(plugins).WithSurfaces(plugins).WithShots(shots).WithDirs(p.Plugins(), p.PluginData())
 	// Every claude spawn gets the plugins' session environments (plugin_hooks.go), and
-	// so does every new bottom-panel shell, without the add-dirs (plugin_env.go).
+	// so does every new shell, without the add-dirs (plugin_env.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
 	// Subscriptions to the plugins' wake sources resolve their args with the plugin store
 	// and tell the plugins as they come and go (plugin_wakes.go).

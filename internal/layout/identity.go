@@ -57,7 +57,7 @@ type Kind struct {
 // which makes it a tab of that thread's own rather than the checkout's.
 const DiffAskerParam = "thread"
 
-// kinds is the identity table (docs/notes/shell-plan.md section 2.7). A new surface kind adds
+// kinds is the identity table (docs/notes/shell-gaps-c-identity.md). A new surface kind adds
 // an entry here, one in the GUI's registry and its size in gui/frontend/src/shell/drag/outerFrac.ts;
 // testdata/kinds.json pins that they agree.
 var kinds = map[string]*Kind{
