@@ -239,6 +239,10 @@ describe("the shell sidebar list", () => {
     expect(within(rowOf("d:d-2")).getByTestId("draft-label").textContent).toBe("Untitled draft");
     // The focused tab is d-1's composer: its row is the selected one.
     expect(d1.getAttribute("aria-selected")).toBe("true");
+    // Both are tinted amber at rest, not only on hover; the selected one more strongly.
+    expect(rowOf("d:d-2").className).toContain("bg-cf-warning-surface");
+    expect(d1.className).toContain("bg-cf-warning/20");
+    expect(rowOf("s:s-1").className).not.toContain("cf-warning");
     fireEvent.click(rowOf("d:d-2"));
     await settle();
     expect(runs).toEqual([{ name: "composer.draft.open", args: { draft: "d-2", focus: "true" } }]);

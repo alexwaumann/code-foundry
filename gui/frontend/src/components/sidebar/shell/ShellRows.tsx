@@ -33,10 +33,17 @@ import { openNeedsPopup, useNeedsStore } from "@/stores/needs";
  */
 
 /** A row's box: the classic row's colours, the lines stacked. */
-function rowClass(selected: boolean, cursor: boolean): string {
+function rowClass(selected: boolean, cursor: boolean, draft = false): string {
   return cn(
     "group/row flex h-full cursor-default flex-col rounded-md px-2 py-1 text-body-sm select-none",
-    selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
+    // A draft keeps a light amber tint at all times, stronger on hover and when selected (docs/notes/shell-model.md, "Drafts").
+    draft
+      ? selected
+        ? "bg-cf-warning/20 text-cf-sidebar-foreground"
+        : "bg-cf-warning-surface text-cf-sidebar-foreground/90 hover:bg-cf-warning/15"
+      : selected
+        ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground"
+        : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
     cursor && "group-focus:ring-1 group-focus:ring-cf-focus group-focus:ring-inset",
   );
 }
@@ -243,8 +250,8 @@ function useDraftProject(draftId: string): string {
 }
 
 /**
- * A composer draft under Active: line 1 a pencil and "Draft" (and its project), its Discard on
- * hover; then its label as the title, regular weight, or "Untitled draft" muted while it has none.
+ * A composer draft under Active, on a light amber tint: line 1 a pencil and "Draft" (and its
+ * project), its Discard on hover; then its label as the title, regular weight, or "Untitled draft" muted while it has none.
  * A click focuses its tab or opens it in the focused pane (onActivate: composer.draft.open).
  */
 export const DraftRowView = memo(function DraftRowView({ row, selected, cursor, onActivate }: RowProps<DraftRow>) {
@@ -259,7 +266,7 @@ export const DraftRowView = memo(function DraftRowView({ row, selected, cursor, 
       data-draft-id={row.draftId}
       data-section="active"
       data-cursor={cursor || undefined}
-      className={rowClass(selected, cursor)}
+      className={rowClass(selected, cursor, true)}
       onClick={() => {
         onActivate(row);
       }}
