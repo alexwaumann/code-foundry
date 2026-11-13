@@ -42,6 +42,8 @@
  *        JSON, the last SetViewport, every Apply as an op and client id; mock/layout.ts)
  *   POST /__mock/layout?seed=empty|one-thread|thread-and-diff|grid|spaces   (that layout as one commit; or
  *        the body's state, internal/layout's JSON, for any other tree)
+ *   POST /__mock/layout/newer?on=1|0          (a newer build wrote the stored layout, or not: sent as a snapshot,
+ *        as a restarted daemon's; the window's line under the grid says changes are not saved)
  *   POST /__mock/layout/import?imported=0|1&fail=N&error=…&delay=ms   (the first-load import's mark; the
  *        next N ImportLegacy calls fail; each answers after `delay`; GET /__mock/layout lists the calls as `imports`)
  *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
@@ -1090,6 +1092,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/layout":
       json(res, 200, { rev: world.layout.rev, state: world.layout.state(), viewport: world.layout.viewport, applied: world.layout.applied, seeds: Object.keys(SEEDS), legacyImported: world.layout.legacyImported, imports: world.layout.imports });
+      break;
+    case "POST /__mock/layout/newer":
+      world.layout.setNewer(q.get("on") === "0" ? [] : ['space sp-main: tab t-newer of kind "notebook"']);
+      json(res, 200, { newer: world.layout.newer });
       break;
     case "POST /__mock/layout/import":
       // The first-load import: ?imported=0|1 sets the mark; ?fail=N makes the next N calls fail (with ?error=…).

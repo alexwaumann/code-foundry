@@ -9,7 +9,7 @@ import { setShellMode, useShellViewStore } from "@/stores/shellView";
 import { escapeLeaves, fullscreenOn, leaveFullscreen } from "@/shell/fullscreen";
 import { NeedsPopup } from "@/components/needs/NeedsPopup";
 import { PaneGrid } from "./PaneGrid";
-import { ShellNotice } from "./ShellNotice";
+import { NewerLayoutLine, ShellNotice } from "./ShellNotice";
 
 /** How long the window waits for the daemon's layout before it says it is waiting. */
 export const LAYOUT_WAIT_MS = 5000;
@@ -74,6 +74,8 @@ export function Shell() {
     // The top bar (TopBar) is the gap above the panes: they start right under it.
     <div className="relative m-shell mt-0 flex min-h-0 min-w-0 flex-1 flex-col" data-testid="shell" data-shell-mode={mode}>
       {mode === "shell" && <PaneGrid />}
+      {/* A newer build's layout: shown, changed in memory, not saved (ShellNotice.tsx). */}
+      {mode === "shell" && <NewerLayoutLine />}
       {mode !== "shell" && phase === "failed" && <ShellNotice kind="import-failed" />}
       {mode !== "shell" && !loaded && slow && <ShellNotice kind="no-layout" />}
       {/* The Needs-you popup (components/needs/NeedsPopup.tsx): one per window, over everything. */}

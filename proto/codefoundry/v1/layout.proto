@@ -57,6 +57,12 @@ message Layout {
   repeated ThreadLayout threads = 5;
   // The first-load import ran (LayoutService.ImportLegacy).
   bool legacy_imported = 6;
+  // What in the stored layout a newer build wrote (a document of a newer version, a tab or
+  // node of a kind this build does not know), one line each. When it is not empty the
+  // daemon left the stored layout as it was: this layout is what this build understands of
+  // it, changes to it live in memory only, and none is saved until the app is updated.
+  // Decided when the daemon loads the layout; no delta changes it.
+  repeated string newer = 7;
 }
 
 // LayoutSpace is a named layout: one tree of panes.

@@ -104,3 +104,15 @@ func TestLayoutDeltaCarriesTheImportMark(t *testing.T) {
 		t.Error("the delta lost legacy_imported")
 	}
 }
+
+// A layout a newer build wrote reaches the window, which tells the user nothing is saved.
+func TestLayoutCarriesWhatANewerBuildWrote(t *testing.T) {
+	snap := &layout.Snapshot{Rev: 3, State: core.NewState("sp-a", "Main"), Newer: []string{`space sp-a: tab t-2 of kind "notebook"`}}
+	if got := layoutToProto(snap).GetNewer(); len(got) != 1 || got[0] != snap.Newer[0] {
+		t.Errorf("newer = %v, want %v", got, snap.Newer)
+	}
+	snap.Newer = nil
+	if got := layoutToProto(snap).GetNewer(); len(got) != 0 {
+		t.Errorf("newer = %v, want none", got)
+	}
+}

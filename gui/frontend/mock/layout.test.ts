@@ -135,6 +135,19 @@ describe("the mock's LayoutService", () => {
     expect(events).toHaveLength(2);
   });
 
+  it("says a newer build wrote the layout in a snapshot at the same rev, and stops saying it on reset", () => {
+    const { layout, events } = service();
+    layout.seed("one-thread");
+    layout.setNewer(["space sp-main: tab t-9 of kind \"notebook\""]);
+    const last = events.at(-1);
+    expect(last?.rev).toBe(1n);
+    expect(last?.change?.case).toBe("snapshot");
+    expect(last?.change?.case === "snapshot" ? last.change.value.newer : []).toHaveLength(1);
+    expect(layout.get().newer).toHaveLength(1);
+    layout.reset();
+    expect(layout.get().newer).toEqual([]);
+  });
+
   it("imports once: the mark set in one commit with the layout unchanged, then a no-op; a failure changes nothing", () => {
     const { layout, events } = service();
     layout.seed("one-thread");

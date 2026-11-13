@@ -1,4 +1,7 @@
+import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tip } from "@/components/ui/tooltip";
+import { useLayoutStore } from "@/stores/layout";
 import { runLegacyImport, skipLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
 
 /**
@@ -37,5 +40,27 @@ export function ShellNotice({ kind }: { kind: "import-failed" | "no-layout" }) {
         <p className="text-body text-cf-text-muted">Waiting for the daemon to send this window&apos;s layout…</p>
       )}
     </main>
+  );
+}
+
+/** The line under the pane grid while the daemon keeps a newer build's layout in memory. */
+export const NEWER_LAYOUT_TEXT = "This layout was saved by a newer version of Code Foundry. Changes to it are not saved until you update.";
+
+/**
+ * One quiet line under the pane grid when a newer build wrote the stored layout
+ * (LayoutState.newerBuild): the daemon left it on disk as it was and works on what this build
+ * understands of it in memory, so the user's changes to it last until the daemon stops
+ * (docs/notes/shell-review-fixes-daemon.md, 7). Nothing is wrong with what is shown; no action.
+ */
+export function NewerLayoutLine() {
+  const newer = useLayoutStore((s) => s.newerBuild);
+  if (!newer) return null;
+  return (
+    <div className="flex min-w-0 shrink-0 items-center gap-1.5 px-1 pt-1.5 text-cf-text-muted" data-testid="shell-newer-layout" role="status">
+      <Info aria-hidden className="size-3 shrink-0" />
+      <Tip label={NEWER_LAYOUT_TEXT} whenTruncated side="top">
+        <span className="truncate text-caption">{NEWER_LAYOUT_TEXT}</span>
+      </Tip>
+    </div>
   );
 }

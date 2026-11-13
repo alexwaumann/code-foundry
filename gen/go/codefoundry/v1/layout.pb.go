@@ -225,8 +225,14 @@ type Layout struct {
 	Threads []*ThreadLayout `protobuf:"bytes,5,rep,name=threads,proto3" json:"threads,omitempty"`
 	// The first-load import ran (LayoutService.ImportLegacy).
 	LegacyImported bool `protobuf:"varint,6,opt,name=legacy_imported,json=legacyImported,proto3" json:"legacy_imported,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// What in the stored layout a newer build wrote (a document of a newer version, a tab or
+	// node of a kind this build does not know), one line each. When it is not empty the
+	// daemon left the stored layout as it was: this layout is what this build understands of
+	// it, changes to it live in memory only, and none is saved until the app is updated.
+	// Decided when the daemon loads the layout; no delta changes it.
+	Newer         []string `protobuf:"bytes,7,rep,name=newer,proto3" json:"newer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Layout) Reset() {
@@ -299,6 +305,13 @@ func (x *Layout) GetLegacyImported() bool {
 		return x.LegacyImported
 	}
 	return false
+}
+
+func (x *Layout) GetNewer() []string {
+	if x != nil {
+		return x.Newer
+	}
+	return nil
 }
 
 // LayoutSpace is a named layout: one tree of panes.
@@ -4376,14 +4389,15 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x1bcodefoundry/v1/layout.proto\x12\x0ecodefoundry.v1\"\x12\n" +
 	"\x10GetLayoutRequest\"C\n" +
 	"\x11GetLayoutResponse\x12.\n" +
-	"\x06layout\x18\x01 \x01(\v2\x16.codefoundry.v1.LayoutR\x06layout\"\x84\x02\n" +
+	"\x06layout\x18\x01 \x01(\v2\x16.codefoundry.v1.LayoutR\x06layout\"\x9a\x02\n" +
 	"\x06Layout\x12\x10\n" +
 	"\x03rev\x18\x01 \x01(\x04R\x03rev\x123\n" +
 	"\x06spaces\x18\x02 \x03(\v2\x1b.codefoundry.v1.LayoutSpaceR\x06spaces\x12(\n" +
 	"\x10current_space_id\x18\x03 \x01(\tR\x0ecurrentSpaceId\x12(\n" +
 	"\x10default_space_id\x18\x04 \x01(\tR\x0edefaultSpaceId\x126\n" +
 	"\athreads\x18\x05 \x03(\v2\x1c.codefoundry.v1.ThreadLayoutR\athreads\x12'\n" +
-	"\x0flegacy_imported\x18\x06 \x01(\bR\x0elegacyImported\"\xda\x01\n" +
+	"\x0flegacy_imported\x18\x06 \x01(\bR\x0elegacyImported\x12\x14\n" +
+	"\x05newer\x18\a \x03(\tR\x05newer\"\xda\x01\n" +
 	"\vLayoutSpace\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12.\n" +
