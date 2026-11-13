@@ -77,6 +77,8 @@ function PopupContent({ threadId }: { threadId: string }) {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   useCloseWhenAnswered(threadId);
   // The keyboard starts on the ask once the Watch has drawn it: digits answer, as in a pane.
+  // Only while it waits on the dialog itself: once the user put it somewhere (the prompt, the
+  // deny reason), a late ask must not take it, or the next digit typed there would answer it.
   useEffect(() => {
     if (!root) return;
     const focusAsk = () => {
@@ -88,7 +90,8 @@ function PopupContent({ threadId }: { threadId: string }) {
     if (focusAsk()) return;
     root.focus({ preventScroll: true });
     const mo = new MutationObserver(() => {
-      if (focusAsk()) mo.disconnect();
+      if (document.activeElement !== root) mo.disconnect();
+      else if (focusAsk()) mo.disconnect();
     });
     mo.observe(root, { childList: true, subtree: true });
     return () => {

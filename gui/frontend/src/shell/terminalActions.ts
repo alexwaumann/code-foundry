@@ -214,15 +214,17 @@ export async function quickKey(): Promise<void> {
       return;
     }
     case "close": {
-      const rev = await quickCommand({ id: thread, close: "true" });
-      await afterRev(rev);
-      if (tab) requestPaneFocus(tab.paneId);
+      await closeQuick(thread);
       return;
     }
   }
 }
 
-/** The quick terminal's ×. */
+/**
+ * The quick terminal's × and cmd+j in it: closed, the keyboard goes to the thread's prompt when
+ * the thread's pane still has the focus once the commit is in (the user may have gone elsewhere
+ * while it ran; nothing then moves under them).
+ */
 export async function closeQuick(threadId: string): Promise<void> {
   const rev = await quickCommand({ id: threadId, close: "true" });
   await afterRev(rev);
@@ -310,12 +312,21 @@ export async function resetTerminal(id: string): Promise<void> {
 export async function runAgain(tab: Pick<TabEntry, "id" | "params">, command: string): Promise<void> {
   const id = terminalOfTab(tab);
   const res = await runCommandForResult("terminal.rerun", { id, command }, { ctx: terminalCtx(id), quiet: true });
-  if (res) await forgetRan(tab);
+  // The rerun waits for the shell's prompt: a Reset meanwhile put a new shell under the tab, which
+  // never ran the line, so it keeps its "Run again".
+  const now = useLayoutStore.getState().tabs[tab.id];
+  if (res && now && terminalOfTab(now) === id) await forgetRan(now);
 }
 
-/** Drops a restored tab's "Run again" line without running it. */
+/**
+ * Drops a restored tab's "Run again" line without running it. The params written are the tab's as
+ * the layout has them now (set_tab_params replaces them all), not as a caller read them before an
+ * await: a reset or rename meanwhile stays.
+ */
 export async function forgetRan(tab: Pick<TabEntry, "id" | "params">): Promise<void> {
-  const { ran: _ran, ...params } = tab.params;
+  const now = useLayoutStore.getState().tabs[tab.id];
+  if (!now || !("ran" in now.params)) return;
+  const { ran: _ran, ...params } = now.params;
   try {
     await applyLayout({ op: "set_tab_params", tab: tab.id, params });
   } catch {

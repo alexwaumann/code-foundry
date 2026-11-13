@@ -16,7 +16,7 @@ const { useThreadStore } = await import("@/stores/thread");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useProjectsStore } = await import("@/stores/projects");
 const { HOME, useUiStore } = await import("@/stores/ui");
-const { openNeedsPopup, resetNeeds, useNeedsStore } = await import("@/stores/needs");
+const { closeNeedsPopup, openNeedsPopup, resetNeeds, useNeedsStore } = await import("@/stores/needs");
 
 /**
  * The Needs-you popup (docs/notes/shell-17-needs-you.md): which thread it shows, Go to thread,
@@ -95,6 +95,44 @@ describe("the Needs-you popup", () => {
     expect(screen.getByTestId("needs-popup")).toBeTruthy();
     fireEvent.click(screen.getByTestId("needs-popup-close"));
     expect(useNeedsStore.getState().popup).toBeNull();
+  });
+
+  it("puts the keyboard on the ask once it is drawn, unless the user put it elsewhere first", () => {
+    const drawAsk = () => {
+      const prompts = document.createElement("div");
+      prompts.setAttribute("data-testid", "thread-prompts");
+      const ask = document.createElement("div");
+      ask.className = "pend";
+      ask.tabIndex = -1;
+      prompts.append(ask);
+      screen.getByTestId("inline-thread").append(prompts);
+      return ask;
+    };
+    const flush = () => new Promise((r) => setTimeout(r, 0));
+    render(<NeedsPopup />);
+    act(() => {
+      openNeedsPopup("s-1");
+    });
+    expect(document.activeElement).toBe(screen.getByTestId("needs-popup"));
+    return (async () => {
+      // The user clicked into a field while the Watch drew: the ask arrives and leaves it there.
+      const reason = screen.getByTestId("reason");
+      reason.focus();
+      drawAsk();
+      await act(flush);
+      expect(document.activeElement).toBe(reason);
+
+      // Opened again, nothing touched: the ask takes the keyboard as soon as it is drawn.
+      act(() => {
+        closeNeedsPopup();
+      });
+      act(() => {
+        openNeedsPopup("s-1");
+      });
+      const ask = drawAsk();
+      await act(flush);
+      expect(document.activeElement).toBe(ask);
+    })();
   });
 
   it("Escape in a field is the field's (the deny reason cancels); elsewhere it closes the popup", () => {
