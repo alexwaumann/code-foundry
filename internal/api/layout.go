@@ -75,7 +75,7 @@ func applyResponse(c layout.Commit) *v1.ApplyLayoutResponse {
 	return &v1.ApplyLayoutResponse{
 		Rev: c.Rev, SpaceId: r.Space, PaneId: r.Pane, TabId: r.Tab, Existing: r.Existing,
 		Closed: tabs(r.Closed), Rule: r.Rule, Kept: tabs(r.Kept), Ended: tabs(r.Ended),
-		BackTabIds: r.Back, PlacedTabIds: r.Placed, FreshTabIds: r.Fresh, SwappedPaneIds: r.Swapped,
+		BackTabIds: r.Back, PlacedTabIds: r.Placed, FreshTabIds: r.Fresh, FreshQuickThreadId: r.FreshQuick, SwappedPaneIds: r.Swapped,
 		DraftId: r.Draft,
 	}
 }
@@ -208,7 +208,7 @@ func layoutTabToProto(tb *core.Tab) *v1.LayoutTab {
 func threadLayoutToProto(id string, ts *core.ThreadState) *v1.ThreadLayout {
 	out := &v1.ThreadLayout{ThreadId: id, SpaceId: ts.Space}
 	if q := ts.Quick; q != nil {
-		out.Quick = &v1.QuickTerminal{Open: q.Open, Height: q.Height}
+		out.Quick = &v1.QuickTerminal{Open: q.Open, Height: q.Height, Ran: q.Ran}
 	}
 	if r := ts.Remembered; r != nil {
 		out.RememberedPaneId = r.Pane

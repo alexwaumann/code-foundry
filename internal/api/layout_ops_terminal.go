@@ -9,7 +9,7 @@ import (
 func init() {
 	registerLayoutOp("set_quick", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetSetQuick()
-		return &core.SetQuick{Thread: o.GetThreadId(), Open: o.GetOpen(), Height: o.GetHeight()}, nil
+		return &core.SetQuick{Thread: o.GetThreadId(), Open: o.GetOpen(), Height: o.GetHeight(), ForgetRan: o.GetForgetRan()}, nil
 	})
 	registerLayoutOp("replace_terminal", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetReplaceTerminal()

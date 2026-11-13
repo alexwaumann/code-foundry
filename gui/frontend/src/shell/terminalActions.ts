@@ -19,7 +19,7 @@ import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, requestPaneFocusOverSheets } from "@/stores/shellView";
 import { useUiStore } from "@/stores/ui";
 import { afterRev, layoutResultOf, runLayoutCommand } from "./commands";
-import { focusQuick, quickHasFocus, quickKeyAction } from "./quickTerminal";
+import { focusQuick, quickHasFocus, quickKeyAction, quickTerminalOf } from "./quickTerminal";
 
 /** The tab whose name is being edited in its strip; "" for none. */
 export const useTabRenameStore = create<{ tabId: string }>()(() => ({ tabId: "" }));
@@ -316,6 +316,29 @@ export async function runAgain(tab: Pick<TabEntry, "id" | "params">, command: st
   // never ran the line, so it keeps its "Run again".
   const now = useLayoutStore.getState().tabs[tab.id];
   if (res && now && terminalOfTab(now) === id) await forgetRan(now);
+}
+
+/**
+ * "Run again" on a quick terminal restored after a snooze: its new shell types the command the
+ * old one ran, then the thread's quick terminal forgets it (QuickTerminal.ran), so the line goes.
+ * A Reset while the rerun waited put a new shell there that never ran it: the line stays.
+ */
+export async function runQuickAgain(threadId: string, terminalId: string, command: string): Promise<void> {
+  const res = await runCommandForResult("terminal.rerun", { id: terminalId, command }, { ctx: terminalCtx(terminalId), quiet: true });
+  if (!res) return;
+  const now = quickTerminalOf(useTerminalsStore.getState().byId, useTerminalsStore.getState().order, threadId);
+  if (now?.id === terminalId) await forgetQuickRan(threadId);
+}
+
+/** Drops a thread's quick terminal's "Run again" line, its open state as the layout has it now. */
+export async function forgetQuickRan(threadId: string): Promise<void> {
+  const quick = useLayoutStore.getState().threads[threadId]?.quick;
+  if (!quick?.ran) return;
+  try {
+    await applyLayout({ op: "set_quick", thread: threadId, open: quick.open, forget_ran: true });
+  } catch {
+    // The thread went meanwhile: nothing to forget.
+  }
 }
 
 /**

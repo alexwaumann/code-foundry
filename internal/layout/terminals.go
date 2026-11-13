@@ -27,11 +27,14 @@ const RanParam = "ran"
 
 // SetQuick opens or closes a thread's quick terminal (ThreadState.Quick), which is not a tab:
 // it is drawn under the thread's conversation in the thread's pane. Height, when above
-// zero, is its height in layout pixels; zero keeps the height it has.
+// zero, is its height in layout pixels; zero keeps the height it has. Either way it is no
+// longer one a snooze ended (Quick.Fresh): it is as this op says. Its "Run again" line
+// (Quick.Ran) stays unless ForgetRan.
 type SetQuick struct {
-	Thread string  `json:"thread"`
-	Open   bool    `json:"open"`
-	Height float64 `json:"height,omitempty"`
+	Thread    string  `json:"thread"`
+	Open      bool    `json:"open"`
+	Height    float64 `json:"height,omitempty"`
+	ForgetRan bool    `json:"forget_ran,omitempty"`
 }
 
 // OpName implements Op.
@@ -52,6 +55,9 @@ func (o *SetQuick) apply(t *tx) (Result, error) {
 	q := Quick{Open: o.Open}
 	if ts.Quick != nil {
 		q.Height = ts.Quick.Height
+		if !o.ForgetRan {
+			q.Ran = ts.Quick.Ran
+		}
 	}
 	if o.Height > 0 {
 		q.Height = o.Height

@@ -30,8 +30,9 @@ const { applyLayoutEvent, resetLayout, useLayoutStore } = await import("@/stores
 const { resetShellView, useShellViewStore } = await import("@/stores/shellView");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
+const { useTerminalsStore } = await import("@/stores/terminals");
 
-const quick = (open: boolean): ThreadLayoutView => ({ threadId: "s-1", spaceId: "sp-a", quick: { open, height: 0 }, remembered: [], rememberedPaneId: "" });
+const quick = (open: boolean, ran = ""): ThreadLayoutView => ({ threadId: "s-1", spaceId: "sp-a", quick: { open, height: 0, ran }, remembered: [], rememberedPaneId: "" });
 
 /** Thread s-1's tab in p-1, its diff and a terminal tab in p-2, the Pull Requests page in p-2 too. */
 async function seed(focusPane: string, active2 = "t-term", open = false): Promise<void> {
@@ -253,5 +254,45 @@ describe("Reset and Run again", () => {
     await actions.runAgain({ id: "t-term", params: restored }, "make dev");
     expect(applied).toEqual([]);
     expect(useLayoutStore.getState().tabs["t-term"]?.params).toEqual({ terminal: "term-2", ran: "make dev" });
+  });
+});
+
+describe("a quick terminal restored after a snooze", () => {
+  /** s-1's quick shell `id`, running. */
+  const quickShell = (id: string) => {
+    useTerminalsStore.setState({
+      byId: { [id]: { id, argv: ["/bin/zsh", "-l"], cwd: "/w", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels: { kind: "shell", thread: "s-1", slot: "quick" }, liveCwd: "/w", foreground: "", lastCommand: "" } },
+      order: [id],
+      loaded: true,
+    });
+  };
+  const restored = () => ({ ...layoutAt("p-1", "t-term", true), threads: [quick(true, "make dev")] });
+
+  it("Run again types the command in its shell, then the thread's quick terminal forgets it", async () => {
+    await seedLayout(restored());
+    quickShell("term-q");
+    await actions.runQuickAgain("s-1", "term-q", "make dev");
+    expect(runs).toEqual([{ name: "terminal.rerun", args: { id: "term-q", command: "make dev" }, thread: "", terminal: "term-q" }]);
+    expect(applied).toEqual([{ op: "set_quick", thread: "s-1", open: true, forget_ran: true }]);
+  });
+
+  it("a Reset while it waited put a new shell there, which never ran it: the line stays", async () => {
+    await seedLayout(restored());
+    quickShell("term-q");
+    during.set("terminal.rerun", () => {
+      quickShell("term-q2");
+    });
+    await actions.runQuickAgain("s-1", "term-q", "make dev");
+    expect(applied).toEqual([]);
+  });
+
+  it("× drops the line, the open state as the layout has it; with no line, nothing is sent", async () => {
+    await seedLayout({ ...layoutAt("p-1", "t-term", true), threads: [quick(false, "make dev")] });
+    await actions.forgetQuickRan("s-1");
+    expect(applied).toEqual([{ op: "set_quick", thread: "s-1", open: false, forget_ran: true }]);
+    applied.length = 0;
+    await seedLayout({ ...layoutAt("p-1", "t-term", true), rev: 9 });
+    await actions.forgetQuickRan("s-1");
+    expect(applied).toEqual([]);
   });
 });

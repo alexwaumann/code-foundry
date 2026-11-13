@@ -877,7 +877,10 @@ type QuickTerminal struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Open  bool                   `protobuf:"varint,1,opt,name=open,proto3" json:"open,omitempty"`
 	// In layout pixels; 0 is the default height.
-	Height        float64 `protobuf:"fixed64,2,opt,name=height,proto3" json:"height,omitempty"`
+	Height float64 `protobuf:"fixed64,2,opt,name=height,proto3" json:"height,omitempty"`
+	// The command its shell was running when a snooze ended it, shown with "Run again" over
+	// the fresh shell that replaced it; empty once that ran or was dismissed.
+	Ran           string `protobuf:"bytes,3,opt,name=ran,proto3" json:"ran,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -924,6 +927,13 @@ func (x *QuickTerminal) GetHeight() float64 {
 		return x.Height
 	}
 	return 0
+}
+
+func (x *QuickTerminal) GetRan() string {
+	if x != nil {
+		return x.Ran
+	}
+	return ""
 }
 
 // RememberedTab is one remembered linked tab and where it was.
@@ -1441,6 +1451,9 @@ type ApplyLayoutResponse struct {
 	BackTabIds   []string `protobuf:"bytes,10,rep,name=back_tab_ids,json=backTabIds,proto3" json:"back_tab_ids,omitempty"`
 	PlacedTabIds []string `protobuf:"bytes,11,rep,name=placed_tab_ids,json=placedTabIds,proto3" json:"placed_tab_ids,omitempty"`
 	FreshTabIds  []string `protobuf:"bytes,12,rep,name=fresh_tab_ids,json=freshTabIds,proto3" json:"fresh_tab_ids,omitempty"`
+	// The thread whose quick terminal came back open with the thread's tab after a snooze
+	// ended it: it needs a new shell (the daemon starts it).
+	FreshQuickThreadId string `protobuf:"bytes,15,opt,name=fresh_quick_thread_id,json=freshQuickThreadId,proto3" json:"fresh_quick_thread_id,omitempty"`
 	// The panes smart swap switched to the newly focused thread's surfaces.
 	SwappedPaneIds []string `protobuf:"bytes,13,rep,name=swapped_pane_ids,json=swappedPaneIds,proto3" json:"swapped_pane_ids,omitempty"`
 	// The composer draft the op started, opened or ended; after clear_draft, discard_draft
@@ -1562,6 +1575,13 @@ func (x *ApplyLayoutResponse) GetFreshTabIds() []string {
 		return x.FreshTabIds
 	}
 	return nil
+}
+
+func (x *ApplyLayoutResponse) GetFreshQuickThreadId() string {
+	if x != nil {
+		return x.FreshQuickThreadId
+	}
+	return ""
 }
 
 func (x *ApplyLayoutResponse) GetSwappedPaneIds() []string {
@@ -2799,7 +2819,9 @@ type SnoozeThreadOp struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// The command each of its terminals ran last, by terminal id, shown with "Run again".
-	Ran           map[string]string `protobuf:"bytes,2,rep,name=ran,proto3" json:"ran,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Ran map[string]string `protobuf:"bytes,2,rep,name=ran,proto3" json:"ran,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// The command its quick terminal ran last, for the same line when it comes back.
+	QuickRan      string `protobuf:"bytes,3,opt,name=quick_ran,json=quickRan,proto3" json:"quick_ran,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2848,13 +2870,22 @@ func (x *SnoozeThreadOp) GetRan() map[string]string {
 	return nil
 }
 
+func (x *SnoozeThreadOp) GetQuickRan() string {
+	if x != nil {
+		return x.QuickRan
+	}
+	return ""
+}
+
 // SetQuickOp opens or closes a thread's quick terminal (LayoutThread.quick); height above
 // zero sets its height in layout pixels, zero keeps it.
 type SetQuickOp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	Open          bool                   `protobuf:"varint,2,opt,name=open,proto3" json:"open,omitempty"`
-	Height        float64                `protobuf:"fixed64,3,opt,name=height,proto3" json:"height,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Open     bool                   `protobuf:"varint,2,opt,name=open,proto3" json:"open,omitempty"`
+	Height   float64                `protobuf:"fixed64,3,opt,name=height,proto3" json:"height,omitempty"`
+	// Drop its "Run again" line (QuickTerminal.ran): it ran, or the user dismissed it.
+	ForgetRan     bool `protobuf:"varint,4,opt,name=forget_ran,json=forgetRan,proto3" json:"forget_ran,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2908,6 +2939,13 @@ func (x *SetQuickOp) GetHeight() float64 {
 		return x.Height
 	}
 	return 0
+}
+
+func (x *SetQuickOp) GetForgetRan() bool {
+	if x != nil {
+		return x.ForgetRan
+	}
+	return false
 }
 
 // ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
@@ -4445,10 +4483,11 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\n" +
 	"remembered\x18\x04 \x03(\v2\x1d.codefoundry.v1.RememberedTabR\n" +
 	"remembered\x12,\n" +
-	"\x12remembered_pane_id\x18\x05 \x01(\tR\x10rememberedPaneId\";\n" +
+	"\x12remembered_pane_id\x18\x05 \x01(\tR\x10rememberedPaneId\"M\n" +
 	"\rQuickTerminal\x12\x12\n" +
 	"\x04open\x18\x01 \x01(\bR\x04open\x12\x16\n" +
-	"\x06height\x18\x02 \x01(\x01R\x06height\"\xa5\x02\n" +
+	"\x06height\x18\x02 \x01(\x01R\x06height\x12\x10\n" +
+	"\x03ran\x18\x03 \x01(\tR\x03ran\"\xa5\x02\n" +
 	"\rRememberedTab\x12+\n" +
 	"\x03tab\x18\x01 \x01(\v2\x19.codefoundry.v1.LayoutTabR\x03tab\x12\x17\n" +
 	"\apane_id\x18\x02 \x01(\tR\x06paneId\x12\x14\n" +
@@ -4483,7 +4522,7 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x0flegacy_imported\x18\b \x01(\bR\x0elegacyImported\"[\n" +
 	"\x12ApplyLayoutRequest\x12(\n" +
 	"\x02op\x18\x01 \x01(\v2\x18.codefoundry.v1.LayoutOpR\x02op\x12\x1b\n" +
-	"\tclient_id\x18\x02 \x01(\tR\bclientId\"\xe6\x03\n" +
+	"\tclient_id\x18\x02 \x01(\tR\bclientId\"\x99\x04\n" +
 	"\x13ApplyLayoutResponse\x12\x10\n" +
 	"\x03rev\x18\x01 \x01(\x04R\x03rev\x12\x19\n" +
 	"\bspace_id\x18\x02 \x01(\tR\aspaceId\x12\x17\n" +
@@ -4498,7 +4537,8 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	" \x03(\tR\n" +
 	"backTabIds\x12$\n" +
 	"\x0eplaced_tab_ids\x18\v \x03(\tR\fplacedTabIds\x12\"\n" +
-	"\rfresh_tab_ids\x18\f \x03(\tR\vfreshTabIds\x12(\n" +
+	"\rfresh_tab_ids\x18\f \x03(\tR\vfreshTabIds\x121\n" +
+	"\x15fresh_quick_thread_id\x18\x0f \x01(\tR\x12freshQuickThreadId\x12(\n" +
 	"\x10swapped_pane_ids\x18\r \x03(\tR\x0eswappedPaneIds\x12\x19\n" +
 	"\bdraft_id\x18\x0e \x01(\tR\adraftId\"_\n" +
 	"\x12SetViewportRequest\x12\x1b\n" +
@@ -4591,18 +4631,21 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x19\n" +
 	"\bspace_id\x18\x02 \x01(\tR\aspaceId\".\n" +
 	"\x0fArchiveThreadOp\x12\x1b\n" +
-	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\xa0\x01\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\xbd\x01\n" +
 	"\x0eSnoozeThreadOp\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x129\n" +
-	"\x03ran\x18\x02 \x03(\v2'.codefoundry.v1.SnoozeThreadOp.RanEntryR\x03ran\x1a6\n" +
+	"\x03ran\x18\x02 \x03(\v2'.codefoundry.v1.SnoozeThreadOp.RanEntryR\x03ran\x12\x1b\n" +
+	"\tquick_ran\x18\x03 \x01(\tR\bquickRan\x1a6\n" +
 	"\bRanEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"U\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"t\n" +
 	"\n" +
 	"SetQuickOp\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
 	"\x04open\x18\x02 \x01(\bR\x04open\x12\x16\n" +
-	"\x06height\x18\x03 \x01(\x01R\x06height\"A\n" +
+	"\x06height\x18\x03 \x01(\x01R\x06height\x12\x1d\n" +
+	"\n" +
+	"forget_ran\x18\x04 \x01(\bR\tforgetRan\"A\n" +
 	"\x11ReplaceTerminalOp\x12\x15\n" +
 	"\x06old_id\x18\x01 \x01(\tR\x05oldId\x12\x15\n" +
 	"\x06new_id\x18\x02 \x01(\tR\x05newId\"1\n" +

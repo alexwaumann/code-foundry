@@ -11,7 +11,7 @@ import (
 //
 // A terminal's foreground and last command lines (Terminal.foreground, last_command) and the
 // line a snoozed terminal's tab keeps for "Run again" (the "ran" param, a remembered tab's
-// Fresh.Ran) are what the user typed, arguments and all. The app, the CLI, a thread's model
+// Fresh.Ran, a quick terminal's Ran) are what the user typed, arguments and all. The app, the CLI, a thread's model
 // through its CLI and a plugin run as the user and could read the process table themselves.
 // A page cannot: its read-only verbs run without asking, so they leave the lines out for an
 // untrusted caller (a page, or a call that does not say who it is).
@@ -35,7 +35,8 @@ func terminalsFor(uctx Context, terms []*v1.Terminal) []*v1.Terminal {
 }
 
 // layoutFor is st as uctx's caller may read it: a copy without the command lines snoozed
-// terminals keep (a tab's "ran" param, a remembered tab's Fresh.Ran) when it may not.
+// terminals keep (a tab's "ran" param, a remembered tab's Fresh.Ran, a quick terminal's Ran)
+// when it may not.
 func layoutFor(uctx Context, st *core.State) *core.State {
 	if !hidesCommandLines(uctx) {
 		return st
@@ -49,6 +50,9 @@ func layoutFor(uctx Context, st *core.State) *core.State {
 		}
 	}
 	for _, ts := range c.Threads {
+		if ts.Quick != nil {
+			ts.Quick.Ran = ""
+		}
 		if ts.Remembered == nil {
 			continue
 		}

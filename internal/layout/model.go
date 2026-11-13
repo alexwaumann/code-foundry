@@ -157,6 +157,12 @@ type ThreadState struct {
 type Quick struct {
 	Open   bool    `json:"open"`
 	Height float64 `json:"height,omitempty"`
+	// Fresh: a snooze ended it while it was open (Open is then false). It comes back open, as
+	// a fresh shell the caller starts (Result.FreshQuick), when the thread's tab opens.
+	Fresh bool `json:"fresh,omitempty"`
+	// Ran is the command its shell was running when a snooze ended it, for its "Run again"
+	// line, until that runs or is dismissed (SetQuick.ForgetRan).
+	Ran string `json:"ran,omitempty"`
 }
 
 // Remembered is the set of linked tabs a thread had open when its tab closed.

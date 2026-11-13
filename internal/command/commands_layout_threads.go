@@ -10,14 +10,15 @@ import (
 )
 
 // writeThreads writes, for layout.show, what the layout stores per thread beside its tabs:
-// its space (listed when it is not the default space, or with any of the rest), its quick terminal open, and the linked tabs it
+// its space (listed when it is not the default space, or with any of the rest), its quick
+// terminal open (or to open again as a fresh shell, after a snooze), and the linked tabs it
 // remembers (closed with it, to come back when it opens; a terminal marked fresh comes back
 // as a new shell, with the command it ran for "Run again").
 func writeThreads(b *strings.Builder, threads map[string]*core.ThreadState, defaultSpace string, names map[string]string) {
 	ids := slices.Sorted(maps.Keys(threads))
 	ids = slices.DeleteFunc(ids, func(id string) bool {
 		ts := threads[id]
-		return ts.Space == defaultSpace && (ts.Quick == nil || !ts.Quick.Open) && ts.Remembered == nil
+		return ts.Space == defaultSpace && (ts.Quick == nil || (!ts.Quick.Open && !ts.Quick.Fresh)) && ts.Remembered == nil
 	})
 	if len(ids) == 0 {
 		return
@@ -30,8 +31,14 @@ func writeThreads(b *strings.Builder, threads map[string]*core.ThreadState, defa
 			fmt.Fprintf(b, " %q", n)
 		}
 		fmt.Fprintf(b, " in space %s", ts.Space)
-		if ts.Quick != nil && ts.Quick.Open {
+		switch q := ts.Quick; {
+		case q != nil && q.Fresh:
+			b.WriteString(", quick terminal comes back open as a fresh shell")
+		case q != nil && q.Open:
 			b.WriteString(", quick terminal open")
+		}
+		if q := ts.Quick; q != nil && q.Ran != "" {
+			fmt.Fprintf(b, " (ran %q)", q.Ran)
 		}
 		b.WriteString("\n")
 		if ts.Remembered == nil {

@@ -35,6 +35,6 @@ func init() {
 	})
 	registerLayoutOp("snooze_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetSnoozeThread()
-		return &core.SnoozeThread{Thread: o.GetThreadId(), Ran: maps.Clone(o.GetRan())}, nil
+		return &core.SnoozeThread{Thread: o.GetThreadId(), Ran: maps.Clone(o.GetRan()), QuickRan: o.GetQuickRan()}, nil
 	})
 }

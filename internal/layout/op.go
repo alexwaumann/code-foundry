@@ -45,6 +45,9 @@ type Result struct {
 	Back   []string `json:"back,omitempty"`
 	Placed []string `json:"placed,omitempty"`
 	Fresh  []string `json:"fresh,omitempty"`
+	// FreshQuick is the thread whose quick terminal came back open when its tab opened, after
+	// a snooze ended it (Quick.Fresh): the caller starts a fresh quick shell for it.
+	FreshQuick string `json:"fresh_quick,omitempty"`
 	// Swapped lists the panes smart swap switched (swap.go).
 	Swapped []string `json:"swapped,omitempty"`
 	// Draft is the composer draft the op started, opened or ended (drafts.go). After

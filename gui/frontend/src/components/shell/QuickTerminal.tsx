@@ -8,11 +8,12 @@ import { normalizeDir } from "@/lib/terminalName";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { quickHeight, quickMode, quickTerminalOf, registerQuickHost } from "@/shell/quickTerminal";
-import { closeQuick, handBackFromQuick, setQuickHeight } from "@/shell/terminalActions";
+import { closeQuick, forgetQuickRan, handBackFromQuick, runQuickAgain, setQuickHeight } from "@/shell/terminalActions";
 import { useTerminalDir } from "@/shell/terminalTab";
 import { useThreadLayout } from "@/stores/layout";
 import { useTerminalsStore } from "@/stores/terminals";
 import { TerminalCwdHint } from "./TerminalCwdHint";
+import { RanLine } from "./TerminalTab";
 
 /** The thread's chrome the quick terminal must leave room for when it pushes: its header and its composer dock. */
 function chromeOf(box: HTMLElement): number {
@@ -89,11 +90,13 @@ export function ThreadWithQuick({ threadId, children }: { threadId: string; chil
 /**
  * The quick terminal itself: a header with its directory, the Reset hint when it has left the
  * thread's directory (right-aligned; the path shortens first), the chord and a close button,
- * then the thread's quick shell. Its top edge drags its height.
+ * then, when a snooze ended its old shell, the line with the command that shell ran and "Run
+ * again", then the thread's quick shell. Its top edge drags its height.
  */
 function QuickTerminal({ threadId, height, overlay, onDrag, onDrop }: { threadId: string; height: number; overlay: boolean; onDrag: (h: number) => void; onDrop: (h: number) => void }) {
   const terminal = useTerminalsStore((s) => quickTerminalOf(s.byId, s.order, threadId));
   const id = terminal?.id ?? "";
+  const ran = useThreadLayout(threadId)?.quick?.ran ?? "";
   // As the user typed it: macOS's /private/tmp is /tmp.
   const dir = tildify(normalizeDir(useTerminalDir(id)));
   const host = useRef<TerminalHostHandle>(null);
@@ -172,6 +175,15 @@ function QuickTerminal({ threadId, height, overlay, onDrag, onDrop }: { threadId
           </Tip>
         </span>
       </div>
+      {ran && id && (
+        <RanLine
+          ran={ran}
+          onRun={() => runQuickAgain(threadId, id, ran)}
+          onDismiss={() => {
+            void forgetQuickRan(threadId);
+          }}
+        />
+      )}
       <TerminalHost ref={host} terminalId={id || null} testId="quick-terminal-host" />
     </section>
   );

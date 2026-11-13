@@ -101,7 +101,8 @@ export interface ThreadLayoutView {
   threadId: string;
   /** The space it lives in. */
   spaceId: string;
-  quick: { open: boolean; height: number } | null;
+  /** ran: the command its shell ran when a snooze ended it, for its "Run again" line ("" when none). */
+  quick: { open: boolean; height: number; ran: string } | null;
   remembered: readonly RememberedTabView[];
   rememberedPaneId: string;
 }
@@ -209,7 +210,7 @@ export function toThreadLayoutView(t: ThreadLayout): ThreadLayoutView {
   return {
     threadId: t.threadId,
     spaceId: t.spaceId,
-    quick: t.quick ? { open: t.quick.open, height: t.quick.height } : null,
+    quick: t.quick ? { open: t.quick.open, height: t.quick.height, ran: t.quick.ran } : null,
     remembered: t.remembered.map((r) => ({
       tab: toTab(r.tab),
       paneId: r.paneId,
@@ -309,7 +310,9 @@ export type LayoutOpView =
   | { op: "label_draft"; draft: string; label: string }
   | { op: "clear_draft"; draft: string }
   | { op: "discard_draft"; draft: string }
-  | { op: "open_draft"; draft: string; focus?: boolean };
+  | { op: "open_draft"; draft: string; focus?: boolean }
+  /** Only its "Run again" line is the window's to drop; terminal.quick opens, closes and sizes it. */
+  | { op: "set_quick"; thread: string; open: boolean; forget_ran?: boolean };
 
 export type LayoutOpName = LayoutOpView["op"];
 
@@ -387,6 +390,8 @@ export function toLayoutOpMessage(o: LayoutOpView): LayoutOp {
         return { case: "discardDraft", value: { draftId: o.draft } };
       case "open_draft":
         return { case: "openDraft", value: { draftId: o.draft, focus: o.focus ?? false } };
+      case "set_quick":
+        return { case: "setQuick", value: { threadId: o.thread, open: o.open, forgetRan: o.forget_ran ?? false } };
     }
   })();
   return create(LayoutOpSchema, { op });

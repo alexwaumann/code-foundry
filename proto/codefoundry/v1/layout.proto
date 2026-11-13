@@ -176,6 +176,9 @@ message QuickTerminal {
   bool open = 1;
   // In layout pixels; 0 is the default height.
   double height = 2;
+  // The command its shell was running when a snooze ended it, shown with "Run again" over
+  // the fresh shell that replaced it; empty once that ran or was dismissed.
+  string ran = 3;
 }
 
 // RememberedTab is one remembered linked tab and where it was.
@@ -277,6 +280,9 @@ message ApplyLayoutResponse {
   repeated string back_tab_ids = 10;
   repeated string placed_tab_ids = 11;
   repeated string fresh_tab_ids = 12;
+  // The thread whose quick terminal came back open with the thread's tab after a snooze
+  // ended it: it needs a new shell (the daemon starts it).
+  string fresh_quick_thread_id = 15;
   // The panes smart swap switched to the newly focused thread's surfaces.
   repeated string swapped_pane_ids = 13;
   // The composer draft the op started, opened or ended; after clear_draft, discard_draft
@@ -428,6 +434,8 @@ message SnoozeThreadOp {
   string thread_id = 1;
   // The command each of its terminals ran last, by terminal id, shown with "Run again".
   map<string, string> ran = 2;
+  // The command its quick terminal ran last, for the same line when it comes back.
+  string quick_ran = 3;
 }
 
 // SetQuickOp opens or closes a thread's quick terminal (LayoutThread.quick); height above
@@ -436,6 +444,8 @@ message SetQuickOp {
   string thread_id = 1;
   bool open = 2;
   double height = 3;
+  // Drop its "Run again" line (QuickTerminal.ran): it ran, or the user dismissed it.
+  bool forget_ran = 4;
 }
 
 // ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
