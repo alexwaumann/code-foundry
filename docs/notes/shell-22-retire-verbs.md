@@ -149,12 +149,7 @@ daemon restarts.
 
 ## Verification
 
-- `make check` green. `make gui-e2e`: 541 passed, 151 skipped (the suite's existing skips), 1
-  failed: `bridge.spec.ts:287` ("a page's own other file keeps the bridge"), in both full runs,
-  passing alone. It is an inline card's page in the conversation (no item verb, no layout op): the
-  test waits for `data-ready="1"`, which the document before the link's navigation already has,
-  so its next `evaluate` can run mid-navigation ("Execution context was destroyed"). A timing race
-  in that test, not this change; left for its owner (`docs/notes/flaky-ci-tests.md`).
+- `make check` and `make gui-e2e` green (`bridge.spec.ts:287` below).
 - The first full run also failed four specs whose item tabs were titled "File": the window's half
   used to retitle them, and the mock now titles them as the daemon does. A fifth showed the plain
   `view.projects` change above.
@@ -178,6 +173,24 @@ daemon restarts.
 - e2e: `thread-panel-items` (new and old names from a thread), `mcp-panel` (the CLI's view.open.mcp),
   `prs` (the CLI's view.pullrequests; a stale ShowView is ignored), `page-verbs-panel`, and the
   file request spec unchanged.
+
+### bridge.spec.ts:287 ("a page's own other file keeps the bridge")
+
+It failed in this branch's first two full e2e runs; a full run of origin/shell (4e84aea86) passed
+it. The test clicks a link in the inline card's page, then waits for `data-ready="1"` and reads
+`location.pathname`. The page's bridge turns that link into `location.assign(…#cf=<nonce>)`
+(`internal/bridge/bridge.js`), a navigation WebKit starts after the click returns. The old
+document already has `data-ready="1"`, so the wait passes on it, and the next `evaluate` runs on
+the old document ("bridge.html") or mid-navigation ("Execution context was destroyed"). The trace
+shows it: the click returned at 34409 ms, the wait passed at 34414, the request for
+`bridge-next.html` started at 34418. Nothing in the window is on this path (no intent, no
+`ShowView`, no layout op): the navigation happens inside the frame.
+
+The race is older than this branch. The old test alone, 80 runs each: this branch failed 7,
+origin/shell failed 4, a difference within noise at these counts. Fixed in the test: it holds the card's
+`Frame` (the same object across its navigations), waits for the frame's URL to be the new
+document (the navigation committed), then for that document's `data-ready`; both navigations in
+the test do. 60 of 60 alone after the fix.
 
 ### End to end with the built binary and the window
 
