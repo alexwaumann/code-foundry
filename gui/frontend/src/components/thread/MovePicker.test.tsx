@@ -13,6 +13,7 @@ const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success:
 vi.mock("sonner", () => ({ toast }));
 
 const { ThreadCrumb } = await import("./ThreadParts");
+const { ThreadHeader } = await import("./ThreadHeader");
 const { useMovePickerStore, openMovePicker, canMoveThread } = await import("@/stores/movePicker");
 const { useCanMove } = await import("./useNoProject");
 const { useProjectsStore } = await import("@/stores/projects");
@@ -197,6 +198,26 @@ describe("step 2: where it works there", () => {
 });
 
 describe("Move", () => {
+  it("the shell's thread header says Moving to … from the send until the move is done", () => {
+    render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+    expect(screen.getByTestId("thread-header-place").textContent).toBe("No project");
+    // Sent, the daemon not answered yet.
+    act(() => {
+      useMovePickerStore.setState({ sending: { "s-1": "web" } });
+    });
+    expect(screen.getByTestId("thread-header-moving").textContent).toBe("Moving to web…");
+    expect(screen.queryByTestId("thread-header-place")).toBeNull();
+    // The daemon's pending move names it.
+    act(() => {
+      useMovePickerStore.setState({ sending: {} });
+    });
+    setThread({ pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } });
+    expect(screen.getByTestId("thread-header-moving").textContent).toBe("Moving to web…");
+    // Moved: the branch chip.
+    setThread({ projectId: "web", projectIds: ["web"], worktreePath: "/Users/me/src/web", branch: "main" });
+    expect(screen.queryByTestId("thread-header-moving")).toBeNull();
+  });
+
   it("Enter moves: thread.move with the choice, the picker closes, the crumb says Moving to … until the daemon answers", async () => {
     let answer: () => void = () => undefined;
     daemon.handlers.set(

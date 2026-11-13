@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { GitBranch, House, MoreHorizontal } from "lucide-react";
+import { GitBranch, House, Loader2, MoreHorizontal } from "lucide-react";
 import { MoveToSpaceItems, ThreadSurfaceItems } from "@/components/shell/ThreadSurfaceItems";
 import { ThreadInfoToggle } from "@/components/threadinfo/ThreadInfoToggle";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { formatChord } from "@/keys/chord";
+import { movingLabel } from "@/lib/move";
 import { cn } from "@/lib/utils";
 import { closeThreadAction, type LinkedAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
@@ -26,6 +27,7 @@ import { MovePicker } from "./MovePicker";
 import { ThreadMenuItems } from "./ThreadMenuItems";
 import { TranscriptDeletedChip } from "./TranscriptDeleted";
 import { useCanMove } from "./useNoProject";
+import { useMovingTo } from "./useMovingTo";
 import { useThreadPlace } from "./useThreadPlace";
 
 /** The quiet chip the header shows the branch in (and, for a thread with no project, where it runs). */
@@ -34,11 +36,21 @@ const CHIP = "flex h-6 min-w-0 items-center gap-1 rounded-md bg-cf-control-hover
 /**
  * Where the thread works: its branch as a chip; a thread with no project says so instead, and
  * (while it can move) opens the move picker, which the menu's "Move to project…" also opens.
+ * While a move is in flight (sent, or the daemon's pending move), it says where to.
  */
 function PlaceChip({ threadId }: { threadId: string }) {
   // The sidebar row's branch (lib/threadRow): the checkout's, else the short head or folder.
   const { branch, noProject } = useThreadPlace(threadId);
   const movable = useCanMove(threadId);
+  const moving = useMovingTo(threadId);
+  if (moving !== null) {
+    return (
+      <span className={CHIP} data-testid="thread-header-moving">
+        <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+        <span className="truncate">{movingLabel(moving)}</span>
+      </span>
+    );
+  }
   if (noProject) {
     const content = (
       <>

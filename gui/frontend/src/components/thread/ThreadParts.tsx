@@ -3,16 +3,16 @@ import { ChevronRight, Folders, House, Layers, type LucideIcon } from "lucide-re
 import { useShallow } from "zustand/react/shallow";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { Tip } from "@/components/ui/tooltip";
-import { movingLabel, movingTo } from "@/lib/move";
+import { movingLabel } from "@/lib/move";
 import { crumbLink, crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
 import { runCommand } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { useMovePickerStore } from "@/stores/movePicker";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { MovePicker } from "./MovePicker";
 import { useCanMove } from "./useNoProject";
+import { useMovingTo } from "./useMovingTo";
 
 /** The place icons other than one project's (that one is the project's kind icon). */
 const crumbIcons: Readonly<Record<Exclude<CrumbIcon, "folder">, LucideIcon>> = { layers: Layers, folders: Folders, house: House };
@@ -31,21 +31,6 @@ function usePlaceInput(id: string) {
       };
     }),
   );
-}
-
-/**
- * Where the thread is moving to, by name (lib/move movingTo): its pending_move, else a
- * move this window sent and the daemon has not answered; null when it is not moving.
- */
-function useMovingTo(id: string): string | null {
-  const pending = useThreadsStore(useShallow((s) => {
-    const m = s.byId[id]?.pendingMove;
-    return m ? { projectId: m.projectId, workspaceId: m.workspaceId } : null;
-  }));
-  const sending = useMovePickerStore((s) => s.sending[id]);
-  const project = useProjectsStore((s) => (pending?.projectId ? s.byId[pending.projectId]?.name : undefined));
-  const workspace = useWorkspacesStore((s) => (pending?.workspaceId ? s.byId[pending.workspaceId]?.name : undefined));
-  return movingTo(pending, sending, { project: () => project, workspace: () => workspace });
 }
 
 /** The crumb's separator. */
