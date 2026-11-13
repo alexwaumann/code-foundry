@@ -1371,11 +1371,12 @@ function threadMsg(id: string, ts: ThreadState): ThreadInit {
   };
 }
 
-export function layoutMsg(st: State, rev: number, legacyImported = false): LayoutInit {
+export function layoutMsg(st: State, rev: number, legacyImported = false, newer: string[] = []): LayoutInit {
   const threads = st.threads ?? {};
   return {
     rev: BigInt(rev),
     legacyImported,
+    newer,
     spaces: st.spaces.map(spaceMsg),
     currentSpaceId: st.current_space,
     defaultSpaceId: st.default_space,
@@ -1628,6 +1629,12 @@ export class MockLayout {
   failImports = 0;
   /** How long the mock's ImportLegacy takes to answer, in ms (a test's: a slow first draw). */
   importDelayMs = 0;
+  /**
+   * What a newer build wrote in the stored layout (Layout.newer): the daemon decides it when it
+   * loads the layout, so the mock's control sends it in a snapshot, as a restarted daemon does.
+   * The mock keeps applying ops either way (the daemon's are in memory only; tested in Go).
+   */
+  newer: string[] = [];
 
   constructor(
     private readonly deps: {
@@ -1648,11 +1655,17 @@ export class MockLayout {
 
   /** The source's snapshot event. */
   snapshotEvent(): LayoutEventInit {
-    return { rev: BigInt(this.revision), change: { case: "snapshot", value: layoutMsg(this.st, this.revision, this.legacyImported) } };
+    return { rev: BigInt(this.revision), change: { case: "snapshot", value: layoutMsg(this.st, this.revision, this.legacyImported, this.newer) } };
   }
 
   get(): LayoutInit {
-    return layoutMsg(this.st, this.revision, this.legacyImported);
+    return layoutMsg(this.st, this.revision, this.legacyImported, this.newer);
+  }
+
+  /** Says (or stops saying) that a newer build wrote the stored layout, as a daemon's restart would: one snapshot. */
+  setNewer(newer: string[]): void {
+    this.newer = newer;
+    this.deps.publish(this.snapshotEvent());
   }
 
   /**
@@ -1706,6 +1719,7 @@ export class MockLayout {
     this.importError = "";
     this.importDelayMs = 0;
     this.legacyImported = false;
+    this.newer = [];
     this.commit(emptyState(), "");
   }
 

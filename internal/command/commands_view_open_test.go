@@ -350,6 +350,72 @@ func TestViewOpenDiffPicksInTheUsersTab(t *testing.T) {
 	}
 }
 
+// The pick reads the user's tab before it asks the checkout whether the user's sides list the
+// file, and writes it after. A change the user made to the tab while that comparison ran (a
+// filter, a file, other sides) is what the pick starts from, never written over with what the tab
+// held before.
+func TestViewOpenDiffPickKeepsAChangeMadeWhileItCompares(t *testing.T) {
+	tests := []struct {
+		name     string
+		mine     map[string]string // the user's tab before the call
+		changed  map[string]string // what the user set while the pick compared
+		want     map[string]string // the user's tab after the call
+		own      bool              // the file went to a tab of the thread's own
+		compares int
+	}{
+		{name: "a filter set meanwhile stays, the file picked",
+			mine:    map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "b.go"},
+			changed: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "c.go", "filter": "rs"},
+			want:    map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "a.go", "filter": "rs"}, compares: 2},
+		{name: "sides changed meanwhile to ones that do not list it: the user's tab as they left it",
+			mine:    map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "b.go"},
+			changed: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v2", "path": "c.go"},
+			want:    map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v2", "path": "c.go"}, own: true, compares: 2},
+		{name: "sides changed meanwhile to the call's: picked there without asking again",
+			mine:    map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "path": "b.go"},
+			changed: map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "path": "c.go", "fold": "1"},
+			want:    map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "path": "a.go", "fold": "1"}, compares: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newOpenFixture(t)
+			f.run(t, selfCLI, "view.open.diff", nil)
+			tab := f.tabsOf("diff")[0].ID
+			set := func(params map[string]string) {
+				if _, err := f.store.Apply(context.Background(), &core.SetTabParams{Tab: tab, Params: params}, layoutstore.ApplyOptions{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			set(tt.mine)
+			diffs := f.diffs
+			diffs.Unlisted = func(base, path string) bool { return base == "v2" && path == "a.go" }
+			before := len(diffs.Requests())
+			once := false
+			diffs.During = func(r *v1.CompareWorktreeRequest) {
+				// The pick's comparison names the user's base; the call's own check does not.
+				if !once && r.GetBase().GetRef() == "v1" {
+					once = true
+					set(tt.changed)
+				}
+			}
+			f.run(t, selfCLI, "view.open.diff", map[string]string{"path": "/wt/a.go"})
+			if !once {
+				t.Fatal("the pick never compared the user's sides")
+			}
+			if n := len(diffs.Requests()) - before - 1; n != tt.compares {
+				t.Errorf("%d comparisons for the pick, want %d", n, tt.compares)
+			}
+			tabs := f.tabsOf("diff")
+			if !maps.Equal(tabs[0].Params, tt.want) {
+				t.Errorf("the user's tab = %v, want %v", tabs[0].Params, tt.want)
+			}
+			if got := len(tabs) == 2; got != tt.own {
+				t.Errorf("diff tabs = %+v, want a tab of the thread's own: %v", tabs, tt.own)
+			}
+		})
+	}
+}
+
 // A refused item opens no tab and shows nothing in the classic window.
 func TestViewOpenRefusedOpensNothing(t *testing.T) {
 	f := newOpenFixture(t)

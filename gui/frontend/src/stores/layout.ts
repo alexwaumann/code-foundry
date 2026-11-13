@@ -63,6 +63,11 @@ export interface LayoutState {
   loaded: boolean;
   /** The first-load import of the classic window's panels has run (shell/legacyImport.ts). */
   legacyImported: boolean;
+  /**
+   * A newer build wrote the stored layout (LayoutView.newer): the daemon shows what this build
+   * understands of it and saves no change until the app is updated (Shell's notice line).
+   */
+  newerBuild: boolean;
   /** The rev of the last commit applied. */
   rev: number;
   spaceOrder: readonly string[];
@@ -80,6 +85,7 @@ export interface LayoutState {
 const EMPTY: LayoutState = {
   loaded: false,
   legacyImported: false,
+  newerBuild: false,
   rev: 0,
   spaceOrder: [],
   currentSpaceId: "",
@@ -199,6 +205,8 @@ export function applyDelta(l: LayoutView, d: LayoutDeltaView, rev: number): Layo
     threads: [...threads.values()],
     // The mark is never taken back.
     legacyImported: Boolean(d.legacyImported) || Boolean(l.legacyImported),
+    // Decided when the daemon loaded the layout; only a snapshot says it.
+    newer: l.newer,
   };
 }
 
@@ -323,6 +331,7 @@ function flatten(l: LayoutView): LayoutState {
   return {
     loaded: true,
     legacyImported: Boolean(l.legacyImported),
+    newerBuild: (l.newer ?? []).length > 0,
     rev: l.rev,
     spaceOrder: l.spaces.map((s) => s.id),
     currentSpaceId: l.currentSpaceId,
@@ -361,6 +370,7 @@ function share(prev: LayoutState, next: LayoutState): LayoutState {
   const out: LayoutState = {
     loaded: next.loaded,
     legacyImported: next.legacyImported,
+    newerBuild: next.newerBuild,
     rev: next.rev,
     spaceOrder: same(prev.spaceOrder, next.spaceOrder) ? prev.spaceOrder : next.spaceOrder,
     currentSpaceId: next.currentSpaceId,

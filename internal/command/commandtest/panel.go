@@ -77,6 +77,9 @@ type FileDiffs struct {
 	// Unlisted, when set, says which asked paths a comparison does not list (by its base ref,
 	// for a ref base: "" otherwise); they are left out of the default response.
 	Unlisted func(baseRef, path string) bool
+	// During, when set, runs inside each comparison, before it answers (a test's change made
+	// while the daemon compares).
+	During func(*v1.CompareWorktreeRequest)
 }
 
 var _ command.WorktreeComparer = (*FileDiffs)(nil)
@@ -84,6 +87,9 @@ var _ command.WorktreeComparer = (*FileDiffs)(nil)
 // CompareWorktree returns Res.
 func (f *FileDiffs) CompareWorktree(_ context.Context, r *connect.Request[v1.CompareWorktreeRequest]) (*connect.Response[v1.CompareWorktreeResponse], error) {
 	f.record(r.Msg)
+	if f.During != nil {
+		f.During(r.Msg)
+	}
 	if f.Err != nil {
 		return nil, f.Err
 	}

@@ -174,8 +174,10 @@ Command args travel inside the view (its 256 KB budget; an event's `data` is cap
 The instance id is `<plugin>/<surface>/<scope id>` (`gh-actions/runs/pr:octo/app#12`,
 `minimal/status/thread:s-1f2e3d4c5b6a`). `SurfaceOpen.Facts` also carries the value of
 every fact the surface's `when` clause reads. Each surface gets a command
-`plugin.<name>.show.<id>` (`code-foundry plugin <name> show <id>`) that opens it in the
-GUI; it is available exactly where the surface is.
+`plugin.<name>.show.<id>` (`code-foundry plugin <name> show <id>`), available exactly where
+the surface is. A thread or pr surface opens as a tab linked to the thread, placed beside it
+by the app's rules; a second call finds that tab. It leaves the user's focus where it is:
+pass `--focus` only when the user asked to be taken there. Other scopes go to the windows.
 
 ## Icons
 

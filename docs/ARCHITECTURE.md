@@ -500,8 +500,9 @@ Services (v1):
   WatchSurface, GetSurface and Act serve plugin surfaces: views (the `pluginsdk/ui`
   JSON the daemon validates) per instance `<plugin>/<surface>/<scope>`, opened on the
   first watcher; each surface's `plugin.<name>.show.<surface>` command carries its
-  availability (a when clause over host facts) in CommandService.List
-  (`docs/notes/plugins-2-surfaces.md`).
+  availability (a when clause over host facts) in CommandService.List and opens a thread or
+  pr surface as a tab linked to the thread, placed by the layout's rules (`--focus` moves the
+  user's focus; `docs/notes/plugins-2-surfaces.md`, `shell-24a-import-moves.md`).
   Environment returns what plugins add to new threads
   (`session/setEnvironment`: env, PATH entries, `--add-dir`s, scoped by project; `plugin
   env`). Plugins subscribe to EventService's sources over the protocol (`events/subscribe`,
@@ -1079,8 +1080,9 @@ verb in `settings.toml` is reported and dropped, never fatal.
   row. Hit-testing is geometry over the drawn frame (the grid's outer band, strips, a pane's
   edge bands and middle, a rail as one target, a space tab), and the preview replays the
   daemon's own tree edit and lays it out, so it is the rectangle that lands. A drop is one
-  `tab.move` or `pane.move` (a row: `thread.open`, then `tab.move`); on a space tab a
-  thread's tab runs `thread.space.move` (`docs/notes/shell-14-drag.md`,
+  `tab.move` or `pane.move` (a row: `thread.open` with its place); on a space tab a
+  thread's tab runs `thread.space.move`, and a pane `pane.move --space`, which moves it whole
+  with its threads and their linked tabs (`docs/notes/shell-14-drag.md`,
   `shell-14b-outer-edge-size.md`, `shell-15-spaces.md`).
 * Full screen (`shell/fullscreen.ts`, `pane.fullscreen`): the space's focused pane over the
   whole grid, the others unmounted; the top bar and the sidebar stay and the direction keys do
@@ -1410,6 +1412,8 @@ tab's preview) run in sandboxed frames that never touch the API
   CORS refuses the pages origin, so a page holding a leaked token still cannot call the API.
 * **`/cf/bridge.js`** (`internal/bridge`) gives a page `window.cf`: run the registry verbs its
   thread may run, subscribe to daemon events, read the theme, `cf.storage` and `cf.fetch`.
+  A page reads no terminal's command lines: the read verbs and the `terminal` source leave
+  them out for it (`internal/command/command_lines.go`, `stores/bridgeSources.ts`).
   Every call is a `postMessage` to the GUI (`lib/bridge.ts`, `stores/bridgeHost.ts`), which
   answers only its own frame and invokes the command with its own token
   (`docs/notes/bridge-2-gui.md`).
@@ -1504,7 +1508,8 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   within a second, by the next structural commit or at `Close`. Rows that do not decode are
   repaired at load and logged once. Rows a newer build wrote (a newer version, a tab kind or
   node type this build does not know) are left as they are: the store shows what it
-  understands and writes nothing (`Snapshot.Newer`). The rev survives restarts; the event source's epoch tells
+  understands and writes nothing (`Snapshot.Newer`, `Layout.newer`; the window says so in a
+  line under the grid). The rev survives restarts; the event source's epoch tells
   a client to take the snapshot again. `layouttest` is the fake with the real ops
   (`docs/notes/shell-3-layout-store.md`).
 * **The event source and the service**: EventService's `layout` source sends the snapshot,

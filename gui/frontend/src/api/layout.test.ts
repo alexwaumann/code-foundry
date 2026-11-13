@@ -105,6 +105,7 @@ describe("the layout source's events", () => {
             },
           ],
           legacyImported: false,
+          newer: [],
         },
       },
     });

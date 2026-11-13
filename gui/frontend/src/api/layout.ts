@@ -118,6 +118,11 @@ export interface LayoutView {
   threads: readonly ThreadLayoutView[];
   /** The first-load import of the classic window's panels ran (LayoutService.ImportLegacy); absent reads false. */
   legacyImported?: boolean;
+  /**
+   * What in the stored layout a newer build wrote (Layout.newer); absent reads none. When there is
+   * any, the daemon saves no change to the layout until the app is updated.
+   */
+  newer?: readonly string[];
 }
 
 /** Everything one commit changed: whole spaces and whole thread records. */
@@ -226,6 +231,7 @@ export function toLayoutView(l: Layout | undefined): LayoutView {
     defaultSpaceId: l?.defaultSpaceId ?? "",
     threads: (l?.threads ?? []).map(toThreadLayoutView),
     legacyImported: l?.legacyImported ?? false,
+    newer: [...(l?.newer ?? [])],
   };
 }
 

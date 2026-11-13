@@ -140,7 +140,7 @@ func layoutError(err error) error {
 
 func layoutToProto(snap *layout.Snapshot) *v1.Layout {
 	st := snap.State
-	out := &v1.Layout{Rev: snap.Rev, CurrentSpaceId: st.CurrentSpace, DefaultSpaceId: st.DefaultSpace, LegacyImported: snap.LegacyImported}
+	out := &v1.Layout{Rev: snap.Rev, CurrentSpaceId: st.CurrentSpace, DefaultSpaceId: st.DefaultSpace, LegacyImported: snap.LegacyImported, Newer: snap.Newer}
 	for _, sp := range st.Spaces {
 		out.Spaces = append(out.Spaces, layoutSpaceToProto(sp))
 	}

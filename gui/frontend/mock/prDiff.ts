@@ -238,6 +238,22 @@ The welcome screen greets the viewer.
   "gui/frontend/public/logo.png": { head: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]), base: null },
 };
 
+/** The added file a long diff ends with (/__mock/gh/pr-diff-long): enough rows to scroll and for the library's virtualizer. */
+export const LONG_PATH = "docs/notes/long-plan.md";
+const LONG_LINES = 1200;
+const LONG_TEXT = Array.from({ length: LONG_LINES }, (_, i) => (i % 100 === 50 ? `Line ${String(i + 1)} ${"wraps ".repeat(60)}` : `Line ${String(i + 1)}`)).join("\n") + "\n";
+const LONG_DIFF = `diff --git a/${LONG_PATH} b/${LONG_PATH}
+new file mode 100644
+index 0000000..1e0f5aa
+--- /dev/null
++++ b/${LONG_PATH}
+@@ -0,0 +1,${String(LONG_LINES)} @@
+${LONG_TEXT.trimEnd()
+  .split("\n")
+  .map((l) => `+${l}`)
+  .join("\n")}
+`;
+
 /** A pull request's head as the diff reports it: its own, or one made up from its number (most fixtures have none). */
 export function diffHead(number: number, head: string): string {
   return head || `d1ff${String(number)}`.padEnd(40, "0");
@@ -246,6 +262,8 @@ export function diffHead(number: number, head: string): string {
 export class PrDiffWorld {
   /** "slug@sha" of every head a diff was reported for: GetPullRequestFile serves the new side there. */
   private readonly heads = new Set<string>();
+  /** Pull request numbers whose diff ends with LONG_PATH, a 1,200-line added file (a test's). */
+  readonly long = new Set<number>();
 
   constructor(private readonly h: PrDiffHooks) {}
 
@@ -256,13 +274,14 @@ export class PrDiffWorld {
     if (number === TOO_LARGE) throw new ConnectError(TOO_LARGE_MESSAGE, Code.FailedPrecondition);
     const head = diffHead(number, shas.head);
     this.heads.add(`${slug.toLowerCase()}@${head}`);
-    return create(GetPullRequestDiffResponseSchema, { diff: PR_DIFF, headSha: head, baseSha: shas.base, truncated: false, fetchedAt: timestampFromDate(new Date()) });
+    const diff = this.long.has(number) ? PR_DIFF + LONG_DIFF : PR_DIFF;
+    return create(GetPullRequestDiffResponseSchema, { diff, headSha: head, baseSha: shas.base, truncated: false, fetchedAt: timestampFromDate(new Date()) });
   }
 
   file(slug: string, ref: string, path: string) {
     this.h.count(`GetPullRequestFile ${path}`);
     if (!/^[0-9a-f]{40}$/.test(ref)) throw new ConnectError("ref must be a full commit SHA", Code.InvalidArgument);
-    const f = FILES[path];
+    const f = path === LONG_PATH ? { head: LONG_TEXT, base: null } : FILES[path];
     const side = f ? (this.heads.has(`${slug.toLowerCase()}@${ref}`) ? f.head : f.base) : null;
     if (side === null) return create(GetPullRequestFileResponseSchema, { notFound: true });
     if (typeof side !== "string") return create(GetPullRequestFileResponseSchema, { contents: side, binary: true });

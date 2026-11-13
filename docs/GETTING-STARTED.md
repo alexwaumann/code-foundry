@@ -84,7 +84,8 @@ thread again.
 
 **Spaces** are the tabs in the bar at the top: separate layouts, each with its own threads.
 **+** adds one and a double click renames it; <kbd>⌃⌘1</kbd> to <kbd>⌃⌘9</kbd> switch.
-Drop a tab or a thread onto a space to move it there. <kbd>⌘[</kbd> and <kbd>⌘]</kbd> go
+Drop a tab, a pane or a thread onto a space to move it there; a pane takes its threads
+along. <kbd>⌘[</kbd> and <kbd>⌘]</kbd> go
 back and forward through what you looked at, across panes and spaces.
 
 <kbd>⌘J</kbd> opens the thread's quick terminal under its conversation, a shell in the

@@ -42,6 +42,8 @@
  *        JSON, the last SetViewport, every Apply as an op and client id; mock/layout.ts)
  *   POST /__mock/layout?seed=empty|one-thread|thread-and-diff|grid|spaces   (that layout as one commit; or
  *        the body's state, internal/layout's JSON, for any other tree)
+ *   POST /__mock/layout/newer?on=1|0          (a newer build wrote the stored layout, or not: sent as a snapshot,
+ *        as a restarted daemon's; the window's line under the grid says changes are not saved)
  *   POST /__mock/layout/import?imported=0|1&fail=N&error=…&delay=ms   (the first-load import's mark; the
  *        next N ImportLegacy calls fail; each answers after `delay`; GET /__mock/layout lists the calls as `imports`)
  *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
@@ -174,6 +176,8 @@
  *   The pull request Code tab's diff and files: mock/prDiff.ts (one
  *        three-file diff for every pull request, #140's refused as too large; counts
  *        "GetPullRequestDiff", "GetPullRequestDiff refresh", "GetPullRequestFile <path>")
+ *   POST /__mock/gh/pr-diff-long?number=145   (that pull request's diff ends with a 1,200-line added
+ *        file, long enough to scroll; reset puts the short diff back)
  *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
  *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
  *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
@@ -1091,6 +1095,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/layout":
       json(res, 200, { rev: world.layout.rev, state: world.layout.state(), viewport: world.layout.viewport, applied: world.layout.applied, seeds: Object.keys(SEEDS), legacyImported: world.layout.legacyImported, imports: world.layout.imports });
       break;
+    case "POST /__mock/layout/newer":
+      world.layout.setNewer(q.get("on") === "0" ? [] : ['space sp-main: tab t-newer of kind "notebook"']);
+      json(res, 200, { newer: world.layout.newer });
+      break;
     case "POST /__mock/layout/import":
       // The first-load import: ?imported=0|1 sets the mark; ?fail=N makes the next N calls fail (with ?error=…).
       if (q.has("imported")) world.layout.legacyImported = q.get("imported") === "1";
@@ -1395,6 +1403,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
+      break;
+    case "POST /__mock/gh/pr-diff-long":
+      world.gh.prDiffs.long.add(Number(q.get("number") ?? "0"));
+      json(res, 200, { long: [...world.gh.prDiffs.long] });
       break;
     case "POST /__mock/gh/pr-fail":
       // command=pr.refresh makes that pull request command's next run fail.
