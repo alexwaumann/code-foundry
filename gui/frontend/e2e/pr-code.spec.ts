@@ -1,14 +1,15 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mockUrl, openApp, resetMock } from "./fixtures";
+import { mockUrl, resetMock } from "./fixtures";
+import { openPrBesidePage } from "./shell-pages";
 
 /**
- * The Pull request surface's Code tab against the mock's three-file diff (mock/prDiff.ts):
+ * The Pull request surface's Code tab against the mock's three-file diff (mock/prDiff.ts), in a
+ * pull request's tab beside the Pull Requests page:
  * a renamed note, an added binary, a modified TypeScript file with four hunks. The diff
  * lives in the library's shadow roots; Playwright's CSS locators pierce them. Set
  * SHOTS=<dir> to save screenshots.
  */
 
-const SLUG = "alexwaumann/code-foundry";
 const shots = process.env.SHOTS;
 
 test.beforeEach(async () => {
@@ -49,12 +50,7 @@ async function clickInDiff(page: Page, target: Locator): Promise<void> {
 }
 
 async function openCode(page: Page, number: number): Promise<void> {
-  await openApp(page);
-  // The Pull Requests page is a selection whose panel can hold a pull request.
-  await page.getByTestId("nav-pullrequests").click();
-  await expect(page.getByTestId("prs-list")).toBeFocused();
-  await page.evaluate(`__cfModule("/src/stores/prPanel.ts").then((m) => m.openPullRequestInPanel({ slug: "${SLUG}", number: ${String(number)} }))`);
-  await expect(page.getByTestId("pr-surface")).toBeVisible();
+  await openPrBesidePage(page, number);
   await page.getByTestId("pr-tab-code").click();
 }
 

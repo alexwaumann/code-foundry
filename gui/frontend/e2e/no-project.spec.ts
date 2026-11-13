@@ -14,9 +14,8 @@ test.beforeEach(async () => {
 // src/components/compose/Composer.test.tsx; thread.new's args (no-project alone): src/lib/compose.test.ts;
 // the crumb's house and No project: src/components/thread/ThreadParts.test.tsx; the row's No project and
 // no branch: src/components/sidebar/SidebarRow.test.tsx and src/lib/threadRow.test.ts; no project surfaces
-// in the side panel: src/surfaces/noProject.test.ts; the shell's tab titled No project:
-// src/stores/bottomPanel.test.ts; its context (the thread's, no project or worktree):
-// src/stores/bottomActions.test.ts. What is left is the chords and the real editor and send.
+// in the side panel: src/surfaces/noProject.test.ts. What is left is the chords and the real editor
+// and send.
 test("No project: cmd+N, cmd+1 and a real send start a thread placed nowhere; cmd+T's shell; cmd+N and Enter again", async ({ page }) => {
   await openApp(page);
   await page.keyboard.press("Meta+n");
@@ -35,11 +34,12 @@ test("No project: cmd+N, cmd+1 and a real send start a thread placed nowhere; cm
   await page.keyboard.press("Meta+a");
   await page.keyboard.type("Reply with just OK");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("thread-crumb-place")).toHaveText("No project");
+  await expect(page.getByTestId("thread-header-place")).toContainText("No project");
 
-  // A shell of the thread starts in home and is titled No project.
+  // A shell of the thread starts in home: cmd+t's terminal tab, linked to the thread, named by its
+  // shell and folder while idle (shell-model.md, Terminals).
   await page.keyboard.press("Meta+t");
-  await expect(page.locator("[data-tab-id]")).toHaveText("No project");
+  await expect(page.locator('[data-testid="shell-tab"][data-kind="terminal"]')).toHaveText("zsh · ~");
 
   // cmd+N from the thread still opens the picker (home is never sent as a worktree), and
   // Enter right away starts another no-project thread.

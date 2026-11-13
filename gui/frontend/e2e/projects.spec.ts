@@ -1,12 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, mockPost, openApp, openProjectPage, openProjects, resetMock } from "./fixtures";
+import { CF, mockPost, openProjectPage, resetMock } from "./fixtures";
+import { layoutState, openShellApp, paneNode, paneOf, rowNode } from "./shell";
+import { openLayout, openProjectsTab, PROJECTS_TAB, sizePane } from "./shell-pages";
 
 /**
  * The Projects view (docs/notes/projects-redesign-1-index.md): the index (rows by last
  * activity, status sentences, pills, setup links, filter, keyboard), a project's page
  * (header, picker, checkouts table, kind variants, details, narrow layout), the workspace
- * page's header, navigation (a selection and a side panel per page, the sidebar row
- * reopening the last page), and a project's Worktrees without threads with the remove
+ * page's header, navigation (the space's one Projects tab keeping its page), and a project's Worktrees without threads with the remove
  * confirm (docs/notes/projects-redesign-2-leftovers.md, project-page-3-leftovers.md). The mock's projects: code-foundry (repo-cf) and
  * ghostty-playground (repo-gp) on GitHub, dotfiles (repo-dot, a remote that is not
  * GitHub), sketches (repo-sk, git without a remote) and writing (repo-wr, no git).
@@ -25,14 +26,15 @@ const SPIKE = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-pe
 const COPY = "/Users/dev/.code-foundry/worktrees/alexwaumann/code-foundry/cf-old-copy";
 const leftover = (page: Page, path: string) => page.locator(`[data-testid="leftover-row"][data-path="${path}"]`);
 
-/** A checkout row's right-click menu, then one of its items. */
-async function pickCheckout(page: Page, path: string, testId: string): Promise<void> {
-  await checkoutRow(page, "repo-cf", path).click({ button: "right" });
-  await page.getByTestId("checkout-menu").getByTestId(testId).click();
-  await expect(page.getByTestId("checkout-menu")).toHaveCount(0);
-}
+/** A checkout's Diff tab, unlinked (as a checkout menu's Show changes opens it from a project's page). */
+const diffTab = (path: string): Record<string, unknown> => ({ id: "t-diff", kind: "diff", params: { project: "repo-cf", worktree: path }, title: "Diff · code-foundry" });
 
-const panelKey = (page: Page) => page.getByTestId("side-panel").getAttribute("data-panel-key");
+/** code-foundry's page in the Projects tab (pane p-1) with a checkout's Diff tab in a pane to its right (p-2). */
+async function pageBesideDiff(page: Page, path: string): Promise<void> {
+  await openLayout(page, rowNode([paneNode("p-1", [{ ...PROJECTS_TAB, params: { project: "repo-cf" } }]), paneNode("p-2", [diffTab(path)])], [0.55, 0.45]), "p-1");
+  await expect(page.locator('[data-testid="projects-page"][data-page="project"][data-project="repo-cf"]')).toBeVisible();
+  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-path", path);
+}
 
 // The index's rows (order, kinds, status sentences, pills, setup links, ages, no hover actions), the
 // setup links and the kind after Initialize git: unit-tested in src/components/projects/ProjectsIndex.test.tsx.
@@ -40,8 +42,7 @@ const panelKey = (page: Page) => page.getByTestId("side-panel").getAttribute("da
 
 test("narrowing drops Activity, then Updated, then Default branch; Needs a look stays", async ({ page }) => {
   await mockPost("workspace?name=login&projects=repo-cf,repo-gp");
-  await openApp(page);
-  await openProjects(page);
+  await openProjectsTab(page);
   const scroll = page.getByTestId("projects-scroll");
   // Sizes the window so the content (the scroll box) is `width` wide.
   const contentWidth = async (width: number) => {
@@ -74,7 +75,7 @@ test("narrowing drops Activity, then Updated, then Default branch; Needs a look 
 // ProjectsIndex.test.tsx and ProjectPage.test.tsx. Left: the real focus, the keymap leaving Shift+F10
 // to the list, the menu taking the keyboard and Escape giving it back.
 test("keyboard: a project page's list has the keyboard; Shift+F10 opens the cursor row's menu, Escape returns", async ({ page }) => {
-  await openApp(page);
+  await openProjectsTab(page);
   await openProjectPage(page, "repo-cf");
   await expect(page.getByTestId("projects-list")).toBeFocused();
   await page.keyboard.press("End");
@@ -91,7 +92,7 @@ test("keyboard: a project page's list has the keyboard; Shift+F10 opens the curs
 // Which items a checkout's menu has, what each runs, Open thread and the apps submenu: menus.test.ts,
 // ProjectPage.test.tsx and CheckoutsTable.test.tsx. Left: the split item's two hover blocks (pseudo-elements).
 test("a checkout menu's Open in Finder hovers as two blocks: text bright with › dim, › bright with its submenu open", async ({ page }) => {
-  await openApp(page);
+  await openProjectsTab(page);
   await openProjectPage(page, "repo-cf");
   await checkoutRow(page, "repo-cf", FEAT).click({ button: "right" });
   const split = page.getByTestId("checkout-menu-open-in");
@@ -132,12 +133,10 @@ test("a checkout menu's Open in Finder hovers as two blocks: text bright with �
 // whenTruncated's slack under a page zoom (a value that fits reading a pixel over its box) and which
 // values open on a real cut: src/components/ui/tooltip.test.tsx.
 
+// A checkout menu's Show changes opening the Diff tab in the page's pane: the shell gap in
+// e2e/workspace-page.spec.ts ("View opens … a File tab"). Here the Diff tab is seeded beside the page.
 test("narrow: with the Diff tab open, Sync and the slug drop and Open in Finder shows its icon only", async ({ page }) => {
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-compact");
-  await pickCheckout(page, FEAT, "checkout-menu-changes");
-  await expect(page.getByTestId("diff-surface")).toBeVisible();
+  await pageBesideDiff(page, FEAT);
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(0);
   await expect(page.getByTestId("worktree-sync")).toHaveCount(0);
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-compact", "true");
@@ -148,8 +147,9 @@ test("narrow: with the Diff tab open, Sync and the slug drop and Open in Finder 
   // The table drops by its own width (lib/projects.ts checkoutColumns).
   const w = await page.getByTestId("checkouts-table").evaluate((e) => e.getBoundingClientRect().width);
   expect(await page.getByTestId("checkouts-col-threads").count()).toBe(w >= 720 ? 1 : 0);
-  // Closing the panel gives the room back.
-  await page.getByTestId("side-panel").getByTestId("panel-toggle").click();
+  // Closing the Diff tab (its pane goes with it) gives the room back.
+  await paneOf(page, "p-2").getByTestId("shell-tab-close").click();
+  await expect(paneOf(page, "p-2")).toHaveCount(0);
   await expect(page.getByTestId("projects-page")).not.toHaveAttribute("data-compact");
   await expect(page.getByTestId("checkouts-col-sync")).toHaveCount(1);
   await expect(page.getByTestId("project-meta")).toHaveText("alexwaumann/code-foundry");
@@ -159,7 +159,7 @@ test("narrow: with the Diff tab open, Sync and the slug drop and Open in Finder 
 // Details' Open in Finder: the split hover (docs/notes/thread-info-split-hover.md) on two real
 // buttons. Which items its ⋯ lists and what they run: ProjectPage.test.tsx.
 test("Details' Open in Finder: two blocks with a 2px seam, the one under the pointer bright, the other half; menu open: only the ⋯", async ({ page }) => {
-  await openApp(page);
+  await openProjectsTab(page);
   await openProjectPage(page, "repo-cf");
   const main = page.getByTestId("details-reveal");
   const more = page.getByTestId("details-open-in-more");
@@ -190,48 +190,33 @@ test("Details' Open in Finder: two blocks with a 2px seam, the one under the poi
   await expect.poll(lit).toEqual([tint.none, tint.full]);
 });
 
-test("each page has its own side panel; the sidebar row reopens the last page and goes to the index from one", async ({ page }) => {
-  await openApp(page);
-  await openProjectPage(page, "repo-cf");
-  await pickCheckout(page, FEAT, "checkout-menu-changes");
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("code-foundry · feat/sidebar vs main");
-
-  // ghostty-playground's page has its own panel: closed, nothing of code-foundry's.
-  await openProjectPage(page, "repo-gp");
-  await expect(page.getByTestId("side-panel")).toHaveCount(0);
-  // The index has its own too.
-  await page.getByTestId("projects-crumb").click();
-  await expect(page.getByTestId("side-panel")).toHaveCount(0);
-
-  // Back on code-foundry's page: its tab is still there.
-  await row(page, "repo-cf").getByTestId("project-name").click();
-  await expect(page.getByTestId("side-panel").getByRole("tab", { selected: true })).toHaveText("code-foundry · feat/sidebar vs main");
-  expect(await panelKey(page)).toBe("view:projects:project:repo-cf");
-
-  // Elsewhere, then the sidebar row: the last Projects page; again: the index.
-  await page.getByTestId("nav-pullrequests").click();
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-cf");
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
-  // Remembered across a reload (the UI store keeps it).
-  await row(page, "repo-dot").click();
-  await page.reload();
-  await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
-  await page.getByTestId("nav-projects").click();
+// The classic window's side panel per page, its sidebar row (back to the last page, then to the index)
+// and the selection history walking the pages are gone: the Projects page is one tab per space, the
+// + menu's Projects runs view.projects without a page (the index, as the daemon's), and cmd+[ walks
+// what was focused. Left: the tab keeps the page it shows, and stays the space's one.
+test("the Projects tab keeps its page across a reload; the + menu focuses the space's one tab", async ({ page }) => {
+  await openProjectsTab(page);
+  await openProjectPage(page, "repo-dot");
+  // The page is the tab's (its params, in the daemon's layout): a reload shows it again.
+  await openShellApp(page);
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-dot");
-
-  // History walks the pages.
-  await page.getByTestId("projects-crumb").click();
-  await page.keyboard.press("Meta+BracketLeft");
-  await expect(page.getByTestId("projects-page")).toHaveAttribute("data-project", "repo-dot");
-  await page.keyboard.press("Meta+BracketRight");
+  const projectsTabs = async () => {
+    const root = (await layoutState()).spaces[0]?.root;
+    return root?.t === "pane" ? root.tabs.filter((t) => t.kind === "projects").length : -1;
+  };
+  // A thread takes the pane; the + menu's Projects focuses the same tab, on the index.
+  await page.locator('[data-row-key="s:s-1"]').click();
+  await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
+  await expect(page.getByTestId("projects-page")).toHaveCount(0);
+  await paneOf(page, "p-1").getByTestId("pane-plus").click();
+  await page.getByTestId("pane-plus-menu").locator('[data-item="projects"]').click();
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
+  expect(await projectsTabs()).toBe(1);
 });
 
 test("a page's scroll position is remembered while the window lives", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 420 });
-  await openApp(page);
+  await openProjectsTab(page);
   await openProjectPage(page, "repo-cf");
   const scroll = page.getByTestId("projects-scroll");
   await scroll.evaluate((el) => {
@@ -261,7 +246,7 @@ test("a page's scroll position is remembered while the window lives", async ({ p
 // reason truncates, no column drops, the icons stay in the row) and Resume from the menu over the stream.
 test("Worktrees without threads: at the width Show diff leaves, the reason truncates and the icons stay; Resume from the menu unarchives and the worktree moves to the table", async ({ page }) => {
   await mockPost("leftovers?project=repo-cf");
-  await openApp(page);
+  await openProjectsTab(page);
   await openProjectPage(page, "repo-cf");
   const reason = leftover(page, COPY).getByTestId("leftover-reason");
   await expect.poll(() => reason.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(false);
@@ -272,11 +257,10 @@ test("Worktrees without threads: at the width Show diff leaves, the reason trunc
   const reasonsX = await page.getByTestId("leftover-reason").evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().x)));
   const headX = await page.getByTestId("leftover-head").locator("span").nth(1).evaluate((el) => Math.round(el.getBoundingClientRect().x));
   expect(new Set([...reasonsX, headX]).size).toBe(1);
-  await leftover(page, COPY).getByTestId("leftover-show-diff").click();
-  await expect(page.getByTestId("diff-surface")).toHaveAttribute("data-path", COPY);
-  // A smaller window beside the panel: the page's content about 480px wide.
-  const vp = page.viewportSize() ?? { width: 1280, height: 800 };
-  await page.setViewportSize({ width: 1140, height: vp.height });
+  // Show diff's Diff tab opening in the page's pane: the shell gap in e2e/workspace-page.spec.ts. Here it
+  // is seeded beside the page, sized so that the page's content is about 480px wide.
+  await pageBesideDiff(page, COPY);
+  await sizePane(page, "p-1", 520);
   await expect.poll(() => reason.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
   // Why it stayed keeps its 10rem (160px) before the branch gives way.
   expect(await reason.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(159.5);
@@ -289,7 +273,9 @@ test("Worktrees without threads: at the width Show diff leaves, the reason trunc
 
   await leftover(page, SPIKE).click({ button: "right" });
   await page.getByTestId("leftover-menu").getByTestId("leftover-menu-resume").click();
-  await expect(page.getByTestId("thread-header").getByTestId("thread-title")).toHaveText("Profile the renderer");
+  // The thread opens as a tab in the focused pane.
+  await expect(paneOf(page, "p-1").locator('[data-testid="shell-tab"][data-kind="thread"][data-active]')).toHaveText("Profile the renderer");
+  await expect(paneOf(page, "p-1").getByTestId("thread-pane")).toBeVisible();
   await openProjectPage(page, "repo-cf");
   await expect(leftover(page, SPIKE)).toHaveCount(0);
   await expect(checkout(page, SPIKE)).toHaveCount(1);

@@ -1,16 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 import { emit, mockPost, openApp, resetMock, row } from "./fixtures";
+import { activeOfKind, paneWith, stripTabs } from "./shell-surfaces";
 
 /**
- * The MCP side panel surface (docs/notes/mcp-panel.md, docs/sketches/mcp-panel variant B)
+ * The MCP surface, a tab linked to its thread (docs/notes/mcp-panel.md, docs/sketches/mcp-panel variant B)
  * over the mock's scripted thread s-r1, seeded with the sketch's six servers (mock/mcp.ts):
  * t3-code and github connected, linear needing a login, playwright failed, filesystem
  * connecting, sentry disabled, under the Connected / Failed / Disabled tabs
  * (docs/notes/mcp-panel-tabs.md). Set SHOTS=<dir> to save screenshots (WebKit, dark and light).
  */
 
-const panel = (page: Page) => page.getByTestId("side-panel");
-const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
+/** The pane holding the MCP tab, beside the thread's. */
+const panel = (page: Page) => paneWith(page, "mcp");
+const tabs = (page: Page) => stripTabs(panel(page));
 const surface = (page: Page) => page.getByTestId("mcp-surface");
 const card = (page: Page, name: string) => surface(page).locator(`[data-testid="mcp-card"][data-server="${name}"]`);
 const mcpTab = (page: Page, bucket: string) => surface(page).locator(`[data-testid="mcp-tab"][data-bucket="${bucket}"]`);
@@ -30,10 +32,12 @@ async function openThread(page: Page): Promise<void> {
   await expect(page.getByTestId("thread-pane")).toBeVisible();
 }
 
+/** The thread's MCP tab, shown in a pane of its own beside the thread's. */
 async function expectMcpTab(page: Page): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-r1");
+  await expect(activeOfKind(page, "mcp")).toHaveCount(1);
   await expect(tabs(page).and(page.locator('[aria-selected="true"]'))).toHaveText("MCP");
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "mcp");
+  await expect(panel(page).locator('[data-testid="shell-tab"][data-kind="thread"]')).toHaveCount(0);
+  await expect(surface(page)).toBeVisible();
 }
 
 /** The thread info card's MCP row: the row opens its menu, whose first item opens the tab. */
@@ -48,7 +52,7 @@ test.beforeEach(async () => {
 
 // The cards in every state, the header's check line, the tab counts and their colours, Reconnect and
 // the tools toggle per state: src/surfaces/mcp.test.tsx ("shows the header and the servers…").
-test("the palette's Show MCP Servers opens the MCP tab in the thread's panel", async ({ page }) => {
+test("the palette's Show MCP Servers opens the MCP tab beside the thread", async ({ page }) => {
   await openThread(page);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Show MCP Servers");
@@ -133,7 +137,7 @@ const STRETCH = {
   ],
 } as const;
 
-/** Stretches the names in the DOM of the shown tab: long names, versions and tool names truncate, never scroll the panel sideways. */
+/** Stretches the names in the DOM of the shown tab: long names, versions and tool names truncate, never scroll the pane sideways. */
 async function stretchNames(page: Page, bucket: keyof typeof STRETCH = "connected"): Promise<void> {
   if (bucket === "connected") {
     await card(page, "github").getByTestId("mcp-tools-toggle").click();
@@ -150,8 +154,9 @@ async function stretchNames(page: Page, bucket: keyof typeof STRETCH = "connecte
 
 /** No sideways scroll, and each named card keeps its pill inside it. */
 async function expectPillsInside(page: Page, names: string[]): Promise<void> {
-  const body = page.getByTestId("panel-body");
-  expect(await body.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  for (const box of [panel(page).getByTestId("shell-pane-body"), surface(page)]) {
+    expect(await box.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+  }
   for (const name of names) {
     const overhang = await card(page, name).evaluate((e) => {
       const pill = e.querySelector('[data-testid="mcp-pill"]');
@@ -162,7 +167,7 @@ async function expectPillsInside(page: Page, names: string[]): Promise<void> {
   }
 }
 
-test("long names truncate: the status pill stays in the card and the panel never scrolls sideways", async ({ page }) => {
+test("long names truncate: the status pill stays in the card and the pane never scrolls sideways", async ({ page }) => {
   await openThread(page);
   expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
   await expectMcpTab(page);

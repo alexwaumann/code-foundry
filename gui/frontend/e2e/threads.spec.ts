@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
 import { BACKGROUND, CF, emit, expectAttention, invocations, mockPost, openApp, openProjectPage, openStreams, resetMock, row } from "./fixtures";
+import { paletteRun } from "./shell";
+import { openRowThread } from "./shell-threads";
 
 const FIX_RESIZE = `${CF}.worktrees/fix-resize`;
 
@@ -77,28 +79,28 @@ test("needs-attention: window title and cmd+shift+a", async ({ page }) => {
 
   await mockPost("thread/attention?id=s-1");
   await expectAttention(page, 2);
-  await expect(badge(page, "s-1")).toHaveAttribute("data-thread-badge", "attention");
+  await expect(row(page, "s:s-1")).toHaveAttribute("data-section", "needs");
 
-  // Both sit on top, newest status change first: s-1 (asked just now) before s-2; wraps around.
-  await expect.poll(async () => (await page.getByTestId("thread-list").locator("[data-row-key]").evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")))).slice(0, 2)).toEqual(["s:s-1", "s:s-2"]);
-  await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Meta+Shift+a"); // from inside the focused prompt
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  // Both sit under Needs you, newest status change first: s-1 (asked just now) before s-2.
+  // cmd+shift+a opens the next one's Needs-you popup (shell-model.md, Keys), wrapping around.
+  const needs = () => page.locator('[data-section="needs"][data-row-kind="thread"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-row-key")));
+  await expect.poll(needs).toEqual(["s:s-1", "s:s-2"]);
+  const popup = page.getByTestId("needs-popup");
+  for (const id of ["s-1", "s-2", "s-1", "s-2"]) {
+    await page.keyboard.press("Meta+Shift+a"); // after the first, from inside the popup
+    await expect(popup).toHaveAttribute("data-thread-id", id);
+  }
 
-  // Answering the waiting thread's docked permission (1: allow, the prompt being empty) clears it.
-  await expect(page.getByTestId("thread-permission")).toBeVisible();
-  await expect(page.getByTestId("thread-composer").getByTestId("composer-input")).toBeFocused();
+  // Answering the waiting thread's permission in its popup (1: allow) clears it.
+  await expect(popup.getByTestId("thread-permission")).toBeFocused();
   await page.keyboard.press("1");
   await expectAttention(page, 1);
 });
 
 test("new thread: a checkout's New thread here on its project page opens the composer with that worktree", async ({ page }) => {
   await openApp(page);
+  // The window opens on an empty space: the palette opens the Projects page as its tab.
+  await paletteRun(page, "Show Projects", "view.projects");
   await openProjectPage(page, "repo-cf");
   const wt = page.locator(`[data-nav-key="pw:repo-cf::${FIX_RESIZE}"]`);
   await wt.click({ button: "right" });
@@ -113,7 +115,8 @@ test("new thread: a checkout's New thread here on its project page opens the com
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.new");
   const last = (await invocations()).at(-1);
-  expect(last?.args).toEqual({ ...BACKGROUND, project: "repo-cf", worktree: FIX_RESIZE, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Fix the resize race" });
+  // compose: the window shell's composer tab, which becomes the thread's tab.
+  expect(last?.args).toEqual({ ...BACKGROUND, project: "repo-cf", worktree: FIX_RESIZE, model: "claude-sonnet-5[1m]", effort: "medium", permission: "auto", prompt: "Fix the resize race", compose: expect.any(String) as unknown as string });
   // The thread is the newest row, in that worktree, selected and shown.
   const created = page.locator('[data-row-kind="thread"][aria-selected="true"]');
   await expect(created).toBeVisible();
@@ -197,12 +200,13 @@ test("the whole app runs on one events stream plus one thread Watch", async ({ p
 
   await openApp(page);
   // Exercise every source: threads, threads (switching watches the other one), intents, projects.
+  // Tabs of one pane: only the active one is drawn. s-2 waits on the user: its row's first line opens it.
   const pane = page.getByTestId("thread-pane");
-  await row(page, "s:s-2").click();
+  await openRowThread(page, "s-2");
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer");
   await row(page, "s:s-1").click();
   await expect(pane.getByTestId("thread-user").first()).toContainText("Refactor the sidebar tree");
-  await row(page, "s:s-2").click();
+  await openRowThread(page, "s-2");
   await expect(pane.getByTestId("thread-user").first()).toContainText("Port the grid renderer");
   await mockPost("thread/attention?id=s-1");
   await expectAttention(page, 2);

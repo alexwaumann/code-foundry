@@ -1,5 +1,4 @@
 import { defineConfig, devices } from "@playwright/test";
-import { cutoverSkipPattern } from "./e2e/cutoverSkips";
 
 /**
  * e2e against the mock daemon. Ports differ from `bun run mock` / `wails3 dev` defaults so
@@ -22,16 +21,13 @@ const MOCK_PORT_BASE = Number(process.env.E2E_MOCK_PORT ?? 7799);
 export const MOCK_PORT = MOCK_PORT_BASE + Number(process.env.TEST_PARALLEL_INDEX ?? 0);
 export const MOCK_TOKEN = "e2e-token";
 export const VITE_PORT = Number(process.env.E2E_VITE_PORT ?? 9255);
-/** Where the e2e build of the app goes (gitignored); rebuilt on every run. */
-const E2E_DIST = "dist-e2e";
+/** Where the e2e build of the app goes (gitignored); rebuilt on every run. E2E_DIST moves it (two runs at once in one checkout). */
+const E2E_DIST = process.env.E2E_DIST ?? "dist-e2e";
 
 export default defineConfig({
   testDir: "e2e",
   // e2e/live.spec.ts drives a real daemon: playwright.live.config.ts (bun run e2e:live).
   testIgnore: /live(-[a-z]+)?\.spec\.ts$/,
-  // The classic window's tests and the reported shell gaps, by name, until PR 21 rewrites them
-  // (e2e/cutoverSkips.ts, docs/notes/shell-20-cutover.md). CUTOVER_SKIPS=0 runs them.
-  grepInvert: process.env.CUTOVER_SKIPS === "0" ? undefined : cutoverSkipPattern(),
   timeout: 20_000,
   expect: { timeout: 5_000 },
   // Files run in parallel across workers; the tests of one file stay in order on one worker

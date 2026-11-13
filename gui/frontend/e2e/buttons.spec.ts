@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { invocations, openApp, resetMock, row } from "./fixtures";
+import { invocations, openApp, resetMock } from "./fixtures";
+import { openHeaderMenu, openRowThread } from "./shell-threads";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -10,7 +11,8 @@ test.beforeEach(async () => {
 // args and context: src/lib/compose.test.ts. This keeps the flow through the real editor to the new thread.
 test("sidebar new-thread button: the project picker, then typing in the composer starts the thread", async ({ page }) => {
   await openApp(page);
-  await row(page, "s:s-2").click();
+  // s-2 waits on the user: its row's first line opens it (the title opens its Needs-you popup).
+  await openRowThread(page, "s-2");
   await page.getByTestId("sidebar-new-thread").click();
   const palette = page.getByTestId("palette");
   await expect(palette).toHaveAttribute("data-mode", "projects");
@@ -33,15 +35,13 @@ test("sidebar new-thread button: the project picker, then typing in the composer
 // the click on the gear under the sheet's backdrop is e2e/settings-sheet.spec.ts's.
 
 // "thread pane header: the title's menu renames; the crumb is not a button; no Close; fork is palette-only",
-// shortened. The header's height is e2e/layout.spec.ts's; no thread buttons but the three toggles, and the crumb's
-// place as text: src/components/thread/ThreadParts.test.tsx.
+// shortened. The shell header's chip and its one menu: src/components/shell/linkedTabs.test.tsx.
 test("thread pane header: the title's menu renames in the sidebar; fork is palette-only", async ({ page }) => {
   await openApp(page);
-  await row(page, "s:s-1").click();
-  const header = page.getByTestId("thread-header");
-  // The title's menu: Rename, presented inline in the sidebar, as from the palette.
-  await header.getByTestId("thread-title").click();
-  await page.getByTestId("thread-title-menu").getByTestId("menu-rename").click();
+  await openRowThread(page, "s-1");
+  // The header's one menu: Rename, presented inline in the sidebar, as from the palette.
+  const menu = await openHeaderMenu(page);
+  await menu.getByTestId("menu-rename").click();
   await expect(page.getByTestId("rename-input")).toBeFocused();
   await page.keyboard.press("Escape");
 
@@ -49,7 +49,8 @@ test("thread pane header: the title's menu renames in the sidebar; fork is palet
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Fork Thread");
   await page.getByTestId("palette").locator('[data-command="thread.fork"]').click();
-  await expect.poll(async () => (await invocations()).at(-1)?.name).toBe("thread.fork");
-  expect((await invocations()).at(-1)?.context?.activeThreadId).toBe("s-1");
+  // The fork's tab opening after it (thread.open) may come last.
+  const fork = async () => (await invocations()).find((i) => i.name === "thread.fork");
+  await expect.poll(async () => (await fork())?.context?.activeThreadId).toBe("s-1");
   await expect(page.locator('[data-row-kind="thread"][aria-selected="true"]')).toHaveAttribute("data-row-key", /^s:s-new-/);
 });

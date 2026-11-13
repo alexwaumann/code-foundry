@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { openQuick } from "./shell-terminals";
 
 const FAMILY = "JetBrainsMono Nerd Font Mono";
 
@@ -33,10 +34,10 @@ test("the bundled Nerd Font is served, loaded before the terminal opens, and is 
   }, FAMILY);
   expect(lineBox).toBeCloseTo(1.32, 2);
 
-  // s-1's shell in its bottom panel (the only terminal host).
+  // s-1's quick terminal (the only terminal host).
   await row(page, "s:s-1").click();
-  await page.keyboard.press("Meta+j");
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await expect(threadPrompt(page)).toBeFocused();
+  await openQuick(page);
   const fontFamily = await page.evaluate(() => {
     const w = window as unknown as { __cfTerminal: { renderer: { term: { options: { fontFamily?: string } } } } };
     return w.__cfTerminal.renderer.term.options.fontFamily ?? "";

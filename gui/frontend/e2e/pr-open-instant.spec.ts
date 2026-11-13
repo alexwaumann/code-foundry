@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, mockUrl, openApp, resetMock } from "./fixtures";
+import { mockPost, mockUrl, resetMock } from "./fixtures";
+import { openPrsTab } from "./shell-pages";
 
 /**
  * Opening a pull request with nothing cached (docs/notes/pr-open-instant.md): what only a real
@@ -25,15 +26,9 @@ const pastDwell = (page: Page) => page.waitForTimeout(350);
 
 const rowsOf = (page: Page) => page.getByTestId("prs-list").locator("[data-nav-key]");
 
-async function openPage(page: Page): Promise<void> {
-  await openApp(page);
-  await page.getByTestId("nav-pullrequests").click();
-  await expect(rowsOf(page).first()).toBeVisible();
-}
-
 test("a pointer resting on a row reads its detail once; a sweep across the table reads at most the row it ends on", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
-  await openPage(page);
+  await openPrsTab(page);
   const before = await detailReads();
 
   const count = await rowsOf(page).count();
@@ -63,9 +58,11 @@ for (const scheme of ["dark", "light"] as const) {
     const suffix = scheme === "light" ? "-light" : "";
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1400, height: 900 });
-    await openPage(page);
+    await openPrsTab(page);
     await mockPost("gh/pr-detail-delay?ms=4000");
     await page.getByTestId("prs-authored").locator("[data-nav-key]").filter({ hasText: "#145" }).click();
+    // The row's tab opens behind the page in its pane (prs.spec.ts's shell gap): shown from its tab.
+    await page.locator('[data-testid="shell-tab"][data-kind="pullrequest"] [role="tab"]').click();
     await expect(page.getByTestId("pr-seed-body")).toBeVisible();
     await page.screenshot({ path: `${shots ?? ""}/pr-seeded${suffix}.png` });
     await expect(page.getByTestId("pr-surface")).not.toHaveAttribute("data-seeded", "", { timeout: 8000 });

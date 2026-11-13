@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { invocations, invokeAs, mockPost, openApp, resetMock, row } from "./fixtures";
+import { paneWith, stripTabs, threadTabOpen } from "./shell-surfaces";
 
 /**
  * The first-run welcome page (docs/notes/welcome-page.md): the real page from the pages
- * skill, at the path the daemon places it, opened in the welcome thread's side panel as
- * view.panel.page does. Its four steps render, a step-1 bubble sends its sentence to the
+ * skill, at the path the daemon places it, opened as a tab linked to the welcome thread, beside
+ * it, as view.panel.page does. Its four steps render, a step-1 bubble sends its sentence to the
  * thread, Add a project opens the dialog, the board reads the thread's child's state, and
  * the tab reloads when the file is rewritten (a page outside every project).
  */
@@ -23,13 +24,14 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("the welcome page in the panel: steps, a sent bubble, Add a project, the board, a reload on write", async ({ page }) => {
+test("the welcome page beside its thread: steps, a sent bubble, Add a project, the board, a reload on write", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await mockPost("welcome");
   await openApp(page);
   await row(page, `s:${THREAD}`).click();
+  await threadTabOpen(THREAD);
   await inThread("view.panel.page", { path: PAGE, title: "Welcome" });
-  await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText(["Welcome"]);
+  await expect(stripTabs(paneWith(page, "file"))).toHaveText(["Welcome"]);
 
   const doc = inner(page);
   await expect(doc.getByRole("heading", { level: 2 })).toHaveText(["Say something to it", "Point it at your work", "Put several agents on it", "Make it yours"]);
