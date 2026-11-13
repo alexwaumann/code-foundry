@@ -73,6 +73,10 @@ their stores and their verbs are gone.
     a snooze keeps other spaces' terminal tabs, drafts are the user's, a page's reset of a
     command line asks, the glue catches up on dropped events, a newer build's layout is not
     written over, a sidebar drop is one command).
+28. `shell-24c-last-pass.md`: the last pass before testing: the newer build's line, the text left
+    for later, the Code tab measured, a seeded fuzz of the grid, fixes from the files the review
+    did not reach, the specification walked on a real daemon (its differences, ranked), and 200%
+    zoom.
 
 ## Where the build departs from the plan
 
@@ -142,8 +146,8 @@ Left by the step notes, de-duplicated:
   (10, 21).
 - **`SurfaceSpec.available`, `warm`, `openDefault`, `hotkey`** look unused since the side
   panel's surface list went (21).
-- **The pull request's Code tab** keeps its own scroll anchoring across a width change; the
-  File and Diff tabs use `useKeepTopLine` (gaps B).
+- **The pull request's Code tab** keeps its own scroll anchoring across a width change (the
+  library's; measured in 24c); the File and Diff tabs use `useKeepTopLine` (gaps B).
 - **A provisional (italic) thread name** shows plainly in its tab and header; the
   stale-plugin-environment dot went with the classic title (21).
 - **Some e2e titles** still name the bottom or side panel (kept so the cutover's table maps)
