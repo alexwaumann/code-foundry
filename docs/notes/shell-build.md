@@ -67,6 +67,12 @@ their stores and their verbs are gone.
 24. `shell-22-retire-verbs.md`: the panel verbs and the legacy view intents retired; a file
     request lives in its tab's params; the diff pick moved to the daemon.
 25. This note (PR 23): the architecture, the guide, the skills and comments.
+26. `shell-24a-import-moves.md`: import and move hardening before the merge.
+27. `shell-review-fixes-daemon.md`: the daemon's findings of a review of the whole branch
+    (a removed space keeps its threads' terminals, archived threads open in the current space,
+    a snooze keeps other spaces' terminal tabs, drafts are the user's, a page's reset of a
+    command line asks, the glue catches up on dropped events, a newer build's layout is not
+    written over, a sidebar drop is one command).
 
 ## Where the build departs from the plan
 

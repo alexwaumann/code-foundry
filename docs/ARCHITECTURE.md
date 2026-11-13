@@ -1483,8 +1483,13 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
 * **A thread's tabs**: `close_thread` closes its linked tabs in its space and remembers where
   each was; `open_thread` puts them back into their old panes when the thread is back in its
   old pane, else places them fresh beside it. Moving a thread takes its linked tabs;
-  archiving closes them everywhere and ends its terminals; snoozing closes them, ends its
-  terminals and remembers them as fresh shells with the command each ran. **Smart swap**
+  removing a space closes each of its threads as `close_thread` does, so their linked tabs
+  join their sets and their terminals keep running; archiving closes them everywhere and
+  ends its terminals; snoozing closes them, ends its terminals and remembers them as fresh
+  shells with the command each ran (a terminal tab in another space with that space, to go
+  back there). An archived thread lives in no space: `open_thread` with `archived` opens it
+  in the current space, and with a pane and an index or an edge it opens at a drop's place
+  in one op. **Smart swap**
   (`swap.go`, setting `layout.smart_swap`): when a thread tab gains the focus, every pane
   whose active tab is another thread's linked surface of a kind this thread also has open in
   that pane switches to it.
@@ -1497,7 +1502,9 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   `layout_meta` (`rev`, `current_space`, `default_space`, `legacy_import`). A structural
   commit is written before it is published; a focus-only one is published at once and written
   within a second, by the next structural commit or at `Close`. Rows that do not decode are
-  repaired at load and logged once. The rev survives restarts; the event source's epoch tells
+  repaired at load and logged once. Rows a newer build wrote (a newer version, a tab kind or
+  node type this build does not know) are left as they are: the store shows what it
+  understands and writes nothing (`Snapshot.Newer`). The rev survives restarts; the event source's epoch tells
   a client to take the snapshot again. `layouttest` is the fake with the real ops
   (`docs/notes/shell-3-layout-store.md`).
 * **The event source and the service**: EventService's `layout` source sends the snapshot,
@@ -1509,15 +1516,17 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   already exists, failed precondition).
 * **The glue** (`internal/daemon/layout.go`), so the store never imports the thread or
   terminal stores: a new thread joins its creator's space or the current one (a plugin's
-  stays in the default space); an unarchived one joins the current space; archive, snooze and
+  stays in the default space); an unarchived one joins the current space unless its tab is
+  open (opened while archived, it lives there); archive, snooze and
   removal reach the layout through the thread store's `ShellsGoing` hook, before the shells
   go, so a snooze can record each terminal's foreground or last command; a commit's closed
   terminal tabs end their terminals (shells and action runs, never a plugin's), while tabs
   closed with their thread keep running; a removed terminal closes its tab; a reset
   terminal's tab follows the shell that `replaces` it; opening a snoozed thread starts a
   fresh shell for each restored terminal tab; a sweep at start and every minute drops what
-  the layout holds of terminals that are gone (no terminal survives a daemon restart)
-  (`docs/notes/shell-6-lifecycle.md`).
+  the layout holds of terminals that are gone (no terminal survives a daemon restart); and
+  when the bus dropped a layout or thread event for it, the glue catches up from the stores'
+  snapshots (`docs/notes/shell-6-lifecycle.md`, `docs/notes/shell-review-fixes-daemon.md`).
 * **The first-load import** (`internal/layout/legacy.go`, `legacy_panel.go`,
   `internal/daemon/layout_import.go`): once per home, the first window sends the classic
   window's stored side panel and bottom panel values; the daemon runs a Go port of the old
