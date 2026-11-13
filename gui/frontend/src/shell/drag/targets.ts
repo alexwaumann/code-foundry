@@ -9,9 +9,9 @@
  *   1. The grid's outer edges: a band `OUTER_IN` px inside the grid and `OUTER_OUT` px outside
  *      it, along each side. In a corner the nearer side wins (left/right on a tie).
  *   2. A pane's strip (its top `stripHeight` px): a place in that strip, by the tabs' centres.
- *   3. A pane's body: its four edges, each a band of `EDGE_SHARE` of the body (at most
- *      `EDGE_MAX`), the nearest edge winning; the middle is the pane itself (join its strip at
- *      the end). A body too narrow for a split has no left and right edges, one too short no top
+ *   3. A pane's body: its four edges, each a band of `EDGE_SHARE` (a third) of the body (at
+ *      most `EDGE_MAX`), the nearest edge winning; the middle third is the pane itself (join its
+ *      strip at the end). A body too narrow for a split has no left and right edges, one too short no top
  *      and bottom edges.
  *   4. Anything else (a gutter, outside the bands): no target.
  * See docs/notes/shell-14-drag.md.
@@ -62,9 +62,12 @@ export interface Point {
 /** The outer band: this far inside the grid's edge, and this far outside it. */
 export const OUTER_IN = 10;
 export const OUTER_OUT = 24;
-/** A pane's edge zone: this share of its body, at most this many px. */
-export const EDGE_SHARE = 0.28;
-export const EDGE_MAX = { w: 150, h: 130 };
+/**
+ * A pane's edge zone: this share of its body, at most this many px. A third each way leaves the
+ * middle third (at least) for "add to this pane" (docs/notes/shell-25a-test-feedback.md).
+ */
+export const EDGE_SHARE = 1 / 3;
+export const EDGE_MAX = { w: 320, h: 260 };
 /** The least body width that has left and right edges, and height that has top and bottom ones. */
 export const EDGE_MIN = { w: 240, h: 160 };
 

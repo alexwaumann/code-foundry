@@ -87,13 +87,24 @@ describe("dropTarget: zones", () => {
     expect(dropTarget(SCENE, stranger, { x: 250, y: STRIP })).toEqual({ kind: "edge", pane: "p-1", edge: "top" });
   });
 
-  it("caps an edge zone at 150px across and 130px down in a big pane", () => {
+  it("caps an edge zone at 320px across and 260px down in a big pane", () => {
     const big = sceneOf(plainRects(pane("p-x", "thread"), 1600, 1000), { "p-x": ["t-x"] });
     const src = stranger;
-    expect(dropTarget(big, src, { x: 149, y: 500 })).toEqual({ kind: "edge", pane: "p-x", edge: "left" });
-    expect(dropTarget(big, src, { x: 151, y: 500 })).toEqual({ kind: "pane", pane: "p-x" });
-    expect(dropTarget(big, src, { x: 800, y: 44 + 129 })).toEqual({ kind: "edge", pane: "p-x", edge: "top" });
-    expect(dropTarget(big, src, { x: 800, y: 44 + 131 })).toEqual({ kind: "pane", pane: "p-x" });
+    expect(dropTarget(big, src, { x: 319, y: 500 })).toEqual({ kind: "edge", pane: "p-x", edge: "left" });
+    expect(dropTarget(big, src, { x: 321, y: 500 })).toEqual({ kind: "pane", pane: "p-x" });
+    expect(dropTarget(big, src, { x: 1600 - 319, y: 500 })).toEqual({ kind: "edge", pane: "p-x", edge: "right" });
+    expect(dropTarget(big, src, { x: 800, y: 44 + 259 })).toEqual({ kind: "edge", pane: "p-x", edge: "top" });
+    expect(dropTarget(big, src, { x: 800, y: 44 + 261 })).toEqual({ kind: "pane", pane: "p-x" });
+    expect(dropTarget(big, src, { x: 800, y: 1000 - 259 })).toEqual({ kind: "edge", pane: "p-x", edge: "bottom" });
+  });
+
+  it("makes each edge a third of a pane's body below the caps, the middle third the pane", () => {
+    // p-1's body: 494 x 556 from y 44, so a third is 164.7 across and 185.3 down.
+    expect(dropTarget(SCENE, stranger, { x: 164, y: 320 })).toEqual({ kind: "edge", pane: "p-1", edge: "left" });
+    expect(dropTarget(SCENE, stranger, { x: 166, y: 320 })).toEqual({ kind: "pane", pane: "p-1" });
+    expect(dropTarget(SCENE, stranger, { x: 494 - 164, y: 320 })).toEqual({ kind: "edge", pane: "p-1", edge: "right" });
+    expect(dropTarget(SCENE, stranger, { x: 250, y: 44 + 185 })).toEqual({ kind: "edge", pane: "p-1", edge: "top" });
+    expect(dropTarget(SCENE, stranger, { x: 250, y: 44 + 187 })).toEqual({ kind: "pane", pane: "p-1" });
   });
 
   it("gives a pane too small for a split no edge zones on that axis", () => {
