@@ -804,8 +804,11 @@ type ThreadLayout struct {
 	// The pane its own tab was in when it closed; empty when the remembered tabs are to be
 	// placed fresh.
 	RememberedPaneId string `protobuf:"bytes,5,opt,name=remembered_pane_id,json=rememberedPaneId,proto3" json:"remembered_pane_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Whether it shows its info card, as the user last toggled it; unset: never toggled (the
+	// setting layout.thread_info decides).
+	Info          *bool `protobuf:"varint,6,opt,name=info,proto3,oneof" json:"info,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ThreadLayout) Reset() {
@@ -871,6 +874,13 @@ func (x *ThreadLayout) GetRememberedPaneId() string {
 		return x.RememberedPaneId
 	}
 	return ""
+}
+
+func (x *ThreadLayout) GetInfo() bool {
+	if x != nil && x.Info != nil {
+		return *x.Info
+	}
+	return false
 }
 
 type QuickTerminal struct {
@@ -1954,6 +1964,7 @@ type LayoutOp struct {
 	//	*LayoutOp_SetQuick
 	//	*LayoutOp_ReplaceTerminal
 	//	*LayoutOp_DropTerminal
+	//	*LayoutOp_SetInfo
 	Op            isLayoutOp_Op `protobuf_oneof:"op"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2293,6 +2304,15 @@ func (x *LayoutOp) GetDropTerminal() *DropTerminalOp {
 	return nil
 }
 
+func (x *LayoutOp) GetSetInfo() *SetInfoOp {
+	if x != nil {
+		if x, ok := x.Op.(*LayoutOp_SetInfo); ok {
+			return x.SetInfo
+		}
+	}
+	return nil
+}
+
 type isLayoutOp_Op interface {
 	isLayoutOp_Op()
 }
@@ -2429,6 +2449,10 @@ type LayoutOp_DropTerminal struct {
 	DropTerminal *DropTerminalOp `protobuf:"bytes,52,opt,name=drop_terminal,json=dropTerminal,proto3,oneof"`
 }
 
+type LayoutOp_SetInfo struct {
+	SetInfo *SetInfoOp `protobuf:"bytes,60,opt,name=set_info,json=setInfo,proto3,oneof"`
+}
+
 func (*LayoutOp_OpenThread) isLayoutOp_Op() {}
 
 func (*LayoutOp_CloseThread) isLayoutOp_Op() {}
@@ -2494,6 +2518,8 @@ func (*LayoutOp_SetQuick) isLayoutOp_Op() {}
 func (*LayoutOp_ReplaceTerminal) isLayoutOp_Op() {}
 
 func (*LayoutOp_DropTerminal) isLayoutOp_Op() {}
+
+func (*LayoutOp_SetInfo) isLayoutOp_Op() {}
 
 // OpenThreadOp opens a thread's tab (or focuses it), and restores its linked tabs.
 type OpenThreadOp struct {
@@ -2948,6 +2974,59 @@ func (x *SetQuickOp) GetForgetRan() bool {
 	return false
 }
 
+// SetInfoOp shows or hides a thread's info card (ThreadLayout.info), kept with the thread.
+type SetInfoOp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Open          bool                   `protobuf:"varint,2,opt,name=open,proto3" json:"open,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetInfoOp) Reset() {
+	*x = SetInfoOp{}
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetInfoOp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetInfoOp) ProtoMessage() {}
+
+func (x *SetInfoOp) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetInfoOp.ProtoReflect.Descriptor instead.
+func (*SetInfoOp) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *SetInfoOp) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *SetInfoOp) GetOpen() bool {
+	if x != nil {
+		return x.Open
+	}
+	return false
+}
+
 // ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
 // still running) at terminal new_id: a reset terminal's tab follows the fresh shell. The
 // daemon applies it itself when a shell labelled replaces=<old id> starts.
@@ -2961,7 +3040,7 @@ type ReplaceTerminalOp struct {
 
 func (x *ReplaceTerminalOp) Reset() {
 	*x = ReplaceTerminalOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[31]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2973,7 +3052,7 @@ func (x *ReplaceTerminalOp) String() string {
 func (*ReplaceTerminalOp) ProtoMessage() {}
 
 func (x *ReplaceTerminalOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[31]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2986,7 +3065,7 @@ func (x *ReplaceTerminalOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplaceTerminalOp.ProtoReflect.Descriptor instead.
 func (*ReplaceTerminalOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{31}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ReplaceTerminalOp) GetOldId() string {
@@ -3014,7 +3093,7 @@ type DropTerminalOp struct {
 
 func (x *DropTerminalOp) Reset() {
 	*x = DropTerminalOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[32]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3026,7 +3105,7 @@ func (x *DropTerminalOp) String() string {
 func (*DropTerminalOp) ProtoMessage() {}
 
 func (x *DropTerminalOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[32]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3039,7 +3118,7 @@ func (x *DropTerminalOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DropTerminalOp.ProtoReflect.Descriptor instead.
 func (*DropTerminalOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{32}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DropTerminalOp) GetTerminalId() string {
@@ -3067,7 +3146,7 @@ type AddTabOp struct {
 
 func (x *AddTabOp) Reset() {
 	*x = AddTabOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[33]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3079,7 +3158,7 @@ func (x *AddTabOp) String() string {
 func (*AddTabOp) ProtoMessage() {}
 
 func (x *AddTabOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[33]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3092,7 +3171,7 @@ func (x *AddTabOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTabOp.ProtoReflect.Descriptor instead.
 func (*AddTabOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{33}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *AddTabOp) GetSpaceId() string {
@@ -3145,7 +3224,7 @@ type SplitPaneOp struct {
 
 func (x *SplitPaneOp) Reset() {
 	*x = SplitPaneOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[34]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3157,7 +3236,7 @@ func (x *SplitPaneOp) String() string {
 func (*SplitPaneOp) ProtoMessage() {}
 
 func (x *SplitPaneOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[34]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3170,7 +3249,7 @@ func (x *SplitPaneOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SplitPaneOp.ProtoReflect.Descriptor instead.
 func (*SplitPaneOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{34}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SplitPaneOp) GetPaneId() string {
@@ -3225,7 +3304,7 @@ type MoveTabOp struct {
 
 func (x *MoveTabOp) Reset() {
 	*x = MoveTabOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[35]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3237,7 +3316,7 @@ func (x *MoveTabOp) String() string {
 func (*MoveTabOp) ProtoMessage() {}
 
 func (x *MoveTabOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[35]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3250,7 +3329,7 @@ func (x *MoveTabOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveTabOp.ProtoReflect.Descriptor instead.
 func (*MoveTabOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{35}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *MoveTabOp) GetTabId() string {
@@ -3310,7 +3389,7 @@ type MovePaneOp struct {
 
 func (x *MovePaneOp) Reset() {
 	*x = MovePaneOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[36]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3322,7 +3401,7 @@ func (x *MovePaneOp) String() string {
 func (*MovePaneOp) ProtoMessage() {}
 
 func (x *MovePaneOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[36]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3335,7 +3414,7 @@ func (x *MovePaneOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MovePaneOp.ProtoReflect.Descriptor instead.
 func (*MovePaneOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{36}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *MovePaneOp) GetPaneId() string {
@@ -3386,7 +3465,7 @@ type MergePaneOp struct {
 
 func (x *MergePaneOp) Reset() {
 	*x = MergePaneOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[37]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3398,7 +3477,7 @@ func (x *MergePaneOp) String() string {
 func (*MergePaneOp) ProtoMessage() {}
 
 func (x *MergePaneOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[37]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3411,7 +3490,7 @@ func (x *MergePaneOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergePaneOp.ProtoReflect.Descriptor instead.
 func (*MergePaneOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{37}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *MergePaneOp) GetPaneId() string {
@@ -3446,7 +3525,7 @@ type SwapPaneOp struct {
 
 func (x *SwapPaneOp) Reset() {
 	*x = SwapPaneOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3458,7 +3537,7 @@ func (x *SwapPaneOp) String() string {
 func (*SwapPaneOp) ProtoMessage() {}
 
 func (x *SwapPaneOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[38]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3471,7 +3550,7 @@ func (x *SwapPaneOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwapPaneOp.ProtoReflect.Descriptor instead.
 func (*SwapPaneOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{38}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SwapPaneOp) GetPaneId() string {
@@ -3499,7 +3578,7 @@ type CloseTabOp struct {
 
 func (x *CloseTabOp) Reset() {
 	*x = CloseTabOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[39]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3511,7 +3590,7 @@ func (x *CloseTabOp) String() string {
 func (*CloseTabOp) ProtoMessage() {}
 
 func (x *CloseTabOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[39]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3524,7 +3603,7 @@ func (x *CloseTabOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseTabOp.ProtoReflect.Descriptor instead.
 func (*CloseTabOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{39}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *CloseTabOp) GetTabId() string {
@@ -3545,7 +3624,7 @@ type ClosePaneOp struct {
 
 func (x *ClosePaneOp) Reset() {
 	*x = ClosePaneOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[40]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3557,7 +3636,7 @@ func (x *ClosePaneOp) String() string {
 func (*ClosePaneOp) ProtoMessage() {}
 
 func (x *ClosePaneOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[40]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3570,7 +3649,7 @@ func (x *ClosePaneOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClosePaneOp.ProtoReflect.Descriptor instead.
 func (*ClosePaneOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{40}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ClosePaneOp) GetPaneId() string {
@@ -3591,7 +3670,7 @@ type SetSizesOp struct {
 
 func (x *SetSizesOp) Reset() {
 	*x = SetSizesOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[41]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3603,7 +3682,7 @@ func (x *SetSizesOp) String() string {
 func (*SetSizesOp) ProtoMessage() {}
 
 func (x *SetSizesOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[41]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3616,7 +3695,7 @@ func (x *SetSizesOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetSizesOp.ProtoReflect.Descriptor instead.
 func (*SetSizesOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{41}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *SetSizesOp) GetSplitId() string {
@@ -3643,7 +3722,7 @@ type FocusTabOp struct {
 
 func (x *FocusTabOp) Reset() {
 	*x = FocusTabOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[42]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3655,7 +3734,7 @@ func (x *FocusTabOp) String() string {
 func (*FocusTabOp) ProtoMessage() {}
 
 func (x *FocusTabOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[42]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3668,7 +3747,7 @@ func (x *FocusTabOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FocusTabOp.ProtoReflect.Descriptor instead.
 func (*FocusTabOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{42}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *FocusTabOp) GetTabId() string {
@@ -3688,7 +3767,7 @@ type FocusPaneOp struct {
 
 func (x *FocusPaneOp) Reset() {
 	*x = FocusPaneOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[43]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3700,7 +3779,7 @@ func (x *FocusPaneOp) String() string {
 func (*FocusPaneOp) ProtoMessage() {}
 
 func (x *FocusPaneOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[43]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3713,7 +3792,7 @@ func (x *FocusPaneOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FocusPaneOp.ProtoReflect.Descriptor instead.
 func (*FocusPaneOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{43}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *FocusPaneOp) GetPaneId() string {
@@ -3735,7 +3814,7 @@ type SetTabParamsOp struct {
 
 func (x *SetTabParamsOp) Reset() {
 	*x = SetTabParamsOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[44]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3747,7 +3826,7 @@ func (x *SetTabParamsOp) String() string {
 func (*SetTabParamsOp) ProtoMessage() {}
 
 func (x *SetTabParamsOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[44]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3760,7 +3839,7 @@ func (x *SetTabParamsOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTabParamsOp.ProtoReflect.Descriptor instead.
 func (*SetTabParamsOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{44}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *SetTabParamsOp) GetTabId() string {
@@ -3795,7 +3874,7 @@ type RenameTabOp struct {
 
 func (x *RenameTabOp) Reset() {
 	*x = RenameTabOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[45]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3807,7 +3886,7 @@ func (x *RenameTabOp) String() string {
 func (*RenameTabOp) ProtoMessage() {}
 
 func (x *RenameTabOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[45]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3820,7 +3899,7 @@ func (x *RenameTabOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameTabOp.ProtoReflect.Descriptor instead.
 func (*RenameTabOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{45}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *RenameTabOp) GetTabId() string {
@@ -3849,7 +3928,7 @@ type NewSpaceOp struct {
 
 func (x *NewSpaceOp) Reset() {
 	*x = NewSpaceOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[46]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3861,7 +3940,7 @@ func (x *NewSpaceOp) String() string {
 func (*NewSpaceOp) ProtoMessage() {}
 
 func (x *NewSpaceOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[46]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3874,7 +3953,7 @@ func (x *NewSpaceOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewSpaceOp.ProtoReflect.Descriptor instead.
 func (*NewSpaceOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{46}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *NewSpaceOp) GetName() string {
@@ -3901,7 +3980,7 @@ type RenameSpaceOp struct {
 
 func (x *RenameSpaceOp) Reset() {
 	*x = RenameSpaceOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[47]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3913,7 +3992,7 @@ func (x *RenameSpaceOp) String() string {
 func (*RenameSpaceOp) ProtoMessage() {}
 
 func (x *RenameSpaceOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[47]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3926,7 +4005,7 @@ func (x *RenameSpaceOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameSpaceOp.ProtoReflect.Descriptor instead.
 func (*RenameSpaceOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{47}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *RenameSpaceOp) GetSpaceId() string {
@@ -3956,7 +4035,7 @@ type RemoveSpaceOp struct {
 
 func (x *RemoveSpaceOp) Reset() {
 	*x = RemoveSpaceOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[48]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3968,7 +4047,7 @@ func (x *RemoveSpaceOp) String() string {
 func (*RemoveSpaceOp) ProtoMessage() {}
 
 func (x *RemoveSpaceOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[48]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3981,7 +4060,7 @@ func (x *RemoveSpaceOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveSpaceOp.ProtoReflect.Descriptor instead.
 func (*RemoveSpaceOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{48}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *RemoveSpaceOp) GetSpaceId() string {
@@ -4008,7 +4087,7 @@ type ReorderSpacesOp struct {
 
 func (x *ReorderSpacesOp) Reset() {
 	*x = ReorderSpacesOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[49]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4020,7 +4099,7 @@ func (x *ReorderSpacesOp) String() string {
 func (*ReorderSpacesOp) ProtoMessage() {}
 
 func (x *ReorderSpacesOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[49]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4033,7 +4112,7 @@ func (x *ReorderSpacesOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReorderSpacesOp.ProtoReflect.Descriptor instead.
 func (*ReorderSpacesOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{49}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ReorderSpacesOp) GetSpaceIds() []string {
@@ -4052,7 +4131,7 @@ type SwitchSpaceOp struct {
 
 func (x *SwitchSpaceOp) Reset() {
 	*x = SwitchSpaceOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[50]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4064,7 +4143,7 @@ func (x *SwitchSpaceOp) String() string {
 func (*SwitchSpaceOp) ProtoMessage() {}
 
 func (x *SwitchSpaceOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[50]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4077,7 +4156,7 @@ func (x *SwitchSpaceOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SwitchSpaceOp.ProtoReflect.Descriptor instead.
 func (*SwitchSpaceOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{50}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *SwitchSpaceOp) GetSpaceId() string {
@@ -4104,7 +4183,7 @@ type NewThreadOp struct {
 
 func (x *NewThreadOp) Reset() {
 	*x = NewThreadOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[51]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4116,7 +4195,7 @@ func (x *NewThreadOp) String() string {
 func (*NewThreadOp) ProtoMessage() {}
 
 func (x *NewThreadOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[51]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4129,7 +4208,7 @@ func (x *NewThreadOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NewThreadOp.ProtoReflect.Descriptor instead.
 func (*NewThreadOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{51}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *NewThreadOp) GetSpaceId() string {
@@ -4174,7 +4253,7 @@ type StartDraftOp struct {
 
 func (x *StartDraftOp) Reset() {
 	*x = StartDraftOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[52]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4186,7 +4265,7 @@ func (x *StartDraftOp) String() string {
 func (*StartDraftOp) ProtoMessage() {}
 
 func (x *StartDraftOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[52]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4199,7 +4278,7 @@ func (x *StartDraftOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDraftOp.ProtoReflect.Descriptor instead.
 func (*StartDraftOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{52}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *StartDraftOp) GetTabId() string {
@@ -4234,7 +4313,7 @@ type LabelDraftOp struct {
 
 func (x *LabelDraftOp) Reset() {
 	*x = LabelDraftOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[53]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4246,7 +4325,7 @@ func (x *LabelDraftOp) String() string {
 func (*LabelDraftOp) ProtoMessage() {}
 
 func (x *LabelDraftOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[53]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4259,7 +4338,7 @@ func (x *LabelDraftOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LabelDraftOp.ProtoReflect.Descriptor instead.
 func (*LabelDraftOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{53}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *LabelDraftOp) GetDraftId() string {
@@ -4287,7 +4366,7 @@ type ClearDraftOp struct {
 
 func (x *ClearDraftOp) Reset() {
 	*x = ClearDraftOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[54]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4299,7 +4378,7 @@ func (x *ClearDraftOp) String() string {
 func (*ClearDraftOp) ProtoMessage() {}
 
 func (x *ClearDraftOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[54]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4312,7 +4391,7 @@ func (x *ClearDraftOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearDraftOp.ProtoReflect.Descriptor instead.
 func (*ClearDraftOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{54}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *ClearDraftOp) GetDraftId() string {
@@ -4332,7 +4411,7 @@ type DiscardDraftOp struct {
 
 func (x *DiscardDraftOp) Reset() {
 	*x = DiscardDraftOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[55]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4344,7 +4423,7 @@ func (x *DiscardDraftOp) String() string {
 func (*DiscardDraftOp) ProtoMessage() {}
 
 func (x *DiscardDraftOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[55]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4357,7 +4436,7 @@ func (x *DiscardDraftOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscardDraftOp.ProtoReflect.Descriptor instead.
 func (*DiscardDraftOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{55}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *DiscardDraftOp) GetDraftId() string {
@@ -4378,7 +4457,7 @@ type OpenDraftOp struct {
 
 func (x *OpenDraftOp) Reset() {
 	*x = OpenDraftOp{}
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[56]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4390,7 +4469,7 @@ func (x *OpenDraftOp) String() string {
 func (*OpenDraftOp) ProtoMessage() {}
 
 func (x *OpenDraftOp) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_layout_proto_msgTypes[56]
+	mi := &file_codefoundry_v1_layout_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4403,7 +4482,7 @@ func (x *OpenDraftOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenDraftOp.ProtoReflect.Descriptor instead.
 func (*OpenDraftOp) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{56}
+	return file_codefoundry_v1_layout_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *OpenDraftOp) GetDraftId() string {
@@ -4475,7 +4554,7 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x04name\x18\a \x01(\tR\x04name\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe8\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8a\x02\n" +
 	"\fThreadLayout\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x19\n" +
 	"\bspace_id\x18\x02 \x01(\tR\aspaceId\x123\n" +
@@ -4483,7 +4562,9 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\n" +
 	"remembered\x18\x04 \x03(\v2\x1d.codefoundry.v1.RememberedTabR\n" +
 	"remembered\x12,\n" +
-	"\x12remembered_pane_id\x18\x05 \x01(\tR\x10rememberedPaneId\"M\n" +
+	"\x12remembered_pane_id\x18\x05 \x01(\tR\x10rememberedPaneId\x12\x17\n" +
+	"\x04info\x18\x06 \x01(\bH\x00R\x04info\x88\x01\x01B\a\n" +
+	"\x05_info\"M\n" +
 	"\rQuickTerminal\x12\x12\n" +
 	"\x04open\x18\x01 \x01(\bR\x04open\x12\x16\n" +
 	"\x06height\x18\x02 \x01(\x01R\x06height\x12\x10\n" +
@@ -4562,7 +4643,7 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x14LegacyImportedThread\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x17\n" +
 	"\atab_ids\x18\x02 \x03(\tR\x06tabIds\x12*\n" +
-	"\x11quick_terminal_id\x18\x03 \x01(\tR\x0fquickTerminalId\"\xe6\x10\n" +
+	"\x11quick_terminal_id\x18\x03 \x01(\tR\x0fquickTerminalId\"\x9e\x11\n" +
 	"\bLayoutOp\x12?\n" +
 	"\vopen_thread\x18\x01 \x01(\v2\x1c.codefoundry.v1.OpenThreadOpH\x00R\n" +
 	"openThread\x12B\n" +
@@ -4609,7 +4690,8 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"open_draft\x18- \x01(\v2\x1b.codefoundry.v1.OpenDraftOpH\x00R\topenDraft\x129\n" +
 	"\tset_quick\x182 \x01(\v2\x1a.codefoundry.v1.SetQuickOpH\x00R\bsetQuick\x12N\n" +
 	"\x10replace_terminal\x183 \x01(\v2!.codefoundry.v1.ReplaceTerminalOpH\x00R\x0freplaceTerminal\x12E\n" +
-	"\rdrop_terminal\x184 \x01(\v2\x1e.codefoundry.v1.DropTerminalOpH\x00R\fdropTerminalB\x04\n" +
+	"\rdrop_terminal\x184 \x01(\v2\x1e.codefoundry.v1.DropTerminalOpH\x00R\fdropTerminal\x126\n" +
+	"\bset_info\x18< \x01(\v2\x19.codefoundry.v1.SetInfoOpH\x00R\asetInfoB\x04\n" +
 	"\x02op\"\xd5\x01\n" +
 	"\fOpenThreadOp\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x17\n" +
@@ -4645,7 +4727,10 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x04open\x18\x02 \x01(\bR\x04open\x12\x16\n" +
 	"\x06height\x18\x03 \x01(\x01R\x06height\x12\x1d\n" +
 	"\n" +
-	"forget_ran\x18\x04 \x01(\bR\tforgetRan\"A\n" +
+	"forget_ran\x18\x04 \x01(\bR\tforgetRan\"<\n" +
+	"\tSetInfoOp\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x12\n" +
+	"\x04open\x18\x02 \x01(\bR\x04open\"A\n" +
 	"\x11ReplaceTerminalOp\x12\x15\n" +
 	"\x06old_id\x18\x01 \x01(\tR\x05oldId\x12\x15\n" +
 	"\x06new_id\x18\x02 \x01(\tR\x05newId\"1\n" +
@@ -4781,7 +4866,7 @@ func file_codefoundry_v1_layout_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_layout_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_codefoundry_v1_layout_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
+var file_codefoundry_v1_layout_proto_msgTypes = make([]protoimpl.MessageInfo, 63)
 var file_codefoundry_v1_layout_proto_goTypes = []any{
 	(LayoutDir)(0),               // 0: codefoundry.v1.LayoutDir
 	(LayoutEdge)(0),              // 1: codefoundry.v1.LayoutEdge
@@ -4816,37 +4901,38 @@ var file_codefoundry_v1_layout_proto_goTypes = []any{
 	(*ArchiveThreadOp)(nil),      // 30: codefoundry.v1.ArchiveThreadOp
 	(*SnoozeThreadOp)(nil),       // 31: codefoundry.v1.SnoozeThreadOp
 	(*SetQuickOp)(nil),           // 32: codefoundry.v1.SetQuickOp
-	(*ReplaceTerminalOp)(nil),    // 33: codefoundry.v1.ReplaceTerminalOp
-	(*DropTerminalOp)(nil),       // 34: codefoundry.v1.DropTerminalOp
-	(*AddTabOp)(nil),             // 35: codefoundry.v1.AddTabOp
-	(*SplitPaneOp)(nil),          // 36: codefoundry.v1.SplitPaneOp
-	(*MoveTabOp)(nil),            // 37: codefoundry.v1.MoveTabOp
-	(*MovePaneOp)(nil),           // 38: codefoundry.v1.MovePaneOp
-	(*MergePaneOp)(nil),          // 39: codefoundry.v1.MergePaneOp
-	(*SwapPaneOp)(nil),           // 40: codefoundry.v1.SwapPaneOp
-	(*CloseTabOp)(nil),           // 41: codefoundry.v1.CloseTabOp
-	(*ClosePaneOp)(nil),          // 42: codefoundry.v1.ClosePaneOp
-	(*SetSizesOp)(nil),           // 43: codefoundry.v1.SetSizesOp
-	(*FocusTabOp)(nil),           // 44: codefoundry.v1.FocusTabOp
-	(*FocusPaneOp)(nil),          // 45: codefoundry.v1.FocusPaneOp
-	(*SetTabParamsOp)(nil),       // 46: codefoundry.v1.SetTabParamsOp
-	(*RenameTabOp)(nil),          // 47: codefoundry.v1.RenameTabOp
-	(*NewSpaceOp)(nil),           // 48: codefoundry.v1.NewSpaceOp
-	(*RenameSpaceOp)(nil),        // 49: codefoundry.v1.RenameSpaceOp
-	(*RemoveSpaceOp)(nil),        // 50: codefoundry.v1.RemoveSpaceOp
-	(*ReorderSpacesOp)(nil),      // 51: codefoundry.v1.ReorderSpacesOp
-	(*SwitchSpaceOp)(nil),        // 52: codefoundry.v1.SwitchSpaceOp
-	(*NewThreadOp)(nil),          // 53: codefoundry.v1.NewThreadOp
-	(*StartDraftOp)(nil),         // 54: codefoundry.v1.StartDraftOp
-	(*LabelDraftOp)(nil),         // 55: codefoundry.v1.LabelDraftOp
-	(*ClearDraftOp)(nil),         // 56: codefoundry.v1.ClearDraftOp
-	(*DiscardDraftOp)(nil),       // 57: codefoundry.v1.DiscardDraftOp
-	(*OpenDraftOp)(nil),          // 58: codefoundry.v1.OpenDraftOp
-	nil,                          // 59: codefoundry.v1.LayoutDraft.ParamsEntry
-	nil,                          // 60: codefoundry.v1.LayoutTab.ParamsEntry
-	nil,                          // 61: codefoundry.v1.SnoozeThreadOp.RanEntry
-	nil,                          // 62: codefoundry.v1.SetTabParamsOp.ParamsEntry
-	nil,                          // 63: codefoundry.v1.NewThreadOp.ParamsEntry
+	(*SetInfoOp)(nil),            // 33: codefoundry.v1.SetInfoOp
+	(*ReplaceTerminalOp)(nil),    // 34: codefoundry.v1.ReplaceTerminalOp
+	(*DropTerminalOp)(nil),       // 35: codefoundry.v1.DropTerminalOp
+	(*AddTabOp)(nil),             // 36: codefoundry.v1.AddTabOp
+	(*SplitPaneOp)(nil),          // 37: codefoundry.v1.SplitPaneOp
+	(*MoveTabOp)(nil),            // 38: codefoundry.v1.MoveTabOp
+	(*MovePaneOp)(nil),           // 39: codefoundry.v1.MovePaneOp
+	(*MergePaneOp)(nil),          // 40: codefoundry.v1.MergePaneOp
+	(*SwapPaneOp)(nil),           // 41: codefoundry.v1.SwapPaneOp
+	(*CloseTabOp)(nil),           // 42: codefoundry.v1.CloseTabOp
+	(*ClosePaneOp)(nil),          // 43: codefoundry.v1.ClosePaneOp
+	(*SetSizesOp)(nil),           // 44: codefoundry.v1.SetSizesOp
+	(*FocusTabOp)(nil),           // 45: codefoundry.v1.FocusTabOp
+	(*FocusPaneOp)(nil),          // 46: codefoundry.v1.FocusPaneOp
+	(*SetTabParamsOp)(nil),       // 47: codefoundry.v1.SetTabParamsOp
+	(*RenameTabOp)(nil),          // 48: codefoundry.v1.RenameTabOp
+	(*NewSpaceOp)(nil),           // 49: codefoundry.v1.NewSpaceOp
+	(*RenameSpaceOp)(nil),        // 50: codefoundry.v1.RenameSpaceOp
+	(*RemoveSpaceOp)(nil),        // 51: codefoundry.v1.RemoveSpaceOp
+	(*ReorderSpacesOp)(nil),      // 52: codefoundry.v1.ReorderSpacesOp
+	(*SwitchSpaceOp)(nil),        // 53: codefoundry.v1.SwitchSpaceOp
+	(*NewThreadOp)(nil),          // 54: codefoundry.v1.NewThreadOp
+	(*StartDraftOp)(nil),         // 55: codefoundry.v1.StartDraftOp
+	(*LabelDraftOp)(nil),         // 56: codefoundry.v1.LabelDraftOp
+	(*ClearDraftOp)(nil),         // 57: codefoundry.v1.ClearDraftOp
+	(*DiscardDraftOp)(nil),       // 58: codefoundry.v1.DiscardDraftOp
+	(*OpenDraftOp)(nil),          // 59: codefoundry.v1.OpenDraftOp
+	nil,                          // 60: codefoundry.v1.LayoutDraft.ParamsEntry
+	nil,                          // 61: codefoundry.v1.LayoutTab.ParamsEntry
+	nil,                          // 62: codefoundry.v1.SnoozeThreadOp.RanEntry
+	nil,                          // 63: codefoundry.v1.SetTabParamsOp.ParamsEntry
+	nil,                          // 64: codefoundry.v1.NewThreadOp.ParamsEntry
 }
 var file_codefoundry_v1_layout_proto_depIdxs = []int32{
 	4,  // 0: codefoundry.v1.GetLayoutResponse.layout:type_name -> codefoundry.v1.Layout
@@ -4854,13 +4940,13 @@ var file_codefoundry_v1_layout_proto_depIdxs = []int32{
 	11, // 2: codefoundry.v1.Layout.threads:type_name -> codefoundry.v1.ThreadLayout
 	7,  // 3: codefoundry.v1.LayoutSpace.root:type_name -> codefoundry.v1.LayoutNode
 	6,  // 4: codefoundry.v1.LayoutSpace.drafts:type_name -> codefoundry.v1.LayoutDraft
-	59, // 5: codefoundry.v1.LayoutDraft.params:type_name -> codefoundry.v1.LayoutDraft.ParamsEntry
+	60, // 5: codefoundry.v1.LayoutDraft.params:type_name -> codefoundry.v1.LayoutDraft.ParamsEntry
 	8,  // 6: codefoundry.v1.LayoutNode.pane:type_name -> codefoundry.v1.LayoutPane
 	9,  // 7: codefoundry.v1.LayoutNode.split:type_name -> codefoundry.v1.LayoutSplit
 	10, // 8: codefoundry.v1.LayoutPane.tabs:type_name -> codefoundry.v1.LayoutTab
 	0,  // 9: codefoundry.v1.LayoutSplit.dir:type_name -> codefoundry.v1.LayoutDir
 	7,  // 10: codefoundry.v1.LayoutSplit.children:type_name -> codefoundry.v1.LayoutNode
-	60, // 11: codefoundry.v1.LayoutTab.params:type_name -> codefoundry.v1.LayoutTab.ParamsEntry
+	61, // 11: codefoundry.v1.LayoutTab.params:type_name -> codefoundry.v1.LayoutTab.ParamsEntry
 	12, // 12: codefoundry.v1.ThreadLayout.quick:type_name -> codefoundry.v1.QuickTerminal
 	13, // 13: codefoundry.v1.ThreadLayout.remembered:type_name -> codefoundry.v1.RememberedTab
 	10, // 14: codefoundry.v1.RememberedTab.tab:type_name -> codefoundry.v1.LayoutTab
@@ -4883,56 +4969,57 @@ var file_codefoundry_v1_layout_proto_depIdxs = []int32{
 	29, // 31: codefoundry.v1.LayoutOp.move_thread:type_name -> codefoundry.v1.MoveThreadOp
 	30, // 32: codefoundry.v1.LayoutOp.archive_thread:type_name -> codefoundry.v1.ArchiveThreadOp
 	31, // 33: codefoundry.v1.LayoutOp.snooze_thread:type_name -> codefoundry.v1.SnoozeThreadOp
-	35, // 34: codefoundry.v1.LayoutOp.add_tab:type_name -> codefoundry.v1.AddTabOp
-	36, // 35: codefoundry.v1.LayoutOp.split_pane:type_name -> codefoundry.v1.SplitPaneOp
-	37, // 36: codefoundry.v1.LayoutOp.move_tab:type_name -> codefoundry.v1.MoveTabOp
-	38, // 37: codefoundry.v1.LayoutOp.move_pane:type_name -> codefoundry.v1.MovePaneOp
-	39, // 38: codefoundry.v1.LayoutOp.merge_pane:type_name -> codefoundry.v1.MergePaneOp
-	40, // 39: codefoundry.v1.LayoutOp.swap_pane:type_name -> codefoundry.v1.SwapPaneOp
-	41, // 40: codefoundry.v1.LayoutOp.close_tab:type_name -> codefoundry.v1.CloseTabOp
-	42, // 41: codefoundry.v1.LayoutOp.close_pane:type_name -> codefoundry.v1.ClosePaneOp
-	43, // 42: codefoundry.v1.LayoutOp.set_sizes:type_name -> codefoundry.v1.SetSizesOp
-	44, // 43: codefoundry.v1.LayoutOp.focus_tab:type_name -> codefoundry.v1.FocusTabOp
-	45, // 44: codefoundry.v1.LayoutOp.focus_pane:type_name -> codefoundry.v1.FocusPaneOp
-	46, // 45: codefoundry.v1.LayoutOp.set_tab_params:type_name -> codefoundry.v1.SetTabParamsOp
-	47, // 46: codefoundry.v1.LayoutOp.rename_tab:type_name -> codefoundry.v1.RenameTabOp
-	48, // 47: codefoundry.v1.LayoutOp.new_space:type_name -> codefoundry.v1.NewSpaceOp
-	49, // 48: codefoundry.v1.LayoutOp.rename_space:type_name -> codefoundry.v1.RenameSpaceOp
-	50, // 49: codefoundry.v1.LayoutOp.remove_space:type_name -> codefoundry.v1.RemoveSpaceOp
-	51, // 50: codefoundry.v1.LayoutOp.reorder_spaces:type_name -> codefoundry.v1.ReorderSpacesOp
-	52, // 51: codefoundry.v1.LayoutOp.switch_space:type_name -> codefoundry.v1.SwitchSpaceOp
-	53, // 52: codefoundry.v1.LayoutOp.new_thread:type_name -> codefoundry.v1.NewThreadOp
-	54, // 53: codefoundry.v1.LayoutOp.start_draft:type_name -> codefoundry.v1.StartDraftOp
-	55, // 54: codefoundry.v1.LayoutOp.label_draft:type_name -> codefoundry.v1.LabelDraftOp
-	56, // 55: codefoundry.v1.LayoutOp.clear_draft:type_name -> codefoundry.v1.ClearDraftOp
-	57, // 56: codefoundry.v1.LayoutOp.discard_draft:type_name -> codefoundry.v1.DiscardDraftOp
-	58, // 57: codefoundry.v1.LayoutOp.open_draft:type_name -> codefoundry.v1.OpenDraftOp
+	36, // 34: codefoundry.v1.LayoutOp.add_tab:type_name -> codefoundry.v1.AddTabOp
+	37, // 35: codefoundry.v1.LayoutOp.split_pane:type_name -> codefoundry.v1.SplitPaneOp
+	38, // 36: codefoundry.v1.LayoutOp.move_tab:type_name -> codefoundry.v1.MoveTabOp
+	39, // 37: codefoundry.v1.LayoutOp.move_pane:type_name -> codefoundry.v1.MovePaneOp
+	40, // 38: codefoundry.v1.LayoutOp.merge_pane:type_name -> codefoundry.v1.MergePaneOp
+	41, // 39: codefoundry.v1.LayoutOp.swap_pane:type_name -> codefoundry.v1.SwapPaneOp
+	42, // 40: codefoundry.v1.LayoutOp.close_tab:type_name -> codefoundry.v1.CloseTabOp
+	43, // 41: codefoundry.v1.LayoutOp.close_pane:type_name -> codefoundry.v1.ClosePaneOp
+	44, // 42: codefoundry.v1.LayoutOp.set_sizes:type_name -> codefoundry.v1.SetSizesOp
+	45, // 43: codefoundry.v1.LayoutOp.focus_tab:type_name -> codefoundry.v1.FocusTabOp
+	46, // 44: codefoundry.v1.LayoutOp.focus_pane:type_name -> codefoundry.v1.FocusPaneOp
+	47, // 45: codefoundry.v1.LayoutOp.set_tab_params:type_name -> codefoundry.v1.SetTabParamsOp
+	48, // 46: codefoundry.v1.LayoutOp.rename_tab:type_name -> codefoundry.v1.RenameTabOp
+	49, // 47: codefoundry.v1.LayoutOp.new_space:type_name -> codefoundry.v1.NewSpaceOp
+	50, // 48: codefoundry.v1.LayoutOp.rename_space:type_name -> codefoundry.v1.RenameSpaceOp
+	51, // 49: codefoundry.v1.LayoutOp.remove_space:type_name -> codefoundry.v1.RemoveSpaceOp
+	52, // 50: codefoundry.v1.LayoutOp.reorder_spaces:type_name -> codefoundry.v1.ReorderSpacesOp
+	53, // 51: codefoundry.v1.LayoutOp.switch_space:type_name -> codefoundry.v1.SwitchSpaceOp
+	54, // 52: codefoundry.v1.LayoutOp.new_thread:type_name -> codefoundry.v1.NewThreadOp
+	55, // 53: codefoundry.v1.LayoutOp.start_draft:type_name -> codefoundry.v1.StartDraftOp
+	56, // 54: codefoundry.v1.LayoutOp.label_draft:type_name -> codefoundry.v1.LabelDraftOp
+	57, // 55: codefoundry.v1.LayoutOp.clear_draft:type_name -> codefoundry.v1.ClearDraftOp
+	58, // 56: codefoundry.v1.LayoutOp.discard_draft:type_name -> codefoundry.v1.DiscardDraftOp
+	59, // 57: codefoundry.v1.LayoutOp.open_draft:type_name -> codefoundry.v1.OpenDraftOp
 	32, // 58: codefoundry.v1.LayoutOp.set_quick:type_name -> codefoundry.v1.SetQuickOp
-	33, // 59: codefoundry.v1.LayoutOp.replace_terminal:type_name -> codefoundry.v1.ReplaceTerminalOp
-	34, // 60: codefoundry.v1.LayoutOp.drop_terminal:type_name -> codefoundry.v1.DropTerminalOp
-	1,  // 61: codefoundry.v1.OpenThreadOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	10, // 62: codefoundry.v1.OpenSurfaceOp.tab:type_name -> codefoundry.v1.LayoutTab
-	61, // 63: codefoundry.v1.SnoozeThreadOp.ran:type_name -> codefoundry.v1.SnoozeThreadOp.RanEntry
-	10, // 64: codefoundry.v1.AddTabOp.tab:type_name -> codefoundry.v1.LayoutTab
-	1,  // 65: codefoundry.v1.SplitPaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	10, // 66: codefoundry.v1.SplitPaneOp.tab:type_name -> codefoundry.v1.LayoutTab
-	1,  // 67: codefoundry.v1.MoveTabOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	1,  // 68: codefoundry.v1.MovePaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	62, // 69: codefoundry.v1.SetTabParamsOp.params:type_name -> codefoundry.v1.SetTabParamsOp.ParamsEntry
-	63, // 70: codefoundry.v1.NewThreadOp.params:type_name -> codefoundry.v1.NewThreadOp.ParamsEntry
-	2,  // 71: codefoundry.v1.LayoutService.Get:input_type -> codefoundry.v1.GetLayoutRequest
-	18, // 72: codefoundry.v1.LayoutService.Apply:input_type -> codefoundry.v1.ApplyLayoutRequest
-	20, // 73: codefoundry.v1.LayoutService.SetViewport:input_type -> codefoundry.v1.SetViewportRequest
-	22, // 74: codefoundry.v1.LayoutService.ImportLegacy:input_type -> codefoundry.v1.ImportLegacyRequest
-	3,  // 75: codefoundry.v1.LayoutService.Get:output_type -> codefoundry.v1.GetLayoutResponse
-	19, // 76: codefoundry.v1.LayoutService.Apply:output_type -> codefoundry.v1.ApplyLayoutResponse
-	21, // 77: codefoundry.v1.LayoutService.SetViewport:output_type -> codefoundry.v1.SetViewportResponse
-	23, // 78: codefoundry.v1.LayoutService.ImportLegacy:output_type -> codefoundry.v1.ImportLegacyResponse
-	75, // [75:79] is the sub-list for method output_type
-	71, // [71:75] is the sub-list for method input_type
-	71, // [71:71] is the sub-list for extension type_name
-	71, // [71:71] is the sub-list for extension extendee
-	0,  // [0:71] is the sub-list for field type_name
+	34, // 59: codefoundry.v1.LayoutOp.replace_terminal:type_name -> codefoundry.v1.ReplaceTerminalOp
+	35, // 60: codefoundry.v1.LayoutOp.drop_terminal:type_name -> codefoundry.v1.DropTerminalOp
+	33, // 61: codefoundry.v1.LayoutOp.set_info:type_name -> codefoundry.v1.SetInfoOp
+	1,  // 62: codefoundry.v1.OpenThreadOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	10, // 63: codefoundry.v1.OpenSurfaceOp.tab:type_name -> codefoundry.v1.LayoutTab
+	62, // 64: codefoundry.v1.SnoozeThreadOp.ran:type_name -> codefoundry.v1.SnoozeThreadOp.RanEntry
+	10, // 65: codefoundry.v1.AddTabOp.tab:type_name -> codefoundry.v1.LayoutTab
+	1,  // 66: codefoundry.v1.SplitPaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	10, // 67: codefoundry.v1.SplitPaneOp.tab:type_name -> codefoundry.v1.LayoutTab
+	1,  // 68: codefoundry.v1.MoveTabOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	1,  // 69: codefoundry.v1.MovePaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	63, // 70: codefoundry.v1.SetTabParamsOp.params:type_name -> codefoundry.v1.SetTabParamsOp.ParamsEntry
+	64, // 71: codefoundry.v1.NewThreadOp.params:type_name -> codefoundry.v1.NewThreadOp.ParamsEntry
+	2,  // 72: codefoundry.v1.LayoutService.Get:input_type -> codefoundry.v1.GetLayoutRequest
+	18, // 73: codefoundry.v1.LayoutService.Apply:input_type -> codefoundry.v1.ApplyLayoutRequest
+	20, // 74: codefoundry.v1.LayoutService.SetViewport:input_type -> codefoundry.v1.SetViewportRequest
+	22, // 75: codefoundry.v1.LayoutService.ImportLegacy:input_type -> codefoundry.v1.ImportLegacyRequest
+	3,  // 76: codefoundry.v1.LayoutService.Get:output_type -> codefoundry.v1.GetLayoutResponse
+	19, // 77: codefoundry.v1.LayoutService.Apply:output_type -> codefoundry.v1.ApplyLayoutResponse
+	21, // 78: codefoundry.v1.LayoutService.SetViewport:output_type -> codefoundry.v1.SetViewportResponse
+	23, // 79: codefoundry.v1.LayoutService.ImportLegacy:output_type -> codefoundry.v1.ImportLegacyResponse
+	76, // [76:80] is the sub-list for method output_type
+	72, // [72:76] is the sub-list for method input_type
+	72, // [72:72] is the sub-list for extension type_name
+	72, // [72:72] is the sub-list for extension extendee
+	0,  // [0:72] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_layout_proto_init() }
@@ -4944,6 +5031,7 @@ func file_codefoundry_v1_layout_proto_init() {
 		(*LayoutNode_Pane)(nil),
 		(*LayoutNode_Split)(nil),
 	}
+	file_codefoundry_v1_layout_proto_msgTypes[9].OneofWrappers = []any{}
 	file_codefoundry_v1_layout_proto_msgTypes[14].OneofWrappers = []any{
 		(*LayoutEvent_Snapshot)(nil),
 		(*LayoutEvent_Delta)(nil),
@@ -4982,19 +5070,20 @@ func file_codefoundry_v1_layout_proto_init() {
 		(*LayoutOp_SetQuick)(nil),
 		(*LayoutOp_ReplaceTerminal)(nil),
 		(*LayoutOp_DropTerminal)(nil),
+		(*LayoutOp_SetInfo)(nil),
 	}
 	file_codefoundry_v1_layout_proto_msgTypes[24].OneofWrappers = []any{}
-	file_codefoundry_v1_layout_proto_msgTypes[33].OneofWrappers = []any{}
-	file_codefoundry_v1_layout_proto_msgTypes[35].OneofWrappers = []any{}
-	file_codefoundry_v1_layout_proto_msgTypes[37].OneofWrappers = []any{}
-	file_codefoundry_v1_layout_proto_msgTypes[44].OneofWrappers = []any{}
+	file_codefoundry_v1_layout_proto_msgTypes[34].OneofWrappers = []any{}
+	file_codefoundry_v1_layout_proto_msgTypes[36].OneofWrappers = []any{}
+	file_codefoundry_v1_layout_proto_msgTypes[38].OneofWrappers = []any{}
+	file_codefoundry_v1_layout_proto_msgTypes[45].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_layout_proto_rawDesc), len(file_codefoundry_v1_layout_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   62,
+			NumMessages:   63,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

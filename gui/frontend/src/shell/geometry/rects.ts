@@ -83,7 +83,9 @@ export function minimumOf(
  * kid that is all rails takes its minimum (a rail's thickness); the others share what is left by
  * their sizes, and while their minimums fit, a kid whose share would fall short is held at its
  * minimum and the rest share again. When every kid is all rails they all share like open kids.
- * When the minimums do not fit, the open kids share by their sizes alone.
+ * When the minimums do not fit, the open kids share what is left in proportion to their minimums,
+ * so each falls short of its minimum by the same fraction (rails.ts leaves only the panes that
+ * never fold open in that case).
  */
 function lengths(kids: readonly GeoNode[], sizes: readonly number[], free: number, row: boolean, o: LayOptions) {
   const n = kids.length;
@@ -103,21 +105,23 @@ function lengths(kids: readonly GeoNode[], sizes: readonly number[], free: numbe
     }
   }
   const need = open.reduce((s, i) => s + (mins[i] ?? 0), 0);
-  if (need <= free + 0.5) {
-    for (let again = true; again; ) {
-      again = false;
-      for (let j = 0; j < open.length; j++) {
-        const i = open[j] ?? 0;
-        const share = sizes[i] ?? 0;
-        const min = mins[i] ?? 0;
-        if (ws > 0 && (free * share) / ws < min - 0.01) {
-          sz[i] = min;
-          free -= min;
-          ws -= share;
-          open.splice(j, 1);
-          again = true;
-          break;
-        }
+  if (need > free + 0.5) {
+    for (const i of open) sz[i] = Math.max(0, (free * (mins[i] ?? 0)) / need);
+    return sz;
+  }
+  for (let again = true; again; ) {
+    again = false;
+    for (let j = 0; j < open.length; j++) {
+      const i = open[j] ?? 0;
+      const share = sizes[i] ?? 0;
+      const min = mins[i] ?? 0;
+      if (ws > 0 && (free * share) / ws < min - 0.01) {
+        sz[i] = min;
+        free -= min;
+        ws -= share;
+        open.splice(j, 1);
+        again = true;
+        break;
       }
     }
   }

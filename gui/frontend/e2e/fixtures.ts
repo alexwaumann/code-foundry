@@ -54,6 +54,14 @@ export async function projectAt(path: string): Promise<{ id: string; path: strin
 }
 
 /** POSTs a /__mock control endpoint and returns its JSON. */
+/**
+ * The thread info card off for every thread never toggled (the setting layout.thread_info; on by
+ * default): a spec of the card turns it on with the header's toggle, from a known state.
+ */
+export async function infoCardOff(): Promise<void> {
+  await mockPost("settings/external?layout.thread_info=false");
+}
+
 export async function mockPost(pathAndQuery: string): Promise<unknown> {
   const res = await fetch(`${mockUrl}/__mock/${pathAndQuery}`, { method: "POST" });
   expect(res.ok, `${pathAndQuery}: ${String(res.status)}`).toBe(true);

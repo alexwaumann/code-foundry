@@ -11,7 +11,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { startThreadWatch, useSetupShown } from "@/stores/thread";
 import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
-import { useUiStore } from "@/stores/ui";
+import { useThreadInfoOpen } from "@/stores/threadInfoOverlay";
 import { setupRowPhase } from "@/lib/threadSetup";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { CiteLayer } from "./cite/CiteLayer";
@@ -101,7 +101,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   );
 
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
-  const infoOpen = useUiStore((s) => s.threadInfoOpen);
+  const infoOpen = useThreadInfoOpen(threadId);
   const findOpen = useThreadFindOpen(threadId);
   const [rowRef, infoFits] = useInfoRoom(threadId);
   // The pane's header (ThreadHeader): the tab above is the title. None outside a pane (tests).

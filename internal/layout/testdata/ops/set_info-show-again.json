@@ -1,0 +1,75 @@
+{
+  "doc": "Showing it again stores true beside what the thread has; the rest is kept.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {
+              "id": "t-a",
+              "kind": "thread",
+              "thread": "th-a"
+            }
+          ],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "info": false,
+        "quick": {
+          "open": true
+        }
+      }
+    }
+  },
+  "op": {
+    "op": "set_info",
+    "thread": "th-a",
+    "open": true
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {
+              "id": "t-a",
+              "kind": "thread",
+              "thread": "th-a"
+            }
+          ],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "info": true,
+        "quick": {
+          "open": true
+        }
+      }
+    }
+  },
+  "result": {}
+}

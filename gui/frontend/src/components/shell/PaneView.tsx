@@ -101,7 +101,12 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
   };
   return (
     <section
-      className={cn("absolute flex flex-col overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs", dragged && "opacity-60")}
+      className={cn(
+        "absolute flex flex-col overflow-hidden rounded-pane border bg-cf-surface shadow-xs",
+        // The focused pane's border takes a tint of the accent (docs/notes/shell-model.md, "Structure").
+        focused ? "border-cf-accent/60" : "border-cf-divider",
+        dragged && "opacity-60",
+      )}
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
       aria-label={tab ? undefined : "Pane"}
       aria-labelledby={tab ? shellTabDomId(tab.id) : undefined}

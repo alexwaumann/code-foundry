@@ -3,14 +3,17 @@
  * Needs you, Active, then the Working, Snoozed and Archived footers as today (lib/tree.ts).
  *
  * - **Needs you** lists the user's own threads (never a thread another thread created: those are
- *   `hidden`) that wait on them (the "prompt" group: a permission, a question, a plan, a woken
- *   snooze, a plugin's attention flag), from every space or only the current one (the
+ *   `hidden`) that are blocked on them (the "prompt" group: a permission, a question, a plan, and
+ *   the other attention states it held before: a trust dialog, a notification, an API error at the
+ *   prompt, a plugin's attention flag), from every space or only the current one (the
  *   `sidebar.needs_scope` setting), most recent ask first. A thread listed there is not also
- *   listed under Active, whatever its pin.
+ *   listed under Active, whatever its pin. A thread woken from a snooze is not blocked: it is
+ *   never under Needs you and counts in none of its numbers.
  * - **Active** lists the current space's live threads in today's order: pinned, then failed and
  *   interrupted ones, then finished turns, then idle ones. The space's composer drafts come right
- *   below the pinned threads. A thread of the space that waits on the user is never here: with
- *   either scope it is under Needs you.
+ *   below the pinned threads, and the threads woken from a snooze (unpinned, not yet opened) right
+ *   below the drafts, most recently woken first. A thread of the space that waits on the user is
+ *   never here: with either scope it is under Needs you.
  * - **Working** and **Snoozed** list the current space's threads; **Archived** every space's.
  *
  * Pure, over the same minimal inputs as lib/tree.ts plus each thread's space, so the sidebar
@@ -109,9 +112,14 @@ function byRecent<T extends ListThread>(list: readonly T[], at: (t: T) => number
   return [...known, ...list.filter((t) => at(t) == null)];
 }
 
-/** Whether a thread waits on the user and would be listed under Needs you in some scope. */
+/** Whether a thread waits on the user and would be listed under Needs you in some scope (a woken one does not). */
 function waitsOnUser(t: ListThread): boolean {
-  return t.hidden !== true && t.archivedAtMs === null && !isSnoozed(t) && t.group === "prompt";
+  return t.hidden !== true && t.archivedAtMs === null && !isSnoozed(t) && t.group === "prompt" && t.woke !== true;
+}
+
+/** Whether a thread woken from a snooze sits at the top of Active: live, shown and unpinned (a pinned one stays with the pinned). */
+function wokeOnTop(t: ListThread): boolean {
+  return t.woke === true && t.hidden !== true && t.archivedAtMs === null && !isSnoozed(t) && !t.pinned;
 }
 
 /** Needs you's threads in its order (most recent ask first), in the scope in force, from those waiting on the user. */
@@ -150,8 +158,10 @@ export function buildShellSections(threads: readonly ShellListThread[], opts: Sh
   const here = (t: ShellListThread) => t.spaceId === opts.currentSpaceId;
   const waiting = threads.filter(waitsOnUser);
   const needs = needsOf(waiting, opts);
-  // The space's threads for Active, Working and Snoozed; those waiting on the user are Needs you's.
-  const space = threads.filter(here).map((t) => (waitsOnUser(t) ? { ...t, hidden: true } : t));
+  // The space's threads for Active, Working and Snoozed; those waiting on the user are Needs you's,
+  // and the woken ones are placed below the drafts by hand.
+  const woke = byRecent(threads.filter((t) => here(t) && wokeOnTop(t)).reverse(), (t) => t.statusChangedAtMs);
+  const space = threads.filter(here).map((t) => (waitsOnUser(t) || wokeOnTop(t) ? { ...t, hidden: true } : t));
   const local = buildSections(space, opts);
   const everywhere = buildSections(threads, { archivedCollapsed: opts.archivedCollapsed, openThreadId: opts.openThreadId });
 
@@ -164,7 +174,8 @@ export function buildShellSections(threads: readonly ShellListThread[], opts: Sh
   const drafts: DraftRow[] = (opts.drafts ?? []).map((d) => ({ key: draftKey(d.id), kind: "draft", section: "active", draftId: d.id, label: d.label }));
   const pinned = local.main.filter((r) => r.kind === "thread" && r.section === "pinned");
   const rest = local.main.filter((r) => !(r.kind === "thread" && r.section === "pinned"));
-  const active: MainRow[] = [...pinned, ...drafts, ...rest].flatMap((r): MainRow[] => (r.kind === "header" ? [] : [r]));
+  const woken: ShellThreadRow[] = woke.map((t) => ({ key: threadKey(t.id), kind: "thread", section: "attention", threadId: t.id }));
+  const active: MainRow[] = [...pinned, ...drafts, ...woken, ...rest].flatMap((r): MainRow[] => (r.kind === "header" ? [] : [r]));
   if (active.length > 0) {
     const collapsed = opts.activeCollapsed === true;
     main.push({ key: mainHeaderKey("active"), kind: "header", section: "active", label: "Active", count: active.length, collapsed });

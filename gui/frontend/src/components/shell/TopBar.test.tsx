@@ -58,9 +58,9 @@ const LAYOUT = {
     space(null, "", { id: "sp-c", name: "Reviews" }),
   ]),
   threads: [
-    { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
-    { threadId: "s-3", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
-    { threadId: "s-4", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
+    { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null },
+    { threadId: "s-3", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null },
+    { threadId: "s-4", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null },
   ],
 };
 
@@ -124,6 +124,25 @@ describe("the top bar", () => {
     expect(tabs().map((t) => t.textContent)).toEqual(["Main1", "Release 0.222", "Reviews"]);
     expect(tabOf("sp-a").getAttribute("aria-selected")).toBe("true");
     expect(screen.getByTestId("top-bar-new-space")).toBeTruthy();
+  });
+
+  it("puts the Needs you control after back and forward, so they do not move when the sidebar collapses", async () => {
+    const { useUiStore } = await import("@/stores/ui");
+    const before = useUiStore.getState().sidebarVisible;
+    try {
+      useUiStore.setState({ sidebarVisible: true });
+      render(<TopBar />);
+      expect(screen.queryByTestId("needs-control")).toBeNull();
+      act(() => {
+        useUiStore.setState({ sidebarVisible: false });
+      });
+      const control = screen.getByTestId("needs-control");
+      const history = screen.getByTestId("top-bar-history");
+      expect(history.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getByTestId("top-bar-sidebar-toggle").compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      useUiStore.setState({ sidebarVisible: before });
+    }
   });
 
   it("counts the threads Needs you lists for each space: not a thread's threads, archived ones nor a finished turn", () => {

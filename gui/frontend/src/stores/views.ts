@@ -154,7 +154,7 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       jumpToNeighbour(1);
       return true;
     case "thread-info":
-      // view.thread-info: the thread info card beside every thread in this window (its overlay on a narrow pane).
+      // view.thread-info: the focused thread's info card, kept per thread (thread.info; its overlay on a narrow pane).
       toggleThreadInfo();
       return true;
     case "pane.fullscreen":

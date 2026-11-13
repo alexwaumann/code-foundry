@@ -37,7 +37,7 @@ beforeEach(async () => {
   const layout = layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-idle")]), "p-1", { id: "sp-a", name: "Main" }), space(null, "", { id: "sp-b", name: "Release" })]);
   await seedLayout({
     ...layout,
-    threads: ["s-a", "s-b", "s-c", "s-idle", "s-kid"].map((id) => ({ threadId: id, spaceId: id === "s-c" ? "sp-b" : "sp-a", quick: null, remembered: [], rememberedPaneId: "" })),
+    threads: ["s-a", "s-b", "s-c", "s-idle", "s-kid"].map((id) => ({ threadId: id, spaceId: id === "s-c" ? "sp-b" : "sp-a", quick: null, remembered: [], rememberedPaneId: "", info: null })),
   });
 });
 

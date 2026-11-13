@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openApp, resetMock, mockPost, row, threadPrompt } from "./fixtures";
+import { openApp, resetMock, mockPost, row, threadPrompt, infoCardOff } from "./fixtures";
 
 // A long user message's fold (docs/notes/user-message-fold.md), only what needs a browser:
 // the real fold height and mask, the row's measured height, where the list stays when it
@@ -10,6 +10,8 @@ import { openApp, resetMock, mockPost, row, threadPrompt } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // Written for a conversation with no card beside it (layout.thread_info is on by default).
+  await infoCardOff();
   await mockPost("thread?state=idle");
 });
 

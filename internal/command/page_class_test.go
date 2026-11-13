@@ -71,7 +71,7 @@ var pageState = []string{
 	"worktree.reveal",
 	"pane.close", "pane.focus", "pane.focus.left", "pane.fullscreen", "pane.focus.down", "pane.focus.up", "pane.focus.right", "pane.move", "pane.move.left", "pane.move.down", "pane.move.up", "pane.move.right",
 	"pane.resize", "pane.split", "space.move", "space.new", "space.remove", "space.rename", "space.switch", "tab.close", "tab.focus", "tab.move", "tab.rename", "tab.auto-name", "tab.next", "tab.previous",
-	"thread.close", "thread.open", "thread.space.move",
+	"thread.close", "thread.info", "thread.open", "thread.space.move",
 	"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "composer.new",
 }
 

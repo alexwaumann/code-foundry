@@ -49,7 +49,7 @@ describe("spaceGlyph", () => {
 /** A layout slice of panes and tabs in two spaces. */
 function slice(panes: [string, string, [string, string, string][]][]): Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId"> {
   // s-7 lives in sp-b; every other thread in the default space, sp-a.
-  const threads = { "s-7": { threadId: "s-7", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" } };
+  const threads = { "s-7": { threadId: "s-7", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null } };
   const out: { panes: Record<string, PaneEntry>; tabs: Record<string, TabEntry>; threads: typeof threads; defaultSpaceId: string } = { panes: {}, tabs: {}, threads, defaultSpaceId: "sp-a" };
   for (const [id, spaceId, tabs] of panes) {
     out.panes[id] = { id, spaceId, tabIds: tabs.map((t) => t[0]), active: tabs[0]?.[0] ?? "" };
@@ -128,7 +128,7 @@ describe("removing a space", () => {
   });
 
   it("counts the user's own threads that live in it", () => {
-    const s = { defaultSpaceId: "sp-a", threads: { "s-2": { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" } } };
+    const s = { defaultSpaceId: "sp-a", threads: { "s-2": { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null } } };
     expect(threadsOfSpace(["s-1", "s-2"], "sp-b", s)).toEqual(["s-2"]);
     expect(threadsOfSpace(["s-1", "s-2"], "sp-a", s)).toEqual(["s-1"]);
   });

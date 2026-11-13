@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row, writes } from "./fixtures";
+import { infoCardOff, mockPost, openApp, resetMock, row, writes } from "./fixtures";
 import { attachStreams, keyboardIn, terminalTabs } from "./shell-terminals";
 
 /**
@@ -30,6 +30,8 @@ test.use({ viewport: { width: 1500, height: 900 } });
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
 });
 
 test("a child's terminal opens in a tab with the keyboard in it, on one Attach stream", async ({ page }) => {

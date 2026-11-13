@@ -5257,6 +5257,7 @@ export class World {
           const t = this.threads.get(id);
           return { projectId: t?.projectId ?? "", worktreePath: t?.worktreePath ?? "" };
         },
+        threadInfoDefault: () => this.settings.value("layout.thread_info") !== "false",
       }),
       ...terminalShellCommands({
         layout: this.layout,

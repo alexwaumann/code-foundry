@@ -88,6 +88,17 @@ describe("PaneView", () => {
     const el = screen.getByTestId("shell-pane");
     expect([el.style.left, el.style.top, el.style.width, el.style.height]).toEqual(["12px", "30px", "500px", "300px"]);
     expect(el.hasAttribute("data-focused")).toBe(false);
+    expect(el.className).toContain("border-cf-divider");
+    expect(el.className).not.toContain("border-cf-accent");
+  });
+
+  it("tints the focused pane's border with the accent", async () => {
+    await showing("t-th");
+    render(<PaneView paneId="p-1" rect={RECT} focused />);
+    const el = screen.getByTestId("shell-pane");
+    expect(el.getAttribute("data-focused")).toBe("true");
+    expect(el.className).toContain("border-cf-accent/60");
+    expect(el.className).not.toContain("border-cf-divider");
   });
 
   it("a press in a pane without the focus focuses it (pane.focus); in the focused pane it asks nothing", async () => {

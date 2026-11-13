@@ -46,6 +46,7 @@ describe("the layout source's events", () => {
               threadId: "th-a",
               spaceId: "sp-a",
               quick: { open: true, height: 200, ran: "make dev" },
+              info: false,
               rememberedPaneId: "p-a",
               remembered: [{ tab: { id: "t-d", kind: "diff", threadId: "th-a" }, paneId: "p-x", index: 1, active: true, beside: { neighbourPaneIds: ["p-a"], edge: LayoutEdge.RIGHT, frac: 0.4 } }],
             },
@@ -90,6 +91,7 @@ describe("the layout source's events", () => {
               threadId: "th-a",
               spaceId: "sp-a",
               quick: { open: true, height: 200, ran: "make dev" },
+              info: false,
               rememberedPaneId: "p-a",
               remembered: [
                 {

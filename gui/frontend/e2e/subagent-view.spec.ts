@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { infoCardOff, invocations, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 /**
  * The subagent view, drawn as a thread (docs/notes/subagent-as-thread.md), over the mock's scripted thread
@@ -88,6 +88,8 @@ async function expectParent(page: Page): Promise<void> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
 });
 
 // The run's view (header, crumb, lineage, prompt, turn header and fold, its own rows, the nested

@@ -153,6 +153,7 @@ func TestDocsRoundTrip(t *testing.T) {
 			Fresh:  &Fresh{Ran: "make dev"},
 		}}},
 		Last: map[string]string{"diff": "t-9"},
+		Info: new(bool),
 	}
 	b, err = EncodeThreadDoc(ts)
 	if err != nil {

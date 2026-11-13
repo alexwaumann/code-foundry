@@ -74,6 +74,8 @@ export interface ThreadState {
   quick?: { open: boolean; height?: number; ran?: string; fresh?: boolean };
   remembered?: { pane?: string; tabs: RememberedTab[] };
   last?: Record<string, string>;
+  /** The info card shown or hidden as the user last toggled it; absent: never toggled (Go's info.go). */
+  info?: boolean;
 }
 
 export interface State {
@@ -901,11 +903,23 @@ const ops = {
     if (q.open || q.height || q.ran) ts.quick = q;
     else delete ts.quick;
     // Go's prune: a record that stores nothing the default would not give goes.
-    if (!ts.quick && !ts.remembered && Object.keys(ts.last ?? {}).length === 0 && ts.space === t.st.default_space) {
+    if (!ts.quick && !ts.remembered && Object.keys(ts.last ?? {}).length === 0 && ts.info === undefined && ts.space === t.st.default_space) {
       const rest = Object.fromEntries(Object.entries(t.st.threads ?? {}).filter(([id]) => id !== thread));
       if (Object.keys(rest).length > 0) t.st.threads = rest;
       else delete t.st.threads;
     }
+    return {};
+  },
+
+  // ---- A thread's info card (internal/layout/info.go) ----
+
+  set_info(t: Tx, o: Op): Result {
+    const thread = str(o, "thread");
+    if (!thread) fail("invalid_argument", "no thread given");
+    const threads = t.st.threads ?? {};
+    const ts = threads[thread] ?? { space: t.spaceOf(thread) };
+    ts.info = o.open === true;
+    t.st.threads = { ...threads, [thread]: ts };
     return {};
   },
 
@@ -1361,6 +1375,7 @@ function threadMsg(id: string, ts: ThreadState): ThreadInit {
     threadId: id,
     spaceId: ts.space,
     quick: ts.quick ? { open: ts.quick.open, height: ts.quick.height ?? 0, ran: ts.quick.ran ?? "" } : undefined,
+    ...(ts.info === undefined ? {} : { info: ts.info }),
     remembered: (ts.remembered?.tabs ?? []).map((r) => ({
       tab: tabMsg(r.tab),
       paneId: r.pane,
@@ -1489,6 +1504,8 @@ export function opFromProto(m: LayoutOp | undefined): Op {
       return { op: "open_draft", draft: c.value.draftId, focus: c.value.focus };
     case "setQuick":
       return { op: "set_quick", thread: c.value.threadId, open: c.value.open, height: c.value.height, forget_ran: c.value.forgetRan };
+    case "setInfo":
+      return { op: "set_info", thread: c.value.threadId, open: c.value.open };
     default:
       return fail("unimplemented", `layout op ${c.case} is not available in the mock`);
   }

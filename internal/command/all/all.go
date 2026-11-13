@@ -227,7 +227,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterDictation(r, command.DictationDeps{Dictation: d.Dictation, Status: d.DictationStatus, Emitter: d.Emitter}),
 		command.RegisterSearch(r, command.SearchDeps{Search: d.Search, Wait: d.SearchWait}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
-		command.RegisterLayout(r, command.LayoutDeps{Layout: d.Layout, Thread: d.Thread}),
+		command.RegisterLayout(r, command.LayoutDeps{Layout: d.Layout, Thread: d.Thread, Settings: d.Settings}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,
 			Skills: d.Skills, Shipped: d.ShippedSkills, Presence: d.Presence,

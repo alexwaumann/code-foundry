@@ -252,6 +252,8 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Draft, o.Focus = pick(s, draftIDs(st)...), s.n(2) == 0
 	case *SetQuick:
 		o.Thread, o.Open, o.Height = pick(s, threads...), s.n(2) == 0, pick[float64](s, 0, 0, 240, -1)
+	case *SetInfo:
+		o.Thread, o.Open = pick(s, threads...), s.n(2) == 0
 	case *ReplaceTerminal:
 		o.Old, o.New = pick(s, terminalIDs...), pick(s, terminalIDs...)
 	case *DropTerminal:

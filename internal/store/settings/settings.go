@@ -51,6 +51,9 @@ type Layout struct {
 	// SmartSwap switches panes to the focused thread's surfaces when they are open there
 	// (internal/layout swap.go).
 	SmartSwap bool
+	// ThreadInfo shows the info card of a thread whose card was never toggled (the GUI's
+	// thread pane; internal/layout info.go keeps each thread's own choice).
+	ThreadInfo bool
 }
 
 // Sidebar is consumed by the GUI.

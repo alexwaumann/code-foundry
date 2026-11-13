@@ -138,11 +138,6 @@ interface UiState {
   snoozedCollapsed: boolean;
   /** Ember's chat opens every "Worked for" row (components/ember/EmberPane.tsx "Show work"). */
   emberShowWork: boolean;
-  /**
-   * The thread info card shows beside every thread's conversation and composer in this
-   * window (view.thread-info; components/threadinfo, docs/notes/thread-info-card.md).
-   */
-  threadInfoOpen: boolean;
 
   /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
   select: (sel: Selection, opts?: SelectOptions) => void;
@@ -179,8 +174,6 @@ interface UiState {
   toggleArchivedCollapsed: () => void;
   toggleSnoozedCollapsed: () => void;
   setEmberShowWork: (on: boolean) => void;
-  /** view.thread-info: shows or hides the thread info card; returns the new state. */
-  toggleThreadInfo: () => boolean;
 }
 
 /** The Usage page's ranges in days (UTC days, today inclusive); 30 by default. */
@@ -301,7 +294,6 @@ export const useUiStore = create<UiState>()(
       archivedCollapsed: true,
       snoozedCollapsed: true,
       emberShowWork: false,
-      threadInfoOpen: false,
 
       select: (sel, opts) => {
         if (selectRoute?.(sel, opts ?? {})) return;
@@ -392,11 +384,6 @@ export const useUiStore = create<UiState>()(
       setEmberShowWork: (emberShowWork) => {
         set({ emberShowWork });
       },
-      toggleThreadInfo: () => {
-        const open = !get().threadInfoOpen;
-        set({ threadInfoOpen: open });
-        return open;
-      },
     }),
     {
       name: "code-foundry.ui",
@@ -433,7 +420,6 @@ export const useUiStore = create<UiState>()(
           archivedCollapsed: bool(p.archivedCollapsed, current.archivedCollapsed),
           snoozedCollapsed: bool(p.snoozedCollapsed, current.snoozedCollapsed),
           emberShowWork: bool(p.emberShowWork, current.emberShowWork),
-          threadInfoOpen: bool(p.threadInfoOpen, current.threadInfoOpen),
         };
       },
       partialize: (s) => ({
@@ -446,7 +432,6 @@ export const useUiStore = create<UiState>()(
         archivedCollapsed: s.archivedCollapsed,
         snoozedCollapsed: s.snoozedCollapsed,
         emberShowWork: s.emberShowWork,
-        threadInfoOpen: s.threadInfoOpen,
       }),
     },
   ),

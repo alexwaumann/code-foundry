@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getDraft, updateDraft } from "@/stores/compose";
 import { useSettingsStore } from "@/stores/settings";
@@ -148,17 +148,31 @@ describe("the floating composer", () => {
     expect(screen.getByTestId("floating-composer-pill")).toBeTruthy();
   });
 
-  it("Escape in it collapses it and stays in full screen; the chip's button collapses it too", async () => {
+  it("Escape in it collapses it and stays in full screen", async () => {
     await fullscreenDiff();
     fireEvent.click(screen.getByTestId("floating-composer-pill"));
     await settle();
     fireEvent.keyDown(screen.getByTestId("composer-input"), { key: "Escape" });
     expect(useShellViewStore.getState().floating.expanded).toBe(false);
     expect(useShellViewStore.getState().fullscreen).not.toBe("");
-    fireEvent.click(screen.getByTestId("floating-composer-pill"));
+  });
+
+  it("the pill and the chip are one button: a click toggles it both ways, and there is no other collapse control", async () => {
+    await fullscreenDiff();
+    const pill = screen.getByTestId("floating-composer-pill");
+    expect(pill.tagName).toBe("BUTTON");
+    expect(pill.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(pill);
     await settle();
-    fireEvent.click(screen.getByTestId("floating-composer-collapse"));
+    const chip = screen.getByTestId("floating-composer-chip");
+    expect(chip.tagName).toBe("BUTTON");
+    expect(chip.getAttribute("aria-expanded")).toBe("true");
+    expect(within(floating() as HTMLElement).getAllByRole("button", { expanded: true })).toEqual([chip]);
+    expect(screen.queryByTestId("floating-composer-collapse")).toBeNull();
+    fireEvent.click(chip);
     expect(useShellViewStore.getState().floating.expanded).toBe(false);
+    expect(screen.getByTestId("floating-composer-pill")).toBeTruthy();
+    expect(screen.queryByTestId("thread-composer")).toBeNull();
   });
 
   it("switching to the thread's own tab keeps full screen and drops the floating composer", async () => {

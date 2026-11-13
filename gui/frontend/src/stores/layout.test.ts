@@ -28,7 +28,7 @@ function mainSpace(over: Partial<LayoutSpaceView> = {}, rightActive = "t-d"): La
 const review: LayoutSpaceView = { id: "sp-b", name: "Review", root: pane("p-c", [tab("t-c", "thread", "th-c")]), focus: "p-c", mru: ["t-c"], drafts: [{ id: "d-1", label: "Fix the build", params: { project: "pj" } }] };
 
 function layout(rev: number, spaces = [mainSpace(), review]): LayoutView {
-  return { rev, spaces, currentSpaceId: "sp-a", defaultSpaceId: "sp-a", threads: [{ threadId: "th-c", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" }] };
+  return { rev, spaces, currentSpaceId: "sp-a", defaultSpaceId: "sp-a", threads: [{ threadId: "th-c", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null }] };
 }
 
 const snapshot = (l: LayoutView): LayoutEventView => ({ kind: "snapshot", rev: l.rev, layout: l, clientId: "" });

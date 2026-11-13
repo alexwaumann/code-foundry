@@ -32,7 +32,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 const { useTerminalsStore } = await import("@/stores/terminals");
 
-const quick = (open: boolean, ran = ""): ThreadLayoutView => ({ threadId: "s-1", spaceId: "sp-a", quick: { open, height: 0, ran }, remembered: [], rememberedPaneId: "" });
+const quick = (open: boolean, ran = ""): ThreadLayoutView => ({ threadId: "s-1", spaceId: "sp-a", quick: { open, height: 0, ran }, remembered: [], rememberedPaneId: "", info: null });
 
 /** Thread s-1's tab in p-1, its diff and a terminal tab in p-2, the Pull Requests page in p-2 too. */
 async function seed(focusPane: string, active2 = "t-term", open = false): Promise<void> {
