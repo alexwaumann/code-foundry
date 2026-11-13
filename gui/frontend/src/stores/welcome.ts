@@ -19,7 +19,7 @@ import { useProjectsStore } from "./projects";
  * "and walk me through it" the thread shows an inline card instead (welcome-page.md).
  */
 export function welcomePrompt(page: string): string {
-  return `I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page ${page} in the side panel and walk me through it.`;
+  return `I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page ${page} in a tab beside this conversation and walk me through it.`;
 }
 
 /** The home composer's draft (No project). */

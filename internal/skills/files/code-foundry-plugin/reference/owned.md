@@ -13,9 +13,10 @@ ui.Node{Key: "shell", Terminal: &ui.Terminal{TerminalID: id, Title: "test run", 
 The plugin's own Claude thread (`h.CreateThread`, permission `threads`) drawn inline with
 the host's thread view and composer (`readOnly: true` leaves the composer out), or its own
 terminal (`h.CreateTerminal`, permission `terminals`) with the host's terminal view, an
-"Open in bottom panel" button and up to 2 buttons of yours. `height` is `"auto"` (the
+"Open in a tab" button (it moves the terminal to a terminal tab, and the node steps aside
+while that tab shows it) and up to 2 buttons of yours. `height` is `"auto"` (the
 default: about 420 px for a thread, `rows` text rows (4..60, default 16) for a terminal),
-`"fill"` (the rest of its box: the panel, or the pane around it, `reference/ui-layout.md`;
+`"fill"` (the rest of its box: the surface's body, or the pane node around it, `reference/ui-layout.md`;
 at least 240 px) or pixels (120..1600). A view naming
 another owner's thread or terminal is refused; one that is gone (removed, closed) shows a
 muted empty state; an archived thread still renders, composer included, with no archived
@@ -58,7 +59,7 @@ so drop it from the view); `Threads` lists them. To write to the
 user's thread, `Invoke` `thread.send` with the id from `act.Context`. `CreateTerminal`
 starts a terminal the plugin owns (cwd the data dir unless given, under home; env checked
 like a thread's; `$SHELL -lc` for the user's tools), shown by a `terminal` node and, on
-request, in the bottom panel; `CloseTerminal` and `Terminals` as for threads, and an exited
+request, in a terminal tab; `CloseTerminal` and `Terminals` as for threads, and an exited
 terminal stays until closed. At most 32 live threads and 16 terminals. Disabling the
 plugin archives its threads (enabling it again finds them with `Threads`; a send
 unarchives one) and closes its terminals. Uninstalling it (with or without `--purge`), or
