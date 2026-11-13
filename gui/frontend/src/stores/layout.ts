@@ -109,7 +109,7 @@ let pending: Pending[] = [];
 /** A Get is running after a gap in the deltas; deltas wait in `held` until it answers. */
 let resyncing = false;
 let held: Extract<LayoutEventView, { kind: "delta" }>[] = [];
-/** Bumped by resetLayout, so a Get started before it is ignored. */
+/** Bumped by resetLayout and by a snapshot during a resync, so a Get started before it is ignored. */
 let generation = 0;
 
 /** Forgets everything (tests; a window that turns the shell off). */
@@ -131,6 +131,12 @@ export function applyLayoutEvent(ev: LayoutEventView): void {
   if (ev.kind === "snapshot") {
     confirmed = ev.layout;
     held = [];
+    // The snapshot is the stream's whole layout now: a Get still running for a gap is older news
+    // and must not land on top of it (resync drops it).
+    if (resyncing) {
+      resyncing = false;
+      generation++;
+    }
     // An answered op is in the snapshot or was lost with a restart; a running one stays on top.
     pending = pending.filter((p) => p.rev === null);
     publish();
@@ -168,8 +174,11 @@ async function resync(): Promise<void> {
   const later = held.sort((a, b) => a.rev - b.rev);
   held = [];
   if (!layout) return;
-  confirmed = layout;
-  publish();
+  // Never back to an older revision: a snapshot or the import's answer may have moved past it.
+  if (!confirmed || layout.rev > confirmed.rev) {
+    confirmed = layout;
+    publish();
+  }
   for (const ev of later) applyLayoutEvent(ev);
 }
 

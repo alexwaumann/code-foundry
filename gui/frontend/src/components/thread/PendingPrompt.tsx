@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
@@ -24,13 +24,13 @@ import {
   type PromptShape,
   type QuestionPick,
 } from "@/lib/threadRequest";
-import { diffStats, parseObject, relPath, str, toolDiff, toolDiffFiles } from "@/lib/toolSummary";
+import { parseObject, relPath, str } from "@/lib/toolSummary";
 import { useThreadsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
 import { useThreadCtx } from "./context";
-import { ToolDiffView } from "./ToolDiffView";
+import { PromptDiff } from "./PromptDiff";
 
 /**
  * The docked prompts (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -93,32 +93,6 @@ function ButtonKey({ k }: { k: string }) {
     <Kbd variant="inherit" size="sm">
       {k}
     </Kbd>
-  );
-}
-
-/** An Edit/Write waiting for permission: its +/− summary, and the diff on demand. */
-function PromptDiff({ r }: { r: ThreadRequestView }) {
-  const { cwd } = useThreadCtx();
-  const diff = useMemo(() => toolDiff({ name: r.toolName, inputJson: r.inputJson, resultJson: "" }), [r.toolName, r.inputJson]);
-  const stats = useMemo(() => (diff ? diffStats(toolDiffFiles(diff)) : null), [diff]);
-  const [open, setOpen] = useState(false);
-  if (!diff || !stats) return null;
-  const { added, removed } = stats;
-  const Chevron = open ? ChevronDown : ChevronRight;
-  return (
-    <div className="pdiff" data-testid="thread-permission-diff">
-      <button type="button" className="pdiff-t" aria-expanded={open} onClick={() => { setOpen(!open); }}>
-        <Chevron aria-hidden />
-        {open ? "Hide the change" : "Show the change"}
-        <span className="n add">+{added}</span>
-        {removed > 0 && <span className="n del">−{removed}</span>}
-      </button>
-      {open && (
-        <div className="pdiff-body">
-          <ToolDiffView diff={diff} cwd={cwd} />
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -225,7 +199,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
       ) : (
         r.inputJson && <div className="cmdbox selectable">{JSON.stringify(input, null, 2)}</div>
       )}
-      <PromptDiff r={r} />
+      <PromptDiff r={r} cwd={cwd} />
       {(description || rules.length > 0 || sessionMode || why) && (
         <div className="desc">
           {description}

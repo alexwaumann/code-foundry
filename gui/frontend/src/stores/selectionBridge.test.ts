@@ -80,12 +80,11 @@ describe("routing a selection", () => {
     expect(planRoute({ kind: "thread", id: "s-2" }, s)).toEqual({ kind: "command", name: "thread.open", args: { id: "s-2", focus: "true" } });
   });
 
-  it("a thread sent from the focused composer takes its tab's place; a sidebar click there opens beside it", async () => {
+  it("a thread selected while a composer has the focus opens beside it: only a send's --compose replaces a composer", async () => {
     await seedLayout(focusOn("p-1", "t-c"));
     const s = useLayoutStore.getState();
     expect(focusedTab(s)?.id).toBe("t-c");
-    expect(planRoute({ kind: "thread", id: "s-9" }, s, { sent: true })).toEqual({ kind: "replace-composer", thread: "s-9", compose: "t-c" });
-    expect(planRoute({ kind: "thread", id: "s-9" }, s)).toEqual({ kind: "command", name: "thread.open", args: { id: "s-9", focus: "true" } });
+    expect(planRoute({ kind: "thread", id: "s-9" }, s, { focusPrompt: true })).toEqual({ kind: "command", name: "thread.open", args: { id: "s-9", focus: "true" } });
   });
 
   it("Pull Requests focuses the space's tab, or opens one", async () => {

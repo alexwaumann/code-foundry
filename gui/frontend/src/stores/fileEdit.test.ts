@@ -10,6 +10,7 @@ import {
   editorDetached,
   editorOpening,
   fileEditKey,
+  fileEditKeyOfTab,
   noteDraft,
   noteEditor,
   noteRead,
@@ -18,7 +19,6 @@ import {
   saveFile,
   startEdit,
   stopEdit,
-  unsavedTabs,
   useFileEditStore,
 } from "./fileEdit";
 import { confirmCloseFile, presentFileSave } from "./fileRequest";
@@ -533,14 +533,87 @@ describe("when the editor goes", () => {
 });
 
 describe("the tab going", () => {
-  it("closing it ends the session and drops the draft, however it closed", async () => {
-    await editing("a=22\n");
+  it("a clean session ends with its tab, however it closed", async () => {
+    await editing();
     const key = edit()?.stateKey ?? "";
     lib.attached.delete(key);
     await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
     await layoutSettled();
     expect(edit()).toBeUndefined();
     expect(lib.drafts.has(key)).toBe(false);
+  });
+
+  it("a dirty one closed by anything but the user's Discard (a model's tab.close) keeps its edits for when the file opens again for that thread", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    detach(key);
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+    expect(lib.drafts.get(key)).toBe("a=22\n");
+    await opened(PANEL, tab);
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+  });
+
+  it("put away with its thread (its tab closed), a dirty file keeps its edits and comes back dirty", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    detach(key);
+    await applyLayoutOp({ op: "close_thread", thread: "s-1" });
+    await layoutSettled();
+    expect(layoutId("/w/.env")).toBe("");
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+    await applyLayoutOp({ op: "open_thread", thread: "s-1", focus: true });
+    await opened(PANEL, tab);
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+    expect(lib.drafts.get(key)).toBe("a=22\n");
+  });
+
+  it("a session follows its file to another space: the key is the thread's and the path's, not the place's", async () => {
+    await editing("a=22\n");
+    const t = useLayoutStore.getState().tabs[layoutId("/w/.env")];
+    expect(t && fileEditKeyOfTab(t)).toBe(KEY);
+    await applyLayoutOp({ op: "move_tab", tab: layoutId("/w/.env"), space: "sp-review", pane: "p-2" });
+    await layoutSettled();
+    expect(useLayoutStore.getState().panes["p-2"]?.tabIds).toContain(layoutId("/w/.env"));
+    noteDraft(KEY, "a=1\n");
+    expect(edit()?.dirty).toBe(false);
+    // Clean and still open in the other space: it stays.
+    await applyLayoutOp({ op: "focus_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(edit()).toBeDefined();
+  });
+
+  it("a dirty session saved after its tab went ends then", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    detach(key);
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    api.write.mockResolvedValue(written());
+    await expect(saveFile(KEY)).resolves.toBe("saved");
+    expect(edit()).toBeUndefined();
+  });
+
+  it("an unlinked File tab's clean session ends with its tab too; a dirty one waits", async () => {
+    const pane = Object.keys(useLayoutStore.getState().panes)[0] ?? "";
+    const loose = fileEditKey("", TAB);
+    openTab(`pane:${pane}`, tab);
+    await layoutSettled();
+    expect(useLayoutStore.getState().tabs[layoutId("/w/.env")]?.thread ?? "").toBe("");
+    await startEdit(loose, { panelKey: "", tabId: TAB, base: "/w" }, view());
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(useFileEditStore.getState().sessions[loose]).toBeUndefined();
+    openTab(`pane:${pane}`, tab);
+    await layoutSettled();
+    await startEdit(loose, { panelKey: "", tabId: TAB, base: "/w" }, view());
+    const key = useFileEditStore.getState().sessions[loose]?.stateKey ?? "";
+    lib.drafts.set(key, "a=3\n");
+    noteDraft(loose, "a=3\n");
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(useFileEditStore.getState().sessions[loose]?.dirty).toBe(true);
   });
 
   it("a removed thread's drafts go with it, and only its", async () => {
@@ -552,14 +625,6 @@ describe("the tab going", () => {
     dropPanelDrafts(PANEL);
     expect(edit()).toBeUndefined();
     expect(lib.drafts.has(key)).toBe(false);
-  });
-
-  it("a thread names its dirty tabs, for a reset to keep", async () => {
-    await editing();
-    const { tabs } = tabPlace(PANEL);
-    expect(unsavedTabs(PANEL, tabs)).toEqual([]);
-    noteDraft(KEY, "a=2\n");
-    expect(unsavedTabs(PANEL, tabs)).toEqual([tab]);
   });
 
   it("two threads showing one file have a draft each", async () => {
@@ -607,11 +672,12 @@ describe("closing a dirty tab", () => {
     expect(api.write).not.toHaveBeenCalled();
   });
 
-  it("Discard closes without writing", async () => {
+  it("Discard closes without writing, and the edits go for good", async () => {
     const { asked } = await ask();
     answerAlternate();
     await expect(asked).resolves.toBe(true);
     expect(api.write).not.toHaveBeenCalled();
+    expect(edit()).toBeUndefined();
   });
 
   it("Save writes, then closes", async () => {

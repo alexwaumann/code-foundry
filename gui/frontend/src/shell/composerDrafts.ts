@@ -10,7 +10,10 @@
  *   shows the tab's `draft` param, the tab reads the id from here (`pendingDraft`).
  * - Later edits relabel it (`composer.draft.label`, at most every LABEL_MS, only when the label
  *   changed); deleting all its text clears it (`composer.draft.clear` after CLEAR_MS, if it is
- *   still empty): the tab is the space's empty composer again, or closes when there is one.
+ *   still empty): the tab is the space's empty composer again, or closes when there is one. Text
+ *   typed while the clear is on its way is kept: once the layout shows the draft gone, a draft
+ *   that is no longer empty starts again as a new draft on the same tab (or, its tab closed, goes
+ *   to its target's composer), never dropped.
  * - The drafts' text is kept in localStorage (STORAGE_KEY) and put back at start, so a draft
  *   survives closing its tab and a reload. A draft the layout no longer lists (sent, discarded,
  *   cleared, from any window or the CLI) loses its text here too.
@@ -74,6 +77,8 @@ function moveEntry(from: string, to: string): void {
 
 const labelTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const clearTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Drafts whose clear was sent and is not yet settled: id → the tab and the target key it came from. */
+const clearing = new Map<string, { tabId: string; targetKey: string }>();
 /** The label last sent per draft, so an unchanged one is not sent again. */
 const sentLabels = new Map<string, string>();
 
@@ -86,27 +91,35 @@ function listedLabel(s: Pick<LayoutState, "spaces">, id: string): string | undef
   return undefined;
 }
 
-async function start(tabId: string, fromKey: string): Promise<void> {
+/**
+ * Makes a compose tab a draft of the text under `fromKey`: the text gets the new draft's own key
+ * at once, and `composer.draft.start` makes the tab that draft. Refused (the tab went, an older
+ * daemon), the text goes to `fallbackKey` (by default where it came from).
+ */
+async function start(tabId: string, fromKey: string, fallbackKey = fromKey): Promise<void> {
   const id = newDraftId();
   // The text gets its own key first, and the tab reads it from there at once.
-  useComposeStore.setState((s) => {
-    const d = s.drafts[fromKey];
-    return d ? { drafts: { ...s.drafts, [DRAFT_KEY + id]: d } } : s;
-  });
+  if (fromKey.startsWith(DRAFT_KEY)) moveEntry(fromKey, DRAFT_KEY + id);
+  else
+    useComposeStore.setState((s) => {
+      const d = s.drafts[fromKey];
+      return d ? { drafts: { ...s.drafts, [DRAFT_KEY + id]: d } } : s;
+    });
   setPending(tabId, id);
   const label = draftLabel(getDraft(DRAFT_KEY + id).text);
   sentLabels.set(id, label);
   const res = await runLayoutCommand("composer.draft.start", { tab: tabId, id, ...(label ? { label } : {}) });
   if (res) {
     // The target's own entry was copied; it starts empty again for the next composer.
-    useComposeStore.setState((s) => {
-      const { [fromKey]: _copied, ...drafts } = s.drafts;
-      return { drafts };
-    });
+    if (!fromKey.startsWith(DRAFT_KEY))
+      useComposeStore.setState((s) => {
+        const { [fromKey]: _copied, ...drafts } = s.drafts;
+        return { drafts };
+      });
     return;
   }
-  // Refused (the tab went, an older daemon): the text goes back where it was.
-  moveEntry(DRAFT_KEY + id, fromKey);
+  // Refused: the text goes back.
+  moveEntry(DRAFT_KEY + id, fallbackKey);
   setPending(tabId, null);
   sentLabels.delete(id);
 }
@@ -130,24 +143,55 @@ function relabel(id: string): void {
   );
 }
 
-function scheduleClear(id: string): void {
+function scheduleClear(id: string, tabId: string, targetKey: string): void {
   clearTimeout(clearTimers.get(id));
   clearTimers.set(
     id,
     setTimeout(() => {
       clearTimers.delete(id);
       if (listedLabel(useLayoutStore.getState(), id) === undefined) {
-        if (isPending(id)) scheduleClear(id);
+        if (isPending(id)) scheduleClear(id, tabId, targetKey);
         return;
       }
       const d = useComposeStore.getState().drafts[DRAFT_KEY + id];
       // Typed into again, sent, or gone meanwhile: nothing to clear.
       if (!d || !isDraftEmpty(d) || d.phase !== "idle") return;
+      clearing.set(id, { tabId, targetKey });
       void runLayoutCommand("composer.draft.clear", { draft: id }).then((res) => {
-        if (res) clearDraft(DRAFT_KEY + id);
+        // Refused: the draft stays as it is. Done: settled here unless the layout still lists it
+        // (its event not in yet), and then when it no longer does (startComposerDrafts' prune).
+        if (!res) clearing.delete(id);
+        else if (listedLabel(useLayoutStore.getState(), id) === undefined) settleCleared(id);
       });
     }, CLEAR_MS),
   );
+}
+
+/**
+ * A cleared draft the layout no longer lists. Still empty: its text goes. Typed into while the
+ * clear was on its way: the text is a draft again, on the same tab when it is still open (the
+ * space's empty composer now), else in its target's composer.
+ */
+function settleCleared(id: string): void {
+  const from = clearing.get(id);
+  if (!from) return;
+  clearing.delete(id);
+  const key = DRAFT_KEY + id;
+  const d = useComposeStore.getState().drafts[key];
+  if (!d || isDraftEmpty(d)) {
+    clearDraft(key);
+    return;
+  }
+  const tab = useLayoutStore.getState().tabs[from.tabId];
+  if (tab?.kind === "compose" && !tab.params.draft && !usePendingStore.getState().byTab[from.tabId]) {
+    void start(from.tabId, key, from.targetKey);
+    return;
+  }
+  if (isDraftEmpty(getDraft(from.targetKey))) moveEntry(key, from.targetKey);
+  else {
+    updateDraft(from.targetKey, { text: `${getDraft(from.targetKey).text}\n\n${d.text}` });
+    clearDraft(key);
+  }
 }
 
 /**
@@ -163,7 +207,7 @@ export function composerTextChanged(tabId: string, draft: string, targetKey: str
   const d = getDraft(DRAFT_KEY + draft);
   if (isDraftEmpty(d)) {
     clearTimeout(labelTimers.get(draft));
-    scheduleClear(draft);
+    scheduleClear(draft, tabId, targetKey);
     return;
   }
   clearTimeout(clearTimers.get(draft));
@@ -175,6 +219,7 @@ export function resetComposerDrafts(): void {
   for (const t of [...labelTimers.values(), ...clearTimers.values()]) clearTimeout(t);
   labelTimers.clear();
   clearTimers.clear();
+  clearing.clear();
   sentLabels.clear();
   usePendingStore.setState({ byTab: {} });
 }
@@ -236,10 +281,12 @@ export function startComposerDrafts(): () => void {
   const prune = (s: LayoutState) => {
     if (!s.loaded) return;
     const listed = listedIds(s);
+    // A clear the layout now shows done: settled before anything unlisted is dropped.
+    for (const id of [...clearing.keys()]) if (!listed.has(id)) settleCleared(id);
     const pending = new Set(Object.values(usePendingStore.getState().byTab));
     for (const key of Object.keys(useComposeStore.getState().drafts)) {
       const id = key.startsWith(DRAFT_KEY) ? key.slice(DRAFT_KEY.length) : "";
-      if (id && !listed.has(id) && !pending.has(id)) clearDraft(key);
+      if (id && !listed.has(id) && !pending.has(id) && !clearing.has(id)) clearDraft(key);
     }
     // A tab the layout now shows as its draft needs no pending id.
     for (const [tabId, id] of Object.entries(usePendingStore.getState().byTab)) {

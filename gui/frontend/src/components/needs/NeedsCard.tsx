@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { PlaceIcon } from "@/components/sidebar/SidebarRow";
 import { TokenSpans } from "@/components/thread/Code";
+import { PromptDiff } from "@/components/thread/PromptDiff";
 import { useThreadPlace } from "@/components/thread/useThreadPlace";
 import { shellTokens } from "@/lib/highlight";
 import { askTarget } from "@/lib/needsAsk";
@@ -20,7 +21,8 @@ import "@/components/thread/thread.css";
 /**
  * The Needs-you hover card (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-17-needs-you.md):
  * the whole ask of a thread that waits on the user. A permission shows the tool, the full command
- * or file, the thread and the last line Claude wrote, with Allow, Deny and Go to thread, and only
+ * or file (for an edit or a write, its +/− summary and the diff too, open, as the pane's card has
+ * them), the thread and the last line Claude wrote, with Allow, Deny and Go to thread, and only
  * once that whole request is known: while it is read the card says so, and when it cannot be read
  * it shows the one-line summary with Open… (the popup) and Go to thread. A question is never
  * answered here: it offers the popup and the thread. Quick actions only; the popup has today's
@@ -132,16 +134,20 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
       </>
     );
     body = (
-      <div className="cmdbox selectable" data-testid="needs-card-target" data-kind={target?.kind ?? "none"}>
-        {target?.kind === "command" ? (
-          <>
-            <span className="text-cf-text-muted">$ </span>
-            <TokenSpans tokens={shellTokens(target.text)} />
-          </>
-        ) : (
-          (target?.text ?? "")
-        )}
-      </div>
+      <>
+        <div className="cmdbox selectable" data-testid="needs-card-target" data-kind={target?.kind ?? "none"}>
+          {target?.kind === "command" ? (
+            <>
+              <span className="text-cf-text-muted">$ </span>
+              <TokenSpans tokens={shellTokens(target.text)} />
+            </>
+          ) : (
+            (target?.text ?? "")
+          )}
+        </div>
+        {/* An edit or a write: the change itself, shown whole (the card scrolls), as the pane's card has it. */}
+        <PromptDiff r={request} cwd={cwd} open />
+      </>
     );
   } else if (pending) {
     // Not known (yet): the summary at most, never Allow or Deny under a command not shown whole.

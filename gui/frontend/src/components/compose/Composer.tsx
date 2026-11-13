@@ -282,12 +282,14 @@ function ComposerCard({
   workspaceName,
   promptFocusRef,
   onTextChange,
+  tabId,
 }: {
   target: ComposeTarget;
   set: ResolvedSet;
   workspaceName: string;
   promptFocusRef: RefObject<() => void>;
   onTextChange?: (text: string) => void;
+  tabId?: string;
 }) {
   const draftKey = keyOf(target);
   const defaults = useDefaults();
@@ -451,10 +453,10 @@ function ComposerCard({
   const send = () => {
     // Dictating: stop, let the last phrase land, then send what the prompt holds.
     if (dictation.phase) {
-      if (!busy && !empty) void dictation.flush().then(() => sendDraft(target, defaults, hints));
+      if (!busy && !empty) void dictation.flush().then(() => sendDraft(target, defaults, hints, { composeTab: tabId }));
       return;
     }
-    if (canSend) void sendDraft(target, defaults, hints);
+    if (canSend) void sendDraft(target, defaults, hints, { composeTab: tabId });
   };
 
   /** Pasted, dropped or picked files: thumbnails, and chips at the caret. */
@@ -810,6 +812,8 @@ function ComposerCard({
 /**
  * `draftId`: the window shell's composer draft this is (its text has its own key, lib/compose
  * draftKey). `onTextChange`: the user changed the text (typing, a paste, a tag), not a prefill.
+ * `tabId`: the compose tab it is drawn in, which its send names (thread.new --compose): the
+ * thread's tab takes that tab's place, whatever has the focus when the send goes out.
  */
 export function Composer({
   projectId,
@@ -818,6 +822,7 @@ export function Composer({
   likeThreadId,
   draftId,
   onTextChange,
+  tabId,
 }: {
   projectId: string;
   workspaceId?: string;
@@ -825,6 +830,7 @@ export function Composer({
   likeThreadId?: string;
   draftId?: string;
   onTextChange?: (text: string) => void;
+  tabId?: string;
 }) {
   const target = useMemo<ComposeTarget>(() => {
     const t: ComposeTarget = likeThreadId ? { kind: "like", threadId: likeThreadId } : workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", projectId };
@@ -915,7 +921,7 @@ export function Composer({
                 </>
               )}
             </h1>
-            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} onTextChange={onTextChange} />
+            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} onTextChange={onTextChange} tabId={tabId} />
           </div>
         )}
       </section>

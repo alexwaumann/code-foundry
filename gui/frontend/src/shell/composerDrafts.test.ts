@@ -99,7 +99,51 @@ describe("a compose tab's draft", () => {
     composerTextChanged("t-c", "d-1", "web");
     await act(() => vi.advanceTimersByTimeAsync(CLEAR_MS * 2));
     expect(runs.at(-1)).toEqual({ name: "composer.draft.clear", args: { draft: "d-1" } });
+    // Its text goes once the layout shows it cleared.
+    await act(async () => {
+      await seedLayout({ ...DRAFTS([]), rev: 2 });
+    });
     expect(useComposeStore.getState().drafts["draft:d-1"]).toBeUndefined();
+  });
+
+  it("text typed while the clear is on its way is kept: it starts a new draft on the same tab", async () => {
+    await seedLayout(DRAFTS([{ id: "d-1", label: "Fix" }]));
+    stop = startComposerDrafts();
+    let answer: (v: unknown) => void = () => undefined;
+    runLayoutCommand.mockImplementationOnce((name: string, args: Record<string, string>) => {
+      runs.push({ name, args });
+      return new Promise((r) => (answer = r));
+    });
+    updateDraft("draft:d-1", { text: "" });
+    composerTextChanged("t-c", "d-1", "web");
+    await act(() => vi.advanceTimersByTimeAsync(CLEAR_MS * 2));
+    expect(runs.at(-1)).toEqual({ name: "composer.draft.clear", args: { draft: "d-1" } });
+    // Typed again before the clear answered; the layout then shows the tab as the empty composer.
+    updateDraft("draft:d-1", { text: "Second thoughts" });
+    composerTextChanged("t-c", "d-1", "web");
+    await act(async () => {
+      await seedLayout({ ...DRAFTS([]), rev: 2 });
+    });
+    answer({ rev: 2, changed: true });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    const id = started();
+    expect(id).toMatch(/^d-/);
+    expect(runs.at(-1)).toEqual({ name: "composer.draft.start", args: { tab: "t-c", id, label: "Second thoughts" } });
+    expect(getDraft(`draft:${id}`).text).toBe("Second thoughts");
+  });
+
+  it("the same when the clear answers before the layout shows it", async () => {
+    await seedLayout(DRAFTS([{ id: "d-1", label: "Fix" }]));
+    stop = startComposerDrafts();
+    updateDraft("draft:d-1", { text: "" });
+    composerTextChanged("t-c", "d-1", "web");
+    await act(() => vi.advanceTimersByTimeAsync(CLEAR_MS * 2));
+    updateDraft("draft:d-1", { text: "Again" });
+    await act(async () => {
+      await seedLayout({ ...DRAFTS([]), rev: 2 });
+    });
+    const id = started();
+    expect(getDraft(`draft:${id}`).text).toBe("Again");
   });
 
   it("keeps the drafts' text in storage and puts it back at start", async () => {

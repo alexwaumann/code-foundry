@@ -212,6 +212,28 @@ test("contents leave the library: on leaving a saved tab, on Discard, on the pen
   await thenLeft(() => page.getByTestId("confirm-alternate").click(), closed);
 });
 
+test("a dirty file put away with its thread keeps its edits: cmd+w on the thread asks nothing, and the file comes back unsaved", async ({ page }) => {
+  const env = `${CF}/.env`;
+  await writeDisk(env, "SECRET=1\n");
+  await openFile(page, ".env");
+  await startEditing(page);
+  await page.keyboard.type("x");
+  await expect(status(page)).toHaveText("Unsaved");
+  // The thread's own tab closes the thread from its space, its linked tabs with it.
+  await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').first().click();
+  await page.keyboard.press("Meta+w");
+  await expect(page.getByTestId("thread-pane")).toHaveCount(0);
+  await expect(file(page)).toHaveCount(0);
+  await expect(page.getByTestId("confirm-dialog")).toHaveCount(0);
+  // The thread again, and its file: the edits are there, still unsaved, nothing written.
+  await row(page, "s:s-1").click();
+  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: ".env" })}))`);
+  await expect(status(page)).toHaveText("Unsaved");
+  await expect(line(page, 1)).toContainText("xSECRET=1");
+  expect(await disk(env)).toBe("SECRET=1\n");
+});
+
 test("cmd+S saves the editor with the keyboard, not the focused pane's tab, and never a hidden draft", async ({ page }) => {
   const a = `${CF}/a.txt`;
   const b = `${CF}/b.txt`;

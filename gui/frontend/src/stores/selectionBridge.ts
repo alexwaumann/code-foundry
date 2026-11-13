@@ -110,11 +110,6 @@ export type RouteAction =
   | { kind: "focus"; tab: string; params?: Record<string, string> }
   /** Set the focused tab's params (the Projects tab moving between its pages). */
   | { kind: "params"; tab: string; params: Record<string, string> }
-  /**
-   * The thread replaces the composer it was sent from. A send through thread.new does this itself
-   * (--compose, shell/composerTab.ts); "New thread on this branch" (thread.new-like) has no such arg.
-   */
-  | { kind: "replace-composer"; thread: string; compose: string }
   /** Open a page's tab in the focused pane (view.open.* arrives with PR 7). */
   | { kind: "open"; tabKind: string; params: Record<string, string> }
   /** Not the shell's: leave the selection to the store. */
@@ -126,7 +121,6 @@ export function planRoute(sel: Selection, s: LayoutState, opts: SelectOptions = 
   switch (sel.kind) {
     case "thread":
       if (focused?.kind === "thread" && focused.thread === sel.id) return { kind: "stay" };
-      if (opts.sent && focused?.kind === "compose") return { kind: "replace-composer", thread: sel.id, compose: focused.id };
       return { kind: "command", name: "thread.open", args: { id: sel.id, focus: "true" } };
     case "view": {
       if (sel.name === EMBER_VIEW) return emberThread ? planRoute({ kind: "thread", id: emberThread }, s, opts) : { kind: "none" };
@@ -185,9 +179,6 @@ async function run(action: RouteAction): Promise<number | null> {
       return null;
     case "params":
       await applyLayoutOp({ op: "set_tab_params", tab: action.tab, params: action.params });
-      return null;
-    case "replace-composer":
-      await applyLayoutOp({ op: "open_thread", thread: action.thread, compose: action.compose, focus: true });
       return null;
     case "open":
       await applyLayoutOp({ op: "open_surface", tab: { kind: action.tabKind, params: action.params }, focus: true });

@@ -4608,11 +4608,17 @@ export class World {
             { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window", defaultValue: "true" },
+            { name: "compose", type: ArgType.STRING, required: false, description: "The composer tab it is sent from (the shell window sets it): the thread's tab takes its place, in its space" },
           ],
         },
         // Like the daemon (canNewLike): in the GUI only for a thread with a project or a workspace.
         when: (ctx) => activeThread(ctx) !== undefined && (!ctx?.activeView || Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
-        run: (ctx, args) => this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args),
+        run: async (ctx, args) => {
+          const out = await this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args);
+          // --compose, as thread.new's.
+          if (args.compose) this.layout.apply({ op: "open_thread", thread: (JSON.parse(out.resultJson) as { id: string }).id, compose: args.compose, focus: true });
+          return out;
+        },
       },
       {
         cmd: {
