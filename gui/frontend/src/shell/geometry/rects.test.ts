@@ -111,11 +111,11 @@ describe("pane minimums", () => {
       want: { a: [0, 0, 494, 600], b: [506, 0, 494, 600] },
     },
     {
-      doc: "when the minimums do not fit, the panes share by their sizes alone",
+      doc: "when the minimums do not fit, the panes share in proportion to their minimums",
       root: row("s", [0.8, 0.2], pane("a", "thread:x"), pane("b", "diff:x")),
       w: 500,
       h: 600,
-      want: { a: [0, 0, 390, 600], b: [402, 0, 98, 600] },
+      want: { a: [0, 0, 283, 600], b: [295, 0, 205, 600] },
     },
     {
       doc: "a column holds a short terminal at its minimum height",

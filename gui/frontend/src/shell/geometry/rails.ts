@@ -6,12 +6,13 @@
  * Order: panes without a thread tab first, then panes with one; within each, the least recently
  * focused first (a pane whose tabs were never focused before any that were), and among equals the
  * later pane in layout order first. The focused pane and the pane holding the focused thread's
- * tab never fold. A fold is kept only when it shrinks a dimension that does not fit; once the
- * tree fits, the folded panes are tried again in reverse order and each one that still fits
- * unfolds. See docs/notes/shell-9-geometry.md.
+ * tab never fold. Panes fold in that order until the tree fits, then the folded ones are tried
+ * again in reverse order and each one that can unfolds (`foldRails`). An open pane is drawn
+ * smaller than its minimum only when it is one that never folds and every other pane is folded.
+ * See docs/notes/shell-9-geometry.md and docs/notes/shell-25a-test-feedback.md.
  */
 import { frameRects, minimumOf, paneMinimum, type MinimumOf } from "./rects";
-import { activeTab, panesOf, type Frame, type GeoNode, type GeoPane } from "./types";
+import { activeTab, panesOf, type Frame, type GeoNode, type GeoPane, type Size } from "./types";
 
 export interface RailsInput {
   root: GeoNode | null;
@@ -62,30 +63,63 @@ function cmpAge(a: number, b: number): number {
   return a === b ? 0 : a < b ? -1 : 1;
 }
 
-/** The panes to draw as rails in this area. */
+/** How far a minimum size runs past the area in each direction (0 where it fits). */
+function excess(m: Size, w: number, h: number): Size {
+  return { w: Math.max(0, m.w - w), h: Math.max(0, m.h - h) };
+}
+
+/**
+ * The panes to draw as rails in this area. Every pane that may fold folds in `foldOrder` until the
+ * tree fits (a fold is not required to help on its own: a column only narrows once all of its
+ * panes fold, docs/notes/shell-25a-test-feedback.md). Then the folded panes are tried again in
+ * reverse order. While the tree fits, one unfolds when the tree still fits. When even the panes
+ * that never fold cannot keep their minimums, one unfolds only when that runs no further past the
+ * area and every open pane that may fold is still drawn at its minimum: the panes that never fold
+ * are the only ones ever drawn smaller.
+ */
 export function foldRails({ root, w, h, focus, mru, minimum = paneMinimum }: RailsInput): Set<string> {
   const rails = new Set<string>();
-  let m = minimumOf(root, rails, minimum);
-  const fits = (s: { w: number; h: number }) => s.w <= w && s.h <= h;
-  if (fits(m)) return rails;
+  const fits = (s: Size) => s.w <= w && s.h <= h;
+  if (fits(minimumOf(root, rails, minimum))) return rails;
   const folded: string[] = [];
   for (const id of foldOrder(root, focus, mru)) {
-    if (fits(m)) break;
     rails.add(id);
-    const next = minimumOf(root, rails, minimum);
-    if ((m.w > w && next.w < m.w) || (m.h > h && next.h < m.h)) {
-      m = next;
-      folded.push(id);
-    } else {
-      rails.delete(id);
-    }
+    folded.push(id);
+    if (fits(minimumOf(root, rails, minimum))) break;
   }
-  if (!fits(m)) return rails;
+  const keep = unfoldable(root, focus);
+  // Short of room: unfolding must not run further past the area, nor draw a pane that may fold short.
+  const noWorse = (before: Size, after: Size): boolean => {
+    const b = excess(before, w, h);
+    const a = excess(after, w, h);
+    return a.w <= b.w && a.h <= b.h && foldableAtMinimums(root, w, h, rails, keep, minimum);
+  };
   for (const id of folded.reverse()) {
+    const before = minimumOf(root, rails, minimum);
     rails.delete(id);
-    if (!fits(minimumOf(root, rails, minimum))) rails.add(id);
+    const after = minimumOf(root, rails, minimum);
+    if (fits(before) ? fits(after) : noWorse(before, after)) continue;
+    rails.add(id);
   }
   return rails;
+}
+
+/** Whether every open pane outside `keep` is drawn at least at its minimum with these rails. */
+function foldableAtMinimums(
+  root: GeoNode | null,
+  w: number,
+  h: number,
+  rails: ReadonlySet<string>,
+  keep: ReadonlySet<string>,
+  minimum: MinimumOf,
+): boolean {
+  const frame = frameRects(root, w, h, rails, minimum);
+  return panesOf(root).every((p) => {
+    if (rails.has(p.id) || keep.has(p.id)) return true;
+    const r = frame.rects[p.id];
+    const m = minimum(p);
+    return !!r && r.w >= m.w - 0.5 && r.h >= m.h - 0.5;
+  });
 }
 
 /** The frame the window draws: rails folded for this area, then the rectangles. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { col, pane, randomTree, rng, row } from "@/test/shellTrees";
 import { foldOrder, foldRails, shellFrame, unfoldable, type RailsInput } from "./rails";
-import { RAIL, minimumOf, tilingErrors } from "./rects";
+import { RAIL, minimumOf, paneMinimum, tilingErrors } from "./rects";
 import { panesOf, type GeoNode } from "./types";
 
 /** Freezes a tree all the way down, so any write to the stored layout throws. */
@@ -109,8 +109,8 @@ describe("folding", () => {
     expect(JSON.stringify(four)).toBe(before);
   });
 
-  it("keeps a fold only when it shrinks a dimension that does not fit", () => {
-    // c folds first (never focused) but the column stays as wide as b, so it unfolds again.
+  it("a fold that does not help unfolds again", () => {
+    // c folds first (never focused) but the column stays as wide as b; b folds too, and then c unfolds.
     const tree = row("s", [0.5, 0.5], pane("a", "thread:A"), col("k", [0.5, 0.5], pane("b", "prs"), pane("c", "terminal")));
     expect(minimumOf(tree)).toEqual({ w: 672, h: 282 });
     expect(sorted(foldRails({ root: tree, w: 612, h: 600, focus: "a", mru: ["b/0"] }))).toEqual(["b"]);
@@ -131,8 +131,86 @@ describe("folding", () => {
     expect(sorted(foldRails({ root: tree, w: 700, h: 600, focus: "a" }))).toEqual(["u"]);
   });
 
+  it("folds a whole column when only all of it folding narrows it", () => {
+    // Two panes stacked in a column: folding either alone leaves the column as wide as the other.
+    const tree = row("s", [0.4, 0.3, 0.3], pane("a", "thread:A"), col("k", [0.5, 0.5], pane("b", "compose"), pane("c", "thread:C")), pane("d", "diff:A"));
+    const input = { root: tree, w: 700, h: 600, focus: "d", mru: ["d/0", "a/0"] };
+    expect(sorted(foldRails(input))).toEqual(["b", "c"]);
+    const frame = shellFrame(input);
+    expect(frame.rects.a?.w).toBeGreaterThanOrEqual(360);
+    expect(frame.rects.d?.w).toBeGreaterThanOrEqual(260);
+  });
+
+  it("folds a whole row of short panes into horizontal strips", () => {
+    // A row of two panes over a thread: the row is only shorter once both fold, and then each is a
+    // strip as wide as its share and a rail tall.
+    const tree = col("s", [0.5, 0.5], row("r", [0.5, 0.5], pane("a", "diff:A"), pane("b", "prs")), pane("c", "thread:A"));
+    const input = { root: tree, w: 900, h: 300, focus: "c", mru: ["c/0"] };
+    expect(sorted(foldRails(input))).toEqual(["a", "b"]);
+    const frame = shellFrame(input);
+    expect(frame.rects.a).toMatchObject({ h: RAIL, rail: true });
+    expect(frame.rects.b).toMatchObject({ h: RAIL, rail: true });
+    expect((frame.rects.a?.w ?? 0) > RAIL).toBe(true);
+    expect(frame.rects.c?.h).toBe(300 - RAIL - 12);
+    expect(tilingErrors(frame)).toEqual([]);
+  });
+
   it("folds nothing for an empty space", () => {
     expect(sorted(foldRails({ root: null, w: 10, h: 10 }))).toEqual([]);
+  });
+});
+
+// The owner's layout at the window's minimum width (940 - the 260 sidebar - 3 gaps): a thread, a
+// column of a draft over a thread, a pane with a thread, A's diff, Pull Requests and Projects; one
+// thread under the row. docs/notes/shell-25a-test-feedback.md.
+const owner = (active: string) =>
+  col(
+    "root",
+    [0.6, 0.4],
+    row(
+      "r",
+      [0.33, 0.33, 0.34],
+      pane("a", "thread:A"),
+      col("m", [0.5, 0.5], pane("cmp", "compose"), pane("b", "thread:B")),
+      { ...pane("c", "thread:C", "diff:A", "prs", "projects"), active },
+    ),
+    pane("d", "thread:D"),
+  );
+const ownerAt = (active: string, focus: string, w = 644) => ({ root: owner(active), w, h: 700, focus, mru: ["c/1", "a/0", "b/0", "cmp/0", "d/0"] });
+
+describe("the owner's layout at the minimum width", () => {
+  it.each([
+    // Focus on the diff keeps a (its thread) and c. Before: nothing folded (neither panes of the
+    // middle column narrowed it alone) and the middle column was drawn at 204px.
+    { doc: "the diff focused", active: "c/1", focus: "c", want: ["b", "cmp"] },
+    { doc: "thread A focused, the diff active", active: "c/1", focus: "a", want: ["b", "c", "cmp"] },
+    { doc: "Pull Requests focused", active: "c/2", focus: "c", want: ["a", "b", "cmp"] },
+  ])("$doc: folds $want and draws no pane that may fold below its minimum", ({ active, focus, want }) => {
+    const input = ownerAt(active, focus);
+    expect(sorted(foldRails(input))).toEqual(want);
+    const frame = shellFrame(input);
+    expect(tilingErrors(frame)).toEqual([]);
+    const keep = unfoldable(input.root, focus);
+    for (const p of panesOf(input.root)) {
+      const r = frame.rects[p.id];
+      if (!r || r.rail || keep.has(p.id)) continue;
+      const m = paneMinimum(p);
+      expect(r.w, p.id).toBeGreaterThanOrEqual(m.w);
+      expect(r.h, p.id).toBeGreaterThanOrEqual(m.h);
+    }
+  });
+
+  it("the diff focused: a and c share what is left in proportion to their minimums", () => {
+    const frame = shellFrame(ownerAt("c/1", "c"));
+    // 644 - two 12px gaps - the 36px rail column = 584, shared 360 : 260.
+    expect(frame.rects.a?.w).toBe(339);
+    expect(frame.rects.c?.w).toBe(245);
+  });
+
+  it("with room for the diff and its thread, both keep their minimums", () => {
+    const frame = shellFrame(ownerAt("c/1", "c", 700));
+    expect(frame.rects.a?.w).toBeGreaterThanOrEqual(360);
+    expect(frame.rects.c?.w).toBeGreaterThanOrEqual(260);
   });
 });
 
@@ -153,6 +231,23 @@ describe("random trees", () => {
       const frame = shellFrame(input);
       expect(tilingErrors(frame), `tree ${String(n)} at ${String(w)}x${String(h)}`).toEqual([]);
       const fits = (s: { w: number; h: number }) => s.w <= w && s.h <= h;
+      const keep = unfoldable(root, focus);
+      const short = panesOf(root).filter((p) => {
+        const r = frame.rects[p.id];
+        const m = paneMinimum(p);
+        return !!r && !r.rail && (r.w < m.w - 1 || r.h < m.h - 1);
+      });
+      // Only a pane that never folds is drawn short, and then no other fold would help.
+      for (const p of short) expect(keep.has(p.id), `tree ${String(n)}: ${p.id} short`).toBe(true);
+      if (short.length > 0) {
+        const over = (s: { w: number; h: number }) => [Math.max(0, s.w - w), Math.max(0, s.h - h)];
+        const [ow = 0, oh = 0] = over(minimumOf(root, rails));
+        for (const p of panesOf(root)) {
+          if (rails.has(p.id) || keep.has(p.id)) continue;
+          const [fw = 0, fh = 0] = over(minimumOf(root, new Set([...rails, p.id])));
+          expect(fw < ow || fh < oh, `tree ${String(n)}: folding ${p.id} would help`).toBe(false);
+        }
+      }
       if (fits(minimumOf(root, rails))) {
         for (const id of rails) {
           const without = new Set(rails);
