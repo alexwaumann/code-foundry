@@ -105,5 +105,11 @@ and `bg-cf-warning/20` when its tab is focused; Discard is unchanged.
 - e2e (`shell-feedback.spec.ts`): the owner's layout at the minimum width in WebKit, a short row as
   strips, and SHOTS for every item; `shell-fullscreen.spec.ts`'s drag test now drags the pill too
   and checks a drag does not toggle.
+- The card on by default changed ten e2e specs' setup: those of the card (they show it with its
+  toggle) and those of the conversation measured without it (`thread`, `thread-prompts`,
+  `thread-message-fold`, `page-library`). They start with `infoCardOff()` (e2e/fixtures.ts:
+  `layout.thread_info` off), the state they were written for. With the card shown, a turn
+  header's fold moved the header by 15 px in `thread.spec.ts`'s fold test; that may predate this
+  change for anyone who had the card on, and is left for a separate look.
 - End to end: `thread.info` on a scratch daemon and the CLI, toggled from the setting's default,
   set explicitly, shown by `layout show`, kept across a daemon restart.
