@@ -5,7 +5,7 @@
  */
 import { startCommandNamed } from "@/keys/bindings";
 import { openAddProject } from "./addProject";
-import { newWorktreeTerminal } from "./bottomActions";
+import { newTerminalInContext } from "@/shell/terminalActions";
 import { toastCleanupResult } from "./cleanupWorktrees";
 import { runCommand, runCommandForResult } from "./commands";
 import { composeIn } from "./compose";
@@ -15,9 +15,9 @@ import { mainWorktreePath, useProjectsStore } from "./projects";
 import { archiveThread } from "./threadActions";
 import { useUiStore } from "./ui";
 
-/** terminal.new in the worktree; the shell opens (focused) in the Projects page's bottom panel. */
+/** terminal.new in the worktree; its tab opens (focused) in the focused pane. */
 export function newTerminalIn(projectId: string, path: string): Promise<boolean> {
-  return newWorktreeTerminal(projectId, path);
+  return newTerminalInContext(worktreeContext(projectId, path));
 }
 
 /**

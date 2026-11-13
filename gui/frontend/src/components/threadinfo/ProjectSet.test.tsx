@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
 import { SaveWorkspaceDialog } from "@/components/thread/SaveWorkspaceDialog";
-import { ThreadTitle } from "@/components/thread/ThreadParts";
+import { ThreadCrumb } from "@/components/thread/ThreadParts";
 import { useThreadsStore } from "@/stores/threads";
 import { card } from "@/test/cardFakes";
 import { confirmFirst, daemon, invocationsOf, resetDaemon } from "@/test/daemonFakes";
@@ -83,7 +83,7 @@ async function tick(): Promise<void> {
 async function renderPlace(): Promise<void> {
   render(
     <>
-      <ThreadTitle id={ID} />
+      <ThreadCrumb id={ID} />
       <PlaceGroup threadId={ID} />
       <SaveWorkspaceDialog />
       <ConfirmDialog />

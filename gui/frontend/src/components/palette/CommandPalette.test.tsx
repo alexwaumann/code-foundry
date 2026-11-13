@@ -25,9 +25,12 @@ const COMMANDS = [
   cmd("thread.new", "New Thread", "Thread", ["cmd+n"]),
   cmd("view.help", "Keyboard Shortcuts and Help", "View", ["cmd+/"]),
   cmd("view.settings", "Settings", "View", ["cmd+,"]),
-  cmd("view.panel.expand", "Expand Side Panel", "View"),
-  cmd("view.panel.toggle", "Toggle Side Panel", "View", ["cmd+b"]),
-  cmd("view.panel.split", "Split Side Panel", "View", ["cmd+\\"]),
+  cmd("pane.fullscreen", "Full Screen Pane", "View"),
+  cmd("pane.close", "Close Pane", "View"),
+  cmd("pane.split", "Split Pane", "View", ["cmd+\\"]),
+  // The classic side panel's verbs, which the daemon lists until PR 22: never in the palette.
+  cmd("view.panel.toggle", "Toggle Side Panel", "View"),
+  cmd("view.panel.split", "Split Side Panel", "View"),
 ];
 
 beforeEach(() => {
@@ -66,7 +69,7 @@ const mode = () => screen.getByTestId("palette").getAttribute("data-mode");
 describe("the command palette's ranking (palette-rank.spec.ts)", () => {
   it.each([
     ["help", "view.help"],
-    ["split", "view.panel.split"],
+    ["split", "pane.split"],
     ["settings", "view.settings"],
   ])("%s: %s first and highlighted, in one Results group", async (query, want) => {
     await openPalette();
@@ -76,11 +79,13 @@ describe("the command palette's ranking (palette-rank.spec.ts)", () => {
     expect(headings()).toEqual(["Results"]);
   });
 
-  it("panel: a panel command first, not an early category's loose match", async () => {
+  it("pane: a pane command first, not an early category's loose match; the side panel's verbs are not listed", async () => {
     await openPalette();
-    typeQuery("panel");
-    expect(first()?.textContent).toContain("Panel");
+    typeQuery("pane");
+    expect(first()?.textContent).toContain("Pane");
     expect(headings()).toEqual(["Results"]);
+    typeQuery("side panel");
+    expect(document.querySelector('[cmdk-item][data-command^="view.panel."]')).toBeNull();
   });
 
   it("Enter on help opens help; it does not relaunch the app", async () => {

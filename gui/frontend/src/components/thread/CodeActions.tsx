@@ -3,9 +3,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
 import { useCopied } from "@/lib/useCopied";
 import { runInLinkedTerminal } from "@/shell/terminalActions";
-import { runInThreadTerminal } from "@/stores/bottomActions";
 import { useCommandsStore } from "@/stores/commands";
-import { shellDrawn } from "@/stores/shellView";
 import { useCodeRun } from "./codeContext";
 import "./codeActions.css";
 
@@ -40,10 +38,10 @@ function useCanStartShell(): boolean {
 }
 
 /**
- * "Run in terminal" for a shell block in Claude's reply: a new shell in the thread's
- * bottom panel runs the command (terminal.new --run) and stays open; in the window shell, a new
- * terminal tab linked to the thread, placed by the rules (shell/terminalActions.ts). Only when the block
- * is runnable (lib/codeActions), finished, and terminal.new is available.
+ * "Run in terminal" for a shell block in Claude's reply: a new terminal tab linked to the thread,
+ * placed by the rules, runs the command (terminal.new --run) and stays open
+ * (shell/terminalActions.ts). Only when the block is runnable (lib/codeActions), finished, and
+ * terminal.new is available.
  */
 function RunButton({ lang, code }: { lang: string; code: string }) {
   const run = useCodeRun();
@@ -58,7 +56,7 @@ function RunButton({ lang, code }: { lang: string; code: string }) {
         aria-label="Run in terminal"
         data-testid="code-run"
         onClick={() => {
-          void (shellDrawn() ? runInLinkedTerminal(run.threadId, command) : runInThreadTerminal(run.threadId, command));
+          void runInLinkedTerminal(run.threadId, command);
         }}
       >
         <Play aria-hidden />

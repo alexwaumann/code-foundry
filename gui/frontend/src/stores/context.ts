@@ -2,15 +2,12 @@ import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
 import { bandSortTimes, placeThread, type ListOptions, type ListThread, type WorktreeRef } from "@/lib/tree";
-import { PROJECT_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
-import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useProjectsStore, type ProjectsData } from "./projects";
 import { getViewing, SUBAGENT_VIEW } from "./subagentView";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { inSidebar, type ThreadsById } from "@/lib/inSidebar";
 import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
-import { useTerminalsStore } from "./terminals";
 import { useUiStore, type Selection } from "./ui";
 
 /** No thread, project, worktree or terminal: HOME's context (the composer on No project). */
@@ -37,45 +34,14 @@ export function projectContext(projectId: string): UiContextView {
   return { ...emptyContext, activeProjectId: projectId, activeView: "projects" };
 }
 
-/** A terminal as the command context needs it: its id and owner labels. */
-export interface ContextShell {
-  id: string;
-  labels: Readonly<Record<string, string>>;
-}
-
-/**
- * The worktree a Projects-page shell belongs to (its project and worktree labels); null for
- * any other terminal. Both the Projects page's "+" (bottomActions paneContext) and the
- * command context with the keyboard in that shell use it.
- */
-export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | null {
-  if (!t || ownerKeyOf(t) !== PROJECTS_KEY) return null;
-  const projectId = t.labels[PROJECT_LABEL] ?? "";
-  const path = t.labels[WORKTREE_LABEL] ?? "";
-  return projectId && path ? { projectId, path } : null;
-}
-
 /**
  * Derives the UiContext the daemon sees from the current selection. A thread contributes
- * its place (project, worktree) and its workspace; a thread has no terminal of its own, so
- * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
- * composer looks only at its project. Actions on a worktree that is not
- * selected (the Projects page) build their context with
- * worktreeContext / projectContext.
+ * its place (project, worktree) and its workspace. The composer looks only at its project.
+ * Actions on a worktree that is not selected (the Projects page) build their context with
+ * worktreeContext / projectContext; a terminal tab's actions add their terminal
+ * (shell/terminalActions.ts).
  */
-export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
-  const ctx = deriveSelectionContext(sel, projects, threads);
-  if (!focusedShell) return ctx;
-  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
-  // it. On the Projects page, which carries no worktree, the shell's worktree is the
-  // context too, so cmd+t (terminal.new) starts another shell beside it.
-  const place = projectsShellPlace(focusedShell);
-  return place
-    ? { ...ctx, activeTerminalId: focusedShell.id, activeProjectId: place.projectId, activeWorktreePath: place.path }
-    : { ...ctx, activeTerminalId: focusedShell.id };
-}
-
-function deriveSelectionContext(sel: Selection, projects: ProjectsData, threads: ThreadsData): UiContextView {
+export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }): UiContextView {
   switch (sel.kind) {
     // `none` shows HOME (App.tsx), whose context is emptyContext.
     case "none":
@@ -112,17 +78,9 @@ export function contextKey(c: UiContextView): string {
   return [c.activeView, c.activeTerminalId, c.activeThreadId, c.activeProjectId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
-/**
- * Current context, read imperatively (keybindings, invoke). For the window's own
- * selection (no `sel`), a bottom panel shell with the keyboard (or the palette's return)
- * is the active terminal (and, on the Projects page, its worktree the active one). An explicit selection gets that selection's context only.
- */
+/** Current context, read imperatively (keybindings, invoke): the window's selection's, or `sel`'s. */
 export function getUiContext(sel?: Selection): UiContextView {
-  const ui = useUiStore.getState();
-  const terminals = useTerminalsStore.getState();
-  const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
-  const shell = focused ? (terminals.byId[focused] ?? { id: focused, labels: {} }) : undefined;
-  return deriveContext(sel ?? ui.selection, useProjectsStore.getState(), useThreadsStore.getState(), shell);
+  return deriveContext(sel ?? useUiStore.getState().selection, useProjectsStore.getState(), useThreadsStore.getState());
 }
 
 const SEP = "\u0001";

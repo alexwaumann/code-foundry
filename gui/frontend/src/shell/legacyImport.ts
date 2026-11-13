@@ -16,7 +16,10 @@ import { importLegacy } from "@/api/layout";
 import { errorMessage } from "@/api/stream";
 import { applyImportedLayout, useLayoutStore } from "@/stores/layout";
 
-/** The classic window's persisted stores (stores/panel.ts and stores/bottomPanel.ts). */
+/**
+ * The classic window's persisted side panels and bottom panels, read as raw strings: their stores
+ * are gone (docs/notes/shell-21-remove-classic.md), the keys stay for this import.
+ */
 export const LEGACY_PANEL_KEY = "code-foundry.panel";
 export const LEGACY_BOTTOM_KEY = "code-foundry.bottom";
 

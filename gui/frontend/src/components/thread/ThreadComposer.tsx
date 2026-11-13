@@ -35,7 +35,6 @@ const SETUP_PLACEHOLDER = "Add to your message. It goes in once Claude starts.";
 const BLOCKING_PLACEHOLDER = "You can reply once Claude has started.";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
-import { tabPlace } from "@/shell/host";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -215,10 +214,9 @@ export function ThreadComposer({
   );
 
   // Focus requests land in the prompt: a thread selected to be typed in (ui
-  // promptFocusSeq), the content pane asked for (the side panel hid, ui contentFocusSeq).
+  // promptFocusSeq), the content asked for (a sheet closed, ui contentFocusSeq).
   // A composer that mounts with no request (Show worktree, a revealed shell) leaves the
-  // keyboard where that put it. Under an expanded side panel the panel takes the
-  // requested focus.
+  // keyboard where that put it.
   const focusSeq = useUiStore((s) => s.promptFocusSeq);
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
   const seenContent = useRef(contentFocusSeq);
@@ -249,12 +247,7 @@ export function ThreadComposer({
     // prompt, not the palette input closing over it), else on the next frame (a composer
     // just mounted: its editor may still be replaced).
     const attempt = (): boolean => {
-      const tabs = tabPlace();
-      if (tabs.shown && tabs.expanded) {
-        useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
-        return true;
-      }
-      // Something took the keyboard meanwhile (the side panel, the inline rename a
+      // Something took the keyboard meanwhile (another pane, the inline rename a
       // double-click on the sidebar row starts): leave it there.
       const now = document.activeElement;
       if (now !== before && now !== null && now !== document.body && !inRoot(now)) return true;

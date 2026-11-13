@@ -6,26 +6,24 @@ import type { ActionIconName } from "@/api/actions";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
-vi.mock("@/terminal/xterm", async () => (await import("@/test/terminalHost")).xtermFakes);
-vi.mock("@/api/terminal", async (orig) => ({ ...(await orig<typeof import("@/api/terminal")>()), ...(await import("@/test/terminalHost")).terminalApiFakes }));
 
 const { ActionDialog } = await import("./ActionDialog");
-const { BottomPanel } = await import("@/components/bottom/BottomPanel");
 const { ProjectsPage } = await import("@/components/projects/ProjectsPage");
 const { Toaster } = await import("@/components/ui/sonner");
 const { daemon, invocationsOf, lastInvocation, refuse, resetDaemon } = await import("@/test/daemonFakes");
-const { attach } = await import("@/test/terminalHost");
+const { layoutOf, pane, row: split, seedLayout, space, tab } = await import("@/test/shellLayout");
 const { ACTION_IDS, ACTION_NAMES, action, fakeActionCommands, seedActions } = await import("@/test/actionsWorld");
 const { CF, GP, seedWorld } = await import("@/test/projectsWorld");
 const { useActionDialogStore } = await import("@/stores/actionDialog");
 const { useActionsStore } = await import("@/stores/actions");
-const { useBottomStore } = await import("@/stores/bottomPanel");
+const { resetLayout } = await import("@/stores/layout");
+const { useShellViewStore } = await import("@/stores/shellView");
 const { projectPage, useUiStore } = await import("@/stores/ui");
 
 /**
  * Actions on the Projects page (docs/notes/actions-2-gui.md): a checkout row's Run action
  * submenu (its right-click menu, docs/notes/project-page-2-checkouts.md), the editor it opens (ActionDialog) saving through action.add / action.edit /
- * action.remove, a run's tab in the page's bottom panel, and Details' Add an action. The
+ * action.remove, a run (the keyboard into its tab), and Details' Add an action. The
  * daemon's answers change the actions store the way its events would. e2e/actions.spec.ts
  * keeps the gear's split hover in a real browser.
  */
@@ -70,7 +68,6 @@ function renderPage(projectId: string) {
     <>
       <ProjectsPage />
       <ActionDialog />
-      <BottomPanel columnHeight={800} />
       <Toaster />
     </>,
   );
@@ -118,10 +115,9 @@ function fakeEditor() {
 
 beforeEach(() => {
   resetDaemon();
-  attach.reset();
+  resetLayout();
   seedWorld();
   seedActions();
-  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
   useActionDialogStore.setState({ editor: null, runId: null, seq: 0 });
   fakeEditor();
 });
@@ -144,17 +140,23 @@ describe("a checkout row's Run action submenu", () => {
     expect(within(item("Test")).getByTestId("checkout-menu-action-gear").getAttribute("aria-label")).toBe("Edit Test");
   });
 
-  it("an item runs the action for that worktree, in the Projects page's bottom panel", async () => {
+  it("an item runs the action for that worktree; the keyboard goes into the run's tab", async () => {
     fakeActionCommands(() => ({ projectId: "repo-cf", worktree: CF }));
+    // The daemon opens the run's tab (here in a second pane) as it starts the run.
+    const run = daemon.handlers.get("action.run");
+    daemon.handlers.set("action.run", async (inv) => {
+      const res = await (run as NonNullable<typeof run>)(inv);
+      const { terminalId } = JSON.parse(res.resultJson) as { terminalId: string };
+      await seedLayout(layoutOf([space(split("r-1", [pane("p-1", [tab("t-page", "projects")]), pane("p-2", [tab("t-run", "terminal", "", { params: { terminal: terminalId } })])]), "p-1")]));
+      return res;
+    });
+    const seq = useShellViewStore.getState().focusRequest.seq;
     renderPage("repo-cf");
     await settle();
     openMenu();
     await pickItem(item("Build"));
     expect(invocationsOf("action.run").map((c) => [c.args, c.context.activeProjectId, c.context.activeWorktreePath])).toEqual([[{ action: ACTION_IDS.build, terminal: "true" }, "repo-cf", CF]]);
-    const bottom = screen.getByTestId("bottom-panel");
-    expect(bottom.dataset.panelKey).toBe("view:projects");
-    expect([...bottom.querySelectorAll('[data-kind="action"]')].map((e) => e.textContent)).toEqual(["Build"]);
-    expect(screen.getByTestId("action-echo").textContent).toBe("$ make build");
+    expect(useShellViewStore.getState().focusRequest).toEqual({ paneId: "p-2", seq: seq + 1 });
   });
 
   it("a project without actions has no Run action; Details says none, and Add an action opens a new one's editor", async () => {

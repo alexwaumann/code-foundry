@@ -6,8 +6,7 @@
  * and the archived ones under a collapsible Archived header (the three footers,
  * buildSections; the thread open in the content pane keeps its row under a collapsed Snoozed
  * or Archived header), as rows for virtual lists. No project, worktree or terminal
- * rows: worktrees live on the Projects page, and shells in their owner's bottom panel
- * (stores/bottomPanel.ts). Pure functions over the minimal inputs that affect structure, so
+ * rows: worktrees live on the Projects page, and terminals in tabs. Pure functions over the minimal inputs that affect structure, so
  * the sidebar only rebuilds when membership, order, pin, group or a band's sort time changes
  * (not on name or status-text updates). The placement helper (which worktree a thread sits in) is here too;
  * the command context uses it.

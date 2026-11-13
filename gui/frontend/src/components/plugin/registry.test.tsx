@@ -104,9 +104,9 @@ describe("node renderer registry", () => {
     const term = screen.getByTestId("plugin-terminal");
     expect(term.getAttribute("data-terminal-id")).toBe(terminalId);
     expect(term.textContent).toContain("Clock");
-    // The plugin's Restart and the host's Open in bottom panel.
+    // The plugin's Restart and the host's Open in a tab.
     expect(screen.getAllByTestId("plugin-button").map((b) => b.getAttribute("data-key"))).toContain("restart-shell");
-    expect(screen.getByTestId("plugin-terminal-open-bottom")).toBeTruthy();
+    expect(screen.getByTestId("plugin-terminal-open-tab")).toBeTruthy();
   });
 
   it("renders the layout tab: two columns of a pane (log and list) beside markdown and pairs, stacked before a width; collapse first", () => {

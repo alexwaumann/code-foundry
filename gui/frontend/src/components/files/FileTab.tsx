@@ -4,7 +4,7 @@ import { canEdit, readFile, type FileReadView } from "@/api/files";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
 import type { EditorHandle } from "@/lib/codeEditor";
 import { FinderIcon } from "@/components/icons/AppIcon";
-import { usePanelKey } from "@/components/panel/panelKeyContext";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { ago } from "@/components/pr/model";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/lib/clock";

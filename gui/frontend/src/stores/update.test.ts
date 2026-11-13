@@ -16,7 +16,6 @@ vi.mock("@/api/update", async (orig) => ({ ...(await orig<typeof import("@/api/u
 const { useCommandsStore } = await import("./commands");
 const { useHealthStore } = await import("./health");
 const { applyUpdateEvent, isOldDaemon, runUpdateAction, startUpdateSync, useUpdateStore } = await import("./update");
-const { resetShellFlag, SHELL_FLAG_KEY } = await import("@/shell/flag");
 const { presentCommand } = await import("@/keys/bindings");
 
 function cmd(name: string): CommandView {
@@ -229,8 +228,6 @@ describe("a daemon from before the window layout", () => {
   });
   afterEach(() => {
     stop();
-    localStorage.removeItem(SHELL_FLAG_KEY);
-    resetShellFlag();
   });
 
   it("opens the update dialog in the shell window", async () => {
@@ -242,24 +239,12 @@ describe("a daemon from before the window layout", () => {
     expect(useUpdateStore.getState().oldDaemon).toBe(true);
   });
 
-  it("leaves the classic window alone", async () => {
-    localStorage.setItem(SHELL_FLAG_KEY, "0");
-    resetShellFlag();
-    stop = startUpdateSync();
-    seen("v0.21.8-tip.2");
-    await Promise.resolve();
-    expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
-    expect(getUpdateStatus).not.toHaveBeenCalled();
-  });
-
   it.each([
-    ["v0.21.5", true, true],
-    ["v0.21.5", false, true],
-    ["v0.21.8-tip.2", true, true],
-    ["v0.21.8-tip.2", false, false],
-    ["v0.22.0-tip.1", true, false],
-    ["dev", true, false],
-  ])("isOldDaemon(%s, shell %s): %s", (version, shell, want) => {
-    expect(isOldDaemon(version, shell)).toBe(want);
+    ["v0.21.5", true],
+    ["v0.21.8-tip.2", true],
+    ["v0.22.0-tip.1", false],
+    ["dev", false],
+  ])("isOldDaemon(%s): %s", (version, want) => {
+    expect(isOldDaemon(version)).toBe(want);
   });
 });

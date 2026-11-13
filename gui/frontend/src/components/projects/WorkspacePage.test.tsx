@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
@@ -24,9 +25,9 @@ const { editorAppsResource } = await import("@/stores/threadInfo");
 
 /**
  * A workspace's page (docs/notes/projects-redesign-3-workspace-page.md) and the New workspace
- * dialog, against the mock's world (src/test/projectsWorld.ts). The tabs the page's panel opens are
- * read off the panel store (panelActive); e2e/workspace-page.spec.ts keeps the hover-only actions
- * (CSS), a File tab drawn in the page's panel, and the files the daemon re-reads after a turn.
+ * dialog, against the mock's world (src/test/projectsWorld.ts). The tabs the page opens are read
+ * off the fake daemon's layout (panelActive); e2e/workspace-page.spec.ts keeps the hover-only
+ * actions (CSS), a File tab drawn, and the files the daemon re-reads after a turn.
  */
 
 const body = (id: string) => document.querySelector<HTMLElement>(`[data-testid="workspace"][data-workspace="${id}"]`) as HTMLElement;
@@ -114,13 +115,13 @@ function workspaceThread(workspaceId: string, id: string, o: { name: string; sta
   return t;
 }
 
-/** The workspace page's own side panel (its key), as e2e reads it off the rendered panel. */
+/** The tab the workspace page opened last (its target's: the current space's unlinked tabs), off the layout. */
 const pagePanel = (workspaceId: string) => panelActive(`view:projects:workspace:${workspaceId}`);
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDaemon();
   seedWorld();
-  resetPanels();
+  await resetPanels();
   resetInstructionsPresses();
   card.editors = [{ name: "VS Code", bundleId: "com.microsoft.VSCode", path: "/Applications/Visual Studio Code.app" }];
   editorAppsResource.store.setState({ entries: {} });
@@ -606,8 +607,9 @@ describe("the workspace's Instructions and skills", () => {
     await pick(apps, "workspace-folder-open-editor");
     expect(lastInvocation("workspace.open.editor")?.args).toEqual({ workspace: mono, app: "com.microsoft.VSCode" });
 
-    // View: the root's instructions as a File tab in the workspace page's own panel.
+    // View: the root's instructions as a File tab, for the workspace page.
     fireEvent.click(by(m, "workspace-instructions-open"));
+    await settle();
     expect(pagePanel(mono)).toMatchObject({ open: true, title: "CLAUDE.md" });
     expect(pagePanel(mono)?.params.path).toBe("/Users/dev/mono/CLAUDE.md");
   });

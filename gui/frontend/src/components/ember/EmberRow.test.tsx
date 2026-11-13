@@ -4,10 +4,12 @@ import { EMBER_THREAD, EmberWorld, putEmberThread, setEmberEnabled } from "@/tes
 
 // The board stream is the store's; the test publishes boards itself.
 vi.mock("@/stores/ember", async (orig) => ({ ...(await orig<typeof import("@/stores/ember")>()), holdEmberBoard: () => () => undefined }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { EmberRow } = await import("./EmberRow");
 const { useEmberStore } = await import("@/stores/ember");
-const { usePanelStore } = await import("@/stores/panel");
+const { layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
+const { layoutTabs } = await import("@/test/layoutTabs");
 const { useUiStore } = await import("@/stores/ui");
 const { useViewsStore } = await import("@/stores/views");
 
@@ -28,11 +30,11 @@ function live(f: () => void): void {
   act(f);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed(EMBER_THREAD));
   setEmberEnabled(true);
   putEmberThread();
   useUiStore.setState({ selection: { kind: "none" }, cursorKey: null });
-  usePanelStore.setState({ byKey: {} });
   world = new EmberWorld();
   world.publish();
 });
@@ -151,16 +153,20 @@ describe("EmberRow", () => {
     expect(row().dataset.cursor).toBe("true");
   });
 
-  it("its menu: Open board and Settings only (no archive, snooze or rename)", () => {
+  it("its menu: Open board and Settings only (no archive, snooze or rename)", async () => {
     render(<EmberRow />);
     fireEvent.contextMenu(row());
     const menu = screen.getByTestId("ember-row-menu");
     expect([...menu.querySelectorAll("[role=menuitem]")].map((e) => e.textContent)).toEqual(["Open board", "Settings"]);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Open board" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("menuitem", { name: "Open board" }));
+      await layoutSettled();
+    });
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: EMBER_THREAD });
-    const panel = usePanelStore.getState().byKey[`thread:${EMBER_THREAD}`];
-    expect(panel?.open).toBe(true);
-    expect(panel?.groups[0]?.tabs.map((t) => t.kind)).toEqual(["ember"]);
+    expect(layoutTabs().map((t) => [t.kind, t.thread])).toEqual([
+      ["thread", EMBER_THREAD],
+      ["ember.board", EMBER_THREAD],
+    ]);
     fireEvent.contextMenu(row());
     fireEvent.click(screen.getByRole("menuitem", { name: "Settings" }));
     expect(useViewsStore.getState()).toMatchObject({ settingsOpen: true, settingsPage: "ember" });

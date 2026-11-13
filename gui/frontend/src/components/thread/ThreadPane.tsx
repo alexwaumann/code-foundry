@@ -2,9 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { EmberBody } from "@/components/ember/EmberPane";
-import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
-import { PaneHeader } from "@/components/window/PaneHeader";
 import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
 import { useInfoRoom } from "@/components/threadinfo/useInfoRoom";
@@ -21,7 +19,6 @@ import { FindBar } from "./find/FindBar";
 import { FindLayer } from "./find/FindLayer";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
-import { HeaderActions } from "./HeaderActions";
 import { ThreadHeader } from "./ThreadHeader";
 import { useShellPane } from "@/shell/paneContext";
 import { useAskStrip } from "@/shell/askStrip";
@@ -107,7 +104,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const infoOpen = useUiStore((s) => s.threadInfoOpen);
   const findOpen = useThreadFindOpen(threadId);
   const [rowRef, infoFits] = useInfoRoom(threadId);
-  // In a window shell pane the shell's header (ThreadHeader): the tab above is the title.
+  // The pane's header (ThreadHeader): the tab above is the title. None outside a pane (tests).
   const shellPane = useShellPane();
   // A shell pane too short for the full ask draws it as one line above the composer (shell/askStrip.ts).
   const askKey = open.map((p) => p.requestId).join(" ");
@@ -115,16 +112,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
-        {shellPane ? (
-          <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />
-        ) : (
-          <PaneHeader className="gap-2 px-3" data-testid="thread-header">
-            <ThreadTitle id={threadId} />
-            <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
-              <HeaderActions />
-            </span>
-          </PaneHeader>
-        )}
+        {shellPane && <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />}
         {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating. */}
         <div
           className="relative flex min-h-0 flex-1"

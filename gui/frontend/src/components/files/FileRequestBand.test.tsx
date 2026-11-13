@@ -3,17 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileReadView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
-import { PanelKeyContext } from "@/components/panel/panelKeyContext";
+import { PanelKeyContext } from "@/shell/panelKeyContext";
 import { useCommandsStore } from "@/stores/commands";
 import { useFileEditStore } from "@/stores/fileEdit";
 import { openFileInPanel } from "@/stores/filePanel";
-import { allTabs, usePanelStore } from "@/stores/panel";
+import { useTabPlace } from "@/shell/host";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { useThreadsStore } from "@/stores/threads";
 import { fileOfTab, type FileAsk, type FileTarget } from "@/surfaces/fileTarget";
 import { FileTab } from "./FileTab";
 
 const disk = vi.hoisted(() => new Map<string, Partial<FileReadView>>());
 const api = vi.hoisted(() => ({ write: vi.fn(), send: vi.fn(), searched: [] as string[] }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/files", async (orig) => ({
   ...(await orig<typeof import("@/api/files")>()),
   writeFile: api.write,
@@ -62,16 +64,26 @@ const target: FileTarget = { project: "repo", base: "/Users/me/w", path: ENV, ed
 const thread = (id: string, name: string) => ({ id, name, projectId: "repo", worktreePath: "/Users/me/w", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], agentRuns: [] }) as unknown as ThreadView;
 const text = { text: "A=1\n", lossless: true, size: 4, modifiedAtMs: 100 };
 
-/** The tab as the panel draws it: from the panel store, under the panel's key. */
+/** The tab as a pane draws it: from the layout, under the thread's key. */
 function PanelTab() {
-  const tab = usePanelStore((s) => allTabs(s.byKey[PANEL] ?? { open: false, groups: [] })[0]);
+  const tab = useTabPlace(PANEL, (p) => p.tabs[0]);
   const file = tab ? fileOfTab(tab) : null;
   return <PanelKeyContext value={PANEL}>{file && <FileTab key={tab?.id} target={file} />}</PanelKeyContext>;
 }
 
-function asked(over: Partial<FileTarget> = {}) {
+/** Opens the request's tab and draws it once the layout has it. */
+async function asked(over: Partial<FileTarget> = {}) {
   openFileInPanel(PANEL, { ...target, ...over });
-  return render(<PanelTab />);
+  const r = render(<PanelTab />);
+  await reopened();
+  return r;
+}
+
+/** Waits for the layout to answer what was sent (a repeat request's tab update). */
+async function reopened(): Promise<void> {
+  await act(async () => {
+    await layoutSettled();
+  });
 }
 
 const band = () => screen.queryByTestId("file-request");
@@ -81,7 +93,8 @@ const type = (value: string) => {
 };
 const tell = () => screen.getByTestId<HTMLButtonElement>("file-request-tell");
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed("s-1"));
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", "Set up billing"), "s-2": thread("s-2", "Another") }, order: ["s-1", "s-2"] });
   useCommandsStore.setState({ commands: [{ name: "file.save", keybindings: ["cmd+s"] } as never] });
   disk.set(ENV, text);
@@ -96,13 +109,12 @@ afterEach(() => {
   cleanup();
   disk.clear();
   useFileEditStore.setState({ sessions: {} });
-  usePanelStore.setState({ byKey: {} });
   useCommandsStore.setState({ commands: [] });
 });
 
 describe("the band", () => {
   it("names the thread, and follows a rename by id", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     expect(band()?.textContent).toContain('Thread "Set up billing" asked you to edit this file');
     act(() => {
@@ -112,29 +124,29 @@ describe("the band", () => {
   });
 
   it("says who asked when that is another thread than the panel's", async () => {
-    asked({ ask: ask({ thread: "s-2" }) });
+    await asked({ ask: ask({ thread: "s-2" }) });
     await screen.findByTestId("draft");
     expect(band()?.textContent).toContain('Thread "Another" asked you to edit this file');
   });
 
   it("shows the note as text, and none when there is none", async () => {
     const note = "**Bold** <img src=x onerror=alert(1)> [link](http://x) <b>b</b>";
-    asked({ ask: ask({ note }) });
+    await asked({ ask: ask({ note }) });
     await screen.findByTestId("draft");
     const shown = screen.getByTestId("file-request-note");
     expect(shown.textContent).toBe(note);
     expect(shown.children).toHaveLength(0);
     expect(shown.tagName).toBe("BLOCKQUOTE");
     cleanup();
-    usePanelStore.setState({ byKey: {} });
-    asked();
+    await resetFakeLayout(threadSeed("s-1"));
+    await asked();
     await screen.findByTestId("draft");
     expect(screen.queryByTestId("file-request-note")).toBeNull();
   });
 
   it("gives a note and a name no layout of their own, whatever reached the tab", async () => {
     useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", `Code Foundry\n\n\u202e${"x".repeat(80)}`) } }));
-    asked({ ask: ask({ note: `Code Foundry${"\n".repeat(60)}Session\u202e expired${"\u0301".repeat(400)}` }) });
+    await asked({ ask: ask({ note: `Code Foundry${"\n".repeat(60)}Session\u202e expired${"\u0301".repeat(400)}` }) });
     await screen.findByTestId("draft");
     expect(screen.getByTestId("file-request-note").textContent).toBe("Code Foundry Session expired\u0301\u0301\u0301");
     expect(band()?.textContent).toContain(`Thread "Code Foundry ${"x".repeat(35)}…" asked you to edit this file`);
@@ -142,13 +154,13 @@ describe("the band", () => {
   });
 
   it("says nothing about who can read what", async () => {
-    asked({ ask: ask() });
+    await asked({ ask: ask() });
     await screen.findByTestId("draft");
     expect(band()?.textContent).not.toMatch(/private|cannot (read|see)|can't (read|see)|hidden|secret/i);
   });
 
   it("carries the chord, which row two's Save gives up while it is there", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     expect(tell().textContent).toContain("Save and tell thread");
     expect(tell().textContent).toContain("⌘S");
@@ -161,14 +173,14 @@ describe("the band", () => {
   });
 
   it("a clean document never saved for this request has nothing to tell: only Dismiss", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     expect(tell().disabled).toBe(true);
     expect(screen.getByTestId<HTMLButtonElement>("file-request-dismiss").disabled).toBe(false);
   });
 
   it("row two's Save opens the way: the thread can be told, truthfully", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     type("A=2\n");
     api.write.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 200, conflict: false, notFound: false });
@@ -192,14 +204,14 @@ describe("the band", () => {
     ["neither", { mode: 0o600 }, []],
   ])("states where the file really is and who can read it: %s", async (_name, facts, want) => {
     disk.set(ENV, { ...text, ...facts });
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     expect(screen.queryAllByTestId("file-request-fact").map((p) => p.textContent)).toEqual(want);
   });
 
   it("a link's target is shown cleaned, cut, and said to be unusual; the facts lead the note", async () => {
     disk.set(ENV, { ...text, realPath: `/Users/me/${"d/".repeat(480)}\u202edrop.txt`, mode: 0o600 });
-    asked({ ask: ask({ note: "The note" }) });
+    await asked({ ask: ask({ note: "The note" }) });
     await screen.findByTestId("draft");
     const [fact] = screen.getAllByTestId("file-request-fact");
     expect(fact?.textContent).toContain("/drop.txt (its name has characters not shown here).");
@@ -214,14 +226,14 @@ describe("the band", () => {
 
   it("a plain link is said plainly", async () => {
     disk.set(ENV, { ...text, realPath: "/Users/me/Public/drop.txt" });
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     expect(screen.getByTestId("file-request-fact").textContent).toBe("This path is a link: the file is really ~/Public/drop.txt.");
   });
 
   it("the facts go with the band", async () => {
     disk.set(ENV, { ...text, mode: 0o644 });
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     fireEvent.click(screen.getByTestId("file-request-dismiss"));
     await waitFor(() => {
@@ -231,7 +243,7 @@ describe("the band", () => {
   });
 
   it("Dismiss hides it, sends nothing, leaves the tab editing, and it does not return", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     type("typed\n");
     fireEvent.click(screen.getByTestId("file-request-dismiss"));
@@ -248,7 +260,7 @@ describe("the band", () => {
 
   it("a chmod or a re-link shows on the next read, the draft untouched", async () => {
     disk.set(ENV, { ...text, mode: 0o600 });
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     type("half typed\n");
     expect(screen.queryAllByTestId("file-request-fact")).toEqual([]);
@@ -262,7 +274,7 @@ describe("the band", () => {
   });
 
   it("Save and tell writes, tells, and goes", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     type("A=2\n");
     api.write.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 200, conflict: false, notFound: false });
@@ -275,7 +287,7 @@ describe("the band", () => {
   });
 
   it("a conflict leaves it up with the conflict's band, and tells nobody", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     type("A=2\n");
     api.write.mockResolvedValue({ path: ENV, size: 9, modifiedAtMs: 300, conflict: true, notFound: false });
@@ -287,7 +299,7 @@ describe("the band", () => {
   });
 
   it("a send that fails says so in the tab, and the save stands", async () => {
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     type("A=2\n");
     api.write.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 200, conflict: false, notFound: false });
@@ -299,7 +311,7 @@ describe("the band", () => {
   });
 
   it("a line stays marked while the document is as it came", async () => {
-    asked({ line: 2 });
+    await asked({ line: 2 });
     await screen.findByTestId("draft");
     expect(screen.getByTestId("code-file").hasAttribute("data-mark")).toBe(true);
     expect(screen.getByTestId("code-file").getAttribute("data-selected")).toBe("2");
@@ -310,13 +322,12 @@ describe("the band", () => {
   });
 
   it("a repeat request shows the new note over a draft, which stays", async () => {
-    asked({ ask: ask({ note: "First" }) });
+    await asked({ ask: ask({ note: "First" }) });
     await screen.findByTestId("draft");
     type("half typed\n");
     const before = useFileEditStore.getState().sessions;
-    act(() => {
-      openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2", note: "Second" }) });
-    });
+    openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2", note: "Second" }) });
+    await reopened();
     expect(screen.getByTestId("file-request-note").textContent).toBe("Second");
     expect(useFileEditStore.getState().sessions).toBe(before);
     expect(screen.getByTestId("file-edit-status").textContent).toBe("Unsaved");
@@ -325,27 +336,25 @@ describe("the band", () => {
 
 describe("a repeat request", () => {
   it("brings editing and the band back after the pencil turned them off, the same note or not", async () => {
-    asked({ ask: ask({ note: "Same" }) });
+    await asked({ ask: ask({ note: "Same" }) });
     await screen.findByTestId("draft");
     fireEvent.click(screen.getByTestId("file-edit"));
     await waitFor(() => {
       expect(screen.queryByTestId("draft")).toBeNull();
     });
     expect(band()).toBeNull();
-    act(() => {
-      openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2", note: "Same" }) });
-    });
+    openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2", note: "Same" }) });
+    await reopened();
     await screen.findByTestId("draft");
     expect(band()).not.toBeNull();
   });
 
   it("forgets that a write landed for the one before: this one has none", async () => {
-    asked({ ask: ask({ saved: "4:100" }) });
+    await asked({ ask: ask({ saved: "4:100" }) });
     await screen.findByTestId("draft");
     expect(tell().disabled).toBe(false);
-    act(() => {
-      openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2" }) });
-    });
+    openFileInPanel(PANEL, { ...target, ask: ask({ id: "ask-2" }) });
+    await reopened();
     expect(tell().disabled).toBe(true);
   });
 });
@@ -358,14 +367,14 @@ describe("a new file", () => {
 
   it("a file deleted before the tab opened takes this path, so the request can be answered", async () => {
     disk.delete(ENV);
-    asked();
+    await asked();
     await screen.findByTestId("draft");
     expect(band()).not.toBeNull();
     expect(screen.getByTestId("file-edit-status").textContent).toBe("New file");
   });
 
   it("is an empty document marked New file, with no pencil, no meta and no File not found", async () => {
-    fresh();
+    await fresh();
     await screen.findByTestId("draft");
     expect(screen.getByTestId("file-edit-status").textContent).toBe("New file");
     expect(screen.getByTestId("code-file").textContent).toBe("");
@@ -375,14 +384,14 @@ describe("a new file", () => {
   });
 
   it("never goes looking for a namesake in the checkout", async () => {
-    fresh();
+    await fresh();
     await screen.findByTestId("draft");
     expect(api.searched).toEqual([]);
     expect(screen.getByTestId("file-tab").getAttribute("data-path")).toBe(ENV);
   });
 
   it("stays New file with an unsaved dot, and Save and tell waits for something typed", async () => {
-    fresh();
+    await fresh();
     await screen.findByTestId("draft");
     expect(tell().disabled).toBe(true);
     type("A=1\n");
@@ -393,7 +402,7 @@ describe("a new file", () => {
   });
 
   it("becomes an ordinary editing tab once saved", async () => {
-    fresh();
+    await fresh();
     await screen.findByTestId("draft");
     type("A=1\n");
     api.write.mockResolvedValue({ path: ENV, size: 4, modifiedAtMs: 200, conflict: false, notFound: false });

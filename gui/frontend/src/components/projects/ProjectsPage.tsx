@@ -1,5 +1,3 @@
-import { Folders } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { targetOf } from "@/shell/host";
 import { isProjectsView, projectPage, PROJECTS_INDEX, useUiStore, workspacePage } from "@/stores/ui";
 import { ProjectPage } from "./ProjectPage";
@@ -27,30 +25,5 @@ export function ProjectsPageAt({ projectId, workspaceId }: { projectId: string; 
   if (projectId) return <ProjectPage key={pageKey} projectId={projectId} pageKey={pageKey} />;
   if (workspaceId) return <WorkspacePage key={pageKey} workspaceId={workspaceId} pageKey={pageKey} />;
   return <ProjectsIndex key={pageKey} pageKey={pageKey} />;
-}
-
-/**
- * Sidebar entry under Pull Requests: reopens the last Projects page shown (the index or a
- * page), or goes to the index from a project's or workspace's page (UiState.openProjects).
- */
-export function ProjectsNav() {
-  const active = useUiStore((s) => isProjectsView(s.selection));
-  return (
-    <button
-      type="button"
-      className={cn(
-        "mt-0.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
-        active ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground hover:bg-cf-sidebar-row-hover",
-      )}
-      data-testid="nav-projects"
-      aria-current={active ? "page" : undefined}
-      onClick={() => {
-        useUiStore.getState().openProjects();
-      }}
-    >
-      <Folders className="size-4 shrink-0 text-cf-icon-muted" aria-hidden />
-      <span className="truncate">Projects</span>
-    </button>
-  );
 }
 

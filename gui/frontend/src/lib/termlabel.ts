@@ -22,7 +22,7 @@ export const KIND_ACTION = "action";
 /**
  * A plugin's own terminal (terminal/create; docs/notes/plugins-6-thread-terminal.md):
  * kind=plugin, plugin=<name>, title=<the plugin's title>. It belongs to no thread or
- * worktree; the bottom panel shows it only where the user opened it (TerminalsData.shownIn).
+ * worktree; it has a tab only once the user opens one (stores/pluginTerminals.ts).
  */
 export const KIND_PLUGIN = "plugin";
 export const PLUGIN_LABEL = "plugin";

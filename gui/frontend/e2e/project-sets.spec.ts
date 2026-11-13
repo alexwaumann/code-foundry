@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, freshCopyByDefault, mockPost, openApp, resetMock, row } from "./fixtures";
+import { composeProject, freshCopyByDefault, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
+import { openHeaderMenu } from "./shell-threads";
 
 /**
  * Workspaces v2 in the GUI (docs/notes/workspaces-v2-3-composer.md): the composer's
@@ -72,8 +73,10 @@ test("Save as workspace: the name takes the keyboard as the menu closes", async 
   const t = (await mockPost("set-thread?projects=repo-cf,repo-gp&project=repo-gp&name=Pair")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  await page.getByTestId("thread-title").click();
-  await page.getByTestId("menu-save-workspace").click();
+  await expect(threadPrompt(page)).toBeFocused();
+  // The thread header's one menu (the shell's title menu).
+  const menu = await openHeaderMenu(page);
+  await menu.getByTestId("menu-save-workspace").click();
   await expect(page.getByTestId("save-workspace-dialog")).toBeVisible();
   await expect(page.getByTestId("save-workspace-name")).toBeFocused();
 });
@@ -84,11 +87,13 @@ test("New thread on this branch: Escape goes back to the thread; from the palett
   const t = (await mockPost("set-thread?projects=repo-cf&name=Solo")) as ThreadSummary;
   await openApp(page);
   await row(page, `s:${t.id}`).click();
-  await page.getByTestId("thread-title").click();
-  await page.getByTestId("menu-new-like").click();
+  await expect(threadPrompt(page)).toBeFocused();
+  const menu = await openHeaderMenu(page);
+  await menu.getByTestId("menu-new-like").click();
   await expect(page.getByTestId("composer")).toHaveAttribute("data-like", t.id);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", t.id);
   await expect(row(page, `s:${t.id}`)).toHaveAttribute("aria-selected", "true");
 
   await page.keyboard.press("Meta+k");

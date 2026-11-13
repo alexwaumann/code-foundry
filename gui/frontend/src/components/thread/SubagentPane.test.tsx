@@ -104,7 +104,7 @@ const cmd = (name: string, o: Partial<CommandView> = {}) => ({ name, title: name
 beforeEach(() => {
   runCommand.mockClear();
   useThreadsStore.setState({ byId: { s1: { id: "s1", name: "Agents panel", projectId: "", worktreePath: "/w", workspaceId: "", projectIds: [], branch: "", model: "claude-opus-4-8", state: "connected", status: "idle", linkedPullRequests: [] } as unknown as ThreadView }, order: ["s1"] });
-  useUiStore.setState({ selection: { kind: "thread", id: "s1" }, windowWidth: 1400, promptFocusSeq: 0, palette: { ...useUiStore.getState().palette, open: false } });
+  useUiStore.setState({ selection: { kind: "thread", id: "s1" }, promptFocusSeq: 0, palette: { ...useUiStore.getState().palette, open: false } });
   useCommandsStore.setState({ commands: [cmd("thread.agent.up", { keybindings: ["escape"] }), cmd("thread.agent.open"), cmd("view.panel.toggle"), cmd("view.bottom.toggle"), cmd("view.thread-info"), cmd("thread.archive"), cmd("thread.rename")] });
   useSubagentViewStore.setState({ viewing: null, focusSeq: 0 });
   useThreadStore.setState({ folds: {} });
@@ -127,13 +127,13 @@ describe("SubagentPane", () => {
   const rowTypes = () => [...tid("subagent-list").querySelectorAll("[data-row-type]")].map((r) => r.getAttribute("data-row-type"));
   const say = () => tid("subagent-composer-text").textContent;
 
-  it("a running run: crumb, a thread's toggles, lineage, plain prompt, live turn header above its rows, composer card", () => {
+  it("a running run: crumb, the thread info toggle, lineage, plain prompt, live turn header above its rows, composer card", () => {
     show();
     expect(tid("subagent-crumb-parent").textContent).toBe("Agents panel");
     expect(tid("subagent-name").textContent).toBe("PR 1: daemon task frames");
     // No thread actions: no title menu; a thread's three toggles.
     expect(screen.queryByTestId("thread-title")).toBeNull();
-    expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["thread-info-toggle", "bottom-toggle", "panel-toggle"]);
+    expect([...tid("pane-actions").querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["thread-info-toggle"]);
     expect(tid("subagent-lineage-parent").textContent).toBe("Agents panel");
     expect(tid("subagent-lineage-meta").textContent).toBe("background · general-purpose · Opus · high · launched by turn 1's Agent call, 4m ago");
     expect(tid("subagent-prompt").textContent).toContain(PROMPT);

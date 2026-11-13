@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp, openHelloDemo, resetMock, row } from "./fixtures";
+import { activeOfKind, dragGutterBeside, paneShowingSurface, setSurfaceWidth } from "./shell-surfaces";
 
 /**
  * Plugin surfaces, consent and Settings → Plugins (docs/notes/plugins-5-gui.md) against the
@@ -10,11 +11,20 @@ import { openApp, openHelloDemo, resetMock, row } from "./fixtures";
 const surface = (page: Page) => page.getByTestId("plugin-surface");
 const tab = (page: Page, key: string) => surface(page).locator(`[data-testid="plugin-tab"][data-key="${key}"]`);
 
-/** Thread s-3 selected, its panel showing the hello demo (opened from the palette). */
+/** Thread s-3 open, the hello demo (opened from the palette) in a tab beside it. */
 async function openDemo(page: Page): Promise<void> {
   await openHelloDemo(page);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.hello.demo");
+  await expect(activeOfKind(page, "plugin.hello.demo")).toHaveCount(1);
 }
+
+/** The demo's pane as wide as the side panel was (420 px), to widen from. */
+const narrow = (page: Page) => setSurfaceWidth(page, "plugin-surface", 420);
+
+/** Drags the gutter left of the demo's pane 500 px left: the pane widens, as the panel's edge did. */
+const widen = (page: Page) => dragGutterBeside(page, "plugin-surface", -500, 6);
+
+/** The body of the pane showing the demo. */
+const paneBody = (page: Page) => paneShowingSurface(page, "plugin-surface").getByTestId("shell-pane-body");
 
 test.beforeEach(async () => {
   await resetMock();
@@ -31,7 +41,7 @@ test.beforeEach(async () => {
 // Settings → Plugins' rows, groups, menus, pid, env names, last error, logs, the consent's title
 // and permissions, Cancel and Enable: src/components/plugin/settings/PluginsPage.test.tsx and
 // src/components/plugin/ConsentDialog.test.tsx. Here the flow across routes once it is enabled.
-test("Settings → Plugins: a plugin's surface opened from its row closes Settings and shows live in the panel", async ({ page }) => {
+test("Settings → Plugins: a plugin's surface opened from its row closes Settings and shows live beside the thread", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-3").click();
   await page.keyboard.press("Meta+,");
@@ -43,13 +53,14 @@ test("Settings → Plugins: a plugin's surface opened from its row closes Settin
   await acme.getByTestId("plugin-row-menu").click();
   await page.getByTestId("plugin-menu-surface-access").click();
   await expect(page.getByTestId("settings-page")).toHaveCount(0);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "plugin.acme-data.access");
+  await expect(activeOfKind(page, "plugin.acme-data.access")).toHaveCount(1);
   await expect(surface(page).getByTestId("plugin-title")).toHaveText("Data access");
 });
 
-test("the layout tab: columns stack in the panel and sit side by side once it is wide enough; collapse first adds the thread there", async ({ page }) => {
+test("the layout tab: columns stack in a narrow pane and sit side by side once it is wide enough; collapse first adds the thread there", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await openDemo(page);
+  await narrow(page);
   await tab(page, "layout").click();
   await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
   const cols = surface(page).locator('[data-testid="plugin-columns"][data-key="layout-cols"]');
@@ -68,13 +79,8 @@ test("the layout tab: columns stack in the panel and sit side by side once it is
   expect(Math.round((await pane.boundingBox())?.height ?? 0)).toBe(320);
   expect(await pane.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
-  // Widen the panel past 2 × 240 + 12 px.
-  const h = await page.getByTestId("panel-resize-handle").boundingBox();
-  if (!h) throw new Error("no handle");
-  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(h.x - 500, h.y + h.height / 2, { steps: 6 });
-  await page.mouse.up();
+  // Widen the pane past 2 × 240 + 12 px.
+  await widen(page);
   await expect(cols).toHaveAttribute("data-layout", "row");
   l = await left.boundingBox();
   r = await right.boundingBox();
@@ -85,7 +91,7 @@ test("the layout tab: columns stack in the panel and sit side by side once it is
   await expect(detail.getByTestId("plugin-column")).toHaveCount(2);
   const thread = detail.getByTestId("plugin-thread");
   await expect(thread).toHaveAttribute("data-thread-id", "s-hello-assistant");
-  // The thread fills its fill pane, which fills the rest of the panel (at least its 320 px
+  // The thread fills its fill pane, which fills the rest of the surface (at least its 320 px
   // minHeight) above the footer: the body scrolls between the toolbar and the footer.
   const chat = detail.locator('[data-testid="plugin-pane"][data-key="layout-chat-pane"]');
   const c = await chat.boundingBox();
@@ -108,9 +114,9 @@ test("the layout tab's toolbar and footer stay pinned while the body scrolls bet
   const footer = surface(page).getByTestId("plugin-footer");
   await expect(toolbar).toBeVisible();
   await expect(footer).toBeVisible();
-  // Under the plugin's tabs, at the bottom of the panel; a hairline toward the body.
+  // Under the plugin's tabs, at the bottom of the pane; a hairline toward the body.
   const tabsBox = await surface(page).getByTestId("plugin-tabs").boundingBox();
-  const panelBody = await page.getByTestId("panel-body").boundingBox();
+  const panelBody = await paneBody(page).boundingBox();
   const tb = await toolbar.boundingBox();
   const ft = await footer.boundingBox();
   expect(tabsBox && tb && Math.abs(tb.y - (tabsBox.y + tabsBox.height)) < 1).toBe(true);
@@ -118,10 +124,10 @@ test("the layout tab's toolbar and footer stay pinned while the body scrolls bet
   expect(await toolbar.evaluate((el) => [getComputedStyle(el).borderBottomWidth, getComputedStyle(el).borderTopWidth])).toEqual(["1px", "0px"]);
   expect(await footer.evaluate((el) => [getComputedStyle(el).borderTopWidth, getComputedStyle(el).borderBottomWidth])).toEqual(["1px", "0px"]);
   expect(await toolbar.evaluate((el) => getComputedStyle(el).paddingLeft)).toBe("16px");
-  // The body scrolls; the panel's own body does not, and the strips stay where they are.
+  // The body scrolls; the pane's own body does not, and the strips stay where they are.
   const scroll = surface(page).getByTestId("plugin-scroll");
   expect(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-  expect(await page.getByTestId("panel-body").evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  expect(await paneBody(page).evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
   const sb = await scroll.boundingBox();
   expect(sb && tb && ft && Math.abs(sb.y - (tb.y + tb.height)) < 1 && Math.abs(sb.y + sb.height - ft.y) < 1).toBe(true);
   await scroll.evaluate((el) => {
@@ -137,15 +143,16 @@ test("the layout tab's toolbar and footer stay pinned while the body scrolls bet
   // PluginSurface.test.tsx ("the layout tab"); the strips' contents: chrome.test.tsx.
 });
 
-test("the layout tab: the grid stacks in the panel and goes to columns as it widens; dividers, inline groups and a flex spacer", async ({ page }) => {
+test("the layout tab: the grid stacks in a narrow pane and goes to columns as it widens; dividers, inline groups and a flex spacer", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await openDemo(page);
+  await narrow(page);
   await tab(page, "layout").click();
   await expect(tab(page, "layout")).toHaveAttribute("aria-selected", "true");
   const grid = surface(page).locator('[data-testid="plugin-grid"][data-key="layout-grid"]');
   const cell = (key: string) => grid.locator(`[data-testid="plugin-grid-item"][data-key="${key}"]`);
   await expect(grid).toHaveAttribute("data-columns", "1");
-  // Stacked in the panel: one card under the other, the span-2 card one column wide.
+  // Stacked in the narrow pane: one card under the other, the span-2 card one column wide.
   let a = await cell("layout-cell-build").boundingBox();
   let b = await cell("layout-cell-tests").boundingBox();
   let d = await cell("layout-cell-deploy").boundingBox();
@@ -188,13 +195,8 @@ test("the layout tab: the grid stacks in the panel and goes to columns as it wid
   await expect(gap).not.toHaveAttribute("data-flex", "true");
   expect(Math.round((await gap.boundingBox())?.height ?? 0)).toBe(24);
 
-  // Widen the panel: as many 200 px columns as fit, 12 px apart.
-  const h = await page.getByTestId("panel-resize-handle").boundingBox();
-  if (!h) throw new Error("no handle");
-  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(h.x - 500, h.y + h.height / 2, { steps: 6 });
-  await page.mouse.up();
+  // Widen the pane: as many 200 px columns as fit, 12 px apart.
+  await widen(page);
   await expect(grid).not.toHaveAttribute("data-columns", "1");
   const width = (await grid.boundingBox())?.width ?? 0;
   const cols = Math.min(6, Math.max(1, Math.floor((width + 12) / (200 + 12))));
@@ -216,6 +218,7 @@ test("the layout tab: the grid stacks in the panel and goes to columns as it wid
 test("the runs tab: the back button and the row take the keyboard; the log pane's height; side by side when wide", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await openDemo(page);
+  await narrow(page);
   await tab(page, "run-list").click();
   await expect(tab(page, "run-list")).toHaveAttribute("aria-selected", "true");
   const md = surface(page).locator('[data-testid="plugin-master-detail"][data-key="runs-md"]');
@@ -238,13 +241,8 @@ test("the runs tab: the back button and the row take the keyboard; the log pane'
   await back.click();
   await expect(runRow(5)).toBeFocused();
 
-  // Widen the panel past 280 + 12 + 320 px: the list beside the detail, each scrolling.
-  const h = await page.getByTestId("panel-resize-handle").boundingBox();
-  if (!h) throw new Error("no handle");
-  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(h.x - 500, h.y + h.height / 2, { steps: 6 });
-  await page.mouse.up();
+  // Widen the pane past 280 + 12 + 320 px: the list beside the detail, each scrolling.
+  await widen(page);
   await expect(md).toHaveAttribute("data-layout", "wide");
   const list = md.getByTestId("plugin-md-list");
   const detail = md.getByTestId("plugin-md-detail");

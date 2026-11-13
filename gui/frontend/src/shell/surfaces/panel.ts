@@ -6,7 +6,7 @@
  */
 import { createElement } from "react";
 import { Puzzle } from "lucide-react";
-import { PanelKeyContext } from "@/components/panel/panelKeyContext";
+import { PanelKeyContext } from "@/shell/panelKeyContext";
 import { panelKindOf, seamTab } from "@/shell/kinds";
 import { surfaceOf } from "@/surfaces/registry";
 import type { SurfaceSpec } from "@/surfaces/types";

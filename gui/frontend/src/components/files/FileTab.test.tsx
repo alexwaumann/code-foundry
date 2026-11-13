@@ -2,13 +2,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileReadView } from "@/api/files";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
-import { PanelKeyContext } from "@/components/panel/panelKeyContext";
+import { PanelKeyContext } from "@/shell/panelKeyContext";
 import type { ThreadView } from "@/api/threads";
 import { useCodeViewStore } from "@/stores/codeView";
 import { fileEditKey, useFileEditStore } from "@/stores/fileEdit";
 import { canSearchFile, openFileFind, useFileFindStore } from "@/stores/fileFind";
 import { openFileInPanel } from "@/stores/filePanel";
-import { activeTab, getPanel, usePanelStore } from "@/stores/panel";
+import { shownTab, tabPlace } from "@/shell/host";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -20,6 +21,7 @@ import { FileTab } from "./FileTab";
 const files = vi.hoisted(() => new Map<string, Partial<FileReadView>>());
 const reads = vi.hoisted(() => [] as string[]);
 const writes = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/files", async (orig) => ({
   ...(await orig<typeof import("@/api/files")>()),
   writeFile: writes.fn,
@@ -627,13 +629,16 @@ describe("a file opened before its thread had a checkout", () => {
     useThreadsStore.setState({ byId: { s: { id: "s", name: "t", projectId: "web", projectIds: ["web"], worktreePath: "", checkoutPaths: [], createdWorktree: false, branch: "", workspaceId: "", setup: setup("running"), ...o } as ThreadView }, order: ["s"] });
   };
   const landed = { worktreePath: WT, createdWorktree: true, branch: "cf/x", checkoutPaths: [{ projectId: "web", path: WT }], setup: setup("done") };
-  const openHeld = () => {
+  const openHeld = async () => {
     put({});
     openFileInPanel(KEY, { project: "web", base: MAIN, path: FILE });
+    await layoutSettled();
     return active();
   };
+  /** The thread's File tab in front, as the layout has it. */
   const active = () => {
-    const tab = activeTab(getPanel(KEY));
+    const p = tabPlace(KEY);
+    const tab = shownTab(p);
     const target = tab ? fileOfTab(tab) : null;
     if (!target) throw new Error("no file tab");
     return target;
@@ -645,18 +650,19 @@ describe("a file opened before its thread had a checkout", () => {
       </PanelKeyContext.Provider>,
     );
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await resetFakeLayout(threadSeed("s"));
     useProjectsStore.setState({ byId: { web: { id: "web", name: "web", path: MAIN, git: true, githubSlug: "", remotes: [], worktrees: [{ path: MAIN, branch: "main", head: "a", isMain: true }] } } as never, order: ["web"] });
     files.set(FILE, body());
   });
 
-  afterEach(() => {
-    usePanelStore.setState({ byKey: {} });
+  afterEach(async () => {
+    await layoutSettled();
     useThreadsStore.setState({ byId: {}, order: [] });
   });
 
   it("opens held, read-only and says so: nothing can reach the main checkout", async () => {
-    const target = openHeld();
+    const target = await openHeld();
     expect(target.heldFor).toBe("s");
     show(target);
     await screen.findByTestId("code-file");
@@ -667,26 +673,29 @@ describe("a file opened before its thread had a checkout", () => {
   it("a thread asking for an edit does not open an editor on it either", async () => {
     put({});
     openFileInPanel(KEY, { project: "web", base: MAIN, path: FILE, edit: true });
+    await layoutSettled();
     show(active());
     await screen.findByTestId("code-file");
     expect(useFileEditStore.getState().sessions).toEqual({});
   });
 
-  it("a file outside the project is nothing of the checkout's, and is not held", () => {
+  it("a file outside the project is nothing of the checkout's, and is not held", async () => {
     put({});
     openFileInPanel(KEY, { project: "", base: "/tmp", path: "/tmp/x.md" });
+    await layoutSettled();
     expect(active().heldFor).toBeUndefined();
   });
 
-  it("a thread with its worktree opens as usual", () => {
+  it("a thread with its worktree opens as usual", async () => {
     put(landed);
     openFileInPanel(KEY, { project: "web", base: WT, path: MOVED });
+    await layoutSettled();
     expect(active().heldFor).toBeUndefined();
   });
 
   it("moves to the worktree when the thread lands, and a save writes there", async () => {
     files.set(MOVED, body());
-    const target = openHeld();
+    const target = await openHeld();
     const first = show(target);
     await screen.findByTestId("code-file");
     act(() => {
@@ -713,7 +722,7 @@ describe("a file opened before its thread had a checkout", () => {
   });
 
   it("stays read-only for good when the file is not in the worktree", async () => {
-    const target = openHeld();
+    const target = await openHeld();
     show(target);
     await screen.findByTestId("code-file");
     act(() => {
@@ -728,7 +737,7 @@ describe("a file opened before its thread had a checkout", () => {
   });
 
   it("is the thread's own file when the thread runs right there", async () => {
-    const target = openHeld();
+    const target = await openHeld();
     show(target);
     await screen.findByTestId("code-file");
     act(() => {
@@ -741,7 +750,7 @@ describe("a file opened before its thread had a checkout", () => {
   });
 
   it("still waits on a setup that failed before it had a worktree", async () => {
-    const target = openHeld();
+    const target = await openHeld();
     act(() => {
       put({ setup: setup("failed") });
     });

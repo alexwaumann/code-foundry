@@ -21,7 +21,7 @@ export function layoutKindOf(kind: string): string {
 
 /**
  * A layout tab as the side panel's surfaces read it. A File tab keeps the id the side panel gave
- * it, its path alone (stores/panel.ts tabId, surfaces/fileTarget.ts fileTab): its edit session,
+ * it, its path alone (shell/tabs.ts tabId, surfaces/fileTarget.ts fileTab): its edit session,
  * a thread's request and the unsaved dot address it by that id, and the host finds a layout tab by
  * it too (hostShell.ts findShellTab). Every other kind is known by its layout id.
  */

@@ -8,9 +8,12 @@ import type { ThreadView } from "@/api/threads";
 import { flagSurfaceFor, flagSurfaces, openFlagSurface, selectThreadAndFlag, shownFlag } from "./flagSurface";
 import { goToNeedsThread, openNeedsPopup, resetNeeds, useNeedsStore } from "./needs";
 import { useThreadsStore } from "./threads";
-import { getPanel } from "./panel";
+import { tabPlace } from "@/shell/host";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { applyPluginEvent, usePluginsStore } from "./plugins";
 import { useUiStore, type Selection } from "./ui";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const surface = (plugin: string, id: string, scope: string) => ({ id, title: id, icon: "", scope, when: "", showCommand: `plugin.${plugin}.show.${id}`, kind: `plugin.${plugin}.${id}` });
 
@@ -29,7 +32,8 @@ function listed(sel: Selection, commands: CommandView[]): void {
   useCommandsStore.setState({ commands, contextKey: contextKey(getUiContext(sel)), loading: false });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed("s-1"));
   usePluginsStore.setState(applyPluginEvent({ byName: {}, order: [], loaded: false, epoch: 0, dirs: null }, { kind: "snapshot", plugins: [gh, tw, bare] }));
   useCommandsStore.setState({ commands: [], contextKey: null, loading: false });
   useUiStore.setState({ selection: thread });
@@ -82,13 +86,16 @@ describe("flagSurfaceFor", () => {
 });
 
 describe("openFlagSurface", () => {
-  it("waits for the thread's list, then opens the available surface's tab in its panel", async () => {
+  it("waits for the thread's list, then opens the available surface's tab linked to the thread", async () => {
     useCommandsStore.setState({ commands: [], contextKey: "previous selection", loading: true });
     const opened = openFlagSurface("s-1", "test-watcher");
-    expect(getPanel("thread:s-1").groups[0]?.tabs).toHaveLength(0);
+    expect(tabPlace("thread:s-1").tabs).toHaveLength(0);
     listed(thread, [cmd("plugin.test-watcher.show.tests", true)]);
     await expect(opened).resolves.toBe("plugin.test-watcher.tests");
-    expect(getPanel("thread:s-1")).toMatchObject({ open: true, groups: [{ activeTabId: "plugin.test-watcher.tests" }] });
+    await layoutSettled();
+    const place = tabPlace("thread:s-1");
+    expect(place.tabs.map((t) => t.kind)).toEqual(["plugin.test-watcher.tests"]);
+    expect(place.groups.map((g) => g.active?.kind)).toEqual(["plugin.test-watcher.tests"]);
   });
 
   it("opens nothing when no surface is available for the thread", async () => {
@@ -128,14 +135,14 @@ describe("opening a thread from a row, a Needs you card or its popup (selectThre
     selectThreadAndFlag("s-1");
     expect(useUiStore.getState().selection).toEqual(thread);
     await vi.waitFor(() => {
-      expect(getPanel("thread:s-1").groups[0]?.activeTabId).toBe("plugin.test-watcher.tests");
+      expect(tabPlace("thread:s-1").tabs.map((t) => t.kind)).toEqual(["plugin.test-watcher.tests"]);
     });
   });
 
   it("only selects a thread without a flag", () => {
     selectThreadAndFlag("s-2");
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-2" });
-    expect(getPanel("thread:s-2").groups[0]?.tabs ?? []).toHaveLength(0);
+    expect(tabPlace("thread:s-2").tabs).toHaveLength(0);
   });
 
   it("is what Go to thread does from the card and the popup: the popup closes, the surface opens", async () => {
@@ -145,7 +152,7 @@ describe("opening a thread from a row, a Needs you card or its popup (selectThre
     expect(useNeedsStore.getState().popup).toBeNull();
     expect(useUiStore.getState().selection).toEqual(thread);
     await vi.waitFor(() => {
-      expect(getPanel("thread:s-1").groups[0]?.activeTabId).toBe("plugin.test-watcher.tests");
+      expect(tabPlace("thread:s-1").tabs.map((t) => t.kind)).toEqual(["plugin.test-watcher.tests"]);
     });
   });
 });

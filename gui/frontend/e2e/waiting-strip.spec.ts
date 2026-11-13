@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { openRowThread } from "./shell-threads";
 
 /**
  * The waiting strip (docs/notes/waiting-strip.md) over the mock's scripted thread s-r1 in its
@@ -76,10 +77,11 @@ test("the list follows the thread's stream: a row removed, a status changed, a w
 
 test("back on a thread the strip says what is true now, not what it said when left", async ({ page }) => {
   await openThread(page);
-  await row(page, "s:s-2").click();
+  // s-2 waits on the user: its row's first line opens it, a tab beside s-r1's.
+  await openRowThread(page, "s-2");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await mockPost("thread/wake-fire?sub=sub-pr");
-  await row(page, "s:s-r1").click();
+  await openRowThread(page, "s-r1");
   await expect(page.getByTestId("waiting-sentence")).toHaveText("Waiting on 2 threads, 1 timer, 1 shell and 1 subagent");
 });
 

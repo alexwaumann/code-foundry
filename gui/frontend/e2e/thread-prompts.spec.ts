@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, leaveSidebar, mockPost, openApp, openTooltip, resetMock, row, threadCalls } from "./fixtures";
+import { invocations, leaveSidebar, mockPost, openApp, openTooltip, resetMock, threadCalls } from "./fixtures";
+import { openRowThread } from "./shell-threads";
 
 /**
  * Answering a thread (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -19,8 +20,8 @@ async function openThread(page: Page, state: State, scheme: "dark" | "light" = "
   await page.emulateMedia({ colorScheme: scheme });
   await mockPost(`thread?state=${state}`);
   await openApp(page);
-  await row(page, "s:s-r1").click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  // A thread asking waits under Needs you: its row's first line opens it (the title opens its popup).
+  await openRowThread(page, "s-r1");
   await expect(page.getByTestId("thread-timeline").locator("[data-row-type]").first()).toBeVisible();
   await leaveSidebar(page, editor(page));
 }

@@ -90,12 +90,13 @@ test("the keyboard walks main → Working → Snoozed → Archived; collapsed se
   // Past the last row cmd+N does nothing.
   await page.keyboard.press("Meta+8");
   await expect(row(page, "s:s-7")).toHaveAttribute("aria-selected", "true");
-  // cmd+shift+a never lands on a snoozed thread (s-8 waits, but is snoozed).
+  // cmd+shift+a (the next Needs-you popup) never lands on a snoozed thread (s-8 waits, but is snoozed).
   await page.getByTestId("snoozed-header").click();
+  const popup = page.getByTestId("needs-popup");
   await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await expect(popup).toHaveAttribute("data-thread-id", "s-2");
   await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
+  await expect(popup).toHaveAttribute("data-thread-id", "s-2");
 });
 
 // The row showing, the header's state and count, the arrows, children and a wake: src/components/sidebar/Sidebar.test.tsx
@@ -162,9 +163,9 @@ test("the hover snooze menu keeps the row's card shut, and clicking away leaves 
     await page.waitForTimeout(100);
     await expect(tip).toHaveCount(0);
   }
-  // Away from the menu and the row, then a click there closes the menu: still shut.
-  const main = await page.getByTestId("content-pane").boundingBox();
-  if (!main) throw new Error("no content pane");
+  // Away from the menu and the row, then a click on the pane area closes the menu: still shut.
+  const main = await page.getByTestId("shell-grid").boundingBox();
+  if (!main) throw new Error("no pane area");
   await page.mouse.move(main.x + main.width / 2, main.y + main.height / 2);
   await page.mouse.down();
   await page.mouse.up();

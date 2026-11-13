@@ -8,10 +8,10 @@ const runCommandForResult = vi.hoisted(() => vi.fn<(...a: unknown[]) => Promise<
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult, refreshCommands: vi.fn(() => Promise.resolve()) }));
 const invokeCommand = vi.hoisted(() => vi.fn(() => Promise.resolve({ message: "", resultJson: "" })));
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), invokeCommand }));
-const showOwnTerminal = vi.hoisted(() => vi.fn());
-const closeBottomTerminal = vi.hoisted(() => vi.fn(() => Promise.resolve()));
-const revealShell = vi.hoisted(() => vi.fn(() => false));
-vi.mock("./bottomActions", async (orig) => ({ ...(await orig<typeof import("./bottomActions")>()), showOwnTerminal, closeBottomTerminal, revealShell }));
+const focusTerminalTab = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const closeTerminal = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const showTerminal = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+vi.mock("@/shell/terminalActions", async (orig) => ({ ...(await orig<typeof import("@/shell/terminalActions")>()), focusTerminalTab, closeTerminal, showTerminal }));
 
 const { deleteAction, onActionRunFinished, openFailedRun, ownerOfTerminal, rerunAction, runAction, saveAction, setupFailedMessage, stopActionRun } = await import("./actionActions");
 const { useActionsStore } = await import("./actions");
@@ -70,12 +70,20 @@ describe("openFailedRun", () => {
     useUiStore.getState().select({ kind: "view", name: "projects" });
   });
 
-  it("a terminal run: its tab", () => {
-    revealShell.mockReturnValueOnce(true);
+  it("a terminal run: its tab (ui.focus.terminal), the keyboard in it", () => {
+    useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action" } } as never }, order: ["t-1"] });
     useActionDialogStore.setState({ runId: null });
     openFailedRun(finished({ terminalId: "t-1" }));
-    expect(revealShell).toHaveBeenCalledWith("t-1");
+    expect(showTerminal).toHaveBeenCalledWith("t-1");
     expect(useActionDialogStore.getState().runId).toBeNull();
+  });
+
+  it("a terminal run whose terminal is gone: the captured output", () => {
+    useTerminalsStore.setState({ byId: {}, order: [] });
+    useActionDialogStore.setState({ runId: null });
+    openFailedRun(finished({ terminalId: "t-gone" }));
+    expect(showTerminal).not.toHaveBeenCalled();
+    expect(useActionDialogStore.getState()).toMatchObject({ runId: "r-1", runName: "Install deps" });
   });
 });
 
@@ -90,30 +98,30 @@ describe("ownerOfTerminal", () => {
 });
 
 describe("runs", () => {
-  it("runAction: action.run --terminal in the owner's context, quietly; the new tab is shown", async () => {
+  it("runAction: action.run --terminal in the owner's context, quietly; the keyboard goes to the new tab", async () => {
     await expect(runAction("a-1", { kind: "worktree", projectId: "repo-cf", path: "/w" })).resolves.toBe("t-9");
     expect(runCommandForResult).toHaveBeenCalledWith("action.run", { action: "a-1", terminal: "true" }, { ctx: expect.objectContaining({ activeProjectId: "repo-cf", activeWorktreePath: "/w" }) as unknown, quiet: true });
-    expect(showOwnTerminal).toHaveBeenCalledWith("t-9");
+    expect(focusTerminalTab).toHaveBeenCalledWith("t-9");
   });
 
   it("runAction: a failed run shows nothing", async () => {
     runCommandForResult.mockResolvedValueOnce(null);
     await expect(runAction("a-1", { kind: "thread", threadId: "s-1" })).resolves.toBeNull();
-    expect(showOwnTerminal).not.toHaveBeenCalled();
+    expect(focusTerminalTab).not.toHaveBeenCalled();
   });
 
   it("rerunAction: runs the same action for the same owner, then closes the old tab", async () => {
     useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", thread: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
     await expect(rerunAction("t-1")).resolves.toBe("t-9");
     expect(runCommandForResult.mock.calls[0]?.[1]).toEqual({ action: "a-1", terminal: "true" });
-    expect(closeBottomTerminal).toHaveBeenCalledWith("t-1");
+    expect(closeTerminal).toHaveBeenCalledWith("t-1");
   });
 
   it("rerunAction: a run that fails keeps the old tab", async () => {
     useTerminalsStore.setState({ byId: { "t-1": { id: "t-1", labels: { kind: "action", thread: "s-1", action: "a-1" } } as never }, order: ["t-1"] });
     runCommandForResult.mockResolvedValueOnce(null);
     await expect(rerunAction("t-1")).resolves.toBeNull();
-    expect(closeBottomTerminal).not.toHaveBeenCalled();
+    expect(closeTerminal).not.toHaveBeenCalled();
   });
 
   it("rerunAction: a second Rerun of the same tab while one is in flight runs nothing", async () => {
@@ -122,7 +130,7 @@ describe("runs", () => {
     await expect(rerunAction("t-1")).resolves.toBeNull();
     await expect(first).resolves.toBe("t-9");
     expect(runCommandForResult).toHaveBeenCalledTimes(1);
-    expect(closeBottomTerminal).toHaveBeenCalledTimes(1);
+    expect(closeTerminal).toHaveBeenCalledTimes(1);
     // Done: the tab (were it still there) could rerun again.
     await expect(rerunAction("t-1")).resolves.toBe("t-9");
   });

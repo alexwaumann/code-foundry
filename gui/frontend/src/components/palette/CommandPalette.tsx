@@ -16,7 +16,6 @@ import { inPalette, invokeStarted, presentCommand, presentInPalette } from "@/ke
 import { formatChord } from "@/keys/chord";
 import { argChoices, groupByCategory, previousArg, promptedArgs, startPrompt, submitArg, UNSET_CHOICE, type ArgPrompt } from "@/palette/args";
 import { rankCommands } from "@/palette/rank";
-import { SHELL_PREVIEW_ENTRY, shellPreviewEntry, toggleShellPreview } from "@/palette/shellPreview";
 import { refreshCommands, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useSearchDialogStore } from "@/stores/searchDialog";
@@ -79,7 +78,7 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
     void refreshCommands(context);
   }, [context]);
 
-  const available = useMemo(() => [...commands.filter(inPalette), shellPreviewEntry], [commands]);
+  const available = useMemo(() => commands.filter(inPalette), [commands]);
   const groups = useMemo(() => groupByCategory(available), [available]);
   // A query lists one flat group ranked by rankCommands; categories only for an empty one.
   const searching = !prompt && query.trim() !== "";
@@ -97,12 +96,6 @@ function PaletteBody({ initialQuery, initialCommand, initialContext, close }: Bo
   };
 
   const pick = (c: CommandView) => {
-    // The shell preview toggle is the window's own (palette/shellPreview.ts), not the daemon's.
-    if (c.name === SHELL_PREVIEW_ENTRY) {
-      close();
-      toggleShellPreview();
-      return;
-    }
     // thread.new: the project picker replaces the model/effort prompts.
     if (presentInPalette(c.name)) {
       close();
@@ -357,7 +350,7 @@ export function CommandPalette() {
         : page === "prompts"
           ? "Pick a prompt you sent to put it in the composer"
           : page === "files"
-            ? "Pick a file of the thread to open in its side panel"
+            ? "Pick a file of the thread to open in a tab beside it"
             : page === "search"
               ? "Find threads by name and messages, and open one at the match"
               : "Run a command in the current context";

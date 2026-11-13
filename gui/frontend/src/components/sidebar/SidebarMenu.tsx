@@ -1,14 +1,12 @@
 import { Plus } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
-import { ProjectsNav } from "@/components/projects/ProjectsPage";
-import { PullRequestsNav } from "@/components/prs/PullRequestsPage";
 import { SearchNav } from "@/components/search/SearchNav";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui";
 
 /**
- * New thread (thread.new) as the first row of the sidebar's menu, above Pull Requests and
- * Projects and drawn like them: a muted plus, the row's text role, the rows' hover, and
+ * New thread (thread.new) as the first row of the sidebar's menu, above search and drawn like
+ * it: a muted plus, the row's text role, the rows' hover, and
  * the selected colour while the new-thread composer shows. Runs exactly what the palette
  * does (the project picker). docs/notes/sidebar-new-thread-row.md.
  */
@@ -35,23 +33,19 @@ export function SidebarNewThread() {
 }
 
 /**
- * The menu pane right under the title band: New thread, Pull Requests and Projects (not in the
- * shell, `pages`: they are tabs there) and,
- * while an agent search has something to say, its row, in a small pane drawn like the content pane beside it (surface fill, divider border, pane
+ * The menu pane at the top of the sidebar: New thread and, while an agent search has something
+ * to say, its row (Pull Requests and Projects are tabs, opened from a pane's "+" and the palette), in a small pane drawn like the content pane beside it (surface fill, divider border, pane
  * radius), so the app's pages read apart from the thread list below. It runs from the
  * body's left gutter to the sidebar's edge, a shell gap from the window and from the
  * content pane. The rows keep rounded-md: 4px inside a 12px corner wants 8, which the
  * radius scale does not have. 8px below it (mb-2) comes Ember's row when it shows, then the
  * thread list, whose 4px paddingStart sits above its first row. docs/notes/sidebar-menu-pane.md.
  */
-export function SidebarMenu({ pages = true }: { pages?: boolean }) {
+export function SidebarMenu() {
   return (
     <div className="mb-2 flex shrink-0 flex-col rounded-pane border border-cf-divider bg-cf-surface p-1 [--wails-draggable:no-drag]" data-testid="sidebar-menu">
       <SidebarNewThread />
       <nav className="flex shrink-0 flex-col" aria-label="Pages">
-        {/* The shell opens Pull Requests and Projects as tabs, from a pane's "+" and the palette. */}
-        {pages && <PullRequestsNav />}
-        {pages && <ProjectsNav />}
         <SearchNav />
       </nav>
     </div>

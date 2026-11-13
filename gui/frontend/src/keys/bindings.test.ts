@@ -262,10 +262,13 @@ describe("handleKeyDown precedence", () => {
     useCommandsStore.setState({ contextKey: contextKey(getUiContext()) });
     relist.run = () => undefined;
     runCommandForResult.mockClear();
+    // The window draws its layout: the key table's verbs (cmd+t) are presented (shell/keyPresenters.ts).
+    setShellMode("shell");
   });
 
   afterEach(() => {
     window.removeEventListener("keydown", handleKeyDown, { capture: true });
+    setShellMode("waiting");
   });
 
   it("global chords win even inside the terminal", () => {
@@ -322,7 +325,7 @@ describe("handleKeyDown precedence", () => {
     const e = press(document.getElementById("pr") as HTMLElement, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     await vi.waitFor(() => {
-      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new-free", {}, expect.objectContaining({ quiet: true }));
     });
   });
 
@@ -339,7 +342,7 @@ describe("handleKeyDown precedence", () => {
     const e = press(prompt, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     await vi.waitFor(() => {
-      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new-free", {}, expect.objectContaining({ quiet: true }));
     });
   });
 
@@ -352,7 +355,7 @@ describe("handleKeyDown precedence", () => {
     const e = press(terminal, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     await vi.waitFor(() => {
-      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+      expect(runCommandForResult).toHaveBeenCalledWith("terminal.new-free", {}, expect.objectContaining({ quiet: true }));
     });
   });
 
@@ -369,20 +372,6 @@ describe("handleKeyDown precedence", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
     press(outside, { key: "F2", code: "F2" });
     expect(useUiStore.getState().renamingThreadId).toBe("s1");
-  });
-
-  it("cmd+shift+a cycles through threads needing attention in sidebar order (newest first)", () => {
-    useThreadsStore.setState({
-      byId: { a: thread("a", { status: "attention" }), b: thread("b"), c: thread("c", { status: "attention" }) },
-      order: ["a", "b", "c"],
-    });
-    const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
-    jump();
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "c" });
-    jump();
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "a" });
-    jump();
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "c" });
   });
 
   describe("cmd+shift+a in the window shell: the popup of the next thread that needs the user", () => {
@@ -441,6 +430,13 @@ describe("handleKeyDown precedence", () => {
       expect(useNeedsStore.getState().popup).toBe("c");
     });
 
+    it("before the window's first draw (the first-load import) it asks for the popup all the same", () => {
+      setShellMode("waiting");
+      useThreadsStore.setState({ byId: { a: thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }) }, order: ["a"] });
+      press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState().popup).toBe("a");
+    });
+
     it("does nothing visible when no thread needs the user", () => {
       useThreadsStore.setState({ byId: { b: thread("b") }, order: ["b"] });
       const before = useUiStore.getState().selection;
@@ -451,29 +447,9 @@ describe("handleKeyDown precedence", () => {
     });
   });
 
-  it("cmd+shift+a visits prompts before finished turns, as the sidebar lists them", () => {
-    useThreadsStore.setState({
-      byId: {
-        a: thread("a", { status: "attention", statusReason: "finished" }),
-        b: thread("b", { status: "attention", statusReason: "question: Which?" }),
-        c: thread("c", { status: "attention", statusReason: "finished" }),
-        d: thread("d", { status: "error", statusReason: "interrupted" }),
-      },
-      order: ["a", "b", "c", "d"],
-    });
-    const jump = () => press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
-    const seen: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      jump();
-      const sel = useUiStore.getState().selection;
-      seen.push(sel.kind === "thread" ? sel.id : "");
-    }
-    expect(seen).toEqual(["b", "c", "a", "b"]);
-  });
-
   describe("cmd+1..9 follow the sidebar's groups", () => {
-    // Creation order a..f: the sidebar shows f (pinned, busy), d (question), b (interrupted),
-    // e (finished), c (idle), then under Working: a (busy).
+    // Creation order a..f: the sidebar shows d (question) under Needs you, then f (pinned, busy),
+    // b (interrupted), e (finished), c (idle), then under Working: a (busy) (lib/shellSections.ts).
     beforeEach(() => {
       useThreadsStore.setState({
         byId: {
@@ -493,8 +469,8 @@ describe("handleKeyDown precedence", () => {
       return sel.kind === "thread" ? sel.id : "";
     };
 
-    it("expanded: pinned, prompts, errors, finished, idle, working", () => {
-      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+    it("expanded: Needs you, then pinned, errors, finished, idle, working", () => {
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["d", "f", "b", "e", "c", "a"]);
     });
 
     it("a stopped idle thread sorts with the idle ones; a starting one keeps a saved finished turn, or is Working once busy", () => {
@@ -502,32 +478,22 @@ describe("handleKeyDown precedence", () => {
       useThreadsStore.setState((s) => ({
         byId: { ...s.byId, c: thread("c", { state: "disconnected", status: "idle" }), e: thread("e", { state: "starting", status: "attention", statusReason: "finished" }) },
       }));
-      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "e", "c", "a"]);
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["d", "f", "b", "e", "c", "a"]);
       // A message starts it: the daemon says busy at once.
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, e: thread("e", { state: "starting", status: "busy", statusReason: "working" }) } }));
-      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["f", "d", "b", "c", "e", "a"]);
+      expect([1, 2, 3, 4, 5, 6].map(jumpTo)).toEqual(["d", "f", "b", "c", "e", "a"]);
     });
 
     it("collapsed: the hidden Working rows are skipped (cmd+6 does nothing)", () => {
       useUiStore.setState({ workingCollapsed: true });
-      expect([1, 2, 3, 4, 5].map(jumpTo)).toEqual(["f", "d", "b", "e", "c"]);
+      expect([1, 2, 3, 4, 5].map(jumpTo)).toEqual(["d", "f", "b", "e", "c"]);
       expect(jumpTo(6)).toBe("c");
     });
 
-    it("cmd+shift+a is unchanged by collapsing: only the waiting threads", () => {
-      useUiStore.setState({ workingCollapsed: true });
-      const seen: string[] = [];
-      for (let i = 0; i < 3; i++) {
-        press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
-        const sel = useUiStore.getState().selection;
-        seen.push(sel.kind === "thread" ? sel.id : "");
-      }
-      expect(seen).toEqual(["d", "e", "d"]);
-    });
   });
 
   describe("cmd+shift+[ / cmd+shift+] step through the sidebar order", () => {
-    // The same sidebar as cmd+1..9's: f, d, b, e, c, then under Working: a.
+    // The same sidebar as cmd+1..9's: d, f, b, e, c, then under Working: a.
     beforeEach(() => {
       useCommandsStore.setState((s) => ({
         commands: [...s.commands, cmd({ name: "thread.previous", keybindings: ["cmd+shift+["] }), cmd({ name: "thread.next", keybindings: ["cmd+shift+]"] })],
@@ -553,17 +519,17 @@ describe("handleKeyDown precedence", () => {
     };
 
     it("next from HOME selects the first row, then walks down and wraps", () => {
-      expect([1, 2, 3, 4, 5, 6, 7].map(() => step(1))).toEqual(["f", "d", "b", "e", "c", "a", "f"]);
+      expect([1, 2, 3, 4, 5, 6, 7].map(() => step(1))).toEqual(["d", "f", "b", "e", "c", "a", "d"]);
       expect(runCommandForResult).not.toHaveBeenCalled();
     });
 
     it("previous from HOME selects the last row, then walks up and wraps", () => {
-      expect([1, 2, 3, 4, 5, 6, 7].map(() => step(-1))).toEqual(["a", "c", "e", "b", "d", "f", "a"]);
+      expect([1, 2, 3, 4, 5, 6, 7].map(() => step(-1))).toEqual(["a", "c", "e", "b", "f", "d", "a"]);
     });
 
     it("rows of a collapsed section do not count; a thread in one starts like a page", () => {
       useUiStore.setState({ workingCollapsed: true, selection: { kind: "thread", id: "c" } });
-      expect(step(1)).toBe("f");
+      expect(step(1)).toBe("d");
       expect(step(-1)).toBe("c");
       useUiStore.setState({ selection: { kind: "thread", id: "a" } });
       expect(step(-1)).toBe("c");
@@ -572,9 +538,9 @@ describe("handleKeyDown precedence", () => {
     it("a hidden thread selected starts from its creator's row, and is never a stop", () => {
       useThreadsStore.setState((s) => ({ byId: { ...s.byId, g: thread("g", { createdBy: "d" }) }, order: [...s.order, "g"] }));
       useUiStore.setState({ selection: { kind: "thread", id: "g" } });
-      expect(step(1)).toBe("b");
+      expect(step(1)).toBe("f");
       expect(step(-1)).toBe("d");
-      expect(step(1)).toBe("b");
+      expect(step(1)).toBe("f");
     });
 
     it("does nothing with no rows", () => {
@@ -583,12 +549,9 @@ describe("handleKeyDown precedence", () => {
       expect(step(-1)).toBe("compose");
     });
 
-    it("works from a focused shell, and lands in the window's history", () => {
-      useUiStore.setState({ history: [HOME], historyIndex: 0 });
-      expect(step(1, terminal)).toBe("f");
+    it("works from a focused shell", () => {
       expect(step(1, terminal)).toBe("d");
-      useUiStore.getState().back();
-      expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "f" });
+      expect(step(1, terminal)).toBe("f");
     });
 
     it("a plain text field keeps them (only back and forward leave one)", () => {
@@ -609,10 +572,9 @@ describe("handleKeyDown precedence", () => {
     ["back rebound to alt+[ stays with the field (no cmd)", "alt+[", { key: "[", code: "BracketLeft", altKey: true }, false],
   ])("%s", (_name, chord, init, leaves) => {
     useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: chord === "cmd+]" ? "view.forward" : "view.back", keybindings: [chord] })] }));
-    useUiStore.setState({ selection: { kind: "view", name: "projects" }, history: [HOME, { kind: "view", name: "projects" }], historyIndex: 1 });
+    useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     const e = press(input, init);
     expect(e.defaultPrevented).toBe(leaves);
-    if (chord === "cmd+[") expect(useUiStore.getState().selection).toEqual(HOME);
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 
@@ -637,7 +599,7 @@ describe("handleKeyDown precedence", () => {
 
   it("view.back's chord does not leave the palette's input", () => {
     useCommandsStore.setState((s) => ({ commands: [...s.commands, cmd({ name: "view.back", keybindings: ["cmd+["] })] }));
-    useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "view", name: "projects" }, history: [HOME, { kind: "view", name: "projects" }], historyIndex: 1 });
+    useUiStore.setState({ palette: { open: true, query: "", commandName: null, page: "commands", returnTo: "content" }, selection: { kind: "view", name: "projects" } });
     expect(press(input, { key: "[", code: "BracketLeft", metaKey: true }).defaultPrevented).toBe(false);
     expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
   });
@@ -645,8 +607,8 @@ describe("handleKeyDown precedence", () => {
   it("command chords run outside the terminal", () => {
     const e = press(outside, { key: "t", code: "KeyT", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
-    // Quiet: the new bottom panel tab is the feedback, not a "created terminal" toast.
-    expect(runCommandForResult).toHaveBeenCalledWith("terminal.new", {}, expect.objectContaining({ quiet: true }));
+    // The key table's cmd+t (shell/keyPresenters.ts): with no thread, a free terminal. Quiet: the new tab is the feedback.
+    expect(runCommandForResult).toHaveBeenCalledWith("terminal.new-free", {}, expect.objectContaining({ quiet: true }));
   });
 
   it("commands with required args open the palette prompt instead of running", () => {

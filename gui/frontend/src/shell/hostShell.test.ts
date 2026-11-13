@@ -1,3 +1,4 @@
+import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LayoutApplyView, LayoutOpView } from "@/api/layout";
 import { layoutOf, pane, row, seedLayout, space, tab } from "@/test/shellLayout";
@@ -124,11 +125,15 @@ describe("the host seam in the shell", () => {
     applyGate = null;
   });
 
-  it("has nothing to show or expand", () => {
-    expect(host.showTabs(host.threadTarget("s-1"), true)).toBe(true);
-    expect(host.showTabs(host.threadTarget("s-9"), true)).toBe(false);
-    expect(host.expandTabs("current")).toBe(false);
-    expect(ops).toEqual([]);
+  it("names targets by selection; a selection of nothing has none, and its place is empty", () => {
+    expect(host.targetOf({ kind: "thread", id: "s-1" })).toBe("thread:s-1");
+    expect(host.targetOf({ kind: "view", name: "projects" })).toBe("view:projects");
+    expect(host.targetOf({ kind: "none" })).toBeNull();
+    expect(host.threadOfTarget("current")).toBe("s-1");
+    expect(host.threadOfTarget("view:projects")).toBe("");
+    const { result } = renderHook(() => host.useTabPlace(null, (p) => p.tabs.length));
+    expect(result.current).toBe(0);
+    expect(host.tabPlace(host.threadTarget("s-9"))).toMatchObject({ shown: false, tabs: [], focused: 0 });
   });
 
   it("tells subscribers when a target's tabs change", async () => {

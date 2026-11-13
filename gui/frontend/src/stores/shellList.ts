@@ -1,19 +1,16 @@
 /**
  * What the shell's sidebar is built from (lib/shellSections.ts): the classic list's keys
  * (stores/context.ts) with each thread's space, the current space's drafts, and the options.
- * Also the sidebar's thread order for the keys (cmd+1..9, thread.next/previous, cmd+shift+a),
- * which follows the shell's list while the shell draws the window.
+ * Also the sidebar's thread order for the keys (cmd+1..9, thread.next/previous).
  * See docs/notes/shell-16-sidebar.md.
  */
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { needsBySpace, needsList, needsScopeOf, shellThreadOrder, type ShellDraft, type ShellListOptions, type ShellListThread } from "@/lib/shellSections";
-import { threadOrder } from "@/lib/tree";
 import { decodeThreadListKeys, getListOptions, getListThreads, useThreadListKeys } from "./context";
 import { spaceOfThread, useCurrentSpaceId, useLayoutStore } from "./layout";
 import { useSettingsStore, useSettingValue } from "./settings";
 import { useShellSidebarStore } from "./shellSidebar";
-import { shellDrawn } from "./shellView";
 import { useThreadsStore } from "./threads";
 
 /** The setting the Needs you section's scope is stored in. */
@@ -61,9 +58,9 @@ export function getShellListOptions(): ShellListOptions {
   };
 }
 
-/** Thread ids in the sidebar's order as drawn: the shell's while it draws the window, else the classic list's. */
+/** Thread ids in the sidebar's order as drawn. */
 export function sidebarThreadOrder(): string[] {
-  return shellDrawn() ? shellThreadOrder(getShellListThreads(), getShellListOptions()) : threadOrder(getListThreads(), getListOptions());
+  return shellThreadOrder(getShellListThreads(), getShellListOptions());
 }
 
 /**

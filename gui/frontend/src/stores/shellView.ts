@@ -3,8 +3,7 @@
  * and is never stored in the daemon or in localStorage. The layout itself (spaces, panes, tabs,
  * the focused pane) is the daemon's (stores/layout.ts).
  *
- * - `mode`: the shell flag is on (shell/flag.ts) and this window waits for the daemon's layout,
- *   draws the shell, or fell back to the classic window (an older daemon sent no layout).
+ * - `mode`: this window waits for the daemon's layout (and the first-load import), or draws it.
  * - `frame`: the pane grid as last drawn (rectangles in layout px): the direction keys find
  *   neighbours on it (shell/keyPresenters.ts), as the spec says they do on the rendered frame.
  * - `focusRequest`: asks a pane to take the keyboard into its active tab (a key or a command
@@ -16,10 +15,9 @@
  * See docs/notes/shell-11-pane-grid.md and docs/notes/shell-19-rails-fullscreen.md.
  */
 import { create } from "zustand";
-import { shellOn } from "@/shell/flag";
 import type { Frame } from "@/shell/geometry/types";
 
-export type ShellMode = "waiting" | "shell" | "classic";
+export type ShellMode = "waiting" | "shell";
 
 interface ShellViewState {
   mode: ShellMode;
@@ -49,18 +47,9 @@ export function setShellMode(mode: ShellMode): void {
   if (useShellViewStore.getState().mode !== mode) useShellViewStore.setState({ mode });
 }
 
-/** Whether the shell draws this window (the flag is on and the layout arrived). */
+/** Whether the shell draws this window (the layout arrived and the first-load import settled). */
 export function shellDrawn(): boolean {
   return useShellViewStore.getState().mode === "shell";
-}
-
-/**
- * Whether the window wears the shell's chrome (the top bar, no sidebar band): the flag is on and
- * the window has not fallen back to the classic one. True while it waits for the layout too, so
- * the band does not flash in and out.
- */
-export function useShellChrome(): boolean {
-  return useShellViewStore((s) => shellOn() && s.mode !== "classic");
 }
 
 export function setShellFrame(frame: Frame | null): void {

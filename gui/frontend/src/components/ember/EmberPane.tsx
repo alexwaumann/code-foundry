@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Eye, Loader2 } from "lucide-react";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { AgentsStrip } from "@/components/thread/AgentsStrip";
 import { CiteLayer } from "@/components/thread/cite/CiteLayer";
 import { FindBar } from "@/components/thread/find/FindBar";
@@ -48,7 +47,7 @@ function HeaderStatus() {
   );
 }
 
-/** Board (the side panel on the Board surface) and Show work (every work row open), then the panel toggle. */
+/** Board (the Board surface beside the chat) and Show work (every work row open). */
 function HeaderActions({ threadId }: { threadId: string }) {
   const enabled = useEmberEnabled();
   const panelKey = useCurrentTarget();
@@ -92,7 +91,6 @@ function HeaderActions({ threadId }: { threadId: string }) {
         <Eye aria-hidden />
         Show work
       </Button>
-      <PanelToggle />
     </span>
   );
 }

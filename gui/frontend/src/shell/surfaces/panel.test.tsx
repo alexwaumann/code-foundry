@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { FileText } from "lucide-react";
 import { afterEach, describe, expect, it } from "vitest";
-import { usePanelKey } from "@/components/panel/panelKeyContext";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import type { Tab } from "@/shell/host";
 import type { SurfaceSpec } from "@/surfaces/types";
 import type { TabEntry } from "@/stores/layout";

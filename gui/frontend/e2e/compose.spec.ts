@@ -198,26 +198,42 @@ test("attachments: a pasted image lands as a thumbnail; into an empty prompt, wi
 // A native drop (images and PDFs staged by path, other paths inserted, another target ignored, the send reusing
 // the staged paths): unit-tested in src/components/compose/hostFiles.test.tsx.
 
+// The shell's drafts (docs/notes/shell-model.md, "The composer"): a typed composer keeps its own tab
+// when a thread opens, and New thread opens another, empty composer. Listed, kept through its tab
+// closing and a reload, cleared when emptied: e2e/shell-sidebar.spec.ts; the draft's identity and
+// the empty composer's rules: src/shell/composerDrafts.test.ts.
 test("the draft survives switching away; Esc on an empty draft shows the project", async ({ page }) => {
   await openApp(page);
   await composeProject(page, 3);
   await expect(page.getByTestId("composer-heading")).toHaveText("What should we build in ghostty-playground?");
   await page.keyboard.type("Half-written idea");
+  const draft = page.locator('[data-row-kind="draft"]');
+  await expect(draft).toHaveCount(1);
+  // A thread opens beside it: the draft's tab stays, not shown.
   await row(page, "s:s-1").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
   await expect(page.getByTestId("composer")).toHaveCount(0);
+  await expect(page.locator('[data-testid="shell-tab"][data-kind="compose"]')).toHaveCount(1);
 
+  // New thread on the same project opens another, empty composer; the draft keeps its text.
   // No project highlighted in the picker, Backspace back to the commands, and thread.new from the
   // palette showing the picker: unit-tested in src/components/palette/CommandPalette.test.tsx.
   await composeProject(page, 3);
+  await expect(prompt(page)).toHaveAttribute("data-value", "");
+  await expect(page.locator('[data-testid="shell-tab"][data-kind="compose"]')).toHaveCount(2);
+  // The draft's row brings its tab back, its text whole.
+  await draft.click();
   await expect(prompt(page)).toHaveAttribute("data-value", "Half-written idea");
 
-  // Esc with text does nothing; with an empty draft it returns to the Projects page.
+  // Esc with text does nothing; with an empty draft it returns to the project's page.
+  await page.getByTestId("composer-input").click();
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toBeVisible();
   await page.getByTestId("composer-input").fill("");
+  await expect(draft).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("composer")).toHaveCount(0);
-  await expect(page.getByTestId("projects-page")).toBeVisible();
+  await expect(page.locator('[data-testid="projects-page"][data-page="project"][data-project="repo-gp"]')).toBeVisible();
 });
 
 test("image chips: inserted at the caret, one unit for arrows and Backspace, × asks while referenced, sent as references", async ({ page }) => {

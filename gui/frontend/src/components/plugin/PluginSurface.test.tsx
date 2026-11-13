@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { PluginView, SurfaceUpdateView } from "@/api/plugin";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
-import { SidePanel } from "@/components/panel/SidePanel";
 import { useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { applyIntent } from "@/stores/intents";
-import { activeTab, getPanel, makeTab, openSurface, usePanelStore, type Tab } from "@/stores/panel";
+import { findTab, makeTab, openTab, shownTab, tabPlace, type Tab } from "@/shell/host";
 import { applyPluginEvent, usePluginsStore } from "@/stores/plugins";
 import { usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { useUiStore } from "@/stores/ui";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { confirmFirst, daemon, invocationsOf, resetDaemon } from "@/test/daemonFakes";
 import { demoView, type DemoTab } from "@/test/pluginFixtures";
 import { push, resetSurfaces, surfaces } from "@/test/pluginSurfaceFakes";
@@ -19,6 +19,7 @@ import { PluginSurface } from "./PluginSurface";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/plugin", async (orig) => ({ ...(await orig<typeof import("@/api/plugin")>()), ...(await import("@/test/pluginSurfaceFakes")).surfaceFakes }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 /**
  * One plugin surface tab over the hello demo's captured views (src/test/pluginFixtures.ts),
@@ -46,12 +47,14 @@ async function tick(): Promise<void> {
   });
 }
 
-/** Thread s-3 selected, its panel showing the hello demo, the plugin's first view sent. */
+/** Thread s-3 selected, a tab linked to it showing the hello demo (the layout's tab), the plugin's first view sent. */
 async function openDemo(view: DemoTab = "overview"): Promise<Tab> {
-  const tab = makeTab("plugin.hello.demo", "Hello Demo");
-  act(() => {
-    openSurface("current", tab);
+  const made = makeTab("plugin.hello.demo", "Hello Demo");
+  await act(async () => {
+    openTab("current", made);
+    await layoutSettled();
   });
+  const tab = findTab("current", made.id) as Tab;
   render(
     <>
       <PluginSurface tab={tab} />
@@ -77,11 +80,11 @@ async function send(...updates: SurfaceUpdateView[]): Promise<void> {
 const surface = () => screen.getByTestId("plugin-surface");
 const byKey = (testId: string, key: string) => surface().querySelector<HTMLElement>(`[data-testid="${testId}"][data-key="${key}"]`) as HTMLElement;
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed("s-3"));
   resetDaemon();
   resetSurfaces();
   seedWorld();
-  usePanelStore.setState({ byKey: {} });
   usePluginSurfacesStore.setState({ watches: {}, drafts: {}, resetTokens: {}, collapsed: {}, pending: {} });
   usePluginsStore.setState(applyPluginEvent({ byName: {}, order: [], loaded: false, epoch: 0, dirs: null }, { kind: "snapshot", plugins: [hello] }));
   act(() => {
@@ -96,12 +99,15 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("PluginSurface", () => {
-  it("opens live with the view's header and tabs; the panel tab takes the view's title", async () => {
-    await openDemo();
+  it("opens live with the view's header and tabs; the tab takes the view's title", async () => {
+    const tab = await openDemo();
     expect(within(surface()).getByTestId("plugin-title").textContent).toBe("Hello demo");
     expect(within(surface()).getByTestId("plugin-subline").textContent).toContain("thread s-");
     expect(byKey("plugin-tab", "overview").getAttribute("aria-selected")).toBe("true");
-    expect(activeTab(getPanel("current"))?.title).toBe("Hello");
+    await act(async () => {
+      await layoutSettled();
+    });
+    expect(findTab("current", tab.id)?.title).toBe("Hello");
     expect(within(surface()).getByTestId("plugin-body")).toBeTruthy();
     // One WatchSurface for the tab, with the panel's thread.
     expect(surfaces.streams.map((s) => [s.ref.plugin, s.ref.surface, s.ref.context.activeThreadId])).toEqual([["hello", "demo", "s-3"]]);
@@ -279,37 +285,15 @@ describe("PluginSurface's own states", () => {
   });
 });
 
-describe("the side panel's surface list", () => {
-  it("lists the available plugin surfaces below the built-ins; one the daemon makes available (Pin) joins, and opens", () => {
-    usePanelStore.setState({ byKey: { "thread:s-3": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
-    useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260 });
-    render(<SidePanel />);
-    const empty = screen.getByTestId("panel-empty");
-    const plugins = within(empty).getByTestId("panel-plugin-surfaces");
-    const kinds = () => [...plugins.querySelectorAll<HTMLElement>("[data-surface]")].map((e) => e.dataset.surface);
-    expect(kinds()).toEqual(["plugin.hello.demo"]);
-    expect(plugins.querySelector('[data-surface="plugin.hello.demo"]')?.textContent).toMatch(/Hello Demo/);
-    // Below the built-ins.
-    const builtIn = empty.querySelector('[data-surface="files"]') as HTMLElement;
-    expect(builtIn.compareDocumentPosition(plugins)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    // Pinned (the plugin's act; its show command is available for this thread now).
-    act(() => {
-      useCommandsStore.setState((st) => ({ commands: [...st.commands, command("plugin.hello.show.pinned", "Show Hello Pinned")] }));
-    });
-    expect(kinds()).toEqual(["plugin.hello.demo", "plugin.hello.pinned"]);
-    fireEvent.click(plugins.querySelector('[data-surface="plugin.hello.pinned"]') as HTMLElement);
-    expect(activeTab(getPanel("current"))?.kind).toBe("plugin.hello.pinned");
-  });
-});
-
 describe("a plugin's intents", () => {
-  it("ShowView with a thread opens the surface in that thread's panel", () => {
-    act(() => {
+  it("ShowView with a thread opens the surface as a tab linked to that thread", async () => {
+    await act(async () => {
       applyIntent({ kind: "showView", name: "panel.plugin.hello.demo?thread=s-4" });
+      await layoutSettled();
     });
-    const e = usePanelStore.getState().byKey["thread:s-4"];
-    expect(e?.open).toBe(true);
-    expect(e && activeTab(e)?.kind).toBe("plugin.hello.demo");
+    const place = tabPlace("thread:s-4");
+    expect(place.shown).toBe(true);
+    expect(shownTab(place)?.kind ?? place.tabs.at(-1)?.kind).toBe("plugin.hello.demo");
   });
 
   it("InvokeCommand runs the command through the confirm dialog, naming the plugin; OK runs it confirmed", async () => {

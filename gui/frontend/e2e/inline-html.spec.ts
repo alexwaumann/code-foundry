@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { paneWith } from "./shell-surfaces";
 
 /**
  * Inline pages (code-foundry view.inline; docs/notes/inline-html.md) over the mock's
@@ -65,11 +66,12 @@ test("an inline page renders in its card, follows cf:resize, and its frame runs 
 // Source swapping the frame for the file's code and back: unit-tested in
 // src/components/thread/InlineHtml.test.tsx (the code view's lines: e2e/file-tabs.spec.ts).
 
-test("expand shows the page over the thread pane's body only; the sidebar and side panel stay usable; Close has focus; Esc closes it", async ({ page }) => {
+test("expand shows the page over the thread pane's body only; the sidebar and the pane beside stay usable; Close has focus; Esc closes it", async ({ page }) => {
   await openHtmlThread(page);
-  // The side panel open too: the modal stays clear of it (inline-page-shows).
+  // The page open as a tab in a pane beside the thread too: the modal stays clear of it (inline-page-shows).
   await hello(page).getByTestId("thread-html-panel").click();
-  await expect(page.getByTestId("side-panel")).toBeVisible();
+  const side = paneWith(page, "file");
+  await expect(side).toBeVisible();
   const card = hello(page).getByTestId("thread-html-card");
   await card.getByTestId("thread-html-expand").click();
   const box = page.getByTestId("thread-html-lightbox");
@@ -78,10 +80,10 @@ test("expand shows the page over the thread pane's body only; the sidebar and si
   await expect(box.frameLocator('[data-testid="thread-html-lightbox-frame"]').locator("#hello")).toHaveText("Hello");
   const lightboxFrame = await box.getByTestId("thread-html-lightbox-frame").boundingBox();
   expect(lightboxFrame?.height ?? 0).toBeGreaterThan(500);
-  // The box sits 12px inside the pane's body: under the header, left of the side panel.
+  // The box sits 12px inside the pane's body: under the header, left of the pane beside.
   const inner = await box.getByTestId("thread-html-lightbox-box").boundingBox();
   const scrim = await box.boundingBox();
-  const panel = await page.getByTestId("side-panel").boundingBox();
+  const panel = await side.boundingBox();
   const pane = await page.getByTestId("thread-pane").boundingBox();
   const header = await page.getByTestId("thread-header").boundingBox();
   expect(inner && scrim && panel && pane && header).toBeTruthy();
@@ -104,8 +106,8 @@ test("expand shows the page over the thread pane's body only; the sidebar and si
   await expect(close).toBeVisible();
   await expect(close).toBeFocused();
   await shot(page, "inline-html-expanded");
-  // The side panel takes clicks while the modal is up.
-  await page.getByTestId("side-panel").getByRole("tab").first().click();
+  // The pane beside takes clicks while the modal is up.
+  await side.getByRole("tab").first().click();
   await expect(box).toBeVisible();
   await close.focus();
   await page.keyboard.press("Escape");
@@ -137,8 +139,9 @@ test("the open page is kept per thread: the sidebar works while it is up, and it
   await hello(page).getByTestId("thread-html-card").getByTestId("thread-html-expand").click();
   const box = page.getByTestId("thread-html-lightbox");
   await expect(box).toBeVisible();
-  // The sidebar is outside the modal: another thread opens, with no modal of its own.
-  await page.getByTestId("thread-list").locator('[data-row-key^="s:"]:not([data-row-key="s:s-r1"])').first().click();
+  // The sidebar is outside the modal: another thread opens (a tab in the same pane), with no modal of its own.
+  await row(page, "s:s-1").click();
+  await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
   await expect(items(page)).toHaveCount(0);
   await expect(box).toHaveCount(0);
   await shot(page, "inline-html-away");

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, openApp, resetMock, row } from "./fixtures";
+import { emit, openApp, resetMock } from "./fixtures";
+import { openShellApp } from "./shell";
+import { diffTab, seedBeside } from "./shell-surfaces";
 
 // The theme editor's fuzz fixes (docs/notes/theme-fuzz-editor.md), by finding. The mock seeds
 // Ocean Dusk (dark, from Catppuccin Mocha, one pin) and Mocha, warmer; the slots start on
@@ -71,11 +73,10 @@ for (const width of [900, 1100, 1200, 1440]) {
   });
 }
 
-test("2: with the side panel open on a thread, the Themes page still fits at 900px", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-2").click();
-  await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
-  await expect(page.getByTestId("panel-resize-handle")).toBeVisible();
+test("2: with a thread and a pane beside it, the Themes page still fits at 900px", async ({ page }) => {
+  await seedBeside("s-1", [diffTab("s-1")]);
+  await openShellApp(page);
+  await expect(page.getByTestId("diff-surface")).toBeVisible();
   await page.setViewportSize({ width: 900, height: 700 });
   await page.keyboard.press("Meta+Comma");
   await page.getByTestId("settings-nav-appearance").click();

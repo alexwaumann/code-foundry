@@ -15,6 +15,7 @@ vi.mock("@/api/gh", async (orig) => {
     },
   };
 });
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { daemon, invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { seedPrWorld, SLUG } = await import("@/test/prWorld");
@@ -22,17 +23,17 @@ const { openPr, renderPrPanel, resetPrStores, settle, toastTexts } = await impor
 const { usePrPanelStore } = await import("@/stores/prPanel");
 
 /**
- * The description's task boxes (TaskBox, stores/prPanel.ts setTaskChecked) in the real side
- * panel against src/test/prWorld.ts: who gets them, what pr.checkbox is sent, the optimistic
+ * The description's task boxes (TaskBox, stores/prPanel.ts setTaskChecked) in a pull request
+ * tab against src/test/prWorld.ts: who gets them, what pr.checkbox is sent, the optimistic
  * state, the failure, and what stays read-only. Which items count: lib/taskItems.test.tsx.
  */
 
 let world: ReturnType<typeof seedPrWorld>;
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDaemon();
   world = seedPrWorld();
-  resetPrStores();
+  await resetPrStores();
   reads.gate = Promise.resolve();
 });
 

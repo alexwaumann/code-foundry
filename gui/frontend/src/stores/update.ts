@@ -6,7 +6,6 @@ import { invokeCommand, isUnknownCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import { getUpdateStatus, type UpdateEventView, type UpdateStatusView } from "@/api/update";
 import { predatesShell, predatesTunnel, type Restarting } from "@/lib/update";
-import { shellOn } from "@/shell/flag";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
 import { useHealthStore } from "./health";
@@ -179,8 +178,8 @@ function watchForOldDaemon(): () => void {
 }
 
 /** Whether this window cannot follow a daemon of this version (see watchForOldDaemon). */
-export function isOldDaemon(version: string, shell: boolean = shellOn()): boolean {
-  return predatesTunnel(version) || (shell && predatesShell(version));
+export function isOldDaemon(version: string): boolean {
+  return predatesTunnel(version) || predatesShell(version);
 }
 
 /** Loads the GUI's own version, wires the app menu's "Check for Updates…" and watches for a daemon this window cannot follow. */

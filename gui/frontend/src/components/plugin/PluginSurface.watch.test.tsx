@@ -11,7 +11,7 @@ vi.mock("@/stores/pluginSurfaces", async (orig) => ({ ...(await orig<typeof impo
 const { PluginSurface } = await import("./PluginSurface");
 const { useCommandsStore } = await import("@/stores/commands");
 const { contextKey, getUiContext } = await import("@/stores/context");
-const { makeTab } = await import("@/stores/panel");
+const { makeTab } = await import("@/shell/host");
 const { applyPluginEvent, usePluginsStore } = await import("@/stores/plugins");
 const { useUiStore } = await import("@/stores/ui");
 

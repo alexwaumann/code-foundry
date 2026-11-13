@@ -5,6 +5,7 @@ import { card } from "@/test/cardFakes";
 import { invocationsOf, resetDaemon } from "@/test/daemonFakes";
 import { HOME, pullRequest, texts } from "@/test/projectsWorld";
 import { activePanelTab, bucket, mcpServer, resetCard, seedChild, seedNoGit, seedServers, seedSingle, seedWs9, setLog, TREE, updateThread } from "@/test/threadInfoWorld";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { tooltipText } from "@/test/tooltip";
 import type { DashboardView } from "@/api/gh";
 import type { McpServerView } from "@/api/mcp";
@@ -22,6 +23,7 @@ vi.mock("@/api/actions", async (orig) => ({ ...(await orig<typeof import("@/api/
 vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
 vi.mock("@/api/placement", async (orig) => ({ ...(await orig<typeof import("@/api/placement")>()), ...(await import("@/test/cardFakes")).cardPlacementFakes }));
 vi.mock("@/lib/clipboard", () => ({ copyText: () => Promise.resolve() }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 /**
  * The thread info card's groups (docs/notes/thread-info-card.md) over the mock's
@@ -77,6 +79,8 @@ async function pick(item: HTMLElement): Promise<void> {
 }
 
 async function renderCard(id: string) {
+  // The card's thread in the window, its tab focused: what the card opens goes beside it.
+  await resetFakeLayout(threadSeed(id));
   const r = render(
     <>
       <ThreadInfoContent threadId={id} />
@@ -87,6 +91,13 @@ async function renderCard(id: string) {
     await new Promise((res) => setTimeout(res, 0));
   });
   return r;
+}
+
+/** Once the tabs a click opened are in the layout. */
+async function settle(): Promise<void> {
+  await act(async () => {
+    await layoutSettled();
+  });
 }
 
 beforeEach(() => {
@@ -143,8 +154,10 @@ describe("ThreadInfoCard: one project", () => {
 
     // Changes opens the cwd's Changes tab, its own title; a pull request its PR tab.
     fireEvent.click(screen.getByTestId("ti-changes"));
+    await settle();
     expect(activePanelTab()).toMatchObject({ kind: "diff", params: { project: "repo-cf", worktree: TREE, own: "1" } });
     fireEvent.click(prs[0] as HTMLElement);
+    await settle();
     expect(activePanelTab()).toMatchObject({ kind: "pullrequest", params: { slug: "alexwaumann/code-foundry", number: "78" } });
 
     // The branch row copies the branch.
@@ -329,6 +342,7 @@ describe("ThreadInfoCard: other scenarios", () => {
     expect(screen.getAllByTestId("ti-changes-project")).toHaveLength(4);
     // A project's row opens that checkout's Changes tab, named for the project.
     fireEvent.click(byTest(cardEl(), "ti-changes-project", '[data-project="repo-web"]') as HTMLElement);
+    await settle();
     expect(activePanelTab()).toMatchObject({ kind: "diff", params: { project: "repo-web" } });
     expect(activePanelTab()?.title).toContain("web");
 
@@ -577,6 +591,7 @@ describe("ThreadInfoCard: other scenarios", () => {
     // Open MCP panel opens the MCP tab.
     openMenu(mcp);
     await pick(within(await screen.findByTestId("ti-mcp-menu")).getByTestId("ti-mcp-open-panel"));
+    await settle();
     expect(activePanelTab()?.kind).toBe("mcp");
     expect(screen.queryByTestId("ti-mcp-menu")).toBeNull();
   });
