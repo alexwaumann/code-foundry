@@ -235,7 +235,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         name: "tab.move",
         title: "Move Tab",
         category: CATEGORY,
-        description: "Move a tab: into another pane's strip (--pane, at --index), into a new pane on an edge of a pane (--split with --edge), onto an edge of the whole pane area (--outer), or to another space (--space).",
+        description: "Move a tab: into another pane's strip (--pane, at --index), into a new pane on an edge of a pane (--split with --edge), onto an edge of the whole pane area (--outer), or to another space (--space). A pane moved to another space goes whole: each thread whose tab it holds moves there too, with its linked tabs (as thread.space.move).",
         keybindings: [],
         noPalette: true,
         args: [str("tab", "The tab to move", { required: true, positional: true }), str("pane", "Into this pane's strip"), { name: "index", type: ArgType.INT, required: false, description: "Its place in the strip" }, str("split", "Into a new pane on --edge of this pane"), edgeArg("edge", "With --split: the edge"), edgeArg("outer", "An edge of the whole area"), str("space", "To this space"), str("frac", "The share the new pane takes"), focusArg],

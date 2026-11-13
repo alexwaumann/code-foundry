@@ -412,7 +412,7 @@ func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
 	b.WriteString(panelItems + "\n")
 	b.WriteString(inlinePage + "\n")
 	if len(js.PluginSurfaces) > 0 {
-		b.WriteString("Plugin surfaces (their show verb acts on each window's selection, not a thread):\n")
+		b.WriteString("Plugin surfaces (a thread or pr surface opens as a tab beside the thread, as above; others in each window):\n")
 		for _, s := range js.PluginSurfaces {
 			fmt.Fprintf(&b, "  %-24s %s\n", s.Command, s.Description)
 		}

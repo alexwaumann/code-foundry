@@ -220,7 +220,7 @@ func TestCapabilitiesGroups(t *testing.T) {
 		{group: "panel",
 			has: []string{"panel: 6 surfaces.", "--thread (default: the thread you run in)",
 				"  view.open.mcp            the thread's MCP servers", "  view.open.file ", "  view.open.diff ", "  view.open.pr ", "  view.open.page ", "  view.open.gallery ", "view.open.page (--path, --title)", "old view.panel.<item> names still work", "renders as a chip", ".html files render there interactively", "view.inline <path> (--title, --panel) shows an .html page inline", "/cf/bridge.js sizes the card",
-				"Plugin surfaces (their show verb acts on each window's selection, not a thread):\n  plugin.gh-actions.show.runs", "Actions (thread scope, from the plugin gh-actions)\n",
+				"Plugin surfaces (a thread or pr surface opens as a tab beside the thread, as above; others in each window):\n  plugin.gh-actions.show.runs", "Actions (thread scope, from the plugin gh-actions)\n",
 				"`code-foundry ui.presence --json` only tells you whether to mention", "a \"show me\" is asking",
 				"unless a remembered preference says not to", "no ui.notify", "Pass --focus only when the user asks"},
 			hasNot: []string{"view.panel.toggle", "view.panel.split", "Panel actions", "side panel", "classic window", "Open the", "Before opening one", "  its ", "view.panel.worktree", "view.panel.agents",

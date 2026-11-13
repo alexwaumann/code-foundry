@@ -154,11 +154,17 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 		case pluginsdk.ScopeWorktree:
 			args = []command.ArgSpec{{Name: "worktree", Type: command.Path, Context: command.ContextWorktree, Description: "Worktree path"}}
 		}
+		// A thread's surface is a tab linked to the thread, placed by the layout's rules
+		// (openSurfaceTab); the others go to the windows as before.
+		as := "as a tab"
+		if threadScoped(spec.Scope) {
+			as = "as a tab linked to the thread, beside it by the app's placement rules (an open one is found, not doubled)"
+		}
 		out = append(out, command.Command{
 			Name:  ShowCommand(name, spec.ID),
 			Title: "Show " + spec.Title,
-			Description: fmt.Sprintf("Open %s's %s surface as a tab (%s scope). Available where the surface is: "+
-				"`code-foundry plugin surface %s %s` prints its view.", mf.DisplayNameOr(), spec.Title, spec.Scope, name, spec.ID),
+			Description: fmt.Sprintf("Open %s's %s surface %s (%s scope). Available where the surface is: "+
+				"`code-foundry plugin surface %s %s` prints its view.", mf.DisplayNameOr(), spec.Title, as, spec.Scope, name, spec.ID),
 			Category:       mf.DisplayNameOr(),
 			Args:           args,
 			When:           func(uctx command.Context) bool { return m.surfaceAvailability(spec, uctx).ok },

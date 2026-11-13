@@ -76,9 +76,9 @@ the code-foundry-pages skill's reference/welcome.md.
 ## Showing things in the app
 
 - A "show me" is asking: open it as a tab beside you (`view.open.file <path>`,
-  `view.open.diff [<path>…]`, `view.open.pr <number>`, `view.open.mcp`; every surface:
-  `code-foundry daemon.capabilities --group panel`); `--focus` only when they ask to be taken
-  there. A secret goes in by `view.open.file --edit`.
+  `view.open.diff [<path>…]`, `view.open.pr <number>`, `view.open.mcp`; every surface, a
+  plugin's too: `code-foundry daemon.capabilities --group panel`); `--focus` only when they ask
+  to be taken there. A secret goes in by `view.open.file --edit`.
 - A page you make: the code-foundry-pages skill (`view.inline`, with `/cf/theme.css`, and
   `/cf/bridge.js`, which sizes its card).
 - Something worth seeing you did on your own (a page, a PR): open it beside you too unless a
