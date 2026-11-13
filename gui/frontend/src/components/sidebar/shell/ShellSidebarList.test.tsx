@@ -323,7 +323,7 @@ describe("the shell sidebar list", () => {
       ...layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1"), space(null, "", { id: "sp-b", name: "Review" })]),
       currentSpaceId: current,
       // s-3 and s-2 live in Review.
-      threads: ["s-3", "s-2"].map((id) => ({ threadId: id, spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" })),
+      threads: ["s-3", "s-2"].map((id) => ({ threadId: id, spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null })),
     });
     await seedLayout({ ...two("sp-a"), rev: 2 });
     render(<ShellSidebarList bodyHeight={800} />);

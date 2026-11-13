@@ -58,9 +58,9 @@ const LAYOUT = {
     space(null, "", { id: "sp-c", name: "Reviews" }),
   ]),
   threads: [
-    { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
-    { threadId: "s-3", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
-    { threadId: "s-4", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" },
+    { threadId: "s-2", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null },
+    { threadId: "s-3", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null },
+    { threadId: "s-4", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null },
   ],
 };
 

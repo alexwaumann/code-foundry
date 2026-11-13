@@ -12,7 +12,6 @@ import { startThreadWatch, useSetupShown } from "@/stores/thread";
 import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
 import { useThreadInfoOpen } from "@/stores/threadInfoOverlay";
-import { useUiStore } from "@/stores/ui";
 import { setupRowPhase } from "@/lib/threadSetup";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { CiteLayer } from "./cite/CiteLayer";

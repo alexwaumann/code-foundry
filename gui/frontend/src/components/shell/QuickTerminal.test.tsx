@@ -29,7 +29,7 @@ function quickShell(id: string): TerminalView {
 
 async function seed(ran: string): Promise<void> {
   const l = layoutOf([space(pane("p-1", [tab("t-th", "thread", "s-1")]), "p-1")]);
-  await seedLayout({ ...l, threads: [{ threadId: "s-1", spaceId: "sp-a", quick: { open: true, height: 0, ran }, remembered: [], rememberedPaneId: "" }] });
+  await seedLayout({ ...l, threads: [{ threadId: "s-1", spaceId: "sp-a", quick: { open: true, height: 0, ran }, remembered: [], rememberedPaneId: "", info: null }] });
 }
 
 beforeEach(() => {

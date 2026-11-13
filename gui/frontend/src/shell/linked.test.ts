@@ -108,7 +108,7 @@ describe("the row under a linked tab", () => {
   });
 
   it("names the space of a thread that lives in another, and takes the window there", () => {
-    const s = slice([diff], { "s-1": { threadId: "s-1", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "" } });
+    const s = slice([diff], { "s-1": { threadId: "s-1", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null } });
     const row = linkedRowOf(s, diff);
     expect(row).toMatchObject({ live: false, elsewhere: "sp-b" });
     if (!row) throw new Error("row");

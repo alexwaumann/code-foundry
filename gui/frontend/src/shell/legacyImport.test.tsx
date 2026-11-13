@@ -31,7 +31,7 @@ const before: LayoutView = { ...layoutOf([space(null, "")], 4), legacyImported: 
 const after: LayoutView = {
   ...layoutOf([space(null, "")], 5),
   legacyImported: true,
-  threads: [{ threadId: "s-1", spaceId: "sp-a", quick: { open: true, height: 240, ran: "" }, remembered: [{ tab: tab("t-f", "file", "s-1"), paneId: "", index: 0, active: true, adjacent: false, beside: null, fresh: null }], rememberedPaneId: "" }],
+  threads: [{ threadId: "s-1", spaceId: "sp-a", quick: { open: true, height: 240, ran: "" }, remembered: [{ tab: tab("t-f", "file", "s-1"), paneId: "", index: 0, active: true, adjacent: false, beside: null, fresh: null }], rememberedPaneId: "", info: null }],
 };
 
 function snapshot(l: LayoutView): void {
