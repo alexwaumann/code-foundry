@@ -373,11 +373,12 @@ func (l layout) readCommands() []Command {
 				{Name: "thread", Type: String, ID: ThreadID, Description: "Only this thread's tab and its linked tabs" + IDHelp},
 			},
 			ReadOnly: true, NoPalette: true, NoKeybinding: true, Page: PageState,
-			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
+			Run: func(_ context.Context, uctx Context, a Args) (Result, error) {
 				snap, err := l.state()
 				if err != nil {
 					return Result{}, err
 				}
+				st := layoutFor(uctx, snap.State) // command_lines.go
 				type row struct {
 					Space  string `json:"space"`
 					Pane   string `json:"pane"`
@@ -386,7 +387,7 @@ func (l layout) readCommands() []Command {
 				}
 				var rows []row
 				var b strings.Builder
-				for _, sp := range snap.State.Spaces {
+				for _, sp := range st.Spaces {
 					if s := a.String("space"); s != "" && s != sp.ID {
 						continue
 					}
@@ -421,12 +422,12 @@ type LayoutView struct {
 	Threads      map[string]*core.ThreadState `json:"threads,omitempty"`
 }
 
-func (l layout) show(ctx context.Context, _ Context, a Args) (Result, error) {
+func (l layout) show(ctx context.Context, uctx Context, a Args) (Result, error) {
 	snap, err := l.state()
 	if err != nil {
 		return Result{}, err
 	}
-	st := snap.State
+	st := layoutFor(uctx, snap.State) // command_lines.go
 	vp := l.store.Viewport()
 	view := LayoutView{Rev: snap.Rev, Width: vp.Width, Height: vp.Height, CurrentSpace: st.CurrentSpace, DefaultSpace: st.DefaultSpace}
 	only := a.String("space")
