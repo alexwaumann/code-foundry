@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { appPath, invocations, mockUrl, openStreams, resetMock } from "./fixtures";
+import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock } from "./fixtures";
 
 /**
  * The window shell's pane grid behind the shell flag (docs/notes/shell-11-pane-grid.md), against
@@ -190,6 +190,28 @@ test("sending from a composer tab turns it into the new thread's tab, in place",
   await expect(paneEl(page, "p-1")).toHaveAttribute("data-focused", "true");
 });
 
+test("a layout a newer build wrote: one quiet line under the grid, which shrinks to make room", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await seed(THREE, "p-1");
+  await openShell(page);
+  const grid = page.getByTestId("shell-grid");
+  const before = (await grid.boundingBox())?.height ?? 0;
+  await mockPost("layout/newer?on=1");
+  const line = page.getByTestId("shell-newer-layout");
+  await expect(line).toBeVisible();
+  // Under the grid, inside the window, one line high; the panes keep to the smaller grid.
+  const g = await grid.boundingBox();
+  const l = await line.boundingBox();
+  expect((g?.y ?? 0) + (g?.height ?? 0)).toBeLessThanOrEqual(l?.y ?? 0);
+  expect((l?.y ?? 0) + (l?.height ?? 0)).toBeLessThanOrEqual(900);
+  expect(l?.height ?? 99).toBeLessThanOrEqual(24);
+  expect(g?.height ?? 0).toBeLessThan(before);
+  const bottoms = await page.locator('[data-testid="shell-pane"]').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().bottom));
+  for (const b of bottoms) expect(b).toBeLessThanOrEqual((g?.y ?? 0) + (g?.height ?? 0) + 0.5);
+  await mockPost("layout/newer?on=0");
+  await expect(line).toHaveCount(0);
+});
+
 /** SHOTS=<dir>: the grid with three panes and the empty space, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`shell grid screenshots (${scheme})`, async ({ page }, info) => {
@@ -206,5 +228,11 @@ for (const scheme of ["dark", "light"] as const) {
     await seed(null, "");
     await expect(page.getByTestId("shell-empty-space")).toBeVisible();
     await page.screenshot({ path: `${shots ?? ""}/shell-empty${suffix}.png` });
+    // A newer build's layout: the line under the grid.
+    await seed(THREE, "p-1");
+    await mockPost("layout/newer?on=1");
+    await expect(page.getByTestId("shell-newer-layout")).toBeVisible();
+    await page.mouse.move(700, 880);
+    await page.screenshot({ path: `${shots ?? ""}/shell-newer-layout${suffix}.png` });
   });
 }

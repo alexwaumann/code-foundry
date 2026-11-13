@@ -182,6 +182,35 @@ test("at 200% in a 1100x720 window the card stays in the window and the popup's 
   }
 });
 
+/** SHOTS=<dir>: the card and the popup at 200% in a 1100x720 window, dark and light. */
+for (const scheme of ["dark", "light"] as const) {
+  test(`needs you at 200% screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    await seed(pane("p-1", [threadTab("s-1")]), "p-1");
+    await openShell(page);
+    await page.setViewportSize({ width: 1100, height: 720 });
+    await setZoom(page, 200);
+    await rowEl(page, "s-ny-badge").getByTestId("thread-name").hover();
+    await expect(card(page)).toBeVisible();
+    await still(page);
+    await page.screenshot({ path: at("needs-200-card") });
+    await rowEl(page, "s-ny-badge").getByTestId("thread-name").click();
+    await expect(page.getByTestId("needs-popup").getByTestId("thread-permission")).toBeVisible();
+    await still(page);
+    await page.screenshot({ path: at("needs-200-popup") });
+    // The thread's pane behind it, narrower than a thread's minimum: its empty composer's placeholder.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("needs-popup")).toHaveCount(0);
+    await page.mouse.move(1090, 710);
+    await expect(card(page)).toHaveCount(0);
+    await still(page);
+    await page.screenshot({ path: at("composer-200") });
+  });
+}
+
 /** SHOTS=<dir>: the hover card (a long command, a question), both popups, the top bar's control with its popover, the strip; dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`needs you screenshots (${scheme})`, async ({ page }, info) => {
