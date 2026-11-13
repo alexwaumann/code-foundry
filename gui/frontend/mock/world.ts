@@ -900,6 +900,9 @@ export class World {
       return { projectId: s.projectId, worktreePath: s.worktreePath, checkouts };
     },
     startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
+    openTerminalTab: (id, thread) => {
+      this.openTerminalTab(id, thread);
+    },
     write: (id, text) => {
       const t = this.terms.get(id);
       if (t?.state === TerminalState.RUNNING) this.output(t, text);

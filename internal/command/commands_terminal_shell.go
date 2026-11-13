@@ -75,7 +75,7 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 				}
 				t := res.Msg.GetTerminal()
 				msg := "created terminal " + t.GetId() + " in " + home
-				tab, err := openTerminalTab(ctx, d, c, "", t.GetId(), a.String("pane"))
+				tab, err := openTerminalTab(ctx, d.Layout, c, "", t.GetId(), a.String("pane"))
 				if err != nil {
 					return Result{}, err
 				}

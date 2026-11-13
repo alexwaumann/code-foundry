@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
@@ -22,14 +23,14 @@ import (
 // for a shell of no thread, unlinked in the focused pane of the current space. From the user
 // it takes the focus; from inside a thread it never does. Without a layout it does nothing.
 // It returns a phrase for the command's message. pane (a pane's "+" menu) puts
-// the tab in that pane instead.
-func openTerminalTab(ctx context.Context, d TerminalDeps, uctx Context, thread, id, pane string) (string, error) {
-	if d.Layout == nil {
+// the tab in that pane instead. terminal.new, terminal.new-free and action.run's terminal runs use it.
+func openTerminalTab(ctx context.Context, store layoutstore.Store, uctx Context, thread, id, pane string) (string, error) {
+	if store == nil {
 		return "", nil
 	}
 	focus := uctx.FromUser()
 	tb := &core.Tab{Kind: "terminal", Thread: thread, Params: map[string]string{core.TerminalParam: id}}
-	c, err := layout{store: d.Layout}.apply(ctx, &core.OpenSurface{Pane: pane, Tab: tb, Focus: focus}, !focus)
+	c, err := layout{store: store}.apply(ctx, &core.OpenSurface{Pane: pane, Tab: tb, Focus: focus}, !focus)
 	if err != nil {
 		return "", fmt.Errorf("created terminal %s, but could not open its tab: %w", id, err)
 	}

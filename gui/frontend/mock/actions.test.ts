@@ -11,6 +11,7 @@ function world() {
     projects: () => [{ id: "repo-cf", name: "cf", worktrees: [WT] }],
     thread: () => ({ projectId: "repo-cf", worktreePath: WT, checkouts: { "repo-cf": WT } }),
     startTerminal: () => "t-1",
+    openTerminalTab: () => undefined,
     write: () => undefined,
     exit: () => undefined,
   };
