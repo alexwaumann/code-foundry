@@ -573,23 +573,31 @@ func TestCancelAtEachStage(t *testing.T) {
 }
 
 // A clean stop cuts off whatever runs. Nothing says so on the step at the time: the next
-// start gives it the reason, and "context canceled" reaches nobody.
+// start gives it the reason, and "context canceled" reaches nobody. The step is checked
+// by kind: naming runs beside the fetch, and a stop before it ends fails it too.
 func TestStoppedDaemonGivesTheStepTheRestart(t *testing.T) {
 	tests := []struct {
-		name string
-		hold func(t *testing.T, e *env, rr *recordingProjects) (string, SetupStepKind)
+		name    string
+		kind    SetupStepKind
+		project string
+		hold    func(t *testing.T, e *env, rr *recordingProjects) string
 	}{
-		{"a fetch", func(t *testing.T, e *env, rr *recordingProjects) (string, SetupStepKind) {
+		{"a fetch", SetupStepFetch, "r1", func(t *testing.T, e *env, rr *recordingProjects) string {
 			s, _ := inSetup(t, e, rr, CreateOptions{InitialPrompt: "do x"})
-			return s.ID, SetupStepFetch
+			// Running on the row, not only in the projects fake: the row is what the
+			// next start reads.
+			waitForStep(t, e, s.ID, SetupStepFetch, "r1", SetupStepRunning)
+			return s.ID
 		}},
-		{"a worktree add", func(t *testing.T, e *env, _ *recordingProjects) (string, SetupStepKind) {
+		// The held add never reports adding: the step is pending, the first one the
+		// restart fails when none runs.
+		{"a worktree add", SetupStepWorktree, "r2", func(t *testing.T, e *env, _ *recordingProjects) string {
 			s, err := e.m.Create(e.ctx(), CreateOptions{ProjectID: "r2", InitialPrompt: "do x", NewWorktree: &NewWorktree{}, BackgroundSetup: true})
 			if err != nil {
 				t.Fatal(err)
 			}
 			waitInStack(t, "(*heldProjects).CreateWorktree")
-			return s.ID, SetupStepWorktree
+			return s.ID
 		}},
 	}
 	for _, tt := range tests {
@@ -598,7 +606,7 @@ func TestStoppedDaemonGivesTheStepTheRestart(t *testing.T) {
 				o.Projects = &heldProjects{recordingProjects: o.Projects.(*recordingProjects), holding: "r2"}
 			})
 			e.addGitProject(t, "r2", "other")
-			id, kind := tt.hold(t, e, rr)
+			id := tt.hold(t, e, rr)
 			e.restart()
 			got, err := e.m.Get(e.ctx(), id)
 			if err != nil {
@@ -607,12 +615,8 @@ func TestStoppedDaemonGivesTheStepTheRestart(t *testing.T) {
 			if got.Setup.Phase != SetupFailed || got.Setup.Error != SetupRestarted {
 				t.Fatalf("setup %+v", got.Setup)
 			}
-			i := slices.IndexFunc(got.Setup.Steps, func(st SetupStep) bool { return st.Status == SetupStepFailed })
-			if i < 0 {
-				t.Fatalf("no failed step: %+v", got.Setup.Steps)
-			}
-			if st := got.Setup.Steps[i]; st.Kind != kind || st.Error != SetupRestarted {
-				t.Errorf("failed step %+v, want kind %v with the restart", st, kind)
+			if st := got.Setup.step(tt.kind, tt.project); st == nil || st.Status != SetupStepFailed || st.Error != SetupRestarted {
+				t.Errorf("step %v of %s: %+v, want failed with the restart (steps %+v)", tt.kind, tt.project, st, got.Setup.Steps)
 			}
 		})
 	}
