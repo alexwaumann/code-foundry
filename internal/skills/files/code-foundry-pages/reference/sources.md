@@ -161,7 +161,7 @@ An array of installed plugins: `name`, `displayName`, `version`, `description`, 
 An array of terminals: `id`, `title`, `argv`, `cwd`, `state` (running or exited),
 `exitCode`, `startedAtMs`, `exitedAtMs`, `labels` (an object of strings). A page gets no
 command lines: what runs in a terminal and its last command are left out here and in the
-read verbs (`terminal.list`, `plugin.terminals`, `layout.show`, `tab.list`).
+read verbs (terminal.list, plugin.terminals, layout.show and tab.list).
 
 ## project
 
