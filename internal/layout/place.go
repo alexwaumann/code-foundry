@@ -48,13 +48,17 @@ func viewport(w, h float64) (float64, float64) {
 // the current space otherwise. Pane is the pane whose "+" asked: the tab opens there, except
 // that a linked tab already open is focused where it is (an unlinked one already open in the
 // space moves there). W and H are the pane area in layout px (default DefaultW x DefaultH).
+// Behind is a tab the user is working in (typing in its editor): when the tab lands in the
+// pane showing it, it waits behind it there, as in the focused pane; anywhere else it shows as
+// usual. Focus overrides it.
 type OpenSurface struct {
-	Space string  `json:"space,omitempty"`
-	Pane  string  `json:"pane,omitempty"`
-	Tab   *Tab    `json:"tab"`
-	Focus bool    `json:"focus,omitempty"`
-	W     float64 `json:"w,omitempty"`
-	H     float64 `json:"h,omitempty"`
+	Space  string  `json:"space,omitempty"`
+	Pane   string  `json:"pane,omitempty"`
+	Tab    *Tab    `json:"tab"`
+	Focus  bool    `json:"focus,omitempty"`
+	Behind string  `json:"behind,omitempty"`
+	W      float64 `json:"w,omitempty"`
+	H      float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -93,7 +97,15 @@ func (o *OpenSurface) apply(t *tx) (Result, error) {
 		}
 	}
 	w, h := viewport(o.W, o.H)
-	return t.place(sp, pane, tb, o.Focus, w, h)
+	var keep *Node
+	if _, bp, _ := t.st.FindTab(o.Behind); o.Behind != "" && !o.Focus && bp != nil && bp.Active == o.Behind {
+		keep = bp
+	}
+	res, err := t.place(sp, pane, tb, o.Focus, w, h)
+	if err == nil && keep != nil && res.Pane == keep.ID && keep.TabIndex(o.Behind) >= 0 {
+		keep.Active = o.Behind
+	}
+	return res, err
 }
 
 // place opens tab tb in space sp by the rules above; chosen is the caller's pane or nil.

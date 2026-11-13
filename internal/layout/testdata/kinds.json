@@ -4,7 +4,7 @@
     "kind": "diff",
     "link": "optional",
     "scope": "space",
-    "key_params": ["project","worktree","title"],
+    "key_params": ["project","worktree","thread","title"],
     "default_frac": 0.45,
     "floor_px": 480
   },

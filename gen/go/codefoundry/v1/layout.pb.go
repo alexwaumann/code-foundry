@@ -2579,7 +2579,10 @@ type OpenSurfaceOp struct {
 	Focus  bool   `protobuf:"varint,3,opt,name=focus,proto3" json:"focus,omitempty"`
 	// The space it opens in; empty: the pane's, else a linked tab's thread's, else the
 	// current space.
-	SpaceId       string `protobuf:"bytes,4,opt,name=space_id,json=spaceId,proto3" json:"space_id,omitempty"`
+	SpaceId string `protobuf:"bytes,4,opt,name=space_id,json=spaceId,proto3" json:"space_id,omitempty"`
+	// A tab the user is working in (typing in its editor): a tab landing in the pane that shows
+	// it waits behind it there; anywhere else it shows as usual. focus overrides it.
+	BehindTabId   string `protobuf:"bytes,5,opt,name=behind_tab_id,json=behindTabId,proto3" json:"behind_tab_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2638,6 +2641,13 @@ func (x *OpenSurfaceOp) GetFocus() bool {
 func (x *OpenSurfaceOp) GetSpaceId() string {
 	if x != nil {
 		return x.SpaceId
+	}
+	return ""
+}
+
+func (x *OpenSurfaceOp) GetBehindTabId() string {
+	if x != nil {
+		return x.BehindTabId
 	}
 	return ""
 }
@@ -4523,12 +4533,13 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x05focus\x18\x03 \x01(\bR\x05focus\x12$\n" +
 	"\x0ecompose_tab_id\x18\x04 \x01(\tR\fcomposeTabId\",\n" +
 	"\rCloseThreadOp\x12\x1b\n" +
-	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\x86\x01\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\xaa\x01\n" +
 	"\rOpenSurfaceOp\x12+\n" +
 	"\x03tab\x18\x01 \x01(\v2\x19.codefoundry.v1.LayoutTabR\x03tab\x12\x17\n" +
 	"\apane_id\x18\x02 \x01(\tR\x06paneId\x12\x14\n" +
 	"\x05focus\x18\x03 \x01(\bR\x05focus\x12\x19\n" +
-	"\bspace_id\x18\x04 \x01(\tR\aspaceId\"F\n" +
+	"\bspace_id\x18\x04 \x01(\tR\aspaceId\x12\"\n" +
+	"\rbehind_tab_id\x18\x05 \x01(\tR\vbehindTabId\"F\n" +
 	"\fMoveThreadOp\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x19\n" +
 	"\bspace_id\x18\x02 \x01(\tR\aspaceId\".\n" +

@@ -2,6 +2,7 @@ package command_test
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
@@ -235,6 +237,8 @@ func TestViewOpenIdentity(t *testing.T) {
 		{name: "the same diff twice", kind: "diff", tabs: 1, calls: []call{{"view.open.diff", nil}, {"view.panel.diff", map[string]string{"path": "/wt/a.go"}}}},
 		{name: "a diff of another checkout", kind: "diff", tabs: 2, calls: []call{{"view.open.diff", nil}, {"view.open.diff", map[string]string{"path": "/api/x.go"}}}},
 		{name: "a titled diff", kind: "diff", tabs: 2, calls: []call{{"view.open.diff", nil}, {"view.open.diff", map[string]string{"title": "The fix"}}}},
+		{name: "a diff a thread framed with a side", kind: "diff", tabs: 2, calls: []call{{"view.open.diff", nil}, {"view.open.diff", map[string]string{"base": "main"}}}},
+		{name: "a diff a thread framed with a note", kind: "diff", tabs: 2, calls: []call{{"view.open.diff", nil}, {"view.open.diff", map[string]string{"path": "/wt/a.go", "note": "Why"}}}},
 		{name: "the same pull request twice", kind: "pullrequest", tabs: 1, calls: []call{{"view.open.pr", map[string]string{"number": "7"}}, {"view.panel.pr", map[string]string{"number": "7"}}}},
 		{name: "another pull request", kind: "pullrequest", tabs: 2, calls: []call{{"view.open.pr", map[string]string{"number": "7"}}, {"view.open.pr", map[string]string{"number": "12"}}}},
 		{name: "the same file twice", kind: "file", tabs: 1, calls: []call{{"view.open.file", map[string]string{"path": "/wt/a.go"}}, {"view.open.file", map[string]string{"path": "/wt/a.go", "line": "3"}}}},
@@ -274,6 +278,26 @@ func TestViewOpenIdentity(t *testing.T) {
 				t.Errorf("focus = %s, want the user's, unmoved", got)
 			}
 		})
+	}
+}
+
+// The checkout's own diff is the user's: a thread's call that only picks a file shows it as the
+// user has it (its sides, filter, folds, file), and the window picks the file there.
+func TestViewOpenDiffKeepsTheUsersTab(t *testing.T) {
+	f := newOpenFixture(t)
+	f.run(t, selfCLI, "view.open.diff", nil)
+	tabs := f.tabsOf("diff")
+	if len(tabs) != 1 {
+		t.Fatalf("diff tabs = %+v", tabs)
+	}
+	mine := map[string]string{"project": "r1", "worktree": "/wt", "own": "1", "base": "ref:v1", "filter": "go", "fold": "1", "path": "b.go"}
+	if _, err := f.store.Apply(context.Background(), &core.SetTabParams{Tab: tabs[0].ID, Params: mine}, layoutstore.ApplyOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	out := f.run(t, selfCLI, "view.open.diff", map[string]string{"path": "/wt/a.go"}).JSON.(command.PanelResult)
+	tabs = f.tabsOf("diff")
+	if len(tabs) != 1 || !out.Existing || !maps.Equal(tabs[0].Params, mine) {
+		t.Errorf("diff tabs = %+v (existing %v), want the user's one with its params %v", tabs, out.Existing, mine)
 	}
 }
 
