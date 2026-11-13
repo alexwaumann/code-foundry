@@ -4,7 +4,7 @@ import { afterRev, runLayoutCommand } from "@/shell/commands";
 import { leaveFullscreen, useFullscreenPane } from "@/shell/fullscreen";
 import { shellFrame } from "@/shell/geometry/rails";
 import { panesOf, type Frame, type GeoNode } from "@/shell/geometry/types";
-import { dragSizes, sizesArg, startDrag, withSizes, type GutterDrag } from "@/shell/resize";
+import { dragSizes, evenSizes, sizesArg, startDrag, withSizes, type GutterDrag } from "@/shell/resize";
 import { reportViewport } from "@/shell/viewport";
 import { geoTree, useCurrentSpaceId, useLayoutStore, useTree, type LayoutState } from "@/stores/layout";
 import { setShellFrame, useShellViewStore } from "@/stores/shellView";
@@ -96,6 +96,16 @@ export function PaneGrid() {
     [],
   );
 
+  /** pane.resize with these sizes; their preview stays until the daemon's commit arrives (or a newer one replaces it), so the panes do not jump back. */
+  const commit = (next: { d: GutterDrag; sizes: number[] }) => {
+    setDrag(next);
+    void runLayoutCommand("pane.resize", { split: next.d.split, sizes: sizesArg(next.sizes) })
+      .then((res) => (res ? afterRev(res.rev) : undefined))
+      .finally(() => {
+        setDrag((cur) => (cur === next ? null : cur));
+      });
+  };
+
   const panes = useMemo(() => (full ? [full] : panesOf(shown).map((p) => p.id)), [shown, full]);
   return (
     <div ref={ref} className="relative min-h-0 min-w-0 flex-1" data-testid="shell-grid" data-space-id={spaceId}>
@@ -125,12 +135,16 @@ export function PaneGrid() {
                 setDrag(null);
                 return;
               }
-              // The preview stays until the daemon's commit arrives, so the panes do not jump back.
-              void runLayoutCommand("pane.resize", { split: cur.d.split, sizes: sizesArg(cur.sizes) })
-                .then((res) => (res ? afterRev(res.rev) : undefined))
-                .finally(() => {
-                  setDrag(null);
-                });
+              commit(cur);
+            }}
+            onStep={(delta) => {
+              // From what is drawn (a step whose commit is on its way included), so quick presses add up.
+              const d = startDrag(shown, frame, g.split, g.i);
+              if (d) commit({ d, sizes: dragSizes(d, delta) });
+            }}
+            onReset={() => {
+              const d = startDrag(shown, frame, g.split, g.i);
+              if (d) commit({ d, sizes: evenSizes(d) });
             }}
           />
         ))}

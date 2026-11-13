@@ -70,6 +70,29 @@ export function dragSizes(d: GutterDrag, delta: number): number[] {
   return out;
 }
 
+/** How far one arrow key moves a gutter (layout px); Shift moves it four times as far. */
+export const GUTTER_STEP = 16;
+
+/**
+ * How far a key on a focused gutter moves it (layout px, right or down positive), as the side
+ * panel's divider took them: Left or Up towards the first kid, Right or Down away from it (both
+ * pairs in either direction), GUTTER_STEP (Shift: four times that); Home and End to the bounds
+ * (dragSizes keeps each kid at its minimum). Null for any other key.
+ */
+export function gutterKeyDelta(key: string, shift: boolean): number | null {
+  const step = (shift ? 4 : 1) * GUTTER_STEP;
+  if (key === "ArrowLeft" || key === "ArrowUp") return -step;
+  if (key === "ArrowRight" || key === "ArrowDown") return step;
+  if (key === "Home") return -Infinity;
+  if (key === "End") return Infinity;
+  return null;
+}
+
+/** A gutter's double-click: the two kids beside it share what they have between them evenly (each kept at its minimum). */
+export function evenSizes(d: GutterDrag): number[] {
+  return dragSizes(d, (d.lens[1] - d.lens[0]) / 2);
+}
+
 /** A tree with one split's sizes replaced (the drag's preview); the same tree when it has no such split. */
 export function withSizes(root: GeoNode | null, split: string, sizes: readonly number[]): GeoNode | null {
   if (!root || root.t === "pane") return root;
