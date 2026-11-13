@@ -3,12 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { useLayoutStore } from "@/stores/layout";
 import { runLegacyImport, skipLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
+import { restartOldDaemon, useLayoutServiceStore } from "@/shell/layoutService";
 
 /**
  * What the pane area shows while the window shell cannot draw yet (components/shell/Shell.tsx):
  * the first-load import failed (what happened, Try again, Open without them), or the daemon has
  * not sent a layout in a while (a daemon from before the shell gets the update dialog's Restart
- * Now over this; lib/update.ts SHELL_SINCE). Drawn as one pane, like the empty space.
+ * Now over this; lib/update.ts SHELL_SINCE). Once the daemon has said it has no layout service at
+ * all (shell/layoutService.ts: whatever its version says), the waiting text gives way to what
+ * is wrong and Restart Now. Drawn as one pane, like the empty space.
  */
 export function ShellNotice({ kind }: { kind: "import-failed" | "no-layout" }) {
   const error = useLegacyImportStore((s) => s.error);
@@ -37,9 +40,35 @@ export function ShellNotice({ kind }: { kind: "import-failed" | "no-layout" }) {
           <p className="text-caption text-cf-text-muted">Opened without them, the app tries again the next time it starts.</p>
         </div>
       ) : (
-        <p className="text-body text-cf-text-muted">Waiting for the daemon to send this window&apos;s layout…</p>
+        <NoLayout />
       )}
     </main>
+  );
+}
+
+/** The no-layout notice's text: waiting, or (the daemon has no layout service) what to do. */
+function NoLayout() {
+  const missing = useLayoutServiceStore((s) => s.missing);
+  const restarting = useLayoutServiceStore((s) => s.restarting);
+  const error = useLayoutServiceStore((s) => s.error);
+  if (!missing) return <p className="text-body text-cf-text-muted">Waiting for the daemon to send this window&apos;s layout…</p>;
+  return (
+    <div className="flex max-w-md flex-col gap-3" data-testid="shell-old-daemon">
+      <h2 className="text-heading text-cf-text">The running daemon is older than this window</h2>
+      <p className="text-body text-cf-text-muted">
+        It was started from a build without the window&apos;s layout, so it has nothing to show here. Restart it, and the app opens again on this version.
+      </p>
+      {error && (
+        <p className="text-body-sm break-words text-cf-text-muted" data-testid="shell-old-daemon-error">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button size="sm" disabled={restarting} onClick={() => void restartOldDaemon()} data-testid="shell-old-daemon-restart">
+          {restarting ? "Restarting…" : "Restart Now"}
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -1638,6 +1638,11 @@ export class MockLayout {
    * The mock keeps applying ops either way (the daemon's are in memory only; tested in Go).
    */
   newer: string[] = [];
+  /**
+   * Off: the mock answers like a daemon from before the shell, which has no LayoutService: every
+   * call to it is the mux's plain 404 and the event stream has no layout source (a test's).
+   */
+  serviceOff = false;
 
   constructor(
     private readonly deps: {
@@ -1723,6 +1728,7 @@ export class MockLayout {
     this.importDelayMs = 0;
     this.legacyImported = false;
     this.newer = [];
+    this.serviceOff = false;
     this.commit(emptyState(), "");
   }
 

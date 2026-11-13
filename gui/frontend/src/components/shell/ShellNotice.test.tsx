@@ -1,11 +1,15 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { create } from "@bufbuild/protobuf";
 import { LayoutSchema } from "@/gen/codefoundry/v1/layout_pb";
 import { toLayoutView, type LayoutView } from "@/api/layout";
 import { applyLayoutEvent, resetLayout, useLayoutStore } from "@/stores/layout";
 import { layoutOf, pane, space, tab } from "@/test/shellLayout";
-import { NEWER_LAYOUT_TEXT, NewerLayoutLine } from "./ShellNotice";
+import { resetLayoutService, useLayoutServiceStore } from "@/shell/layoutService";
+import { NEWER_LAYOUT_TEXT, NewerLayoutLine, ShellNotice } from "./ShellNotice";
+
+const restarts = vi.fn(() => Promise.resolve());
+vi.mock("@/shell/layoutService", async (orig) => ({ ...(await orig<typeof import("@/shell/layoutService")>()), restartOldDaemon: () => restarts() }));
 
 const NEWER = ['space sp-a: tab t-9 of kind "notebook"'];
 
@@ -18,6 +22,36 @@ function snapshot(l: LayoutView): void {
 afterEach(() => {
   cleanup();
   resetLayout();
+  resetLayoutService();
+  restarts.mockClear();
+});
+
+describe("the no-layout notice", () => {
+  it("waits, until the daemon says it has no layout service: then what is wrong, and Restart Now", () => {
+    render(<ShellNotice kind="no-layout" />);
+    expect(screen.getByTestId("shell-notice").textContent).toBe("Waiting for the daemon to send this window's layout…");
+    expect(screen.queryByRole("button")).toBeNull();
+
+    act(() => {
+      useLayoutServiceStore.setState({ missing: true });
+    });
+    expect(screen.getByRole("heading").textContent).toBe("The running daemon is older than this window");
+    expect(screen.queryByText(/Waiting for the daemon/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Restart Now" }));
+    expect(restarts).toHaveBeenCalledTimes(1);
+
+    // Sent: the button says so and does nothing more; a failure shows why and the button again.
+    act(() => {
+      useLayoutServiceStore.setState({ restarting: true });
+    });
+    const busy = screen.getByRole("button", { name: "Restarting…" });
+    expect(busy.hasAttribute("disabled")).toBe(true);
+    act(() => {
+      useLayoutServiceStore.setState({ restarting: false, error: "this daemon cannot restart itself" });
+    });
+    expect(screen.getByTestId("shell-old-daemon-error").textContent).toBe("this daemon cannot restart itself");
+    expect(screen.getByRole("button", { name: "Restart Now" }).hasAttribute("disabled")).toBe(false);
+  });
 });
 
 describe("the newer build's layout line", () => {

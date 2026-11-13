@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { startComposerDrafts } from "@/shell/composerDrafts";
 import { importSettled, runLegacyImport, useLegacyImportStore } from "@/shell/legacyImport";
+import { probeLayoutService, useLayoutServiceStore } from "@/shell/layoutService";
 import { startSelectionBridge } from "@/stores/selectionBridge";
 import { startFocusHistory } from "@/stores/focusHistory";
 import { startFileRequests } from "@/stores/fileRequestArrivals";
@@ -21,7 +22,10 @@ export const LAYOUT_WAIT_MS = 5000;
  * first draw, from the classic window's stored panels). A failed import shows what happened with
  * Try again and "Open without them" (ShellNotice). A daemon without a layout (one from before the
  * shell) never sends it: the update dialog asks for Restart Now (lib/update.ts SHELL_SINCE), and
- * after a wait the pane area says it is waiting; there is no classic fallback (plan 2.12).
+ * after a wait the pane area says it is waiting and asks the daemon for the layout itself, every
+ * wait, until one arrives: a daemon without the layout service (a locally built one reports "dev",
+ * which no version check catches) gets a notice with Restart Now in place of the waiting text
+ * (shell/layoutService.ts). There is no classic fallback (plan 2.12).
  * While it draws, the selection bridge runs: select() opens tabs and the selection follows the
  * focused tab. Tabs, panes and the sidebar's thread rows drag inside ShellDnd (App.tsx).
  * See docs/notes/shell-11-pane-grid.md.
@@ -49,6 +53,17 @@ export function Shell() {
       clearTimeout(timer);
     };
   }, [loaded]);
+  // Still waiting: ask for the layout, now and after each further wait, until it arrives or the
+  // daemon says it has no layout service.
+  const missing = useLayoutServiceStore((s) => s.missing);
+  useEffect(() => {
+    if (loaded || !slow || missing) return;
+    void probeLayoutService();
+    const timer = setInterval(() => void probeLayoutService(), LAYOUT_WAIT_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [loaded, slow, missing]);
   useEffect(() => (mode === "shell" ? startSelectionBridge() : undefined), [mode]);
   // Composer drafts' text back from storage, kept there, dropped with the draft (shell/composerDrafts.ts).
   useEffect(() => (mode === "shell" ? startComposerDrafts() : undefined), [mode]);
