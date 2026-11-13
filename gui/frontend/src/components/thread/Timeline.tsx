@@ -233,7 +233,7 @@ export function TimelineList<R extends ListRow>({
   const innerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
-  /** When the user last gave scroll input (wheel, touch, key); Infinity while a pointer is down on the list (its scrollbar). */
+  /** When the user last gave scroll input (wheel, touch, key, a press that moved the list); Infinity while a pointer is down on the list (its scrollbar). */
   const userInput = useRef(-Infinity);
   const markInput = useCallback(() => {
     if (userInput.current !== Infinity) userInput.current = performance.now();
@@ -516,9 +516,15 @@ export function TimelineList<R extends ListRow>({
           }}
           onPointerDown={(e) => {
             if (!inList(e)) return;
+            const el = e.currentTarget;
+            const from = el.scrollTop;
+            const before = userInput.current;
             userInput.current = Infinity;
             const up = () => {
-              userInput.current = performance.now();
+              // A press that moved the list (its scrollbar dragged, a selection scrolling it) is the
+              // user's scroll until a moment after; a click that did not (a row's button, Run in
+              // terminal narrowing the pane) leaves the layout's scrolls to the layout.
+              userInput.current = Math.abs(el.scrollTop - from) >= 1 ? performance.now() : before;
               window.removeEventListener("pointerup", up);
               window.removeEventListener("pointercancel", up);
             };
