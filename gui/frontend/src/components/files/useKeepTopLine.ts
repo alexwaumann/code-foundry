@@ -8,18 +8,36 @@ const RESTORE_MS = 600;
 /** Frames in a row with the line in place before the restore ends early. */
 const STABLE_FRAMES = 3;
 
-function rowOf(el: HTMLElement): LineRow {
+/**
+ * How a code box's rows are known. A file's by its line number (`data-line`); a diff's by its row
+ * index (`data-line-index`, "unified,split": its first part), since a diff's line numbers repeat (an
+ * old and a new line 10).
+ */
+export type TopLineRows = "line" | "index";
+
+function keyOf(el: HTMLElement, rows: TopLineRows): number {
+  return rows === "line" ? Number(el.dataset.line) : Number((el.dataset.lineIndex ?? "").split(",")[0]);
+}
+
+function rowOf(el: HTMLElement, rows: TopLineRows): LineRow {
   const r = el.getBoundingClientRect();
-  return { line: Number(el.dataset.line), top: r.top, height: r.height };
+  return { line: keyOf(el, rows), top: r.top, height: r.height };
+}
+
+/** The selector of the row whose key is `key`. */
+function rowSelector(key: number, rows: TopLineRows): string {
+  const k = String(key);
+  return rows === "line" ? `[data-content] [data-line="${k}"]` : `[data-content] [data-line][data-line-index^="${k},"]`;
 }
 
 /**
  * Keeps the line at the top of a code box where it was when the box's width changes (topLine.ts):
  * the line on top is noted after each scroll, and after a width change it is scrolled back into
  * its place each frame until it stays there. A scroll by the user (wheel, key, press) ends that.
- * `virtual`: the scroller is the box's first child (CodeScroll), not the box.
+ * `virtual`: the scroller is the box's first child (CodeScroll), not the box. `rows`: a file's
+ * lines or a diff's rows (TopLineRows).
  */
-export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: boolean): void {
+export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: boolean, rows: TopLineRows = "line"): void {
   useEffect(() => {
     const el = box.current;
     const root = virtual ? (el?.firstElementChild as HTMLElement | null | undefined) : el;
@@ -36,13 +54,13 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
     const note = () => {
       noted = 0;
       const rect = root.getBoundingClientRect();
-      const rows: LineRow[] = [];
+      const seen: LineRow[] = [];
       for (const r of shadow()?.querySelectorAll<HTMLElement>("[data-content] [data-line]") ?? []) {
-        const row = rowOf(r);
-        rows.push(row);
+        const row = rowOf(r, rows);
+        seen.push(row);
         if (row.height > 0 && row.top + row.height > rect.top + 1) break;
       }
-      anchor = topLineOf(rows, rect.top, rect.bottom, zoomFactor()) ?? anchor;
+      anchor = topLineOf(seen, rect.top, rect.bottom, zoomFactor()) ?? anchor;
     };
     const stop = () => {
       if (restoring) cancelAnimationFrame(restoring);
@@ -55,8 +73,8 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
         note();
         return;
       }
-      const row = shadow()?.querySelector<HTMLElement>(`[data-content] [data-line="${String(a.line)}"]`);
-      const delta = row ? topLineCorrection(a, [rowOf(row)], root.getBoundingClientRect().top, zoomFactor()) : null;
+      const row = shadow()?.querySelector<HTMLElement>(rowSelector(a.line, rows));
+      const delta = row ? topLineCorrection(a, [rowOf(row, rows)], root.getBoundingClientRect().top, zoomFactor()) : null;
       if (delta === 0) stable++;
       else stable = 0;
       if (delta) root.scrollTop += delta;
@@ -95,5 +113,5 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
       root.removeEventListener("scroll", onScroll);
       for (const ev of ["wheel", "keydown", "pointerdown", "touchstart"]) root.removeEventListener(ev, onUser);
     };
-  }, [box, virtual]);
+  }, [box, virtual, rows]);
 }

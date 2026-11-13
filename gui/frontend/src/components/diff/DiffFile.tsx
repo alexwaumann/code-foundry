@@ -7,6 +7,7 @@ import { VIRTUALIZE_LINES } from "@/components/files/CodeBody";
 import type { FilePlace } from "@/components/files/fileActions";
 import { FileActions, FileHeader, HeaderAction, WrapToggle } from "@/components/files/FileHeader";
 import { firstChangeLine } from "@/components/files/fileKind";
+import { useKeepTopLine } from "@/components/files/useKeepTopLine";
 import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/states";
 import { useFileChanges, useOnWindowVisible, useTabRead, useThrottled, useWorktreeChanges } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
@@ -44,13 +45,24 @@ function Body({ d, error, reload, parsed, row, listed, compared }: { d: CompareF
   if (d.status === "R" && parsed?.lines === 0) return <FileEmptyState icon={GitCompare} heading="Renamed" detail={`From ${row.oldPath}; the contents are the same.`} testId="diff-renamed" />;
   if ((!parsed || !d.status || parsed.lines === 0) && !listed) return <FileEmptyState icon={GitCompare} heading="No changes" detail={`${row.path} is no longer in this comparison.`} testId="diff-unlisted" />;
   if (!parsed || !d.status || parsed.lines === 0) return <FileEmptyState icon={GitCompare} heading="No changes in the contents" detail={`${compared}.`} testId="diff-none" />;
+  return <DiffCode parsed={parsed} />;
+}
+
+/**
+ * The two sides' code, in its scroller. Its top row stays across a change of its width (a zoom, a
+ * resize of the pane), as the File tab's top line does (components/files/useKeepTopLine.ts).
+ */
+function DiffCode({ parsed }: { parsed: NonNullable<ReturnType<typeof useParsed>> }) {
+  const box = useRef<HTMLDivElement>(null);
+  const virtual = parsed.lines > VIRTUALIZE_LINES;
+  useKeepTopLine(box, virtual, "index");
   const diff = <CodeDiff oldFile={parsed.oldFile} newFile={parsed.newFile} />;
-  return parsed.lines > VIRTUALIZE_LINES ? (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="diff-code" data-virtual="">
+  return virtual ? (
+    <div ref={box} className="flex min-h-0 flex-1 flex-col" data-testid="diff-code" data-virtual="">
       <CodeScroll className="min-h-0 flex-1 overflow-auto">{diff}</CodeScroll>
     </div>
   ) : (
-    <div className="min-h-0 flex-1 overflow-auto" data-testid="diff-code">
+    <div ref={box} className="min-h-0 flex-1 overflow-auto" data-testid="diff-code">
       {diff}
     </div>
   );
