@@ -130,7 +130,7 @@ test("the draft is the thread's own: typed in the floating composer, it is in th
   await expect(paneEl(page, "p-1").getByTestId("composer-input")).toHaveText("Half a thought");
 });
 
-test("the chip drags the composer; the drag lasts through collapsing and ends with full screen", async ({ page }) => {
+test("the chip drags the composer, collapsed or expanded, without toggling; a click toggles; the drag ends with full screen", async ({ page }) => {
   await fullscreenDiff(page);
   await page.getByTestId("floating-composer-pill").click();
   await expect(floating(page).getByTestId("composer-input")).toBeFocused();
@@ -143,11 +143,25 @@ test("the chip drags the composer; the drag lasts through collapsing and ends wi
   await page.mouse.up();
   const moved = await spot(page);
   expect([moved.cx - start.cx, moved.bottom - start.bottom]).toEqual([-100, -250]);
-  // Collapsed and expanded again: where it was dragged (the pill too).
-  await page.getByTestId("floating-composer-collapse").click();
+  // The drag did not toggle it.
+  await expect(floating(page)).toHaveAttribute("data-expanded", "true");
+  // A click on the chip collapses it, where it was dragged (the pill too); a click on the pill expands it there.
+  await page.getByTestId("floating-composer-chip").click();
+  await expect(page.getByTestId("floating-composer-pill")).toBeVisible();
   expect(await spot(page)).toEqual(moved);
+  // The pill drags too, and stays collapsed.
+  const pill = await boxOf(page, "floating-composer-pill");
+  await page.mouse.move(pill.x + 20, pill.y + pill.h / 2);
+  await page.mouse.down();
+  await page.mouse.move(pill.x + 60, pill.y + pill.h / 2 - 20, { steps: 4 });
+  await page.mouse.move(pill.x + 70, pill.y + pill.h / 2 - 50, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByTestId("floating-composer-pill")).toBeVisible();
+  const movedPill = await spot(page);
+  expect([movedPill.cx - moved.cx, movedPill.bottom - moved.bottom]).toEqual([50, -50]);
   await page.getByTestId("floating-composer-pill").click();
-  expect(await spot(page)).toEqual(moved);
+  await expect(floating(page)).toHaveAttribute("data-expanded", "true");
+  expect((await spot(page)).cx).toBe(movedPill.cx);
   // Dragged far off: it stays inside the pane.
   const chip2 = await boxOf(page, "floating-composer-chip");
   await page.mouse.move(chip2.x + 20, chip2.y + chip2.h / 2);

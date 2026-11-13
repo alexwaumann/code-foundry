@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Minimize2 } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
-import { Tip } from "@/components/ui/tooltip";
 import { useThreadActivity } from "@/components/thread/activity";
 import { ThreadContext } from "@/components/thread/context";
 import { ThreadComposer } from "@/components/thread/ThreadComposer";
@@ -27,49 +25,66 @@ function focusPrompt(root: HTMLElement | null): void {
   });
 }
 
+/** How far a press moves before it is a drag of the composer rather than a click on its chip, in screen px. */
+const DRAG_SLOP = 3;
+
 /**
- * The expanded card: the thread's chip centred above its own composer (components/thread/
+ * The thread's chip: one button, collapsed (the pill: "Message", the thread, ⌘L) or expanded
+ * ("to" and the thread, centred above the composer). A click toggles; a press that moves drags
+ * the composer instead, in either state, and does not toggle.
+ */
+function FloatingChip({
+  threadId,
+  expanded,
+  onToggle,
+  onPress,
+}: {
+  threadId: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onPress: (e: ReactPointerEvent<HTMLElement>) => void;
+}) {
+  const name = useThreadName(threadId);
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      className={cn(
+        "flex max-w-full min-w-0 cursor-default touch-none items-center gap-1.5 rounded-full border border-cf-border bg-cf-surface-raised text-body-sm outline-none select-none hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus",
+        expanded ? "h-7 px-3 shadow-xs" : "h-8 px-3.5 shadow-sm",
+      )}
+      data-testid={expanded ? "floating-composer-chip" : "floating-composer-pill"}
+      onPointerDown={onPress}
+      onClick={onToggle}
+    >
+      <span className="shrink-0 text-cf-text-muted">{expanded ? "to" : "Message"}</span>
+      <ThreadDot threadId={threadId} />
+      <span className="min-w-0 truncate font-medium text-cf-text">{name}</span>
+      {!expanded && (
+        <Kbd size="sm" className="ml-1">
+          {FLOATING_CHORD}
+        </Kbd>
+      )}
+    </button>
+  );
+}
+
+/**
+ * The expanded card's composer, under the chip: the thread's own (components/thread/
  * ThreadComposer: its draft, attachments, model controls, send or steer, docked asks). While
  * expanded it holds the thread's WatchThread (shared with any other view of the thread), which
  * the docked permissions and questions need; the pill holds nothing.
  */
-function FloatingCard({ threadId, onCollapse, onDragStart }: { threadId: string; onCollapse: () => void; onDragStart: (e: ReactPointerEvent<HTMLElement>) => void }) {
+function FloatingCard({ threadId }: { threadId: string }) {
   useEffect(() => startThreadWatch(threadId), [threadId]);
-  const name = useThreadName(threadId);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
   const { open, busy } = useThreadActivity(threadId);
   return (
     <ThreadContext.Provider value={ctx}>
-      <div className="flex w-full flex-col items-center gap-1.5">
-        {/* The drag handle: the thread's chip, centred above the composer. Its popovers may cover it. */}
-        <div
-          className="flex h-7 max-w-full cursor-grab touch-none items-center gap-1.5 rounded-full border border-cf-border bg-cf-surface-raised pr-1 pl-3 text-body-sm shadow-xs select-none active:cursor-grabbing"
-          data-testid="floating-composer-chip"
-          onPointerDown={onDragStart}
-        >
-          <span className="shrink-0 text-cf-text-muted">to</span>
-          <ThreadDot threadId={threadId} />
-          <span className="min-w-0 truncate font-medium text-cf-text">{name}</span>
-          <Tip label="Collapse">
-            <button
-              type="button"
-              aria-label="Collapse the composer"
-              data-testid="floating-composer-collapse"
-              className="flex size-5 shrink-0 cursor-default items-center justify-center rounded-full text-cf-text-muted outline-none hover:bg-cf-control-hover/60 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-              }}
-              onClick={onCollapse}
-            >
-              <Minimize2 className="size-3" aria-hidden />
-            </button>
-          </Tip>
-        </div>
-        {/* Opaque and lifted: it floats over a busy surface (a diff), not the thread's own gradient. */}
-        <div className="cf-thread w-full [&_.ccard]:bg-cf-surface-raised! [&_.ccard]:shadow-lg!">
-          <ThreadComposer threadId={threadId} pending={open} busy={busy} focusRequests={false} />
-        </div>
+      {/* Opaque and lifted: it floats over a busy surface (a diff), not the thread's own gradient. */}
+      <div className="cf-thread w-full [&_.ccard]:bg-cf-surface-raised! [&_.ccard]:shadow-lg!">
+        <ThreadComposer threadId={threadId} pending={open} busy={busy} focusRequests={false} />
       </div>
     </ThreadContext.Provider>
   );
@@ -78,16 +93,17 @@ function FloatingCard({ threadId, onCollapse, onDragStart }: { threadId: string;
 /**
  * The thread's composer floating over a full-screened linked surface (docs/notes/shell-model.md,
  * "Full screen"): a pill naming the thread at the bottom centre; a click or ⌘L expands it into the
- * thread's real composer with the thread's chip centred above it as the drag handle. The draft is
+ * thread's real composer with the thread's chip centred above it. The pill and the chip are one
+ * button (FloatingChip): a click toggles, a press that moves drags, in either state. The draft is
  * the thread's own (`thread:<id>` in the compose store), so it is the same text in the thread's
- * pane. A send that goes through collapses it back to the pill; Escape or the chip's button
- * collapse it too. It always opens at the same spot: a drag lasts until full screen ends
+ * pane. A send that goes through collapses it back to the pill; Escape collapses it too. It always opens at the same spot: a drag lasts until full screen ends
  * (stores/shellView `floating`). See docs/notes/shell-19-rails-fullscreen.md.
  */
 export function FloatingComposer({ threadId, paneId }: { threadId: string; paneId: string }) {
   const { expanded, x, y } = useShellViewStore((s) => s.floating);
-  const name = useThreadName(threadId);
   const ref = useRef<HTMLDivElement>(null);
+  // A press that turned into a drag: its click does not toggle.
+  const dragged = useRef(false);
   const [dragging, setDragging] = useState(false);
   const draftKey = threadDraftKey(threadId);
   const phase = useDraft(draftKey, "phase");
@@ -130,11 +146,13 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
     };
   }, []);
 
-  // The chip drags the card; the pane is its bounds.
-  const startDrag = (e: ReactPointerEvent<HTMLElement>) => {
+  // A press on the chip that moves drags the card, collapsed or expanded; the pane is its bounds.
+  const press = (e: ReactPointerEvent<HTMLElement>) => {
     const card = ref.current;
     const pane = card?.offsetParent;
+    dragged.current = false;
     if (e.button !== 0 || !card || !(pane instanceof HTMLElement)) return;
+    // The keyboard stays where it is (the prompt, expanded); the click still comes.
     e.preventDefault();
     const z = zoomFactor();
     const from = { px: e.clientX, py: e.clientY, x, y };
@@ -144,8 +162,12 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
     const spot = { x: (box.left - area.left) / z - x, y: (box.top - area.top) / z - y, w: box.width / z, h: box.height / z };
     const handle = e.currentTarget;
     handle.setPointerCapture(e.pointerId);
-    setDragging(true);
     const move = (ev: PointerEvent) => {
+      if (!dragged.current && Math.hypot(ev.clientX - from.px, ev.clientY - from.py) < DRAG_SLOP) return;
+      if (!dragged.current) {
+        dragged.current = true;
+        setDragging(true);
+      }
       setFloating(clampFloat({ x: from.x + (ev.clientX - from.px) / z, y: from.y + (ev.clientY - from.py) / z }, spot, { w: area.width / z, h: area.height / z }));
     };
     const end = () => {
@@ -157,6 +179,14 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", end);
     handle.addEventListener("pointercancel", end);
+  };
+  const toggle = () => {
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
+    if (expanded) collapse();
+    else expand();
   };
 
   return (
@@ -182,23 +212,10 @@ export function FloatingComposer({ threadId, paneId }: { threadId: string; paneI
         collapse();
       }}
     >
-      {expanded ? (
-        <FloatingCard threadId={threadId} onCollapse={collapse} onDragStart={startDrag} />
-      ) : (
-        <button
-          type="button"
-          className="flex h-8 min-w-0 cursor-default items-center gap-1.5 rounded-full border border-cf-border bg-cf-surface-raised px-3.5 text-body-sm shadow-sm outline-none hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus"
-          data-testid="floating-composer-pill"
-          onClick={expand}
-        >
-          <span className="shrink-0 text-cf-text-muted">Message</span>
-          <ThreadDot threadId={threadId} />
-          <span className="min-w-0 truncate font-medium text-cf-text">{name}</span>
-          <Kbd size="sm" className="ml-1">
-            {FLOATING_CHORD}
-          </Kbd>
-        </button>
-      )}
+      <div className="flex w-full min-w-0 flex-col items-center gap-1.5">
+        <FloatingChip threadId={threadId} expanded={expanded} onToggle={toggle} onPress={press} />
+        {expanded && <FloatingCard threadId={threadId} />}
+      </div>
     </div>
   );
 }
