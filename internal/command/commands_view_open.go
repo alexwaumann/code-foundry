@@ -54,6 +54,58 @@ func (o tabs) open(ctx context.Context, tb *core.Tab, pane string, focus bool) (
 	return &c.Result, nil
 }
 
+// where says, for the result of an item verb that opened tab id for thread, what the layout
+// now holds that its message must not get wrong (docs/notes/shell-24d-spec-differences.md,
+// 3 and 4): the thread of an open tab it used (another thread's, or none: a file is one per
+// path), and, when thread's own tab is open in no space, where its tab went instead of beside
+// it. A closed thread's surface goes to its space's focused pane, behind the tab shown there
+// when the call keeps the user's focus; before any window has loaded the layout (the first-load
+// import has not run), the import takes it into the thread's remembered set, so it shows when
+// the thread is opened.
+func (o tabs) where(r *PanelResult, thread string) {
+	snap := o.store.Snapshot()
+	st := snap.State
+	sp, p, tb := st.FindTab(r.Tab)
+	if tb == nil {
+		return
+	}
+	r.TabThread = tb.Thread
+	if threadTabOpen(st, thread) || r.Existing {
+		return
+	}
+	r.ThreadNotOpen = true
+	r.Behind = p.Active != tb.ID
+	r.OtherSpace = sp.ID != st.CurrentSpace
+	r.JoinsSet = !snap.LegacyImported && tb.Thread != "" && st.SpaceOf(tb.Thread) == sp.ID && !holdsThreadTab(sp)
+}
+
+// threadTabOpen reports whether thread's own tab is open in any space.
+func threadTabOpen(st *core.State, thread string) bool {
+	for _, sp := range st.Spaces {
+		if holdsTab(sp, func(tb *core.Tab) bool { return tb.Kind == "thread" && tb.Thread == thread }) {
+			return true
+		}
+	}
+	return false
+}
+
+// holdsThreadTab reports whether space sp has any thread's tab open (the first-load import
+// leaves such a space as it is).
+func holdsThreadTab(sp *core.Space) bool {
+	return holdsTab(sp, func(tb *core.Tab) bool { return tb.Kind == "thread" })
+}
+
+func holdsTab(sp *core.Space, match func(*core.Tab) bool) bool {
+	for _, p := range core.Panes(sp.Root) {
+		for _, tb := range p.Tabs {
+			if match(tb) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // openLead is how the item verbs' descriptions say where the tab goes.
 const openLead = "beside a thread (from a thread: its own; in the app: the selected one), " +
 	"or focus it where it is when the same one is open: "
@@ -111,6 +163,7 @@ func showTab(ctx context.Context, o tabs, t ThreadGetter, e Emitter, uctx Contex
 	}
 	out := PanelResult{Windows: windowsOf(e), Thread: id}
 	out.placed(c, focus)
+	o.where(&out, id)
 	res := Result{JSON: out}
 	if uctx.ActiveView == "" {
 		res.Message = out.message()
@@ -136,13 +189,30 @@ var rulePhrases = map[string]string{
 }
 
 // tabMessage is an item verb's text: where its tab is, and the windows that show the layout.
+// A tab already open names the thread it belongs to, which may not be the asker's; a tab for a
+// thread whose own tab is not open says where it went instead, so the model does not tell the
+// user it is beside the thread.
 func (r PanelResult) tabMessage() string {
 	msg := fmt.Sprintf("opened tab %s in pane %s for thread %s", r.Tab, r.Pane, r.Thread)
 	if p := rulePhrases[r.Rule]; p != "" {
 		msg += " (" + p + ")"
 	}
-	if r.Existing {
-		msg = fmt.Sprintf("thread %s's tab %s is already open in pane %s (nothing new opened)", r.Thread, r.Tab, r.Pane)
+	switch {
+	case r.Existing && r.TabThread == "":
+		msg = fmt.Sprintf("tab %s (of no thread) is already open in pane %s (nothing new opened)", r.Tab, r.Pane)
+	case r.Existing:
+		msg = fmt.Sprintf("thread %s's tab %s is already open in pane %s (nothing new opened)", r.TabThread, r.Tab, r.Pane)
+	case r.JoinsSet:
+		msg = fmt.Sprintf("thread %s's tab is not open, and no app window has loaded the layout yet: tab %s joins the thread's set of tabs "+
+			"when one does, and shows beside the thread when the thread is opened", r.Thread, r.Tab)
+	case r.ThreadNotOpen:
+		msg = fmt.Sprintf("thread %s's tab is not open, so tab %s opened in pane %s, the focused pane of its space", r.Thread, r.Tab, r.Pane)
+		if r.OtherSpace {
+			msg += " (" + r.Space + ", not the space the user is in)"
+		}
+		if r.Behind {
+			msg += ", behind the tab shown there"
+		}
 	}
 	if r.TabFocused {
 		msg += "; it has the user's focus"

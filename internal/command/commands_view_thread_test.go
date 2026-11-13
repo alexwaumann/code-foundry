@@ -135,7 +135,9 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 		deps.PullRequestChecks.Gh = d.prs
 	}
 	if d.layout == nil {
+		// A layout a window has loaded (the first-load import ran), as a daemon's is once the app opened.
 		d.layout = layouttest.New(nil)
+		d.layout.MarkImported()
 	}
 	deps.Layout = d.layout
 	layouts.Store(reg, d.layout)
@@ -197,11 +199,11 @@ func TestItemVerbThreadScope(t *testing.T) {
 		{name: "the app's palette: the selected thread", ctx: gui, wantThread: "s-aaaaaaaaaaa1", wantFocus: true},
 		{name: "the app with an explicit --thread", ctx: gui, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2", wantFocus: true},
 		{name: "the CLI in a thread acts on that thread", ctx: inThread, wantThread: "s-aaaaaaaaaaa1",
-			wantMsg: "opened tab t-n1 in pane p-n1 for thread s-aaaaaaaaaaa1 (in the focused pane); windows=1"},
+			wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
 		{name: "the CLI in a thread with --thread", ctx: inThread, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2",
-			wantMsg: "opened tab t-n1 in pane p-n1 for thread s-bbbbbbbbbbb2 (in the focused pane); windows=1"},
+			wantMsg: "thread s-bbbbbbbbbbb2's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
 		{name: "the CLI in a thread with --focus", ctx: inThread, args: map[string]string{"focus": "true"}, wantThread: "s-aaaaaaaaaaa1", wantFocus: true,
-			wantMsg: "opened tab t-n1 in pane p-n1 for thread s-aaaaaaaaaaa1 (in the focused pane); it has the user's focus; windows=1"},
+			wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; it has the user's focus; windows=1"},
 	}
 	th := &commandtest.Thread{Current: richThread()}
 	for _, verb := range []string{"view.open.mcp", "view.panel.mcp"} {
