@@ -274,8 +274,7 @@ describe("one tab for a pull request, however its slug is spelled", () => {
     return open[0]?.id;
   };
 
-  // Shell gap: the seam finds an open tab by its params' exact slug (hostShell panelIdOf), so another spelling goes to the daemon, whose open replaces the tab's params and does not focus its pane (a mixed-case slug's tab is never found by the seam: pullRequestTab's id is lower case).
-  it.skip("the tab keeps the slug it was opened with, and another spelling focuses its pane", async () => {
+  it("the tab keeps the slug it was opened with, and another spelling focuses its pane", async () => {
     await openIn({ slug: "Acme/Repo", number: 5 });
     await openIn({ slug: "acme/repo", number: 6 });
     const held = tabs().find((t) => t.params.number === "5")?.id ?? "";

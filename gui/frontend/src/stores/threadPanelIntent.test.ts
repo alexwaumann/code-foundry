@@ -242,8 +242,7 @@ describe("a ShowView scoped to a thread", () => {
           useFileEditStore.setState({ sessions: {} });
         });
 
-        // Shell gap: `behind` holds only for an open tab (hostShell.ts shellOpenTab); a new one opens in front in the editor's pane.
-        it.skip("a request joins the strip behind it", async () => {
+        it("a request joins the strip behind it", async () => {
           await showItem("panel.file", ask);
           const g = tabPlace("thread:b").groups[0];
           expect(g?.active?.id).toBe(a.id);
@@ -271,19 +270,21 @@ describe("a ShowView scoped to a thread", () => {
           expect(tabPlace("thread:b").groups[0]?.active?.id).toBe(b.id);
         });
 
-        // Shell gap: the daemon places a thread's new tab in the first pane holding its tabs, not the focused one of them.
-        it.skip("in another pane it opens as usual: that pane's screen is not the user's", async () => {
-          // The thread's MCP tab in a pane of its own below a.env's, focused.
+        // The daemon places a thread's new tab by rule 2 in the pane holding its linked tabs nearest
+        // its thread's, ties in layout order (internal/layout place.go), not in the focused one: the
+        // editor's tab is moved to a pane of its own below, so the request lands in the other.
+        it("landing in another pane than the editor's, it opens as usual: that pane's screen is not the user's", async () => {
           openTab("thread:b", makeTab("mcp", "MCP"));
           await layoutSettled();
-          const mcp = Object.values(useLayoutStore.getState().tabs).find((t) => t.kind === "mcp")?.id ?? "";
-          const pane = Object.values(useLayoutStore.getState().panes).find((p) => p.tabIds.includes(mcp))?.id ?? "";
-          await applyLayoutOp({ op: "move_tab", tab: mcp, pane, edge: "bottom" });
-          await applyLayoutOp({ op: "focus_tab", tab: mcp });
+          const tabs = Object.values(useLayoutStore.getState().tabs);
+          const env = tabs.find((t) => t.params.path === A);
+          await applyLayoutOp({ op: "move_tab", tab: env?.id ?? "", pane: env?.paneId ?? "", edge: "bottom" });
           await layoutSettled();
           await showItem("panel.file", ask);
-          expect(tabPlace("thread:b").groups[1]?.active?.id).toBe(b.id);
-          expect(tabPlace("thread:b").groups[0]?.active?.id).toBe(a.id);
+          const g = tabPlace("thread:b").groups;
+          expect(g.map((x) => x.tabs.map((t) => t.kind))).toEqual([["mcp", "files"], ["files"]]);
+          expect(g[0]?.active?.id).toBe(b.id);
+          expect(g[1]?.active?.id).toBe(a.id);
         });
       });
     });
@@ -301,8 +302,7 @@ describe("a ShowView scoped to a thread", () => {
       untouched();
     });
 
-    // Shell gap: the layout keys a thread's Diff tab by its linked thread, project and worktree (internal/layout/identity.go), so a thread's untitled diff is the user's own tab.
-    it.skip("panel.diff framed with no title leaves the checkout's own tab as the user had it", async () => {
+    it("panel.diff framed with no title leaves the checkout's own tab as the user had it", async () => {
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", path: "src/main.go" });
       const mine = active("thread:b");
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1", paths: "a.go\nb.go", note: "Why", thread: "b" });
@@ -311,8 +311,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(tabPlace("thread:b").tabs.find((t) => t.id === mine?.id)).toEqual(mine);
     });
 
-    // Shell gap: threadPanelIntent.ts finds the user's own Diff tab by diffTab's id, but the seam knows a Diff tab by its layout id: the call's params replace the tab's.
-    it.skip("panel.diff with one path only picks the file in the user's own tab: what it compares, filters and folds stays", async () => {
+    it("panel.diff with one path only picks the file in the user's own tab: what it compares, filters and folds stays", async () => {
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const id = active("thread:b")?.id ?? "";
       await userSets(id, { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:v1.2", head: "staged", filter: "go", fold: "1", path: "other.go" });
@@ -326,8 +325,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params.path).toBe("src/main.go");
     });
 
-    // Shell gap: the layout keys a thread's Diff tab by its linked thread, project and worktree (internal/layout/identity.go), so a thread's untitled diff is the user's own tab.
-    it.skip("panel.diff with sources and a thread opens that thread's tab, the user's own unchanged", async () => {
+    it("panel.diff with sources and a thread opens that thread's tab, the user's own unchanged", async () => {
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const own = tabIds("thread:b")[0] ?? "";
       await userSets(own, { project: "web", worktree: WEB_FEAT, own: "1", filter: "go", fold: "1", path: "other.go" });
@@ -337,8 +335,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(tabPlace("thread:b").tabs.find((t) => t.id === own)?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", filter: "go", fold: "1", path: "other.go" });
     });
 
-    // Shell gap: threadPanelIntent.ts finds the user's own Diff tab by diffTab's id, but the seam knows a Diff tab by its layout id: the call's params replace the tab's.
-    it.skip.each([
+    it.each([
       ["a base", { base: "ref:v1.2" }],
       ["a head", { head: "staged" }],
       ["an older daemon's scope", { scope: "branch" }],
@@ -355,8 +352,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", filter: "go", fold: "1", path: "src/main.go" });
     });
 
-    // Shell gap: threadPanelIntent.ts finds the user's own Diff tab by diffTab's id, but the seam knows a Diff tab by its layout id: the call's params replace the tab's.
-    it.skip("panel.diff picking a file leaves a commit the user was in, and a call with no file does not", async () => {
+    it("panel.diff picking a file leaves a commit the user was in, and a call with no file does not", async () => {
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const own = tabIds("thread:b")[0] ?? "";
       const inCommit = { project: "web", worktree: WEB_FEAT, own: "1", base: "ref:p1", head: "ref:c1", path: "other.go", commit: "c1", backBase: "merge-base", backHead: "staged", backPath: "was.go", commits: "1" };
@@ -371,8 +367,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", head: "staged", path: "src/main.go", commits: "1" });
     });
 
-    // Shell gap: threadPanelIntent.ts finds the user's own Diff tab by diffTab's id, but the seam knows a Diff tab by its layout id: the call's params replace the tab's.
-    it.skip("panel.diff picks at once, asking nothing, when the user's tab compares what the daemon checked", async () => {
+    it("panel.diff picks at once, asking nothing, when the user's tab compares what the daemon checked", async () => {
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const own = tabIds("thread:b")[0] ?? "";
       await userSets(own, { project: "web", worktree: WEB_FEAT, own: "1", filter: "go", path: "other.go" });
@@ -382,8 +377,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params).toEqual({ project: "web", worktree: WEB_FEAT, own: "1", filter: "go", path: "src/main.go" });
     });
 
-    // Shell gap: threadPanelIntent.ts finds the user's own Diff tab by diffTab's id, but the seam knows a Diff tab by its layout id: the call's params replace the tab's.
-    it.skip("panel.diff picks a rename under the name the user's sides list it by", async () => {
+    it("panel.diff picks a rename under the name the user's sides list it by", async () => {
       await showItem("panel.diff", { project: "web", worktree: WEB_FEAT, own: "1" });
       const own = tabIds("thread:b")[0] ?? "";
       await userSets(own, { project: "web", worktree: WEB_FEAT, own: "1", base: "staged" });
@@ -393,8 +387,7 @@ describe("a ShowView scoped to a thread", () => {
       expect(active("thread:b")?.params).toMatchObject({ base: "staged", path: "src/new.go", oldPath: "src/staged-name.go" });
     });
 
-    // Shell gap: the seam knows a Diff tab by its layout id, not diffTab's (threadPanelIntent.ts finds no open tab), and the layout's identity makes a thread's untitled diff the user's own tab.
-    it.skip.each([
+    it.each([
       ["not in what the user compares", () => [] as { path: string; oldPath: string }[]],
       ["the user's comparison cannot say", () => new Error("unavailable")],
     ])("panel.diff opens a file %s in a tab of the thread's own, comparing where the daemon found it", async (_name, listed) => {
@@ -436,8 +429,7 @@ describe("a ShowView scoped to a thread", () => {
       untouched();
     });
 
-    // Shell gap: an open tab only the daemon's identity finds (a slug in another case) takes the new params; the classic panel only activated it.
-    it.skip("panel.pr switches to the tab it opened, in any letter case", async () => {
+    it("panel.pr switches to the tab it opened, in any letter case", async () => {
       await showItem("panel.pr", { slug: "Owner/Web", number: "42" });
       await showItem("panel.pr", { slug: "owner/web", number: "42" });
       expect(tabIds("thread:b")).toHaveLength(1);

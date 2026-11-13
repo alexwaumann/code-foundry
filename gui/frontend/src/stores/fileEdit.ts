@@ -166,13 +166,20 @@ useUiStore.subscribe((s, prev) => {
   if (s.palette.open && !prev.palette.open) paletteEditor = editorWithFocus();
 });
 
-/** Whether an editor in the group `tabId` opens in has the keyboard, and is another tab's: opening it there would swap the document under the user's fingers. */
-export function editorHasKeyboard(panelKey: string, tabId: string): boolean {
+/**
+ * The tab whose editor has the keyboard among `panelKey`'s tabs when opening tab `tabId` could
+ * swap the document under the user's fingers (null otherwise): another tab's editor, in the
+ * group `tabId` is open in. For a tab not open yet the daemon picks the pane, so it is that
+ * editor's tab wherever it is: the open names it (shell/host.ts openTab `behind`), and the new
+ * tab waits behind it only if it lands in its pane.
+ */
+export function editorTabInTheWay(panelKey: string, tabId: string): string | null {
   const at = editorWithFocus();
   const s = at === null ? undefined : session(at);
-  if (s?.panelKey !== panelKey || s.tabId === tabId) return false;
+  if (s?.panelKey !== panelKey || s.tabId === tabId) return null;
   const p = tabPlace(panelKey);
-  return groupOfTab(p, s.tabId) === (groupOfTab(p, tabId) ?? p.focused);
+  const open = groupOfTab(p, tabId);
+  return open === null || open === groupOfTab(p, s.tabId) ? s.tabId : null;
 }
 
 /** The session whose editor the user was in: the palette's, while it covers the window. */

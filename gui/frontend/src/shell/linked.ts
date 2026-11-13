@@ -10,16 +10,9 @@
 import type { TerminalView } from "@/api/terminal";
 import { isPanelLabels, THREAD_LABEL } from "@/lib/termlabel";
 import type { LayoutState, TabEntry } from "@/stores/layout";
+import { diffKey, prKey } from "./identity";
 
-/** The identity key of a thread's diff of one checkout (internal/layout identity.go). */
-export function diffKey(thread: string, project: string, worktree: string): string {
-  return `diff:${thread}:${project}:${worktree}`;
-}
-
-/** The identity key of a pull request's tab (internal/layout identity.go). */
-export function prKey(slug: string, n: number): string {
-  return `pr:${slug.toLowerCase()}#${String(n)}`;
-}
+export { diffKey, prKey } from "./identity";
 
 /** Every tab of a space, pane by pane in the panes' order of the slice. */
 export function spaceTabs(s: Pick<LayoutState, "panes" | "tabs">, spaceId: string): TabEntry[] {

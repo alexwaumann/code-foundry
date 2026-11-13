@@ -7,7 +7,7 @@
 import { useMemo } from "react";
 import { usePanelKey } from "@/shell/panelKeyContext";
 import { parsePullRequestUrl } from "@/lib/prUrl";
-import { tabPlace, type TabTarget } from "@/shell/host";
+import { findTab, tabPlace, type TabTarget } from "@/shell/host";
 import { pullRequestTab } from "@/surfaces/pullrequestTarget";
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import type { MarkdownExtras } from "./Markdown";
@@ -22,10 +22,11 @@ export function openPullRequestLink(target: TabTarget): (url: string) => boolean
     const parsed = parsePullRequestUrl(url);
     if (parsed === null) return false;
     const { slug, number, anchored } = parsed;
-    const { id } = pullRequestTab({ slug, number });
     // A link into the page of the pull request already showing (a comment, a diff line)
-    // would land on the same tab and lose its anchor: the browser opens it there.
-    if (anchored && tabPlace(target).groups.some((g) => g.active?.id === id)) return false;
+    // would land on the same tab and lose its anchor: the browser opens it there. The open
+    // tab is found by identity, so a link in another letter case is that tab too.
+    const open = anchored ? findTab(target, pullRequestTab({ slug, number }).id) : undefined;
+    if (open && tabPlace(target).groups.some((g) => g.active?.id === open.id)) return false;
     return openPullRequestInPanel({ slug, number }, target);
   };
 }

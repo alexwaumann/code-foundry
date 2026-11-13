@@ -50,7 +50,7 @@ import { MockSearches } from "./agentSearch";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
 import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
-import { panelItemCommands } from "./panelItemVerbs";
+import { keepUsersDiff, panelItemCommands } from "./panelItemVerbs";
 import { createHints, type SetThread } from "./projectSets";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -4161,7 +4161,7 @@ export class World {
           changed: (root) => this.gh.details.get(root)?.files?.map((f) => f.path ?? ""),
         };
       }, (i) => this.emit(i), (op, keepFocus) => {
-        this.layout.apply(op, "", { keep_focus: keepFocus });
+        this.layout.apply(keepUsersDiff(this.layout.state(), op), "", { keep_focus: keepFocus });
       }),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...shellCommands(this.logs),

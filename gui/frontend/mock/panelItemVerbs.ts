@@ -18,7 +18,8 @@ import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { plainLine } from "../src/lib/plainText";
 import { CommandError } from "./errors";
 import type { InvokeOut } from "./gitops";
-import type { Op } from "./layout";
+import { panes, type Op, type State, type Tab } from "./layout";
+import { DIFF_ASKER_PARAM, identityKey } from "../src/shell/identity";
 import { panelThreadArgs } from "./panelVerbs";
 import type { UiIntentInit } from "./world";
 
@@ -96,6 +97,24 @@ function tabTitle(args: Record<string, string>): string {
   const n = Array.from(title).length;
   if (n > MAX_TITLE) throw new CommandError("invalid", `${String(n)} characters, at most ${String(MAX_TITLE)}`);
   return title;
+}
+
+/**
+ * Like the daemon's tabs.open (internal/command/commands_view_open.go): a diff that frames nothing
+ * (no asker) shows an open checkout tab of its identity as the user has it, its params kept; the
+ * window picks the file there (stores/threadPanelIntent.ts).
+ */
+export function keepUsersDiff(st: State, op: Op): Op {
+  const tab = op.op === "open_surface" ? (op.tab as Tab | undefined) : undefined;
+  if (tab?.kind !== "diff" || tab.params?.[DIFF_ASKER_PARAM]) return op;
+  const thread = tab.thread ?? "";
+  const key = identityKey("diff", thread, tab.params ?? {});
+  const space = st.spaces.find((sp) => sp.id === (st.threads?.[thread]?.space ?? st.default_space));
+  for (const p of panes(space?.root)) {
+    const open = (p.tabs ?? []).find((t) => t.kind === "diff" && identityKey("diff", t.thread ?? "", t.params ?? {}) === key);
+    if (key !== null && open) return { ...op, tab: { ...tab, params: { ...open.params } } };
+  }
+  return op;
 }
 
 /** Applies a layout op; keepFocus runs it without moving the user's focus (a thread's call). */

@@ -20,7 +20,7 @@ import { HOME, useUiStore } from "./ui";
  * showing what it shows. A project's file opened on a thread with no checkout yet is held
  * (FileTarget.heldFor): it is that project's own. False with no panel.
  */
-export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { behind?: boolean } = {}): boolean {
+export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { behind?: string } = {}): boolean {
   const id = fileTab(file).id;
   const old = findTab(target, id);
   const was = old ? fileOfTab(old) : null;

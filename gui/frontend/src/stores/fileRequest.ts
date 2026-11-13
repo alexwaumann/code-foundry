@@ -74,9 +74,15 @@ export function fileFacts(file: FileWhere): string[] {
   return facts;
 }
 
-/** The request is over, unless a newer one took its place while a write was out. */
+/**
+ * The request is over, unless a newer one took its place while a write was out. Decided on the
+ * tab's newest params, those of an update still on its way included (the seam's queue): a newer
+ * request sent but not yet landed stands.
+ */
 function finish(s: FileEdit, ask: FileAsk): void {
-  if (askOf(s)?.id === ask.id) setTabParams(s.panelKey, s.tabId, withoutParams(ASK_PARAMS));
+  if (askOf(s)?.id !== ask.id) return;
+  const end = withoutParams(ASK_PARAMS);
+  setTabParams(s.panelKey, s.tabId, (now) => (now.askId === ask.id ? end(now) : now));
 }
 
 /** "saved" and told; "untold" when the write stood and the thread did not hear; otherwise the write's outcome and nothing was sent. */
