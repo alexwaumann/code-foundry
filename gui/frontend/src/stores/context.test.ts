@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TerminalView } from "@/api/terminal";
 import type { ThreadView } from "@/api/threads";
+import { needsList } from "@/lib/shellSections";
 import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
 import { decodeThreadListKeys, deriveContext, encodeThreadListKey, getListOptions, getListThreads, getUiContext } from "./context";
 import { resetLayout } from "./layout";
@@ -106,6 +107,8 @@ describe("the sidebar list's keys", () => {
     ["pinned and idle", { pinned: true }, { pinned: true, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...NONE }],
     ["idle, times unknown", { statusChangedAtMs: null, lastActivityAtMs: null }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...NONE }],
     ["pinned and busy", { pinned: true, status: "busy" }, { pinned: true, group: "working", archivedAtMs: null, snoozedUntilMs: null, ...NONE }],
+    // Needs you lists a pinned thread that asks by its ask's time, like any other.
+    ["pinned and asking", { pinned: true, status: "attention", statusReason: "snooze ended" }, { pinned: true, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS }],
     ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123, snoozedUntilMs: null, ...NONE }],
     ["snoozed", { state: "disconnected", snoozedUntilMs: 1760518800000 }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 1760518800000, ...NONE }],
     [
@@ -126,17 +129,29 @@ describe("the sidebar list's keys", () => {
   it("getListThreads and getListOptions read the stores (archive and snooze times, hidden and orphaned threads, the collapsed states)", () => {
     useThreadsStore.setState({ byId: { s1: thread({ archivedAtMs: 5 }), s2: thread({ id: "s2", snoozedUntilMs: 7 }), s3: thread({ id: "s3", createdBy: "s1" }), s4: thread({ id: "s4", createdBy: "gone" }) }, order: ["s1", "s2", "s3", "s4"] });
     useUiStore.setState({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true, selection: HOME });
+    // What the keys decode to: the band's sort times only, as the list is drawn from.
     expect(getListThreads()).toEqual([
-      { id: "s1", pinned: false, group: "idle", archivedAtMs: 5, snoozedUntilMs: null, statusChangedAtMs: 100, lastActivityAtMs: 200 },
-      { id: "s2", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 7, statusChangedAtMs: 100, lastActivityAtMs: 200 },
+      { id: "s1", pinned: false, group: "idle", archivedAtMs: 5, snoozedUntilMs: null, ...NONE },
+      { id: "s2", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 7, ...NONE },
       // Its creator (s1, archived) still exists: hidden.
-      { id: "s3", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, statusChangedAtMs: 100, lastActivityAtMs: 200, hidden: true },
+      { id: "s3", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...IDLE, hidden: true },
       // Its creator was removed: shown.
-      { id: "s4", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, statusChangedAtMs: 100, lastActivityAtMs: 200 },
+      { id: "s4", pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...IDLE },
     ]);
     expect(getListOptions()).toEqual({ workingCollapsed: true, archivedCollapsed: false, snoozedCollapsed: true, openThreadId: null });
     // The open thread keeps its row under a collapsed header, so cmd+1..9 count it as the sidebar shows it.
     useUiStore.setState({ selection: { kind: "thread", id: "s2" } });
     expect(getListOptions().openThreadId).toBe("s2");
+  });
+
+  it("Needs you is one order, drawn and walked by the keys: most recent ask first, a pinned asker too", () => {
+    const ask = (id: string, at: number, pinned = false) => thread({ id, pinned, status: "attention", statusReason: "snooze ended", statusChangedAtMs: at });
+    useThreadsStore.setState({ byId: { a: ask("a", 100), b: ask("b", 300, true), c: ask("c", 200) }, order: ["a", "b", "c"] });
+    const opts = { needsScope: "all" as const, currentSpaceId: "sp" };
+    const s = useThreadsStore.getState();
+    const drawn = needsList(decodeThreadListKeys(s.order.map((id) => encodeThreadListKey(id, s.byId[id], s.byId))).map((t) => ({ ...t, spaceId: "sp" })), opts).ids;
+    const walked = needsList(getListThreads().map((t) => ({ ...t, spaceId: "sp" })), opts).ids;
+    expect(drawn).toEqual(["b", "c", "a"]);
+    expect(walked).toEqual(drawn);
   });
 });

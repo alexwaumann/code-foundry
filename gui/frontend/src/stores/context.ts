@@ -165,24 +165,13 @@ export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   });
 }
 
-/** The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a). */
+/**
+ * The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a): what its keys decode to
+ * (encodeThreadListKey), so the keys walk the list in the order it is drawn.
+ */
 export function getListThreads(): ListThread[] {
   const s = useThreadsStore.getState();
-  return s.order.flatMap((id) => {
-    const x = s.byId[id];
-    if (!x) return [];
-    const t: ListThread = {
-      id,
-      pinned: x.pinned,
-      group: threadGroup(x),
-      archivedAtMs: x.archivedAtMs,
-      snoozedUntilMs: x.snoozedUntilMs,
-      savedAtMs: x.savedAtMs,
-      statusChangedAtMs: x.statusChangedAtMs,
-      lastActivityAtMs: x.lastActivityAtMs,
-    };
-    return [inSidebar(x, s.byId) ? t : { ...t, hidden: true }];
-  });
+  return decodeThreadListKeys(s.order.map((id) => encodeThreadListKey(id, s.byId[id], s.byId))).filter((t) => t.id in s.byId);
 }
 
 /** The sidebar list's display options read imperatively, so cmd+1..9 and cmd+shift+a see the rendered list. */

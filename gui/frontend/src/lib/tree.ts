@@ -46,17 +46,20 @@ export interface ListThread {
 }
 
 /**
- * The sort times that matter for where a thread sits (buildSections): statusChangedAtMs
- * for an unpinned live thread in the attention or done band, lastActivityAtMs for one in
- * the idle band, both null otherwise (pinned, working, snoozed and archived threads sort by
- * other things). The sidebar's list keys (stores/context.ts) carry only these, so a working
- * thread's activity ticks do not rebuild the list.
+ * The sort times that matter for where a thread sits (buildSections, and the shell's Needs you,
+ * lib/shellSections.ts): statusChangedAtMs for a live thread waiting on the user (pinned or not:
+ * Needs you lists pinned ones too, most recent ask first) and for an unpinned one in the error or
+ * done band, lastActivityAtMs for an unpinned one in the idle band, both null otherwise (other
+ * pinned, working, snoozed and archived threads sort by other things). The sidebar's list keys
+ * (stores/context.ts) and the keys' own reading (getListThreads) carry only these, so both see one
+ * order and a working thread's activity ticks do not rebuild the list.
  */
 export function bandSortTimes(
   t: Pick<ListThread, "pinned" | "group" | "archivedAtMs" | "snoozedUntilMs" | "savedAtMs" | "statusChangedAtMs" | "lastActivityAtMs">,
 ): { statusChangedAtMs: number | null; lastActivityAtMs: number | null } {
-  const live = !t.pinned && t.archivedAtMs === null && !isSnoozed(t);
-  const byStatus = live && (t.group === "prompt" || t.group === "error" || t.group === "done");
+  const unarchived = t.archivedAtMs === null && !isSnoozed(t);
+  const live = !t.pinned && unarchived;
+  const byStatus = (unarchived && t.group === "prompt") || (live && (t.group === "error" || t.group === "done"));
   return {
     statusChangedAtMs: byStatus ? (t.statusChangedAtMs ?? null) : null,
     lastActivityAtMs: live && t.group === "idle" ? (t.lastActivityAtMs ?? null) : null,
