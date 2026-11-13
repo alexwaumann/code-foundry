@@ -76,7 +76,8 @@ describe("the mock's layout ops against internal/layout's cases", () => {
     const ops = new Set(cases.filter(({ c }) => notPorted(c)?.endsWith("is a rule")).map(({ c }) => c.op.op));
     expect([...ops].sort()).toEqual(["archive_thread", "close_thread", "move_thread", "open_thread", "snooze_thread"]);
     expect(skipped("smart swap")).toEqual(["close_tab-smart-swap-on-return", "focus_tab-smart-swap", "focus_tab-smart-swap-last", "focus_tab-smart-swap-mru"]);
-    expect(skipped("a remembered set")).toEqual(["close_pane-closes-threads", "open_surface-drops-remembered"]);
+    // remove_space puts a moved thread's linked tabs into its set (Result.kept).
+    expect(skipped("a remembered set")).toEqual(["close_pane-closes-threads", "open_surface-drops-remembered", "remove_space-default", "remove_space-keeps-linked-terminals"]);
     expect(skipped("placement rules 2 to 6").every((n) => /^open_surface-rule[2-6]-/.test(n))).toBe(true);
     expect(skipped("linked tabs placed by the rules")).toEqual(["move_pane-thread-to-space"]);
   });

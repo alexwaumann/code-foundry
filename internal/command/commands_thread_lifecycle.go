@@ -313,7 +313,11 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 				if err := r.known(ctx, ThreadID, a.String("id")); err != nil {
 					return Result{}, err
 				}
-				tab, err := o.focusThreadTab(ctx, a.String("id"))
+				archived := false
+				if res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")})); err == nil {
+					archived = res.Msg.GetThread().GetArchivedAt() != nil
+				}
+				tab, err := o.focusThreadTab(ctx, a.String("id"), archived)
 				if err != nil {
 					return Result{}, err
 				}

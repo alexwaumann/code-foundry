@@ -38,8 +38,10 @@ interface Entry {
 /** What the verbs need of the world. */
 export interface LayoutVerbsWorld {
   readonly layout: MockLayout;
-  /** The user's own threads that are not archived (space.remove moves or archives those in the space). */
-  userThreads?(): string[];
+  /** The threads the sidebar lists (the user's, and children whose creator is gone) that are not archived (space.remove moves or archives those in the space). */
+  sidebarThreads?(): string[];
+  /** Whether a thread is archived (it lives in no space: thread.open puts it in the current one). */
+  isArchived?(id: string): boolean;
   /** Archives a thread (space.remove --archive). */
   archiveThread?(id: string): void;
   /** Whether a thread exists. */
@@ -151,16 +153,35 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         name: "thread.open",
         title: "Open Thread",
         category: CATEGORY,
-        description: "Open a thread's tab, or focus it when it is open: in the focused pane of the thread's space (--pane: that pane), in place of the space's composer when that is all the space shows.",
+        description: "Open a thread's tab, or focus it when it is open: in the focused pane of the thread's space (--pane: that pane, at --index; --split with --edge: a new pane on that edge of a pane; --outer: a new pane on that edge of the whole pane area), in place of the space's composer when that is all the space shows. An archived thread opens in the current space.",
         keybindings: [],
         noPalette: true,
-        args: [str("id", "The thread", { required: true, positional: true }), str("pane", "The pane its tab opens in"), focusArg],
+        args: [
+          str("id", "The thread", { required: true, positional: true }),
+          str("pane", "The pane its tab opens in"),
+          { name: "index", type: ArgType.INT, required: false, description: "With --pane: its place in the strip" },
+          str("split", "In a new pane on --edge of this pane"),
+          edgeArg("edge", "With --split: the edge"),
+          edgeArg("outer", "In a new pane on this edge of the whole area"),
+          focusArg,
+        ],
       },
       when: always,
       run: (_c, a) => {
         const id = a.id ?? "";
         if (!world.hasThread(id)) refuse(`not found: thread ${id}`, "notfound");
-        return run({ op: "open_thread", thread: id, ...(a.pane ? { pane: resolvePane(L.state(), a.pane).pane.id } : {}), focus: a.focus !== "false" }, (r) => `opened thread ${id} as tab ${r.result.tab ?? ""}`);
+        const st = L.state();
+        if ([a.pane, a.split, a.outer].filter(Boolean).length > 1) refuse("invalid argument: give one of --pane, --split (with --edge) or --outer");
+        if (a.split && !a.edge) refuse("invalid argument: --split needs --edge");
+        if (a.edge && !a.split) refuse("invalid argument: --edge goes with --split; an edge of the whole area is --outer");
+        const pane = a.pane || a.split ? resolvePane(st, a.pane || a.split || "").pane.id : "";
+        const op: Op = { op: "open_thread", thread: id, focus: a.focus !== "false" };
+        if (pane) op.pane = pane;
+        if (a.index !== undefined && a.index !== "") op.index = Number(a.index);
+        if (a.split) op.edge = a.edge;
+        if (a.outer) op.edge = a.outer;
+        if (world.isArchived?.(id)) op.archived = true;
+        return run(op, (r) => `opened thread ${id} as tab ${r.result.tab ?? ""}`);
       },
     },
     {
@@ -425,7 +446,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         const archive = a.archive === "true";
         const to = archive ? "" : a.to ? resolveSpace(st, a.to).id : "";
         if (archive) {
-          const ids = (world.userThreads?.() ?? []).filter((id) => (st.threads?.[id]?.space ?? st.default_space) === sp.id);
+          const ids = (world.sidebarThreads?.() ?? []).filter((id) => (st.threads?.[id]?.space ?? st.default_space) === sp.id);
           for (const id of ids) world.archiveThread?.(id);
         }
         return run({ op: "remove_space", space: sp.id, ...(to ? { to } : {}) }, () => `removed space ${sp.id} "${sp.name}"`);

@@ -289,6 +289,8 @@ func TestLayoutShowThreads(t *testing.T) {
 	st.Threads = map[string]*core.ThreadState{
 		threadA: {Space: "sp-main", Quick: &core.Quick{Open: true}, Remembered: &core.Remembered{Pane: "p-left", Tabs: []core.RememberedTab{
 			{Tab: &core.Tab{ID: "t-x", Kind: "terminal", Thread: threadA, Params: map[string]string{"terminal": "term-x"}}, Pane: "p-right", Fresh: &core.Fresh{Ran: "make dev"}},
+			// A snooze takes a terminal tab from another space with that space.
+			{Tab: &core.Tab{ID: "t-y", Kind: "terminal", Thread: threadA, Params: map[string]string{"terminal": "term-y"}}, Space: "sp-two", Pane: "p-two", Fresh: &core.Fresh{}},
 			// The first-load import remembers tabs with no pane.
 			{Tab: &core.Tab{ID: "t-f", Kind: "file", Thread: threadA, Title: "notes.md", Params: map[string]string{"path": "/w/notes.md"}}},
 		}}},
@@ -307,6 +309,7 @@ func TestLayoutShowThreads(t *testing.T) {
 	want := "threads\n" +
 		"  thread s-aaaa00000001 in space sp-main, quick terminal open\n" +
 		"    remembered t-x terminal of s-aaaa00000001 terminal term-x in pane p-right (comes back as a fresh shell; ran \"make dev\")\n" +
+		"    remembered t-y terminal of s-aaaa00000001 terminal term-y in pane p-two of space sp-two (comes back as a fresh shell)\n" +
 		"    remembered t-f file of s-aaaa00000001 \"notes.md\", placed fresh beside the thread\n" +
 		"  thread s-moved0000001 in space sp-two"
 	if !strings.HasSuffix(res.Message, want) {

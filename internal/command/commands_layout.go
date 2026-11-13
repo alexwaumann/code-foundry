@@ -450,6 +450,9 @@ func (l layout) show(ctx context.Context, uctx Context, a Args) (Result, error) 
 	names := l.threadNames(ctx)
 	var b strings.Builder
 	fmt.Fprintf(&b, "rev %d, laid out in %gx%g\n", snap.Rev, vp.Width, vp.Height)
+	if len(snap.Newer) > 0 {
+		fmt.Fprintf(&b, "a newer build wrote the stored layout (%s): this is what this build understands of it, and no change is saved\n", strings.Join(snap.Newer, "; "))
+	}
 	for _, sp := range view.Spaces {
 		fmt.Fprintf(&b, "space %s %q", sp.ID, sp.Name)
 		if sp.ID == st.CurrentSpace {

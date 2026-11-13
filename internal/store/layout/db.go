@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -44,10 +45,12 @@ type stored struct {
 	fresh bool
 	// repairs are the documents that did not decode, kept as empty ones.
 	repairs []string
+	// newer are the documents a newer build wrote (a newer version), read as empty ones.
+	newer []string
 }
 
 // load reads the tables. A document that does not decode is replaced by an empty one and
-// noted in repairs; only a database error fails.
+// noted in repairs, or in newer when a newer build wrote it; only a database error fails.
 func load(ctx context.Context, db *sql.DB) (stored, error) {
 	out := stored{state: &core.State{V: core.Version}}
 	rows, err := db.QueryContext(ctx, `SELECT id, name, doc FROM layout_spaces ORDER BY position, id`)
@@ -61,7 +64,11 @@ func load(ctx context.Context, db *sql.DB) (stored, error) {
 			return out, fmt.Errorf("layout: load spaces: %w", err)
 		}
 		sp, err := core.DecodeSpaceDoc(id, name, []byte(doc))
-		if err != nil {
+		switch {
+		case errors.Is(err, core.ErrNewerVersion):
+			out.newer = append(out.newer, fmt.Sprintf("space %s: %v", id, err))
+			sp = &core.Space{ID: id, Name: name}
+		case err != nil:
 			out.repairs = append(out.repairs, fmt.Sprintf("space %s: %v; its panes are dropped", id, err))
 			sp = &core.Space{ID: id, Name: name}
 		}
@@ -83,7 +90,11 @@ func load(ctx context.Context, db *sql.DB) (stored, error) {
 			return out, fmt.Errorf("layout: load threads: %w", err)
 		}
 		ts, err := core.DecodeThreadDoc(space, []byte(doc))
-		if err != nil {
+		switch {
+		case errors.Is(err, core.ErrNewerVersion):
+			out.newer = append(out.newer, fmt.Sprintf("thread %s: %v", id, err))
+			ts = &core.ThreadState{Space: space}
+		case err != nil:
 			out.repairs = append(out.repairs, fmt.Sprintf("thread %s: %v; its stored tabs are dropped", id, err))
 			ts = &core.ThreadState{Space: space}
 		}

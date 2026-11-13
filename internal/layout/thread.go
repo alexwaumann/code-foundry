@@ -27,15 +27,28 @@ func init() {
 //     ephemeral composer; a draft is never replaced), else in the focused pane after its active tab, else as the first
 //     pane of an empty space.
 //
+// A place in the pane can be given with it, so a sidebar row dropped on the grid is one op:
+//   - Pane and Index: at that place in Pane's strip (default: after its active tab);
+//   - Pane and Edge: in a new pane on that edge of Pane, which it splits in half;
+//   - Edge alone: in a new pane on that edge of the space's whole pane area, at the thread
+//     kind's default size (unless the space shows only its empty composer, which it replaces).
+//
+// Archived says the thread is archived, which the layout cannot tell (an archived thread has
+// no record, as a thread of the default space has none): it lives in no space, so its tab
+// opens in the current space (Pane's, when given), which it then lives in.
+//
 // Then the thread's remembered set comes back (Restore). W and H are the pane area for
 // placement (default DefaultW x DefaultH).
 type OpenThread struct {
-	Thread  string  `json:"thread"`
-	Pane    string  `json:"pane,omitempty"`
-	Compose string  `json:"compose,omitempty"`
-	Focus   bool    `json:"focus,omitempty"`
-	W       float64 `json:"w,omitempty"`
-	H       float64 `json:"h,omitempty"`
+	Thread   string  `json:"thread"`
+	Pane     string  `json:"pane,omitempty"`
+	Index    *int    `json:"index,omitempty"`
+	Edge     Edge    `json:"edge,omitempty"`
+	Compose  string  `json:"compose,omitempty"`
+	Archived bool    `json:"archived,omitempty"`
+	Focus    bool    `json:"focus,omitempty"`
+	W        float64 `json:"w,omitempty"`
+	H        float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -53,6 +66,15 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		t.show(sp, p, id, o.Focus)
 		return Result{Space: sp.ID, Pane: p.ID, Tab: id, Existing: true, Rule: "1"}, nil
 	}
+	switch {
+	case o.Edge != "" && !o.Edge.Valid():
+		return Result{}, fmt.Errorf("edge %q: %w", o.Edge, ErrInvalidArgument)
+	case o.Index != nil && (o.Pane == "" || o.Edge != ""):
+		return Result{}, fmt.Errorf("an index is a place in a pane's strip: give the pane and no edge: %w", ErrInvalidArgument)
+	case o.Compose != "" && (o.Edge != "" || o.Index != nil):
+		return Result{}, fmt.Errorf("a thread sent from a composer takes its place: %w", ErrInvalidArgument)
+	}
+	w, h := viewport(o.W, o.H)
 	var sp *Space
 	var pane *Node
 	var compose *Tab
@@ -76,11 +98,17 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
+		if o.Archived {
+			t.setThreadSpace(o.Thread, psp.ID)
+		}
 		if psp.ID != t.st.SpaceOf(o.Thread) {
 			return Result{}, fmt.Errorf("thread %s lives in space %s, pane %s is in %s: %w", o.Thread, t.st.SpaceOf(o.Thread), p.ID, psp.ID, ErrFailedPrecondition)
 		}
 		sp, pane, rule = psp, p, "pane"
 	default:
+		if o.Archived {
+			t.setThreadSpace(o.Thread, t.st.CurrentSpace)
+		}
 		var err error
 		if sp, err = t.space(t.st.SpaceOf(o.Thread)); err != nil {
 			return Result{}, err
@@ -109,8 +137,24 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 			unlistDraft(t.st, id)
 			res.Draft = id
 		}
+	case pane != nil && o.Edge != "":
+		np := &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
+		var err error
+		if o.Pane != "" {
+			err = insertBeside(sp, pane.ID, o.Edge, np, 0, t.newID("s-"))
+		} else {
+			err = toOuter(t, sp, np, o.Edge, 0, w, h)
+		}
+		if err != nil {
+			return Result{}, err
+		}
+		res.Rule = "edge"
 	case pane != nil:
-		pane.Tabs = slices.Insert(pane.Tabs, pane.TabIndex(pane.Active)+1, tb)
+		at := pane.TabIndex(pane.Active) + 1
+		if o.Index != nil {
+			at = clampIndex(*o.Index, len(pane.Tabs))
+		}
+		pane.Tabs = slices.Insert(pane.Tabs, at, tb)
 	default:
 		// An empty space: the thread's first pane takes back the id of the pane the thread
 		// was in when it closed, if that is free, so its remembered set goes back in place.
@@ -126,7 +170,6 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		pane = &Node{T: NodePane, ID: id, Tabs: []*Tab{tb}, Active: tb.ID}
 		sp.Root = pane
 	}
-	w, h := viewport(o.W, o.H)
 	if err := t.restore(sp, o.Thread, w, h, &res); err != nil {
 		return Result{}, err
 	}
@@ -176,8 +219,16 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 				tb.Params["ran"] = rec.Fresh.Ran
 			}
 		}
+		// A tab that was in another space (a snooze took it from there) goes back there when
+		// its pane, or a neighbour to rebuild it beside, is still there.
+		home := sp
+		if rec.Space != "" && rec.Space != sp.ID {
+			if other := t.st.Space(rec.Space); other != nil {
+				home = other
+			}
+		}
 		k, key, err := Identify(tb)
-		if err != nil || t.sameTab(sp, k, key, "") != nil {
+		if err != nil || t.sameTab(home, k, key, "") != nil || (home != sp && t.sameTab(sp, k, key, "") != nil) {
 			continue
 		}
 		tb.Key = key
@@ -187,7 +238,14 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 		if tb.ID == "" || usedIDs(t.st)[tb.ID] {
 			tb.ID = t.newID("t-")
 		}
-		if same && t.putBack(sp, rec, tb, tid, w, h) {
+		if home != sp && t.putBack(home, rec, tb, "", w, h) {
+			res.Back = append([]string{tb.ID}, res.Back...)
+			if rec.Fresh != nil {
+				res.Fresh = append(res.Fresh, tb.ID)
+			}
+			continue
+		}
+		if same && home == sp && t.putBack(sp, rec, tb, tid, w, h) {
 			res.Back = append([]string{tb.ID}, res.Back...)
 			if rec.Fresh != nil {
 				res.Fresh = append(res.Fresh, tb.ID)
@@ -377,6 +435,39 @@ func (t *tx) putAway(sp *Space, thread, threadPane string, w, h float64) []*Tab 
 		refocus(sp)
 	}
 	return linked
+}
+
+// putAwayElsewhere takes thread's terminal tabs in space sp, which is not the thread's, into
+// its remembered set, each with the space and pane it was in (RememberedTab.Space), so it
+// goes back there when the thread opens. It returns the tabs it took.
+func (t *tx) putAwayElsewhere(sp *Space, thread string) []*Tab {
+	var took []*Tab
+	wasFocused := false
+	for _, p := range Panes(sp.Root) {
+		for _, tb := range slices.Clone(p.Tabs) {
+			if tb.Kind != "terminal" || tb.Thread != thread {
+				continue
+			}
+			_, p, _ := t.st.FindTab(tb.ID)
+			rec := RememberedTab{Tab: tb, Space: sp.ID, Pane: p.ID, Index: p.TabIndex(tb.ID), Active: p.Active == tb.ID}
+			if len(p.Tabs) == 1 {
+				rec.Beside = BesideInfo(sp.Root, p.ID)
+			}
+			ts := threadState(t.st, thread)
+			if ts.Remembered == nil {
+				ts.Remembered = &Remembered{}
+			}
+			ts.Remembered.Tabs = append(ts.Remembered.Tabs, rec)
+			wasFocused = wasFocused || focusedTab(sp) == tb.ID
+			detach(sp, p, tb.ID)
+			forget(sp, tb.ID)
+			took = append(took, tb)
+		}
+	}
+	if wasFocused {
+		refocus(sp)
+	}
+	return took
 }
 
 // CloseThread closes a thread's tab and the linked tabs in its space, remembering which were
@@ -571,9 +662,10 @@ func runningTerminals(r *Remembered) []*Tab {
 // SnoozeThread closes a thread like close_thread (its tab when open, and its linked tabs in
 // its space, remembered), then ends its terminals while keeping the set: each remembered
 // terminal is marked to come back as a fresh shell under the same name, with the command it
-// was running (Ran, by terminal id, from the caller) for its "Run again" line. Result.Kept
-// lists the tabs it took, Result.Ended the terminals the caller ends; its terminal tabs open
-// in other spaces are closed too (Result.Closed), as a terminal cannot end under an open tab.
+// was running (Ran, by terminal id, from the caller) for its "Run again" line. Its terminal
+// tabs open in other spaces join the set too, each with the space it was in, so it comes
+// back there (a terminal cannot end under an open tab). Result.Kept lists the tabs it took,
+// Result.Ended the terminals the caller ends.
 type SnoozeThread struct {
 	Thread string            `json:"thread"`
 	Ran    map[string]string `json:"ran,omitempty"`
@@ -597,28 +689,9 @@ func (o *SnoozeThread) apply(t *tx) (Result, error) {
 		res = Result{Space: sp.ID, Kept: t.putAway(sp, o.Thread, "", w, h)}
 	}
 	for _, other := range t.st.Spaces {
-		if other == sp {
-			continue
+		if other != sp {
+			res.Kept = append(res.Kept, t.putAwayElsewhere(other, o.Thread)...)
 		}
-		var gone []*Tab
-		for _, p := range Panes(other.Root) {
-			for _, tb := range p.Tabs {
-				if tb.Kind == "terminal" && tb.Thread == o.Thread {
-					gone = append(gone, tb)
-				}
-			}
-		}
-		wasFocused := false
-		for _, tb := range gone {
-			_, p, _ := t.st.FindTab(tb.ID)
-			wasFocused = wasFocused || focusedTab(other) == tb.ID
-			detach(other, p, tb.ID)
-			forget(other, tb.ID)
-		}
-		if wasFocused {
-			refocus(other)
-		}
-		res.Closed = append(res.Closed, gone...)
 	}
 	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Remembered != nil {
 		res.Ended = runningTerminals(ts.Remembered)

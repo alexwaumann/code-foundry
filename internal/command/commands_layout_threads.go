@@ -41,6 +41,9 @@ func writeThreads(b *strings.Builder, threads map[string]*core.ThreadState, defa
 			fmt.Fprintf(b, "    remembered %s %s", rt.Tab.ID, tabWords(rt.Tab, nil))
 			if rt.Pane != "" {
 				fmt.Fprintf(b, " in pane %s", rt.Pane)
+				if rt.Space != "" && rt.Space != ts.Space {
+					fmt.Fprintf(b, " of space %s", rt.Space)
+				}
 			} else {
 				// No pane (the first-load import's records): opening the thread places it fresh.
 				b.WriteString(", placed fresh beside the thread")

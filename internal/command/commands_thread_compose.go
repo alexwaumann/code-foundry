@@ -60,13 +60,14 @@ func (o threadLifecycleOptions) sentFrom(ctx context.Context, uctx Context, comp
 
 // focusThreadTab is thread.focus's half in the shell window's layout: thread.open --focus, which
 // switches to the thread's space and focuses its tab, opening it (and its remembered tabs) when
-// it is closed. It works with no window open: the layout shows it when one opens. It returns a
-// phrase for the message; without a layout it does nothing.
-func (o threadLifecycleOptions) focusThreadTab(ctx context.Context, id string) (string, error) {
+// it is closed. It works with no window open: the layout shows it when one opens. An archived
+// thread lives in no space, so it opens in the current one. It returns a phrase for the
+// message; without a layout it does nothing.
+func (o threadLifecycleOptions) focusThreadTab(ctx context.Context, id string, archived bool) (string, error) {
 	if o.layout == nil {
 		return "", nil
 	}
-	c, err := layout{store: o.layout}.apply(ctx, &core.OpenThread{Thread: id, Focus: true}, false)
+	c, err := layout{store: o.layout}.apply(ctx, &core.OpenThread{Thread: id, Focus: true, Archived: archived}, false)
 	if err != nil {
 		return "", err
 	}

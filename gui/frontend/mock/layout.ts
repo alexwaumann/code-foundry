@@ -939,10 +939,11 @@ const ops = {
     const closed = panes(sp.root).flatMap((p) => p.tabs ?? []);
     const target = t.spaceByID(to);
     if (sp.drafts?.length) target.drafts = [...sp.drafts, ...(target.drafts ?? [])];
+    // Its threads move, closed, keeping what they remember (Go also puts their linked tabs
+    // here into their sets, which the mock does not port).
     for (const ts of Object.values(t.st.threads ?? {})) {
       if (ts.space !== sp.id) continue;
       ts.space = to;
-      delete ts.remembered;
       delete ts.last;
     }
     if (t.st.default_space === sp.id) t.st.default_space = to;
@@ -975,6 +976,10 @@ const ops = {
   open_thread(t: Tx, o: Op): Result {
     const thread = str(o, "thread");
     if (!thread) fail("invalid_argument", "no thread given");
+    const edge = edgeOf(o, false);
+    const index = num(o, "index");
+    if (index !== undefined && (!str(o, "pane") || edge)) fail("invalid_argument", "an index is a place in a pane's strip: give the pane and no edge");
+    if (str(o, "compose") && (edge || index !== undefined)) fail("invalid_argument", "a thread sent from a composer takes its place");
     for (const sp of t.st.spaces)
       for (const p of panes(sp.root))
         for (const tb of p.tabs ?? [])
@@ -990,6 +995,8 @@ const ops = {
       if (compose.tab.kind !== "compose") fail("invalid_argument", `tab ${compose.tab.id} is not a composer`);
       if (t.spaceOf(thread) !== compose.sp.id) ((t.st.threads ??= {})[thread] ??= { space: compose.sp.id }).space = compose.sp.id;
     } else if (!str(o, "pane")) {
+      // An archived thread lives in no space: it opens in the current one (Go's Archived).
+      if (o.archived === true && t.spaceOf(thread) !== t.st.current_space) ((t.st.threads ??= {})[thread] ??= { space: t.st.current_space }).space = t.st.current_space;
       const sp = t.space(t.spaceOf(thread));
       const ps = panes(sp.root);
       const only = ps.length === 1 && ps[0]?.tabs?.length === 1 ? ps[0].tabs[0] : undefined;
@@ -1006,14 +1013,28 @@ const ops = {
       if (draft) unlistDraft(t.st, draft);
       return { space: compose.sp.id, pane: compose.pane.id, tab: tb.id, closed: [compose.tab], rule: "compose", ...(draft ? { draft } : {}) };
     }
+    if (str(o, "pane") && o.archived === true) {
+      const psp = t.pane(str(o, "pane")).sp;
+      if (t.spaceOf(thread) !== psp.id) ((t.st.threads ??= {})[thread] ??= { space: psp.id }).space = psp.id;
+    }
     const sp = t.space(t.spaceOf(thread));
     let pane: Node | undefined;
     if (str(o, "pane")) {
       const p = t.pane(str(o, "pane"));
-      if (p.sp !== sp) fail("invalid_argument", `pane ${p.pane.id} is not in thread ${thread}'s space ${sp.id}`);
+      if (p.sp !== sp) fail("failed_precondition", `pane ${p.pane.id} is not in thread ${thread}'s space ${sp.id}`);
       pane = p.pane;
     }
-    return ops.add_tab(t, { op: "add_tab", space: sp.id, ...(pane ? { pane: pane.id } : {}), tab: { id: "", kind: "thread", thread }, focus: o.focus === true });
+    if (edge && (pane ?? panes(sp.root).find((p) => p.id === sp.focus))) {
+      // A new pane on a pane's edge, or on the edge of the whole pane area (Go's Edge).
+      const tb: Tab = { id: "", kind: "thread", thread };
+      t.prepare(sp, tb);
+      const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
+      if (pane) insertBeside(sp, pane.id, edge, np, undefined, t.newID("s-"));
+      else toOuter(t, sp, np, edge, undefined, num(o, "w") ?? 0, num(o, "h") ?? 0);
+      t.show(sp, np, tb.id, o.focus === true);
+      return { space: sp.id, pane: np.id, tab: tb.id, rule: "edge" };
+    }
+    return ops.add_tab(t, { op: "add_tab", space: sp.id, ...(pane ? { pane: pane.id } : {}), ...(index !== undefined ? { index } : {}), tab: { id: "", kind: "thread", thread }, focus: o.focus === true });
   },
 
   close_thread(t: Tx, o: Op): Result {
@@ -1445,7 +1466,7 @@ export function opFromProto(m: LayoutOp | undefined): Op {
     case "switchSpace":
       return { op: "switch_space", space: c.value.spaceId };
     case "openThread":
-      return { op: "open_thread", thread: c.value.threadId, pane: c.value.paneId, focus: c.value.focus, compose: c.value.composeTabId };
+      return { op: "open_thread", thread: c.value.threadId, pane: c.value.paneId, index: c.value.index, edge: protoEdge(c.value.edge), focus: c.value.focus, compose: c.value.composeTabId };
     case "closeThread":
       return { op: "close_thread", thread: c.value.threadId };
     case "openSurface":

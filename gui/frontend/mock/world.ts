@@ -5242,7 +5242,8 @@ export class World {
       ...layoutCommands({
         layout: this.layout,
         hasThread: (id) => this.threads.has(id),
-        userThreads: () => [...this.threads.values()].filter((t) => !t.createdBy && t.archivedAt === null).map((t) => t.id),
+        sidebarThreads: () => [...this.threads.values()].filter((t) => (!t.createdBy || !this.threads.has(t.createdBy)) && t.archivedAt === null).map((t) => t.id),
+        isArchived: (id) => (this.threads.get(id)?.archivedAt ?? null) !== null,
         archiveThread: (id) => {
           this.archiveThread(id, true);
         },

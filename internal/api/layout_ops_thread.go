@@ -13,7 +13,11 @@ import (
 func init() {
 	registerLayoutOp("open_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetOpenThread()
-		return &core.OpenThread{Thread: o.GetThreadId(), Pane: o.GetPaneId(), Compose: o.GetComposeTabId(), Focus: o.GetFocus()}, nil
+		edge, err := layoutEdgeFromProto(o.GetEdge())
+		if err != nil {
+			return nil, err
+		}
+		return &core.OpenThread{Thread: o.GetThreadId(), Pane: o.GetPaneId(), Index: optionalIndex(o.Index), Edge: edge, Compose: o.GetComposeTabId(), Focus: o.GetFocus()}, nil
 	})
 	registerLayoutOp("close_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		return &core.CloseThread{Thread: m.GetCloseThread().GetThreadId()}, nil

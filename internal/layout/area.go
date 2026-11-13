@@ -40,3 +40,4 @@ func (o *SnoozeThread) setArea(w, h float64)      { area(&o.W, &o.H, w, h) }
 func (o *ClosePane) setArea(w, h float64)         { area(&o.W, &o.H, w, h) }
 func (o *MoveTab) setArea(w, h float64)           { area(&o.W, &o.H, w, h) }
 func (o *MovePane) setArea(w, h float64)          { area(&o.W, &o.H, w, h) }
+func (o *RemoveSpace) setArea(w, h float64)       { area(&o.W, &o.H, w, h) }

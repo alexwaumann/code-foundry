@@ -185,6 +185,9 @@ message RememberedTab {
   LayoutBeside beside = 6;
   // A terminal that comes back as a fresh shell (after a snooze); unset otherwise.
   FreshTerminal fresh = 7;
+  // The space it was in when that is not the thread's (a snooze takes the thread's terminal
+  // tabs from every space): it goes back there. Empty: the thread's space.
+  string space_id = 8;
 }
 
 message LayoutBeside {
@@ -375,6 +378,11 @@ message OpenThreadOp {
   // The composer tab the thread was sent from: the thread's tab replaces it, and the
   // thread lives in that composer's space.
   string compose_tab_id = 4;
+  // With pane_id: its place in that pane's strip (default: after the active tab).
+  optional int32 index = 5;
+  // With pane_id: a new pane on this edge of that pane; without: a new pane on this edge of
+  // the space's whole pane area.
+  LayoutEdge edge = 6;
 }
 
 // CloseThreadOp closes a thread's tab and its linked tabs in its space, remembering them.

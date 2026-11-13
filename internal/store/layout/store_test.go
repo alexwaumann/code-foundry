@@ -327,17 +327,6 @@ func TestCorruptRowsAreRepaired(t *testing.T) {
 			},
 		},
 		{
-			name: "space doc from a newer build",
-			rows: []string{
-				`INSERT INTO layout_spaces VALUES ('sp-a', 'Main', 0, '{"v":99,"root":null}', 1)`,
-			},
-			check: func(t *testing.T, st *core.State) {
-				if len(st.Spaces) != 1 || st.Spaces[0].ID != "sp-a" || st.CurrentSpace != "sp-a" || st.DefaultSpace != "sp-a" {
-					t.Errorf("state %+v; want sp-a current and default", st)
-				}
-			},
-		},
-		{
 			name: "thread doc that is not JSON, and one in a space that is gone",
 			rows: []string{
 				`INSERT INTO layout_spaces VALUES ('sp-a', 'Main', 0, '{"v":1}', 1)`,
@@ -356,7 +345,7 @@ func TestCorruptRowsAreRepaired(t *testing.T) {
 		{
 			name: "a tree out of normal form with a duplicate surface",
 			rows: []string{
-				`INSERT INTO layout_spaces VALUES ('sp-a', 'Main', 0, '{"v":1,"root":{"t":"split","id":"s-1","dir":"row","kids":[{"t":"pane","id":"p-1","tabs":[{"id":"t-1","kind":"prs"}],"active":"t-1"},{"t":"pane","id":"p-2","tabs":[{"id":"t-2","kind":"prs"},{"id":"t-3","kind":"nope"}],"active":"t-2"}],"sizes":[1,1]},"focus":"p-9","mru":["t-9"]}', 1)`,
+				`INSERT INTO layout_spaces VALUES ('sp-a', 'Main', 0, '{"v":1,"root":{"t":"split","id":"s-1","dir":"row","kids":[{"t":"pane","id":"p-1","tabs":[{"id":"t-1","kind":"prs"}],"active":"t-1"},{"t":"pane","id":"p-2","tabs":[{"id":"t-2","kind":"prs"},{"id":"t-3","kind":"file"}],"active":"t-2"}],"sizes":[1,1]},"focus":"p-9","mru":["t-9"]}', 1)`,
 			},
 			check: func(t *testing.T, st *core.State) {
 				sp := st.Spaces[0]

@@ -1,5 +1,5 @@
 {
-  "doc": "Removing the default space makes the target the default, so threads without a row follow.",
+  "doc": "Removing the default space makes the target the default, so threads without a row follow; th-a closes as close_thread closes it, its linked tabs joining its remembered set.",
   "state": {
     "v": 1,
     "spaces": [
@@ -107,7 +107,37 @@
     ],
     "current_space": "sp-b",
     "default_space": "sp-b",
-    "threads": {"th-b":{"space":"sp-b"}}
+    "threads": {
+      "th-a": {
+        "space": "sp-b",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj-1","worktree":"w-1"}
+              },
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true
+            },
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}},
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true,
+              "beside": {"neighbours":["p-a"],"edge":"right","frac":0.4}
+            }
+          ]
+        }
+      },
+      "th-b": {"space":"sp-b"}
+    }
   },
-  "result": {"space":"sp-b","closed":["t-a","t-d","t-f"]}
+  "result": {"space":"sp-b","closed":["t-a"],"kept":["t-d","t-f"]}
 }

@@ -479,7 +479,7 @@ func TestLayoutComposerDrafts(t *testing.T) {
 	if got := f.focus(); !strings.HasPrefix(got, "sp-main/p-left/") {
 		t.Fatalf("open: %s", got)
 	}
-	f.must(t, fromThread, "composer.draft.discard", map[string]string{"draft": "d-first0001"})
+	f.must(t, fromApp, "composer.draft.discard", map[string]string{"draft": "d-first0001"})
 	if d := f.state().Space("sp-main").Drafts; len(d) != 0 {
 		t.Fatalf("discard left %+v", d)
 	}

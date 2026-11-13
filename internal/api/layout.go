@@ -213,7 +213,7 @@ func threadLayoutToProto(id string, ts *core.ThreadState) *v1.ThreadLayout {
 	if r := ts.Remembered; r != nil {
 		out.RememberedPaneId = r.Pane
 		for _, rt := range r.Tabs {
-			m := &v1.RememberedTab{Tab: layoutTabToProto(rt.Tab), PaneId: rt.Pane, Index: int32(rt.Index), Active: rt.Active, Adjacent: rt.Adjacent}
+			m := &v1.RememberedTab{Tab: layoutTabToProto(rt.Tab), SpaceId: rt.Space, PaneId: rt.Pane, Index: int32(rt.Index), Active: rt.Active, Adjacent: rt.Adjacent}
 			if b := rt.Beside; b != nil {
 				m.Beside = &v1.LayoutBeside{NeighbourPaneIds: b.Neighbours, Edge: layoutEdges[b.Edge], Frac: b.Frac}
 			}

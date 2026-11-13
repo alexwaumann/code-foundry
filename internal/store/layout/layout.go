@@ -65,6 +65,9 @@ type Snapshot struct {
 	State *core.State
 	// LegacyImported: the first-load import ran (ImportLegacy).
 	LegacyImported bool
+	// Newer lists what in the stored layout a newer build wrote. When it is not empty the
+	// store saves nothing, so going back to the newer build finds its layout as it was.
+	Newer []string
 }
 
 // ApplyOptions are the caller's facts about an Apply.
@@ -101,6 +104,9 @@ type Event struct {
 	// restored (docs/notes/shell-6-lifecycle.md). Neither reaches a client.
 	Op     string
 	Result core.Result
+	// State is the whole state after the commit (Go only): a subscriber that missed events
+	// compares it with a later snapshot to see what changed in between.
+	State *core.State
 }
 
 // Delta is what one commit changed: whole spaces and whole thread records. Order,

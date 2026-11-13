@@ -8,8 +8,10 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 
@@ -100,9 +102,12 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 			Args:           []ArgSpec{positional(idArg)},
 			When:           isShell,
 			WhyUnavailable: notShell,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				old, err := findShell(ctx, d.Terminal, a.String("id"), "reset")
 				if err != nil {
+					return Result{}, err
+				}
+				if err := resetAsks(ctx, uctx, old); err != nil {
 					return Result{}, err
 				}
 				if termlabel.IsQuick(old.GetLabels()) {
@@ -236,4 +241,24 @@ func quickTerminal(ctx context.Context, terms TerminalBackend, thread string) (*
 		}
 	}
 	return nil, nil
+}
+
+// resetAsks is terminal.reset's question to a page: a reset starts the old terminal's argv
+// again, so a terminal started with a command line of its own (terminal.new --argv, which
+// asks a page) asks again before a page's reset runs it. A plain shell's reset runs
+// unasked, as a plain shell's start does.
+func resetAsks(ctx context.Context, uctx Context, old *v1.Terminal) error {
+	argv := old.GetArgv()
+	if len(argv) == 0 || slices.Equal(argv, defaultShell()) {
+		return nil
+	}
+	words := make([]string, len(argv))
+	for i, w := range argv {
+		words[i] = strconv.Quote(w)
+	}
+	ask := "Run this?\nterminal.reset --id " + strconv.Quote(old.GetId()) + "\nIt starts again: " + strings.Join(words, " ")
+	if n := utf8.RuneCountInString(ask); n > pageAskMax && uctx.Untrusted() {
+		return Failed(fmt.Errorf("terminal.reset: this call is too long to show the user (%d characters, at most %d)", n, pageAskMax))
+	}
+	return pageAsks(ctx, uctx, "terminal.reset", "Reset Terminal", "Allow", ask)
 }

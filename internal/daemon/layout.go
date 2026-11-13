@@ -40,13 +40,18 @@ import (
 //
 // The glue's own ops carry no client id. A sweep at start and every layoutSweepEvery drops
 // what the layout holds of terminals that are gone (after a restart every terminal is), for
-// the events the bus dropped.
+// the terminal events the bus dropped.
+//
+// The bus drops an event for a subscriber whose buffer is full and counts the drop. When the
+// layout or thread subscription has dropped one, the glue catches up from the stores'
+// snapshots (resync): what the missed layout commits did to terminals (from the state after
+// the last commit it acted on to the state now), and every thread it has not placed.
 
 // layoutSweepEvery is how often the glue re-checks the layout's terminals.
 const layoutSweepEvery = 60 * time.Second
 
-// layoutGlueOptions configures startLayoutGlue. Every field but Log, Shell and SweepEvery is
-// required.
+// layoutGlueOptions configures startLayoutGlue. Every field but Log, Shell, SweepEvery and
+// Buffer is required.
 type layoutGlueOptions struct {
 	Log       *slog.Logger
 	Layout    layoutstore.Store
@@ -59,6 +64,8 @@ type layoutGlueOptions struct {
 	Shell func() []string
 	// SweepEvery is the sweep interval. Default layoutSweepEvery.
 	SweepEvery time.Duration
+	// Buffer is the buffer of the thread and layout subscriptions. Default 256.
+	Buffer int
 }
 
 type layoutGlue struct {
@@ -71,6 +78,12 @@ type layoutGlue struct {
 	// archived is, for each thread seen, whether it was archived: a thread not in it is new,
 	// one that goes from true to false was unarchived.
 	archived map[string]bool
+	// prev is the layout state after the last commit the glue acted on, and prevRev that
+	// commit's rev once a resync set it: a commit at or below it is covered already.
+	prev    *core.State
+	prevRev uint64
+	// layoutDrops and threadDrops are the drops of each subscription already caught up on.
+	layoutDrops, threadDrops uint64
 }
 
 // startLayoutGlue starts the glue's loop. The returned func stops it and waits for terminals
@@ -85,6 +98,9 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 	if opts.SweepEvery <= 0 {
 		opts.SweepEvery = layoutSweepEvery
 	}
+	if opts.Buffer <= 0 {
+		opts.Buffer = 256
+	}
 	g := &layoutGlue{opts: opts, labels: map[string]map[string]string{}, archived: map[string]bool{}}
 	g.ctx, g.cancel = context.WithCancel(ctx)
 	// Subscribe before reading the state, so nothing between the two is missed.
@@ -93,8 +109,8 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 		g.cancel()
 		return nil, err
 	}
-	threadEvents := bus.Subscribe[thread.Event](opts.Bus, 256)
-	layoutEvents := bus.Subscribe[layoutstore.Event](opts.Bus, 256)
+	threadEvents := bus.Subscribe[thread.Event](opts.Bus, opts.Buffer)
+	layoutEvents := bus.Subscribe[layoutstore.Event](opts.Bus, opts.Buffer)
 	for _, t := range opts.Terminals.List(g.ctx) {
 		g.labels[t.ID] = t.Labels
 	}
@@ -103,6 +119,7 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 			g.archived[t.ID] = !t.ArchivedAt.IsZero()
 		}
 	}
+	g.prev = opts.Layout.Snapshot().State
 	g.sweep()
 	g.wg.Go(func() {
 		defer threadEvents.Close()
@@ -114,6 +131,7 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 			case <-g.ctx.Done():
 				return
 			case <-tick.C:
+				g.resync(threadEvents, layoutEvents)
 				g.sweep()
 			case ev, ok := <-terms:
 				if !ok {
@@ -122,8 +140,10 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 				g.terminalEvent(ev)
 			case ev := <-threadEvents.C():
 				g.threadEvent(ev)
+				g.resync(threadEvents, layoutEvents)
 			case ev := <-layoutEvents.C():
-				g.layoutEvent(ev)
+				g.commit(ev)
+				g.resync(threadEvents, layoutEvents)
 			}
 		}
 	})
@@ -184,10 +204,11 @@ func (g *layoutGlue) threadEvent(ev thread.Event) {
 
 // joinSpace moves thread t to the space it belongs in now: a new thread (created) to its
 // creator's space, else to the current space; an unarchived one to the current space. A new
-// thread the layout already knows (thread.new --compose placed it) stays where it is.
+// thread the layout already knows (thread.new --compose placed it) stays where it is, and so
+// does an unarchived one whose tab is open (opened while archived, it lives where it opened).
 func (g *layoutGlue) joinSpace(t thread.Thread, created bool) {
 	st := g.state()
-	if created && (st.Threads[t.ID] != nil || threadOpen(st, t.ID)) {
+	if (created && st.Threads[t.ID] != nil) || threadOpen(st, t.ID) {
 		return
 	}
 	to := st.CurrentSpace
@@ -263,6 +284,107 @@ func (g *layoutGlue) hasQuick(thread string) bool {
 		}
 	}
 	return false
+}
+
+// commit acts on a layout commit the glue has not covered yet (layoutEvent) and remembers
+// the state after it.
+func (g *layoutGlue) commit(ev layoutstore.Event) {
+	if ev.Rev <= g.prevRev {
+		return // a resync covered it
+	}
+	g.layoutEvent(ev)
+	g.prev = ev.State
+	if g.prev == nil {
+		g.prev = g.state()
+	}
+}
+
+// resync catches up on what a subscription dropped: for layout events, what the commits in
+// between did to terminals (catchUp from the state after the last commit acted on to the
+// state now); for thread events, every thread as the thread store has it now.
+func (g *layoutGlue) resync(threads *bus.Subscription[thread.Event], layouts *bus.Subscription[layoutstore.Event]) {
+	if n := layouts.Dropped(); n != g.layoutDrops {
+		g.opts.Log.Warn("layout: the glue missed layout events; catching up from the layout", "dropped", n-g.layoutDrops)
+		g.layoutDrops = n
+		snap := g.opts.Layout.Snapshot()
+		g.catchUp(g.prev, snap.State)
+		g.prev, g.prevRev = snap.State, snap.Rev
+	}
+	if n := threads.Dropped(); n != g.threadDrops {
+		g.opts.Log.Warn("layout: the glue missed thread events; catching up from the threads", "dropped", n-g.threadDrops)
+		g.threadDrops = n
+		g.resyncThreads()
+	}
+}
+
+// catchUp does what the layout commits from prev to now meant for terminals, as layoutEvent
+// does for one: a terminal prev held and now does not hold ended (unless a reset replaced
+// it), and a terminal tab restored as a fresh shell (a remembered fresh record in prev, an
+// open tab of the same old terminal now) gets its shell.
+func (g *layoutGlue) catchUp(prev, now *core.State) {
+	if prev == nil || now == nil {
+		return
+	}
+	held := map[string]bool{}
+	for _, id := range core.HeldTerminals(now) {
+		held[id] = true
+	}
+	var replaced map[string]bool
+	for _, id := range core.HeldTerminals(prev) {
+		if held[id] {
+			continue
+		}
+		if replaced == nil {
+			replaced = map[string]bool{}
+			for _, t := range g.opts.Terminals.List(g.ctx) {
+				if old := t.Labels[termlabel.Replaces]; old != "" {
+					replaced[old] = true
+				}
+			}
+		}
+		if !replaced[id] {
+			g.end(id)
+		}
+	}
+	fresh := map[string]bool{}
+	for _, ts := range prev.Threads {
+		if ts.Remembered == nil {
+			continue
+		}
+		for _, rt := range ts.Remembered.Tabs {
+			if rt.Fresh != nil && rt.Tab != nil && rt.Tab.Kind == "terminal" {
+				fresh[rt.Tab.Params[core.TerminalParam]] = true
+			}
+		}
+	}
+	for _, sp := range now.Spaces {
+		for _, p := range core.Panes(sp.Root) {
+			for _, tb := range p.Tabs {
+				if tb.Kind == "terminal" && fresh[tb.Params[core.TerminalParam]] {
+					g.fresh(tb.ID)
+				}
+			}
+		}
+	}
+}
+
+// resyncThreads places every thread as the thread store has it now, as its events would
+// have: a new or unarchived one joins its space, and one that is gone is forgotten.
+func (g *layoutGlue) resyncThreads() {
+	snap := g.opts.Threads()
+	if snap == nil {
+		return
+	}
+	seen := make(map[string]bool, len(snap.Threads))
+	for _, t := range snap.Threads {
+		seen[t.ID] = true
+		g.threadEvent(thread.Updated{Thread: t})
+	}
+	for id := range g.archived {
+		if !seen[id] {
+			g.threadEvent(thread.Removed{ID: id})
+		}
+	}
 }
 
 // layoutEvent ends the terminals a commit closed by themselves or ended, and starts the
