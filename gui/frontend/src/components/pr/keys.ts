@@ -1,5 +1,6 @@
 import { useCallback, useState, type KeyboardEvent } from "react";
 import { imeKeyDown } from "@/lib/ime";
+import { paneBoxOf } from "@/shell/paneBox";
 
 /** The surface's copy-link chord (SurfaceSpec.onKey in surfaces/pullrequest.ts). */
 export const COPY_LINK_CHORD = "cmd+shift+c";
@@ -13,14 +14,14 @@ export function stopPlainKeys(e: KeyboardEvent): void {
 }
 
 /**
- * Popups (menu, picker) stay inside the side panel: pass `ref` to the trigger and
+ * Popups (menu, picker) stay inside the surface's pane: pass `ref` to the trigger and
  * `boundary` as the content's collisionBoundary, with POPUP_FIT in its className. The
- * panel is the trigger's [data-region="panel"] ancestor.
+ * pane is the trigger's box (shell/paneBox.ts); outside one, the window.
  */
 export function usePanelBoundary(): { ref: (el: HTMLElement | null) => void; boundary: Element | null } {
   const [boundary, setBoundary] = useState<Element | null>(null);
   const ref = useCallback((el: HTMLElement | null) => {
-    setBoundary(el?.closest('[data-region="panel"]') ?? null);
+    setBoundary(paneBoxOf(el));
   }, []);
   return { ref, boundary };
 }

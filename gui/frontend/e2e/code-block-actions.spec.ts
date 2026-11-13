@@ -93,8 +93,7 @@ test("Run in terminal: hidden while the block streams, then a new terminal tab l
   await expect(host(page)).not.toHaveAttribute("data-terminal-id", id ?? "");
 });
 
-// Shell gap: the terminal's new pane narrows the thread's, and its timeline, at its end before, is no longer at its end (data-at-bottom).
-test.fixme("Run in terminal: the thread's timeline stays at its end when the terminal opens beside it", async ({ page }) => {
+test("Run in terminal: the thread's timeline stays at its end when the terminal opens beside it", async ({ page }) => {
   await streamToBash(page);
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n```\n"));
   await expect(pane(page).locator('[data-testid="thread-text"][data-streaming]')).toHaveCount(0);

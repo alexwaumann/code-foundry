@@ -293,8 +293,7 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   await page.keyboard.press("Escape");
 });
 
-// Shell gap: an action run from the card starts its terminal but opens no tab for it (stores/actionActions.ts runAction waits for a tab nothing opens: action.run --terminal places none, unlike terminal.new and ui.focus.terminal); the classic window showed the run in the thread's bottom panel.
-test.fixme("an action run from the card shows its terminal as a tab beside the thread, with the keyboard in it", async ({ page }) => {
+test("an action run from the card shows its terminal as a tab beside the thread, with the keyboard in it", async ({ page }) => {
   await page.setViewportSize({ width: 2200, height: 900 });
   await openWithCard(page, "single");
   const action = card(page).getByTestId("ti-action");

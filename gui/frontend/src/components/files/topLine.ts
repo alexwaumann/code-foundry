@@ -1,5 +1,6 @@
 /**
- * The File tab's top line, kept across a change of its width (docs/notes/shell-20b-gaps.md).
+ * The File tab's top line, and the Diff tab's top row, kept across a change of the box's width
+ * (docs/notes/shell-20b-gaps.md, docs/notes/shell-gaps-b-surfaces.md).
  * A wrapped line above the view takes another number of rows once the box is wider or narrower,
  * so the same scrollTop shows other lines. In a shell pane that happens on every page zoom
  * change (a pane is a share of the grid, whose layout width is the window's over the zoom) and
@@ -7,7 +8,7 @@
  * did not show there. Pure: the box's rows in, the scroll correction out.
  */
 
-/** A line's row as measured: its number and its top, in viewport px (a rect). */
+/** A line's row as measured: its number (a diff's: its row index) and its top, in viewport px (a rect). */
 export interface LineRow {
   line: number;
   top: number;

@@ -112,3 +112,36 @@ test("a long file opened at a line lands it a third down at 200%", async ({ page
   await openLong(page, 900);
   await expect.poll(async () => (await view(page, { at: 900 })).at).toBeCloseTo(0.33, 1);
 });
+
+test("the Diff tab keeps its top row across zoom changes, wrapped", async ({ page }) => {
+  // An untracked file of the thread's checkout: every line added, over 400 rows (the virtualizer).
+  const path = "notes/plan.md";
+  await mockPost(`fs/write?path=${encodeURIComponent(`${CF}/${path}`)}&text=${encodeURIComponent(TEXT).replaceAll("%20", "+")}`);
+  await row(page, "s:s-1").click();
+  await openThreadChanges(page);
+  await page.locator(`[data-nav-key="f:${path}"]`).click();
+  const code = page.getByTestId("diff-code");
+  await expect(code).toHaveAttribute("data-virtual", "");
+  await page.evaluate(`__cfModule("/src/stores/codeView.ts").then((m) => m.setWrap(true))`);
+  // The first row on screen, by its row index (a diff's line numbers repeat).
+  const topRow = () =>
+    code.evaluate((box) => {
+      const sc = box.firstElementChild as HTMLElement;
+      const s = sc.getBoundingClientRect();
+      const rows = [...(sc.querySelector("diffs-container")?.shadowRoot?.querySelectorAll<HTMLElement>("[data-content] [data-line]") ?? [])];
+      const shown = rows.find((r) => {
+        const b = r.getBoundingClientRect();
+        return b.height > 0 && b.bottom > s.top + 1 && b.top < s.bottom - 1;
+      });
+      return Number((shown?.dataset.lineIndex ?? "").split(",")[0]);
+    });
+  await code.evaluate((box) => {
+    (box.firstElementChild as HTMLElement).scrollTop = 14000;
+  });
+  await expect.poll(topRow).toBeGreaterThan(0);
+  const first = await topRow();
+  for (const zoom of [90, 200, 100]) {
+    await setZoom(page, zoom);
+    await expect.poll(topRow).toBe(first);
+  }
+});

@@ -10,7 +10,8 @@ import { contextKey, getUiContext } from "@/stores/context";
 import { retitleTab, useCurrentTarget, type Tab } from "@/shell/host";
 import { surfaceManifestOf, usePluginsStore } from "@/stores/plugins";
 import { chooserKeyOf, startSurfaceWatch, useChoice, useSurfaceEntry, watchKeyOf } from "@/stores/pluginSurfaces";
-import { useUiStore } from "@/stores/ui";
+import { useUiStore, type Selection } from "@/stores/ui";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { useShowState } from "@/surfaces/plugin";
 import { ViewContext, type ViewCtx } from "./context";
 import { SurfaceHeader } from "./Header";
@@ -78,13 +79,24 @@ const downWords: Partial<Record<PluginStateView, string>> = {
   stopped: "is stopped",
 };
 
+/** The selection a plugin tab draws for: its linked thread (panel key `thread:<id>`), else the window's. */
+function useTabSelection(linked: string): Selection {
+  const windowSelection = useUiStore((s) => s.selection);
+  const thread = linked.startsWith("thread:") ? linked.slice("thread:".length) : "";
+  return useMemo<Selection>(() => (thread ? { kind: "thread", id: thread } : windowSelection), [thread, windowSelection]);
+}
+
 /**
  * One plugin surface tab (docs/notes/plugins-5-gui.md): holds the instance open while the
  * tab shows (one WatchSurface), names the tab after the view, and draws the body
- * (PluginSurfaceBody) with the panel's selection, or says the surface is gone.
+ * (PluginSurfaceBody) for its linked thread or the window's selection, or says the surface is gone.
  */
 export function PluginSurface({ tab }: { tab: Tab }) {
-  const panelKey = useCurrentTarget() ?? "";
+  // A tab linked to a thread draws for its thread wherever the window's selection is; an unlinked
+  // one for the window's selection.
+  const linked = usePanelKey();
+  const current = useCurrentTarget();
+  const panelKey = linked || (current ?? "");
   const watchKey = watchKeyOf(panelKey, tab.id);
   const { plugin, surface } = parseKind(tab.kind);
   const loaded = usePluginsStore((s) => s.loaded);
@@ -92,7 +104,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
     const m = surfaceManifestOf(tab.kind, s);
     return Boolean(m?.title) || Boolean(m?.icon);
   });
-  const selection = useUiStore((s) => s.selection);
+  const selection = useTabSelection(linked);
   const uiContext = useMemo(() => getUiContext(selection), [selection]);
   const ctxKey = contextKey(uiContext);
   const show = useShowState(tab.kind, selection);

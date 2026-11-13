@@ -181,7 +181,7 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 				if a.Bool("quick") {
 					msg = "created thread " + owner.thread + "'s quick terminal " + t.GetId()
 				} else {
-					tab, err := openTerminalTab(ctx, d, c, owner.thread, t.GetId(), a.String("pane"))
+					tab, err := openTerminalTab(ctx, d.Layout, c, owner.thread, t.GetId(), a.String("pane"))
 					if err != nil {
 						return Result{}, err
 					}

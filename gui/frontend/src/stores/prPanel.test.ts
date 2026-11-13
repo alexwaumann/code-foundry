@@ -20,7 +20,7 @@ const { layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fake
 const { makeTab, openTab, tabPlace } = await import("@/shell/host");
 const { useLayoutStore } = await import("./layout");
 const { openPullRequestLink } = await import("@/components/pr/prLinks");
-const { clearConfirmedRequests, openPullRequestInPanel, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
+const { clearConfirmedRequests, openPullRequestInPanel, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -359,16 +359,25 @@ describe("inner state per tab", () => {
     await openIn({ slug: SLUG, number: 7 });
     await openIn({ slug: SLUG, number: 8 });
     const [seven, eight] = tabPlace("thread:a").tabs.map((t) => t.id);
-    setInnerTab(prTabKey("thread:a", seven ?? ""), "activity");
-    setInnerTab(prTabKey("thread:a", eight ?? ""), "activity");
+    setInnerTab(seven ?? "", "activity");
+    setInnerTab(eight ?? "", "activity");
 
     await applyLayoutOp({ op: "close_tab", tab: seven ?? "" });
     await layoutSettled();
-    expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([prTabKey("thread:a", eight ?? "")]);
+    expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([eight]);
 
     // Reopened, it starts fresh.
     await openIn({ slug: SLUG, number: 7 });
     const again = tabPlace("thread:a").tabs.find((t) => t.params.number === "7")?.id ?? "";
-    expect(usePrPanelStore.getState().byTab[prTabKey("thread:a", again)]).toBeUndefined();
+    expect(usePrPanelStore.getState().byTab[again]).toBeUndefined();
+  });
+
+  it("is kept for an unlinked tab (a page's) across a change of the layout", async () => {
+    await openIn({ slug: SLUG, number: 7 }, "view:pullrequests");
+    const page = Object.values(useLayoutStore.getState().tabs).find((t) => t.kind === "pullrequest" && !t.thread)?.id ?? "";
+    expect(page).not.toBe("");
+    setInnerTab(page, "code");
+    await openIn({ slug: SLUG, number: 8 });
+    expect(usePrPanelStore.getState().byTab[page]?.inner).toBe("code");
   });
 });

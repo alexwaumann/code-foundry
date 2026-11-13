@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { chordFromEvent } from "@/keys/chord";
+import { keyTarget } from "@/lib/keyTarget";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { PaneError } from "@/components/error/fallbacks";
 import { lastInputWasKeyboard } from "@/lib/inputModality";
@@ -7,6 +9,7 @@ import { focusPaneNow } from "@/shell/commands";
 import type { PaneRect } from "@/shell/geometry/types";
 import { usePaneDragged } from "@/shell/drag/state";
 import { ShellPaneContext, type ShellPane } from "@/shell/paneContext";
+import { focusPaneBody } from "@/shell/paneBox";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
 import { useShellViewStore } from "@/stores/shellView";
@@ -37,22 +40,26 @@ function focusInto(body: HTMLElement, kind: string): void {
     useUiStore.getState().focusComposer();
     return;
   }
-  const root = body.querySelector<HTMLElement>("[data-focus-root]");
-  if (root) {
-    root.focus({ preventScroll: true });
-    return;
-  }
-  // The body itself takes the keyboard only for this request: focusable for good, any press on a
-  // blank spot of a tab (a composer's heading) would take the keyboard out of its prompt.
-  body.tabIndex = -1;
-  body.addEventListener(
-    "blur",
-    () => {
-      body.removeAttribute("tabindex");
-    },
-    { once: true },
-  );
-  body.focus({ preventScroll: true });
+  focusPaneBody(body);
+}
+
+function isEditable(el: Element | null): boolean {
+  return el instanceof HTMLElement && (el.isContentEditable || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement);
+}
+
+/**
+ * A key pressed inside the pane, outside text fields, that the window's keymap left alone: its
+ * active tab's surface may take it (SurfaceSpec.onKey: a pull request's cmd+shift+c), as the side
+ * panel offered its keys. Portalled popups' keys bubble here through React too.
+ */
+function surfaceKey(e: KeyboardEvent<HTMLElement>, tab: TabEntry | undefined): void {
+  if (!tab || e.defaultPrevented) return;
+  const onKey = shellSurfaceOf(tab.kind).onKey;
+  const chord = onKey ? chordFromEvent(e.nativeEvent) : null;
+  if (!onKey || !chord || isEditable(keyTarget(e.nativeEvent))) return;
+  if (!onKey(chord, tab)) return;
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 /**
@@ -66,8 +73,9 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
 /**
  * An open pane: its tab strip, then its active tab's body. A pointer press or the keyboard (Tab)
  * entering it focuses it (pane.focus, shown at once); a focus request (a direction key, a closed
- * tab, a click on a rail's icon) moves the keyboard into its active tab. Full screen, a linked
- * tab's thread composer floats over the body (FloatingComposer).
+ * tab, a click on a rail's icon) moves the keyboard into its active tab. A key inside it may be
+ * its active surface's own (surfaceKey). Full screen, a linked tab's thread composer floats over
+ * the body (FloatingComposer).
  */
 function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; focused: boolean }) {
   const pane = usePane(paneId);
@@ -102,7 +110,12 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
       data-focused={focused || undefined}
       data-fullscreen={full || undefined}
       data-dragging={dragged || undefined}
+      // Popups keep inside it, and a surface part that closes hands it the keyboard (shell/paneBox.ts).
+      data-pane-box
       onPointerDownCapture={takeFocus}
+      onKeyDown={(e) => {
+        surfaceKey(e, tab);
+      }}
       // The keyboard entering the pane (Tab) focuses it; a surface focusing itself as it mounts does not.
       onFocusCapture={() => {
         if (lastInputWasKeyboard()) takeFocus();

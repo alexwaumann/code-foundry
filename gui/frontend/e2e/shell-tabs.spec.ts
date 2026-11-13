@@ -101,8 +101,7 @@ test("cmd+w on a pane's last tab is handled and closes the pane; the keyboard go
   await expect(page.getByTestId("prs-list").locator('[aria-selected="true"]')).toHaveCount(1);
 });
 
-// Shell gap: a gutter is a separator the keyboard cannot reach or move (and a double-click does nothing); the side panel's edge and its split's divider took arrow keys and reset on a double-click.
-test.fixme("a gutter takes the keyboard and its arrow keys move it", async ({ page }) => {
+test("a gutter takes the keyboard and its arrow keys move it; a double click evens its panes", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 });
   await seedLayout(rowNode([paneNode("p-1", [threadTab("s-1")]), paneNode("p-2", [diffTab("s-1")])], [0.6, 0.4]), "p-1");
   await openShellApp(page);
@@ -113,4 +112,8 @@ test.fixme("a gutter takes the keyboard and its arrow keys move it", async ({ pa
   await expect(gutter).toBeFocused();
   await page.keyboard.press("ArrowLeft");
   await expect.poll(width).toBeGreaterThan(before);
+  // A double click shares the two panes evenly.
+  await gutter.dblclick();
+  const left = async () => Math.round((await paneOf(page, "p-1").boundingBox())?.width ?? 0);
+  await expect.poll(async () => Math.abs((await left()) - (await width()))).toBeLessThanOrEqual(1);
 });

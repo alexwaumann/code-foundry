@@ -32,8 +32,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-// Shell gap: a popup's collision boundary is the side panel's region (components/pr/keys.ts usePanelBoundary finds [data-region="panel"]); a pane has none, so the picker is kept inside the window, not its pane, and overhangs a pane at the window's edge.
-test.fixme("a toolbar picker opens inside its pane, searches the plugin and filters the runs", async ({ page }) => {
+test("a toolbar picker opens inside its pane, searches the plugin and filters the runs", async ({ page }) => {
   await openDemo(page, "layout");
   await setSurfaceWidth(page, "plugin-surface", 420);
   const trigger = surface(page).locator('[data-testid="plugin-select"][data-name="branch"]');

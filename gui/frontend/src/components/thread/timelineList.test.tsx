@@ -26,3 +26,50 @@ it("ends at the bottom when two scrolls land before a render, the first away fro
   expect(list.dataset.atBottom).toBe("true");
   vi.unstubAllGlobals();
 });
+
+it("a click on a row that did not move the list leaves the layout's next scroll to the layout: the list stays at its end", () => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  render(<TimelineList threadId="s-1" rows={[{ key: "a", type: "text" }]} bottomInset={0} renderRow={() => <div />} />);
+  const list = screen.getByTestId("thread-timeline");
+  act(() => {
+    place(list, 2000);
+    fireEvent.scroll(list);
+  });
+  // Run in terminal on a row (jsdom virtualizes none: the rows' box): pressed and released, the list did not move.
+  fireEvent.pointerDown(screen.getByRole("log"));
+  fireEvent.pointerUp(window);
+  // The pane narrows and the virtualizer keeps rows in place: a scroll away from the end nobody asked for.
+  act(() => {
+    place(list, 1500);
+    fireEvent.scroll(list);
+  });
+  // Pinned, the list went back to its end.
+  act(() => {
+    fireEvent.scroll(list);
+  });
+  expect(list.dataset.atBottom).toBe("true");
+  vi.unstubAllGlobals();
+});
+
+it("a press that moved the list (its scrollbar dragged) makes the next moment's scrolls the user's: the list leaves its end", () => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  render(<TimelineList threadId="s-1" rows={[{ key: "a", type: "text" }]} bottomInset={0} renderRow={() => <div />} />);
+  const list = screen.getByTestId("thread-timeline");
+  act(() => {
+    place(list, 2000);
+    fireEvent.scroll(list);
+  });
+  fireEvent.pointerDown(list);
+  act(() => {
+    place(list, 1700);
+    fireEvent.scroll(list);
+  });
+  fireEvent.pointerUp(window);
+  act(() => {
+    place(list, 1500);
+    fireEvent.scroll(list);
+    fireEvent.scroll(list);
+  });
+  expect(list.dataset.atBottom).toBeUndefined();
+  vi.unstubAllGlobals();
+});

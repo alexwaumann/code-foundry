@@ -77,8 +77,7 @@ test("a terminal tab beside the nodes adds a stream and takes none from a node",
   await expect(page.getByTestId("plugin-header")).toContainText("1 click");
 });
 
-// Shell gap: a plugin surface draws for the window's selection, not its linked thread: with an unlinked tab focused it says "Not available here" and its nodes' streams end.
-test.fixme("a plugin surface linked to a thread keeps its view while an unlinked tab has the focus", async ({ page }) => {
+test("a plugin surface linked to a thread keeps its view while an unlinked tab has the focus", async ({ page }) => {
   await openStress(page);
   const threadPane = (await paneShowing(page, "thread").getAttribute("data-pane-id")) ?? "";
   await page.keyboard.press("Meta+Shift+t");

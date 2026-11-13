@@ -44,7 +44,7 @@ export const defaultPrTabState: PrTabState = { inner: "overview", commentOrder: 
 export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, fullDescription: false, checks: false, comments: true, files: true };
 
 interface PrPanelState {
-  /** By prTabKey(panelKey, tabId). */
+  /** By the pull request tab's layout id, linked or not (a tab is known by its id wherever it is). */
   byTab: Readonly<Record<string, PrTabState>>;
   /** pullRequestKey → a pr.refresh in flight. */
   refreshing: Readonly<Record<string, boolean>>;
@@ -73,15 +73,16 @@ interface PrPanelState {
 
 export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {}, mergeMethods: {} }));
 
-export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
-
-/** Drops inner state of tabs no panel holds any more (a closed tab reopens fresh). */
+/**
+ * Drops inner state of tabs no pane holds any more (a closed tab reopens fresh). Every open tab is
+ * in its pane's place, so a tab moved, resized around or shown from another selection keeps its own.
+ */
 function pruneClosedTabs(places: TabPlaces): void {
   const byTab = usePrPanelStore.getState().byTab;
   const keys = Object.keys(byTab);
   if (keys.length === 0) return;
   const live = new Set<string>();
-  for (const [panelKey, p] of Object.entries(places)) for (const t of p.tabs) live.add(prTabKey(panelKey, t.id));
+  for (const p of Object.values(places)) for (const t of p.tabs) live.add(t.id);
   if (keys.every((k) => live.has(k))) return;
   usePrPanelStore.setState({ byTab: Object.fromEntries(Object.entries(byTab).filter(([k]) => live.has(k))) });
 }

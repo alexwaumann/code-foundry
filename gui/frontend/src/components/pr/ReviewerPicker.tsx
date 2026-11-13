@@ -246,7 +246,6 @@ export function ReviewerPicker({ prRef, canUpdate }: { prRef: PrRef; canUpdate: 
         collisionPadding={POPUP_COLLISION_PADDING}
         className={cn("w-72 overflow-hidden p-0", POPUP_FIT)}
         data-testid="pr-reviewer-picker"
-        data-region="panel"
         onKeyDown={stopPlainKeys}
       >
         {canUpdate ? (

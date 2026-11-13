@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,8 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	core "github.com/alexwaumann/code-foundry/internal/layout"
+	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 )
 
 const (
@@ -398,6 +401,62 @@ func TestActionRunsPorts(t *testing.T) {
 			}
 			if got := strings.TrimRight(lines[1], " "); !strings.HasSuffix(got, tt.want) || (tt.want == "" && strings.Contains(got, "localhost")) {
 				t.Errorf("row %q, want it to end in %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// A terminal run is seen in its terminal's tab: linked to the run's thread and placed by the
+// rules (beside the thread's diff), or, a worktree's, unlinked in the focused pane. The user's own
+// run focuses it, a thread's never does. A background run has no tab.
+func TestActionRunOpensItsTerminalsTab(t *testing.T) {
+	thread := "s-aaaa00000001"
+	for _, tc := range []struct {
+		name         string
+		uctx         command.Context
+		args         map[string]string
+		pane, linked string
+		focused      bool
+	}{
+		{name: "a thread's run from the app", uctx: command.Context{ActiveView: "thread", ActiveThreadID: thread},
+			args: map[string]string{"terminal": "true"}, pane: "p-right", linked: thread, focused: true},
+		{name: "a thread's run from the thread", uctx: command.Context{Origin: command.OriginCLI, ActiveThreadID: thread},
+			args: map[string]string{"terminal": "true"}, pane: "p-right", linked: thread},
+		{name: "a worktree's run", uctx: command.Context{ActiveView: "projects", ActiveProjectID: "r1", ActiveWorktreePath: actApp},
+			args: map[string]string{"terminal": "true"}, pane: "p-left", focused: true},
+		{name: "a background run", uctx: command.Context{ActiveView: "thread", ActiveThreadID: thread}, args: map[string]string{"background": "true"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := layouttest.New(nil)
+			store.Put(seeded())
+			reg := command.NewRegistry()
+			if err := command.RegisterAction(reg, command.ActionDeps{
+				Action:  &commandtest.Action{},
+				Project: &commandtest.Project{Projects: actionProjects},
+				Thread:  &commandtest.Thread{Current: &v1.Thread{Id: thread, ProjectId: "r1", WorktreePath: actFeat}},
+				Layout:  store,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			args := map[string]string{"action": "dev"}
+			maps.Copy(args, tc.args)
+			res, err := reg.Invoke(context.Background(), tc.uctx, "action.run", args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pane, linked, focused := "", "", false
+			st := store.Snapshot().State
+			for _, sp := range st.Spaces {
+				for _, p := range core.Panes(sp.Root) {
+					for _, tb := range p.Tabs {
+						if tb.Kind == "terminal" && tb.Params[core.TerminalParam] == "t1" {
+							pane, linked, focused = p.ID, tb.Thread, sp.Focus == p.ID && p.Active == tb.ID
+						}
+					}
+				}
+			}
+			if pane != tc.pane || linked != tc.linked || focused != tc.focused {
+				t.Errorf("tab in %q linked to %q focused %v; want %q, %q, %v (%s)", pane, linked, focused, tc.pane, tc.linked, tc.focused, res.Message)
 			}
 		})
 	}

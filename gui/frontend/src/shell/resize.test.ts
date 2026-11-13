@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { frameRects, tilingErrors } from "./geometry/rects";
 import type { GeoNode } from "./geometry/types";
-import { dragSizes, sizesArg, startDrag, withSizes } from "./resize";
+import { dragSizes, evenSizes, GUTTER_STEP, gutterKeyDelta, sizesArg, startDrag, withSizes } from "./resize";
 
 const p = (id: string, kind = "diff"): GeoNode => ({ t: "pane", id, tabs: [{ id: `t-${id}`, kind }], active: `t-${id}` });
 const tree: GeoNode = {
@@ -62,5 +62,39 @@ describe("dragging a gutter", () => {
 
   it("sends sizes with enough digits and no more", () => {
     expect(sizesArg([1 / 3, 2 / 3])).toBe("0.333333,0.666667");
+  });
+});
+
+describe("a gutter's keys and double click", () => {
+  const frame = frameRects(tree, 1600, 900);
+
+  it.each([
+    ["ArrowLeft", false, -GUTTER_STEP],
+    ["ArrowUp", false, -GUTTER_STEP],
+    ["ArrowRight", false, GUTTER_STEP],
+    ["ArrowDown", true, 4 * GUTTER_STEP],
+    ["ArrowLeft", true, -4 * GUTTER_STEP],
+    ["Home", false, -Infinity],
+    ["End", false, Infinity],
+    ["Enter", false, null],
+    ["a", false, null],
+  ])("%s (shift %s) moves it %s", (key, shift, want) => {
+    expect(gutterKeyDelta(key, shift)).toBe(want);
+  });
+
+  it("Home and End go to the bounds: each kid at its minimum", () => {
+    const d = startDrag(tree, frame, "s-r", 0);
+    if (!d) throw new Error("no drag");
+    expect(frameRects(withSizes(tree, "s-r", dragSizes(d, -Infinity)), 1600, 900).rects.a?.w).toBe(360);
+    expect(frameRects(withSizes(tree, "s-r", dragSizes(d, Infinity)), 1600, 900).rects.b?.w).toBe(260);
+  });
+
+  it("a double click evens the two kids beside it, the others keep theirs", () => {
+    const d = startDrag(tree, frame, "s-r", 0);
+    if (!d) throw new Error("no drag");
+    const even = frameRects(withSizes(tree, "s-r", evenSizes(d)), 1600, 900);
+    expect(Math.abs((even.rects.a?.w ?? 0) - (even.rects.b?.w ?? 0))).toBeLessThanOrEqual(1);
+    expect(even.rects.d?.w).toBe(frame.rects.d?.w);
+    expect(tilingErrors(even)).toEqual([]);
   });
 });

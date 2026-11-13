@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tip } from "@/components/ui/tooltip";
 import { LISTENING_PLACEHOLDER, phraseAtCaret } from "@/lib/dictation";
 import { cn } from "@/lib/utils";
+import { focusPaneOf } from "@/shell/paneBox";
 import { composerKeyAction } from "./keys";
 
 /**
@@ -137,11 +138,11 @@ export function PanelComposer({
     if (at !== null && ref.current && document.activeElement === ref.current) ref.current.setSelectionRange(at, at);
   }, [text]);
 
-  /** Closes, handing focus to the panel so its keys keep working. */
+  /** Closes, handing focus to its pane so the pane's keys keep working. */
   const close = () => {
-    const panel = ref.current?.closest<HTMLElement>('[data-region="panel"]');
+    const field = ref.current;
     onClose();
-    panel?.focus();
+    focusPaneOf(field);
   };
 
   const send = async () => {

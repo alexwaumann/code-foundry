@@ -35,6 +35,12 @@ export interface ShellSurface {
   useAttention?: (tab: TabEntry) => boolean;
   /** A hook: the tab holds unsaved work (a File tab editing), which its strip marks with a dot. */
   useUnsaved?: (tab: TabEntry) => boolean;
+  /**
+   * A chord (keys/chord.ts syntax) pressed inside the tab's pane while it is the active tab,
+   * outside text fields, that the window's keymap did not take; true when handled (the pane then
+   * prevents the default). components/shell/PaneView.tsx dispatches it.
+   */
+  onKey?: (chord: string, tab: TabEntry) => boolean;
   /** Asked before the user closes the tab (cmd+w, its ×, its pane); false keeps it open (shell/closeTab.ts). */
   beforeClose?: (tab: TabEntry) => true | Promise<boolean>;
 }

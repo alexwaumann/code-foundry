@@ -25,16 +25,35 @@ export function panelSurface(kind: string, spec: SurfaceSpec | undefined): Shell
   const title = spec?.title ?? "";
   const useUnsaved = spec?.useUnsaved;
   const beforeClose = spec?.beforeClose;
+  const onKey = spec?.onKey;
   return {
     kind,
     icon: spec?.icon ?? Puzzle,
     useTitle: (tab) => tab.name || tab.title || spec?.title || kind,
     // A linked tab's body acts for its thread as it did in that thread's side panel (a File tab's
     // page bridge, the MCP tab's state, a pull request's links): the panel key is the thread's.
-    render: (tab) => (spec ? createElement(PanelKeyContext, { value: panelKeyOfTab(tab) }, spec.render(seamTab(tab, spec.title))) : null),
+    // It sits in the side panel's box: it scrolls (overflow auto, the scroll root long lists
+    // virtualize against, components/pr/VirtualStack, and plugin nodes count as on screen in), and
+    // a press inside it takes the keyboard (the pane's focus root), so the surface's own keys
+    // (SurfaceSpec.onKey, dispatched by the pane) reach it.
+    render: (tab) =>
+      spec
+        ? createElement(
+            "div",
+            {
+              className: "flex min-h-0 flex-1 flex-col overflow-auto outline-none",
+              tabIndex: -1,
+              "data-scroll-root": "",
+              "data-focus-root": "",
+              "data-testid": "shell-surface-scroll",
+            },
+            createElement(PanelKeyContext, { value: panelKeyOfTab(tab) }, spec.render(seamTab(tab, spec.title))),
+          )
+        : null,
     linkedNoun: spec?.title ?? kind,
     // Unsaved work and the question before a close, as the side panel had them (a File tab editing).
     ...(useUnsaved ? { useUnsaved: (tab: TabEntry) => useUnsaved(panelKeyOfTab(tab), seamTab(tab, title)) } : {}),
+    ...(onKey ? { onKey: (chord: string, tab: TabEntry) => onKey(chord, seamTab(tab, title)) } : {}),
     ...(beforeClose ? { beforeClose: (tab: TabEntry) => beforeClose(panelKeyOfTab(tab), seamTab(tab, title)) } : {}),
   };
 }

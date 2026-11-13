@@ -133,7 +133,7 @@ test("the readiness box fits at 360, 420 and 560px in every state: nothing overf
 
 // Which controls the Code tab's compact box keeps: src/components/pr/PullRequestSurface.test.tsx ("the Code tab keeps ...").
 test("the Code tab's compact box: headline and footer on one line when the panel is wide enough, under it when not; the diff keeps the height", async ({ page }) => {
-  // #145 as s-3's linked tab: an unlinked one loses its Code tab on a resize (the shell gap below).
+  // #145 as s-3's linked tab.
   await openPrBesideThread(page, "s-3", 145);
   await page.getByTestId("pr-tab-code").click();
   await expect(page.getByTestId("pr-readiness")).toHaveAttribute("data-compact", "true");
@@ -209,9 +209,7 @@ test("reviewer picker (screenshots)", async ({ page }) => {
   await shot(page, "reviewer-search-tokens-requested");
 });
 
-// Shell gap: an unlinked pull request tab (one opened from the Pull Requests page) loses its inner state on
-// any layout change: stores/prPanel.ts pruneClosedTabs keys it by the panel key "", which no shell place has.
-test.fixme("an unlinked pull request tab keeps its Code tab across a resize of its pane", async ({ page }) => {
+test("an unlinked pull request tab keeps its Code tab across a resize of its pane", async ({ page }) => {
   await openPrBesidePage(page, 145);
   await page.getByTestId("pr-tab-code").click();
   await expect(page.getByTestId("pr-tab-code")).toHaveAttribute("aria-selected", "true");
@@ -220,8 +218,7 @@ test.fixme("an unlinked pull request tab keeps its Code tab across a resize of i
 });
 
 // The menu's items, Refresh (and a failed one), Open on GitHub and Copy link: src/components/pr/PullRequestSurface.test.tsx ("the ⋯ menu").
-// Shell gap: the surface's chord (SurfaceSpec.onKey, surfaces/pullrequest.ts) is dispatched by nothing in a shell pane.
-test.fixme("shift+cmd+c copies the link while the panel has focus", async ({ page }) => {
+test("shift+cmd+c copies the link while the panel has focus", async ({ page }) => {
   await openPrBesidePage(page, 145);
   await page.getByTestId("pr-title").click();
   await page.keyboard.press("Meta+Shift+c");
@@ -347,15 +344,12 @@ test("at 280px nothing overflows: header, readiness box, inner tab bar, logins, 
   await page.getByTestId("pr-timeline-order").click();
   await expect(page.getByTestId("pr-timeline")).toHaveAttribute("data-order", "oldest");
 
-  // The popups and the Review composer reached through one: the shell gap below.
+  // The popups and the Review composer reached through one: the next test.
   // The side panel's strip scrolling its active tab into view is gone: a pane's strip fits its tabs,
   // going icon-only when tight (src/components/shell/PaneTabStrip.test.tsx, "tight, tabs go icon-only").
 });
 
-// Shell gap: popups are kept inside the side panel's [data-region="panel"] (components/pr/keys.ts
-// usePanelBoundary); a shell pane has none, so at 280px they run past the pane. And at 280px a verdict
-// chosen in the Review menu leaves the keyboard in the closing menu, not in the composer it opens.
-test.fixme("at 280px the surface's popups stay inside its pane: the ⋯ menu, the reviewer picker, the Review menu and its composer", async ({ page }) => {
+test("at 280px the surface's popups stay inside its pane: the ⋯ menu, the reviewer picker, the Review menu and its composer", async ({ page }) => {
   await openPrBesidePage(page, 145, 280);
   await page.getByTestId("pr-menu-button").click();
   await expect(page.getByTestId("pr-menu")).toBeVisible();
@@ -379,9 +373,7 @@ test.fixme("at 280px the surface's popups stay inside its pane: the ⋯ menu, th
   await expect(page.getByTestId("pr-review-composer")).toHaveCount(0);
 });
 
-// Shell gap: a panel surface in a shell pane has no scroll area: the pane body is not the side panel
-// body's [data-scroll-root] with overflow auto, so a long pull request is cut at the pane's foot.
-test.fixme("long conversations and timelines are virtualized in the panel's scroll", async ({ page }) => {
+test("long conversations and timelines are virtualized in the panel's scroll", async ({ page }) => {
   for (let i = 1; i <= 45; i++) await mockPost(`gh/pr-comment?number=145&body=${encodeURIComponent(`Note ${String(i)}`)}`);
   await openPrBesidePage(page, 145);
   const list = page.getByTestId("pr-comments-list");
@@ -575,9 +567,7 @@ test("#142 merges from a menu inside the side panel; the dashboard moves it to r
   await expect(prRow(page, "authored", 142)).toHaveCount(0);
 });
 
-// Shell gap: the dropdown is kept inside the side panel's [data-region="panel"] (components/pr/keys.ts
-// usePanelBoundary); a shell pane has none, so at 280px it runs past the pane.
-test.fixme("at 280px the merge split button stays inside the box and its dropdown inside the panel", async ({ page }) => {
+test("at 280px the merge split button stays inside the box and its dropdown inside the panel", async ({ page }) => {
   await shotViewport(page);
   await openPrBesidePage(page, 142, 280);
   await expect(page.getByTestId("pr-merge-button")).toBeVisible();

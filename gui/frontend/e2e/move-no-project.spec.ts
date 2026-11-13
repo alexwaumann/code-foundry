@@ -71,10 +71,7 @@ test("with its thread open, the sidebar row's Move to project… opens the picke
   await moveFromPicker(page, id);
 });
 
-// Shell gap: the classic crumb said "Moving to code-foundry…" from the send until the daemon's
-// answer (stores/movePicker.ts, lib/move.ts movingLabel); the shell's header (ThreadHeader's
-// PlaceChip) shows nothing while a move is in flight, and nothing else in the pane or the row does.
-test.fixme("while a move is in flight the thread's header says where it is moving", async ({ page }) => {
+test("while a move is in flight the thread's header says where it is moving", async ({ page }) => {
   const id = await homeThread();
   await openApp(page);
   await row(page, `s:${id}`).click();
