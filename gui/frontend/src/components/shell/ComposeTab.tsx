@@ -38,6 +38,7 @@ export function ComposeTab({ tab }: { tab: TabEntry }) {
       likeThreadId={sel.likeThreadId}
       draftId={draft || undefined}
       onTextChange={onTextChange}
+      tabId={tab.id}
     />
   );
 }

@@ -126,6 +126,7 @@
  *   thread.new takes workspace and/or projects (the set; new-worktree makes worktrees on a new
  *   branch), or no-project (a thread in the home directory with no project or workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
+ *   POST /__mock/attachments/hold?on=true|false   (StageAttachment waits until on=false: a send mid-upload)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
  *   POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
@@ -301,6 +302,15 @@ function rpcError(err: unknown): ConnectError {
     return new ConnectError(err.message, code);
   }
   return ConnectError.from(err);
+}
+
+/** While set, StageAttachment calls wait here (POST /__mock/attachments/hold?on=true); on=false lets them go. */
+let stageHold: (() => void)[] | null = null;
+
+function releaseStageHold(): void {
+  const held = stageHold ?? [];
+  stageHold = null;
+  for (const go of held) go();
 }
 
 function guard<T>(fn: () => T): T {
@@ -555,8 +565,12 @@ function routes(router: ConnectRouter): void {
         throw rpcError(err);
       }
     },
-    stageAttachment: (req) =>
-      guard(() => ({ path: req.path ? world.stageAttachmentPath(req.path, req.pages) : world.stageAttachment(req.name, req.mimeType, req.data, req.pages) })),
+    stageAttachment: async (req) => {
+      // Held (POST /__mock/attachments/hold): the upload waits until it is let go.
+      const held = stageHold;
+      if (held) await new Promise<void>((r) => held.push(r));
+      return guard(() => ({ path: req.path ? world.stageAttachmentPath(req.path, req.pages) : world.stageAttachment(req.name, req.mimeType, req.data, req.pages) }));
+    },
     // The scripted thread's image (mock/thread.ts); a staged PDF reads back as its bytes, a
     // staged image as that same PNG.
     readAttachment: (req) => {
@@ -1359,6 +1373,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/attachments":
       json(res, 200, [...world.attachments].map(([path, a]) => ({ path, ...a })));
       break;
+    case "POST /__mock/attachments/hold":
+      if (q.get("on") === "false") releaseStageHold();
+      else stageHold ??= [];
+      json(res, 200, { held: stageHold !== null });
+      break;
     case "GET /__mock/update":
       json(res, 200, updateSummary());
       break;
@@ -1470,6 +1489,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, world.writes);
       break;
     case "POST /__mock/reset":
+      releaseStageHold();
       world.reset();
       resetClones();
       resetCompletion();

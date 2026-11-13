@@ -56,11 +56,12 @@ import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, stagedPdfPages, tagsByProject } from "@/lib/prompt";
 import type { Citation } from "@/lib/citation";
 import { toast } from "sonner";
+import { runLayoutCommand } from "@/shell/commands";
 import { readAttachmentFile } from "./attachments";
-import { composerTabSentFrom } from "@/shell/composerTab";
 import { invokeConfirmed, refreshCommands } from "./commands";
 import { requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
+import { useLayoutStore } from "./layout";
 import { useProjectsStore } from "./projects";
 import { noteSentFrom, setupDraftJson } from "./setupActions";
 import { THREAD_COMMANDS } from "./threadActions";
@@ -988,7 +989,7 @@ export function noGitCheckout(r: Pick<ProjectView, "git" | "path" | "worktrees">
  * the daemon's after-create hints that repeat one of them are not toasted again
  * (lib/collisionHints unshownHints). A background setup's reply has none.
  */
-export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }, shownHints: readonly string[] = []): Promise<boolean> {
+export async function sendDraft(target: ComposeTarget, defaults: { model: string; effort: string }, shownHints: readonly string[] = [], opts: { composeTab?: string } = {}): Promise<boolean> {
   const key = draftKey(target);
   const d = getDraft(key);
   if (d.phase !== "idle" || isDraftEmpty(d)) return false;
@@ -1040,8 +1041,10 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (draftJson) args["draft-json"] = draftJson;
     // "New thread on this branch" is its own command (the daemon copies the thread's set, branch, workspace and mode).
     const command = place.kind === "like" ? THREAD_COMMANDS.newLike : THREAD_COMMANDS.create;
-    // In the window shell the thread's tab takes the composer tab's place (thread.new --compose; new-like has no such arg).
-    const composeTab = place.kind === "like" ? "" : composerTabSentFrom();
+    // In the window shell the thread's tab takes the place of the compose tab that sent, as the
+    // composer names it (--compose), never what has the focus now that the attachments are staged.
+    // A tab closed meanwhile is not named: the thread opens as any new one does.
+    const composeTab = composeTabStill(opts.composeTab);
     if (composeTab) args.compose = composeTab;
     const res = await invokeConfirmed(command, args, getUiContext(composeSelection(target, place)));
     if (!res) {
@@ -1049,6 +1052,8 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
       return false;
     }
     clearDraft(key);
+    // A sent draft ends: --compose ended it with its tab; one whose tab went did not.
+    if (target.draft) void endSentDraft(target.draft, createdThreadId(res.resultJson) ?? "");
     // The daemon's collision hints (CreateThreadResponse.hints): never a refusal, said once
     // the thread exists; not again when the composer already showed the line.
     for (const w of unshownHints(res.warnings ?? [], shownHints)) toast.warning(w);
@@ -1056,7 +1061,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (id) noteSentFrom(id, target);
     const ui = useUiStore.getState();
     // Replace the composer with the new thread unless the user has moved on.
-    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true, sent: !composeTab });
+    if (id && ui.selection.kind === "compose" && draftKey(composeTarget(ui.selection)) === key) ui.select({ kind: "thread", id }, { focusPrompt: true });
     return true;
   } catch (err) {
     updateDraft(key, { phase: "idle", error: sendErrorMessage(err) });
@@ -1064,4 +1069,37 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
   } finally {
     void refreshCommands();
   }
+}
+
+/** The compose tab a send names, while the layout still holds it as a composer; "" otherwise. */
+function composeTabStill(tabId: string | undefined): string {
+  return tabId && useLayoutStore.getState().tabs[tabId]?.kind === "compose" ? tabId : "";
+}
+
+/** Whether some space lists a draft. */
+function draftListed(id: string): boolean {
+  return Object.values(useLayoutStore.getState().spaces).some((sp) => sp.drafts.some((d) => d.id === id));
+}
+
+/**
+ * Ends a draft that was sent, once the layout has had the send's commit (the thread has a record,
+ * or the draft is no longer listed), or after 2s: a draft still listed then (its tab was closed
+ * before or during the send, so --compose did not end it) is discarded.
+ */
+async function endSentDraft(id: string, threadId: string): Promise<void> {
+  const done = (l: { threads: Readonly<Record<string, unknown>> }) => !draftListed(id) || (threadId !== "" && threadId in l.threads);
+  if (!done(useLayoutStore.getState())) {
+    await new Promise<void>((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        stop();
+        resolve();
+      };
+      const timer = setTimeout(finish, 2000);
+      const stop = useLayoutStore.subscribe((l) => {
+        if (done(l)) finish();
+      });
+    });
+  }
+  if (draftListed(id)) await runLayoutCommand("composer.draft.discard", { draft: id });
 }

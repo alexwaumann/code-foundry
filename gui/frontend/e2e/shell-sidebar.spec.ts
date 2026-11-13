@@ -207,6 +207,39 @@ test("sending from a draft turns its tab into the thread's and its row goes", as
   await expect(page.locator('[data-pane-id="p-1"] [data-testid="shell-tab"][data-kind="thread"][data-active="true"]')).toHaveCount(1);
 });
 
+test("a draft sent with an attachment becomes the thread, even when another draft took the focus while the file uploaded", async ({ page }) => {
+  const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+  await seed(
+    { t: "split", id: "s-r", dir: "row", sizes: [0.5, 0.5], kids: [pane("p-a", [{ id: "t-a", kind: "compose", params: { draft: "d-a" } }]), pane("p-b", [{ id: "t-b", kind: "compose", params: { draft: "d-b" } }])] },
+    "p-a",
+    [
+      { id: "d-a", label: "Ship it", params: { project: "repo-cf" } },
+      { id: "d-b", label: "Keep me", params: { project: "repo-cf" } },
+    ],
+  );
+  await openShell(page);
+  const paneA = page.locator('[data-pane-id="p-a"]');
+  const paneB = page.locator('[data-pane-id="p-b"]');
+  await paneB.getByTestId("composer-input").click();
+  await page.keyboard.type("Keep me");
+  await paneA.getByTestId("composer-input").click();
+  await page.keyboard.type("Ship it");
+  await paneA.getByTestId("composer-file-input").setInputFiles([{ name: "shot.png", mimeType: "image/png", buffer: PNG }]);
+  await mockPost("attachments/hold?on=true");
+  await paneA.getByTestId("composer-input").click();
+  await page.keyboard.press("Enter");
+  // While the file uploads, the user moves to the other draft and types there.
+  await paneB.getByTestId("composer-input").click();
+  await expect(paneB).toHaveAttribute("data-focused", "true");
+  await page.keyboard.type(" too");
+  await mockPost("attachments/hold?on=false");
+  await expect.poll(async () => (await invocations()).find((i) => i.name === "thread.new")?.args.compose).toBe("t-a");
+  await expect(paneA.locator('[data-testid="shell-tab"][data-kind="thread"]')).toHaveCount(1);
+  await expect(paneB.locator('[data-testid="shell-tab"][data-kind="compose"]')).toHaveCount(1);
+  await expect(paneB.getByTestId("composer-prompt")).toHaveAttribute("data-value", "Keep me too");
+  await expect(page.locator('[data-row-kind="draft"]')).toHaveCount(1);
+});
+
 /** SHOTS=<dir>: the whole sidebar, a hovered row, rows without a project, drafts, the scope button both ways; dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`shell sidebar screenshots (${scheme})`, async ({ page }, info) => {

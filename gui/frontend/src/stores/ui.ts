@@ -216,12 +216,11 @@ export function sameSelection(a: Selection, b: Selection): boolean {
 }
 
 /**
- * How a selection is asked for. `sent`: the composer that showed sent its thread, which takes
- * its place (the window shell turns the composer's tab into the thread's).
+ * How a selection is asked for. A thread sent from a compose tab takes that tab's place through
+ * the send itself (thread.new --compose, stores/compose.ts sendDraft), never through a selection.
  */
 export interface SelectOptions {
   focusPrompt?: boolean;
-  sent?: boolean;
 }
 
 /**
