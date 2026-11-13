@@ -81,7 +81,7 @@ export function tabPlace(target: TabTarget = "current"): TabPlace {
   return shellPlace(useLayoutStore.getState(), target);
 }
 
-/** A target's tab with this id, if it holds one. */
+/** A target's tab with this id (a layout id, or a seam id: the open tab of the identity it names), if it holds one. */
 export function findTab(target: TabTarget, id: string): Tab | undefined {
   const t = findShellTab(useLayoutStore.getState(), target, id);
   return t ? seamTab(t) : undefined;
@@ -123,12 +123,14 @@ export const tabChanges = {
 };
 
 /**
- * Opens a tab, or activates the one with its id where it is (its title and params refreshed).
- * A new tab goes to the target's `group` (its pane), else where the daemon places it. `behind`:
- * an open one only takes the new params, so nothing moves under someone typing. It does not take
- * focus. False before the layout has loaded.
+ * Opens a tab, or activates the open one of its identity where it is (its title and params
+ * refreshed): the same kind, link and key params (shell/identity.ts), whatever else its params
+ * hold. A new tab goes to the target's `group` (its pane), else where the daemon places it.
+ * `behind` names a tab the user is typing in: an open tab only takes the new params, and a new
+ * one waits behind that tab if it lands in its pane, so nothing moves under someone typing. It
+ * does not take focus. False before the layout has loaded.
  */
-export function openTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: boolean } = {}): boolean {
+export function openTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: string } = {}): boolean {
   return shellOpenTab(target, tab, opts);
 }
 

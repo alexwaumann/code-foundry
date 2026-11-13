@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { panelItemCommands, type ItemThread } from "./panelItemVerbs";
+import { keepUsersDiff, panelItemCommands, type ItemThread } from "./panelItemVerbs";
+import type { State } from "./layout";
 
 const thread: ItemThread = {
   projectId: "r1",
@@ -125,5 +126,28 @@ describe("view.open.* in the mock: a linked tab in the layout, and the classic S
     const cmds = panelItemCommands(() => thread, () => 1, (op) => placed.push(op));
     expect(() => cmds.find((c) => c.cmd.name === "view.open.page")?.run(ctx, { path: "/w/a/p.txt" })).toThrow();
     expect(placed).toEqual([]);
+  });
+});
+
+describe("keepUsersDiff, like the daemon's tabs.open", () => {
+  const mine = { project: "r1", worktree: "/w/a", own: "1", base: "ref:v1", filter: "go", fold: "1", path: "b.go" };
+  const st: State = {
+    v: 1,
+    spaces: [{ id: "sp-1", name: "Main", root: { t: "pane", id: "p-1", tabs: [{ id: "t-1", kind: "thread", thread: "t1" }, { id: "t-d", kind: "diff", thread: "t1", params: mine }], active: "t-1" }, mru: [] }],
+    current_space: "sp-1",
+    default_space: "sp-1",
+  };
+  const op = (params: Record<string, string>) => ({ op: "open_surface", tab: { id: "", kind: "diff", thread: "t1", params } });
+
+  it("a pick on the user's open tab keeps what the user has in it", () => {
+    expect(keepUsersDiff(st, op({ project: "r1", worktree: "/w/a", own: "1", path: "x.go" }))).toMatchObject({ tab: { params: mine } });
+  });
+
+  it.each([
+    ["a framed call (its own tab)", { project: "r1", worktree: "/w/a", thread: "t1", note: "Why" }],
+    ["another checkout", { project: "r2", worktree: "/w/b", path: "api.go" }],
+  ])("%s goes as it is", (_name, params) => {
+    const o = op(params);
+    expect(keepUsersDiff(st, o)).toBe(o);
   });
 });

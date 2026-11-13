@@ -53,6 +53,10 @@ type Kind struct {
 	key func(t *Tab) (string, error)
 }
 
+// DiffAskerParam is the diff param naming the thread that framed the tab (view.open.diff),
+// which makes it a tab of that thread's own rather than the checkout's.
+const DiffAskerParam = "thread"
+
 // kinds is the identity table (docs/notes/shell-plan.md section 2.7). A new surface kind adds
 // an entry here, one in the GUI's registry and its size in gui/frontend/src/shell/drag/outerFrac.ts;
 // testdata/kinds.json pins that they agree.
@@ -61,8 +65,12 @@ var kinds = map[string]*Kind{
 		Link: LinkSelf, Scope: ScopeGlobal, DefaultFrac: 0.5,
 		key: func(t *Tab) (string, error) { return "thread:" + t.Thread, nil },
 	},
+	// A diff is one per thread and checkout: the user's. What a thread frames for the user (a
+	// side, a narrowed list, a note, a title: view.open.diff's "thread" param, the thread that
+	// asked) is a tab of that thread's own, so a thread's call never takes over the user's tab
+	// (its filter, folds and sides); the same title updates the same tab.
 	"diff": {
-		Link: LinkOptional, Scope: ScopeSpace, KeyParams: []string{"project", "worktree", "title"},
+		Link: LinkOptional, Scope: ScopeSpace, KeyParams: []string{"project", "worktree", "thread", "title"},
 		DefaultFrac: 0.45, FloorPx: 480,
 		key: func(t *Tab) (string, error) {
 			project, worktree, err := need2(t, "project", "worktree")
@@ -70,6 +78,9 @@ var kinds = map[string]*Kind{
 				return "", err
 			}
 			k := "diff:" + t.Thread + ":" + project + ":" + worktree
+			if asker := t.Params[DiffAskerParam]; asker != "" {
+				k += ":by:" + asker
+			}
 			if title := t.Params["title"]; title != "" {
 				k += ":" + title
 			}

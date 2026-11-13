@@ -11,16 +11,20 @@
  *
  * Tab ids are the layout's (`t-…`): a surface's body gets its layout tab (shell/surfaces/panel.ts),
  * and an id lookup searches every space, so the target of an id-based call does not matter. A seam
- * id a surface made itself (makeTab: kind and params) also finds the open tab it stands for.
- * Opening goes through the daemon (open_surface), which deduplicates by identity and places the
- * tab; nothing here changes the slice before the daemon answers.
+ * id a surface made itself (makeTab: kind and params) also finds the open tab it stands for, by the
+ * daemon's identity (shell/identity.ts): the same kind, link and key params, with the daemon's
+ * normalisation (a pull request's slug in any case); the other params never tell tabs apart.
+ * Opening goes through the daemon (open_surface), which deduplicates by the same identity and places
+ * the tab; nothing here changes the slice before the daemon answers. Every params update of a tab
+ * goes through one ordered queue (queueParams).
  * See docs/notes/shell-11-pane-grid.md.
  */
 import { applyLayoutOp, type LayoutOpView } from "@/api/layout";
 import { focusTab as focusTabOp, useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
-import { selectionTarget, tabId, type Tab } from "./tabs";
+import { parseTabId, selectionTarget, type Tab } from "./tabs";
+import { identityKey } from "./identity";
 import { useUiStore } from "@/stores/ui";
-import { layoutKindOf, panelKindOf, seamTab } from "./kinds";
+import { layoutKindOf, seamTab } from "./kinds";
 import type { TabPlace, TabPlaceGroup, TabPlaces, TabTarget } from "./host";
 
 /** Kinds that are pages, the composer or a terminal, not a surface: never in a place. */
@@ -122,25 +126,29 @@ export function shellPlaces(s: LayoutState): TabPlaces {
   return out;
 }
 
-/** A layout tab by its id anywhere, or by the seam id (kind and params) a surface made for it. */
+/** A layout tab by its id anywhere, or the open tab of the identity a seam id (kind and params) names among the target's. */
 export function findShellTab(s: LayoutState, target: TabTarget, id: string): TabEntry | undefined {
   const byId = s.tabs[id];
   if (byId) return byId;
-  for (const g of groupsOf(s, target)) {
-    const hit = g.tabs.find((t) => panelIdOf(t) === id);
-    if (hit) return hit;
-  }
-  return undefined;
+  const named = parseTabId(id);
+  return named ? findByIdentity(s, target, named.kind, named.params) : undefined;
 }
 
 /**
- * The id the side panel gave a tab of this kind and params. A File tab's is its path alone
- * (surfaces/fileTarget.ts fileTab), whatever else its params hold (a line, an edit, a request):
- * its edit session and a thread's request address it by that id.
+ * The target's open tab that a tab of this kind (the panel's name) and params would be: the same
+ * kind and the same identity key for its link (shell/identity.ts, pinned to internal/layout's), so
+ * the seam finds what the daemon would deduplicate.
  */
-function panelIdOf(t: TabEntry): string {
-  const kind = panelKindOf(t.kind);
-  return kind === "files" ? tabId(kind, { path: t.params.path ?? "" }) : tabId(kind, t.params);
+function findByIdentity(s: LayoutState, target: TabTarget, panelKind: string, params: Tab["params"]): TabEntry | undefined {
+  const kind = layoutKindOf(panelKind);
+  for (const g of groupsOf(s, target)) {
+    for (const t of g.tabs) {
+      if (t.kind !== kind) continue;
+      const want = identityKey(kind, t.thread, params);
+      if (want !== null && want === identityKey(t.kind, t.thread, t.params)) return t;
+    }
+  }
+  return undefined;
 }
 
 function apply(op: LayoutOpView): void {
@@ -153,23 +161,27 @@ function apply(op: LayoutOpView): void {
  * daemon's rules), into a target pane or group's pane when one is named, else the focused pane.
  * An open tab of the same identity is used instead. It does not take the focus.
  */
-export function shellOpenTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: boolean }): boolean {
+export function shellOpenTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: string }): boolean {
   const s = useLayoutStore.getState();
   if (!s.loaded) return false;
   const t = resolveTarget(target);
-  const open = findShellTab(s, t, tab.id);
+  const open = s.tabs[tab.id] ?? findByIdentity(s, t, tab.kind, tab.params);
   if (open) {
-    apply({ op: "set_tab_params", tab: open.id, params: { ...tab.params }, ...(tab.title ? { title: tab.title } : {}) });
-    if (!opts.behind) void focusTabOp(open.id);
+    // Behind any update of this tab still on its way (a save's), so the newest request lands last.
+    const base = pendingParams.get(open.id)?.params ?? open.params;
+    if (JSON.stringify(tab.params) !== JSON.stringify(base) || (tab.title && tab.title !== open.title)) queueParams(open.id, { ...tab.params }, tab.title || undefined);
+    if (opts.behind === undefined) void focusTabOp(open.id);
     return true;
   }
   const pane = t.startsWith("pane:") ? t.slice(5) : opts.group !== undefined ? groupsOf(s, t)[opts.group]?.paneId : undefined;
   const thread = threadOfShellTarget(t);
+  const behind = opts.behind === undefined ? undefined : findShellTab(s, t, opts.behind)?.id;
   apply({
     op: "open_surface",
     tab: { kind: layoutKindOf(tab.kind), ...(thread ? { thread } : {}), params: { ...tab.params }, ...(tab.title ? { title: tab.title } : {}) },
     ...(pane ? { pane } : {}),
     focus: false,
+    ...(behind ? { behind } : {}),
   });
   return true;
 }
@@ -227,5 +239,5 @@ export function shellReplaceTab(target: TabTarget, id: string, tab: Tab): void {
     apply({ op: "close_tab", tab: old.id });
     return;
   }
-  apply({ op: "set_tab_params", tab: old.id, params: { ...tab.params }, ...(tab.title ? { title: tab.title } : {}) });
+  queueParams(old.id, { ...tab.params }, tab.title || undefined);
 }

@@ -328,8 +328,7 @@ describe("Save and tell", () => {
     expect((await tab()).params.askSaved).toBeUndefined();
   });
 
-  // Shell gap: an open tab's reopen (hostShell.ts shellOpenTab) sends its params outside setTabParams's queue, so the save's end, computed from the params before that op landed, overwrites the newer request.
-  it.skip("a newer request whose tab update has not landed when the write answers stands", async () => {
+  it("a newer request whose tab update has not landed when the write answers stands", async () => {
     await asked(SECRET);
     let done: (v: FileWriteView) => void = () => undefined;
     api.write.mockReturnValue(new Promise<FileWriteView>((r) => {

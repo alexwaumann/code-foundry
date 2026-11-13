@@ -391,6 +391,9 @@ message OpenSurfaceOp {
   // The space it opens in; empty: the pane's, else a linked tab's thread's, else the
   // current space.
   string space_id = 4;
+  // A tab the user is working in (typing in its editor): a tab landing in the pane that shows
+  // it waits behind it there; anywhere else it shows as usual. focus overrides it.
+  string behind_tab_id = 5;
 }
 
 // MoveThreadOp moves a thread to another space with the linked tabs in its space.

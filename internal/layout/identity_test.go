@@ -7,26 +7,44 @@ import (
 	"testing"
 )
 
-// TestKindsJSON pins testdata/kinds.json to the identity table: the GUI's registry is
-// tested against that file, so the two cannot drift. Regenerate it with -update.
+// TestKindsJSON pins testdata/kinds.json to the identity table: the GUI's registry and its
+// identity port (gui/frontend/src/shell/identity.ts) are tested against that file, so they
+// cannot drift. Regenerate it with -update.
 func TestKindsJSON(t *testing.T) {
-	b, err := json.Marshal(Kinds())
+	pinJSON(t, "testdata/kinds.json", Kinds())
+}
+
+// identityCase is one row of testdata/identity.json: a tab and the key Identify gives it, or
+// that it refuses it. The GUI's port of the key functions runs the same rows.
+type identityCase struct {
+	Name    string            `json:"name"`
+	Kind    string            `json:"kind"`
+	Thread  string            `json:"thread,omitempty"`
+	Params  map[string]string `json:"params,omitempty"`
+	Key     string            `json:"key,omitempty"`
+	Refused bool              `json:"refused,omitempty"`
+}
+
+// pinJSON compares v's JSON with the file, or rewrites the file with -update.
+func pinJSON(t *testing.T, file string, v any) {
+	t.Helper()
+	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := append(pretty(b), '\n')
 	if *update {
-		if err := os.WriteFile("testdata/kinds.json", got, 0o644); err != nil {
+		if err := os.WriteFile(file, got, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		return
 	}
-	want, err := os.ReadFile("testdata/kinds.json")
+	want, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(got) != string(want) {
-		t.Errorf("testdata/kinds.json is stale: run go test ./internal/layout -run TestKindsJSON -update\n got %s", got)
+		t.Errorf("%s is stale: run go test ./internal/layout -run 'TestKindsJSON|TestIdentify' -update\n got %s", file, got)
 	}
 }
 
@@ -53,7 +71,9 @@ func TestIdentify(t *testing.T) {
 		{"diff of a thread", tb("diff", "th-1", "project", "pj", "worktree", "w"), "diff:th-1:pj:w", nil},
 		{"diff unlinked, from a Projects row", tb("diff", "", "project", "pj", "worktree", "w"), "diff::pj:w", nil},
 		{"diff with a title of its own", tb("diff", "th-1", "project", "pj", "worktree", "w", "title", "Review"), "diff:th-1:pj:w:Review", nil},
-		{"diff ignores what it shows", tb("diff", "th-1", "project", "pj", "worktree", "w", "path", "a.go", "base", "ref:main"), "diff:th-1:pj:w", nil},
+		{"diff ignores what it shows", tb("diff", "th-1", "project", "pj", "worktree", "w", "path", "a.go", "base", "ref:main", "filter", "go", "fold", "1"), "diff:th-1:pj:w", nil},
+		{"diff a thread framed is its own", tb("diff", "th-1", "project", "pj", "worktree", "w", "thread", "th-2", "note", "Why"), "diff:th-1:pj:w:by:th-2", nil},
+		{"diff a thread framed and titled", tb("diff", "th-1", "project", "pj", "worktree", "w", "thread", "th-1", "title", "Review"), "diff:th-1:pj:w:by:th-1:Review", nil},
 		{"diff needs its checkout", tb("diff", "th-1", "project", "pj"), "", ErrInvalidArgument},
 		{"file by path alone", tb("file", "th-1", "path", "/r/a.go", "line", "3"), "file:/r/a.go", nil},
 		{"file unlinked has the same key", tb("file", "", "path", "/r/a.go"), "file:/r/a.go", nil},
@@ -81,6 +101,11 @@ func TestIdentify(t *testing.T) {
 		{"plugin kind with empty surface", tb("plugin.notes.", ""), "", ErrInvalidArgument},
 		{"unknown kind", tb("files", ""), "", ErrInvalidArgument},
 	}
+	cases := make([]identityCase, 0, len(tests))
+	for _, tt := range tests {
+		cases = append(cases, identityCase{Name: tt.name, Kind: tt.tab.Kind, Thread: tt.tab.Thread, Params: tt.tab.Params, Key: tt.key, Refused: tt.err != nil})
+	}
+	pinJSON(t, "testdata/identity.json", cases)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, key, err := Identify(tt.tab)

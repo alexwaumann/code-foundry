@@ -27,6 +27,26 @@ export function tabId(kind: SurfaceKind, params: Readonly<Record<string, string>
   return query ? `${kind}?${query}` : kind;
 }
 
+/** A seam id's kind and params (tabId's inverse); null for an id tabId does not make (a layout id parses as a kind with no params). */
+export function parseTabId(id: string): { kind: SurfaceKind; params: Record<string, string> } | null {
+  const q = id.indexOf("?");
+  const kind = q < 0 ? id : id.slice(0, q);
+  if (kind === "") return null;
+  const params: Record<string, string> = {};
+  if (q >= 0) {
+    for (const pair of id.slice(q + 1).split("&")) {
+      const eq = pair.indexOf("=");
+      if (eq < 0) return null;
+      try {
+        params[decodeURIComponent(pair.slice(0, eq))] = decodeURIComponent(pair.slice(eq + 1));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return { kind, params };
+}
+
 /**
  * A pull request tab's id: lower case, as GitHub slugs are case-insensitive, so `Octo/Hello`
  * and `octo/hello` are one tab. The tab's slug param keeps the spelling it was opened with.

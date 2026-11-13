@@ -49,6 +49,16 @@ func (o tabs) open(ctx context.Context, tb *core.Tab, pane string, focus bool) (
 	if o.store == nil {
 		return nil, nil
 	}
+	// The checkout's own diff is the user's: a call that frames nothing (no asker, so it only
+	// picks a file) shows an open one as the user has it, its sides, filter, folds and file; the
+	// window picks the file there when the user's sides list it (stores/threadPanelIntent.ts).
+	if tb.Kind == tabDiff && tb.Params[core.DiffAskerParam] == "" {
+		if snap := o.store.Snapshot(); snap != nil {
+			if open := openLinked(snap.State, tb); open != nil {
+				tb = &core.Tab{Kind: tb.Kind, Thread: tb.Thread, Params: maps.Clone(open.Params)}
+			}
+		}
+	}
 	c, err := layout{store: o.store}.apply(ctx, &core.OpenSurface{Tab: tb, Pane: pane, Focus: focus}, !focus)
 	if err != nil {
 		return nil, fmt.Errorf("could not open its tab: %w", err)
@@ -316,20 +326,28 @@ func (d ViewDeps) ownDiff(ctx context.Context, thread string) (map[string]string
 
 // openDiff is the open tab with want's identity in its thread's space, "" when there is none.
 func openDiff(st *core.State, want *core.Tab) string {
+	if tb := openLinked(st, want); tb != nil {
+		return tb.ID
+	}
+	return ""
+}
+
+// openLinked is the open tab with want's identity in its thread's space, nil when there is none.
+func openLinked(st *core.State, want *core.Tab) *core.Tab {
 	_, key, err := core.Identify(want)
-	if err != nil {
-		return ""
+	if err != nil || st == nil {
+		return nil
 	}
 	sp := st.Space(st.SpaceOf(want.Thread))
 	if sp == nil {
-		return ""
+		return nil
 	}
 	for _, p := range core.Panes(sp.Root) {
 		for _, tb := range p.Tabs {
 			if tb.Key == key {
-				return tb.ID
+				return tb
 			}
 		}
 	}
-	return ""
+	return nil
 }

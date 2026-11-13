@@ -20,7 +20,7 @@ func init() {
 	})
 	registerLayoutOp("open_surface", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetOpenSurface()
-		return &core.OpenSurface{Space: o.GetSpaceId(), Pane: o.GetPaneId(), Tab: layoutTabFromProto(o.GetTab()), Focus: o.GetFocus()}, nil
+		return &core.OpenSurface{Space: o.GetSpaceId(), Pane: o.GetPaneId(), Tab: layoutTabFromProto(o.GetTab()), Focus: o.GetFocus(), Behind: o.GetBehindTabId()}, nil
 	})
 	registerLayoutOp("move_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetMoveThread()

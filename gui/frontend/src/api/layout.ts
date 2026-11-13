@@ -293,7 +293,8 @@ export type LayoutOpView =
   | { op: "switch_space"; space: string }
   | { op: "open_thread"; thread: string; pane?: string; focus?: boolean; compose?: string }
   | { op: "close_thread"; thread: string }
-  | { op: "open_surface"; tab: NewTabView; pane?: string; focus?: boolean; space?: string }
+  /** behind: a tab the user is typing in; landing in its pane, the tab waits behind it (OpenSurfaceOp.behind_tab_id). */
+  | { op: "open_surface"; tab: NewTabView; pane?: string; focus?: boolean; space?: string; behind?: string }
   | { op: "move_thread"; thread: string; space: string }
   | { op: "archive_thread"; thread: string }
   | { op: "snooze_thread"; thread: string; ran?: Record<string, string> }
@@ -361,7 +362,7 @@ export function toLayoutOpMessage(o: LayoutOpView): LayoutOp {
       case "close_thread":
         return { case: "closeThread", value: { threadId: o.thread } };
       case "open_surface":
-        return { case: "openSurface", value: { tab: tabMsg(o.tab), paneId: o.pane ?? "", focus: o.focus ?? false, spaceId: o.space ?? "" } };
+        return { case: "openSurface", value: { tab: tabMsg(o.tab), paneId: o.pane ?? "", focus: o.focus ?? false, spaceId: o.space ?? "", behindTabId: o.behind ?? "" } };
       case "move_thread":
         return { case: "moveThread", value: { threadId: o.thread, spaceId: o.space } };
       case "archive_thread":

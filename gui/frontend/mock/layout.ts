@@ -15,6 +15,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { LayoutDir, LayoutEdge, type LayoutEventSchema, type LayoutOp, type LayoutSchema, type LayoutSpaceSchema, type LayoutTab, type LayoutTabSchema, type LayoutNodeSchema, type ThreadLayoutSchema } from "../src/gen/codefoundry/v1/layout_pb";
 import { outerFrac } from "../src/shell/drag/outerFrac";
+import { identify as identifyTab, identityKindOf, isRefusal, type IdentityKind } from "../src/shell/identity";
 
 // ---- The model (internal/layout/model.go's JSON) ----
 
@@ -120,78 +121,14 @@ function fail(code: ErrorCode, message: string): never {
 
 const MAX_MRU = 64;
 
-// ---- Identity (internal/layout/identity.go) ----
+// ---- Identity (internal/layout/identity.go): the window's one port, src/shell/identity.ts ----
 
-interface Kind {
-  link: "self" | "required" | "optional" | "none";
-  scope: "space" | "global";
-  renameable?: boolean;
-  key: (t: Tab) => string;
-}
-
-function need(t: Tab, p: string): string {
-  const v = t.params?.[p] ?? "";
-  if (v === "") fail("invalid_argument", `${t.kind} tab without param "${p}"`);
-  return v;
-}
-
-const kinds: Record<string, Kind> = {
-  thread: { link: "self", scope: "global", key: (t) => `thread:${t.thread ?? ""}` },
-  diff: {
-    link: "optional",
-    scope: "space",
-    key: (t) => {
-      const k = `diff:${t.thread ?? ""}:${need(t, "project")}:${need(t, "worktree")}`;
-      const title = t.params?.title ?? "";
-      return title ? `${k}:${title}` : k;
-    },
-  },
-  file: { link: "optional", scope: "space", key: (t) => `file:${need(t, "path")}` },
-  pullrequest: {
-    link: "optional",
-    scope: "space",
-    key: (t) => {
-      const slug = need(t, "slug");
-      const number = need(t, "number");
-      if (!/^[1-9]\d{0,17}$/.test(number)) fail("invalid_argument", `param number "${number}" is not a pull request number`);
-      return `pr:${slug.toLowerCase()}#${number}`;
-    },
-  },
-  terminal: { link: "optional", scope: "global", renameable: true, key: (t) => `term:${need(t, "terminal")}` },
-  prs: { link: "none", scope: "space", key: () => "prs" },
-  projects: { link: "none", scope: "space", key: () => "projects" },
-  "ember.board": { link: "required", scope: "space", key: () => "ember.board" },
-  // One empty composer per space ("compose"); a draft is keyed by its id, so a space holds several.
-  compose: { link: "none", scope: "space", key: (t) => (t.params?.draft ? `compose:draft:${t.params.draft}` : "compose") },
-  mcp: { link: "required", scope: "space", key: (t) => `mcp:${t.thread ?? ""}` },
-  gallery: { link: "required", scope: "space", key: (t) => `gallery:${t.thread ?? ""}:${need(t, "title")}` },
-};
-
-const pluginKind: Kind = {
-  link: "optional",
-  scope: "space",
-  key: (t) => {
-    const rest = t.kind.slice("plugin.".length);
-    const i = rest.indexOf(".");
-    return `plugin:${rest.slice(0, i)}/${rest.slice(i + 1)}/${t.params?.scope ?? ""}`;
-  },
-};
-
-function kindOf(name: string): Kind | undefined {
-  if (Object.hasOwn(kinds, name)) return kinds[name];
-  if (!name.startsWith("plugin.")) return undefined;
-  const rest = name.slice("plugin.".length);
-  const i = rest.indexOf(".");
-  return i > 0 && i < rest.length - 1 ? pluginKind : undefined;
-}
+type Kind = IdentityKind;
 
 /** A tab's kind and identity key; refuses a tab its kind does not allow. */
 export function identify(t: Tab): { kind: Kind; key: string } {
-  const k = kindOf(t.kind) ?? fail("invalid_argument", `unknown tab kind "${t.kind}"`);
-  const thread = t.thread ?? "";
-  if ((k.link === "self" || k.link === "required") && thread === "") fail("invalid_argument", `${t.kind} tab without a thread`);
-  if (k.link === "none" && thread !== "") fail("invalid_argument", `${t.kind} tab cannot belong to a thread`);
-  return { kind: k, key: k.key(t) };
+  const r = identifyTab({ kind: t.kind, thread: t.thread ?? "", params: t.params ?? {} });
+  return isRefusal(r) ? fail("invalid_argument", r.refused) : r;
 }
 
 function isLinked(t: Tab): boolean {
@@ -477,8 +414,12 @@ class Tx {
   }
 
   findTab(id: string): { sp: Space; pane: Node } {
+    return this.findTabOrNull(id) ?? fail("not_found", `tab "${id}"`);
+  }
+
+  findTabOrNull(id: string): { sp: Space; pane: Node } | null {
     for (const sp of this.st.spaces) for (const p of panes(sp.root)) if (tabIndex(p, id) >= 0) return { sp, pane: p };
-    return fail("not_found", `tab "${id}"`);
+    return null;
   }
 
   finish(): void {
@@ -903,7 +844,7 @@ const ops = {
 
   rename_tab(t: Tx, o: Op): Result {
     const { sp, pane, tab } = t.tab(str(o, "tab"));
-    if (!kindOf(tab.kind)?.renameable) fail("failed_precondition", `a ${tab.kind} tab takes no name`);
+    if (!identityKindOf(tab.kind)?.renameable) fail("failed_precondition", `a ${tab.kind} tab takes no name`);
     tab.name = str(o, "name").trim();
     return { space: sp.id, pane: pane.id, tab: tab.id };
   },
@@ -1126,7 +1067,13 @@ const ops = {
       chosen = p.pane;
     } else if (str(o, "space")) sp = t.space(str(o, "space"));
     else sp = t.space(isLinked(tb) ? t.spaceOf(tb.thread) : "");
-    return place(t, sp, chosen, tb, o.focus === true);
+    // behind: a tab the user is typing in keeps showing when the tab lands in its pane.
+    const behind = str(o, "behind");
+    const keep = behind && o.focus !== true ? t.findTabOrNull(behind) : null;
+    const shown = keep?.pane.active === behind ? keep.pane : null;
+    const res = place(t, sp, chosen, tb, o.focus === true);
+    if (shown && res.pane === shown.id && tabIndex(shown, behind) >= 0) shown.active = behind;
+    return res;
   },
 
   // ---- Drafts (internal/layout/drafts.go) ----
@@ -1475,7 +1422,7 @@ export function opFromProto(m: LayoutOp | undefined): Op {
     case "closeThread":
       return { op: "close_thread", thread: c.value.threadId };
     case "openSurface":
-      return { op: "open_surface", tab: protoTab(c.value.tab), pane: c.value.paneId, focus: c.value.focus, space: c.value.spaceId };
+      return { op: "open_surface", tab: protoTab(c.value.tab), pane: c.value.paneId, focus: c.value.focus, space: c.value.spaceId, behind: c.value.behindTabId };
     case "newThread":
       return { op: "new_thread", space: c.value.spaceId, pane: c.value.paneId, params: Object.keys(c.value.params).length > 0 ? { ...c.value.params } : undefined, focus: c.value.focus };
     case "startDraft":

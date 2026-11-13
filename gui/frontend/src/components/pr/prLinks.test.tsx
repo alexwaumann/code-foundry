@@ -55,15 +55,13 @@ describe("openPullRequestLink", () => {
     expect(openPullRequestLink("current")(PR)).toBe(false);
   });
 
-  // Shell gap: openPullRequestLink compares the place's active tab id (a layout id, t-…) with pullRequestTab's id (pullrequest?number=…&slug=…), so it never matches.
-  it.skip("knows the pull request showing in another letter case", async () => {
+  it("knows the pull request showing in another letter case", async () => {
     await seedPanel("t1", [{ slug: "octo/hello", number: 42 }], 0);
     expect(openPullRequestLink("thread:t1")("https://github.com/Octo/Hello/pull/42/files#discussion_r7")).toBe(false);
     expect(openPullRequestInPanel).not.toHaveBeenCalled();
   });
 
-  // Shell gap: openPullRequestLink compares the place's active tab id (a layout id, t-…) with pullRequestTab's id (pullrequest?number=…&slug=…), so it never matches.
-  it.skip("sends a link into the page of the pull request already showing to the browser", async () => {
+  it("sends a link into the page of the pull request already showing to the browser", async () => {
     await seedPanel("t1", [{ slug: "octo/hello", number: 42 }], 0);
     expect(openPullRequestLink("thread:t1")(PR)).toBe(false);
     expect(openPullRequestInPanel).not.toHaveBeenCalled();

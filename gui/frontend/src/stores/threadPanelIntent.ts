@@ -20,10 +20,10 @@ import { compareWorktree, type CompareFileView } from "@/api/compare";
 import { COMMITTED_HEAD, DEFAULT_BASE, DEFAULT_HEAD, diffOfTab, diffTab, sameSource, sourceOfParam, type DiffTarget } from "@/surfaces/diffTarget";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { galleryTab } from "@/surfaces/galleryTarget";
-import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
+import { editorTabInTheWay, fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
-import { openTab, tabPlace, targetOf } from "@/shell/host";
+import { findTab, openTab, tabPlace, targetOf } from "@/shell/host";
 import { openPullRequestInPanel } from "./prPanel";
 import { useThreadsStore } from "./threads";
 import type { Selection } from "./ui";
@@ -96,8 +96,8 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
       ...(p.edit === "1" ? { edit: true, ask: { id: nextAskId(), thread: p.thread ?? "", note: p.note ?? "" } } : {}),
     };
     const tabId = fileTab(file).id;
-    const behind = p.edit === "1" && p.focus !== "1" && editorHasKeyboard(key, tabId);
-    if (!openFileInPanel(key, file, { behind })) return false;
+    const behind = p.edit === "1" && p.focus !== "1" ? editorTabInTheWay(key, tabId) : null;
+    if (!openFileInPanel(key, file, behind === null ? {} : { behind })) return false;
     if (p.focus === "1") focusEditorLine(fileEditKey(key, tabId), line);
     return true;
   }),
@@ -121,8 +121,7 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
       head: sourceOfParam(p.head, fromScope),
       own: p.own === "1" || p.scope !== undefined,
     };
-    const fresh = diffTab(asked);
-    const open = tabPlace(key).tabs.find((t) => t.id === fresh.id);
+    const open = findTab(key, diffTab(asked).id);
     const was = open && !p.thread ? diffOfTab(open) : null;
     if (!open || !was) return openDiffInPanel(key, asked);
     if (!asked.file) return openDiffInPanel(key, { ...was, own: asked.own }, open.title);

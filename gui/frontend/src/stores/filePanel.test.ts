@@ -50,8 +50,7 @@ describe("openCheckoutDiff", () => {
     expect(s.panes[s.spaces[s.currentSpaceId]?.focus ?? ""]?.active).toBe("t-s-1");
   });
 
-  // Shell gap: findTab misses an open Diff tab whose params carry more than its key (hostShell.ts panelIdOf hashes every param), so the fresh tab's params replace it.
-  it.skip("an open tab keeps what it compares and shows: coming back is not a reset", async () => {
+  it("an open tab keeps what it compares and shows: coming back is not a reset", async () => {
     openDiffInPanel("current", target({ file: "a.ts", base: { kind: "ref", ref: "v1" } }), "feat vs v1");
     openFileInPanel("current", { project: "repo-cf", base: W, path: "README.md" });
     await layoutSettled();

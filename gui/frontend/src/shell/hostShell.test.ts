@@ -82,9 +82,33 @@ describe("the host seam in the shell", () => {
     expect(ops).toEqual([{ op: "open_surface", tab: { kind: "file", thread: "s-1", params: { path: "/w/b.ts" }, title: "b.ts" }, focus: false }]);
   });
 
-  it("an open tab takes the new params where it is", () => {
-    host.openTab(host.threadTarget("s-1"), host.makeTab("files", "a.ts", { path: "/w/a.ts" }), { behind: true });
-    expect(ops).toEqual([{ op: "set_tab_params", tab: "t-f", params: { path: "/w/a.ts" }, title: "a.ts" }]);
+  it("an open tab takes the new params where it is, through the tab's queue; the same ones send nothing", async () => {
+    host.openTab(host.threadTarget("s-1"), host.makeTab("files", "a.ts", { path: "/w/a.ts" }), { behind: "t-d" });
+    host.openTab(host.threadTarget("s-1"), host.makeTab("files", "a.ts", { path: "/w/a.ts", line: "3" }), { behind: "t-d" });
+    await vi.waitFor(() => {
+      expect(ops).toEqual([{ op: "set_tab_params", tab: "t-f", params: { path: "/w/a.ts", line: "3" }, title: "a.ts" }]);
+    });
+  });
+
+  it("finds an open tab by the daemon's identity: kind, link and key params, whatever else its params hold", () => {
+    const own = { project: "pj", worktree: "/w" };
+    // The user's diff with a file and sides picked is still the checkout's tab.
+    expect(host.findTab(host.threadTarget("s-1"), host.tabId("diff", { ...own, path: "x.go", base: "ref:v1" }))?.id).toBe("t-d");
+    // A thread's framed diff (its asker) is a tab of its own, not the user's.
+    expect(host.findTab(host.threadTarget("s-1"), host.tabId("diff", { ...own, thread: "s-1" }))).toBeUndefined();
+    // Another thread's tabs are not this one's.
+    expect(host.findTab(host.threadTarget("s-2"), host.tabId("diff", own))).toBeUndefined();
+  });
+
+  it("finds a pull request's tab however its slug is spelled", async () => {
+    await seedLayout(layoutOf([space(pane("p-1", [tab("t-th", "thread", "s-1"), tab("t-pr", "pullrequest", "s-1", { params: { slug: "Acme/Repo", number: "5" } })]), "p-1")], 4));
+    expect(host.findTab(host.threadTarget("s-1"), host.pullRequestTabId("acme/REPO", "5"))?.params.slug).toBe("Acme/Repo");
+    expect(host.findTab(host.threadTarget("s-1"), host.pullRequestTabId("acme/repo", "6"))).toBeUndefined();
+  });
+
+  it("a new tab opened behind a tab names it: the daemon keeps it behind if it lands in that tab's pane", () => {
+    host.openTab(host.threadTarget("s-1"), host.makeTab("files", "b.ts", { path: "/w/b.ts" }), { behind: host.tabId("files", { path: "/w/a.ts" }) });
+    expect(ops).toEqual([{ op: "open_surface", tab: { kind: "file", thread: "s-1", params: { path: "/w/b.ts" }, title: "b.ts" }, focus: false, behind: "t-f" }]);
   });
 
   it("sets params and titles by the layout id, and skips a change that changes nothing", async () => {
