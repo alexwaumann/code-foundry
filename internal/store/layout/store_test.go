@@ -101,21 +101,26 @@ func TestApplyPersistsAndReloads(t *testing.T) {
 	if c.Rev != 4 || !c.Changed {
 		t.Fatalf("commit %+v; want rev 4", c)
 	}
+	// A thread's info card choice is stored with the thread (and nothing else of it).
+	apply(t, m, &core.SetInfo{Thread: "s-1", Open: false})
 	want := m.Snapshot()
 	if err := m.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := metaValue(t, db, metaRev); got != "4" {
-		t.Errorf("rev on disk %s; want 4", got)
+	if got := metaValue(t, db, metaRev); got != "5" {
+		t.Errorf("rev on disk %s; want 5", got)
 	}
 	m2 := open(t, db, nil, nil)
 	got := m2.Snapshot()
-	if got.Rev != 4 || !reflect.DeepEqual(got.State, want.State) {
-		t.Errorf("reloaded rev %d %+v; want rev 4 %+v", got.Rev, got.State, want.State)
+	if got.Rev != 5 || !reflect.DeepEqual(got.State, want.State) {
+		t.Errorf("reloaded rev %d %+v; want rev 5 %+v", got.Rev, got.State, want.State)
+	}
+	if ts := got.State.Threads["s-1"]; ts == nil || ts.Info == nil || *ts.Info {
+		t.Errorf("reloaded s-1 %+v; want its info card hidden", ts)
 	}
 	// Revs go on from the stored one.
-	if c := apply(t, m2, &core.SwitchSpace{Space: "sp-n2"}); c.Rev != 5 {
-		t.Errorf("next rev %d; want 5", c.Rev)
+	if c := apply(t, m2, &core.SwitchSpace{Space: "sp-n2"}); c.Rev != 6 {
+		t.Errorf("next rev %d; want 6", c.Rev)
 	}
 }
 
