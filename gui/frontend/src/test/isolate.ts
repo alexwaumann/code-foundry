@@ -31,7 +31,8 @@ export function it(name: string, fn: (ctx: TestContext) => unknown, timeout?: nu
 }
 
 /** Vitest's `it.each` with each body recorded for bodyDone. */
-it.each = <T extends unknown[]>(cases: readonly T[]) =>
+// `| [unknown]` makes each case infer as a tuple, as vitest's own `each` does.
+it.each = <T extends unknown[] | [unknown]>(cases: readonly T[]) =>
   (name: string, fn: (...args: T) => unknown, timeout?: number): void => {
     base.each<T>(cases)(name, tracked(fn), timeout);
   };
