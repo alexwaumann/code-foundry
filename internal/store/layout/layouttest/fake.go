@@ -24,9 +24,11 @@ type Fake struct {
 	ids      core.SeqIDs
 	snap     *layout.Snapshot
 	imported bool
-	ops      []string
-	vp       layout.Viewport
-	vpSet    bool
+	// windowTabs: as the Manager's (layout.FromWindow).
+	windowTabs []string
+	ops        []string
+	vp         layout.Viewport
+	vpSet      bool
 }
 
 var _ layout.Store = (*Fake)(nil)
@@ -66,7 +68,7 @@ func (f *Fake) Snapshot() *layout.Snapshot {
 }
 
 // Apply implements layout.Store.
-func (f *Fake) Apply(_ context.Context, op core.Op, opts layout.ApplyOptions) (layout.Commit, error) {
+func (f *Fake) Apply(ctx context.Context, op core.Op, opts layout.ApplyOptions) (layout.Commit, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ops = append(f.ops, op.OpName())
@@ -78,6 +80,9 @@ func (f *Fake) Apply(_ context.Context, op core.Op, opts layout.ApplyOptions) (l
 	next, res, err := core.ApplyWith(f.snap.State, op, &f.ids, core.Options{KeepFocus: opts.KeepFocus})
 	if err != nil {
 		return layout.Commit{}, err
+	}
+	if !f.imported {
+		f.windowTabs = core.TrackWindowTabs(f.windowTabs, f.snap.State, next, res, layout.IsWindowCall(ctx))
 	}
 	if layout.Unchanged(f.snap.State, next) {
 		return layout.Commit{Rev: f.snap.Rev, Result: res}, nil
@@ -96,11 +101,12 @@ func (f *Fake) ImportLegacy(_ context.Context, in core.LegacyInput, opts layout.
 	if f.imported {
 		return layout.ImportCommit{Rev: f.snap.Rev}, nil
 	}
+	in.WindowTabs = f.windowTabs
 	next, res, err := core.ImportLegacy(f.snap.State, in, &f.ids)
 	if err != nil {
 		return layout.ImportCommit{}, err
 	}
-	f.imported = true
+	f.imported, f.windowTabs = true, nil
 	return layout.ImportCommit{Rev: f.commit(next, opts.ClientID, layout.ImportOp, core.Result{}), Imported: true, Result: res}, nil
 }
 

@@ -204,11 +204,13 @@ func RegisterTerminal(r *Registry, d TerminalDeps) error {
 			Description:  "List every terminal with its state, working directory now, what runs in it, and labels (who it belongs to).",
 			Category:     "Terminal",
 			NoKeybinding: true,
-			Run: func(ctx context.Context, _ Context, _ Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, _ Args) (Result, error) {
 				res, err := d.Terminal.List(ctx, connect.NewRequest(&v1.ListTerminalsRequest{}))
 				if err != nil {
 					return Result{}, err
 				}
+				// A page does not read what was typed in a terminal (command_lines.go).
+				res.Msg.Terminals = terminalsFor(uctx, res.Msg.GetTerminals())
 				var sb strings.Builder
 				tw := tabwriter.NewWriter(&sb, 0, 4, 2, ' ', 0)
 				_, _ = fmt.Fprintln(tw, "ID\tSTATE\tCWD\tRUNNING\tLABELS")

@@ -143,11 +143,18 @@ var kinds = map[string]*Kind{
 			return "gallery:" + t.Thread + ":" + title, err
 		},
 	},
+	// A plugin surface is one per scope its tab names ("scope", the plugin store's instance
+	// scope: a project, a worktree, global); a linked tab that names none is one per thread,
+	// which is what a thread-scoped surface's instance is.
 	"plugin.": {
 		Prefix: true, Link: LinkOptional, Scope: ScopeSpace, KeyParams: []string{"scope"}, DefaultFrac: 0.35,
 		key: func(t *Tab) (string, error) {
 			p, s, _ := strings.Cut(strings.TrimPrefix(t.Kind, "plugin."), ".")
-			return "plugin:" + p + "/" + s + "/" + t.Params["scope"], nil
+			scope := t.Params["scope"]
+			if scope == "" && t.Thread != "" {
+				scope = "thread:" + t.Thread
+			}
+			return "plugin:" + p + "/" + s + "/" + scope, nil
 		},
 	},
 }

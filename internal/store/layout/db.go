@@ -3,6 +3,7 @@ package layout
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -21,14 +22,24 @@ const (
 	metaDefaultSpace = "default_space"
 	// metaLegacyImport is "" until the first-load import ran, then "done:<unix ms>".
 	metaLegacyImport = "legacy_import"
+	// metaWindowTabs is, until the import, the JSON list of the thread tabs a window's
+	// command opened (window.go); absent when there are none.
+	metaWindowTabs = "legacy_window_tabs"
 )
+
+// marks are the import's own keys of layout_meta.
+type marks struct {
+	// imported is metaLegacyImport's value.
+	imported string
+	// windowTabs is metaWindowTabs' list.
+	windowTabs []string
+}
 
 // stored is what the tables hold, decoded as far as it decodes.
 type stored struct {
 	state *core.State
 	rev   uint64
-	// imported is metaLegacyImport's value.
-	imported string
+	marks
 	// fresh: no row in any of the tables (a new database).
 	fresh bool
 	// repairs are the documents that did not decode, kept as empty ones.
@@ -110,6 +121,11 @@ func load(ctx context.Context, db *sql.DB) (stored, error) {
 			out.state.DefaultSpace = v
 		case metaLegacyImport:
 			out.imported = v
+		case metaWindowTabs:
+			if err := json.Unmarshal([]byte(v), &out.windowTabs); err != nil {
+				out.windowTabs = nil
+				out.repairs = append(out.repairs, fmt.Sprintf("%s %q: %v; dropped", metaWindowTabs, v, err))
+			}
 		}
 	}
 	if err := mrows.Err(); err != nil {
@@ -119,9 +135,10 @@ func load(ctx context.Context, db *sql.DB) (stored, error) {
 	return out, nil
 }
 
-// save writes what changed from prev (what the tables hold) to next, rev, and the import
-// mark when it is set, in one transaction. A nil prev rewrites every row.
-func save(ctx context.Context, db *sql.DB, prev, next *core.State, rev uint64, imported string, now time.Time) (err error) {
+// save writes what changed from prev (what the tables hold) to next, rev, and the import's
+// marks (the import mark when it is set; the window tabs, or none), in one transaction. A nil
+// prev rewrites every row.
+func save(ctx context.Context, db *sql.DB, prev, next *core.State, rev uint64, mk marks, now time.Time) (err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("layout: save: %w", err)
@@ -188,8 +205,17 @@ func save(ctx context.Context, db *sql.DB, prev, next *core.State, rev uint64, i
 		metaCurrentSpace: next.CurrentSpace,
 		metaDefaultSpace: next.DefaultSpace,
 	}
-	if imported != "" {
-		meta[metaLegacyImport] = imported
+	if mk.imported != "" {
+		meta[metaLegacyImport] = mk.imported
+	}
+	if len(mk.windowTabs) > 0 {
+		b, err := json.Marshal(mk.windowTabs)
+		if err != nil {
+			return fmt.Errorf("layout: save %s: %w", metaWindowTabs, err)
+		}
+		meta[metaWindowTabs] = string(b)
+	} else if _, err = tx.ExecContext(ctx, `DELETE FROM layout_meta WHERE key = ?`, metaWindowTabs); err != nil {
+		return fmt.Errorf("layout: save %s: %w", metaWindowTabs, err)
 	}
 	for k, v := range meta {
 		if _, err = tx.ExecContext(ctx, `INSERT INTO layout_meta (key, value) VALUES (?, ?)

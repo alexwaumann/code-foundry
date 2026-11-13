@@ -502,3 +502,122 @@ func TestImportLegacyCapturedStores(t *testing.T) {
 		}
 	}
 }
+
+// A tab whose project is no longer registered, or whose plugin surface no installed plugin
+// offers, would open as "Project not found" or "This surface is gone": the import drops it
+// and lists it, from the side panel and from the layout's folded tabs alike. A diff of a
+// registered project and a surface an installed plugin offers are kept. Nil lists check
+// nothing (docs/notes/shell-24a-import-moves.md, item 1).
+func TestImportLegacyDropsGoneProjectsAndPlugins(t *testing.T) {
+	gDiff := ptab("diff", "Diff", map[string]string{"project": "gone", "worktree": "/wt/gone"})
+	gPlug := ptab("plugin.weather.radar", "Radar", nil)
+	panel := store6(map[string]any{
+		"thread:s-0": map[string]any{"open": true, "groups": []any{group("", pFile, pDiff, gDiff, pPlug, gPlug)}},
+	})
+	// A classic shell's automatic diff of the gone project, folded from the layout.
+	layoutDoc := `{"v":1,"current_space":"sp-a","default_space":"sp-a","spaces":[
+		{"id":"sp-a","name":"Main","focus":"p-1","root":{"t":"pane","id":"p-1","active":"t-g","tabs":[
+			{"id":"t-g","kind":"diff","thread":"s-1","params":{"project":"gone","worktree":"/wt/gone"}},
+			{"id":"t-w","kind":"plugin.weather.radar","thread":"s-1"}]}}]}`
+	known := map[string]bool{"web": true}
+	plugins := map[string]bool{"plugin.notes.pad": true}
+	tests := []struct {
+		name     string
+		projects map[string]bool
+		surfaces map[string]bool
+		want     map[string]string
+		dropped  []string
+	}{
+		{
+			name: "a gone project's diff and an uninstalled plugin's surface are dropped", projects: known, surfaces: plugins,
+			want: map[string]string{"s-0": "file diff plugin.notes.pad", "s-1": "-"},
+			dropped: []string{
+				"thread s-0: side panel tab diff?project=gone&worktree=%2Fwt%2Fgone: project gone is not registered",
+				"thread s-0: side panel tab plugin.weather.radar: no installed plugin offers plugin.weather.radar",
+				"thread s-1: tab t-g: project gone is not registered",
+				"thread s-1: tab t-w: no installed plugin offers plugin.weather.radar",
+			},
+		},
+		{
+			name: "no plugins installed: every plugin surface is dropped", projects: known, surfaces: map[string]bool{},
+			want: map[string]string{"s-0": "file diff", "s-1": "-"},
+			dropped: []string{
+				"thread s-0: side panel tab diff?project=gone&worktree=%2Fwt%2Fgone: project gone is not registered",
+				"thread s-0: side panel tab plugin.notes.pad: no installed plugin offers plugin.notes.pad",
+				"thread s-0: side panel tab plugin.weather.radar: no installed plugin offers plugin.weather.radar",
+				"thread s-1: tab t-g: project gone is not registered",
+				"thread s-1: tab t-w: no installed plugin offers plugin.weather.radar",
+			},
+		},
+		{
+			name: "nothing known: nothing checked",
+			want: map[string]string{"s-0": "file diff diff plugin.notes.pad plugin.weather.radar", "s-1": "diff plugin.weather.radar"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			in := LegacyInput{Panel: panel, Threads: []LegacyThread{{ID: "s-0"}, {ID: "s-1"}}, Projects: tc.projects, Surfaces: tc.surfaces}
+			got, res, err := ImportLegacy(stateWith(t, layoutDoc), in, &SeqIDs{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			emptyLayout(t, got)
+			for th, want := range tc.want {
+				if g := remembered(got, th); g != want {
+					t.Errorf("thread %s: %s, want %s", th, g, want)
+				}
+			}
+			if !slices.Equal(res.Dropped, tc.dropped) {
+				t.Errorf("dropped\n%s\nwant\n%s", strings.Join(res.Dropped, "\n"), strings.Join(tc.dropped, "\n"))
+			}
+		})
+	}
+}
+
+// The set an import gives a thread marks as active only the tab the classic window showed:
+// the focused group's active tab. Opening the thread then shows that tab in the set's pane;
+// with none (the focused group was picking), the first (item 2).
+func TestImportLegacyActiveTab(t *testing.T) {
+	split := func(focused int, a0, a1 string) []byte {
+		return store6(map[string]any{"thread:s-0": map[string]any{"open": true, "focused": focused, "ratio": 0.5,
+			"groups": []any{group(a0, pFile, pDiff), group(a1, pPR, pMCP)}}})
+	}
+	tests := []struct {
+		name   string
+		panel  []byte
+		active string // the remembered tab marked active ("" none)
+		shown  string // the kind the set's pane shows after the thread opens
+	}{
+		{"first group focused: its active tab", split(0, pDiff["id"].(string), pMCP["id"].(string)), "diff", "diff"},
+		{"second group focused: its active tab", split(1, pDiff["id"].(string), pMCP["id"].(string)), "mcp", "mcp"},
+		{"the focused group was picking: none, the first shows", split(1, pDiff["id"].(string), ""), "", "file"},
+		{"one group, its active tab", store6(map[string]any{"thread:s-0": map[string]any{"open": true,
+			"groups": []any{group(pPR["id"].(string), pFile, pPR)}}}), "pullrequest", "pullrequest"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ids := &SeqIDs{}
+			st, _, err := ImportLegacy(NewState("sp-a", "Main"), LegacyInput{Panel: tc.panel, Threads: []LegacyThread{{ID: "s-0"}}}, ids)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var active []string
+			for _, rt := range st.Threads["s-0"].Remembered.Tabs {
+				if rt.Active {
+					active = append(active, rt.Tab.Kind)
+				}
+			}
+			if want := slices.DeleteFunc([]string{tc.active}, func(s string) bool { return s == "" }); !slices.Equal(active, want) {
+				t.Errorf("active records %v, want %v", active, want)
+			}
+			st, res, err := Apply(st, &OpenThread{Thread: "s-0", Focus: true}, ids)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, p, _ := st.FindTab(res.Placed[0])
+			if got := p.ActiveTab().Kind; got != tc.shown {
+				t.Errorf("the set's pane shows %s, want %s: %s", got, tc.shown, layoutShape(st.Spaces[0].Root))
+			}
+		})
+	}
+}

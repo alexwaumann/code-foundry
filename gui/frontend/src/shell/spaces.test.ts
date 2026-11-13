@@ -90,19 +90,14 @@ describe("spaceDropCommands", () => {
     expect(spaceDropCommands({ kind: "tab", tab: "t-prs", pane: "p-1" }, "sp-b", s)).toEqual([{ name: "tab.move", args: { tab: "t-prs", space: "sp-b" } }]);
   });
 
-  it("moves a pane whole with pane.move when it holds no thread's own tab", () => {
-    expect(spaceDropCommands({ kind: "pane", pane: "p-2" }, "sp-b", s)).toEqual([{ name: "pane.move", args: { pane: "p-2", space: "sp-b" } }]);
-  });
-
-  it("moves a pane's threads first (their linked tabs go along), then the pane with what is left", () => {
-    expect(spaceDropCommands({ kind: "pane", pane: "p-1" }, "sp-b", s)).toEqual([
-      { name: "thread.space.move", args: { id: "s-1", space: "sp-b" } },
-      { name: "pane.move", args: { pane: "p-1", space: "sp-b" } },
-    ]);
-  });
-
-  it("moves only the thread when nothing else would be left in the pane", () => {
-    expect(spaceDropCommands({ kind: "pane", pane: "p-3" }, "sp-b", s)).toEqual([{ name: "thread.space.move", args: { id: "s-3", space: "sp-b" } }]);
+  // One command whatever the pane holds: the daemon moves its threads with it (their linked tabs
+  // go along), so a drop never ends half moved.
+  it.each([
+    ["no thread's own tab", "p-2"],
+    ["a thread's tab, its linked tab and others", "p-1"],
+    ["only a thread and its linked tab", "p-3"],
+  ])("moves a pane holding %s whole with one pane.move", (_what, pane) => {
+    expect(spaceDropCommands({ kind: "pane", pane }, "sp-b", s)).toEqual([{ name: "pane.move", args: { pane, space: "sp-b" } }]);
   });
 
   it("moves a sidebar row's thread, open or not, to the space it is dropped on; not to its own", () => {

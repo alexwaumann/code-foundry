@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/layout"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
@@ -16,6 +17,29 @@ import (
 // and every surface gets plugin.<name>.show.<surface>, whose availability is the
 // surface's. CommandService.List carries both to the GUI (and the CLI), so the GUI
 // learns which plugin tabs a selection offers from the command list it already syncs.
+
+// TabOpener opens a tab in the window shell's layout: by the placement rules (focused where it
+// is when its identity is open), taking the user's focus only with focus. The daemon adapts
+// the layout store.
+type TabOpener interface {
+	OpenTab(ctx context.Context, tb *layout.Tab, focus bool) (layout.Result, error)
+}
+
+// ShowResult is a show command's JSON when it opened a tab.
+type ShowResult struct {
+	Thread   string `json:"thread_id"`
+	Space    string `json:"space_id"`
+	Pane     string `json:"pane_id"`
+	Tab      string `json:"tab_id"`
+	Existing bool   `json:"existing,omitempty"`
+	Focused  bool   `json:"focused,omitempty"`
+}
+
+// threadScoped reports whether a surface of scope shows a thread's: its tab is linked to that
+// thread (a pull request surface is the thread's pull request's).
+func threadScoped(scope string) bool {
+	return scope == pluginsdk.ScopeThread || scope == pluginsdk.ScopePR
+}
 
 // ShowCommand is the name of the command that shows a surface.
 func ShowCommand(plugin, surface string) string { return Prefix(plugin) + "show." + surface }
@@ -123,7 +147,8 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 		switch spec.Scope {
 		case pluginsdk.ScopeThread, pluginsdk.ScopePR:
 			args = []command.ArgSpec{{Name: "thread", Type: command.String, Context: command.ContextThread, ID: command.ThreadID,
-				Description: "Thread id" + command.IDHelp}}
+				Description: "Thread id; the tab opens beside it without taking the user's focus" + command.IDHelp},
+				{Name: "focus", Type: command.Bool, Description: "Also take the user's focus to the tab; only when the user asked to be taken there"}}
 		case pluginsdk.ScopeProject:
 			args = []command.ArgSpec{{Name: "project", Type: command.String, Context: command.ContextProject, Description: "Project id"}}
 		case pluginsdk.ScopeWorktree:
@@ -138,7 +163,10 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 			Args:           args,
 			When:           func(uctx command.Context) bool { return m.surfaceAvailability(spec, uctx).ok },
 			WhyUnavailable: func(uctx command.Context) string { return m.surfaceAvailability(spec, uctx).reason },
-			Run: func(_ context.Context, uctx command.Context, _ command.Args) (command.Result, error) {
+			Run: func(ctx context.Context, uctx command.Context, a command.Args) (command.Result, error) {
+				if threadScoped(spec.Scope) && m.opts.Tabs != nil {
+					return m.openSurfaceTab(ctx, uctx, a, name, spec)
+				}
 				if m.opts.Emitter == nil {
 					return command.Result{}, errors.New("no GUI to show it in")
 				}
@@ -148,4 +176,32 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 		})
 	}
 	return out
+}
+
+// openSurfaceTab is a thread or pull request surface's show command with a layout: a tab of
+// the surface linked to the thread, placed by the rules beside it like the view.open verbs'
+// (docs/notes/shell-24a-import-moves.md, item 5). Its identity is one per surface and thread
+// (internal/layout identity.go). The user's own call focuses it; a thread's, a page's or a
+// plugin's never does without --focus.
+func (m *Manager) openSurfaceTab(ctx context.Context, uctx command.Context, a command.Args, name string, spec pluginsdk.SurfaceSpec) (command.Result, error) {
+	thread := uctx.ActiveThreadID
+	focus := uctx.FromUser()
+	if a.Given("focus") {
+		focus = a.Bool("focus")
+	}
+	tb := &layout.Tab{Kind: SurfaceKind(name, spec.ID), Thread: thread, Title: spec.Title}
+	r, err := m.opts.Tabs.OpenTab(ctx, tb, focus)
+	if err != nil {
+		return command.Result{}, fmt.Errorf("could not open its tab: %w", err)
+	}
+	out := ShowResult{Thread: thread, Space: r.Space, Pane: r.Pane, Tab: r.Tab, Existing: r.Existing, Focused: focus}
+	verb := "opened"
+	if r.Existing {
+		verb = "found"
+	}
+	msg := fmt.Sprintf("%s %s for thread %s as tab %s in pane %s", verb, spec.Title, thread, r.Tab, r.Pane)
+	if !focus {
+		msg += " (the user's focus did not move)"
+	}
+	return command.Result{Message: msg, JSON: out}, nil
 }

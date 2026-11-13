@@ -163,6 +163,22 @@ test("a tab and a pane dropped on a space tab move to that space", async ({ page
   await expect(tabEl(page, "t-s-1")).toBeVisible();
 });
 
+// A pane holding two threads' tabs goes by its strip in one command; both threads live in the
+// space it lands in and s-1's diff, in another pane, goes with its thread (shell 24a, item 4).
+test("a pane holding two threads dropped on a space tab moves whole in one command", async ({ page }) => {
+  await seed([MAIN, REVIEWS]);
+  await openShell(page);
+  await lift(page, await stripGrip(page, "p-1"), centre(await boxOf(page, '[data-testid="space-tab"][data-space-id="sp-rev"]')));
+  await expect(spaceTab(page, "sp-rev")).toHaveAttribute("data-drop-target", "true");
+  await drop(page);
+  await expect.poll(() => tabsIn("sp-rev")).toEqual(["t-diff-s-1", "t-s-1", "t-s-3"]);
+  const st = await stored();
+  expect([st.threads?.["s-1"]?.space, st.threads?.["s-3"]?.space]).toEqual(["sp-rev", "sp-rev"]);
+  expect(await tabsIn("sp-main")).toEqual(["t-prs"]);
+  const ran = (await invocations()).map((i) => i.name).filter((n) => /^(tab|pane|thread\.space)\.move$/.test(n));
+  expect(ran).toEqual(["pane.move"]);
+});
+
 test("back and forward go through the focus across panes and spaces", async ({ page }) => {
   await seed([MAIN, RELEASE]);
   await openShell(page);

@@ -68,7 +68,7 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 			Category:     "Plugin",
 			NoKeybinding: true,
 			Args:         []ArgSpec{nameArg},
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				res, err := d.Terminal.List(ctx, connect.NewRequest(&v1.ListTerminalsRequest{}))
 				if err != nil {
 					return Result{}, err
@@ -80,6 +80,7 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 						out.Terminals = append(out.Terminals, t)
 					}
 				}
+				out.Terminals = terminalsFor(uctx, out.GetTerminals()) // command_lines.go
 				return Result{Message: formatPluginTerminals(name, out.GetTerminals()), JSON: out}, nil
 			},
 		},

@@ -233,7 +233,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Dir: p.Plugins(), DataDir: p.PluginData(), LogDir: p.PluginLogs(),
 		DB: st.db, Commands: settingsCommandHost{Registry: commands, settings: st.settings}, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
-		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows},
+		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows}, Tabs: pluginTabs{layout: st.layout},
 		Flags: pluginFlags{threads: st.thread},
 		// Wake sources: the thread store keeps the subscriptions (plugin_wakes.go).
 		Wakes:   pluginWakeSink{threads: st.thread},
@@ -371,6 +371,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		filesystemAPI.Route(),
 		api.NewLayout(st.layout).WithImporter(legacyImport{
 			log: log.With("store", "layout"), layout: st.layout, terminals: st.terminal, threads: st.thread.Snapshot,
+			projects: st.project.Snapshot, plugins: plugins.Snapshot,
 		}).Route(),
 		eventsAPI.Route(),
 	}

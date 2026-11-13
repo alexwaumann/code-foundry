@@ -97,10 +97,16 @@ export const bridgeSources: Record<BridgeSource, SourceSpec> = {
     },
     subscribe: onStores(usePluginsStore),
   },
+  // Every terminal, without what was typed in it: a page does not read a terminal's command
+  // lines (its foreground and last command), which can hold secrets in their arguments, as the
+  // daemon's read verbs leave them out for a page (docs/notes/shell-24a-import-moves.md, item 7).
   terminal: {
     snapshot: () => {
       const s = useTerminalsStore.getState();
-      return s.order.flatMap((id) => s.byId[id] ?? []);
+      return s.order.flatMap((id) => {
+        const t = s.byId[id];
+        return t ? [{ ...t, foreground: "", lastCommand: "" }] : [];
+      });
     },
     subscribe: onStores(useTerminalsStore),
   },

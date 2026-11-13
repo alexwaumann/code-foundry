@@ -32,6 +32,29 @@ type LegacyInput struct {
 	Threads []LegacyThread
 	// Terminals is every terminal the daemon runs or keeps.
 	Terminals []LegacyTerminal
+	// Projects is every registered project's id. A tab of a project that is not registered
+	// (a diff's "project") is dropped: the window could only say the project is not found.
+	// Nil: not checked.
+	Projects map[string]bool
+	// Surfaces is every plugin surface an installed plugin offers, as a tab kind
+	// ("plugin.<plugin>.<surface>"). A tab of any other plugin surface is dropped: the window
+	// could only say the surface is gone. Nil: not checked.
+	Surfaces map[string]bool
+	// WindowTabs are the thread tabs a window's command opened before the import, which no
+	// window drew (TrackWindowTabs, legacy_window.go): they do not make a space arranged.
+	WindowTabs []string
+}
+
+// gone says why tab tb cannot be shown any more (its project is not registered, its plugin
+// surface is not installed), or "" when it can.
+func (in LegacyInput) gone(tb *Tab) string {
+	if p := tb.Params["project"]; tb.Kind == "diff" && in.Projects != nil && p != "" && !in.Projects[p] {
+		return fmt.Sprintf("project %s is not registered", p)
+	}
+	if strings.HasPrefix(tb.Kind, "plugin.") && in.Surfaces != nil && !in.Surfaces[tb.Kind] {
+		return fmt.Sprintf("no installed plugin offers %s", tb.Kind)
+	}
+	return ""
 }
 
 // LegacyThread is a thread the import may give a set to.
@@ -59,8 +82,9 @@ type LegacyResult struct {
 	Quick map[string]string
 	// Folded lists the open linked tabs that went into their thread's remembered set.
 	Folded []*Tab
-	// Removed lists the unlinked terminal tabs taken out of the layout. Their terminals keep
-	// running: nothing is to end them.
+	// Removed lists the tabs taken out of the layout and not remembered: unlinked terminal
+	// tabs, and thread tabs an old window opened (LegacyInput.WindowTabs). Nothing ends with
+	// them: their terminals, and a thread's quick terminal, keep running.
 	Removed []*Tab
 	// Dropped says, one line each, what could not be carried.
 	Dropped []string
@@ -121,12 +145,13 @@ func ImportLegacy(st *State, in LegacyInput, ids IDs) (*State, LegacyResult, err
 		exists[tm.ID] = true
 	}
 
+	t.closeWindowTabs(in.WindowTabs, &res)
 	folded := t.foldAutomatic(live, exists, &res)
 
 	panels := readPanel(in.Panel)
 	bottom := readBottom(in.Bottom)
 	for _, id := range slices.Sorted(maps.Keys(live)) {
-		r := t.importThread(id, panels["thread:"+id], bottom["thread:"+id], folded[id], terms, &res)
+		r := t.importThread(id, panels["thread:"+id], bottom["thread:"+id], folded[id], terms, in.gone, &res)
 		if len(r.Tabs) > 0 || r.Quick != "" {
 			res.Threads = append(res.Threads, r)
 		}
@@ -151,7 +176,7 @@ func ImportLegacy(st *State, in LegacyInput, ids IDs) (*State, LegacyResult, err
 func (t *tx) foldAutomatic(live, exists map[string]bool, res *LegacyResult) map[string][]*Tab {
 	folded := map[string][]*Tab{}
 	for _, sp := range t.st.Spaces {
-		if arranged(sp) {
+		if arranged(sp, nil) {
 			continue
 		}
 		for _, p := range Panes(sp.Root) {
@@ -180,12 +205,13 @@ func (t *tx) foldAutomatic(live, exists map[string]bool, res *LegacyResult) map[
 	return folded
 }
 
-// arranged reports whether sp holds a thread tab: someone opened a thread there with the new
-// verbs, which the classic window never does.
-func arranged(sp *Space) bool {
+// arranged reports whether sp holds a thread tab other than those of window: someone opened a
+// thread there with the new verbs, which the classic window never does (window: the thread
+// tabs an old window's chord opened, legacy_window.go).
+func arranged(sp *Space, window []string) bool {
 	for _, p := range Panes(sp.Root) {
 		for _, tb := range p.Tabs {
-			if tb.Kind == "thread" {
+			if tb.Kind == "thread" && !slices.Contains(window, tb.ID) {
 				return true
 			}
 		}
@@ -194,7 +220,7 @@ func arranged(sp *Space) bool {
 }
 
 // importThread gives thread id its remembered set and quick terminal (ImportLegacy).
-func (t *tx) importThread(id string, panel *panelEntry, bottom *bottomEntry, folded []*Tab, terms []LegacyTerminal, res *LegacyResult) LegacyThreadResult {
+func (t *tx) importThread(id string, panel *panelEntry, bottom *bottomEntry, folded []*Tab, terms []LegacyTerminal, gone func(*Tab) string, res *LegacyResult) LegacyThreadResult {
 	r := LegacyThreadResult{Thread: id}
 	sp := t.st.Space(t.st.SpaceOf(id))
 	var recs []RememberedTab
@@ -207,11 +233,16 @@ func (t *tx) importThread(id string, panel *panelEntry, bottom *bottomEntry, fol
 		}
 	}
 	// add appends tb unless its surface is open in the thread's space or remembered already;
-	// a tab without an id gets one.
+	// a tab without an id gets one. A tab the window could not show (its project or plugin is
+	// gone) is dropped and listed.
 	add := func(tb *Tab, active bool, what string) {
 		k, key, err := Identify(tb)
 		if err != nil {
 			res.Dropped = append(res.Dropped, fmt.Sprintf("thread %s: %s: %v", id, what, err))
+			return
+		}
+		if why := gone(tb); why != "" {
+			res.Dropped = append(res.Dropped, fmt.Sprintf("thread %s: %s: %s", id, what, why))
 			return
 		}
 		if have[key] || (sp != nil && t.sameTab(sp, k, key, "") != nil) {
@@ -230,7 +261,7 @@ func (t *tx) importThread(id string, panel *panelEntry, bottom *bottomEntry, fol
 	}
 
 	if panel != nil {
-		for _, g := range panel.Groups {
+		for gi, g := range panel.Groups {
 			for _, pt := range g.Tabs {
 				kind := legacyKinds[pt.Kind]
 				if strings.HasPrefix(pt.Kind, "plugin.") {
@@ -244,7 +275,9 @@ func (t *tx) importThread(id string, panel *panelEntry, bottom *bottomEntry, fol
 				if len(params) == 0 {
 					params = nil
 				}
-				active := g.Active != nil && *g.Active == pt.ID
+				// The tab the classic window showed: the focused group's active one. The set
+				// comes back in one pane, where only one tab can be active.
+				active := gi == panel.Focused && g.Active != nil && *g.Active == pt.ID
 				add(&Tab{Kind: kind, Thread: id, Params: params, Title: pt.Title}, active, "side panel tab "+pt.ID)
 			}
 		}
