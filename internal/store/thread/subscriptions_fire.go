@@ -241,7 +241,7 @@ func (m *Manager) fireLaterLocked(r *subRec, handled int64, build func(Subscript
 	}
 	r.s.FiredCount++
 	r.s.LastFiredAt = now
-	d.sub, d.of, d.queued = r.s.ID, sub, time.Now()
+	d.sub, d.of, d.queued = r.s.ID, sub, m.opts.batchClock.Now()
 	if !joins {
 		d.slot = now
 	}

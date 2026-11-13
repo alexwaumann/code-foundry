@@ -21,6 +21,21 @@ func (e *env) sentTexts() []string {
 	return out
 }
 
+// sentTextsN is the user texts sent to Claude once the fake has logged at least n: the
+// fake logs a line after it reads it from the pipe, so its log trails what the store
+// wrote (a row's Setup.Queued clears as the store writes).
+func (e *env) sentTextsN(n int) []string {
+	e.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		got := e.sentTexts()
+		if len(got) >= n || time.Now().After(deadline) {
+			return got
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // lastUser is the last user message item.
 func lastUser(items []Item) Item {
 	for i := len(items) - 1; i >= 0; i-- {

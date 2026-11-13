@@ -58,9 +58,11 @@ func TestRestartIdle(t *testing.T) {
 
 // A busy thread (here waiting on a permission request) is interrupted first, then
 // restarted with the same conversation; a message sent meanwhile goes to the new
-// process.
+// process. The new process answers it with a plain turn (text-table): replaying
+// interrupt-pending would ask the withdrawn request again under the same id and reopen
+// its item.
 func TestRestartBusyInterrupts(t *testing.T) {
-	re := newFixtureEnv(t, "interrupt-pending")
+	re := newFixtureEnvAt(t, fixturePath("interrupt-pending"), []string{"CF_FAKE_CLAUDE_RESUME_FIXTURE=" + fixturePath("text-table")})
 	s := re.create(CreateOptions{PermissionMode: PermissionSupervised, InitialPrompt: "write"})
 	re.waitFor(s.ID, "permission", func(s Thread) bool { return s.Status == StatusNeedsAttention })
 	cid := argOf(re.argvOf(), "--session-id")
@@ -88,7 +90,18 @@ func TestRestartBusyInterrupts(t *testing.T) {
 	if note < 0 || msg < note {
 		t.Errorf("the held message should follow the restart note:\n%s", describeItems(items))
 	}
-	re.waitFor(s.ID, "connected again", func(s Thread) bool { return s.State == StateConnected })
+	// The new process answers the held message, and the withdrawn request stays so.
+	re.waitItems(s.ID, "the held message's answer", func(items []Item) bool {
+		return slices.ContainsFunc(items[msg:], func(it Item) bool { return it.Kind == KindTurnEnd })
+	})
+	re.waitFor(s.ID, "the held message's turn over", func(th Thread) bool {
+		return th.State == StateConnected && th.HandledThrough >= items[msg].Ordinal && turnOver(th)
+	})
+	items = re.items(s.ID).Items
+	if !slices.ContainsFunc(items, func(it Item) bool { return it.Request != nil && it.Request.State == RequestCancelled }) ||
+		slices.ContainsFunc(items, func(it Item) bool { return it.Request != nil && it.Request.State == RequestPending }) {
+		t.Errorf("the withdrawn request after the new turn:\n%s", describeItems(items))
+	}
 }
 
 func hasRestartNoteItem(it Item) bool { return it.Kind == KindCommandOutput && it.Text == RestartNote }

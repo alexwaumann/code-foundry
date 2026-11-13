@@ -226,10 +226,11 @@ func newRestartEnv(t *testing.T, mutate ...func(*Options)) *restartEnv {
 	r.parent = r.stopped("Orchestrator")
 	for _, name := range []string{"Tests", "Docs"} {
 		k := r.create(CreateOptions{Name: name, InitialPrompt: "go", CreatedBy: r.parent.ID, Notify: true})
-		r.kids = append(r.kids, r.waitFor(k.ID, "busy", func(s Thread) bool { return s.Status == StatusBusy }))
+		// Connected: its message went out (a first message never sent is not a turn to
+		// resume, and a stop before the handshake is not one cut: interruptedByStop).
+		r.kids = append(r.kids, r.waitFor(k.ID, "busy", func(s Thread) bool { return s.Status == StatusBusy && s.State == StateConnected }))
 	}
 	r.loner = r.create(CreateOptions{Name: "Loner", InitialPrompt: "go"})
-	// Connected: its message went out (a first message never sent is not a turn to resume).
 	r.waitFor(r.loner.ID, "busy", func(s Thread) bool { return s.Status == StatusBusy && s.State == StateConnected })
 	subs, err := r.m.Subscriptions(r.ctx(), r.parent.ID)
 	if err != nil || len(subs) != 2 {
@@ -292,7 +293,10 @@ func TestRestartWakesDelivered(t *testing.T) {
 
 	// Another restart: the children were told about already. The parent, started by its
 	// wake and busy, was cut this time: a notice alone.
-	r.waitFor(r.parent.ID, "the parent working", func(s Thread) bool { return s.Status == StatusBusy })
+	// Connected, not only busy: the wake's message makes the parent busy before its
+	// Claude is up, and a stop during that handshake is not a running turn cut
+	// (interruptedByStop).
+	r.waitFor(r.parent.ID, "the parent working", func(s Thread) bool { return s.State == StateConnected && s.Status == StatusBusy })
 	r.restart(r.restartMutate...)
 	r.m.DeliverRestartWakes()
 	items = r.waitItems(r.parent.ID, "the second restart's wake", func(items []Item) bool { return len(wakes(items)) == 2 })
@@ -334,12 +338,14 @@ func TestRestartWakesAfterCrash(t *testing.T) {
 // A thread archived between the restart and the delivery is left out of the message;
 // one archived before is not planned at all (its subscriptions went with it).
 func TestRestartWakesSkipArchived(t *testing.T) {
-	r := newRestartEnv(t, func(o *Options) { o.WakeBatch = 300 * time.Millisecond })
+	clock := newManualClock()
+	r := newRestartEnv(t, func(o *Options) { o.WakeBatch = 300 * time.Millisecond }, withManualClock(clock))
 	r.restart(r.restartMutate...)
 	r.m.DeliverRestartWakes()
 	if _, err := r.m.Archive(r.ctx(), r.kids[1].ID, true); err != nil {
 		t.Fatal(err)
 	}
+	clock.Advance(300 * time.Millisecond) // the batch window ends after the archive
 	items := r.waitItems(r.parent.ID, "the restart wake", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
 	if !strings.Contains(w.WakeTitle, "1 of your child threads was interrupted: \"Tests\"") || strings.Contains(w.WakeTitle, "Docs") {

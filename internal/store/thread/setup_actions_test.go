@@ -1081,7 +1081,7 @@ func TestSendDuringSetupQueues(t *testing.T) {
 	}
 	release()
 	e.waitFor(s.ID, "the messages to go out", func(s Thread) bool { return s.Setup.Phase == SetupDone && len(s.Setup.Queued) == 0 })
-	if got := e.sentTexts(); !slices.Equal(got, []string{"first", "second", "third"}) {
+	if got := e.sentTextsN(3); !slices.Equal(got, []string{"first", "second", "third"}) {
 		t.Errorf("sent %q", got)
 	}
 	if rows, _ := loadThreads(e.ctx(), e.m.opts.DB); len(rows[0].Setup.Queued) != 0 {
@@ -1109,7 +1109,7 @@ func TestSendDuringSetupWithoutAPrompt(t *testing.T) {
 	}
 	release()
 	e.waitUserText("hello")
-	if got := e.sentTexts(); !slices.Equal(got, []string{"hello"}) {
+	if got := e.sentTextsN(1); !slices.Equal(got, []string{"hello"}) {
 		t.Errorf("sent %q", got)
 	}
 }
@@ -1146,7 +1146,7 @@ func TestSendDuringSetupSurvivesARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.waitFor(s.ID, "the messages to go out", func(s Thread) bool { return s.Setup.Phase == SetupDone && len(s.Setup.Queued) == 0 })
-	if got := e.sentTexts(); !slices.Equal(got, []string{"first", "second"}) {
+	if got := e.sentTextsN(2); !slices.Equal(got, []string{"first", "second"}) {
 		t.Errorf("sent %q", got)
 	}
 }
@@ -1190,7 +1190,7 @@ func TestSendDuringSetupGoesAtTheNextStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.sentUser("third")
-	if got := e.sentTexts(); !slices.Equal(got, []string{"first", "second", "third"}) {
+	if got := e.sentTextsN(3); !slices.Equal(got, []string{"first", "second", "third"}) {
 		t.Errorf("sent %q", got)
 	}
 	e.waitFor(s.ID, "the row to empty", func(s Thread) bool { return s.PendingFirst == nil && len(s.Setup.Queued) == 0 })
@@ -1211,7 +1211,7 @@ func TestSendAfterItFailedTriesAgain(t *testing.T) {
 		t.Errorf("item %+v", it)
 	}
 	e.waitFor(s.ID, "the setup to land", func(s Thread) bool { return s.Setup.Phase == SetupDone && len(s.Setup.Queued) == 0 })
-	if got := e.sentTexts(); !slices.Equal(got, []string{"do x", "second"}) {
+	if got := e.sentTextsN(2); !slices.Equal(got, []string{"do x", "second"}) {
 		t.Errorf("sent %q", got)
 	}
 }
@@ -1227,7 +1227,7 @@ func TestSendAfterACancelStartsOver(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.waitFor(s.ID, "the setup to land", func(s Thread) bool { return s.Setup.Phase == SetupDone && len(s.Setup.Queued) == 0 })
-	if got := e.sentTexts(); !slices.Equal(got, []string{"first", "second"}) {
+	if got := e.sentTextsN(2); !slices.Equal(got, []string{"first", "second"}) {
 		t.Errorf("sent %q", got)
 	}
 }
@@ -1276,11 +1276,7 @@ func TestSendRacesTheLanding(t *testing.T) {
 		}
 		e.waitFor(s.ID, "the row to empty", func(s Thread) bool { return s.Setup.Phase == SetupDone && len(s.Setup.Queued) == 0 })
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for len(e.sentTexts()) < len(want) && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
-	}
-	got := e.sentTexts()
+	got := e.sentTextsN(len(want))
 	slices.Sort(got)
 	slices.Sort(want)
 	if !slices.Equal(got, want) {

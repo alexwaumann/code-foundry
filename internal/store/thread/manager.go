@@ -246,6 +246,9 @@ type Options struct {
 	// Now is the wall clock: timestamps, snooze validation and wake-ups, idle stops.
 	// Default time.Now.
 	Now func() time.Time
+	// batchClock is the wake batch window's clock (batchclock.go); tests set a manual
+	// one. Default the monotonic clock.
+	batchClock batchClock
 }
 
 func (o Options) withDefaults() (Options, error) {
@@ -324,6 +327,9 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.McpPollInterval, mcpPendingInterval)
 	if o.Now == nil {
 		o.Now = time.Now
+	}
+	if o.batchClock == nil {
+		o.batchClock = realClock{}
 	}
 	if o.ServerProbe == nil {
 		o.ServerProbe = lsofProbe{}
