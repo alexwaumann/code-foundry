@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mockUrl, resetMock } from "./fixtures";
-import { openPrBesidePage } from "./shell-pages";
+import { mockPost, mockUrl, resetMock, setZoom } from "./fixtures";
+import { openPrBesidePage, PR_PANE, sizePane } from "./shell-pages";
 
 /**
  * The Pull request surface's Code tab against the mock's three-file diff (mock/prDiff.ts), in a
@@ -108,3 +108,44 @@ test("the Code tab lists the files and renders the diff; split, file rows scroll
 
 // "the file list folds; the diff is read again when the head moves and on refresh" and "a diff GitHub
 // refuses as too large shows its message and the way to GitHub": src/components/pr/PrCode.test.tsx.
+
+test("the Code tab keeps its top row across zoom changes and a resize of its pane, wrapped", async ({ page }) => {
+  // The library's CodeView anchors its own scroll on a re-layout (docs/notes/shell-24c-last-pass.md):
+  // a long added file whose every 100th line wraps, so rows above the top change height.
+  await page.setViewportSize({ width: 2400, height: 1100 });
+  await mockPost("gh/pr-diff-long?number=145");
+  await openCode(page, 145);
+  await page.evaluate(`__cfModule("/src/stores/codeView.ts").then((m) => m.setWrap(true))`);
+  /** The first row on screen: its text (the long file's lines are unique) and how far above the top it starts, in layout px. */
+  const top = () =>
+    diff(page).evaluate((box) => {
+      const sc = box.firstElementChild as HTMLElement;
+      const s = sc.getBoundingClientRect();
+      let best: { text: string; off: number } | null = null;
+      for (const c of sc.querySelectorAll("diffs-container")) {
+        for (const r of c.shadowRoot?.querySelectorAll<HTMLElement>("[data-content] [data-line]") ?? []) {
+          const b = r.getBoundingClientRect();
+          if (b.height > 0 && b.bottom > s.top + 1 && b.top < s.bottom - 1 && (!best || (b.top - s.top) / sc.currentCSSZoom < best.off)) best = { text: (r.textContent ?? "").split(" ")[1] ?? "", off: (b.top - s.top) / sc.currentCSSZoom };
+        }
+      }
+      return best;
+    });
+  // Line 655 near the top, under the wrapped 651.
+  await diff(page).evaluate((box) => {
+    (box.firstElementChild as HTMLElement).scrollTop = 13616;
+  });
+  await expect.poll(async () => (await top())?.text ?? "").toMatch(/^6\d\d$/);
+  const first = await top();
+  const same = async () => {
+    const now = await top();
+    return now?.text === first?.text && Math.abs((now?.off ?? 99) - (first?.off ?? 0)) <= 4;
+  };
+  for (const zoom of [90, 200, 100]) {
+    await setZoom(page, zoom);
+    await expect.poll(same).toBe(true);
+  }
+  for (const width of [520, 900]) {
+    await sizePane(page, PR_PANE, width);
+    await expect.poll(same).toBe(true);
+  }
+});

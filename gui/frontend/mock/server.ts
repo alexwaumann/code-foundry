@@ -176,6 +176,8 @@
  *   The pull request Code tab's diff and files: mock/prDiff.ts (one
  *        three-file diff for every pull request, #140's refused as too large; counts
  *        "GetPullRequestDiff", "GetPullRequestDiff refresh", "GetPullRequestFile <path>")
+ *   POST /__mock/gh/pr-diff-long?number=145   (that pull request's diff ends with a 1,200-line added
+ *        file, long enough to scroll; reset puts the short diff back)
  *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
  *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
  *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
@@ -1401,6 +1403,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
+      break;
+    case "POST /__mock/gh/pr-diff-long":
+      world.gh.prDiffs.long.add(Number(q.get("number") ?? "0"));
+      json(res, 200, { long: [...world.gh.prDiffs.long] });
       break;
     case "POST /__mock/gh/pr-fail":
       // command=pr.refresh makes that pull request command's next run fail.
