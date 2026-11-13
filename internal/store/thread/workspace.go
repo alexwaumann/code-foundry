@@ -57,7 +57,7 @@ const ThreadPrompt = "This thread runs inside code-foundry. Its skill code-found
 	"PRs: code-foundry pr.create (project.github.publish off GitHub); " +
 	"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call; " +
 	"never suggest /model or /cost; " +
-	"page verbs (view.*) move every window: prefer panel verbs; " +
+	"page verbs (view.*) move every window: prefer view.open; " +
 	"say what you'll do, not command or skill names. " +
 	"Work split up, run in parallel or landed on several branches goes through code-foundry-orchestrate, never hand-made worktrees or branches, nor the Agent tool (read-only research)."
 

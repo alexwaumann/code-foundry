@@ -49,7 +49,7 @@ func (d ViewDeps) paneFullscreenCommand() Command {
 				}
 				params["pane"] = p
 			}
-			return EmitTo(d.Emitter, showViewIntent(ViewPaneFullscreen, "", params)).CLIResult(uctx), nil
+			return EmitTo(d.Emitter, showViewIntent(ViewPaneFullscreen, params)).CLIResult(uctx), nil
 		},
 	}
 }

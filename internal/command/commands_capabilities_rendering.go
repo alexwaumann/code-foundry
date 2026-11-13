@@ -8,7 +8,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/pagelib"
 )
 
-// Rendering is one thing the thread view (or the side panel's File tab, reached from it)
+// Rendering is one thing the thread view (or a File tab, reached from it)
 // shows, for daemon.capabilities --group rendering.
 type Rendering struct {
 	Name string `json:"name"`
@@ -28,16 +28,16 @@ var renderings = []Rendering{
 		"strikethrough, links (absolute ones open in the browser). Raw HTML shows as text, except the inline " +
 		"tags kbd, sub, sup, mark, small, ins, del, s, u and br."},
 	{"code", "Fenced code with syntax highlighting and a Copy button. A finished bash, sh, shell, zsh or " +
-		"console (`$ ` lines) block in your reply also gets Run in terminal, which runs it in a bottom-panel shell."},
+		"console (`$ ` lines) block in your reply also gets Run in terminal, which runs it in a terminal tab beside the thread."},
 	{"paths", "A file path in prose, inline code or a relative link (with :line, :line:col or #L12-L30) becomes " +
-		"a chip; clicking it opens the file in the side panel's File tab at that line."},
+		"a chip; clicking it opens the file in a File tab at that line."},
 	{"images", "https images (![alt](https://…)) render inline in a reply. A local image's path in prose or inline code is " +
 		"a chip that opens the image in the File tab; markdown image syntax with a local path (![](a.png)) shows only a label that does not open. " +
 		"A Read of an image shows it in the tool's detail; the user's attached images show as tiles."},
 	{"pdfs", "The user's attached PDFs show a first-page thumbnail and page count. A PDF path chip opens it in the " +
 		"File tab, which draws its pages. Replies do not render PDFs inline."},
 	{"html", "An .html or .htm file opens rendered and interactive in the File tab (scripts on, sandboxed, served " +
-		"by the daemon's preview), through its path chip or view.panel.file; a toggle shows the source. A page that links " +
+		"by the daemon's preview), through its path chip or view.open.file; a toggle shows the source. A page that links " +
 		"<link rel=\"stylesheet\" href=\"/cf/theme.css\"> gets the user's theme: --cf-* variables (surfaces, text, accent, " +
 		"status colours, sidebar, diff, charts), the shadcn names (--background, --card…), radii and type-role classes " +
 		"(.text-body…); /cf/theme.json has the same for scripts, and the frame is posted {type: \"cf:theme\", id, scheme, vars} " +
@@ -102,8 +102,8 @@ var renderingsAfter = []Rendering{
 		"another theme, or new colours for the theme in use) the user also gets a toast with Undo and Edit. A later save of the same theme adds a new card. " +
 		"The save prints the app's contrast check of the file (failing pairs, stale pins) while the app is open; theme check <id> prints it again."},
 	{"edits", "Edit, MultiEdit, Write and NotebookEdit calls show as diffs in the timeline."},
-	{"file tab", "Opened by a path chip the user clicks, or by view.panel.file (view.panel.diff for a changed file's diff). " +
-		"It renders markdown, images, PDFs and HTML, and highlights other text files; the user can edit a text file there, and view.panel.file --edit asks them to."},
+	{"file tab", "Opened by a path chip the user clicks, or by view.open.file (view.open.diff for a changed file's diff). " +
+		"It renders markdown, images, PDFs and HTML, and highlights other text files; the user can edit a text file there, and view.open.file --edit asks them to."},
 	{"not rendered", "Math (LaTeX) and mermaid or other diagrams show as text or code; data: URI images and raw " +
 		"HTML blocks do not render."},
 }

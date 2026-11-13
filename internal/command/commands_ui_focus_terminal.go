@@ -26,7 +26,7 @@ type uiOptions struct {
 }
 
 // WithTerminalTabs gives ui.focus.terminal the layout and the terminals it reads the labels of.
-// Without them it only tells the classic window.
+// Without them it only sends FocusTerminal, which moves the keyboard to a terminal tab that is open.
 func WithTerminalTabs(l layoutstore.Store, terms TerminalBackend) UIOption {
 	return func(o *uiOptions) { o.layout, o.terminals = l, terms }
 }

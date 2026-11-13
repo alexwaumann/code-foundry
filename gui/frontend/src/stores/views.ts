@@ -3,15 +3,13 @@
  * over the window showing Settings or Themes, docs/notes/settings-sheet.md), the usage
  * sheet (docs/notes/usage-sheet.md; at most one of the three is open) and the help
  * overlay. None replaces the content area: the window stays laid out under them.
- * Top-level pages that are selections (ui.ts `viewNames`, the Pull Requests page) are
- * routed to `select`. Opened by view.settings / view.help (their chords are presented
+ * Opened by view.settings / view.help (their chords are presented
  * locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
  * window's own settings and usage keys and buttons toggle (toggleView); a ShowView only shows.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
-import { projectPage, useUiStore, viewNames, workspacePage, type Selection } from "./ui";
-import { openMcpSurface } from "./mcpPanel";
+import { useUiStore } from "./ui";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
@@ -135,17 +133,6 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "help":
       openHelp();
       return true;
-    case "panel.toggle":
-    case "panel.expand":
-    case "panel.new-tab":
-    case "panel.split":
-    case "bottom.toggle":
-      // The classic side and bottom panels' verbs (view.panel.toggle, .expand, .new-tab, .split,
-      // view.bottom.toggle): this window has neither panel, so they change nothing. PR 22 retires them.
-      return true;
-    case "panel.mcp":
-      // view.panel.mcp: the MCP surface beside the current thread.
-      return openMcpSurface() !== null;
     case "agent.up":
       // thread.agent.up from the CLI: out of the subagent view, back to its thread.
       leaveSubagent();
@@ -237,21 +224,10 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
         setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => void showPluginView(name));
         return true;
       }
-      // Top-level pages (the Pull Requests page) are selections. Closing settings and
-      // usage here too covers re-selecting the page that is already selected.
-      if (!viewNames.includes(name)) return false;
-      setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => {
-        useUiStore.getState().select(pageSelection(name, params));
-      });
-      return true;
+      // The Pull Requests and Projects pages are tabs: view.pullrequests and view.projects open
+      // them in the layout and send nothing (docs/notes/shell-22-retire-verbs.md).
+      return false;
   }
-}
-
-/** The selection a top-level page's ShowView names: a project's or workspace's page for "projects" with one in params. */
-function pageSelection(name: string, params: Readonly<Record<string, string>> | undefined): Extract<Selection, { kind: "view" }> {
-  if (name === "projects" && params?.project) return projectPage(params.project);
-  if (name === "projects" && params?.workspace) return workspacePage(params.workspace);
-  return { kind: "view", name };
 }
 
 /**

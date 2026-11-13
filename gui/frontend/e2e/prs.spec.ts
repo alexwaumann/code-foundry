@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, invocations, mockPost, resetMock } from "./fixtures";
+import { emit, invocations, invokeAs, mockPost, resetMock } from "./fixtures";
 import { layoutState, openShellApp, paneNode, paneOf, paletteRun, seedLayout, threadTab } from "./shell";
 import { openPrsTab } from "./shell-pages";
 
@@ -170,7 +170,7 @@ test.describe("Pull Requests page", () => {
 
   // cmd+shift+d is the thread's diff in the shell (shell-model.md, Keys); Show Pull Requests has no
   // chord: the palette and a pane's + open the page (+: src/components/shell/linkedTabs.test.tsx).
-  test("the palette runs view.pullrequests and the ShowView intent shows the page's tab", async ({ page }) => {
+  test("the palette runs view.pullrequests, and the CLI's opens the page's tab too", async ({ page }) => {
     await seedLayout(paneNode("p-1", [threadTab("s-1")]), "p-1");
     await openShellApp(page);
     await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
@@ -178,19 +178,22 @@ test.describe("Pull Requests page", () => {
     await expect(page.getByTestId("prs-page")).toBeVisible();
     expect((await invocations()).some((i) => i.name === "view.pullrequests")).toBe(true);
 
-    // The intent a command emits does the same: the space's one Pull Requests tab, shown.
+    // The CLI's (the user's, outside a thread) does the same through the layout alone: the space's
+    // one Pull Requests tab, shown (docs/notes/shell-22-retire-verbs.md).
     await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').click();
     await expect(page.getByTestId("prs-page")).toHaveCount(0);
-    expect(await emit({ showView: { name: "pullrequests" } })).toBeGreaterThan(0);
+    expect((await invokeAs("", "view.pullrequests")).ok).toBe(true);
     await expect(page.getByTestId("prs-page")).toBeVisible();
     const kinds = async () => {
       const root = (await layoutState()).spaces[0]?.root;
       return root?.t === "pane" ? root.tabs.map((t) => String(t.kind)) : [];
     };
     await expect.poll(kinds).toEqual(["thread", "prs"]);
-    // Unknown views are ignored.
+    // A ShowView of the page (an older daemon's) is no view any more: ignored.
+    await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').click();
+    await emit({ showView: { name: "pullrequests" } });
     await emit({ showView: { name: "nope" } });
-    await expect(page.getByTestId("prs-page")).toBeVisible();
+    await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
   });
 
   // "gh events refresh the page; a failed poll shows stale and the error": src/components/prs/PullRequestsPage.test.tsx.

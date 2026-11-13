@@ -23,6 +23,8 @@ describe("the mock's keymap", () => {
     // The retired chords are on nothing.
     const all = [...byName.values()].flat();
     for (const c of ["cmd+shift+e", "cmd+\\", "cmd+alt+\\"]) expect(all, c).not.toContain(c);
-    for (const name of ["view.pullrequests", "view.projects", "thread.previous", "thread.next", "view.bottom.toggle", "view.panel.toggle", "thread.rename"]) expect(byName.get(name), name).toEqual([]);
+    for (const name of ["view.pullrequests", "view.projects", "thread.previous", "thread.next", "thread.rename"]) expect(byName.get(name), name).toEqual([]);
+    // The side and bottom panel verbs went with their panels (docs/notes/shell-22-retire-verbs.md).
+    for (const name of ["view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.bottom.toggle"]) expect(byName.has(name), name).toBe(false);
   });
 });

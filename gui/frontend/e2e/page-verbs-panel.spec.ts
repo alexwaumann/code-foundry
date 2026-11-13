@@ -35,7 +35,7 @@ test("view.panel.page opens the page in a tab beside the thread with its bridge,
   const cards = page.getByTestId("thread-html");
   await expect(cards).toHaveCount(0);
 
-  expect(await inS1("view.panel.page", { path: PAGE, title: "Welcome" })).toEqual({ ok: true, message: "windows=1 thread=s-1" });
+  expect(await inS1("view.panel.page", { path: PAGE, title: "Welcome" })).toEqual({ ok: true, message: "opened a file tab for thread s-1" });
 
   await expect(tabs(page)).toHaveText(["Welcome"]);
   await expect(panel(page).locator('[data-testid="shell-tab"][data-kind="file"]')).toHaveAttribute("data-active", "true");

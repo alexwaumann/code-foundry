@@ -74,6 +74,9 @@ type FileDiffs struct {
 	Calls
 	Err error
 	Res *v1.CompareWorktreeResponse
+	// Unlisted, when set, says which asked paths a comparison does not list (by its base ref,
+	// for a ref base: "" otherwise); they are left out of the default response.
+	Unlisted func(baseRef, path string) bool
 }
 
 var _ command.WorktreeComparer = (*FileDiffs)(nil)
@@ -92,9 +95,13 @@ func (f *FileDiffs) CompareWorktree(_ context.Context, r *connect.Request[v1.Com
 		Base: &v1.ResolvedDiffSource{Label: "origin/main"}, Head: &v1.ResolvedDiffSource{Label: "Working tree"},
 	}
 	for _, p := range r.Msg.GetPaths() {
+		if f.Unlisted != nil && f.Unlisted(r.Msg.GetBase().GetRef(), p) {
+			res.UnmatchedPaths = append(res.UnmatchedPaths, p)
+			continue
+		}
 		res.Files = append(res.Files, &v1.CompareFile{Path: p, Status: "M"})
 	}
-	if len(res.Files) == 0 {
+	if len(res.Files) == 0 && len(res.UnmatchedPaths) == 0 {
 		res.Files = []*v1.CompareFile{{Path: "a.go", Status: "M"}}
 	}
 	return connect.NewResponse(res), nil

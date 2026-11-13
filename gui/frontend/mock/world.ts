@@ -49,8 +49,7 @@ import { MockDictation } from "./dictation";
 import { MockSearches } from "./agentSearch";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
-import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
-import { keepUsersDiff, panelItemCommands } from "./panelItemVerbs";
+import { intoUsersDiff, panelItemCommands, type PlaceTab } from "./panelItemVerbs";
 import { createHints, type SetThread } from "./projectSets";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -2758,6 +2757,17 @@ export class World {
     if (args.focus !== "false" && !s.createdBy) this.focusThread(s.id);
   }
 
+  /**
+   * Opens an item verb's tab (view.open.*, panelItemVerbs.ts and mcp.ts) in the layout, as the
+   * daemon's tabs.open: a diff that frames nothing lands in the user's own tab, the file picked
+   * there when its sides list it (intoUsersDiff; a changed file of the checkout counts as listed).
+   */
+  private readonly placeItemTab: PlaceTab = (op, keepFocus) => {
+    const thread = (op.tab as { thread?: string } | undefined)?.thread ?? "";
+    const listed = (root: string, file: string) => (this.gh.details.get(root)?.files ?? []).some((f) => f.path === file);
+    this.layout.apply(intoUsersDiff(this.layout.state(), op, thread, listed), "", { keep_focus: keepFocus });
+  };
+
   /** An intent as a command emits it: delivered to WatchIntents watchers and EventService watchers with UI. */
   emit(intent: UiIntentInit): number {
     return this.intents.publish(intent) + this.uiEventWatchers;
@@ -4143,16 +4153,13 @@ export class World {
     const activeThread = (ctx: UiContext | undefined) => (ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined);
     const always = () => true;
     return [
-      ...viewCommands(
-        (i) => this.emit(i),
-        (kind, pane, params) => {
-          this.layout.apply({ op: "open_surface", pane, tab: { id: "", kind, ...(Object.keys(params).length > 0 ? { params } : {}) }, focus: true }, "");
-        },
-      ),
+      ...viewCommands((kind, pane, params, focus) => {
+        this.layout.apply({ op: "open_surface", ...(pane ? { pane } : {}), tab: { id: "", kind, ...(params ? { params } : {}) }, focus }, "", { keep_focus: !focus });
+      }),
       ...bridgeCommands(() => [...this.threads.values()]),
       ...fileExportCommands((id) => this.threads.get(id)?.worktreePath, () => this.exportDisk),
       ...this.logs.commands(),
-      ...mcpCommands(this.logs, (i) => this.emit(i)),
+      ...mcpCommands(this.logs, this.placeItemTab),
       ...panelItemCommands((id) => {
         const t = this.threads.get(id);
         if (!t) return undefined;
@@ -4163,9 +4170,7 @@ export class World {
           checkouts: Object.entries(t.checkoutPaths).filter(([, path]) => path).map(([projectId, path]) => ({ projectId, path })),
           changed: (root) => this.gh.details.get(root)?.files?.map((f) => f.path ?? ""),
         };
-      }, (i) => this.emit(i), (op, keepFocus) => {
-        this.layout.apply(keepUsersDiff(this.layout.state(), op), "", { keep_focus: keepFocus });
-      }),
+      }, this.placeItemTab),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...shellCommands(this.logs),
       ...this.actions.commands(),
@@ -4400,7 +4405,7 @@ export class World {
         // Like the daemon (canOpenMove): a thread without a project or workspace.
         when: (ctx) => Boolean(ctx?.activeThreadId) && !ctx?.activeProjectId && !ctx?.activeWorkspaceId,
         run: (ctx, args) => {
-          this.intents.publish({ intent: { case: "showView", value: { name: "thread.move", threadId: "", params: { id: args.id || (ctx?.activeThreadId ?? "") } } } });
+          this.intents.publish({ intent: { case: "showView", value: { name: "thread.move", params: { id: args.id || (ctx?.activeThreadId ?? "") } } } });
           return "";
         },
       },
@@ -5267,16 +5272,6 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: [], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.toggle", args),
-      },
-      {
-        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: [], args: [] },
-        when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
-      },
-      {
         cmd: { name: "view.thread-info", title: "Toggle Thread Info", category: "View", description: "Show or hide the thread info card beside a thread's conversation: its checkout, branch and pull requests, git state, shells, related threads and agents, MCP servers, context and usage.", keybindings: ["cmd+shift+i"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread-info" } } }))}`,
@@ -5347,21 +5342,6 @@ export class World {
         when: (ctx: UiContext | undefined) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId)),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
       })),
-      {
-        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.expand", args),
-      },
-      {
-        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.", keybindings: [], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.new-tab", args),
-      },
-      {
-        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: [], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.split", args),
-      },
       {
         cmd: { name: "view.back", title: "Back", category: "View", description: "Go back to what was focused before: a tab, a pane, a space.", keybindings: ["cmd+["], args: [] },
         when: always,

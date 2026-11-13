@@ -8,7 +8,6 @@ import { getUiContext } from "./context";
 import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { usePluginsStore } from "./plugins";
 import { showAgentRun } from "./subagentView";
-import { showThreadView } from "./threadPanelIntent";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
@@ -114,12 +113,8 @@ export function applyIntent(intent: UiIntentView): void {
       break;
     }
     case "showView":
-      if (intent.threadId) {
-        // An item action scoped to one thread (a view.open.* verb run inside it): the
-        // window does not move, so a pending focus stays pending too.
-        showThreadView(intent.name, intent.threadId, intent.params);
-        break;
-      }
+      // The item verbs (view.open.*) send none: their tab in the layout is the whole effect
+      // (docs/notes/shell-22-retire-verbs.md).
       clearPendingFocus();
       showView(intent.name, intent.params);
       break;

@@ -7,23 +7,14 @@ import { requestPaneFocus, requestPaneFocusOverSheets } from "./shellView";
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
 
 describe("showView", () => {
-  it("\"projects\" selects the Projects page and closes settings", () => {
+  // view.pullrequests and view.projects open their tab in the layout and send no ShowView
+  // (docs/notes/shell-22-retire-verbs.md); neither do the item verbs, whose old names were panel.*.
+  it.each(["pullrequests", "projects", "panel.file", "panel.diff", "panel.pr", "panel.mcp", "panel.gallery"])("%s is no view: ignored", (name) => {
     useUiStore.setState({ selection: { kind: "thread", id: "a" } });
     useViewsStore.setState({ settingsOpen: true, helpOpen: false });
-    expect(showView("projects")).toBe(true);
-    expect(useUiStore.getState().selection).toEqual({ kind: "view", name: "projects" });
-    expect(useViewsStore.getState().settingsOpen).toBe(false);
-  });
-
-  it.each([
-    ["project", { project: "r1" }, { kind: "view", name: "projects", projectId: "r1" }],
-    ["workspace", { workspace: "w-1" }, { kind: "view", name: "projects", workspaceId: "w-1" }],
-  ])("\"projects\" with a %s param selects that page (view.projects --project / --workspace)", (_kind, params, want) => {
-    useUiStore.setState({ selection: { kind: "thread", id: "a" } });
-    useViewsStore.setState({ settingsOpen: true, helpOpen: false });
-    expect(showView("projects", params)).toBe(true);
-    expect(useUiStore.getState().selection).toEqual(want);
-    expect(useViewsStore.getState().settingsOpen).toBe(false);
+    expect(showView(name, { project: "r1" })).toBe(false);
+    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "a" });
+    expect(useViewsStore.getState().settingsOpen).toBe(true);
   });
 
   it("\"dashboard\" (removed, docs/notes/remove-dashboard.md) is an unknown name: ignored", () => {
@@ -90,7 +81,6 @@ describe("the usage page", () => {
     ["settings over help", { helpOpen: true }, "settings", { settingsOpen: true, usageOpen: false, helpOpen: false }],
     ["usage over settings", { settingsOpen: true, helpOpen: true }, "usage", { settingsOpen: false, usageOpen: true, helpOpen: false }],
     ["settings over usage", { usageOpen: true }, "settings", { settingsOpen: true, usageOpen: false, helpOpen: false }],
-    ["a top-level page closes usage", { usageOpen: true }, "pullrequests", { settingsOpen: false, usageOpen: false, helpOpen: false }],
   ])("%s", (_name, before, view, want) => {
     useViewsStore.setState(before);
     showView(view);
@@ -141,10 +131,10 @@ describe("the usage page", () => {
     }
   });
 
-  it("the classic panels' verbs (PR 22 retires them) change nothing, and it stays up", () => {
+  it("the classic panels' verbs are gone: their names are no view, and it stays up", () => {
     useViewsStore.setState({ usageOpen: true });
     const before = useUiStore.getState().selection;
-    for (const name of ["panel.toggle", "panel.expand", "panel.new-tab", "panel.split", "bottom.toggle"]) expect(showView(name)).toBe(true);
+    for (const name of ["panel.toggle", "panel.expand", "panel.new-tab", "panel.split", "bottom.toggle"]) expect(showView(name)).toBe(false);
     expect(views().usageOpen).toBe(true);
     expect(useUiStore.getState().selection).toBe(before);
   });

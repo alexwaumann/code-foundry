@@ -193,10 +193,10 @@ func TestPanelDiff(t *testing.T) {
 				if tt.msg != "" && !strings.Contains(err.Error(), tt.msg) {
 					t.Errorf("err = %v, want %q", err, tt.msg)
 				}
-				sameIntents(t, emit.Intents(), nil)
+				openedNothing(t, reg, emit)
 				return
 			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelDiff, "s-aaaaaaaaaaa1", tt.wantParams)})
+			openedTab(t, reg, emit, res, "s-aaaaaaaaaaa1", tt.wantParams)
 			reqs := tt.diffs.Requests()
 			req, ok := reqs[len(reqs)-1].(*v1.CompareWorktreeRequest)
 			if !ok {
@@ -238,12 +238,13 @@ func TestPanelDiffAsker(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, diffs: &commandtest.FileDiffs{}})
 			args := map[string]string{"note": "Look here", "thread": "s-aaaaaaaaaaa1"}
-			if _, err := reg.Invoke(context.Background(), tt.uctx, "view.panel.diff", args); err != nil {
+			res, err := reg.Invoke(context.Background(), tt.uctx, "view.panel.diff", args)
+			if err != nil {
 				t.Fatal(err)
 			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelDiff, "s-aaaaaaaaaaa1", map[string]string{
+			openedTab(t, reg, emit, res, "s-aaaaaaaaaaa1", map[string]string{
 				"project": "r1", "worktree": "/wt", "own": "1", "note": "Look here", "thread": tt.want,
-			})})
+			})
 		})
 	}
 }

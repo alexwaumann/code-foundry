@@ -109,16 +109,16 @@ type Deps struct {
 	// for a system scheme in the theme verbs' output; nil: unknown.
 	ThemeShowing func() (scheme string, ok bool)
 	// Files reads a file as the File tab does (FilesystemService.ReadFile), for
-	// view.panel.file. Nil makes it fail with Unimplemented.
+	// view.open.file. Nil makes it fail with Unimplemented.
 	Files command.FileReader
 	// FileEdits checks a file the File tab is to edit (Filesystem.CheckEdit), for
-	// view.panel.file --edit. Nil makes it fail with Unimplemented.
+	// view.open.file --edit. Nil makes it fail with Unimplemented.
 	FileEdits command.FileEditChecker
 	// FileExports writes a page's file into its thread's checkout (Filesystem.ExportFile),
 	// for file.export. Nil makes it fail with Unimplemented.
 	FileExports command.FileExporter
 	// FileDiffs reads what differs in a checkout as the Diff tab does
-	// (ProjectService.CompareWorktree), for view.panel.diff. Nil makes it fail with
+	// (ProjectService.CompareWorktree), for view.open.diff. Nil makes it fail with
 	// Unimplemented.
 	FileDiffs command.WorktreeComparer
 	// Layout backs layout.show, space.*, pane.*, tab.*, thread.open, thread.close and

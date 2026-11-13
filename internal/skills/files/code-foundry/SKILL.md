@@ -9,14 +9,14 @@ user-invocable: false
 {{cf.provenance}}
 
 Code Foundry is the macOS app this thread runs in: it runs Claude Code threads (conversations
-like this one) on the user's projects in one window with a sidebar, pages and a side panel per
-thread. The `code-foundry` CLI drives it (most buttons are commands too) and changes the real app.
+like this one) on the user's projects in one window with a sidebar and panes of tabs: a thread,
+and its diff, files and pull requests beside it. The `code-foundry` CLI drives it (most buttons are commands too) and changes the real app.
 
 ## The one rule
 
 If the CLI can do it, offer it and do it. A question ("how do I…?") gets the answer and the offer;
 run a change once the user says yes (code-foundry-help). Talk about the app as the user sees it:
-pages, buttons, the side panel, Settings labels; never skill or command names.
+pages, tabs, buttons, Settings labels; never skill or command names.
 
 ## Which skill or command
 

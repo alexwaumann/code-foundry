@@ -38,7 +38,7 @@ func TestSystemPrompt(t *testing.T) {
 		"code-foundry usage.show", "view.open.file, diff or pr (a tab beside you; --focus only if asked)", "secrets: view.open.file --edit --note, not chat",
 		"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line", "a page, mockup, chart or form to fill in is an .html file in $CODE_FOUNDRY_PAGES, not the repo unless asked (skill code-foundry-pages first), shown with view.inline <file>, not markdown", "code-foundry pr.create (project.github.publish",
 		"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call",
-		"/model or /cost", "page verbs (view.*) move every window: prefer panel verbs", "not command or skill names"} {
+		"/model or /cost", "page verbs (view.*) move every window: prefer view.open", "not command or skill names"} {
 		if !strings.Contains(ThreadPrompt, want) {
 			t.Errorf("ThreadPrompt does not route %q: %q", want, ThreadPrompt)
 		}

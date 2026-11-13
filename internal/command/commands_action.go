@@ -168,14 +168,14 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Name:  "action.add",
 			Title: "Add Action",
 			Description: "Add an action to a project: a command line run as `$SHELL -lc <command>` in a worktree, with " +
-				"CODE_FOUNDRY_PROJECT_ROOT and CODE_FOUNDRY_WORKTREE set. It opens as a terminal in the bottom panel, " +
+				"CODE_FOUNDRY_PROJECT_ROOT and CODE_FOUNDRY_WORKTREE set. It opens as a terminal tab, " +
 				"or with --in-terminal=false runs in the background with its output captured.",
 			Category: "Action",
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Name, unique in the project (ignoring case)"},
 				{Name: "command", Type: String, Required: true, Description: "Command line (may span lines)"},
 				withDefault(iconArg, "play"),
-				{Name: "in-terminal", Type: Bool, Default: "true", Description: "Run in a terminal in the bottom panel (--in-terminal=false: in the background)"},
+				{Name: "in-terminal", Type: Bool, Default: "true", Description: "Run in a terminal tab (--in-terminal=false: in the background)"},
 				{Name: "on-worktree-create", Type: Bool, Default: "false", Description: "Also run (in the background) when a new thread creates its worktree"},
 				projectArg, hereArg,
 			},

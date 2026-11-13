@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, mockPost, openApp, resetMock, row } from "./fixtures";
+import { invokeAs, mockPost, openApp, resetMock, row } from "./fixtures";
 import { activeOfKind, paneWith, stripTabs } from "./shell-surfaces";
 
 /**
@@ -57,7 +57,7 @@ test("the palette's Show MCP Servers opens the MCP tab beside the thread", async
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Show MCP Servers");
   const palette = page.getByTestId("palette");
-  await palette.locator('[data-command="view.panel.mcp"]').click();
+  await palette.locator('[data-command="view.open.mcp"]').click();
   await expect(palette).toHaveCount(0);
   await expectMcpTab(page);
   await expectTabs(page, [3, 2, 1], "connected", ["t3-code", "github", "filesystem"]);
@@ -67,11 +67,16 @@ test("the palette's Show MCP Servers opens the MCP tab beside the thread", async
 
 // The chosen tab per panel, reset when the MCP tab closes: unit-tested in src/stores/mcpTabs.test.ts
 
-// Not in the + list, M opening nothing, the thread info card's Open MCP panel, view.panel.mcp's
-// ShowView, the tools' expand and collapse and their hint labels: src/surfaces/mcp.test.tsx.
-test("the CLI's view.panel.mcp opens it; a tool's hint icons show their tooltips on hover", async ({ page }) => {
+/** The CLI's view.open.mcp for s-r1, taking the user there: the daemon opens the tab, no intent. */
+async function openFromCli(): Promise<void> {
+  expect((await invokeAs("s-r1", "view.open.mcp", { focus: "true" })).ok).toBe(true);
+}
+
+// Not in the + list, M opening nothing, the thread info card's Open MCP panel, the tools' expand
+// and collapse and their hint labels: src/surfaces/mcp.test.tsx.
+test("the CLI's view.open.mcp opens it; a tool's hint icons show their tooltips on hover", async ({ page }) => {
   await openThread(page);
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await openFromCli();
   await expectMcpTab(page);
   const github = card(page, "github");
   await github.getByTestId("mcp-tools-toggle").click();
@@ -121,7 +126,7 @@ async function expectStale(page: Page, on: boolean): Promise<void> {
 
 // A thread Claude never reported for: unit-tested in src/surfaces/mcp.test.tsx.
 
-// Hidden for a page (not in the panel's list, M and view.panel.mcp open nothing): src/surfaces/mcp.test.tsx
+// Hidden for a page (not in the panel's list, M and the window's open give nothing): src/surfaces/mcp.test.tsx
 // ("on a page…"); not in the palette there: the daemon's When (internal/command/commands_mcp_test.go).
 
 /** The DOM edits stretchNames makes, by tab (a tab switch remounts the cards). */
@@ -169,7 +174,7 @@ async function expectPillsInside(page: Page, names: string[]): Promise<void> {
 
 test("long names truncate: the status pill stays in the card and the pane never scrolls sideways", async ({ page }) => {
   await openThread(page);
-  expect(await emit({ showView: { name: "panel.mcp" } })).toBeGreaterThan(0);
+  await openFromCli();
   await expectMcpTab(page);
   await stretchNames(page);
   await expectPillsInside(page, ["t3-code", "github"]);

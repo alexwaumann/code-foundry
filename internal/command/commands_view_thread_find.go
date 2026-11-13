@@ -40,7 +40,7 @@ func (d ViewDeps) threadFindCommands() []Command {
 				return "no thread is on screen"
 			},
 			Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
-				return EmitTo(d.Emitter, showViewIntent(view, "", nil)).CLIResult(uctx), nil
+				return EmitTo(d.Emitter, showViewIntent(view, nil)).CLIResult(uctx), nil
 			},
 		}
 	}

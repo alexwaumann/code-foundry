@@ -132,7 +132,7 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 		out = append(out, command.Command{
 			Name:  ShowCommand(name, spec.ID),
 			Title: "Show " + spec.Title,
-			Description: fmt.Sprintf("Open %s's %s surface in the side panel (%s scope). Available where the surface is: "+
+			Description: fmt.Sprintf("Open %s's %s surface as a tab (%s scope). Available where the surface is: "+
 				"`code-foundry plugin surface %s %s` prints its view.", mf.DisplayNameOr(), spec.Title, spec.Scope, name, spec.ID),
 			Category:       mf.DisplayNameOr(),
 			Args:           args,

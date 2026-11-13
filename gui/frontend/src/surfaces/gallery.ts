@@ -6,8 +6,8 @@ import type { SurfaceSpec } from "./types";
 
 /**
  * Gallery: a set of images a thread shows (components/gallery/GalleryTab.tsx), as a grid that
- * opens one image over a filmstrip. Never listed and no hotkey: view.panel.gallery is the only
- * way in (stores/threadPanelIntent.ts), one tab per title: params { title, images, project,
+ * opens one image over a filmstrip. Never listed and no hotkey: view.open.gallery is the only
+ * way in (the daemon opens its tab), one tab per title: params { title, images, project,
  * base } (surfaces/galleryTarget.ts). Opening one from an image in a thread would be another
  * caller of galleryTab.
  */

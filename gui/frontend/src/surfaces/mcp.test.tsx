@@ -20,7 +20,8 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { setMcpTab, useMcpTabsStore } = await import("@/stores/mcpTabs");
-const { showView, useViewsStore } = await import("@/stores/views");
+const { useViewsStore } = await import("@/stores/views");
+const { openMcpSurface } = await import("@/stores/mcpPanel");
 
 const thread = (id: string, state = "connected") =>
   ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
@@ -67,10 +68,10 @@ const pick = (bucket: string) => {
 /** The kinds of the current space's tabs. */
 const kinds = () => layoutTabs().map((t) => t.kind);
 
-/** view.panel.mcp (the palette's Show MCP Servers, the CLI): the MCP tab beside the selected thread, once the layout has it. */
+/** The window's own open (the thread info card's MCP row): the MCP tab beside the selected thread, once the layout has it. */
 async function openMcp(): Promise<void> {
   await act(async () => {
-    showView("panel.mcp");
+    openMcpSurface();
     await layoutSettled();
   });
 }
@@ -95,7 +96,7 @@ afterEach(() => {
 });
 
 describe("MCP surface", () => {
-  it("opens as a tab linked to the thread, beside it (view.panel.mcp); a page has none", async () => {
+  it("opens as a tab linked to the thread, beside it; a page has none", async () => {
     await openMcp();
     expect(layoutTabs().map((t) => [t.kind, t.thread, t.active])).toEqual([
       ["thread", "s-r", true],
@@ -198,11 +199,11 @@ describe("MCP surface", () => {
     expect(screen.queryByTestId("mcp-tools")).toBeNull();
   });
 
-  it("on a page: view.panel.mcp opens nothing", async () => {
+  it("on a page: it opens nothing", async () => {
     useUiStore.setState({ selection: { kind: "view", name: "projects" } });
     render(<ShellPanes />);
     await act(async () => {
-      expect(showView("panel.mcp")).toBe(false);
+      expect(openMcpSurface()).toBeNull();
       await layoutSettled();
     });
     expect(kinds()).toEqual(["thread"]);

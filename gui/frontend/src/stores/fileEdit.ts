@@ -17,7 +17,7 @@ import { blankFile, canEdit, readFile, versionStamp, writeFile, type FileReadVie
 import { errorMessage } from "@/api/stream";
 import { draftText, forgetDraft, loadCodeEditor, type EditorHandle, type EditorPlace } from "@/lib/codeEditor";
 import { deepActiveElement } from "@/lib/keyTarget";
-import { findTab, groupOfTab, setTabParams, shownTab, subscribeTabs, tabPlace, targetOf, type Tab, type TabPlaces } from "@/shell/host";
+import { findTab, setTabParams, shownTab, subscribeTabs, tabPlace, targetOf, type Tab, type TabPlaces } from "@/shell/host";
 import { useUiStore } from "./ui";
 
 /** What is wrong with the draft's baseline: the file was changed, or is gone. */
@@ -166,20 +166,10 @@ useUiStore.subscribe((s, prev) => {
   if (s.palette.open && !prev.palette.open) paletteEditor = editorWithFocus();
 });
 
-/**
- * The tab whose editor has the keyboard among `panelKey`'s tabs when opening tab `tabId` could
- * swap the document under the user's fingers (null otherwise): another tab's editor, in the
- * group `tabId` is open in. For a tab not open yet the daemon picks the pane, so it is that
- * editor's tab wherever it is: the open names it (shell/host.ts openTab `behind`), and the new
- * tab waits behind it only if it lands in its pane.
- */
-export function editorTabInTheWay(panelKey: string, tabId: string): string | null {
+/** The edit session whose editor has the keyboard (its find field too); null when none does. */
+export function typingIn(): FileEdit | null {
   const at = editorWithFocus();
-  const s = at === null ? undefined : session(at);
-  if (s?.panelKey !== panelKey || s.tabId === tabId) return null;
-  const p = tabPlace(panelKey);
-  const open = groupOfTab(p, tabId);
-  return open === null || open === groupOfTab(p, s.tabId) ? s.tabId : null;
+  return (at !== null && session(at)) || null;
 }
 
 /** The session whose editor the user was in: the palette's, while it covers the window. */

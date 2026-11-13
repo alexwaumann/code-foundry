@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Frame, type Page } from "@playwright/test";
 import { CF, invocations, mockPost, mockUrl, openApp, resetMock, row } from "./fixtures";
 
 /**
@@ -284,8 +284,27 @@ test("a page that leads its frame to another grant's page, or is led to its own 
   await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "no");
 });
 
+/**
+ * The card's frame, which stays the same Frame across its navigations. A navigation the page
+ * makes starts after the click or script that asked for it returns (bridge.js carries it on with
+ * location.assign), so waiting for the old document's data-ready proves nothing: wait for the
+ * frame to commit the new one (its URL), then for that document's data-ready.
+ */
+async function cardFrame(page: Page): Promise<Frame> {
+  const frame = await card(page).locator('[data-testid="thread-html-frame"]').elementHandle().then((h) => h.contentFrame());
+  if (!frame) throw new Error("the card has no frame");
+  return frame;
+}
+
+/** Waits until the frame shows `file` (its document committed) and that document's bridge is ready. */
+async function navigatedTo(page: Page, frame: Frame, file: RegExp): Promise<void> {
+  await expect.poll(() => new URL(frame.url()).pathname).toMatch(file);
+  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+}
+
 test("a page's own other file keeps the bridge, followed by a link or set as its location", async ({ page }) => {
   await openBridgeThread(page);
+  const frame = await cardFrame(page);
   const nonce = await doc(page).locator("body").evaluate(NONCE);
   // A link the page adds, followed by the user's click.
   await doc(page).locator("body").evaluate((b) => {
@@ -296,7 +315,7 @@ test("a page's own other file keeps the bridge, followed by a link or set as its
     b.prepend(a);
   });
   await doc(page).locator("#next").click();
-  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  await navigatedTo(page, frame, /\/bridge-next\.html$/);
   expect(await doc(page).locator("body").evaluate(() => location.pathname)).toMatch(/\/bridge-next\.html$/);
   expect(await doc(page).locator("body").evaluate(() => location.hash)).toBe(`#rows&cf=${nonce}`);
   await doc(page).locator("#list").click();
@@ -305,7 +324,7 @@ test("a page's own other file keeps the bridge, followed by a link or set as its
   await doc(page).locator("body").evaluate(() => {
     location.href = "bridge.html";
   });
-  await expect(doc(page).locator("body")).toHaveAttribute("data-ready", "1");
+  await navigatedTo(page, frame, /\/bridge\.html$/);
   expect(await doc(page).locator("body").evaluate(() => location.pathname)).toMatch(/\/bridge\.html$/);
   expect(await doc(page).locator("body").evaluate(NONCE)).toBe(nonce);
   await doc(page).locator("#list").click();

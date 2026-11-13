@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { versionStamp, type FileReadView, type FileWriteView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
-import { fileTab } from "@/surfaces/fileTarget";
+import { fileOfTab, fileTab } from "@/surfaces/fileTarget";
+import { applyLayoutOp } from "@/api/layout";
 import { answerAlternate, answerConfirm, useConfirmStore } from "./confirm";
 import { discardDraft, editorDetached, fileEditKey, noteDraft, noteEditor, observeRead, reloadDraft, saveFile, startEdit, useFileEditStore } from "./fileEdit";
 import { openFileInPanel } from "./filePanel";
@@ -93,6 +94,32 @@ beforeEach(async () => {
 // A tab's params update still on its way would land on the next test's layout.
 afterEach(async () => {
   await layoutSettled();
+});
+
+describe("a request as the daemon writes it (view.open.file --edit, shell-22-retire-verbs.md)", () => {
+  // The daemon's open_surface: the tab linked to the thread, the request whole in its params
+  // (internal/command fileAskParams), the asker another thread than the tab's.
+  it("the tab reads the asker and id from its params, and Save and tell answers that asker", async () => {
+    useThreadsStore.setState((st) => ({ byId: { ...st.byId, "s-2": { ...st.byId["s-1"], id: "s-2", name: "Lead" } as ThreadView }, order: ["s-1", "s-2"] }));
+    await applyLayoutOp({
+      op: "open_surface",
+      tab: { kind: "file", thread: "s-1", params: { path: ENV, project: "repo", base: "/w", edit: "1", asker: "s-2", askId: "d4e5f6a1b2c3", note: "Put the key on line 2", focus: "1" } },
+      focus: true,
+    });
+    await layoutSettled();
+    const t = await tab();
+    expect(fileOfTab(t)).toMatchObject({ edit: true, ask: { id: "d4e5f6a1b2c3", thread: "s-2", note: "Put the key on line 2" } });
+    await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, view(), { create: true });
+    lib.drafts.set(edit()?.stateKey ?? "", SECRET);
+    noteDraft(KEY, SECRET);
+    api.write.mockResolvedValue(written());
+    await expect(saveAndTell(KEY)).resolves.toBe("saved");
+    expect(sentArgs()).toEqual([{ id: "s-2", text: "I saved .env. Continue without reading its values." }]);
+    // The request is over: every param the daemon wrote for it goes, focus with them.
+    const after = (await tab()).params;
+    for (const k of ["edit", "asker", "askId", "note", "focus"]) expect(after[k]).toBeUndefined();
+    expect(after.path).toBe(ENV);
+  });
 });
 
 describe("Save and tell", () => {

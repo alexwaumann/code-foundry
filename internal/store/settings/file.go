@@ -95,10 +95,12 @@ func decode(data []byte) (map[string]string, error) {
 // projects.worktree_dir went when the app took over where worktrees go (always
 // <config home>/worktrees/<owner>/<repo>/<branch>). threads.show_created_threads went
 // when a thread another thread created was never in the sidebar any more
-// (docs/notes/no-sidebar-override-2-daemon.md).
+// (docs/notes/no-sidebar-override-2-daemon.md). appearance.panel_keep_open went with the
+// side panel (docs/notes/shell-22-retire-verbs.md).
 var retiredKeys = []string{
 	GroupProjects + ".worktree_dir",
 	GroupThreads + ".show_created_threads",
+	GroupAppearance + ".panel_keep_open",
 }
 
 // movedKeys are settings that took a new key: old key -> new key. A file that still sets

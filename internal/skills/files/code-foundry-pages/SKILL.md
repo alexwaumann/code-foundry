@@ -22,7 +22,7 @@ first-run welcome page).
 - **A wake** to be told, reminded or have it done later or again: `thread subscribe` (`--pr
   owner/name#4 --until checks_passed`, `--every 1h`; the code-foundry skill), never cron or a `--watch` loop.
 - **A plugin** (the code-foundry-plugin skill) when it must work with no thread at all, as
-  its own side panel tab, or on every new PR in every project.
+  its own tab, or on every new PR in every project.
 - **A plain reply** when one answer is enough ("which PRs are green?").
 
 ## Before you write it

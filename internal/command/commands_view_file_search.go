@@ -41,13 +41,13 @@ func (d ViewDeps) fileSearchCommands() []Command {
 				return "no thread is on screen"
 			},
 			Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
-				return EmitTo(d.Emitter, showViewIntent(view, "", nil)).CLIResult(uctx), nil
+				return EmitTo(d.Emitter, showViewIntent(view, nil)).CLIResult(uctx), nil
 			},
 		}
 	}
 	return []Command{
 		cmd("file.search", ViewFileSearch, "Find in File",
-			"Find in the File tab. Searches the file the side panel's File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"),
+			"Find in the File tab. Searches the file a File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"),
 		cmd("file.search.next", ViewFileSearchNext, "Find Next in File",
 			"Next match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+g"),
 		cmd("file.search.previous", ViewFileSearchPrevious, "Find Previous in File",

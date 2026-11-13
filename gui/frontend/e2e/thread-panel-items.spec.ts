@@ -3,10 +3,10 @@ import { CF, invokeAs, openApp, resetMock, row } from "./fixtures";
 import { openRowThread } from "./shell-threads";
 
 /**
- * view.panel.file, view.panel.diff and view.panel.pr from inside a thread
- * (docs/notes/control-5-fixes.md): the model in s-1 opens a file, a changed file's diff and
- * a pull request as tabs linked to it while the user looks at s-2. The window does not
- * move; the tabs are there for s-1. SHOTS=<dir> saves screenshots.
+ * view.open.file, view.open.diff and view.open.pr (and their old view.panel.* names) from inside
+ * a thread (docs/notes/control-5-fixes.md, shell-22-retire-verbs.md): the model in s-1 opens a
+ * file, a changed file's diff and a pull request as tabs linked to it while the user looks at
+ * s-2. The window does not move; the tabs are there for s-1. SHOTS=<dir> saves screenshots.
  */
 
 /** The tabs linked to a thread (files, diffs, pull requests), in strip order. */
@@ -34,19 +34,19 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-// Which tab each item action opens in which thread's panel, without moving the window: unit-tested
-// in src/stores/threadPanelIntent.test.ts; the daemon placing them without moving the focus (a tab
-// of a thread with no tab in the space goes to the focused pane, behind its active tab):
-// internal/layout/property_test.go (KeepFocus). Left here: the intents arriving over the UiService stream
-// from the CLI while another thread is shown, and the tabs there for s-1.
+// What each item verb opens: internal/command commands_view_open_test.go (and the mock's
+// panelItemVerbs.test.ts); the daemon placing them without moving the focus (a tab of a thread with
+// no tab in the space goes to the focused pane, behind its active tab): internal/layout
+// property_test.go (KeepFocus). Left here: the layout's commits reaching the window from the CLI
+// while another thread is shown, and the tabs there for s-1, under the new names and the old.
 test("a thread's model opens a file, a diff and a pull request in its own panel; the window stays on the user's thread", async ({ page }) => {
   await openApp(page);
   await openRowThread(page, "s-2");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
 
-  expect(await inS1("view.panel.file", { path: `${CF}/README.md`, line: "3" })).toMatch(/^windows=1 thread=s-1$/);
-  expect(await inS1("view.panel.diff", { path: `${CF}/README.md` })).toMatch(/^windows=1 thread=s-1$/);
-  expect(await inS1("view.panel.pr", { number: "145" })).toMatch(/^windows=1 thread=s-1$/);
+  expect(await inS1("view.open.file", { path: `${CF}/README.md`, line: "3" })).toBe("opened a file tab for thread s-1");
+  expect(await inS1("view.panel.diff", { path: `${CF}/README.md` })).toBe("opened a diff tab for thread s-1");
+  expect(await inS1("view.open.pr", { number: "145" })).toBe("opened a pullrequest tab for thread s-1");
 
   // The user's view did not move: s-1 has no tab in the space, so its three tabs wait in the
   // focused pane behind s-2's, each placed after the active tab. A Diff tab is named by its

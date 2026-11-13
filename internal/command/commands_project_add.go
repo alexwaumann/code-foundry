@@ -46,7 +46,7 @@ func (d AddProjectDialog) open(uctx Context) (Result, bool) {
 	if fromThread && d.Viewed != nil && !d.Viewed(uctx.CallerThreadID) {
 		return Result{}, false
 	}
-	return EmitTo(d.Emitter, showViewIntent(ViewProjectAdd, "", nil)).CLIResult(uctx), true
+	return EmitTo(d.Emitter, showViewIntent(ViewProjectAdd, nil)).CLIResult(uctx), true
 }
 
 // RegisterProjectAdd registers project.add (the Add Project dialog: the app presents it

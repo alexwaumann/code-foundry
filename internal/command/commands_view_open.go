@@ -20,10 +20,9 @@ import (
 //
 // Each verb checks its item as it always has, then opens a tab linked to the thread through the
 // layout's open_surface, placed by the rules (or focused where it is, when a tab of the same
-// identity is open), and still sends the classic window its ShowView. So both windows work while
-// the shell is built: the classic window ignores the layout, and the shell ignores panel.*
-// ShowViews. The view.panel.<item> names stay registered as unlisted aliases of the same command
-// for one stable release.
+// identity is open). The tab is the whole effect: no intent goes to the windows
+// (docs/notes/shell-22-retire-verbs.md). The view.panel.<item> names stay registered as unlisted
+// aliases of the same command for one stable release.
 //
 // Focus follows the layout verbs' rule: the user's call (the app, the CLI outside a thread)
 // focuses the tab; a thread's never does without --focus.
@@ -39,25 +38,14 @@ const (
 	tabProjs   = "projects"
 )
 
-// tabs opens surfaces as tabs of the layout. A nil store opens nothing: a daemon without a
-// layout, or a test of the classic half alone.
+// tabs opens surfaces as tabs of the layout.
 type tabs struct{ store layoutstore.Store }
 
 // open opens tb by the placement rules, or in pane when one is given (a pane's "+" menu),
 // taking the user's focus when focus.
 func (o tabs) open(ctx context.Context, tb *core.Tab, pane string, focus bool) (*core.Result, error) {
 	if o.store == nil {
-		return nil, nil
-	}
-	// The checkout's own diff is the user's: a call that frames nothing (no asker, so it only
-	// picks a file) shows an open one as the user has it, its sides, filter, folds and file; the
-	// window picks the file there when the user's sides list it (stores/threadPanelIntent.ts).
-	if tb.Kind == tabDiff && tb.Params[core.DiffAskerParam] == "" {
-		if snap := o.store.Snapshot(); snap != nil {
-			if open := openLinked(snap.State, tb); open != nil {
-				tb = &core.Tab{Kind: tb.Kind, Thread: tb.Thread, Params: maps.Clone(open.Params)}
-			}
-		}
+		return nil, errNoLayout
 	}
 	c, err := layout{store: o.store}.apply(ctx, &core.OpenSurface{Tab: tb, Pane: pane, Focus: focus}, !focus)
 	if err != nil {
@@ -67,7 +55,7 @@ func (o tabs) open(ctx context.Context, tb *core.Tab, pane string, focus bool) (
 }
 
 // openLead is how the item verbs' descriptions say where the tab goes.
-const openLead = "beside a thread (from a thread: its own; in the app: the selected one; the classic window: its side panel), " +
+const openLead = "beside a thread (from a thread: its own; in the app: the selected one), " +
 	"or focus it where it is when the same one is open: "
 
 // openThreadArg is the item verbs' --thread.
@@ -79,7 +67,7 @@ var openThreadArg = ArgSpec{
 
 // openFocusArg is the item verbs' --focus.
 var openFocusArg = ArgSpec{Name: "focus", Type: Bool,
-	Description: "Also take the user's focus to the tab (the classic window: select the thread first); only when the user asked to be taken there"}
+	Description: "Also take the user's focus to the tab; only when the user asked to be taken there"}
 
 // openPaneArg is the --pane of the verbs that open a tab.
 var openPaneArg = paneIDArg("pane", "Open the tab in this pane (the pane's + menu); a linked tab that is already open is focused where it is")
@@ -102,59 +90,37 @@ func itemTab(kind, thread string, params map[string]string) *core.Tab {
 	return tb
 }
 
-// showTab runs an item verb for thread id: check (the item's own check, which gives the tab's
-// params or refuses), then the thread's tab of kind in the layout, then the classic window's
-// ShowView view, scoped to the thread as before. A refusal changes neither window.
-func showTab(ctx context.Context, o tabs, t ThreadGetter, e Emitter, uctx Context, a Args, id, view, kind string, check panelCheck) (Result, error) {
-	var placed *core.Result
+// showTab runs an item verb for thread id: the thread (an unknown one fails), the item's own
+// check (which gives the tab's params or refuses), then the thread's tab of kind in the
+// layout. A refusal opens nothing.
+func showTab(ctx context.Context, o tabs, t ThreadGetter, e Emitter, uctx Context, a Args, id, kind string, check panelCheck) (Result, error) {
+	th, err := itemThread(ctx, t, id)
+	if err != nil {
+		return Result{}, err
+	}
+	var params map[string]string
+	if check != nil {
+		if params, err = check(ctx, th, a); err != nil {
+			return Result{}, err
+		}
+	}
 	focus := wantsFocus(uctx, a)
-	place := func(ctx context.Context, th *v1.Thread, a Args) (map[string]string, error) {
-		var params map[string]string
-		if check != nil {
-			p, err := check(ctx, th, a)
-			if err != nil {
-				return nil, err
-			}
-			params = p
-		}
-		r, err := o.open(ctx, itemTab(kind, id, params), a.String("pane"), focus)
-		if err != nil {
-			return nil, err
-		}
-		placed = r
-		return params, nil
+	c, err := o.open(ctx, itemTab(kind, id, params), a.String("pane"), focus)
+	if err != nil {
+		return Result{}, err
 	}
-	res, err := showScoped(ctx, t, e, uctx, a, id, view, place)
-	if err != nil || placed == nil {
-		return res, err
-	}
-	out, _ := res.JSON.(PanelResult)
-	out.placed(placed, focus)
-	res.JSON = out
+	out := PanelResult{Windows: windowsOf(e), Thread: id}
+	out.placed(c, focus)
+	res := Result{JSON: out}
 	if uctx.ActiveView == "" {
 		res.Message = out.message()
 	}
 	return res, nil
 }
 
-// showPanelTab is showTab for a verb that also runs unscoped: the app's own call without
-// --thread acts on each window's selection in the classic window (showPanel), and its tab goes
-// to the app's active thread.
-func showPanelTab(ctx context.Context, o tabs, t ThreadGetter, e Emitter, uctx Context, a Args, view, kind string) (Result, error) {
-	if id := panelThread(uctx, a); id != "" {
-		return showTab(ctx, o, t, e, uctx, a, id, view, kind, nil)
-	}
-	if id := a.String("thread"); id != "" {
-		if _, err := o.open(ctx, itemTab(kind, id, nil), a.String("pane"), wantsFocus(uctx, a)); err != nil {
-			return Result{}, err
-		}
-	}
-	return showPanel(ctx, t, e, uctx, a, view, nil)
-}
-
 // showItem is showTab with the view verbs' dependencies.
-func (d ViewDeps) showItem(ctx context.Context, uctx Context, a Args, id, view, kind string, check panelCheck) (Result, error) {
-	return showTab(ctx, tabs{d.Layout}, d.Thread, d.Emitter, uctx, a, id, view, kind, check)
+func (d ViewDeps) showItem(ctx context.Context, uctx Context, a Args, id, kind string, check panelCheck) (Result, error) {
+	return showTab(ctx, tabs{d.Layout}, d.Thread, d.Emitter, uctx, a, id, kind, check)
 }
 
 // placed records where the layout put the verb's tab.
@@ -169,7 +135,7 @@ var rulePhrases = map[string]string{
 	"focused": "in the focused pane",
 }
 
-// tabMessage is an item verb's text when it placed a tab: where, and what the classic window got.
+// tabMessage is an item verb's text: where its tab is, and the windows that show the layout.
 func (r PanelResult) tabMessage() string {
 	msg := fmt.Sprintf("opened tab %s in pane %s for thread %s", r.Tab, r.Pane, r.Thread)
 	if p := rulePhrases[r.Rule]; p != "" {
@@ -207,25 +173,23 @@ func withAliases(cmds ...Command) []Command {
 }
 
 // pageTab opens a page's tab (the Pull Requests or Projects page, one per space) in the current
-// space, or in --pane's. params nil keeps what an open tab shows.
+// space, or in --pane's. params nil keeps what an open tab shows; empty replaces it.
 func (d ViewDeps) pageTab(ctx context.Context, uctx Context, a Args, kind string, params map[string]string) (*core.Result, error) {
 	return tabs{d.Layout}.open(ctx, &core.Tab{Kind: kind, Params: maps.Clone(params)}, a.String("pane"), wantsFocus(uctx, a))
 }
 
-// PageTabResult is a page verb's JSON when the layout opened its tab: EmitResult's counts, and
-// where the tab is.
+// PageTabResult is a page verb's JSON: the app windows connected, and where its tab is.
 type PageTabResult struct {
-	Windows   int    `json:"windows"`
-	Receivers int    `json:"receivers"`
-	Tab       string `json:"tab"`
-	Pane      string `json:"pane"`
-	Space     string `json:"space"`
-	Existing  bool   `json:"existing,omitempty"`
+	Windows  int    `json:"windows"`
+	Tab      string `json:"tab"`
+	Pane     string `json:"pane"`
+	Space    string `json:"space"`
+	Existing bool   `json:"existing,omitempty"`
 }
 
-// showPageTab runs a page verb in both windows: the refusal from a thread no window shows, then
-// the page's tab of kind, then the classic window's ShowView.
-func (d ViewDeps) showPageTab(ctx context.Context, uctx Context, a Args, name, kind string, params map[string]string) (Result, error) {
+// showPageTab runs a page verb: the refusal from a thread no window shows, then the page's tab
+// of kind, which is the whole effect.
+func (d ViewDeps) showPageTab(ctx context.Context, uctx Context, a Args, kind string, params map[string]string) (Result, error) {
 	if err := d.refusePage(uctx, a); err != nil {
 		return Result{}, err
 	}
@@ -233,20 +197,16 @@ func (d ViewDeps) showPageTab(ctx context.Context, uctx Context, a Args, name, k
 	if err != nil {
 		return Result{}, err
 	}
-	sent := EmitTo(d.Emitter, showViewIntent(name, "", params))
-	res := sent.CLIResult(uctx)
-	if placed == nil {
-		return res, nil
-	}
-	res.JSON = PageTabResult{Windows: sent.Windows, Receivers: sent.Receivers, Tab: placed.Tab, Pane: placed.Pane, Space: placed.Space, Existing: placed.Existing}
-	if res.Message == "" {
+	n := windowsOf(d.Emitter)
+	res := Result{JSON: PageTabResult{Windows: n, Tab: placed.Tab, Pane: placed.Pane, Space: placed.Space, Existing: placed.Existing}}
+	if uctx.ActiveView != "" {
 		return res, nil
 	}
 	res.Message = fmt.Sprintf("opened %s tab %s in pane %s of space %s", kind, placed.Tab, placed.Pane, placed.Space)
 	if placed.Existing {
 		res.Message = fmt.Sprintf("%s tab %s is already open in pane %s of space %s", kind, placed.Tab, placed.Pane, placed.Space)
 	}
-	res.Message += "; " + sent.windows()
+	res.Message += "; " + EmitResult{Windows: n}.windows()
 	return res, nil
 }
 

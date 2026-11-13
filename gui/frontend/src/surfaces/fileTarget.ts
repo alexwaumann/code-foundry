@@ -19,14 +19,14 @@ export interface FileTarget {
   /** 1-based line to scroll to and mark; absent for none. */
   line?: number;
   /**
-   * An HTML page its panel's thread opened as its own (view.panel.page): its bridge acts as
+   * An HTML page its thread opened as its own (view.open.page): its bridge acts as
    * that thread though no card in the conversation shows it (usePageThread). Absent for any
    * other file.
    */
   page?: { title: string };
   /** The tab opens with its editor on, when the file is one it can edit. */
   edit?: boolean;
-  /** A thread asked the user to edit this file (view.panel.file --edit); gone once saved or dismissed. With `edit`. */
+  /** A thread asked the user to edit this file (view.open.file --edit); gone once saved or dismissed. With `edit`. */
   ask?: FileAsk;
   /**
    * The thread whose panel this tab opened in while it had no checkout of its own, so the
@@ -52,8 +52,12 @@ export interface FileAsk {
   saved?: string;
 }
 
-/** The params a File tab's request lives in: dropping them finishes it, for good. */
-export const ASK_PARAMS = ["edit", "askId", "asker", "note", "askSaved"] as const;
+/**
+ * The params a File tab's request lives in: dropping them finishes it, for good. The daemon
+ * writes all but askSaved (view.open.file --edit, internal/command fileAskParams); focus=1 is
+ * the user's ask to be taken there (stores/fileRequestArrivals.ts).
+ */
+export const ASK_PARAMS = ["edit", "askId", "asker", "note", "askSaved", "focus"] as const;
 
 /** A tab's params without `names` (for setTabParams). */
 export function withoutParams(names: readonly string[]): (params: Tab["params"]) => Tab["params"] {

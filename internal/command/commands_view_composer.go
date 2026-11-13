@@ -21,7 +21,7 @@ func (d ViewDeps) composerHistoryCommand() Command {
 		Category:    "View",
 		// No default chord: Up in an empty composer opens it; bindable in settings.
 		Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
-			return EmitTo(d.Emitter, showViewIntent(ViewComposerHistory, "", nil)).CLIResult(uctx), nil
+			return EmitTo(d.Emitter, showViewIntent(ViewComposerHistory, nil)).CLIResult(uctx), nil
 		},
 	}
 }
