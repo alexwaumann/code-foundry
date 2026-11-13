@@ -125,7 +125,7 @@ test("the Code tab keeps its top row across zoom changes and a resize of its pan
       for (const c of sc.querySelectorAll("diffs-container")) {
         for (const r of c.shadowRoot?.querySelectorAll<HTMLElement>("[data-content] [data-line]") ?? []) {
           const b = r.getBoundingClientRect();
-          if (b.height > 0 && b.bottom > s.top + 1 && b.top < s.bottom - 1 && (!best || (b.top - s.top) / sc.currentCSSZoom < best.off)) best = { text: (r.textContent ?? "").split(" ")[1] ?? "", off: (b.top - s.top) / sc.currentCSSZoom };
+          if (b.height > 0 && b.bottom > s.top + 1 && b.top < s.bottom - 1 && (!best || (b.top - s.top) / sc.currentCSSZoom < best.off)) best = { text: r.textContent.split(" ")[1] ?? "", off: (b.top - s.top) / sc.currentCSSZoom };
         }
       }
       return best;
