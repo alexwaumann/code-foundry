@@ -142,8 +142,7 @@ test("the panes stay laid out under it", async ({ page }) => {
 
 });
 
-// Shell gap: cmd+t under the sheet opens the thread's terminal tab behind it and the sheet stays (the keyboard cannot reach the terminal); the classic window's new shell closed the sheet.
-test.fixme("a terminal this window starts under it takes the keyboard: the sheet closes", async ({ page }) => {
+test("a terminal this window starts under it takes the keyboard: the sheet closes", async ({ page }) => {
   await seedBeside("s-1", [diffTab("s-1")]);
   await openShellApp(page);
   await page.locator('[data-testid="shell-pane"][data-pane-id="p-1"]').getByTestId("thread-pane-body").click({ position: { x: 20, y: 200 } });

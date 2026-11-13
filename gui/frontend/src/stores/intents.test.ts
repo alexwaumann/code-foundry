@@ -14,6 +14,10 @@ const { useTerminalsStore } = await import("./terminals");
 const { HOME, useUiStore } = await import("./ui");
 const { getDraft, updateDraft } = await import("./compose");
 const { threadDraftKey } = await import("./threadActions");
+const { resetLayout } = await import("./layout");
+const { resetShellView, useShellViewStore } = await import("./shellView");
+const { registerQuickHost, resetQuickHosts } = await import("@/shell/quickTerminal");
+const { layoutOf, pane, row, seedLayout, space, tab } = await import("@/test/shellLayout");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
@@ -37,14 +41,39 @@ beforeEach(() => {
 });
 
 describe("focusTerminal", () => {
-  it("does nothing: the layout already shows the terminal's tab with the focus (ui.focus.terminal)", () => {
+  afterEach(() => {
+    resetLayout();
+    resetShellView();
+    resetQuickHosts();
+  });
+
+  it("moves the keyboard into the terminal's tab once the layout shows it, not the tab still showing; nothing else moves", async () => {
+    // sh's tab is open but hidden behind the thread's in p-2; p-1 has the focus.
+    const grid = (active: string, focus: string, rev: number) =>
+      layoutOf([space(row("r", [pane("p-1", [tab("t-th", "thread", "s1")]), pane("p-2", [tab("t-x", "diff", "s1"), tab("t-sh", "terminal", "s1", { params: { terminal: "sh" } })], active)]), focus)], rev);
+    await seedLayout(grid("t-x", "p-1", 1));
     focusTerminal("sh");
-    focusTerminal("raw");
     focusTerminal("unknown");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useShellViewStore.getState().focusRequest.seq).toBe(0);
+    // ui.focus.terminal's commit: the tab active, its pane focused.
+    await seedLayout(grid("t-sh", "p-2", 2));
+    await vi.waitFor(() => {
+      expect(useShellViewStore.getState().focusRequest).toEqual({ paneId: "p-2", seq: 1 });
+    });
     expect(useUiStore.getState().selection).toEqual(HOME);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
     expect(toastInfo).not.toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("a quick terminal: its thread's quick terminal takes the keyboard (as it mounts)", () => {
+    setTerminals([term("q", { ...shell, slot: "quick" })]);
+    const focus = vi.fn();
+    focusTerminal("q");
+    expect(focus).not.toHaveBeenCalled();
+    registerQuickHost("s1", focus);
+    expect(focus).toHaveBeenCalledOnce();
   });
 });
 

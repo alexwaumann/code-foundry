@@ -398,8 +398,7 @@ describe("the Pull Requests page", () => {
     expect(prTabs()).toHaveLength(2);
   });
 
-  // Shell gap: a row opens its tab into the focused pane with focus: false, which the daemon places behind the active tab (here #145's), so the new pull request is not shown.
-  it.skip("a click on a row shows its pull request", async () => {
+  it("a click on a row shows its pull request", async () => {
     await openPage();
     await act(async () => {
       fireEvent.click(rows("authored")[0] as HTMLElement);

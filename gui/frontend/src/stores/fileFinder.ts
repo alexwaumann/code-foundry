@@ -46,11 +46,13 @@ export function presentFileFinder(): boolean {
 
 /**
  * Enter: the file as a File tab linked to the thread (placed by the layout; an open tab of the
- * file only activates), at `line` when given. The palette closes.
+ * file only activates), at `line` when given, with the keyboard in it. The palette closes
+ * without handing the keyboard to the thread's prompt: until the tab draws, it is back where
+ * it was.
  */
 export function openFoundFile(threadId: string, f: FinderFile, line?: number): void {
+  useUiStore.getState().closePalette(true);
   openFileInPanel(threadTarget(threadId), { project: f.projectId, base: f.checkout, path: f.path, ...(line === undefined ? {} : { line }) });
-  useUiStore.getState().closePalette();
 }
 
 /**

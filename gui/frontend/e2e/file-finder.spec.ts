@@ -24,8 +24,7 @@ async function openFinder(page: Page): Promise<void> {
   await expect(finderInput(page)).toBeFocused();
 }
 
-// Shell gap: Enter opens the File tab beside the thread, but the keyboard stays in the thread's prompt (stores/fileFinder.ts openFoundFile); the side panel took it into the file.
-test.fixme("cmd+p from a thread's prompt opens the finder; Enter opens the file in a tab beside the thread; ⌥⏎ tags it in the prompt", async ({ page }) => {
+test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a tab beside the thread; ⌥⏎ tags it in the prompt", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(threadPrompt(page)).toBeFocused();

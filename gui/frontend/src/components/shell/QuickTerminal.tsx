@@ -8,7 +8,7 @@ import { normalizeDir } from "@/lib/terminalName";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { quickHeight, quickMode, quickTerminalOf, registerQuickHost } from "@/shell/quickTerminal";
-import { closeQuick, setQuickHeight } from "@/shell/terminalActions";
+import { closeQuick, handBackFromQuick, setQuickHeight } from "@/shell/terminalActions";
 import { useTerminalDir } from "@/shell/terminalTab";
 import { useThreadLayout } from "@/stores/layout";
 import { useTerminalsStore } from "@/stores/terminals";
@@ -102,6 +102,15 @@ function QuickTerminal({ threadId, height, overlay, onDrag, onDrop }: { threadId
       registerQuickHost(threadId, () => {
         host.current?.focus();
       }),
+    [threadId],
+  );
+  // Closed under the keyboard (its shell exited, the CLI closed it): the keyboard would fall to
+  // the body with it, so the thread's prompt takes it. Read before the node goes: a layout
+  // effect's cleanup runs while it is still in the document.
+  useLayoutEffect(
+    () => () => {
+      handBackFromQuick(threadId);
+    },
     [threadId],
   );
   const drag = useRef<{ y: number; h: number } | null>(null);

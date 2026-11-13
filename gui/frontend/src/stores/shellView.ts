@@ -25,6 +25,8 @@ interface ShellViewState {
   frame: Frame | null;
   /** The pane asked to take the keyboard, and a counter so the same pane can be asked again. */
   focusRequest: { paneId: string; seq: number };
+  /** Counts the focus requests that close a sheet over the window (requestPaneFocusOverSheets). */
+  overSheetsSeq: number;
   /** The space full screen is on in; "" when it is off. */
   fullscreen: string;
   floating: FloatingState;
@@ -39,7 +41,7 @@ export interface FloatingState {
 
 export const FLOATING_START: FloatingState = { expanded: false, x: 0, y: 0 };
 
-const INITIAL: ShellViewState = { mode: "waiting", frame: null, focusRequest: { paneId: "", seq: 0 }, fullscreen: "", floating: FLOATING_START };
+const INITIAL: ShellViewState = { mode: "waiting", frame: null, focusRequest: { paneId: "", seq: 0 }, overSheetsSeq: 0, fullscreen: "", floating: FLOATING_START };
 
 export const useShellViewStore = create<ShellViewState>()(() => INITIAL);
 
@@ -59,6 +61,15 @@ export function setShellFrame(frame: Frame | null): void {
 /** Asks a pane to move the keyboard into its active tab. */
 export function requestPaneFocus(paneId: string): void {
   useShellViewStore.setState((s) => ({ focusRequest: { paneId, seq: s.focusRequest.seq + 1 } }));
+}
+
+/**
+ * Asks a pane to take the keyboard where a sheet over the window would keep it from it: a terminal
+ * this window started or showed. The sheet closes (stores/views.ts startViewSync). Other requests
+ * leave a sheet alone: one may arrive late (a tab drawn after a click), after the user opened it.
+ */
+export function requestPaneFocusOverSheets(paneId: string): void {
+  useShellViewStore.setState((s) => ({ focusRequest: { paneId, seq: s.focusRequest.seq + 1 }, overSheetsSeq: s.overSheetsSeq + 1 }));
 }
 
 /** Full screen on in a space, or off (""); turning it off or on again puts the floating composer back at its start. */

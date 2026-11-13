@@ -247,8 +247,7 @@ test("it works on an exited terminal", async ({ page }) => {
   await expect(bar(page)).toHaveCount(0);
 });
 
-// Shell gap: a focused terminal tab does not give the command context its activeTerminalId, so the palette does not offer terminal.find.
-test.fixme("the palette's Find in Terminal lands in the bar", async ({ page }) => {
+test("the palette's Find in Terminal lands in the bar", async ({ page }) => {
   await shell(page);
   await page.keyboard.press("Meta+k");
   await page.keyboard.type("Find in Terminal");

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useAddProjectStore } from "./addProject";
 import { useUiStore } from "./ui";
 import { closeUsage, setSettingsPage, showView, startViewSync, toggleView, useViewsStore } from "./views";
+import { requestPaneFocus, requestPaneFocusOverSheets } from "./shellView";
 
 const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
 
@@ -108,6 +109,23 @@ describe("the usage page", () => {
     closeUsage();
     expect(views().usageOpen).toBe(false);
     expect(useUiStore.getState().promptFocusSeq).toBe(1);
+  });
+
+  it("a terminal this window started under it asks for the keyboard: it closes, as the settings sheet; any other pane request leaves it", () => {
+    const stop = startViewSync();
+    try {
+      useViewsStore.setState({ usageOpen: true });
+      // A late request (a clicked row's tab drawn after the sheet opened) leaves it.
+      requestPaneFocus("p-2");
+      expect(views().usageOpen).toBe(true);
+      requestPaneFocusOverSheets("p-2");
+      expect(views().usageOpen).toBe(false);
+      useViewsStore.setState({ settingsOpen: true });
+      requestPaneFocusOverSheets("p-2");
+      expect(views().settingsOpen).toBe(false);
+    } finally {
+      stop();
+    }
   });
 
   it("a selection change closes it", () => {

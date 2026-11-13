@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { TerminalView } from "@/api/terminal";
 import type { ThreadView } from "@/api/threads";
+import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
 import { decodeThreadListKeys, deriveContext, encodeThreadListKey, getListOptions, getListThreads, getUiContext } from "./context";
+import { resetLayout } from "./layout";
 import { useProjectsStore } from "./projects";
+import { useTerminalsStore } from "./terminals";
 import { useThreadsStore } from "./threads";
 import { HOME, useUiStore } from "./ui";
 
@@ -16,6 +20,70 @@ describe("getUiContext", () => {
     expect(getUiContext()).toEqual(deriveContext({ kind: "thread", id: "s1" }, useProjectsStore.getState()));
     expect(getUiContext()).toMatchObject({ activeThreadId: "s1", activeTerminalId: "" });
     expect(getUiContext({ kind: "view", name: "projects" })).toMatchObject({ activeThreadId: "", activeView: "projects" });
+  });
+});
+
+describe("the terminal the user is on, in the command context", () => {
+  const term = (id: string, labels: Record<string, string>): TerminalView => ({ id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels });
+  const terminals = [
+    term("own", { kind: "shell", thread: "s1", project: "r1", worktree: "/src/app" }),
+    term("wt", { kind: "shell", project: "r1", worktree: "/src/app.worktrees/x" }),
+    term("home", { kind: "shell" }),
+    term("quick", { kind: "shell", thread: "s1", project: "r1", worktree: "/src/app", slot: "quick" }),
+  ];
+  /** One pane: s1's tab and a terminal tab, `active` shown and focused. */
+  const seed = (active: string, terminal: string, thread: string) =>
+    seedLayout(layoutOf([space(pane("p-1", [tab("t-th", "thread", "s1"), tab("t-term", "terminal", thread, { params: { terminal } })], active), "p-1")]));
+  let box: HTMLElement;
+
+  beforeEach(() => {
+    useProjectsStore.setState({ byId: {}, order: [] });
+    useThreadsStore.setState({ byId: {}, order: [] });
+    useTerminalsStore.setState({ byId: Object.fromEntries(terminals.map((t) => [t.id, t])), order: terminals.map((t) => t.id), loaded: true });
+    // The quick terminal's drawing, with a field that can hold the keyboard.
+    box = document.createElement("div");
+    box.setAttribute("data-quick-terminal", "s1");
+    box.append(document.createElement("textarea"));
+    document.body.append(box);
+  });
+  afterEach(() => {
+    box.remove();
+    resetLayout();
+    useUiStore.getState().closePalette();
+  });
+
+  const cases: [string, () => Promise<void>, Parameters<typeof getUiContext>[0] & object, Record<string, string>][] = [
+    ["a focused thread's shell tab: the shell, with the thread's place", () => seed("t-term", "own", "s1"), { kind: "thread", id: "s1" }, { activeTerminalId: "own", activeThreadId: "s1" }],
+    ["a focused worktree shell's tab (no thread): the shell, its project and worktree", () => seed("t-term", "wt", ""), HOME, { activeTerminalId: "wt", activeProjectId: "r1", activeWorktreePath: "/src/app.worktrees/x", activeThreadId: "" }],
+    ["a focused home shell's tab: the shell only", () => seed("t-term", "home", ""), HOME, { activeTerminalId: "home", activeProjectId: "", activeWorktreePath: "" }],
+    ["the thread's tab focused: no terminal", () => seed("t-th", "own", "s1"), { kind: "thread", id: "s1" }, { activeTerminalId: "", activeThreadId: "s1" }],
+    [
+      "the thread's tab focused, the keyboard in its quick terminal: the quick terminal",
+      async () => {
+        await seed("t-th", "own", "s1");
+        box.querySelector("textarea")?.focus();
+      },
+      { kind: "thread", id: "s1" },
+      { activeTerminalId: "quick", activeThreadId: "s1" },
+    ],
+    [
+      "the palette opened from the quick terminal: still the quick terminal",
+      async () => {
+        await seed("t-th", "own", "s1");
+        box.querySelector("textarea")?.focus();
+        useUiStore.getState().openPalette();
+        (document.activeElement as HTMLElement | null)?.blur();
+      },
+      { kind: "thread", id: "s1" },
+      { activeTerminalId: "quick" },
+    ],
+  ];
+  it.each(cases)("%s", async (_name, arrange, sel, want) => {
+    useUiStore.setState({ selection: sel });
+    await arrange();
+    expect(getUiContext()).toMatchObject(want);
+    // An explicit selection's context has no terminal.
+    expect(getUiContext(sel).activeTerminalId).toBe("");
   });
 });
 

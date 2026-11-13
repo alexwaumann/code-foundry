@@ -158,11 +158,7 @@ test.describe("Pull Requests page", () => {
   });
 
   // Keyboard order, Enter and click opening a pull request, cmd+Enter and cmd+click on GitHub: src/components/prs/PullRequestsPage.test.tsx.
-  // Shell gap: a row's pull request opens as a tab in the page's own pane (shell-model.md, a surface that
-  // belongs to no thread) without the focus, and in the focused pane such a tab waits behind the active
-  // one (internal/layout show): the tab lands behind the page and nothing the user sees changes. The
-  // classic window showed it beside the list, which kept the keyboard.
-  test.fixme("the list keeps focus while Enter opens a row in the side panel", async ({ page }) => {
+  test("Enter on a row opens its pull request in the page's pane, shown", async ({ page }) => {
     await openPrsTab(page);
     const list = page.getByTestId("prs-list");
     await expect(list).toBeFocused();

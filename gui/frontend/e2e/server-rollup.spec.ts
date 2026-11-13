@@ -58,8 +58,7 @@ test("a child's terminal opens in a tab with the keyboard in it, on one Attach s
   await expect.poll(attachStreams).toBe(1);
 });
 
-// Shell gap: a row's press on a terminal whose tab is open but not shown shows it without the keyboard (shell/terminalActions.ts showTerminal asks the pane for the focus before the commit shows the tab).
-test.fixme("a second press on the row shows the child's terminal tab again with the keyboard in it", async ({ page }) => {
+test("a second press on the row shows the child's terminal tab again with the keyboard in it", async ({ page }) => {
   await openParent(page);
   await server(page, 5173).click();
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");

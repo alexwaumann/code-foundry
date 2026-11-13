@@ -17,10 +17,11 @@ import { HOME, useUiStore } from "./ui";
  * thread's page (view.panel.page) stays one when the file opens again another way (a
  * path chip), so its bridge keeps working, and a thread's open request to edit it stays
  * until it is saved or dismissed; a new request replaces it. `behind` leaves the tab's group
- * showing what it shows. A project's file opened on a thread with no checkout yet is held
- * (FileTarget.heldFor): it is that project's own. False with no panel.
+ * showing what it shows; `focus: false` (a thread's call) leaves the user's focus where it is.
+ * A project's file opened on a thread with no checkout yet is held (FileTarget.heldFor): it is
+ * that project's own. False with no panel.
  */
-export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { behind?: string } = {}): boolean {
+export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { behind?: string; focus?: boolean } = {}): boolean {
   const id = fileTab(file).id;
   const old = findTab(target, id);
   const was = old ? fileOfTab(old) : null;
@@ -47,15 +48,15 @@ export function openLooseFile(dir: string, path: string): boolean {
   return openFileInPanel("current", { project: "", base: dir, path });
 }
 
-/** Opens (or activates) a checkout's Diff tab in a panel; an open one takes the new sources and file. */
-export function openDiffInPanel(target: TabTarget, diff: DiffTarget, title?: string): boolean {
-  return openTab(target, diffTab(diff, title));
+/** Opens (or activates) a checkout's Diff tab in a panel; an open one takes the new sources and file. `focus: false`: a thread's call. */
+export function openDiffInPanel(target: TabTarget, diff: DiffTarget, title?: string, opts: { focus?: boolean } = {}): boolean {
+  return openTab(target, diffTab(diff, title), opts);
 }
 
 /**
  * Opens (or activates) a checkout's Diff tab, keeping what an open one compares and shows,
- * and shows the panel without focus: the thread info card's Changes rows and the Projects
- * page's checkout menus. `own`: the thread's cwd checkout, whose title names no project.
+ * and shows it with the focus: the thread info card's Changes rows and the Projects page's
+ * checkout menus. `own`: the thread's cwd checkout, whose title names no project.
  * False with nothing selected.
  */
 export function openCheckoutDiff(target: TabTarget, project: string, worktree: string, own = false): boolean {

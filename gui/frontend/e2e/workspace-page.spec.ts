@@ -29,18 +29,14 @@ async function twoWorkspaces(): Promise<{ shop: string; mono: string }> {
 // A rooted workspace's folder row, its root marked missing, its instructions and skills, and View opening
 // the root's CLAUDE.md as a File tab in the page's own panel: src/components/projects/WorkspacePage.test.tsx.
 // Left: that tab drawn, in the page's pane (shell-model.md: a surface that belongs to no thread).
-// Shell gap: a surface opened from a page (this File tab, a checkout's Diff tab from a project's page, a
-// pull request from the Pull Requests page) opens in the page's pane without the focus, and in the focused
-// pane such a tab waits behind the active one (internal/layout show): it lands behind the page and
-// nothing the user sees changes. The classic window showed it in the page's side panel.
-test.fixme("a rooted workspace: View opens the root's instructions as a File tab in the page's own panel", async ({ page }) => {
+test("a rooted workspace: View opens the root's instructions as a File tab in the page's own pane, shown", async ({ page }) => {
   const { mono } = await twoWorkspaces();
   await openProjectsTab(page);
   await openWorkspacePage(page, mono);
   await body(page, mono).getByTestId("workspace-instructions-open").click();
   const tab = paneOf(page, "p-1").locator('[data-testid="shell-tab"][data-kind="file"]');
   await expect(tab).toHaveText("CLAUDE.md");
-  await expect(tab).toHaveAttribute("data-active", "");
+  await expect(tab).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("file-tab")).toBeVisible();
 });
 

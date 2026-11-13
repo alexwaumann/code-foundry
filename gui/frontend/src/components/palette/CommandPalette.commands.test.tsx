@@ -28,6 +28,8 @@ const { applyIntent } = await import("@/stores/intents");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useTerminalsStore } = await import("@/stores/terminals");
 const { HOME, useUiStore } = await import("@/stores/ui");
+const { resetLayout } = await import("@/stores/layout");
+const { layoutOf, pane, seedLayout, space, tab } = await import("@/test/shellLayout");
 
 /**
  * The command palette over a faked List (e2e/app.spec.ts): what it lists for the context it
@@ -101,6 +103,7 @@ afterEach(() => {
     toast.dismiss();
     useUiStore.getState().closePalette();
   });
+  resetLayout();
   cleanup();
 });
 
@@ -120,8 +123,9 @@ describe("what the palette lists", () => {
     expect(palette()).toBeNull();
   });
 
-  // Shell gap: a focused terminal tab is not the command context's terminal (getUiContext has no activeTerminalId), as a focused bottom panel shell was.
-  it.skip("with the keyboard in a thread's shell, the shell is the context's terminal: its commands listed, never a NoPalette verb", async () => {
+  it("with the keyboard in a thread's shell, the shell is the context's terminal: its commands listed, never a NoPalette verb", async () => {
+    // s-1's shell in a tab linked to it, the tab focused.
+    await seedLayout(layoutOf([space(pane("p-1", [tab("t-th", "thread", "s-1"), tab("t-sh", "terminal", "s-1", { params: { terminal: "t-s1-shell" } })], "t-sh"), "p-1")]));
     useTerminalsStore.setState({
       byId: { "t-s1-shell": { id: "t-s1-shell", argv: ["/bin/zsh"], cwd: CF, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels: { kind: "shell", thread: "s-1", project: "repo-cf", worktree: CF } } },
       order: ["t-s1-shell"],

@@ -24,6 +24,7 @@ vi.mock("@/api/layout", async (orig) => ({
 const actions = await import("./terminalActions");
 const { registerQuickHost, resetQuickHosts } = await import("./quickTerminal");
 const { resetLayout } = await import("@/stores/layout");
+const { resetShellView, useShellViewStore } = await import("@/stores/shellView");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 
@@ -57,6 +58,31 @@ afterEach(() => {
   resetQuickHosts();
   actions.endTabRename();
   document.body.innerHTML = "";
+});
+
+describe("a quick terminal going away under the keyboard (handBackFromQuick)", () => {
+  /** The quick terminal's drawing, the keyboard in it (`keyboard`) or not. */
+  const drawn = (keyboard: boolean) => {
+    const box = document.createElement("div");
+    box.setAttribute("data-quick-terminal", "s-1");
+    const field = document.createElement("textarea");
+    box.append(field);
+    document.body.append(box);
+    if (keyboard) field.focus();
+  };
+  const cases: [string, boolean, boolean, string][] = [
+    ["closed (its shell exited) with the keyboard in it: the thread's prompt takes it", true, false, "p-1"],
+    ["closed without the keyboard: nothing moves", false, false, ""],
+    ["still open (its tab left, smart swap): nothing moves", true, true, ""],
+  ];
+  it.each(cases)("%s", async (_name, keyboard, open, pane) => {
+    await seed("p-1", "t-term", open);
+    resetShellView();
+    drawn(keyboard);
+    actions.handBackFromQuick("s-1");
+    await Promise.resolve();
+    expect(useShellViewStore.getState().focusRequest.paneId).toBe(pane);
+  });
 });
 
 describe("cmd+j", () => {

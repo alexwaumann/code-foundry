@@ -66,8 +66,7 @@ test("tabs are keyboard reachable: arrows move, Enter and Space activate, Tab re
   await expect(paneOf(page, "p-2").getByTestId("prs-page")).toBeVisible();
 });
 
-// Shell gap: closed, the palette hands the keyboard back only to a thread's prompt (stores/ui.ts closePalette's contentFocusSeq, which ThreadComposer takes); opened from a linked surface's pane (a diff), the keyboard lands nowhere. The side panel took it back.
-test.fixme("the palette hands the keyboard back to the pane it was opened from", async ({ page }) => {
+test("the palette hands the keyboard back to the pane it was opened from", async ({ page }) => {
   await seedLayout(rowNode([paneNode("p-1", [threadTab("s-1")]), paneNode("p-2", [diffTab("s-1")])]), "p-1");
   await openShellApp(page);
   await page.locator('[data-nav-key="f:README.md"]').click();
