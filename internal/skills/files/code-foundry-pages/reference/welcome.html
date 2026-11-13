@@ -33,7 +33,7 @@
     { text: "make me a to-do page with three boxes: things to try today, questions for you, things to come back to. Keep everything I do on it between visits", send: true, note: "it builds tools you keep",
       after: [] },
   ];
-  const demoSentence = (p: any) => `start three threads on the project ${p.name} (id ${p.id}), each read-only and not in the sidebar: what it is in two paragraphs; the ten most-changed files; anything unfinished or risky. The welcome page in the panel shows them, so do not build another board; reply in one line when they are started.`;
+  const demoSentence = (p: any) => `start three threads on the project ${p.name} (id ${p.id}), each read-only and not in the sidebar: what it is in two paragraphs; the ten most-changed files; anything unfinished or risky. The welcome page in its tab shows them, so do not build another board; reply in one line when they are started.`;
 
   function Chips({ items, dim, onSend }: { items: Chip[]; dim?: boolean; onSend?: (t: string) => void }) {
     const { text, clear, say } = useProblem();

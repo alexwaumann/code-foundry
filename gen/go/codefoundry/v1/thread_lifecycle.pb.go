@@ -2423,7 +2423,7 @@ type UsageBucket struct {
 	CostUsd float64 `protobuf:"fixed64,11,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
 	// The bucket's (model, tier, speed) has no known rate.
 	Unpriced bool `protobuf:"varint,12,opt,name=unpriced,proto3" json:"unpriced,omitempty"`
-	// cost_usd split by token kind (the side panel's token table); all 0 when unpriced.
+	// cost_usd split by token kind (the usage token table); all 0 when unpriced.
 	InputCostUsd         float64 `protobuf:"fixed64,13,opt,name=input_cost_usd,json=inputCostUsd,proto3" json:"input_cost_usd,omitempty"`
 	OutputCostUsd        float64 `protobuf:"fixed64,14,opt,name=output_cost_usd,json=outputCostUsd,proto3" json:"output_cost_usd,omitempty"`
 	CacheReadCostUsd     float64 `protobuf:"fixed64,15,opt,name=cache_read_cost_usd,json=cacheReadCostUsd,proto3" json:"cache_read_cost_usd,omitempty"`

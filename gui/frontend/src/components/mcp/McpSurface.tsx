@@ -324,7 +324,7 @@ function EmptyTab({ threadId, bucket }: { threadId: string; bucket: McpBucket })
 }
 
 /**
- * The side panel's MCP surface (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md):
+ * The MCP surface (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md):
  * the selected thread's MCP servers as Claude last reported them, one card each
  * (name, version, status pill; scope · transport · tools; the error or the login hint;
  * Reconnect and the tools disclosure), split into Connected / Failed / Disabled tabs with

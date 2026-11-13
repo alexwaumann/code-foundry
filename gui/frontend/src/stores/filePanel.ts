@@ -37,7 +37,7 @@ export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { beh
 
 /**
  * Opens a file that belongs to no project (a skill's SKILL.md: `path` in the folder `dir`,
- * under home) in the side panel of what the window shows, whatever that is: a File tab reads
+ * under home) as a tab for what the window shows, whatever that is: a File tab reads
  * by path, so any panel can hold it. A selection with no panel of its own (`none`, which
  * draws the home composer) goes to the home composer, whose panel it is. False when no panel
  * took it.

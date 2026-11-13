@@ -32,7 +32,7 @@ function useSetupOwner(): boolean {
   return canRunSetup();
 }
 
-/** The file in the side panel of what is selected, and Settings out of the way so it shows. */
+/** The file in a tab for what is selected, and Settings out of the way so it shows. */
 function viewSkillFile(r: InstalledSkillView): void {
   if (openLooseFile(r.dir, SKILL_FILE)) closeSettings();
 }

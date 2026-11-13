@@ -41,7 +41,7 @@ func runOf(key string) (layoutRun, bool) {
 func runTook(n int) time.Duration { return time.Duration(60+37*n) * time.Second }
 
 func runsNodes(s runsState) []ui.Node {
-	intro := ui.NewText("runs-intro", ui.Plain("The runs beside the chosen run's detail where there is room (a 280 px list, 12 px, at least 320 px of detail); in the side panel, the list, then the run alone under a back button."))
+	intro := ui.NewText("runs-intro", ui.Plain("The runs beside the chosen run's detail where there is room (a 280 px list, 12 px, at least 320 px of detail); in a narrow pane, the list, then the run alone under a back button."))
 	rows := make([]ui.Row, 0, len(layoutRuns))
 	for _, r := range layoutRuns {
 		rows = append(rows, ui.Row{Key: runKey(r.n), Glyph: ui.StatusGlyph(r.glyph), Title: fmt.Sprintf("Build #%d", r.n),

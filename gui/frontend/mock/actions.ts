@@ -908,11 +908,11 @@ export class MockActions {
         },
       },
       {
-        cmd: cmd("action.add", "Add Action", "Add an action to a project: a command line run as `$SHELL -lc <command>` in a worktree. It opens as a terminal in the bottom panel, or with --in-terminal=false runs in the background with its output captured.", [
+        cmd: cmd("action.add", "Add Action", "Add an action to a project: a command line run as `$SHELL -lc <command>` in a worktree. It opens as a terminal tab, or with --in-terminal=false runs in the background with its output captured.", [
           { name: "name", type: ArgType.STRING, required: true, description: "Name, unique in the project (ignoring case)" },
           { name: "command", type: ArgType.STRING, required: true, description: "Command line (may span lines)" },
           { ...iconArg, defaultValue: "play" },
-          bool("in-terminal", "Run in a terminal in the bottom panel (--in-terminal=false: in the background)", "true"),
+          bool("in-terminal", "Run in a terminal tab (--in-terminal=false: in the background)", "true"),
           bool("on-worktree-create", "Also run (in the background) when a new thread creates its worktree", "false"),
           projectArg,
           hereArg,

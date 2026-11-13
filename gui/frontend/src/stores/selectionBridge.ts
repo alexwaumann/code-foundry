@@ -1,5 +1,5 @@
 /**
- * The selection bridge (docs/notes/shell-plan.md 2.11): with the window shell on, the window has
+ * The selection bridge (docs/notes/shell-11-pane-grid.md): with the window shell on, the window has
  * no single selection of its own; the focused tab is what it shows. So that the many readers of
  * `useUiStore.selection` (the command context, the sidebar's selected row, the window title, the
  * composer's send) keep working, this writes the selection from the current space's focused tab,

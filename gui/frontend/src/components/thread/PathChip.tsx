@@ -43,7 +43,7 @@ function useOpen(path: string, line: number | undefined) {
 /**
  * A file path in Claude's markdown (lib/pathChips) as the user bubble's file tag (style A):
  * a file icon, the path in mono with its directory truncating from the start so the name
- * stays, the `:line` suffix muted. Opens the File tab in the side panel. A span with the
+ * stays, the `:line` suffix muted. Opens the File tab beside the thread. A span with the
  * button role, so it can sit inside a tool row's button; its text stays selectable (copying
  * a paragraph keeps its paths). The tooltip shows the whole token only while it is cut short.
  */

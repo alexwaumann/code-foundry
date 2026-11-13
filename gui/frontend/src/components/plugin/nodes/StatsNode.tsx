@@ -13,7 +13,7 @@ import type { NodeProps } from "../registry";
  * A row of figure cards, the Pull Requests page's (docs/notes/plugin-stats-bars.md): one
  * row while every card fits at 100 px, else balanced rows (charts.ts statsColumns); the
  * figures take the largest type role whose estimate of the widest value fits a card
- * (display on a page or an expanded panel, title at most in the side panel), so a value
+ * (display in a wide pane, title at most in a narrow one), so a value
  * never wraps. A card with an
  * action is a toggle; while one is pressed the others dim, as the page's filter cards do.
  */

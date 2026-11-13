@@ -112,7 +112,7 @@ type Terminal struct {
 	//	          terminal, kind "plugin", the title the plugin gave).
 	//
 	// An action terminal carries the same thread / project / worktree owner labels as a
-	// shell, so a bottom panel shows both the same way.
+	// shell, so a terminal tab shows both the same way.
 	// A terminal created through Create without labels belongs to nothing.
 	//
 	//	slot      "quick" on a thread's quick terminal (one per thread; terminal.new

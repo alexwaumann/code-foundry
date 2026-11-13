@@ -20,7 +20,7 @@ export const SETTLE_FRAMES = 4;
 
 /**
  * Whether the element is on screen (or within ON_SCREEN_MARGIN of it) in its scroll box
- * (the side panel's [data-scroll-root]) and has been for SETTLE_FRAMES. False until then;
+ * (the pane's [data-scroll-root]) and has been for SETTLE_FRAMES. False until then;
  * leaving is at once. True where there is no IntersectionObserver (unit tests).
  */
 export function useOnScreen(el: HTMLElement | null): boolean {

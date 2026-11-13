@@ -390,7 +390,7 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
   const loaded = useProjectsStore((s) => s.loaded);
   const rootRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
-  // The content pane's width (the side panel takes from it): the scroll box's.
+  // The pane's width: the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const scrollRef = usePageScroll(pageKey, widthRef);
   const { activity, updated, branch } = indexColumns(width);

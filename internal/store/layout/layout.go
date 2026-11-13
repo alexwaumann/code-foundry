@@ -5,7 +5,7 @@
 // the next rev. It never looks at threads or terminals: the daemon's glue turns their
 // events into operations.
 //
-// See docs/notes/shell-plan.md (sections 2.1 to 2.4) and docs/notes/shell-3-layout-store.md.
+// See docs/ARCHITECTURE.md §14 and docs/notes/shell-3-layout-store.md.
 package layout
 
 import (
@@ -158,7 +158,7 @@ func Diff(prev, next *core.State) Delta {
 
 // FocusOnly reports whether prev and next differ only in focus: the current space, each
 // space's focused pane and MRU, and each pane's active tab. The store writes such a change
-// through at most once a second (docs/notes/shell-plan.md section 2.3).
+// through at most once a second (docs/notes/shell-3-layout-store.md).
 func FocusOnly(prev, next *core.State) bool {
 	return reflect.DeepEqual(withoutFocus(prev), withoutFocus(next))
 }

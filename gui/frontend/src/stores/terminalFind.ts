@@ -71,7 +71,7 @@ export interface TerminalFindHost {
   step: (dir: 1 | -1) => void;
 }
 
-/** The terminals on screen, by id. Two hosts never show one terminal (a plugin node yields to the bottom panel). */
+/** The terminals on screen, by id. Two hosts never show one terminal (a plugin node yields to a terminal tab). */
 const hosts = new Map<string, TerminalFindHost>();
 let lastKeyboard: string | null = null;
 

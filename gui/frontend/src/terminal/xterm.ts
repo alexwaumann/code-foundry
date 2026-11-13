@@ -321,7 +321,7 @@ export class XtermRenderer implements TerminalRenderer {
 
   fit(): void {
     if (!this.mounted) return;
-    // A hidden host (display: none, e.g. the content pane under an expanded side panel)
+    // A hidden host (display: none, e.g. a body hidden under another)
     // measures 0x0, and the fit addon would shrink the terminal (and the PTY, via
     // onResize) to its 2-column minimum. Keep the size; the host's ResizeObserver refits
     // when it shows again.

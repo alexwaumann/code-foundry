@@ -19,7 +19,7 @@ const closePoll = 250 * time.Millisecond
 // labels).
 var ErrNotShell = errors.New("not a shell terminal")
 
-// CloseShell is KillAndRemove for a bottom panel terminal (termlabel.IsPanel: a shell
+// CloseShell is KillAndRemove for a terminal a tab shows (termlabel.IsPanel: a shell
 // terminal.new started, or an action run). It refuses any other terminal with
 // ErrNotShell (terminal.kill and terminal.remove end those). It fails with ErrNotFound
 // when id does not exist.

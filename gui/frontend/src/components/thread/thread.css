@@ -1328,7 +1328,7 @@ html[data-thread-width="full"] {
 .cf-thread .agent-host:has(> .row:hover, > .agent-open:hover, > .agent-open:focus-visible) > .row .chev {
   display: none;
 }
-/* ---------- inline: a thread inside a plugin's side-panel view (InlineThread) ---------- */
+/* ---------- inline: a thread inside a plugin's surface (InlineThread) ---------- */
 .cf-thread-inline {
   --thread-col: none;
   --thread-dock: none;

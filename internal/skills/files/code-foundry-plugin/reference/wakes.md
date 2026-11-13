@@ -98,5 +98,5 @@ n, err := h.FireWake(ctx, "checks-done", map[string]string{"pr": "octo/app#12", 
   args)`): the exact `code-foundry thread subscribe --plugin … --arg …` line, so an agent
   that reads "checks failed" waits for the next run instead of polling it. Never a flag
   reason: it is one line of at most 80 characters and the line does not fit; the
-  failure's message or the panel's notice carries it.
+  failure's message or the surface's notice carries it.
 

@@ -12,7 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/termlabel"
 )
 
-// ui.focus.terminal in the shell window's layout (docs/notes/shell-plan.md section 2.9): the
+// ui.focus.terminal in the shell window's layout (docs/notes/shell-7-view-open.md): the
 // terminal's tab takes the user's focus, opened by the placement rules when it has none (linked
 // to the terminal's thread, else unlinked in the focused pane); a thread's quick terminal opens
 // under its thread, whose tab takes the focus.

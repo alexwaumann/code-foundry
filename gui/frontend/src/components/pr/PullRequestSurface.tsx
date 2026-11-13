@@ -188,7 +188,7 @@ function Centered({ icon: Icon, title, children, testId }: { icon: typeof Search
 }
 
 /**
- * The Pull request surface: one tab of the side panel showing a pull request's detail
+ * The Pull request surface: one tab showing a pull request's detail
  * (GhService.GetPullRequestDetail through pullRequestDetailResource), modeled on T3
  * Code's panel. Inner view state lives in stores/prPanel.ts per tab. While the detail
  * is on its way the row the GUI already holds paints the header and what it can of the box

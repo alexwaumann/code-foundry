@@ -1,5 +1,5 @@
 /**
- * GitHub pull request links that open in the side panel (a Pull request tab) instead of
+ * GitHub pull request links that open in a Pull request tab instead of
  * the browser: in a thread's messages (components/thread/Code.tsx) and in a pull
  * request's description and comments (PrOverview, PrTimeline). Markdown's other users
  * (plugin nodes, file previews, help) keep opening every link in the browser.

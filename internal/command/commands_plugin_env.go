@@ -11,7 +11,7 @@ import (
 
 // plugin.env (docs/notes/plugins-3-events-flags-env.md): what plugins contribute to new
 // Claude threads (session/setEnvironment), as applied, with the issues found; new
-// bottom-panel shells get the env and PATH entries too (plugins-env-restart.md).
+// shells get the env and PATH entries too (plugins-env-restart.md).
 
 // PluginEnvBackend is the slice of PluginService plugin.env needs.
 type PluginEnvBackend interface {

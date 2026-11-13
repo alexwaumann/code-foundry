@@ -1,5 +1,5 @@
 /**
- * The layout slice (docs/notes/shell-plan.md 2.13): the window shell's spaces, pane trees,
+ * The layout slice (docs/notes/shell-10-layout-slice.md): the window shell's spaces, pane trees,
  * panes, tabs and thread records as the daemon's layout source publishes them. The daemon is
  * the only writer; this slice holds what it last confirmed, plus the two changes applied before
  * the daemon answers (focusing a tab or a pane, 2.6), which its next event confirms or corrects.

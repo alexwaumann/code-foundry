@@ -1,6 +1,6 @@
 /**
  * What a surface knows of the shell pane it is drawn in (docs/notes/shell-11-pane-grid.md).
- * Outside the shell (the classic window, a side panel tab) there is no pane: the defaults say
+ * Outside a pane (a test, the shot page) there is no pane: the defaults say
  * so, and a surface behaves as it always has.
  */
 import { createContext, useContext } from "react";

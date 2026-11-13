@@ -44,7 +44,7 @@ type Manifest struct {
 	// Commands become plugin.<name>.<command> in the host's command registry: palette
 	// entries and `code-foundry plugin <name> <command>` CLI verbs.
 	Commands []CommandSpec `json:"commands,omitempty"`
-	// Surfaces are the plugin's views (side-panel tabs, settings sections).
+	// Surfaces are the plugin's views (tabs in the window's panes, settings sections).
 	Surfaces []SurfaceSpec `json:"surfaces,omitempty"`
 	// Wakes are the events an agent's thread may subscribe to (wake.go): `code-foundry
 	// thread subscribe --plugin <name>/<wake>`. The plugin fires them (Host.FireWake).

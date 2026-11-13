@@ -20,7 +20,7 @@ func canFindFiles(c Context) bool {
 }
 
 // fileFindCommand is file.find. The GUI presents it in the window (keys/bindings.ts):
-// the palette's file finder, whose Enter opens a File tab in the thread's side panel.
+// the palette's file finder, whose Enter opens a File tab beside the thread.
 // The CLI's reaches every window through ShowView.
 func (d ViewDeps) fileFindCommand() Command {
 	return Command{

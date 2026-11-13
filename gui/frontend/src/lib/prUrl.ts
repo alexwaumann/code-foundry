@@ -1,5 +1,5 @@
 /**
- * The GitHub pull request a URL is the page of, for links that open in the side panel
+ * The GitHub pull request a URL is the page of, for links that open in a tab
  * (components/pr/prLinks.ts): `http(s)://github.com/<owner>/<repo>/pull/<n>`, also
  * `www.github.com` (any case), with an optional tab (`/files`, `/commits`, `/checks`,
  * `/changes`), a trailing slash, a query and a fragment (`#discussion_r1`,

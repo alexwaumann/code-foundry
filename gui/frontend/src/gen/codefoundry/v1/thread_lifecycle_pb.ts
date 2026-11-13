@@ -1259,7 +1259,7 @@ export type UsageBucket = Message<"codefoundry.v1.UsageBucket"> & {
   unpriced: boolean;
 
   /**
-   * cost_usd split by token kind (the side panel's token table); all 0 when unpriced.
+   * cost_usd split by token kind (the usage token table); all 0 when unpriced.
    *
    * @generated from field: double input_cost_usd = 13;
    */

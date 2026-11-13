@@ -13,7 +13,7 @@ import (
 
 // The plugins' session environment beyond a thread's spawn
 // (docs/notes/plugins-env-restart.md): running threads learn that it changed
-// (startPluginEnvWatch), and bottom-panel shells get it when they start
+// (startPluginEnvWatch), and new shells get it when they start
 // (pluginShellExtras).
 
 // envChecker is the thread store's staleness check (thread.Manager.CheckSpawnExtras).
@@ -64,7 +64,7 @@ func envMayChange(ev plugin.Event) bool {
 	return false
 }
 
-// shellScope is the plugins' scope for a terminal with labels: a bottom-panel shell
+// shellScope is the plugins' scope for a terminal with labels: a shell
 // started for a thread gets that thread's (its project, workspace members, or none;
 // its owner), one started for a project that project's, any other shell (a home
 // directory one) the no-project scope. Not a shell (an action run, a plugin's

@@ -210,17 +210,17 @@ beyond the identity rule above.
 
 ## Build
 
-The plan, the pull request stack and the test plan are in `docs/notes/shell-plan.md`. Where the plan
-and this file disagree, this file wins. The interactive toy the plan mentions is a reference for
-algorithms only; where it differs from this file (it placed terminals below and by family), this
-file wins. `shell-plan.md` is removed before the merge to `main`.
+The build is summed up in `docs/notes/shell-build.md`: the step notes in order, where the build
+departs from its plan, and what is not in this change. The plan itself (`shell-plan.md`) was
+removed before the merge to `main` and is in git history. The interactive toy the plan mentioned
+was a reference for algorithms only; where it differed from this file (it placed terminals below
+and by family), this file won.
 
 Composer drafts and remembering the current space were added to this file after PRs 1 and 2
-were briefed: a small layout PR after PR 2 gives drafts their identity, and the sidebar PR lists
+were briefed: a small layout PR after PR 2 gave drafts their identity, and the sidebar PR lists
 them.
 
 Answers to the plan's open questions that differ from its recommendations: placement may join a pane
 that holds a thread tab (question 5); a thread's tab opens in the focused pane (question 2); closing
 a terminal's tab ends it (question 6); there is no "thread last viewed" and no change on `main` for
 it, the first space starts empty (question 3).
-

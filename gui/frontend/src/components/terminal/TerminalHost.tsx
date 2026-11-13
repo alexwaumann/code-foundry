@@ -21,8 +21,8 @@ interface DevHook {
 declare global {
   interface Window {
     /**
-     * Dev/test hook: the mounted host's renderer and controller (only in dev builds). The
-     * bottom panel's is the only host, so this is its active shell; e2e reads its buffer
+     * Dev/test hook: the mounted host's renderer and controller (only in dev builds): the
+     * host of the focused terminal; e2e reads its buffer
      * (e2e/fixtures.ts terminalText) and loses its WebGL context.
      */
     __cfTerminal?: DevHook;
@@ -87,14 +87,14 @@ function Overlay({ state, finding }: { state: AttachState; finding: boolean }) {
 }
 
 /**
- * One xterm attached to at most one terminal: the bottom panel's active shell
- * (components/bottom; threads have no terminal). The renderer lives as long as the host;
+ * One xterm attached to at most one terminal: a terminal tab, a thread's quick
+ * terminal or a plugin's terminal node. The renderer lives as long as the host;
  * switching `terminalId` aborts the old Attach stream and resets the renderer before the
  * new snapshot, and a null id detaches (no stream). Resizes refit through a
  * ResizeObserver, and the fit skips a hidden (zero-size) host (terminal/xterm.ts).
  *
  * Focus is the parent's call (`ref.focus()`). The host's focus counts for the region
- * around it (the bottom panel's "bottom").
+ * around it (a terminal tab's or the quick terminal's).
  *
  * The find bar is the host's, so every terminal has one (a plugin's node too). Its query is
  * the terminal's (stores/terminalFind.ts) and the renderer searches whichever terminal is

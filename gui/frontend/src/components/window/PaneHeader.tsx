@@ -6,7 +6,7 @@ import { PANE_HEADER_HEIGHT, trafficLightGutter } from "./titleBand";
 /**
  * Header of a page in the content pane: PANE_HEADER_HEIGHT (44 px), so below the pane's
  * shell-gap top margin (12 px) it ends on the title band's bottom edge (titleBand.ts),
- * level with the sidebar band and the side panel's header, and its middle is the band's
+ * level with a pane's tab strip, and its middle is the band's
  * centre, where the traffic lights and the app name sit. With the sidebar hidden the
  * pane's top-left corner sits under the traffic lights, so the header's content starts
  * past the gutter.

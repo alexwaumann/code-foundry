@@ -5,7 +5,7 @@
 // one set of names. It has no dependencies (in particular no cgo), so any package may
 // import it.
 //
-// Three kinds of terminal belong to a thread or worktree, shown in its bottom panel:
+// Three kinds of terminal belong to a thread or worktree, shown as its terminal tabs:
 //
 //   - A shell started by terminal.new has Kind = KindShell, Project and Worktree for the
 //     worktree it belongs to, and Thread when it belongs to a thread (Project and
@@ -111,7 +111,7 @@ func IsAction(labels map[string]string) bool { return labels[Kind] == KindAction
 // IsSetup reports whether labels mark a skill's setup script in a terminal.
 func IsSetup(labels map[string]string) bool { return labels[Kind] == KindSetup }
 
-// IsPanel reports whether labels mark a terminal the bottom panel shows (a shell, an
+// IsPanel reports whether labels mark a terminal a terminal tab shows (a shell, an
 // action run or a skill's setup): one with an owner, closed with terminal.close, and
 // cleaned up when its owner goes away.
 func IsPanel(labels map[string]string) bool {

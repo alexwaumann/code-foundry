@@ -86,15 +86,15 @@ func layoutChrome(f layoutFilter) (toolbar, footer []ui.Node) {
 }
 
 // layoutNodes is the demo's Layout tab: the layout nodes, in a wide container (a page's
-// main column; the panel is narrower). Two columns (a pane with a log and the runs the
-// toolbar filters, beside markdown and facts) that stack in the side panel; a grid of
-// cards (one column in the panel, more as it widens) under a labelled divider; inline
+// main column; a pane beside a thread is narrower). Two columns (a pane with a log and the
+// runs the toolbar filters, beside markdown and facts) that stack in a narrow pane; a grid
+// of cards (one column in a narrow pane, more as it widens) under a labelled divider; inline
 // groups; a card whose pane holds a flex spacer that keeps its bar at the bottom; a fixed
 // spacer; and a
 // collapse-first pair whose second column (the assistant thread in a fill pane) shows only
 // where the columns fit side by side.
 func layoutNodes(threadID string, err error, f layoutFilter) []ui.Node {
-	intro := ui.NewText("layout-intro", ui.Plain("Columns sit side by side where they fit (240 px a column) and stack in order where they do not, as in the side panel."))
+	intro := ui.NewText("layout-intro", ui.Plain("Columns sit side by side where they fit (240 px a column) and stack in order where they do not, as in a narrow pane."))
 	lines := make([]ui.LogLine, 0, 24)
 	for i := 1; i <= 24; i++ {
 		ln := ui.LogLine{Text: fmt.Sprintf("step %02d  ok", i)}

@@ -50,7 +50,7 @@ function ShellRow({ shell }: { shell: BackgroundShellView }) {
 /**
  * A server (lib/servers): localhost:<port> (its first; the hover card lists them all), then
  * its command, where it comes from (the action, the thread below this one that owns it) and
- * its uptime. A click shows its terminal in this thread's bottom panel (a terminal run) or
+ * its uptime. A click shows its terminal in a tab (a terminal run) or
  * opens the port in the browser. On hover (or while it has the keyboard) two buttons show
  * over the row's end: open in the browser, and stop. They are the row's siblings, like the
  * lineage group's, so Enter on one does not press the row. Stop names what it stops, the
@@ -162,7 +162,7 @@ function ServerRow({ threadId, server }: { threadId: string; server: ServerSourc
  * thread below it, background shells and action runs alike (docs/notes/server-rollup.md,
  * docs/notes/thread-servers.md), then this thread's shells that listen on nothing, folded
  * under "N shells · running" ("N more shells" below servers). The fold stays this thread's: a
- * child's other shells are its own card's. Not the bottom panel's terminals.
+ * child's other shells are its own card's. Not the terminal tabs' terminals.
  */
 export function ShellsGroup({ threadId }: { threadId: string }) {
   const encoded = useOtherShells(threadId);

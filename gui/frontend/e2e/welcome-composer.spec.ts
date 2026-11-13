@@ -11,7 +11,7 @@ test.beforeEach(async () => {
 });
 
 const PAGE = "/Users/dev/.code-foundry/pages/welcome.html";
-const PROMPT = `I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page ${PAGE} in the side panel and walk me through it.`;
+const PROMPT = `I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page ${PAGE} in a tab beside this conversation and walk me through it.`;
 
 const heading = (page: Page) => page.getByTestId("composer-heading");
 const prompt = (page: Page) => page.getByTestId("composer-prompt");

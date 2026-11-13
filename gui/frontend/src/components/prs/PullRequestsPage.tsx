@@ -60,7 +60,7 @@ function Body({ d }: { d: DashboardView }) {
       shown.flatMap((s): NavItem[] => {
         const rows = sectionPrs(m, s).map(({ pr: p }) => ({
           key: prKey(s, p),
-          // Enter and click open the pull request in the side panel; cmd+Enter and cmd+click on GitHub.
+          // Enter and click open the pull request in a tab; cmd+Enter and cmd+click on GitHub.
           activate: () => void openPullRequestInPanel({ slug: p.repoSlug, number: p.number }),
           secondary: () => void openUrl(p.url),
         }));

@@ -128,7 +128,7 @@ type Cells = Partial<Record<Column, ReactNode>>;
 
 /**
  * A table row: the cells of the columns its table shows, in order. Enter and click open
- * it in the side panel (the page's nav), cmd+click on GitHub.
+ * it in a tab (the page's nav), cmd+click on GitHub.
  */
 function Row({ section, pr, className, cells }: { section: Section; pr: PullRequestView; className?: string; cells: Cells }) {
   const shown = useContext(ShownColumns);

@@ -105,7 +105,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
     if (loaded && seen && !exists) useUiStore.getState().select(PROJECTS_INDEX);
   }, [loaded, seen, exists]);
 
-  // The content pane's width (the side panel takes from it): the scroll box's.
+  // The pane's width: the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   // A checkout's or a leftover's row has no activation: its right-click menu (ContextMenu key, Shift+F10) holds what it does.

@@ -10,7 +10,7 @@ import (
 )
 
 // Spawn extras are what others add to a new terminal's environment by its labels: the
-// daemon gives bottom-panel shells the plugins' session environment
+// daemon gives shells the plugins' session environment
 // (docs/notes/plugins-env-restart.md). The package stays program-agnostic: it never
 // reads the labels itself.
 

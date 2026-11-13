@@ -2,8 +2,8 @@ package layout
 
 import "slices"
 
-// A call from inside a thread never moves the user's focus (docs/notes/shell-plan.md section
-// 2.6): Options.KeepFocus runs any op so. The op does what it does to the tree, and then the
+// A call from inside a thread never moves the user's focus (docs/notes/shell-4-commands.md,
+// "Focus from a thread"): Options.KeepFocus runs any op so. The op does what it does to the tree, and then the
 // focus is put back as it was: the current space, and in each space the tab that had the
 // focus (or, when that tab went, the pane that had it) and the order of the recently focused
 // tabs. A tab the op moved or opened stays active in its own pane, except in the focused pane,

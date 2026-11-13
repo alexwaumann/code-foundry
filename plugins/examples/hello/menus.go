@@ -16,8 +16,8 @@ func headerMenu() *ui.Menu {
 	)
 }
 
-// runActions are Build #2's buttons: wider together than the side panel's row allows
-// beside its title, so the panel folds them into the row's ⋯ (an expanded panel shows them).
+// runActions are Build #2's buttons: wider together than a narrow pane's row allows
+// beside its title, so it folds them into the row's ⋯ (a wide pane shows them).
 func runActions() []ui.Button {
 	return []ui.Button{
 		ui.EventButton("run-2-rerun", "Rerun", "rerun-run").WithData("2").WithIcon("rotate-ccw"),

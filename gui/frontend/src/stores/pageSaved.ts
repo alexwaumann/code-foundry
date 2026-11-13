@@ -28,7 +28,7 @@ export function savedPath(verb: string, res: InvokeResultView | null): string {
 
 /**
  * Shows "Saved <name>" for a page's run that wrote a file, with Open (a File tab in the
- * thread's side panel) and Show in Finder; nothing for any other run.
+ * tab beside the thread) and Show in Finder; nothing for any other run.
  */
 export function noticePageResult(threadId: string, verb: string, res: InvokeResultView | null): void {
   const path = savedPath(verb, res);

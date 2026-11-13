@@ -2,7 +2,7 @@
  * The window shell's layout (LayoutService and the EventService layout source): spaces, each
  * space's tree of panes, the tabs in them, and what is stored per thread. The only file that
  * uses the generated layout types; it maps them to plain view models that follow the daemon's
- * layout JSON (internal/layout, docs/notes/shell-plan.md 2.3), so a pane tree passes to the
+ * layout JSON (internal/layout, docs/notes/shell-1-layout-model.md), so a pane tree passes to the
  * shell's geometry (src/shell/geometry) as it is. docs/notes/shell-10-layout-slice.md.
  */
 import { create, type MessageInitShape } from "@bufbuild/protobuf";

@@ -153,7 +153,7 @@ func (c Costs) Total() float64 {
 	return c.Input + c.Output + c.CacheRead + c.CacheWrite5m + c.CacheWrite1h
 }
 
-// CostByKind prices one bucket with Lookup, per token kind (the side panel's token table
+// CostByKind prices one bucket with Lookup, per token kind (the usage token table
 // shows a cost per kind). ok is false when the bucket is unpriced.
 func CostByKind(b Bucket) (Costs, bool) {
 	r, ok := Lookup(b.Model, b.Tier, b.Speed)

@@ -5029,7 +5029,7 @@ type ShowThreadHtmlRequest struct {
 	Title string `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	// A second card even when this page's card is still live (see reused).
 	Again bool `protobuf:"varint,4,opt,name=again,proto3" json:"again,omitempty"`
-	// The page also opens in the side panel (view.inline --panel): a card of it anywhere
+	// The page also opens as a tab beside the thread (view.inline --panel): a card of it anywhere
 	// in the thread is reused, not only one since the last user message.
 	Panel         bool `protobuf:"varint,5,opt,name=panel,proto3" json:"panel,omitempty"`
 	unknownFields protoimpl.UnknownFields

@@ -21,7 +21,7 @@ import type { SurfaceContext, SurfaceSpec } from "./types";
  */
 /**
  * The id FileTab keys its edit session by (fileTab(target).id: the file's path), whatever id the
- * host gave the tab: the side panel's is the same, a window shell tab's is the layout's.
+ * host gave the tab: a File tab's is its path (shell/kinds.ts seamTab).
  */
 function editTab(tab: Tab): Tab {
   const target = fileOfTab(tab);

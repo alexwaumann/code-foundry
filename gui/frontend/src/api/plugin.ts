@@ -406,7 +406,7 @@ export interface ThreadData {
   height?: NodeHeight;
 }
 
-/** The plugin's own terminal, inline, with "Open in bottom panel" and up to 2 buttons of the plugin's. */
+/** The plugin's own terminal, inline, with "Open in a tab" and up to 2 buttons of the plugin's. */
 export interface TerminalData {
   terminalId: string;
   /** Text rows (4..60, default 16) when height is "auto". */

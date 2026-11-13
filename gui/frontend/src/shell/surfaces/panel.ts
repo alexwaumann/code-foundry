@@ -1,5 +1,5 @@
 /**
- * The surfaces the side panel had, as shell tabs: a file, a diff, a pull request, MCP, the
+ * The panel surfaces (once the side panel's), as shell tabs: a file, a diff, a pull request, MCP, the
  * gallery, Ember's board and plugin surfaces draw the same body (surfaces/registry.ts), given
  * the layout tab as a seam tab (shell/host.ts). Two layout kinds have other names in the panel:
  * `file` is `files` and `ember.board` is `ember`.
@@ -15,7 +15,7 @@ import type { ShellSurface } from "./types";
 
 export { layoutKindOf, panelKindOf, seamTab } from "@/shell/kinds";
 
-/** The side panel key a linked tab's body acts for: its thread's panel ("" for an unlinked tab). */
+/** The panel key a linked tab's body acts for: its thread's ("" for an unlinked tab). */
 export function panelKeyOfTab(tab: Pick<TabEntry, "thread">): string {
   return tab.thread ? `thread:${tab.thread}` : "";
 }
@@ -32,7 +32,7 @@ export function panelSurface(kind: string, spec: SurfaceSpec | undefined): Shell
     useTitle: (tab) => tab.name || tab.title || spec?.title || kind,
     // A linked tab's body acts for its thread as it did in that thread's side panel (a File tab's
     // page bridge, the MCP tab's state, a pull request's links): the panel key is the thread's.
-    // It sits in the side panel's box: it scrolls (overflow auto, the scroll root long lists
+    // It sits in a box like the old side panel's: it scrolls (overflow auto, the scroll root long lists
     // virtualize against, components/pr/VirtualStack, and plugin nodes count as on screen in), and
     // a press inside it takes the keyboard (the pane's focus root), so the surface's own keys
     // (SurfaceSpec.onKey, dispatched by the pane) reach it.

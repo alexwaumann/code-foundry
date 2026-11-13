@@ -298,7 +298,7 @@ const KIND_SHELL = "shell";
 const KIND_ACTION = "action";
 const KIND_SETUP = "setup";
 
-/** termlabel.IsPanel: a shell, an action run or a skill's setup (the bottom panel's terminals; what close and thread removal take). */
+/** termlabel.IsPanel: a shell, an action run or a skill's setup (the terminals tabs show; what close and thread removal take). */
 const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION || labels[LABEL_KIND] === KIND_SETUP;
 
 /** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when threadId is set. */
@@ -1042,7 +1042,7 @@ export class World {
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
-    // A shell terminal.new started in thread s-1 (thread-owned: s-1's bottom panel).
+    // A shell terminal.new started in thread s-1 (thread-owned: a tab linked to s-1).
     this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
     // Threads in every state, each with a short history (SEEDS).
     this.threads.clear();
@@ -4194,7 +4194,7 @@ export class World {
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
         when: (ctx) => Boolean(ctx?.activeThreadId || ctx?.activeWorktreePath),
         // Like the daemon: no focus intent; the result's JSON is the new terminal (the GUI
-        // focuses it in the bottom panel by its id).
+        // focuses its tab by its id).
         run: async (ctx, args) => {
           const owner = this.shellOwner(ctx, args.cwd ?? "");
           const fail = this.terminalNewFail;
@@ -5288,7 +5288,7 @@ export class World {
       },
       {
         // internal/command canFindFiles: a thread view with a project or workspace; the CLI always.
-        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it in the thread's side panel (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
+        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
         when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
       },
@@ -5333,7 +5333,7 @@ export class World {
       // internal/command canSearchFile: a thread view (the GUI's palette further asks for a File tab that can search); the CLI always.
       ...(
         [
-          ["file.search", "Find in File", "Find in the File tab. Searches the file the side panel's File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"],
+          ["file.search", "Find in File", "Find in the File tab. Searches the file a File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"],
           ["file.search.next", "Find Next in File", "Next match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+g"],
           ["file.search.previous", "Find Previous in File", "Previous match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+shift+g"],
         ] as const

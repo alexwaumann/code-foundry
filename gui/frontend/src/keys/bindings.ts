@@ -277,7 +277,7 @@ function fileCommand(e: KeyboardEvent, target: Element | null, code: boolean, ch
 const editorOnly: ReadonlySet<string> = new Set(["file.save"]);
 
 /**
- * The command a focused terminal (a bottom panel shell) or thread prompt
+ * The command a focused terminal (a terminal tab or the quick terminal) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
  * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell. The code
  * editor (`code`) yields the same, and its own commands.
@@ -292,7 +292,7 @@ function terminalYields(chord: string, code = false): CommandView | undefined {
  * Commands whose chords also leave a focused text field (the settings search, which the
  * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
  * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so a chord bound
- * to it works in a side panel's PR review composer (a plain textarea); and search.open, which works from
+ * to it works in a pull request tab's review composer (a plain textarea); and search.open, which works from
  * anywhere (a thread's find bar included). Only cmd chords that do not move or delete text
  * (a user may rebind these to cmd+arrow).
  */

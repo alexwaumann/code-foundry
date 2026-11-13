@@ -99,7 +99,7 @@ function Hints() {
  * The file finder (file.find, cmd+P; docs/notes/file-finder-2-gui.md): the palette's
  * chrome over a thread's checkouts. An empty query lists the files changed in the thread
  * and the panel's recently opened files; a query lists the daemon's ranked matches across
- * the checkouts (lib/fileFinder.ts). Enter opens the file in the thread's side panel (at
+ * the checkouts (lib/fileFinder.ts). Enter opens the file in a tab beside the thread (at
  * the line of a trailing `:<line>`), ⌥⏎ puts it in the prompt as an @ file.
  */
 export function FileFinder({ threadId, search }: { threadId: string; search?: FindFilesFn }) {

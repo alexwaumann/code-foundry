@@ -1,5 +1,5 @@
 /**
- * The window shell's view state (docs/notes/shell-plan.md 2.5, 2.13): what one window draws
+ * The window shell's view state (docs/notes/shell-11-pane-grid.md, shell-19-rails-fullscreen.md): what one window draws
  * and is never stored in the daemon or in localStorage. The layout itself (spaces, panes, tabs,
  * the focused pane) is the daemon's (stores/layout.ts).
  *

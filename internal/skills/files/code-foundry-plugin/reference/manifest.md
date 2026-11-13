@@ -147,7 +147,7 @@ The context carries ids and one path: `WorktreePath`, the folder the thread work
 | `title` | Required, up to 80 characters: the tab's title and `Show <title>` in the palette. |
 | `icon` | A lucide icon name from the list below; any other name draws a plain circle. |
 | `scope` | What one instance is for (below). Default `thread`. |
-| `placement` | `["panel"]` (default): the side panel. `settings` is accepted and reserved for a later version. |
+| `placement` | `["panel"]` (default): a tab in a pane of the window (the name is the old side panel's). `settings` is accepted and reserved for a later version. |
 | `when` | A clause; the surface is offered only where it holds (and its scope's context exists). |
 
 | Scope | One instance per | Context the plugin gets (`SurfaceOpen.Context`) | Debug it with |
@@ -165,8 +165,8 @@ The context carries ids and one path: `WorktreePath`, the folder the thread work
 but its `SurfaceOpen.Context` is the first opener's thread (the same holds for a `project`
 or `global` surface shown beside different threads). So an event that acts on "this
 thread" (send a failure to Claude) must read the thread from `act.Context`, the acting
-panel's, never from the open. A **command button** works too: the host runs it with the
-viewing panel's context, so the command's `context: thread` arg is the thread the user is
+tab's, never from the open. A **command button** works too: the host runs it with the
+viewing tab's context, so the command's `context: thread` arg is the thread the user is
 looking at.
 Command args travel inside the view (its 256 KB budget; an event's `data` is capped at
 1 KB): pass an id the command can look up (a run id, a job id), not the text itself.

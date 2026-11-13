@@ -14,8 +14,8 @@ const (
 	ViewFileSearchPrevious = "file.search.previous"
 )
 
-// canSearchFile is the verbs' availability: a thread view, the only one with a side panel
-// of File tabs. The GUI's palette further lists them only while a File tab it can search
+// canSearchFile is the verbs' availability: a thread view, whose File tabs are linked
+// to it. The GUI's palette further lists them only while a File tab it can search
 // is on screen (keys/bindings.ts inPalette), as it does for file.save. The CLI (no view)
 // may always ask; windows decide.
 func canSearchFile(c Context) bool {

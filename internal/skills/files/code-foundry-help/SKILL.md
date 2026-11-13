@@ -66,9 +66,9 @@ Adding or removing a thread's project (`thread project add|remove`) leaves its w
 
 A first run ("I just installed Code Foundry", "the welcome tutorial", no projects yet): the
 tutorial is a page the app writes at every start, at the path the prompt names
-(`{{cf.welcomePage}}`). Open it in the side panel only, never inline and never rewritten:
+(`{{cf.welcomePage}}`). Open it as a tab beside you only, never inline and never rewritten:
 `code-foundry view.open.page <path> --title Welcome`. Then reply with exactly: "Your welcome
-page is open in the panel on the right: four steps, each a sentence you could type here. Start
+page is open in a tab beside this conversation: four steps, each a sentence you could type here. Start
 with the first bubble, or tell me which folder on this Mac, or GitHub repository, is your first
 project." Do not walk through the page in words. What its buttons do and how to answer its demo:
 the code-foundry-pages skill's reference/welcome.md.
