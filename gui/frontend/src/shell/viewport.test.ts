@@ -9,7 +9,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function reporter(opts: { zoom?: number; enabled?: boolean; fail?: boolean } = {}) {
+function reporter(opts: { zoom?: number; fail?: boolean } = {}) {
   const sent: [number, number][] = [];
   const r = createViewportReporter({
     send: (w, h) => {
@@ -17,7 +17,6 @@ function reporter(opts: { zoom?: number; enabled?: boolean; fail?: boolean } = {
       return opts.fail ? Promise.reject(new Error("no daemon")) : Promise.resolve();
     },
     zoom: () => opts.zoom ?? 1,
-    enabled: () => opts.enabled ?? true,
     delayMs: 200,
   });
   return { r, sent };
@@ -75,11 +74,7 @@ describe("reporting the pane area's size", () => {
     expect(sent).toHaveLength(2);
   });
 
-  it("sends nothing with the shell flag off, or for an empty box", async () => {
-    const off = reporter({ enabled: false });
-    off.r.report(1000, 700);
-    await vi.advanceTimersByTimeAsync(200);
-    expect(off.sent).toEqual([]);
+  it("sends nothing for an empty box", async () => {
     const empty = reporter();
     empty.r.report(0, 700);
     await vi.advanceTimersByTimeAsync(200);

@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CloudUpload, Folder, GitBranchPlus } from "lucide-react";
-import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { useProjectKind } from "@/components/icons/projectKind";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -154,8 +152,6 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
           <PagePicker icon={<KindIcon kind={kind} />} name={name} currentProject={projectId} />
         )}
         <span className="-mr-2 ml-auto flex shrink-0 items-center pl-2">
-          <BottomToggle />
-          <PanelToggle />
         </span>
       </PaneHeader>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">

@@ -8,16 +8,12 @@ vi.mock("sonner", () => ({ toast: { info: toastInfo, error: toastError, warning:
 const playAlertSound = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/api/app", () => ({ playAlertSound }));
 
-const { applyIntent, clearPendingFocus } = await import("./intents");
-const { getBottom, PENDING_FOCUS_MS, useBottomStore } = await import("./bottomPanel");
-const { onNewTerminal, revealArrived } = await import("./bottomActions");
-const { usePanelStore } = await import("./panel");
+const { applyIntent, clearPendingFocus, PENDING_FOCUS_MS } = await import("./intents");
 const { useThreadsStore } = await import("./threads");
 const { useTerminalsStore } = await import("./terminals");
 const { HOME, useUiStore } = await import("./ui");
 const { getDraft, updateDraft } = await import("./compose");
 const { threadDraftKey } = await import("./threadActions");
-const { setShellMode } = await import("./shellView");
 
 function term(id: string, labels: Record<string, string>): TerminalView {
   return { id, argv: ["/bin/zsh"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
@@ -34,121 +30,21 @@ const focusTerminal = (terminalId: string) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null });
-  usePanelStore.setState({ byKey: {} });
   useThreadsStore.setState({ byId: { s1: thread("s1") }, order: ["s1"] });
   setTerminals([term("sh", shell), term("raw", {})]);
-  useUiStore.setState({ selection: HOME, promptFocusSeq: 0, bottomFocusSeq: 0 });
+  useUiStore.setState({ selection: HOME, promptFocusSeq: 0 });
   clearPendingFocus();
 });
 
-describe("focusTerminal in the window shell", () => {
-  afterEach(() => {
-    setShellMode("classic");
-  });
-
-  it("does nothing: the layout already shows the terminal's tab with the focus", () => {
-    setShellMode("shell");
+describe("focusTerminal", () => {
+  it("does nothing: the layout already shows the terminal's tab with the focus (ui.focus.terminal)", () => {
     focusTerminal("sh");
     focusTerminal("raw");
+    focusTerminal("unknown");
     expect(useUiStore.getState().selection).toEqual(HOME);
-    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
+    expect(useUiStore.getState().promptFocusSeq).toBe(0);
     expect(toastInfo).not.toHaveBeenCalled();
-  });
-
-  it("with the classic window, still reveals a shell in its owner's panel", () => {
-    focusTerminal("sh");
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
-  });
-});
-
-describe("a pending focusTerminal", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("expires after PENDING_FOCUS_MS: a toast, and a late shell only gets its tab", () => {
-    vi.useFakeTimers();
-    focusTerminal("late");
-    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
-    expect(toastError).toHaveBeenCalledWith("Terminal late not found");
-    const late = term("late", shell);
-    setTerminals([late]);
-    onNewTerminal(late);
-    expect(useUiStore.getState().selection).toEqual(HOME);
-    expect(useUiStore.getState().bottomFocusSeq).toBe(0);
-  });
-
-  it("a terminal that arrives as no shell is not shown, and the wait ends without a toast", () => {
-    vi.useFakeTimers();
-    focusTerminal("c9");
-    const c9 = term("c9", { thread: "s1" });
-    setTerminals([c9]);
-    onNewTerminal(c9);
-    expect(useUiStore.getState().selection).toEqual(HOME);
-    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
     expect(toastError).not.toHaveBeenCalled();
-  });
-
-  const cancels: [string, () => void][] = [
-    ["the user selects something", () => { useUiStore.getState().select({ kind: "view", name: "pullrequests" }); }],
-    ["a focusThread intent", () => { applyIntent({ kind: "focusThread", threadId: "s1" }); }],
-    ["a showView intent", () => { applyIntent({ kind: "showView", name: "projects" }); }],
-    ["another focusTerminal", () => { focusTerminal("sh"); }],
-  ];
-  it.each(cancels)("is dropped when %s", (_name, act) => {
-    vi.useFakeTimers();
-    focusTerminal("later");
-    act();
-    const selected = useUiStore.getState().selection;
-    const later = term("later", { kind: "shell", thread: "s2", project: "r1", worktree: "/src/app" });
-    setTerminals([later]);
-    onNewTerminal(later);
-    expect(useUiStore.getState().selection).toEqual(selected);
-    vi.advanceTimersByTime(PENDING_FOCUS_MS + 1);
-    expect(toastError).not.toHaveBeenCalled();
-  });
-
-  it("the reconnect's List reveals a pending shell once (revealArrived)", () => {
-    focusTerminal("relist");
-    setTerminals([term("relist", shell)]);
-    revealArrived();
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
-    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "relist" });
-    useUiStore.setState({ selection: HOME });
-    revealArrived();
-    expect(useUiStore.getState().selection).toEqual(HOME);
-  });
-});
-
-describe("the focusTerminal intent", () => {
-  it("a shell shows in its owner's bottom panel, focused there", () => {
-    focusTerminal("sh");
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
-    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "sh" });
-    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
-    expect(useUiStore.getState().promptFocusSeq).toBe(0);
-  });
-
-  it.each([
-    ["no labels", "raw", {}],
-    ["a thread's label but no shell", "labelled", { thread: "s1" }],
-  ])("a known terminal with %s changes nothing and says why", (_name, id, labels) => {
-    setTerminals([term(id, labels)]);
-    focusTerminal(id);
-    expect(useUiStore.getState().selection).toEqual(HOME);
-    expect(toastInfo).toHaveBeenCalledWith(`Terminal ${id} belongs to no thread or project`, expect.anything());
-  });
-
-  it("an unknown terminal that arrives as a shell is revealed there, not in the thread's prompt", () => {
-    focusTerminal("later");
-    expect(useUiStore.getState().selection).toEqual(HOME);
-    const later = term("later", shell);
-    setTerminals([later]);
-    onNewTerminal(later);
-    expect(getBottom("thread:s1")).toEqual({ open: true, activeTerminalId: "later" });
-    expect(useUiStore.getState().bottomFocusSeq).toBe(1);
-    expect(useUiStore.getState().promptFocusSeq).toBe(0);
   });
 });
 
@@ -329,27 +225,13 @@ describe("showView from the daemon", () => {
   });
 });
 
-// From e2e/panel.spec.ts: view.panel.new-tab from the palette and the CLI (ShowView "panel.new-tab").
-describe("showView panel.new-tab", () => {
-  const files = { id: "files", kind: "files", title: "Files", params: {} };
-  const closedPalette = { open: false, query: "", commandName: null, page: "commands" as const, returnTo: "content" as const };
-
-  beforeEach(() => {
-    usePanelStore.setState({ byKey: { "thread:s1": { open: false, groups: [{ tabs: [files], activeTabId: files.id }] } } });
-    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "content", panelFocusSeq: 0, palette: closedPalette });
-  });
-
-  it("shows the hidden panel picking (no tab added) and asks for the keyboard there", () => {
-    applyIntent({ kind: "showView", name: "panel.new-tab" });
-    expect(usePanelStore.getState().byKey["thread:s1"]).toEqual({ open: true, groups: [{ tabs: [files], activeTabId: null, pickFrom: files.id }] });
-    expect(useUiStore.getState().panelFocusSeq).toBe(1);
-  });
-
-  it("with the palette open, the palette's return target moves to the panel instead", () => {
-    useUiStore.setState({ focus: "palette", palette: { ...closedPalette, open: true } });
-    applyIntent({ kind: "showView", name: "panel.new-tab" });
-    expect(usePanelStore.getState().byKey["thread:s1"]?.groups[0]?.activeTabId).toBeNull();
-    expect(useUiStore.getState().palette.returnTo).toBe("panel");
-    expect(useUiStore.getState().panelFocusSeq).toBe(0);
+describe("the classic panels' ShowViews (view.panel.toggle, .expand, .new-tab, .split, view.bottom.toggle)", () => {
+  it("change nothing: this window has neither panel (PR 22 retires them)", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, focus: "content" });
+    const before = useUiStore.getState();
+    for (const name of ["panel.toggle", "panel.expand", "panel.new-tab", "panel.split", "bottom.toggle"]) applyIntent({ kind: "showView", name });
+    const after = useUiStore.getState();
+    expect(after.selection).toBe(before.selection);
+    expect([after.promptFocusSeq, after.contentFocusSeq, after.palette]).toEqual([before.promptFocusSeq, before.contentFocusSeq, before.palette]);
   });
 });

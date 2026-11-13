@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { GitPullRequest } from "lucide-react";
 import type { DashboardView, PullRequestView } from "@/api/gh";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tip } from "@/components/ui/tooltip";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
@@ -12,14 +10,12 @@ import { DASHBOARD_KEY, dashboardResource, openUrl, pullRequestKey, useFreshness
 import { openPullRequestInPanel } from "@/stores/prPanel";
 import { armPrefetch, disarmPrefetch } from "@/stores/prPrefetch";
 import { useResource } from "@/stores/resource";
-import { useUiStore } from "@/stores/ui";
 import { ActivityCharts } from "./ActivityCharts";
 import { prKey } from "./format";
 import { capKey, cards, dashboardLoad, liveFilter, mergedSubtitle, olderFreshness, pageModel, sectionRows, SECTIONS, type PageModel, type Section } from "./pageModel";
 import { SectionTitle } from "@/components/table/TableParts";
 import { Freshness } from "./PrBits";
 import { AuthoredPrRow, MergedRow, NeedsReviewRow, OtherPrRow, PrTable, ReviewedByYouRow } from "./PrRows";
-import { needsReviewCount } from "./reviewQueue";
 import { SummaryCards } from "./SummaryCards";
 import { useServesFocusRequests } from "@/shell/paneContext";
 
@@ -243,7 +239,6 @@ export function PullRequestsPage() {
           {d?.viewer && load === "ready" && <span aria-hidden>·</span>}
           {load === "ready" && <Freshness fetchedAtMs={fresh.fetchedAtMs} lastError={fresh.lastError} staleAfterMs={STALE_AFTER_MS} testId="prs-updated" />}
         </span>
-        <PanelToggle className="-mr-2" />
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {load === "ready" && d ? (
@@ -259,50 +254,5 @@ export function PullRequestsPage() {
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * How many pull requests need the viewer's review, from the dashboard the sidebar watches
- * (useSidebarDashboard); 0 until it loads. A number, so the row re-renders only when it changes.
- */
-function useNeedsReviewCount(): number {
-  return dashboardResource.store((s) => {
-    const d = s.entries[DASHBOARD_KEY]?.data;
-    return d ? needsReviewCount(d.reviewRequested, d.reviewed, d.viewer?.login ?? "") : 0;
-  });
-}
-
-/** The sidebar's Pull Requests entry, with an amber count of the pull requests that need the viewer's review. */
-export function PullRequestsNav() {
-  const active = useUiStore((s) => s.selection.kind === "view" && s.selection.name === "pullrequests");
-  const count = useNeedsReviewCount();
-  return (
-    <button
-      type="button"
-      className={cn(
-        "mt-0.5 flex h-7 items-center gap-2 rounded-md px-2 text-left text-body-sm",
-        active ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground hover:bg-cf-sidebar-row-hover",
-      )}
-      data-testid="nav-pullrequests"
-      aria-current={active ? "page" : undefined}
-      onClick={() => {
-        useUiStore.getState().select({ kind: "view", name: "pullrequests" });
-      }}
-    >
-      <GitPullRequest className="size-4 shrink-0 text-cf-icon-muted" aria-hidden />
-      <span className="truncate">Pull Requests</span>
-      {count > 0 && (
-        // The pill hides the words, so the tooltip says them.
-        <Tip label={count === 1 ? "1 pull request needs your review" : `${String(count)} pull requests need your review`}>
-          <span
-            className="ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-cf-warning-surface px-1.5 text-caption-sm font-semibold tabular-nums text-cf-warning-text"
-            data-testid="nav-pullrequests-count"
-          >
-            {count}
-          </span>
-        </Tip>
-      )}
-    </button>
   );
 }

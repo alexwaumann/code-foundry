@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { BottomToggle } from "@/components/bottom/BottomToggle";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
@@ -117,8 +115,6 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
           <PagePicker icon={<WorkspaceIcon />} name={name} currentWorkspace={workspaceId} />
         )}
         <span className="-mr-2 ml-auto flex shrink-0 items-center pl-2">
-          <BottomToggle />
-          <PanelToggle />
         </span>
       </PaneHeader>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">

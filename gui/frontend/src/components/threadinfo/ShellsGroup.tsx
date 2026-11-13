@@ -93,7 +93,7 @@ function ServerRow({ threadId, server }: { threadId: string; server: ServerSourc
           icon={<Globe />}
           meta={rest.length > 0 ? <span className="text-cf-text-muted group-hover/srv:invisible group-has-focus-visible/srv:invisible">+{rest.length}</span> : null}
           onActivate={() => {
-            openServer(server, threadId);
+            openServer(server);
           }}
           className="group-hover/srv:pr-12 group-has-focus-visible/srv:pr-12"
           testId="ti-server"

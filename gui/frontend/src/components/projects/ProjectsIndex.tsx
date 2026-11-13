@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Broom, FolderOpen, FolderPlus, Folders, GitPullRequest, Layers, Search } from "lucide-react";
-import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PR_CELL_AGE } from "@/components/prs/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -443,8 +441,6 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
           )}
         </div>
         <span className="-mr-2 ml-auto flex shrink-0 items-center">
-          <BottomToggle />
-          <PanelToggle />
         </span>
       </PaneHeader>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">

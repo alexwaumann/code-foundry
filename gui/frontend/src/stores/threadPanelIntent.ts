@@ -1,16 +1,14 @@
 /**
- * Panel actions scoped to one thread: a UiIntent.ShowView with a thread id, which the
- * view.panel.* verbs send when the model in a thread runs them
- * (docs/notes/control-1-thread-scoped-views.md, control-5-fixes.md). Each applies to
- * that thread's panel entry (`thread:<id>`, stores/panel.ts) and never changes the
- * window's selection: with the thread selected the change shows at once, otherwise it is
- * there when the user opens the thread.
- *
- * Unlike the window's own panel commands (stores/views.ts), they never take keyboard
- * focus (the user may be typing in another thread's prompt), never toast (about a thread
- * the user is not looking at it would puzzle them; the action is just a no-op), and apply
- * under a sheet (Settings, Themes, Usage), since what they change is the thread's panel,
- * not the screen.
+ * Item actions scoped to one thread: a UiIntent.ShowView with a thread id, which the
+ * view.open.* verbs (and their view.panel.* aliases) still send beside their layout op
+ * (docs/notes/control-1-thread-scoped-views.md, shell-7-view-open.md). The daemon has placed the
+ * tab already; this brings the window's half to it, through the host seam (shell/host.ts) on the
+ * thread's linked tabs (`thread:<id>`): a request to edit a file gets its request id and its
+ * asker, a diff call on the user's own checkout tab only picks its file, and --focus puts the
+ * caret on the line. It never changes the window's selection, never takes the keyboard but for
+ * --focus, and never toasts (about a thread the user is not looking at it would puzzle them).
+ * The classic side panel's own actions (panel.toggle, .expand, .new-tab, .split) have nothing to
+ * act on and are ignored (docs/notes/shell-21-remove-classic.md); PR 22 retires them.
  *
  * The item actions (panel.file, panel.diff, panel.pr, panel.gallery) open what their params
  * name; the daemon checked it exists first (internal/command/commands_view_items.go). The one thing
@@ -25,7 +23,7 @@ import { galleryTab } from "@/surfaces/galleryTarget";
 import { editorHasKeyboard, fileEditKey, focusEditorLine } from "./fileEdit";
 import { openDiffInPanel, openFileInPanel } from "./filePanel";
 import { openMcpSurface } from "./mcpPanel";
-import { allTabs, expandPanel, getPanel, isSplit, keyOf, openSurface, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
+import { openTab, tabPlace, targetOf } from "@/shell/host";
 import { openPullRequestInPanel } from "./prPanel";
 import { useThreadsStore } from "./threads";
 import type { Selection } from "./ui";
@@ -33,26 +31,17 @@ import type { Selection } from "./ui";
 /** A ShowView's params: what an item action opens. */
 type Params = Readonly<Record<string, string>>;
 
-/** One panel action on a thread's panel `key` (its selection is `sel`); false when it did nothing. */
+/** One item action on a thread's tabs `key` (its selection is `sel`); false when it did nothing. */
 type ThreadPanelAction = (sel: Selection, key: string, params: Params) => boolean;
 
-/** Opens a surface's tab with `open` (null: the thread cannot show it) and shows the panel, without focus. */
+/** Opens a surface's tab with `open` (null: the thread cannot show it), without focus. */
 function surface(open: (sel: Selection) => string | null): ThreadPanelAction {
-  return (sel) => {
-    const key = open(sel);
-    if (key === null) return false;
-    togglePanel(key, true, { focus: false });
-    return true;
-  };
+  return (sel) => open(sel) !== null;
 }
 
-/** Opens an item's tab with `open` (false: the params name none) and shows the panel, without focus. */
+/** Opens an item's tab with `open` (false: the params name none), without focus. */
 function item(open: (key: string, params: Params, sel: Selection) => boolean): ThreadPanelAction {
-  return (sel, key, params) => {
-    if (!open(key, params, sel)) return false;
-    togglePanel(key, true, { focus: false });
-    return true;
-  };
+  return (sel, key, params) => open(key, params, sel);
 }
 
 let asks = 0;
@@ -79,9 +68,9 @@ async function rowIn(t: DiffTarget, file: string): Promise<CompareFileView | nul
   }
 }
 
-/** The checkout's own tab `id` in `key`'s panel with `file` picked (null: none), as it is now: the user may have moved since. */
+/** The checkout's own tab `id` in `key`'s tabs with `file` picked (null: none), as it is now: the user may have moved since. */
 function pickIn(key: string, id: string, file: string, oldPath: string, own: boolean): boolean {
-  const open = allTabs(getPanel(key)).find((t) => t.id === id);
+  const open = tabPlace(key).tabs.find((t) => t.id === id);
   const was = open ? diffOfTab(open) : null;
   if (!open || !was) return false;
   // The file was found in the sides the tab came from, not in a commit the user was looking at.
@@ -89,25 +78,8 @@ function pickIn(key: string, id: string, file: string, oldPath: string, own: boo
   return openDiffInPanel(key, { ...was, ...back, own, file, oldPath }, open.title);
 }
 
-/** The panel actions by ShowView name: the view.panel.* verbs' (internal/command/commands_view.go). */
+/** The item actions by ShowView name: the view.open.* verbs' (internal/command/commands_view.go). */
 const actions: Readonly<Record<string, ThreadPanelAction>> = {
-  "panel.toggle": (_sel, key) => {
-    togglePanel(key, undefined, { focus: false });
-    return true;
-  },
-  // Like expandPanelCommand: a hidden panel is shown expanded, a shown one flips.
-  "panel.expand": (_sel, key) => {
-    expandPanel(key, getPanel(key).open ? undefined : true);
-    return true;
-  },
-  "panel.new-tab": (_sel, key) => startPanelPicking(key, { focus: false }),
-  // Like splitPanelCommand: a shown split panel joins, anything else is shown split.
-  "panel.split": (_sel, key) => {
-    const e = getPanel(key);
-    if (e.open && isSplit(e)) unsplitPanel(key);
-    else splitPanel(key, { focus: false });
-    return true;
-  },
   "panel.mcp": surface(openMcpSurface),
   // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
   // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts); --edit adds
@@ -150,7 +122,7 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
       own: p.own === "1" || p.scope !== undefined,
     };
     const fresh = diffTab(asked);
-    const open = allTabs(getPanel(key)).find((t) => t.id === fresh.id);
+    const open = tabPlace(key).tabs.find((t) => t.id === fresh.id);
     const was = open && !p.thread ? diffOfTab(open) : null;
     if (!open || !was) return openDiffInPanel(key, asked);
     if (!asked.file) return openDiffInPanel(key, { ...was, own: asked.own }, open.title);
@@ -171,20 +143,20 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   // view.panel.gallery: params title, images (JSON), project and base. The same title is the same tab.
   "panel.gallery": item((key, p) => {
     const tab = galleryTab(p);
-    return tab !== null && openSurface(key, tab);
+    return tab !== null && openTab(key, tab);
   }),
 };
 
 /**
- * Applies a thread-scoped ShowView: the panel action `name` on thread `threadId`'s panel,
- * the window's selection untouched. False (and nothing changes) for a name that is no
- * panel action, a thread the window does not know, a surface the thread cannot show, or
- * item params that name nothing.
+ * Applies a thread-scoped ShowView: the item action `name` on thread `threadId`'s tabs, the
+ * window's selection untouched. False (and nothing changes) for a name that is no item action
+ * (the classic panel's own included), a thread the window does not know, a surface the thread
+ * cannot show, or item params that name nothing.
  */
 export function showThreadView(name: string, threadId: string, params: Params = {}): boolean {
   const act = actions[name];
   if (act === undefined || !(threadId in useThreadsStore.getState().byId)) return false;
   const sel: Selection = { kind: "thread", id: threadId };
-  const key = keyOf(sel);
+  const key = targetOf(sel);
   return key !== null && act(sel, key, params);
 }

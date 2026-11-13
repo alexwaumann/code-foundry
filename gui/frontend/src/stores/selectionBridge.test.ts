@@ -126,7 +126,7 @@ describe("the bridge", () => {
     resetLayout();
     applyLayoutOp.mockReset();
     runLayoutCommand.mockReset();
-    useUiStore.setState({ selection: HOME, history: [HOME], historyIndex: 0 });
+    useUiStore.setState({ selection: HOME });
   });
   afterEach(() => {
     stop();

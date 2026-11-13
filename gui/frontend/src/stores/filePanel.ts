@@ -1,15 +1,15 @@
 /**
- * Opening files and diffs as side panel tabs (surfaces/files.ts, surfaces/diff.ts). GUI
- * state only: no daemon command. The Diff tab's Open file opens a File tab; path chips open
+ * Opening files and diffs as tabs (surfaces/files.ts, surfaces/diff.ts) through the host seam
+ * (shell/host.ts): the layout places them. The Diff tab's Open file opens a File tab; path chips open
  * File tabs through openFileInPanel too.
  */
 import { DEFAULT_BASE, DEFAULT_HEAD, DIFF_TITLE, diffTab, type DiffTarget } from "@/surfaces/diffTarget";
 import { fileOfTab, fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { isUnplaced } from "@/lib/threadSetup";
-import { expandTabs, findTab, openTab, showTabs, tabPlace, targetOf, threadOfTarget, type Tab, type TabTarget } from "@/shell/host";
+import { findTab, openTab, tabPlace, targetOf, threadOfTarget, type Tab, type TabTarget } from "@/shell/host";
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
-import { HOME, PANEL_MIN, panelMax, useUiStore, visibleSidebarWidth } from "./ui";
+import { HOME, useUiStore } from "./ui";
 
 /**
  * Opens (or activates) a file's tab in a panel ("current": the window's selection) and
@@ -38,17 +38,13 @@ export function openFileInPanel(target: TabTarget, file: FileTarget, opts: { beh
  * Opens a file that belongs to no project (a skill's SKILL.md: `path` in the folder `dir`,
  * under home) in the side panel of what the window shows, whatever that is: a File tab reads
  * by path, so any panel can hold it. A selection with no panel of its own (`none`, which
- * draws the home composer) goes to the home composer, whose panel it is. A window too narrow
- * to show a panel beside the content gets it expanded, or the tab would open out of sight.
- * False when no panel took it.
+ * draws the home composer) goes to the home composer, whose panel it is. False when no panel
+ * took it.
  */
 export function openLooseFile(dir: string, path: string): boolean {
   const ui = useUiStore.getState();
   if (targetOf(ui.selection) === null) ui.select(HOME);
-  if (!openFileInPanel("current", { project: "", base: dir, path })) return false;
-  const now = useUiStore.getState();
-  if (panelMax(now.windowWidth, visibleSidebarWidth(now)) < PANEL_MIN) expandTabs("current", { focus: false });
-  return true;
+  return openFileInPanel("current", { project: "", base: dir, path });
 }
 
 /** Opens (or activates) a checkout's Diff tab in a panel; an open one takes the new sources and file. */
@@ -67,9 +63,7 @@ export function openCheckoutDiff(target: TabTarget, project: string, worktree: s
   const title = own ? DIFF_TITLE : `${DIFF_TITLE} · ${useProjectsStore.getState().byId[project]?.name ?? project}`;
   const fresh = diffTab({ project, worktree, base: DEFAULT_BASE, head: DEFAULT_HEAD, file: "", oldPath: "", own }, title);
   const open = findTab(target, fresh.id);
-  if (!openTab(target, open ?? fresh)) return false;
-  showTabs(target, true, { focus: false });
-  return true;
+  return openTab(target, open ?? fresh);
 }
 
 /**

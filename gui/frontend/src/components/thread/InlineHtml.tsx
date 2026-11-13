@@ -247,7 +247,7 @@ function Strip({ page, children, big }: { page: InlinePage; children: ReactNode;
   );
 }
 
-/** The strip's actions: page errors, open in the side panel, reload (the page as written, from wherever it went), expand (the card's, in a pane with a modal), source, save. */
+/** The strip's actions: page errors, open in a tab beside the thread, reload (the page as written, from wherever it went), expand (the card's, in a pane with a modal), source, save. */
 function Actions({
   threadId,
   page,
@@ -275,7 +275,7 @@ function Actions({
     <>
       <PageErrors errors={errors} threadId={threadId} page={label} onAsk={onAsk} />
       <Action
-        label="Open in side panel"
+        label="Open in a tab"
         icon={PanelRight}
         onClick={() => {
           openFileInPanel(`thread:${threadId}`, { project, base: page.baseDir, path: page.abs });

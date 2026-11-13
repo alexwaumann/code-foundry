@@ -5,7 +5,7 @@
  * (plugin nodes, file previews, help) keep opening every link in the browser.
  */
 import { useMemo } from "react";
-import { usePanelKey } from "@/components/panel/panelKeyContext";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { parsePullRequestUrl } from "@/lib/prUrl";
 import { tabPlace, type TabTarget } from "@/shell/host";
 import { pullRequestTab } from "@/surfaces/pullrequestTarget";

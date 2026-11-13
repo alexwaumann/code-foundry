@@ -430,8 +430,3 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     </DndContext>
   );
 }
-
-/** The drag layer around the sidebar and the shell while the shell flag is on; nothing otherwise. */
-export function ShellDndRoot({ on, children }: { on: boolean; children: ReactNode }) {
-  return on ? <ShellDnd>{children}</ShellDnd> : children;
-}

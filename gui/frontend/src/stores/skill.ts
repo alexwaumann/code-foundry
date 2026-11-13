@@ -29,7 +29,8 @@ import {
   type SkillSearchView,
   type SkillTierView,
 } from "@/api/skill";
-import { revealShell } from "./bottomActions";
+import { showTerminal } from "@/shell/terminalActions";
+import { useViewsStore } from "./views";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
 
@@ -115,7 +116,7 @@ export interface SkillMarketplaceDeps {
   registries: (signal?: AbortSignal) => Promise<SkillRegistriesView>;
   run: (name: string, args: Record<string, string>, opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void }) => Promise<InvokeResultView | null>;
   context: () => UiContextView;
-  /** Opens a setup terminal in its owner's bottom panel (stores/bottomActions.ts revealShell). */
+  /** Shows a setup terminal: its tab takes the focus, over any open sheet (Settings). */
   reveal: (terminalId: string) => void;
   /** How long an epoch waits before the re-read (a burst re-reads once). */
   reloadDelayMs: number;
@@ -127,7 +128,10 @@ const defaultDeps: SkillMarketplaceDeps = {
   registries: (signal) => listSkillRegistries(signal),
   run: (name, args, opts) => runCommandForResult(name, args, opts),
   context: () => getUiContext(),
-  reveal: (id) => void revealShell(id),
+  reveal: (id) => {
+    useViewsStore.setState({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false });
+    void showTerminal(id);
+  },
   reloadDelayMs: 100,
 };
 
@@ -395,9 +399,9 @@ export function canRunSetup(ctx: UiContextView = deps.context()): boolean {
 }
 
 /**
- * Runs a skill's setup script in a bottom-panel terminal of the context's thread or
- * project (skill.setup; it takes no kind: only skills have setup). Returns the
- * terminal's id, null when it failed. reveal opens that panel (and leaves Settings).
+ * Runs a skill's setup script in a terminal of the context's thread or project (skill.setup; it
+ * takes no kind: only skills have setup). Returns the terminal's id, null when it failed. reveal
+ * shows its tab (and leaves Settings).
  */
 export async function runSkillSetup(item: SkillItemRef, opts: { reveal?: boolean } = {}): Promise<string | null> {
   const res = await act(item, "setup", { name: item.name }, { ctx: deps.context() });

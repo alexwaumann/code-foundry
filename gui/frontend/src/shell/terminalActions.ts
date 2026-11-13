@@ -6,9 +6,14 @@
  * See docs/notes/shell-13-terminals.md.
  */
 import { create } from "zustand";
+import { toast } from "sonner";
+import { isNotFound } from "@/api/errors";
+import { errorMessage } from "@/api/stream";
+import type { UiContextView } from "@/api/command";
 import { terminalIdFromResult } from "@/api/terminal";
 import { getUiContext } from "@/stores/context";
-import { runCommandForResult } from "@/stores/commands";
+import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore } from "@/stores/commands";
+import { useTerminalsStore } from "@/stores/terminals";
 import { applyLayout, useLayoutStore, type TabEntry } from "@/stores/layout";
 import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus } from "@/stores/shellView";
@@ -68,12 +73,58 @@ function whenTerminalTab(id: string, timeoutMs = 3000): Promise<TabEntry | null>
   });
 }
 
-/** After a command started terminal `id` with the user's focus on its new tab, the keyboard goes into it. */
-async function intoNewTerminal(resultJson: string | undefined): Promise<void> {
+/**
+ * After a command started terminal `id` with the user's focus on its new tab, the keyboard goes
+ * into it (an action run, a skill's setup, "New terminal here" too).
+ */
+export async function intoNewTerminal(resultJson: string | undefined): Promise<void> {
   const id = terminalIdFromResult(resultJson ?? "");
-  if (!id) return;
+  if (id) await focusTerminalTab(id);
+}
+
+/** Moves the keyboard into the tab that shows terminal `id`, once the layout has it. */
+export async function focusTerminalTab(id: string): Promise<void> {
   const tab = await whenTerminalTab(id);
   if (tab) requestPaneFocus(tab.paneId);
+}
+
+/**
+ * Shows a terminal: its tab takes the focus, opened by the placement rules when it has none
+ * (ui.focus.terminal), and the keyboard goes into it. False when the daemon refused.
+ */
+export async function showTerminal(id: string): Promise<boolean> {
+  const res = await runCommandForResult("ui.focus.terminal", { id }, { quiet: true });
+  if (!res) return false;
+  await focusTerminalTab(id);
+  return true;
+}
+
+/**
+ * terminal.new in `ctx` (a thread's, a worktree's; `cwd`: another folder of it), its tab opened by
+ * the daemon with the keyboard in it. False when the daemon refused.
+ */
+export async function newTerminalInContext(ctx: UiContextView, cwd?: string): Promise<boolean> {
+  const res = await runCommandForResult("terminal.new", cwd ? { cwd } : {}, { ctx, quiet: true });
+  if (!res) return false;
+  await intoNewTerminal(res.resultJson);
+  return true;
+}
+
+/**
+ * Closes terminal `id` (terminal.close, no confirmation: a Rerun's old run); its tab goes when the
+ * daemon removes it. One already gone (reaped meanwhile: NotFound, or unknown to the daemon) is
+ * not an error; any other failure toasts.
+ */
+export async function closeTerminal(id: string): Promise<void> {
+  try {
+    await invokeConfirmed("terminal.close", { id }, terminalCtx(id));
+  } catch (err) {
+    if (isNotFound(err) || !(id in useTerminalsStore.getState().byId)) return;
+    const title = useCommandsStore.getState().commands.find((c) => c.name === "terminal.close")?.title ?? "Close Terminal";
+    toast.error(`${title} failed`, { description: errorMessage(err) });
+  } finally {
+    void refreshCommands();
+  }
 }
 
 /** The thread of the focused tab (a thread's tab or a surface linked to it); "" for none. */

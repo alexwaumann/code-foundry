@@ -12,7 +12,7 @@ import type { TerminalView } from "@/api/terminal";
 import type { ThreadView } from "@/api/threads";
 import type { WorkspaceView } from "@/api/workspace";
 import { useConfirmStore } from "@/stores/confirm";
-import { activeTab, usePanelStore } from "@/stores/panel";
+import { shownTab, tabPlace } from "@/shell/host";
 import { branchPullRequestsResource, repoActivityResource } from "@/stores/gh";
 import { useProjectsStore } from "@/stores/projects";
 import { useRemoveWorktreeStore } from "@/stores/removeWorktree";
@@ -318,19 +318,24 @@ export function menuEntries(menu: HTMLElement, separators = false): string[] {
 }
 
 /**
- * A page's (or thread's) side panel by its key ("view:projects:project:repo-cf"): whether it
- * is open and its active tab's kind, title and params; null when it has no active tab. What
- * the e2e tests read off the rendered side panel.
+ * A target's tabs ("view:projects:project:repo-cf": a page's, the current space's unlinked tabs;
+ * "thread:<id>": its linked tabs) as the layout has them (shell/host.ts tabPlace): whether it has
+ * any, and the focused pane's active one's kind, title and params; null when it shows none. Needs
+ * the fake layout daemon (src/test/fakeLayout.ts) mocked in for tabs to open.
  */
 export function panelActive(key: string): { open: boolean; kind: string; title: string; params: Readonly<Record<string, string>> } | null {
-  const e = usePanelStore.getState().byKey[key];
-  const t = e ? activeTab(e) : null;
-  return e && t ? { open: e.open, kind: t.kind, title: t.title, params: t.params } : null;
+  const p = tabPlace(key);
+  const t = shownTab(p) ?? p.tabs[p.tabs.length - 1] ?? null;
+  return t ? { open: p.shown, kind: t.kind, title: t.title, params: t.params } : null;
 }
 
-/** Forgets every side panel (call in beforeEach when a test opens tabs). */
-export function resetPanels(): void {
-  usePanelStore.setState({ byKey: {} });
+/**
+ * Forgets every tab: a new fake layout daemon (src/test/fakeLayout.ts, which the test mocks in for
+ * `@/api/layout`) with `seed` (default: an empty space). Await it in beforeEach.
+ */
+export async function resetPanels(seed: Parameters<typeof import("@/test/fakeLayout").resetFakeLayout>[0] = "empty"): Promise<void> {
+  const { resetFakeLayout } = await import("@/test/fakeLayout");
+  await resetFakeLayout(seed);
 }
 
 /**

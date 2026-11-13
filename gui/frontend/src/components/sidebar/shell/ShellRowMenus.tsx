@@ -30,7 +30,6 @@ export function ShellRowMenu({ id }: { id: string }) {
   return (
     <RowMenu
       id={id}
-      terminal={false}
       keepFocus={() => {
         const m = moved.current;
         moved.current = false;

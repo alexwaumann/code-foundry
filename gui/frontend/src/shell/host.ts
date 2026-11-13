@@ -1,44 +1,18 @@
 /**
  * The host seam: how a surface (a file, a diff, a pull request, MCP, a plugin's view, Ember's
- * board) and the code around it reach the tabs it lives in, without knowing what draws them.
- * With the classic window every operation delegates to the side panel (stores/panel.ts); while
- * the window shell draws the window (docs/notes/shell-model.md, the shell flag) each goes to the
- * daemon's layout instead (shell/hostShell.ts, docs/notes/shell-11-pane-grid.md), and the callers
- * stay as they are. Only the side panel's own code (components/panel, the bottom panel, the
- * panel's commands) imports stores/panel.ts; host.guard.test.ts keeps it that way.
- * See docs/notes/shell-8-host-seam.md.
+ * board) and the code around it reach the tabs it lives in, without knowing what draws them. Each
+ * operation goes to the daemon's layout (shell/hostShell.ts, docs/notes/shell-11-pane-grid.md).
+ * The classic side panel it once also delegated to is gone (docs/notes/shell-21-remove-classic.md);
+ * the seam stays so surfaces name places, not panes. See docs/notes/shell-8-host-seam.md.
  *
  * A target names where tabs go: "current" (what the window shows), `thread:<id>` (a thread's
- * tabs), or another key `targetOf` gives for a selection (a page's, the composer's). Classic
- * targets are the side panel's keys.
+ * linked tabs), `pane:<id>` (one pane's), or another key `targetOf` gives for a selection (a
+ * page's, the composer's: the current space's unlinked tabs).
  */
-import {
-  activatePanelTab,
-  allTabs,
-  expandPanel,
-  focusedGroup,
-  getPanel,
-  keyOf,
-  makeTab,
-  openSurface,
-  panelThreadId,
-  pullRequestTabId,
-  replacePanelTab,
-  retitlePanelTab,
-  setPanelTabParams,
-  tabId,
-  togglePanel,
-  useCurrentPanelKey,
-  usePanelStore,
-  type GroupIndex,
-  type PanelEntry,
-  type SurfaceKind,
-  type Tab,
-} from "@/stores/panel";
-import type { Selection } from "@/stores/ui";
+import { useUiStore, type Selection } from "@/stores/ui";
 import { useLayoutStore } from "@/stores/layout";
-import { shellDrawn, useShellViewStore } from "@/stores/shellView";
 import {
+  EMPTY_PLACE,
   findShellTab,
   shellActivateTab,
   shellOpenTab,
@@ -50,19 +24,17 @@ import {
   threadOfShellTarget,
 } from "./hostShell";
 import { seamTab } from "./kinds";
+import { makeTab, pullRequestTabId, selectionTarget, tabId, type SurfaceKind, type Tab } from "./tabs";
 
 export type { SurfaceKind, Tab };
 export { makeTab, pullRequestTabId, tabId };
 
-/** Where tabs go: "current", `thread:<id>`, a key from targetOf, or in the shell `pane:<id>`. */
+/** Where tabs go: "current", `thread:<id>`, `pane:<id>`, or a key from targetOf. */
 export type TabTarget = string;
-
-/** One group of a place's tabs (a group of the split side panel): the group a surface's own picker opens into. */
-export type TabGroup = GroupIndex;
 
 /** The target of a selection's tabs; null for `none` (it has no tabs of its own). */
 export function targetOf(sel: Selection): TabTarget | null {
-  return keyOf(sel);
+  return selectionTarget(sel);
 }
 
 /** A thread's target. */
@@ -72,15 +44,15 @@ export function threadTarget(threadId: string): TabTarget {
 
 /** The thread a target's tabs belong to ("current" resolved); "" for any other target. */
 export function threadOfTarget(target: TabTarget): string {
-  return shellDrawn() ? threadOfShellTarget(target) : panelThreadId(target);
+  return threadOfShellTarget(target);
 }
 
 /** The target of what the window shows (a string, so the selector is cheap and stable). */
 export function useCurrentTarget(): TabTarget | null {
-  return useCurrentPanelKey();
+  return useUiStore((s) => selectionTarget(s.selection));
 }
 
-/** One group of tabs and the one it shows (null while it shows none: the side panel's picker). */
+/** One group of tabs (a pane holding some of the target's tabs) and the one it shows. */
 export interface TabPlaceGroup {
   readonly tabs: readonly Tab[];
   readonly active: Tab | null;
@@ -91,69 +63,28 @@ export interface TabPlaceGroup {
  * change, so a selector may return it or a part of it.
  */
 export interface TabPlace {
-  /** Whether the tabs are on screen (the side panel is open). */
+  /** Whether the target has tabs in the layout. */
   readonly shown: boolean;
-  /** Whether they fill the content area (the side panel is expanded). */
-  readonly expanded: boolean;
-  /** Every tab, in strip order, the first group's then the second's. */
+  /** Every tab, in layout order, pane by pane. */
   readonly tabs: readonly Tab[];
-  /** One or two groups. */
+  /** One per pane holding the target's tabs (one empty group when there are none). */
   readonly groups: readonly TabPlaceGroup[];
-  /** The index in `groups` of the group the user last worked in: where keys go and new tabs open. */
+  /** The index in `groups` of the focused pane's group: where keys go. */
   readonly focused: number;
 }
 
-/** Every target that has tabs, to its place. The same object until any of them changes. */
+/** Every target that has tabs, to its place. */
 export type TabPlaces = Readonly<Record<TabTarget, TabPlace>>;
 
-const EMPTY_PLACE: TabPlace = placeFrom({ open: false, groups: [{ tabs: [], activeTabId: null }] });
-
-function placeFrom(e: PanelEntry): TabPlace {
-  return {
-    shown: e.open,
-    expanded: e.expanded ?? false,
-    tabs: allTabs(e),
-    groups: e.groups.map((g) => ({ tabs: g.tabs, active: g.tabs.find((t) => t.id === g.activeTabId) ?? null })),
-    focused: focusedGroup(e),
-  };
-}
-
-const places = new WeakMap<PanelEntry, TabPlace>();
-
-/** An entry's place, made once per entry object, so selectors stay narrow. */
-function placeOf(e: PanelEntry | undefined): TabPlace {
-  if (e === undefined) return EMPTY_PLACE;
-  let p = places.get(e);
-  if (p === undefined) {
-    p = placeFrom(e);
-    places.set(e, p);
-  }
-  return p;
-}
-
-const placeSets = new WeakMap<Readonly<Record<string, PanelEntry>>, TabPlaces>();
-
-function placesOf(byKey: Readonly<Record<string, PanelEntry>>): TabPlaces {
-  let p = placeSets.get(byKey);
-  if (p === undefined) {
-    p = Object.fromEntries(Object.entries(byKey).map(([k, e]) => [k, placeOf(e)]));
-    placeSets.set(byKey, p);
-  }
-  return p;
-}
-
-/** A target's tabs now (default: what the window shows); an empty, hidden place when it has none. */
+/** A target's tabs now (default: what the window shows); an empty place when it has none. */
 export function tabPlace(target: TabTarget = "current"): TabPlace {
-  return shellDrawn() ? shellPlace(useLayoutStore.getState(), target) : placeOf(getPanel(target));
+  return shellPlace(useLayoutStore.getState(), target);
 }
 
 /** A target's tab with this id, if it holds one. */
 export function findTab(target: TabTarget, id: string): Tab | undefined {
-  if (shellDrawn()) {
-    const t = findShellTab(useLayoutStore.getState(), target, id);
-    return t ? seamTab(t) : undefined;
-  }
-  return tabPlace(target).tabs.find((t) => t.id === id);
+  const t = findShellTab(useLayoutStore.getState(), target, id);
+  return t ? seamTab(t) : undefined;
 }
 
 /** The tab a place's focused group shows: what keys act on. Null while it shows none. */
@@ -173,63 +104,42 @@ export function groupOfTab(place: TabPlace, id: string): number | null {
  * (useCurrentTarget), not "current"; null selects from an empty place.
  */
 export function useTabPlace<T>(target: TabTarget | null, select: (place: TabPlace) => T): T {
-  const shell = useShellViewStore((s) => s.mode === "shell");
-  const classic = usePanelStore((s) => (shell ? null : select(placeOf(target === null ? undefined : s.byKey[target]))));
-  const inShell = useLayoutStore((s) => (shell ? select(target === null ? placeOf(undefined) : shellPlace(s, target)) : null));
-  return (shell ? inShell : classic) as T;
+  return useLayoutStore((s) => select(target === null ? EMPTY_PLACE : shellPlace(s, target)));
 }
 
 /**
- * Calls `listener` after any target's tabs change (opened, closed, moved, shown, retitled),
- * with every place now and before. Returns the unsubscribe.
+ * Calls `listener` after any target's tabs change (opened, closed, moved, retitled), with every
+ * place now and before. Returns the unsubscribe.
  */
 export function subscribeTabs(listener: (now: TabPlaces, prev: TabPlaces) => void): () => void {
-  const a = usePanelStore.subscribe((s, prev) => {
-    if (!shellDrawn() && s.byKey !== prev.byKey) listener(placesOf(s.byKey), placesOf(prev.byKey));
+  return useLayoutStore.subscribe((s, prev) => {
+    if (s.tabs !== prev.tabs || s.panes !== prev.panes || s.trees !== prev.trees || s.spaces !== prev.spaces) listener(shellPlaces(s), shellPlaces(prev));
   });
-  const b = useLayoutStore.subscribe((s, prev) => {
-    if (shellDrawn() && (s.tabs !== prev.tabs || s.panes !== prev.panes || s.trees !== prev.trees || s.spaces !== prev.spaces)) listener(shellPlaces(s), shellPlaces(prev));
-  });
-  return () => {
-    a();
-    b();
-  };
 }
 
 /** For a SurfaceSpec's `watches`: notified whenever any tabs change. */
 export const tabChanges = {
-  subscribe: (listener: () => void): (() => void) => {
-    const a = usePanelStore.subscribe(listener);
-    const b = useLayoutStore.subscribe(listener);
-    return () => {
-      a();
-      b();
-    };
-  },
+  subscribe: (listener: () => void): (() => void) => useLayoutStore.subscribe(listener),
 };
 
 /**
- * Opens a tab, or activates the one with its id where it is (its title and params refreshed),
- * and shows the target's tabs. A new tab goes to `group` (default: the focused one). `behind`:
- * a new tab joins the strip behind the one showing, and an open one only takes the new params,
- * so nothing moves under someone typing. It does not take focus. False when there is no
- * target (nothing selected).
+ * Opens a tab, or activates the one with its id where it is (its title and params refreshed).
+ * A new tab goes to the target's `group` (its pane), else where the daemon places it. `behind`:
+ * an open one only takes the new params, so nothing moves under someone typing. It does not take
+ * focus. False before the layout has loaded.
  */
-export function openTab(target: TabTarget, tab: Tab, opts: { group?: TabGroup; behind?: boolean } = {}): boolean {
-  if (shellDrawn()) return shellOpenTab(target, tab, opts);
-  return openSurface(target, tab, opts);
+export function openTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: boolean } = {}): boolean {
+  return shellOpenTab(target, tab, opts);
 }
 
-/** Activates a tab where it is, focusing its group; an unknown id changes nothing. */
+/** Activates a tab where it is, focusing its pane; an unknown id changes nothing. */
 export function activateTab(target: TabTarget, id: string): void {
-  if (shellDrawn()) shellActivateTab(target, id);
-  else activatePanelTab(target, id);
+  shellActivateTab(target, id);
 }
 
 /** Renames a tab; an unknown id, an empty or the same title changes nothing. */
 export function retitleTab(target: TabTarget, id: string, title: string): void {
-  if (shellDrawn()) shellRetitleTab(target, id, title);
-  else retitlePanelTab(target, id, title);
+  shellRetitleTab(target, id, title);
 }
 
 /**
@@ -237,37 +147,10 @@ export function retitleTab(target: TabTarget, id: string, title: string): void {
  * activates, opens or takes focus. An unknown id or the same params change nothing.
  */
 export function setTabParams(target: TabTarget, id: string, params: Tab["params"] | ((old: Tab["params"]) => Tab["params"])): void {
-  if (shellDrawn()) {
-    shellSetTabParams(target, id, params);
-    return;
-  }
-  if (typeof params !== "function") {
-    setPanelTabParams(target, id, params);
-    return;
-  }
-  const old = findTab(target, id);
-  if (old) setPanelTabParams(target, id, params(old.params));
+  shellSetTabParams(target, id, params);
 }
 
-/** Puts `tab` where tab `id` is, active if that one was (a tab that became another file); if `tab` is already open, `id` just closes. */
+/** Puts `tab` where tab `id` is (a tab that became another file); if `tab` is already open, `id` just closes. */
 export function replaceTab(target: TabTarget, id: string, tab: Tab): void {
-  if (shellDrawn()) shellReplaceTab(target, id, tab);
-  else replacePanelTab(target, id, tab);
-}
-
-/**
- * Shows or hides a target's tabs (the side panel). Showing asks for focus unless `focus` is
- * false. Returns whether they are shown now.
- */
-export function showTabs(target: TabTarget, shown: boolean, opts: { focus?: boolean } = {}): boolean {
-  // In the shell a tab is always in a pane: there is nothing to show or hide.
-  if (shellDrawn()) return shown && tabPlace(target).tabs.length > 0;
-  return togglePanel(target, shown, opts);
-}
-
-/** Makes a target's tabs fill the content area (expands the side panel). Returns whether they do. */
-export function expandTabs(target: TabTarget, opts: { focus?: boolean } = {}): boolean {
-  // Full screen (the shell's expand) is PR 19's.
-  if (shellDrawn()) return false;
-  return expandPanel(target, true, opts);
+  shellReplaceTab(target, id, tab);
 }

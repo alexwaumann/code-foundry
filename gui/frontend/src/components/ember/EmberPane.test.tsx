@@ -12,11 +12,13 @@ vi.mock("@/components/thread/ThreadComposer", () => ({
 }));
 vi.mock("@/components/thread/cite/CiteLayer", () => ({ CiteLayer: () => null }));
 vi.mock("@/components/thread/AgentsStrip", () => ({ AgentsStrip: () => null }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { EmberBody } = await import("./EmberPane");
 const { useEmberStore } = await import("@/stores/ember");
 const { openEmberBoard } = await import("@/stores/emberPanel");
-const { usePanelStore } = await import("@/stores/panel");
+const { layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
+const { layoutTabs } = await import("@/test/layoutTabs");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 
@@ -32,11 +34,11 @@ const header = () => screen.getByTestId("thread-header");
 const summary = () => screen.getByTestId("ember-header-status");
 const dot = () => summary().querySelector("[data-dot]")?.getAttribute("data-dot") ?? null;
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed(EMBER_THREAD));
   setEmberEnabled(true);
   putEmberThread();
   useUiStore.setState({ selection: { kind: "thread", id: EMBER_THREAD }, emberShowWork: false });
-  usePanelStore.setState({ byKey: {} });
   world = new EmberWorld();
   world.publish();
 });
@@ -103,20 +105,37 @@ describe("EmberBody's header", () => {
     expect(summary().textContent).toBe("1 blocked · 1 queued");
   });
 
-  it("Board opens the board in the chat's panel and hides it again", () => {
+  it("Board opens the board beside the chat, pressed; pressed again it stays", async () => {
     render(<EmberBody threadId={EMBER_THREAD} />);
     const toggle = screen.getByTestId("ember-board-toggle");
-    fireEvent.click(toggle);
+    const kinds = () => layoutTabs().map((t) => [t.kind, t.thread]);
+    await act(async () => {
+      fireEvent.click(toggle);
+      await layoutSettled();
+    });
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
-    const panel = () => usePanelStore.getState().byKey[`thread:${EMBER_THREAD}`];
-    expect(panel()?.open).toBe(true);
-    expect(panel()?.groups[0]?.tabs.map((t) => t.kind)).toEqual(["ember"]);
-    fireEvent.click(toggle);
+    expect(kinds()).toEqual([
+      ["thread", EMBER_THREAD],
+      ["ember.board", EMBER_THREAD],
+    ]);
+    await act(async () => {
+      fireEvent.click(toggle);
+      await layoutSettled();
+    });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(kinds()).toEqual([
+      ["thread", EMBER_THREAD],
+      ["ember.board", EMBER_THREAD],
+    ]);
+  });
+
+  it("a task link's click (TaskPointer) opens the board too, pressed", async () => {
+    render(<EmberBody threadId={EMBER_THREAD} />);
+    const toggle = screen.getByTestId("ember-board-toggle");
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
-    expect(panel()?.open).toBe(false);
-    // A task link's click (TaskPointer) opens it too, pressed.
-    act(() => {
+    await act(async () => {
       openEmberBoard("t-9c0d1e2f");
+      await layoutSettled();
     });
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
   });

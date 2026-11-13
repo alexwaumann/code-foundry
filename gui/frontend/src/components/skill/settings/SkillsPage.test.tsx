@@ -3,11 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InstalledSkillView, SkillEntryView, SkillRegistryView } from "@/api/skill";
 import { skillItemKey } from "@/api/skill";
 import { confirmPresenter } from "@/stores/confirm";
-import { usePanelStore } from "@/stores/panel";
 import { useSkillMarketplaceStore } from "@/stores/skill";
 import { HOME, useUiStore } from "@/stores/ui";
 import { resetUpdateRuns, useUpdateRunStore } from "@/stores/updateRun";
 import { useViewsStore } from "@/stores/views";
+import { layoutSettled, resetFakeLayout } from "@/test/fakeLayout";
+import { layoutTabs } from "@/test/layoutTabs";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({ toast: Object.assign(toast, { error: vi.fn(), success: vi.fn() }) }));
@@ -409,9 +412,9 @@ describe("a row's menu", () => {
     expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["View SKILL.md", "Uninstall"]);
   });
 
-  it("View SKILL.md opens the file in the selection's panel and closes Settings", async () => {
-    usePanelStore.setState({ byKey: {} });
-    useUiStore.setState({ selection: HOME, windowWidth: 1600 });
+  it("View SKILL.md opens the file in a tab and closes Settings", async () => {
+    await resetFakeLayout("empty");
+    useUiStore.setState({ selection: HOME });
     useViewsStore.setState({ settingsOpen: true });
     show();
     openMenu(within(installedRow("pr-review")).getByTestId("skill-row-menu"));
@@ -419,7 +422,10 @@ describe("a row's menu", () => {
     await vi.waitFor(() => {
       expect(useViewsStore.getState().settingsOpen).toBe(false);
     });
-    const tab = usePanelStore.getState().byKey["compose:home:"]?.groups[0]?.tabs[0];
+    await act(async () => {
+      await layoutSettled();
+    });
+    const tab = layoutTabs().find((t) => t.kind === "file");
     expect(tab?.params).toMatchObject({ project: "", path: "/Users/dev/.claude/skills/pr-review/SKILL.md" });
   });
 });

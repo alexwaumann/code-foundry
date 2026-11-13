@@ -3,11 +3,10 @@
  * restore and the direction verbs lay out with (docs/notes/shell-plan.md 2.4). The pane grid
  * reports its box as it resizes; a burst sends one call once the size holds still, in layout px
  * (viewport px divided by the page zoom). The daemon forgets the size when it restarts, so the
- * layout slice sends the last one again on each snapshot. Only with the shell flag on.
+ * layout slice sends the last one again on each snapshot.
  */
 import { setLayoutViewport } from "@/api/layout";
 import { zoomFactor } from "@/lib/zoom";
-import { shellOn } from "./flag";
 
 /** How long the size must hold still before it is sent. */
 export const VIEWPORT_DEBOUNCE_MS = 200;
@@ -24,7 +23,6 @@ export interface ViewportReporter {
 interface ReporterDeps {
   send: (width: number, height: number) => Promise<void>;
   zoom: () => number;
-  enabled: () => boolean;
   delayMs: number;
 }
 
@@ -37,7 +35,7 @@ export function createViewportReporter(deps: ReporterDeps): ViewportReporter {
 
   const send = (): void => {
     timer = null;
-    if (!size || !deps.enabled()) return;
+    if (!size) return;
     const s = size;
     sent = s;
     deps.send(s.w, s.h).catch(() => {
@@ -75,7 +73,6 @@ export function createViewportReporter(deps: ReporterDeps): ViewportReporter {
 const reporter = createViewportReporter({
   send: (w, h) => setLayoutViewport(w, h),
   zoom: zoomFactor,
-  enabled: shellOn,
   delayMs: VIEWPORT_DEBOUNCE_MS,
 });
 

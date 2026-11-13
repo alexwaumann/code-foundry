@@ -12,7 +12,7 @@ vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { ThreadTitle } = await import("./ThreadParts");
+const { ThreadCrumb } = await import("./ThreadParts");
 const { useMovePickerStore, openMovePicker, canMoveThread } = await import("@/stores/movePicker");
 const { useCanMove } = await import("./useNoProject");
 const { useProjectsStore } = await import("@/stores/projects");
@@ -89,7 +89,7 @@ const crumb = () => screen.getByTestId("thread-crumb-place").textContent;
 const picker = () => screen.getByTestId("move-picker");
 
 function openPicker(): HTMLElement {
-  render(<ThreadTitle id="s-1" />);
+  render(<ThreadCrumb id="s-1" />);
   fireEvent.click(screen.getByTestId("thread-crumb-move"));
   return picker();
 }
@@ -104,16 +104,16 @@ function pick(id: string): HTMLElement {
 
 describe("the crumb as the move picker's trigger", () => {
   it("No project is a trigger; a project thread's place, and an archived thread's, is not", () => {
-    render(<ThreadTitle id="s-1" />);
+    render(<ThreadCrumb id="s-1" />);
     expect(screen.getByTestId("thread-crumb-move").textContent).toContain("No project");
     cleanup();
     setThread({ archivedAtMs: 1 });
-    render(<ThreadTitle id="s-1" />);
+    render(<ThreadCrumb id="s-1" />);
     expect(screen.queryByTestId("thread-crumb-move")).toBeNull();
     expect(crumb()).toBe("No project");
     cleanup();
     setThread({ projectId: "web", projectIds: ["web"], worktreePath: "/Users/me/src/web" });
-    render(<ThreadTitle id="s-1" />);
+    render(<ThreadCrumb id="s-1" />);
     expect(screen.queryByTestId("thread-crumb-move")).toBeNull();
   });
 

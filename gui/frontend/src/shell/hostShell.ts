@@ -18,18 +18,18 @@
  */
 import { applyLayoutOp, type LayoutOpView } from "@/api/layout";
 import { focusTab as focusTabOp, useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
-import { keyOf, tabId, type Tab } from "@/stores/panel";
+import { selectionTarget, tabId, type Tab } from "./tabs";
 import { useUiStore } from "@/stores/ui";
 import { layoutKindOf, panelKindOf, seamTab } from "./kinds";
 import type { TabPlace, TabPlaceGroup, TabPlaces, TabTarget } from "./host";
 
-/** Kinds that are pages or the composer, not a surface the side panel had: never in a place. */
+/** Kinds that are pages, the composer or a terminal, not a surface: never in a place. */
 const NOT_PANEL = new Set(["thread", "prs", "projects", "compose", "terminal"]);
 
 /** A target with "current" resolved to the selection's. */
 export function resolveTarget(target: TabTarget): TabTarget {
   if (target !== "current") return target;
-  return keyOf(useUiStore.getState().selection) ?? "";
+  return selectionTarget(useUiStore.getState().selection) ?? "";
 }
 
 /** The thread a resolved target belongs to; "" for any other. */
@@ -78,7 +78,8 @@ function groupsOf(s: LayoutState, target: TabTarget): { paneId: string; tabs: Ta
   });
 }
 
-const EMPTY: TabPlace = { shown: false, expanded: false, tabs: [], groups: [{ tabs: [], active: null }], focused: 0 };
+/** The place of a target with no tabs. */
+export const EMPTY_PLACE: TabPlace = { shown: false, tabs: [], groups: [{ tabs: [], active: null }], focused: 0 };
 
 /** The last place made per target, kept while it reads the same, so selectors stay narrow. */
 const lastPlaces = new Map<TabTarget, { sig: string; place: TabPlace }>();
@@ -91,7 +92,7 @@ function signature(groups: { paneId: string; tabs: TabEntry[] }[], active: (stri
 export function shellPlace(s: LayoutState, target: TabTarget): TabPlace {
   const t = resolveTarget(target);
   const groups = groupsOf(s, t);
-  if (groups.length === 0) return EMPTY;
+  if (groups.length === 0) return EMPTY_PLACE;
   const actives = groups.map((g) => {
     const a = s.panes[g.paneId]?.active ?? "";
     return g.tabs.some((x) => x.id === a) ? a : null;
@@ -107,7 +108,7 @@ export function shellPlace(s: LayoutState, target: TabTarget): TabPlace {
     const at = g.tabs.findIndex((x) => x.id === actives[i]);
     return { tabs, active: tabs[at] ?? null };
   });
-  const place: TabPlace = { shown: true, expanded: false, tabs: placeGroups.flatMap((g) => g.tabs), groups: placeGroups, focused };
+  const place: TabPlace = { shown: true, tabs: placeGroups.flatMap((g) => g.tabs), groups: placeGroups, focused };
   lastPlaces.set(t, { sig, place });
   return place;
 }

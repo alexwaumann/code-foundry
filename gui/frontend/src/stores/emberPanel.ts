@@ -1,10 +1,10 @@
 /**
- * Opening Ember's Board in the chat's side panel (surfaces/ember.ts): the header's Board
- * button and a task link's click end here.
+ * Opening Ember's Board beside the chat (surfaces/ember.ts): the header's Board button and a
+ * task link's click end here.
  */
 import { EMBER_ENABLED, focusEmberTask } from "./ember";
 import { emberBoardTab, EMBER_KIND, selectionIsEmber } from "@/surfaces/emberTarget";
-import { openTab, showTabs, tabPlace, targetOf, useTabPlace, type TabPlace } from "@/shell/host";
+import { openTab, tabPlace, targetOf, useTabPlace, type TabPlace } from "@/shell/host";
 import { useSettingsStore } from "./settings";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -29,11 +29,14 @@ export function openEmberBoard(taskId?: string): boolean {
   return true;
 }
 
-/** The header's Board button: hides the panel while it shows the board, else opens the board. */
+/**
+ * The header's Board button: opens the board. While a tab shows it there is nothing to hide (the
+ * classic side panel's hide went with it); Ember's chat in the shell is PR 24's.
+ */
 export function toggleEmberBoard(): boolean {
   const key = emberPanelKey();
   if (key === null) return false;
-  if (showsBoard(tabPlace(key))) return !showTabs(key, false, { focus: false });
+  if (showsBoard(tabPlace(key))) return true;
   return openTab(key, emberBoardTab());
 }
 

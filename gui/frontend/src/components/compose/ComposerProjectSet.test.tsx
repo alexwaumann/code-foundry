@@ -9,7 +9,9 @@ import { card } from "@/test/cardFakes";
 import { BACKGROUND } from "@/test/composerWorld";
 import { daemon, invocationsOf, lastInvocation, refuse, resetDaemon } from "@/test/daemonFakes";
 import { addThreads, addWorkspace, addWorktrees, HOME, removeWorkspace, seedWorld, SK, thread, worktree, WR } from "@/test/projectsWorld";
-import { ThreadTitle } from "@/components/thread/ThreadParts";
+import { ThreadHeader } from "@/components/thread/ThreadHeader";
+import { resetLayout } from "@/stores/layout";
+import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
 import { SaveWorkspaceDialog } from "@/components/thread/SaveWorkspaceDialog";
 import { RowMenu } from "@/components/sidebar/RowMenu";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -412,10 +414,10 @@ describe("the composer's project set", () => {
   });
 });
 
-/** Opens the thread header's title menu (Enter on the title, as the keyboard does). */
+/** Opens the thread header's menu (ThreadHeader's ⋯). */
 function openTitleMenu(): HTMLElement {
-  fireEvent.keyDown(screen.getByTestId("thread-title"), { key: "Enter" });
-  return screen.getByTestId("thread-title-menu");
+  fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
+  return screen.getByTestId("thread-header-menu");
 }
 
 const setItems = (menu: HTMLElement) => [...menu.querySelectorAll('[data-testid="menu-new-like"], [data-testid="menu-save-workspace"]')].map((e) => e.textContent);
@@ -447,9 +449,11 @@ function setThread(id: string, name: string, projects: string[], primary: string
 }
 
 async function renderThreadChrome(id: string): Promise<void> {
+  resetLayout();
+  await seedLayout(layoutOf([space(pane("p-1", [tab("t-1", "thread", id)]), "p-1")]));
   render(
     <>
-      <ThreadTitle id={id} />
+      <ThreadHeader threadId={id} paneId="p-1" />
       <ComposeHost />
       <SaveWorkspaceDialog />
       <Toaster />

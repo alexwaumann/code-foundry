@@ -39,18 +39,18 @@ describe("RowMenu: Fork (docs/notes/transcript-deleted.md)", () => {
 
 describe("RowMenu: a setup that has not finished", () => {
   const setup = (phase: "running" | "failed" | "done") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
-  const terminal = () => screen.queryAllByRole("menuitem", { name: "New terminal here" }).length;
   const fork = () => screen.queryAllByTestId("menu-fork").length;
 
-  it.each<[string, Partial<ThreadView>, number, number]>([
-    ["running with no checkout: neither", { worktreePath: "", setup: setup("running") }, 0, 0],
-    ["failed with no checkout: neither", { worktreePath: "", setup: setup("failed") }, 0, 0],
-    ["failed after its worktree landed: a terminal has a place to run, a fork still needs Claude", { worktreePath: "/w/x", setup: setup("failed") }, 1, 0],
-    ["done: both", { worktreePath: "/w/x", setup: setup("done") }, 1, 1],
-    ["no setup: both", {}, 1, 1],
-  ])("%s", (_n, o, terminals, forks) => {
+  // A terminal is Open ▸'s (the shell's row, sidebar/shell): the row's own items end with Fork and Remove.
+  it.each<[string, Partial<ThreadView>, number]>([
+    ["running with no checkout: no fork", { worktreePath: "", setup: setup("running") }, 0],
+    ["failed with no checkout: no fork", { worktreePath: "", setup: setup("failed") }, 0],
+    ["failed after its worktree landed: a fork still needs Claude", { worktreePath: "/w/x", setup: setup("failed") }, 0],
+    ["done: a fork", { worktreePath: "/w/x", setup: setup("done") }, 1],
+    ["no setup: a fork", {}, 1],
+  ])("%s", (_n, o, forks) => {
     openMenu(o);
-    expect(terminal()).toBe(terminals);
+    expect(screen.queryAllByRole("menuitem", { name: "New terminal here" })).toHaveLength(0);
     expect(fork()).toBe(forks);
   });
 });

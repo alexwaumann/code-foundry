@@ -5,8 +5,8 @@ import type { ThreadItemView } from "@/api/thread";
 
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
-const runInThreadTerminal = vi.hoisted(() => vi.fn(() => Promise.resolve("t-new")));
-vi.mock("@/stores/bottomActions", () => ({ runInThreadTerminal }));
+const runInLinkedTerminal = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/shell/terminalActions", async (orig) => ({ ...(await orig<typeof import("@/shell/terminalActions")>()), runInLinkedTerminal }));
 
 const { buildRows, buildTurns, decodeTimelineKey, timelineKey } = await import("@/lib/threadTimeline");
 const { useCommandsStore } = await import("@/stores/commands");
@@ -120,13 +120,13 @@ describe("code block Run in terminal", () => {
     const btn = c.querySelector<HTMLButtonElement>('[data-testid="code-run"]');
     expect(btn?.getAttribute("aria-label")).toBe("Run in terminal");
     fireEvent.click(btn as HTMLButtonElement);
-    expect(runInThreadTerminal).toHaveBeenCalledWith("s", "make test");
+    expect(runInLinkedTerminal).toHaveBeenCalledWith("s", "make test");
   });
 
   it("a console block runs its $ lines only", () => {
     const c = show(reply("```console\n$ go version\ngo version go1.26\n```"));
     fireEvent.click(c.querySelector('[data-testid="code-run"]') as HTMLElement);
-    expect(runInThreadTerminal).toHaveBeenCalledWith("s", "go version");
+    expect(runInLinkedTerminal).toHaveBeenCalledWith("s", "go version");
   });
 
   const none: [string, string, boolean?][] = [
