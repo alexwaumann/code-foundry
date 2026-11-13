@@ -30,8 +30,8 @@ function FocusHistoryButtons() {
 /**
  * The window shell's top bar (docs/notes/shell-model.md, "Structure"): always visible, laid out on
  * its own with no alignment to the sidebar. The traffic-light gutter, the app name, the sidebar
- * toggle, back and forward, then the space tabs, then "+" (a new space, shown at once, its name
- * ready to type).
+ * toggle, back and forward, the Needs you control while the sidebar is collapsed, then the space
+ * tabs, then "+" (a new space, shown at once, its name ready to type).
  *
  * It is the window's drag band (Wails runtime, `--wails-draggable`): everything but its buttons
  * and tabs drags the window. It is the title band's height (titleBand.ts), its row centred where
@@ -56,9 +56,9 @@ export function TopBar() {
             </Button>
           </Tip>
         </span>
-        {/* While the sidebar is collapsed: the Needs you count and its list (components/needs/NeedsPopover.tsx). */}
-        {loaded && <NeedsPopover />}
         <FocusHistoryButtons />
+        {/* While the sidebar is collapsed: the Needs you count and its list (components/needs/NeedsPopover.tsx), after back and forward so they never move. */}
+        {loaded && <NeedsPopover />}
         {loaded && (
           <>
             <SpaceTabs renaming={renaming} onRenaming={setRenaming} />

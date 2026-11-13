@@ -126,6 +126,25 @@ describe("the top bar", () => {
     expect(screen.getByTestId("top-bar-new-space")).toBeTruthy();
   });
 
+  it("puts the Needs you control after back and forward, so they do not move when the sidebar collapses", async () => {
+    const { useUiStore } = await import("@/stores/ui");
+    const before = useUiStore.getState().sidebarVisible;
+    try {
+      useUiStore.setState({ sidebarVisible: true });
+      render(<TopBar />);
+      expect(screen.queryByTestId("needs-control")).toBeNull();
+      act(() => {
+        useUiStore.setState({ sidebarVisible: false });
+      });
+      const control = screen.getByTestId("needs-control");
+      const history = screen.getByTestId("top-bar-history");
+      expect(history.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getByTestId("top-bar-sidebar-toggle").compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      useUiStore.setState({ sidebarVisible: before });
+    }
+  });
+
   it("counts the threads Needs you lists for each space: not a thread's threads, archived ones nor a finished turn", () => {
     render(<TopBar />);
     expect(within(tabOf("sp-a")).getByTestId("space-tab-count").textContent).toBe("1");
