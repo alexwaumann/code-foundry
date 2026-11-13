@@ -59,13 +59,26 @@ type PanelResult struct {
 	Thread  string `json:"thread"`
 	// Tab, Pane and Space are where the layout has the verb's tab (commands_view_open.go):
 	// Rule says how placement chose the pane, Existing that a tab of the same identity was
-	// open and is used, TabFocused that it took the user's focus.
-	Tab        string `json:"tab,omitempty"`
-	Pane       string `json:"pane,omitempty"`
-	Space      string `json:"space,omitempty"`
-	Rule       string `json:"rule,omitempty"`
-	Existing   bool   `json:"existing,omitempty"`
-	TabFocused bool   `json:"tab_focused,omitempty"`
+	// open and is used, TabFocused that it took the user's focus. TabThread is the thread the
+	// tab belongs to: another thread's when an open tab of the same identity was used (a file
+	// is one per path), "" for none.
+	//
+	// ThreadNotOpen: Thread's own tab is open in no space, so the tab went to its space's
+	// focused pane (Rule "focused"), not beside it: Behind when it waits behind the tab shown
+	// there, OtherSpace when that space is not the one the user is in. JoinsSet: no window has
+	// loaded the layout yet, and the first load takes the tab into the thread's remembered set
+	// (it shows when the thread is opened).
+	Tab           string `json:"tab,omitempty"`
+	Pane          string `json:"pane,omitempty"`
+	Space         string `json:"space,omitempty"`
+	Rule          string `json:"rule,omitempty"`
+	Existing      bool   `json:"existing,omitempty"`
+	TabThread     string `json:"tab_thread,omitempty"`
+	ThreadNotOpen bool   `json:"thread_not_open,omitempty"`
+	Behind        bool   `json:"behind,omitempty"`
+	OtherSpace    bool   `json:"other_space,omitempty"`
+	JoinsSet      bool   `json:"joins_set,omitempty"`
+	TabFocused    bool   `json:"tab_focused,omitempty"`
 }
 
 // showViewIntent is a ShowView of name with params.

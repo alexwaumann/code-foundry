@@ -20,14 +20,15 @@ export function TerminalTabIcon({ tab, className }: { tab: TabEntry; className?:
 /**
  * A restored terminal's one quiet line (docs/notes/shell-model.md, "Terminals"): the command its
  * shell ran before the snooze, and "Run again" (also Enter on the line). It never reruns by
- * itself; running it, or ×, drops the line (the tab's `ran` param).
+ * itself; running it (onRun), or × (onDismiss), drops the line: a terminal tab's `ran` param, a
+ * quick terminal's `ran` (QuickTerminal.tsx).
  */
-export function RanLine({ tab, ran }: { tab: TabEntry; ran: string }) {
+export function RanLine({ ran, onRun, onDismiss }: { ran: string; onRun: () => Promise<void>; onDismiss: () => void }) {
   const [busy, setBusy] = useState(false);
   const run = () => {
     if (busy) return;
     setBusy(true);
-    void runAgain(tab, ran).finally(() => {
+    void onRun().finally(() => {
       setBusy(false);
     });
   };
@@ -61,7 +62,7 @@ export function RanLine({ tab, ran }: { tab: TabEntry; ran: string }) {
           type="button"
           aria-label="Dismiss"
           className="ml-auto flex size-4 shrink-0 items-center justify-center rounded-sm text-cf-text-muted outline-none hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
-          onClick={() => void forgetRan(tab)}
+          onClick={onDismiss}
         >
           <X className="size-3" aria-hidden />
         </button>
@@ -91,7 +92,15 @@ export function TerminalTabBody({ tab }: { tab: TabEntry }) {
         if (e.target === e.currentTarget) ref.current?.focus();
       }}
     >
-      {ran && <RanLine tab={tab} ran={ran} />}
+      {ran && (
+        <RanLine
+          ran={ran}
+          onRun={() => runAgain(tab, ran)}
+          onDismiss={() => {
+            void forgetRan(tab);
+          }}
+        />
+      )}
       <TerminalHost ref={ref} terminalId={id && known ? id : null} testId="shell-terminal-host" />
     </div>
   );

@@ -478,3 +478,71 @@ func TestLayoutGlueFreshWithoutACheckout(t *testing.T) {
 		t.Errorf("a shell started: %+v", got)
 	}
 }
+
+// A snooze in the thread store's order with the quick terminal open: the hook reads what runs
+// in it and marks it fresh, then its shell goes (and must not settle the mark). Opening the
+// thread brings it back open over a fresh quick shell in the checkout, the command kept for
+// "Run again". One started meanwhile (terminal.quick) is kept: no second shell.
+func TestLayoutGlueSnoozeBringsTheQuickTerminalBack(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		meantime bool
+	}{
+		{name: "a fresh shell"},
+		{name: "one started meanwhile is kept", meantime: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
+			e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
+			startQuick := func() string {
+				tm, err := e.terms.Create(e.ctx, terminal.Spec{Argv: []string{"zsh"}, Cwd: glueWT, Labels: termlabel.QuickShell("th-a", "pj", glueWT)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return tm.ID
+			}
+			old := startQuick()
+			if err := e.terms.SetFacts(old, glueWT, "npm run dev", ""); err != nil {
+				t.Fatal(err)
+			}
+			e.apply(&core.SetQuick{Thread: "th-a", Open: true, Height: 200})
+
+			e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
+			if err := terminal.KillAndRemove(e.ctx, e.terms, old); err != nil {
+				t.Fatal(err)
+			}
+			settle()
+			if q := e.state().Threads["th-a"].Quick; q == nil || q.Open || !q.Fresh || q.Ran != "npm run dev" || q.Height != 200 {
+				t.Fatalf("quick after the snooze: %+v, want closed, fresh, ran npm run dev, 200 high", q)
+			}
+
+			e.publish(thread.Updated{Thread: th("th-a")})
+			meantime := ""
+			if tc.meantime {
+				meantime = startQuick()
+			}
+			c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
+			if c.Result.FreshQuick != "th-a" {
+				t.Fatalf("FreshQuick = %q", c.Result.FreshQuick)
+			}
+			quicks := func() []terminal.Terminal {
+				var out []terminal.Terminal
+				for _, tm := range e.terms.List(e.ctx) {
+					if termlabel.IsQuick(tm.Labels) && tm.Labels[termlabel.Thread] == "th-a" && tm.State == terminal.StateRunning {
+						out = append(out, tm)
+					}
+				}
+				return out
+			}
+			e.eventually("a running quick shell for th-a", func() bool { return len(quicks()) == 1 })
+			settle()
+			got := quicks()
+			if len(got) != 1 || got[0].ID == old || got[0].Cwd != glueWT || (tc.meantime && got[0].ID != meantime) {
+				t.Fatalf("quick shells %+v, want one new one in the checkout (the meantime one: %q)", got, meantime)
+			}
+			if q := e.state().Threads["th-a"].Quick; q == nil || !q.Open || q.Fresh || q.Ran != "npm run dev" {
+				t.Errorf("quick after opening: %+v, want open with its Run again line", q)
+			}
+		})
+	}
+}

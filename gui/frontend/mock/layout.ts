@@ -70,7 +70,8 @@ export interface RememberedTab {
 
 export interface ThreadState {
   space: string;
-  quick?: { open: boolean; height?: number };
+  /** ran: the command its shell ran when a snooze ended it ("Run again"); fresh: back with the thread (Go only). */
+  quick?: { open: boolean; height?: number; ran?: string; fresh?: boolean };
   remembered?: { pane?: string; tabs: RememberedTab[] };
   last?: Record<string, string>;
 }
@@ -891,11 +892,13 @@ const ops = {
       ts = { space: t.spaceOf(thread) };
       t.st.threads = { ...threads, [thread]: ts };
     }
-    const q: { open: boolean; height?: number } = { open };
+    const q: { open: boolean; height?: number; ran?: string } = { open };
     const kept = ts.quick?.height ?? 0;
     if (height > 0) q.height = height;
     else if (kept > 0) q.height = kept;
-    if (q.open || q.height) ts.quick = q;
+    // Its "Run again" line stays unless the op drops it (Go's SetQuick.ForgetRan).
+    if (ts.quick?.ran && o.forget_ran !== true) q.ran = ts.quick.ran;
+    if (q.open || q.height || q.ran) ts.quick = q;
     else delete ts.quick;
     // Go's prune: a record that stores nothing the default would not give goes.
     if (!ts.quick && !ts.remembered && Object.keys(ts.last ?? {}).length === 0 && ts.space === t.st.default_space) {
@@ -1357,7 +1360,7 @@ function threadMsg(id: string, ts: ThreadState): ThreadInit {
   return {
     threadId: id,
     spaceId: ts.space,
-    quick: ts.quick ? { open: ts.quick.open, height: ts.quick.height ?? 0 } : undefined,
+    quick: ts.quick ? { open: ts.quick.open, height: ts.quick.height ?? 0, ran: ts.quick.ran ?? "" } : undefined,
     remembered: (ts.remembered?.tabs ?? []).map((r) => ({
       tab: tabMsg(r.tab),
       paneId: r.pane,
@@ -1485,7 +1488,7 @@ export function opFromProto(m: LayoutOp | undefined): Op {
     case "openDraft":
       return { op: "open_draft", draft: c.value.draftId, focus: c.value.focus };
     case "setQuick":
-      return { op: "set_quick", thread: c.value.threadId, open: c.value.open, height: c.value.height };
+      return { op: "set_quick", thread: c.value.threadId, open: c.value.open, height: c.value.height, forget_ran: c.value.forgetRan };
     default:
       return fail("unimplemented", `layout op ${c.case} is not available in the mock`);
   }
@@ -1635,6 +1638,11 @@ export class MockLayout {
    * The mock keeps applying ops either way (the daemon's are in memory only; tested in Go).
    */
   newer: string[] = [];
+  /**
+   * Off: the mock answers like a daemon from before the shell, which has no LayoutService: every
+   * call to it is the mux's plain 404 and the event stream has no layout source (a test's).
+   */
+  serviceOff = false;
 
   constructor(
     private readonly deps: {
@@ -1720,6 +1728,7 @@ export class MockLayout {
     this.importDelayMs = 0;
     this.legacyImported = false;
     this.newer = [];
+    this.serviceOff = false;
     this.commit(emptyState(), "");
   }
 

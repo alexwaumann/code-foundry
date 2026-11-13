@@ -34,10 +34,10 @@ func TestCommandLinesByCaller(t *testing.T) {
 	}
 	store := layouttest.New(nil)
 	// A snoozed thread's terminal tab came back fresh with its "Run again" line; another
-	// thread's set still remembers one.
+	// thread's set still remembers one; a third's quick terminal keeps its line.
 	st, _, err := core.Decode([]byte(`{"v":1,"current_space":"sp-a","default_space":"sp-a","spaces":[{"id":"sp-a","name":"Main","focus":"p-1",
 		"root":{"t":"pane","id":"p-1","active":"t-x","tabs":[{"id":"t-x","kind":"terminal","thread":"s-1","params":{"terminal":"term-x","ran":"make deploy TOKEN=`+secret+`"}}]}}],
-		"threads":{"s-2":{"space":"sp-a","remembered":{"pane":"","tabs":[{"tab":{"id":"t-y","kind":"terminal","thread":"s-2","params":{"terminal":"term-y"}},"pane":"","index":0,
+		"threads":{"s-3":{"space":"sp-a","quick":{"open":false,"fresh":true,"ran":"vault login `+secret+`"}},"s-2":{"space":"sp-a","remembered":{"pane":"","tabs":[{"tab":{"id":"t-y","kind":"terminal","thread":"s-2","params":{"terminal":"term-y"}},"pane":"","index":0,
 			"fresh":{"name":"dev","ran":"psql postgres://u:`+secret+`@db"}}]}}}}`), &core.SeqIDs{})
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestCommandLinesByCaller(t *testing.T) {
 	}{
 		{"terminal.list", nil, 3},
 		{"plugin.terminals", map[string]string{"name": "notes"}, 1},
-		{"layout.show", nil, 2},
+		{"layout.show", nil, 3},
 		{"tab.list", nil, 1},
 	}
 	for _, c := range callers {

@@ -44,6 +44,8 @@
  *        the body's state, internal/layout's JSON, for any other tree)
  *   POST /__mock/layout/newer?on=1|0          (a newer build wrote the stored layout, or not: sent as a snapshot,
  *        as a restarted daemon's; the window's line under the grid says changes are not saved)
+ *   POST /__mock/layout/service?off=1|0       (off: a daemon from before the shell: LayoutService is the mux's 404 and
+ *        the event stream sends no layout, for streams opened after it)
  *   POST /__mock/layout/import?imported=0|1&fail=N&error=…&delay=ms   (the first-load import's mark; the
  *        next N ImportLegacy calls fail; each answers after `delay`; GET /__mock/layout lists the calls as `imports`)
  *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
@@ -804,7 +806,8 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.SKILL, event: { event: { case: "skill", value: world.skills.event() } } },
         { source: EventSource.MEMORY, event: { event: { case: "memory", value: world.memory.event() } } },
         { source: EventSource.SEARCH, event: { event: { case: "search", value: world.searches.activity() } } },
-        { source: EventSource.LAYOUT, event: { event: { case: "layout", value: world.layout.snapshotEvent() } } },
+        // A daemon from before the shell has no layout source (POST /__mock/layout/service?off=1).
+        ...(world.layout.serviceOff ? [] : [{ source: EventSource.LAYOUT, event: { event: { case: "layout" as const, value: world.layout.snapshotEvent() } } }]),
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -1098,6 +1101,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/layout/newer":
       world.layout.setNewer(q.get("on") === "0" ? [] : ['space sp-main: tab t-newer of kind "notebook"']);
       json(res, 200, { newer: world.layout.newer });
+      break;
+    case "POST /__mock/layout/service":
+      world.layout.serviceOff = q.get("off") === "1";
+      json(res, 200, { serviceOff: world.layout.serviceOff });
       break;
     case "POST /__mock/layout/import":
       // The first-load import: ?imported=0|1 sets the mark; ?fail=N makes the next N calls fail (with ?error=…).
@@ -1610,6 +1617,12 @@ const server = createServer((req, res) => {
     const dest = req.headers["sec-fetch-dest"];
     const tag = (themed ? mockPaintTag() : "") + (html && navigated(typeof dest === "string" ? dest : undefined, themed) ? frameTag : "");
     res.end(tag ? insertInHead(new TextDecoder().decode(e.data), tag) : e.data);
+    return;
+  }
+  // A daemon from before the shell: its mux has no LayoutService route (Go's ServeMux 404).
+  if (world.layout.serviceOff && url.pathname.startsWith("/codefoundry.v1.LayoutService/")) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("404 page not found\n");
     return;
   }
   if (req.headers.authorization !== `Bearer ${token}`) {

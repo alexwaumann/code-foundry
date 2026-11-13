@@ -36,7 +36,8 @@ import (
 //   - A commit that closed terminal tabs by themselves (Result.Closed) or ended a thread's
 //     terminals (Result.Ended): those terminals end. Tabs closed with their thread
 //     (Result.Kept) keep theirs running. A commit that restored fresh shells (Result.Fresh,
-//     after a snooze): a new shell for each, and the tab follows it.
+//     after a snooze): a new shell for each, and the tab follows it. A commit that opened a
+//     quick terminal a snooze ended (Result.FreshQuick): a new quick shell for its thread.
 //
 // The glue's own ops carry no client id. A sweep at start and every layoutSweepEvery drops
 // what the layout holds of terminals that are gone (after a restart every terminal is), for
@@ -319,8 +320,9 @@ func (g *layoutGlue) resync(threads *bus.Subscription[thread.Event], layouts *bu
 
 // catchUp does what the layout commits from prev to now meant for terminals, as layoutEvent
 // does for one: a terminal prev held and now does not hold ended (unless a reset replaced
-// it), and a terminal tab restored as a fresh shell (a remembered fresh record in prev, an
-// open tab of the same old terminal now) gets its shell.
+// it), a terminal tab restored as a fresh shell (a remembered fresh record in prev, an
+// open tab of the same old terminal now) gets its shell, and so does a quick terminal a
+// snooze ended that is open again.
 func (g *layoutGlue) catchUp(prev, now *core.State) {
 	if prev == nil || now == nil {
 		return
@@ -364,6 +366,14 @@ func (g *layoutGlue) catchUp(prev, now *core.State) {
 					g.fresh(tb.ID)
 				}
 			}
+		}
+	}
+	for th, ts := range prev.Threads {
+		if ts.Quick == nil || !ts.Quick.Fresh {
+			continue
+		}
+		if q := now.Threads[th]; q != nil && q.Quick != nil && q.Quick.Open && !q.Quick.Fresh {
+			g.freshQuick(th)
 		}
 	}
 }
@@ -411,6 +421,9 @@ func (g *layoutGlue) layoutEvent(ev layoutstore.Event) {
 	for _, tab := range ev.Result.Fresh {
 		g.fresh(tab)
 	}
+	if th := ev.Result.FreshQuick; th != "" {
+		g.freshQuick(th)
+	}
 }
 
 // end kills and removes terminal id in the background: a shell or an action run (what
@@ -457,6 +470,31 @@ func (g *layoutGlue) fresh(tabID string) {
 	g.apply(&core.ReplaceTerminal{Old: old, New: t.ID})
 }
 
+// freshQuick starts a new quick shell for thread, whose quick terminal a snooze ended and
+// its tab's opening brought back (core.Quick.Fresh), in the thread's checkout. One already
+// running (terminal.quick started it meanwhile) is kept. A thread with no checkout (or gone)
+// gets none, and its quick terminal is drawn closed.
+func (g *layoutGlue) freshQuick(thread string) {
+	if g.hasQuick(thread) {
+		return
+	}
+	th, ok := g.opts.Threads().Thread(thread)
+	if !ok || th.WorktreePath == "" {
+		g.opts.Log.Info("layout: no checkout for a restored quick terminal; it closes", "thread", thread)
+		g.apply(&core.SetQuick{Thread: thread, Open: false})
+		return
+	}
+	t, err := g.opts.Terminals.Create(g.ctx, terminal.Spec{
+		Argv: g.opts.Shell(), Cwd: th.WorktreePath, Labels: termlabel.QuickShell(th.ID, th.ProjectID, th.WorktreePath),
+	})
+	if err != nil {
+		g.opts.Log.Warn("layout: start a restored quick terminal; it closes", "thread", thread, "err", err)
+		g.apply(&core.SetQuick{Thread: thread, Open: false})
+		return
+	}
+	g.labels[t.ID] = t.Labels
+}
+
 // sweep drops what the layout holds of terminals that no longer exist, and draws closed the
 // quick terminals that have no shell.
 func (g *layoutGlue) sweep() {
@@ -475,9 +513,10 @@ func (g *layoutGlue) sweep() {
 
 // layoutShellsGoing is the thread store's ShellsGoing: before a thread's shells go, the
 // layout closes its tabs. An archive or a removal forgets the thread (archive_thread); a
-// snooze keeps its set, its terminals to come back as fresh shells, each with the command
-// it was running (the foreground job, else the last one) for its "Run again" line. It runs
-// before the shells go, so that command can still be read.
+// snooze keeps its set, its terminals (its quick terminal too, when open) to come back as
+// fresh shells, each with the command it was running (the foreground job, else the last
+// one) for its "Run again" line. It runs before the shells go, so that command can still be
+// read.
 func layoutShellsGoing(log *slog.Logger, l layoutstore.Store, terms terminal.Store) func(context.Context, string, thread.ShellsGo) {
 	return func(ctx context.Context, id string, why thread.ShellsGo) {
 		ctx = context.WithoutCancel(ctx)
@@ -495,7 +534,14 @@ func layoutShellsGoing(log *slog.Logger, l layoutstore.Store, terms terminal.Sto
 				ran[term] = cmd
 			}
 		}
-		applyLayout(ctx, log, l, &core.SnoozeThread{Thread: id, Ran: ran})
+		quickRan := ""
+		for _, t := range terms.List(ctx) {
+			if termlabel.IsQuick(t.Labels) && t.Labels[termlabel.Thread] == id && t.State != terminal.StateExited {
+				quickRan = cmp.Or(t.Foreground, t.LastCommand)
+				break
+			}
+		}
+		applyLayout(ctx, log, l, &core.SnoozeThread{Thread: id, Ran: ran, QuickRan: quickRan})
 	}
 }
 

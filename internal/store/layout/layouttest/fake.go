@@ -90,6 +90,17 @@ func (f *Fake) Apply(ctx context.Context, op core.Op, opts layout.ApplyOptions) 
 	return layout.Commit{Rev: f.commit(next, opts.ClientID, op.OpName(), res), Changed: true, Result: res}, nil
 }
 
+// MarkImported records that the first-load import ran, as a window's first load leaves a
+// daemon's layout, without changing the layout or recording an op.
+func (f *Fake) MarkImported() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.imported, f.windowTabs = true, nil
+	snap := *f.snap
+	snap.LegacyImported = true
+	f.snap = &snap
+}
+
 // ImportLegacy implements layout.Store.
 func (f *Fake) ImportLegacy(_ context.Context, in core.LegacyInput, opts layout.ApplyOptions) (layout.ImportCommit, error) {
 	f.mu.Lock()

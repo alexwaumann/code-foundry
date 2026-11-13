@@ -282,7 +282,8 @@ func (f termLayoutFixture) focusedTab() string {
 }
 
 // layout.show lists what a thread stores beside its tabs: a space not the default, its quick
-// terminal open and the tabs it remembers, a snoozed terminal marked to come back fresh with what it ran.
+// terminal open and the tabs it remembers, a snoozed terminal marked to come back fresh with what it ran,
+// and a snoozed quick terminal.
 func TestLayoutShowThreads(t *testing.T) {
 	f := newTermLayoutFixture(t)
 	st := seeded()
@@ -296,6 +297,8 @@ func TestLayoutShowThreads(t *testing.T) {
 		}}},
 		"s-quiet0000001": {Space: "sp-main"},
 		"s-moved0000001": {Space: "sp-two"},
+		// A snoozed thread whose quick terminal was open.
+		"s-snoozed00001": {Space: "sp-main", Quick: &core.Quick{Fresh: true, Ran: "make dev"}},
 	}
 	f.store.Put(st)
 	reg := command.NewRegistry()
@@ -311,7 +314,8 @@ func TestLayoutShowThreads(t *testing.T) {
 		"    remembered t-x terminal of s-aaaa00000001 terminal term-x in pane p-right (comes back as a fresh shell; ran \"make dev\")\n" +
 		"    remembered t-y terminal of s-aaaa00000001 terminal term-y in pane p-two of space sp-two (comes back as a fresh shell)\n" +
 		"    remembered t-f file of s-aaaa00000001 \"notes.md\", placed fresh beside the thread\n" +
-		"  thread s-moved0000001 in space sp-two"
+		"  thread s-moved0000001 in space sp-two\n" +
+		"  thread s-snoozed00001 in space sp-main, quick terminal comes back open as a fresh shell (ran \"make dev\")"
 	if !strings.HasSuffix(res.Message, want) {
 		t.Errorf("layout show:\n%s\nwant it to end with:\n%s", res.Message, want)
 	}

@@ -173,6 +173,10 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 	if err := t.restore(sp, o.Thread, w, h, &res); err != nil {
 		return Result{}, err
 	}
+	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Quick != nil && ts.Quick.Fresh {
+		ts.Quick.Fresh, ts.Quick.Open = false, true
+		res.FreshQuick = o.Thread
+	}
 	_, pane, _ = t.st.FindTab(tb.ID)
 	t.show(sp, pane, tb.ID, o.Focus)
 	res.Pane = pane.ID
@@ -664,13 +668,17 @@ func runningTerminals(r *Remembered) []*Tab {
 // terminal is marked to come back as a fresh shell under the same name, with the command it
 // was running (Ran, by terminal id, from the caller) for its "Run again" line. Its terminal
 // tabs open in other spaces join the set too, each with the space it was in, so it comes
-// back there (a terminal cannot end under an open tab). Result.Kept lists the tabs it took,
-// Result.Ended the terminals the caller ends.
+// back there (a terminal cannot end under an open tab). Its quick terminal, when open, is
+// marked the same way (Quick.Fresh, with QuickRan for its line): drawn closed now, it opens
+// again with a fresh shell when the thread's tab opens. Result.Kept lists the tabs it took,
+// Result.Ended the terminals the caller ends (the quick terminal is not a tab: the thread's
+// shells end with the snooze).
 type SnoozeThread struct {
-	Thread string            `json:"thread"`
-	Ran    map[string]string `json:"ran,omitempty"`
-	W      float64           `json:"w,omitempty"`
-	H      float64           `json:"h,omitempty"`
+	Thread   string            `json:"thread"`
+	Ran      map[string]string `json:"ran,omitempty"`
+	QuickRan string            `json:"quick_ran,omitempty"`
+	W        float64           `json:"w,omitempty"`
+	H        float64           `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -700,6 +708,9 @@ func (o *SnoozeThread) apply(t *tx) (Result, error) {
 				ts.Remembered.Tabs[i].Fresh = &Fresh{Name: rt.Tab.Name, Ran: o.Ran[rt.Tab.Params["terminal"]]}
 			}
 		}
+	}
+	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Quick != nil && ts.Quick.Open {
+		ts.Quick.Open, ts.Quick.Fresh, ts.Quick.Ran = false, true, o.QuickRan
 	}
 	return res, nil
 }

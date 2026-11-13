@@ -77,6 +77,10 @@ their stores and their verbs are gone.
     for later, the Code tab measured, a seeded fuzz of the grid, fixes from the files the review
     did not reach, the specification walked on a real daemon (its differences, ranked), and 200%
     zoom.
+29. `shell-24d-spec-differences.md`: four of the last pass's differences and a stuck window: the
+    quick terminal back after a snooze, the header over a too-narrow thread pane's composer, what a
+    thread is told when it opens a surface of a closed thread and whose tab is already open, and a
+    daemon without the layout service (a "dev" one) noticed by the window, with Restart Now.
 
 ## Where the build departs from the plan
 
