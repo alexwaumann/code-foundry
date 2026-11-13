@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, mockPost, row, threadPrompt } from "./fixtures";
+import { infoCardOff, mockPost, openApp, resetMock, row, threadPrompt } from "./fixtures";
 
 // The in-thread find (docs/notes/search-2-thread-find.md), only what needs a browser: the
 // cmd+f chord from the prompt, where the bar sits beside the thread info card, the
@@ -9,6 +9,8 @@ import { openApp, resetMock, mockPost, row, threadPrompt } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
   await mockPost("thread?state=idle");
 });
 

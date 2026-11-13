@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, openTooltip, resetMock, row, setZoom } from "./fixtures";
+import { expectTooltip, infoCardOff, invocations, mockPost, openApp, openTooltip, resetMock, row, setZoom } from "./fixtures";
 import { activeOfKind, paneWith } from "./shell-surfaces";
 
 /**
@@ -24,6 +24,8 @@ async function openWithCard(page: Page, scenario: string): Promise<string> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
 });
 
 // The card's rows, menus, stop squares, tabs it opens and the Branch copied toast:
@@ -32,7 +34,7 @@ test("one project: the toggle, the usage card's lines, an open fold's background
   const { id } = (await mockPost("thread-info?scenario=single")) as { id: string };
   await openApp(page);
   await row(page, `s:${id}`).click();
-  // Off by default; the toggle (view.thread-info) shows it beside the conversation and composer.
+  // Off by the setting (infoCardOff); the toggle (view.thread-info) shows it beside the conversation and composer.
   await expect(page.getByTestId("thread-info")).toHaveCount(0);
   await expect(toggle(page)).toHaveAttribute("aria-pressed", "false");
   await toggle(page).click();

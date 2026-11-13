@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { invocations, leaveSidebar, mockPost, openApp, openTooltip, resetMock, threadCalls } from "./fixtures";
+import { invocations, leaveSidebar, mockPost, openApp, openTooltip, resetMock, threadCalls, infoCardOff } from "./fixtures";
 import { openRowThread } from "./shell-threads";
 
 /**
@@ -12,6 +12,8 @@ import { openRowThread } from "./shell-threads";
 
 test.beforeEach(async () => {
   await resetMock();
+  // Written for a conversation with no card beside it (layout.thread_info is on by default).
+  await infoCardOff();
 });
 
 type State = "permission" | "question" | "streaming" | "multi" | "subagent";

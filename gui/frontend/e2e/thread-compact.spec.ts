@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { infoCardOff, mockPost, openApp, resetMock, row } from "./fixtures";
 
 /**
  * The Compact chip and row (docs/notes/compact-button.md) over the mock's "Fix stale PR badge"
@@ -12,6 +12,8 @@ import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
 });
 
 const schemes = process.env.SHOTS ? (["dark", "light"] as const) : (["dark"] as const);
