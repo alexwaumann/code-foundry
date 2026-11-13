@@ -159,8 +159,7 @@ async function s1ShellTab(page: Page): Promise<void> {
   await expect.poll(() => inXterm(page)).toBe(true);
 }
 
-// Shell gap: Escape from the palette puts the keyboard back in the "content" region, not in the terminal it was opened from (a terminal tab or the quick terminal).
-test.fixme("the palette returns to the bottom panel, and the panel is per thread", async ({ page }) => {
+test("Escape from the palette hands the keyboard back to the terminal tab or the quick terminal it came from", async ({ page }) => {
   await s1ShellTab(page);
   await page.keyboard.press("Meta+k");
   await expect(page.getByTestId("palette")).toBeVisible();
@@ -250,8 +249,7 @@ test("cmd+j on a thread without a quick terminal starts one with the keyboard in
   await expect.poll(() => keyboardIn(page, "quick-terminal-host")).toBe(true);
 });
 
-// Shell gap: a quick terminal closed because its shell exited takes the keyboard with it (to the document body), not back to the thread's prompt.
-test.fixme("cmd+j on a thread without shells starts one with the keyboard in it; its exit hands the keyboard back; the next cmd+j starts a fresh one", async ({ page }) => {
+test("cmd+j on a thread without shells starts one with the keyboard in it; its exit hands the keyboard back; the next cmd+j starts a fresh one", async ({ page }) => {
   await openApp(page);
   await openThreadTab(page, "s-3");
   const first = await openQuick(page);
@@ -279,8 +277,7 @@ test("a daemon restart that pruned the shells leaves the quick terminal closed; 
   await expect.poll(() => keyboardIn(page, "quick-terminal-host")).toBe(true);
 });
 
-// Shell gap: cmd+t from a worktree shell's tab (no thread) runs terminal.new-free (a shell in home), not terminal.new in the shell's worktree.
-test.fixme("cmd+t from a Projects-page shell starts another in its worktree", async ({ page }) => {
+test("cmd+t from a Projects-page shell starts another in its worktree", async ({ page }) => {
   // t-top (the feat/sidebar worktree's shell) in a tab of its own, the keyboard in it.
   await seedLayout(rowNode([paneNode("p-1", [threadTab("s-3")]), paneNode("p-2", [terminalTab("t-top-tab", "t-top")])]), "p-2");
   await openShellApp(page);

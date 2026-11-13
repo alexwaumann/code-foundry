@@ -21,6 +21,7 @@
  */
 import { applyLayoutOp, type LayoutOpView } from "@/api/layout";
 import { focusTab as focusTabOp, useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
+import { requestPaneFocus } from "@/stores/shellView";
 import { parseTabId, selectionTarget, type Tab } from "./tabs";
 import { identityKey } from "./identity";
 import { useUiStore } from "@/stores/ui";
@@ -159,31 +160,66 @@ function apply(op: LayoutOpView): void {
 /**
  * Opens a tab through the daemon: linked to the target's thread (placed beside it by the
  * daemon's rules), into a target pane or group's pane when one is named, else the focused pane.
- * An open tab of the same identity is used instead. It does not take the focus.
+ * An open tab of the same identity is used instead. `focus` (the user asked for it): the tab is
+ * shown and its pane takes the focus and the keyboard; false (a thread's call), nothing moves.
  */
-export function shellOpenTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: string }): boolean {
+export function shellOpenTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: string; focus?: boolean }): boolean {
   const s = useLayoutStore.getState();
   if (!s.loaded) return false;
   const t = resolveTarget(target);
+  // A tab the user is typing in (`behind`) keeps the focus and the keyboard, whoever asks.
+  const focus = opts.focus === true && opts.behind === undefined;
   const open = s.tabs[tab.id] ?? findByIdentity(s, t, tab.kind, tab.params);
   if (open) {
     // Behind any update of this tab still on its way (a save's), so the newest request lands last.
     const base = pendingParams.get(open.id)?.params ?? open.params;
     if (JSON.stringify(tab.params) !== JSON.stringify(base) || (tab.title && tab.title !== open.title)) queueParams(open.id, { ...tab.params }, tab.title || undefined);
-    if (opts.behind === undefined) void focusTabOp(open.id);
+    if (focus) showOpenTab(s, open);
     return true;
   }
   const pane = t.startsWith("pane:") ? t.slice(5) : opts.group !== undefined ? groupsOf(s, t)[opts.group]?.paneId : undefined;
   const thread = threadOfShellTarget(t);
   const behind = opts.behind === undefined ? undefined : findShellTab(s, t, opts.behind)?.id;
-  apply({
+  const op: LayoutOpView = {
     op: "open_surface",
     tab: { kind: layoutKindOf(tab.kind), ...(thread ? { thread } : {}), params: { ...tab.params }, ...(tab.title ? { title: tab.title } : {}) },
     ...(pane ? { pane } : {}),
-    focus: false,
+    focus,
     ...(behind ? { behind } : {}),
-  });
+  };
+  if (!focus) apply(op);
+  else
+    void applyLayoutOp(op)
+      .then(async (res) => {
+        // The keyboard follows once the pane draws the tab: asked for earlier, it reached the tab still showing.
+        await whenRev(res.rev);
+        if (res.paneId) requestPaneFocus(res.paneId);
+      })
+      .catch(() => undefined);
   return true;
+}
+
+/** An open tab the user asked for: active in its pane, the pane focused, the keyboard in it. Nothing moves when it already is. */
+function showOpenTab(s: LayoutState, tab: TabEntry): void {
+  if (s.spaces[s.currentSpaceId]?.focus === tab.paneId && s.panes[tab.paneId]?.active === tab.id) return;
+  void focusTabOp(tab.id);
+  requestPaneFocus(tab.paneId);
+}
+
+/** Resolves once the layout slice holds the commit at `rev`, or after 2s (a dropped stream resyncs on its own). */
+function whenRev(rev: number): Promise<void> {
+  if (useLayoutStore.getState().rev >= rev) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      unsub();
+      resolve();
+    };
+    const timer = setTimeout(done, 2000);
+    const unsub = useLayoutStore.subscribe((l) => {
+      if (l.rev >= rev) done();
+    });
+  });
 }
 
 /** Makes a tab active in its pane (and its pane focused, as the slice's focus does). */

@@ -61,8 +61,7 @@ test("cmd+shift+p reaches the app from a focused terminal tab", async ({ page })
   expect((await writes()).filter((w) => w.id === "t-s1-shell")).toEqual([]);
 });
 
-// Shell gap: a focused terminal tab does not give the command context its activeTerminalId, so the palette offers no terminal command for it.
-test.fixme("cmd+shift+p reaches the app from a focused shell, and the palette lists for that shell", async ({ page }) => {
+test("cmd+shift+p reaches the app from a focused shell, and the palette lists for that shell", async ({ page }) => {
   await s1ShellTab(page);
   await page.keyboard.press("Meta+Shift+p");
   await expect(page.getByTestId("palette").locator('[data-command="terminal.kill"]')).toBeVisible();
@@ -87,8 +86,7 @@ test("invoking a command sends the current context: a thread's", async ({ page }
   });
 });
 
-// Shell gap: a focused terminal tab does not give the command context its activeTerminalId (terminal.kill is not offered, and the context has no terminal).
-test.fixme("invoking a command sends the current context", async ({ page }) => {
+test("invoking a command sends the current context", async ({ page }) => {
   // The keyboard in s-1's shell's tab: the shell is the active terminal, the thread its owner.
   await s1ShellTab(page);
   await page.keyboard.press("Meta+k");
@@ -146,8 +144,7 @@ test("ui.focus.terminal: a worktree's shell opens as a tab in the focused pane, 
   await expect(page.getByTestId("shell-pane")).toHaveCount(2);
 });
 
-// Shell gap: ui.focus.terminal from outside the window shows the terminal's tab, but the keyboard stays where it was (the window ignores FocusTerminal; thread.focus does move it).
-test.fixme("FocusTerminal intent: a shell shows in its owner's bottom panel", async ({ page }) => {
+test("FocusTerminal intent: the shell's tab takes the keyboard", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(threadPrompt(page)).toBeFocused();

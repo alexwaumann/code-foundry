@@ -53,12 +53,7 @@ async function moveFromPicker(page: Page, id: string): Promise<void> {
   await expect(page.getByText(/Moved this thread to code-foundry/)).toBeVisible();
 }
 
-// Shell gap: from a thread whose tab is not open, the picker shows about half the time.
-// openMovePicker (stores/movePicker.ts) selects the thread (thread.open, a round trip in the shell)
-// and sets the picker open two frames later, before the thread's tab is drawn; the tab's body then
-// mounts and remounts, and MovePicker's unmount cleanup (closeMovePicker) shuts it: recorded order
-// "open=<id>", "open=null", then the header drawn. Reliable below with the thread open first.
-test.fixme("the sidebar row's Move to project… opens the thread and the picker under its crumb; a move lands over the streams", async ({ page }) => {
+test("the sidebar row's Move to project… opens the thread and the picker under its crumb; a move lands over the streams", async ({ page }) => {
   const id = await homeThread();
   await openApp(page);
   await row(page, `s:${id}`).click({ button: "right" });

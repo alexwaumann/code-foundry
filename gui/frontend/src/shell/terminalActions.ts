@@ -16,7 +16,7 @@ import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore
 import { useTerminalsStore } from "@/stores/terminals";
 import { applyLayout, useLayoutStore, type TabEntry } from "@/stores/layout";
 import { focusedTab } from "@/stores/selectionBridge";
-import { requestPaneFocus } from "@/stores/shellView";
+import { requestPaneFocus, requestPaneFocusOverSheets } from "@/stores/shellView";
 import { useUiStore } from "@/stores/ui";
 import { afterRev, layoutResultOf, runLayoutCommand } from "./commands";
 import { focusQuick, quickHasFocus, quickKeyAction } from "./quickTerminal";
@@ -52,9 +52,18 @@ export function terminalOfTab(tab: Pick<TabEntry, "params">): string {
   return tab.params.terminal ?? "";
 }
 
-/** Resolves the tab that shows terminal `id` once the layout has it (or null after `timeoutMs`). */
+/**
+ * Resolves the tab that shows terminal `id` once the layout shows it: the active tab of its pane,
+ * as the command that focused it committed (or null after `timeoutMs`). A tab that was already
+ * open but hidden is there before that commit arrives; asked for then, the keyboard went to the
+ * tab still showing.
+ */
 function whenTerminalTab(id: string, timeoutMs = 3000): Promise<TabEntry | null> {
-  const find = () => Object.values(useLayoutStore.getState().tabs).find((t) => t.kind === "terminal" && terminalOfTab(t) === id) ?? null;
+  const find = () => {
+    const s = useLayoutStore.getState();
+    const t = Object.values(s.tabs).find((x) => x.kind === "terminal" && terminalOfTab(x) === id);
+    return t && s.panes[t.paneId]?.active === t.id ? t : null;
+  };
   const now = find();
   if (now) return Promise.resolve(now);
   return new Promise((resolve) => {
@@ -82,10 +91,21 @@ export async function intoNewTerminal(resultJson: string | undefined): Promise<v
   if (id) await focusTerminalTab(id);
 }
 
-/** Moves the keyboard into the tab that shows terminal `id`, once the layout has it. */
+/** Moves the keyboard into the tab that shows terminal `id`, once the layout shows it; a sheet over the window closes. */
 export async function focusTerminalTab(id: string): Promise<void> {
   const tab = await whenTerminalTab(id);
-  if (tab) requestPaneFocus(tab.paneId);
+  if (tab) requestPaneFocusOverSheets(tab.paneId);
+}
+
+/**
+ * ui.focus.terminal's FocusTerminal intent (the CLI's or this window's call; the daemon has
+ * focused its tab or opened the quick terminal under its thread's focused tab): the keyboard
+ * follows into the terminal.
+ */
+export function followFocusTerminal(id: string): void {
+  const t = useTerminalsStore.getState().byId[id];
+  if (t?.labels.slot === "quick" && t.labels.thread) focusQuick(t.labels.thread);
+  else void focusTerminalTab(id);
 }
 
 /**
@@ -209,6 +229,24 @@ export async function closeQuick(threadId: string): Promise<void> {
   const s = useLayoutStore.getState();
   const tab = Object.values(s.tabs).find((t) => t.kind === "thread" && t.thread === threadId);
   if (tab && s.spaces[s.currentSpaceId]?.focus === tab.paneId) requestPaneFocus(tab.paneId);
+}
+
+/**
+ * A thread's quick terminal is going (its drawing unmounts): when it had the keyboard and the
+ * thread's quick terminal is closed in the layout (its shell exited, cmd+j, ×, the CLI), the
+ * keyboard goes to the thread's prompt instead of falling to the body. Leaving the tab (another
+ * tab, smart swap) keeps the quick terminal open and moves nothing.
+ */
+export function handBackFromQuick(threadId: string): void {
+  if (!quickHasFocus(threadId)) return;
+  const s = useLayoutStore.getState();
+  if (s.threads[threadId]?.quick?.open === true) return;
+  const tab = Object.values(s.tabs).find((t) => t.kind === "thread" && t.thread === threadId);
+  if (!tab) return;
+  // After the commit that removes it: asked for now, the prompt would be focused while the terminal still holds the keyboard.
+  queueMicrotask(() => {
+    requestPaneFocus(tab.paneId);
+  });
 }
 
 /** The quick terminal's height drag, once dropped (layout px). */

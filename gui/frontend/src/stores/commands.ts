@@ -6,6 +6,7 @@ import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
 import { confirmPresenter, requestConfirm, secondStagePresenter, type ConfirmPresenter } from "./confirm";
 import { contextKey, getUiContext } from "./context";
+import { useLayoutStore } from "./layout";
 import { useProjectsStore } from "./projects";
 import { useSubagentViewStore } from "./subagentView";
 import { useThreadsStore } from "./threads";
@@ -172,9 +173,9 @@ export async function runCommandForResult(
 }
 
 /**
- * Re-lists commands whenever the derived UiContext changes (debounced; the terminals
- * store decides which bottom panel shell is active), and when the selected thread's
- * state changes (availability often depends on it).
+ * Re-lists commands whenever the derived UiContext changes (debounced; the focused tab and
+ * the keyboard decide which terminal is active), and when the selected thread's state
+ * changes (availability often depends on it).
  */
 export function startCommandSync(debounceMs = 60): () => void {
   let lastKey = "";
@@ -191,7 +192,14 @@ export function startCommandSync(debounceMs = 60): () => void {
     clearTimeout(timer);
     timer = setTimeout(() => void refreshCommands(ctx), debounceMs);
   };
-  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check), useSubagentViewStore.subscribe(check)];
+  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check), useSubagentViewStore.subscribe(check), useLayoutStore.subscribe(check)];
+  // The keyboard entering or leaving a quick terminal changes the context's terminal.
+  if (typeof document !== "undefined") {
+    document.addEventListener("focusin", check);
+    unsubs.push(() => {
+      document.removeEventListener("focusin", check);
+    });
+  }
   check();
   // Retry periodically while the list is failing (e.g. daemon restarting).
   const retry = setInterval(() => {

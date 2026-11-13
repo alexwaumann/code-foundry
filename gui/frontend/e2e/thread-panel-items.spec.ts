@@ -39,11 +39,7 @@ test.beforeEach(async () => {
 // of a thread with no tab in the space goes to the focused pane, behind its active tab):
 // internal/layout/property_test.go (KeepFocus). Left here: the intents arriving over the UiService stream
 // from the CLI while another thread is shown, and the tabs there for s-1.
-// Shell gap: the daemon's op leaves s-2's tab active (open_surface, focus false), but the window's
-// half of the ShowView (stores/threadPanelIntent.ts openPullRequestInPanel → shell host openTab)
-// then sends set_tab_params and focus_tab from the app, so the model's pull request takes the
-// user's pane: the window moves off the user's thread.
-test.fixme("a thread's model opens a file, a diff and a pull request in its own panel; the window stays on the user's thread", async ({ page }) => {
+test("a thread's model opens a file, a diff and a pull request in its own panel; the window stays on the user's thread", async ({ page }) => {
   await openApp(page);
   await openRowThread(page, "s-2");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");

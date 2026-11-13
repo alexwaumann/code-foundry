@@ -57,25 +57,11 @@ test("a row shows its file in the tab, and @pierre/diffs draws its lines", async
 
 // Open file to the File tab: DiffView.test.tsx; Rendered ↔ Source, the meta, the wrap toggle and the remembered mode:
 // src/components/files/FileTab.test.tsx; the File and Diff entries: src/surfaces/files.test.ts. Left here: a local image decoding, and the library marking the line.
-// Shell gap: Open file in the Diff tab adds the File tab behind the diff (open_surface without focus into the focused pane leaves its active tab); the side panel showed it.
-test.fixme("Open file goes to the File tab: a markdown image decodes; Source marks the first change in the code view", async ({ page }) => {
+test("Open file goes to the File tab: a markdown image decodes; Source marks the first change in the code view", async ({ page }) => {
   await openApp(page);
   await worktreeTab(page, "s-1");
   await changeRow(page, "README.md").click();
   await diff(page).getByTestId("diff-open-file").click();
-  await expect(activeOfKind(page, "file")).toHaveCount(1);
-  await expect(file(page).getByTestId("file-markdown").getByTestId("md-local-image")).toHaveJSProperty("naturalWidth", 2);
-  await file(page).getByTestId("file-mode-source").click();
-  await expect(file(page).getByTestId("file-code").locator('[data-line="3"][data-selected-line]').first()).toBeVisible();
-});
-
-// The same File tab reached by its tab, while the gap above stands.
-test("Open file's File tab: a markdown image decodes; Source marks the first change in the code view", async ({ page }) => {
-  await openApp(page);
-  await worktreeTab(page, "s-1");
-  await changeRow(page, "README.md").click();
-  await diff(page).getByTestId("diff-open-file").click();
-  await tabs(page).filter({ hasText: "README.md" }).click();
   await expect(activeOfKind(page, "file")).toHaveCount(1);
   await expect(file(page).getByTestId("file-markdown").getByTestId("md-local-image")).toHaveJSProperty("naturalWidth", 2);
   await file(page).getByTestId("file-mode-source").click();

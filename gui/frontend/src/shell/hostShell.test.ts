@@ -10,13 +10,14 @@ vi.mock("@/api/layout", async (orig) => ({
   ...(await orig<typeof import("@/api/layout")>()),
   applyLayoutOp: (op: LayoutOpView) => {
     ops.push(op);
-    return (applyGate ?? Promise.resolve()).then(() => ({ rev: 0 }) as LayoutApplyView);
+    // An opened tab lands in p-9.
+    return (applyGate ?? Promise.resolve()).then(() => ({ rev: 0, paneId: op.op === "open_surface" ? "p-9" : "" }) as LayoutApplyView);
   },
 }));
 
 const host = await import("./host");
 const { resetLayout } = await import("@/stores/layout");
-const { resetShellView, setShellMode } = await import("@/stores/shellView");
+const { resetShellView, setShellMode, useShellViewStore } = await import("@/stores/shellView");
 const { useUiStore } = await import("@/stores/ui");
 
 // A thread's tab beside a pane of its diff and file, an unlinked diff from Projects, and another thread's MCP.
@@ -77,9 +78,51 @@ describe("the host seam in the shell", () => {
     expect(host.findTab("current", "t-f")?.params.path).toBe("/w/a.ts");
   });
 
-  it("opens a new tab through the daemon, linked to the target's thread, without focus", () => {
-    host.openTab(host.threadTarget("s-1"), host.makeTab("files", "b.ts", { path: "/w/b.ts" }));
-    expect(ops).toEqual([{ op: "open_surface", tab: { kind: "file", thread: "s-1", params: { path: "/w/b.ts" }, title: "b.ts" }, focus: false }]);
+  // The user's open (a row, a menu, a chip) is shown and takes the focus and the keyboard; a
+  // thread's call (focus: false) moves nothing: the daemon placed its tab without the focus.
+  const b = host.makeTab("files", "b.ts", { path: "/w/b.ts" });
+  const newB = (focus: boolean, behind?: string): LayoutOpView => ({ op: "open_surface", tab: { kind: "file", thread: "s-1", params: { path: "/w/b.ts" }, title: "b.ts" }, focus, ...(behind ? { behind } : {}) });
+  const cases: [string, () => void, LayoutOpView[], string][] = [
+    ["the user's new tab: opened with the focus, the keyboard into its pane", () => host.openTab(host.threadTarget("s-1"), b), [newB(true)], "p-9"],
+    ["a thread's new tab: opened without it", () => host.openTab(host.threadTarget("s-1"), b, { focus: false }), [newB(false)], ""],
+    [
+      "the user's open tab hidden in its pane: shown and focused, the keyboard into its pane",
+      () => host.openTab("current", host.makeTab("diff", "Diff", { project: "pj", worktree: "/w" })),
+      // The focus at once; the params through the tab's queue.
+      [{ op: "focus_tab", tab: "t-d" }, { op: "set_tab_params", tab: "t-d", params: { project: "pj", worktree: "/w" }, title: "Diff" }],
+      "p-2",
+    ],
+    [
+      "a thread's call on an open hidden tab: its params only",
+      () => host.openTab("current", host.makeTab("diff", "Diff", { project: "pj", worktree: "/w" }), { focus: false }),
+      [{ op: "set_tab_params", tab: "t-d", params: { project: "pj", worktree: "/w" }, title: "Diff" }],
+      "",
+    ],
+    ["the user's open of the tab already shown and focused, as it is: nothing sent, the keyboard stays", () => host.openTab("current", host.makeTab("files", "a.ts", { path: "/w/a.ts" })), [], ""],
+    ["the user's open of the tab already shown and focused, at a line: its params only, the keyboard stays", () => host.openTab("current", host.makeTab("files", "a.ts", { path: "/w/a.ts", line: "4" })), [{ op: "set_tab_params", tab: "t-f", params: { path: "/w/a.ts", line: "4" }, title: "a.ts" }], ""],
+    // `behind` (a tab the user is typing in) wins over the default: nothing takes the focus or the keyboard.
+    ["a thread's request behind the editor being typed in: opened without the focus, behind it", () => host.openTab(host.threadTarget("s-1"), b, { behind: host.tabId("files", { path: "/w/a.ts" }), focus: false }), [newB(false, "t-f")], ""],
+    ["an open behind the editor with the default focus: still without it, behind it", () => host.openTab(host.threadTarget("s-1"), b, { behind: host.tabId("files", { path: "/w/a.ts" }) }), [newB(false, "t-f")], ""],
+    [
+      "an open hidden tab behind the editor with the default focus: its params only",
+      () => host.openTab("current", host.makeTab("diff", "Diff", { project: "pj", worktree: "/w" }), { behind: "t-f" }),
+      [{ op: "set_tab_params", tab: "t-d", params: { project: "pj", worktree: "/w" }, title: "Diff" }],
+      "",
+    ],
+  ];
+  it.each(cases)("%s", async (_name, open, want, keyboard) => {
+    open();
+    await vi.waitFor(() => {
+      expect(ops).toEqual(want);
+    });
+    if (keyboard) {
+      await vi.waitFor(() => {
+        expect(useShellViewStore.getState().focusRequest.paneId).toBe(keyboard);
+      });
+    } else {
+      await new Promise((r) => setTimeout(r, 0));
+      expect(useShellViewStore.getState().focusRequest.seq).toBe(0);
+    }
   });
 
   it("an open tab takes the new params where it is, through the tab's queue; the same ones send nothing", async () => {

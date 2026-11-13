@@ -226,7 +226,7 @@ describe("a ShowView scoped to a thread", () => {
         let wrap: HTMLElement;
 
         beforeEach(async () => {
-          openTab("thread:b", a);
+          openTab("thread:b", a, { focus: false });
           await layoutSettled();
           await startEdit(aKey, { panelKey: "thread:b", tabId: a.id, base: WEB_FEAT }, { ...blankFile(A), text: "x\n" });
           wrap = document.createElement("div");

@@ -39,15 +39,16 @@ describe("openDiffInPanel", () => {
 });
 
 describe("openCheckoutDiff", () => {
-  it("opens the checkout's tab without taking focus", async () => {
+  it("opens the checkout's tab and shows it with the focus: the user asked for it", async () => {
     expect(openCheckoutDiff("current", "repo-cf", W, true)).toBe(true);
     await layoutSettled();
     const p = tabPlace(KEY);
     expect(p.shown).toBe(true);
     expect(p.tabs.map((t) => t.params)).toEqual([{ project: "repo-cf", worktree: W, own: "1" }]);
-    // The thread's pane keeps the focus.
     const s = useLayoutStore.getState();
-    expect(s.panes[s.spaces[s.currentSpaceId]?.focus ?? ""]?.active).toBe("t-s-1");
+    const shown = s.tabs[s.panes[s.spaces[s.currentSpaceId]?.focus ?? ""]?.active ?? ""];
+    expect(shown?.kind).toBe("diff");
+    expect(shown?.params).toEqual({ project: "repo-cf", worktree: W, own: "1" });
   });
 
   it("an open tab keeps what it compares and shows: coming back is not a reset", async () => {

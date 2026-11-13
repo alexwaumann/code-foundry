@@ -484,8 +484,7 @@ describe("the ⋯ menu", () => {
     expect(byTestId("pr-title").textContent).toBe('Revert "chore(gh): pace requests through one worker"');
   });
 
-  // Shell gap: the new tab opens into the focused pane with focus: false, which the daemon places behind the active tab.
-  it.skip("the revert's new pull request is shown at once", async () => {
+  it("the revert's new pull request is shown at once", async () => {
     renderPrPanel();
     await openPr(138);
     fireEvent.click(byTestId("pr-revert"));

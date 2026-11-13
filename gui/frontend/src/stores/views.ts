@@ -31,7 +31,7 @@ import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing,
 import { themeById } from "@/themes";
 import { canStepFocus, stepFocus, useFocusHistoryStore } from "./focusHistory";
 import { useLayoutStore } from "./layout";
-import { shellDrawn } from "./shellView";
+import { shellDrawn, useShellViewStore } from "./shellView";
 import { presentFullscreen } from "@/shell/fullscreen";
 
 interface ViewsState {
@@ -473,8 +473,14 @@ export function startViewSync(): () => void {
   const unsubViews = useViewsStore.subscribe((s, prev) => {
     if (prev.themesOpen && !s.themesOpen) stopEditing();
   });
+  // A terminal this window started or showed asks for the keyboard, which it cannot get under a
+  // sheet over the window: the sheet closes, as selecting something does.
+  const unsubPane = useShellViewStore.subscribe((s, prev) => {
+    if (s.overSheetsSeq !== prev.overSheetsSeq && anyViewOpen()) setPages({ settingsOpen: false, usageOpen: false, themesOpen: false });
+  });
   return () => {
     unsubUi();
     unsubViews();
+    unsubPane();
   };
 }

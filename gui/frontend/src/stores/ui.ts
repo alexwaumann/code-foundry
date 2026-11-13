@@ -160,7 +160,13 @@ interface UiState {
   openFilesPalette: (threadId: string) => void;
   /** Opens the palette on the Find dialog over every thread (search.open's presenter). */
   openSearchPalette: () => void;
-  closePalette: () => void;
+  /**
+   * Closes the palette. The keyboard goes back to the region it came from (a thread's prompt for
+   * the content), where a command run from the palette may have moved that target first.
+   * `restore` (Escape, the backdrop, the file finder's pick): back to the very element that had
+   * it, a diff, a terminal tab or the quick terminal included (takePaletteRestore).
+   */
+  closePalette: (restore?: boolean) => void;
   focusComposer: () => void;
   setRenaming: (threadId: string | null) => void;
   toggleSidebar: () => void;
@@ -227,6 +233,34 @@ export type SelectRoute = (sel: Selection, opts: SelectOptions) => boolean;
 
 let selectRoute: SelectRoute | null = null;
 
+/** The element that had the keyboard when the palette opened; null while it is closed or had none. */
+let paletteReturn: HTMLElement | null = null;
+/** The element a closed palette hands the keyboard back to, until the palette takes it (takePaletteRestore). */
+let pendingRestore: HTMLElement | null = null;
+
+/** As the palette opens (not when it switches page): where the keyboard was. */
+function noteReturn(open: boolean): void {
+  if (open) return;
+  const el = typeof document === "undefined" ? null : document.activeElement;
+  paletteReturn = el instanceof HTMLElement && el !== document.body ? el : null;
+}
+
+/**
+ * Where the user's keyboard is: the focused element, or while the palette is open the one that
+ * had it when it opened (the command context reads it: stores/context.ts).
+ */
+export function keyboardElement(): Element | null {
+  if (useUiStore.getState().palette.open) return paletteReturn;
+  return typeof document === "undefined" ? null : document.activeElement;
+}
+
+/** The element closePalette(true) hands the keyboard back to, once (the palette's close takes it). */
+export function takePaletteRestore(): HTMLElement | null {
+  const el = pendingRestore;
+  pendingRestore = null;
+  return el?.isConnected ? el : null;
+}
+
 /** Installs (or with null removes) the route select() goes through first. */
 export function setSelectRoute(route: SelectRoute | null): void {
   selectRoute = route;
@@ -287,35 +321,45 @@ export const useUiStore = create<UiState>()(
         set({ cursorKey });
       },
       openPalette: (query = "", commandName = null, context) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query, commandName, page: "commands", returnTo: s.palette.open ? s.palette.returnTo : s.focus, ...(context ? { context } : {}) } }));
       },
       openProjectPicker: (returnTo) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
       openRunInPicker: (threadId, returnTo) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "runin", threadId, returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
       openPromptsPalette: () => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "prompts", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       openFilesPalette: (threadId) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "files", threadId, returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       openSearchPalette: () => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "search", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       focusComposer: () => {
         set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));
       },
-      closePalette: () => {
+      closePalette: (restore = false) => {
         // Hand focus back to where it was before the palette opened. A command run from
         // the palette may move that target first.
+        const back = paletteReturn;
+        paletteReturn = null;
+        pendingRestore = restore && back?.isConnected ? back : null;
+        const exact = pendingRestore !== null;
         set((s) => {
           const to = s.palette.returnTo;
           return {
             palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
-            sidebarFocusSeq: to === "sidebar" ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
-            contentFocusSeq: to === "content" ? s.contentFocusSeq + 1 : s.contentFocusSeq,
+            sidebarFocusSeq: to === "sidebar" && !exact ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
+            contentFocusSeq: to === "content" && !exact ? s.contentFocusSeq + 1 : s.contentFocusSeq,
           };
         });
       },

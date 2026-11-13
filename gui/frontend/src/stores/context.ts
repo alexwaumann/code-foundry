@@ -8,7 +8,11 @@ import { useThreadsStore, type ThreadsData } from "./threads";
 import { inSidebar, type ThreadsById } from "@/lib/inSidebar";
 import { isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
-import { useUiStore, type Selection } from "./ui";
+import { PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { quickTerminalOf } from "@/shell/quickTerminal";
+import { useLayoutStore } from "./layout";
+import { useTerminalsStore } from "./terminals";
+import { keyboardElement, useUiStore, type Selection } from "./ui";
 
 /** No thread, project, worktree or terminal: HOME's context (the composer on No project). */
 export const emptyContext: UiContextView = {
@@ -38,8 +42,7 @@ export function projectContext(projectId: string): UiContextView {
  * Derives the UiContext the daemon sees from the current selection. A thread contributes
  * its place (project, worktree) and its workspace. The composer looks only at its project.
  * Actions on a worktree that is not selected (the Projects page) build their context with
- * worktreeContext / projectContext; a terminal tab's actions add their terminal
- * (shell/terminalActions.ts).
+ * worktreeContext / projectContext; the terminal the user is on is getUiContext's.
  */
 export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }): UiContextView {
   switch (sel.kind) {
@@ -78,9 +81,44 @@ export function contextKey(c: UiContextView): string {
   return [c.activeView, c.activeTerminalId, c.activeThreadId, c.activeProjectId, c.activeWorktreePath, c.activeWorkspaceId].join("\u0000");
 }
 
-/** Current context, read imperatively (keybindings, invoke): the window's selection's, or `sel`'s. */
+/**
+ * The terminal the user is on: the current space's focused tab when it shows a terminal, else
+ * the quick terminal with the keyboard (keyboardElement: while the palette is open, the one that
+ * had it when it opened). "" for none.
+ */
+export function activeTerminalId(): string {
+  const s = useLayoutStore.getState();
+  const pane = s.panes[s.spaces[s.currentSpaceId]?.focus ?? ""];
+  const tab = pane ? s.tabs[pane.active] : undefined;
+  if (tab?.kind === "terminal") return tab.params.terminal ?? "";
+  const thread = keyboardElement()?.closest("[data-quick-terminal]")?.getAttribute("data-quick-terminal") ?? "";
+  if (!thread) return "";
+  const t = useTerminalsStore.getState();
+  return quickTerminalOf(t.byId, t.order, thread)?.id ?? "";
+}
+
+/**
+ * The window's context with the terminal the user is on (activeTerminalId): terminal commands act
+ * on it. A shell of a worktree and no thread (a Projects page's) also brings its project and
+ * worktree, so cmd+t starts another shell beside it.
+ */
+function withTerminal(ctx: UiContextView): UiContextView {
+  const id = activeTerminalId();
+  if (!id) return ctx;
+  const labels = useTerminalsStore.getState().byId[id]?.labels ?? {};
+  const project = labels[PROJECT_LABEL] ?? "";
+  const worktree = labels[WORKTREE_LABEL] ?? "";
+  if (!labels[THREAD_LABEL] && project && worktree) return { ...ctx, activeTerminalId: id, activeProjectId: project, activeWorktreePath: worktree };
+  return { ...ctx, activeTerminalId: id };
+}
+
+/**
+ * Current context, read imperatively (keybindings, invoke): the window's selection's with the
+ * terminal the user is on, or an explicit selection's alone.
+ */
 export function getUiContext(sel?: Selection): UiContextView {
-  return deriveContext(sel ?? useUiStore.getState().selection, useProjectsStore.getState(), useThreadsStore.getState());
+  if (sel !== undefined) return deriveContext(sel, useProjectsStore.getState(), useThreadsStore.getState());
+  return withTerminal(deriveContext(useUiStore.getState().selection, useProjectsStore.getState(), useThreadsStore.getState()));
 }
 
 const SEP = "\u0001";

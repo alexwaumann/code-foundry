@@ -125,13 +125,15 @@ export const tabChanges = {
 /**
  * Opens a tab, or activates the open one of its identity where it is (its title and params
  * refreshed): the same kind, link and key params (shell/identity.ts), whatever else its params
- * hold. A new tab goes to the target's `group` (its pane), else where the daemon places it.
- * `behind` names a tab the user is typing in: an open tab only takes the new params, and a new
- * one waits behind that tab if it lands in its pane, so nothing moves under someone typing. It
- * does not take focus. False before the layout has loaded.
+ * hold. A new tab goes to the target's `group` (its pane), else where the daemon places it. The
+ * user asked for it: it is shown and takes the focus and the keyboard. `focus: false` is a
+ * thread's call (a view.open.* ShowView), which never moves the user's focus. `behind` names a tab
+ * the user is typing in: nothing takes the focus then, an open tab only takes the new params, and a
+ * new one waits behind that tab if it lands in its pane, so nothing moves under someone typing.
+ * False before the layout has loaded.
  */
-export function openTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: string } = {}): boolean {
-  return shellOpenTab(target, tab, opts);
+export function openTab(target: TabTarget, tab: Tab, opts: { group?: number; behind?: string; focus?: boolean } = {}): boolean {
+  return shellOpenTab(target, tab, { ...opts, focus: opts.focus ?? true });
 }
 
 /** Activates a tab where it is, focusing its pane; an unknown id changes nothing. */

@@ -13,6 +13,7 @@ import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
 import { showProjectOnProjectsPage } from "./projectsPage";
+import { followFocusTerminal } from "@/shell/terminalActions";
 
 /** How long a focusThread intent waits for its thread to arrive. */
 export const PENDING_FOCUS_MS = 10_000;
@@ -79,8 +80,8 @@ export function applyIntent(intent: UiIntentView): void {
   const ui = useUiStore.getState();
   switch (intent.kind) {
     case "focusTerminal":
-      // The layout shows the terminal (ui.focus.terminal's tab, with the focus): nothing to do
-      // here. It was the classic bottom panel's reveal.
+      // The layout shows the terminal (ui.focus.terminal's tab, with the focus); the keyboard follows it.
+      followFocusTerminal(intent.terminalId);
       break;
     case "focusThread":
       focusThread(intent.threadId, intent.explicit ?? false);

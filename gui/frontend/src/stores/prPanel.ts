@@ -124,10 +124,10 @@ export const reviewerCandidatesResource = createResource(
 /**
  * Opens a pull request in a side panel: the current selection's (a row on the Pull
  * Requests page or the worktree overview), or a thread's (view.panel.pr,
- * stores/threadPanelIntent.ts). Returns false with nothing selected.
+ * stores/threadPanelIntent.ts, with `focus: false`). Returns false with nothing selected.
  */
-export function openPullRequestInPanel(ref: PrRef, target: TabTarget = "current"): boolean {
-  return openTab(target, panelPullRequestTab(ref, target));
+export function openPullRequestInPanel(ref: PrRef, target: TabTarget = "current", opts: { focus?: boolean } = {}): boolean {
+  return openTab(target, panelPullRequestTab(ref, target), opts);
 }
 
 /** The tab to open for a pull request: the one the panel holds, so it keeps the slug it shows, else a new one. */

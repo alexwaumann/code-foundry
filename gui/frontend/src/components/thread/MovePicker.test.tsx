@@ -327,6 +327,43 @@ describe("the keyboard when the crumb's trigger unmounts", () => {
   });
 });
 
+describe("the picker across its header mounting", () => {
+  const frame = () =>
+    act(async () => {
+      await new Promise((r) => {
+        requestAnimationFrame(() => {
+          r(null);
+        });
+      });
+    });
+
+  it("asked for as the thread's tab draws, it survives the header mounting again at once", async () => {
+    useMovePickerStore.setState({ open: "s-1" });
+    const { rerender } = render(<ThreadCrumb key="first" id="s-1" />);
+    // The tab's body drawn again: the old header unmounts as the new one mounts, in one commit.
+    rerender(<ThreadCrumb key="again" id="s-1" />);
+    await frame();
+    expect(useMovePickerStore.getState().open).toBe("s-1");
+    expect(picker()).toBeTruthy();
+  });
+
+  it("a header remounting while the keyboard is nowhere (the menu that asked just went) does not ask the thread's prompt for it", () => {
+    const before = useUiStore.getState().promptFocusSeq;
+    (document.activeElement as HTMLElement | null)?.blur();
+    const { rerender } = render(<ThreadCrumb key="first" id="s-1" />);
+    rerender(<ThreadCrumb key="again" id="s-1" />);
+    expect(useUiStore.getState().promptFocusSeq).toBe(before);
+  });
+
+  it("leaving the thread (the header gone) closes it a frame later, so coming back does not reopen it", async () => {
+    useMovePickerStore.setState({ open: "s-1" });
+    const { unmount } = render(<ThreadCrumb id="s-1" />);
+    unmount();
+    await frame();
+    expect(useMovePickerStore.getState().open).toBeNull();
+  });
+});
+
 describe("openMovePicker (the menus' Move to project…, thread.move.open)", () => {
   it("selects the thread, then opens its picker; false for a thread that cannot move", async () => {
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });

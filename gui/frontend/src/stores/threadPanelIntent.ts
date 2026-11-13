@@ -28,6 +28,9 @@ import { openPullRequestInPanel } from "./prPanel";
 import { useThreadsStore } from "./threads";
 import type { Selection } from "./ui";
 
+/** A thread's call never moves the user's focus (the daemon placed the tab with KeepFocus). */
+const KEEP = { focus: false } as const;
+
 /** A ShowView's params: what an item action opens. */
 type Params = Readonly<Record<string, string>>;
 
@@ -75,12 +78,12 @@ function pickIn(key: string, id: string, file: string, oldPath: string, own: boo
   if (!open || !was) return false;
   // The file was found in the sides the tab came from, not in a commit the user was looking at.
   const back = was.commit ? { base: was.commit.base, head: was.commit.head, commit: undefined } : {};
-  return openDiffInPanel(key, { ...was, ...back, own, file, oldPath }, open.title);
+  return openDiffInPanel(key, { ...was, ...back, own, file, oldPath }, open.title, KEEP);
 }
 
 /** The item actions by ShowView name: the view.open.* verbs' (internal/command/commands_view.go). */
 const actions: Readonly<Record<string, ThreadPanelAction>> = {
-  "panel.mcp": surface(openMcpSurface),
+  "panel.mcp": surface((sel) => openMcpSurface(sel, KEEP)),
   // view.panel.file: params path (absolute), line, project and base; view.panel.page adds
   // page=1 and its title (the tab is the thread's page, surfaces/fileTarget.ts); --edit adds
   // edit=1 and thread (who asked), with note and focus when they apply.
@@ -97,7 +100,7 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     };
     const tabId = fileTab(file).id;
     const behind = p.edit === "1" && p.focus !== "1" ? editorTabInTheWay(key, tabId) : null;
-    if (!openFileInPanel(key, file, behind === null ? {} : { behind })) return false;
+    if (!openFileInPanel(key, file, behind === null ? KEEP : { behind, focus: false })) return false;
     if (p.focus === "1") focusEditorLine(fileEditKey(key, tabId), line);
     return true;
   }),
@@ -123,13 +126,13 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
     };
     const open = findTab(key, diffTab(asked).id);
     const was = open && !p.thread ? diffOfTab(open) : null;
-    if (!open || !was) return openDiffInPanel(key, asked);
-    if (!asked.file) return openDiffInPanel(key, { ...was, own: asked.own }, open.title);
+    if (!open || !was) return openDiffInPanel(key, asked, undefined, KEEP);
+    if (!asked.file) return openDiffInPanel(key, { ...was, own: asked.own }, open.title, KEEP);
     const sides = was.commit ?? was;
     if (sameSource(sides.base, asked.base) && sameSource(sides.head, asked.head)) return pickIn(key, open.id, asked.file, asked.oldPath, asked.own);
     void rowIn({ ...was, base: sides.base, head: sides.head }, asked.file).then((row) => {
       if (row) pickIn(key, open.id, row.path, row.oldPath, asked.own);
-      else openDiffInPanel(key, { ...asked, ...(sel.kind === "thread" ? { thread: sel.id } : {}) });
+      else openDiffInPanel(key, { ...asked, ...(sel.kind === "thread" ? { thread: sel.id } : {}) }, undefined, KEEP);
     });
     return true;
   }),
@@ -137,12 +140,12 @@ const actions: Readonly<Record<string, ThreadPanelAction>> = {
   "panel.pr": item((key, p) => {
     const number = positive(p.number);
     if (!p.slug?.includes("/") || number === undefined) return false;
-    return openPullRequestInPanel({ slug: p.slug, number }, key);
+    return openPullRequestInPanel({ slug: p.slug, number }, key, KEEP);
   }),
   // view.panel.gallery: params title, images (JSON), project and base. The same title is the same tab.
   "panel.gallery": item((key, p) => {
     const tab = galleryTab(p);
-    return tab !== null && openTab(key, tab);
+    return tab !== null && openTab(key, tab, KEEP);
   }),
 };
 
