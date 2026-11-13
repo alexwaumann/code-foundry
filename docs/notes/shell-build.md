@@ -81,6 +81,11 @@ their stores and their verbs are gone.
     quick terminal back after a snooze, the header over a too-narrow thread pane's composer, what a
     thread is told when it opens a surface of a closed thread and whose tab is already open, and a
     daemon without the layout service (a "dev" one) noticed by the window, with Restart Now.
+30. `shell-25a-test-feedback.md`: the owner's test feedback: thread info per thread (with
+    `thread.info` and the setting `layout.thread_info`), wider edge drop zones, the focused pane's
+    accent border, one button for the floating composer's chip, one fold rule for widths and
+    heights (a column folds whole), woken threads out of Needs you, the collapsed sidebar's control
+    after back and forward, and amber draft rows.
 
 ## Where the build departs from the plan
 
