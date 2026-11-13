@@ -322,11 +322,12 @@ test("a terminal tab drags like any tab; a press in its name field or its contex
   await expectStored("row([t-s-1,t-top] [t-term])");
   const sent = (await moves()).length;
 
-  // A right press, moved, opens the menu and drags nothing.
+  // A right press, moved, opens the menu and drags nothing. It moves away from the menu (which
+  // opens down and right of the press): a release on an item would pick it, as menus do.
   const t = centre(await tabBox(page, "t-term"));
   await page.mouse.move(t.x, t.y);
   await page.mouse.down({ button: "right" });
-  await page.mouse.move(t.x + 40, t.y + 30, { steps: 6 });
+  await page.mouse.move(t.x - 40, t.y + 30, { steps: 6 });
   await expect(page.getByTestId("shell-drag-ghost")).toHaveCount(0);
   await page.mouse.up({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
