@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock } from "./fixtures";
+import { appPath, invocations, mockPost, mockUrl, openStreams, resetMock, setZoom } from "./fixtures";
 
 /**
  * The Needs-you inbox (docs/notes/shell-17-needs-you.md), what only a browser shows: the pointer
@@ -154,6 +154,32 @@ test("the popup holds one WatchThread while open, shared with a pane showing the
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("needs-popup")).toHaveCount(0);
   await expect.poll(watches).toBe(1);
+});
+
+test("at 200% in a 1100x720 window the card stays in the window and the popup's header is never covered", async ({ page }) => {
+  await seed(pane("p-1", [threadTab("s-1")]), "p-1");
+  await openShell(page);
+  await page.setViewportSize({ width: 1100, height: 720 });
+  await setZoom(page, 200);
+  await rowEl(page, "s-ny-badge").getByTestId("thread-name").hover();
+  await expect(card(page)).toBeVisible();
+  await still(page);
+  // The room right of the sidebar is under the card's 320px minimum: it takes that room, not more.
+  const box = await card(page).boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1100);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(720);
+  // The popup: its thread's ask and composer are taller than its body; the header stays on top.
+  await rowEl(page, "s-ny-badge").getByTestId("thread-name").click();
+  await expect(page.getByTestId("needs-popup").getByTestId("thread-permission")).toBeVisible();
+  await still(page);
+  for (const id of ["needs-popup-close", "needs-popup-go"]) {
+    const on = await page.getByTestId(id).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return at !== null && el.contains(at);
+    });
+    expect(on, `${id} is under the pointer where it is drawn`).toBe(true);
+  }
 });
 
 /** SHOTS=<dir>: the hover card (a long command, a question), both popups, the top bar's control with its popover, the strip; dark and light. */

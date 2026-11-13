@@ -137,7 +137,9 @@ function PopupContent({ threadId }: { threadId: string }) {
           </DialogClose>
         </Tip>
       </div>
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Clipped: in a short window (200% zoom) the thread's dock (the ask and the composer) is
+          taller than this box and would cover the header, Go to thread and Close with it. */}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <InlineThread threadId={threadId} />
       </div>
     </DialogContent>
