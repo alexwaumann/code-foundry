@@ -132,6 +132,25 @@
     "key": "plugin:notes/board/th-1"
   },
   {"name":"plugin surface without scope","kind":"plugin.notes.board","key":"plugin:notes/board/"},
+  {
+    "name": "plugin surface of a thread, no scope: one per thread",
+    "kind": "plugin.notes.board",
+    "thread": "th-1",
+    "key": "plugin:notes/board/thread:th-1"
+  },
+  {
+    "name": "plugin surface of another thread",
+    "kind": "plugin.notes.board",
+    "thread": "th-2",
+    "key": "plugin:notes/board/thread:th-2"
+  },
+  {
+    "name": "plugin surface of a thread naming its project scope",
+    "kind": "plugin.notes.board",
+    "thread": "th-1",
+    "params": {"scope":"project:pj"},
+    "key": "plugin:notes/board/project:pj"
+  },
   {"name":"plugin kind needs plugin and surface","kind":"plugin.notes","refused":true},
   {"name":"plugin kind with empty surface","kind":"plugin.notes.","refused":true},
   {"name":"unknown kind","kind":"files","refused":true}

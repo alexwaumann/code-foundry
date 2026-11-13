@@ -920,6 +920,7 @@ export class World {
       this.logs.send(id, text, []);
     },
     registries: () => this.settings.value("plugins.registries"),
+    openTab: (tab, focus) => this.layout.apply({ op: "open_surface", tab, focus }, "", { keep_focus: !focus }).result,
   });
   /** The Skills marketplace (mock/skills.ts); the EventService skill source. */
   readonly skills = new MockSkills({

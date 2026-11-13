@@ -102,6 +102,9 @@ type Options struct {
 	// commands, host/invoke with confirm "ask", toasts); nil sends none.
 	Facts   FactSource
 	Emitter command.Emitter
+	// Tabs opens a surface for a thread as a tab of the window shell's layout (the show
+	// commands of thread and pull request surfaces); nil sends their show intent instead.
+	Tabs TabOpener
 	// Surface timing; zero values take DefaultSurfaceGrace, DefaultFirstViewTimeout,
 	// DefaultCoalesce and DefaultActTimeout (how long an act waits for the plugin).
 	SurfaceGrace, FirstViewTimeout, CoalesceInterval, ActTimeout time.Duration

@@ -126,7 +126,9 @@ export const IDENTITY_KINDS: Readonly<Record<string, IdentityKind>> = {
     key: (t) => {
       const rest = t.kind.slice("plugin.".length);
       const i = rest.indexOf(".");
-      return `plugin:${rest.slice(0, i)}/${rest.slice(i + 1)}/${t.params.scope ?? ""}`;
+      // A linked tab that names no scope is one per thread (identity.go).
+      const scope = t.params.scope || (t.thread ? `thread:${t.thread}` : "");
+      return `plugin:${rest.slice(0, i)}/${rest.slice(i + 1)}/${scope}`;
     },
   },
 };
