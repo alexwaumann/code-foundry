@@ -118,6 +118,16 @@ describe("the hover card's contents", () => {
     expect(screen.getByTestId("needs-card-body").textContent).toContain("Allow Claude to write docs/notes.md?");
   });
 
+  it("an edit or a write: Allow comes only with the change on screen, its +/− summary and the diff, as the pane's card has them", async () => {
+    const input = { file_path: `${CF}/src/app.ts`, old_string: "const a = 1;\n", new_string: "const a = 2;\nconst b = 3;\n" };
+    waiting("s-1", { ...PERM, toolName: "Edit", summary: "Edit app.ts" }, [permItem({ requestId: "req-1", toolName: "Edit", displayName: "Edit", inputJson: JSON.stringify(input) })]);
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    const diff = await screen.findByTestId("thread-permission-diff");
+    expect(diff.textContent).toContain("Hide the change+2−1");
+    expect(within(diff).getByTestId("thread-diff").querySelector("diffs-container")).not.toBeNull();
+    expect(screen.getByTestId("needs-card-allow")).toBeTruthy();
+  });
+
   it("a thread whose Watch is open: the ask from its log, nothing read", () => {
     waiting("s-1", PERM, []);
     const item = permItem({ requestId: "req-1", toolName: "Bash", displayName: "Bash", inputJson: JSON.stringify({ command: "make check" }) });
