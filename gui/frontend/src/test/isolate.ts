@@ -4,9 +4,11 @@
  * world, the stores, the fake layout), its later steps act on the next test's, and one slow test
  * under load fails dozens after it (docs/notes/shell-24b-flakes.md).
  *
- * Use this `it` in place of vitest's, register `trackTests()` at the top of the file, and await
- * `bodyDone()` first in its afterEach, before cleanup: a timed-out body then ends against its own
- * DOM and fakes. Harness steps call `throwIfTimedOut()`, so such a body ends at its next step.
+ * Use this `it` in place of vitest's and call `trackTests()` at the top of the file, before its
+ * own hooks: each test then starts only once the body before it has ended, before the file's
+ * beforeEach resets its fakes. A file whose afterEach cleans up can await `bodyDone()` first, so a
+ * timed-out body ends against its own DOM. Harness steps call `throwIfTimedOut()`, so such a body
+ * ends at its next step.
  */
 import { beforeEach, it as base, type TestContext } from "vitest";
 
@@ -34,9 +36,14 @@ it.each = <T extends unknown[]>(cases: readonly T[]) =>
     base.each<T>(cases)(name, tracked(fn), timeout);
   };
 
-/** Keeps each test's abort signal (aborted when it times out) for throwIfTimedOut. */
+/**
+ * Before each test (and the file's own beforeEach, registered after it): waits for the body
+ * before to end, then keeps the test's abort signal (aborted when it times out) for
+ * throwIfTimedOut.
+ */
 export function trackTests(): void {
-  beforeEach((ctx) => {
+  beforeEach(async (ctx) => {
+    await bodyDone();
     signal = ctx.signal;
   });
 }

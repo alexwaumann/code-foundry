@@ -92,12 +92,25 @@ afterEach(() => {
 
 describe("mutated views", () => {
   const tabs: DemoTab[] = ["overview", "form", "log", "assistant", "shell", "layout", "run-list"];
-  it("parse and render without throwing", () => {
-    let rendered = 0;
-    for (let seed = 1; seed <= 150; seed++) {
-      const tab = tabs[seed % tabs.length] ?? "overview";
-      const rand = rng(seed);
-      const json = JSON.stringify(mutate(JSON.parse(demoJson(tab)) as Json, rand));
+  const SEEDS = 150;
+  /** Seed `seed`'s demo tab and its mutated view's JSON. */
+  const mutated = (seed: number): { tab: DemoTab; json: string } => {
+    const tab = tabs[seed % tabs.length] ?? "overview";
+    return { tab, json: JSON.stringify(mutate(JSON.parse(demoJson(tab)) as Json, rng(seed))) };
+  };
+
+  it("most mutations still parse", () => {
+    let parsed = 0;
+    for (let seed = 1; seed <= SEEDS; seed++) if (parseView(mutated(seed).json)) parsed++;
+    expect(parsed).toBeGreaterThan(100);
+  });
+
+  // One test per demo tab, over that tab's seeds: run-list (a 79 KB view) alone takes 1.4 s
+  // of the 3.4 s the seeds take together, and no one test should carry all of it.
+  it.each(tabs)("%s: parse and render without throwing", (want) => {
+    for (let seed = 1; seed <= SEEDS; seed++) {
+      const { tab, json } = mutated(seed);
+      if (tab !== want) continue;
       const view = parseView(json);
       if (!view) continue;
       try {
@@ -121,8 +134,6 @@ describe("mutated views", () => {
         throw new Error(`seed ${String(seed)} (${tab}): ${String(e)}\n${json.slice(0, 2000)}`, { cause: e });
       }
       cleanup();
-      rendered++;
     }
-    expect(rendered).toBeGreaterThan(100);
-  }, 60_000); // ~1 s alone; the whole suite in parallel can take several
+  }, 60_000); // well under 2 s alone; the whole suite in parallel can take several
 });

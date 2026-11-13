@@ -1,6 +1,7 @@
 /** The table node (docs/notes/plugin-table.md): columns by width, sort acts, group collapse, the truncation tooltip, row actions and menus. */
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { it, trackTests } from "@/test/isolate";
 import type { ActRequestView, ViewNode } from "@/api/plugin";
 import type { TableData } from "@/api/pluginTable";
 import { emptyContext } from "@/stores/context";
@@ -73,6 +74,9 @@ const headers = (scope: HTMLElement) => [...scope.querySelectorAll("[data-col]")
 const actKeys = (): string[] => host.acts.map((a: ActRequestView) => a.key);
 const actPairs = (): string[] => host.acts.map((a: ActRequestView) => `${a.key} ${a.value ?? ""}`);
 const rowKeys = () => screen.queryAllByTestId("plugin-table-row").map((r) => r.dataset.key);
+
+// A test that times out under load must not run on into the next (src/test/isolate.ts).
+trackTests();
 
 beforeEach(() => {
   host.acts.length = 0;
