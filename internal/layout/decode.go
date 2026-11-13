@@ -98,6 +98,53 @@ func DecodeThreadDoc(space string, data []byte) (*ThreadState, error) {
 	return &ThreadState{Space: space, Quick: d.Quick, Remembered: d.Remembered, Last: d.Last}, nil
 }
 
+// FromNewerBuild lists what in st only a newer build writes: a node of a type this build
+// does not know, and a tab of a kind it does not know, open or remembered. Sanitize drops
+// them, since they cannot be shown; a store that finds any keeps the stored documents as they
+// are (a kind is never removed from the identity table for that reason).
+func FromNewerBuild(st *State) []string {
+	var out []string
+	var node func(sp string, n *Node)
+	node = func(sp string, n *Node) {
+		switch {
+		case n == nil:
+		case n.T == NodeSplit:
+			for _, k := range n.Kids {
+				node(sp, k)
+			}
+		case n.T == NodePane:
+			for _, tb := range n.Tabs {
+				if tb != nil {
+					if _, ok := KindOf(tb.Kind); !ok {
+						out = append(out, fmt.Sprintf("space %s: tab %s of kind %q", sp, tb.ID, tb.Kind))
+					}
+				}
+			}
+		default:
+			out = append(out, fmt.Sprintf("space %s: node %s of type %q", sp, n.ID, n.T))
+		}
+	}
+	for _, sp := range st.Spaces {
+		if sp != nil {
+			node(sp.ID, sp.Root)
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(st.Threads)) {
+		ts := st.Threads[id]
+		if ts == nil || ts.Remembered == nil {
+			continue
+		}
+		for _, rt := range ts.Remembered.Tabs {
+			if rt.Tab != nil {
+				if _, ok := KindOf(rt.Tab.Kind); !ok {
+					out = append(out, fmt.Sprintf("thread %s: remembered tab %s of kind %q", id, rt.Tab.ID, rt.Tab.Kind))
+				}
+			}
+		}
+	}
+	return out
+}
+
 // Sanitize repairs any state into normal form (Check) in place and returns what it changed.
 // It never fails: what cannot be repaired is dropped (a tab of an unknown kind, a duplicate
 // of an open surface, a node of an unknown type), a missing or repeated id is replaced, and

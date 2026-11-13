@@ -117,3 +117,29 @@ func TestLayoutDraftOps(t *testing.T) {
 		t.Errorf("discard a cleared draft: %v", err)
 	}
 }
+
+// open_thread carries a drop's place: an index in a pane's strip, and an edge (of a pane, or
+// of the whole pane area).
+func TestLayoutOpenThreadAtAPlace(t *testing.T) {
+	f, cl, _ := layoutServer(t)
+	ctx := context.Background()
+	must := func(op *v1.LayoutOp) *v1.ApplyLayoutResponse {
+		t.Helper()
+		res, err := applyLayout(ctx, cl, op)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+	pane := must(&v1.LayoutOp{Op: &v1.LayoutOp_OpenSurface{OpenSurface: &v1.OpenSurfaceOp{Tab: &v1.LayoutTab{Kind: "prs"}, Focus: true}}}).GetPaneId()
+	must(&v1.LayoutOp{Op: &v1.LayoutOp_OpenSurface{OpenSurface: &v1.OpenSurfaceOp{Tab: &v1.LayoutTab{Kind: "projects"}, PaneId: pane, Focus: true}}})
+	first := int32(0)
+	res := must(&v1.LayoutOp{Op: &v1.LayoutOp_OpenThread{OpenThread: &v1.OpenThreadOp{ThreadId: "s-1", PaneId: pane, Index: &first}}})
+	if _, p := f.Snapshot().State.FindPane(pane); p.Tabs[0].ID != res.GetTabId() {
+		t.Fatalf("index 0: %v", p.Tabs)
+	}
+	res = must(&v1.LayoutOp{Op: &v1.LayoutOp_OpenThread{OpenThread: &v1.OpenThreadOp{ThreadId: "s-2", PaneId: pane, Edge: v1.LayoutEdge_LAYOUT_EDGE_RIGHT}}})
+	if res.GetRule() != "edge" || res.GetPaneId() == pane {
+		t.Fatalf("edge: %v", res)
+	}
+}

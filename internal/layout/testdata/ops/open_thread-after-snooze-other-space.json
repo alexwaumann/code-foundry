@@ -1,0 +1,134 @@
+{
+  "doc": "A snoozed thread's terminal tab that was in another space comes back there, in its old pane, as a fresh shell; the user's space does not change.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "split",
+          "id": "s-b",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-q","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"},
+            {
+              "t": "pane",
+              "id": "p-y",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/r/a.go"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-q"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-x",
+                "kind": "terminal",
+                "params": {"terminal":"term-x"},
+                "thread": "th-a",
+                "name": "dev"
+              },
+              "pane": "p-a",
+              "index": 1,
+              "adjacent": true,
+              "fresh": {"name":"dev","ran":"make dev"}
+            },
+            {
+              "tab": {"id":"t-y","kind":"terminal","params":{"terminal":"term-y"},"thread":"th-a"},
+              "space": "sp-b",
+              "pane": "p-y",
+              "index": 1,
+              "active": true,
+              "fresh": {"ran":"tail -f log"}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"open_thread","thread":"th-a","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {
+              "id": "t-x",
+              "kind": "terminal",
+              "thread": "th-a",
+              "params": {"ran":"make dev","terminal":"term-x"},
+              "name": "dev"
+            },
+            {"id":"t-n1","kind":"thread","thread":"th-a"}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1"]
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "split",
+          "id": "s-b",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-q","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"},
+            {
+              "t": "pane",
+              "id": "p-y",
+              "tabs": [
+                {"id":"t-f","kind":"file","params":{"path":"/r/a.go"}},
+                {
+                  "id": "t-y",
+                  "kind": "terminal",
+                  "thread": "th-a",
+                  "params": {"ran":"tail -f log","terminal":"term-y"}
+                }
+              ],
+              "active": "t-y"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-q"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a"}}
+  },
+  "result": {
+    "space": "sp-a",
+    "pane": "p-a",
+    "tab": "t-n1",
+    "rule": "focused",
+    "back": ["t-x","t-y"],
+    "fresh": ["t-y","t-x"]
+  }
+}

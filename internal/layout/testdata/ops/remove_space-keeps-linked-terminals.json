@@ -1,0 +1,122 @@
+{
+  "doc": "Removing a space with its threads moved keeps their terminals: th2's open linked terminal joins its remembered set, th1's remembered running terminal stays in its set, and a linked terminal of th4 (which lives in another space) joins th4's set. Only the unlinked terminal's tab is closed.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Work",
+        "root": {
+          "t": "split",
+          "id": "s-b",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-2","kind":"thread","thread":"th2"},
+                {"id":"t-t2","kind":"terminal","params":{"terminal":"term-2"},"thread":"th2"}
+              ],
+              "active": "t-2"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {"id":"t-t3","kind":"terminal","params":{"terminal":"term-3"}},
+                {"id":"t-t4","kind":"terminal","params":{"terminal":"term-4"},"thread":"th4"}
+              ],
+              "active": "t-t3"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-2"]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-a",
+    "threads": {
+      "th1": {
+        "space": "sp-b",
+        "remembered": {
+          "pane": "p-b",
+          "tabs": [
+            {
+              "tab": {"id":"t-t1","kind":"terminal","params":{"terminal":"term-1"},"thread":"th1"},
+              "pane": "p-b",
+              "index": 1,
+              "adjacent": true
+            }
+          ]
+        }
+      },
+      "th2": {"space":"sp-b"}
+    }
+  },
+  "op": {"op":"remove_space","space":"sp-b","to":"sp-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th1": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-b",
+          "tabs": [
+            {
+              "tab": {"id":"t-t1","kind":"terminal","thread":"th1","params":{"terminal":"term-1"}},
+              "pane": "p-b",
+              "index": 1,
+              "adjacent": true
+            }
+          ]
+        }
+      },
+      "th2": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-b",
+          "tabs": [
+            {
+              "tab": {"id":"t-t2","kind":"terminal","thread":"th2","params":{"terminal":"term-2"}},
+              "pane": "p-b",
+              "index": 1,
+              "adjacent": true
+            }
+          ]
+        }
+      },
+      "th4": {
+        "space": "sp-a",
+        "remembered": {
+          "tabs": [
+            {
+              "tab": {"id":"t-t4","kind":"terminal","thread":"th4","params":{"terminal":"term-4"}},
+              "pane": "p-c",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-a","closed":["t-2","t-t3"],"kept":["t-t2","t-t4"]}
+}

@@ -1,0 +1,37 @@
+{
+  "doc": "A thread dropped on the outer edge of a space that shows only its empty composer takes the composer's place, as any open does.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-c","kind":"compose"}],"active":"t-c"},
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-a","edge":"right","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-n1","kind":"thread","thread":"th-a"}],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","closed":["t-c"],"rule":"compose"}
+}

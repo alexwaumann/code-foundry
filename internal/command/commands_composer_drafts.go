@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 )
@@ -79,17 +80,18 @@ func (l layout) composerCommands() []Command {
 		{
 			Name: "composer.draft.clear", Title: "Clear Draft", Category: layoutCategory, Page: PageState,
 			Description: "End a draft whose text was deleted: its tab is the space's empty composer again, or closes when " +
-				"the space has one already.",
+				"the space has one already. A draft is the user's: a thread cannot clear one, and a page asks the user first.",
 			Args:      []ArgSpec{draftArg()},
 			NoPalette: true, NoIndex: true, NoKeybinding: true,
-			Run: l.draftOp("cleared draft", func(a Args) core.Op { return &core.ClearDraft{Draft: a.String("draft")} }),
+			Run: l.usersDraftOp("composer.draft.clear", "Clear Draft", "Clear", "cleared draft", func(a Args) core.Op { return &core.ClearDraft{Draft: a.String("draft")} }),
 		},
 		{
 			Name: "composer.draft.discard", Title: "Discard Draft", Category: layoutCategory, Page: PageState,
-			Description: "End a draft and close its tab when it is open.",
-			Args:        []ArgSpec{draftArg()},
-			NoPalette:   true, NoIndex: true, NoKeybinding: true,
-			Run: l.draftOp("discarded draft", func(a Args) core.Op { return &core.DiscardDraft{Draft: a.String("draft")} }),
+			Description: "End a draft and close its tab when it is open; its text is gone. A draft is the user's: a thread " +
+				"cannot discard one, and a page asks the user first.",
+			Args:      []ArgSpec{draftArg()},
+			NoPalette: true, NoIndex: true, NoKeybinding: true,
+			Run: l.usersDraftOp("composer.draft.discard", "Discard Draft", "Discard", "discarded draft", func(a Args) core.Op { return &core.DiscardDraft{Draft: a.String("draft")} }),
 		},
 		{
 			Name: "composer.draft.open", Title: "Open Draft", Category: layoutCategory, Page: PageState,
@@ -117,4 +119,39 @@ func (l layout) draftOp(did string, build func(Args) core.Op) func(context.Conte
 		}
 		return layoutResult(uctx, c, did+" "+a.String("draft")), nil
 	}
+}
+
+// usersDraftOp is draftOp for a verb that ends a draft and loses its text. A draft is what the
+// user typed: a thread's model may read draft ids (layout show) but never ends one, and a
+// page's call asks the user first, showing the draft. The window's composer and sidebar row,
+// the CLI outside a thread and a plugin run it as before.
+func (l layout) usersDraftOp(name, title, label, did string, build func(Args) core.Op) func(context.Context, Context, Args) (Result, error) {
+	run := l.draftOp(did, build)
+	return func(ctx context.Context, uctx Context, a Args) (Result, error) {
+		id := a.String("draft")
+		switch {
+		case uctx.Untrusted():
+			ask := fmt.Sprintf("%s the draft %s? Its text is lost.", label, strconv.Quote(l.draftLabel(id)))
+			if err := pageAsks(ctx, uctx, name, title, label, ask); err != nil {
+				return Result{}, err
+			}
+		case !uctx.FromUser() && uctx.Origin != OriginPlugin:
+			return Result{}, Failed(fmt.Errorf("%s: draft %s is the user's: a thread does not end it (the user can, from its row in the sidebar)", name, id))
+		}
+		return run(ctx, uctx, a)
+	}
+}
+
+// draftLabel is draft id's label, else its id.
+func (l layout) draftLabel(id string) string {
+	if snap, err := l.state(); err == nil {
+		for _, sp := range snap.State.Spaces {
+			for _, d := range sp.Drafts {
+				if d.ID == id && d.Label != "" {
+					return d.Label
+				}
+			}
+		}
+	}
+	return id
 }

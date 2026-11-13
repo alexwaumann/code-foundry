@@ -102,7 +102,9 @@ keys; adding them put the guide 54 bytes over its budget).
   the fresh shells it starts itself.
 - **`remove_space` ends every terminal of the tabs it closes**, linked ones too: the threads move
   with no remembered set, so nothing could bring those tabs back. The spec names only the
-  unlinked ones; this PR's scope said linked or free.
+  unlinked ones; this PR's scope said linked or free. *Superseded*
+  (`shell-review-fixes-daemon.md`): a moved thread keeps its set, its linked tabs join it, and
+  only unlinked terminals end.
 - **An action run that exits keeps its tab** so its output can be read, as in the classic window;
   closing the tab removes it. Shells are removed on exit, so their tabs close.
 - **Unarchive joins the current space**, not the space the thread had (its record went with the

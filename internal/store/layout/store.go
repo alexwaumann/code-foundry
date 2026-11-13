@@ -58,6 +58,12 @@ type Manager struct {
 	vps Viewports
 
 	snap atomic.Pointer[Snapshot]
+
+	// newer is what in the stored layout a newer build wrote (a document of a newer version,
+	// a tab or node this build does not know). While it is set nothing is written: the
+	// layout is shown and changed as far as this build understands it, in memory only, and
+	// the tables keep the newer build's layout for when it runs again.
+	newer []string
 }
 
 var _ Store = (*Manager)(nil)
@@ -90,6 +96,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		return nil, err
 	}
 	st := got.state
+	m.newer = append(got.newer, core.FromNewerBuild(st)...)
 	repairs := append(got.repairs, core.Sanitize(st, opts.IDs)...)
 	if err := core.Check(st); err != nil {
 		// Sanitize always ends in normal form; this is a bug, never a reason not to start.
@@ -97,9 +104,13 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		st = core.NewState(opts.IDs.NewID("sp-"), FirstSpaceName)
 		repairs = append(repairs, "started over")
 	}
-	if got.fresh {
+	switch {
+	case got.fresh:
 		m.log.Info("layout: first space", "space", st.Spaces[0].ID)
-	} else if len(repairs) > 0 {
+	case len(m.newer) > 0:
+		m.log.Warn("layout: a newer build wrote the stored layout; it is shown as far as this build understands it, and no change is saved",
+			"newer", m.newer, "repairs", repairs)
+	case len(repairs) > 0:
 		m.log.Warn("layout: repaired the stored layout", "repairs", repairs)
 	}
 	m.state, m.rev, m.imported, m.windowTabs = st, got.rev, got.imported, got.windowTabs
@@ -107,7 +118,7 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 		m.windowTabs = nil
 	}
 	if got.fresh || len(repairs) > 0 {
-		if err := save(ctx, opts.DB, nil, st, m.rev, m.marks(), opts.Now()); err != nil {
+		if err := m.save(ctx, nil, st, m.rev, m.marks()); err != nil {
 			return nil, err
 		}
 	}
@@ -156,7 +167,7 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	if FocusOnly(prev, next) {
 		m.later()
 	} else {
-		if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, m.marks(), m.opts.Now()); err != nil {
+		if err := m.save(context.WithoutCancel(ctx), m.disk, next, rev, m.marks()); err != nil {
 			return Commit{}, err
 		}
 		m.disk, m.diskRev = next, rev
@@ -186,7 +197,7 @@ func (m *Manager) ImportLegacy(ctx context.Context, in core.LegacyInput, opts Ap
 	}
 	rev := m.rev + 1
 	imported := fmt.Sprintf("done:%d", m.opts.Now().UnixMilli())
-	if err := save(context.WithoutCancel(ctx), m.opts.DB, m.disk, next, rev, marks{imported: imported}, m.opts.Now()); err != nil {
+	if err := m.save(context.WithoutCancel(ctx), m.disk, next, rev, marks{imported: imported}); err != nil {
 		return ImportCommit{}, err
 	}
 	m.stopTimer()
@@ -199,14 +210,14 @@ func (m *Manager) ImportLegacy(ctx context.Context, in core.LegacyInput, opts Ap
 
 // snapshot is the state now as a Snapshot. Callers hold m.mu (or own m, in New).
 func (m *Manager) snapshot() *Snapshot {
-	return &Snapshot{Rev: m.rev, State: m.state, LegacyImported: m.imported != ""}
+	return &Snapshot{Rev: m.rev, State: m.state, LegacyImported: m.imported != "", Newer: m.newer}
 }
 
 // publish announces the commit that took prev to the state now. Callers hold m.mu.
 func (m *Manager) publish(prev *core.State, client, op string, res core.Result) {
 	d := Diff(prev, m.state)
 	d.LegacyImported = m.imported != ""
-	bus.Publish(m.opts.Bus, Event{Rev: m.rev, ClientID: client, Delta: d, Op: op, Result: res})
+	bus.Publish(m.opts.Bus, Event{Rev: m.rev, ClientID: client, Delta: d, Op: op, Result: res, State: m.state})
 }
 
 // later makes sure a write of the state is coming. Callers hold m.mu.
@@ -245,11 +256,20 @@ func (m *Manager) flush(ctx context.Context) error {
 
 // flushMarks writes the state and the import's marks. Callers hold m.mu.
 func (m *Manager) flushMarks(ctx context.Context) error {
-	if err := save(ctx, m.opts.DB, m.disk, m.state, m.rev, m.marks(), m.opts.Now()); err != nil {
+	if err := m.save(ctx, m.disk, m.state, m.rev, m.marks()); err != nil {
 		return err
 	}
 	m.disk, m.diskRev = m.state, m.rev
 	return nil
+}
+
+// save writes what changed from prev to next (db.go save), unless a newer build wrote the
+// stored layout: then nothing is written over it.
+func (m *Manager) save(ctx context.Context, prev, next *core.State, rev uint64, mk marks) error {
+	if len(m.newer) > 0 {
+		return nil
+	}
+	return save(ctx, m.opts.DB, prev, next, rev, mk, m.opts.Now())
 }
 
 // marks are the import's keys as they are now. Callers hold m.mu.

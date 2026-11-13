@@ -167,7 +167,10 @@ type Remembered struct {
 
 // RememberedTab is one remembered linked tab and where it was.
 type RememberedTab struct {
-	Tab      *Tab    `json:"tab"`
+	Tab *Tab `json:"tab"`
+	// Space is the space it was in when that is not its thread's (a snooze takes the thread's
+	// terminal tabs from every space): it goes back there. Empty: the thread's space.
+	Space    string  `json:"space,omitempty"`
 	Pane     string  `json:"pane"`
 	Index    int     `json:"index"`
 	Active   bool    `json:"active,omitempty"`

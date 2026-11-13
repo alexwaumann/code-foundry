@@ -29,7 +29,8 @@ type Result struct {
 	// what they hold (an unlinked terminal) or closes what they show (a thread).
 	Closed []*Tab `json:"closed,omitempty"`
 	// Rule says how placement chose where a tab went (place.go): "1" to "6", "pane" (the
-	// caller's pane), "focused" (the focused pane), "compose" (it replaced a composer tab).
+	// caller's pane), "focused" (the focused pane), "compose" (it replaced a composer tab),
+	// "edge" (a new pane on the edge the caller gave).
 	Rule string `json:"rule,omitempty"`
 	// Kept lists linked tabs taken out of the layout into their thread's remembered set
 	// (thread.go). Their terminals keep running.

@@ -130,7 +130,8 @@ test("a row dragged onto a pane's edge opens its thread in a new pane there", as
   await expect(page.getByTestId("shell-drop-preview")).toHaveAttribute("data-kind", "edge");
   await page.mouse.up();
   await expect.poll(async () => outline(await storedRoot())).toBe("row([s-1] [s-sb-trip])");
-  expect((await invocations()).filter((i) => i.name === "thread.open" || i.name === "tab.move").map((i) => i.name)).toEqual(["thread.open", "tab.move"]);
+  // One command, with the place: the drop cannot stop halfway (shell-review-fixes-daemon.md).
+  expect((await invocations()).filter((i) => i.name === "thread.open" || i.name === "tab.move").map((i) => i.name)).toEqual(["thread.open"]);
   await expect(page.getByTestId("shell-drag-shield")).toHaveCount(0);
 });
 

@@ -1,0 +1,50 @@
+{
+  "doc": "An archived thread opened into a pane lives in that pane's space.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {"t":"pane","id":"p-b","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"},
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-z","pane":"p-b","archived":true,"focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [{"id":"t-j","kind":"projects"},{"id":"t-n1","kind":"thread","thread":"th-z"}],
+          "active": "t-n1"
+        },
+        "focus": "p-b",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-a",
+    "threads": {"th-z":{"space":"sp-b"}}
+  },
+  "result": {"space":"sp-b","pane":"p-b","tab":"t-n1","rule":"pane"}
+}

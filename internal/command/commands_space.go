@@ -154,7 +154,7 @@ type spaceRemoval struct {
 	space   *core.Space
 	to      *core.Space // the space its threads move to; nil when they are archived
 	tabs    int
-	threads []string // the user's own threads that live in it, not archived
+	threads []string // the threads its sidebar lists (the user's, and children whose creator is gone), not archived
 }
 
 func (l layout) removal(ctx context.Context, uctx Context, a Args) (spaceRemoval, error) {
@@ -193,13 +193,20 @@ func (l layout) removal(ctx context.Context, uctx Context, a Args) (spaceRemoval
 		}
 	}
 	if l.thread != nil {
-		res, err := l.thread.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{CreatedBy: "user"}}))
+		// The space's threads as its sidebar lists them (thread.Thread.InSidebar): the user's,
+		// and a thread's child once its creator no longer exists (an archived creator does).
+		res, err := l.thread.List(ctx, connect.NewRequest(&v1.ListThreadsRequest{Filter: &v1.ThreadFilter{IncludeArchived: true}}))
 		if err != nil && connect.CodeOf(err) != connect.CodeUnimplemented {
 			return spaceRemoval{}, err
 		}
 		if err == nil {
+			exists := map[string]bool{}
 			for _, t := range res.Msg.GetThreads() {
-				if st.SpaceOf(t.GetId()) == sp.ID {
+				exists[t.GetId()] = true
+			}
+			for _, t := range res.Msg.GetThreads() {
+				inSidebar := t.GetCreatedBy() == "" || !exists[t.GetCreatedBy()]
+				if t.GetArchivedAt() == nil && inSidebar && st.SpaceOf(t.GetId()) == sp.ID {
 					rm.threads = append(rm.threads, t.GetId())
 				}
 			}

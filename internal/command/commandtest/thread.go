@@ -165,19 +165,25 @@ func (s *Thread) Fork(_ context.Context, r *connect.Request[v1.ForkThreadRequest
 	return connect.NewResponse(&v1.ForkThreadResponse{Thread: &v1.Thread{Id: "s2", ParentId: r.Msg.GetId(), Name: r.Msg.GetName()}}), nil
 }
 
-// List returns Current, if set, then Others.
+// List returns Current, if set, then Others; created_by "user" leaves out the threads a
+// thread created, as the thread store does. Other filters are not applied.
 func (s *Thread) List(_ context.Context, r *connect.Request[v1.ListThreadsRequest]) (*connect.Response[v1.ListThreadsResponse], error) {
 	if err := s.do(r.Msg); err != nil {
 		return nil, err
 	}
-	if id := r.Msg.GetFilter().GetArchiveCascadeOf(); id != "" {
+	f := r.Msg.GetFilter()
+	if id := f.GetArchiveCascadeOf(); id != "" {
 		return connect.NewResponse(&v1.ListThreadsResponse{Threads: s.Cascade[id]}), nil
 	}
 	var out []*v1.Thread
 	if s.Current != nil {
 		out = append(out, s.Current)
 	}
-	out = append(out, s.Others...)
+	for _, t := range s.Others {
+		if f.GetCreatedBy() != "user" || t.GetCreatedBy() == "" {
+			out = append(out, t)
+		}
+	}
 	res := &v1.ListThreadsResponse{Threads: out, RetiredUsage: s.RetiredUsage}
 	if r.Msg.GetFilter().GetIncludeRemoved() {
 		res.Removed = s.Removed

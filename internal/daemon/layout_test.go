@@ -40,20 +40,30 @@ const glueWT = "/tmp/wt-a"
 // with a checkout. seed runs before the glue starts (for the start sweep).
 func newGlueEnv(t *testing.T, threads []thread.Thread, seed func(e *glueEnv)) *glueEnv {
 	t.Helper()
+	return newGlueEnvWith(t, threads, seed, nil)
+}
+
+// newGlueEnvWith is newGlueEnv with the glue's options changed by opts.
+func newGlueEnvWith(t *testing.T, threads []thread.Thread, seed func(e *glueEnv), opts func(*layoutGlueOptions)) *glueEnv {
+	t.Helper()
 	b := bus.New()
 	e := &glueEnv{t: t, ctx: context.Background(), bus: b, layout: layouttest.New(b), terms: terminaltest.New(b), thrs: threads}
 	if seed != nil {
 		seed(e)
 	}
 	log := slog.New(slog.DiscardHandler)
-	stop, err := startLayoutGlue(e.ctx, layoutGlueOptions{
+	o := layoutGlueOptions{
 		Log: log, Layout: e.layout, Terminals: e.terms, Bus: b, Shell: func() []string { return []string{"zsh"} },
 		Threads: func() *thread.Snapshot {
 			e.mu.Lock()
 			defer e.mu.Unlock()
 			return &thread.Snapshot{Threads: slices.Clone(e.thrs)}
 		},
-	})
+	}
+	if opts != nil {
+		opts(&o)
+	}
+	stop, err := startLayoutGlue(e.ctx, o)
 	if err != nil {
 		t.Fatal(err)
 	}

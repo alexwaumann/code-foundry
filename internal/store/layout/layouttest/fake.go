@@ -117,7 +117,7 @@ func (f *Fake) commit(next *core.State, client, op string, res core.Result) uint
 	f.snap = &layout.Snapshot{Rev: rev, State: next, LegacyImported: f.imported}
 	d := layout.Diff(prev.State, next)
 	d.LegacyImported = f.imported
-	bus.Publish(f.bus, layout.Event{Rev: rev, ClientID: client, Delta: d, Op: op, Result: res})
+	bus.Publish(f.bus, layout.Event{Rev: rev, ClientID: client, Delta: d, Op: op, Result: res, State: next})
 	return rev
 }
 

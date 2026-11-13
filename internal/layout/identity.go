@@ -59,7 +59,9 @@ const DiffAskerParam = "thread"
 
 // kinds is the identity table (docs/notes/shell-gaps-c-identity.md). A new surface kind adds
 // an entry here, one in the GUI's registry and its size in gui/frontend/src/shell/drag/outerFrac.ts;
-// testdata/kinds.json pins that they agree.
+// testdata/kinds.json pins that they agree. A kind is never removed: a stored tab of a kind
+// this build does not know is read as a newer build's, and the store then writes nothing
+// (FromNewerBuild).
 var kinds = map[string]*Kind{
 	"thread": {
 		Link: LinkSelf, Scope: ScopeGlobal, DefaultFrac: 0.5,

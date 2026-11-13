@@ -52,7 +52,10 @@ when the first working version is whole. Nothing partial is released.
     replaced.
 - **Removing a space** always drops its tabs and panes and ends its unlinked terminals. A dialog asks
   what to do with its threads: move them to another space (they appear in that sidebar, nothing
-  opens) or archive them all. The last space cannot be removed.
+  opens) or archive them all. A moved thread is closed as closing its tab closes it: its linked tabs
+  in the space join its remembered set, its terminals keep running, and they come back, placed
+  fresh, when it is opened in its new space. Archiving them ends their terminals, as any archive
+  does. The last space cannot be removed.
 - **A pane's "+"** opens a menu of surfaces, built with the app's existing dropdown and submenu
   components. With a thread tab active it has a submenu for that thread's surfaces, then the general
   ones (new thread, terminal, Pull Requests, Projects). Without a thread it has only the general

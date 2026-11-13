@@ -30,6 +30,34 @@ describe("the mock's layout verbs", () => {
     expect(again).toMatchObject({ changed: false, tab: r.tab });
   });
 
+  it("open a dropped thread at its place in one command, as Go's thread.open does", async () => {
+    const w = world();
+    const before = w.layout.rev;
+    const strip = await w.run("thread.open", { id: "s-5", focus: "true", pane: "p-1", index: "0" });
+    expect(w.pane("p-1")?.tabs?.[0]?.id).toBe(strip.tab);
+    const edge = await w.run("thread.open", { id: "s-6", focus: "true", split: "p-2", edge: "bottom" });
+    expect(edge.pane).not.toBe("p-2");
+    expect(w.pane(edge.pane ?? "")?.tabs?.map((t) => t.id)).toEqual([edge.tab]);
+    const outer = await w.run("thread.open", { id: "s-7", focus: "true", outer: "left" });
+    const root = w.st().spaces[0]?.root;
+    expect(root?.kids?.[0]?.tabs?.map((t) => t.id)).toEqual([outer.tab]);
+    expect(w.layout.rev).toBe(before + 3);
+    await expect(w.run("thread.open", { id: "s-8", split: "p-1" })).rejects.toThrow(/--split needs --edge/);
+  });
+
+  it("open an archived thread in the current space", async () => {
+    const layout = new MockLayout({ publish: () => undefined, ids: seqIds() });
+    layout.seed("grid");
+    const cmds = layoutCommands({ layout, hasThread: () => true, isArchived: (id) => id === "s-9" });
+    const run = (name: string, args: Record<string, string>) => cmds.find((x) => x.cmd.name === name)?.run(undefined, args);
+    await run("space.new", { name: "Two" });
+    const two = layout.state().current_space;
+    expect(two).not.toBe(layout.state().default_space);
+    await run("thread.open", { id: "s-9", focus: "true" });
+    expect(layout.state().current_space).toBe(two);
+    expect(layout.state().threads?.["s-9"]?.space).toBe(two);
+  });
+
   it("default to the stored focus, as the user's call does", async () => {
     const w = world();
     expect(w.focus()).toBe("p-1");

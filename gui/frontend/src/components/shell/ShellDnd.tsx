@@ -12,7 +12,7 @@ import { fullscreenOn } from "@/shell/fullscreen";
 import { shellFrame } from "@/shell/geometry/rails";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
-import { threadDropPlan } from "@/shell/drag/threadDrop";
+import { threadDropArgs } from "@/shell/drag/threadDrop";
 import type { GeoNode } from "@/shell/geometry/types";
 import { runSpaceDrop } from "@/shell/spaceActions";
 import { spaceDropCommands } from "@/shell/spaces";
@@ -215,17 +215,10 @@ function openThreadAsTab(src: DragSource | null, spaceId: string): DragSource | 
   return tab ? { kind: "tab", tab: tab.id, pane: tab.paneId } : src;
 }
 
-/** Opens a sidebar thread where it was dropped (shell/drag/threadDrop.ts): thread.open, then the tab's move. */
+/** Opens a sidebar thread where it was dropped (shell/drag/threadDrop.ts): one thread.open with the place. */
 async function dropThread(thread: string, target: DropTarget): Promise<void> {
-  const plan = threadDropPlan(thread, target);
-  const opened = await runLayoutCommand("thread.open", plan.open);
-  if (!opened?.tab || !opened.pane) return;
-  await afterRev(opened.rev);
-  if (!plan.then || opened.rule === "compose") return;
-  const at = useLayoutStore.getState().panes[opened.pane]?.tabIds.indexOf(opened.tab) ?? -1;
-  const cmd = plan.then(opened.tab, at < 0 ? Number.MAX_SAFE_INTEGER : at);
-  const moved = await runLayoutCommand(cmd.name, cmd.args);
-  if (moved) await afterRev(moved.rev);
+  const opened = await runLayoutCommand("thread.open", threadDropArgs(thread, target));
+  if (opened) await afterRev(opened.rev);
 }
 
 /**

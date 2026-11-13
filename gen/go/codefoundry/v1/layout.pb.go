@@ -926,7 +926,10 @@ type RememberedTab struct {
 	// Where its pane sat, when the pane is to be rebuilt; unset when not stored.
 	Beside *LayoutBeside `protobuf:"bytes,6,opt,name=beside,proto3" json:"beside,omitempty"`
 	// A terminal that comes back as a fresh shell (after a snooze); unset otherwise.
-	Fresh         *FreshTerminal `protobuf:"bytes,7,opt,name=fresh,proto3" json:"fresh,omitempty"`
+	Fresh *FreshTerminal `protobuf:"bytes,7,opt,name=fresh,proto3" json:"fresh,omitempty"`
+	// The space it was in when that is not the thread's (a snooze takes the thread's terminal
+	// tabs from every space): it goes back there. Empty: the thread's space.
+	SpaceId       string `protobuf:"bytes,8,opt,name=space_id,json=spaceId,proto3" json:"space_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1008,6 +1011,13 @@ func (x *RememberedTab) GetFresh() *FreshTerminal {
 		return x.Fresh
 	}
 	return nil
+}
+
+func (x *RememberedTab) GetSpaceId() string {
+	if x != nil {
+		return x.SpaceId
+	}
+	return ""
 }
 
 type LayoutBeside struct {
@@ -2462,7 +2472,12 @@ type OpenThreadOp struct {
 	Focus  bool   `protobuf:"varint,3,opt,name=focus,proto3" json:"focus,omitempty"`
 	// The composer tab the thread was sent from: the thread's tab replaces it, and the
 	// thread lives in that composer's space.
-	ComposeTabId  string `protobuf:"bytes,4,opt,name=compose_tab_id,json=composeTabId,proto3" json:"compose_tab_id,omitempty"`
+	ComposeTabId string `protobuf:"bytes,4,opt,name=compose_tab_id,json=composeTabId,proto3" json:"compose_tab_id,omitempty"`
+	// With pane_id: its place in that pane's strip (default: after the active tab).
+	Index *int32 `protobuf:"varint,5,opt,name=index,proto3,oneof" json:"index,omitempty"`
+	// With pane_id: a new pane on this edge of that pane; without: a new pane on this edge of
+	// the space's whole pane area.
+	Edge          LayoutEdge `protobuf:"varint,6,opt,name=edge,proto3,enum=codefoundry.v1.LayoutEdge" json:"edge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2523,6 +2538,20 @@ func (x *OpenThreadOp) GetComposeTabId() string {
 		return x.ComposeTabId
 	}
 	return ""
+}
+
+func (x *OpenThreadOp) GetIndex() int32 {
+	if x != nil && x.Index != nil {
+		return *x.Index
+	}
+	return 0
+}
+
+func (x *OpenThreadOp) GetEdge() LayoutEdge {
+	if x != nil {
+		return x.Edge
+	}
+	return LayoutEdge_LAYOUT_EDGE_UNSPECIFIED
 }
 
 // CloseThreadOp closes a thread's tab and its linked tabs in its space, remembering them.
@@ -4405,7 +4434,7 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x12remembered_pane_id\x18\x05 \x01(\tR\x10rememberedPaneId\";\n" +
 	"\rQuickTerminal\x12\x12\n" +
 	"\x04open\x18\x01 \x01(\bR\x04open\x12\x16\n" +
-	"\x06height\x18\x02 \x01(\x01R\x06height\"\x8a\x02\n" +
+	"\x06height\x18\x02 \x01(\x01R\x06height\"\xa5\x02\n" +
 	"\rRememberedTab\x12+\n" +
 	"\x03tab\x18\x01 \x01(\v2\x19.codefoundry.v1.LayoutTabR\x03tab\x12\x17\n" +
 	"\apane_id\x18\x02 \x01(\tR\x06paneId\x12\x14\n" +
@@ -4413,7 +4442,8 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\x06active\x18\x04 \x01(\bR\x06active\x12\x1a\n" +
 	"\badjacent\x18\x05 \x01(\bR\badjacent\x124\n" +
 	"\x06beside\x18\x06 \x01(\v2\x1c.codefoundry.v1.LayoutBesideR\x06beside\x123\n" +
-	"\x05fresh\x18\a \x01(\v2\x1d.codefoundry.v1.FreshTerminalR\x05fresh\"\x80\x01\n" +
+	"\x05fresh\x18\a \x01(\v2\x1d.codefoundry.v1.FreshTerminalR\x05fresh\x12\x19\n" +
+	"\bspace_id\x18\b \x01(\tR\aspaceId\"\x80\x01\n" +
 	"\fLayoutBeside\x12,\n" +
 	"\x12neighbour_pane_ids\x18\x01 \x03(\tR\x10neighbourPaneIds\x12.\n" +
 	"\x04edge\x18\x02 \x01(\x0e2\x1a.codefoundry.v1.LayoutEdgeR\x04edge\x12\x12\n" +
@@ -4526,12 +4556,15 @@ const file_codefoundry_v1_layout_proto_rawDesc = "" +
 	"\tset_quick\x182 \x01(\v2\x1a.codefoundry.v1.SetQuickOpH\x00R\bsetQuick\x12N\n" +
 	"\x10replace_terminal\x183 \x01(\v2!.codefoundry.v1.ReplaceTerminalOpH\x00R\x0freplaceTerminal\x12E\n" +
 	"\rdrop_terminal\x184 \x01(\v2\x1e.codefoundry.v1.DropTerminalOpH\x00R\fdropTerminalB\x04\n" +
-	"\x02op\"\x80\x01\n" +
+	"\x02op\"\xd5\x01\n" +
 	"\fOpenThreadOp\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x17\n" +
 	"\apane_id\x18\x02 \x01(\tR\x06paneId\x12\x14\n" +
 	"\x05focus\x18\x03 \x01(\bR\x05focus\x12$\n" +
-	"\x0ecompose_tab_id\x18\x04 \x01(\tR\fcomposeTabId\",\n" +
+	"\x0ecompose_tab_id\x18\x04 \x01(\tR\fcomposeTabId\x12\x19\n" +
+	"\x05index\x18\x05 \x01(\x05H\x00R\x05index\x88\x01\x01\x12.\n" +
+	"\x04edge\x18\x06 \x01(\x0e2\x1a.codefoundry.v1.LayoutEdgeR\x04edgeB\b\n" +
+	"\x06_index\",\n" +
 	"\rCloseThreadOp\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\"\xaa\x01\n" +
 	"\rOpenSurfaceOp\x12+\n" +
@@ -4820,28 +4853,29 @@ var file_codefoundry_v1_layout_proto_depIdxs = []int32{
 	32, // 58: codefoundry.v1.LayoutOp.set_quick:type_name -> codefoundry.v1.SetQuickOp
 	33, // 59: codefoundry.v1.LayoutOp.replace_terminal:type_name -> codefoundry.v1.ReplaceTerminalOp
 	34, // 60: codefoundry.v1.LayoutOp.drop_terminal:type_name -> codefoundry.v1.DropTerminalOp
-	10, // 61: codefoundry.v1.OpenSurfaceOp.tab:type_name -> codefoundry.v1.LayoutTab
-	61, // 62: codefoundry.v1.SnoozeThreadOp.ran:type_name -> codefoundry.v1.SnoozeThreadOp.RanEntry
-	10, // 63: codefoundry.v1.AddTabOp.tab:type_name -> codefoundry.v1.LayoutTab
-	1,  // 64: codefoundry.v1.SplitPaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	10, // 65: codefoundry.v1.SplitPaneOp.tab:type_name -> codefoundry.v1.LayoutTab
-	1,  // 66: codefoundry.v1.MoveTabOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	1,  // 67: codefoundry.v1.MovePaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
-	62, // 68: codefoundry.v1.SetTabParamsOp.params:type_name -> codefoundry.v1.SetTabParamsOp.ParamsEntry
-	63, // 69: codefoundry.v1.NewThreadOp.params:type_name -> codefoundry.v1.NewThreadOp.ParamsEntry
-	2,  // 70: codefoundry.v1.LayoutService.Get:input_type -> codefoundry.v1.GetLayoutRequest
-	18, // 71: codefoundry.v1.LayoutService.Apply:input_type -> codefoundry.v1.ApplyLayoutRequest
-	20, // 72: codefoundry.v1.LayoutService.SetViewport:input_type -> codefoundry.v1.SetViewportRequest
-	22, // 73: codefoundry.v1.LayoutService.ImportLegacy:input_type -> codefoundry.v1.ImportLegacyRequest
-	3,  // 74: codefoundry.v1.LayoutService.Get:output_type -> codefoundry.v1.GetLayoutResponse
-	19, // 75: codefoundry.v1.LayoutService.Apply:output_type -> codefoundry.v1.ApplyLayoutResponse
-	21, // 76: codefoundry.v1.LayoutService.SetViewport:output_type -> codefoundry.v1.SetViewportResponse
-	23, // 77: codefoundry.v1.LayoutService.ImportLegacy:output_type -> codefoundry.v1.ImportLegacyResponse
-	74, // [74:78] is the sub-list for method output_type
-	70, // [70:74] is the sub-list for method input_type
-	70, // [70:70] is the sub-list for extension type_name
-	70, // [70:70] is the sub-list for extension extendee
-	0,  // [0:70] is the sub-list for field type_name
+	1,  // 61: codefoundry.v1.OpenThreadOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	10, // 62: codefoundry.v1.OpenSurfaceOp.tab:type_name -> codefoundry.v1.LayoutTab
+	61, // 63: codefoundry.v1.SnoozeThreadOp.ran:type_name -> codefoundry.v1.SnoozeThreadOp.RanEntry
+	10, // 64: codefoundry.v1.AddTabOp.tab:type_name -> codefoundry.v1.LayoutTab
+	1,  // 65: codefoundry.v1.SplitPaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	10, // 66: codefoundry.v1.SplitPaneOp.tab:type_name -> codefoundry.v1.LayoutTab
+	1,  // 67: codefoundry.v1.MoveTabOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	1,  // 68: codefoundry.v1.MovePaneOp.edge:type_name -> codefoundry.v1.LayoutEdge
+	62, // 69: codefoundry.v1.SetTabParamsOp.params:type_name -> codefoundry.v1.SetTabParamsOp.ParamsEntry
+	63, // 70: codefoundry.v1.NewThreadOp.params:type_name -> codefoundry.v1.NewThreadOp.ParamsEntry
+	2,  // 71: codefoundry.v1.LayoutService.Get:input_type -> codefoundry.v1.GetLayoutRequest
+	18, // 72: codefoundry.v1.LayoutService.Apply:input_type -> codefoundry.v1.ApplyLayoutRequest
+	20, // 73: codefoundry.v1.LayoutService.SetViewport:input_type -> codefoundry.v1.SetViewportRequest
+	22, // 74: codefoundry.v1.LayoutService.ImportLegacy:input_type -> codefoundry.v1.ImportLegacyRequest
+	3,  // 75: codefoundry.v1.LayoutService.Get:output_type -> codefoundry.v1.GetLayoutResponse
+	19, // 76: codefoundry.v1.LayoutService.Apply:output_type -> codefoundry.v1.ApplyLayoutResponse
+	21, // 77: codefoundry.v1.LayoutService.SetViewport:output_type -> codefoundry.v1.SetViewportResponse
+	23, // 78: codefoundry.v1.LayoutService.ImportLegacy:output_type -> codefoundry.v1.ImportLegacyResponse
+	75, // [75:79] is the sub-list for method output_type
+	71, // [71:75] is the sub-list for method input_type
+	71, // [71:71] is the sub-list for extension type_name
+	71, // [71:71] is the sub-list for extension extendee
+	0,  // [0:71] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_layout_proto_init() }
@@ -4892,6 +4926,7 @@ func file_codefoundry_v1_layout_proto_init() {
 		(*LayoutOp_ReplaceTerminal)(nil),
 		(*LayoutOp_DropTerminal)(nil),
 	}
+	file_codefoundry_v1_layout_proto_msgTypes[24].OneofWrappers = []any{}
 	file_codefoundry_v1_layout_proto_msgTypes[33].OneofWrappers = []any{}
 	file_codefoundry_v1_layout_proto_msgTypes[35].OneofWrappers = []any{}
 	file_codefoundry_v1_layout_proto_msgTypes[37].OneofWrappers = []any{}
