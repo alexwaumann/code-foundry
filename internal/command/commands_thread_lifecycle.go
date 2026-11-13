@@ -288,17 +288,18 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 				}
 				focusCreated(e, a, s)
 				msg := createdMessage(req, res.Msg, r.projectNamer(ctx))
-				if err := o.sentFrom(ctx, c, a.String("compose"), s.GetId()); err != nil {
-					return Result{}, fmt.Errorf("%s, but its tab could not take the composer's place: %w", msg, err)
+				// Collision hints, never a refusal: printed on stderr.
+				warnings := res.Msg.GetHints()
+				if w := o.sentFrom(ctx, c, a.String("compose"), s.GetId()); w != "" {
+					warnings = append(warnings, "thread "+s.GetId()+" was made, but "+w)
 				}
 				if req.GetNotify() {
 					msg += "; " + notifyLine(req)
 				}
-				// Collision hints, never a refusal: printed on stderr.
-				return Result{Message: msg, JSON: s, Warnings: res.Msg.GetHints()}, nil
+				return Result{Message: msg, JSON: s, Warnings: warnings}, nil
 			},
 		},
-		threadNewLike(r, b, e),
+		threadNewLike(r, b, e, o),
 		Command{
 			Name:         "thread.focus",
 			Page:         PageState,
