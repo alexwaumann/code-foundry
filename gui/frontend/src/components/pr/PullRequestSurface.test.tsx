@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { toast } from "sonner";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { bodyDone, it, trackTests } from "@/test/isolate";
 import type { Selection } from "@/stores/ui";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -35,13 +36,17 @@ const { PREPARING_TOAST_DELAY_MS } = await import("@/stores/prThreads");
 
 let world: ReturnType<typeof seedPrWorld>;
 
+trackTests();
+
 beforeEach(async () => {
   resetDaemon();
   world = seedPrWorld();
   await resetPrStores();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // A body that timed out ends first, against its own world (src/test/isolate.ts).
+  await bodyDone();
   act(() => {
     toast.dismiss();
   });
@@ -893,9 +898,9 @@ describe("the merge button", () => {
     await expectToast("deleted origin/feat/sidebar");
   });
 
-  it("draft, read-only and merged pull requests; a method from the menu becomes the default; unchecking the branch, declining, a spinner, a refusal", async () => {
+  // Four cases that were one test: each opens only what it needs, so none nears the timeout under load.
+  it("#145 (draft): disabled with the reason; a click sends nothing; the menu says why and offers nothing", async () => {
     renderPrPanel();
-    // #145 is a draft: disabled with the reason; a click sends nothing; the menu says why and offers nothing.
     await openPr(145);
     expect(button().getAttribute("aria-disabled")).toBe("true");
     // Visibly disabled, both parts (the app's disabled opacity), never like Review beside it.
@@ -909,17 +914,21 @@ describe("the merge button", () => {
     press(chevron());
     expect(texts("pr-merge-note")).toEqual(["Draft pull requests cannot be merged"]);
     expect(byTestId("pr-merge-method-squash").hasAttribute("data-disabled")).toBe(true);
-    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
-    // #138 is merged: no button.
+    expect(merges()).toEqual([]);
+  });
+
+  it("#138 (merged) has no merge button; #140 (read access) no merge controls at all", async () => {
+    renderPrPanel();
     await openPr(138);
     expect(byTestId("pr-state").textContent).toBe("Merged");
     expect(queryTestId("pr-merge-button")).toBeNull();
-    // #140: read access only: no merge controls at all.
     await openPr(140);
     expect(queryTestId("pr-merge-button")).toBeNull();
     expect(queryTestId("pr-auto-merge-button")).toBeNull();
+  });
 
-    // #142: keep the branch, then decline: nothing is sent.
+  it("#142: unchecking the branch and a method from the menu, then declining, sends nothing; the button is idle and its default unchanged", async () => {
+    renderPrPanel();
     await openPr(142);
     expect(byTestId("pr-merge-button-split").dataset.blocked).toBeUndefined();
     for (const part of [button(), chevron()]) expect(part.classList.contains("opacity-50")).toBe(false);
@@ -938,12 +947,18 @@ describe("the merge button", () => {
     expect(queryTestId("pr-merge-button-menu")).toBeNull();
     expect(button().textContent).toBe("Squash and merge");
     expect(merges().filter(([, confirmed]) => confirmed)).toEqual([]);
+    // The branch stays unchecked for the next merge of this pull request.
+    press(chevron());
+    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
+  });
 
-    // GitHub refuses (the head moved): toasted, still open, the button usable again.
+  it("#142: GitHub refuses (the head moved): a spinner while it runs, then toasted, still open, the button usable again and its default unchanged", async () => {
+    renderPrPanel();
+    await openPr(142);
     world.failNext.add("pr.merge");
     const release = world.hold("pr.merge");
     press(chevron());
-    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(byTestId("pr-merge-delete-branch"));
     await pick(byTestId("pr-merge-method-rebase"));
     fireEvent.click(byTestId("confirm-ok"));
     await settle();

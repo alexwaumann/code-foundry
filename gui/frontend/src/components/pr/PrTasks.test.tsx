@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { toast } from "sonner";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { bodyDone, it, trackTests } from "@/test/isolate";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
@@ -24,13 +25,17 @@ const { useUiStore } = await import("@/stores/ui");
 
 let world: ReturnType<typeof seedPrWorld>;
 
+trackTests();
+
 beforeEach(() => {
   resetDaemon();
   world = seedPrWorld();
   usePrTasksStore.setState({ running: {} });
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // A body that timed out ends first, against its own world (src/test/isolate.ts).
+  await bodyDone();
   act(() => {
     toast.dismiss();
   });

@@ -25,6 +25,7 @@ import { useReviewerRecentsStore } from "@/stores/reviewerRecents";
 import { useUiStore, type Selection } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
 import { layoutSettled, resetFakeLayout, threadSeed, type FakeLayoutState } from "./fakeLayout";
+import { throwIfTimedOut } from "./isolate";
 import { PR_COMMANDS, SLUG } from "./prWorld";
 import { layoutTabs } from "./layoutTabs";
 import { ShellPanes } from "./shellPanes";
@@ -64,13 +65,15 @@ export function renderPrPanel() {
   );
 }
 
-/** Lets reads land and a picked menu item run. */
+/** Lets reads land and a picked menu item run. A test that timed out stops here (src/test/isolate.ts). */
 export async function settle(times = 2): Promise<void> {
   for (let i = 0; i < times; i++) {
+    throwIfTimedOut();
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
   }
+  throwIfTimedOut();
 }
 
 /** The open pull request tab for this pull request in the current space, if any. */
@@ -85,6 +88,7 @@ function layoutPrTab(number: number, slug: string): string | undefined {
  * clicked, as the user would.
  */
 export async function openPr(number: number, slug = SLUG): Promise<void> {
+  throwIfTimedOut();
   await act(async () => {
     openPullRequestInPanel({ slug, number });
     await layoutSettled();
