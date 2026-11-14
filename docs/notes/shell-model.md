@@ -22,11 +22,24 @@ when the first working version is whole. Nothing partial is released.
 - **Top bar**, always visible, laid out on its own (no alignment to the sidebar): app name, sidebar
   toggle, back and forward, then the space tabs, then "+". A space tab shows a small icon drawn from
   that space's real pane layout, its name, and a count when threads in it need the user. Nothing
-  between the sidebar toggle and back and forward comes and goes: they never move.
+  between the sidebar toggle and back and forward comes and goes: they never move. In the icon a
+  pane the user collapsed is a thin bar along its place (a rail's share of the icon), and the
+  panes beside it take its room, as in the grid.
 - **A space** owns a pane layout and a thread list. A thread lives in exactly one space. Archived
   threads are shared by all spaces.
 - **Panes** tile the whole content area: no operation leaves a gap. The layout is one tree of
   proportions; resizing the window only scales it, and there are no per-display snapshots.
+- **Dividers.** The gap between two panes (or two columns or rows) is a divider: dragging it moves
+  room from one side to the other, and the arrow keys move it when it has the keyboard. It stops
+  when the side being shrunk reaches its minimum (each pane in it held at its kind's minimum, a
+  folded pane at a rail's thickness); it never folds or collapses a pane. A drag starts from what
+  is drawn, not from the stored proportions (a pane held at its minimum is drawn wider than its
+  share): the divider does not jump when it is grabbed, and when it is let go the split's open
+  sides keep the proportions they were drawn at (a side that is all folded keeps its stored one).
+  The cursor says how it can move: the resize cursor when it can go both ways, the one-way resize
+  cursor (pointing the way it can still go) when one side is at its minimum, and `not-allowed`
+  when it cannot move at all (both sides at their minimums, or a side that is all rails, folded or
+  collapsed); then a drag does nothing and the divider shows no handle.
 - **Any surface can be a tab in any pane.** Tabs drag to reorder, to another strip, or to a pane's
   edge to split. A whole pane drags by its strip: onto an edge, onto another strip to merge, onto the
   outer edge of the grid, or onto a space tab. Any tab is draggable, active or not. Over a pane's
@@ -125,10 +138,11 @@ when the first working version is whole. Nothing partial is released.
     icons, mark the selected one and carry the attention dot; a click on an icon unfolds the pane on
     that tab. A column is narrower only when every pane in it folds, and a row is shorter only when
     every pane in it folds.
-  - **Which fold, in what order.** Panes without a thread tab first, then panes with one; within
-    each, the least recently focused first (never focused before any that was, and among equals the
-    later in layout order). The focused pane and the pane holding the focused tab's thread's tab
-    never fold.
+  - **Which fold, in what order.** A pane the user collapsed is always folded and is not in this
+    order (see "Collapsing a pane"). The others: panes without a thread tab first, then panes with
+    one; within each, the least recently focused first (never focused before any that was, and
+    among equals the later in layout order). The focused pane and the pane holding the focused
+    tab's thread's tab never fold on their own.
   - **How far.** Panes fold in that order until every open pane keeps its minimum. A fold counts even
     when it does not help on its own (the first pane of a column folds before the column can narrow).
     Then the folded panes, the last folded first, unfold again wherever the rest still keep their
@@ -142,9 +156,47 @@ when the first working version is whole. Nothing partial is released.
     folding the thread's pane as well would hide the one the user asked to keep; at the window's
     minimum size with the default sidebar the shortfall is small (a thread and a diff beside one
     folded column: about 6%).
-  Rails unfold when there is room. The stored layout does not change. A thread's pane left narrower
+  Rails unfold when there is room (never one the user collapsed). The stored layout does not change. A thread's pane left narrower
   than a thread's minimum keeps its header on top: what does not fit under it (the composer too) is
   cut, never drawn over it.
+- **Collapsing a pane.** The user can fold any pane on demand, to hide it and give its room to the
+  others, in a row or a column: cmd+shift+m (`pane.collapse`) toggles the focused pane, the
+  collapse button in the pane's strip (beside full screen) collapses it, and the same verb with a
+  pane id works from the palette and the CLI.
+  - **It is the user's.** The daemon's layout keeps the choice per pane, so it survives a restart,
+    and the pane stays collapsed until the user opens it again. It looks and behaves as a fold of
+    "Small windows": a rail in a row, a strip in a column, by the same rule (a column narrows only
+    when every pane in it is folded, a row gets shorter only when every pane in it is folded), with
+    the tabs' icons, the selected one marked and the attention dots; its expand button sits where a
+    rail has full screen, beside it. The room it frees goes to its neighbours by the stored
+    proportions, which do not change: opening it again gives every pane its old size. Automatic
+    folding goes on for the other panes; a collapsed pane is never one that unfolds.
+  - **The last open pane** of a space cannot be collapsed: the verb refuses and says why, and the
+    button is disabled with the reason in its tooltip. The layout keeps it so: when the last open
+    pane goes (closed or moved away), the pane that takes the focus opens.
+  - **Focus.** Collapsing the focused pane hands the focus on as closing a pane does: to the most
+    recently focused pane that is open. The focus may still rest on a collapsed pane: the direction
+    keys reach it as they reach a rail (as drawn), and focus it without opening it, so the next key
+    goes on from it; with shift they swap it with its neighbour, still collapsed. While it has the
+    focus its border is the focused one and the keyboard is on its selected icon; cmd+shift+m or a
+    click on an icon opens it.
+  - **Opening it.** A click on one of its icons opens it on that tab; cmd+shift+m while it has the
+    focus; its expand button; `pane.collapse --off` from the CLI. Opening from the user takes the
+    focus; from a thread's model it does not.
+  - **What opens it by itself.** An action that gives one of its tabs the user's focus opens it:
+    a sidebar click on a thread whose tab it holds, an "already open" surface focused there,
+    cmd+shift+t reopening into it, a tab or pane dropped into it. The direction keys and full screen do not. An action that does not take the user's focus (a
+    thread's model opening a tab there, smart swap) leaves it collapsed: the tab becomes its
+    selected one, and the icon carries the attention dot as on any rail.
+  - **Full screen** from its rail shows the pane over the whole area; leaving full screen leaves
+    it collapsed again (full screen never changes the stored choice).
+  - **Drops.** A collapsed pane is one target as a whole, as a rail is: a tab or pane dropped on it
+    joins it and opens it, and the highlight is the rectangle the pane is drawn at once it is
+    open. A drop beside it or on the grid's outer edge leaves it collapsed.
+  - **What keeps it.** The choice is the pane's and goes where the pane goes: closing a thread
+    whose linked tabs it held (while the pane keeps a tab), smart swap, a pane moved by direction
+    key or drag, a pane moved to another space (where it opens if it is the space's only pane). A
+    pane that comes back from cmd+shift+t comes back open.
 - **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus
   and move keys do nothing while it is on. Escape leaves it from anywhere but a terminal (the shell's own Escape;
   cmd+shift+enter leaves from there), a menu or dialog, and a prompt that has a use for the key: an
@@ -282,6 +334,7 @@ when the first working version is whole. Nothing partial is released.
 | ctrl+cmd+1…9 | Switch to that space |
 | cmd+1…9 | Jump to that thread of the list, as today |
 | cmd+shift+enter | Full screen the pane; escape leaves |
+| cmd+shift+m | Collapse the focused pane to a rail, or open it again when it is collapsed |
 | cmd+shift+a | The popup of the next thread that needs the user |
 | cmd+r | Rename the focused tab, where it can be renamed |
 | cmd+shift+r | Automatic name: a thread's is generated again, a terminal goes back to its automatic name |
@@ -291,7 +344,8 @@ The direction keys go to a pane that touches that side of the focused pane, as d
 included). Of several, the one focused most recently wins (the pane the last direction key left
 counts as such, so a key and its opposite come back), then the one sharing the longest stretch of
 edge, then the upper (left and right) or the left (up and down). A direction key pressed while a
-pane move is on its way to the daemon waits for it to land.
+pane move is on its way to the daemon waits for it to land. A pane the user collapsed is reached
+and focused like a rail but stays collapsed ("Collapsing a pane").
 
 The free terminal in the home directory keeps its command (palette: New Terminal in Home Folder)
 without a key of its own.
