@@ -124,13 +124,28 @@ describe("runCommand toasts", () => {
     notify.mockReset();
   });
 
-  it("toasts a command's result message and its failure", async () => {
+  it("toasts a command's result message (what happened, as the title) and its failure", async () => {
     invokeCommand.mockResolvedValueOnce({ message: "renamed the thread", resultJson: "" });
     expect(await runCommand("thread.rename", {}, ctx)).toBe(true);
-    expect(notify).toHaveBeenCalledWith({ level: "success", title: "thread.rename", description: "renamed the thread" });
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Renamed the thread" });
     invokeCommand.mockRejectedValueOnce(new Error("no such thread"));
     expect(await runCommand("thread.rename", {}, ctx)).toBe(false);
     expect(notify).toHaveBeenCalledWith({ level: "error", title: "thread.rename failed", description: "no such thread" });
+  });
+
+  it("run from a control that shows the result (inView): no success toast, a failure still toasts", async () => {
+    invokeCommand.mockResolvedValueOnce({ message: "renamed the thread", resultJson: "" });
+    expect(await runCommand("thread.rename", {}, ctx, { inView: true })).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
+    invokeCommand.mockRejectedValueOnce(new Error("no such thread"));
+    expect(await runCommand("thread.rename", {}, ctx, { inView: true })).toBe(false);
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "thread.rename failed", description: "no such thread" });
+  });
+
+  it.each(["worktree.reveal", "worktree.open.editor", "view.open.url", "terminal.new", "thread.interrupt"])("%s shows itself: no success toast from anywhere", async (name) => {
+    invokeCommand.mockResolvedValueOnce({ message: "revealed /w/a", resultJson: "" });
+    expect(await runCommand(name, {}, ctx)).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("leaves a git op's result and failure to the op's own toast (stores/gitops.tsx)", async () => {
@@ -139,6 +154,20 @@ describe("runCommand toasts", () => {
     invokeCommand.mockRejectedValueOnce(gitOpFailure);
     expect(await runCommand("git.push", {}, ctx)).toBe(false);
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("commandSuccessNotice", () => {
+  it.each([
+    // [what, message, want]
+    ["a short message is the title, its first letter raised", "approved #5", { title: "Approved #5" }],
+    ["a full stop goes", "Forgot 2 preferences.", { title: "Forgot 2 preferences" }],
+    ["one already capitalised stays", "Requested a review from ana on #5", { title: "Requested a review from ana on #5" }],
+    ["a long one goes under the command's title", `thread ${"x".repeat(70)} runs in /w/a`, { title: "Set Model", description: `thread ${"x".repeat(70)} runs in /w/a` }],
+    ["more than one line goes under the command's title", "line one\nline two", { title: "Set Model", description: "line one\nline two" }],
+  ])("%s", async (_what, message, want) => {
+    const { commandSuccessNotice } = await import("./commands");
+    expect(commandSuccessNotice("Set Model", message)).toEqual(want);
   });
 });
 

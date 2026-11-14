@@ -143,24 +143,67 @@ export async function invokeConfirmed(
 }
 
 /**
- * Invokes a command with the current context; reports the result as a toast. A command
- * the daemon wants confirmed (ConfirmationRequired) opens the confirm dialog and runs
- * again with confirmed set if the user agrees; declining returns false quietly.
+ * Commands whose success shows by itself wherever they are run from, so they never toast
+ * it: another app or window comes forward (Finder, the editor, the browser), a terminal tab
+ * opens, the thread stops. The CLI still prints the message. docs/notes/toast-success-rule.md.
  */
-export async function runCommand(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): Promise<boolean> {
-  return (await runCommandForResult(name, args, { ctx })) !== null;
+const SHOWS_ITSELF: ReadonlySet<string> = new Set([
+  "terminal.new",
+  "thread.interrupt",
+  "worktree.reveal",
+  "workspace.reveal",
+  "settings.reveal",
+  "worktree.open.editor",
+  "workspace.open.editor",
+  "view.open.url",
+]);
+
+/** Longest daemon message that is the success toast's title by itself (one line, it says what happened). */
+const TITLE_MAX = 64;
+
+/**
+ * The success toast for a command's message: a short one-line message is what happened, so
+ * it is the title ("Requested a review from ana on #5"), its first letter raised (daemon
+ * messages are CLI sentences, often lower case, some with a full stop); a longer one goes
+ * under the command's title.
+ */
+export function commandSuccessNotice(title: string, message: string): { title: string; description?: string } {
+  const line = message.trim().replace(/\.$/, "");
+  if (line !== "" && !line.includes("\n") && line.length <= TITLE_MAX) return { title: line.charAt(0).toUpperCase() + line.slice(1) };
+  return { title, description: message };
+}
+
+/** Where a command was run from, for its success toast (docs/notes/toast-success-rule.md). */
+export interface CommandSource {
+  /**
+   * Run from a control that stays on screen and shows the result itself (an inline rename,
+   * a switch, a button whose row changes): no success toast. Left out (a menu, the
+   * palette, a keybinding, a dialog that closes elsewhere), the success is toasted.
+   */
+  inView?: boolean;
+}
+
+/**
+ * Invokes a command with the current context; reports a failure as a toast, and a success
+ * unless `source` says the screen shows it. A command the daemon wants confirmed
+ * (ConfirmationRequired) opens the confirm dialog and runs again with confirmed set if the
+ * user agrees; declining returns false quietly.
+ */
+export async function runCommand(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext(), source: CommandSource = {}): Promise<boolean> {
+  return (await runCommandForResult(name, args, { ctx, ...source })) !== null;
 }
 
 /**
  * runCommand that hands back the command's result (null when it failed or the user
  * declined). `quiet` skips the success toast, for callers that report the result their
- * own way; failures are toasted, after `onError` (for callers that also show the failure
- * in place), unless `expected` says the failure is one the caller handles itself.
+ * own way, and so does `inView` (CommandSource); failures are toasted, after `onError` (for
+ * callers that also show the failure in place), unless `expected` says the failure is one
+ * the caller handles itself.
  */
 export async function runCommandForResult(
   name: string,
   args: Record<string, string> = {},
-  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void; expected?: (err: unknown) => boolean; caller?: string } = {},
+  opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void; expected?: (err: unknown) => boolean; caller?: string } & CommandSource = {},
 ): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
@@ -171,7 +214,8 @@ export async function runCommandForResult(
     const res = await invokeConfirmed(name, args, ctx, opts.caller);
     if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
-    if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) notify({ level: "success", title, description: res.message });
+    const silent = opts.quiet || opts.inView || SHOWS_ITSELF.has(name);
+    if (!silent && res.message && !isGitOpResult(res.resultJson)) notify({ level: "success", ...commandSuccessNotice(title, res.message) });
     return res;
   } catch (err) {
     opts.onError?.(errorMessage(err));
