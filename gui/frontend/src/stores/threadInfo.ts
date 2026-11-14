@@ -4,7 +4,7 @@
  * pick for the thread, and the card's own sends. Everything it runs is a registry command
  * (thread.send, worktree.reveal, worktree.open.editor, …) or an existing store action.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -140,7 +140,7 @@ export async function sendThreadPrompt(threadId: string, text: string): Promise<
   try {
     return await deliverThreadPrompt(threadId, text);
   } catch (err) {
-    toast.error("Send failed", { description: sendErrorMessage(err) });
+    notify({ level: "error", title: "Send failed", description: sendErrorMessage(err) });
     return false;
   }
 }
@@ -175,9 +175,9 @@ export async function runCardAction(actionId: string, threadId: string): Promise
 export async function copyBranchName(branch: string): Promise<void> {
   try {
     await copyText(branch);
-    toast.success("Branch copied", { description: branch });
+    notify({ level: "success", title: "Branch copied", description: branch });
   } catch {
-    toast.error("Copy failed");
+    notify({ level: "error", title: "Copy failed" });
   }
 }
 

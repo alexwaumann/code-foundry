@@ -1,12 +1,12 @@
 import { Code, ConnectError } from "@connectrpc/connect";
-import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishedTheme } from "@/api/ui";
 import { useHealthStore } from "@/stores/health";
 import { DEFAULT_DARK, DEFAULT_LIGHT } from "@/themes";
 import { onThemePublished, resetPublishFailureForTest, setThemePreference, setThemeSlots, startThemePublish, themeFrameMessage } from "./theme";
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+const notify = vi.hoisted(() => vi.fn<(n: { level: string; title: string; description?: unknown }) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 let stop: () => void = () => {};
 
@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   setThemePreference("dark");
   resetPublishFailureForTest();
-  vi.mocked(toast.error).mockClear();
+  notify.mockClear();
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
@@ -133,9 +133,9 @@ describe("startThemePublish", () => {
     expect(publish).toHaveBeenCalledTimes(2);
     expect(console.warn).toHaveBeenCalledTimes(2);
     expect(console.warn).toHaveBeenCalledWith("theme publish", err);
-    expect(toast.error).toHaveBeenCalledTimes(toasts);
-    if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[0]).toBe("Theme could not be published to pages");
-    if (toasts) expect(vi.mocked(toast.error).mock.calls[0]?.[1]?.description).toContain("missing 1 of the 103 slots: --cf-text");
+    expect(notify).toHaveBeenCalledTimes(toasts);
+    if (toasts) expect(notify.mock.calls[0]?.[0]).toMatchObject({ level: "error", title: "Theme could not be published to pages" });
+    if (toasts) expect(notify.mock.calls[0]?.[0].description).toContain("missing 1 of the 103 slots: --cf-text");
   });
 
   it("stops publishing once stopped", () => {

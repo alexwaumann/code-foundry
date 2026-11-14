@@ -18,7 +18,7 @@ describe("@cf/ui (/cf/ui.js, docs/notes/page-library.md)", () => {
     }
   });
 
-  it("adds cn and sonner's toast", () => {
+  it("has cn, and sonner's toast (from components/ui/sonner)", () => {
     expect(typeof ui.cn).toBe("function");
     expect(ui.cn("text-caption", "text-cf-text")).toBe("text-caption text-cf-text");
     expect(typeof ui.toast).toBe("function");

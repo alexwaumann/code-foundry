@@ -5,7 +5,7 @@
  * See docs/notes/shell-15-spaces.md.
  */
 import { guardRemoveSpaceArchive } from "@/stores/fileEditGuards";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
 import { invokeConfirmed } from "@/stores/commands";
 import { getUiContext } from "@/stores/context";
@@ -75,7 +75,7 @@ export async function removeSpace(id: string, choice: RemoveChoice): Promise<boo
     const res = await invokeConfirmed("space.remove", removeSpaceArgs(id, choice), getUiContext(), undefined, { ask: () => Promise.resolve(true) });
     return res !== null;
   } catch (err) {
-    toast.error("Remove Space failed", { description: errorMessage(err) });
+    notify({ level: "error", title: "Remove Space failed", description: errorMessage(err) });
     return false;
   }
 }

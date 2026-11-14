@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { confirmationOf, confirmButtonLabel, invokeCommand, listCommands, type CommandView, type InvokeResultView, type UiContextView } from "@/api/command";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
@@ -171,11 +171,11 @@ export async function runCommandForResult(
     const res = await invokeConfirmed(name, args, ctx, opts.caller);
     if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
-    if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
+    if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) notify({ level: "success", title, description: res.message });
     return res;
   } catch (err) {
     opts.onError?.(errorMessage(err));
-    if (!isGitOpFailure(err) && !opts.expected?.(err)) toast.error(`${title} failed`, { description: errorMessage(err) });
+    if (!isGitOpFailure(err) && !opts.expected?.(err)) notify({ level: "error", title: `${title} failed`, description: errorMessage(err) });
     return null;
   } finally {
     void refreshCommands();

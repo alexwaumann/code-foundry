@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BASE_FROM_ORIGIN_KEY, draftKey, WORK_IN_SETTING_KEY } from "@/lib/compose";
 import { composeIn, composeInWorkspace, composeTarget, updateDraft, useComposeStore } from "@/stores/compose";
@@ -142,7 +143,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  toast.dismiss();
+  dismissNotice();
   cleanup();
 });
 

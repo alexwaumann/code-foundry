@@ -4,7 +4,7 @@
  * page's source and Enter. The composers' registry and composer.history's presentation
  * are stores/historyComposers.ts.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import type { PromptScopeView, SentPromptView } from "@/api/thread";
 import { newCitationId } from "@/lib/citation";
 import { copyText } from "@/lib/clipboard";
@@ -33,9 +33,9 @@ export function insertPrompt(draftKey: string, p: SentPromptView): void {
 export async function copyPrompt(p: SentPromptView): Promise<void> {
   try {
     await copyText(p.text);
-    toast.success("Prompt copied");
+    notify({ level: "success", title: "Prompt copied" });
   } catch {
-    toast.error("Copy failed");
+    notify({ level: "error", title: "Copy failed" });
   }
 }
 

@@ -15,7 +15,7 @@ vi.mock("@/api/command", async (orig) => ({
   invokeCommand,
   confirmationOf: (err: unknown) => (err instanceof NeedsConfirm ? err.confirm : null),
 }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }) }));
+vi.mock("@/lib/notify", () => ({ notify: vi.fn(), notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { CONFIRM_ARM_MS, ConfirmDialog } = await import("./ConfirmDialog");
 const { runCommand } = await import("@/stores/commands");

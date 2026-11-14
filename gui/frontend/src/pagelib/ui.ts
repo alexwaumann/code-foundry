@@ -1,8 +1,9 @@
 /**
  * /cf/ui.js (`@cf/ui`, docs/notes/page-library.md): every component in components/ui as the
- * app has it, plus cn and sonner's toast (the Toaster's other half). ui.test.ts fails when a
- * component file is missing here; the pages skill's reference/components.md names every
- * export (internal/skills/pages_test.go, against dist/ui-exports.json).
+ * app has it (components/ui/sonner.tsx brings sonner's toast, the Toaster's other half), plus
+ * cn. ui.test.ts fails when a component file is missing here; the pages skill's
+ * reference/components.md names every export (internal/skills/pages_test.go, against
+ * dist/ui-exports.json).
  */
 import "./ui.css";
 
@@ -34,4 +35,3 @@ export * from "@/components/ui/textarea";
 export * from "@/components/ui/toggle";
 export * from "@/components/ui/tooltip";
 export { cn } from "@/lib/utils";
-export { toast } from "sonner";

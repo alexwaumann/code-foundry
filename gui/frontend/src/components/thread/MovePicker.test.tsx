@@ -9,8 +9,8 @@ import { daemon, invocationsOf, refuse, resetDaemon } from "@/test/daemonFakes";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 // No daemon: refs never load (the pickers show them loading).
 vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/project")>()), listRefs: () => new Promise(() => undefined) }));
-const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { ThreadCrumb } = await import("./ThreadParts");
 const { ThreadHeader } = await import("./ThreadHeader");
@@ -264,9 +264,9 @@ describe("Move", () => {
     openPicker();
     fireEvent.keyDown(pick("web"), { key: "Enter" });
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalled();
+      expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "error" }));
     });
-    expect(JSON.stringify(toast.error.mock.calls[0])).toContain("thread s-1 is already moving");
+    expect(JSON.stringify(notify.mock.calls[0])).toContain("thread s-1 is already moving");
     await waitFor(() => {
       expect(crumb()).toBe("No project");
     });

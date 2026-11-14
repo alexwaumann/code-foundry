@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { bodyDone, it, trackTests } from "@/test/isolate";
 
@@ -37,7 +37,7 @@ afterEach(async () => {
   // A body that timed out ends first, against its own world (src/test/isolate.ts).
   await bodyDone();
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   cleanup();
   vi.clearAllMocks();

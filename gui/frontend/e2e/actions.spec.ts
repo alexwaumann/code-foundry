@@ -68,7 +68,7 @@ async function runFromMenu(page: Page, name: string): Promise<string> {
 test("a failed worktree-create run's output at a narrow window: the meta on one line, the path giving way in the middle", async ({ page }) => {
   await openApp(page);
   await mockPost("action/setup?thread=s-1&code=1");
-  const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Setup action Install deps failed (exit 1)" });
+  const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Install deps exited with code 1." });
   await toast.getByRole("button", { name: "Open" }).click();
   const out = page.getByTestId("action-run-dialog");
   await expect(out.getByTestId("action-run-output")).not.toBeEmpty();

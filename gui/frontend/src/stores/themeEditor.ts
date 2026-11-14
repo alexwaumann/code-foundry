@@ -9,7 +9,7 @@
  * a file) the slot's derived value is recorded as its basis; a pin whose slot derives
  * something else now is stale (staleOverrides in src/themes/contrast.ts).
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
 import { themeSlots } from "@/lib/theme";
@@ -371,7 +371,7 @@ export async function saveEdits(opts: { name: string; apply: boolean }): Promise
   useThemeEditorStore.setState({ saving: true });
   const res = await runCommandForResult("theme.save", { data: JSON.stringify(themeFileJson(file)), ...(opts.apply ? { apply: "true" } : {}) }, { quiet: true });
   useThemeEditorStore.setState((cur) => (res && cur.id === file.id ? { saving: false, saveOpen: false, saved: file, draft: file, disk: null, fresh: false } : { saving: false }));
-  if (res) toast.success(opts.apply ? `Saved ${name} and made it your ${file.scheme} theme` : `Saved ${name}`);
+  if (res) notify({ level: "success", title: `Saved ${name}`, ...(opts.apply ? { description: `It is your ${file.scheme} theme now.` } : {}) });
   return res !== null;
 }
 

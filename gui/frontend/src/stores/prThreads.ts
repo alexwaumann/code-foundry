@@ -8,7 +8,7 @@
  * effort come from the settings defaults. The originating selection's panel keeps its
  * PR tab; the new thread's panel is left as it is.
  */
-import { toast } from "sonner";
+import { notify, notifyProgress, dismissNotice, type NoticeId } from "@/lib/notify";
 import { create } from "zustand";
 import { parseThreadResult } from "@/api/gh";
 import type { PrRef } from "@/surfaces/pullrequestTarget";
@@ -51,15 +51,17 @@ export const PREPARING_TOAST_DELAY_MS = 200;
  * the dismissal therefore waits for a timeout queued after the add's.
  */
 function preparingToast(ref: PrRef): () => void {
-  let id: string | number | undefined;
+  let id: NoticeId | undefined;
   const timer = setTimeout(() => {
-    id = toast.loading(`Preparing worktree for #${String(ref.number)}…`);
+    id = notifyProgress({ title: `Preparing worktree for #${String(ref.number)}…` });
   }, PREPARING_TOAST_DELAY_MS);
   return () => {
     clearTimeout(timer);
     if (id === undefined) return;
     const shown = id;
-    setTimeout(() => toast.dismiss(shown), 0);
+    setTimeout(() => {
+      dismissNotice(shown);
+    }, 0);
   };
 }
 
@@ -97,7 +99,7 @@ export async function startPrThread(kind: PrThreadKind, ref: PrRef, question = "
       const open = () => {
         openStartedThread(id);
       };
-      toast.success(res.message, id ? { action: { label: "Open", onClick: open } } : undefined);
+      notify({ level: "success", title: "Thread started", description: res.message, ...(id ? { action: { label: "Open", onClick: open } } : {}) });
     }
     return id;
   } finally {

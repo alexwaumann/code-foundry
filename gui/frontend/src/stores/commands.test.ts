@@ -21,8 +21,8 @@ vi.mock("@/api/gitops", () => ({
   isGitOpResult: (json: string) => json === GIT_OP_RESULT,
   isGitOpFailure: (err: unknown) => err === gitOpFailure,
 }));
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const { invokeConfirmed, runCommand } = await import("./commands");
 
 const ctx = { activeTerminalId: "", activeThreadId: "", activeProjectId: "p1", activeWorktreePath: "/w/a", activeView: "projects", activeWorkspaceId: "" };
@@ -121,17 +121,16 @@ describe("invokeConfirmed bind args", () => {
 describe("runCommand toasts", () => {
   beforeEach(() => {
     invokeCommand.mockReset();
-    toast.success.mockReset();
-    toast.error.mockReset();
+    notify.mockReset();
   });
 
   it("toasts a command's result message and its failure", async () => {
     invokeCommand.mockResolvedValueOnce({ message: "renamed the thread", resultJson: "" });
     expect(await runCommand("thread.rename", {}, ctx)).toBe(true);
-    expect(toast.success).toHaveBeenCalledWith("renamed the thread");
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "thread.rename", description: "renamed the thread" });
     invokeCommand.mockRejectedValueOnce(new Error("no such thread"));
     expect(await runCommand("thread.rename", {}, ctx)).toBe(false);
-    expect(toast.error).toHaveBeenCalledWith("thread.rename failed", { description: "no such thread" });
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "thread.rename failed", description: "no such thread" });
   });
 
   it("leaves a git op's result and failure to the op's own toast (stores/gitops.tsx)", async () => {
@@ -139,8 +138,7 @@ describe("runCommand toasts", () => {
     expect(await runCommand("git.push", {}, ctx)).toBe(true);
     invokeCommand.mockRejectedValueOnce(gitOpFailure);
     expect(await runCommand("git.push", {}, ctx)).toBe(false);
-    expect(toast.success).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 });
 
@@ -158,7 +156,7 @@ describe("command guards", () => {
     await expect(runCommand("thread.archive", { archived: "true" }, ctx)).resolves.toBe(false);
     expect(guard).toHaveBeenCalledWith({ archived: "true" }, ctx);
     expect(invokeCommand).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
     await expect(runCommandForResult("thread.archive", {}, { ctx, caller: "a plugin" })).resolves.toEqual(ok);
     expect(guard).toHaveBeenCalledTimes(1);
     guard.mockResolvedValue(true);

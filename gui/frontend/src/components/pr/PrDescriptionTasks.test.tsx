@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -39,7 +39,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   cleanup();
   vi.clearAllMocks();

@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { card } from "@/test/cardFakes";
 import { invocationsOf, resetDaemon } from "@/test/daemonFakes";
@@ -106,7 +107,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  toast.dismiss();
+  dismissNotice();
   cleanup();
 });
 

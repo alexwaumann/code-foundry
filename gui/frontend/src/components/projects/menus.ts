@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { copyText } from "@/lib/clipboard";
 import type { ProjectKind, ProjectNextStep } from "@/lib/projects";
 import type { ThreadBadge } from "@/lib/thread";
@@ -113,9 +113,9 @@ export type CheckoutMenuPart =
 export async function copyWithToast(text: string, what: string): Promise<void> {
   try {
     await copyText(text);
-    toast.success(`${what} copied`, { description: text });
+    notify({ level: "success", title: `${what} copied`, description: text });
   } catch {
-    toast.error("Copy failed");
+    notify({ level: "error", title: "Copy failed" });
   }
 }
 

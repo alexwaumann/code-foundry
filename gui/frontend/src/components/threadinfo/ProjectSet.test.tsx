@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { ConfirmDialog } from "@/components/confirm/ConfirmDialog";
@@ -121,7 +122,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  toast.dismiss();
+  dismissNotice();
   cleanup();
 });
 

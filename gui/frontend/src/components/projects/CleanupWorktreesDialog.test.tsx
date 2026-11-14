@@ -11,8 +11,8 @@ vi.mock("@/api/project", async (orig) => ({
     return preview.fail ? Promise.reject(new Error("unavailable")) : Promise.resolve(preview.rows);
   },
 }));
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn<(n: { level: string; title: string; description?: React.ReactNode }) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { CleanupWorktreesDialog } = await import("./CleanupWorktreesDialog");
@@ -57,7 +57,7 @@ beforeEach(() => {
   preview.rows = [];
   preview.fail = false;
   preview.calls = [];
-  toast.success.mockClear();
+  notify.mockClear();
   render(
     <>
       <ConfirmDialog />
@@ -94,10 +94,10 @@ describe("CleanupWorktreesDialog", () => {
       [false, { project: "repo-cf" }],
       [true, { project: "repo-cf" }],
     ]);
-    expect(toast.success).toHaveBeenCalledTimes(1);
-    const [title, opts] = toast.success.mock.calls[0] as [string, { description: React.ReactNode }];
-    expect(title).toBe("Removed 3 worktrees");
-    render(<>{opts.description}</>);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const opts = notify.mock.calls[0]?.[0];
+    expect(opts).toMatchObject({ level: "success", title: "Removed 3 worktrees" });
+    render(<>{opts?.description}</>);
     expect(screen.getByTestId("cleanup-toast-branches").textContent).toBe("cf/usage-polishcf/prs-shrink-guicf/try-oxlint");
   });
 
@@ -111,7 +111,7 @@ describe("CleanupWorktreesDialog", () => {
     expect(within(dialog).getByTestId("cleanup-ok").textContent).toBe("Remove 1 worktree");
     fireEvent.click(within(dialog).getByTestId("cleanup-ok"));
     await done;
-    expect(toast.success.mock.calls[0]?.[0]).toBe("Removed 1 worktree");
+    expect(notify.mock.calls[0]?.[0].title).toBe("Removed 1 worktree");
   });
 
   it("nothing merged right now: offers the fetch alone; nothing removed says so", async () => {
@@ -123,7 +123,7 @@ describe("CleanupWorktreesDialog", () => {
     expect(within(dialog).getByTestId("cleanup-ok").textContent).toBe("Fetch and check");
     fireEvent.click(within(dialog).getByTestId("cleanup-ok"));
     await done;
-    expect(toast.success).toHaveBeenCalledWith("No merged worktrees to remove");
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "No merged worktrees to remove" });
   });
 
   it("Cancel runs nothing and toasts nothing", async () => {
@@ -133,7 +133,7 @@ describe("CleanupWorktreesDialog", () => {
     fireEvent.click(within(screen.getByTestId("cleanup-dialog")).getByTestId("cleanup-cancel"));
     expect(await done).toBe(false);
     expect(invocationsOf("project.worktree.cleanup").map((i) => i.confirmed)).toEqual([false]);
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("a failed dry run falls back to the daemon's words in the generic confirm", async () => {

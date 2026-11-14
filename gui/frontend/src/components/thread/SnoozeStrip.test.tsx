@@ -1,11 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { toast } from "sonner";
 import type { ThreadView } from "@/api/threads";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }) }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { SnoozeStrip } = await import("./SnoozeStrip");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -19,7 +19,7 @@ const { seedWorld } = await import("@/test/projectsWorld");
 beforeEach(() => {
   resetDaemon();
   seedWorld();
-  vi.mocked(toast.error).mockClear();
+  notify.mockClear();
 });
 afterEach(cleanup);
 
@@ -98,7 +98,7 @@ describe("SnoozeStrip", () => {
     show("s-1");
     fireEvent.click(button());
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("failed"), expect.objectContaining({ description: expect.stringContaining("no such thread") as string }));
+      expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "error", title: expect.stringContaining("failed") as string, description: expect.stringContaining("no such thread") as string }));
     });
     await waitFor(() => {
       expect(button().disabled).toBe(false);

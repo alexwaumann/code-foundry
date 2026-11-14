@@ -1,11 +1,14 @@
+import type { Notice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const invokeCommand = vi.hoisted(() => vi.fn());
 const listCommands = vi.hoisted(() => vi.fn(() => Promise.resolve([])));
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), invokeCommand, listCommands }));
 
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), loading: vi.fn(() => "t1"), dismiss: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn<(n: Notice) => void>());
+const notifyProgress = vi.hoisted(() => vi.fn(() => "t1"));
+const dismissNotice = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress, dismissNotice }));
 
 const { PREPARING_TOAST_DELAY_MS, openStartedThread, prThreadArgs, startingKey, startPrThread, usePrThreadsStore } = await import("./prThreads");
 const { useUiStore } = await import("./ui");
@@ -51,11 +54,11 @@ describe("startPrThread", () => {
     invokeCommand.mockResolvedValueOnce(started("s-9"));
     await expect(startPrThread(kind, REF, question)).resolves.toBe("s-9");
     expect(invokeCommand).toHaveBeenCalledWith(name, expect.anything(), { "repo-slug": "acme/repo", number: "12", ...extra });
-    expect(toast.success).toHaveBeenCalledTimes(1); // runCommandForResult's own toast is skipped
-    const [message, opts] = toast.success.mock.calls[0] as [string, { action: { label: string; onClick: unknown } }];
-    expect(message).toBe("Started thread s-9 for PR #12");
-    expect(opts.action.label).toBe("Open");
-    expect(typeof opts.action.onClick).toBe("function");
+    expect(notify).toHaveBeenCalledTimes(1); // runCommandForResult's own toast is skipped
+    const opts = notify.mock.calls[0]?.[0];
+    expect(opts).toMatchObject({ level: "success", title: "Thread started", description: "Started thread s-9 for PR #12" });
+    expect(opts?.action?.label).toBe("Open");
+    expect(typeof opts?.action?.onClick).toBe("function");
     expect(usePrThreadsStore.getState().starting).toEqual({});
   });
 
@@ -82,15 +85,15 @@ describe("startPrThread", () => {
       const d = deferred<ReturnType<typeof started>>();
       invokeCommand.mockReturnValueOnce(d.promise);
       const run = startPrThread("fix", REF);
-      expect(toast.loading).not.toHaveBeenCalled();
+      expect(notifyProgress).not.toHaveBeenCalled();
       vi.advanceTimersByTime(PREPARING_TOAST_DELAY_MS);
-      expect(toast.loading).toHaveBeenCalledWith("Preparing worktree for #12…");
+      expect(notifyProgress).toHaveBeenCalledWith({ title: "Preparing worktree for #12…" });
       d.resolve(started("s-2"));
       await run;
       // Deferred to a timeout queued after sonner's own add.
-      expect(toast.dismiss).not.toHaveBeenCalled();
+      expect(dismissNotice).not.toHaveBeenCalled();
       vi.runAllTimers();
-      expect(toast.dismiss).toHaveBeenCalledWith("t1");
+      expect(dismissNotice).toHaveBeenCalledWith("t1");
     } finally {
       vi.useRealTimers();
     }
@@ -102,8 +105,8 @@ describe("startPrThread", () => {
       invokeCommand.mockResolvedValueOnce(started("s-2"));
       await startPrThread("fix", REF);
       vi.runAllTimers();
-      expect(toast.loading).not.toHaveBeenCalled();
-      expect(toast.dismiss).not.toHaveBeenCalled();
+      expect(notifyProgress).not.toHaveBeenCalled();
+      expect(dismissNotice).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
@@ -112,29 +115,28 @@ describe("startPrThread", () => {
   it("explain shows no preparing toast", async () => {
     invokeCommand.mockResolvedValueOnce(started("s-3"));
     await startPrThread("explain", REF);
-    expect(toast.loading).not.toHaveBeenCalled();
+    expect(notifyProgress).not.toHaveBeenCalled();
   });
 
   it("a failure is toasted, resolves null and clears the busy flag", async () => {
     invokeCommand.mockRejectedValueOnce(new Error("#12 comes from a fork and no worktree of acme/repo has its head checked out"));
     await expect(startPrThread("fix", REF)).resolves.toBeNull();
-    expect(toast.error).toHaveBeenCalledTimes(1);
-    expect(toast.error.mock.calls[0]).toEqual(["pr.fix.findings failed", { description: "#12 comes from a fork and no worktree of acme/repo has its head checked out" }]);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0]?.[0]).toEqual({ level: "error", title: "pr.fix.findings failed", description: "#12 comes from a fork and no worktree of acme/repo has its head checked out" });
     expect(usePrThreadsStore.getState().starting).toEqual({});
   });
 
   it("a result without a thread id still counts as started, with no Open action", async () => {
     invokeCommand.mockResolvedValueOnce({ message: "Started", resultJson: "" });
     await expect(startPrThread("explain", REF)).resolves.toBe("");
-    expect(toast.success).toHaveBeenCalledWith("Started", undefined);
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Thread started", description: "Started" });
   });
 
   it("the toast's Open selects the new thread when no FocusThread moved the selection", async () => {
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" }, promptFocusSeq: 0 });
     invokeCommand.mockResolvedValueOnce(started("s-9"));
     await startPrThread("explain", REF);
-    const opts = toast.success.mock.calls[0]?.[1] as { action: { onClick: () => void } };
-    opts.action.onClick();
+    notify.mock.calls[0]?.[0].action?.onClick();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-9" });
     expect(useUiStore.getState().promptFocusSeq).toBe(1);
   });

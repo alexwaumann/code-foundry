@@ -7,7 +7,7 @@
  * that are clean" button, the palette) gets it; without a project, or when the dry run fails,
  * the generic confirm asks with the daemon's words. docs/notes/cleanup-dialog.md.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { previewCleanup, removedByCleanup, type CleanupRowView } from "@/api/project";
 import { registerConfirmPresenter, registerOwnDialog, requestConfirm, type ConfirmRequest } from "./confirm";
@@ -56,10 +56,12 @@ registerOwnDialog(useCleanupWorktreesStore, (s) => s.pending !== null);
 export function toastCleanupResult(resultJson: string): void {
   const gone = removedByCleanup(resultJson);
   if (gone.length === 0) {
-    toast.success("No merged worktrees to remove");
+    notify({ level: "success", title: "No merged worktrees to remove" });
     return;
   }
-  toast.success(`Removed ${String(gone.length)} ${gone.length === 1 ? "worktree" : "worktrees"}`, {
+  notify({
+    level: "success",
+    title: `Removed ${String(gone.length)} ${gone.length === 1 ? "worktree" : "worktrees"}`,
     description: (
       <span className="block text-code text-cf-text-secondary" data-testid="cleanup-toast-branches">
         {gone.map((b) => (

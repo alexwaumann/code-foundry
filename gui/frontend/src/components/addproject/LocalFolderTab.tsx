@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FolderPlus, Loader2, SearchIcon } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
 import { PathSuggestions, PickFolderButton } from "@/components/palette/pathCompletion";
 import { usePathCompletion } from "@/components/palette/usePathListing";
@@ -93,7 +93,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     }
     try {
       const project = await registerFolder(p);
-      toast.success(`Added ${project.name}`);
+      notify({ level: "success", title: `Added ${project.name}` });
       finishAddProject();
       selectAddedProject(project.id);
     } catch (err) {
@@ -109,12 +109,12 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     try {
       if (as === "workspace") {
         const w = await addFolderAsWorkspace(choice.typed);
-        toast.success(`Added workspace ${w.name}`);
+        notify({ level: "success", title: `Added workspace ${w.name}` });
         finishAddProject();
         showAddedWorkspace(w.id);
       } else {
         const project = await registerFolder(choice.typed);
-        toast.success(`Added ${project.name}`);
+        notify({ level: "success", title: `Added ${project.name}` });
         finishAddProject();
         selectAddedProject(project.id);
       }

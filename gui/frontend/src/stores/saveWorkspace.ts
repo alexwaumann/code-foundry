@@ -7,7 +7,7 @@
  * commands; the dialog adds no user action of its own.
  */
 import { create } from "zustand";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { canSaveAsWorkspace, matchingWorkspace, WORKSPACE_PRIMARY } from "@/lib/projectSet";
 import { setupUnfinished } from "@/lib/threadSetup";
 import { runCommand, runCommandForResult } from "./commands";
@@ -116,6 +116,6 @@ export async function saveThreadAsWorkspace(threadId: string, name: string): Pro
   if (!workspaceId) return null;
   // A failure here is toasted by runCommandForResult: the workspace exists, the thread just does not reference it.
   const set = await runCommandForResult(THREAD_COMMANDS.setWorkspace, { workspace: workspaceId }, { quiet: true, ctx: threadContext(threadId) });
-  if (set) toast.success(`Saved workspace ${name.trim()}`);
+  if (set) notify({ level: "success", title: `Saved workspace ${name.trim()}` });
   return null;
 }

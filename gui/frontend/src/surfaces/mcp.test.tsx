@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpServerView, McpStatusView } from "@/api/mcp";
 import type { ThreadView } from "@/api/threads";
 
-const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const commands = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult: commands.run }));
 const api = vi.hoisted(() => ({ get: vi.fn() }));
@@ -247,7 +247,7 @@ describe("MCP surface", () => {
     pick("connected");
     expect(card("playwright").getAttribute("data-status")).toBe("connected");
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, after reconnecting playwright");
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalledWith(expect.objectContaining({ level: "error" }));
   });
 
   it("toasts Claude's refusal of a reconnect", async () => {
@@ -259,7 +259,7 @@ describe("MCP surface", () => {
       fireEvent.click(within(card("linear"), "mcp-reconnect") as HTMLElement);
       await Promise.resolve();
     });
-    expect(toast.error).toHaveBeenCalledWith("Could not reconnect linear", { description: "needs a login" });
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "Could not reconnect linear", description: "needs a login" });
   });
 
   it("refresh runs thread.mcp --refresh", async () => {

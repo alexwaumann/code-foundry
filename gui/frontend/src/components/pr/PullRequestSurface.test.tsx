@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { bodyDone, it, trackTests } from "@/test/isolate";
 import type { Selection } from "@/stores/ui";
@@ -48,7 +48,7 @@ afterEach(async () => {
   // A body that timed out ends first, against its own world (src/test/isolate.ts).
   await bodyDone();
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   cleanup();
   vi.useRealTimers();
@@ -443,7 +443,7 @@ describe("the ⋯ menu", () => {
     expect(invocationsOf("pr.refresh").map((i) => i.args)).toEqual([{ "repo-slug": SLUG, number: "145" }]);
     expect(byTestId("pr-menu")).toBeTruthy();
     expect(byTestId("pr-menu-refresh-hint").textContent).toMatch(/^Updated (just now|[0-5]s ago)$/);
-    expect(toastTexts().filter((t) => t.startsWith("Refreshed #145"))).toEqual([]);
+    expect(toastTexts().filter((t) => t.includes("Refreshed #145"))).toEqual([]);
     // A failure is toasted and reported over the copy, which stays.
     world.failNext.add("pr.refresh");
     await pick(byTestId("pr-menu-refresh"));
@@ -536,7 +536,7 @@ describe("threads about a pull request", () => {
     expect(invocationsOf("pr.explain").map((i) => ({ args: i.args, worktree: i.context.activeWorktreePath }))).toEqual([{ args: { "repo-slug": SLUG, number: "145" }, worktree: "" }]);
     release();
     await settle();
-    await expectToast(/^Started thread s-new-\d+ for PR #145/);
+    await expectToast(/Started thread s-new-\d+ for PR #145/);
     expect(queryTestId("pr-menu")).toBeNull();
     expect(toastCount("Preparing worktree")).toBe(0);
   });
@@ -563,7 +563,7 @@ describe("threads about a pull request", () => {
     await expectToast("Preparing worktree for #145…");
     release();
     await settle(3);
-    await expectToast(/^Started thread s-new-\d+ for PR #145/);
+    await expectToast(/Started thread s-new-\d+ for PR #145/);
     await vi.waitFor(() => {
       expect(toastCount("Preparing worktree for #145…")).toBe(0);
     });
@@ -642,7 +642,7 @@ describe("threads about a pull request", () => {
     release();
     await settle();
     expect(invocationsOf("pr.ask").map((i) => ({ args: i.args, worktree: i.context.activeWorktreePath }))).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "What changed?" }, worktree: "" }]);
-    await expectToast(/^Started thread s-new-\d+ for PR #145/);
+    await expectToast(/Started thread s-new-\d+ for PR #145/);
     expect(queryTestId("pr-ask")).toBeNull();
   });
 
@@ -665,7 +665,7 @@ describe("threads about a pull request", () => {
     fireEvent.click(byTestId("pr-ask-send"));
     await settle();
     expect(invocationsOf("pr.ask").map((i) => i.args.question)).toEqual(["Is the retry bounded?", "Is the retry bounded?"]);
-    await expectToast(/^Started thread s-new-\d+ for PR #145/);
+    await expectToast(/Started thread s-new-\d+ for PR #145/);
   });
 
   it("a pull request's running threads show on every surface that shows it (a thread's tab and the Pull Requests page's, in another space)", async () => {
@@ -698,7 +698,7 @@ describe("threads about a pull request", () => {
     expect(byTestId("pr-ask-hint").textContent).toBe("Already starting a thread for this pull request");
     expect(input("pr-ask-input").value).toBe("From the page");
     releaseAsk();
-    await expectToast(/^Started thread s-new-\d+ for PR #145/);
+    await expectToast(/Started thread s-new-\d+ for PR #145/);
     await settle();
     // s-1's question starts its thread; this one was never sent.
     expect(invocationsOf("pr.ask").map((i) => ({ args: i.args, worktree: i.context.activeWorktreePath }))).toEqual([{ args: { "repo-slug": SLUG, number: "145", question: "From s-1" }, worktree: CF }]);
@@ -722,7 +722,7 @@ describe("threads about a pull request", () => {
     releaseExplain();
     await settle();
     await vi.waitFor(() => {
-      expect(toastTexts().filter((t) => /^Started thread s-new-\d+ for PR #145/.test(t))).toHaveLength(2);
+      expect(toastTexts().filter((t) => /Started thread s-new-\d+ for PR #145/.test(t))).toHaveLength(2);
     });
   });
 });

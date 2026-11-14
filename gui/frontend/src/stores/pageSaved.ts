@@ -4,7 +4,7 @@
  * after each run of a page's that succeeded (stores/bridgeHost.ts); only a verb that names a
  * written file in its result shows anything.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import type { InvokeResultView } from "@/api/command";
 import { revealInFinder } from "@/components/files/fileActions";
 import { fileName } from "@/lib/filePath";
@@ -36,7 +36,9 @@ export function noticePageResult(threadId: string, verb: string, res: InvokeResu
   const t = useThreadsStore.getState().byId[threadId];
   const project = t?.projectId ?? "";
   const dir = t?.worktreePath || path.slice(0, path.lastIndexOf("/"));
-  toast.success(`Saved ${fileName(path)}`, {
+  notify({
+    level: "success",
+    title: `Saved ${fileName(path)}`,
     description: tildify(path),
     action: {
       label: "Open",

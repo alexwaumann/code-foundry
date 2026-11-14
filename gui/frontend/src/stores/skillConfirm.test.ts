@@ -4,8 +4,8 @@ import { skillItemKey } from "@/api/skill";
 import { RESTART_WARNING, setSkillMarketplaceDeps, useSkillMarketplaceStore } from "./skill";
 import { setSkillEnabled } from "./skillConfirm";
 
-const toast = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: Object.assign(toast, { error: vi.fn(), success: vi.fn() }) }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const item = { kind: "skill" as const, name: "pr-review", registry: "ai-marketplace" };
 const key = skillItemKey(item.kind, item.name, item.registry);
@@ -17,7 +17,7 @@ function seed(enabled: boolean) {
 const enabled = () => useSkillMarketplaceStore.getState().installed?.installed[0]?.enabled;
 
 beforeEach(() => {
-  toast.mockReset();
+  notify.mockReset();
   setSkillMarketplaceDeps(null);
 });
 
@@ -28,8 +28,8 @@ describe("setSkillEnabled", () => {
     seed(true);
     expect(await setSkillEnabled(item, false)).toBe(true);
     expect(run).toHaveBeenCalledWith("skill.disable", { name: "pr-review", kind: "skill" }, expect.objectContaining({ quiet: true }));
-    expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast).toHaveBeenCalledWith("Disabled pr-review", expect.objectContaining({ description: RESTART_WARNING }));
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "warning", title: "Disabled pr-review", description: RESTART_WARNING }));
   });
 
   it("the row reads as flipped when the command returns, before the re-read", async () => {
@@ -62,7 +62,7 @@ describe("setSkillEnabled", () => {
     seed(true);
     expect(await setSkillEnabled(item, false)).toBe(false);
     expect(enabled()).toBe(true);
-    expect(toast).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
     expect(useSkillMarketplaceStore.getState().failures[key]).toEqual({ action: "disable", message: "it is in use" });
   });
 
@@ -70,6 +70,6 @@ describe("setSkillEnabled", () => {
     setSkillMarketplaceDeps({ run: () => Promise.resolve(ok) });
     seed(false);
     expect(await setSkillEnabled(item, true)).toBe(true);
-    expect(toast).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 });

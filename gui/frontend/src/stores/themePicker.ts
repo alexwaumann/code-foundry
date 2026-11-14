@@ -6,7 +6,7 @@
  * The user's own themes (docs/notes/user-themes.md) list first; Customise copies a theme
  * into them (theme.duplicate) and Delete removes one (theme.delete).
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { effectiveScheme, themeSlots, type ColorScheme, type ThemePreference } from "@/lib/theme";
 import { subscribeUserThemes, themeById, themesFor } from "@/themes";
@@ -211,7 +211,7 @@ export async function deleteTheme(id: string): Promise<boolean> {
   if (!res) return false;
   if (useThemeEditorStore.getState().id === id) stopEditing({ keepCopy: true });
   useThemePickerStore.setState((s) => (s.preview === id ? { preview: null } : s));
-  toast.success(`Deleted ${name}`, { description: movedSlots(res.resultJson) });
+  notify({ level: "success", title: `Deleted ${name}`, description: movedSlots(res.resultJson) });
   return true;
 }
 

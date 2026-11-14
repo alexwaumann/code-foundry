@@ -6,7 +6,7 @@
  * or existing store actions (openUrl, copyText); components
  * call these, never RPCs.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { listReviewerCandidates, parseMergeResult, parseRefreshResult, parseRevertResult, type MergeMethodView } from "@/api/gh";
 import { mergeArgs } from "@/components/pr/merge";
@@ -257,11 +257,13 @@ export async function revertPullRequest(ref: PrRef, panel: TabTarget): Promise<P
     const made = parseRevertResult(res.resultJson);
     pullRequestDetailResource.invalidate(key);
     if (!made) {
-      if (res.message) toast.success(res.message);
+      if (res.message) notify({ level: "success", title: "Revert pull request", description: res.message });
       return null;
     }
     const url = made.url || pullRequestUrl({ slug: ref.slug, number: made.number });
-    toast.success(`Opened #${String(made.number)} to revert #${String(ref.number)}`, {
+    notify({
+      level: "success",
+      title: `Opened #${String(made.number)} to revert #${String(ref.number)}`,
       description: url,
       action: { label: "Open on GitHub", onClick: () => void openUrl(url) },
     });
@@ -295,7 +297,7 @@ export async function mergePullRequest(ref: PrRef, method: MergeMethodView, dele
     rememberMergeMethod(ref.slug, method);
     const message = parseMergeResult(res.resultJson)?.message || res.message || `Merged #${String(ref.number)}`;
     const [title = message, ...rest] = message.split("; ");
-    toast.success(title, rest.length > 0 ? { description: rest.join("; ") } : undefined);
+    notify({ level: "success", title, ...(rest.length > 0 ? { description: rest.join("; ") } : {}) });
     return true;
   } finally {
     pullRequestDetailResource.invalidate(key);
@@ -308,7 +310,7 @@ export async function mergePullRequest(ref: PrRef, method: MergeMethodView, dele
 
 /**
  * The Review composer: pr.review with the verdict and the (trimmed) body. The daemon's
- * message is toasted ("Approved #N"); a refusal is the generic "Review Pull Request
+ * message is toasted under the command's title ("Approved #N"); a refusal is the generic "Review Pull Request
  * failed" toast with GitHub's message. Either way the detail is read again (the daemon
  * also announces it); on success this waits for that read, so the header's chip and the
  * new review in Comments are there when the composer closes, and a failure returns at
@@ -432,8 +434,8 @@ export function linkPullRequestToThread(threadId: string, ref: PrRef): Promise<b
 export async function copyPullRequestLink(ref: PrRef, url = pullRequestUrl(ref)): Promise<void> {
   try {
     await copyText(url);
-    toast.success("Link copied", { description: url });
+    notify({ level: "success", title: "Link copied", description: url });
   } catch {
-    toast.error("Copy failed");
+    notify({ level: "error", title: "Copy failed" });
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, FolderPlus, Loader2, Search } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { appendProgress, cloneRepo, lookupGitHub, searchGitHub, type CloneProgressView, type GitHubRepoView } from "@/api/addProject";
 import { errorMessage, isAbort } from "@/api/stream";
 import { Button } from "@/components/ui/button";
@@ -108,7 +108,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
         undefined,
         ac.signal,
       );
-      toast.success(`Cloned ${repo.slug}`);
+      notify({ level: "success", title: `Cloned ${repo.slug}` });
       finishAddProject();
       selectAddedProject(added.id);
     } catch (err) {
@@ -123,7 +123,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
     setAdding(true);
     try {
       const added = await registerFolder(repo.clonePath);
-      toast.success(`Added ${added.name}`);
+      notify({ level: "success", title: `Added ${added.name}` });
       finishAddProject();
       selectAddedProject(added.id);
     } catch (err) {

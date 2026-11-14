@@ -6,7 +6,7 @@
  * See docs/notes/shell-13-terminals.md.
  */
 import { create } from "zustand";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import type { UiContextView } from "@/api/command";
@@ -142,7 +142,7 @@ export async function closeTerminal(id: string): Promise<void> {
   } catch (err) {
     if (isNotFound(err) || !(id in useTerminalsStore.getState().byId)) return;
     const title = useCommandsStore.getState().commands.find((c) => c.name === "terminal.close")?.title ?? "Close Terminal";
-    toast.error(`${title} failed`, { description: errorMessage(err) });
+    notify({ level: "error", title: `${title} failed`, description: errorMessage(err) });
   } finally {
     void refreshCommands();
   }

@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { inspectFolder, registerProject, type AddedProjectView, type FolderInfoView } from "@/api/addProject";
 import { errorMessage } from "@/api/stream";
@@ -79,9 +79,9 @@ export function setAddProjectBusy(busy: boolean): void {
 async function discardCreated(p: CreatedProject): Promise<void> {
   try {
     await deleteProject(p.id);
-    toast(`Deleted ${p.name}`, { description: "The project was not kept." });
+    notify({ level: "info", title: `Deleted ${p.name}`, description: "The project was not kept." });
   } catch (err) {
-    toast.error(`Could not delete ${p.name}: ${errorMessage(err)}`);
+    notify({ level: "error", title: `Could not delete ${p.name}`, description: errorMessage(err) });
   }
 }
 

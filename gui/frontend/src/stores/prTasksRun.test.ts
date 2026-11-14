@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InvokeResultView } from "@/api/command";
+import type { Notice } from "@/lib/notify";
 
 const answer = vi.hoisted(() => ({ resolve: null as ((r: InvokeResultView) => void) | null }));
 vi.mock("./commands", () => ({
@@ -10,8 +11,8 @@ vi.mock("./commands", () => ({
       }),
   ),
 }));
-const toasts = vi.hoisted(() => ({ success: vi.fn<(text: string, opts?: { action?: unknown }) => void>(), error: vi.fn<(text: string) => void>() }));
-vi.mock("sonner", () => ({ toast: toasts }));
+const notify = vi.hoisted(() => vi.fn<(n: Notice) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { runPrTask } = await import("./prTasks");
 const { useUiStore } = await import("./ui");
@@ -31,9 +32,9 @@ describe("runPrTask", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
     answer.resolve?.({ message: "Sent to Port the fix (s-kid) for Fix resize race (s-3) (#4); wait with: x", resultJson: '{"threadId":"s-kid","viaThreadId":"s-3","sent":true,"ordinal":4}' });
     await expect(run).resolves.toBe("s-kid");
-    const [text, opts] = toasts.success.mock.calls[0] ?? [];
-    expect(text).toBe("Sent to Port the fix for this thread");
-    expect(opts?.action).toBeDefined(); // Open: the owner is not selected
+    const n = notify.mock.calls[0]?.[0];
+    expect(n).toMatchObject({ level: "success", title: "Task sent", description: "Sent to Port the fix for this thread" });
+    expect(n?.action).toBeDefined(); // Open: the owner is not selected
   });
 
   it("pressed outside a thread (a page): the sender is named, whatever is selected later", async () => {
@@ -43,6 +44,6 @@ describe("runPrTask", () => {
     useUiStore.setState({ selection: { kind: "thread", id: "s-3" } });
     answer.resolve?.({ message: "Sent to Port the fix (s-kid) for Fix resize race (s-3) (#4)", resultJson: '{"threadId":"s-kid","viaThreadId":"s-3","sent":true}' });
     await run;
-    expect(toasts.success.mock.calls[0]?.[0]).toBe("Sent to Port the fix for Fix resize race");
+    expect(notify.mock.calls[0]?.[0].description).toBe("Sent to Port the fix for Fix resize race");
   });
 });

@@ -5,7 +5,7 @@
  * terminal.close (closing a finished run's tab, Rerun). Plus the toast for a failed
  * worktree-create run. See docs/notes/actions-2-gui.md.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { runFromResult, type ActionRunFinishedView } from "@/api/actions";
 import { invokeCommand, type UiContextView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
@@ -69,7 +69,7 @@ export async function stopActionRun(terminalId: string): Promise<boolean> {
     if (useTerminalsStore.getState().byId[terminalId]?.state === "exited") return false;
     clearStopRequested(terminalId);
     const title = useCommandsStore.getState().commands.find((c) => c.name === "terminal.kill")?.title ?? "Kill Terminal";
-    toast.error(`${title} failed`, { description: errorMessage(err) });
+    notify({ level: "error", title: `${title} failed`, description: errorMessage(err) });
     return false;
   } finally {
     void refreshCommands();
@@ -149,9 +149,9 @@ export async function deleteAction(actionId: string, projectId: string): Promise
   return res === null ? failed.message : null;
 }
 
-/** The failed setup run's toast text. */
+/** The failed setup run's toast description (its title is "Setup action failed"). */
 export function setupFailedMessage(f: Pick<ActionRunFinishedView, "actionName" | "exitCode">): string {
-  return `Setup action ${f.actionName} failed (exit ${String(f.exitCode)})`;
+  return `${f.actionName} exited with code ${String(f.exitCode)}.`;
 }
 
 /**
@@ -169,16 +169,18 @@ export function openFailedRun(f: Pick<ActionRunFinishedView, "runId" | "threadId
 
 /**
  * run_finished (stores/events.ts): a worktree-create action that exited non-zero toasts
- * "Setup action X failed (exit N)" with Open. Other runs finish quietly (their tab shows it).
+ * "Setup action failed" ("X exited with code N.") with Open. Other runs finish quietly (their tab shows it).
  * The toast stays until dismissed (× or Open), like a failed git op's: setup runs in the
  * background with no tab, so it is the only sign the run failed.
  */
 export function onActionRunFinished(f: ActionRunFinishedView): void {
   if (f.trigger !== "worktree-create" || f.exitCode === 0) return;
-  toast.error(setupFailedMessage(f), {
+  notify({
+    level: "error",
     id: `action-run-${f.runId}`,
-    duration: Infinity,
-    closeButton: true,
+    title: "Setup action failed",
+    description: setupFailedMessage(f),
+    sticky: true,
     action: {
       label: "Open",
       onClick: () => {

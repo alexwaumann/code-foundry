@@ -1,5 +1,4 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -7,6 +6,8 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
+const notify = vi.hoisted(() => vi.fn<(n: { level: string; title: string }) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { NewWorkspaceDialog } = await import("./NewWorkspaceDialog");
@@ -653,7 +654,6 @@ describe("the workspace's Instructions and skills", () => {
   });
 
   it("Edit instructions steers once: the toast names the thread (no CLI text); while it works a press only shows it", async () => {
-    const success = vi.spyOn(toast, "success");
     const { mono } = twoWorkspaces();
     daemon.handlers.set("thread.send", () => ({ message: "Sent. wait with: code-foundry thread wait s-driver", resultJson: "" }));
     addThreads(thread("s-driver", { name: "driver", projectId: "", projectIds: ["repo-dot"], workspaceId: mono, worktreePath: "/Users/dev/mono", state: "connected", status: "busy" }));
@@ -663,7 +663,7 @@ describe("the workspace's Instructions and skills", () => {
     fireEvent.click(by(body(mono), "workspace-edit-instructions"));
     await settle();
     expect(selection()).toEqual({ kind: "thread", id: "s-driver" });
-    expect(success.mock.calls.map((c) => c[0])).toEqual(["Sent to driver"]);
+    expect(notify.mock.calls.map(([n]) => [n.level, n.title])).toEqual([["success", "Sent to driver"]]);
     expect(invocationsOf("thread.send")).toHaveLength(1);
 
     // Still working on it: shown again, not sent again.

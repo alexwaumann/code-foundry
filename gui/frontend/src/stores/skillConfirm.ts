@@ -6,7 +6,7 @@
  * toast (setSkillEnabled). From the palette they get the generic confirm with the daemon's
  * words. The plugin page does the same for plugin.uninstall (stores/pluginRegistry.ts).
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { skillCommandName, skillItemKey } from "@/api/skill";
 import { registerConfirmPresenter, requestConfirm, type ConfirmRequest } from "./confirm";
 import { disableSkill, enableSkill, removeLocalSkill, RESTART_WARNING, uninstallSkill, type SkillItemRef } from "./skill";
@@ -46,7 +46,7 @@ export async function runConfirmedSkill(action: ConfirmedSkillAction, item: Skil
 export async function setSkillEnabled(item: SkillItemRef, on: boolean): Promise<boolean> {
   if (on) return enableSkill(item);
   const done = await runConfirmedSkill("disable", item);
-  if (done) toast(`Disabled ${item.name}`, { id: `skill-disabled:${skillItemKey(item.kind, item.name, item.registry)}`, description: RESTART_WARNING });
+  if (done) notify({ level: "warning", title: `Disabled ${item.name}`, id: `skill-disabled:${skillItemKey(item.kind, item.name, item.registry)}`, description: RESTART_WARNING });
   return done;
 }
 

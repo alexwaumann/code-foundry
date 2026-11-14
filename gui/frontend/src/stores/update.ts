@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { appInfo, onCheckForUpdatesMenu, relaunchApp } from "@/api/app";
 import { invokeCommand, isUnknownCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
@@ -51,7 +51,7 @@ export function applyUpdateEvent(ev: UpdateEventView): void {
   if (ev.kind === "relaunch") {
     // Inside the app the Wails host follows relaunch requests itself (gui/relaunch.go).
     void appInfo().then((app) => {
-      if (!app) toast.info("Relaunch requested", { description: "Reopen the app to run the installed version." });
+      if (!app) notify({ level: "info", title: "Relaunch requested", description: "Reopen the app to run the installed version." });
     });
     return;
   }
@@ -137,7 +137,7 @@ export async function runUpdateAction(action: UpdateAction): Promise<boolean> {
     }
     const res = await invokeConfirmed(actionCommands[action], {}, getUiContext());
     if (!res) return false;
-    if (action === "relaunch" && res.message.startsWith("no app window")) toast.info(res.message);
+    if (action === "relaunch" && res.message.startsWith("no app window")) notify({ level: "info", title: "Relaunch requested", description: res.message });
     return true;
   } catch (err) {
     useUpdateStore.setState({ error: errorMessage(err) });

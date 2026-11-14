@@ -5,7 +5,7 @@
  * args and the page's context, so the palette and the CLI reach the same code; opening
  * the instructions file is a File tab (GUI state, like a path chip).
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import type { UiContextView } from "@/api/command";
 import type { WorkspaceView } from "@/api/workspace";
@@ -133,7 +133,7 @@ export async function editWorkspaceInstructions(workspaceId: string): Promise<bo
     if (!res) return false;
     lastEdit.set(workspaceId, step.id);
     selectThread(step.id);
-    toast.success(`Sent to ${threadLabel(useThreadsStore.getState().byId[step.id]?.name ?? "", step.id)}`);
+    notify({ level: "success", title: `Sent to ${threadLabel(useThreadsStore.getState().byId[step.id]?.name ?? "", step.id)}` });
     return true;
   }
   const res = await runCommandForResult(
