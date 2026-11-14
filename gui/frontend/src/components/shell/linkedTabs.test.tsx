@@ -20,6 +20,7 @@ const { resetLayout, useLayoutStore } = await import("@/stores/layout");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useTerminalsStore } = await import("@/stores/terminals");
+const { setShellFrame } = await import("@/stores/shellView");
 const { setTabCut, useTabCut } = await import("@/shell/tabCut");
 const { diffKey, prKey } = await import("@/shell/linked");
 
@@ -159,6 +160,36 @@ describe("the pane's + menu", () => {
     fireEvent.click(within(menu).getByText("make dev"));
     await settle();
     expect(runs).toEqual([{ name: "ui.focus.terminal", args: { id: "t-dev", pane: "p-2" }, thread: "" }]);
+  });
+});
+
+describe("the + menu of a pane of terminals (docs/notes/shell-25f-sizes.md)", () => {
+  // A thread beside a pane holding only a terminal: 480 + 12 + 300 = 792 wide; anything else in
+  // the terminal's pane raises its minimum to 480, so the row needs 972.
+  const TERMS = layoutOf([space(row("s-r", [pane("p-1", [tab("t-th", "thread", "s-1", { key: "thread:s-1" })]), pane("p-t", [tab("t-term", "terminal", "s-1", { key: "term:t-x", params: { terminal: "t-x" } })])]), "p-1")], 2);
+  const grid = (w: number) => {
+    setShellFrame({ w, h: 800, rects: {}, gutters: [] });
+  };
+  afterEach(() => {
+    setShellFrame(null);
+  });
+
+  it("lists only Terminal while nothing else would fit there", async () => {
+    await seedLayout(TERMS);
+    grid(900);
+    expect(entries(openPlus("p-t"))).toEqual(["Terminal"]);
+  });
+
+  it("lists everything once the pane could grow to a pane's minimum", async () => {
+    await seedLayout(TERMS);
+    grid(972);
+    expect(entries(openPlus("p-t"))).toEqual(["New thread⌘N", "Terminal", "Pull Requests", "Projects"]);
+  });
+
+  it("a pane that is not all terminals lists everything, however narrow the grid", async () => {
+    await seedLayout(TERMS);
+    grid(500);
+    expect(entries(openPlus("p-1"))).toEqual(["# This thread", "Refactor sidebar tree", "—", "New thread⌘N", "Terminal", "Pull Requests", "Projects"]);
   });
 });
 

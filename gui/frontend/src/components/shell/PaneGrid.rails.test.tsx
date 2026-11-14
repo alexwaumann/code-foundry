@@ -42,7 +42,7 @@ const TREE = row("s-r", [
   pane("p-c", [tab("t-th2", "thread", "s-2"), tab("t-prs", "prs")], "t-prs"),
 ]);
 
-let width = 1400;
+let width = 1500;
 function sized(w: number): void {
   width = w;
 }
@@ -79,8 +79,8 @@ afterEach(() => {
 
 describe("rails in the pane grid", () => {
   it.each([
-    [1400, []],
-    [800, ["p-b"]],
+    [1500, []],
+    [1100, ["p-b"]],
     [600, ["p-b", "p-c"]],
   ])("at %ipx wide, the panes rails.ts folds are rails (%j) and the rest are open", async (w, want) => {
     sized(w);
@@ -159,7 +159,7 @@ describe("rails in the pane grid", () => {
 
 describe("full screen in the pane grid", () => {
   it("draws only the focused pane, over the whole area, with no gutter; the others mount nothing", async () => {
-    sized(1400);
+    sized(1500);
     await seed();
     render(<PaneGrid />);
     expect(open()).toHaveLength(3);
@@ -169,7 +169,7 @@ describe("full screen in the pane grid", () => {
     expect(open()).toEqual(["p-a"]);
     expect(rails()).toEqual([]);
     const el = screen.getByTestId("shell-pane");
-    expect([el.style.left, el.style.top, el.style.width, el.style.height]).toEqual(["0px", "0px", "1400px", "800px"]);
+    expect([el.style.left, el.style.top, el.style.width, el.style.height]).toEqual(["0px", "0px", "1500px", "800px"]);
     expect(el.hasAttribute("data-fullscreen")).toBe(true);
     expect(screen.queryAllByTestId("shell-gutter")).toHaveLength(0);
     expect(bodies()).toEqual(["thread:s-1"]);
@@ -193,7 +193,7 @@ describe("full screen in the pane grid", () => {
   });
 
   it("every open pane's strip has a full screen button", async () => {
-    sized(1400);
+    sized(1500);
     await seed();
     render(<PaneGrid />);
     expect(screen.getAllByTestId("shell-fullscreen")).toHaveLength(3);

@@ -241,6 +241,8 @@ test("cmd+S saves the editor with the keyboard, not the focused pane's tab, and 
   await writeDisk(b, "b\n");
   // a.txt and b.txt side by side, each in its own pane beside the thread, b's over the thread's diff.
   const fileOf = (id: string, path: string) => ({ id, kind: "file", thread: "s-1", params: { project: "repo-cf", base: CF, path }, title: path.split("/").pop() });
+  // Wide enough for three panes at their 480px minimum (docs/notes/shell-25f-sizes.md).
+  await page.setViewportSize({ width: 1800, height: 900 });
   await seedLayout(rowNode([paneNode("p-1", [threadTab("s-1")]), paneNode("p-2", [fileOf("t-a", a)]), paneNode("p-3", [fileOf("t-b", b), diffTab("s-1")])], [0.34, 0.33, 0.33]), "p-1");
   await openShellApp(page);
   const shown = (path: string) => page.locator(`[data-testid="file-tab"][data-path="${path}"]`);
@@ -294,6 +296,8 @@ test("a clean document following the file keeps the keyboard and the caret", asy
 });
 
 test("moving a clean tab to another pane keeps its document and undo", async ({ page }) => {
+  // Tall enough for a pane under the diff's, both at their 400px minimum.
+  await page.setViewportSize({ width: 1280, height: 900 });
   const notes = `${CF}/notes.txt`;
   await writeDisk(notes, "one\n");
   await openFile(page, "notes.txt");
@@ -423,8 +427,11 @@ test("caret and selection sit on an emoji line's text at 125%, wrapped or not, a
 });
 
 test("at 175% the caret sits on its text on every row of a wrapped ASCII line", async ({ page }) => {
-  // Wide enough that the file's pane stays open at 175%.
-  await page.setViewportSize({ width: 2400, height: 1100 });
+  // Wide enough that the file's pane stays open at 175%. 2305 keeps the grid this test was written
+  // at (2400 with the old 260px sidebar; the sidebar at its minimum now follows the top bar's toggle,
+  // 206 layout px at 175%): at some wider panes the caret lands a pixel off on a wrapped row, a
+  // separate issue (docs/notes/shell-25f-sizes.md).
+  await page.setViewportSize({ width: 2305, height: 1100 });
   const words = Array.from({ length: 6 }, () => "lorem ipsum dolor sit amet consectetur adipiscing elit").join(" ");
   await writeDisk(`${CF}/src/words.ts`, `const words = "${words}";\n`);
   await openFile(page, "src/words.ts");

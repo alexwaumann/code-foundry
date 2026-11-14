@@ -14,9 +14,17 @@
  *      strip at the end). A body too narrow for a split has no left and right edges, one too short no top
  *      and bottom edges.
  *   4. Anything else (a gutter, outside the bands): no target.
- * See docs/notes/shell-14-drag.md.
+ *
+ * Only drops whose result fits are offered (docs/notes/shell-model.md, "Room for panes";
+ * `room.ts`): an outer edge whose result would not fit is no band (the pane under it answers); a
+ * pane edge whose split would not fit is no zone, and its part of the body adds to the pane like
+ * the middle; a pane that the dragged tabs would raise past the room (a pane of terminals) is no
+ * target at all, its strip and middle included. The scene's `tree` is what this is computed on;
+ * without one every drop fits.
+ * See docs/notes/shell-14-drag.md and docs/notes/shell-25f-sizes.md.
  */
-import type { Frame, Rect } from "@/shell/geometry/types";
+import type { Frame, GeoNode, Rect } from "@/shell/geometry/types";
+import { dropFits } from "./room";
 
 export type Edge = "left" | "right" | "top" | "bottom";
 
@@ -52,6 +60,8 @@ export interface DragScene {
   strips: Readonly<Record<string, readonly StripTab[]>>;
   /** The height of a pane's strip. */
   stripHeight: number;
+  /** The space's pane tree as drawn: drops whose result would not fit its area are not offered. */
+  tree?: GeoNode | null;
 }
 
 export interface Point {
@@ -105,8 +115,12 @@ export function outerEdge(frame: Frame, p: Point): Edge | null {
   return best ? best[0] : null;
 }
 
-/** The edge zone of a pane's body the pointer is in, or null in its middle. */
-export function bodyEdge(body: Rect, p: Point): Edge | null {
+/**
+ * The edge zone of a pane's body the pointer is in, or null in its middle. Only the edges `offered`
+ * says yes to are zones (default: all); the part of the body an edge left out would have is the
+ * middle.
+ */
+export function bodyEdge(body: Rect, p: Point, offered: (e: Edge) => boolean = () => true): Edge | null {
   const tx = Math.min(body.w * EDGE_SHARE, EDGE_MAX.w);
   const ty = Math.min(body.h * EDGE_SHARE, EDGE_MAX.h);
   const near: [Edge, number][] = [];
@@ -114,29 +128,39 @@ export function bodyEdge(body: Rect, p: Point): Edge | null {
   if (body.h >= EDGE_MIN.h) near.push(["top", (p.y - body.y) / ty], ["bottom", (body.y + body.h - p.y) / ty]);
   let best: [Edge, number] | null = null;
   for (const n of near) {
-    if (n[1] < 1 && (!best || n[1] < best[1])) best = n;
+    if (n[1] < 1 && (!best || n[1] < best[1]) && offered(n[0])) best = n;
   }
   return best ? best[0] : null;
 }
 
+/** Whether the drop's result fits the frame's area (room.ts); always without a tree. */
+function fits(scene: DragScene, source: DragSource, t: DropTarget): boolean {
+  return dropFits(scene.tree ?? null, source, t, scene.frame);
+}
+
 /** The raw target under the pointer, before asking whether the drop would do anything. */
-function zoneAt(scene: DragScene, p: Point): DropTarget | null {
+function zoneAt(scene: DragScene, source: DragSource, p: Point): DropTarget | null {
   const outer = outerEdge(scene.frame, p);
-  if (outer) return { kind: "outer", edge: outer };
+  if (outer && fits(scene, source, { kind: "outer", edge: outer })) return { kind: "outer", edge: outer };
   for (const [pane, r] of Object.entries(scene.frame.rects)) {
     if (!inside(r, p)) continue;
+    // A pane the dragged tabs would raise past the room is no target: not its strip, not its middle.
+    const joins = fits(scene, source, { kind: "pane", pane });
     // A rail (a folded pane) is one target as a whole: a tab joins the end of its tabs.
-    if (r.rail) return { kind: "pane", pane };
+    if (r.rail) return joins ? { kind: "pane", pane } : null;
     const strip = Math.min(scene.stripHeight, r.h);
     if (p.y < r.y + strip)
-      return {
-        kind: "strip",
-        pane,
-        index: stripIndex(tabsOf(scene, pane), p.x),
-      };
+      return joins
+        ? {
+            kind: "strip",
+            pane,
+            index: stripIndex(tabsOf(scene, pane), p.x),
+          }
+        : null;
     const body = { x: r.x, y: r.y + strip, w: r.w, h: r.h - strip };
-    const edge = bodyEdge(body, p);
-    return edge ? { kind: "edge", pane, edge } : { kind: "pane", pane };
+    const edge = bodyEdge(body, p, (e) => fits(scene, source, { kind: "edge", pane, edge: e }));
+    if (edge) return { kind: "edge", pane, edge };
+    return joins ? { kind: "pane", pane } : null;
   }
   return null;
 }
@@ -165,7 +189,7 @@ function allowed(scene: DragScene, source: DragSource, t: DropTarget): boolean {
 
 /** The drop target for `source` with the pointer at `p`, or null where a drop does nothing. */
 export function dropTarget(scene: DragScene, source: DragSource, p: Point): DropTarget | null {
-  const t = zoneAt(scene, p);
+  const t = zoneAt(scene, source, p);
   return t && allowed(scene, source, t) ? t : null;
 }
 

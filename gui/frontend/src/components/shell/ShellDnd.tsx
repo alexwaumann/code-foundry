@@ -12,7 +12,8 @@ import { fullscreenOn } from "@/shell/fullscreen";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
 import { threadDropArgs } from "@/shell/drag/threadDrop";
-import type { GeoNode } from "@/shell/geometry/types";
+import { panesOf, type GeoNode } from "@/shell/geometry/types";
+import { paneFitsInSpace } from "@/shell/drag/room";
 import { runSpaceDrop } from "@/shell/spaceActions";
 import { spaceDropCommands } from "@/shell/spaces";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
@@ -89,13 +90,28 @@ function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
   };
   const g = grid.getBoundingClientRect();
   const z = zoomFactor();
+  const tree = geoTree(layout, spaceId);
   return {
     origin: { x: g.left / z, y: g.top / z },
-    scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT },
-    tree: geoTree(layout, spaceId),
+    // The tree: a drop whose result would not fit the grid is not offered (shell/drag/room.ts).
+    scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT, tree },
+    tree,
     lay: shellDropLayout(layout.spaces[spaceId]?.mru),
     names,
   };
+}
+
+/**
+ * Whether a pane dropped on a space tab fits that space (pane.move --space puts it right of the
+ * space's focused pane; docs/notes/shell-model.md, "Room for panes"). A tab or a thread goes into
+ * a pane there, so only a pane is checked.
+ */
+function fitsInSpace(source: DragSource, space: string, s: Snapshot): boolean {
+  if (source.kind !== "pane") return true;
+  const pane = panesOf(s.tree).find((p) => p.id === source.pane);
+  if (!pane) return true;
+  const layout = useLayoutStore.getState();
+  return paneFitsInSpace(geoTree(layout, space), layout.spaces[space]?.focus, pane, s.scene.frame);
 }
 
 /** A space's name for the announcements. */
@@ -275,7 +291,7 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     const tb = topBar.current;
     if (tb.bar && within(tb.bar, client)) {
       const hit = tb.spaces.find((x) => within(x.box, client));
-      const space = hit && spaceDropCommands(st.source, hit.id, useLayoutStore.getState()) ? hit.id : "";
+      const space = hit && spaceDropCommands(st.source, hit.id, useLayoutStore.getState()) && fitsInSpace(st.source, hit.id, s) ? hit.id : "";
       useShellDragStore.setState({ client, target: null, preview: null, bar: null, space });
       return;
     }

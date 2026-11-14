@@ -4,10 +4,10 @@ import { col, pane, randomTree, rng, row } from "@/test/shellTrees";
 import { neighbour, type Direction } from "./neighbours";
 import { shellFrame } from "./rails";
 import {
-  DEFAULT_MINIMUM,
   GUTTER,
-  PANE_MINIMUMS,
+  PANE_MINIMUM,
   RAIL,
+  TERMINAL_MINIMUM,
   frameRects,
   minimumOf,
   paneMinimum,
@@ -71,19 +71,25 @@ describe("plainRects agrees with the daemon's Rects", () => {
 });
 
 describe("pane minimums", () => {
-  it("come from the active tab's kind, else the default", () => {
-    expect(paneMinimum(pane("p", "thread:a"))).toEqual(PANE_MINIMUMS.thread);
-    expect(paneMinimum(pane("p", "terminal", "thread:a"))).toEqual({ w: 240, h: 110 });
-    expect(paneMinimum({ ...pane("p", "terminal", "diff:a"), active: "p/1" })).toEqual({ w: 260, h: 150 });
-    expect(paneMinimum(pane("p", "prs"))).toEqual(DEFAULT_MINIMUM);
-    expect(paneMinimum(pane("p"))).toEqual(DEFAULT_MINIMUM);
+  it("are one size for every pane, a smaller one for a pane of terminals only, whatever tab is active", () => {
+    expect(PANE_MINIMUM).toEqual({ w: 480, h: 400 });
+    expect(TERMINAL_MINIMUM).toEqual({ w: 300, h: 220 });
+    expect(paneMinimum(pane("p", "thread:a"))).toEqual(PANE_MINIMUM);
+    expect(paneMinimum(pane("p", "diff:a"))).toEqual(PANE_MINIMUM);
+    expect(paneMinimum(pane("p", "prs"))).toEqual(PANE_MINIMUM);
+    expect(paneMinimum(pane("p", "terminal"))).toEqual(TERMINAL_MINIMUM);
+    expect(paneMinimum(pane("p", "terminal", "terminal"))).toEqual(TERMINAL_MINIMUM);
+    // A terminal with anything else: the pane's minimum, the terminal active or not.
+    expect(paneMinimum(pane("p", "terminal", "thread:a"))).toEqual(PANE_MINIMUM);
+    expect(paneMinimum({ ...pane("p", "terminal", "diff:a"), active: "p/1" })).toEqual(PANE_MINIMUM);
+    expect(paneMinimum(pane("p"))).toEqual(PANE_MINIMUM);
   });
 
   it("add up along a split with its gutters, and take the largest across it", () => {
     const tree = row("s", [0.5, 0.5], pane("a", "thread:x"), col("c", [0.5, 0.5], pane("b", "terminal"), pane("d", "diff")));
-    expect(minimumOf(tree)).toEqual({ w: 360 + GUTTER + 260, h: 110 + GUTTER + 150 });
-    expect(minimumOf(tree, new Set(["b", "d"]))).toEqual({ w: 360 + GUTTER + RAIL, h: 220 });
-    expect(minimumOf(tree, new Set(["d"]))).toEqual({ w: 360 + GUTTER + 240, h: 220 });
+    expect(minimumOf(tree)).toEqual({ w: 480 + GUTTER + 480, h: 220 + GUTTER + 400 });
+    expect(minimumOf(tree, new Set(["b", "d"]))).toEqual({ w: 480 + GUTTER + RAIL, h: 400 });
+    expect(minimumOf(tree, new Set(["d"]))).toEqual({ w: 480 + GUTTER + 300, h: 400 });
     expect(minimumOf(null)).toEqual({ w: 0, h: 0 });
   });
 
@@ -92,16 +98,16 @@ describe("pane minimums", () => {
     {
       doc: "a pane whose share falls short is held at its minimum, the rest share again",
       root: row("s", [0.8, 0.2], pane("a", "thread:x"), pane("b", "diff:x")),
-      w: 1000,
+      w: 1200,
       h: 600,
-      want: { a: [0, 0, 728, 600], b: [740, 0, 260, 600] },
+      want: { a: [0, 0, 708, 600], b: [720, 0, 480, 600] },
     },
     {
-      doc: "the thread's minimum is larger",
-      root: row("s", [0.2, 0.8], pane("a", "thread:x"), pane("b", "diff:x")),
+      doc: "a pane of terminals is held at its smaller minimum",
+      root: row("s", [0.2, 0.8], pane("a", "terminal"), pane("b", "thread:x")),
       w: 1000,
       h: 600,
-      want: { a: [0, 0, 360, 600], b: [372, 0, 628, 600] },
+      want: { a: [0, 0, 300, 600], b: [312, 0, 688, 600] },
     },
     {
       doc: "shares that already fit are the plain ones",
@@ -112,25 +118,25 @@ describe("pane minimums", () => {
     },
     {
       doc: "when the minimums do not fit, the panes share in proportion to their minimums",
-      root: row("s", [0.8, 0.2], pane("a", "thread:x"), pane("b", "diff:x")),
-      w: 500,
+      root: row("s", [0.8, 0.2], pane("a", "thread:x"), pane("b", "terminal")),
+      w: 600,
       h: 600,
-      want: { a: [0, 0, 283, 600], b: [295, 0, 205, 600] },
+      want: { a: [0, 0, 362, 600], b: [374, 0, 226, 600] },
     },
     {
       doc: "a column holds a short terminal at its minimum height",
       root: col("s", [0.9, 0.1], pane("a", "thread:x"), pane("b", "terminal")),
       w: 800,
-      h: 600,
-      want: { a: [0, 0, 800, 478], b: [0, 490, 800, 110] },
+      h: 700,
+      want: { a: [0, 0, 800, 468], b: [0, 480, 800, 220] },
     },
     {
       doc: "a rail in a row is 36px wide and the others share the rest",
       root: row("s", [0.4, 0.3, 0.3], pane("a", "thread:x"), pane("b", "diff:x"), pane("c", "terminal")),
-      w: 800,
+      w: 1000,
       h: 500,
       rails: ["b"],
-      want: { a: [0, 0, 423, 500], b: [435, 0, 36, 500], c: [483, 0, 317, 500] },
+      want: { a: [0, 0, 537, 500], b: [549, 0, 36, 500], c: [597, 0, 403, 500] },
     },
     {
       doc: "a rail in a column is 36px tall",

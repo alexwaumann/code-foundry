@@ -19,7 +19,9 @@ import { terminalName } from "@/lib/terminalName";
 import { plusAction, showTerminalAction, tabbedTerminalIds, untabbedTerminals, type LinkedAction, type PlusItem } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
 import { useThreadName } from "@/shell/useThreadName";
-import { useLayoutStore } from "@/stores/layout";
+import { paneTakesAnyTab } from "@/shell/drag/room";
+import { geoTree, useLayoutStore } from "@/stores/layout";
+import { useShellViewStore } from "@/stores/shellView";
 import { useTerminalsStore } from "@/stores/terminals";
 import { TERMINAL_ICONS } from "./terminalIcons";
 import { ThreadDot } from "./ThreadDot";
@@ -39,6 +41,17 @@ function useActiveThread(paneId: string): string {
     const t = p ? s.tabs[p.active] : undefined;
     return t?.kind === "thread" ? t.thread : "";
   });
+}
+
+/**
+ * Whether the pane can take a tab other than a terminal (shell/drag/room.ts paneTakesAnyTab): a
+ * pane of terminals with no room to grow to a pane's minimum cannot, and its "+" lists only
+ * terminals (docs/notes/shell-model.md, "A pane's +"). Before the grid has measured, it can.
+ */
+function useTakesAnyTab(paneId: string, spaceId: string): boolean {
+  const w = useShellViewStore((s) => s.frame?.w ?? 0);
+  const h = useShellViewStore((s) => s.frame?.h ?? 0);
+  return useLayoutStore((s) => !(w > 0 && h > 0) || paneTakesAnyTab(geoTree(s, spaceId), paneId, { w, h }));
 }
 
 /** The ids of the running terminals no tab shows (shell/linked.ts untabbedTerminals). */
@@ -96,13 +109,15 @@ function ThreadSub({ threadId, paneId, spaceId, pick }: { threadId: string; pane
  * Open ▸ items); then New thread, Terminal (a free one), Pull Requests and Projects. The choice
  * opens in this pane (`--pane`), except a linked surface already open, which is focused where it
  * is (shell/linked.ts). Under Terminal, the running terminals that have no tab (a classic bottom
- * panel's shells): a pick gives one a tab here. Keyboard: Enter or Space opens it, arrows move,
- * right opens the submenu.
+ * panel's shells): a pick gives one a tab here. In a pane of terminals that has no room for
+ * anything else, only Terminal (and the untabbed ones). Keyboard: Enter or Space opens it,
+ * arrows move, right opens the submenu.
  */
 export function PanePlusMenu({ paneId }: { paneId: string }) {
   const threadId = useActiveThread(paneId);
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
   const untabbed = useUntabbedTerminals();
+  const anyTab = useTakesAnyTab(paneId, spaceId);
   const [open, setOpen] = useState(false);
   // A pick that moves the keyboard (a tab, a composer) keeps it there when the menu closes.
   const picked = useRef(false);
@@ -139,7 +154,7 @@ export function PanePlusMenu({ paneId }: { paneId: string }) {
         }}
       >
         {threadId && <ThreadSub threadId={threadId} paneId={paneId} spaceId={spaceId} pick={pick} />}
-        {GENERAL.map(({ item, label, icon: Icon, chord }) => (
+        {GENERAL.filter(({ item }) => anyTab || item === "terminal").map(({ item, label, icon: Icon, chord }) => (
           <Fragment key={item}>
             <DropdownMenuItem
               data-testid="plus-item"

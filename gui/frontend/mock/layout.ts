@@ -15,6 +15,8 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { LayoutDir, LayoutEdge, type LayoutEventSchema, type LayoutOp, type LayoutSchema, type LayoutSpaceSchema, type LayoutTab, type LayoutTabSchema, type LayoutNodeSchema, type ThreadLayoutSchema } from "../src/gen/codefoundry/v1/layout_pb";
 import { outerFrac } from "../src/shell/drag/outerFrac";
+import { terminalsOnly, treeFits } from "../src/shell/geometry/rects";
+import type { GeoNode } from "../src/shell/geometry/types";
 import { identify as identifyTab, identityKindOf, isRefusal, type IdentityKind } from "../src/shell/identity";
 
 // ---- The model (internal/layout/model.go's JSON) ----
@@ -639,6 +641,62 @@ function toOuter(t: Tx, sp: Space, node: Node, edge: Edge, frac: number | undefi
   insertBeside(sp, sp.root.id, edge, node, outerFrac(sp.root, kind, edge, frac, w, h), t.newID("s-"));
 }
 
+// ---- Room for panes (internal/layout fit.go; docs/notes/shell-25f-sizes.md) ----
+
+/** The pane area an op lays out in when it names none (internal/layout place.go DefaultW, DefaultH). */
+const DEFAULT_AREA = { w: 1180, h: 820 };
+
+/** The refusal of an op whose result would not fit (internal/layout NoRoom). */
+export const NO_ROOM = "no room for another pane here: collapse or close one first";
+
+interface Area {
+  w: number;
+  h: number;
+}
+
+/** The op's pane area, else the default (internal/layout viewport). */
+function areaOf(o: Op): Area {
+  const w = num(o, "w") ?? 0;
+  const h = num(o, "h") ?? 0;
+  return w > 0 && h > 0 ? { w, h } : DEFAULT_AREA;
+}
+
+/** Whether sp's tree fits the area with no pane folded automatically (the window's own treeFits, Go's Fits). */
+function fitsSpace(sp: Space, a: Area): boolean {
+  return treeFits((sp.root ?? null) as GeoNode | null, a.w, a.h);
+}
+
+/** Refuses an op whose result does not fit (Go's needRoom). */
+function needRoom(sp: Space, a: Area): void {
+  if (!fitsSpace(sp, a)) fail("failed_precondition", NO_ROOM);
+}
+
+/** Whether tabs joining p raise its minimum: p holds only terminals and one of them is not one. */
+function raises(p: Node, tabs: readonly Tab[]): boolean {
+  return terminalsOnly(p.tabs) && !terminalsOnly(tabs);
+}
+
+/** Whether open pane p can take tabs and the tree still fit (Go's canTake); a collapsed one takes anything. */
+function canTake(sp: Space, p: Node, a: Area, tabs: readonly Tab[]): boolean {
+  if (p.collapsed || !raises(p, tabs)) return true;
+  const saved = p.tabs;
+  p.tabs = [...(saved ?? []), ...tabs];
+  const ok = fitsSpace(sp, a);
+  p.tabs = saved;
+  return ok;
+}
+
+/** The focused pane when it can take tb, else the most recently focused open pane that can, else the focused one (Go's hostPane). */
+function hostPane(sp: Space, a: Area, tb: Tab): Node | undefined {
+  const all = panes(sp.root);
+  const fp = all.find((p) => p.id === sp.focus);
+  if (!fp || canTake(sp, fp, a, [tb])) return fp;
+  const order: Node[] = [];
+  for (const id of sp.mru ?? []) for (const p of all) if (tabIndex(p, id) >= 0 && !order.includes(p)) order.push(p);
+  for (const p of all) if (!order.includes(p)) order.push(p);
+  return order.find((p) => !p.collapsed && canTake(sp, p, a, [tb])) ?? fp;
+}
+
 type OpFn = (t: Tx, o: Op) => Result;
 
 /** The ops the mock runs, by internal/layout's names. */
@@ -661,7 +719,9 @@ const ops = {
       t.show(at.sp, at.pane, same.id, o.focus === true);
       return { space: at.sp.id, pane: at.pane.id, tab: same.id, existing: true };
     }
-    pane ??= panes(sp.root).find((p) => p.id === sp.focus);
+    const a = areaOf(o);
+    if (pane && !canTake(sp, pane, a, [tb])) fail("failed_precondition", NO_ROOM);
+    pane ??= hostPane(sp, a, tb);
     if (!pane) {
       pane = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
       sp.root = pane;
@@ -683,6 +743,7 @@ const ops = {
     if (same) fail("already_exists", `${same.key ?? ""} is already open as ${same.id}`);
     const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
     insertBeside(sp, target.id, edge, np, num(o, "frac"), t.newID("s-"));
+    needRoom(sp, areaOf(o));
     t.show(sp, np, tb.id, o.focus === true);
     return { space: sp.id, pane: np.id, tab: tb.id };
   },
@@ -707,6 +768,9 @@ const ops = {
     }
     const wasFocused = focusedTab(from) === tb.id;
     const index = num(o, "index");
+    const a = areaOf(o);
+    // The tab joins a pane whose minimum it raises: the result must then fit.
+    let raised = false;
     if (target && edge) {
       if (target === src && (src.tabs ?? []).length === 1) {
         focusTab(to, src, tb.id);
@@ -724,6 +788,7 @@ const ops = {
         if (i < at) at--;
         src.tabs?.splice(i, 1);
       } else {
+        raised = !into.collapsed && raises(into, [tb]);
         detach(from, src, tb.id);
       }
       const tabs = (into.tabs ??= []);
@@ -735,7 +800,8 @@ const ops = {
     } else {
       if (to === from) fail("invalid_argument", "move_tab needs a pane, an edge or another space");
       detach(from, src, tb.id);
-      target = panes(to.root).find((p) => p.id === to.focus);
+      target = hostPane(to, a, tb);
+      if (target) raised = !target.collapsed && raises(target, [tb]);
       if (!target) {
         target = { t: "pane", id: t.newID("p-"), tabs: [tb] };
         to.root = target;
@@ -744,6 +810,7 @@ const ops = {
         tabs.splice(tabIndex(target, target.active) + 1, 0, tb);
       }
     }
+    if (edge || raised) needRoom(to, a);
     if (to !== from) {
       forget(from, tb.id);
       if (wasFocused) refocus(from);
@@ -787,6 +854,7 @@ const ops = {
       if (wasFocused) refocus(from);
       if (!to.root) to.root = pane;
       else insertBeside(to, to.focus ?? "", "right", pane, DEFAULT_FRAC, t.newID("s-"));
+      needRoom(to, areaOf(o));
       focusTab(to, pane, pane.active ?? "");
       const res: Result = { space: to.id, pane: pane.id, tab: pane.active };
       const closed: Tab[] = [];
@@ -795,7 +863,7 @@ const ops = {
           closed.push(tb);
           continue;
         }
-        place(t, to, null, tb, false);
+        place(t, to, null, tb, false, areaOf(o));
       }
       focusTab(to, pane, pane.active ?? "");
       if (closed.length) res.closed = closed;
@@ -811,6 +879,7 @@ const ops = {
       removeNode(from, pane.id);
       insertBeside(from, target.id, edge, pane, num(o, "frac"), t.newID("s-"));
     }
+    needRoom(from, areaOf(o));
     focusTab(from, pane, pane.active ?? "");
     return { space: from.id, pane: pane.id, tab: pane.active };
   },
@@ -819,11 +888,13 @@ const ops = {
     const { sp, pane } = t.pane(str(o, "pane"));
     const { sp: tsp, pane: target } = t.pane(str(o, "target"));
     if (tsp !== sp || target === pane) fail("invalid_argument", `pane ${pane.id} cannot merge into ${target.id}`);
+    const raised = !target.collapsed && raises(target, pane.tabs ?? []);
     removeNode(sp, pane.id);
     const tabs = (target.tabs ??= []);
     const index = num(o, "index");
     const at = index === undefined ? tabs.length : clampIndex(index, tabs.length);
     tabs.splice(at, 0, ...(pane.tabs ?? []));
+    if (raised) needRoom(sp, areaOf(o));
     t.focusTab(sp, target, pane.active ?? "");
     return { space: sp.id, pane: target.id, tab: pane.active };
   },
@@ -1112,10 +1183,11 @@ const ops = {
       const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
       if (pane) insertBeside(sp, pane.id, edge, np, undefined, t.newID("s-"));
       else toOuter(t, sp, np, edge, undefined, num(o, "w") ?? 0, num(o, "h") ?? 0);
+      needRoom(sp, areaOf(o));
       t.show(sp, np, tb.id, o.focus === true);
       return { space: sp.id, pane: np.id, tab: tb.id, rule: "edge" };
     }
-    return ops.add_tab(t, { op: "add_tab", space: sp.id, ...(pane ? { pane: pane.id } : {}), ...(index !== undefined ? { index } : {}), tab: { id: "", kind: "thread", thread }, focus: o.focus === true });
+    return ops.add_tab(t, { op: "add_tab", space: sp.id, ...(pane ? { pane: pane.id } : {}), ...(index !== undefined ? { index } : {}), tab: { id: "", kind: "thread", thread }, focus: o.focus === true, ...areaOf(o) });
   },
 
   close_thread(t: Tx, o: Op): Result {
@@ -1200,7 +1272,7 @@ const ops = {
     const behind = str(o, "behind");
     const keep = behind && o.focus !== true ? t.findTabOrNull(behind) : null;
     const shown = keep?.pane.active === behind ? keep.pane : null;
-    const res = place(t, sp, chosen, tb, o.focus === true);
+    const res = place(t, sp, chosen, tb, o.focus === true, areaOf(o));
     if (shown && res.pane === shown.id && tabIndex(shown, behind) >= 0) shown.active = behind;
     return res;
   },
@@ -1210,7 +1282,7 @@ const ops = {
   new_thread(t: Tx, o: Op): Result {
     const params = o.params && typeof o.params === "object" ? { ...(o.params as Record<string, string>) } : undefined;
     if (params?.draft) fail("invalid_argument", "new_thread opens the empty composer; a draft opens with open_draft");
-    return ops.open_surface(t, { op: "open_surface", space: str(o, "space"), pane: str(o, "pane"), tab: { id: "", kind: "compose", ...(params ? { params } : {}) }, focus: o.focus === true });
+    return ops.open_surface(t, { op: "open_surface", space: str(o, "space"), pane: str(o, "pane"), tab: { id: "", kind: "compose", ...(params ? { params } : {}) }, focus: o.focus === true, ...areaOf(o) });
   },
 
   start_draft(t: Tx, o: Op): Result {
@@ -1282,7 +1354,7 @@ const ops = {
 
   open_draft(t: Tx, o: Op): Result {
     const { sp, draft } = needDraft(t, str(o, "draft"));
-    const res = place(t, sp, null, { id: "", kind: "compose", params: { ...draft.params, draft: draft.id } }, o.focus === true);
+    const res = place(t, sp, null, { id: "", kind: "compose", params: { ...draft.params, draft: draft.id } }, o.focus === true, areaOf(o));
     return { ...res, draft: draft.id };
   },
 };
@@ -1297,9 +1369,10 @@ function needDraft(t: Tx, id: string): { sp: Space; draft: Draft } {
  * is, or moved into the caller's pane when unlinked), the caller's pane, else the focused pane,
  * else the first pane of an empty space. A linked tab of a thread whose tab is open in the space
  * is placed the mock's way, not by rules 2 to 6: after the last of its thread's linked tabs, else
- * in a new pane right of the thread's at 0.45 (rule "mock").
+ * in a new pane right of the thread's at 0.45 while the result fits, else after the thread's tab
+ * (rule "mock"). A pane of terminals that has no room for the tab is skipped, as in Go (canTake).
  */
-function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean): Result {
+function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean, a: Area = DEFAULT_AREA): Result {
   const same = t.prepare(sp, tb);
   if (same) {
     if (tb.params !== undefined) same.params = tb.params;
@@ -1320,11 +1393,14 @@ function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean): 
     t.show(sp, p, tb.id, focus);
     return { space: sp.id, pane: p.id, tab: tb.id, rule };
   };
-  if (chosen) return put(chosen, tabIndex(chosen, chosen.active) + 1, "pane");
+  if (chosen) {
+    if (!canTake(sp, chosen, a, [tb])) fail("failed_precondition", NO_ROOM);
+    return put(chosen, tabIndex(chosen, chosen.active) + 1, "pane");
+  }
   const all = panes(sp.root);
   const own = isLinked(tb) ? all.find((p) => (p.tabs ?? []).some((x) => x.kind === "thread" && x.thread === tb.thread)) : undefined;
   if (!own) {
-    const fp = all.find((p) => p.id === sp.focus);
+    const fp = hostPane(sp, a, tb);
     if (!fp) {
       const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
       sp.root = np;
@@ -1333,15 +1409,19 @@ function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean): 
     }
     return put(fp, tabIndex(fp, fp.active) + 1, "focused");
   }
-  const holding = all.find((p) => (p.tabs ?? []).some((x) => isLinked(x) && x.thread === tb.thread));
+  const holding = all.find((p) => (p.tabs ?? []).some((x) => isLinked(x) && x.thread === tb.thread) && canTake(sp, p, a, [tb]));
   if (holding) {
     const last = (holding.tabs ?? []).reduce((n, x, i) => (isLinked(x) && x.thread === tb.thread ? i : n), -1);
     return put(holding, last + 1, "mock");
   }
-  const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
-  insertBeside(sp, own.id, "right", np, 0.45, t.newID("s-"));
-  t.show(sp, np, tb.id, focus);
-  return { space: sp.id, pane: np.id, tab: tb.id, rule: "mock" };
+  // A new pane right of the thread's while the result fits (Go's rule 5); else the thread's own pane (rule 6).
+  const probe: Space = { ...sp, root: structuredClone(sp.root) };
+  insertBeside(probe, own.id, "right", { t: "pane", id: "p-probe", tabs: [tb], active: tb.id }, 0.45, "s-probe");
+  if (!fitsSpace(probe, a)) return put(own, tabIndex(own, own.tabs?.find((x) => x.kind === "thread" && x.thread === tb.thread)?.id) + 1, "mock");
+  const real: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
+  insertBeside(sp, own.id, "right", real, 0.45, t.newID("s-"));
+  t.show(sp, real, tb.id, focus);
+  return { space: sp.id, pane: real.id, tab: tb.id, rule: "mock" };
 }
 
 const opTable: Readonly<Record<string, OpFn | undefined>> = ops;
@@ -1696,8 +1776,8 @@ export const SEEDS: Record<string, () => State> = {
   }),
 };
 
-/** The ops that lay panes out with the pane area here (a subset of internal/layout's measured ops: the mock ports no placement rules). */
-const MEASURED_OPS = ["move_tab", "move_pane"];
+/** The ops that lay panes out with the pane area here (internal/layout's measured ops the mock runs). */
+const MEASURED_OPS = ["move_tab", "move_pane", "merge_pane", "split_pane", "add_tab", "open_surface", "open_thread", "new_thread", "open_draft"];
 
 /** op with the reported pane area when it measures one and names none (internal/layout area.go WithArea). */
 function withArea(op: Op, vp: { width: number; height: number } | null): Op {

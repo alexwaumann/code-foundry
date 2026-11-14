@@ -56,10 +56,75 @@ function paneLength(page: Page, id: string, row: boolean): Promise<number> {
   );
 }
 
+/** A pane's minimum along an axis (docs/notes/shell-25f-sizes.md): 480 x 400, a pane of terminals only 300 x 220. */
+export function paneMinimumOf(n: LayoutNode | null, id: string, row: boolean): number {
+  const find = (x: LayoutNode | null): LayoutNode | null => (!x ? null : x.t === "pane" ? (x.id === id ? x : null) : x.kids.map(find).find(Boolean) ?? null);
+  const p = find(n);
+  const terms = p?.t === "pane" && p.tabs.length > 0 && p.tabs.every((t) => t.kind === "terminal");
+  return row ? (terms ? 300 : 480) : terms ? 220 : 400;
+}
+
+/** Two frames, so a resize has been measured and drawn. */
+async function frames(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
+/**
+ * Focuses pane `id` as a press on it does: only the focused pane (and its thread's) is ever drawn
+ * under its minimum, the others fold first (docs/notes/shell-model.md, "Small windows").
+ */
+export async function focusForNarrow(page: Page, id: string): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/layout.ts").then((m) => m.focusPane(${JSON.stringify(id)}))`);
+  await expect(page.locator(`[data-testid="shell-pane"][data-pane-id="${id}"]`)).toHaveAttribute("data-focused", "true");
+}
+
+/** The window's size before windowFor first changed it, per page: dragGutterBeside gives it back. */
+const resized = new WeakMap<Page, { width: number; height: number }>();
+
+/** Gives the window back the size it had before windowFor changed it, if it did. */
+export async function restoreWindow(page: Page): Promise<void> {
+  const vp = resized.get(page);
+  if (!vp) return;
+  resized.delete(page);
+  await page.setViewportSize(vp);
+  await frames(page);
+}
+
+/**
+ * Resizes the window until `len` measures `px`: proportions cannot draw a pane under its minimum,
+ * nor wider than the room the other panes' minimums leave it (docs/notes/shell-25f-sizes.md); a
+ * smaller window (where the others fold, or share what is left with it) or a larger one can. A
+ * binary search over the window's width (`row`) or height: with the proportions as they are, the
+ * pane is never smaller in a larger window, over the range searched.
+ */
+export async function windowFor(page: Page, len: () => Promise<number>, px: number, row: boolean): Promise<void> {
+  const vp = page.viewportSize() ?? { width: 1280, height: 800 };
+  if (!resized.has(page)) resized.set(page, vp);
+  const cur = row ? vp.width : vp.height;
+  const now = await len();
+  if (Math.abs(now - px) <= 1) return;
+  let lo = now > px ? 200 : cur;
+  let hi = now > px ? cur : cur + 3000;
+  const set = async (n: number) => {
+    await page.setViewportSize(row ? { width: n, height: vp.height } : { width: vp.width, height: n });
+    await frames(page);
+  };
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    await set(mid);
+    const at = await len();
+    if (Math.abs(at - px) <= 0.5) return;
+    if (at > px) hi = mid;
+    else lo = mid;
+  }
+  await set(Math.abs((await len()) - px) <= 1 ? hi : lo);
+}
+
 /**
  * Sizes a pane to `px` wide (`dir` "row") or tall ("col") by giving the nearest split along that
  * axis new proportions in the mock (one commit the window draws), its other kids keeping their
- * shares of what is left: what dragging the gutter would do.
+ * shares of what is left: what dragging the gutter would do. A size the minimums do not allow in
+ * this window resizes the window instead (windowFor), as a smaller or larger window draws it.
  */
 export async function setPaneSize(page: Page, paneId: string, px: number, dir: "row" | "col" = "row"): Promise<void> {
   const state = await layoutState();
@@ -89,6 +154,18 @@ export async function setPaneSize(page: Page, paneId: string, px: number, dir: "
   split.sizes = lens.map((l, i) => (i === at ? px / free : ((free - px) * l) / rest / free));
   const res = await fetch(`${mockUrl}/__mock/layout`, { method: "POST", body: JSON.stringify(state) });
   expect(res.ok).toBe(true);
+  // The window has the new proportions, and has drawn them.
+  const { rev } = (await res.json()) as { rev: number };
+  await expect.poll(() => page.evaluate(`__cfModule("/src/stores/layout.ts").then((m) => Number(m.useLayoutStore.getState().rev))`)).toBeGreaterThanOrEqual(rev);
+  await frames(page);
+  // Under the pane's minimum, proportions cannot draw it: a smaller window does.
+  if (px < paneMinimumOf(space?.root ?? null, paneId, row)) {
+    await focusForNarrow(page, paneId);
+    await windowFor(page, () => paneLength(page, paneId, row), px, row);
+  } else {
+    // The others held at their minimums may leave it less room than asked: a larger window gives it.
+    await windowFor(page, () => paneLength(page, paneId, row), px, row);
+  }
   await expect.poll(async () => Math.abs((await paneLength(page, paneId, row)) - Math.round(px))).toBeLessThanOrEqual(1);
 }
 
@@ -115,6 +192,8 @@ export async function fullScreenSurface(page: Page, testId: string): Promise<voi
  * panes keep their minimums.
  */
 export async function dragGutterBeside(page: Page, testId: string, dx: number, steps = 4): Promise<void> {
+  // A pane narrowed under its minimum took a smaller window (windowFor): the drag starts in the window as it was.
+  await restoreWindow(page);
   const pane = await paneShowingSurface(page, testId).boundingBox();
   if (!pane) throw new Error(`no pane shows ${testId}`);
   const gutters = await page.getByTestId("shell-gutter").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));

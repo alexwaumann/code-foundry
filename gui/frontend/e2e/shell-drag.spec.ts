@@ -58,7 +58,8 @@ async function expectStored(want: string): Promise<void> {
 }
 
 async function openShell(page: Page): Promise<void> {
-  await page.setViewportSize({ width: 1400, height: 900 });
+  // Room for a third column of panes at their 480px minimum (docs/notes/shell-25f-sizes.md).
+  await page.setViewportSize({ width: 1800, height: 1000 });
   await page.goto(`${appPath}&shell=1`);
   await expect(page.getByTestId("shell-grid")).toBeVisible();
 }

@@ -7,7 +7,7 @@
  */
 import { shellFrame } from "@/shell/geometry/rails";
 import { frameRects } from "@/shell/geometry/rects";
-import type { Frame, GeoNode, GeoTab, Rect } from "@/shell/geometry/types";
+import type { Frame, GeoNode, GeoPane, GeoTab, Rect } from "@/shell/geometry/types";
 import { outerFrac } from "./outerFrac";
 import type { DragSource, DropTarget, Edge } from "./targets";
 
@@ -253,6 +253,20 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
   const kind = moved.tabs.find((t) => t.id === moved.active)?.kind;
   const share = outerFrac(tree, kind, target.edge, frac, area.w, area.h);
   return { root: insertBeside(tree, tree.id, target.edge, moved, share) as GeoNode, pane: moved.id };
+}
+
+/**
+ * `root` with a copy of pane `pane` put on `edge` of the node `beside` at half its room
+ * (internal/layout MovePane's move to another space puts it right of that space's focused pane);
+ * `root` itself when `beside` is not in it. The fit check of a pane dropped on a space tab
+ * (room.ts) lays it out.
+ */
+export function treeWithPaneBeside(root: GeoNode | null, beside: string, edge: Edge, pane: GeoPane): GeoNode {
+  const moved = copy(pane);
+  if (!root) return moved;
+  const tree = copy(root);
+  if (!parentOf(tree, beside)) return root;
+  return insertBeside(tree, beside, edge, moved, HALF);
 }
 
 /** Lays out a tree after a drop: `moved` is the pane the drop makes or moves (it takes the focus). */

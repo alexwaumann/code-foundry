@@ -5,6 +5,7 @@ import { frameRects, plainRects, tilingErrors } from "@/shell/geometry/rects";
 import { panesOf, type GeoNode } from "@/shell/geometry/types";
 import { col, pane, randomTree, rng, row } from "@/test/shellTrees";
 import { dropCommand, dropPreview, shellDropLayout, treeAfterDrop } from "./drop";
+import { dropFits } from "./room";
 import type { DragSource, DropTarget, Edge } from "./targets";
 
 const tab = (t: string, p: string): DragSource => ({ kind: "tab", tab: t, pane: p });
@@ -75,7 +76,7 @@ describe("treeAfterDrop matches the daemon's ops (internal/layout/testdata/ops)"
     });
 
   it("finds the edge and outer cases", () => {
-    expect(cases.map(([f]) => f)).toEqual(expect.arrayContaining(["move_pane-beside.json", "move_pane-beside-half.json", "move_pane-outer.json", "move_pane-outer-floor.json", "move_pane-outer-floor-no-room.json", "move_tab-to-edge.json", "move_tab-outer-edge.json", "move_tab-outer-kind-size.json", "move_tab-own-edge-only-tab.json"]));
+    expect(cases.map(([f]) => f)).toEqual(expect.arrayContaining(["move_pane-beside.json", "move_pane-beside-half.json", "move_pane-outer.json", "move_pane-outer-floor.json", "move_tab-to-edge.json", "move_tab-outer-edge.json", "move_tab-outer-kind-size.json", "move_tab-own-edge-only-tab.json"]));
   });
 
   it.each(cases)("%s", (_f, c, d) => {
@@ -89,28 +90,29 @@ describe("treeAfterDrop matches the daemon's ops (internal/layout/testdata/ops)"
 });
 
 describe("dropPreview", () => {
-  // 1600x900: p-1 (thread, file) left half; p-2 over p-3 on the right.
+  // 2400x1800, roomy enough that no pane here is held at its 480x400 minimum: p-1 (thread,
+  // file) left half; p-2 over p-3 on the right.
   const TREE = row("s-r", [0.5, 0.5], pane("p-1", "thread", "file"), col("s-c", [0.5, 0.5], pane("p-2", "diff"), pane("p-3", "prs")));
-  const FRAME = frameRects(TREE, 1600, 900);
+  const FRAME = frameRects(TREE, 2400, 1800);
 
   it("is the right half of a pane a tab splits off to the right", () => {
-    // The row is now [p-1 .25, new .25, column .5] of 1600 less two gutters.
-    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "edge", pane: "p-1", edge: "right" })).toEqual({ x: 406, y: 0, w: 394, h: 900 });
+    // The row is now [p-1 .25, new .25, column .5] of 2400 less two gutters.
+    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "edge", pane: "p-1", edge: "right" })).toEqual({ x: 606, y: 0, w: 594, h: 1800 });
   });
 
   it("is where a pane goes after leaving its place", () => {
     // p-3 beside p-1 on its left: p-3 leaves the column, so p-2 is the whole right side.
-    expect(dropPreview(TREE, FRAME, whole("p-3"), { kind: "edge", pane: "p-1", edge: "left" })).toEqual({ x: 0, y: 0, w: 394, h: 900 });
+    expect(dropPreview(TREE, FRAME, whole("p-3"), { kind: "edge", pane: "p-1", edge: "left" })).toEqual({ x: 0, y: 0, w: 594, h: 1800 });
   });
 
   it("is a full-height column or full-width row of its kind's size on an outer edge", () => {
-    // p-3 (Pull Requests, half) on the left: the row is [p-3, p-1, column], 1600 less two gutters.
+    // p-3 (Pull Requests, half) on the left: the row is [p-3, p-1, column], 2400 less two gutters.
     const left = dropPreview(TREE, FRAME, whole("p-3"), { kind: "outer", edge: "left" });
-    expect(left).toMatchObject({ x: 0, y: 0, h: 900 });
-    expect(left?.w).toBeCloseTo((1600 - 24) / 2, 0);
-    // A file tab (0.35) on the bottom: 0.35 of 900 less one gutter.
+    expect(left).toMatchObject({ x: 0, y: 0, h: 1800 });
+    expect(left?.w).toBeCloseTo((2400 - 24) / 2, 0);
+    // A file tab (0.35) on the bottom: 0.35 of 1800 less one gutter.
     const bottom = dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "outer", edge: "bottom" });
-    expect(bottom).toMatchObject({ x: 0, w: 1600, y: 589, h: 311 });
+    expect(bottom).toMatchObject({ x: 0, w: 2400, y: 1174, h: 626 });
     // A diff pane on the right is raised to its 480px floor: 0.45 of 1576 is 709, so no; on the
     // bottom of a 1600x1100 grid, 0.45 of 1088 is 490, so no; at 1600x1000, 0.45 of 988 is 445,
     // raised to 480 as the rest keeps 508.
@@ -119,12 +121,12 @@ describe("dropPreview", () => {
   });
 
   it("splits a pane in half whatever the kind dropped beside it", () => {
-    // A file tab beside p-2 (diff), under it: the column [p-2, new, p-3] of 900 less two gutters.
-    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "edge", pane: "p-2", edge: "bottom" })).toMatchObject({ x: 806, w: 794, h: 219 });
+    // A file tab beside p-2 (diff), under it: the column [p-2, new, p-3] of 1800 less two gutters.
+    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "edge", pane: "p-2", edge: "bottom" })).toMatchObject({ x: 1206, w: 1194, h: 444 });
   });
 
   it("is the whole pane for its middle, and nothing for a strip (the bar shows it)", () => {
-    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "pane", pane: "p-2" })).toEqual({ x: 806, y: 0, w: 794, h: 444 });
+    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "pane", pane: "p-2" })).toEqual({ x: 1206, y: 0, w: 1194, h: 894 });
     expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "strip", pane: "p-2", index: 0 })).toBeNull();
   });
 
@@ -162,8 +164,8 @@ describe("dropPreview", () => {
   it("is a new pane beside the target for a sidebar thread, which leaves nothing behind; no single command opens it", () => {
     const thread: DragSource = { kind: "thread", thread: "s-9" };
     // p-1 splits in two: the thread's pane takes the right half of p-1's room.
-    expect(dropPreview(TREE, FRAME, thread, { kind: "edge", pane: "p-1", edge: "right" })).toEqual({ x: 406, y: 0, w: 394, h: 900 });
-    expect(dropPreview(TREE, FRAME, thread, { kind: "pane", pane: "p-2" })).toEqual({ x: 806, y: 0, w: 794, h: 444 });
+    expect(dropPreview(TREE, FRAME, thread, { kind: "edge", pane: "p-1", edge: "right" })).toEqual({ x: 606, y: 0, w: 594, h: 1800 });
+    expect(dropPreview(TREE, FRAME, thread, { kind: "pane", pane: "p-2" })).toEqual({ x: 1206, y: 0, w: 1194, h: 894 });
     expect(dropCommand(thread, { kind: "pane", pane: "p-2" }, [])).toBeNull();
   });
 
@@ -212,7 +214,8 @@ interface DropCase {
   h: number;
   focus: string;
   mru: string[] | null;
-  drops: { source: DragSource; target: DropTarget; after: { root: GeoNode; focus: string; mru: string[] | null; pane: string } }[];
+  /** The space each op leaves; none when the daemon refused it for want of room (`refused`). */
+  drops: { source: DragSource; target: DropTarget; after?: { root: GeoNode; focus: string; mru: string[] | null; pane: string }; refused?: boolean }[];
 }
 
 /**
@@ -234,11 +237,18 @@ describe("dropPreview is where the daemon's op puts it, as drawn", () => {
     const collapsedIds = (c: DropCase) => new Set(panesOf(c.root).flatMap((p) => (p.collapsed ? [p.id] : [])));
     const onto = all.filter(([, c, d]) => d.target.kind === "pane" && collapsedIds(c).has(d.target.pane));
     expect(onto.length).toBeGreaterThanOrEqual(5);
-    expect(onto.every(([, , d]) => !panesOf(d.after.root).find((p) => p.id === d.after.pane)?.collapsed)).toBe(true);
+    expect(onto.every(([, , d]) => !d.after || !panesOf(d.after.root).find((p) => p.id === d.after?.pane)?.collapsed)).toBe(true);
     expect(all.filter(([, c, d]) => d.source.kind === "tab" && collapsedIds(c).has(d.source.pane)).length).toBeGreaterThanOrEqual(5);
+    // Drops the daemon refuses for want of room (docs/notes/shell-25f-sizes.md): edges, outer edges and a pane of terminals.
+    const refused = all.filter(([, , d]) => d.refused);
+    expect(new Set(refused.map(([, , d]) => d.target.kind))).toEqual(new Set(["edge", "outer", "pane"]));
+    expect(all.length - refused.length).toBeGreaterThan(60);
   });
 
   it.each(all)("%s", (_name, c, d) => {
+    // The window offers the drop exactly when the daemon takes it (room.ts dropFits, Go's layout.Fits).
+    expect(dropFits(c.root, d.source, d.target, { w: c.w, h: c.h })).toBe(!d.refused);
+    if (!d.after) return;
     const mru = c.mru ?? [];
     const frame = shellFrame({ root: c.root, w: c.w, h: c.h, focus: c.focus, mru });
     const want = shellFrame({ root: d.after.root, w: c.w, h: c.h, focus: d.after.focus, mru: d.after.mru ?? [] });

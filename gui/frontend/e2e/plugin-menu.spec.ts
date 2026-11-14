@@ -28,6 +28,8 @@ test.beforeEach(async () => {
 
 test("a right-click opens a row's menu at the pointer; the keyboard opens it and Escape gives focus back", async ({ page }) => {
   await openDemo(page);
+  // Narrow, as the demo's pane opened before every pane kept 480px: the row's buttons fold into its ⋯.
+  await panelWidth(page, 420);
   const r = await buildRow(page).boundingBox();
   if (!r) throw new Error("no row");
   const at = { x: r.x + 120, y: r.y + 12 };

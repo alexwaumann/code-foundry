@@ -83,7 +83,8 @@ test.beforeEach(async () => {
 });
 
 test("a gutter drag resizes the panes beside it, keeps the tiling, and is stored", async ({ page }) => {
-  await page.setViewportSize({ width: 1400, height: 900 });
+  // Tall enough for the column's panes to give 80px and keep their 400px minimum.
+  await page.setViewportSize({ width: 1400, height: 1100 });
   await seed(THREE, "p-1");
   await openShell(page);
   await expect(page.getByTestId("shell-pane")).toHaveCount(3);

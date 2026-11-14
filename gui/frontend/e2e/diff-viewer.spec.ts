@@ -310,11 +310,12 @@ test("the list on top comes back on the current row, not at the top", async ({ p
 // height. The side panel's split tab was 342px at 1280x800 and the list used to leave the code 33
 // of them; a pane's Diff tab there is 282px (the top bar and the strip take more than the panel's
 // header did), 654px alone, and 202px at 1024x640. Too short for both, the list folds and the code has the whole tab.
-// At 1024 the thread's pane leaves the diff's 360px.
+// Since every pane keeps 480 x 400 (docs/notes/shell-25f-sizes.md) a pane of a stacked split is
+// 400px tall at the least: the shortest met is 410 at 1280x900; at 1280x800 and 1024x640 the
+// column does not fit and folds beside the focused thread, so those sizes are gone.
 for (const [name, w, h, stacked, listed, code] of [
   ["1280x800, alone", 1280, 800, false, true, 320],
-  ["1280x800, a stacked split", 1280, 800, true, false, 140],
-  ["1024x640, a stacked split", 1024, 640, true, false, 70],
+  ["1280x900, a stacked split", 1280, 900, true, false, 140],
   ["1920x1080, a stacked split", 1920, 1080, true, true, 180],
 ] as const) {
   test(`the list on top leaves the code readable: ${name}`, async ({ page }) => {
@@ -325,7 +326,7 @@ for (const [name, w, h, stacked, listed, code] of [
       const right: Parameters<typeof seedLayout>[0] = { t: "split", id: "s-c", dir: "col", kids: [paneNode("p-2", [diffTab("s-1")]), paneNode("p-3", [{ id: "t-prs", kind: "prs", title: "Pull Requests" }])], sizes: [0.5, 0.5] };
       await seedLayout(rowNode([paneNode("p-1", [threadTab("s-1")]), right], [0.55, 0.45]), "p-1");
       await openShellApp(page);
-      await setPaneSize(page, "p-2", w < 1280 ? 360 : 480);
+      await setPaneSize(page, "p-2", 480);
     } else {
       await openDiff(page, 480);
     }

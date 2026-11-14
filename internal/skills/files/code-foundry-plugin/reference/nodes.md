@@ -286,8 +286,8 @@ before it and `Pill` after it (`PillCell` alone). A column is `WithWidth(px)` (1
 numbers; `Style` `CellMuted`, `CellMono`, `CellCaption`; `label` may be "" (an icon column).
 **Narrow** (a pane beside a thread usually is), columns drop instead of squeezing: the
 lowest `priority` first, among equals the rightmost; the highest never drops. Rank the
-column that names the row highest and give the narrowest pane (300 px) 3 or 4 columns that
-fit (about 270 px).
+column that names the row highest and give the narrowest pane (480 px) 4 or 5 columns that
+fit (about 450 px).
 Rows take a row `action`, `menu` (⋯ and right-click, as a list row's), `selected` and up to 3
 buttons, which fold into the ⋯ before any column drops. A cut cell shows whole in its
 tooltip. **Sorting is yours**: a `Sortable` header's click sends a `sort` act (`Key` the

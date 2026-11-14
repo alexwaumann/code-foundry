@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { plainRects } from "@/shell/geometry/rects";
-import type { Frame } from "@/shell/geometry/types";
+import { frameRects, plainRects } from "@/shell/geometry/rects";
+import type { Frame, GeoNode } from "@/shell/geometry/types";
 import { col, pane, row } from "@/test/shellTrees";
 import { dropTarget, EDGE_MIN, insertionBar, OUTER_IN, OUTER_OUT, sameTarget, stripIndex, type DragScene, type DragSource, type DropTarget, type StripTab } from "./targets";
 
@@ -225,5 +225,80 @@ describe("dropTarget: a rail", () => {
   it("takes no tab of its own, and not itself", () => {
     expect(dropTarget(scene, tabC, { x: 750, y: 150 })).toBeNull();
     expect(dropTarget(scene, paneP2, { x: 750, y: 150 })).toBeNull();
+  });
+});
+
+/**
+ * Room for panes (docs/notes/shell-model.md; docs/notes/shell-25f-sizes.md): with the space's tree
+ * in the scene, only the drops whose result fits are targets.
+ */
+describe("dropTarget: only drops whose result fits", () => {
+  // p-1 (thread, file, terminal) | p-2 (file). Another column needs 1464 wide; another row 812 tall.
+  const TWO = row("s-r", [0.5, 0.5], pane("p-1", "thread:A", "file:A", "terminal:A"), pane("p-2", "file"));
+  const roomScene = (tree: GeoNode, frame: Frame, strips: Record<string, string[]>): DragScene => ({ ...sceneOf(frame, strips), tree });
+  const fileTab: DragSource = { kind: "tab", tab: "p-1/1", pane: "p-1" };
+  const termTab: DragSource = { kind: "tab", tab: "p-1/2", pane: "p-1" };
+
+  it("at the limit, a pane's whole body adds to the pane: no edge splits it", () => {
+    const frame = plainRects(TWO, 972, 400);
+    const scene = roomScene(TWO, frame, { "p-1": ["p-1/0", "p-1/1", "p-1/2"], "p-2": ["p-2/0"] });
+    const r = frame.rects["p-2"] ?? { x: 0, y: 0, w: 0, h: 0 };
+    for (const p of [
+      { x: r.x + 20, y: 200 },
+      { x: r.x + r.w - 20, y: 200 },
+      { x: r.x + r.w / 2, y: 60 },
+      { x: r.x + r.w / 2, y: r.h - 20 },
+      { x: r.x + r.w / 2, y: 220 },
+    ]) {
+      expect(dropTarget(scene, fileTab, p), JSON.stringify(p)).toEqual({ kind: "pane", pane: "p-2" });
+    }
+  });
+
+  it("offers each edge whose split fits: here the top and bottom, not the left and right", () => {
+    const frame = plainRects(TWO, 1200, 900);
+    const scene = roomScene(TWO, frame, { "p-1": ["p-1/0", "p-1/1", "p-1/2"], "p-2": ["p-2/0"] });
+    const r = frame.rects["p-2"] ?? { x: 0, y: 0, w: 0, h: 0 };
+    expect(dropTarget(scene, fileTab, { x: r.x + 20, y: 450 })).toEqual({ kind: "pane", pane: "p-2" });
+    expect(dropTarget(scene, fileTab, { x: r.x + r.w - 20, y: 450 })).toEqual({ kind: "pane", pane: "p-2" });
+    expect(dropTarget(scene, fileTab, { x: r.x + r.w / 2, y: 60 })).toEqual({ kind: "edge", pane: "p-2", edge: "top" });
+    expect(dropTarget(scene, fileTab, { x: r.x + r.w / 2, y: 880 })).toEqual({ kind: "edge", pane: "p-2", edge: "bottom" });
+    // Without the tree (no room check), the left and right edges are zones as before.
+    expect(dropTarget({ ...scene, tree: null }, fileTab, { x: r.x + r.w - 20, y: 450 })).toEqual({ kind: "edge", pane: "p-2", edge: "right" });
+  });
+
+  it("an outer edge whose result would not fit is no band: the pane under it answers", () => {
+    const frame = plainRects(TWO, 1200, 900);
+    const scene = roomScene(TWO, frame, { "p-1": ["p-1/0", "p-1/1", "p-1/2"], "p-2": ["p-2/0"] });
+    expect(dropTarget(scene, fileTab, { x: 1195, y: 450 })).toEqual({ kind: "pane", pane: "p-2" });
+    expect(dropTarget(scene, fileTab, { x: 1210, y: 450 })).toBeNull();
+    // The bottom one fits (a full-width row under both: 400 + 12 + 400 in 900).
+    expect(dropTarget(scene, fileTab, { x: 800, y: 896 })).toEqual({ kind: "outer", edge: "bottom" });
+  });
+
+  it("a pane of terminals that a tab would raise past the room is no target, strip and middle; a terminal still joins it", () => {
+    const tree = row("s-r", [0.6, 0.4], pane("p-1", "thread:A", "file:A", "terminal:A"), pane("p-t", "terminal"));
+    const frame = plainRects(tree, 900, 800);
+    const scene = roomScene(tree, frame, { "p-1": ["p-1/0", "p-1/1", "p-1/2"], "p-t": ["p-t/0"] });
+    const r = frame.rects["p-t"] ?? { x: 0, y: 0, w: 0, h: 0 };
+    const middle = { x: r.x + r.w / 2, y: 400 };
+    const strip = { x: r.x + r.w - 30, y: 20 };
+    expect(dropTarget(scene, fileTab, middle)).toBeNull();
+    expect(dropTarget(scene, fileTab, strip)).toBeNull();
+    expect(dropTarget(scene, { kind: "thread", thread: "s-9" }, middle)).toBeNull();
+    expect(dropTarget(scene, termTab, middle)).toEqual({ kind: "pane", pane: "p-t" });
+    expect(dropTarget(scene, termTab, strip)).toEqual({ kind: "strip", pane: "p-t", index: 1 });
+    // The other pane takes the file as usual.
+    expect(dropTarget(scene, { kind: "tab", tab: "p-t/0", pane: "p-t" }, { x: 200, y: 400 })).toEqual({ kind: "pane", pane: "p-1" });
+  });
+
+  it("a rail of terminals folded for room is no target for a tab that would open it past the room; a collapsed one is", () => {
+    const tree = row("s-r", [0.6, 0.4], pane("p-1", "thread:A", "file:A"), pane("p-t", "terminal"));
+    const folded = frameRects(tree, 700, 800, new Set(["p-t"]));
+    const strips = { "p-1": ["p-1/0", "p-1/1"], "p-t": ["p-t/0"] };
+    const rail = folded.rects["p-t"] ?? { x: 0, y: 0, w: 0, h: 0 };
+    const onRail = { x: rail.x + rail.w / 2, y: 400 };
+    expect(dropTarget(roomScene(tree, folded, strips), fileTab, onRail)).toBeNull();
+    const collapsed = row("s-r", [0.6, 0.4], pane("p-1", "thread:A", "file:A"), { ...pane("p-t", "terminal"), collapsed: true });
+    expect(dropTarget(roomScene(collapsed, frameRects(collapsed, 700, 800), strips), fileTab, onRail)).toEqual({ kind: "pane", pane: "p-t" });
   });
 });

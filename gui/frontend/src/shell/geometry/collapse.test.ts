@@ -20,24 +20,24 @@ function frozen<T>(v: T): T {
 
 const collapsed = (p: GeoPane): GeoPane => ({ ...p, collapsed: true });
 
-// a: thread (360), b: Pull Requests (300), collapsed, c: a diff (260).
+// a: thread, b: Pull Requests, collapsed, c: a diff; each 480 wide at least when open.
 const three = frozen(row("s", [0.25, 0.25, 0.5], pane("a", "thread:A"), collapsed(pane("b", "prs")), pane("c", "diff:A")));
 
 describe("a collapsed pane", () => {
   it("is a rail at any size, and its neighbours share its room by the stored proportions", () => {
-    const f = shellFrame({ root: three, w: 1644, h: 800, focus: "a" });
-    expect(f.rects.b).toEqual({ x: 540, y: 0, w: RAIL, h: 800, rail: true });
-    // 1644 less two gutters and the rail: 1584, shared 1 : 2.
-    expect(f.rects.a?.w).toBe(528);
-    expect(f.rects.c?.w).toBe(1056);
+    const f = shellFrame({ root: three, w: 2424, h: 800, focus: "a" });
+    expect(f.rects.b).toEqual({ x: 800, y: 0, w: RAIL, h: 800, rail: true });
+    // 2424 less two gutters and the rail: 2364, shared 1 : 2.
+    expect(f.rects.a?.w).toBe(788);
+    expect(f.rects.c?.w).toBe(1576);
     expect(tilingErrors(f)).toEqual([]);
     expect(three.sizes).toEqual([0.25, 0.25, 0.5]);
   });
 
   it("opened again, every pane is back at its old size", () => {
     const opened = row("s", [0.25, 0.25, 0.5], pane("a", "thread:A"), pane("b", "prs"), pane("c", "diff:A"));
-    const f = shellFrame({ root: opened, w: 1644, h: 800, focus: "a" });
-    expect([f.rects.a?.w, f.rects.b?.w, f.rects.c?.w]).toEqual([405, 405, 810]);
+    const f = shellFrame({ root: opened, w: 2424, h: 800, focus: "a" });
+    expect([f.rects.a?.w, f.rects.b?.w, f.rects.c?.w]).toEqual([600, 600, 1200]);
   });
 
   it("is not in the fold order and never unfolds, with room or with the focus", () => {
@@ -47,9 +47,9 @@ describe("a collapsed pane", () => {
   });
 
   it("automatic folding goes on for the other panes", () => {
-    // 360 + 36 + 260 and two gutters is 680: below it the diff folds as it would beside an open pane.
-    expect([...foldRails({ root: three, w: 679, h: 800, focus: "a" })].sort()).toEqual(["b", "c"]);
-    expect([...foldRails({ root: three, w: 680, h: 800, focus: "a" })]).toEqual(["b"]);
+    // 480 + 36 + 480 and two gutters is 1020: below it the diff folds as it would beside an open pane.
+    expect([...foldRails({ root: three, w: 1019, h: 800, focus: "a" })].sort()).toEqual(["b", "c"]);
+    expect([...foldRails({ root: three, w: 1020, h: 800, focus: "a" })]).toEqual(["b"]);
   });
 
   it("in a column is a strip; a column narrows only when every pane in it is folded", () => {
@@ -64,7 +64,7 @@ describe("a collapsed pane", () => {
   });
 
   it("counts as a rail in the minimum and in the plain layout (the daemon's Rects)", () => {
-    expect(minimumOf(three).w).toBe(360 + RAIL + 260 + 2 * GUTTER);
+    expect(minimumOf(three).w).toBe(480 + RAIL + 480 + 2 * GUTTER);
     const p = plainRects(three, 1644, 800);
     expect([p.rects.a?.w, p.rects.b?.w, p.rects.c?.w]).toEqual([528, RAIL, 1056]);
   });
