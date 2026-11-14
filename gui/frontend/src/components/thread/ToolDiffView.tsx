@@ -1,31 +1,15 @@
 import { memo, useMemo } from "react";
-import { Check, Copy } from "lucide-react";
 import { CodeDiff, CodeScroll } from "@/components/code/CodeDiff";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Tip } from "@/components/ui/tooltip";
 import { diffText, relPath, splitPath, toolDiffFiles, type ToolDiff } from "@/lib/toolSummary";
-import { useCopied } from "@/lib/useCopied";
 
 /** Above this many rendered lines the diff scrolls in a bounded box that lays out only what is visible. */
 const VIRTUALIZE_LINES = 400;
 
 /** The diff header's Copy diff: a check and "Copied" for a moment after (its own state, so the diff below does not re-render). */
 function CopyDiff({ text }: { text: () => string }) {
-  const { copied, copy } = useCopied();
-  const label = copied ? "Copied" : "Copy diff";
-  return (
-    <Tip label={label}>
-      <button
-        type="button"
-        className="flex size-[22px] items-center justify-center rounded-md text-cf-text-muted hover:bg-cf-control-hover hover:text-cf-text"
-        aria-label={label}
-        data-copied={copied || undefined}
-        data-testid="thread-diff-copy"
-        onClick={() => void copy(text())}
-      >
-        {copied ? <Check className="size-3" aria-hidden /> : <Copy className="size-3" aria-hidden />}
-      </button>
-    </Tip>
-  );
+  return <CopyButton text={text} label="Copy diff" testId="thread-diff-copy" className="size-[22px] hover:bg-cf-control-hover" />;
 }
 
 /**

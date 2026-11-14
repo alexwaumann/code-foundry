@@ -2,12 +2,10 @@ import { memo, useContext, useMemo, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   Bot,
-  Check,
   ChevronRight,
   CircleAlert,
   CircleCheck,
   CircleX,
-  Copy,
   CornerDownRight,
   FilePen,
   FilePlus,
@@ -30,6 +28,7 @@ import {
 } from "lucide-react";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
+import { CopyIcon } from "@/components/ui/copy-button";
 import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, agentName, parseAgentNote } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";
@@ -378,7 +377,7 @@ function CopyAnswer({ answer }: { answer: string }) {
   return (
     <Tip label={label}>
       <button type="button" className="tb copy-answer" aria-label={label} data-copied={copied || undefined} data-testid="thread-copy-answer" onClick={onClick}>
-        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+        <CopyIcon copied={copied} />
       </button>
     </Tip>
   );

@@ -1,4 +1,5 @@
-import { Check, Copy, Play } from "lucide-react";
+import { Play } from "lucide-react";
+import { CopyIcon } from "@/components/ui/copy-button";
 import { Tip } from "@/components/ui/tooltip";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
 import { useCopied } from "@/lib/useCopied";
@@ -25,7 +26,7 @@ export function CopyButton({ text, label = "Copy code" }: { text: string; label?
           void copy(text);
         }}
       >
-        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+        <CopyIcon copied={copied} />
         {copied && <span>Copied</span>}
       </button>
     </Tip>

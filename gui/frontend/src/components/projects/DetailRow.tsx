@@ -1,7 +1,6 @@
-import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Tip } from "@/components/ui/tooltip";
-import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,26 +56,9 @@ export function DetailRow({
   );
 }
 
-/** The path's copy button: a check in the success colour for a moment after (lib/useCopied), no toast. */
+/** The path's copy button: a check in the success colour for a moment after (components/ui/copy-button), no toast. */
 export function CopyPath({ path, testId = "details-copy-path" }: { path: string; testId?: string }) {
-  const { copied, copy } = useCopied();
-  return (
-    <Tip label={copied ? "Copied" : "Copy path"}>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        tabIndex={-1}
-        className={cn("size-7 [&_svg]:size-3.5", copied ? "text-cf-success-text hover:text-cf-success-text" : "text-cf-text-muted hover:text-cf-text")}
-        aria-label="Copy path"
-        data-testid={testId}
-        data-copied={copied || undefined}
-        onClick={() => void copy(path)}
-      >
-        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-      </Button>
-    </Tip>
-  );
+  return <CopyButton text={path} label="Copy path" testId={testId} tabIndex={-1} className="size-7 [&_svg]:size-3.5" />;
 }
 
 /**

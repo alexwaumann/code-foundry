@@ -1,8 +1,9 @@
 import type { ComponentType, ReactNode } from "react";
-import { Check, ClipboardCopy, Copy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
+import { Check, ClipboardCopy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
 import { FinderIcon, type AppIconSlotProps } from "@/components/icons/AppIcon";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Tip } from "@/components/ui/tooltip";
 import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
@@ -61,19 +62,9 @@ export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { 
   );
 }
 
-/** Copy path: copies the absolute path; a check for a moment after. */
+/** Copy path: copies the absolute path; a check for a moment after (components/ui/copy-button). */
 export function CopyPathAction({ path }: { path: string }) {
-  const { copied, copy } = useCopied();
-  return (
-    <HeaderAction
-      icon={copied ? Check : Copy}
-      label={copied ? "Copied" : "Copy path"}
-      testId="file-copy-path"
-      onClick={() => {
-        void copy(path);
-      }}
-    />
-  );
+  return <CopyButton text={path} label="Copy path" testId="file-copy-path" />;
 }
 
 /** Copy contents: copies what `contents` gives when pressed (the text, a draft, a table as tab-separated text); a check for a moment after. */
