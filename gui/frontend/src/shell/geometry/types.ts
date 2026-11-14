@@ -20,6 +20,8 @@ export interface GeoPane {
   tabs?: readonly GeoTab[];
   /** The active tab's id. */
   active?: string;
+  /** The user collapsed it (pane.collapse): always drawn as a rail. */
+  collapsed?: boolean;
 }
 
 /** A split: its kids side by side ("row") or stacked ("col"), sharing its length by `sizes`. */
@@ -80,6 +82,11 @@ export function panesOf(root: GeoNode | null): GeoPane[] {
   };
   if (root) walk(root);
   return out;
+}
+
+/** The panes the user collapsed (docs/notes/shell-25d-collapse.md). */
+export function collapsedOf(root: GeoNode | null): Set<string> {
+  return new Set(panesOf(root).flatMap((p) => (p.collapsed ? [p.id] : [])));
 }
 
 /** A pane's active tab: the one `active` names, else its first. */

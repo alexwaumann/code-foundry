@@ -7,13 +7,14 @@ import { useTree, type TreeNode } from "@/stores/layout";
 /** A space's tree as the geometry reads it: only its structure matters to the glyph. */
 function geoOf(n: TreeNode): GeoNode {
   if (n.t === "split") return { t: "split", id: n.id, dir: n.dir, kids: n.kids.map(geoOf), sizes: n.sizes };
-  return { t: "pane", id: n.id, tabs: [] };
+  // A collapsed pane is laid out as a rail: a thin bar in the glyph (docs/notes/shell-25d-collapse.md).
+  return { t: "pane", id: n.id, tabs: [], ...(n.collapsed ? { collapsed: true } : {}) };
 }
 
 /**
  * A space's glyph (docs/notes/shell-model.md, "Structure": "a small icon drawn from that space's
  * real pane layout"): each pane an outlined rectangle at its place, from the space's own tree laid
- * out plainly (shell/spaces.ts spaceGlyph). It follows the tree, so splitting or closing a pane
+ * out plainly (shell/spaces.ts spaceGlyph), a collapsed pane as a thin bar. It follows the tree, so splitting or closing a pane
  * redraws it. Decorative: the tab names the space.
  */
 export function SpaceIcon({ spaceId, className }: { spaceId: string; className?: string }) {

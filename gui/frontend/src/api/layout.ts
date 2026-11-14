@@ -46,6 +46,8 @@ export interface LayoutPaneView {
   tabs: readonly LayoutTabView[];
   /** The active tab's id. */
   active: string;
+  /** The user collapsed it to a rail (pane.collapse); absent reads false. */
+  collapsed?: boolean;
 }
 
 /** A split: its kids side by side ("row") or stacked ("col"), sharing its length by `sizes`. */
@@ -180,7 +182,7 @@ function toNode(n: LayoutNode | undefined): LayoutNodeView | null {
     const first = tabs[0];
     if (!first) return null;
     const active = tabs.some((t) => t.id === v.value.activeTabId) ? v.value.activeTabId : first.id;
-    return { t: "pane", id: v.value.id, tabs, active };
+    return { t: "pane", id: v.value.id, tabs, active, ...(v.value.collapsed ? { collapsed: true } : {}) };
   }
   if (v?.case === "split") {
     const kids: LayoutNodeView[] = [];

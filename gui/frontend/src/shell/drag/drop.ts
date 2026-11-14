@@ -73,7 +73,7 @@ const PREVIEW_PANE = "drop-preview-pane";
 const PREVIEW_SPLIT = "drop-preview-split";
 
 type Mut =
-  | { t: "pane"; id: string; tabs: GeoTab[]; active?: string }
+  | { t: "pane"; id: string; tabs: GeoTab[]; active?: string; collapsed?: boolean }
   | {
       t: "split";
       id: string;
@@ -83,7 +83,7 @@ type Mut =
     };
 
 function copy(n: GeoNode): Mut {
-  if (n.t === "pane") return { t: "pane", id: n.id, tabs: [...(n.tabs ?? [])], active: n.active };
+  if (n.t === "pane") return { t: "pane", id: n.id, tabs: [...(n.tabs ?? [])], active: n.active, ...(n.collapsed ? { collapsed: true } : {}) };
   return {
     t: "split",
     id: n.id,
@@ -207,6 +207,8 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
       if (!tree || !into) return null;
       into.tabs.push(...pane.tabs);
       into.active = pane.active;
+      // It takes the focus: a collapsed pane opens (docs/notes/shell-25d-collapse.md).
+      into.collapsed = false;
       return { root: tree as GeoNode, pane: into.id };
     }
     moved = pane;
@@ -219,6 +221,7 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
       if (!into) return null;
       into.tabs.push(...moved.tabs);
       into.active = PREVIEW_PANE;
+      into.collapsed = false;
       return { root: tree as GeoNode, pane: into.id };
     }
   } else {
@@ -238,6 +241,7 @@ export function treeAfterDrop(root: GeoNode, source: DragSource, target: DropTar
       if (!tree || !into) return null;
       into.tabs.push(tab);
       into.active = tab.id;
+      into.collapsed = false;
       return { root: tree as GeoNode, pane: into.id };
     }
   }

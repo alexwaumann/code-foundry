@@ -259,11 +259,11 @@ async function step(page: Page, r: Rng): Promise<string> {
     return `drag tab ${tab.id} to ${to.what}`;
   }
   if (roll < 34) {
-    // A pane by its strip's free space: between the "+" and the full screen button.
+    // A pane by its strip's free space: between the "+" and the collapse button (full screen's left neighbour).
     const panes = await page.locator('[data-testid="shell-pane"]').evaluateAll((els) =>
       els.flatMap((el) => {
         const plus = el.querySelector('[aria-label="Open a tab"]')?.getBoundingClientRect();
-        const fs = el.querySelector('[data-testid="shell-fullscreen"]')?.getBoundingClientRect();
+        const fs = (el.querySelector('[data-testid="shell-collapse"]') ?? el.querySelector('[data-testid="shell-fullscreen"]'))?.getBoundingClientRect();
         if (!plus || !fs || fs.left - plus.right < 16) return [];
         return [{ id: (el as HTMLElement).dataset.paneId ?? "", x: (plus.right + fs.left) / 2, y: plus.top + plus.height / 2 }];
       }),

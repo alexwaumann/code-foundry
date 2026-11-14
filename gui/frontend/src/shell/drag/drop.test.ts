@@ -230,6 +230,12 @@ describe("dropPreview is where the daemon's op puts it, as drawn", () => {
     expect([...kinds].sort()).toEqual(["pane>edge", "pane>outer", "pane>pane", "tab>edge", "tab>outer", "tab>pane", "thread>edge", "thread>outer", "thread>pane"]);
     const withRails = all.filter(([, c]) => Object.values(shellFrame({ root: c.root, w: c.w, h: c.h, focus: c.focus, mru: c.mru ?? [] }).rects).some((r) => r.rail));
     expect(withRails.length).toBeGreaterThan(30);
+    // Panes the user collapsed (docs/notes/shell-25d-collapse.md): drops onto one (it opens) and tabs dragged out of one.
+    const collapsedIds = (c: DropCase) => new Set(panesOf(c.root).flatMap((p) => (p.collapsed ? [p.id] : [])));
+    const onto = all.filter(([, c, d]) => d.target.kind === "pane" && collapsedIds(c).has(d.target.pane));
+    expect(onto.length).toBeGreaterThanOrEqual(5);
+    expect(onto.every(([, , d]) => !panesOf(d.after.root).find((p) => p.id === d.after.pane)?.collapsed)).toBe(true);
+    expect(all.filter(([, c, d]) => d.source.kind === "tab" && collapsedIds(c).has(d.source.pane)).length).toBeGreaterThanOrEqual(5);
   });
 
   it.each(all)("%s", (_name, c, d) => {

@@ -33,6 +33,11 @@ export const useCommandsStore = create<CommandsState>()(() => ({
   error: null,
 }));
 
+/** A command's first chord as the user bound it; "" when none. */
+export function useCommandChord(name: string): string {
+  return useCommandsStore((s) => s.commands.find((c) => c.name === name)?.keybindings[0] ?? "");
+}
+
 /** The chord the user bound to dictation.toggle; "" when none, which is the default. */
 export function useDictateChord(): string {
   return useCommandsStore((s) => s.commands.find((c) => c.name === "dictation.toggle")?.keybindings[0] ?? "");

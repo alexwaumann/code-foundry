@@ -22,6 +22,14 @@ describe("spaceGlyph", () => {
     ]);
   });
 
+  it("draws a collapsed pane as a thin bar, the others taking its room", () => {
+    const rects = spaceGlyph({ t: "split", id: "s", dir: "row", kids: [p("a"), { t: "pane", id: "b", tabs: [], collapsed: true }], sizes: [0.5, 0.5] });
+    expect(rects).toEqual([
+      { x: 0, y: 0, w: 10, h: 12 },
+      { x: 11.5, y: 0, w: 4.5, h: 12 },
+    ]);
+  });
+
   it("follows the real tree: a column inside a row, uneven sizes", () => {
     const tree: GeoNode = {
       t: "split",

@@ -20,6 +20,7 @@ import { PanePlusMenu } from "./PanePlusMenu";
 import { Kbd } from "@/components/ui/kbd";
 import { toggleFullscreen } from "@/shell/fullscreen";
 import { TabNameField } from "./TerminalTab";
+import { PaneCollapseButton } from "./PaneCollapseButton";
 
 /** The active tab: full tint in the focused pane, lighter in the others (the side panel's tints). */
 const ACTIVE_FOCUSED = "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50";
@@ -32,6 +33,8 @@ const STRIP_PAD = 6;
 const PLUS_WIDTH = 28;
 /** The full screen button at the strip's right end (size-7 and its gap); in full screen the exit control is wider. */
 const FULL_WIDTH = 32;
+/** The collapse control left of it, and the gap after it. */
+const COLLAPSE_WIDTH = 30;
 const EXIT_WIDTH = 150;
 
 /** The attention dot on a tab's icon: its thread needs the user (docs/notes/shell-model.md, "In a pane"). */
@@ -239,7 +242,7 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
  * The strip's right end: full screen for this pane, or, while it is full screen, a labelled exit
  * with its key (Escape) so leaving is never a guess.
  */
-function FullscreenButton({ paneId, on }: { paneId: string; on: boolean }) {
+function FullscreenButton({ paneId, on, pushed }: { paneId: string; on: boolean; pushed: boolean }) {
   if (on) {
     return (
       <button
@@ -262,7 +265,7 @@ function FullscreenButton({ paneId, on }: { paneId: string; on: boolean }) {
         type="button"
         aria-label="Full screen"
         data-testid="shell-fullscreen"
-        className="ml-auto flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus [--wails-draggable:no-drag]"
+        className={cn(!pushed && "ml-auto", "flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus [--wails-draggable:no-drag]")}
         onClick={() => {
           toggleFullscreen(paneId);
         }}
@@ -306,7 +309,8 @@ function onStripKeyDown(e: KeyboardEvent<HTMLElement>): void {
  * under the strip by default. Any tab drags, and the strip's free space drags the whole pane
  * (components/shell/ShellDnd.tsx), so it no longer drags the window (the top bar does). The "+" after
  * the last tab opens the pane's menu of surfaces (PanePlusMenu) and is not part of the pane's grip.
- * The right end shows the pane full screen; in full screen it is the exit control (Escape too).
+ * The right end collapses the pane (PaneCollapseButton) and shows it full screen; in full screen it
+ * is only the exit control (Escape too).
  */
 export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: string; focused: boolean; fullscreen?: boolean }) {
   const pane = usePane(paneId);
@@ -327,7 +331,7 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
       const ids = key ? key.split(",") : [];
       const widths = Array.from(row.children).map((c) => Math.ceil(c.getBoundingClientRect().width / z));
       // The "+" after the last tab keeps its room.
-      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH - (fullscreen ? EXIT_WIDTH : FULL_WIDTH);
+      const avail = strip.getBoundingClientRect().width / z - 2 * STRIP_PAD - TAB_GAP * widths.length - PLUS_WIDTH - (fullscreen ? EXIT_WIDTH : FULL_WIDTH + COLLAPSE_WIDTH);
       if (!(avail > 0)) return;
       const next = fitTabs({ widths, active: ids.indexOf(active), avail, iconWidth: TAB_ICON_WIDTH });
       setFits((prev) => (prev && sameFits(prev, next) ? prev : next));
@@ -367,7 +371,9 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
         <ShellTab key={id} tabId={id} active={id === active} paneFocused={focused} fit={fits?.[i]} focusable={id === active} />
       ))}
       <PanePlusMenu paneId={paneId} />
-      <FullscreenButton paneId={paneId} on={fullscreen} />
+      {/* Collapse, then full screen, at the right end; in full screen only its exit. */}
+      {!fullscreen && <PaneCollapseButton paneId={paneId} className="ml-auto" />}
+      <FullscreenButton paneId={paneId} on={fullscreen} pushed={!fullscreen} />
       <div ref={measureRef} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 flex" data-testid="shell-tab-measure">
         {tabIds.map((id) => (
           <MeasureTab key={id} tabId={id} />

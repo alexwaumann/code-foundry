@@ -15,13 +15,14 @@ import { PaneView } from "./PaneView";
 /**
  * What the drawn frame depends on beyond the tree's shape, in one string: each pane's tabs (kind
  * and thread: the minimums go by the active tab's kind, the fold order by whether a pane holds a
- * thread's tab and which thread the focused tab belongs to) and its active tab. The grid lays out
+ * thread's tab and which thread the focused tab belongs to), its active tab, and whether the user
+ * collapsed it. The grid lays out
  * again only when it changes, not when a tab is renamed.
  */
 function tabsKey(s: LayoutState, spaceId: string): string {
   return Object.values(s.panes)
     .filter((p) => p.spaceId === spaceId)
-    .map((p) => `${p.id}=${p.active}|${p.tabIds.map((id) => `${id}:${s.tabs[id]?.kind ?? ""}:${s.tabs[id]?.thread ?? ""}`).join(",")}`)
+    .map((p) => `${p.id}${p.collapsed ? "!" : ""}=${p.active}|${p.tabIds.map((id) => `${id}:${s.tabs[id]?.kind ?? ""}:${s.tabs[id]?.thread ?? ""}`).join(",")}`)
     .sort()
     .join("\n");
 }

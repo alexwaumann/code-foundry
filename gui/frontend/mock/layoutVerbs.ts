@@ -56,6 +56,7 @@ const CATEGORY = "Layout";
 const DEFAULT_AREA = { width: 1180, height: 820 };
 
 const str = (name: string, description: string, extra: Partial<Arg> = {}): Arg => ({ name, type: ArgType.STRING, required: false, description, ...extra });
+const bool = (name: string, description: string): Arg => ({ name, type: ArgType.BOOL, required: false, description });
 const focusArg: Arg = { name: "focus", type: ArgType.BOOL, required: false, description: "Take the user's focus there; from inside a thread only when the user asked to be taken there" };
 const edges = ["left", "right", "top", "bottom"];
 const edgeArg = (name: string, description: string, extra: Partial<Arg> = {}): Arg => ({ name, type: ArgType.ENUM, required: false, description, enumValues: edges, ...extra });
@@ -453,6 +454,27 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         const out = run({ op: "close_pane", pane: pane.id }, () => `closed pane ${pane.id}`);
         remember(sp.id, { pane: pane.id, index: 0, tabs, whole: true });
         return out;
+      },
+    },
+    {
+      // internal/command commands_pane_collapse.go: a pane folded to a rail until the user opens it.
+      cmd: {
+        name: "pane.collapse",
+        title: "Toggle Collapse Pane",
+        category: CATEGORY,
+        description: "Collapse a pane to a rail, giving its room to the panes beside it, or open it again (default: the focused pane, toggled). The last open pane of a space cannot be collapsed.",
+        keybindings: ["cmd+shift+m"],
+        args: [str("pane", "The pane (default: the focused one)", { positional: true }), bool("on", "Collapse it (default: toggle)"), bool("off", "Open it again (default: toggle)")],
+      },
+      when: always,
+      run: (_c, a) => {
+        if (a.on === "true" && a.off === "true") refuse("invalid argument: --on and --off together");
+        const { sp, pane } = resolvePane(L.state(), a.pane);
+        const collapse = a.on === "true" ? true : a.off === "true" ? false : !pane.collapsed;
+        if (collapse && !pane.collapsed && !panes(sp.root).some((p) => p.id !== pane.id && !p.collapsed)) {
+          refuse(`failed precondition: pane ${pane.id} is the last open pane of its space: it cannot be collapsed`, "unavailable");
+        }
+        return run({ op: "set_collapsed", pane: pane.id, collapsed: collapse }, () => `${collapse ? "collapsed" : "opened"} pane ${pane.id}`);
       },
     },
     {

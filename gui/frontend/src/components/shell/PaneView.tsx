@@ -67,7 +67,7 @@ function surfaceKey(e: KeyboardEvent<HTMLElement>, tab: TabEntry | undefined): v
  * open (OpenPane). Switching between the two unmounts the other.
  */
 export function PaneView({ paneId, rect, focused }: { paneId: string; rect: PaneRect; focused: boolean }) {
-  return rect.rail ? <PaneRail paneId={paneId} rect={rect} /> : <OpenPane paneId={paneId} rect={rect} focused={focused} />;
+  return rect.rail ? <PaneRail paneId={paneId} rect={rect} focused={focused} /> : <OpenPane paneId={paneId} rect={rect} focused={focused} />;
 }
 
 /**

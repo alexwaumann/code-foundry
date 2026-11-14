@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Maximize2 } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -8,8 +9,9 @@ import { enterFullscreen } from "@/shell/fullscreen";
 import type { PaneRect } from "@/shell/geometry/types";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
-import { requestPaneFocus } from "@/stores/shellView";
+import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
 import { AttentionDot, LinkedTip, TabContentIcon } from "./PaneTabStrip";
+import { PaneExpandButton } from "./PaneCollapseButton";
 
 /** One tab of a rail: its icon, the selected one marked, its attention dot; a click unfolds the pane on it. */
 function RailTab({ tabId, paneId, selected, vertical }: { tabId: string; paneId: string; selected: boolean; vertical: boolean }) {
@@ -70,27 +72,46 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
 
 /**
  * A pane folded to a rail (docs/notes/shell-model.md, "Small windows"): too little room to keep
- * every pane at its minimum, so this one shows only its tabs' icons, the selected one marked, with
- * their attention dots. It mounts no tab body and holds no stream. A click on an icon focuses that
- * tab, which unfolds the pane (another may fold); a tab drags out like any tab, and the rail as a
- * whole takes a dropped tab (shell/drag/targets.ts). Its last button shows the pane full screen.
- * Vertical in a row of panes, horizontal in a column. See docs/notes/shell-19-rails-fullscreen.md.
+ * every pane at its minimum, or the user collapsed it ("Collapsing a pane"), so this one shows
+ * only its tabs' icons, the selected one marked, with their attention dots. It mounts no tab body
+ * and holds no stream. A click on an icon focuses that tab, which unfolds the pane (another may
+ * fold) and opens a collapsed one; a tab drags out like any tab, and the rail as a whole takes a
+ * dropped tab (shell/drag/targets.ts). Its last buttons open it again when the user collapsed it,
+ * and show the pane full screen. A collapsed pane may have the focus (a direction key reached
+ * it): its border is the focused one and the keyboard goes to its selected icon. Vertical in a
+ * row of panes, horizontal in a column. See docs/notes/shell-19-rails-fullscreen.md and
+ * docs/notes/shell-25d-collapse.md.
  */
-export function PaneRail({ paneId, rect }: { paneId: string; rect: PaneRect }) {
+export function PaneRail({ paneId, rect, focused = false }: { paneId: string; rect: PaneRect; focused?: boolean }) {
   const pane = usePane(paneId);
   const dragged = usePaneDragged(paneId);
   const vertical = rect.h >= rect.w;
   const tabIds = pane?.tabIds ?? [];
+  const collapsed = pane?.collapsed ?? false;
+  const listRef = useRef<HTMLDivElement>(null);
+  const request = useShellViewStore((s) => (s.focusRequest.paneId === paneId ? s.focusRequest.seq : 0));
+  useEffect(() => {
+    // A focus request (a direction key, a collapse that left the focus here) puts the keyboard on the selected icon.
+    if (request === 0) return;
+    listRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  }, [request]);
   return (
     <section
-      className={cn("absolute flex overflow-hidden rounded-pane border border-cf-divider bg-cf-surface shadow-xs", dragged && "opacity-60")}
+      className={cn(
+        "absolute flex overflow-hidden rounded-pane border bg-cf-surface shadow-xs",
+        focused ? "border-cf-accent/60" : "border-cf-divider",
+        dragged && "opacity-60",
+      )}
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
-      aria-label="Folded pane"
+      aria-label={collapsed ? "Collapsed pane" : "Folded pane"}
       data-testid="shell-rail"
       data-pane-id={paneId}
+      data-collapsed={collapsed || undefined}
+      data-focused={focused || undefined}
       data-orientation={vertical ? "vertical" : "horizontal"}
     >
       <div
+        ref={listRef}
         role="tablist"
         aria-label="Tabs"
         aria-orientation={vertical ? "vertical" : "horizontal"}
@@ -100,6 +121,8 @@ export function PaneRail({ paneId, rect }: { paneId: string; rect: PaneRect }) {
           <RailTab key={id} tabId={id} paneId={paneId} selected={id === pane?.active} vertical={vertical} />
         ))}
         <span aria-hidden className={cn("shrink-0 bg-cf-divider", vertical ? "my-0.5 h-px w-4" : "mx-0.5 h-4 w-px")} />
+        {/* As in the strip: the collapsed pane's open control, then full screen. */}
+        {collapsed && <PaneExpandButton paneId={paneId} vertical={vertical} />}
         <Tip label="Full screen" side={vertical ? "right" : "bottom"}>
           <button
             type="button"

@@ -33,7 +33,7 @@ describe("the layout source's events", () => {
                     sizes: [0.7, 0.3],
                     children: [
                       { node: { case: "pane", value: { id: "p-a", activeTabId: "t-a", tabs: [{ id: "t-a", kind: "thread", threadId: "th-a", key: "thread:th-a" }] } } },
-                      { node: { case: "pane", value: { id: "p-t", activeTabId: "", tabs: [{ id: "t-t", kind: "terminal", threadId: "th-a", key: "term:x", params: { terminal: "x" }, name: "build" }] } } },
+                      { node: { case: "pane", value: { id: "p-t", activeTabId: "", collapsed: true, tabs: [{ id: "t-t", kind: "terminal", threadId: "th-a", key: "term:x", params: { terminal: "x" }, name: "build" }] } } },
                     ],
                   },
                 },
@@ -79,8 +79,8 @@ describe("the layout source's events", () => {
                 sizes: [0.7, 0.3],
                 kids: [
                   { t: "pane", id: "p-a", active: "t-a", tabs: [{ id: "t-a", kind: "thread", thread: "th-a", key: "thread:th-a", params: {}, title: "", name: "" }] },
-                  // An unset active tab is the first.
-                  { t: "pane", id: "p-t", active: "t-t", tabs: [{ id: "t-t", kind: "terminal", thread: "th-a", key: "term:x", params: { terminal: "x" }, title: "", name: "build" }] },
+                  // An unset active tab is the first; a pane the user collapsed says so (absent: open).
+                  { t: "pane", id: "p-t", active: "t-t", collapsed: true, tabs: [{ id: "t-t", kind: "terminal", thread: "th-a", key: "term:x", params: { terminal: "x" }, title: "", name: "build" }] },
                 ],
               },
             },
