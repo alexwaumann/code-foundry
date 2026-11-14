@@ -491,7 +491,7 @@ describe("predatesShell", () => {
 
   it("a daemon from before the layout gets Restart Now, as one from before the tunnel", () => {
     const st = status("idle", { currentVersion: "v0.21.8-tip.2", targetVersion: "v0.21.8-tip.2" });
-    const v = updateView(st, "v0.22.0-tip.1", { busy: 0 }, null, true);
+    const v = updateView(st, "v0.22.0-tip.3", { busy: 0 }, null, true);
     expect(v.variant).toBe("partlyApplied");
     expect(v.primary).toBe("Restart Now");
   });

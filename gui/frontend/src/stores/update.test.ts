@@ -194,7 +194,7 @@ describe("a daemon from before the tunnel", () => {
     });
   });
 
-  it.each(["v0.22.0-tip.1", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
+  it.each(["v0.22.0-tip.3", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
     seen(version);
     await Promise.resolve();
     expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
@@ -242,7 +242,7 @@ describe("a daemon from before the window layout", () => {
   it.each([
     ["v0.21.5", true],
     ["v0.21.8-tip.2", true],
-    ["v0.22.0-tip.1", false],
+    ["v0.22.0-tip.3", false],
     ["dev", false],
   ])("isOldDaemon(%s): %s", (version, want) => {
     expect(isOldDaemon(version)).toBe(want);

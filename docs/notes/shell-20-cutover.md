@@ -63,10 +63,10 @@ a retry after a lost answer finds the mark set and calls nothing.
 - **A daemon without a layout** (from before PR 18) never sends one. `SHELL_SINCE` opens the update
   dialog with Restart Now, as a pre-tunnel daemon does, only while the shell is on; after 5 s the
   pane area says it is waiting. There is no classic fallback any more (plan 2.12).
-- **`SHELL_SINCE` is `v0.22.0-tip.1`**: the shell reaches `main` as one `feat!` merge, the first
-  minor after v0.21. It must be re-derived at the merge (PR 25) from the version that merge will
-  produce, `scripts/next-version.sh --tip` on the rebased tree, since a `feat` reaching `main`
-  first would make a pre-shell `v0.22.0-tip.N`.
+- **`SHELL_SINCE` is `v0.22.0-tip.3`**: the shell reaches `main` as one merge, the first minor
+  after v0.21. Re-derived at the merge (PR 25) from the version that merge produces: `main` was two
+  first-parent commits past v0.21.7 (tips v0.21.8-tip.1 and tip.2), so the merge is the third and
+  `scripts/next-version.sh --tip` gives `v0.22.0-tip.3`. No `v0.22.0-tip.1` or `tip.2` was released.
 
 ## Terminals at import
 

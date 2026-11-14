@@ -69,7 +69,7 @@ export function predatesTunnel(daemon: string): boolean {
  * after v0.21; if another `feat` reaches `main` first, the merge (plan PR 25) sets this to the tip
  * tag `scripts/next-version.sh --tip` prints for it.
  */
-export const SHELL_SINCE = "v0.22.0-tip.1";
+export const SHELL_SINCE = "v0.22.0-tip.3";
 
 /** Whether a daemon of this version has no window layout. A "dev" daemon has one. */
 export function predatesShell(daemon: string): boolean {
