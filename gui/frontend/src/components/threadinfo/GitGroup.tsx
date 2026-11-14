@@ -17,6 +17,7 @@ import {
   Upload,
   WandSparkles,
 } from "lucide-react";
+import { CopyIcon } from "@/components/ui/copy-button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { fileTotals } from "@/components/diff/files";
@@ -36,13 +37,14 @@ import {
   type PrRow,
 } from "@/lib/threadInfo";
 import { isWorkingThread } from "@/lib/thread";
+import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { copyPullRequestLink, openPullRequestInPanel } from "@/stores/prPanel";
 import { usePrPrefetch } from "@/stores/prPrefetch";
 import { useProjectsStore } from "@/stores/projects";
-import { copyBranchName, pendingKey, runOnce, sendThreadPrompt, useCardPending, useCheckoutShared, useWatchKeys } from "@/stores/threadInfo";
+import { pendingKey, runOnce, sendThreadPrompt, useCardPending, useCheckoutShared, useWatchKeys } from "@/stores/threadInfo";
 import { threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { detailKey, worktreeDetailResource } from "@/stores/worktreeDetail";
@@ -105,11 +107,13 @@ function RowButton({
 
 /**
  * The branch checked out at the cwd (HEAD), ahead and behind its upstream ("not pushed"
- * without one, "no remote" without a remote). A click copies it; the hover card names the
- * branch the thread was made for when the checkout moved, and the upstream.
+ * without one, "no remote" without a remote). A click copies it, and its branch icon is a
+ * check in the success colour for a moment (lib/useCopied, no toast); the hover card names
+ * the branch the thread was made for when the checkout moved, and the upstream.
  */
 function BranchRow({ threadId }: { threadId: string }) {
   const { wt, hasRemote } = useCwdCheckout(threadId);
+  const { copied, copy } = useCopied();
   const created = useThreadsStore((s) => (s.byId[threadId]?.createdWorktree ? s.byId[threadId].branch : ""));
   if (!wt) return null;
   const branch = wt.detached ? wt.head.slice(0, 7) : wt.branch;
@@ -159,7 +163,15 @@ function BranchRow({ threadId }: { threadId: string }) {
   );
   return (
     <Tip label={tip} side="left">
-      <Row icon={<GitBranch />} meta={meta} onActivate={() => void copyBranchName(branch)} testId="ti-branch" data-branch={branch}>
+      <Row
+        icon={<CopyIcon copied={copied} icon={GitBranch} />}
+        meta={meta}
+        onActivate={() => void copy(branch)}
+        testId="ti-branch"
+        data-branch={branch}
+        data-copied={copied || undefined}
+        aria-label={copied ? "Copied" : undefined}
+      >
         <span className="text-code">{branch}</span>
       </Row>
     </Tip>

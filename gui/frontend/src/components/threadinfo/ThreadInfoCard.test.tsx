@@ -161,9 +161,13 @@ describe("ThreadInfoCard: one project", () => {
     await settle();
     expect(activePanelTab()).toMatchObject({ kind: "pullrequest", params: { slug: "alexwaumann/code-foundry", number: "78" } });
 
-    // The branch row copies the branch.
+    // The branch row copies the branch and shows it in place: a check, "Copied", no toast.
     fireEvent.click(screen.getByTestId("ti-branch"));
-    expect(await screen.findByText("Branch copied")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByTestId("ti-branch").dataset.copied).toBe("true");
+    });
+    expect(screen.getByRole("button", { name: "Copied" })).toBe(screen.getByTestId("ti-branch"));
+    expect(screen.queryByText("Branch copied")).toBeNull();
   });
 
   it("shells, lineage and MCP: one shell folded; live children with stop squares, the finished one under Previous agents", async () => {
