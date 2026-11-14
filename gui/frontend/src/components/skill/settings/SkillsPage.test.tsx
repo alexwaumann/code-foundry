@@ -12,8 +12,8 @@ import { layoutTabs } from "@/test/layoutTabs";
 
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
-const toast = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: Object.assign(toast, { error: vi.fn(), success: vi.fn() }) }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const m = vi.hoisted(() => ({
   enable: vi.fn(),
@@ -200,7 +200,7 @@ const type = (text: string) => {
 
 beforeEach(() => {
   for (const f of [m.enable, m.disable, m.update, m.uninstall, m.remove, m.setup, m.install, m.search, m.refresh]) f.mockReset().mockResolvedValue(true);
-  toast.mockReset();
+  notify.mockReset();
   m.owner.value = true;
   resetUpdateRuns();
   seed();
@@ -323,7 +323,7 @@ describe("the switch", () => {
       await Promise.resolve();
     });
     expect(m.disable).toHaveBeenCalledWith(expect.objectContaining({ name: "pr-review" }), { quiet: true });
-    expect(toast).toHaveBeenCalledWith("Disabled pr-review", expect.objectContaining({ description: RESTART }));
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "warning", title: "Disabled pr-review", description: RESTART }));
   });
 
   it("enabling runs at once, with no toast of its own", async () => {
@@ -333,7 +333,7 @@ describe("the switch", () => {
       await Promise.resolve();
     });
     expect(m.enable).toHaveBeenCalledWith(expect.objectContaining({ name: "sql-helper" }));
-    expect(toast).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it.each([

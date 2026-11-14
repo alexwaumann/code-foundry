@@ -6,8 +6,8 @@ import type { WakeSubscriptionView } from "@/api/wakes";
 const run = vi.hoisted(() => vi.fn());
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult: run }));
 vi.mock("./context", () => ({ getUiContext: (target: { id: string }) => ({ activeThreadId: target.id }) }));
-const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn<(n: { level: string; title: string; description?: unknown }) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { applyThreadEvent } = await import("./thread");
 const { stopShell } = await import("./threadActions");
@@ -43,7 +43,7 @@ describe("a row gone under the press", () => {
   /** runCommandForResult failing with err: toasts unless `expected` claims it, like the real one. */
   const failWith = (err: unknown) => {
     run.mockImplementationOnce((_name: string, _args: unknown, opts: Opts) => {
-      if (!opts.expected?.(err)) toast.error("failed");
+      if (!opts.expected?.(err)) notify({ level: "error", title: "failed" });
       return Promise.resolve(null);
     });
   };
@@ -59,12 +59,12 @@ describe("a row gone under the press", () => {
   it.each(presses)("%s: NotFound is done, with no toast", async (_name, press) => {
     failWith(new ConnectError("gone", Code.NotFound));
     await expect(press()).resolves.toBe(true);
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it.each(presses)("%s: any other failure stays a failure, toasted", async (_name, press) => {
     failWith(new ConnectError("no group", Code.FailedPrecondition));
     await expect(press()).resolves.toBe(false);
-    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls.map(([n]) => n.level)).toEqual(["error"]);
   });
 });

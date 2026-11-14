@@ -314,3 +314,15 @@ export function scanSlotRefs(fileName: string, source: string, known: (name: str
     .flatMap((l) => slotRefs(l.raw, (o) => sf.getLineAndCharacterOfPosition(l.start + o).line, lines, known))
     .sort((a, b) => a.line - b.line);
 }
+
+/**
+ * Every place a TS/TSX source names the "sonner" module (src/design/toastGuard.test.ts): an
+ * import, a re-export, a dynamic or type import, a vi.mock. A literal that is exactly
+ * "sonner" is the module's name; sonner's DOM attributes (`[data-sonner-toast]`) are not.
+ */
+export function sonnerRefs(fileName: string, source: string): { line: number; text: string }[] {
+  const lines = source.split("\n");
+  return stringLiterals(fileName, source)
+    .filter((l) => /^["'`]sonner["'`]$/.test(l.raw))
+    .map((l) => ({ line: l.line, text: (lines[l.line - 1] ?? "").trim() }));
+}

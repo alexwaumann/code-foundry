@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
 import { threadFocus } from "@/lib/inSidebar";
@@ -107,9 +107,7 @@ export function applyIntent(intent: UiIntentView): void {
             }
           : undefined;
       const title = intent.title || intent.body;
-      if (intent.level === "error") toast.error(title, opts);
-      else if (intent.level === "warning") toast.warning(title, opts);
-      else toast.info(title, opts);
+      notify({ level: intent.level === "error" || intent.level === "warning" ? intent.level : "info", title, ...opts });
       break;
     }
     case "showView":

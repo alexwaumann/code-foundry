@@ -6,7 +6,7 @@
  * thread.mcp --refresh) run with the thread's context; their answers reach the panel
  * through the Watch like any other check.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { getMcpStatus, type McpServerView, type McpStatusView } from "@/api/mcp";
@@ -141,7 +141,7 @@ export async function reconnectMcp(threadId: string, name: string): Promise<bool
     const res = await runCommandForResult(MCP_COMMANDS.reconnect, { id: threadId, server: name }, { ctx: threadContext(threadId), quiet: true });
     if (!res) return false;
     const err = reconnectError(res.resultJson);
-    if (err) toast.error(`Could not reconnect ${name}`, { description: err });
+    if (err) notify({ level: "error", title: `Could not reconnect ${name}`, description: err });
     return err === "";
   } finally {
     setReconnecting(threadId, name, false);

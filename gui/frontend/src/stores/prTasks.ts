@@ -7,7 +7,7 @@
  * viaThreadId): "Sent to <owner> for this thread", with Open selecting the owner.
  * docs/notes/pr-panel-tasks.md, docs/notes/pr-task-forward.md.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import type { TaskKind } from "@/components/pr/readiness";
 import { prTaskArgs, type TaskTarget } from "@/components/pr/taskRouting";
@@ -103,7 +103,7 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
     if (!res) return null;
     const out = parseTaskResult(res.resultJson);
     if (taskWentNowhere(out)) {
-      toast.error(res.message || "The thread was removed: nothing was sent");
+      notify({ level: "error", title: "Nothing was sent", description: res.message || "The thread was removed." });
       return null;
     }
     const id = out.threadId || (target.threadId ?? "");
@@ -116,7 +116,7 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
         },
       };
       const text = out.viaThreadId && id ? forwardToast(id, out.viaThreadId, pressedIn) : taskToast(res.message, out.sent);
-      toast.success(text, open ? { action } : undefined);
+      notify({ level: "success", title: "Task sent", description: text, ...(open ? { action } : {}) });
     }
     return id;
   } finally {

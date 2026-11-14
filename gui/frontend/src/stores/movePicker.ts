@@ -7,7 +7,7 @@
  * ShowView "thread.move" (stores/views.ts), the menus through openMovePicker.
  */
 import { create } from "zustand";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { canMove } from "@/lib/move";
 import { runCommandForResult } from "./commands";
 import { useProjectsStore } from "./projects";
@@ -107,7 +107,7 @@ export async function moveThread(threadId: string, args: Record<string, string>,
   useMovePickerStore.setState((s) => ({ open: s.open === threadId ? null : s.open, sending: { ...s.sending, [threadId]: name } }));
   try {
     const res = await runCommandForResult(MOVE_COMMAND, args, { ctx: getUiContext({ kind: "thread", id: threadId }), quiet: true });
-    for (const w of res?.warnings ?? []) toast.warning(w);
+    for (const w of res?.warnings ?? []) notify({ level: "warning", title: "Moved with a warning", description: w });
     if (res === null && focusDropped()) focusMovedThreadPrompt(threadId);
     return res !== null;
   } finally {

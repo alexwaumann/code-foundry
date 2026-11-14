@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { invokeCommand } from "@/api/command";
 import { getBranchPullRequests, getDashboard, getPullRequestDetail, getRepoActivity, getViewer, type GhEventView } from "@/api/gh";
@@ -169,6 +169,6 @@ export async function openUrl(url: string): Promise<void> {
   try {
     await invokeCommand("view.open.url", getUiContext(), { url });
   } catch (err) {
-    toast.error("Open in browser failed", { description: errorMessage(err) });
+    notify({ level: "error", title: "Open in browser failed", description: errorMessage(err) });
   }
 }

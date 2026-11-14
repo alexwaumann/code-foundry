@@ -1,10 +1,10 @@
+import type { Notice, NoticeButton } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import type { TerminalView } from "@/api/terminal";
 
-const toastInfo = vi.hoisted(() => vi.fn());
-const toastError = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: { info: toastInfo, error: toastError, warning: vi.fn() } }));
+const notify = vi.hoisted(() => vi.fn<(n: Notice) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const playAlertSound = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/api/app", () => ({ playAlertSound }));
 
@@ -63,8 +63,7 @@ describe("focusTerminal", () => {
     });
     expect(useUiStore.getState().selection).toEqual(HOME);
     expect(useUiStore.getState().promptFocusSeq).toBe(0);
-    expect(toastInfo).not.toHaveBeenCalled();
-    expect(toastError).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("a quick terminal: its thread's quick terminal takes the keyboard (as it mounts)", () => {
@@ -190,8 +189,8 @@ describe("notify", () => {
     const { useViewsStore } = await import("./views");
     useViewsStore.setState({ settingsOpen: false, settingsPage: "general", usageOpen: true });
     applyIntent({ kind: "notify", level: "info", title: "Remembered: Use tabs", body: 'By thread "Fix login".', link: "settings:memory", linkLabel: "Show in Settings" });
-    const [title, opts] = toastInfo.mock.calls[0] as [string, { description: string; action: { label: string; onClick: () => void } }];
-    expect(title).toBe("Remembered: Use tabs");
+    const opts = notify.mock.calls[0]?.[0] as Notice & { action: NoticeButton };
+    expect(opts).toMatchObject({ level: "info", title: "Remembered: Use tabs" });
     expect(opts.description).toBe('By thread "Fix login".');
     expect(opts.action.label).toBe("Show in Settings");
     opts.action.onClick();
@@ -213,14 +212,14 @@ describe("notify", () => {
       unlessShowing: "themes",
     };
     applyIntent(intent);
-    const [title, opts] = toastInfo.mock.calls[0] as [string, { action: { label: string }; cancel: { label: string } }];
-    expect(title).toBe("Ocean Dusk applied to dark");
-    expect(opts.action.label).toBe("Undo");
-    expect(opts.cancel.label).toBe("Edit");
-    toastInfo.mockClear();
+    const opts = notify.mock.calls[0]?.[0];
+    expect(opts?.title).toBe("Ocean Dusk applied to dark");
+    expect(opts?.action?.label).toBe("Undo");
+    expect(opts?.cancel?.label).toBe("Edit");
+    notify.mockClear();
     useViewsStore.setState({ themesOpen: true });
     applyIntent(intent);
-    expect(toastInfo).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
     useViewsStore.setState({ themesOpen: false });
   });
 
@@ -229,7 +228,7 @@ describe("notify", () => {
     ["a link this window does not know", "nowhere:at-all", { description: "b" }],
   ])("%s: no button", (_name, link, want) => {
     applyIntent({ kind: "notify", level: "info", title: "t", body: link ? "b" : "", ...(link ? { link, linkLabel: "Go" } : {}) });
-    expect(toastInfo).toHaveBeenCalledWith("t", want);
+    expect(notify).toHaveBeenCalledWith({ level: "info", title: "t", ...want });
   });
 });
 

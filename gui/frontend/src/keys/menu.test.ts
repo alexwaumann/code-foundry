@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 
-const toastInfo = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: { info: toastInfo, error: vi.fn(), warning: vi.fn() } }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const menu = vi.hoisted(() => ({ fn: null as ((name: string) => void) | null }));
 vi.mock("@/api/app", async (orig) => ({
   ...(await orig<typeof import("@/api/app")>()),
@@ -40,22 +40,22 @@ describe("runMenuCommand", () => {
     await vi.waitFor(() => {
       expect(useUiStore.getState().palette.open).toBe(true);
     });
-    expect(toastInfo).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("says when the command is not available here, by its title", () => {
     runMenuCommand("thread.rename");
-    expect(toastInfo).toHaveBeenCalledWith("Rename Thread is not available here");
+    expect(notify).toHaveBeenCalledWith({ level: "info", title: "Rename Thread is not available here" });
   });
 
   it("falls back to the name for a command the daemon does not list", () => {
     runMenuCommand("no.such.command");
-    expect(toastInfo).toHaveBeenCalledWith("no.such.command is not available here");
+    expect(notify).toHaveBeenCalledWith({ level: "info", title: "no.such.command is not available here" });
   });
 
   it("runs the attention jump, a GUI view action, by its menu name", () => {
     runMenuCommand("attention.next");
-    expect(toastInfo).toHaveBeenCalledWith("No threads need attention");
+    expect(notify).toHaveBeenCalledWith({ level: "info", title: "No threads need attention" });
   });
 
   it.each([
@@ -65,7 +65,7 @@ describe("runMenuCommand", () => {
     useViewsStore.setState({ helpOpen: true, helpTab: tab === "guide" ? "shortcuts" : "guide" });
     runMenuCommand(name);
     expect(useViewsStore.getState()).toMatchObject({ helpOpen: true, helpTab: tab });
-    expect(toastInfo).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 });
 

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionRunFinishedView } from "@/api/actions";
 import type { InvokeResultView } from "@/api/command";
 
-const toastError = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn() } }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const runCommandForResult = vi.hoisted(() => vi.fn<(...a: unknown[]) => Promise<InvokeResultView | null>>());
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult, refreshCommands: vi.fn(() => Promise.resolve()) }));
 const invokeCommand = vi.hoisted(() => vi.fn(() => Promise.resolve({ message: "", resultJson: "" })));
@@ -52,12 +52,12 @@ describe("onActionRunFinished", () => {
     ["a user's failed run is quiet (its tab shows it)", finished({ trigger: "user" }), false],
   ])("%s", (_n, f, toasts) => {
     onActionRunFinished(f);
-    expect(toastError).toHaveBeenCalledTimes(toasts ? 1 : 0);
-    if (toasts) expect(toastError).toHaveBeenCalledWith("Setup action Install deps failed (exit 1)", expect.objectContaining({ id: "action-run-r-1", duration: Infinity, closeButton: true }));
+    expect(notify).toHaveBeenCalledTimes(toasts ? 1 : 0);
+    if (toasts) expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "error", id: "action-run-r-1", title: "Setup action failed", description: "Install deps exited with code 1.", sticky: true }));
   });
 
   it("the message", () => {
-    expect(setupFailedMessage({ actionName: "Setup", exitCode: 127 })).toBe("Setup action Setup failed (exit 127)");
+    expect(setupFailedMessage({ actionName: "Setup", exitCode: 127 })).toBe("Setup exited with code 127.");
   });
 });
 
@@ -164,7 +164,7 @@ describe("runs", () => {
     invokeCommand.mockImplementationOnce(() => Promise.reject(new Error("boom")));
     await stopActionRun("t-3");
     expect(useActionStopsStore.getState().byId).not.toHaveProperty("t-3");
-    expect(toastError).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "error" }));
   });
 });
 

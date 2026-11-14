@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionRunFinishedView, ActionRunOutputView } from "@/api/actions";
 
@@ -77,7 +77,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   cleanup();
 });
@@ -96,9 +96,9 @@ describe("a failed worktree-create run", () => {
     const seq = useShellViewStore.getState().focusRequest.seq;
     runFinished(finished({}));
     await waitFor(() => {
-      expect(toastOf("Setup action Install deps failed (exit 1)")).toBeDefined();
+      expect(toastOf("Install deps exited with code 1.")).toBeDefined();
     });
-    fireEvent.click(within(toastOf("Setup action Install deps failed (exit 1)") as HTMLElement).getByRole("button", { name: "Open" }));
+    fireEvent.click(within(toastOf("Install deps exited with code 1.") as HTMLElement).getByRole("button", { name: "Open" }));
     await settle();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-1" });
     const out = screen.getByTestId("action-run-dialog");
@@ -122,13 +122,13 @@ describe("a failed worktree-create run", () => {
     runFinished(finished({ runId: "r-ok", exitCode: 0 }));
     runFinished(finished({ runId: "r-build", actionId: ACTION_IDS.build, actionName: "Build", exitCode: 2 }));
     await waitFor(() => {
-      expect(toastOf("Setup action Build failed (exit 2)")).toBeDefined();
+      expect(toastOf("Build exited with code 2.")).toBeDefined();
     });
-    expect(toasts().filter((t) => t.textContent.includes("(exit 0)"))).toHaveLength(0);
+    expect(toasts().filter((t) => t.textContent.includes("code 0"))).toHaveLength(0);
     expect(toasts()).toHaveLength(1);
-    fireEvent.click(within(toastOf("Setup action Build failed (exit 2)") as HTMLElement).getByRole("button", { name: "Close toast" }));
+    fireEvent.click(within(toastOf("Build exited with code 2.") as HTMLElement).getByRole("button", { name: "Close toast" }));
     await waitFor(() => {
-      expect(toastOf("Setup action Build failed (exit 2)")).toBeUndefined();
+      expect(toastOf("Build exited with code 2.")).toBeUndefined();
     });
   });
 
@@ -136,7 +136,7 @@ describe("a failed worktree-create run", () => {
     runFinished(finished({ runId: "r-user", actionId: ACTION_IDS.test, actionName: "Test", trigger: "user", mode: "terminal", terminalId: "t-run" }));
     runFinished(finished({ runId: "r-build", actionId: ACTION_IDS.build, actionName: "Build", exitCode: 2 }));
     await waitFor(() => {
-      expect(toastOf("Setup action Build failed (exit 2)")).toBeDefined();
+      expect(toastOf("Build exited with code 2.")).toBeDefined();
     });
     expect(toasts()).toHaveLength(1);
   });

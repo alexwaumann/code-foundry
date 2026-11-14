@@ -11,7 +11,7 @@
  * card's colours; it reads "Undone" once the slot is back on what it put back, and is
  * disabled when that is gone (the theme deleted, the version no longer kept).
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { themeById, type ThemeFile, type ThemeScheme } from "@/themes";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
@@ -100,10 +100,10 @@ export function undoFromLink(target: string): void {
       return;
     case "gone":
     case "undone":
-      toast.info(state.tip);
+      notify({ level: "info", title: "Nothing to undo", description: state.tip });
       return;
     default:
-      toast.info(`Nothing to undo: the ${scheme} theme has changed since`);
+      notify({ level: "info", title: "Nothing to undo", description: `The ${scheme} theme has changed since.` });
   }
 }
 

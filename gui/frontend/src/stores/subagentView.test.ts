@@ -5,7 +5,7 @@ import type { CommandView } from "@/api/command";
 import type { ThreadItemView } from "@/api/thread";
 import type { ThreadView } from "@/api/threads";
 
-vi.mock("sonner", () => ({ toast: { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
+vi.mock("@/lib/notify", () => ({ notify: vi.fn(), notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { getViewing, leaveSubagent, showAgentRun, useRunTimelineKeys, useShownRun, useSubagentViewStore, useViewingRun } = await import("./subagentView");
 const { applyIntent } = await import("./intents");

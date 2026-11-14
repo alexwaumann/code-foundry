@@ -19,7 +19,7 @@ vi.mock("@/api/command", async (orig) => ({
   },
 }));
 const fakeDaemonRef = vi.hoisted(() => ({ current: (() => Promise.resolve(null)) as (name: string, args: Record<string, string>) => Promise<unknown> }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }) }));
+vi.mock("@/lib/notify", () => ({ notify: vi.fn(), notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 // The gallery is a picture of the app inside the theme's scope: these tests read the scope only.
 vi.mock("./ThemeGallery", () => ({ ThemeGallery: () => <div data-testid="gallery-thread" /> }));
 // Wide enough for the full list beside the editor (jsdom has no layout; narrower widths fold it: e2e).

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CloudUpload, FolderPlus, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
 import { PublishPicker } from "@/components/publish/PublishPicker";
 import { usePublishOwners, type PublishChoice } from "@/components/publish/usePublishOwners";
@@ -66,8 +66,8 @@ export function NewTab({ active }: { active: boolean }) {
   const destination = `${tildify(projectsDir)}/${name || "<name>"}`;
   const canPublish = !publish || (choice.owner !== "" && choice.visibility !== null);
 
-  const finish = (project: CreatedProject, message: string) => {
-    toast.success(message);
+  const finish = (project: CreatedProject, description?: string) => {
+    notify({ level: "success", title: `Created ${project.name}`, ...(description ? { description } : {}) });
     finishAddProject();
     selectAddedProject(project.id);
   };
@@ -89,14 +89,14 @@ export function NewTab({ active }: { active: boolean }) {
       }
     }
     if (!publish || !choice.visibility) {
-      finish(project, `Created ${project.name}`);
+      finish(project);
       return;
     }
     setBusy("publish");
     setPublishError(null);
     try {
       await publishProject({ projectId: project.id, owner: choice.owner, name: project.name, visibility: choice.visibility });
-      finish(project, `Created ${project.name} and published it to ${choice.owner}/${project.name}`);
+      finish(project, `Published to ${choice.owner}/${project.name}.`);
     } catch (err) {
       setPublishError(errorMessage(err));
       setBusy(null);
@@ -176,7 +176,7 @@ export function NewTab({ active }: { active: boolean }) {
             variant="ghost"
             disabled={busy !== null}
             onClick={() => {
-              finish(created, `Created ${created.name}`);
+              finish(created);
             }}
             data-testid="add-project-keep-local"
           >

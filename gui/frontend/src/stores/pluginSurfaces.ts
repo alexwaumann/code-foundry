@@ -11,7 +11,7 @@
  * instance finds them again. Nothing here is persisted.
  */
 import { create } from "zustand";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import {
   actOnSurface,
@@ -489,9 +489,7 @@ export function applyUpdateToState(s: PluginSurfacesState, watchKey: string, u: 
 
 function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
   if (u.kind === "toast") {
-    if (u.level === "error") toast.error(u.text);
-    else if (u.level === "attention") toast.warning(u.text);
-    else toast.info(u.text);
+    notify({ level: u.level === "error" ? "error" : u.level === "attention" ? "warning" : "info", title: u.text });
     return;
   }
   usePluginSurfacesStore.setState((s) => applyUpdateToState(s, watchKey, u));
@@ -575,7 +573,7 @@ export async function actOnElement(watchKey: string, key: string, opts: ActOptio
     return true;
   } catch (err) {
     invalidateOnTransportError(err);
-    toast.error(errorMessage(err));
+    notify({ level: "error", title: "The plugin did not take that", description: errorMessage(err) });
     return false;
   } finally {
     setPending(watchKey, key, false);
@@ -665,7 +663,7 @@ export function openElementUrl(url: string): void {
 
 export async function copyElementText(text: string): Promise<void> {
   await copyText(text);
-  toast.success("Copied");
+  notify({ level: "success", title: "Copied" });
 }
 
 export function setDraft(draftKey: string, name: string, value: FieldValue): void {

@@ -5,8 +5,8 @@ import type { SettingFieldView, SettingPageView, SettingsSchemaView } from "@/ap
 // The settings sheet over a small schema shaped like the daemon's: the page logic (nav,
 // sections, pairs, dependents, keybinding buckets, search, Escape) is the GUI's; the real
 // schema's pages and fields are internal/store/settings's (tested in Go).
-const toast = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const save = vi.hoisted(() => ({ fn: vi.fn<(v: Record<string, string>) => Promise<{ ok: true }>>() }));
 const runCommand = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand }));
@@ -262,7 +262,7 @@ describe("the settings page", () => {
     expect(sw.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(sw);
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith("Saved Name threads automatically", expect.anything());
+      expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "success", title: "Saved Name threads automatically" }));
     });
     expect(sw.getAttribute("aria-checked")).toBe("false");
 

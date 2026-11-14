@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionIconName } from "@/api/actions";
 
@@ -124,7 +124,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   cleanup();
 });

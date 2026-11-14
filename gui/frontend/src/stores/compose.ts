@@ -55,7 +55,7 @@ import { NO_PROJECT } from "@/lib/threadRow";
 import { sentComposerText } from "@/lib/userMessage";
 import { projectPrompt, removeReferences, removeProjectTags, projectTagCount, stagedPdfPages, tagsByProject } from "@/lib/prompt";
 import type { Citation } from "@/lib/citation";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { runLayoutCommand } from "@/shell/commands";
 import { readAttachmentFile } from "./attachments";
 import { invokeConfirmed, refreshCommands } from "./commands";
@@ -724,7 +724,7 @@ export function convertGoneLikeDraft(threadId: string): boolean {
   else if (to.kind === "project") ui.select({ kind: "compose", projectId: to.projectId });
   else ui.select({ kind: "compose", projectId: "", noProject: true });
   useUiStore.getState().focusComposer();
-  toast.info(`Thread ${src.name || threadId} was removed; starting fresh`);
+  notify({ level: "info", title: "Thread removed", description: `${src.name || threadId} was removed, so this starts a new thread.` });
   return true;
 }
 
@@ -1056,7 +1056,7 @@ export async function sendDraft(target: ComposeTarget, defaults: { model: string
     if (target.draft) void endSentDraft(target.draft, createdThreadId(res.resultJson) ?? "");
     // The daemon's collision hints (CreateThreadResponse.hints): never a refusal, said once
     // the thread exists; not again when the composer already showed the line.
-    for (const w of unshownHints(res.warnings ?? [], shownHints)) toast.warning(w);
+    for (const w of unshownHints(res.warnings ?? [], shownHints)) notify({ level: "warning", title: "Thread started with a warning", description: w });
     const id = createdThreadId(res.resultJson);
     if (id) noteSentFrom(id, target);
     const ui = useUiStore.getState();

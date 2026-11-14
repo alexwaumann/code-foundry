@@ -8,8 +8,8 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const getPullRequestDetail = vi.hoisted(() => vi.fn(() => new Promise(() => undefined)));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), getPullRequestDetail }));
 
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
 const { mergePullRequest, usePrPanelStore } = await import("./prPanel");
@@ -50,7 +50,7 @@ describe("mergePullRequest", () => {
 
     answer.resolve({ message: "ignored", resultJson: JSON.stringify({ merged: true, sha: "abc", message: "Merged #142 (abc1234); deleted origin/feat/x", branchDeleted: true }) });
     await expect(run).resolves.toBe(true);
-    expect(toast.success).toHaveBeenCalledWith("Merged #142 (abc1234)", { description: "deleted origin/feat/x" });
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Merged #142 (abc1234)", description: "deleted origin/feat/x" });
     expect(invalidate).toHaveBeenCalledWith(KEY);
     expect(usePrPanelStore.getState().merging[KEY]).toBeUndefined();
   });
@@ -58,15 +58,15 @@ describe("mergePullRequest", () => {
   it("falls back to the command's message", async () => {
     invokeCommand.mockResolvedValueOnce({ message: "Merged #142 (abc1234)", resultJson: "" });
     await expect(mergePullRequest(REF, "rebase", false, HEAD)).resolves.toBe(true);
-    expect(toast.success).toHaveBeenCalledWith("Merged #142 (abc1234)", undefined);
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Merged #142 (abc1234)" });
   });
 
   it("a refusal is toasted, not reported as merged, and the detail is read again", async () => {
     invokeCommand.mockRejectedValueOnce(new ConnectError("pull request #142 changed since it was shown (head 1111111, shown e2e0142); refresh and try again", Code.FailedPrecondition));
     const invalidate = vi.spyOn(pullRequestDetailResource, "invalidate");
     await expect(mergePullRequest(REF, "squash", true, HEAD)).resolves.toBe(false);
-    expect(toast.success).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith("pr.merge failed", expect.objectContaining({ description: expect.stringContaining("changed since it was shown") as string }));
+    expect(notify).not.toHaveBeenCalledWith(expect.objectContaining({ level: "success" }));
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "error", title: "pr.merge failed", description: expect.stringContaining("changed since it was shown") as string }));
     expect(invalidate).toHaveBeenCalledWith(KEY);
     expect(usePrPanelStore.getState().merging[KEY]).toBeUndefined();
   });

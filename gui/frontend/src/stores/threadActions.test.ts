@@ -4,8 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const commands = vi.hoisted(() => ({ runCommand: vi.fn(), runCommandForResult: vi.fn(), refreshCommands: vi.fn() }));
 vi.mock("./commands", async (importOriginal) => ({ ...(await importOriginal<typeof import("./commands")>()), ...commands }));
 vi.mock("./context", () => ({ getUiContext: (target: { id: string }) => ({ activeThreadId: target.id }) }));
-const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn<(n: { level: string; title: string; description?: unknown }) => void>());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
+/** The levels notify was called with, in order. */
+const levels = () => notify.mock.calls.map(([n]) => n.level);
+
 
 const { archiveThread, respondThread, saveThreadForLater, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
 const { useThreadStore } = await import("./thread");
@@ -15,7 +18,7 @@ type Opts = { expected?: (err: unknown) => boolean };
 /** runCommandForResult failing with err: calls `expected` like the real one, then resolves null. */
 function failWith(err: unknown) {
   commands.runCommandForResult.mockImplementationOnce((_name: string, _args: unknown, opts: Opts) => {
-    if (!opts.expected?.(err)) toast.error("Answer Thread Request failed");
+    if (!opts.expected?.(err)) notify({ level: "error", title: "Answer Thread Request failed" });
     return Promise.resolve(null);
   });
 }
@@ -72,15 +75,13 @@ describe("respondThread", () => {
     failWith(new ConnectError("the thread's process has ended", Code.FailedPrecondition));
     expect(await respondThread("s1", "r1", "allow")).toBe(false);
     expect(answering()).toEqual({});
-    expect(toast.error).toHaveBeenCalledTimes(1);
-    expect(toast).not.toHaveBeenCalled();
+    expect(levels()).toEqual(["error"]);
   });
 
   it("a request Claude withdrew stays gone with a plain notice, no error", async () => {
     failWith(new ConnectError("Claude withdrew request r1", Code.NotFound));
     expect(await respondThread("s1", "r1", "allow")).toBe(false);
     expect(answering()).toEqual({ r1: true });
-    expect(toast.error).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledTimes(1);
+    expect(levels()).toEqual(["info"]);
   });
 });

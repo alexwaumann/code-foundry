@@ -8,11 +8,8 @@ const run = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 type RunOpts = { expected?: (err: unknown) => boolean };
 const runForResult = vi.hoisted(() => vi.fn<(name: string, args: Record<string, string>, opts: RunOpts) => Promise<unknown>>(() => Promise.resolve({ message: "Forgot" })));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommand: run, runCommandForResult: runForResult }));
-const toastInfo = vi.hoisted(() => vi.fn());
-vi.mock("sonner", async (orig) => {
-  const mod = await orig<typeof import("sonner")>();
-  return { ...mod, toast: Object.assign(mod.toast, { info: toastInfo }) };
-});
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const getMemory = vi.hoisted(() => vi.fn());
 vi.mock("@/api/memory", async (orig) => ({ ...(await orig<typeof import("@/api/memory")>()), getMemory }));
 const { ConnectError, Code } = await import("@connectrpc/connect");
@@ -50,7 +47,7 @@ beforeEach(() => {
   resetMemory();
   run.mockClear();
   runForResult.mockClear();
-  toastInfo.mockClear();
+  notify.mockClear();
   getMemory.mockReset();
   useThreadsStore.setState({ byId: { "s-1": thread("s-1", "Renamed thread"), "s-7": thread("s-7", "Old work", 5) }, order: ["s-1", "s-7"] });
   useUiStore.setState({ selection: HOME });
@@ -118,7 +115,7 @@ describe("RememberedSection", () => {
     await vi.waitFor(() => {
       expect(within(second).getByTestId<HTMLButtonElement>("memory-forget").disabled).toBe(false);
     });
-    expect(toastInfo).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("memory-forget-all"));
     expect(run).toHaveBeenCalledWith("memory.clear");
   });
@@ -136,7 +133,7 @@ describe("RememberedSection", () => {
     await vi.waitFor(() => {
       expect(screen.getAllByTestId("memory-row")).toHaveLength(1);
     });
-    expect(toastInfo).toHaveBeenCalledWith("That entry is gone; the list was refreshed.");
+    expect(notify).toHaveBeenCalledWith({ level: "info", title: "That entry is gone", description: "The list was refreshed." });
     expect(getMemory).toHaveBeenCalledTimes(1);
   });
 
@@ -165,7 +162,7 @@ describe("RememberedSection", () => {
     await vi.waitFor(() => {
       expect(runForResult).toHaveBeenCalled();
     });
-    expect(toastInfo).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
     expect(getMemory).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,6 @@
 import { useCallback, useId, useState } from "react";
 import { CloudUpload, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,7 @@ function PublishBody({ projectId }: { projectId: string }) {
     setError(null);
     try {
       const msg = await publishProject({ projectId, owner: choice.owner, name, visibility: choice.visibility });
-      toast.success(msg || `Published ${project}`);
+      notify({ level: "success", title: `Published ${project}`, ...(msg ? { description: msg } : {}) });
       closePublishDialog();
     } catch (err) {
       setError(errorMessage(err));

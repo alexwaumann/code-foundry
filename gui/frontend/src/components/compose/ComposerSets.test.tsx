@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceView } from "@/api/workspace";
 import { Toaster } from "@/components/ui/sonner";
@@ -81,7 +81,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   useConfirmStore.setState({ pending: null });
 });
@@ -277,7 +277,7 @@ describe("New thread on this branch (composer-fixes.spec.ts 2, 7, 8, 9, 14, 15)"
       });
     });
     await settle();
-    expect(await screen.findByText("Thread Src was removed; starting fresh")).not.toBeNull();
+    expect(await screen.findByText("Src was removed, so this starts a new thread.")).not.toBeNull();
     expect(screen.getByTestId("composer").hasAttribute("data-like")).toBe(false);
     expect(heading()).toBe("What should we build in 2 projects?");
     expect(promptValue()).toBe("Carry on");

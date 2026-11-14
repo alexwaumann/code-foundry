@@ -3,7 +3,7 @@
  * and Help menus; gui/menu.go). The host emits EventRunCommand with a name; this starts it
  * exactly as the palette would, so the menu adds no user action of its own.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { onRunCommandMenu } from "@/api/app";
 import { useCommandsStore } from "@/stores/commands";
 import { openHelp } from "@/stores/views";
@@ -17,7 +17,7 @@ import { nextAttention, startCommandNamed } from "./bindings";
 const menuViewActions: Readonly<Record<string, () => void>> = {
   // Thread > Next Needing Attention, as cmd+shift+a (in the window shell, nothing visible when none waits).
   "attention.next": () => {
-    if (!nextAttention() && !shellDrawn()) toast.info("No threads need attention");
+    if (!nextAttention() && !shellDrawn()) notify({ level: "info", title: "No threads need attention" });
   },
   // Help > Getting Started and Keyboard Shortcuts and Help: the help overlay on a tab.
   // Not view.help, a toggle: picking one while the overlay shows switches its tab.
@@ -42,7 +42,7 @@ export function runMenuCommand(name: string): void {
   }
   if (startCommandNamed(name)) return;
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
-  toast.info(`${title} is not available here`);
+  notify({ level: "info", title: `${title} is not available here` });
 }
 
 /** Wires the app menu's command items to this window. Returns an unsubscribe. */

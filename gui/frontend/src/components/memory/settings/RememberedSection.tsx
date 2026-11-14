@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CircleQuestionMark, EyeOff, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { isMemoryEntryGone } from "@/api/memory";
 import { SectionCard } from "@/components/settings/SectionCard";
 import { Button } from "@/components/ui/button";
@@ -68,7 +68,7 @@ async function forget(id: string): Promise<void> {
     },
   );
   if (!seen.gone) return;
-  toast.info("That entry is gone; the list was refreshed.");
+  notify({ level: "info", title: "That entry is gone", description: "The list was refreshed." });
   await loadMemory();
 }
 

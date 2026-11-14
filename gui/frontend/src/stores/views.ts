@@ -7,7 +7,7 @@
  * locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
  * window's own settings and usage keys and buttons toggle (toggleView); a ShowView only shows.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { useUiStore } from "./ui";
 import { parsePluginView, showPluginView } from "./pluginPanel";
@@ -296,7 +296,7 @@ export async function openThemeEditor(id: string): Promise<boolean> {
   if (!(await whenTheme(id))) return false;
   const t = themeById.get(id);
   if (!t?.user) {
-    toast.error("Cannot edit that theme", { description: `${t?.name ?? id} is not one of your themes. Customise copies it first.` });
+    notify({ level: "error", title: "Cannot edit that theme", description: `${t?.name ?? id} is not one of your themes. Customise copies it first.` });
     return false;
   }
   const editing = useThemeEditorStore.getState().id;

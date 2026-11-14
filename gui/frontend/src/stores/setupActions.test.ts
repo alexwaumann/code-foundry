@@ -5,13 +5,10 @@ import { tagToken } from "@/lib/prompt";
 import { encodeSetupDraft, SETUP_DRAFT_VERSION, type SetupDraft } from "@/lib/setupDraft";
 
 const blobs = vi.hoisted(() => new Map<string, Blob>());
-const toastInfo = vi.hoisted(() => vi.fn());
+const notify = vi.hoisted(() => vi.fn());
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("./attachments", async (orig) => ({ ...(await orig<typeof import("./attachments")>()), readAttachmentFile: (path: string) => Promise.resolve(blobs.get(path) ?? null) }));
-vi.mock("sonner", async (orig) => {
-  const real = await orig<typeof import("sonner")>();
-  return { ...real, toast: Object.assign(real.toast, { info: toastInfo }) };
-});
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { daemon, invocationsOf, refuse, resetDaemon } = await import("@/test/daemonFakes");
 const { getDraft, updateDraft, useComposeStore } = await import("./compose");
@@ -62,7 +59,7 @@ beforeEach(() => {
   resetDaemon();
   blobs.clear();
   blobs.set("/att/shot.png", new Blob(["png"], { type: "image/png" }));
-  toastInfo.mockClear();
+  notify.mockClear();
   useProjectsStore.setState({ byId: { "repo-a": project("repo-a"), "repo-b": project("repo-b", [{ path: "/src/repo-b" }]) }, order: ["repo-a", "repo-b"] });
   useWorkspacesStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { [ID]: thread() }, order: [ID] });
@@ -304,7 +301,7 @@ describe("Cancel", () => {
       throw refuse("it was too late to cancel it, and Claude is starting", Code.FailedPrecondition);
     });
     expect(await cancelSetup(ID)).toBe(false);
-    expect(toastInfo.mock.calls[0]?.[0]).toBe(CANCEL_TOO_LATE);
+    expect(notify).toHaveBeenCalledWith({ level: "info", title: "Too late to cancel", description: CANCEL_TOO_LATE });
   });
 });
 

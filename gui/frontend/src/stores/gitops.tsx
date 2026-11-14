@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify, notifyProgress, dismissNotice } from "@/lib/notify";
 import type { GitOpView, GitOpsEventView } from "@/api/gitops";
 import { GitOpProgress, GitOpResult } from "@/components/gitops/GitOpToast";
 import { runCommand } from "./commands";
@@ -55,12 +55,12 @@ const SUCCESS_MS = 5000;
 
 function show(a: GitOpToastAction): void {
   if (a.show === "dismiss") {
-    toast.dismiss(a.id);
+    dismissNotice(a.id);
     return;
   }
   const { show, op } = a;
   if (show === "progress") {
-    toast.loading(op.title, { id: op.id, description: <GitOpProgress op={op} />, duration: Infinity });
+    notifyProgress({ id: op.id, title: op.title, description: <GitOpProgress op={op} /> });
     return;
   }
   if (op.state === "failed") {
@@ -69,7 +69,7 @@ function show(a: GitOpToastAction): void {
   }
   // A created PR offers to open it; pr-open and open-url have already opened theirs.
   const openPr = op.kind === "pr-create" && op.url ? { label: "Open", onClick: () => void runCommand("view.open.url", { url: op.url }) } : undefined;
-  toast.success(op.title, { id: op.id, description: <GitOpResult op={op} />, duration: SUCCESS_MS, action: openPr });
+  notify({ level: "success", id: op.id, title: op.title, description: <GitOpResult op={op} />, duration: SUCCESS_MS, ...(openPr ? { action: openPr } : {}) });
 }
 
 /** Failure toast; toggling the output re-issues it so sonner re-measures its height. */
@@ -77,11 +77,12 @@ function showFailure(op: GitOpView, expanded: boolean): void {
   const onToggle = () => {
     showFailure(op, !expanded);
   };
-  toast.error(`${op.title} failed`, {
+  notify({
+    level: "error",
     id: op.id,
+    title: `${op.title} failed`,
     description: <GitOpResult op={op} expanded={expanded} onToggle={onToggle} />,
-    duration: Infinity,
-    closeButton: true,
+    sticky: true,
   });
 }
 

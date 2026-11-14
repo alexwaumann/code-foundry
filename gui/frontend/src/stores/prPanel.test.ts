@@ -10,8 +10,8 @@ const getPullRequestDetail = vi.hoisted(() => vi.fn());
 const listReviewerCandidates = vi.hoisted(() => vi.fn());
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), getPullRequestDetail, listReviewerCandidates }));
 
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock("sonner", () => ({ toast }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
@@ -60,7 +60,7 @@ describe("refreshPullRequest", () => {
     expect(invokeCommand).toHaveBeenCalledWith("pr.refresh", expect.anything(), { "repo-slug": SLUG, number: "1" });
     expect(entry(key)).toMatchObject({ data: { body: "fresh", lastError: "", fetchedAtMs: Date.parse("2026-10-09T10:00:00Z") }, error: null, loading: false });
     expect(getPullRequestDetail).toHaveBeenCalledTimes(1); // the watch's first read only
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalledWith(expect.objectContaining({ level: "success" }));
     expect(usePrPanelStore.getState().refreshing).toEqual({});
     release();
   });
@@ -76,7 +76,7 @@ describe("refreshPullRequest", () => {
     invokeCommand.mockRejectedValueOnce(new ConnectError("refresh #2 failed, the cached copy is unchanged: boom", Code.Unavailable));
 
     await expect(refreshPullRequest(ref)).resolves.toBe(false);
-    expect(toast.error).toHaveBeenCalledWith("pr.refresh failed", { description: expect.stringContaining("boom") as unknown });
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "pr.refresh failed", description: expect.stringContaining("boom") as unknown });
     expect(entry(key)).toMatchObject({ data: { body: "v1", lastError: "earlier failure" }, error: expect.stringContaining("boom") as unknown, loading: false });
     expect(getPullRequestDetail).toHaveBeenCalledTimes(1);
     expect(usePrPanelStore.getState().refreshing).toEqual({});
@@ -166,7 +166,7 @@ describe("setReviewRequest", () => {
     expect(busy()).toBe(true); // the row's spinner while the request runs
     fail(new ConnectError("Review cannot be requested from pull request author.", Code.FailedPrecondition));
     await expect(p).resolves.toBe(false);
-    expect(toast.error).toHaveBeenCalledWith("pr.review.request failed", { description: expect.stringContaining("cannot be requested") as unknown });
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "pr.review.request failed", description: expect.stringContaining("cannot be requested") as unknown });
     expect(listReviewerCandidates).toHaveBeenCalledTimes(2);
     expect(busy()).toBe(false);
     expect(usePrPanelStore.getState().confirmed[requestingKey(ref, "lee")]).toBeUndefined(); // nothing to confirm
@@ -201,7 +201,7 @@ describe("submitReview", () => {
     await expect(first).resolves.toBe(true);
     expect(busy()).toBe(false);
     expect(entry(key)?.data?.body).toBe("after");
-    expect(toast.success).toHaveBeenCalledWith("Approved #5");
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "pr.review", description: "Approved #5" });
     release();
   });
 
@@ -219,7 +219,7 @@ describe("submitReview", () => {
 
     await expect(submitReview(ref, "approve", "   ")).resolves.toBe(false);
     expect(invokeCommand).toHaveBeenCalledWith("pr.review", expect.anything(), { "repo-slug": SLUG, number: "6", verdict: "approve" });
-    expect(toast.error).toHaveBeenCalledWith("pr.review failed", { description: expect.stringContaining("Can not approve your own") as unknown });
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "pr.review failed", description: expect.stringContaining("Can not approve your own") as unknown });
     expect(getPullRequestDetail).toHaveBeenCalledTimes(2);
     // The re-read is still in flight; the busy flag is already gone.
     expect(entry(key)?.loading).toBe(true);
@@ -340,7 +340,7 @@ describe("revertPullRequest", () => {
     invokeCommand.mockResolvedValueOnce({ message: "Revert requested", resultJson: "{}" });
     await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toBeNull();
     await layoutSettled();
-    expect(toast.success).toHaveBeenCalledWith("Revert requested");
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Revert pull request", description: "Revert requested" });
     expect(tabPlace("thread:a").tabs.map((t) => t.title)).toEqual(["#5"]);
   });
 

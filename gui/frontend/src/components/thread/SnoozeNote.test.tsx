@@ -3,7 +3,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }) }));
+vi.mock("@/lib/notify", () => ({ notify: vi.fn(), notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { SnoozeNote } = await import("./ThreadComposer");
 const { useThreadsStore } = await import("@/stores/threads");

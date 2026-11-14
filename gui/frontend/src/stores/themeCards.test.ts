@@ -3,8 +3,8 @@ import { themeById, type ThemeFile } from "@/themes";
 
 const runCommandForResult = vi.hoisted(() => vi.fn(() => Promise.resolve({ message: "", resultJson: "{}" })));
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
-const toastInfo = vi.hoisted(() => vi.fn());
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { info: toastInfo, success: vi.fn(), error: vi.fn() }) }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const { themeUndoState, undoFromLink } = await import("./themeCards");
 const { useSettingsStore } = await import("./settings");
@@ -71,16 +71,16 @@ describe("undoFromLink (the toast's Undo)", () => {
     slot("dracula");
     undoFromLink("dark:dracula:github-dark");
     expect(runCommandForResult).toHaveBeenCalledWith("theme.set-dark", { theme: "github-dark" }, { quiet: true });
-    expect(toastInfo).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("once the slot moved on: a note, no change; already back: says so", () => {
     slot("nord");
     undoFromLink("dark:dracula:github-dark");
-    expect(toastInfo).toHaveBeenLastCalledWith("Nothing to undo: the dark theme has changed since");
+    expect(notify).toHaveBeenLastCalledWith({ level: "info", title: "Nothing to undo", description: "The dark theme has changed since." });
     slot("github-dark");
     undoFromLink("dark:dracula:github-dark");
-    expect(toastInfo).toHaveBeenLastCalledWith("The dark theme is GitHub Dark again");
+    expect(notify).toHaveBeenLastCalledWith({ level: "info", title: "Nothing to undo", description: "The dark theme is GitHub Dark again" });
     expect(runCommandForResult).not.toHaveBeenCalled();
   });
 });

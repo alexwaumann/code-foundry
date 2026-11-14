@@ -25,7 +25,7 @@ import { UpdateDialog } from "@/components/update/UpdateDialog";
 import { installKeybindings } from "@/keys/bindings";
 import { installInputModality } from "@/lib/inputModality";
 import { startMenuCommands } from "@/keys/menu";
-import { startThemePublish, syncDocumentScheme, useColorScheme } from "@/lib/theme";
+import { startThemePublish, syncDocumentScheme } from "@/lib/theme";
 import { startThemeReports } from "@/lib/themeReports";
 import { syncWindowBackground } from "@/lib/windowBackground";
 import { useWindowTitle } from "@/lib/title";
@@ -89,7 +89,6 @@ function startApp(): () => void {
 
 export function App() {
   useEffect(() => startApp(), []);
-  const scheme = useColorScheme();
   // Settings, Themes and Usage are modal sheets over the window (SettingsSheet,
   // UsageSheet), which stays laid out under them.
   useWindowTitle(useAttentionCount());
@@ -131,7 +130,7 @@ export function App() {
         <ActionDialog />
         <ActionRunDialog />
         <RemoveSpaceDialog />
-        <Toaster theme={scheme} position="bottom-right" offset={{ bottom: 20, right: 20 }} />
+        <Toaster position="bottom-right" offset={{ bottom: 20, right: 20 }} />
       </div>
     </TooltipProvider>
   );

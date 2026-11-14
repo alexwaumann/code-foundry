@@ -5,7 +5,7 @@
  * after the detail loaded; when the detail's head moves (a push the poll saw, a
  * pull_request_detail_updated re-read), the tab invalidates it (syncPullRequestDiff).
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { getPullRequestDiff, getPullRequestFile, type PullRequestDiffView } from "@/api/prDiff";
 import { errorMessage } from "@/api/stream";
@@ -103,5 +103,5 @@ export const readPullRequestFile = (repoSlug: string, ref: string, path: string)
 /** A hunk expansion that could not load its file: toasted once per file. */
 export function expandFailed(path: string, err: unknown): void {
   const why = err instanceof ExpandError ? err.message : errorMessage(err);
-  toast.error(`Cannot expand ${path}`, { id: `pr-expand:${path}`, description: why });
+  notify({ level: "error", title: "Cannot expand the diff", id: `pr-expand:${path}`, description: `${path}: ${why}` });
 }

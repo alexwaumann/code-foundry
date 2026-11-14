@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Code } from "@connectrpc/connect";
-import { toast } from "sonner";
+import { dismissNotice } from "@/lib/notify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadItemView, ThreadPendingView, ThreadRequestView } from "@/api/thread";
 
@@ -229,7 +229,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => {
-    toast.dismiss();
+    dismissNotice();
   });
   cleanup();
   vi.restoreAllMocks();

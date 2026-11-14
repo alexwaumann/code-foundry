@@ -10,7 +10,7 @@
  * store under `thread:<id>` (its text with the composer's tags as tokens, its images), so
  * switching threads keeps what was typed.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { isNotFound } from "@/api/errors";
 import { stageAttachment } from "@/api/threads";
 import { sendErrorMessage } from "@/api/stream";
@@ -298,7 +298,7 @@ export async function respondThread(threadId: string, requestId: string, decisio
     expected: (err) => (failure.withdrawn = isNotFound(err)),
   });
   if (res !== null) return true;
-  if (failure.withdrawn) toast("Claude no longer needs that answer", { id: `withdrawn:${requestId}` });
+  if (failure.withdrawn) notify({ level: "info", title: "Claude no longer needs that answer", id: `withdrawn:${requestId}` });
   else setAnswering(threadId, requestId, false);
   return false;
 }

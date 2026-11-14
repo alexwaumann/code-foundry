@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import type { SettingFieldView } from "@/api/settings";
 import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
@@ -40,7 +40,9 @@ export function useSettingField(field: SettingFieldView) {
         return;
       }
       const shown = displayValue(field, useSettingsStore.getState().snapshot?.values[field.key] ?? v.value);
-      toast.success(`Saved ${field.title}`, {
+      notify({
+        level: "success",
+        title: `Saved ${field.title}`,
         description: `${shown}${field.restartRequired ? " · applies after a daemon restart" : ""}`,
       });
     });

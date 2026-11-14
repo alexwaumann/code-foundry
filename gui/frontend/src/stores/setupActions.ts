@@ -5,7 +5,7 @@
  * the send: the thread goes and the new-thread composer shows the draft it came from. The
  * rules of what comes back are here; the snapshot's format is lib/setupDraft.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { isFailedPrecondition } from "@/api/errors";
 import type { ThreadView } from "@/api/threads";
 import { newCitationId } from "@/lib/citation";
@@ -79,7 +79,7 @@ export async function retrySetup(threadId: string): Promise<boolean> {
 }
 
 /** Cancel lost the race with the setup's end: the composer shows what is true now. */
-export const CANCEL_TOO_LATE = "Too late to cancel: this setup has just ended.";
+export const CANCEL_TOO_LATE = "This setup has just ended.";
 
 /** Edit lost the race with a Try again, or the setup finished. */
 export const EDIT_TOO_LATE = "This setup is running again, so there is no send to undo.";
@@ -96,7 +96,7 @@ export async function cancelSetup(threadId: string): Promise<boolean> {
     quiet: true,
     expected: (err) => {
       if (!isFailedPrecondition(err)) return false;
-      toast.info(CANCEL_TOO_LATE);
+      notify({ level: "info", title: "Too late to cancel", description: CANCEL_TOO_LATE });
       return true;
     },
   });

@@ -6,7 +6,7 @@
  * selection (the panel shows for whatever holds that worktree now). The caller (views.ts
  * showView) closes a page over the content area first, since it hides the panel.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { getUiContext } from "./context";
 import { openTab } from "@/shell/host";
 import { surfaceManifestOf } from "./plugins";
@@ -31,7 +31,7 @@ export function showPluginView(name: string): boolean {
   if (!parsed) return false;
   const m = surfaceManifestOf(parsed.kind);
   if (!m) {
-    toast.error("That plugin surface is not available", { description: parsed.kind });
+    notify({ level: "error", title: "That plugin surface is not available", description: parsed.kind });
     return true;
   }
   const ui = useUiStore.getState();

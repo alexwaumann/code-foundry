@@ -5,7 +5,7 @@
  * what only the page shows: the files that did not load and the directory.
  */
 import { useSyncExternalStore } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import type { ThemeFileIssueView, ThemesSnapshotView } from "@/api/theme";
 import { setUserThemes, subscribeUserThemes, userThemes, type Theme } from "@/themes";
@@ -45,7 +45,7 @@ export function applyThemeEvent(ev: ThemesSnapshotView): void {
 export async function deleteThemeFile(file: string): Promise<boolean> {
   const res = await runCommandForResult("theme.delete", { file }, { quiet: true });
   if (!res) return false;
-  toast.success(`Deleted ${file}`);
+  notify({ level: "success", title: `Deleted ${file}` });
   return true;
 }
 

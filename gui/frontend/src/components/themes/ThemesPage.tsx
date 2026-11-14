@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Check, ChevronRight, Link2, Monitor, Moon, Search, Sun, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -528,7 +528,7 @@ function ControlBar({ slot, slots }: { slot: ThemeSlot; slots: { dark: string; l
   const scheme = useColorScheme();
   const save = (v: string) => {
     void saveSettings({ "appearance.theme": v }).then((res) => {
-      if (!res.ok) toast.error("Cannot set the scheme", { description: res.issues["appearance.theme"] ?? res.error });
+      if (!res.ok) notify({ level: "error", title: "Cannot set the scheme", description: res.issues["appearance.theme"] ?? res.error });
     });
   };
   return (

@@ -3,7 +3,7 @@
  * a failure is toasted), with a thread's context when it names one; the focus of an open tab,
  * with the keyboard following it into its pane; a terminal through PR 13's actions; or a note.
  */
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { runCommandForResult } from "@/stores/commands";
 import { getUiContext } from "@/stores/context";
 import { useLayoutStore } from "@/stores/layout";
@@ -20,7 +20,7 @@ export async function runLinked(a: LinkedAction): Promise<void> {
     return;
   }
   if ("say" in a) {
-    toast(a.say);
+    notify({ level: "info", title: a.say });
     return;
   }
   if ("terminal" in a) {

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { isOutdatedDaemon } from "@/api/errors";
 import { errorMessage, isUnreachable } from "@/api/stream";
 import { publishTheme, type PublishedTheme } from "@/api/ui";
@@ -296,7 +296,7 @@ export function reportPublishFailure(err: unknown): void {
   console.warn("theme publish", err);
   if (publishFailureShown || isUnreachable(err) || isOutdatedDaemon(err)) return;
   publishFailureShown = true;
-  toast.error("Theme could not be published to pages", { description: `${errorMessage(err)}. Pages keep the last theme the daemon had.` });
+  notify({ level: "error", title: "Theme could not be published to pages", description: `${errorMessage(err)}. Pages keep the last theme the daemon had.` });
 }
 
 /** Lets the next refusal toast again (tests). */
