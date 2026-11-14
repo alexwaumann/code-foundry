@@ -77,8 +77,10 @@ works around it today; the file named is a place to copy from.
   send's notice) a thread id of its own.
 - A debounce under fake timers: `vi.useFakeTimers({ shouldAdvanceTime: true })` and
   `advanceTimersByTimeAsync`, so zero timeouts still run (`pr/PullRequestSurface.test.tsx`).
-- sonner's `toast(...)` cannot be spied on: mount a `Toaster`, find the text, and
-  `toast.dismiss()` in `afterEach` (`actions/ActionRunDialog.test.tsx`).
+- Toasts: mock `@/lib/notify` and assert on `notify`'s calls; to see the card itself, mount
+  the `Toaster` from `components/ui/sonner`, find the text, and `dismissNotice()` in
+  `afterEach` (`actions/ActionRunDialog.test.tsx`). Nothing names sonner directly
+  (`design/toastGuard.test.ts`).
 - A store fed by a fake stream gets a published snapshot a tick later: wait until the store
   holds it before asserting (`settings/DictationSettings.test.tsx`).
 - A test that times out keeps running after vitest moved on: with module-level fakes its late
