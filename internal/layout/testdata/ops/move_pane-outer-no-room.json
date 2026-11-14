@@ -1,5 +1,5 @@
 {
-  "doc": "No floor when the rest of the grid would keep less than 480px: a diff pane on the outer left edge of a 912px wide grid takes 0.45 of it, though the height would allow the floor.",
+  "doc": "A pane moved onto the outer left edge is refused when the result would not fit: in a 912px wide grid the diff and the column beside it need 480 + 12 + 480 = 972px (docs/notes/shell-25f-sizes.md). The layout does not change.",
   "state": {
     "v": 1,
     "spaces": [
@@ -57,61 +57,5 @@
     "default_space": "sp-a"
   },
   "op": {"op":"move_pane","pane":"p-b","edge":"left","w":912,"h":2000},
-  "want": {
-    "v": 1,
-    "spaces": [
-      {
-        "id": "sp-a",
-        "name": "Main",
-        "root": {
-          "t": "split",
-          "id": "s-n1",
-          "dir": "row",
-          "kids": [
-            {
-              "t": "pane",
-              "id": "p-b",
-              "tabs": [
-                {
-                  "id": "t-d",
-                  "kind": "diff",
-                  "thread": "th-a",
-                  "params": {"project":"pj-1","worktree":"w-1"}
-                }
-              ],
-              "active": "t-d"
-            },
-            {
-              "t": "split",
-              "id": "s-c",
-              "dir": "col",
-              "kids": [
-                {
-                  "t": "pane",
-                  "id": "p-a",
-                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
-                  "active": "t-a"
-                },
-                {
-                  "t": "pane",
-                  "id": "p-t",
-                  "tabs": [
-                    {"id":"t-t","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
-                  ],
-                  "active": "t-t"
-                }
-              ],
-              "sizes": [0.62,0.38]
-            }
-          ],
-          "sizes": [0.45,0.55]
-        },
-        "focus": "p-b",
-        "mru": ["t-d","t-a"]
-      }
-    ],
-    "current_space": "sp-a",
-    "default_space": "sp-a"
-  },
-  "result": {"space":"sp-a","pane":"p-b","tab":"t-d"}
+  "error": "failed_precondition"
 }

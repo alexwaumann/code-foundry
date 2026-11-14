@@ -55,6 +55,8 @@ func (l layout) reopenCommand() Command {
 				return cliOnly(uctx, fmt.Sprintf("nothing to reopen in space %s %q", sp.ID, sp.Name)), nil
 			case r.Existing:
 				return layoutResult(uctx, c, fmt.Sprintf("tab %s is open again already: focused it in pane %s", r.Tab, r.Pane)), nil
+			case r.Collapsed:
+				return layoutResult(uctx, c, fmt.Sprintf("reopened tab %s in pane %s, collapsed: there is no room to open it here", r.Tab, r.Pane)), nil
 			}
 			return layoutResult(uctx, c, fmt.Sprintf("reopened tab %s in pane %s", r.Tab, r.Pane)), nil
 		},

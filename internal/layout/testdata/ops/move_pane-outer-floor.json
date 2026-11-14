@@ -1,5 +1,5 @@
 {
-  "doc": "A pane on the outer bottom edge takes its active tab's kind's default share of the grid's height less its gutters, raised to the kind's floor: it joins the root column as its third pane, so 1024px less two gutters is 1000; a diff's 0.45 of that is 450, under its 480px floor, and the rest keeps 520 (at least 480), so 0.48. The width plays no part.",
+  "doc": "A pane on the outer bottom edge takes its active tab's kind's default share of the grid's height less its gutters, raised to the kind's floor: it joins the root column as its third pane, so 1068px less two gutters is 1044; a diff's 0.45 of that is 470, under its 480px floor, and the rest keeps 564 (at least 480), so 480/1044. The width plays no part (it is wide enough for a pane's 480px minimum).",
   "state": {
     "v": 1,
     "spaces": [
@@ -56,7 +56,7 @@
     "current_space": "sp-a",
     "default_space": "sp-a"
   },
-  "op": {"op":"move_pane","pane":"p-b","edge":"bottom","w":400,"h":1024},
+  "op": {"op":"move_pane","pane":"p-b","edge":"bottom","w":1200,"h":1068},
   "want": {
     "v": 1,
     "spaces": [
@@ -96,7 +96,7 @@
               "active": "t-d"
             }
           ],
-          "sizes": [0.3224,0.1976,0.48]
+          "sizes": [0.3349425287356322,0.2052873563218391,0.45977011494252873]
         },
         "focus": "p-b",
         "mru": ["t-d","t-a"]

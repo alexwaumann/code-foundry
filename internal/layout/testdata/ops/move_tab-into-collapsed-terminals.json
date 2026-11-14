@@ -1,0 +1,102 @@
+{
+  "doc": "A collapsed pane of terminals takes any tab: the drop opens it, which is always allowed, and automatic folding copes when the result does not fit.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t",
+              "collapsed": true
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","params":{"path":"/r/a.go"},"thread":"th-a"}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.4,0.2,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"move_tab","tab":"t-f","pane":"p-b","w":1300,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}},
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-f"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.4,0.2,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-f","t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-f"}
+}

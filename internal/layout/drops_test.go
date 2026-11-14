@@ -24,11 +24,14 @@ type dropCase struct {
 }
 
 // dropTest is one drag: what is dragged and where it lands, in the GUI's terms (shell/drag
-// targets.ts DragSource and DropTarget), and the space after the op the drop runs.
+// targets.ts DragSource and DropTarget), and the space after the op the drop runs; or Refused
+// when the op refuses it for want of room (fit.go): the GUI must not offer that target
+// (docs/notes/shell-25f-sizes.md).
 type dropTest struct {
-	Source dropSource `json:"source"`
-	Target dropTarget `json:"target"`
-	After  dropAfter  `json:"after"`
+	Source  dropSource `json:"source"`
+	Target  dropTarget `json:"target"`
+	After   *dropAfter `json:"after,omitempty"`
+	Refused bool       `json:"refused,omitempty"`
 }
 
 type dropSource struct {
@@ -116,9 +119,9 @@ func dropOp(c *dropCase, s dropSource, tg dropTarget, panes int, tabsIn func(str
 		case "outer":
 			return &OpenThread{Thread: s.Thread, Edge: tg.Edge, Focus: true, W: c.W, H: c.H}
 		case "edge":
-			return &OpenThread{Thread: s.Thread, Pane: tg.Pane, Edge: tg.Edge, Focus: true}
+			return &OpenThread{Thread: s.Thread, Pane: tg.Pane, Edge: tg.Edge, Focus: true, W: c.W, H: c.H}
 		default:
-			return &OpenThread{Thread: s.Thread, Pane: tg.Pane, Focus: true}
+			return &OpenThread{Thread: s.Thread, Pane: tg.Pane, Focus: true, W: c.W, H: c.H}
 		}
 	}
 	if s.Kind == "pane" {
@@ -128,9 +131,9 @@ func dropOp(c *dropCase, s dropSource, tg dropTarget, panes int, tabsIn func(str
 		case tg.Kind == "outer" || tg.Pane == s.Pane:
 			return nil
 		case tg.Kind == "edge":
-			return &MovePane{Pane: s.Pane, Target: tg.Pane, Edge: tg.Edge}
+			return &MovePane{Pane: s.Pane, Target: tg.Pane, Edge: tg.Edge, W: c.W, H: c.H}
 		default:
-			return &MergePane{Pane: s.Pane, Target: tg.Pane}
+			return &MergePane{Pane: s.Pane, Target: tg.Pane, W: c.W, H: c.H}
 		}
 	}
 	own := tabsIn(s.Pane)
@@ -143,9 +146,9 @@ func dropOp(c *dropCase, s dropSource, tg dropTarget, panes int, tabsIn func(str
 	case tg.Pane == s.Pane && (tg.Kind == "pane" || own == 1):
 		return nil
 	case tg.Kind == "edge":
-		return &MoveTab{Tab: s.Tab, Pane: tg.Pane, Edge: tg.Edge}
+		return &MoveTab{Tab: s.Tab, Pane: tg.Pane, Edge: tg.Edge, W: c.W, H: c.H}
 	default:
-		return &MoveTab{Tab: s.Tab, Pane: tg.Pane}
+		return &MoveTab{Tab: s.Tab, Pane: tg.Pane, W: c.W, H: c.H}
 	}
 }
 
@@ -170,10 +173,10 @@ func dropCases(t *testing.T) []*dropCase {
 			}
 		}
 		r.Shuffle(len(tabs), func(i, j int) { tabs[i], tabs[j] = tabs[j], tabs[i] })
-		// Every third roomy, the rest small: rails fold in most.
-		w, h := float64(480+r.IntN(500)), float64(320+r.IntN(380))
+		// Every third roomy, the rest small: rails fold in most, and many drops find no room.
+		w, h := float64(700+r.IntN(900)), float64(450+r.IntN(600))
 		if len(out)%3 == 0 {
-			w, h = float64(1400+r.IntN(800)), float64(800+r.IntN(400))
+			w, h = float64(1800+r.IntN(1200)), float64(1000+r.IntN(600))
 		}
 		c := &dropCase{Root: root, W: w, H: h, Focus: ids[r.IntN(len(ids))], MRU: tabs[:r.IntN(len(tabs)+1)]}
 		st := dropState(t, c)
@@ -214,11 +217,15 @@ func dropCases(t *testing.T) []*dropCase {
 				continue
 			}
 			next, res, err := Apply(st, op, &SeqIDs{})
+			if IsNoRoom(err) {
+				c.Drops = append(c.Drops, dropTest{Source: s, Target: tg, Refused: true})
+				continue
+			}
 			if err != nil {
 				t.Fatalf("%s %+v: %v", op.OpName(), op, err)
 			}
 			sp := next.Spaces[0]
-			c.Drops = append(c.Drops, dropTest{Source: s, Target: tg, After: dropAfter{Root: slim(sp.Root), Focus: sp.Focus, MRU: sp.MRU, Pane: res.Pane}})
+			c.Drops = append(c.Drops, dropTest{Source: s, Target: tg, After: &dropAfter{Root: slim(sp.Root), Focus: sp.Focus, MRU: sp.MRU, Pane: res.Pane}})
 		}
 		c.Root = slim(c.Root)
 		out = append(out, c)

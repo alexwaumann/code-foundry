@@ -45,7 +45,7 @@
     "current_space": "sp-a",
     "default_space": "sp-a"
   },
-  "op": {"op":"reopen_closed"},
+  "op": {"op":"reopen_closed","w":1600,"h":900},
   "want": {
     "v": 1,
     "spaces": [

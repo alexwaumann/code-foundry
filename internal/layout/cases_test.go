@@ -45,6 +45,8 @@ type caseResult struct {
 	Fresh    []string `json:"fresh,omitempty"`
 	Swapped  []string `json:"swapped,omitempty"`
 	Draft    string   `json:"draft,omitempty"`
+	// Collapsed: a reopened pane came back collapsed (fit.go).
+	Collapsed bool `json:"collapsed,omitempty"`
 }
 
 func toCaseResult(r Result) *caseResult {
@@ -58,7 +60,7 @@ func toCaseResult(r Result) *caseResult {
 	return &caseResult{
 		Space: r.Space, Pane: r.Pane, Tab: r.Tab, Existing: r.Existing, Closed: ids(r.Closed),
 		Rule: r.Rule, Kept: ids(r.Kept), Ended: ids(r.Ended), Back: r.Back, Placed: r.Placed,
-		Fresh: r.Fresh, Swapped: r.Swapped, Draft: r.Draft,
+		Fresh: r.Fresh, Swapped: r.Swapped, Draft: r.Draft, Collapsed: r.Collapsed,
 	}
 }
 

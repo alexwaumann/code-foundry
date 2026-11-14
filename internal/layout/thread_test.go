@@ -99,7 +99,7 @@ func TestCloseOpenRoundTrip(t *testing.T) {
 			if err := Check(st); err != nil {
 				t.Fatal(err)
 			}
-			got := roundTrip(t, st, "th-a", "p-a", DefaultW, DefaultH)
+			got := roundTrip(t, st, "th-a", "p-a", 1600, 1000)
 			if want := layoutShape(st.Spaces[0].Root); layoutShape(got.Spaces[0].Root) != want {
 				t.Errorf("after close and open:\n got %s\nwant %s", layoutShape(got.Spaces[0].Root), want)
 			}
@@ -215,10 +215,9 @@ func TestRoomBeside(t *testing.T) {
 	}{
 		{"diff at its default share", 1180, "diff", 0.45, true},
 		{"diff raised to its 480px floor", 1012, "diff", 0.48, true},
-		{"diff below the floor, no room at the floor, room at 45%", 900, "diff", 0.45, true},
-		{"diff without room", 800, "diff", 0, false},
+		{"diff below the floor, no room at the floor: 45%", 900, "diff", 0.45, true},
+		{"diff in a narrow pane: 45% all the same (room is the fit's question)", 800, "diff", 0.45, true},
 		{"terminal at 30%", 700, "terminal", 0.3, true},
-		{"terminal without room", 680, "terminal", 0, false},
 		{"file at 35%", 1180, "file", 0.35, true},
 		{"a pane narrower than a gutter", 10, "file", 0, false},
 		{"unknown kind", 1180, "nope", 0, false},
@@ -228,9 +227,6 @@ func TestRoomBeside(t *testing.T) {
 			frac, ok := roomBeside(tc.width, tc.kind)
 			if ok != tc.ok || math.Abs(frac-tc.frac) > 1e-9 {
 				t.Fatalf("roomBeside(%v, %s) = %v, %v; want %v, %v", tc.width, tc.kind, frac, ok, tc.frac, tc.ok)
-			}
-			if ok && (tc.width-Gutter)*(1-frac) < KeepPx-1e-9 {
-				t.Fatalf("the conversation keeps %vpx", (tc.width-Gutter)*(1-frac))
 			}
 		})
 	}

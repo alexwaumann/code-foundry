@@ -1,0 +1,41 @@
+{
+  "doc": "A thread opened on a pane's edge (a sidebar row dropped there) is refused when the new pane would not fit.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/f"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_thread",
+    "thread": "th-x",
+    "pane": "p-b",
+    "edge": "right",
+    "focus": true,
+    "w": 1000,
+    "h": 900
+  },
+  "error": "failed_precondition"
+}

@@ -37,6 +37,10 @@ func init() {
 // no record, as a thread of the default space has none): it lives in no space, so its tab
 // opens in the current space (Pane's, when given), which it then lives in.
 //
+// Room (fit.go): a new pane on an edge whose result would not fit the pane area is refused,
+// and so is a Pane of terminals the thread would not fit in (ErrNoRoom); a focused pane of
+// terminals that cannot take it gives way to the most recently focused pane that can.
+//
 // Then the thread's remembered set comes back (Restore). W and H are the pane area for
 // placement (default DefaultW x DefaultH).
 type OpenThread struct {
@@ -104,6 +108,9 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		if psp.ID != t.st.SpaceOf(o.Thread) {
 			return Result{}, fmt.Errorf("thread %s lives in space %s, pane %s is in %s: %w", o.Thread, t.st.SpaceOf(o.Thread), p.ID, psp.ID, ErrFailedPrecondition)
 		}
+		if o.Edge == "" && !canTake(psp, p, w, h, &Tab{Kind: "thread"}) {
+			return Result{}, ErrNoRoom
+		}
 		sp, pane, rule = psp, p, "pane"
 	default:
 		if o.Archived {
@@ -116,7 +123,7 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		if ps := Panes(sp.Root); len(ps) == 1 && len(ps[0].Tabs) == 1 && ps[0].Tabs[0].Kind == "compose" && draftOf(ps[0].Tabs[0]) == "" {
 			pane, compose, rule = ps[0], ps[0].Tabs[0], "compose"
 		} else {
-			pane = focusedPane(sp)
+			pane = hostPane(sp, w, h, &Tab{Kind: "thread"})
 		}
 	}
 	tb := &Tab{Kind: "thread", Thread: o.Thread}
@@ -146,6 +153,9 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 			err = toOuter(t, sp, np, o.Edge, 0, w, h)
 		}
 		if err != nil {
+			return Result{}, err
+		}
+		if err := needRoom(sp, w, h); err != nil {
 			return Result{}, err
 		}
 		res.Rule = "edge"
@@ -290,8 +300,8 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 }
 
 // putBack puts a remembered tab back where it was: into its old pane at its old index when
-// that pane is still there, else into its old pane rebuilt beside the neighbours it had, at
-// its old share. A tab that sat in or beside the thread's pane (Adjacent) goes back only where
+// that pane is still there and can take it (fit.go canTake), else into its old pane rebuilt
+// beside the neighbours it had, at its old share, when the result fits the pane area. A tab that sat in or beside the thread's pane (Adjacent) goes back only where
 // it is still beside it. It reports whether it put the tab back; when not, nothing changed.
 func (t *tx) putBack(sp *Space, rec RememberedTab, tb *Tab, threadTab string, w, h float64) bool {
 	besideThread := func() bool {
@@ -304,6 +314,9 @@ func (t *tx) putBack(sp *Space, rec RememberedTab, tb *Tab, threadTab string, w,
 	psp, p := t.st.FindPane(rec.Pane)
 	if p != nil {
 		if psp != sp || !besideThread() {
+			return false
+		}
+		if !canTake(sp, p, w, h, tb) {
 			return false
 		}
 		p.Tabs = slices.Insert(p.Tabs, clampIndex(rec.Index, len(p.Tabs)), tb)
@@ -323,7 +336,7 @@ func (t *tx) putBack(sp *Space, rec RememberedTab, tb *Tab, threadTab string, w,
 	saved := sp.Root.clone()
 	target := groupRun(Lca(sp.Root, ids), ids, rec.Beside.Edge, func() string { return t.newID("s-") })
 	np := &Node{T: NodePane, ID: rec.Pane, Tabs: []*Tab{tb}, Active: tb.ID}
-	if err := insertBeside(sp, target.ID, rec.Beside.Edge, np, rec.Beside.Frac, t.newID("s-")); err != nil || !besideThread() {
+	if err := insertBeside(sp, target.ID, rec.Beside.Edge, np, rec.Beside.Frac, t.newID("s-")); err != nil || !besideThread() || !Fits(sp.Root, w, h) {
 		sp.Root = saved
 		return false
 	}

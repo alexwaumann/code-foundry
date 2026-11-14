@@ -41,12 +41,7 @@
     "current_space": "sp-a",
     "default_space": "sp-a"
   },
-  "op": {
-    "op": "split_pane",
-    "pane": "p-b",
-    "edge": "right",
-    "tab": {"id":"","kind":"terminal","thread":"th-a","params":{"terminal":"term-9"}}
-  },
+  "op": {"op":"split_pane","pane":"p-b","edge":"right","tab":{"id":"","kind":"terminal","thread":"th-a","params":{"terminal":"term-9"}},"w":1600,"h":900},
   "want": {
     "v": 1,
     "spaces": [

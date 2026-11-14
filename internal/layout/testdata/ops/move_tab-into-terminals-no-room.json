@@ -1,0 +1,52 @@
+{
+  "doc": "A file tab joining a pane of terminals raises its minimum from 300x220 to 480x400; refused when the row would then not fit: 480 + 12 + 480 + 12 + 480 = 1464px in 1300 (it needs 1284 now).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","params":{"path":"/r/a.go"},"thread":"th-a"}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.4,0.2,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"move_tab","tab":"t-f","pane":"p-b","w":1300,"h":900},
+  "error": "failed_precondition"
+}

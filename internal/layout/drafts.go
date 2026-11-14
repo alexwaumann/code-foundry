@@ -156,12 +156,15 @@ func followDrafts(st *State) {
 // NewThread is the New thread action: it focuses the space's empty composer when the space
 // has one (giving it Params when given), and otherwise opens one in the focused pane, or in
 // Pane (a pane's "+": an empty composer open elsewhere in the space moves there). Space is
-// the space ("" is the current one, or Pane's). It is open_surface with a compose tab.
+// the space ("" is the current one, or Pane's). It is open_surface with a compose tab, in the
+// W x H pane area.
 type NewThread struct {
 	Space  string            `json:"space,omitempty"`
 	Pane   string            `json:"pane,omitempty"`
 	Params map[string]string `json:"params,omitempty"`
 	Focus  bool              `json:"focus,omitempty"`
+	W      float64           `json:"w,omitempty"`
+	H      float64           `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -171,7 +174,7 @@ func (o *NewThread) apply(t *tx) (Result, error) {
 	if o.Params[DraftParam] != "" {
 		return Result{}, fmt.Errorf("new_thread opens the empty composer; a draft opens with open_draft: %w", ErrInvalidArgument)
 	}
-	op := &OpenSurface{Space: o.Space, Pane: o.Pane, Tab: &Tab{Kind: "compose", Params: maps.Clone(o.Params)}, Focus: o.Focus}
+	op := &OpenSurface{Space: o.Space, Pane: o.Pane, Tab: &Tab{Kind: "compose", Params: maps.Clone(o.Params)}, Focus: o.Focus, W: o.W, H: o.H}
 	return op.apply(t)
 }
 
@@ -331,6 +334,9 @@ func (o *DiscardDraft) apply(t *tx) (Result, error) {
 type OpenDraft struct {
 	Draft string `json:"draft"`
 	Focus bool   `json:"focus,omitempty"`
+	// W and H are the pane area (default DefaultW x DefaultH).
+	W float64 `json:"w,omitempty"`
+	H float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -346,7 +352,8 @@ func (o *OpenDraft) apply(t *tx) (Result, error) {
 		params = map[string]string{}
 	}
 	params[DraftParam] = d.ID
-	res, err := t.place(sp, nil, &Tab{Kind: "compose", Params: params}, o.Focus, DefaultW, DefaultH)
+	w, h := viewport(o.W, o.H)
+	res, err := t.place(sp, nil, &Tab{Kind: "compose", Params: params}, o.Focus, w, h)
 	if err != nil {
 		return Result{}, err
 	}
