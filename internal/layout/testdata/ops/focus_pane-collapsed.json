@@ -1,0 +1,99 @@
+{
+  "doc": "Focusing a collapsed pane (a direction key) leaves it collapsed.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-b",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-c","kind":"terminal","params":{"terminal":"term-1"}}],
+              "active": "t-c",
+              "collapsed": true
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-c","t-b"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"focus_pane","pane":"p-c"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-b",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-c","kind":"terminal","params":{"terminal":"term-1"}}],
+              "active": "t-c",
+              "collapsed": true
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-c",
+        "mru": ["t-c","t-a","t-b"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-c","tab":"t-c"}
+}

@@ -261,6 +261,8 @@ func randomOp(s *bytesrc, st *State) Op {
 		o.Thread, o.Open, o.Height = pick(s, threads...), s.n(2) == 0, pick[float64](s, 0, 0, 240, -1)
 	case *SetInfo:
 		o.Thread, o.Open = pick(s, threads...), s.n(2) == 0
+	case *SetCollapsed:
+		o.Pane, o.Collapsed = pick(s, panes...), s.n(3) != 0
 	case *ReplaceTerminal:
 		o.Old, o.New = pick(s, terminalIDs...), pick(s, terminalIDs...)
 	case *DropTerminal:
@@ -318,6 +320,7 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 		}
 		checkPlacement(t, step, string(opJSON), st, next, res)
 		checkDrafts(t, step, string(opJSON), next, res)
+		checkCollapsed(t, step, string(opJSON), op, opts, st, next)
 		enc, err := Encode(next)
 		if err != nil {
 			t.Fatal(err)
@@ -330,6 +333,28 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 			t.Fatalf("step %d %s: the result does not read back as written", step, opJSON)
 		}
 		st = next
+	}
+}
+
+// checkCollapsed pins who changes a pane's collapsed mark (docs/notes/shell-25d-collapse.md):
+// only set_collapsed collapses a pane; an op that keeps the user's focus opens one only when it
+// is set_collapsed or the pane is the last of its space that could be open.
+func checkCollapsed(t *testing.T, step int, opJSON string, op Op, opts Options, before, after *State) {
+	t.Helper()
+	_, setting := op.(*SetCollapsed)
+	for _, sp := range after.Spaces {
+		for _, p := range Panes(sp.Root) {
+			_, old := before.FindPane(p.ID)
+			if old == nil {
+				continue
+			}
+			if p.Collapsed && !old.Collapsed && !setting {
+				t.Fatalf("step %d %s collapsed pane %s", step, opJSON, p.ID)
+			}
+			if !p.Collapsed && old.Collapsed && opts.KeepFocus && !setting && !LastOpen(sp, p.ID) {
+				t.Fatalf("step %d %s opened collapsed pane %s while keeping the focus", step, opJSON, p.ID)
+			}
+		}
 	}
 }
 

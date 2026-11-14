@@ -189,6 +189,7 @@ func ApplyWith(st *State, op Op, ids IDs, opts Options) (*State, Result, error) 
 	t.finish()
 	if opts.KeepFocus {
 		keepFocus(st, t.st)
+		keepCollapsed(t.st, t.revealed)
 	}
 	if after := focusedThreadTab(t.st); !opts.NoSmartSwap && after.thread != "" && after != before {
 		res.Swapped = smartSwap(t.st, after.space, after.thread)
@@ -204,6 +205,9 @@ type tx struct {
 	st   *State
 	ids  IDs
 	used map[string]bool
+	// revealed lists the collapsed panes the op opened because it gave one of their tabs the
+	// focus (collapse.go); with Options.KeepFocus they are collapsed again.
+	revealed []string
 }
 
 // newID is a fresh id with that prefix, unused anywhere in the state.
@@ -374,7 +378,7 @@ func focusTab(sp *Space, pane *Node, id string) {
 func (t *tx) show(sp *Space, pane *Node, id string, focus bool) {
 	switch {
 	case focus:
-		focusTab(sp, pane, id)
+		t.focusTab(sp, pane, id)
 		t.st.CurrentSpace = sp.ID
 	case sp.Focus != pane.ID:
 		pane.Active = id
@@ -384,15 +388,21 @@ func (t *tx) show(sp *Space, pane *Node, id string, focus bool) {
 	}
 }
 
-// refocus gives the focus back to the newest MRU entry still open in the space; with none,
-// it leaves the focus where detaching put it.
+// refocus gives the focus back to the newest MRU entry still open in the space, in a pane
+// that is not collapsed; with none, it leaves the focus where detaching put it, unless that
+// pane is collapsed, when the first open pane takes it.
 func refocus(sp *Space) {
 	for _, id := range sp.MRU {
 		for _, p := range Panes(sp.Root) {
-			if p.TabIndex(id) >= 0 {
+			if p.TabIndex(id) >= 0 && !p.Collapsed {
 				focusTab(sp, p, id)
 				return
 			}
+		}
+	}
+	if p := paneByID(sp, sp.Focus); p != nil && p.Collapsed {
+		if o := firstOpen(sp); o != nil {
+			focusTab(sp, o, o.Active)
 		}
 	}
 }
@@ -420,10 +430,13 @@ func (t *tx) finish() {
 		ids := PaneIDs(sp.Root)
 		if !slices.Contains(ids, sp.Focus) {
 			sp.Focus = ""
-			if len(ids) > 0 {
+			if o := firstOpen(sp); o != nil {
+				sp.Focus = o.ID
+			} else if len(ids) > 0 {
 				sp.Focus = ids[0]
 			}
 		}
+		keepOneOpen(sp)
 		open := map[string]bool{}
 		for _, p := range Panes(sp.Root) {
 			for _, tb := range p.Tabs {

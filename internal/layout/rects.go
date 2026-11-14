@@ -36,10 +36,16 @@ type Layout struct {
 	Gutters []GutterRect    `json:"gutters,omitempty"`
 }
 
+// Rail is the thickness of a pane the user collapsed, in layout px (the GUI's RAIL).
+const Rail = 36.0
+
 // Rects lays the tree out in a w x h pane area by its proportions alone: no minimum sizes and
-// no rails (those are the GUI's, per frame). Each split shares its length minus its gutters by
-// its sizes; edges are rounded to whole px, and the last child runs to the split's far edge,
-// so panes and gutters tile the area exactly. This is the layout placement measures.
+// no automatic rails (those are the GUI's, per frame). A pane the user collapsed is a rail: a
+// child of a split that is all collapsed panes takes its rail thickness along the split, and the
+// others share what is left (when every child is all collapsed, they share by their sizes).
+// Each split shares its length minus its gutters by its sizes; edges are rounded to whole px,
+// and the last child runs to the split's far edge, so panes and gutters tile the area exactly.
+// This is the layout placement measures; the GUI's plainRects gives the same px.
 func Rects(root *Node, w, h float64) *Layout {
 	l := &Layout{W: w, H: h, Rects: map[string]Rect{}}
 	if root != nil {
@@ -63,17 +69,32 @@ func (l *Layout) lay(n *Node, x, y, w, h float64) {
 		length = w
 	}
 	free := max(0, length-Gutter*float64(count-1))
+	fixed := make([]bool, count)
+	all := true
+	for i, k := range n.Kids {
+		fixed[i] = allCollapsed(k)
+		all = all && fixed[i]
+	}
+	if all {
+		fixed = make([]bool, count)
+	}
+	sizes := make([]float64, count)
 	ws := 0.0
-	for _, s := range n.Sizes {
-		ws += s
+	for i, k := range n.Kids {
+		if fixed[i] {
+			sizes[i] = min(railLength(k, n.Dir), free)
+			free -= sizes[i]
+		} else {
+			ws += n.Sizes[i]
+		}
 	}
 	p, end := y, y+h
 	if row {
 		p, end = x, x+w
 	}
 	for i, k := range n.Kids {
-		sz := 0.0
-		if ws > 0 {
+		sz := sizes[i]
+		if !fixed[i] && ws > 0 {
 			sz = max(0, free*n.Sizes[i]/ws)
 		}
 		a, b := round(p), round(p+sz)
@@ -95,6 +116,39 @@ func (l *Layout) lay(n *Node, x, y, w, h float64) {
 		}
 		p += sz + Gutter
 	}
+}
+
+// allCollapsed reports whether every pane under n is one the user collapsed.
+func allCollapsed(n *Node) bool {
+	if n.IsPane() {
+		return n.Collapsed
+	}
+	for _, k := range n.Kids {
+		if !allCollapsed(k) {
+			return false
+		}
+	}
+	return true
+}
+
+// railLength is the length along dir of a subtree of collapsed panes: its rails and gutters.
+func railLength(n *Node, dir Dir) float64 {
+	if n.IsPane() {
+		return Rail
+	}
+	out := 0.0
+	for _, k := range n.Kids {
+		l := railLength(k, dir)
+		if n.Dir == dir {
+			out += l
+		} else {
+			out = max(out, l)
+		}
+	}
+	if n.Dir == dir {
+		out += Gutter * float64(len(n.Kids)-1)
+	}
+	return out
 }
 
 // overlap is the length two spans [a, a+al) and [b, b+bl) share.

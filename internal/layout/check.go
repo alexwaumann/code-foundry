@@ -15,7 +15,8 @@ const sizeTolerance = 1e-9
 // Check reports every way st is not in normal form, or nil. Normal form:
 //   - at least one space; space ids unique, names not blank; the current and default spaces exist;
 //   - every space, pane, split and tab id non-empty and unique in the whole state;
-//   - no pane without tabs; each pane's active tab is one of its tabs;
+//   - no pane without tabs; each pane's active tab is one of its tabs; a space with panes has
+//     one that is not collapsed, and only a pane is ever collapsed;
 //   - no split with fewer than two children, none directly in a split of the same direction,
 //     one size per child, each positive, summing to 1;
 //   - every tab valid for its kind (identity.go), its key the computed one, no manual name
@@ -133,6 +134,8 @@ func (c *checker) space(sp *Space) {
 		c.fail("space %s: focus %q with no panes", sp.ID, sp.Focus)
 	case sp.Root != nil && !slices.Contains(panes, sp.Focus):
 		c.fail("space %s: focus %q is not one of its panes", sp.ID, sp.Focus)
+	case sp.Root != nil && firstOpen(sp) == nil:
+		c.fail("space %s: every pane is collapsed", sp.ID)
 	}
 	if len(sp.MRU) > MaxMRU {
 		c.fail("space %s: MRU holds %d entries", sp.ID, len(sp.MRU))
@@ -180,7 +183,7 @@ func (c *checker) node(sp *Space, n *Node, parent Dir, keys map[string]string, o
 		}
 	case NodeSplit:
 		c.id(n.ID, "split")
-		if len(n.Tabs) > 0 || n.Active != "" {
+		if len(n.Tabs) > 0 || n.Active != "" || n.Collapsed {
 			c.fail("split %s has pane fields", n.ID)
 		}
 		if n.Dir != Row && n.Dir != Col {

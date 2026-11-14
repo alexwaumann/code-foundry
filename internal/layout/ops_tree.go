@@ -252,7 +252,7 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 			refocus(from)
 		}
 	}
-	focusTab(to, target, tb.ID)
+	t.focusTab(to, target, tb.ID)
 	return Result{Space: to.ID, Pane: target.ID, Tab: tb.ID}, nil
 }
 
@@ -453,7 +453,7 @@ func (o *MergePane) apply(t *tx) (Result, error) {
 		at = clampIndex(*o.Index, len(target.Tabs))
 	}
 	target.Tabs = slices.Insert(target.Tabs, at, pane.Tabs...)
-	focusTab(sp, target, pane.Active)
+	t.focusTab(sp, target, pane.Active)
 	return Result{Space: sp.ID, Pane: target.ID, Tab: pane.Active}, nil
 }
 
@@ -623,12 +623,13 @@ func (o *FocusTab) apply(t *tx) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	focusTab(sp, pane, tb.ID)
+	t.focusTab(sp, pane, tb.ID)
 	t.st.CurrentSpace = sp.ID
 	return Result{Space: sp.ID, Pane: pane.ID, Tab: tb.ID}, nil
 }
 
-// FocusPane focuses a pane (its active tab) and switches to its space.
+// FocusPane focuses a pane (its active tab) and switches to its space. A collapsed pane takes
+// the focus and stays collapsed (collapse.go): the direction keys pass over it.
 type FocusPane struct {
 	Pane string `json:"pane"`
 }

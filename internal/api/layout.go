@@ -188,7 +188,7 @@ func layoutNodeToProto(n *core.Node) *v1.LayoutNode {
 		return nil
 	}
 	if n.IsPane() {
-		p := &v1.LayoutPane{Id: n.ID, ActiveTabId: n.Active}
+		p := &v1.LayoutPane{Id: n.ID, ActiveTabId: n.Active, Collapsed: n.Collapsed}
 		for _, tb := range n.Tabs {
 			p.Tabs = append(p.Tabs, layoutTabToProto(tb))
 		}

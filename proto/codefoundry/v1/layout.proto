@@ -106,6 +106,9 @@ message LayoutPane {
   string id = 1;
   repeated LayoutTab tabs = 2;
   string active_tab_id = 3;
+  // The user collapsed it to a rail (SetCollapsedOp); the window draws it folded until the
+  // user opens it again.
+  bool collapsed = 4;
 }
 
 // LayoutSplit lays out its children in a row or a column.
@@ -383,6 +386,8 @@ message LayoutOp {
     DropTerminalOp drop_terminal = 52;
 
     SetInfoOp set_info = 60;
+
+    SetCollapsedOp set_collapsed = 70;
   }
 }
 
@@ -460,6 +465,14 @@ message SetQuickOp {
 message SetInfoOp {
   string thread_id = 1;
   bool open = 2;
+}
+
+// SetCollapsedOp collapses a pane to a rail or opens it again (LayoutPane.collapsed). The
+// last open pane of a space cannot be collapsed. Collapsing the focused pane hands the focus to
+// the most recently focused open pane; opening a pane focuses it.
+message SetCollapsedOp {
+  string pane_id = 1;
+  bool collapsed = 2;
 }
 
 // ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
