@@ -15,20 +15,22 @@ import (
 //  3. in a pane next to the thread's pane holding linked surfaces of any thread;
 //  4. in any pane of the space holding linked surfaces;
 //  5. in a new pane to the right of the thread's pane, at the kind's default size, when the
-//     conversation keeps KeepPx of width;
+//     result fits the pane area (fit.go: every open pane keeps its minimum);
 //  6. in the thread's own pane, right after the thread's tab.
 //
 // In 2 to 4 a pane that holds a linked tab of this thread ranks first, then (rule 3) the side
-// in the order right, left, below, above, then the nearest by centre distance. A joined pane
-// is never resized. The caller's pane ("+") wins over 2 to 6; a tab whose thread has no tab in
-// the space, and a tab of no thread, go to the focused pane.
+// in the order right, left, below, above, then the nearest by centre distance; a pane of
+// terminals the tab would not fit in (canTake) is no candidate. A joined pane is never
+// resized. The caller's pane ("+") wins over 2 to 6, and is refused when it cannot take the
+// tab; a tab whose thread has no tab in the space, and a tab of no thread, go to the focused
+// pane, or the most recently focused pane that can take it (hostPane).
 
 // The pane area placement measures when the op names none (plan section 2.4), and the width
-// the conversation keeps for rule 5.
+// the rest keeps when a new pane's size is raised to its kind's floor: a pane's minimum.
 const (
 	DefaultW = 1180.0
 	DefaultH = 820.0
-	KeepPx   = 480.0
+	KeepPx   = PaneMinW
 )
 
 func init() {
@@ -126,11 +128,14 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 		return Result{Space: sp.ID, Pane: p.ID, Tab: tb.ID, Rule: rule}, nil
 	}
 	if chosen != nil {
+		if !canTake(sp, chosen, w, h, tb) {
+			return Result{}, ErrNoRoom
+		}
 		return put(chosen, chosen.TabIndex(chosen.Active)+1, "pane")
 	}
 	tsp, tp, _ := t.st.FindTab(threadTabID(t.st, tb.Thread))
 	if !tb.IsLinked() || tp == nil || tsp != sp {
-		fp := focusedPane(sp)
+		fp := hostPane(sp, w, h, tb)
 		if fp == nil {
 			fp = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
 			sp.Root = fp
@@ -144,7 +149,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	// Rule 2: a pane holding this thread's linked tabs, after the last of them.
 	var mine []*Node
 	for _, p := range Panes(sp.Root) {
-		if lastLinkedOf(p, tb.Thread) >= 0 {
+		if lastLinkedOf(p, tb.Thread) >= 0 && canTake(sp, p, w, h, tb) {
 			mine = append(mine, p)
 		}
 	}
@@ -157,7 +162,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	var next []*Node
 	for _, side := range sideOrder {
 		for _, id := range L.SideNeighbours(tp.ID, side) {
-			if _, p := t.st.FindPane(id); p != nil && holdsLinked(p) && !slices.Contains(next, p) {
+			if _, p := t.st.FindPane(id); p != nil && holdsLinked(p) && !slices.Contains(next, p) && canTake(sp, p, w, h, tb) {
 				next = append(next, p)
 			}
 		}
@@ -170,7 +175,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	// Rule 4: any pane of the space holding linked surfaces.
 	var holding []*Node
 	for _, p := range Panes(sp.Root) {
-		if holdsLinked(p) {
+		if holdsLinked(p) && canTake(sp, p, w, h, tb) {
 			holding = append(holding, p)
 		}
 	}
@@ -180,7 +185,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	}
 
 	// Rule 5: room for a new pane to the right of the thread's pane.
-	if frac, ok := roomBeside(L.Rects[tp.ID].W, tb.Kind); ok {
+	if frac, ok := roomBeside(L.Rects[tp.ID].W, tb.Kind); ok && fitsBeside(sp, tp.ID, Right, w, h, tb) {
 		np := &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
 		if err := insertBeside(sp, tp.ID, Right, np, frac, t.newID("s-")); err != nil {
 			return Result{}, err
@@ -254,10 +259,9 @@ func rank(L *Layout, tp *Node, thread string, cands []*Node, bySide bool) []*Nod
 	return out
 }
 
-// roomBeside says whether a pane width wide has room for a new pane of kind to its right
-// (rule 5), and the share of its room that pane takes: the kind's default share, raised to
-// its floor when the conversation still keeps KeepPx. There is room when the conversation
-// keeps KeepPx at that size.
+// roomBeside is the share of a pane width wide that a new pane of kind to its right takes
+// (rule 5): the kind's default share, raised to its floor when the rest still keeps KeepPx.
+// Whether there is room is not its question: the tree after the split must fit (fitsBeside).
 func roomBeside(width float64, kind string) (float64, bool) {
 	k, ok := KindOf(kind)
 	if !ok {
@@ -267,11 +271,7 @@ func roomBeside(width float64, kind string) (float64, bool) {
 	if room <= 0 {
 		return 0, false
 	}
-	px := k.sizeIn(room)
-	if room-px < KeepPx {
-		return 0, false
-	}
-	return px / room, true
+	return k.sizeIn(room) / room, true
 }
 
 // sizeIn is the px a new pane of kind k takes of room px: its default share, raised to its
@@ -297,6 +297,46 @@ func lastLinkedOf(p *Node, thread string) int {
 // holdsLinked reports whether pane p holds a linked surface of any thread.
 func holdsLinked(p *Node) bool {
 	return slices.ContainsFunc(p.Tabs, (*Tab).IsLinked)
+}
+
+// hostPane is the pane a tab goes to when it goes to the focused pane: the focused pane when it
+// can take tb (canTake), else the most recently focused pane that can, else the focused pane
+// all the same (no pane can: automatic folding copes, as for a small window). Nil in an empty
+// space.
+func hostPane(sp *Space, w, h float64, tb *Tab) *Node {
+	fp := focusedPane(sp)
+	if fp == nil || canTake(sp, fp, w, h, tb) {
+		return fp
+	}
+	if p := recentTaker(sp, w, h, tb); p != nil {
+		return p
+	}
+	return fp
+}
+
+// recentTaker is the most recently focused open pane of sp that can take tb (by the space's
+// MRU, then layout order for panes never focused), or nil.
+func recentTaker(sp *Space, w, h float64, tb *Tab) *Node {
+	panes := Panes(sp.Root)
+	order := make([]*Node, 0, len(panes))
+	for _, id := range sp.MRU {
+		for _, p := range panes {
+			if p.TabIndex(id) >= 0 && !slices.Contains(order, p) {
+				order = append(order, p)
+			}
+		}
+	}
+	for _, p := range panes {
+		if !slices.Contains(order, p) {
+			order = append(order, p)
+		}
+	}
+	for _, p := range order {
+		if !p.Collapsed && canTake(sp, p, w, h, tb) {
+			return p
+		}
+	}
+	return nil
 }
 
 // focusedPane is the space's focused pane, or nil when it has none.

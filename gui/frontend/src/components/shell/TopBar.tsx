@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, PanelLeft, Plus } from "lucide-react";
 import { CommandButton } from "@/components/command/CommandButton";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
-import { TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
+import { APP_NAME_WIDTH, TITLE_BAND_HEIGHT, trafficLightGutter } from "@/components/window/titleBand";
 import { toggleSidebar } from "@/keys/bindings";
 import { newSpace } from "@/shell/spaceActions";
 import { useCanStepFocus } from "@/stores/focusHistory";
@@ -46,7 +46,8 @@ export function TopBar() {
     <div className="flex shrink-0 bg-cf-chrome [--wails-draggable:drag]" style={{ height: TITLE_BAND_HEIGHT }} data-testid="top-bar">
       <div className="h-full shrink-0" style={{ width: gutter }} data-testid="traffic-light-gutter" aria-hidden />
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 pt-shell pr-shell pl-3">
-        <span className="shrink-0 text-brand leading-none whitespace-nowrap text-cf-sidebar-foreground select-none" data-testid="top-bar-app-name">
+        {/* A fixed box, so the sidebar toggle's right edge is a constant the sidebar's width lines up with (titleBand.ts sidebarToggleEnd). */}
+        <span className="shrink-0 text-brand leading-none whitespace-nowrap text-cf-sidebar-foreground select-none" style={{ width: APP_NAME_WIDTH }} data-testid="top-bar-app-name">
           Code Foundry
         </span>
         <span className="ml-2 flex shrink-0 items-center [--wails-draggable:no-drag]">

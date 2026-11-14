@@ -95,6 +95,10 @@ func layoutErr(err error) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		code = connect.CodeDeadlineExceeded
 	}
+	if core.IsNoRoom(err) {
+		// The reason alone, as the user reads it (docs/notes/shell-model.md, "Room for panes").
+		return connect.NewError(code, errors.New(core.NoRoom))
+	}
 	return connect.NewError(code, err)
 }
 

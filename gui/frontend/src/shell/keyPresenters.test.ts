@@ -37,7 +37,7 @@ const { neighbour } = await import("./geometry/neighbours");
 const col = (id: string, kids: LayoutNodeView[], sizes: number[]): LayoutNodeView => ({ t: "split", id, dir: "col", kids, sizes });
 
 /** Seeds the layout and draws its frame as the grid would, `w` x `h`. */
-async function seed(root: LayoutNodeView, focus: string, mru: string[], w = 1200, h = 800, rev = 1): Promise<void> {
+async function seed(root: LayoutNodeView, focus: string, mru: string[], w = 1200, h = 1000, rev = 1): Promise<void> {
   await seedLayout(layoutOf([space(root, focus, { mru })], rev));
   const s = useLayoutStore.getState();
   setShellFrame(shellFrame({ root: geoTree(s, "sp-a"), w, h, focus, mru }));
@@ -108,20 +108,20 @@ describe("direction keys", () => {
     const root = row(
       "s-r",
       [
-        col("s-l", [pane("p-a", [tab("t-a", "thread", "th-a")]), pane("p-b", [tab("t-b", "prs")])], [0.69, 0.31]),
+        col("s-l", [pane("p-a", [tab("t-a", "thread", "th-a")]), pane("p-b", [tab("t-b", "prs")])], [0.2, 0.8]),
         col("s-k", [pane("p-c", [tab("t-c", "thread", "th-c")]), pane("p-d", [tab("t-d", "projects")])], [0.25, 0.75]),
       ],
       [0.32, 0.68],
     );
-    await seed(root, "p-d", ["t-d"], 700, 700);
+    await seed(root, "p-d", ["t-d"], 900, 800);
     presentShellCommand("pane.focus.up");
     expect(focus()).toBe("p-c");
     // The frame last drawn (d focused) and the one c's focus draws send left to different panes.
     const s = useLayoutStore.getState();
     const geo = geoTree(s, "sp-a");
     const mru = s.spaces["sp-a"]?.mru ?? [];
-    const stale = neighbour(shellFrame({ root: geo, w: 700, h: 700, focus: "p-d", mru: ["t-d"] }), "p-c", "left", { root: geo, mru });
-    const fresh = neighbour(shellFrame({ root: geo, w: 700, h: 700, focus: "p-c", mru }), "p-c", "left", { root: geo, mru });
+    const stale = neighbour(shellFrame({ root: geo, w: 900, h: 800, focus: "p-d", mru: ["t-d"] }), "p-c", "left", { root: geo, mru });
+    const fresh = neighbour(shellFrame({ root: geo, w: 900, h: 800, focus: "p-c", mru }), "p-c", "left", { root: geo, mru });
     expect(stale).not.toBe(fresh);
     // Pressed before the grid drew c's frame: the key goes where the screen will show.
     presentShellCommand("pane.focus.left");

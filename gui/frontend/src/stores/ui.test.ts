@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOME, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, viewNames, useUiStore, type FocusRegion } from "./ui";
+import { HOME, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, sidebarWidthAt, viewNames, useUiStore, type FocusRegion } from "./ui";
 
 describe("ui persistence", () => {
   it("migrating drops the old global panelWidth, the tree's collapsed rows and the sidebar width saved before v4, and keeps the rest", async () => {
@@ -27,6 +27,7 @@ describe("ui persistence", () => {
     ["a width saved under the old 220 minimum is raised", { sidebarWidth: 220 }, SIDEBAR_MIN],
     ["a width above the maximum is lowered", { sidebarWidth: 900 }, SIDEBAR_MAX],
     ["a width inside the bounds is kept, rounded", { sidebarWidth: 300.4 }, 300],
+    ["the old default 260, at least the new minimum, is kept", { sidebarWidth: 260 }, 260],
     ["no saved width keeps the default", { fontSize: 14 }, SIDEBAR_DEFAULT],
     ["nothing saved keeps the default", undefined, SIDEBAR_DEFAULT],
   ];
@@ -34,6 +35,21 @@ describe("ui persistence", () => {
     const merge = useUiStore.persist.getOptions().merge;
     const current = { ...useUiStore.getState(), sidebarWidth: SIDEBAR_DEFAULT };
     expect(merge?.(persisted, current).sidebarWidth).toBe(want);
+  });
+
+  it("the minimum and default line the sidebar up with the top bar's toggle: 80 + 12 + 108 + 12 + 28", () => {
+    expect(SIDEBAR_MIN).toBe(240);
+    expect(SIDEBAR_DEFAULT).toBe(SIDEBAR_MIN);
+  });
+
+  it.each<[string, number, number, number]>([
+    ["at the minimum, at 100%: the toggle's edge", SIDEBAR_MIN, 100, 240],
+    ["at the minimum, zoomed in: the toggle's edge (the lights' gutter narrows in layout px)", SIDEBAR_MIN, 125, 64 + 160],
+    ["at the minimum, zoomed out", SIDEBAR_MIN, 90, 89 + 160],
+    ["wider than the minimum: kept", 300, 90, 300],
+    ["wider at 100% but under the toggle's edge zoomed out: the toggle's edge", 245, 80, 100 + 160],
+  ])("drawn: %s", (_name, stored, zoom, want) => {
+    expect(sidebarWidthAt(stored, zoom)).toBe(want);
   });
 
   it("loading keeps the other saved fields", () => {

@@ -1,0 +1,93 @@
+{
+  "doc": "A closed pane that would not fit open comes back collapsed, with the focus (Result.collapsed): beside the thread and the file, a third pane needs 1464px of 1000.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-h","kind":"file","params":{"path":"/z"}}],
+              "active": "t-h"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-h"],
+        "closed": [
+          {
+            "pane": "p-b",
+            "whole": true,
+            "tabs": [
+              {"id":"t-f","kind":"file","params":{"path":"/x"}},
+              {"id":"t-g","kind":"file","params":{"path":"/y"}}
+            ],
+            "active": "t-g",
+            "beside": {"neighbours":["p-c"],"edge":"left","frac":0.3}
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed","w":1000,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-f","kind":"file","params":{"path":"/x"}},
+                {"id":"t-g","kind":"file","params":{"path":"/y"}}
+              ],
+              "active": "t-g",
+              "collapsed": true
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-h","kind":"file","params":{"path":"/z"}}],
+              "active": "t-h"
+            }
+          ],
+          "sizes": [0.5,0.15,0.35]
+        },
+        "focus": "p-b",
+        "mru": ["t-g","t-a","t-h"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-g","collapsed":true}
+}

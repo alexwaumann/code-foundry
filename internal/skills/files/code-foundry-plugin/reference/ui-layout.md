@@ -8,8 +8,8 @@ capped, centred width), **masterDetail** (a list beside its chosen row's detail)
 **tabs** (a node's own tab strip). **divider**, **spacer** and **group** (leaves on one line) space
 and line up nodes without a container. Two view slots pin nodes around the scrolling
 body: the **toolbar** and the **footer**. A surface is a tab, as wide as its pane: at least
-300 px (a pane that cannot keep that folds to a rail of icons and draws nothing), about a
-third of the thread's pane when it opens beside one (some 400 px in a 1440 px window), the
+480 px (a pane that cannot keep that folds to a rail of icons and draws nothing), about a
+third of the thread's pane when it opens beside one, held at 480 px (in a 1440 px window), the
 whole grid in full screen, anything between as the user drags; the body pads 16 px a side
 (12 under 340). One view serves every width, so every container says how it degrades to one column. Check
 `h.HasCapability("view.node.columns")` (`view.node.pane`, `view.node.grid`,

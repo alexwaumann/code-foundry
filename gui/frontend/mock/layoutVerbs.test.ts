@@ -5,6 +5,8 @@ import { layoutCommands } from "./layoutVerbs";
 function world(seed = "grid") {
   const layout = new MockLayout({ publish: () => undefined, ids: seqIds() });
   layout.seed(seed);
+  // A pane area roomy enough for the splits these verbs make (docs/notes/shell-25f-sizes.md).
+  layout.setViewport("", 2400, 1600);
   const cmds = layoutCommands({ layout, hasThread: (id) => /^s-\d$/.test(id) });
   const run = async (name: string, args: Record<string, string> = {}) => {
     const c = cmds.find((x) => x.cmd.name === name);
@@ -121,13 +123,15 @@ describe("the mock's layout verbs", () => {
   });
 
   it("put a pane on the outer edge at its kind's size in the reported area, and split a pane in half", async () => {
-    // p-2's active tab is a diff (0.45, at least 480px): with no area reported, 0.45.
+    // p-2's active tab is a diff (0.45, at least 480px): in the world's roomy area, 0.45.
     const w = world();
     await w.run("pane.move", { pane: "p-2", outer: "bottom" });
     expect(w.st().spaces[0]?.root?.sizes?.at(-1)).toBeCloseTo(0.45, 9);
-    // In a 1600x1000 area, 0.45 of 1000 less a gutter is 445: raised to 480, as the rest keeps 508.
+    // In a 2000x1000 area, 0.45 of 1000 less a gutter is 445: raised to 480, as the rest keeps 508.
+    // (Pull Requests collapsed, so the panes above still fit: 400 + 12 + 36 over the diff's 480.)
     const v = world();
-    v.layout.setViewport("c-1", 1600, 1000);
+    v.layout.setViewport("c-1", 2000, 1000);
+    v.layout.apply({ op: "set_collapsed", pane: "p-3", collapsed: true });
     await v.run("pane.move", { pane: "p-2", outer: "bottom" });
     expect(v.st().spaces[0]?.root?.sizes?.at(-1)).toBeCloseTo(480 / 988, 9);
     // The area is the op's, not recorded as sent.

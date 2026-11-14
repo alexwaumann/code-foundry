@@ -249,7 +249,7 @@ test("a real pointer keeps the card open over the row's actions and PR tag", asy
 test("at the narrowest sidebar the actions never cover the branch, on a selected row too, and the name and status stay", async ({ page }) => {
   await openApp(page);
   // The default width is the minimum (SIDEBAR_MIN).
-  expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(260);
+  expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(240);
   for (const select of [false, true]) {
     const r = row(page, "s:s-3");
     if (select) await r.click();

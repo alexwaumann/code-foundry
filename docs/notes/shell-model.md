@@ -31,7 +31,7 @@ when the first working version is whole. Nothing partial is released.
   proportions; resizing the window only scales it, and there are no per-display snapshots.
 - **Dividers.** The gap between two panes (or two columns or rows) is a divider: dragging it moves
   room from one side to the other, and the arrow keys move it when it has the keyboard. It stops
-  when the side being shrunk reaches its minimum (each pane in it held at its kind's minimum, a
+  when the side being shrunk reaches its minimum (each pane in it held at its minimum, a
   folded pane at a rail's thickness); it never folds or collapses a pane. A drag starts from what
   is drawn, not from the stored proportions (a pane held at its minimum is drawn wider than its
   share): the divider does not jump when it is grabbed, and when it is let go the split's open
@@ -45,7 +45,13 @@ when the first working version is whole. Nothing partial is released.
   outer edge of the grid, or onto a space tab. Any tab is draggable, active or not. Over a pane's
   body, each of its four edges is a drop zone a third of the body deep (at most 320px for left and
   right, 260px for top and bottom), and the middle that is left adds to the pane. The grid's outer
-  edge is a thin band of its own (10px inside, 24px outside). A drop on a
+  edge is a thin band of its own (10px inside, 24px outside). Only drops whose result fits are
+  offered ("Room for panes"): an edge whose split would not fit is not a zone, and its part of the
+  body adds to the pane like the middle, with the same highlight (a left or right split may be
+  unavailable while a top or bottom one fits, and the other way round); an outer edge whose result
+  would not fit is not a target; a pane that holds only terminals is no target at all for a tab
+  that would raise its minimum when the result would not fit (other panes take the tab as usual).
+  A drop on a
   pane's edge splits that pane in half; a tab or pane dropped on the grid's outer edge takes its
   kind's default size (a pane's: its active tab's kind) as a share of the grid along that axis,
   raised to the kind's pixel floor while the rest keeps room. A pane that is joined is never resized.
@@ -89,7 +95,8 @@ when the first working version is whole. Nothing partial is released.
   components. With a thread tab active it has a submenu for that thread's surfaces, then the general
   ones (new thread, terminal, Pull Requests, Projects). Without a thread it has only the general
   ones. The choice always opens in that pane, except that a linked surface which is already open is
-  focused where it is.
+  focused where it is. One exception to the menu: in a pane that holds only terminals, while
+  anything else there would not fit ("Room for panes"), the menu lists only terminals.
 - **Reopening closed tabs.** cmd+shift+t reopens the most recently closed tab or pane of the
   current space.
   - **What is recorded.** What the user closes: a tab (cmd+w, its ×, a middle click, Close in its
@@ -116,7 +123,10 @@ when the first working version is whole. Nothing partial is released.
     - A pane comes back with its tabs, its active tab and its share, beside the panes it sat
       beside while one of them is still in the space. Otherwise it goes on the right edge of the
       whole pane area at its active tab's default size (as a pane dropped there), or is the only
-      pane of an empty space.
+      pane of an empty space. A pane that would not fit open ("Room for panes") comes back
+      collapsed, with the focus, and the result says so; so does a tab whose pane is rebuilt.
+      A tab whose old pane can no longer take it (a pane of terminals it would not fit in) is
+      placed by the usual rules instead.
     - A thread's tab opens the thread: its remembered set comes back as when it is opened from
       the sidebar.
     - A terminal's tab starts a fresh shell where the old one was started: the thread's checkout,
@@ -130,9 +140,11 @@ when the first working version is whole. Nothing partial is released.
       left out, and the pane comes back with the rest.
     - The reopened tab (a pane's active tab) takes the focus, and the keyboard follows it.
     - With nothing to reopen nothing happens; the CLI says so.
-- **Small windows.** Every pane has a minimum size by the kind of its active tab: a thread or a
-  composer 360×220px, a terminal 240×110, a diff, file or pull request 260×150, anything else
-  300×160. When the panes cannot all keep theirs, panes fold, by one rule for widths and heights:
+- **Small windows.** Every pane has the same minimum size, 480×400px, whatever its tabs are. The
+  one exception is a pane all of whose tabs are terminals: 300×220. A pane that holds a terminal
+  and anything else takes 480×400. The minimum depends on every tab in the pane, not on the active
+  one. When the panes cannot all keep theirs (a window made smaller, a collapsed pane opened, a
+  layout from before "Room for panes"), panes fold, by one rule for widths and heights:
   - **What a fold looks like.** A pane folded in a row is a rail 36px wide and as tall as its place;
     a pane folded in a column is a strip 36px tall and as wide as its place. Both show the tabs'
     icons, mark the selected one and carry the attention dot; a click on an icon unfolds the pane on
@@ -146,7 +158,7 @@ when the first working version is whole. Nothing partial is released.
   - **How far.** Panes fold in that order until every open pane keeps its minimum. A fold counts even
     when it does not help on its own (the first pane of a column folds before the column can narrow).
     Then the folded panes, the last folded first, unfold again wherever the rest still keep their
-    minimums. So an open pane is never narrower or shorter than its kind's minimum while another pane
+    minimums. So an open pane is never narrower or shorter than its minimum while another pane
     could still fold.
   - **When folding is not enough.** If even the panes that never fold cannot keep their minimums
     with every other pane folded, those (at most two: the focused pane and its thread's) share what
@@ -154,11 +166,35 @@ when the first working version is whole. Nothing partial is released.
     is drawn short (one that would be stays folded), and the grid never scrolls or spills. Chosen
     because those two are what the user is looking at, a surface and the thread it belongs to, and
     folding the thread's pane as well would hide the one the user asked to keep; at the window's
-    minimum size with the default sidebar the shortfall is small (a thread and a diff beside one
-    folded column: about 6%).
+    minimum size with the default sidebar one open pane fits whole beside a folded column.
   Rails unfold when there is room (never one the user collapsed). The stored layout does not change. A thread's pane left narrower
-  than a thread's minimum keeps its header on top: what does not fit under it (the composer too) is
+  than its minimum keeps its header on top: what does not fit under it (the composer too) is
   cut, never drawn over it.
+- **Room for panes.** A space holds only as many open panes as fit. An action that would add an
+  open pane, or raise a pane's minimum (a tab other than a terminal joining a pane of terminals),
+  is offered only when the result still fits: every open pane keeps its minimum in the pane area
+  as it is now, with the panes the user collapsed counted as their 36px rails or strips and no
+  pane folded automatically. Proportions do not matter: the result fits when the tree's minimum
+  (each open pane's minimum, each collapsed pane's 36px and the 12px gaps, summed along each
+  split, the largest across it) is no larger than the pane area. Collapsing a pane is how the
+  user makes room. When the result would not fit:
+  - **Drags**: the edge zones and outer edges that would not fit are not offered (see the drag
+    rules above); a pane of terminals is not a target for a tab that would raise its minimum.
+  - **Placement** (a thread or its model opening a surface, a sidebar click, the "+" menu's
+    linked surfaces, a thread's remembered set coming back): the rule that would open a new pane
+    is skipped and placement goes on to the next rule, ending with a tab in the thread's own
+    pane; a pane of terminals that would not fit the tab is skipped like a pane without room. A
+    tab that goes to the focused pane goes, when that pane cannot take it, to the most recently
+    focused open pane that can (to the focused pane all the same when none can).
+  - **Commands** that split or add a pane (split a pane, move a tab or pane onto an edge, move a
+    pane into another space, add a tab to a pane of terminals it would not fit in) refuse: "no
+    room for another pane here: collapse or close one first". A space's first pane always fits.
+    Reopening a closed pane brings it back collapsed instead (see "Reopening closed tabs").
+  - **Always allowed**, with automatic folding to cope as for a small window: opening a pane the
+    user collapsed, a drop onto a collapsed pane (it opens), a window made smaller, a layout
+    restored from before this rule, the first load's import.
+  When a pane grows to its minimum (a pane of terminals that takes another kind of tab), its
+  neighbours give up the room by holding it at its minimum; the stored proportions do not change.
 - **Collapsing a pane.** The user can fold any pane on demand, to hide it and give its room to the
   others, in a row or a column: cmd+shift+m (`pane.collapse`) toggles the focused pane, the
   collapse button in the pane's strip (beside full screen) collapses it, and the same verb with a
@@ -185,7 +221,8 @@ when the first working version is whole. Nothing partial is released.
     focus; from a thread's model it does not.
   - **What opens it by itself.** An action that gives one of its tabs the user's focus opens it:
     a sidebar click on a thread whose tab it holds, an "already open" surface focused there,
-    cmd+shift+t reopening into it, a tab or pane dropped into it. The direction keys and full screen do not. An action that does not take the user's focus (a
+    cmd+shift+t reopening into it (unless the pane it rebuilds would not fit open), a tab or pane
+    dropped into it. The direction keys and full screen do not. An action that does not take the user's focus (a
     thread's model opening a tab there, smart swap) leaves it collapsed: the tab becomes its
     selected one, and the icon carries the attention dot as on any rail.
   - **Full screen** from its rail shows the pane over the whole area; leaving full screen leaves
@@ -196,7 +233,8 @@ when the first working version is whole. Nothing partial is released.
   - **What keeps it.** The choice is the pane's and goes where the pane goes: closing a thread
     whose linked tabs it held (while the pane keeps a tab), smart swap, a pane moved by direction
     key or drag, a pane moved to another space (where it opens if it is the space's only pane). A
-    pane that comes back from cmd+shift+t comes back open.
+    pane that comes back from cmd+shift+t comes back open while it fits ("Room for panes"),
+    collapsed when it does not.
 - **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus,
   move and collapse keys do nothing while it is on. Escape leaves it from anywhere but a terminal (the shell's own Escape;
   cmd+shift+enter leaves from there), a menu or dialog, and a prompt that has a use for the key: an
@@ -227,14 +265,18 @@ when the first working version is whole. Nothing partial is released.
      order: right, left, below, above.
   4. Any pane in the space holds linked surfaces: add a tab there.
   5. There is room: a new pane to the right of the thread's pane (a split of that pane, not of its
-     column), at the surface type's default size.
+     column), at the surface type's default size. "Room" means the result fits ("Room for
+     panes"): the thread's pane, the new one and every other open pane keep their minimums.
   6. Otherwise: a tab in the thread's own pane.
   In 3 and 4, a pane that already holds a linked tab of this thread wins, then the nearest. Threads and
   other surfaces may share a pane: a pane that also holds a thread tab counts like any other. A pane
-  that is joined is never resized. "Room" means the conversation keeps at least 480px of width. Terminal tabs follow these
+  that is joined is never resized. In 2 to 4, a pane of terminals that a tab of another kind would
+  not fit in (its minimum would rise and the result would not fit) is skipped. Terminal tabs follow these
   same rules: there is no separate rule for terminals and no "below" default.
 - **Where a thread's own tab opens** (a sidebar click, the CLI, a new thread): the focused pane,
-  whatever it holds.
+  whatever it holds, unless it holds only terminals and the thread would not fit there ("Room for
+  panes"): then the most recently focused open pane that can take it (the focused pane all the
+  same when none can).
 - **A surface that belongs to no thread** (a checkout's diff opened from Projects, a pull request
   opened from Pull Requests) opens as an unlinked tab in the pane of the page it was opened from.
 - **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
@@ -282,6 +324,10 @@ when the first working version is whole. Nothing partial is released.
 
 ## Sidebar
 
+- **Width.** The sidebar's minimum width, which is also its default, lines its right edge up with
+  the right edge of the sidebar toggle in the top bar (past the traffic-light gutter, the app name
+  and the toggle). The user can widen it; a width stored earlier that is at least the minimum is
+  kept.
 - Sections, in order: **Needs you**, **Active**, then **Working**, **Snoozed** and **Archived** at
   the bottom as today. A click on a thread always adds a tab (or focuses it when it is open). Active
   keeps today's order (pinned, then the space's drafts, then the threads that call without

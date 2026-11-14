@@ -1050,8 +1050,12 @@ verb in `settings.toml` is reported and dropped, never fatal.
   with `SetViewport` (`shell/viewport.ts`).
 * Geometry (`shell/geometry`, pure; `docs/notes/shell-9-geometry.md`): `plainRects` equals
   the daemon's `Rects` to the px (shared fixtures); `frameRects` holds each pane at its
-  active tab's minimum (thread and composer 360 × 220, terminal 240 × 110, diff, file and
-  pull request 260 × 150, anything else, plugin surfaces included, 300 × 160); `rails.ts`
+  minimum (480 × 400 whatever its tabs, 300 × 220 for a pane of terminals only; Go's
+  `internal/layout/fit.go` has the same numbers); `treeFits` says whether a tree fits with no
+  automatic fold, the daemon's `layout.Fits` (shared `fits.json`): an action that would add an
+  open pane or raise a pane's minimum is offered only when the result fits, in the daemon's ops
+  and placement and in the window's drag targets and "+" menu (`shell/drag/room.ts`;
+  `docs/notes/shell-25f-sizes.md`); `rails.ts`
   folds the panes that cannot keep theirs into 36 px rails of tab icons (panes without a
   thread tab first, least recently focused first; never the focused pane or its thread's),
   computed per frame and never stored, so a larger window unfolds them; a pane the user
@@ -1332,7 +1336,7 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   (`skills.SDKPin`).
 * **GUI**: plugin surfaces are a generic tab kind (`plugin.<name>.<surface>`), linked to a
   thread when thread-scoped and placed by the daemon's rules, as wide as their pane (at
-  least 300 px, the whole grid in full screen), available exactly when their show command
+  least 480 px, the whole grid in full screen), available exactly when their show command
   is (which opens the tab from the window through a ShowView `panel.<kind>`); one
   renderer component per node kind, drawn with the app's own components (no HTML from
   plugins, no filled buttons, neutral header icon, emerald only for `ok`); one

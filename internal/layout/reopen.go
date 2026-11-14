@@ -73,6 +73,11 @@ func recordPane(sp *Space, p *Node, active string) {
 // terminal's tab comes back as a fresh shell the caller starts (Result.Fresh), without a "Run
 // again" line. An entry whose tabs are all open again (the same identity) focuses the open
 // one instead (Result.Existing). The reopened tab (a pane's active tab) takes the focus.
+//
+// Room (fit.go): a pane rebuilt (a pane's entry, or a tab that was its pane's only tab) that
+// would not fit the pane area open comes back collapsed, still with the focus
+// (Result.Collapsed); a tab whose old pane cannot take it (a pane of terminals it would not
+// fit in) is placed as it would open now.
 // With nothing left to reopen it changes nothing but the dropped entries, and Result.Tab is "".
 // W and H are the pane area (default DefaultW x DefaultH).
 type ReopenClosed struct {
@@ -181,6 +186,10 @@ func (t *tx) reopenTab(sp *Space, e *Closed, tb *Tab, w, h float64) (Result, err
 	if p != nil && !slices.Contains(PaneIDs(sp.Root), p.ID) {
 		p = nil
 	}
+	if p != nil && !canTake(sp, p, w, h, tb) {
+		// Its pane is there but has no room for it: it opens as it would now.
+		p, e = nil, &Closed{Pane: e.Pane, Tabs: e.Tabs, Index: e.Index}
+	}
 	if tb.Kind == "thread" && (p != nil || e.Beside == nil) {
 		op := &OpenThread{Thread: tb.Thread, Focus: true, W: w, H: h}
 		if p != nil {
@@ -199,7 +208,7 @@ func (t *tx) reopenTab(sp *Space, e *Closed, tb *Tab, w, h float64) (Result, err
 		}
 		np := &Node{T: NodePane, ID: t.paneID(e.Pane), Tabs: []*Tab{tb}, Active: tb.ID}
 		if t.rebuild(sp, e.Beside, np) {
-			return t.reopened(sp, []*Tab{tb}, tb.ID, "", w, h)
+			return t.reopenedFolded(sp, np, []*Tab{tb}, tb.ID, "", w, h)
 		}
 		if tb.Kind == "thread" {
 			tb.ID = ""
@@ -253,7 +262,24 @@ func (t *tx) reopenPane(sp *Space, e *Closed, tabs []*Tab, w, h float64) (Result
 	if id, ok := ids[e.Active]; ok {
 		show, prefer = id, ""
 	}
-	return t.reopened(sp, tabs, show, prefer, w, h)
+	return t.reopenedFolded(sp, np, tabs, show, prefer, w, h)
+}
+
+// reopenedFolded is reopened for a pane np just rebuilt: when the tree does not fit the pane
+// area with it open, it comes back collapsed (the space's other panes keep their room) and
+// keeps the focus (focus may rest on a collapsed pane), and Result.Collapsed says so. A
+// thread's remembered set coming back is placed with np collapsed.
+func (t *tx) reopenedFolded(sp *Space, np *Node, tabs []*Tab, show, prefer string, w, h float64) (Result, error) {
+	fold := !Fits(sp.Root, w, h)
+	np.Collapsed = fold
+	res, err := t.reopened(sp, tabs, show, prefer, w, h)
+	if err != nil || !fold {
+		return res, err
+	}
+	np.Collapsed = true
+	t.revealed = slices.DeleteFunc(t.revealed, func(id string) bool { return id == np.ID })
+	res.Collapsed = true
+	return res, nil
 }
 
 // reopened finishes a reopen of tabs: each thread's tab brings its remembered set back,

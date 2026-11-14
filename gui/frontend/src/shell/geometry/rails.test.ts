@@ -15,7 +15,7 @@ function frozen<T>(v: T): T {
 
 const sorted = (s: Set<string>) => [...s].sort();
 
-// a: thread A (360), b: A's diff (260), c: Pull Requests (300), d: thread B (360). 1316 x 220.
+// a: thread A, b: A's diff, c: Pull Requests, d: thread B, each 480 wide at least. 1956 x 400.
 const four = frozen(
   row("s", [0.25, 0.25, 0.25, 0.25], pane("a", "thread:A"), pane("b", "diff:A"), pane("c", "prs"), pane("d", "thread:B")),
 );
@@ -82,11 +82,11 @@ describe("never folds", () => {
 
 describe("folding", () => {
   it.each([
-    { w: 1400, want: [] },
-    { w: 1316, want: [] },
-    { w: 1315, want: ["c"] },
-    { w: 1100, want: ["c"] },
-    { w: 900, want: ["b", "c"] },
+    { w: 2000, want: [] },
+    { w: 1956, want: [] },
+    { w: 1955, want: ["c"] },
+    { w: 1600, want: ["c"] },
+    { w: 1100, want: ["b", "c"] },
     { w: 700, want: ["b", "c", "d"] },
     { w: 400, want: ["b", "c", "d"] },
   ])("at $w px wide: $want", ({ w, want }) => {
@@ -97,10 +97,10 @@ describe("folding", () => {
   });
 
   it("unfolds when there is room again: the rails come from the area alone", () => {
-    const input = fourAt(900);
+    const input = fourAt(1100);
     expect(sorted(foldRails(input))).toEqual(["b", "c"]);
-    expect(sorted(foldRails({ ...input, w: 1100 }))).toEqual(["c"]);
-    expect(sorted(foldRails({ ...input, w: 1600 }))).toEqual([]);
+    expect(sorted(foldRails({ ...input, w: 1600 }))).toEqual(["c"]);
+    expect(sorted(foldRails({ ...input, w: 2000 }))).toEqual([]);
   });
 
   it("never changes the stored layout", () => {
@@ -112,46 +112,46 @@ describe("folding", () => {
   it("a fold that does not help unfolds again", () => {
     // c folds first (never focused) but the column stays as wide as b; b folds too, and then c unfolds.
     const tree = row("s", [0.5, 0.5], pane("a", "thread:A"), col("k", [0.5, 0.5], pane("b", "prs"), pane("c", "terminal")));
-    expect(minimumOf(tree)).toEqual({ w: 672, h: 282 });
-    expect(sorted(foldRails({ root: tree, w: 612, h: 600, focus: "a", mru: ["b/0"] }))).toEqual(["b"]);
+    expect(minimumOf(tree)).toEqual({ w: 972, h: 632 });
+    expect(sorted(foldRails({ root: tree, w: 800, h: 600, focus: "a", mru: ["b/0"] }))).toEqual(["b"]);
   });
 
   it("folds for height as well as width", () => {
     const tree = col("s", [0.5, 0.25, 0.25], pane("a", "thread:A"), pane("b", "terminal"), pane("c", "diff"));
-    expect(minimumOf(tree).h).toBe(220 + 110 + 150 + 24);
-    const input = { root: tree, w: 800, h: 400, focus: "a", mru: ["a/0", "b/0", "c/0"] };
+    expect(minimumOf(tree).h).toBe(400 + 220 + 400 + 24);
+    const input = { root: tree, w: 800, h: 700, focus: "a", mru: ["a/0", "b/0", "c/0"] };
     expect(sorted(foldRails(input))).toEqual(["c"]);
-    expect(shellFrame(input).rects.c).toEqual({ x: 0, y: 364, w: 800, h: RAIL, rail: true });
+    expect(shellFrame(input).rects.c).toEqual({ x: 0, y: 664, w: 800, h: RAIL, rail: true });
   });
 
   it("unfolds an earlier fold a later one made unnecessary", () => {
-    // The terminal folds first and saves 204px, not enough; thread B then saves 324px alone.
+    // The terminal folds first and saves 264px, not enough; thread B then saves 444px alone.
     const tree = row("s", [0.4, 0.2, 0.4], pane("a", "thread:A"), pane("t", "terminal"), pane("u", "thread:B"));
     expect(foldOrder(tree, "a", [])).toEqual(["t", "u"]);
-    expect(sorted(foldRails({ root: tree, w: 700, h: 600, focus: "a" }))).toEqual(["u"]);
+    expect(sorted(foldRails({ root: tree, w: 900, h: 600, focus: "a" }))).toEqual(["u"]);
   });
 
   it("folds a whole column when only all of it folding narrows it", () => {
     // Two panes stacked in a column: folding either alone leaves the column as wide as the other.
     const tree = row("s", [0.4, 0.3, 0.3], pane("a", "thread:A"), col("k", [0.5, 0.5], pane("b", "compose"), pane("c", "thread:C")), pane("d", "diff:A"));
-    const input = { root: tree, w: 700, h: 600, focus: "d", mru: ["d/0", "a/0"] };
+    const input = { root: tree, w: 1100, h: 600, focus: "d", mru: ["d/0", "a/0"] };
     expect(sorted(foldRails(input))).toEqual(["b", "c"]);
     const frame = shellFrame(input);
-    expect(frame.rects.a?.w).toBeGreaterThanOrEqual(360);
-    expect(frame.rects.d?.w).toBeGreaterThanOrEqual(260);
+    expect(frame.rects.a?.w).toBeGreaterThanOrEqual(480);
+    expect(frame.rects.d?.w).toBeGreaterThanOrEqual(480);
   });
 
   it("folds a whole row of short panes into horizontal strips", () => {
     // A row of two panes over a thread: the row is only shorter once both fold, and then each is a
     // strip as wide as its share and a rail tall.
     const tree = col("s", [0.5, 0.5], row("r", [0.5, 0.5], pane("a", "diff:A"), pane("b", "prs")), pane("c", "thread:A"));
-    const input = { root: tree, w: 900, h: 300, focus: "c", mru: ["c/0"] };
+    const input = { root: tree, w: 1000, h: 500, focus: "c", mru: ["c/0"] };
     expect(sorted(foldRails(input))).toEqual(["a", "b"]);
     const frame = shellFrame(input);
     expect(frame.rects.a).toMatchObject({ h: RAIL, rail: true });
     expect(frame.rects.b).toMatchObject({ h: RAIL, rail: true });
     expect((frame.rects.a?.w ?? 0) > RAIL).toBe(true);
-    expect(frame.rects.c?.h).toBe(300 - RAIL - 12);
+    expect(frame.rects.c?.h).toBe(500 - RAIL - 12);
     expect(tilingErrors(frame)).toEqual([]);
   });
 
@@ -160,9 +160,11 @@ describe("folding", () => {
   });
 });
 
-// The owner's layout at the window's minimum width (940 - the 260 sidebar - 3 gaps): a thread, a
-// column of a draft over a thread, a pane with a thread, A's diff, Pull Requests and Projects; one
-// thread under the row. docs/notes/shell-25a-test-feedback.md.
+// The owner's layout at the window's minimum width (MIN_GRID_W: 940 less the sidebar at its minimum
+// and two gaps): a thread, a column of a draft over a thread, a pane with a thread, A's diff, Pull
+// Requests and Projects; one thread under the row. docs/notes/shell-25a-test-feedback.md; the
+// minimums since docs/notes/shell-25f-sizes.md.
+const MIN_GRID_W = 940 - 240 - 24;
 const owner = (active: string) =>
   col(
     "root",
@@ -176,7 +178,7 @@ const owner = (active: string) =>
     ),
     pane("d", "thread:D"),
   );
-const ownerAt = (active: string, focus: string, w = 644) => ({ root: owner(active), w, h: 700, focus, mru: ["c/1", "a/0", "b/0", "cmp/0", "d/0"] });
+const ownerAt = (active: string, focus: string, w = MIN_GRID_W) => ({ root: owner(active), w, h: 900, focus, mru: ["c/1", "a/0", "b/0", "cmp/0", "d/0"] });
 
 describe("the owner's layout at the minimum width", () => {
   it.each([
@@ -202,15 +204,16 @@ describe("the owner's layout at the minimum width", () => {
 
   it("the diff focused: a and c share what is left in proportion to their minimums", () => {
     const frame = shellFrame(ownerAt("c/1", "c"));
-    // 644 - two 12px gaps - the 36px rail column = 584, shared 360 : 260.
-    expect(frame.rects.a?.w).toBe(339);
-    expect(frame.rects.c?.w).toBe(245);
+    // The width less two 12px gaps and the 36px rail column, shared 480 : 480.
+    const left = MIN_GRID_W - 24 - RAIL;
+    expect(frame.rects.a?.w).toBe(Math.round(left / 2));
+    expect((frame.rects.a?.w ?? 0) + (frame.rects.c?.w ?? 0)).toBe(left);
   });
 
   it("with room for the diff and its thread, both keep their minimums", () => {
-    const frame = shellFrame(ownerAt("c/1", "c", 700));
-    expect(frame.rects.a?.w).toBeGreaterThanOrEqual(360);
-    expect(frame.rects.c?.w).toBeGreaterThanOrEqual(260);
+    const frame = shellFrame(ownerAt("c/1", "c", 480 + 12 + RAIL + 12 + 480));
+    expect(frame.rects.a?.w).toBeGreaterThanOrEqual(480);
+    expect(frame.rects.c?.w).toBeGreaterThanOrEqual(480);
   });
 });
 

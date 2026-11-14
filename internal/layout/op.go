@@ -54,6 +54,9 @@ type Result struct {
 	// clear_draft, discard_draft, or open_thread sending from a draft, the draft is gone and
 	// the caller deletes its stored text.
 	Draft string `json:"draft,omitempty"`
+	// Collapsed: the pane the op put back (reopen_closed) came back collapsed, since it
+	// would not fit the pane area open (fit.go).
+	Collapsed bool `json:"collapsed,omitempty"`
 }
 
 // Options are the user settings an op runs with.

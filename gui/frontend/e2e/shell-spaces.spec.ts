@@ -141,7 +141,15 @@ test("a tab and a pane dropped on a space tab move to that space", async ({ page
   await expect(page.getByTestId("shell-grid")).toHaveAttribute("data-space-id", "sp-main");
   await expect(spaceTab(page, "sp-rev")).not.toHaveAttribute("data-drop-target", "true");
 
-  // A whole pane by its strip.
+  // A whole pane by its strip. Release's two panes leave no room for a third in this window
+  // (480 x 3 and two gaps: 1464 of 1136): its tab is no target, and a drop there puts it back.
+  await lift(page, await stripGrip(page, "p-3"), centre(await boxOf(page, '[data-testid="space-tab"][data-space-id="sp-rel"]')));
+  await expect(spaceTab(page, "sp-rel")).not.toHaveAttribute("data-drop-target", "true");
+  await drop(page);
+  expect(await tabsIn("sp-rel")).toEqual(["t-projects", "t-s-2"].sort());
+  // A wider window has room (the daemon lays out in the area the window reported).
+  await page.setViewportSize({ width: 1800, height: 900 });
+  await expect.poll(async () => ((await (await fetch(`${mockUrl}/__mock/layout`)).json()) as { viewport: { width: number } | null }).viewport?.width ?? 0).toBeGreaterThan(1464);
   await lift(page, await stripGrip(page, "p-3"), centre(await boxOf(page, '[data-testid="space-tab"][data-space-id="sp-rel"]')));
   await expect(spaceTab(page, "sp-rel")).toHaveAttribute("data-drop-target", "true");
   await drop(page);

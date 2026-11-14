@@ -23,8 +23,8 @@ err := h.UpdateView(open.Instance, v)
 
 ## Design rules
 
-- A surface is a tab as wide as its pane: 300 px at the narrowest, about 400 px beside a
-  thread, the whole window's panes in full screen (`ui-layout.md`): short
+- A surface is a tab as wide as its pane: 480 px at the narrowest (beside a thread too, in
+  a 1440 px window), the whole window's panes in full screen (`ui-layout.md`): short
   labels (pills of one or two words). Rows, pairs and chips wrap or truncate, table
   columns drop, and layout nodes degrade to one column (`ui-layout.md`). Titles get one line and
   the header sub-line two, then are cut for good: guidance is a `text` node.

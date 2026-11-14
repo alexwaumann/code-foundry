@@ -66,8 +66,8 @@ function ownerLayout(active: string): Node {
   );
 }
 const OWNER_DRAFTS: Draft[] = [{ id: "d-1", label: "this is pretty cool", params: {} }];
-/** The window's minimum width (940) less the default sidebar and its gaps. */
-const MIN_GRID = 644;
+/** The window's minimum width (940) less the default sidebar (240) and its gaps. */
+const MIN_GRID = 940 - 240 - 24;
 
 test.beforeEach(async () => {
   await resetMock();
@@ -81,7 +81,8 @@ test("at the minimum width, the middle column folds whole instead of being drawn
   // The diff's thread and the diff share what is left; nothing else is open in the row.
   const a = await paneBox(page, "p-a");
   const c = await paneBox(page, "p-c");
-  expect(Math.round((a?.width ?? 0) / (c?.width ?? 1) * 100) / 100).toBeCloseTo(360 / 260, 1);
+  // In proportion to their minimums, both 480 now (docs/notes/shell-25f-sizes.md): half each.
+  expect(Math.round((a?.width ?? 0) / (c?.width ?? 1) * 100) / 100).toBeCloseTo(1, 1);
 });
 
 test("a row too short for its panes folds them to horizontal strips", async ({ page }) => {

@@ -7,7 +7,7 @@
  * round to whole px (JavaScript's Math.round, as the Go side) and the last kid of a split runs to
  * its far edge, so a fractional area (page zoom) leaves no gap. See docs/notes/shell-9-geometry.md.
  */
-import { activeTab, collapsedOf, type Frame, type GeoNode, type GeoPane, type Rect, type Size } from "./types";
+import { collapsedOf, type Frame, type GeoNode, type GeoPane, type Rect, type Size } from "./types";
 
 /** The gap between panes, in layout px. */
 export const GUTTER = 12;
@@ -15,26 +15,27 @@ export const GUTTER = 12;
 /** A folded pane's thickness, in layout px. */
 export const RAIL = 36;
 
-/** What a pane needs by the kind of its active tab; kinds not listed take DEFAULT_MINIMUM. */
-export const PANE_MINIMUMS: Readonly<Record<string, Size>> = {
-  thread: { w: 360, h: 220 },
-  compose: { w: 360, h: 220 },
-  terminal: { w: 240, h: 110 },
-  diff: { w: 260, h: 150 },
-  file: { w: 260, h: 150 },
-  pullrequest: { w: 260, h: 150 },
-};
-
-export const DEFAULT_MINIMUM: Size = { w: 300, h: 160 };
+/**
+ * The minimum size of every pane, and of a pane all of whose tabs are terminals
+ * (docs/notes/shell-model.md, "Small windows"; docs/notes/shell-25f-sizes.md). Go's
+ * internal/layout fit.go holds the same numbers.
+ */
+export const PANE_MINIMUM: Size = { w: 480, h: 400 };
+export const TERMINAL_MINIMUM: Size = { w: 300, h: 220 };
 
 /** A pane's minimum size: what it needs to stay a pane rather than a rail. */
 export type MinimumOf = (pane: GeoPane) => Size;
 
-/** The minimum of a pane by its active tab's kind (an empty pane takes the default). */
-export const paneMinimum: MinimumOf = (pane) => {
-  const kind = activeTab(pane)?.kind ?? "";
-  return PANE_MINIMUMS[kind] ?? DEFAULT_MINIMUM;
-};
+/** Whether tabs is not empty and every tab in it is a terminal. */
+export function terminalsOnly(tabs: readonly { kind: string }[] | undefined): boolean {
+  return !!tabs && tabs.length > 0 && tabs.every((t) => t.kind === "terminal");
+}
+
+/**
+ * The minimum of a pane by all of its tabs, whatever the active one: TERMINAL_MINIMUM when every
+ * tab is a terminal, else PANE_MINIMUM (an empty pane too). Go's PaneMinimum.
+ */
+export const paneMinimum: MinimumOf = (pane) => (terminalsOnly(pane.tabs) ? TERMINAL_MINIMUM : PANE_MINIMUM);
 
 interface LayOptions {
   rails: ReadonlySet<string>;
@@ -84,6 +85,21 @@ export function minimumOf(
   minimum: MinimumOf = paneMinimum,
 ): Size {
   return root ? minOf(root, { rails: withCollapsed(root, rails), minimum, plain: false }) : { w: 0, h: 0 };
+}
+
+/**
+ * Whether a tree fits a w x h pane area with no pane folded automatically: every open pane keeps
+ * its minimum and every collapsed pane its rail (`minimumOf` with the collapsed panes as the only
+ * rails). The proportions play no part. A tree of at most one pane always fits: a space's first
+ * pane is never refused. The daemon's `layout.Fits` (internal/layout fit.go) is the same function;
+ * internal/layout/testdata/fits.json holds the two to the same answer. An action that would add an
+ * open pane, or raise a pane's minimum, is offered only when the result fits
+ * (docs/notes/shell-model.md, "Room for panes").
+ */
+export function treeFits(root: GeoNode | null, w: number, h: number): boolean {
+  if (!root || root.t === "pane") return true;
+  const m = minimumOf(root);
+  return m.w <= w && m.h <= h;
 }
 
 /**

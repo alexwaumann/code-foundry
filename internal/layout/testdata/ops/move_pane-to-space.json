@@ -71,7 +71,7 @@
     "default_space": "sp-a",
     "threads": {"th-b":{"space":"sp-b"}}
   },
-  "op": {"op":"move_pane","pane":"p-b","space":"sp-b"},
+  "op": {"op":"move_pane","pane":"p-b","space":"sp-b","w":1600,"h":900},
   "want": {
     "v": 1,
     "spaces": [

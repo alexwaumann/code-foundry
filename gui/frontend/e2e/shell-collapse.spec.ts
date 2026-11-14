@@ -67,7 +67,8 @@ async function box(page: Page, sel: string): Promise<{ x: number; y: number; w: 
   return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
 }
 
-async function openShell(page: Page, width = 1500, height = 900): Promise<void> {
+// Wide enough for three panes in a row at their 480px minimum (docs/notes/shell-25f-sizes.md).
+async function openShell(page: Page, width = 2200, height = 900): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto(`${appPath}&shell=1`);
   await expect(page.getByTestId("shell-grid")).toBeVisible();
@@ -173,7 +174,7 @@ test("a tab dropped on a collapsed pane opens it, and the highlight is where it 
 });
 
 test("a divider's cursor says which ways it can move, it stops at the minimum, and beside a collapsed pane it cannot move", async ({ page }) => {
-  // The thread's pane held at its 360px minimum (its share is a tenth), a diff beside it.
+  // The thread's pane held at its 480px minimum (its share is a tenth), a diff beside it.
   const two: Node = { t: "split", id: "s-r", dir: "row", kids: [pane("p-m", [thread("s-1")]), pane("p-r", [diff("s-1")])], sizes: [0.1, 0.9] };
   await seed(two, "p-m");
   await openShell(page);
@@ -182,7 +183,7 @@ test("a divider's cursor says which ways it can move, it stops at the minimum, a
   if (!g) throw new Error("no gutter");
   const at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
   const thread0 = await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]');
-  expect(thread0.w).toBe(360);
+  expect(thread0.w).toBe(480);
   // Only the diff side can give: it moves right only.
   await page.mouse.move(at.x, at.y);
   expect(await cursorAt(page, at.x, at.y)).toBe("e-resize");
@@ -190,15 +191,15 @@ test("a divider's cursor says which ways it can move, it stops at the minimum, a
   await page.mouse.down();
   await page.mouse.move(at.x - 1, at.y);
   await page.mouse.move(at.x - 80, at.y, { steps: 4 });
-  expect((await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(360);
+  expect((await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(480);
   expect(await cursorAt(page, at.x - 80, at.y)).toBe("e-resize");
   // Right: it moves, both ways now.
   await page.mouse.move(at.x + 100, at.y, { steps: 4 });
-  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(460);
+  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(580);
   expect(await cursorAt(page, at.x + 100, at.y)).toBe("col-resize");
   await page.mouse.up();
   await expect.poll(async () => (await invocations()).filter((i) => i.name === "pane.resize").length).toBe(1);
-  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(460);
+  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(580);
   const g2 = await gutter.boundingBox();
   if (!g2) throw new Error("no gutter");
   expect(await cursorAt(page, g2.x + g2.width / 2, g2.y + g2.height / 2)).toBe("col-resize");
@@ -229,7 +230,7 @@ for (const scheme of ["dark", "light"] as const) {
     const at = (name: string) => `${shots ?? ""}/collapse-${name}${scheme === "light" ? "-light" : ""}.png`;
     await page.emulateMedia({ colorScheme: scheme });
     await seed(ROW, "p-l", ["t-prs", "t-s-1"]);
-    await openShell(page, 1400, 760);
+    await openShell(page, 1800, 760);
     await expect(page.getByTestId("thread-pane")).toBeVisible();
     await page.mouse.move(1390, 750);
     await page.screenshot({ path: at("row-before") });

@@ -65,7 +65,7 @@ async function gridWidth(page: Page, w: number): Promise<void> {
   await expect.poll(async () => Math.round((await page.getByTestId("shell-grid").boundingBox())?.width ?? 0)).toBe(w);
 }
 
-async function openShell(page: Page, width = 1700, height = 900): Promise<void> {
+async function openShell(page: Page, width = 2000, height = 900): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto(`${appPath}&shell=1`);
   await expect(page.getByTestId("shell-grid")).toBeVisible();
@@ -79,22 +79,22 @@ test("shrinking the window folds panes to rails in order, growing unfolds them, 
   await seed(ROW, "p-m", ["t-s-1", "t-diff-s-1", "t-prs"]);
   await openShell(page);
   const before = shape(await storedRoot());
-  await gridWidth(page, 1200);
+  await gridWidth(page, 1500);
   await expect.poll(() => rails(page)).toEqual([]);
-  // Room for neither Pull Requests' 300px: the pane without a thread tab folds first.
-  await gridWidth(page, 900);
+  // No room for a third pane's 480px: the pane without a thread tab folds first.
+  await gridWidth(page, 1100);
   await expect.poll(() => rails(page)).toEqual(["p-l"]);
   expect(await open(page)).toEqual(["p-m", "p-r"]);
   // Less still: the right pane folds too; the focused thread's pane never does.
-  await gridWidth(page, 560);
+  await gridWidth(page, 600);
   await expect.poll(() => rails(page)).toEqual(["p-l", "p-r"]);
   expect(await open(page)).toEqual(["p-m"]);
   // The rails are 36px wide and the open pane takes the rest.
   expect(Math.round((await railEl(page, "p-l").boundingBox())?.width ?? 0)).toBe(36);
   // Growing unfolds them, in reverse.
-  await gridWidth(page, 900);
+  await gridWidth(page, 1100);
   await expect.poll(() => rails(page)).toEqual(["p-l"]);
-  await gridWidth(page, 1200);
+  await gridWidth(page, 1500);
   await expect.poll(() => rails(page)).toEqual([]);
   expect(shape(await storedRoot())).toBe(before);
   expect((await invocations()).filter((i) => i.name === "pane.resize" || i.name.startsWith("tab.") || i.name.startsWith("pane.move"))).toEqual([]);
@@ -104,13 +104,13 @@ test("a folded pane holds no stream", async ({ page }) => {
   // s-5's thread active on the right: two threads on screen.
   await seed({ ...ROW, kids: [ROW.kids[0] as Node, ROW.kids[1] as Node, pane("p-r", [diff("s-1"), thread("s-5")], "t-s-5")] }, "p-m");
   await openShell(page);
-  await gridWidth(page, 1200);
+  await gridWidth(page, 1500);
   await expect.poll(watches).toBe(2);
   await gridWidth(page, 600);
   await expect.poll(() => rails(page)).toEqual(["p-l", "p-r"]);
   await expect.poll(watches).toBe(1);
   await expect(page.getByTestId("thread-pane")).toHaveCount(1);
-  await gridWidth(page, 1200);
+  await gridWidth(page, 1500);
   await expect.poll(watches).toBe(2);
 });
 
@@ -130,7 +130,7 @@ test("a click on a rail's icon focuses that tab and unfolds the pane; another fo
 test("a tab dropped on a rail joins that pane, and the highlight is where the opened pane lands", async ({ page }) => {
   await seed(ROW, "p-m");
   await openShell(page);
-  await gridWidth(page, 900);
+  await gridWidth(page, 1100);
   await expect.poll(() => rails(page)).toEqual(["p-l"]);
   const from = await page.locator('[data-testid="shell-tab"][data-tab-id="t-s-3"]').boundingBox();
   const to = await railEl(page, "p-l").boundingBox();

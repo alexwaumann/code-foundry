@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { layoutState, openShellApp, paneNode, paneOf, rowNode, seedLayout, type LayoutNode } from "./shell";
+import { focusForNarrow, paneMinimumOf, windowFor } from "./shell-surfaces";
 
 /**
  * Helpers for the Pull Requests and Projects pages and the Pull request surface in the window
@@ -101,21 +102,37 @@ function splitOf(root: LayoutNode | null, paneId: string): { id: string; index: 
 
 /**
  * Sizes a pane of a two-pane row split to `width` px through the layout's set_sizes (what a
- * gutter drag sends), correcting by what it measures until the pane is that wide.
+ * gutter drag sends), correcting by what it measures until the pane is that wide. A width under
+ * the pane's minimum narrows the window instead (windowFor).
  */
 export async function sizePane(page: Page, paneId: string, width: number): Promise<void> {
   const pane = paneOf(page, paneId);
   const measure = async () => Math.round((await pane.boundingBox())?.width ?? 0);
+  // Under the pane's minimum, proportions cannot draw it: a smaller window does (docs/notes/shell-25f-sizes.md).
+  if (width < paneMinimumOf((await layoutState()).spaces[0]?.root ?? null, paneId, true)) {
+    await focusForNarrow(page, paneId);
+    await windowFor(page, measure, width, true);
+    await expect.poll(measure).toBe(width);
+    return;
+  }
+  const rev = async (): Promise<number> => Number(await page.evaluate(`__cfModule("/src/stores/layout.ts").then((m) => m.useLayoutStore.getState().rev)`));
   for (let i = 0; i < 4; i++) {
     const now = await measure();
     if (Math.abs(now - width) <= 0.5) break;
     const split = splitOf(((await layoutState()).spaces[0]?.root ?? null), paneId);
     if (!split || split.sizes.length !== 2) throw new Error(`pane ${paneId} is not in a two-pane split`);
     const grid = (await page.getByTestId("shell-grid").boundingBox())?.width ?? 0;
-    const f = (split.sizes[split.index] ?? 0.5) + (width - now) / (grid - 12);
+    const f = Math.min(0.95, Math.max(0.05, (split.sizes[split.index] ?? 0.5) + (width - now) / (grid - 12)));
     const sizes = split.index === 0 ? [f, 1 - f] : [1 - f, f];
+    const before = await rev();
     await page.evaluate(`__cfModule("/src/stores/layout.ts").then((m) => m.applyLayout({ op: "set_sizes", split: ${JSON.stringify(split.id)}, sizes: ${JSON.stringify(sizes)} }))`);
-    await expect.poll(measure).not.toBe(now);
+    await expect.poll(rev).toBeGreaterThan(before);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // The other pane held at its 480px minimum: no proportion gives this one more room; a wider window does.
+    if ((await measure()) === now) {
+      await windowFor(page, measure, width, true);
+      break;
+    }
   }
   await expect.poll(measure).toBe(width);
 }

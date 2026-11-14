@@ -36,7 +36,7 @@
     "current_space": "sp-a",
     "default_space": "sp-a"
   },
-  "op": {"op":"open_thread","thread":"th-a","edge":"left","focus":true},
+  "op": {"op":"open_thread","thread":"th-a","edge":"left","focus":true,"w":1600,"h":900},
   "want": {
     "v": 1,
     "spaces": [

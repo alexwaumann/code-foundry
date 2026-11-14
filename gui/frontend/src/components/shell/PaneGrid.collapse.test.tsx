@@ -195,19 +195,19 @@ describe("dividers' cursors", () => {
     const { unmount } = render(<PaneGrid />);
     expect(gutters()).toEqual([["0", "col-resize"]]);
     unmount();
-    // 360 + 12 + 300: the thread at its minimum, the diff 40 over its 260.
-    width = 672;
+    // 480 + 12 + 520: the thread at its minimum, the diff 40 over its 480.
+    width = 1012;
     await seed(row("s-r", [pane("p-a", [tab("t-th", "thread", "s-1")]), pane("p-c", [tab("t-d", "diff", "s-1")])], [0.2, 0.8]));
     const second = render(<PaneGrid />);
     expect(gutters()).toEqual([["0", "e-resize"]]);
     second.unmount();
-    width = 632;
+    width = 972;
     await seed(two);
     render(<PaneGrid />);
     expect(gutters()).toEqual([["0", "not-allowed"]]);
     // A press there starts no drag.
     const g = screen.getByTestId("shell-gutter");
-    fireEvent.pointerDown(g, { button: 0, pointerId: 1, clientX: 366 });
+    fireEvent.pointerDown(g, { button: 0, pointerId: 1, clientX: 486 });
     expect(screen.queryByTestId("shell-gutter-drag")).toBeNull();
     expect(g.querySelector("span")?.hidden).toBe(true);
   });

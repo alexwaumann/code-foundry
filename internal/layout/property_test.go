@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"encoding/json"
 	"errors"
 	"maps"
 	"math/rand/v2"
@@ -321,6 +322,7 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 		checkPlacement(t, step, string(opJSON), st, next, res)
 		checkDrafts(t, step, string(opJSON), next, res)
 		checkCollapsed(t, step, string(opJSON), op, opts, st, next)
+		checkRoom(t, step, string(opJSON), op, st, next, res)
 		enc, err := Encode(next)
 		if err != nil {
 			t.Fatal(err)
@@ -337,7 +339,8 @@ func runOps(t *testing.T, data []byte, maxSteps int) {
 }
 
 // checkCollapsed pins who changes a pane's collapsed mark (docs/notes/shell-25d-collapse.md):
-// only set_collapsed collapses a pane; an op that keeps the user's focus opens one only when it
+// only set_collapsed collapses a pane that was there (a pane reopen_closed rebuilds may come
+// back collapsed: docs/notes/shell-25f-sizes.md); an op that keeps the user's focus opens one only when it
 // is set_collapsed or the pane is the last of its space that could be open.
 func checkCollapsed(t *testing.T, step int, opJSON string, op Op, opts Options, before, after *State) {
 	t.Helper()
@@ -354,6 +357,43 @@ func checkCollapsed(t *testing.T, step int, opJSON string, op Op, opts Options, 
 			if !p.Collapsed && old.Collapsed && opts.KeepFocus && !setting && !LastOpen(sp, p.ID) {
 				t.Fatalf("step %d %s opened collapsed pane %s while keeping the focus", step, opJSON, p.ID)
 			}
+		}
+	}
+}
+
+// checkRoom pins room for panes (docs/notes/shell-25f-sizes.md): an op that lays panes out
+// never takes a space that fit its pane area to one that does not, except by opening a pane
+// the user collapsed (always allowed: folding copes), by reopening a closed pane, which comes
+// back collapsed when it does not fit open (and may not fit even so: its 36 px), or by putting
+// a tab into the focused pane when no open pane of the space could take it (hostPane's last
+// resort).
+func checkRoom(t *testing.T, step int, opJSON string, op Op, before, after *State, res Result) {
+	t.Helper()
+	if !Measures(op) {
+		return
+	}
+	var area struct{ W, H float64 }
+	_ = json.Unmarshal([]byte(opJSON), &area)
+	w, h := viewport(area.W, area.H)
+	for _, sp := range after.Spaces {
+		old := before.Space(sp.ID)
+		if old == nil || !Fits(old.Root, w, h) || Fits(sp.Root, w, h) {
+			continue
+		}
+		opened := false
+		for _, p := range Panes(sp.Root) {
+			if _, o := before.FindPane(p.ID); o != nil && o.Collapsed && !p.Collapsed {
+				opened = true
+			}
+		}
+		noTaker := true
+		for _, p := range Panes(old.Root) {
+			if !p.Collapsed && !terminalsOnly(p.Tabs) {
+				noTaker = false
+			}
+		}
+		if !opened && !res.Collapsed && !(noTaker && res.Pane != "") {
+			t.Fatalf("step %d %s: space %s fit %vx%v and does not now", step, opJSON, sp.ID, w, h)
 		}
 	}
 }

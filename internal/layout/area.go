@@ -42,3 +42,8 @@ func (o *MoveTab) setArea(w, h float64)           { area(&o.W, &o.H, w, h) }
 func (o *MovePane) setArea(w, h float64)          { area(&o.W, &o.H, w, h) }
 func (o *RemoveSpace) setArea(w, h float64)       { area(&o.W, &o.H, w, h) }
 func (o *ReopenClosed) setArea(w, h float64)      { area(&o.W, &o.H, w, h) }
+func (o *AddTab) setArea(w, h float64)            { area(&o.W, &o.H, w, h) }
+func (o *SplitPane) setArea(w, h float64)         { area(&o.W, &o.H, w, h) }
+func (o *MergePane) setArea(w, h float64)         { area(&o.W, &o.H, w, h) }
+func (o *OpenDraft) setArea(w, h float64)         { area(&o.W, &o.H, w, h) }
+func (o *NewThread) setArea(w, h float64)         { area(&o.W, &o.H, w, h) }

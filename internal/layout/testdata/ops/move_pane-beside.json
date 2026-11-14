@@ -56,7 +56,7 @@
     "current_space": "sp-a",
     "default_space": "sp-a"
   },
-  "op": {"op":"move_pane","pane":"p-t","target":"p-b","edge":"right","frac":0.3},
+  "op": {"op":"move_pane","pane":"p-t","target":"p-b","edge":"right","frac":0.3,"w":1600,"h":900},
   "want": {
     "v": 1,
     "spaces": [

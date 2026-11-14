@@ -4,10 +4,10 @@
  * mock's `move_tab` and `move_pane`, so both give the rectangle the daemon lands. A drop beside a
  * pane splits it in half; only the outer edge takes a kind's size.
  */
-import { GUTTER } from "../geometry/rects";
+import { GUTTER, PANE_MINIMUM } from "../geometry/rects";
 
-/** The width a thread keeps beside a new pane (internal/layout place.go KeepPx). */
-export const KEEP_PX = 480;
+/** The width the rest keeps when a new pane is raised to its floor: a pane's minimum (internal/layout place.go KeepPx). */
+export const KEEP_PX = PANE_MINIMUM.w;
 
 /** The default share when a kind is unknown (internal/layout tree.go defaultFrac). */
 const HALF = 0.5;

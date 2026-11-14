@@ -27,7 +27,10 @@ func init() {
 // AddTab adds a tab to a pane: Pane, else the focused pane of Space ("" is the current
 // space), else a new pane when the space is empty. It lands at Index, else right after the
 // pane's active tab. A tab whose identity is already open in its scope is not added: that one
-// is used (with Params and Title replaced when given) and Result.Existing is set.
+// is used (with Params and Title replaced when given) and Result.Existing is set. A Pane of
+// terminals that the tab would not fit in (fit.go canTake) refuses it (ErrNoRoom); without a
+// Pane, a focused pane that cannot take it gives way to the most recently focused one that can
+// (hostPane). W and H are the pane area (default DefaultW x DefaultH).
 type AddTab struct {
 	Space string `json:"space,omitempty"`
 	Pane  string `json:"pane,omitempty"`
@@ -35,7 +38,9 @@ type AddTab struct {
 	Index *int   `json:"index,omitempty"`
 	// Focus moves the focus to the tab. Without it the tab becomes active in its pane unless
 	// that pane has the focus, where it waits behind the active tab.
-	Focus bool `json:"focus,omitempty"`
+	Focus bool    `json:"focus,omitempty"`
+	W     float64 `json:"w,omitempty"`
+	H     float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -73,12 +78,11 @@ func (o *AddTab) apply(t *tx) (Result, error) {
 		t.show(ssp, sp2, same.ID, o.Focus)
 		return Result{Space: ssp.ID, Pane: sp2.ID, Tab: same.ID, Existing: true}, nil
 	}
+	w, h := viewport(o.W, o.H)
 	if pane == nil {
-		for _, p := range Panes(sp.Root) {
-			if p.ID == sp.Focus {
-				pane = p
-			}
-		}
+		pane = hostPane(sp, w, h, tb)
+	} else if !canTake(sp, pane, w, h, tb) {
+		return Result{}, ErrNoRoom
 	}
 	if pane == nil {
 		pane = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
@@ -98,13 +102,16 @@ func clampIndex(i, n int) int { return max(0, min(i, n)) }
 
 // SplitPane opens a new tab in a new pane on an edge of Pane, taking Frac of its room
 // (0 is half; it is kept between 0.05 and 0.95). A tab whose identity is already open in its
-// scope is refused: move that one with move_tab.
+// scope is refused: move that one with move_tab. A split whose result would not fit the W x H
+// pane area (default DefaultW x DefaultH) is refused (ErrNoRoom).
 type SplitPane struct {
 	Pane  string  `json:"pane"`
 	Edge  Edge    `json:"edge"`
 	Tab   *Tab    `json:"tab"`
 	Frac  float64 `json:"frac,omitempty"`
 	Focus bool    `json:"focus,omitempty"`
+	W     float64 `json:"w,omitempty"`
+	H     float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -130,6 +137,9 @@ func (o *SplitPane) apply(t *tx) (Result, error) {
 	if err := insertBeside(sp, target.ID, o.Edge, np, o.Frac, t.newID("s-")); err != nil {
 		return Result{}, err
 	}
+	if err := needRoom(sp, o.W, o.H); err != nil {
+		return Result{}, err
+	}
 	t.show(sp, np, tb.ID, o.Focus)
 	return Result{Space: sp.ID, Pane: np.ID, Tab: tb.ID}, nil
 }
@@ -143,7 +153,10 @@ func (o *SplitPane) apply(t *tx) (Result, error) {
 //   - Space alone: into that space's focused pane after its active tab, or a new pane.
 //
 // A thread tab never changes space here (moving a thread is its own op); a tab whose identity
-// is already open in the target space is refused.
+// is already open in the target space is refused. So is a move whose result would not fit the
+// W x H pane area (ErrNoRoom, fit.go): a new pane on an edge, or a tab that raises the minimum
+// of a pane of terminals it joins (a space's focused pane gives way to the most recently
+// focused pane that can take it). A collapsed pane takes any tab: it opens.
 type MoveTab struct {
 	Tab   string  `json:"tab"`
 	Space string  `json:"space,omitempty"`
@@ -194,6 +207,9 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 		}
 	}
 	wasFocused := focusedTab(from) == tb.ID
+	w, h := viewport(o.W, o.H)
+	// raised: the tab joins a pane whose minimum it raises; the result must then fit.
+	raised := false
 
 	switch {
 	case target != nil && o.Edge != "":
@@ -221,6 +237,7 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 			src.Tabs = slices.Insert(src.Tabs, clampIndex(at, len(src.Tabs)), tb)
 			break
 		}
+		raised = !target.Collapsed && raises(target, tb)
 		detach(from, src, tb.ID)
 		target.Tabs = slices.Insert(target.Tabs, clampIndex(at, len(target.Tabs)), tb)
 	case o.Edge != "":
@@ -234,16 +251,20 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 			return Result{}, fmt.Errorf("move_tab needs a pane, an edge or another space: %w", ErrInvalidArgument)
 		}
 		detach(from, src, tb.ID)
-		for _, p := range Panes(to.Root) {
-			if p.ID == to.Focus {
-				target = p
-			}
+		target = hostPane(to, w, h, tb)
+		if target != nil {
+			raised = !target.Collapsed && raises(target, tb)
 		}
 		if target == nil {
 			target = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}}
 			to.Root = target
 		} else {
 			target.Tabs = slices.Insert(target.Tabs, target.TabIndex(target.Active)+1, tb)
+		}
+	}
+	if o.Edge != "" || raised {
+		if err := needRoom(to, w, h); err != nil {
+			return Result{}, err
 		}
 	}
 	if to != from {
@@ -306,6 +327,9 @@ func toOuter(t *tx, sp *Space, node *Node, edge Edge, frac, w, h float64) error 
 //     step. Each thread whose tab it holds then lives in that space and takes its other linked
 //     tabs in the old space along, placed by the rules beside it, as move_thread does (one of
 //     those whose identity is open there already is closed in favour of it: Result.Closed).
+//
+// A move whose result would not fit the W x H pane area of the space it lands in is refused
+// (ErrNoRoom, fit.go).
 type MovePane struct {
 	Pane   string  `json:"pane"`
 	Target string  `json:"target,omitempty"`
@@ -351,6 +375,9 @@ func (o *MovePane) apply(t *tx) (Result, error) {
 		if err := insertBeside(from, target.ID, o.Edge, pane, o.Frac, t.newID("s-")); err != nil {
 			return Result{}, err
 		}
+	}
+	if err := needRoom(from, o.W, o.H); err != nil {
+		return Result{}, err
 	}
 	focusTab(from, pane, pane.Active)
 	return Result{Space: from.ID, Pane: pane.ID, Tab: pane.Active}, nil
@@ -400,14 +427,17 @@ func (o *MovePane) toSpace(t *tx, from *Space, pane *Node) (Result, error) {
 	if wasFocused {
 		refocus(from)
 	}
+	w, h := viewport(o.W, o.H)
 	if to.Root == nil {
 		to.Root = pane
 	} else if err := insertBeside(to, to.Focus, Right, pane, defaultFrac, t.newID("s-")); err != nil {
 		return Result{}, err
 	}
+	if err := needRoom(to, w, h); err != nil {
+		return Result{}, err
+	}
 	focusTab(to, pane, pane.Active)
 	res := Result{Space: to.ID, Pane: pane.ID, Tab: pane.Active}
-	w, h := viewport(o.W, o.H)
 	for _, tb := range follow {
 		k, _ := KindOf(tb.Kind)
 		if t.sameTab(to, k, tb.Key, tb.ID) != nil {
@@ -425,11 +455,15 @@ func (o *MovePane) toSpace(t *tx, from *Space, pane *Node) (Result, error) {
 }
 
 // MergePane moves every tab of Pane into Target's strip at Index (default: the end). Pane's
-// active tab stays active, and Target takes the focus.
+// active tab stays active, and Target takes the focus. A merge that raises the minimum of a
+// Target of terminals is refused when the result would not fit the W x H pane area
+// (ErrNoRoom, fit.go); a collapsed Target takes anything (it opens).
 type MergePane struct {
-	Pane   string `json:"pane"`
-	Target string `json:"target"`
-	Index  *int   `json:"index,omitempty"`
+	Pane   string  `json:"pane"`
+	Target string  `json:"target"`
+	Index  *int    `json:"index,omitempty"`
+	W      float64 `json:"w,omitempty"`
+	H      float64 `json:"h,omitempty"`
 }
 
 // OpName implements Op.
@@ -447,12 +481,18 @@ func (o *MergePane) apply(t *tx) (Result, error) {
 	if tsp != sp || target == pane {
 		return Result{}, fmt.Errorf("pane %s cannot merge into %s: %w", pane.ID, target.ID, ErrInvalidArgument)
 	}
+	raised := !target.Collapsed && raises(target, pane.Tabs...)
 	removeNode(sp, pane.ID)
 	at := len(target.Tabs)
 	if o.Index != nil {
 		at = clampIndex(*o.Index, len(target.Tabs))
 	}
 	target.Tabs = slices.Insert(target.Tabs, at, pane.Tabs...)
+	if raised {
+		if err := needRoom(sp, o.W, o.H); err != nil {
+			return Result{}, err
+		}
+	}
 	t.focusTab(sp, target, pane.Active)
 	return Result{Space: sp.ID, Pane: target.ID, Tab: pane.Active}, nil
 }

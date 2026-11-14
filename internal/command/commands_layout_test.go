@@ -14,6 +14,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 	core "github.com/alexwaumann/code-foundry/internal/layout"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 )
 
@@ -87,6 +88,16 @@ func (f layoutFixture) must(t *testing.T, uctx command.Context, name string, arg
 }
 
 func (f layoutFixture) state() *core.State { return f.store.Snapshot().State }
+
+// wide gives the fixture a pane area wide enough for a third column of panes at their 480px
+// minimum (the default 1180 is not: docs/notes/shell-25f-sizes.md).
+func (f layoutFixture) wide(t *testing.T) layoutFixture {
+	t.Helper()
+	if err := f.store.SetViewport("", layoutstore.Viewport{Width: 1600, Height: 1000}); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
 
 // focus is the current space, its focused pane and that pane's active tab.
 func (f layoutFixture) focus() string {
@@ -307,7 +318,7 @@ func TestLayoutArgumentShapes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := newLayoutFixture(t)
+			f := newLayoutFixture(t).wide(t)
 			_, err := f.run(t, fromThread, tt.cmd, tt.args)
 			if tt.code != 0 {
 				if connect.CodeOf(err) != tt.code && !(tt.code == connect.CodeInvalidArgument && errors.Is(err, command.ErrInvalidArgs)) {

@@ -23,7 +23,7 @@ function bg(page: Page, selector: string) {
 // files' (shell-spaces, shell-grid).
 const GAP = 12;
 
-test("the sidebar starts at 260, a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
+test("the sidebar starts at 240 (the top bar's toggle), a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
   const width = async () => (await box(page, "sidebar")).width;
   // A store saved before version 4, at the old 280 default dragged to 360.
   await page.addInitScript(() => {
@@ -32,8 +32,8 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
     localStorage.setItem("code-foundry.ui", JSON.stringify({ state: { sidebarWidth: 360, workingCollapsed: true }, version: 3 }));
   });
   await openApp(page);
-  await expect.poll(width).toBe(260);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 260, workingCollapsed: true }, version: 4 });
+  await expect.poll(width).toBe(240);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 240, workingCollapsed: true }, version: 4 });
 
   // Dragging the handle: the width persists across a reload, capped at the maximum.
   const handle = page.getByRole("separator", { name: "Resize sidebar" });
@@ -42,7 +42,7 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
   const y = hb.y + hb.height / 2;
   await page.mouse.move(hb.x + hb.width / 2, y);
   await page.mouse.down();
-  await page.mouse.move(hb.x + hb.width / 2 + 90, y, { steps: 4 });
+  await page.mouse.move(hb.x + hb.width / 2 + 110, y, { steps: 4 });
   await page.mouse.up();
   await expect.poll(width).toBe(350);
   await page.reload();
@@ -57,12 +57,12 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
   await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
   await expect.poll(width).toBe(520);
 
-  // Double-click restores the 260 default.
+  // Double-click restores the 240 default.
   await handle.dblclick();
-  await expect.poll(width).toBe(260);
+  await expect.poll(width).toBe(240);
 });
 
-/** SHOTS=<dir>: the PR's screenshots of the 260px default, WebKit, 1280x800, dark and light. */
+/** SHOTS=<dir>: the PR's screenshots of the 240px default, WebKit, 1280x800, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`sidebar default screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
@@ -70,9 +70,9 @@ for (const scheme of ["dark", "light"] as const) {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.emulateMedia({ colorScheme: scheme });
     await openApp(page);
-    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(260);
+    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(240);
     await page.mouse.move(640, 400);
-    await page.screenshot({ path: `${String(shots)}/sidebar-260-${scheme}.png` });
+    await page.screenshot({ path: `${String(shots)}/sidebar-240-${scheme}.png` });
   });
 }
 
