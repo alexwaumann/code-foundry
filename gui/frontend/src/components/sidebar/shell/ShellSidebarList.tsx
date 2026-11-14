@@ -134,7 +134,7 @@ function estimate(row: ShellRow | undefined): number {
   if (!row) return THREAD_ESTIMATE;
   if (row.kind === "header") return row.section === "needs" || row.section === "active" ? MAIN_HEADER_HEIGHT : HEADER_HEIGHT;
   if (row.section === "snoozed" || row.section === "archived") return ONE_LINE_ROW;
-  return row.kind === "draft" ? 48 : THREAD_ESTIMATE;
+  return THREAD_ESTIMATE;
 }
 
 type ScrollTo = (index: number) => void;
