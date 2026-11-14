@@ -51,12 +51,18 @@ when the first working version is whole. Nothing partial is released.
   - **Drafts.** Once something is typed, the composer is a draft with its own identity: New thread
     then opens another, empty composer, so a space can hold several drafts. A draft that is emptied
     again is the space's empty composer again (if the space already has another empty one, the one
-    without focus closes). Drafts and their text survive a restart.
+    without focus closes). Drafts and their text survive a restart, and so does the text typed
+    and not yet sent in a thread's own composer (until it is sent, or the thread is archived or
+    removed).
   - **In the sidebar**, a space's drafts are listed at the top of Active, below the pinned threads,
     and are drawn so that they read as drafts: a light amber tint behind the row at all times (not
-    only on hover), stronger on hover. A click focuses the draft's tab, or opens it in the
-    focused pane when its tab is closed. Closing a draft's tab keeps the draft; the row can discard
-    it. The empty composer is not listed.
+    only on hover), stronger on hover. A draft row has a thread row's lines: line 1 the project
+    with its icon as a thread row shows it ("No project" with its icon when the draft has none),
+    with Discard on hover; then the title, the draft's label ("Untitled draft", muted, while it
+    has none); then, where a thread shows its branch, the pencil icon and "Draft". A click
+    focuses the draft's tab, or opens it in the focused pane when its tab is closed. Closing a
+    draft's tab keeps the draft (and cmd+shift+t reopens its tab like any other); the row can
+    discard it. The empty composer is not listed.
   - An empty composer that is the only tab in its space is ephemeral: opening a thread replaces it.
     Once the space has other tabs or panes, it stays when focus moves away. A draft is never
     replaced.
@@ -71,6 +77,46 @@ when the first working version is whole. Nothing partial is released.
   ones (new thread, terminal, Pull Requests, Projects). Without a thread it has only the general
   ones. The choice always opens in that pane, except that a linked surface which is already open is
   focused where it is.
+- **Reopening closed tabs.** cmd+shift+t reopens the most recently closed tab or pane of the
+  current space.
+  - **What is recorded.** What the user closes: a tab (cmd+w, its ×, a middle click, Close in its
+    menu, a thread's Close in its header menu) and a pane (cmd+shift+w, Close in its menu), and
+    the same verbs run from the CLI outside a thread. A close made from inside a thread (a
+    model's) is not recorded. Nothing closed as the consequence of something else is recorded on
+    its own: the linked tabs that close with their thread (they are in its remembered set), a
+    thread archived, snoozed or moved, a space removed, a terminal whose shell exited, a composer
+    replaced by its thread, smart swap. The space's empty composer is not recorded (New thread
+    makes one).
+  - **An entry.** Closing a tab records the tab, the pane it was in and its place in the strip,
+    and, when it was its pane's only tab, where that pane sat. Closing a pane records the pane
+    with all its tabs, which one was active, and where it sat (beside which panes, on which edge,
+    at what share). Closing a thread's tab is one entry: its linked tabs go to its remembered set
+    as always. A pane that held a thread's tab keeps the thread's tab in its entry; that thread's
+    linked tabs go to its remembered set.
+  - **The history** is per space, newest first, at most 20 entries, and lives in the daemon's
+    layout, so it survives a restart. Removing a space drops its history.
+  - **Reopening** takes the newest entry that can still be reopened and drops it:
+    - A tab goes back into its pane at its old place while that pane is in the space. When its
+      pane is gone and the tab was its only tab, the pane is rebuilt where it sat, as a pane is.
+      Otherwise it is placed by the usual rules: a thread's tab in the focused pane, a linked
+      surface by the placement rules, anything else in the focused pane.
+    - A pane comes back with its tabs, its active tab and its share, beside the panes it sat
+      beside while one of them is still in the space. Otherwise it goes on the right edge of the
+      whole pane area at its active tab's default size (as a pane dropped there), or is the only
+      pane of an empty space.
+    - A thread's tab opens the thread: its remembered set comes back as when it is opened from
+      the sidebar.
+    - A terminal's tab starts a fresh shell where the old one was started: the thread's checkout,
+      linked to that thread again, or the home directory for a free terminal. It keeps a manual
+      name. There is no "Run again" line.
+    - A draft's tab opens the draft again while the space still lists it.
+    - What is open again (the same identity) is focused where it is, and its entry dropped.
+    - Skipped and dropped, and the next entry tried: an entry whose thread was archived or
+      removed or now lives in another space, whose file is gone, whose draft was sent or
+      discarded, or whose tab no longer has a valid identity. In a pane's entry only such tabs are
+      left out, and the pane comes back with the rest.
+    - The reopened tab (a pane's active tab) takes the focus, and the keyboard follows it.
+    - With nothing to reopen nothing happens; the CLI says so.
 - **Small windows.** Every pane has a minimum size by the kind of its active tab: a thread or a
   composer 360×220px, a terminal 240×110, a diff, file or pull request 260×150, anything else
   300×160. When the panes cannot all keep theirs, panes fold, by one rule for widths and heights:
@@ -176,6 +222,8 @@ when the first working version is whole. Nothing partial is released.
   name sticks until the automatic name is asked for again.
 - **Closing a terminal's tab by itself ends the terminal**, linked or not. A terminal whose tab
   closed because its thread was closed keeps running, so reopening the thread brings it back.
+  Reopening a closed terminal's tab (cmd+shift+t) starts a fresh shell, as "Reopening closed
+  tabs" says.
 - A terminal restored after a snooze shows its idle name and one line with the last command and
   "Run again". It never reruns by itself. The last command is the foreground job's command line as
   the process list gives it; there is no shell integration.
@@ -184,21 +232,22 @@ when the first working version is whole. Nothing partial is released.
 
 - Sections, in order: **Needs you**, **Active**, then **Working**, **Snoozed** and **Archived** at
   the bottom as today. A click on a thread always adds a tab (or focuses it when it is open). Active
-  keeps today's order (pinned, then the space's drafts, then threads woken from a snooze, then
-  finished, then idle) and Pin stays in the row's menu.
-- **A thread woken from a snooze** is not in Needs you: it goes to the top of Active (below the
-  pinned threads and the drafts), most recently woken first, with its "Woke" status until the user
-  opens it. It does not count in the Needs you number, a space tab's count or the top bar's
-  control, and cmd+shift+a skips it.
+  keeps today's order (pinned, then the space's drafts, then the threads that call without
+  blocking, below, then finished, then idle) and Pin stays in the row's menu.
+- **A thread that calls without blocking** is not in Needs you: a thread woken from a snooze, a
+  terminal notification or bell, a Claude API error waiting at the prompt, any other attention
+  reason ("blocked: …", "continue: …", "menu: …" and unknown ones), and a plugin's attention flag.
+  It goes to the top of Active (below the pinned threads and the drafts), most recent first, with
+  its status until the user opens it. It does not count in the Needs you number, a space tab's
+  count or the top bar's control, and cmd+shift+a skips it. A pinned one stays with the pinned.
 - **Thread row.** Line 1: project on the left, status or time on the right; on hover the snooze and
   archive controls take that slot. Then the title at full width, up to two lines. Then the branch,
   with the pull request tag and the counts right-aligned. A thread with no project has no third line
   unless it has a tag or counts.
-- **Needs you** lists the user's own threads that are blocked until the user acts: a permission
-  prompt, a question from the model, a plan to approve. (It still also lists the other attention
-  states it held before this rule, until they are decided: a folder trust dialog, a terminal
-  notification or bell, an API error at the prompt, a plugin's attention flag and any other attention
-  reason; see `shell-25a-test-feedback.md`.) Never threads started by threads; from every space, and such a thread is not also listed under Active. One toggle button switches
+- **Needs you** lists only actionable asks: the user's own threads that are blocked until the user
+  acts, by a permission prompt, a question from the model, a plan to approve or a folder trust
+  dialog. Never threads started by threads; from every space, and such a thread is not also listed
+  under Active. One toggle button switches
   between all spaces and this space; the choice is global. A row is the project and the kind of ask,
   then the same title. It has no buttons.
   - Hovering a row shows a card with the whole ask. A permission has Allow, Deny and "Go to thread".
@@ -217,8 +266,8 @@ when the first working version is whole. Nothing partial is released.
 | Key | Does |
 | --- | --- |
 | cmd+n | New thread |
-| cmd+t | New terminal tab linked to the current thread |
-| cmd+shift+t | New terminal tab linked to nothing, in the home directory |
+| cmd+t | New terminal tab: linked to the focused tab's thread; with no thread there, linked to nothing, in the home directory |
+| cmd+shift+t | Reopen the most recently closed tab or pane of the space |
 | cmd+j | Quick terminal of the thread: open and focus, focus when open, close when focused. From a linked surface: go to its thread and open it |
 | cmd+shift+j | Ring: the thread, each of its terminal tabs, the thread. From a view it starts at the first terminal |
 | cmd+shift+d | The thread's diff; again from the diff, back to the thread |
@@ -243,6 +292,9 @@ included). Of several, the one focused most recently wins (the pane the last dir
 counts as such, so a key and its opposite come back), then the one sharing the longest stretch of
 edge, then the upper (left and right) or the left (up and down). A direction key pressed while a
 pane move is on its way to the daemon waits for it to land.
+
+The free terminal in the home directory keeps its command (palette: New Terminal in Home Folder)
+without a key of its own.
 
 Retired: cmd+shift+e (side panel), cmd+\ and cmd+alt+\ (panel split and its other group), the
 bindings for Show Pull Requests and Show Projects (the palette and "+" open them), and the old
