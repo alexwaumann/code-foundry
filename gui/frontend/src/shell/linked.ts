@@ -74,7 +74,7 @@ export function threadSurfaces(thread: string, checkouts: readonly Checkout[], p
  * What a menu item or the row does: run a verb (with a thread's context), focus an open tab, only
  * say something, or a terminal: a new one (a thread's, or with no thread a free one), or a running
  * one given a tab. Terminals go through PR 13's actions (shell/terminalActions.ts), the same verbs
- * as cmd+t and cmd+shift+t, with the keyboard following into the new tab.
+ * as cmd+t, with the keyboard following into the new tab.
  */
 export type LinkedAction =
   | { run: string; args: Record<string, string>; thread?: string }
@@ -133,7 +133,7 @@ export function untabbedTerminals(terminals: Readonly<Record<string, TerminalVie
 /** The "+" menu's general items. */
 export type PlusItem = "new-thread" | "terminal" | "prs" | "projects";
 
-/** A general item of the "+" menu: it opens in that pane. The terminal is a free one (cmd+shift+t's: in the home folder, linked to nothing). */
+/** A general item of the "+" menu: it opens in that pane. The terminal is a free one (cmd+t's with no thread: in the home folder, linked to nothing). */
 export function plusAction(item: PlusItem, pane: string): LinkedAction {
   switch (item) {
     case "new-thread":

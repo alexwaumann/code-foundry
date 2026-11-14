@@ -611,6 +611,13 @@ describe("handleKeyDown precedence", () => {
     expect(runCommandForResult).toHaveBeenCalledWith("terminal.new-free", {}, expect.objectContaining({ quiet: true }));
   });
 
+  it("cmd+t runs where the daemon lists terminal.new unavailable (no thread, no checkout): a free terminal", () => {
+    useCommandsStore.setState((s) => ({ commands: s.commands.map((c) => (c.name === "terminal.new" ? { ...c, available: false } : c)) }));
+    const e = press(outside, { key: "t", code: "KeyT", metaKey: true });
+    expect(e.defaultPrevented).toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("terminal.new-free", {}, expect.objectContaining({ quiet: true }));
+  });
+
   it("commands with required args open the palette prompt instead of running", () => {
     press(outside, { key: "n", code: "KeyN", metaKey: true, altKey: true });
     expect(runCommandForResult).not.toHaveBeenCalled();

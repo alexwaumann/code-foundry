@@ -107,8 +107,8 @@ func TestTerminalNewFree(t *testing.T) {
 		})
 	}
 	c, _ := reg(t).Get("terminal.new-free")
-	if c.NoPalette || !slices.Equal(c.Keybindings, []string{"cmd+shift+t"}) {
-		t.Errorf("terminal.new-free: NoPalette %v keybindings %v; want listed, on cmd+shift+t", c.NoPalette, c.Keybindings)
+	if c.NoPalette || len(c.Keybindings) != 0 {
+		t.Errorf("terminal.new-free: NoPalette %v keybindings %v; want listed, with no key (cmd+t opens one where no thread is in context)", c.NoPalette, c.Keybindings)
 	}
 }
 

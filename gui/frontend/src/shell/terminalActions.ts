@@ -153,19 +153,21 @@ function currentThread(): string {
 }
 
 /**
- * cmd+t: a new terminal tab linked to the current thread, placed by the rules. With no thread a
- * shell of the page's checkout (the Projects page), else one in the home directory. A pane's "+"
- * menu names the thread (`thread`) and its pane (`pane`: the tab opens there).
+ * cmd+t: a new terminal tab linked to the focused tab's thread, placed by the rules; with no thread
+ * there, a free one in the home directory (docs/notes/shell-model.md, "Keys"). A pane's "+" menu
+ * names the thread (`thread`) and its pane (`pane`: the tab opens there).
  */
 export async function newTerminalTab(opts: { thread?: string; pane?: string } = {}): Promise<void> {
   const thread = opts.thread ?? currentThread();
-  const ctx = thread ? getUiContext({ kind: "thread", id: thread }) : getUiContext();
-  const verb = ctx.activeThreadId || ctx.activeWorktreePath ? "terminal.new" : "terminal.new-free";
-  const res = await runCommandForResult(verb, opts.pane ? { pane: opts.pane } : {}, { ctx, quiet: true });
+  if (!thread) {
+    await newFreeTerminalTab(opts.pane);
+    return;
+  }
+  const res = await runCommandForResult("terminal.new", opts.pane ? { pane: opts.pane } : {}, { ctx: getUiContext({ kind: "thread", id: thread }), quiet: true });
   await intoNewTerminal(res?.resultJson);
 }
 
-/** cmd+shift+t: a terminal tab linked to nothing, in the home directory; the "+" menu's Terminal, in its `pane`. */
+/** A terminal tab linked to nothing, in the home directory (cmd+t with no thread, the palette); the "+" menu's Terminal, in its `pane`. */
 export async function newFreeTerminalTab(pane = ""): Promise<void> {
   const res = await runCommandForResult("terminal.new-free", pane ? { pane } : {}, { quiet: true });
   await intoNewTerminal(res?.resultJson);

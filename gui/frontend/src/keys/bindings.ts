@@ -125,10 +125,12 @@ export function isViewActionChord(chord: string): boolean {
 
 /**
  * Commands whose GUI presenter supplies the context the daemon needs: thread.new's
- * project picker picks the project. They start (palette, chord, button) even where the
- * daemon lists them as unavailable, e.g. with nothing selected.
+ * project picker picks the project; cmd+t's terminal.new opens a free terminal in the home
+ * directory where no thread is in context (shell/terminalActions.ts newTerminalTab). They start
+ * (palette, chord, button) even where the daemon lists them as unavailable, e.g. with nothing
+ * selected.
  */
-const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
+const contextSupplied: ReadonlySet<string> = new Set(["thread.new", "terminal.new"]);
 
 /**
  * What a subagent's view does not start from the keyboard, the palette or a command button
