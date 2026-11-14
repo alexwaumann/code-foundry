@@ -21,6 +21,9 @@ const Version = 1
 // MaxMRU is how many recently focused tab ids a space keeps.
 const MaxMRU = 64
 
+// MaxClosed is how many entries a space's reopen history keeps (reopen.go).
+const MaxClosed = 20
+
 // Errors returned by operations and decoding, wrapped with detail; test with errors.Is.
 // They line up with Connect codes so a handler maps them one to one.
 var (
@@ -133,6 +136,25 @@ type Space struct {
 	// Drafts are the space's composer drafts, newest first, whether or not each has a tab
 	// open (drafts.go). The space's empty composer is never one of them.
 	Drafts []*Draft `json:"drafts,omitempty"`
+	// Closed is the space's reopen history (reopen.go): the tabs and panes the user closed,
+	// newest first, at most MaxClosed.
+	Closed []*Closed `json:"closed,omitempty"`
+}
+
+// Closed is one entry of a space's reopen history: a tab the user closed, or a whole pane with
+// its tabs (Whole).
+type Closed struct {
+	// Pane is the pane the tab was in, or the pane itself.
+	Pane string `json:"pane"`
+	// Whole: the user closed the pane with all its tabs.
+	Whole bool   `json:"whole,omitempty"`
+	Tabs  []*Tab `json:"tabs"`
+	// Index is a tab's place in its pane's strip.
+	Index int `json:"index,omitempty"`
+	// Active is the pane's active tab when it closed (Whole).
+	Active string `json:"active,omitempty"`
+	// Beside is where the pane sat: a whole pane, or the pane a tab was the only tab of.
+	Beside *Beside `json:"beside,omitempty"`
 }
 
 // Draft is a composer with something typed in it: its id (the "draft" param of its compose
@@ -335,6 +357,12 @@ func (sp *Space) clone() *Space {
 		return nil
 	}
 	c := &Space{ID: sp.ID, Name: sp.Name, Root: sp.Root.clone(), Focus: sp.Focus, MRU: slices.Clone(sp.MRU)}
+	if sp.Closed != nil {
+		c.Closed = make([]*Closed, len(sp.Closed))
+		for i, e := range sp.Closed {
+			c.Closed[i] = e.clone()
+		}
+	}
 	if sp.Drafts != nil {
 		c.Drafts = make([]*Draft, len(sp.Drafts))
 		for i, d := range sp.Drafts {
@@ -364,6 +392,23 @@ func (n *Node) clone() *Node {
 		}
 	}
 	return c
+}
+
+func (e *Closed) clone() *Closed {
+	if e == nil {
+		return nil
+	}
+	c := *e
+	c.Tabs = make([]*Tab, len(e.Tabs))
+	for i, tb := range e.Tabs {
+		c.Tabs[i] = tb.Clone()
+	}
+	if e.Beside != nil {
+		b := *e.Beside
+		b.Neighbours = slices.Clone(b.Neighbours)
+		c.Beside = &b
+	}
+	return &c
 }
 
 // Clone is a deep copy of t.

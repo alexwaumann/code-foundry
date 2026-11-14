@@ -4220,7 +4220,8 @@ export class World {
           title: "New Terminal in Home Folder",
           category: "Terminal",
           description: "Start a shell in the home folder, owned by nothing.",
-          keybindings: ["cmd+shift+t"],
+          // No key of its own: cmd+t opens one where no thread is in context, cmd+shift+t reopens a closed tab.
+          keybindings: [],
           args: [TERMINAL_PANE_ARG],
         },
         when: always,

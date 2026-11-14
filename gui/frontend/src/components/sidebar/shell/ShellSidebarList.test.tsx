@@ -105,7 +105,7 @@ beforeEach(async () => {
     layoutOf([
       space(pane("p-1", [tab("t-1", "thread", "s-1", { key: "thread:s-1" }), tab("t-c", "compose", "", { key: "compose:draft:d-1", params: { draft: "d-1" } })], "t-c"), "p-1", {
         drafts: [
-          { id: "d-1", label: "Release notes for the shell", params: {} },
+          { id: "d-1", label: "Release notes for the shell", params: { project: "api" } },
           { id: "d-2", label: "", params: {} },
         ],
       }),
@@ -231,12 +231,24 @@ describe("the shell sidebar list", () => {
     expect(screen.queryByTestId("needs-card")).toBeNull();
   });
 
-  it("drafts read as drafts: the mark, the label or a placeholder; a click opens it, Discard ends it", async () => {
+  it("drafts read as drafts with a thread row's lines: the place, the label or a placeholder, the mark; a click opens it, Discard ends it", async () => {
     render(<ShellSidebarList bodyHeight={800} />);
     const d1 = rowOf("d:d-1");
-    expect(within(d1).getByTestId("row-draft-mark")).toBeTruthy();
+    const d2 = rowOf("d:d-2");
+    // Line 1: the project with its icon, as a thread row shows it, or "No project" with its icon.
+    expect(within(within(d1).getByTestId("row-line-1")).getByTestId("row-project").textContent).toBe("code-foundry");
+    expect(within(d1).getByTestId("row-place-icon")).toBeTruthy();
+    const none = within(within(d2).getByTestId("row-line-1")).getByTestId("row-project");
+    expect(none.textContent).toBe("No project");
+    expect(none.getAttribute("data-no-project")).toBe("true");
+    expect(within(none).getByTestId("row-place-icon").getAttribute("data-place")).toBe("none");
+    // Then the title, then where a thread shows its branch: the pencil and "Draft".
     expect(within(d1).getByTestId("draft-label").textContent).toBe("Release notes for the shell");
-    expect(within(rowOf("d:d-2")).getByTestId("draft-label").textContent).toBe("Untitled draft");
+    expect(within(d2).getByTestId("draft-label").textContent).toBe("Untitled draft");
+    expect(within(d2).getByTestId("draft-label").className).toContain("text-cf-sidebar-muted-foreground");
+    const line3 = within(d1).getByTestId("row-line-3");
+    expect(line3.textContent).toBe("Draft");
+    expect(within(line3).getByTestId("row-draft-mark")).toBeTruthy();
     // The focused tab is d-1's composer: its row is the selected one.
     expect(d1.getAttribute("aria-selected")).toBe("true");
     // Both are tinted amber at rest, not only on hover; the selected one more strongly.

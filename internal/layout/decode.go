@@ -40,16 +40,17 @@ func Decode(data []byte, ids IDs) (*State, []string, error) {
 
 // SpaceDoc is one space's stored document (the row holds its id, name and position).
 type SpaceDoc struct {
-	V      int      `json:"v"`
-	Root   *Node    `json:"root"`
-	Focus  string   `json:"focus,omitempty"`
-	MRU    []string `json:"mru,omitempty"`
-	Drafts []*Draft `json:"drafts,omitempty"`
+	V      int       `json:"v"`
+	Root   *Node     `json:"root"`
+	Focus  string    `json:"focus,omitempty"`
+	MRU    []string  `json:"mru,omitempty"`
+	Drafts []*Draft  `json:"drafts,omitempty"`
+	Closed []*Closed `json:"closed,omitempty"`
 }
 
 // EncodeSpaceDoc writes a space's document.
 func EncodeSpaceDoc(sp *Space) ([]byte, error) {
-	b, err := json.Marshal(SpaceDoc{V: Version, Root: sp.Root, Focus: sp.Focus, MRU: sp.MRU, Drafts: sp.Drafts})
+	b, err := json.Marshal(SpaceDoc{V: Version, Root: sp.Root, Focus: sp.Focus, MRU: sp.MRU, Drafts: sp.Drafts, Closed: sp.Closed})
 	if err != nil {
 		return nil, fmt.Errorf("encode space %s: %w", sp.ID, err)
 	}
@@ -66,7 +67,7 @@ func DecodeSpaceDoc(id, name string, data []byte) (*Space, error) {
 	if d.V > Version {
 		return nil, fmt.Errorf("decode space %s: version %d: %w", id, d.V, ErrNewerVersion)
 	}
-	return &Space{ID: id, Name: name, Root: d.Root, Focus: d.Focus, MRU: d.MRU, Drafts: d.Drafts}, nil
+	return &Space{ID: id, Name: name, Root: d.Root, Focus: d.Focus, MRU: d.MRU, Drafts: d.Drafts, Closed: d.Closed}, nil
 }
 
 // ThreadDoc is one thread's stored document (the row holds its id and space).
@@ -210,6 +211,7 @@ func (s *sanitizer) run() {
 	}
 	for _, sp := range st.Spaces {
 		s.space(sp)
+		s.closed(sp)
 	}
 	s.threads()
 	s.drafts()
@@ -437,5 +439,34 @@ func (s *sanitizer) drafts() {
 				}
 			}
 		}
+	}
+}
+
+// closed keeps the entries of a space's reopen history that can be read: without nil and
+// unknown-kind tabs, without entries left with none, at most MaxClosed. Their ids are not
+// claimed: a reopened tab or pane takes its id back only while it is free (reopen.go).
+func (s *sanitizer) closed(sp *Space) {
+	n := len(sp.Closed)
+	sp.Closed = slices.DeleteFunc(sp.Closed, func(e *Closed) bool {
+		if e == nil {
+			return true
+		}
+		e.Tabs = slices.DeleteFunc(e.Tabs, func(tb *Tab) bool {
+			if tb == nil {
+				return true
+			}
+			_, ok := KindOf(tb.Kind)
+			return !ok
+		})
+		return len(e.Tabs) == 0
+	})
+	if len(sp.Closed) > MaxClosed {
+		sp.Closed = sp.Closed[:MaxClosed]
+	}
+	if len(sp.Closed) != n {
+		s.note("space %s: reopen history kept %d of %d entries", sp.ID, len(sp.Closed), n)
+	}
+	if len(sp.Closed) == 0 {
+		sp.Closed = nil
 	}
 }

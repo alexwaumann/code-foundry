@@ -165,8 +165,8 @@ describe("a space tab's count (needsBySpace)", () => {
   });
 });
 
-describe("a thread woken from a snooze (docs/notes/shell-25a-test-feedback.md)", () => {
-  const woke = (id: string, o: Partial<ShellListThread> = {}) => t(id, { group: "prompt", woke: true, ...o });
+describe("a thread that calls without blocking: woken, a notification, an API error, a plugin's flag (docs/notes/shell-25c-keys-drafts.md)", () => {
+  const woke = (id: string, o: Partial<ShellListThread> = {}) => t(id, { group: "prompt", nudge: true, ...o });
   const W: ShellListThread[] = [
     t("idle-a", { lastActivityAtMs: 100 }),
     t("ask-a", { group: "prompt", statusChangedAtMs: 10 }),
@@ -178,7 +178,7 @@ describe("a thread woken from a snooze (docs/notes/shell-25a-test-feedback.md)",
     t("pin-a", { pinned: true }),
   ];
 
-  it("is not under Needs you: it tops Active below the pinned threads and the drafts, most recently woken first", () => {
+  it("is not under Needs you: it tops Active below the pinned threads and the drafts, most recent first", () => {
     expect(view(W, { drafts: [{ id: "d-1", label: "x" }] })).toEqual([
       "# Needs you 1",
       "needs:ask-a",
@@ -200,7 +200,7 @@ describe("a thread woken from a snooze (docs/notes/shell-25a-test-feedback.md)",
   it("counts in no Needs you number: the list, the space tabs, the top bar's control, cmd+shift+a", () => {
     expect(needsList(W, OPTS)).toEqual({ ids: ["ask-a"], any: true });
     expect(needsBySpace(W)).toEqual({ A: 1 });
-    // Only woken threads: nothing waits on the user, so Needs you has no header and the top bar no control.
+    // Only threads that call without blocking: nothing waits on the user, so Needs you has no header and the top bar no control.
     const only = [woke("w-1", { statusChangedAtMs: 1 }), t("i")];
     expect(needsList(only, OPTS)).toEqual({ ids: [], any: false });
     expect(needsBySpace(only)).toEqual({});

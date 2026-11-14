@@ -172,10 +172,29 @@ describe("the other terminal keys", () => {
     expect(names()).toEqual([["terminal.new-free", {}]]);
   });
 
-  it("cmd+shift+t: terminal.new-free", async () => {
+  it("cmd+t with no thread focused: a free shell, whatever the sidebar has selected", async () => {
+    await seed("p-2", "t-prs");
+    useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+    await actions.newTerminalTab();
+    useUiStore.setState({ selection: { kind: "none" } });
+    expect(names()).toEqual([["terminal.new-free", {}]]);
+  });
+
+  it("cmd+t from a checkout's shell of no thread (a Projects page's): another in that checkout; the + menu's Terminal there is a free one", async () => {
+    await seedLayout(layoutOf([space(pane("p-1", [tab("t-x", "terminal", "", { params: { terminal: "term-x" } })]), "p-1")]));
+    useTerminalsStore.setState({ byId: { "term-x": { id: "term-x", labels: { kind: "shell", project: "repo-cf", worktree: "/w/feat" } } } as never, order: ["term-x"] });
+    await actions.newTerminalTab();
+    await actions.newTerminalTab({ thread: "", pane: "p-1" });
+    useTerminalsStore.setState({ byId: {}, order: [] });
+    expect(names()).toEqual([["terminal.new", {}], ["terminal.new-free", { pane: "p-1" }]]);
+    expect(runs[0]).toMatchObject({ thread: "" });
+  });
+
+  it("the palette's New Terminal in Home Folder (and the + menu's, in its pane): terminal.new-free", async () => {
     await seed("p-1");
     await actions.newFreeTerminalTab();
-    expect(names()).toEqual([["terminal.new-free", {}]]);
+    await actions.newTerminalTab({ thread: "", pane: "p-2" });
+    expect(names()).toEqual([["terminal.new-free", {}], ["terminal.new-free", { pane: "p-2" }]]);
   });
 
   it("cmd+shift+j: terminal.cycle from the focused tab", async () => {

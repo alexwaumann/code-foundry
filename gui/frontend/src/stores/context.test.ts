@@ -91,7 +91,7 @@ describe("the terminal the user is on, in the command context", () => {
 describe("the sidebar list's keys", () => {
   const thread = (o: Partial<ThreadView>) =>
     ({ id: "s1", state: "connected", status: "idle", statusReason: "", pinned: false, archivedAtMs: null, snoozedUntilMs: null, createdBy: "", statusChangedAtMs: 100, lastActivityAtMs: 200, ...o }) as ThreadView;
-  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null; statusChangedAtMs: number | null; lastActivityAtMs: number | null; hidden?: true; woke?: true };
+  type Want = { pinned: boolean; group: string; archivedAtMs: number | null; snoozedUntilMs: number | null; statusChangedAtMs: number | null; lastActivityAtMs: number | null; hidden?: true; nudge?: true };
   // The keys carry only the band's sort time: the last activity for idle, the status change for attention and done.
   const IDLE = { statusChangedAtMs: null, lastActivityAtMs: 200 };
   const BY_STATUS = { statusChangedAtMs: 100, lastActivityAtMs: null };
@@ -111,11 +111,27 @@ describe("the sidebar list's keys", () => {
     ["pinned and asking", { pinned: true, status: "attention", statusReason: "permission: Bash" }, { pinned: true, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS }],
     ["archived", { state: "disconnected", archivedAtMs: 1760352000123 }, { pinned: false, group: "idle", archivedAtMs: 1760352000123, snoozedUntilMs: null, ...NONE }],
     ["snoozed", { state: "disconnected", snoozedUntilMs: 1760518800000 }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: 1760518800000, ...NONE }],
-    [
-      "woken (snooze ended): marked, for the top of Active rather than Needs you",
-      { state: "disconnected", status: "attention", statusReason: "snooze ended" },
-      { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS, woke: true },
-    ],
+    // Needs you lists only actionable asks; the rest of the prompt group calls without blocking
+    // (nudge): the top of Active rather than Needs you.
+    ...(
+      [
+        ["woken (snooze ended)", { state: "disconnected", status: "attention", statusReason: "snooze ended" }],
+        ["a terminal notification", { status: "attention", statusReason: "notification: Build done" }],
+        ["a bell", { status: "attention", statusReason: "bell" }],
+        ["an API error at the prompt", { status: "attention", statusReason: "error: overloaded_error" }],
+        ["another attention reason", { status: "attention", statusReason: "blocked: waiting on a lock" }],
+        ["an unknown attention reason", { status: "attention", statusReason: "something new" }],
+        ["a plugin's attention flag", { flags: [{ plugin: "p", pluginName: "P", level: "attention", reason: "Look" }] } as unknown as Partial<ThreadView>],
+      ] as const
+    ).map(([name, o]): [string, Partial<ThreadView>, Want] => [`${name}: a nudge`, o, { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS, nudge: true }]),
+    ...(
+      [
+        ["a permission", "permission: Bash"],
+        ["a question", "question: Which?"],
+        ["a plan", "plan: Ready?"],
+        ["a folder trust dialog", "trust: Trust this folder?"],
+      ] as const
+    ).map(([name, reason]): [string, Partial<ThreadView>, Want] => [`${name}: an actionable ask`, { status: "attention", statusReason: reason }, { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS }]),
     ["created by a thread, its creator present: hidden", { createdBy: "p" }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...IDLE, hidden: true }],
     ["created by a thread, its creator removed: shown", { createdBy: "gone" }, { pinned: false, group: "idle", archivedAtMs: null, snoozedUntilMs: null, ...IDLE }],
   ])("round-trips %s", (_name, o, want) => {

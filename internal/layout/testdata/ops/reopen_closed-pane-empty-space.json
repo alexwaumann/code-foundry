@@ -1,0 +1,47 @@
+{
+  "doc": "A pane reopened in an empty space is its only pane.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": null,
+        "focus": "",
+        "mru": [],
+        "closed": [
+          {
+            "pane": "p-b",
+            "whole": true,
+            "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+            "active": "t-f",
+            "beside": {"neighbours":["p-z"],"edge":"left","frac":0.3}
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+          "active": "t-f"
+        },
+        "focus": "p-b",
+        "mru": ["t-f"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-f"}
+}

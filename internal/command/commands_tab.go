@@ -15,7 +15,7 @@ func tabIDArg(desc string) ArgSpec {
 	return ArgSpec{Name: "tab", Type: String, ID: TabID, Description: desc + IDHelp}
 }
 
-// tabCommands are tab.focus, tab.move, tab.close, tab.rename, tab.auto-name, tab.next and tab.previous.
+// tabCommands are tab.focus, tab.move, tab.close, tab.reopen, tab.rename, tab.auto-name, tab.next and tab.previous.
 func (l layout) tabCommands() []Command {
 	return []Command{
 		{
@@ -53,7 +53,8 @@ func (l layout) tabCommands() []Command {
 		{
 			Name: "tab.close", Title: "Close Tab", Category: layoutCategory, Page: PageState,
 			Description: "Close a tab (default: the focused tab); the focus returns to what had it before. A thread's tab closes " +
-				"the thread from its space as thread.close does (it is never archived).",
+				"the thread from its space as thread.close does (it is never archived). Closed by the user (the app, or the CLI " +
+				"outside a thread), it goes in its space's reopen history (tab.reopen).",
 			Args:        []ArgSpec{positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)"))},
 			Keybindings: []string{"cmd+w"},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -65,9 +66,10 @@ func (l layout) tabCommands() []Command {
 				if err != nil {
 					return Result{}, err
 				}
-				var op core.Op = &core.CloseTab{Tab: tb.ID}
+				// A close by the user is recorded for tab.reopen; a model's is not.
+				var op core.Op = &core.CloseTab{Tab: tb.ID, Record: uctx.FromUser()}
 				if tb.Kind == "thread" {
-					op = &core.CloseThread{Thread: tb.Thread}
+					op = &core.CloseThread{Thread: tb.Thread, Record: uctx.FromUser()}
 				}
 				c, err := l.apply(ctx, op, !uctx.FromUser())
 				if err != nil {
@@ -80,6 +82,7 @@ func (l layout) tabCommands() []Command {
 				return layoutResult(uctx, c, msg), nil
 			},
 		},
+		l.reopenCommand(),
 		{
 			Name: "tab.rename", Title: "Rename Tab", Category: layoutCategory, Page: PageState,
 			Description: "Rename a tab (default: the focused tab). A thread's tab renames the thread (as thread.rename; in the app, " +

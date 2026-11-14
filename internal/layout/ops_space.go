@@ -130,7 +130,7 @@ func (o *RemoveSpace) apply(t *tx) (Result, error) {
 		var k []*Tab
 		if id := threadTabID(t.st, th); id != "" {
 			if tsp, _, _ := t.st.FindTab(id); tsp == sp {
-				k = t.closeThread(th, id, w, h).Kept
+				k = t.closeThread(th, id, w, h, false).Kept
 			}
 		}
 		k = append(k, t.putAway(sp, th, "", w, h)...)

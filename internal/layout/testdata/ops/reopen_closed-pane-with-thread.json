@@ -1,0 +1,100 @@
+{
+  "doc": "A pane that held a thread's tab comes back with it, and the thread's linked tabs that were in it come back into it.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [{"id":"t-g","kind":"file","params":{"path":"/y"}}],
+          "active": "t-g"
+        },
+        "focus": "p-b",
+        "mru": ["t-g"],
+        "closed": [
+          {
+            "pane": "p-a",
+            "whole": true,
+            "tabs": [
+              {"id":"t-a","kind":"thread","thread":"th-a"},
+              {"id":"t-f","kind":"file","params":{"path":"/x"}}
+            ],
+            "active": "t-d",
+            "beside": {"neighbours":["p-b"],"edge":"left","frac":0.5}
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj-1","worktree":"w-1"}
+              },
+              "pane": "p-a",
+              "index": 2,
+              "active": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-f","kind":"file","params":{"path":"/x"}},
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-g","kind":"file","params":{"path":"/y"}}],
+              "active": "t-g"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-d","t-g"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a"}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-d","back":["t-d"]}
+}

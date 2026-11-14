@@ -1640,6 +1640,12 @@ export class MockLayout {
   viewport: { clientId: string; width: number; height: number } | null = null;
   /** Every Apply, in order: the op as JSON and the client id. */
   applied: { op: Op; clientId: string }[] = [];
+  /**
+   * The reopen history the layout verbs keep (mock/layoutVerbs.ts), beside the state rather than
+   * in it (Go keeps it in the layout, internal/layout reopen.go): per space, newest first. A seed
+   * or a reset forgets it.
+   */
+  readonly closed = new Map<string, { pane: string; index: number; tabs: Tab[]; whole: boolean }[]>();
   /** The first-load import ran (Layout.legacy_imported). A new database's layout has not. */
   legacyImported = false;
   /** Every ImportLegacy call, in order, with what the window sent. */
@@ -1732,6 +1738,7 @@ export class MockLayout {
   seed(raw: State | string): void {
     const make = typeof raw === "string" ? SEEDS[raw] : undefined;
     if (typeof raw === "string" && !make) fail("not_found", `layout seed "${raw}"`);
+    this.closed.clear();
     this.commit(decodeState(make ? make() : raw), "");
   }
 
@@ -1746,6 +1753,7 @@ export class MockLayout {
     this.legacyImported = false;
     this.newer = [];
     this.serviceOff = false;
+    this.closed.clear();
     this.commit(emptyState(), "");
   }
 

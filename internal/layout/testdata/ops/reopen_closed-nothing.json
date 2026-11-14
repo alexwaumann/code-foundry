@@ -1,0 +1,71 @@
+{
+  "doc": "With nothing to reopen, nothing changes and no tab is named.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a"}
+}

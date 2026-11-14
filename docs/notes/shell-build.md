@@ -86,6 +86,10 @@ their stores and their verbs are gone.
     accent border, one button for the floating composer's chip, one fold rule for widths and
     heights (a column folds whole), woken threads out of Needs you, the collapsed sidebar's control
     after back and forward, and amber draft rows.
+31. `shell-25c-keys-drafts.md`: the owner's second round: cmd+shift+t reopens the last closed tab
+    or pane (`tab.reopen`, a per-space history in the layout), cmd+t opens a free home terminal
+    where no thread is focused, Needs you lists only actionable asks, draft rows take a thread
+    row's lines, and a thread's unsent composer text survives a restart.
 
 ## Where the build departs from the plan
 

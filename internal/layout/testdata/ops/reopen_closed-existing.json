@@ -1,0 +1,82 @@
+{
+  "doc": "A tab open again (the same identity) is focused where it is, and its entry dropped.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-f2","kind":"file","params":{"path":"/x"}},
+                {"id":"t-h","kind":"file","params":{"path":"/z"}}
+              ],
+              "active": "t-h"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-h","t-f2"],
+        "closed": [
+          {"pane":"p-b","tabs":[{"id":"t-f","kind":"file","params":{"path":"/x"}}],"index":0},
+          {"pane":"p-b","tabs":[{"id":"t-q","kind":"file","params":{"path":"/q"}}],"index":0}
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-f2","kind":"file","params":{"path":"/x"}},
+                {"id":"t-h","kind":"file","params":{"path":"/z"}}
+              ],
+              "active": "t-f2"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-f2","t-a","t-h"],
+        "closed": [{"pane":"p-b","tabs":[{"id":"t-q","kind":"file","params":{"path":"/q"}}]}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-f2","existing":true,"rule":"1"}
+}

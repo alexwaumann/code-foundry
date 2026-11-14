@@ -60,7 +60,7 @@ const VIEW = "(view action)";
 const WANT: Readonly<Record<string, readonly string[]>> = {
   "cmd+n": ["thread.new"],
   "cmd+t": ["terminal.new"],
-  "cmd+shift+t": ["terminal.new-free"],
+  "cmd+shift+t": ["tab.reopen"],
   "cmd+j": ["terminal.quick"],
   "cmd+shift+j": ["terminal.cycle"],
   "cmd+shift+d": ["view.thread-diff"],

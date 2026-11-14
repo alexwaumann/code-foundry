@@ -160,7 +160,7 @@ func TestShellKeyTable(t *testing.T) {
 	want := map[string][]string{
 		"cmd+n":                             {"thread.new"},
 		"cmd+t":                             {"terminal.new"},
-		"cmd+shift+t":                       {"terminal.new-free"},
+		"cmd+shift+t":                       {"tab.reopen"},
 		"cmd+j":                             {"terminal.quick"},
 		"cmd+shift+j":                       {"terminal.cycle"},
 		"cmd+shift+d":                       {"view.thread-diff"},

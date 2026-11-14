@@ -22,7 +22,8 @@ const sizeTolerance = 1e-9
 //     unless the kind is renameable, and no two tabs with one key in the key's scope;
 //   - a thread tab is in its thread's space;
 //   - a space's focus names one of its panes ("" only when it has none); its MRU holds only
-//     its open tabs, each once, at most MaxMRU;
+//     its open tabs, each once, at most MaxMRU; its reopen history at most MaxClosed entries,
+//     each with a tab;
 //   - every thread state names an existing space;
 //   - draft ids non-empty and listed once in the whole state, labels as draftLabel leaves
 //     them, no "draft" key in a draft's params; a composer that is a draft is listed by its
@@ -135,6 +136,14 @@ func (c *checker) space(sp *Space) {
 	}
 	if len(sp.MRU) > MaxMRU {
 		c.fail("space %s: MRU holds %d entries", sp.ID, len(sp.MRU))
+	}
+	if len(sp.Closed) > MaxClosed {
+		c.fail("space %s: reopen history holds %d entries", sp.ID, len(sp.Closed))
+	}
+	for i, e := range sp.Closed {
+		if e == nil || len(e.Tabs) == 0 || slices.Contains(e.Tabs, nil) {
+			c.fail("space %s: reopen history entry %d holds no tab, or a nil one", sp.ID, i)
+		}
 	}
 	seen := map[string]bool{}
 	for _, id := range sp.MRU {

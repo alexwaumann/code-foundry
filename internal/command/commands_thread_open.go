@@ -129,7 +129,8 @@ func (l layout) threadCommands() []Command {
 				if err != nil {
 					return Result{}, err
 				}
-				c, err := l.apply(ctx, &core.CloseThread{Thread: id}, !uctx.FromUser())
+				// A close by the user is recorded for tab.reopen; a model's is not.
+				c, err := l.apply(ctx, &core.CloseThread{Thread: id, Record: uctx.FromUser()}, !uctx.FromUser())
 				if err != nil {
 					return Result{}, err
 				}

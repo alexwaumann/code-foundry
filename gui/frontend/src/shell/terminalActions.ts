@@ -11,7 +11,8 @@ import { isNotFound } from "@/api/errors";
 import { errorMessage } from "@/api/stream";
 import type { UiContextView } from "@/api/command";
 import { terminalIdFromResult } from "@/api/terminal";
-import { getUiContext } from "@/stores/context";
+import { PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { activeTerminalId, getUiContext, worktreeContext } from "@/stores/context";
 import { invokeConfirmed, refreshCommands, runCommandForResult, useCommandsStore } from "@/stores/commands";
 import { useTerminalsStore } from "@/stores/terminals";
 import { applyLayout, useLayoutStore, type TabEntry } from "@/stores/layout";
@@ -152,20 +153,35 @@ function currentThread(): string {
   return focusedTab(useLayoutStore.getState())?.thread ?? "";
 }
 
+/** The checkout of the focused shell when it belongs to one and to no thread (a Projects page's); null otherwise. */
+function focusedCheckoutShell(): { project: string; worktree: string } | null {
+  const id = activeTerminalId();
+  const labels = id ? useTerminalsStore.getState().byId[id]?.labels : undefined;
+  if (!labels || labels[THREAD_LABEL]) return null;
+  const project = labels[PROJECT_LABEL] ?? "";
+  const worktree = labels[WORKTREE_LABEL] ?? "";
+  return project && worktree ? { project, worktree } : null;
+}
+
 /**
- * cmd+t: a new terminal tab linked to the current thread, placed by the rules. With no thread a
- * shell of the page's checkout (the Projects page), else one in the home directory. A pane's "+"
- * menu names the thread (`thread`) and its pane (`pane`: the tab opens there).
+ * cmd+t: a new terminal tab linked to the focused tab's thread, placed by the rules; from a shell
+ * of a checkout and no thread (a Projects page's), another in that checkout; otherwise a free one
+ * in the home directory (docs/notes/shell-model.md, "Keys"). A pane's "+" menu names the thread
+ * (`thread`, "" for its general Terminal: a free one) and its pane (`pane`: the tab opens there).
  */
 export async function newTerminalTab(opts: { thread?: string; pane?: string } = {}): Promise<void> {
   const thread = opts.thread ?? currentThread();
-  const ctx = thread ? getUiContext({ kind: "thread", id: thread }) : getUiContext();
-  const verb = ctx.activeThreadId || ctx.activeWorktreePath ? "terminal.new" : "terminal.new-free";
-  const res = await runCommandForResult(verb, opts.pane ? { pane: opts.pane } : {}, { ctx, quiet: true });
+  const checkout = opts.thread === undefined && !thread ? focusedCheckoutShell() : null;
+  if (!thread && !checkout) {
+    await newFreeTerminalTab(opts.pane);
+    return;
+  }
+  const ctx = checkout ? worktreeContext(checkout.project, checkout.worktree) : getUiContext({ kind: "thread", id: thread });
+  const res = await runCommandForResult("terminal.new", opts.pane ? { pane: opts.pane } : {}, { ctx, quiet: true });
   await intoNewTerminal(res?.resultJson);
 }
 
-/** cmd+shift+t: a terminal tab linked to nothing, in the home directory; the "+" menu's Terminal, in its `pane`. */
+/** A terminal tab linked to nothing, in the home directory (cmd+t with no thread, the palette); the "+" menu's Terminal, in its `pane`. */
 export async function newFreeTerminalTab(pane = ""): Promise<void> {
   const res = await runCommandForResult("terminal.new-free", pane ? { pane } : {}, { quiet: true });
   await intoNewTerminal(res?.resultJson);

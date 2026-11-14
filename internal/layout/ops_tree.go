@@ -487,9 +487,11 @@ func (o *SwapPane) apply(t *tx) (Result, error) {
 
 // CloseTab takes a tab out of the layout. When it had the focus, the focus returns to the
 // newest tab in the space's MRU that is still open. This is the plain close; closing a thread
-// with its linked tabs is the thread op built on it.
+// with its linked tabs is the thread op built on it. Record puts the tab in its space's reopen
+// history (reopen.go): the user closed it.
 type CloseTab struct {
-	Tab string `json:"tab"`
+	Tab    string `json:"tab"`
+	Record bool   `json:"record,omitempty"`
 }
 
 // OpName implements Op.
@@ -499,6 +501,9 @@ func (o *CloseTab) apply(t *tx) (Result, error) {
 	sp, pane, tb, err := t.tab(o.Tab)
 	if err != nil {
 		return Result{}, err
+	}
+	if o.Record {
+		recordTab(sp, pane, tb)
 	}
 	wasFocused := focusedTab(sp) == tb.ID
 	detach(sp, pane, tb.ID)
@@ -512,11 +517,13 @@ func (o *CloseTab) apply(t *tx) (Result, error) {
 // ClosePane takes a pane and all its tabs out of the layout; the focus returns as CloseTab's.
 // Each thread tab in it closes as close_thread closes it, first: the thread's linked tabs in
 // its space are remembered (Result.Kept), wherever they are. W and H are the pane area that
-// measures where they were (default DefaultW x DefaultH).
+// measures where they were (default DefaultW x DefaultH). Record puts the pane, with the tabs
+// it still holds once those are remembered, in its space's reopen history (reopen.go).
 type ClosePane struct {
-	Pane string  `json:"pane"`
-	W    float64 `json:"w,omitempty"`
-	H    float64 `json:"h,omitempty"`
+	Pane   string  `json:"pane"`
+	W      float64 `json:"w,omitempty"`
+	H      float64 `json:"h,omitempty"`
+	Record bool    `json:"record,omitempty"`
 }
 
 // OpName implements Op.
@@ -529,12 +536,28 @@ func (o *ClosePane) apply(t *tx) (Result, error) {
 	}
 	res := Result{Space: sp.ID}
 	w, h := viewport(o.W, o.H)
+	active := pane.Active
+	// Each thread's linked tabs are put away first, then its tab closes (closeThread, in two
+	// steps): the pane as it is between the two is what the reopen history keeps.
+	var threads []*Tab
 	for _, tb := range slices.Clone(pane.Tabs) {
 		if tb.Kind == "thread" {
-			r := t.closeThread(tb.Thread, tb.ID, w, h)
-			res.Closed = append(res.Closed, r.Closed...)
-			res.Kept = append(res.Kept, r.Kept...)
+			res.Kept = append(res.Kept, t.putAway(sp, tb.Thread, pane.ID, w, h)...)
+			threads = append(threads, tb)
 		}
+	}
+	if o.Record {
+		recordPane(sp, pane, active)
+	}
+	for _, tb := range threads {
+		_, p, _ := t.st.FindTab(tb.ID)
+		wasFocused := focusedTab(sp) == tb.ID
+		detach(sp, p, tb.ID)
+		forget(sp, tb.ID)
+		if wasFocused {
+			refocus(sp)
+		}
+		res.Closed = append(res.Closed, tb)
 	}
 	if _, pane = t.st.FindPane(o.Pane); pane == nil {
 		return res, nil

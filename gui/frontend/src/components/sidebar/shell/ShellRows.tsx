@@ -1,5 +1,7 @@
 import { memo, useContext } from "react";
-import { ChevronDown, ChevronRight, GitBranch, Layers, PencilLine, Square, X } from "lucide-react";
+import { ChevronDown, ChevronRight, GitBranch, House, Layers, PencilLine, Square, X } from "lucide-react";
+import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
+import { useProjectKind } from "@/components/icons/projectKind";
 import { useShallow } from "zustand/react/shallow";
 import { Tip } from "@/components/ui/tooltip";
 import { rowHasBranchLine, useThreadPlace } from "@/components/thread/useThreadPlace";
@@ -18,6 +20,7 @@ import { NEEDS_SCOPE_KEY, useNeedsScope } from "@/stores/shellList";
 import { toggleActiveCollapsed, toggleNeedsCollapsed } from "@/stores/shellSidebar";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
+import { useWorkspacesStore } from "@/stores/workspaces";
 import { linkedPrTag } from "../linkedPrTag";
 import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, ThreadTooltip } from "../SidebarRow";
 import { useLinkedPrFacts, useLinkKeys } from "../useLinkedPrs";
@@ -243,19 +246,44 @@ export const ShellThreadRowView = memo(function ShellThreadRowView({ row, select
   );
 });
 
-/** The draft's project, when it starts in one. */
-function useDraftProject(draftId: string): string {
-  const projectId = useLayoutStore((s) => s.spaces[s.currentSpaceId]?.drafts.find((d) => d.id === draftId)?.params.project ?? "");
-  return useProjectsStore((s) => (projectId ? (s.byId[projectId]?.name ?? "") : ""));
+/** One param of a draft of the current space ("" when it has none). */
+function useDraftParam(draftId: string, key: "project" | "workspace" | "like"): string {
+  return useLayoutStore((s) => s.spaces[s.currentSpaceId]?.drafts.find((d) => d.id === draftId)?.params[key] ?? "");
+}
+
+/** Where a draft's thread will start, as a thread row's line 1 shows a thread's: like another thread, in a workspace, in a project, or "No project". */
+function DraftPlaceLabel({ draftId }: { draftId: string }) {
+  const like = useDraftParam(draftId, "like");
+  const workspaceId = useDraftParam(draftId, "workspace");
+  const projectId = useDraftParam(draftId, "project");
+  const workspace = useWorkspacesStore((s) => (workspaceId ? (s.byId[workspaceId]?.name ?? "") : ""));
+  const project = useProjectsStore((s) => (projectId ? (s.byId[projectId]?.name ?? "") : ""));
+  const kind = useProjectKind(projectId);
+  // Like another thread: that thread's own place.
+  if (like) return <PlaceLabel id={like} />;
+  const noProject = !workspaceId && !projectId;
+  return (
+    <span className="flex min-w-0 items-center gap-[3px] text-cf-sidebar-muted-foreground" data-testid="row-project" data-no-project={noProject || undefined} data-set={workspaceId !== "" || undefined}>
+      {noProject ? (
+        <House className="size-3 shrink-0" aria-hidden data-testid="row-place-icon" data-place="none" />
+      ) : workspaceId ? (
+        <Layers className="size-3 shrink-0" aria-label="workspace" data-testid="row-workspace" />
+      ) : (
+        <ProjectKindIcon kind={kind} className="size-3 shrink-0" data-testid="row-place-icon" />
+      )}
+      <span className="truncate">{noProject ? "No project" : workspaceId ? workspace : project}</span>
+    </span>
+  );
 }
 
 /**
- * A composer draft under Active, on a light amber tint: line 1 a pencil and "Draft" (and its
- * project), its Discard on hover; then its label as the title, regular weight, or "Untitled draft" muted while it has none.
- * A click focuses its tab or opens it in the focused pane (onActivate: composer.draft.open).
+ * A composer draft under Active, on a light amber tint, with a thread row's lines
+ * (docs/notes/shell-model.md, "Drafts"): line 1 the place its thread will start in and Discard on
+ * hover; then its label as the title, or "Untitled draft" muted while it has none; then, where a
+ * thread row shows its branch, a pencil and "Draft". A click focuses its tab or opens it in the
+ * focused pane (onActivate: composer.draft.open).
  */
 export const DraftRowView = memo(function DraftRowView({ row, selected, cursor, onActivate }: RowProps<DraftRow>) {
-  const project = useDraftProject(row.draftId);
   return (
     <div
       id={`row-${row.key}`}
@@ -271,12 +299,9 @@ export const DraftRowView = memo(function DraftRowView({ row, selected, cursor, 
         onActivate(row);
       }}
     >
-      <span className="flex h-4 min-w-0 items-center gap-[3px] text-caption-sm text-cf-sidebar-muted-foreground" data-testid="row-line-1">
-        <PencilLine className="size-3 shrink-0" aria-hidden data-testid="row-draft-mark" />
-        <span className="truncate">
-          Draft{project && <span> · {project}</span>}
-        </span>
-        <span className="relative ml-auto flex h-4 shrink-0 items-center">
+      <span className="flex h-4 min-w-0 items-center text-caption-sm" data-testid="row-line-1">
+        <DraftPlaceLabel draftId={row.draftId} />
+        <span className="relative ml-auto flex h-4 shrink-0 items-center pl-1.5">
           <button
             type="button"
             tabIndex={cursor ? 0 : -1}
@@ -293,8 +318,12 @@ export const DraftRowView = memo(function DraftRowView({ row, selected, cursor, 
           </button>
         </span>
       </span>
-      <span className={cn("line-clamp-2 text-body break-words", row.label ? "text-inherit" : "text-cf-sidebar-muted-foreground italic")} data-testid="draft-label">
+      <span className={cn("line-clamp-2 text-body break-words", row.label ? "font-medium text-inherit" : "text-cf-sidebar-muted-foreground italic")} data-testid="draft-label">
         {row.label || "Untitled draft"}
+      </span>
+      <span className="flex h-4 min-w-0 items-center gap-[3px] text-caption-sm text-cf-sidebar-muted-foreground" data-testid="row-line-3">
+        <PencilLine className="size-3 shrink-0" aria-hidden data-testid="row-draft-mark" />
+        <span className="truncate">Draft</span>
       </span>
     </div>
   );

@@ -48,8 +48,9 @@ func shellWindowTerminalCommands(d TerminalDeps, idArg ArgSpec, quick *sync.Mute
 			Description: "Start a shell in the home folder, owned by nothing. " +
 				"It belongs to no thread or project: it ends when it exits or is closed, never because a thread or project goes. " +
 				"--argv runs something else; with --run, a command line is typed into it once it has printed its prompt.",
-			Category:    "Terminal",
-			Keybindings: []string{"cmd+shift+t"},
+			// No key of its own: cmd+t opens one where no thread is in context (the app's
+			// presenter), and cmd+shift+t reopens a closed tab (docs/notes/shell-model.md, "Keys").
+			Category: "Terminal",
 			Args: []ArgSpec{
 				{Name: "argv", Type: String, PageAsks: true, Description: `Command line, split like a shell would (e.g. "htop -d 5")`},
 				{Name: "run", Type: String, PageAsks: true, Description: "A command line typed into the new shell once it has printed its prompt, then Return"},
