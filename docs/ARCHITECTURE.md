@@ -904,7 +904,7 @@ the CLI and a thread's model reach the same op:
 | --- | --- | --- |
 | layout | `layout.show` (`--json`), `space.list`, `tab.list` | read the layout: spaces, splits with sizes, panes, tabs, each thread's space and remembered tabs |
 | space | `space.new`, `.rename`, `.remove` (`--to` a space or `--archive` its threads; asks first), `.switch` (`--index n`), `.move` | the top bar's spaces |
-| pane | `pane.focus` and `.focus.<left/down/up/right>`, `.move.<dir>` (swap), `.move` (beside, into, the outer edge, another space), `.split`, `.close`, `.resize`, `.fullscreen` | panes; the GUI passes the drawn neighbour as `--to` |
+| pane | `pane.focus` and `.focus.<left/down/up/right>`, `.move.<dir>` (swap), `.move` (beside, into, the outer edge, another space), `.split`, `.close`, `.resize`, `.fullscreen`, `.collapse` | panes; the GUI passes the drawn neighbour as `--to` |
 | tab | `tab.focus`, `.move`, `.close`, `.next`, `.previous`, `.rename`, `.auto-name` | tabs; `tab.close` on a thread's tab is `thread.close` |
 | thread | `thread.open` (its tab, with its remembered tabs), `thread.close` (from its space, never archived), `thread.space.move`, `thread.new --compose <tab>` | a thread's own tab |
 | composer | `composer.new` (New thread in the shell), `composer.draft.start`, `.label`, `.clear`, `.discard`, `.open` | the composer tab and its drafts |
@@ -935,6 +935,7 @@ says what each verb does in the window (`docs/notes/shell-20-cutover.md`):
 | ctrl+cmd+h j k l, arrows; with shift | `pane.focus.<dir>`; `pane.move.<dir>` (both do nothing in full screen) |
 | ctrl+cmd+1…9 / cmd+1…9 | `space.switch --index n` / the nth thread of the sidebar (view actions) |
 | cmd+shift+enter, escape | `pane.fullscreen`; escape leaves (a window listener) |
+| cmd+shift+m | `pane.collapse`: the focused pane to a rail, or open again (nothing in full screen) |
 | cmd+shift+a | the Needs-you popup of the next thread that waits (Ember first while it waits) |
 | cmd+r / cmd+shift+r | `tab.rename` / `tab.auto-name` (a thread's tab renames or renames again the thread) |
 | cmd+b | the sidebar (view action) |
@@ -1035,7 +1036,7 @@ verb in `settings.toml` is reported and dropped, never fatal.
   keyboard. A pane (`PaneView.tsx`) is its tab strip (`PaneTabStrip.tsx`: the tab is the
   title; tabs shorten, then go icon-only, `geometry/tabFit.ts`, with a tooltip only for a cut
   name; the attention dot on a thread's icon; "+" at the end, `PanePlusMenu.tsx`, a menu of
-  surfaces; full screen at the right), the quiet row under the strip that names a linked
+  surfaces; collapse and full screen at the right), the quiet row under the strip that names a linked
   tab's thread and links back (`LinkedRow.tsx`), and the active tab's body only. A space with
   no pane shows the composer (`EmptySpace.tsx`).
 * The layout slice (`stores/layout.ts`) is the daemon's layout and nothing else: a snapshot
@@ -1053,8 +1054,11 @@ verb in `settings.toml` is reported and dropped, never fatal.
   pull request 260 × 150, anything else, plugin surfaces included, 300 × 160); `rails.ts`
   folds the panes that cannot keep theirs into 36 px rails of tab icons (panes without a
   thread tab first, least recently focused first; never the focused pane or its thread's),
-  computed per frame and never stored, so a larger window unfolds them; `neighbour` is the
-  pane a direction key goes to.
+  computed per frame and never stored, so a larger window unfolds them; a pane the user
+  collapsed (`pane.collapse`, its `collapsed` mark stored with the pane) is always a rail and
+  never in that order (`docs/notes/shell-25d-collapse.md`); `neighbour` is the pane a direction
+  key goes to. A divider stops at the minimums as drawn, starts from what is drawn, and its
+  cursor says which ways it can still move (`shell/resize.ts`).
 * Surfaces: a tab's body comes from the shell's surface registry (`shell/surfaces`): thread,
   compose, prs, projects, terminal, and the panel surfaces (file, diff, pullrequest, mcp,
   gallery, ember.board, `plugin.*`), which draw the `src/surfaces` specs inside a scroll
@@ -1455,7 +1459,7 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
 
 * **The model** (`internal/layout`, pure, no I/O): a `State` of spaces in order, the current
   space and the default one (a thread with no record lives there); a `Space` is a name, a
-  tree of `Node`s (a pane with its tabs and active tab, or a split with a direction, kids and
+  tree of `Node`s (a pane with its tabs, active tab and whether the user collapsed it, or a split with a direction, kids and
   sizes that sum to 1), its focused pane, its MRU of tabs and its composer drafts; a `Tab` is
   a kind, an optional thread link, params and a title; each thread has a record (its space,
   its remembered tabs, its quick terminal's open state and height, its last tab per kind).

@@ -86,10 +86,17 @@ their stores and their verbs are gone.
     accent border, one button for the floating composer's chip, one fold rule for widths and
     heights (a column folds whole), woken threads out of Needs you, the collapsed sidebar's control
     after back and forward, and amber draft rows.
-31. `shell-25c-keys-drafts.md`: the owner's second round: cmd+shift+t reopens the last closed tab
+31. `shell-25b-audits.md`: audits of the direction keys (the pane focused last wins, on the frame
+    as drawn now, moves queued), the drop highlight (a pane's middle and a rail replayed as the
+    daemon's op leaves them; Go-generated `neighbour.json` and `drops.json` shared with the GUI)
+    and full screen's Escape typed in a prompt.
+32. `shell-25c-keys-drafts.md`: the owner's second round: cmd+shift+t reopens the last closed tab
     or pane (`tab.reopen`, a per-space history in the layout), cmd+t opens a free home terminal
     where no thread is focused, Needs you lists only actionable asks, draft rows take a thread
     row's lines, and a thread's unsent composer text survives a restart.
+33. `shell-25d-collapse.md`: any pane collapses to a rail on demand (`pane.collapse`,
+    cmd+shift+m, a strip button), kept per pane in the daemon's layout; a divider stops at the
+    minimum from what is drawn and says with its cursor which ways it can still move.
 
 ## Where the build departs from the plan
 
