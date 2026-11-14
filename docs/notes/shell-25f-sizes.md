@@ -160,7 +160,7 @@ joining a pane of terminals), goes ahead only when the tree after it fits.
   layout px, the toggle's edge) widened the panes, and at some pane widths the caret lands 1 px
   off on a wrapped row (2305 and 2350 wide windows pass, 2450 and 2500 fail). The spec keeps its
   old grid (2305, what 2400 was with the 260 sidebar); the caret issue is the editor's, left for a
-  separate look.
+  separate look. (It was the test's ruler, not the editor: `shell-25h-caret.md`.)
 - Full e2e run (WebKit, 4 workers): 563 passed, 167 skipped (SHOTS and opt-in), 3 failed: the
   three red on `shell` that #715 fixed; on the tree rebased onto it they pass.
 

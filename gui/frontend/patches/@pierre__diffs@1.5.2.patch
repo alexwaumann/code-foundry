@@ -168,7 +168,7 @@ index 4063b992bf7c4958c0d8a305977280ea9a3a7330..be6abd10c31945c7660953381f3ae9d1
  //#endregion
  export { Virtualizer };
 diff --git a/dist/editor/editor.js b/dist/editor/editor.js
-index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb75d66a16 100644
+index 8f04a6f92221c796a2636c203f739f94786c2df3..7822a5dda4fc4eead4781a0b35705fa2a13dd328 100644
 --- a/dist/editor/editor.js
 +++ b/dist/editor/editor.js
 @@ -23,7 +23,7 @@ import { findBracketMatchRanges } from "./matchBrackets.js";
@@ -189,7 +189,15 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  	#globalStyleElement;
  	#editorStyleElement;
  	#themeStyleElement;
-@@ -1310,6 +1312,7 @@ var Editor = class {
+@@ -1065,6 +1067,7 @@ var Editor = class {
+ 				}
+ 				this.#setDeletedTextSelectionActive(false);
+ 				this.#markerRenderer?.removePopover();
++				if (!this.#isComposing) this.#shouldIgnoreSelectionChange = false;
+ 				const selectEventDisposes = [];
+ 				if (isSafari() && this.#lineAnnotations !== void 0 && this.#lineAnnotations.length > 0) {
+ 					const annotationDisposes = [...contentEl.querySelectorAll("[data-line-annotation]")].map((el) => [addEventListener(el, "mouseenter", () => {
+@@ -1310,6 +1313,7 @@ var Editor = class {
  		this.#resizeObserver = new ResizeObserver(this.#handleLayoutResize);
  		this.#resizeObserver.observe(contentEl);
  		this.#resizeObserver.observe(contentEl.parentElement);
@@ -197,7 +205,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  		this.#computeContentOffset(contentEl);
  	}
  	#handleCustomPasteEvent = async () => {
-@@ -1776,11 +1779,12 @@ var Editor = class {
+@@ -1776,11 +1780,12 @@ var Editor = class {
  		this.#contentWidthCache = void 0;
  		const gutterWidthChanged = this.#getGutterWidth() !== prevGutterWidth;
  		const contentWidthChanged = this.#getContentWidth() !== prevContentWidth;
@@ -212,7 +220,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  			this.#wrapLineOffsetsCache.clear();
  			if (this.#isWrap || lineAnnotations > 0) this.#lineYCache.clear();
  		}
-@@ -1792,6 +1796,25 @@ var Editor = class {
+@@ -1792,6 +1797,25 @@ var Editor = class {
  		this.#computeContentOffset(this.#contentElement);
  		this.#renderCarets();
  	};
@@ -238,7 +246,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  	#remeasureMetricsOnFontLoad() {
  		if (this.#fontRemeasureScheduled) return;
  		const fonts = document.fonts;
-@@ -2284,7 +2307,7 @@ var Editor = class {
+@@ -2284,7 +2308,7 @@ var Editor = class {
  		if (drag === void 0 || drag.focusLine === void 0 || selectionStart === void 0 || textDocument === void 0) return false;
  		const anchor = selectionStart.direction === -1 ? selectionStart.end : selectionStart.start;
  		const scrollLeft = this.#contentElement?.parentElement?.scrollLeft ?? 0;
@@ -247,7 +255,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  		const characterDelta = characterDeltaRaw < 0 ? -Math.round(-characterDeltaRaw) : Math.round(characterDeltaRaw);
  		const focusCharacter = Math.max(0, anchor.character + characterDelta);
  		const goal = {
-@@ -2752,6 +2775,7 @@ var Editor = class {
+@@ -2752,6 +2776,7 @@ var Editor = class {
  	}
  	#updateSelections(selections) {
  		this.__postponeBgTokenizeToNextFrame();
@@ -255,7 +263,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  		const previousSelections = this.#selections;
  		let selectionsChanged = previousSelections?.length !== selections.length;
  		if (!selectionsChanged && previousSelections !== void 0) for (let i = 0; i < selections.length; i++) {
-@@ -3514,7 +3538,7 @@ var Editor = class {
+@@ -3514,7 +3539,7 @@ var Editor = class {
  		if (this.#gutterWidthCache === void 0) {
  			const diffsColumnNumberWidth = this.#contentElement?.parentElement?.style.getPropertyValue("--diffs-column-number-width");
  			if (diffsColumnNumberWidth !== void 0 && diffsColumnNumberWidth.length > 2 && diffsColumnNumberWidth.endsWith("px")) this.#gutterWidthCache = parseInt(diffsColumnNumberWidth.slice(0, -2), 10);
@@ -264,7 +272,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  		}
  		return this.#gutterWidthCache;
  	}
-@@ -3617,7 +3641,8 @@ var Editor = class {
+@@ -3617,7 +3642,8 @@ var Editor = class {
  			const divRect = div.getBoundingClientRect();
  			if (divRect.width === 0) return;
  			const unicodeOffsets = getUnicodeMeasurementOffsets(lineText);
@@ -274,7 +282,7 @@ index 8f04a6f92221c796a2636c203f739f94786c2df3..bff90b20a2783ee39ee0c37d6dd714eb
  			const graphemeCount = unicodeOffsets === void 0 ? lineText.length : unicodeOffsets.length - 1;
  			const graphemeStart = (index) => unicodeOffsets === void 0 ? index : unicodeOffsets[index];
  			const measureGrapheme = (index) => {
-@@ -3639,7 +3664,7 @@ var Editor = class {
+@@ -3639,7 +3665,7 @@ var Editor = class {
  				}
  				if (low >= graphemeCount) break;
  				const { left, top } = measureGrapheme(low);

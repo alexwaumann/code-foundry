@@ -343,25 +343,41 @@ test("a draft survives leaving the tab, and a long file edits through the virtua
   await expect.poll(() => disk(long)).toMatch(/line 600\ntail$/);
 });
 
-/** Where grapheme `index` of line `n` starts, and its row's middle, in viewport px: a Range over the editor's own text. */
+/**
+ * Where grapheme `index` of line `n` starts, and its row's middle, in viewport px: the grapheme
+ * wrapped in a span, in a copy of the row laid out beside it and removed in the same task, so
+ * the editor never sees it. Not a Range over the row's own text: WebKit floors a Range's left
+ * inside a text run to a whole zoomed px, so with a fractional advance (7.2 layout px, 12.6 at
+ * 175%) it reads up to 1 viewport px left of where the glyph is laid out and painted, while an
+ * element's rect is exact (docs/notes/shell-25h-caret.md).
+ */
 async function glyph(page: Page, n: number, index: number): Promise<{ x: number; y: number }> {
   return line(page, n).evaluate((row, i) => {
     const seg = [...new Intl.Segmenter().segment(row.textContent)][i];
     if (!seg) throw new Error(`no grapheme ${String(i)}`);
-    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
-    const range = document.createRange();
-    let start = 0;
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const length = (node as Text).length;
-      if (seg.index < start + length) {
-        range.setStart(node, seg.index - start);
-        range.setEnd(node, seg.index - start + seg.segment.length);
-        break;
+    const copy = row.cloneNode(true) as HTMLElement;
+    row.after(copy);
+    try {
+      const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+      let start = 0;
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node as Text;
+        if (seg.index < start + text.length) {
+          const own = text.splitText(seg.index - start);
+          own.splitText(seg.segment.length);
+          const mark = document.createElement("span");
+          own.replaceWith(mark);
+          mark.append(own);
+          const r = mark.getBoundingClientRect();
+          const shift = row.getBoundingClientRect().top - copy.getBoundingClientRect().top;
+          return { x: r.left, y: (r.top + r.bottom) / 2 + shift };
+        }
+        start += text.length;
       }
-      start += length;
+      throw new Error(`grapheme ${String(i)} is not in one text node`);
+    } finally {
+      copy.remove();
     }
-    const r = range.getBoundingClientRect();
-    return { x: r.left, y: (r.top + r.bottom) / 2 };
   }, index);
 }
 
@@ -426,24 +442,57 @@ test("caret and selection sit on an emoji line's text at 125%, wrapped or not, a
   await expect.poll(() => caretOff(page, 1, after, 0.9)).toBeLessThan(1);
 });
 
-test("at 175% the caret sits on its text on every row of a wrapped ASCII line", async ({ page }) => {
-  // Wide enough that the file's pane stays open at 175%. 2305 keeps the grid this test was written
-  // at (2400 with the old 260px sidebar; the sidebar at its minimum now follows the top bar's toggle,
-  // 206 layout px at 175%): at some wider panes the caret lands a pixel off on a wrapped row, a
-  // separate issue (docs/notes/shell-25f-sizes.md).
-  await page.setViewportSize({ width: 2305, height: 1100 });
-  const words = Array.from({ length: 6 }, () => "lorem ipsum dolor sit amet consectetur adipiscing elit").join(" ");
-  await writeDisk(`${CF}/src/words.ts`, `const words = "${words}";\n`);
-  await openFile(page, "src/words.ts");
-  await page.evaluate(`__cfModule("/src/stores/codeView.ts").then((m) => m.setWrap(true))`);
-  await startEditing(page);
-  await setZoom(page, 175);
-  await expect.poll(() => line(page, 1).evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(100);
-  // The "o" of the last "lorem", the "i" of the last "elit": second letters, so never a row's first, on later rows.
-  const text = `const words = "${words}";`;
-  for (const index of [text.lastIndexOf("lorem") + 1, text.lastIndexOf("elit") + 1]) {
-    const at = await glyph(page, 1, index);
-    await page.mouse.click(at.x + 1, at.y);
-    await expect.poll(() => caretOff(page, 1, index, 1.75)).toBeLessThan(1);
-  }
-});
+/**
+ * Resolves once a ResizeObserver made now on the editor's content has been called. Observers are
+ * called in the order they were made, so the editor's own (made when it mounted) has by then
+ * handled every resize so far. Its handler re-applies the selection the editor holds, so a click
+ * in the same frame as the resize, before that handler, would be undone before the editor read it
+ * (docs/notes/shell-25h-caret.md).
+ */
+async function editorSawResize(page: Page): Promise<void> {
+  await file(page)
+    .locator("[data-content]")
+    .evaluate(
+      (el) =>
+        new Promise<void>((resolve) => {
+          const observer = new ResizeObserver(() => {
+            observer.disconnect();
+            resolve();
+          });
+          observer.observe(el);
+        }),
+    );
+}
+
+// The pane widths include the ones where the Range-based measure read the caret 1 px off (2450 and
+// 2500 at 175%): each width moves the wrap points, so the clicked graphemes land on other columns.
+for (const zoom of [150, 175]) {
+  test(`at ${String(zoom)}% the caret sits on its text on every row of a wrapped ASCII line, at every pane width`, async ({ page }) => {
+    // From 2305 the file's pane stays open beside the thread's at 175%.
+    await page.setViewportSize({ width: 2305, height: 1100 });
+    const words = Array.from({ length: 6 }, () => "lorem ipsum dolor sit amet consectetur adipiscing elit").join(" ");
+    await writeDisk(`${CF}/src/words.ts`, `const words = "${words}";\n`);
+    await openFile(page, "src/words.ts");
+    await page.evaluate(`__cfModule("/src/stores/codeView.ts").then((m) => m.setWrap(true))`);
+    await startEditing(page);
+    await setZoom(page, zoom);
+    const text = `const words = "${words}";`;
+    // The "o" of the last "lorem", the "i" of the last "elit", the "p" of the first "ipsum", the "i" of
+    // the last "sit": second letters, so never a row's first, on rows from the first to the last.
+    const indexes = [text.lastIndexOf("lorem") + 1, text.lastIndexOf("elit") + 1, text.indexOf("ipsum") + 1, text.lastIndexOf("sit") + 1];
+    const content = file(page).locator("[data-content]");
+    const contentWidth = () => content.evaluate((el) => el.getBoundingClientRect().width);
+    for (const width of [2305, 2350, 2400, 2425, 2450, 2475, 2500]) {
+      const before = await contentWidth();
+      await page.setViewportSize({ width, height: 1100 });
+      // The pane, and the editor's text in it, takes the new width before anything is measured.
+      if (width !== 2305) await expect.poll(contentWidth).not.toBe(before);
+      await editorSawResize(page);
+      for (const index of indexes) {
+        const at = await glyph(page, 1, index);
+        await page.mouse.click(at.x + 1, at.y);
+        await expect.poll(() => caretOff(page, 1, index, zoom / 100), `${String(width)} px, grapheme ${String(index)}`).toBeLessThan(0.1);
+      }
+    }
+  });
+}
