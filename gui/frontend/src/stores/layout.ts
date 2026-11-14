@@ -31,7 +31,7 @@ import type { GeoNode } from "@/shell/geometry/types";
 import { resendViewport } from "@/shell/viewport";
 
 /** A space's tree without its tabs: what a pane grid lays out. */
-export type TreeNode = { t: "pane"; id: string } | { t: "split"; id: string; dir: "row" | "col"; kids: readonly TreeNode[]; sizes: readonly number[] };
+export type TreeNode = { t: "pane"; id: string; collapsed?: boolean } | { t: "split"; id: string; dir: "row" | "col"; kids: readonly TreeNode[]; sizes: readonly number[] };
 
 /** A space without its tree. */
 export interface SpaceEntry {
@@ -51,6 +51,8 @@ export interface PaneEntry {
   spaceId: string;
   tabIds: readonly string[];
   active: string;
+  /** The user collapsed it to a rail (pane.collapse). */
+  collapsed?: boolean;
 }
 
 /** A tab and the pane it is in. */
@@ -284,15 +286,19 @@ function publish(): void {
   if (shared !== prev) useLayoutStore.setState(shared, true);
 }
 
-/** A focus op applied as the daemon applies it (internal/layout FocusTab, FocusPane), without smart swap. */
+/**
+ * A focus op applied as the daemon applies it (internal/layout FocusTab, FocusPane), without smart
+ * swap: focusing a tab opens its pane when the user collapsed it; focusing a pane does not.
+ */
 export function overlayFocus(l: LayoutView, op: FocusOp): LayoutView {
   for (const s of l.spaces) {
     const pane = panesOfNode(s.root).find((n) => (op.op === "focus_pane" ? n.id === op.pane : n.tabs.some((t) => t.id === op.tab)));
     if (!pane) continue;
     const tab = op.op === "focus_tab" ? op.tab : pane.active;
+    const opened = op.op === "focus_tab" && pane.collapsed ? { collapsed: false } : {};
     const space: LayoutSpaceView = {
       ...s,
-      root: replacePane(s.root, { ...pane, active: tab }),
+      root: replacePane(s.root, { ...pane, active: tab, ...opened }),
       focus: pane.id,
       mru: [tab, ...s.mru.filter((m) => m !== tab)].slice(0, 64),
     };
@@ -320,9 +326,10 @@ function flatten(l: LayoutView): LayoutState {
   const tabs: Record<string, TabEntry> = {};
   const tree = (n: LayoutNodeView, spaceId: string): TreeNode => {
     if (n.t === "split") return { t: "split", id: n.id, dir: n.dir, kids: n.kids.map((k) => tree(k, spaceId)), sizes: n.sizes };
-    panes[n.id] = { id: n.id, spaceId, tabIds: n.tabs.map((t) => t.id), active: n.active };
+    const collapsed = n.collapsed ? { collapsed: true } : {};
+    panes[n.id] = { id: n.id, spaceId, tabIds: n.tabs.map((t) => t.id), active: n.active, ...collapsed };
     for (const t of n.tabs) tabs[t.id] = { ...t, paneId: n.id };
-    return { t: "pane", id: n.id };
+    return { t: "pane", id: n.id, ...collapsed };
   };
   for (const s of l.spaces) {
     spaces[s.id] = { id: s.id, name: s.name, focus: s.focus, mru: s.mru, drafts: s.drafts };
@@ -394,7 +401,7 @@ export function geoTree(s: Pick<LayoutState, "trees" | "panes" | "tabs">, spaceI
       const t = s.tabs[id];
       return t ? [{ id: t.id, kind: t.kind, thread: t.thread }] : [];
     });
-    return { t: "pane", id: n.id, tabs, active: p?.active };
+    return { t: "pane", id: n.id, tabs, active: p?.active, ...(p?.collapsed ? { collapsed: true } : {}) };
   };
   const root = s.trees[spaceId];
   return root ? node(root) : null;

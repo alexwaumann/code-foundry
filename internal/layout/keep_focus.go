@@ -37,6 +37,18 @@ func keepFocus(before, after *State) {
 	}
 }
 
+// keepCollapsed collapses again the panes an op opened only because it focused one of their
+// tabs (tx.revealed): a call that keeps the user's focus does not open a pane either. A space
+// keeps one open pane.
+func keepCollapsed(st *State, revealed []string) {
+	for _, id := range revealed {
+		if sp, p := st.FindPane(id); p != nil {
+			p.Collapsed = true
+			keepOneOpen(sp)
+		}
+	}
+}
+
 // paneOf is the pane of space sp holding tab id, or nil.
 func paneOf(sp *Space, id string) *Node {
 	if id == "" {

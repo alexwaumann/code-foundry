@@ -134,20 +134,20 @@ test.describe("composer", () => {
   });
 
   test("a chord bound to dictation.toggle toggles the focused composer, else the content pane's", async ({ page }) => {
-    await mockPost("settings/external?keybindings.dictation.toggle=cmd%2Bshift%2Bm");
+    await mockPost("settings/external?keybindings.dictation.toggle=cmd%2Bshift%2By");
     await mockPost("dictation?state=ready");
     await mockPost("dictation/script?phrases=");
     const card = await openThread(page);
     await card.getByTestId("composer-input").click();
-    await page.keyboard.press("Meta+Shift+m");
+    await page.keyboard.press("Meta+Shift+y");
     await expect(card.getByTestId("dictation-pill")).toBeVisible();
-    await page.keyboard.press("Meta+Shift+m");
+    await page.keyboard.press("Meta+Shift+y");
     await expect(card.getByTestId("dictation-mic")).toBeVisible();
     // Nothing focused: the thread's composer.
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
     });
-    await page.keyboard.press("Meta+Shift+m");
+    await page.keyboard.press("Meta+Shift+y");
     await expect(card.getByTestId("dictation-pill")).toBeVisible();
   });
 });

@@ -242,6 +242,28 @@ func applyDelta(st *core.State, d Delta) *core.State {
 	return out
 }
 
+// A pane the user collapsed stays collapsed across a restart: the mark is written at once (it is
+// not a focus change) with the space.
+func TestCollapsedPaneReloads(t *testing.T) {
+	db := dbtest.Open(t)
+	m := open(t, db, nil, nil)
+	apply(t, m, &core.AddTab{Tab: file("/a"), Focus: true})
+	apply(t, m, &core.SplitPane{Pane: "p-n1", Edge: core.Right, Tab: file("/b"), Focus: true})
+	apply(t, m, &core.SetCollapsed{Pane: "p-n2", Collapsed: true})
+	if got := metaValue(t, db, metaRev); got != "3" {
+		t.Errorf("rev on disk %s; want 3 (a collapse is written at once)", got)
+	}
+	if err := m.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got := open(t, db, nil, nil).Snapshot().State
+	sp := got.Spaces[0]
+	_, p := got.FindPane("p-n2")
+	if p == nil || !p.Collapsed || sp.Focus != "p-n1" {
+		t.Errorf("reloaded p-n2 %+v, focus %s; want it collapsed and the focus on p-n1", p, sp.Focus)
+	}
+}
+
 func TestFocusIsWrittenLater(t *testing.T) {
 	db := dbtest.Open(t)
 	m := open(t, db, nil, nil)

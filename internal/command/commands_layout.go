@@ -317,7 +317,7 @@ func RegisterLayout(r *Registry, d LayoutDeps) error {
 	}))
 	r.SetRefResolver(SpaceID, l.resolveSpace)
 	var errs []error
-	for _, c := range slices.Concat(l.readCommands(), l.spaceCommands(), l.paneCommands(), l.tabCommands(), l.threadCommands(), l.composerCommands(), []Command{l.threadInfoCommand()}) {
+	for _, c := range slices.Concat(l.readCommands(), l.spaceCommands(), l.paneCommands(), l.tabCommands(), l.threadCommands(), l.composerCommands(), []Command{l.threadInfoCommand(), l.paneCollapseCommand()}) {
 		errs = append(errs, r.Register(c))
 	}
 	return errors.Join(errs...)
@@ -493,6 +493,9 @@ func writeNode(b *strings.Builder, sp *core.Space, n *core.Node, depth int, name
 		return
 	}
 	fmt.Fprintf(b, "%spane %s", pad, n.ID)
+	if n.Collapsed {
+		b.WriteString(" (collapsed)")
+	}
 	if n.ID == sp.Focus {
 		b.WriteString(" (focused)")
 	}

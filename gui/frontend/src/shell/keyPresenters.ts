@@ -18,6 +18,7 @@ import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
 import { autoNameFocusedTab, cycleTerminals, newFreeTerminalTab, newTerminalTab, quickKey, renameFocusedTab } from "./terminalActions";
 import { fullscreenOn } from "./fullscreen";
+import { toggleCollapseFocused } from "./collapse";
 
 /** The current space's focused pane; "" when it has none. */
 function focusedPane(): string {
@@ -150,6 +151,11 @@ export const SHELL_PRESENTERS: Readonly<Record<string, () => void>> = {
   // cmd+shift+t: the space's most recently closed tab or pane comes back with the focus, and the keyboard follows.
   "tab.reopen": () => {
     void runLayoutCommand("tab.reopen").then((r) => thenFocus(r?.changed ? r.rev : undefined));
+  },
+  // cmd+shift+m: the focused pane collapses to a rail, or opens again; the keyboard follows the focus.
+  "pane.collapse": () => {
+    // Like the focus and move keys, nothing in full screen.
+    if (!fullscreenOn()) void toggleCollapseFocused();
   },
   "tab.previous": () => {
     stepTab(-1);

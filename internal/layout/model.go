@@ -98,13 +98,15 @@ type Tab struct {
 // Node is a pane (T == NodePane: Tabs, Active) or a split (T == NodeSplit: Dir, Kids, Sizes).
 // Sizes are the children's shares of the split, positive and summing to 1.
 type Node struct {
-	T      NodeType  `json:"t"`
-	ID     string    `json:"id"`
-	Tabs   []*Tab    `json:"tabs,omitempty"`
-	Active string    `json:"active,omitempty"`
-	Dir    Dir       `json:"dir,omitempty"`
-	Kids   []*Node   `json:"kids,omitempty"`
-	Sizes  []float64 `json:"sizes,omitempty"`
+	T      NodeType `json:"t"`
+	ID     string   `json:"id"`
+	Tabs   []*Tab   `json:"tabs,omitempty"`
+	Active string   `json:"active,omitempty"`
+	// Collapsed: the user folded this pane to a rail (collapse.go). Panes only.
+	Collapsed bool      `json:"collapsed,omitempty"`
+	Dir       Dir       `json:"dir,omitempty"`
+	Kids      []*Node   `json:"kids,omitempty"`
+	Sizes     []float64 `json:"sizes,omitempty"`
 }
 
 // IsPane reports whether n is a pane.
@@ -378,7 +380,7 @@ func (n *Node) clone() *Node {
 	if n == nil {
 		return nil
 	}
-	c := &Node{T: n.T, ID: n.ID, Active: n.Active, Dir: n.Dir, Sizes: slices.Clone(n.Sizes)}
+	c := &Node{T: n.T, ID: n.ID, Active: n.Active, Collapsed: n.Collapsed, Dir: n.Dir, Sizes: slices.Clone(n.Sizes)}
 	if n.Tabs != nil {
 		c.Tabs = make([]*Tab, len(n.Tabs))
 		for i, t := range n.Tabs {

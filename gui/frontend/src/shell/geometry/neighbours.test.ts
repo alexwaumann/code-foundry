@@ -112,8 +112,9 @@ describe("the GUI and the daemon agree", () => {
     ["top", "up"],
   ];
 
-  it("reads the shared cases", () => {
+  it("reads the shared cases, ten of them with panes the user collapsed (rails in the plain layout too)", () => {
     expect(cases.length).toBeGreaterThanOrEqual(20);
+    expect(cases.filter((c) => panesOf(c.root).some((p) => p.collapsed)).length).toBeGreaterThanOrEqual(10);
   });
 
   it.each(cases.map((c, i) => [i, c] as const))("case %i: every pane, every side, with the case's mru", (_i, c) => {

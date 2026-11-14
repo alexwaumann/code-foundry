@@ -151,13 +151,17 @@ func dropOp(c *dropCase, s dropSource, tg dropTarget, panes int, tabsIn func(str
 
 // dropCases are random trees in areas from roomy to small enough to fold panes to rails, each
 // with drags of every kind (a tab, a pane or a sidebar row's thread, onto a pane's middle, an edge or the outer edge),
-// generated from a fixed seed.
+// generated from a fixed seed. The last eight have panes the user collapsed, which the GUI
+// offers only as a whole (a rail's middle) and whose rails are not dragged as panes.
 func dropCases(t *testing.T) []*dropCase {
 	r := rand.New(rand.NewPCG(21, 34))
 	edges := []Edge{Left, Right, Top, Bottom}
 	var out []*dropCase
-	for len(out) < 18 {
+	for len(out) < 26 {
 		root := dropTree(r)
+		if len(out) >= 18 {
+			collapseSome(r, root)
+		}
 		ids := PaneIDs(root)
 		var tabs []string
 		for _, p := range Panes(root) {
@@ -202,6 +206,9 @@ func dropCases(t *testing.T) []*dropCase {
 			default:
 				tg = dropTarget{Kind: "outer", Edge: edges[r.IntN(4)]}
 			}
+			if collapsedPane(c.Root, s.Pane) && s.Kind == "pane" || tg.Kind == "edge" && collapsedPane(c.Root, tg.Pane) {
+				continue
+			}
 			op := dropOp(c, s, tg, len(ids), tabsIn)
 			if op == nil {
 				continue
@@ -219,12 +226,23 @@ func dropCases(t *testing.T) []*dropCase {
 	return out
 }
 
-// slim is a tree with only what the preview reads: tabs' ids, kinds and threads.
+// collapsedPane reports whether the pane with that id under root is collapsed.
+func collapsedPane(root *Node, id string) bool {
+	for _, p := range Panes(root) {
+		if p.ID == id {
+			return p.Collapsed
+		}
+	}
+	return false
+}
+
+// slim is a tree with only what the preview reads: tabs' ids, kinds and threads, and the
+// collapsed mark.
 func slim(n *Node) *Node {
 	if n == nil {
 		return nil
 	}
-	c := &Node{T: n.T, ID: n.ID, Dir: n.Dir, Sizes: n.Sizes, Active: n.Active}
+	c := &Node{T: n.T, ID: n.ID, Dir: n.Dir, Sizes: n.Sizes, Active: n.Active, Collapsed: n.Collapsed}
 	for _, tb := range n.Tabs {
 		c.Tabs = append(c.Tabs, &Tab{ID: tb.ID, Kind: tb.Kind, Thread: tb.Thread})
 	}

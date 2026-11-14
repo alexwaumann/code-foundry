@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { shellFrame } from "./geometry/rails";
 import { frameRects, tilingErrors } from "./geometry/rects";
-import type { GeoNode } from "./geometry/types";
-import { dragSizes, evenSizes, GUTTER_STEP, gutterKeyDelta, sizesArg, startDrag, withSizes } from "./resize";
+import type { GeoNode, GeoPane } from "./geometry/types";
+import { dragSizes, evenSizes, GUTTER_STEP, gutterCursor, gutterKeyDelta, gutterReach, sizesArg, startDrag, withSizes, type GutterDrag } from "./resize";
 
 const p = (id: string, kind = "diff"): GeoNode => ({ t: "pane", id, tabs: [{ id: `t-${id}`, kind }], active: `t-${id}` });
 const tree: GeoNode = {
@@ -96,5 +97,67 @@ describe("a gutter's keys and double click", () => {
     expect(Math.abs((even.rects.a?.w ?? 0) - (even.rects.b?.w ?? 0))).toBeLessThanOrEqual(1);
     expect(even.rects.d?.w).toBe(frame.rects.d?.w);
     expect(tilingErrors(even)).toEqual([]);
+  });
+});
+
+/**
+ * The divider's rule (docs/notes/shell-model.md, "Dividers"; docs/notes/shell-25d-collapse.md): it
+ * stops at the minimums as drawn (a folded or collapsed pane at a rail's thickness), a drag starts
+ * from what is drawn so the divider does not jump, and the cursor says which ways it can still go.
+ */
+describe("a divider beside rails and held panes", () => {
+  const collapsed = (n: GeoNode): GeoNode => ({ ...(n as GeoPane), collapsed: true });
+
+  it("reads a side's minimum with its rails folded: a column with a collapsed pane needs only its open pane's width", () => {
+    const t: GeoNode = { t: "split", id: "s-r", dir: "row", sizes: [0.5, 0.5], kids: [p("a", "thread"), { t: "split", id: "s-c", dir: "col", sizes: [0.5, 0.5], kids: [collapsed(p("b")), p("c", "terminal")] }] };
+    const f = shellFrame({ root: t, w: 1200, h: 800, focus: "a" });
+    // A diff's 260 would count without the rail; the terminal's 240 is what the column needs.
+    expect(startDrag(t, f, "s-r", 0)?.mins).toEqual([360, 240]);
+    const far = frameRects(withSizes(t, "s-r", dragSizes(startDrag(t, f, "s-r", 0) as GutterDrag, 5000)), 1200, 800);
+    expect(far.rects.c?.w).toBe(240);
+  });
+
+  // a thread held at its 360 minimum (its share is 10%), two diffs sharing the rest.
+  const held: GeoNode = { t: "split", id: "s-r", dir: "row", sizes: [0.1, 0.45, 0.45], kids: [p("a", "thread"), p("b"), p("c")] };
+
+  it("starts from what is drawn: grabbing it beside a pane held at its minimum moves nothing", () => {
+    const f = frameRects(held, 1000, 800);
+    expect(f.rects.a?.w).toBe(360);
+    const d = startDrag(held, f, "s-r", 0);
+    if (!d) throw new Error("no drag");
+    // From the stored sizes (as before this rule) the diff beside it jumped from 308 to 260 px (its own minimum).
+    expect(f.rects.b?.w).toBe(308);
+    expect(frameRects(withSizes(held, "s-r", dragSizes({ ...d, sizes: [0.1, 0.45, 0.45] }, 0)), 1000, 800).rects.b?.w).toBe(260);
+    const still = frameRects(withSizes(held, "s-r", dragSizes(d, 0)), 1000, 800);
+    for (const id of ["a", "b", "c"]) expect(Math.abs((still.rects[id]?.w ?? 0) - (f.rects[id]?.w ?? 0)), id).toBeLessThanOrEqual(1);
+    const moved = frameRects(withSizes(held, "s-r", dragSizes(d, 40)), 1000, 800);
+    expect(Math.abs((moved.rects.a?.w ?? 0) - 400)).toBeLessThanOrEqual(1);
+    expect(Math.abs((moved.rects.c?.w ?? 0) - (f.rects.c?.w ?? 0))).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps the stored sizes when the split is drawn at them, and a folded side's stored size always", () => {
+    const f = frameRects(tree, 1600, 900);
+    expect(startDrag(tree, f, "s-r", 0)?.sizes).toBe((tree as { sizes: readonly number[] }).sizes);
+    const t: GeoNode = { t: "split", id: "s-r", dir: "row", sizes: [0.1, 0.3, 0.3, 0.3], kids: [p("a", "thread"), p("b"), collapsed(p("x")), p("c")] };
+    const g = shellFrame({ root: t, w: 1000, h: 800, focus: "a" });
+    expect(g.rects.a?.w).toBe(360);
+    expect(startDrag(t, g, "s-r", 0)?.sizes[2]).toBe(0.3);
+  });
+
+  it.each<[string, GutterDrag, number, { back: boolean; forward: boolean }, string, string]>([
+    ["room both ways", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [500, 500], mins: [300, 300] }, 0, { back: true, forward: true }, "col-resize", "row-resize"],
+    ["the first side at its minimum", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [300, 700], mins: [300, 300] }, 0, { back: false, forward: true }, "e-resize", "s-resize"],
+    ["the second side at its minimum", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [700, 300], mins: [300, 300] }, 0, { back: true, forward: false }, "w-resize", "n-resize"],
+    ["dragged to the second side's minimum", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [500, 500], mins: [300, 300] }, 900, { back: true, forward: false }, "w-resize", "n-resize"],
+    ["both sides at their minimums", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [300, 300], mins: [300, 300] }, 0, { back: false, forward: false }, "not-allowed", "not-allowed"],
+    ["minimums that do not fit", { split: "s", i: 0, row: true, sizes: [0.5, 0.5], lens: [250, 250], mins: [300, 300] }, 0, { back: false, forward: false }, "not-allowed", "not-allowed"],
+  ])("%s: it can go %j, its cursor in a row %s, in a column %s", (_name, d, delta, reach, rowCursor, colCursor) => {
+    expect(gutterReach(d, delta)).toEqual(reach);
+    expect(gutterCursor(true, reach)).toBe(rowCursor);
+    expect(gutterCursor(false, reach)).toBe(colCursor);
+  });
+
+  it("a gutter with no drag (beside a side that is all rails) is not-allowed", () => {
+    expect(gutterCursor(true, null)).toBe("not-allowed");
   });
 });

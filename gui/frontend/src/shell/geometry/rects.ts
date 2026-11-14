@@ -1,12 +1,13 @@
 /**
  * The pane tree to pixel rectangles. `plainRects` is the daemon's `layout.Rects`
- * (internal/layout/rects.go) to the px: proportions alone, what placement measures. `frameRects`
- * is what the window draws: the same tree with each pane kept at its minimum where the area
- * allows and the panes `rails.ts` folded drawn as 36px rails. Both tile the area exactly: edges
+ * (internal/layout/rects.go) to the px: proportions alone, what placement measures, with only the
+ * panes the user collapsed drawn as rails. `frameRects` is what the window draws: the same tree
+ * with each pane kept at its minimum where the area allows and the panes `rails.ts` folded (the
+ * collapsed ones among them) drawn as 36px rails. Both tile the area exactly: edges
  * round to whole px (JavaScript's Math.round, as the Go side) and the last kid of a split runs to
  * its far edge, so a fractional area (page zoom) leaves no gap. See docs/notes/shell-9-geometry.md.
  */
-import { activeTab, type Frame, type GeoNode, type GeoPane, type Rect, type Size } from "./types";
+import { activeTab, collapsedOf, type Frame, type GeoNode, type GeoPane, type Rect, type Size } from "./types";
 
 /** The gap between panes, in layout px. */
 export const GUTTER = 12;
@@ -38,8 +39,15 @@ export const paneMinimum: MinimumOf = (pane) => {
 interface LayOptions {
   rails: ReadonlySet<string>;
   minimum: MinimumOf;
-  /** Proportions alone: no minimums, no rails. */
+  /** Proportions alone: no minimums; the rails are the collapsed panes. */
   plain: boolean;
+}
+
+/** `rails` with the tree's collapsed panes added: a collapsed pane is always a rail. */
+function withCollapsed(root: GeoNode | null, rails: ReadonlySet<string>): ReadonlySet<string> {
+  const collapsed = collapsedOf(root);
+  if (collapsed.size === 0) return rails;
+  return new Set([...rails, ...collapsed]);
 }
 
 /** Whether every pane under n is a rail. */
@@ -75,12 +83,13 @@ export function minimumOf(
   rails: ReadonlySet<string> = new Set(),
   minimum: MinimumOf = paneMinimum,
 ): Size {
-  return root ? minOf(root, { rails, minimum, plain: false }) : { w: 0, h: 0 };
+  return root ? minOf(root, { rails: withCollapsed(root, rails), minimum, plain: false }) : { w: 0, h: 0 };
 }
 
 /**
- * The lengths of a split's kids along its direction. Plain: `free` shared by `sizes`. Otherwise a
- * kid that is all rails takes its minimum (a rail's thickness); the others share what is left by
+ * The lengths of a split's kids along its direction. A kid that is all rails takes its rails'
+ * length along the split (plain: the collapsed panes are the rails); plain, the others share what
+ * is left by `sizes`. Otherwise the others share what is left by
  * their sizes, and while their minimums fit, a kid whose share would fall short is held at its
  * minimum and the rest share again. When every kid is all rails they all share like open kids.
  * When the minimums do not fit, the open kids share what is left in proportion to their minimums,
@@ -89,9 +98,9 @@ export function minimumOf(
  */
 function lengths(kids: readonly GeoNode[], sizes: readonly number[], free: number, row: boolean, o: LayOptions) {
   const n = kids.length;
-  const mins = kids.map((k) => (o.plain ? 0 : minOf(k, o)[row ? "w" : "h"]));
-  let fixed = kids.map((k) => !o.plain && allRail(k, o.rails));
+  let fixed = kids.map((k) => allRail(k, o.rails));
   if (fixed.every(Boolean)) fixed = fixed.map(() => false);
+  const mins = kids.map((k, i) => (o.plain && !fixed[i] ? 0 : minOf(k, o)[row ? "w" : "h"]));
   const sz: number[] = Array.from({ length: n }, () => 0);
   const open: number[] = [];
   let ws = 0;
@@ -131,14 +140,14 @@ function lengths(kids: readonly GeoNode[], sizes: readonly number[], free: numbe
 
 function lay(n: GeoNode, r: Rect, out: Frame, o: LayOptions): void {
   if (n.t === "pane") {
-    out.rects[n.id] = { ...r, rail: !o.plain && o.rails.has(n.id) };
+    out.rects[n.id] = { ...r, rail: o.rails.has(n.id) };
     return;
   }
   const row = n.dir === "row";
   const count = n.kids.length;
   const free = Math.max(0, (row ? r.w : r.h) - GUTTER * (count - 1));
   const sz = lengths(n.kids, n.sizes, free, row, o);
-  const railKid = n.kids.map((k) => !o.plain && allRail(k, o.rails));
+  const railKid = n.kids.map((k) => allRail(k, o.rails));
   let p = row ? r.x : r.y;
   const end = row ? r.x + r.w : r.y + r.h;
   n.kids.forEach((k, i) => {
@@ -161,14 +170,14 @@ function layout(root: GeoNode | null, w: number, h: number, o: LayOptions): Fram
   return out;
 }
 
-/** The plain layout: proportions alone, no minimums and no rails. Equal to the daemon's `Rects`. */
+/** The plain layout: proportions alone, no minimums, the collapsed panes as rails. Equal to the daemon's `Rects`. */
 export function plainRects(root: GeoNode | null, w: number, h: number): Frame {
-  return layout(root, w, h, { rails: new Set(), minimum: paneMinimum, plain: true });
+  return layout(root, w, h, { rails: collapsedOf(root), minimum: paneMinimum, plain: true });
 }
 
 /**
- * The drawn layout: the panes in `rails` as rails, the others held at their minimums where the
- * area allows. `rails.ts` chooses the rails; the stored tree is only read.
+ * The drawn layout: the panes in `rails` (and the collapsed ones) as rails, the others held at
+ * their minimums where the area allows. `rails.ts` chooses the rails; the stored tree is only read.
  */
 export function frameRects(
   root: GeoNode | null,
@@ -177,7 +186,7 @@ export function frameRects(
   rails: ReadonlySet<string> = new Set(),
   minimum: MinimumOf = paneMinimum,
 ): Frame {
-  return layout(root, w, h, { rails, minimum, plain: false });
+  return layout(root, w, h, { rails: withCollapsed(root, rails), minimum, plain: false });
 }
 
 /**

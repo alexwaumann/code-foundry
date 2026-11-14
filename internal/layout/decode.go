@@ -230,6 +230,10 @@ func (s *sanitizer) space(sp *Space) {
 		s.note("space %s: focus %q is now %q", sp.ID, sp.Focus, want)
 		sp.Focus = want
 	}
+	if sp.Root != nil && firstOpen(sp) == nil {
+		s.note("space %s: every pane was collapsed; the focused one is open", sp.ID)
+		keepOneOpen(sp)
+	}
 	open := map[string]bool{}
 	for _, p := range Panes(sp.Root) {
 		for _, tb := range p.Tabs {
@@ -277,7 +281,7 @@ func (s *sanitizer) node(sp *Space, n *Node, keys map[string]bool) *Node {
 		return n
 	case NodeSplit:
 		n.ID = s.claim(n.ID, "s-", "split")
-		n.Tabs, n.Active = nil, ""
+		n.Tabs, n.Active, n.Collapsed = nil, "", false
 		if n.Dir != Row && n.Dir != Col {
 			s.note("split %s: direction %q is now row", n.ID, n.Dir)
 			n.Dir = Row

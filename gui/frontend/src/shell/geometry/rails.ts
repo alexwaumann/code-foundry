@@ -3,6 +3,9 @@
  * (docs/notes/shell-model.md, "Small windows"). Derived per frame from the area: nothing here
  * changes the stored layout, and computing again on a larger area unfolds what now fits.
  *
+ * A pane the user collapsed (pane.collapse) is always a rail and never in the order: it neither
+ * folds nor unfolds here (docs/notes/shell-25d-collapse.md).
+ *
  * Order: panes without a thread tab first, then panes with one; within each, the least recently
  * focused first (a pane whose tabs were never focused before any that were), and among equals the
  * later pane in layout order first. The focused pane and the pane holding the focused thread's
@@ -12,7 +15,7 @@
  * See docs/notes/shell-9-geometry.md and docs/notes/shell-25a-test-feedback.md.
  */
 import { frameRects, minimumOf, paneMinimum, type MinimumOf } from "./rects";
-import { activeTab, panesOf, type Frame, type GeoNode, type GeoPane, type Size } from "./types";
+import { activeTab, collapsedOf, panesOf, type Frame, type GeoNode, type GeoPane, type Size } from "./types";
 
 export interface RailsInput {
   root: GeoNode | null;
@@ -41,7 +44,7 @@ export function unfoldable(root: GeoNode | null, focus: string | undefined): Set
   return keep;
 }
 
-/** The panes in the order they fold, the unfoldable ones left out. */
+/** The panes in the order they fold, the unfoldable and the collapsed ones left out. */
 export function foldOrder(root: GeoNode | null, focus?: string, mru: readonly string[] = []): string[] {
   const keep = unfoldable(root, focus);
   const recency = new Map<string, number>();
@@ -53,7 +56,7 @@ export function foldOrder(root: GeoNode | null, focus?: string, mru: readonly st
   const hasThread = (p: GeoPane): number => ((p.tabs ?? []).some((t) => t.kind === "thread") ? 1 : 0);
   return panesOf(root)
     .map((p, index) => ({ p, index, age: age(p), thread: hasThread(p) }))
-    .filter(({ p }) => !keep.has(p.id))
+    .filter(({ p }) => !keep.has(p.id) && !p.collapsed)
     .sort((a, b) => a.thread - b.thread || cmpAge(b.age, a.age) || b.index - a.index)
     .map(({ p }) => p.id);
 }
@@ -78,7 +81,8 @@ function excess(m: Size, w: number, h: number): Size {
  * are the only ones ever drawn smaller.
  */
 export function foldRails({ root, w, h, focus, mru, minimum = paneMinimum }: RailsInput): Set<string> {
-  const rails = new Set<string>();
+  // The collapsed panes first: always rails, never unfolded below (only `folded` is).
+  const rails = collapsedOf(root);
   const fits = (s: Size) => s.w <= w && s.h <= h;
   if (fits(minimumOf(root, rails, minimum))) return rails;
   const folded: string[] = [];

@@ -175,6 +175,7 @@ func TestShellKeyTable(t *testing.T) {
 		"ctrl+cmd+1…9":                      {view},
 		"cmd+1…9":                           {view},
 		"cmd+shift+enter":                   {"pane.fullscreen"},
+		"cmd+shift+m":                       {"pane.collapse"},
 		"cmd+shift+a":                       {view},
 		"cmd+r":                             {"tab.rename"},
 		"cmd+shift+r":                       {"tab.auto-name"},

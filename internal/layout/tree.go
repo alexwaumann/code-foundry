@@ -199,10 +199,10 @@ func dropPane(sp *Space, paneID string) {
 	at := slices.Index(PaneIDs(sp.Root), paneID)
 	removeNode(sp, paneID)
 	if sp.Focus == paneID {
-		rest := PaneIDs(sp.Root)
+		rest := Panes(sp.Root)
 		sp.Focus = ""
 		if len(rest) > 0 {
-			sp.Focus = rest[min(max(at, 0), len(rest)-1)]
+			sp.Focus = nearestOpen(rest, min(max(at, 0), len(rest)-1)).ID
 		}
 	}
 }

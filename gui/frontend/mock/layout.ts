@@ -37,6 +37,8 @@ export interface Node {
   id: string;
   tabs?: Tab[];
   active?: string;
+  /** The user collapsed this pane to a rail (internal/layout collapse.go). Panes only. */
+  collapsed?: boolean;
   dir?: Dir;
   kids?: Node[];
   sizes?: number[];
@@ -292,9 +294,39 @@ function dropPane(sp: Space, paneID: string): void {
   const at = paneIds(sp.root).indexOf(paneID);
   removeNode(sp, paneID);
   if (sp.focus === paneID) {
-    const rest = paneIds(sp.root);
-    sp.focus = rest.length > 0 ? rest[Math.min(Math.max(at, 0), rest.length - 1)] : "";
+    const rest = panes(sp.root);
+    sp.focus = rest.length > 0 ? nearestOpen(rest, Math.min(Math.max(at, 0), rest.length - 1)).id : "";
   }
+}
+
+// ---- Collapsed panes (internal/layout/collapse.go) ----
+
+/** The first pane of sp that is not collapsed. */
+function firstOpen(sp: Space): Node | undefined {
+  return panes(sp.root).find((p) => !p.collapsed);
+}
+
+/** The pane nearest index `at` that is not collapsed (the earlier of two as near), else the one at `at`. */
+function nearestOpen(ps: Node[], at: number): Node {
+  for (let d = 0; d < ps.length; d++) {
+    for (const i of [at - d, at + d]) {
+      const p = ps[i];
+      if (p && !p.collapsed) return p;
+    }
+  }
+  return ps[at] as Node;
+}
+
+/** Whether pane id is the only pane of sp that is not collapsed. */
+function lastOpen(sp: Space, id: string): boolean {
+  return !panes(sp.root).some((p) => p.id !== id && !p.collapsed);
+}
+
+/** Opens the focused pane of sp when every pane of it is collapsed. */
+function keepOneOpen(sp: Space): void {
+  if (!sp.root || firstOpen(sp)) return;
+  const p = panes(sp.root).find((x) => x.id === sp.focus) ?? panes(sp.root)[0];
+  if (p) delete p.collapsed;
 }
 
 // ---- Applying an op (internal/layout/op.go) ----
@@ -339,6 +371,8 @@ function usedIds(st: State): Set<string> {
 
 class Tx {
   private used: Set<string> | null = null;
+  /** The collapsed panes the op opened because it focused one of their tabs; keep_focus collapses them again. */
+  readonly revealed: string[] = [];
   constructor(
     readonly st: State,
     private readonly ids: IdSource,
@@ -406,9 +440,18 @@ class Tx {
     return null;
   }
 
+  /** focusTab for an op that gives the tab the user's focus: a collapsed pane opens. */
+  focusTab(sp: Space, pane: Node, id: string): void {
+    if (pane.collapsed) {
+      delete pane.collapsed;
+      this.revealed.push(pane.id);
+    }
+    focusTab(sp, pane, id);
+  }
+
   show(sp: Space, pane: Node, id: string, focus: boolean | undefined): void {
     if (focus) {
-      focusTab(sp, pane, id);
+      this.focusTab(sp, pane, id);
       this.st.current_space = sp.id;
     } else if (sp.focus !== pane.id) {
       pane.active = id;
@@ -429,8 +472,9 @@ class Tx {
     for (const sp of this.st.spaces) {
       sp.root = norm(sp.root);
       const ids = paneIds(sp.root);
-      if (!ids.includes(sp.focus ?? "")) sp.focus = ids[0];
+      if (!ids.includes(sp.focus ?? "")) sp.focus = firstOpen(sp)?.id ?? ids[0];
       if (!sp.focus) delete sp.focus;
+      keepOneOpen(sp);
       const open = new Set(panes(sp.root).flatMap((p) => (p.tabs ?? []).map((t) => t.id)));
       const seen = new Set<string>();
       sp.mru = (sp.mru ?? []).filter((m) => {
@@ -539,12 +583,15 @@ function focusTab(sp: Space, pane: Node, id: string): void {
 function refocus(sp: Space): void {
   for (const id of sp.mru ?? []) {
     for (const p of panes(sp.root)) {
-      if (tabIndex(p, id) >= 0) {
+      if (tabIndex(p, id) >= 0 && !p.collapsed) {
         focusTab(sp, p, id);
         return;
       }
     }
   }
+  const at = panes(sp.root).find((p) => p.id === sp.focus);
+  const open = firstOpen(sp);
+  if (at?.collapsed && open) focusTab(sp, open, open.active ?? "");
 }
 
 function focusedTab(sp: Space): string {
@@ -701,7 +748,7 @@ const ops = {
       forget(from, tb.id);
       if (wasFocused) refocus(from);
     }
-    focusTab(to, target, tb.id);
+    t.focusTab(to, target, tb.id);
     return { space: to.id, pane: target.id, tab: tb.id };
   },
 
@@ -777,7 +824,7 @@ const ops = {
     const index = num(o, "index");
     const at = index === undefined ? tabs.length : clampIndex(index, tabs.length);
     tabs.splice(at, 0, ...(pane.tabs ?? []));
-    focusTab(sp, target, pane.active ?? "");
+    t.focusTab(sp, target, pane.active ?? "");
     return { space: sp.id, pane: target.id, tab: pane.active };
   },
 
@@ -837,7 +884,7 @@ const ops = {
 
   focus_tab(t: Tx, o: Op): Result {
     const { sp, pane, tab } = t.tab(str(o, "tab"));
-    focusTab(sp, pane, tab.id);
+    t.focusTab(sp, pane, tab.id);
     t.st.current_space = sp.id;
     return { space: sp.id, pane: pane.id, tab: tab.id };
   },
@@ -909,6 +956,23 @@ const ops = {
       else delete t.st.threads;
     }
     return {};
+  },
+
+  // ---- A pane the user collapses (internal/layout/collapse.go) ----
+
+  set_collapsed(t: Tx, o: Op): Result {
+    const { sp, pane } = t.pane(str(o, "pane"));
+    if (o.collapsed !== true) {
+      delete pane.collapsed;
+      focusTab(sp, pane, pane.active ?? "");
+      t.st.current_space = sp.id;
+      return { space: sp.id, pane: pane.id, tab: pane.active };
+    }
+    if (pane.collapsed) return { space: sp.id, pane: pane.id };
+    if (lastOpen(sp, pane.id)) fail("failed_precondition", `pane ${pane.id} is the last open pane of its space`);
+    pane.collapsed = true;
+    if (sp.focus === pane.id) refocus(sp);
+    return { space: sp.id, pane: pane.id };
   },
 
   // ---- A thread's info card (internal/layout/info.go) ----
@@ -1296,7 +1360,18 @@ export function applyOp(st: State, op: Op, ids: IdSource, opts: Options = {}): {
   const t = new Tx(structuredClone(st), ids);
   const result = fn(t, op);
   t.finish();
-  if (opts.keep_focus) keepFocus(st, t.st);
+  if (opts.keep_focus) {
+    keepFocus(st, t.st);
+    // A call that keeps the user's focus does not open a pane either (internal/layout keepCollapsed).
+    for (const id of t.revealed) {
+      for (const sp of t.st.spaces) {
+        const p = panes(sp.root).find((x) => x.id === id);
+        if (!p) continue;
+        p.collapsed = true;
+        keepOneOpen(sp);
+      }
+    }
+  }
   return { state: t.st, result };
 }
 
@@ -1355,7 +1430,7 @@ export function tabMsg(t: Tab): TabInit {
 }
 
 function nodeMsg(n: Node): NodeInit {
-  if (n.t === "pane") return { node: { case: "pane", value: { id: n.id, tabs: (n.tabs ?? []).map(tabMsg), activeTabId: n.active ?? "" } } };
+  if (n.t === "pane") return { node: { case: "pane", value: { id: n.id, tabs: (n.tabs ?? []).map(tabMsg), activeTabId: n.active ?? "", collapsed: n.collapsed === true } } };
   return { node: { case: "split", value: { id: n.id, dir: n.dir === "col" ? LayoutDir.COL : LayoutDir.ROW, children: (n.kids ?? []).map(nodeMsg), sizes: n.sizes ?? [] } } };
 }
 
@@ -1506,6 +1581,8 @@ export function opFromProto(m: LayoutOp | undefined): Op {
       return { op: "set_quick", thread: c.value.threadId, open: c.value.open, height: c.value.height, forget_ran: c.value.forgetRan };
     case "setInfo":
       return { op: "set_info", thread: c.value.threadId, open: c.value.open };
+    case "setCollapsed":
+      return { op: "set_collapsed", pane: c.value.paneId, collapsed: c.value.collapsed };
     default:
       return fail("unimplemented", `layout op ${c.case} is not available in the mock`);
   }

@@ -116,11 +116,12 @@ type neighbourCase struct {
 }
 
 // neighbourCases are random trees of 3 to 9 panes (several tabs a pane, so a pane's recency is its most
-// recent tab's) with a random MRU, generated from a fixed seed.
+// recent tab's) with a random MRU, generated from a fixed seed. The last ten have panes the user
+// collapsed (laid out as rails by Rects, docs/notes/shell-25d-collapse.md).
 func neighbourCases() []*neighbourCase {
 	r := rand.New(rand.NewPCG(13, 17))
 	var out []*neighbourCase
-	for len(out) < 30 {
+	for len(out) < 40 {
 		n := 0
 		root := randomTree(r, 0, &n, Dir(""))
 		if n < 3 || n > 9 {
@@ -137,6 +138,9 @@ func neighbourCases() []*neighbourCase {
 		}
 		r.Shuffle(len(tabs), func(i, j int) { tabs[i], tabs[j] = tabs[j], tabs[i] })
 		c := &neighbourCase{Root: root, W: float64(n*60 + 400 + r.IntN(1600)), H: float64(n*60 + 300 + r.IntN(900)), MRU: tabs[:r.IntN(len(tabs)+1)]}
+		if len(out) >= 30 {
+			collapseSome(r, root)
+		}
 		l := Rects(root, c.W, c.H)
 		c.Want = map[string]map[Edge]string{}
 		for _, id := range PaneIDs(root) {
@@ -152,6 +156,15 @@ func neighbourCases() []*neighbourCase {
 		out = append(out, c)
 	}
 	return out
+}
+
+// collapseSome collapses one to all but one of the tree's panes, at random.
+func collapseSome(r *rand.Rand, root *Node) {
+	panes := Panes(root)
+	r.Shuffle(len(panes), func(i, j int) { panes[i], panes[j] = panes[j], panes[i] })
+	for _, p := range panes[:1+r.IntN(len(panes)-1)] {
+		p.Collapsed = true
+	}
 }
 
 func TestNeighbourCases(t *testing.T) {

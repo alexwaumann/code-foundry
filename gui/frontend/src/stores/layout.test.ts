@@ -213,6 +213,19 @@ describe("applying the layout source", () => {
 });
 
 describe("optimistic focus", () => {
+  it("opens a collapsed pane when one of its tabs takes the focus, and leaves it collapsed when only the pane does", () => {
+    const folded = mainSpace({ root: { t: "split", id: "s-r", dir: "row", kids: [pane("p-a", [tab("t-a", "thread", "th-a")]), { ...pane("p-b", [tab("t-d", "diff", "th-a"), tab("t-f", "file", "th-a")]), collapsed: true } as LayoutNodeView], sizes: [0.6, 0.4] } });
+    applyLayoutEvent(snapshot(layout(4, [folded, review])));
+    applyLayoutOp.mockReturnValue(new Promise(() => undefined));
+    expect(state().panes["p-b"]?.collapsed).toBe(true);
+    expect(geoTree(state(), "sp-a")).toMatchObject({ kids: [{ id: "p-a" }, { id: "p-b", collapsed: true }] });
+    void focusPane("p-b");
+    expect(state().spaces["sp-a"]?.focus).toBe("p-b");
+    expect(state().panes["p-b"]?.collapsed).toBe(true);
+    void focusTab("t-f");
+    expect(state().panes["p-b"]?.collapsed).toBeUndefined();
+  });
+
   const applied = (rev: number): LayoutApplyView => ({ rev, spaceId: "", paneId: "", tabId: "", existing: false, closed: [], rule: "", kept: [], ended: [], backTabIds: [], placedTabIds: [], freshTabIds: [], swappedPaneIds: [], draftId: "" });
 
   it("focuses a tab at once, in another space too, before the daemon answers", () => {

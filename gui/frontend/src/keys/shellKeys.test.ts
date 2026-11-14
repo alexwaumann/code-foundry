@@ -75,6 +75,7 @@ const WANT: Readonly<Record<string, readonly string[]>> = {
   "ctrl+cmd+1…9": [VIEW],
   "cmd+1…9": [VIEW],
   "cmd+shift+enter": ["pane.fullscreen"],
+  "cmd+shift+m": ["pane.collapse"],
   "cmd+shift+a": [VIEW],
   "cmd+r": ["tab.rename"],
   "cmd+shift+r": ["tab.auto-name"],
