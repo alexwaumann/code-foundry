@@ -17,17 +17,17 @@ test.beforeEach(async () => {
 test("a row that shows a plugin's flag opens the thread and the plugin's surface for it", async ({ page }) => {
   await openApp(page);
   await flag("s-3", "hello", "Hello", "attention", "deploy needs approval");
-  // The flagged thread is under Needs you (its ask's kind is the plugin's flag); the card's Go to
-  // thread opens the thread and the plugin's surface as a linked tab placed by the rules. Which
-  // control does what: src/components/needs/NeedsCard.test.tsx and src/stores/flagSurface.test.ts.
-  // Kept here: the surface going live through the plugin host's stream in a pane of the shell.
+  // A plugin's flag is not an ask: the thread goes to the top of Active (shell-25c-keys-drafts.md,
+  // "Needs you lists only actionable asks"), its row showing the flag with the plugin's name. Its
+  // click opens the thread and the plugin's surface as a linked tab placed by the rules. Which row
+  // goes where and what the click runs: src/lib/shellSections.test.ts, SidebarRow.test.tsx and
+  // src/stores/flagSurface.test.ts. Kept here: the surface going live through the plugin host's
+  // stream in a pane of the shell.
   const s3 = row(page, "s:s-3");
-  await expect(s3).toHaveAttribute("data-section", "needs");
-  await expect(s3.getByTestId("row-ask")).toHaveText("Hello");
-  await s3.getByTestId("thread-name").hover();
-  const card = page.getByTestId("needs-card");
-  await expect(card).toBeVisible();
-  await card.getByTestId("needs-card-go").click();
+  await expect(s3).toHaveAttribute("data-section", "attention");
+  await expect(s3.getByTestId("row-status")).toHaveAttribute("data-kind", "flagAttention");
+  await expect(s3.getByTestId("row-status-word")).toHaveText("Hello");
+  await s3.getByTestId("thread-name").click();
   const threadPane = page.locator('[data-testid="shell-pane"]').filter({ has: page.locator('[data-testid="thread-pane"][data-thread-id="s-3"]') });
   await expect(threadPane).toHaveCount(1);
   const surface = page.getByTestId("plugin-surface");

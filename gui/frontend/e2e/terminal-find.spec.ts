@@ -30,10 +30,13 @@ async function printed(page: Page, id: string, text: string, last: string): Prom
   await expect.poll(() => page.evaluate(() => (window as unknown as { __cfTerminal?: { renderer: { getText(): string } } }).__cfTerminal?.renderer.getText() ?? "")).toContain(last);
 }
 
-/** Thread s-3 with a new terminal tab linked to it (cmd+t), the keyboard in it. Its id. */
+/** Thread s-3 with a new terminal tab linked to it (cmd+t) in a pane beside it, the keyboard in it. Its id. */
 async function shell(page: Page): Promise<string> {
   await openApp(page);
   await row(page, "s:s-3").click();
+  // cmd+t reads the focused tab's thread, not the sidebar's selection (shell-25c-keys-drafts.md):
+  // its tab first, or the chord opens a free home terminal.
+  await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-3"]')).toBeVisible();
   await page.keyboard.press("Meta+t");
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(() => inXterm(page)).toBe(true);

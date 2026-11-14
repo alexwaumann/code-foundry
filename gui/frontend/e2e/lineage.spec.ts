@@ -100,17 +100,19 @@ test.describe("child threads", () => {
     expect(n).toBeLessThan(10);
     await page.keyboard.press(`Meta+${String(n)}`);
     await expect.poll(shownId).toBe(C);
-    // The waiting orphans join Needs you and cmd+shift+a's round; C's finished turn is not an ask.
-    // Opening a thread's popup can drop it from the list (and the round), so walk until all three
-    // were reached.
+    // The orphan asking for a permission joins Needs you and cmd+shift+a's round; s-l-allow's API
+    // error is not an ask (shell-25c-keys-drafts.md: it goes to the top of Active), nor is C's
+    // finished turn. Opening a thread's popup can drop it from the list (and the round), so walk
+    // until both were reached.
     const visited = new Set<string>();
-    for (let i = 0; i < 8 && visited.size < 3; i++) {
+    for (let i = 0; i < 8 && visited.size < 2; i++) {
       const prev = await popupId();
       await page.keyboard.press("Meta+Shift+a");
       await expect.poll(popupId).not.toBe(prev);
       visited.add(String(await popupId()));
     }
-    expect([...visited].sort()).toEqual(["s-2", "s-l-allow", "s-l-cookie"]);
+    expect([...visited].sort()).toEqual(["s-2", "s-l-cookie"]);
+    await expect(row(page, "s:s-l-allow")).toHaveAttribute("data-section", "attention");
   });
 
   // No Show hidden in the lineage menu (LineageGroup.test.tsx), no sidebar items in the title or row
