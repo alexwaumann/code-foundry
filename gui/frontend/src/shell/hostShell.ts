@@ -15,12 +15,14 @@
  * daemon's identity (shell/identity.ts): the same kind, link and key params, with the daemon's
  * normalisation (a pull request's slug in any case); the other params never tell tabs apart.
  * Opening goes through the daemon (open_surface), which deduplicates by the same identity and places
- * the tab; nothing here changes the slice before the daemon answers. Every params update of a tab
- * goes through one ordered queue (queueParams).
+ * the tab; nothing here changes the slice before the daemon answers. Every request goes through the
+ * window's ordered queue (stores/layout.ts applyLayout), so the ops of one action (several tabs
+ * opened, the one to show last) take effect in the order made; a tab's params updates are also
+ * each computed from the one before (queueParams). docs/notes/shell-25i-open-order.md.
  * See docs/notes/shell-11-pane-grid.md.
  */
-import { applyLayoutOp, type LayoutOpView } from "@/api/layout";
-import { focusTab as focusTabOp, useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
+import type { LayoutOpView } from "@/api/layout";
+import { applyLayout, focusTab as focusTabOp, useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus } from "@/stores/shellView";
 import { parseTabId, selectionTarget, type Tab } from "./tabs";
 import { identityKey } from "./identity";
@@ -154,7 +156,7 @@ function findByIdentity(s: LayoutState, target: TabTarget, panelKind: string, pa
 
 function apply(op: LayoutOpView): void {
   // A refusal (the tab went meanwhile) changes nothing; the layout stays the daemon's.
-  void applyLayoutOp(op).catch(() => undefined);
+  void applyLayout(op).catch(() => undefined);
 }
 
 /**
@@ -173,8 +175,9 @@ export function shellOpenTab(target: TabTarget, tab: Tab, opts: { group?: number
   if (open) {
     // Behind any update of this tab still on its way (a save's), so the newest request lands last.
     const base = pendingParams.get(open.id)?.params ?? open.params;
-    if (JSON.stringify(tab.params) !== JSON.stringify(base) || (tab.title && tab.title !== open.title)) queueParams(open.id, { ...tab.params }, tab.title || undefined);
+    // The focus first: what the user asked to see is shown before its params land.
     if (focus) showOpenTab(s, open);
+    if (JSON.stringify(tab.params) !== JSON.stringify(base) || (tab.title && tab.title !== open.title)) queueParams(open.id, { ...tab.params }, tab.title || undefined);
     return true;
   }
   const pane = t.startsWith("pane:") ? t.slice(5) : opts.group !== undefined ? groupsOf(s, t)[opts.group]?.paneId : undefined;
@@ -189,7 +192,7 @@ export function shellOpenTab(target: TabTarget, tab: Tab, opts: { group?: number
   };
   if (!focus) apply(op);
   else
-    void applyLayoutOp(op)
+    void applyLayout(op)
       .then(async (res) => {
         // The keyboard follows once the pane draws the tab: asked for earlier, it reached the tab still showing.
         await whenRev(res.rev);
@@ -234,10 +237,10 @@ export function shellRetitleTab(target: TabTarget, id: string, title: string): v
 }
 
 /**
- * A tab's params updates still on their way to the daemon, in order: each is computed from the one
- * before it, not from the layout's last confirmed params, and sent after it. Two updates in a row
- * (a File tab's save stamps the request, then ends it) would otherwise each start from the same
- * stale params, and the daemon could apply them in either order.
+ * A tab's params updates still on their way to the daemon: each is computed from the one before
+ * it, not from the layout's last confirmed params, and sent after it (the window's queue). Two
+ * updates in a row (a File tab's save stamps the request, then ends it) would otherwise each
+ * start from the same stale params.
  */
 const pendingParams = new Map<string, { params: Tab["params"]; chain: Promise<void> }>();
 
@@ -250,14 +253,12 @@ export function shellSetTabParams(target: TabTarget, id: string, params: Tab["pa
   queueParams(tab.id, next);
 }
 
-/** Sends a tab's params (and title) after its updates already on their way. */
+/** Sends a tab's params (and title) after the window's ops already on their way, its own among them. */
 function queueParams(tabId: string, params: Tab["params"], title?: string): void {
-  const chain = (pendingParams.get(tabId)?.chain ?? Promise.resolve()).then(() =>
-    applyLayoutOp({ op: "set_tab_params", tab: tabId, params: { ...params }, ...(title ? { title } : {}) }).then(
-      () => undefined,
-      // A refusal (the tab went meanwhile) changes nothing; the layout stays the daemon's.
-      () => undefined,
-    ),
+  const chain = applyLayout({ op: "set_tab_params", tab: tabId, params: { ...params }, ...(title ? { title } : {}) }).then(
+    () => undefined,
+    // A refusal (the tab went meanwhile) changes nothing; the layout stays the daemon's.
+    () => undefined,
   );
   pendingParams.set(tabId, { params, chain });
   void chain.then(() => {

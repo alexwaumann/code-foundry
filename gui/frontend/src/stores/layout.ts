@@ -126,6 +126,7 @@ export function resetLayout(): void {
   pending = [];
   resyncing = false;
   held = [];
+  tail = null;
   generation++;
   useLayoutStore.setState(EMPTY, true);
 }
@@ -229,9 +230,31 @@ export function applyImportedLayout(layout: LayoutView): void {
   }
 }
 
-/** Runs an op on the daemon (no change here until its event arrives). */
+/**
+ * The last request in the window's queue of ops (null while none is on its way), settled
+ * either way so a refusal never holds back the ops after it.
+ */
+let tail: Promise<void> | null = null;
+
+/**
+ * Runs an op on the daemon (no change here until its event arrives), after this window's ops
+ * already on their way: each LayoutService.Apply takes one op, and two requests in flight can
+ * reach the daemon in either order, so one action's ops (several tabs opened, the one to show
+ * last) would end with another tab active. With none on its way the op is sent at once. Each
+ * caller handles its own op's refusal; the next op is sent after it either way.
+ * docs/notes/shell-25i-open-order.md.
+ */
 export function applyLayout(op: LayoutOpView): Promise<LayoutApplyView> {
-  return applyLayoutOp(op);
+  const sent = tail === null ? applyLayoutOp(op) : tail.then(() => applyLayoutOp(op));
+  const settled = sent.then(
+    () => undefined,
+    () => undefined,
+  );
+  tail = settled;
+  void settled.then(() => {
+    if (tail === settled) tail = null;
+  });
+  return sent;
 }
 
 /**
@@ -254,7 +277,7 @@ export function focusPane(paneId: string, run?: FocusRunner): Promise<boolean> {
   return optimistic({ op: "focus_pane", pane: paneId }, run);
 }
 
-async function optimistic(op: FocusOp, run: FocusRunner = async () => (await applyLayoutOp(op)).rev): Promise<boolean> {
+async function optimistic(op: FocusOp, run: FocusRunner = async () => (await applyLayout(op)).rev): Promise<boolean> {
   const p: Pending = { op, rev: null };
   pending.push(p);
   publish();
