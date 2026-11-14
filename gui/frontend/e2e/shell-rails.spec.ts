@@ -127,7 +127,7 @@ test("a click on a rail's icon focuses that tab and unfolds the pane; another fo
   expect(await rails(page)).toEqual(["p-l"]);
 });
 
-test("a tab dropped on a rail joins that pane", async ({ page }) => {
+test("a tab dropped on a rail joins that pane, and the highlight is where the opened pane lands", async ({ page }) => {
   await seed(ROW, "p-m");
   await openShell(page);
   await gridWidth(page, 900);
@@ -141,10 +141,13 @@ test("a tab dropped on a rail joins that pane", async ({ page }) => {
   await page.mouse.move(from.x + from.width / 2 + 8, from.y + from.height / 2 + 4, { steps: 2 });
   await expect(page.getByTestId("shell-drag-ghost")).toBeVisible();
   await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
-  // The whole rail is the target (the preview glides for 75ms).
+  // The whole rail is the target (the preview glides for 75ms). The rail takes the focus with
+  // the tab, so it opens: the highlight is the open pane, not the 36px rail
+  // (docs/notes/shell-25b-audits.md).
   await page.waitForFunction(() => document.querySelector('[data-testid="shell-drop-preview"]')?.getAnimations().length === 0);
   const preview = await page.getByTestId("shell-drop-preview").boundingBox();
-  expect(Math.round(preview?.width ?? 0)).toBe(Math.round(to.width));
+  if (!preview) throw new Error("no preview");
+  expect(preview.width).toBeGreaterThan(to.width * 2);
   await page.mouse.up();
   await expect(page.getByTestId("shell-drag-shield")).toHaveCount(0);
   await expect.poll(async () => (await invocations()).find((i) => i.name === "tab.move")?.args).toMatchObject({ tab: "t-s-3", pane: "p-l" });
@@ -154,6 +157,11 @@ test("a tab dropped on a rail joins that pane", async ({ page }) => {
       return root?.t === "split" ? root.kids.map((k) => (k.t === "pane" ? k.tabs.map((t) => t.id).join(",") : "")) : [];
     })
     .toEqual(["t-prs,t-projects,t-s-3", "t-s-1", "t-diff-s-1,t-file-README.md,t-s-5"]);
+  const landed = page.locator('[data-testid="shell-pane"][data-pane-id="p-l"]');
+  await expect(landed).toHaveAttribute("data-focused", "true");
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getTiming().iterations === Infinity));
+  const box = await landed.boundingBox();
+  expect([box?.x, box?.y, box?.width, box?.height].map((v) => Math.round(v ?? -1))).toEqual([preview.x, preview.y, preview.width, preview.height].map(Math.round));
 });
 
 /** SHOTS=<dir>: a small window with two rails (the selected icons marked, an attention dot), dark and light. */

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import drops from "../../../../../internal/layout/testdata/drops.json?raw";
+import { shellFrame } from "@/shell/geometry/rails";
 import { frameRects, plainRects, tilingErrors } from "@/shell/geometry/rects";
 import { panesOf, type GeoNode } from "@/shell/geometry/types";
 import { col, pane, randomTree, rng, row } from "@/test/shellTrees";
-import { dropCommand, dropPreview, treeAfterDrop } from "./drop";
+import { dropCommand, dropPreview, shellDropLayout, treeAfterDrop } from "./drop";
 import type { DragSource, DropTarget, Edge } from "./targets";
 
 const tab = (t: string, p: string): DragSource => ({ kind: "tab", tab: t, pane: p });
@@ -122,15 +124,46 @@ describe("dropPreview", () => {
   });
 
   it("is the whole pane for its middle, and nothing for a strip (the bar shows it)", () => {
-    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "pane", pane: "p-2" })).toEqual(FRAME.rects["p-2"]);
+    expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "pane", pane: "p-2" })).toEqual({ x: 806, y: 0, w: 794, h: 444 });
     expect(dropPreview(TREE, FRAME, tab("p-1/1", "p-1"), { kind: "strip", pane: "p-2", index: 0 })).toBeNull();
+  });
+
+  it("is the pane as drawn after the drop for its middle: its new active tab's minimum, the pane a drop empties gone, a rail open", () => {
+    // 900 wide: p-a (diff, file) | p-b (prs) | p-c (thread), p-c focused. The diff's 260px and
+    // Pull Requests' 300 do not both fit beside the thread's 360 with two gutters (944 > 900):
+    // p-b, the later of the two never focused, folds.
+    const root = row("s", [0.3, 0.3, 0.4], pane("p-a", "diff", "file"), pane("p-b", "prs"), pane("p-c", "thread:A"));
+    const lay = shellDropLayout([]);
+    const frame = shellFrame({ root, w: 900, h: 600, focus: "p-c" });
+    expect(frame.rects["p-b"]?.rail).toBe(true);
+    // The diff tab onto the rail: the rail takes the focus and opens (and p-a, whose file is
+    // left, folds in its place).
+    const onRail = dropPreview(root, frame, tab("p-a/0", "p-a"), { kind: "pane", pane: "p-b" }, lay);
+    const landed = treeAfterDrop(root, tab("p-a/0", "p-a"), { kind: "pane", pane: "p-b" }, frame)?.root ?? root;
+    expect(onRail).toEqual(rectOf(shellFrame({ root: landed, w: 900, h: 600, focus: "p-b" }), "p-b"));
+    expect(onRail?.w).toBeGreaterThan(36);
+    // Merging p-a into p-c: p-a leaves the row and its room goes to p-b, which opens, so p-c is
+    // not where it is drawn now.
+    const merged = dropPreview(root, frame, whole("p-a"), { kind: "pane", pane: "p-c" }, lay);
+    const after = treeAfterDrop(root, whole("p-a"), { kind: "pane", pane: "p-c" }, frame)?.root ?? root;
+    expect(merged).toEqual(rectOf(shellFrame({ root: after, w: 900, h: 600, focus: "p-c" }), "p-c"));
+    expect(merged).not.toEqual(rectOf(frame, "p-c"));
+  });
+
+  it("leaves the tab after a moved active tab active in its old pane, as the daemon's detach does", () => {
+    const root = row("s", [0.5, 0.5], { ...pane("p-a", "diff", "file", "thread:A"), active: "p-a/1" }, pane("p-b", "prs"));
+    const after = treeAfterDrop(root, tab("p-a/1", "p-a"), { kind: "edge", pane: "p-b", edge: "right" }, { w: 1200, h: 800 });
+    expect(panesOf(after?.root ?? null).find((p) => p.id === "p-a")?.active).toBe("p-a/2");
+    const last = row("s", [0.5, 0.5], { ...pane("p-a", "diff", "file"), active: "p-a/1" }, pane("p-b", "prs"));
+    const after2 = treeAfterDrop(last, tab("p-a/1", "p-a"), { kind: "edge", pane: "p-b", edge: "right" }, { w: 1200, h: 800 });
+    expect(panesOf(after2?.root ?? null).find((p) => p.id === "p-a")?.active).toBe("p-a/0");
   });
 
   it("is a new pane beside the target for a sidebar thread, which leaves nothing behind; no single command opens it", () => {
     const thread: DragSource = { kind: "thread", thread: "s-9" };
     // p-1 splits in two: the thread's pane takes the right half of p-1's room.
     expect(dropPreview(TREE, FRAME, thread, { kind: "edge", pane: "p-1", edge: "right" })).toEqual({ x: 406, y: 0, w: 394, h: 900 });
-    expect(dropPreview(TREE, FRAME, thread, { kind: "pane", pane: "p-2" })).toEqual(FRAME.rects["p-2"]);
+    expect(dropPreview(TREE, FRAME, thread, { kind: "pane", pane: "p-2" })).toEqual({ x: 806, y: 0, w: 794, h: 444 });
     expect(dropCommand(thread, { kind: "pane", pane: "p-2" }, [])).toBeNull();
   });
 
@@ -151,8 +184,9 @@ describe("dropPreview", () => {
       if (!from || !to || !firstTab) continue;
       const source = rand() < 0.5 ? whole(from.id) : tab(firstTab.id, from.id);
       const edge = edges[Math.floor(rand() * 4)] ?? "left";
-      const target: DropTarget = rand() < 0.3 ? { kind: "outer", edge } : { kind: "edge", pane: to.id, edge };
-      if (source.kind === "pane" && target.kind === "edge" && target.pane === from.id) continue;
+      const pick = rand();
+      const target: DropTarget = pick < 0.3 ? { kind: "outer", edge } : pick < 0.5 ? { kind: "pane", pane: to.id } : { kind: "edge", pane: to.id, edge };
+      if (source.kind === "pane" && target.kind !== "outer" && target.pane === from.id) continue;
       const after = treeAfterDrop(root, source, target, { w: 2400, h: 1600 });
       if (!after) continue;
       const frame = plainRects(after.root, 2400, 1600);
@@ -163,5 +197,45 @@ describe("dropPreview", () => {
       const now = panesOf(after.root).flatMap((p) => (p.tabs ?? []).map((t) => t.id)).sort();
       expect(now).toEqual(before);
     }
+  });
+});
+
+const rectOf = (f: { rects: Record<string, { x: number; y: number; w: number; h: number }> }, id: string) => {
+  const r = f.rects[id];
+  return r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+};
+
+/** One case of internal/layout/testdata/drops.json (Go's TestDropCases): a space, and drags with the space each op leaves. */
+interface DropCase {
+  root: GeoNode;
+  w: number;
+  h: number;
+  focus: string;
+  mru: string[] | null;
+  drops: { source: DragSource; target: DropTarget; after: { root: GeoNode; focus: string; mru: string[] | null; pane: string } }[];
+}
+
+/**
+ * The highlight is the rectangle the dropped tab's or pane's pane is drawn at after the drop: the
+ * daemon's own op applied (the shared cases), laid out as the grid draws it (minimums held, rails
+ * folded for the focus and mru the op leaves). Random trees in areas from roomy to folding, every
+ * kind of drag and target; the preview is laid out as the drag layer lays it (shellDropLayout).
+ */
+describe("dropPreview is where the daemon's op puts it, as drawn", () => {
+  const cases = JSON.parse(drops) as DropCase[];
+  const all = cases.flatMap((c, ci) => c.drops.map((d, di) => [`case ${String(ci)} drop ${String(di)}: ${d.source.kind} onto ${d.target.kind}`, c, d] as const));
+
+  it("reads the shared cases: every kind of drag onto every kind of target, many with rails", () => {
+    const kinds = new Set(all.map(([, , d]) => `${d.source.kind}>${d.target.kind}`));
+    expect([...kinds].sort()).toEqual(["pane>edge", "pane>outer", "pane>pane", "tab>edge", "tab>outer", "tab>pane", "thread>edge", "thread>outer", "thread>pane"]);
+    const withRails = all.filter(([, c]) => Object.values(shellFrame({ root: c.root, w: c.w, h: c.h, focus: c.focus, mru: c.mru ?? [] }).rects).some((r) => r.rail));
+    expect(withRails.length).toBeGreaterThan(30);
+  });
+
+  it.each(all)("%s", (_name, c, d) => {
+    const mru = c.mru ?? [];
+    const frame = shellFrame({ root: c.root, w: c.w, h: c.h, focus: c.focus, mru });
+    const want = shellFrame({ root: d.after.root, w: c.w, h: c.h, focus: d.after.focus, mru: d.after.mru ?? [] });
+    expect(dropPreview(c.root, frame, d.source, d.target, shellDropLayout(mru))).toEqual(rectOf(want, d.after.pane));
   });
 });
