@@ -266,7 +266,7 @@ when the first working version is whole. Nothing partial is released.
 | Key | Does |
 | --- | --- |
 | cmd+n | New thread |
-| cmd+t | New terminal tab: linked to the focused tab's thread; with no thread there, linked to nothing, in the home directory |
+| cmd+t | New terminal tab: linked to the focused tab's thread; from a checkout's shell of no thread (a Projects page's), another in that checkout; otherwise linked to nothing, in the home directory |
 | cmd+shift+t | Reopen the most recently closed tab or pane of the space |
 | cmd+j | Quick terminal of the thread: open and focus, focus when open, close when focused. From a linked surface: go to its thread and open it |
 | cmd+shift+j | Ring: the thread, each of its terminal tabs, the thread. From a view it starts at the first terminal |

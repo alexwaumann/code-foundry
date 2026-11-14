@@ -180,6 +180,16 @@ describe("the other terminal keys", () => {
     expect(names()).toEqual([["terminal.new-free", {}]]);
   });
 
+  it("cmd+t from a checkout's shell of no thread (a Projects page's): another in that checkout; the + menu's Terminal there is a free one", async () => {
+    await seedLayout(layoutOf([space(pane("p-1", [tab("t-x", "terminal", "", { params: { terminal: "term-x" } })]), "p-1")]));
+    useTerminalsStore.setState({ byId: { "term-x": { id: "term-x", labels: { kind: "shell", project: "repo-cf", worktree: "/w/feat" } } } as never, order: ["term-x"] });
+    await actions.newTerminalTab();
+    await actions.newTerminalTab({ thread: "", pane: "p-1" });
+    useTerminalsStore.setState({ byId: {}, order: [] });
+    expect(names()).toEqual([["terminal.new", {}], ["terminal.new-free", { pane: "p-1" }]]);
+    expect(runs[0]).toMatchObject({ thread: "" });
+  });
+
   it("the palette's New Terminal in Home Folder (and the + menu's, in its pane): terminal.new-free", async () => {
     await seed("p-1");
     await actions.newFreeTerminalTab();
