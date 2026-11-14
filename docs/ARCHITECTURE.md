@@ -1071,8 +1071,11 @@ verb in `settings.toml` is reported and dropped, never fatal.
   (`shell/identity.ts`, pinned to `internal/layout/testdata/kinds.json` and
   `identity.json`). Surfaces reach their tabs only through the **host seam** (`shell/host.ts`,
   `hostShell.ts`): `openTab` (a user's open takes the focus; `behind` keeps a new tab behind
-  the editor in use), `setTabParams` and `retitleTab` (one ordered queue per tab), `tabPlace`
-  / `useTabPlace` (a thread's linked tabs in its space), `subscribeTabs`. A linked tab's body
+  the editor in use), `setTabParams` and `retitleTab` (each update from the one before),
+  `tabPlace` / `useTabPlace` (a thread's linked tabs in its space), `subscribeTabs`. Every
+  `LayoutService.Apply` the window sends (the seam's, a tab's or pane's focus) goes one at a
+  time in the order made (`stores/layout.ts` `applyLayout`), so one action's ops land in its
+  order (`docs/notes/shell-25i-open-order.md`). A linked tab's body
   acts for its thread (`shell/panelKeyContext.ts`), an unlinked one for what the window has
   focused (`docs/notes/shell-8-host-seam.md`, `shell-gaps-b-surfaces.md`,
   `shell-gaps-c-identity.md`).

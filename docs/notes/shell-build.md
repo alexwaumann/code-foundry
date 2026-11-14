@@ -105,6 +105,9 @@ their stores and their verbs are gone.
     the glue has acted on, so a tab or quick terminal waiting for its fresh shell is never
     closed; a settings file's old dictation chord (cmd+shift+m) is cleared; one full e2e run on
     the combined branch.
+36. `shell-25i-open-order.md`: the window's `LayoutService.Apply` requests go one at a time in
+    the order made (`stores/layout.ts` `applyLayout`), so the sidebar PR tag's opens land in
+    order and the shown pull request's tab ends active.
 
 ## Where the build departs from the plan
 
