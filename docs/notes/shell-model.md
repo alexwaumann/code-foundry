@@ -197,8 +197,8 @@ when the first working version is whole. Nothing partial is released.
     whose linked tabs it held (while the pane keeps a tab), smart swap, a pane moved by direction
     key or drag, a pane moved to another space (where it opens if it is the space's only pane). A
     pane that comes back from cmd+shift+t comes back open.
-- **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus
-  and move keys do nothing while it is on. Escape leaves it from anywhere but a terminal (the shell's own Escape;
+- **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus,
+  move and collapse keys do nothing while it is on. Escape leaves it from anywhere but a terminal (the shell's own Escape;
   cmd+shift+enter leaves from there), a menu or dialog, and a prompt that has a use for the key: an
   open completion or history card, dictation, or the floating composer (which collapses first). An
   empty composer's Escape back to its project's page waits until full screen is off. When the tab is a linked surface, the thread's own composer
