@@ -15,10 +15,7 @@ const LEVELS = ["success", "info", "warning", "error"] as const;
 
 /** Shows a toast through the app's notify (src/lib/notify.ts), by the dev build's module hook. */
 async function show(page: Page, calls: string): Promise<void> {
-  await page.evaluate(
-    (src) => (window.__cfModule?.("/src/lib/notify.ts") as Promise<unknown>).then((m) => new Function("m", src)(m) as unknown),
-    calls,
-  );
+  await page.evaluate(`__cfModule("/src/lib/notify.ts").then((m) => { ${calls}; })`);
 }
 
 /** A slot's colour as the browser computes it (rgb()), to compare with a computed style. */
