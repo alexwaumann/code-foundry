@@ -1328,7 +1328,7 @@ html[data-thread-width="full"] {
 .cf-thread .agent-host:has(> .row:hover, > .agent-open:hover, > .agent-open:focus-visible) > .row .chev {
   display: none;
 }
-/* ---------- inline: a thread inside a plugin's side-panel view (InlineThread) ---------- */
+/* ---------- inline: a thread inside a plugin's surface (InlineThread) ---------- */
 .cf-thread-inline {
   --thread-col: none;
   --thread-dock: none;
@@ -1338,4 +1338,22 @@ html[data-thread-width="full"] {
 }
 .cf-thread-inline .dock {
   padding: 16px 8px 8px;
+}
+/* The Needs-you hover card (components/needs/NeedsCard.tsx): today's prompt look, the command
+   box whole (the card itself scrolls past its maximum), no divider under the one prompt. */
+.cf-thread.cf-needs-card .pend {
+  border-bottom: 0;
+}
+.cf-thread.cf-needs-card .pend .cmdbox {
+  max-height: none;
+  overflow: visible;
+}
+.cf-thread.cf-needs-card .q-text {
+  margin-bottom: 0;
+}
+/* A short shell pane's ask as one line (components/needs/AskStrip.tsx), where the prompts dock. */
+.cf-thread .ccard > .ask-strip {
+  grid-column: 1 / 3;
+  border-bottom: 1px solid var(--cf-border);
+  border-radius: 10px 10px 0 0;
 }

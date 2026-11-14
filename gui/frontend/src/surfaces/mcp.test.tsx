@@ -9,16 +9,19 @@ const commands = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult: commands.run }));
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/api/mcp", async (orig) => ({ ...(await orig<typeof import("@/api/mcp")>()), getMcpStatus: api.get }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
-const { SidePanel } = await import("@/components/panel/SidePanel");
+const { ShellPanes } = await import("@/test/shellPanes");
+const { layoutTabs } = await import("@/test/layoutTabs");
+const { layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
 const { McpGroup } = await import("@/components/threadinfo/McpGroup");
-const { getPanel, usePanelStore } = await import("@/stores/panel");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
 const { useThreadStore } = await import("@/stores/thread");
 const { useUiStore } = await import("@/stores/ui");
 const { setMcpTab, useMcpTabsStore } = await import("@/stores/mcpTabs");
-const { mcpPanelCommand, showView, useViewsStore } = await import("@/stores/views");
+const { useViewsStore } = await import("@/stores/views");
+const { openMcpSurface } = await import("@/stores/mcpPanel");
 
 const thread = (id: string, state = "connected") =>
   ({ id, name: `thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", pendingWorktreePath: "", state, status: "idle", linkedPullRequests: [], usage: [], agentRuns: [] }) as unknown as ThreadView;
@@ -62,14 +65,23 @@ const pick = (bucket: string) => {
   const t = screen.getAllByTestId("mcp-tab").find((x) => x.getAttribute("data-bucket") === bucket) as HTMLElement;
   fireEvent.mouseDown(t, { button: 0 });
 };
-const row = () => screen.queryByTestId("panel-empty")?.querySelector('[data-surface="mcp"]') ?? null;
+/** The kinds of the current space's tabs. */
+const kinds = () => layoutTabs().map((t) => t.kind);
 
-beforeEach(() => {
+/** The window's own open (the thread info card's MCP row): the MCP tab beside the selected thread, once the layout has it. */
+async function openMcp(): Promise<void> {
+  await act(async () => {
+    openMcpSurface();
+    await layoutSettled();
+  });
+}
+
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed("s-r"));
   useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
-  usePanelStore.setState({ byKey: { "thread:s-r": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "thread:s-off": { open: true, groups: [{ tabs: [], activeTabId: null }] }, "view:projects": { open: true, groups: [{ tabs: [], activeTabId: null }] } } });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ windowWidth: 1400, sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
+  useUiStore.setState({ sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
   useMcpTabsStore.setState({ byKey: {} });
   // Stamped per test: a check time taken when the module loaded drifts past 12s under load.
@@ -84,23 +96,20 @@ afterEach(() => {
 });
 
 describe("MCP surface", () => {
-  it("is never listed (the card's MCP row and view.panel.mcp open it), and opens nothing for a page", () => {
-    render(<SidePanel />);
-    expect(row()).toBeNull();
-    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
-    expect(getPanel("thread:s-r").groups[0]?.activeTabId ?? null).toBeNull();
-    act(() => {
-      useUiStore.setState({ selection: { kind: "view", name: "projects" } });
-    });
-    expect(mcpPanelCommand()).toBe(false);
+  it("opens as a tab linked to the thread, beside it; a page has none", async () => {
+    await openMcp();
+    expect(layoutTabs().map((t) => [t.kind, t.thread, t.active])).toEqual([
+      ["thread", "s-r", true],
+      ["mcp", "s-r", true],
+    ]);
+    // Again: the same tab, nothing new.
+    await openMcp();
+    expect(kinds()).toEqual(["thread", "mcp"]);
   });
 
-  it("shows the header and the servers in Connected / Failed / Disabled tabs, Connected first", () => {
-    render(<SidePanel />);
-    act(() => {
-      mcpPanelCommand();
-    });
-    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("mcp");
+  it("shows the header and the servers in Connected / Failed / Disabled tabs, Connected first", async () => {
+    render(<ShellPanes />);
+    await openMcp();
     expect(screen.queryByTestId("mcp-count")).toBeNull();
     expect(screen.getByTestId("mcp-checked").textContent).toBe("Checked 12s ago, at the start of the last turn");
     // Connecting counts as connected; needs login as failed.
@@ -145,12 +154,10 @@ describe("MCP surface", () => {
     expect(within(card("sentry"), "mcp-tools-toggle")).toBeNull();
   });
 
-  it("an empty tab says so; a quiet Failed count is muted", () => {
+  it("an empty tab says so; a quiet Failed count is muted", async () => {
     setMcp("s-r", { ...STATUS, checkedAtMs, servers: STATUS.servers.filter((x) => x.name === "github") });
-    render(<SidePanel />);
-    act(() => {
-      mcpPanelCommand();
-    });
+    render(<ShellPanes />);
+    await openMcp();
     expect(tabCounts().map((t) => t[2])).toEqual(["1", "0", "0"]);
     expect(screen.getAllByTestId("mcp-tab-count")[1]?.className).toContain("text-cf-text-muted");
     for (const [bucket, line] of [
@@ -166,21 +173,17 @@ describe("MCP surface", () => {
     expect(screen.getByTestId("mcp-tab-empty").textContent).toBe("No connected servers.");
   });
 
-  it("no tabs without servers", () => {
+  it("no tabs without servers", async () => {
     setMcp("s-r", { ...STATUS, checkedAtMs, servers: [] });
-    render(<SidePanel />);
-    act(() => {
-      mcpPanelCommand();
-    });
+    render(<ShellPanes />);
+    await openMcp();
     expect(screen.getByTestId("mcp-none").textContent).toBe("Claude has no MCP servers in this thread.");
     expect(screen.queryByTestId("mcp-tabs")).toBeNull();
   });
 
-  it("expands a server's tools with their hint icons", () => {
-    act(() => {
-      showView("panel.mcp");
-    });
-    render(<SidePanel />);
+  it("expands a server's tools with their hint icons", async () => {
+    await openMcp();
+    render(<ShellPanes />);
     expect(screen.queryByTestId("mcp-tools")).toBeNull();
     const toggle = within(card("github"), "mcp-tools-toggle") as HTMLElement;
     expect(toggle.textContent).toBe("2 tools");
@@ -196,46 +199,39 @@ describe("MCP surface", () => {
     expect(screen.queryByTestId("mcp-tools")).toBeNull();
   });
 
-  it("on a page: not in the panel's list, M opens nothing, view.panel.mcp opens nothing", () => {
+  it("on a page: it opens nothing", async () => {
     useUiStore.setState({ selection: { kind: "view", name: "projects" } });
-    render(<SidePanel />);
-    expect(screen.getByTestId("panel-empty")).toBeTruthy();
-    expect(row()).toBeNull();
-    fireEvent.keyDown(screen.getByTestId("side-panel"), { key: "m" });
-    expect(getPanel("view:projects").groups[0]?.activeTabId ?? null).toBeNull();
-    act(() => {
-      showView("panel.mcp");
+    render(<ShellPanes />);
+    await act(async () => {
+      expect(openMcpSurface()).toBeNull();
+      await layoutSettled();
     });
-    expect(getPanel("view:projects").groups[0]?.activeTabId ?? null).toBeNull();
+    expect(kinds()).toEqual(["thread"]);
     expect(screen.queryByTestId("mcp-surface")).toBeNull();
   });
 
   it("the thread info card's MCP row: its menu's Open MCP panel opens the tab", async () => {
-    usePanelStore.setState({ byKey: { "thread:s-r": { open: false, groups: [{ tabs: [], activeTabId: null }] } } });
     render(
       <>
         <McpGroup threadId="s-r" />
-        <SidePanel />
+        <ShellPanes />
       </>,
     );
     fireEvent.pointerDown(screen.getByTestId("ti-mcp"), { button: 0 });
     fireEvent.click(await screen.findByTestId("ti-mcp-open-panel"));
     await act(async () => {
-      await Promise.resolve();
+      await layoutSettled();
     });
-    expect(getPanel("thread:s-r")).toMatchObject({ open: true });
-    expect(getPanel("thread:s-r").groups[0]?.activeTabId).toBe("mcp");
-    expect(screen.getByTestId("panel-body").getAttribute("data-surface")).toBe("mcp");
+    expect(kinds()).toEqual(["thread", "mcp"]);
+    expect(screen.getByTestId("mcp-surface")).toBeTruthy();
   });
 
   it("Reconnect runs thread.mcp-reconnect; meanwhile the card says Connecting… with a spinner", async () => {
     let finish: (v: unknown) => void = () => undefined;
     commands.run.mockImplementation(() => new Promise((r) => (finish = r)));
-    act(() => {
-      showView("panel.mcp");
-    });
+    await openMcp();
     setMcpTab("thread:s-r", "failed");
-    render(<SidePanel />);
+    render(<ShellPanes />);
     fireEvent.click(within(card("playwright"), "mcp-reconnect") as HTMLElement);
     expect(commands.run).toHaveBeenCalledWith("thread.mcp-reconnect", { id: "s-r", server: "playwright" }, expect.objectContaining({ quiet: true }));
     expect(card("playwright").getAttribute("data-status")).toBe("pending");
@@ -256,11 +252,9 @@ describe("MCP surface", () => {
 
   it("toasts Claude's refusal of a reconnect", async () => {
     commands.run.mockResolvedValue({ message: "reconnect linear failed", resultJson: JSON.stringify({ error: "needs a login" }) });
-    act(() => {
-      showView("panel.mcp");
-    });
+    await openMcp();
     setMcpTab("thread:s-r", "failed");
-    render(<SidePanel />);
+    render(<ShellPanes />);
     await act(async () => {
       fireEvent.click(within(card("linear"), "mcp-reconnect") as HTMLElement);
       await Promise.resolve();
@@ -268,33 +262,28 @@ describe("MCP surface", () => {
     expect(toast.error).toHaveBeenCalledWith("Could not reconnect linear", { description: "needs a login" });
   });
 
-  it("refresh runs thread.mcp --refresh", () => {
+  it("refresh runs thread.mcp --refresh", async () => {
     commands.run.mockResolvedValue({ message: "", resultJson: "{}" });
-    act(() => {
-      showView("panel.mcp");
-    });
-    render(<SidePanel />);
+    await openMcp();
+    render(<ShellPanes />);
     fireEvent.click(screen.getByTestId("mcp-refresh"));
     expect(commands.run).toHaveBeenCalledWith("thread.mcp", { id: "s-r", refresh: "true" }, expect.objectContaining({ quiet: true }));
   });
 
-  it("asks once for a thread never checked, running or not; the empty state never mentions running", () => {
+  it("asks once for a thread never checked, running or not; the empty state never mentions running", async () => {
     setMcp("s-r", null);
-    act(() => {
-      showView("panel.mcp");
-    });
-    render(<SidePanel />);
+    await openMcp();
+    render(<ShellPanes />);
     expect(screen.getByTestId("mcp-empty").textContent).toBe("Checking MCP servers…");
     expect(api.get).toHaveBeenCalledTimes(1);
     expect(api.get).toHaveBeenCalledWith("s-r");
     cleanup();
 
+    await resetFakeLayout(threadSeed("s-off"));
     useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
     setMcp("s-off", null);
-    act(() => {
-      showView("panel.mcp");
-    });
-    render(<SidePanel />);
+    await openMcp();
+    render(<ShellPanes />);
     expect(screen.getByTestId("mcp-empty").textContent).toBe("No MCP status yet. Refresh to check.");
     expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(false);
     // McpStatus without refresh: the cached status, no start.
@@ -302,15 +291,14 @@ describe("MCP surface", () => {
     expect(api.get).toHaveBeenLastCalledWith("s-off");
   });
 
-  it("a stopped thread keeps its last status, with Refresh and Reconnect enabled (the daemon starts Claude for them)", () => {
+  it("a stopped thread keeps its last status, with Refresh and Reconnect enabled (the daemon starts Claude for them)", async () => {
     commands.run.mockResolvedValue({ message: "", resultJson: "{}" });
+    await resetFakeLayout(threadSeed("s-off"));
     useUiStore.setState({ selection: { kind: "thread", id: "s-off" } });
     setMcp("s-off", STATUS);
-    act(() => {
-      showView("panel.mcp");
-    });
+    await openMcp();
     setMcpTab("thread:s-off", "failed");
-    render(<SidePanel />);
+    render(<ShellPanes />);
     expect(screen.getByTestId<HTMLButtonElement>("mcp-refresh").disabled).toBe(false);
     const reconnect = within(card("linear"), "mcp-reconnect") as HTMLButtonElement;
     expect(reconnect.disabled).toBe(false);
@@ -324,12 +312,11 @@ describe("MCP surface", () => {
 describe("MCP surface staleness", () => {
   const header = () => screen.getByTestId("mcp-header");
   const pills = () => cards().map((c) => within(c, "mcp-pill") as HTMLElement);
-  function open(id: string): void {
+  async function open(id: string): Promise<void> {
+    await resetFakeLayout(threadSeed(id));
     useUiStore.setState({ selection: { kind: "thread", id } });
-    act(() => {
-      showView("panel.mcp");
-    });
-    render(<SidePanel />);
+    await openMcp();
+    render(<ShellPanes />);
   }
   function expectStale(on: boolean): void {
     expect(header().getAttribute("data-stale")).toBe(on ? "true" : null);
@@ -349,18 +336,18 @@ describe("MCP surface staleness", () => {
     ["running, checked 12s ago: current", "s-r", 12_000, false, "Checked 12s ago, at the start of the last turn"],
     ["running, checked 12m ago: stale", "s-r", 12 * 60_000, true, "Last check 12m ago · may be out of date"],
     ["Claude not running, checked 12s ago: stale", "s-off", 12_000, true, "Last check 12s ago · may be out of date"],
-  ])("%s", (_name, id, ago, stale, line) => {
+  ])("%s", async (_name, id, ago, stale, line) => {
     setMcp(id, { ...STATUS, checkedAtMs: Date.now() - ago });
-    open(id);
+    await open(id);
     expect(screen.getByTestId("mcp-checked").textContent).toBe(line);
     expectStale(stale);
   });
 
-  it("goes stale on its own once the check turns 10 min old, and when Claude stops", () => {
-    vi.useFakeTimers();
+  it("goes stale on its own once the check turns 10 min old, and when Claude stops", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       setMcp("s-r", { ...STATUS, checkedAtMs: Date.now() - 9 * 60_000 - 50_000 });
-      open("s-r");
+      await open("s-r");
       expectStale(false);
       act(() => {
         vi.advanceTimersByTime(15_000);
@@ -385,7 +372,7 @@ describe("MCP surface staleness", () => {
     let finish: (v: unknown) => void = () => undefined;
     commands.run.mockReturnValue(new Promise((r) => (finish = r)));
     setMcp("s-off", STATUS);
-    open("s-off");
+    await open("s-off");
     expectStale(true);
     fireEvent.click(screen.getByTestId("mcp-refresh"));
     expectStale(false);

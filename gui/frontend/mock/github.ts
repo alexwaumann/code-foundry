@@ -21,7 +21,6 @@ import {
   type ActivityStatsSchema,
 } from "../src/gen/codefoundry/v1/gh_pb";
 import type { ProjectEventSchema, WorktreeDetailSchema } from "../src/gen/codefoundry/v1/project_pb";
-import type { UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import { PrDetailWorld } from "./prDetail";
 import { PrDiffWorld } from "./prDiff";
 
@@ -90,7 +89,6 @@ interface ActivityInit {
 type DetailInit = MessageInitShape<typeof WorktreeDetailSchema>;
 type GhEventInit = MessageInitShape<typeof GhEventSchema>;
 type ProjectEventInit = MessageInitShape<typeof ProjectEventSchema>;
-type IntentInit = MessageInitShape<typeof UiIntentSchema>;
 type FileInit = { path: string; status: string; added?: number; deleted?: number; binary?: boolean; uncommitted?: boolean; oldPath?: string };
 
 const HOME = "/Users/dev";
@@ -579,15 +577,25 @@ export function ghEvent(e: GhEventInit) {
   return { source: EventSource.GH, event: { event: { case: "gh" as const, value: e } } };
 }
 
-/** view.pullrequests and view.projects in the mock registry (view.open.url is in mock/gitops.ts, like 3c). */
-export function viewCommands(emit: (intent: IntentInit) => number) {
+/** --pane of the page verbs: the pane's "+" menu (internal/command openPaneArg). */
+const pagePaneArg = { name: "pane", type: ArgType.STRING, required: false, description: "Open the tab in this pane (the pane's + menu); a linked tab that is already open is focused where it is" };
+
+/**
+ * view.pullrequests and view.projects in the mock registry (view.open.url is in mock/gitops.ts, like 3c),
+ * like the daemon's (commands_view.go showPageTab): the page's tab in the current space (--pane: that
+ * pane), focused for the user's call (the app, the CLI outside a thread), from a thread only with
+ * --focus. The tab is the whole effect: no intent goes out (docs/notes/shell-22-retire-verbs.md).
+ */
+export function viewCommands(openTab: (kind: string, pane: string, params: Record<string, string> | undefined, focus: boolean) => void) {
+  const focusOf = (ctx: { activeView?: string; activeThreadId?: string } | undefined, a: Record<string, string>) =>
+    a.focus !== undefined ? a.focus === "true" : Boolean(ctx?.activeView) || !ctx?.activeThreadId;
   return [
     {
-      cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page", keybindings: ["cmd+shift+d"], args: [] },
+      cmd: { name: "view.pullrequests", title: "Show Pull Requests", category: "View", description: "Show the Pull Requests page, its tab in the current space", keybindings: [], args: [pagePaneArg] },
       when: () => true,
-      run: () => {
-        emit({ intent: { case: "showView", value: { name: "pullrequests" } } });
-        return ""; // like the daemon: no toast
+      run: (ctx: { activeView?: string; activeThreadId?: string } | undefined, a: Record<string, string> = {}) => {
+        openTab("prs", a.pane ?? "", undefined, focusOf(ctx, a));
+        return ""; // like the daemon in the app: no toast
       },
     },
     {
@@ -595,18 +603,20 @@ export function viewCommands(emit: (intent: IntentInit) => number) {
         name: "view.projects",
         title: "Show Projects",
         category: "View",
-        description: "Show the Projects page: each project's worktrees and each workspace's members; --project or --workspace opens that one's page",
-        keybindings: ["cmd+shift+j"],
+        description: "Show the Projects page, its tab in the current space: each project's worktrees and each workspace's members; --project or --workspace opens that one's page",
+        keybindings: [],
         args: [
           { name: "project", type: ArgType.STRING, required: false, description: "Open this project's page" },
           { name: "workspace", type: ArgType.STRING, required: false, description: "Open this workspace's page" },
+          pagePaneArg,
         ],
       },
       when: () => true,
-      run: (_ctx: unknown, a: Record<string, string> = {}) => {
-        // Like the daemon: which page in the ShowView's params (the ids as given; the mock resolves no names).
+      run: (ctx: { activeView?: string; activeThreadId?: string } | undefined, a: Record<string, string> = {}) => {
+        // Like the daemon: which page in the tab's params (the ids as given; the mock resolves no
+        // names); none is the index, an open tab's page left.
         const params: Record<string, string> = a.project ? { project: a.project } : a.workspace ? { workspace: a.workspace } : {};
-        emit({ intent: { case: "showView", value: { name: "projects", params } } });
+        openTab("projects", a.pane ?? "", params, focusOf(ctx, a));
         return "";
       },
     },

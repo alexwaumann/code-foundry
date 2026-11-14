@@ -87,6 +87,7 @@ func decode(data []byte) (map[string]string, error) {
 	}
 	renameMovedKeys(raw)
 	dropRetiredKeys(raw)
+	dropRetiredChords(raw)
 	return raw, nil
 }
 
@@ -95,10 +96,12 @@ func decode(data []byte) (map[string]string, error) {
 // projects.worktree_dir went when the app took over where worktrees go (always
 // <config home>/worktrees/<owner>/<repo>/<branch>). threads.show_created_threads went
 // when a thread another thread created was never in the sidebar any more
-// (docs/notes/no-sidebar-override-2-daemon.md).
+// (docs/notes/no-sidebar-override-2-daemon.md). appearance.panel_keep_open went with the
+// side panel (docs/notes/shell-22-retire-verbs.md).
 var retiredKeys = []string{
 	GroupProjects + ".worktree_dir",
 	GroupThreads + ".show_created_threads",
+	GroupAppearance + ".panel_keep_open",
 }
 
 // movedKeys are settings that took a new key: old key -> new key. A file that still sets
@@ -131,6 +134,35 @@ func renameMovedKeys(raw map[string]string) {
 func dropRetiredKeys(raw map[string]string) {
 	for _, k := range retiredKeys {
 		delete(raw, k)
+	}
+}
+
+// retiredChords are keybindings a command once had by default that another command has
+// now: keybinding key -> that chord. A file that binds the command to exactly that chord
+// (in any spelling the keybinding parser reads as it) reads as unset, so the command keeps
+// its default now and the chord's new owner gets it; the next save leaves it out. Any other
+// chord the user bound stays. dictation.toggle had cmd+shift+m by default until 2026-11-03
+// (the hold key replaced it); pane.collapse has it now
+// (docs/notes/shell-25g-race-chord.md).
+var retiredChords = map[string]string{
+	KeybindingKey("dictation.toggle"): "cmd+shift+m",
+}
+
+// dropRetiredChords deletes raw's retiredChords.
+func dropRetiredChords(raw map[string]string) {
+	field := Field{Type: Keybinding}
+	for k, old := range retiredChords {
+		v, ok := raw[k]
+		if !ok {
+			continue
+		}
+		got, err := field.parse(v)
+		if err != nil {
+			continue
+		}
+		if want, _ := field.parse(old); got == want {
+			delete(raw, k)
+		}
 	}
 }
 

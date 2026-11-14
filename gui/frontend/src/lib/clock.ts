@@ -38,7 +38,7 @@ function subscribe(periodMs: number, cb: () => void): () => void {
  * One subscribe function per period. useSyncExternalStore resubscribes whenever it gets a
  * new function; an inline one did so on every render, and when the caller was the
  * period's only subscriber each resubscribe restarted the clock with a new `now`, which
- * rendered again: an endless loop (seen with a lone useNow(30_000) in the side panel).
+ * rendered again: an endless loop (seen with a lone useNow(30_000) in a panel surface).
  */
 const subscribers = new Map<number, (cb: () => void) => () => void>();
 

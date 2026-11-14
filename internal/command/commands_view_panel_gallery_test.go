@@ -11,7 +11,6 @@ import (
 
 	"connectrpc.com/connect"
 
-	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
 )
@@ -45,25 +44,25 @@ func TestPanelGallery(t *testing.T) {
 		says         string
 	}{
 		{name: "captions stay with their images, in order", args: args(`[{"path":"/tmp/b.jpg","caption":"Before"},{"path":"/wt/a.png"}]`),
-			wantTitle: "Shots", wantImages: `[{"path":"/tmp/b.jpg","caption":"Before","stamp":22},{"path":"/wt/a.png","stamp":11}]`, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+			wantTitle: "Shots", wantImages: `[{"path":"/tmp/b.jpg","caption":"Before","stamp":22},{"path":"/wt/a.png","stamp":11}]`, wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
 		{name: "a relative path reads against the checkout", args: args(`[{"path":"a.png"}]`),
-			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","stamp":11}]`, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","stamp":11}]`, wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
 		{name: "a caption and a title are model text", args: map[string]string{"title": "  Sh\u202eots\n", "images": `[{"path":"/wt/a.png","caption":" two\nlines\u202e "}]`},
-			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","caption":"two lines","stamp":11}]`, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","caption":"two lines","stamp":11}]`, wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
 		{name: "in the app, no message", ctx: command.Context{ActiveThreadID: "s-aaaaaaaaaaa1", ActiveView: "thread"}, args: args(`[{"path":"/wt/a.png"}]`),
 			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","stamp":11}]`},
 		{name: "no window open", args: args(`[{"path":"/wt/a.png"}]`), noWindow: true,
-			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","stamp":11}]`, wantMsg: command.NoWindowMessage},
+			wantTitle: "Shots", wantImages: `[{"path":"/wt/a.png","stamp":11}]`, wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; no app window is open"},
 		{name: "what will not show warns and keeps its place",
 			args:      args(`[{"path":"/wt/gone.png","caption":"Gone"},{"path":"/wt/a.png"},{"path":"/wt/shots"},{"path":"/wt/notes.txt"},{"path":"/wt/huge.png"},{"path":"/etc/c.png"}]`),
-			wantTitle: "Shots", wantMsg: "windows=1 thread=s-aaaaaaaaaaa1",
+			wantTitle: "Shots", wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1",
 			wantImages: `[{"path":"/wt/gone.png","caption":"Gone"},{"path":"/wt/a.png","stamp":11},{"path":"/wt/shots"},{"path":"/wt/notes.txt"},{"path":"/wt/huge.png"},{"path":"/etc/c.png"}]`,
 			wantWarnings: []string{"/wt/gone.png: no such file", "/wt/shots: a directory, not an image", "/wt/notes.txt: not an image (text/plain)",
 				"/wt/huge.png: larger than the 32 MiB the tab reads", "/etc/c.png: /etc/c.png is outside the home directory"}},
 		{name: "none can show", args: args(`[{"path":"/wt/gone.png"},{"path":"/wt/shots"}]`), argErr: "images", says: "none of the 2 images can be shown: /wt/gone.png: no such file"},
 		{name: "an SVG reads as text, so its limit is 1 MiB", args: args(`[{"path":"/wt/big.svg"}]`), argErr: "images", says: "none of the 1 images can be shown: /wt/big.svg: larger than the 1 MiB the tab reads"},
 		{name: "an SVG at that limit shows", args: args(`[{"path":"/wt/small.svg"}]`),
-			wantTitle: "Shots", wantImages: `[{"path":"/wt/small.svg","stamp":33}]`, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
+			wantTitle: "Shots", wantImages: `[{"path":"/wt/small.svg","stamp":33}]`, wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
 		{name: "a path too long", args: args(`[{"path":"/wt/` + strings.Repeat("x", 1021) + `"}]`), argErr: "images", says: "image 1's path has 1025 bytes, at most 1024"},
 		{name: "a blank title", args: map[string]string{"title": " \n ", "images": `[{"path":"/wt/a.png"}]`}, argErr: "title", says: "needs a title"},
 		{name: "a title too long", args: map[string]string{"title": strings.Repeat("x", 81), "images": `[{"path":"/wt/a.png"}]`}, argErr: "title", says: "at most 80"},
@@ -91,11 +90,11 @@ func TestPanelGallery(t *testing.T) {
 				if !strings.Contains(err.Error(), tt.says) {
 					t.Errorf("error = %q, want it to say %q", err, tt.says)
 				}
-				sameIntents(t, emit.Intents(), nil)
+				openedNothing(t, reg, emit)
 				return
 			}
 			want := map[string]string{"title": tt.wantTitle, "images": tt.wantImages, "project": "r1", "base": "/wt"}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelGallery, "s-aaaaaaaaaaa1", want)})
+			openedTab(t, reg, emit, res, "s-aaaaaaaaaaa1", want)
 			if res.Message != tt.wantMsg {
 				t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 			}
@@ -126,8 +125,8 @@ func TestPanelGalleryLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(emit.Intents()) != 1 {
-		t.Fatalf("intents = %d, want 1", len(emit.Intents()))
+	if tb := opened(t, reg, res); tb.Kind != "gallery" || len(emit.Intents()) != 0 {
+		t.Fatalf("tab = %+v, intents = %v: want the gallery's tab and no intent", tb, emit.Intents())
 	}
 	if n := len(res.Warnings); n != 6 || res.Warnings[5] != "and 194 more images that cannot be shown" {
 		t.Errorf("warnings = %q", res.Warnings)

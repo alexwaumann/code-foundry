@@ -1,0 +1,111 @@
+{
+  "doc": "Rule 3: below wins over above; terminals follow the same rules (no below default of their own).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-t","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-t"
+            },
+            {
+              "t": "split",
+              "id": "s-m",
+              "dir": "row",
+              "kids": [
+                {"t":"pane","id":"p-l","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"},
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {"t":"pane","id":"p-r","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+              ],
+              "sizes": [0.2,0.4,0.4]
+            },
+            {
+              "t": "pane",
+              "id": "p-u",
+              "tabs": [{"id":"t-u","kind":"file","thread":"th-c","params":{"path":"/r/t-u"}}],
+              "active": "t-u"
+            }
+          ],
+          "sizes": [0.25,0.5,0.25]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-t",
+              "tabs": [
+                {"id":"t-t","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-t"
+            },
+            {
+              "t": "split",
+              "id": "s-m",
+              "dir": "row",
+              "kids": [
+                {"t":"pane","id":"p-l","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"},
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {"t":"pane","id":"p-r","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+              ],
+              "sizes": [0.2,0.4,0.4]
+            },
+            {
+              "t": "pane",
+              "id": "p-u",
+              "tabs": [
+                {"id":"t-u","kind":"file","thread":"th-c","params":{"path":"/r/t-u"}},
+                {"id":"t-n1","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.25,0.5,0.25]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-u","tab":"t-n1","rule":"3"}
+}

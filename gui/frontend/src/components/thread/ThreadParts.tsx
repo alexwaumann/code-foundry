@@ -1,23 +1,18 @@
-import { useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Folders, House, Layers, type LucideIcon } from "lucide-react";
+import { type ReactNode } from "react";
+import { ChevronRight, Folders, House, Layers, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { movingLabel, movingTo } from "@/lib/move";
+import { movingLabel } from "@/lib/move";
 import { crumbLink, crumbParent, crumbPlace, type CrumbIcon, type CrumbParent } from "@/lib/threadCrumb";
-import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { useMovePickerStore } from "@/stores/movePicker";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./menuKit";
 import { MovePicker } from "./MovePicker";
 import { useCanMove } from "./useNoProject";
-import { ThreadMenuItems } from "./ThreadMenuItems";
-import { TranscriptDeletedChip } from "./TranscriptDeleted";
+import { useMovingTo } from "./useMovingTo";
 
 /** The place icons other than one project's (that one is the project's kind icon). */
 const crumbIcons: Readonly<Record<Exclude<CrumbIcon, "folder">, LucideIcon>> = { layers: Layers, folders: Folders, house: House };
@@ -36,21 +31,6 @@ function usePlaceInput(id: string) {
       };
     }),
   );
-}
-
-/**
- * Where the thread is moving to, by name (lib/move movingTo): its pending_move, else a
- * move this window sent and the daemon has not answered; null when it is not moving.
- */
-function useMovingTo(id: string): string | null {
-  const pending = useThreadsStore(useShallow((s) => {
-    const m = s.byId[id]?.pendingMove;
-    return m ? { projectId: m.projectId, workspaceId: m.workspaceId } : null;
-  }));
-  const sending = useMovePickerStore((s) => s.sending[id]);
-  const project = useProjectsStore((s) => (pending?.projectId ? s.byId[pending.projectId]?.name : undefined));
-  const workspace = useWorkspacesStore((s) => (pending?.workspaceId ? s.byId[pending.workspaceId]?.name : undefined));
-  return movingTo(pending, sending, { project: () => project, workspace: () => workspace });
 }
 
 /** The crumb's separator. */
@@ -157,74 +137,6 @@ export function ThreadCrumb({ id, run }: { id: string; run?: { parent: ReactNode
           </>
         )
       )}
-    </span>
-  );
-}
-
-const STALE_TIP = "Plugin environment changed · Restart Claude from this menu";
-
-/**
- * The thread's title as a menu button: its name, then a small muted chevron, always
- * shown. It opens the thread's menu (ThreadMenuItems, the sidebar row's items verbatim):
- * Enter or Space from the keyboard. While the menu is up the button stays pressed. While a
- * plugin's environment changed since Claude started, a warning dot on the chevron says so
- * (its tooltip points at the menu's Restart Claude).
- */
-function ThreadTitleMenu({ id }: { id: string }) {
-  const name = useThreadsStore((s) => s.byId[id]?.name || id);
-  // The daemon's cut of the first prompt until the utility model's title lands, or a name being
-  // regenerated (thread.regenerate-name): muted and italic, as in the sidebar.
-  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
-  // With the card off nothing else says it: a warning dot on the chevron, and the menu has Restart Claude.
-  const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
-  const [open, setOpen] = useState(false);
-  return (
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <Tip label={stale ? STALE_TIP : null} data-testid="thread-title-stale-tip">
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "flex h-6 min-w-12 shrink-[100] cursor-pointer items-center gap-1 rounded-md px-1.5 text-label font-medium text-cf-text outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover dark:hover:bg-cf-control-hover/50 dark:aria-expanded:bg-cf-control-hover/50",
-            )}
-            data-testid="thread-title"
-          >
-            <span className={cn("truncate", provisional && "text-cf-text-muted italic")} data-testid="thread-title-name">
-              {name}
-            </span>
-            <span className="relative flex shrink-0">
-              <ChevronDown className="size-3.5 text-cf-text-muted" aria-hidden />
-              {stale && <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-cf-warning" data-testid="thread-title-stale" role="img" aria-label={STALE_TIP} />}
-            </span>
-          </button>
-        </DropdownMenuTrigger>
-      </Tip>
-      <DropdownMenuContent
-        align="start"
-        className="min-w-52"
-        data-testid="thread-title-menu"
-        onCloseAutoFocus={(e) => {
-          if (!keepFocusAfterMenu(id)) return;
-          e.preventDefault();
-          focusPromptAfterMenu(id);
-        }}
-      >
-        <ThreadMenuItems id={id} kit={dropdownMenuKit} />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-/**
- * Left side of a thread's header: the crumb (where it runs, its parent), then the title
- * and its menu, then "Transcript deleted" when Claude Code deleted the transcript.
- */
-export function ThreadTitle({ id }: { id: string }) {
-  return (
-    <span className="flex min-w-0 flex-1 items-center gap-1" data-testid="thread-title-bar">
-      <ThreadCrumb id={id} />
-      <ThreadTitleMenu id={id} />
-      <TranscriptDeletedChip id={id} />
     </span>
   );
 }

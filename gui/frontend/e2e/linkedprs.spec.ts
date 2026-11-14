@@ -30,17 +30,24 @@ test.beforeEach(async () => {
 // "one PR: the sidebar tag opens it in that thread's panel and selects the thread" and "several PRs: the
 // sidebar tag opens each in its thread's panel, the shown one active, and selects the thread", merged:
 // which pull requests the tag opens and the selection are src/components/sidebar/SidebarRow.test.tsx's
-// ("SidebarRow linked PR tag click"); this keeps the surface rendering in the newly selected thread's panel.
+// ("SidebarRow linked PR tag click"); where the linked tabs go, shell/linked.test.ts. This keeps the surface
+// rendering in tabs linked to the newly opened thread. A Needs you row has no tag (s-2's): s-3 here.
 test("the sidebar tag opens its pull requests as tabs in the thread's panel, the shown one's surface, and the prompt keeps no focus", async ({ page }) => {
-  await link("s-2", 12, 10 * MIN, "alexwaumann/ghostty-playground");
-  await link("s-2", 147, 2 * MIN);
+  await link("s-3", 12, 10 * MIN, "alexwaumann/ghostty-playground");
+  await link("s-3", 147, 2 * MIN);
   await openApp(page);
   await row(page, "s:s-1").click();
-  await row(page, "s:s-2").getByTestId("row-linked-prs").click();
-  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
+  await row(page, "s:s-3").getByTestId("row-linked-prs").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-3");
   await expect(page.getByTestId("pr-surface")).toBeVisible();
   await expect(page.getByTestId("pr-repo")).toHaveText("alexwaumann/ghostty-playground #12");
-  await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveCount(2);
+  // Both are tabs linked to s-3, in one pane beside the thread's.
+  const prTabs = page.locator('[data-testid="shell-tab"][data-kind="pullrequest"]');
+  await expect(prTabs).toHaveCount(2);
+  const prPane = page.locator('[data-testid="shell-pane"]').filter({ has: prTabs.first() });
+  await expect(prPane.locator('[data-testid="shell-tab"][data-kind="pullrequest"]')).toHaveCount(2);
+  await expect(prPane.locator('[data-testid="thread-pane"]')).toHaveCount(0);
   await expect(card(page)).toHaveCount(0);
   // The row's own click did not run: the prompt does not take the keyboard.
   await expect(page.getByTestId("thread-composer").locator("textarea, [contenteditable=true]").first()).not.toBeFocused();

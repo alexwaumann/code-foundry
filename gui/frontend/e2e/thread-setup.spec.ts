@@ -53,7 +53,8 @@ test("the rows arrive under the message without moving it, and the turn's header
 });
 
 test("the fold line keeps its place on screen as it opens and closes, in a list that scrolls", async ({ page }) => {
-  await page.setViewportSize({ width: 1000, height: 340 });
+  // Short enough that the list scrolls under the window shell's top bar and tab strip.
+  await page.setViewportSize({ width: 1000, height: 400 });
   await setup("done");
   await row(page, `s:${THREAD}`).click();
   const fold = page.getByTestId("thread-setup-fold");
@@ -63,6 +64,7 @@ test("the fold line keeps its place on screen as it opens and closes, in a list 
   await fold.click();
   await expect(page.getByTestId("thread-setup-line")).toHaveCount(4);
   expect(await top(fold)).toBe(at);
+  expect(await page.getByTestId("thread-timeline").evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
   await fold.click();
   await expect(page.getByTestId("thread-setup-line")).toHaveCount(0);

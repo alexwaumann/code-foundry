@@ -1,0 +1,125 @@
+{
+  "doc": "Snoozing closes the thread like a close (its set remembered), ends its terminals while keeping them in the set as fresh shells, and takes its terminal tabs in other spaces into the set too, each with the space it was in.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {
+                  "id": "t-x",
+                  "kind": "terminal",
+                  "thread": "th-a",
+                  "params": {"terminal":"term-x"},
+                  "name": "dev"
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-y",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-y","kind":"terminal","thread":"th-a","params":{"terminal":"term-y"}}
+          ],
+          "active": "t-p"
+        },
+        "focus": "p-y"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"snooze_thread","thread":"th-a","ran":{"term-x":"make dev"}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {"id":"sp-a","name":"Space A","root":null},
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {"t":"pane","id":"p-y","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-y"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true
+            },
+            {
+              "tab": {
+                "id": "t-x",
+                "kind": "terminal",
+                "thread": "th-a",
+                "params": {"terminal":"term-x"},
+                "name": "dev"
+              },
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true,
+              "beside": {"neighbours":["p-a"],"edge":"right","frac":0.4},
+              "fresh": {"name":"dev","ran":"make dev"}
+            },
+            {
+              "tab": {"id":"t-y","kind":"terminal","thread":"th-a","params":{"terminal":"term-y"}},
+              "space": "sp-b",
+              "pane": "p-y",
+              "index": 1,
+              "fresh": {}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {
+    "space": "sp-a",
+    "pane": "p-a",
+    "tab": "t-a",
+    "closed": ["t-a"],
+    "kept": ["t-d","t-x","t-y"],
+    "ended": ["t-x","t-y"]
+  }
+}

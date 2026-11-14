@@ -5,10 +5,9 @@ import { FileEmptyState, FileLoading, NoticeBar } from "@/components/files/state
 import { REFRESH_DEBOUNCE_MS, useOnWindowVisible, useTabRead, useThrottled, useWorktreeChanges } from "@/components/files/useTabRead";
 import { Button } from "@/components/ui/button";
 import { useHeight, useWidth } from "@/lib/useWidth";
-import { openDiffInPanel } from "@/stores/filePanel";
-import { retitlePanelTab, setPanelTabParams } from "@/stores/panel";
+import { retitleTab, setTabParams } from "@/shell/host";
 import { findWorktree, useProjectsStore } from "@/stores/projects";
-import { diffTab, FROM_THREAD, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
+import { diffOfTab, diffTab, FROM_THREAD, sameSource, sourceParam, type DiffTarget } from "@/surfaces/diffTarget";
 import { CommitBand } from "./CommitBand";
 import { CommitList } from "./CommitList";
 import { commitsHeight, commitsShown, leaveCommit, listSides, viewCommit } from "./commits";
@@ -80,22 +79,19 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
   const compareName = view ? diffTitle(view, { branch, remotes, ...place }) : "";
   const named = target.heading ? inProject(target.heading, place) : !view ? tabTitle : target.thread ? `${FROM_THREAD} · ${compareName}` : compareName;
   useEffect(() => {
-    if (named !== tabTitle) retitlePanelTab("current", tabId, named);
+    if (named !== tabTitle) retitleTab("current", tabId, named);
   }, [named, tabTitle, tabId]);
 
-  const go = useCallback(
-    (t: Partial<DiffTarget>) => {
-      openDiffInPanel("current", { ...target, ...t }, named);
-    },
-    [target, named],
-  );
-  // What the tab keeps as it is used: nothing about that opens or activates it.
+  // What the tab shows and keeps as it is used: nothing about that opens or activates it. Each
+  // change goes over the tab's newest params (one still on its way included, the seam's queue),
+  // not the ones this render read, so two changes in a row (a filter, then a swap) both stand.
   const keep = useCallback(
     (t: Partial<DiffTarget>) => {
-      setPanelTabParams("current", tabId, diffTab({ ...target, ...t }).params);
+      setTabParams("current", tabId, (now) => diffTab({ ...(diffOfTab({ params: now }) ?? target), ...t }).params);
     },
     [target, tabId],
   );
+  const go = keep;
   // The first file shown is the tab's from here on, or the next one to sort above it takes over.
   useEffect(() => {
     if (!target.file && current) keep({ file: current.path, oldPath: current.oldPath });
@@ -248,7 +244,7 @@ function Comparison({ tabId, tabTitle, target }: { tabId: string; tabTitle: stri
 }
 
 /**
- * The side panel's Diff surface (surfaces/diff.ts): two sources of one checkout, compared
+ * The Diff surface (surfaces/diff.ts): two sources of one checkout, compared
  * file by file. The list comes from ProjectService.CompareWorktree and only the file on
  * screen is read. It is a rail beside the diff when the panel is wide and a list above it
  * when narrow. It does not take focus when it mounts. docs/notes/diff-viewer-2.md.

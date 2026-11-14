@@ -1,0 +1,93 @@
+{
+  "doc": "Closing a pane closes its thread tabs as threads: the thread's linked tabs elsewhere in the space are remembered, and a pane they emptied goes too.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"},{"id":"t-p","kind":"prs"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            },
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.4,0.3,0.3]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-f","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_pane","pane":"p-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-c",
+          "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+          "active": "t-f"
+        },
+        "focus": "p-c",
+        "mru": ["t-f"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj-1","worktree":"w-1"}
+              },
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true,
+              "beside": {"neighbours":["p-a"],"edge":"right","frac":0.4285714285714286}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-a","closed":["t-a","t-p"],"kept":["t-d"]}
+}

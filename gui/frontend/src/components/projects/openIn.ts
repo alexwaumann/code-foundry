@@ -14,7 +14,7 @@ export interface OpenInTarget {
   terminal: (() => void) | null;
 }
 
-/** A checkout's: worktree.reveal, worktree.open.editor, a new terminal in it (the page's bottom panel). */
+/** A checkout's: worktree.reveal, worktree.open.editor, a new terminal in it (a terminal tab). */
 export function checkoutOpenIn(projectId: string, path: string): OpenInTarget {
   const ctx = () => worktreeContext(projectId, path);
   return {

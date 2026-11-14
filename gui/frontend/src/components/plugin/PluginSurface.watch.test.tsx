@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandView } from "@/api/command";
 import type { PluginView } from "@/api/plugin";
@@ -11,9 +11,10 @@ vi.mock("@/stores/pluginSurfaces", async (orig) => ({ ...(await orig<typeof impo
 const { PluginSurface } = await import("./PluginSurface");
 const { useCommandsStore } = await import("@/stores/commands");
 const { contextKey, getUiContext } = await import("@/stores/context");
-const { makeTab } = await import("@/stores/panel");
+const { makeTab } = await import("@/shell/host");
 const { applyPluginEvent, usePluginsStore } = await import("@/stores/plugins");
 const { useUiStore } = await import("@/stores/ui");
+const { PanelKeyContext } = await import("@/shell/panelKeyContext");
 
 const hello = {
   name: "hello",
@@ -44,5 +45,20 @@ describe("PluginSurface", () => {
     expect(watchKey).not.toBe("");
     expect(ref).toMatchObject({ plugin: "hello", surface: "demo" });
     expect(ref.context.activeThreadId).toBe("s-3");
+  });
+
+  it("a tab linked to a thread watches with its thread's context, whatever the window shows", () => {
+    render(
+      <PanelKeyContext value="thread:s-7">
+        <PluginSurface tab={makeTab("plugin.hello.demo", "Hello Demo")} />
+      </PanelKeyContext>,
+    );
+    const [, ref] = startSurfaceWatch.mock.calls[0] as unknown as [string, { context: { activeThreadId: string } }];
+    expect(ref.context.activeThreadId).toBe("s-7");
+    // Another tab focused (the window selects nothing): the watch stays its thread's.
+    act(() => {
+      useUiStore.setState({ selection: { kind: "none" } });
+    });
+    expect(startSurfaceWatch).toHaveBeenCalledTimes(1);
   });
 });

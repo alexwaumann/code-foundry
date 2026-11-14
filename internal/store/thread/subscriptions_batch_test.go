@@ -68,16 +68,17 @@ func sum(ns []int) int {
 
 // The batch window: thread wakes to one subscriber that fire within the window of the
 // last one are one message; later ones are another; without batching each goes alone.
+// The window's clock is the test's: it moves only between steps.
 func TestWakeBatchWindow(t *testing.T) {
 	const w = 300 * time.Millisecond
-	// A plan's steps: settle child i (>= 0), sleep, or wait for n messages.
+	// A plan's steps: settle child i (>= 0), move the clock, or wait for n messages.
 	type do struct {
-		settle int
-		sleep  time.Duration
-		wait   int
+		settle  int
+		advance time.Duration
+		wait    int
 	}
 	settle := func(i int) do { return do{settle: i} }
-	sleep := func(d time.Duration) do { return do{settle: -1, sleep: d} }
+	advance := func(d time.Duration) do { return do{settle: -1, advance: d} }
 	wait := func(n int) do { return do{settle: -1, wait: n} }
 	tests := []struct {
 		name  string
@@ -86,13 +87,14 @@ func TestWakeBatchWindow(t *testing.T) {
 		want  []int // thread wakes per message
 	}{
 		{"a burst is one message", w, []do{settle(0), settle(1), settle(2)}, []int{3}},
-		{"each within the window of the last", w, []do{settle(0), sleep(w / 2), settle(1), sleep(w / 2), settle(2)}, []int{3}},
-		{"after the window: another message", w, []do{settle(0), wait(1), settle(1), settle(2)}, []int{1, 2}},
+		{"each within the window of the last", w, []do{settle(0), advance(w * 2 / 3), settle(1), advance(w * 2 / 3), settle(2)}, []int{3}},
+		{"after the window: another message", w, []do{settle(0), advance(w), wait(1), settle(1), settle(2)}, []int{1, 2}},
 		{"no batching: each alone", -1, []do{settle(0), settle(1), settle(2)}, []int{1, 1, 1}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := newBatchEnv(t, 4, func(o *Options) { o.WakeBatch = tt.batch })
+			clock := newManualClock()
+			b := newBatchEnv(t, 4, func(o *Options) { o.WakeBatch = tt.batch }, withManualClock(clock))
 			for _, s := range tt.plan {
 				switch {
 				case s.settle >= 0:
@@ -100,11 +102,12 @@ func TestWakeBatchWindow(t *testing.T) {
 				case s.wait > 0:
 					b.waitItems(b.parent.ID, "the messages", func(items []Item) bool { return len(wakes(items)) == s.wait })
 				default:
-					time.Sleep(s.sleep)
+					clock.Advance(s.advance)
 				}
 			}
+			clock.Advance(w) // the last window ends
 			b.waitItems(b.parent.ID, "the wakes", func(items []Item) bool { return sum(wakeSizes(t, items)) == sum(tt.want) })
-			time.Sleep(w / 3) // nothing more comes
+			b.waitDrained(b.parent.ID) // nothing more comes
 			items := b.items(b.parent.ID).Items
 			if got := wakeSizes(t, items); !slices.Equal(got, tt.want) {
 				t.Errorf("messages = %v, want %v:\n%s", got, tt.want, describeItems(items))
@@ -122,27 +125,38 @@ func TestWakeBatchWindow(t *testing.T) {
 // wakeBatchHold windows have passed since the first.
 func TestWakeBatchHoldBounded(t *testing.T) {
 	const w = 60 * time.Millisecond
-	b := newBatchEnv(t, 8, func(o *Options) { o.WakeBatch = w })
-	for _, k := range b.kids {
+	clock := newManualClock()
+	b := newBatchEnv(t, 8, func(o *Options) { o.WakeBatch = w }, withManualClock(clock))
+	// Seven wakes 0.8 windows apart: the last at 4.8 windows, each within the window of
+	// the one before. The batch goes at wakeBatchHold windows, not 5.8.
+	for i, k := range b.kids[:7] {
+		if i > 0 {
+			clock.Advance(w * 4 / 5)
+		}
 		b.setStep(k.ID, finished)
-		time.Sleep(w * 4 / 5)
 	}
+	clock.Advance(wakeBatchHold*w - 6*(w*4/5))
+	b.waitItems(b.parent.ID, "the held batch", func(items []Item) bool { return len(wakes(items)) == 1 })
+	b.setStep(b.kids[7].ID, finished)
+	clock.Advance(w)
 	items := b.waitItems(b.parent.ID, "every wake", func(items []Item) bool { return sum(wakeSizes(t, items)) == 8 })
-	if got := wakeSizes(t, items); len(got) < 2 {
-		t.Errorf("messages = %v: 8 wakes 0.8 windows apart span more than %d windows", got, wakeBatchHold)
+	if got := wakeSizes(t, items); !slices.Equal(got, []int{7, 1}) {
+		t.Errorf("messages = %v, want [7 1]: a batch goes %d windows after its first wake", got, wakeBatchHold)
 	}
 }
 
 // One message for a burst: the header lists each thread and ends with the siblings
 // sentence; the JSON is the per-thread payloads, each with the siblings counts.
 func TestWakeBatchMessage(t *testing.T) {
-	b := newBatchEnv(t, 4, func(o *Options) { o.WakeBatch = 100 * time.Millisecond })
+	clock := newManualClock()
+	b := newBatchEnv(t, 4, func(o *Options) { o.WakeBatch = 100 * time.Millisecond }, withManualClock(clock))
 	if _, err := b.m.Report(b.ctx(), b.kids[0].ID, Report{Status: ReportDone, Summary: "ok"}); err != nil {
 		t.Fatal(err)
 	}
 	b.setStep(b.kids[0].ID, finished)
 	b.setStep(b.kids[1].ID, askBash)
 	b.setStep(b.kids[2].ID, finished)
+	clock.Advance(100 * time.Millisecond)
 	items := b.waitItems(b.parent.ID, "the batch", func(items []Item) bool { return len(wakes(items)) == 1 })
 	w := wakes(items)[0]
 	k := b.kids
@@ -184,12 +198,15 @@ func TestWakeBatchMessage(t *testing.T) {
 
 // A batch takes one slot of the wake limit, however many wakes it holds.
 func TestWakeBatchLimit(t *testing.T) {
-	b := newBatchEnv(t, 4, func(o *Options) { o.WakeBatch = 100 * time.Millisecond; o.WakeLimit = 2 })
+	clock := newManualClock()
+	b := newBatchEnv(t, 4, func(o *Options) { o.WakeBatch = 100 * time.Millisecond; o.WakeLimit = 2 }, withManualClock(clock))
 	for _, k := range b.kids[:3] {
 		b.setStep(k.ID, finished)
 	}
+	clock.Advance(100 * time.Millisecond)
 	b.waitItems(b.parent.ID, "the batch", func(items []Item) bool { return len(wakes(items)) == 1 })
 	b.setStep(b.kids[3].ID, finished)
+	clock.Advance(100 * time.Millisecond)
 	items := b.waitItems(b.parent.ID, "the second message", func(items []Item) bool { return len(wakes(items)) == 2 })
 	if got := wakeSizes(t, items); !slices.Equal(got, []int{3, 1}) {
 		t.Errorf("messages = %v, want [3 1]", got)

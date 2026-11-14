@@ -12,12 +12,15 @@ vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { pullRequestDetailResource, pullRequestKey } = await import("./gh");
-const { makeTab, closePanelTab, moveTabToGroup, openSurface, usePanelStore } = await import("./panel");
+const { applyLayoutOp } = await import("@/api/layout");
+const { layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
+const { makeTab, openTab, tabPlace } = await import("@/shell/host");
+const { useLayoutStore } = await import("./layout");
 const { openPullRequestLink } = await import("@/components/pr/prLinks");
-const { pullRequestTab } = await import("@/surfaces/pullrequestTarget");
-const { clearConfirmedRequests, openPullRequestInPanel, prTabKey, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
+const { clearConfirmedRequests, openPullRequestInPanel, refreshPullRequest, requestingKey, reviewerCandidatesKey, reviewerCandidatesResource, revertPullRequest, reviewArgs, setAutoMerge, setInnerTab, setReviewRequest, submitReview, usePrPanelStore } = await import("./prPanel");
 
 const SLUG = "acme/repo";
 const view = (body: string, lastError = "") => ({ body, lastError }) as PullRequestDetailView;
@@ -31,9 +34,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   usePrPanelStore.setState({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, reviewing: {}, changing: {}, reverting: {}, mergeMethods: {} });
-  usePanelStore.setState({ byKey: {} });
+  await resetFakeLayout(threadSeed("a"));
 });
 
 afterEach(() => {
@@ -256,89 +259,125 @@ describe("setAutoMerge", () => {
   });
 });
 
+/** Opens a pull request in thread a's tabs and waits for the layout to have it. */
+async function openIn(ref: { slug: string; number: number }, target = "thread:a"): Promise<void> {
+  openPullRequestInPanel(ref, target);
+  await layoutSettled();
+}
+
 describe("one tab for a pull request, however its slug is spelled", () => {
-  const panel = () => usePanelStore.getState().byKey["thread:a"];
-  const tabs = () => panel()?.groups.flatMap((g) => g.tabs) ?? [];
-  const shown = (slug: string) => {
-    const id = pullRequestTab({ slug, number: 5 }).id;
-    expect(tabs().filter((t) => t.id === id)).toHaveLength(1);
-    expect(tabs().find((t) => t.id === id)?.params.slug).toBe(slug);
-    return id;
+  const tabs = () => tabPlace("thread:a").tabs;
+  /** #5's one tab. (Which spelling it keeps: the skipped test below.) */
+  const shown = () => {
+    const open = tabs().filter((t) => t.params.number === "5");
+    expect(open).toHaveLength(1);
+    return open[0]?.id;
   };
+
+  it("the tab keeps the slug it was opened with, and another spelling focuses its pane", async () => {
+    await openIn({ slug: "Acme/Repo", number: 5 });
+    await openIn({ slug: "acme/repo", number: 6 });
+    const held = tabs().find((t) => t.params.number === "5")?.id ?? "";
+    await applyLayoutOp({ op: "move_tab", tab: held, pane: useLayoutStore.getState().tabs[held]?.paneId ?? "", edge: "bottom" });
+    await layoutSettled();
+    await openIn({ slug: "acme/repo", number: 5 });
+    expect(tabs().find((t) => t.id === held)?.params.slug).toBe("Acme/Repo");
+    const place = tabPlace("thread:a");
+    expect(place.focused).toBe(place.groups.findIndex((g) => g.tabs.some((t) => t.id === held)));
+  });
 
   it.each([
     ["a mixed-case tab, then lower case", "Acme/Repo", "acme/repo"],
     ["a lower-case tab, then mixed case", "acme/repo", "Acme/Repo"],
     ["two other spellings", "ACME/repo", "acme/REPO"],
-  ])("%s: it switches to the first and keeps its slug", (_name, first, second) => {
-    openPullRequestInPanel({ slug: first, number: 5 }, "thread:a");
-    openPullRequestInPanel({ slug: "acme/repo", number: 6 }, "thread:a");
-    openPullRequestInPanel({ slug: second, number: 5 }, "thread:a");
+  ])("%s: it switches to the first", async (_name, first, second) => {
+    await openIn({ slug: first, number: 5 });
+    await openIn({ slug: "acme/repo", number: 6 });
+    await openIn({ slug: second, number: 5 });
     expect(tabs()).toHaveLength(2);
-    expect(panel()?.groups[0]?.activeTabId).toBe(shown(first));
+    expect(tabPlace("thread:a").groups[0]?.active?.id).toBe(shown());
   });
 
-  it("a link in another case lands on the tab", () => {
-    openPullRequestInPanel({ slug: "Acme/Repo", number: 5 }, "thread:a");
+  it("a link in another case lands on the tab", async () => {
+    await openIn({ slug: "Acme/Repo", number: 5 });
     expect(openPullRequestLink("thread:a")("https://github.com/acme/repo/pull/5")).toBe(true);
+    await layoutSettled();
     expect(tabs()).toHaveLength(1);
-    shown("Acme/Repo");
+    shown();
   });
 
-  it("in a split panel it switches to the group that holds the tab", () => {
-    openPullRequestInPanel({ slug: "Acme/Repo", number: 5 }, "thread:a");
-    openPullRequestInPanel({ slug: "acme/repo", number: 6 }, "thread:a");
-    const held = pullRequestTab({ slug: "Acme/Repo", number: 5 });
-    usePanelStore.setState((s) => {
-      const e = s.byKey["thread:a"];
-      if (!e) throw new Error("no panel");
-      return { byKey: { "thread:a": { ...moveTabToGroup(e, held.id, 1), focused: 0 } } };
-    });
-    openPullRequestInPanel({ slug: "acme/repo", number: 5 }, "thread:a");
-    expect(panel()?.groups[1]?.tabs).toHaveLength(1);
-    expect(panel()?.groups[1]?.activeTabId).toBe(shown("Acme/Repo"));
-    expect(panel()?.focused).toBe(1);
+  it("with the tab in another pane, opening it again switches to that pane's tab", async () => {
+    await openIn({ slug: "acme/repo", number: 5 });
+    await openIn({ slug: "acme/repo", number: 6 });
+    const held = tabs().find((t) => t.params.number === "5")?.id ?? "";
+    // #5 to a pane of its own, below; #6 shows.
+    await applyLayoutOp({ op: "move_tab", tab: held, pane: useLayoutStore.getState().tabs[held]?.paneId ?? "", edge: "bottom" });
+    await applyLayoutOp({ op: "focus_tab", tab: tabs().find((t) => t.params.number === "6")?.id ?? "" });
+    await layoutSettled();
+    expect(tabPlace("thread:a").groups).toHaveLength(2);
+    await openIn({ slug: "acme/repo", number: 5 });
+    const place = tabPlace("thread:a");
+    const at = place.groups.findIndex((g) => g.tabs.some((t) => t.id === held));
+    expect(place.groups[at]?.tabs).toHaveLength(1);
+    expect(place.groups[at]?.active?.id).toBe(shown());
+    expect(place.focused).toBe(at);
   });
 
   it("a revert whose new pull request is open already switches to its tab", async () => {
-    openPullRequestInPanel({ slug: "Acme/Repo", number: 5 }, "thread:a");
+    await openIn({ slug: "Acme/Repo", number: 5 });
     invokeCommand.mockResolvedValueOnce({ message: "Opened #5", resultJson: JSON.stringify({ number: 5, url: "https://github.com/acme/repo/pull/5" }) });
     await revertPullRequest({ slug: "acme/repo", number: 3 }, "thread:a");
+    await layoutSettled();
     expect(tabs()).toHaveLength(1);
-    shown("Acme/Repo");
+    shown();
   });
 });
 
 describe("revertPullRequest", () => {
   it("a result without a number toasts the daemon's message and opens no tab", async () => {
-    openSurface("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
+    openTab("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
+    await layoutSettled();
     invokeCommand.mockResolvedValueOnce({ message: "Revert requested", resultJson: "{}" });
     await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toBeNull();
+    await layoutSettled();
     expect(toast.success).toHaveBeenCalledWith("Revert requested");
-    expect(usePanelStore.getState().byKey["thread:a"]?.groups[0]?.tabs.map((t) => t.title)).toEqual(["#5"]);
+    expect(tabPlace("thread:a").tabs.map((t) => t.title)).toEqual(["#5"]);
   });
 
-  it("opens the new pull request as a tab of the same panel", async () => {
-    openSurface("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
+  it("opens the new pull request as a tab of the same thread", async () => {
+    openTab("thread:a", makeTab("pullrequest", "#5", { slug: SLUG, number: "5" }));
+    await layoutSettled();
     invokeCommand.mockResolvedValueOnce({ message: "Opened #9", resultJson: JSON.stringify({ number: 9, url: "https://github.com/acme/repo/pull/9" }) });
     await expect(revertPullRequest({ slug: SLUG, number: 5 }, "thread:a")).resolves.toEqual({ slug: SLUG, number: 9 });
-    expect(usePanelStore.getState().byKey["thread:a"]?.groups[0]?.tabs.map((t) => t.title)).toEqual(["#5", "#9"]);
+    await layoutSettled();
+    expect(tabPlace("thread:a").tabs.map((t) => t.title)).toEqual(["#5", "#9"]);
   });
 });
 
 describe("inner state per tab", () => {
-  it("is dropped when its tab closes, and kept while another panel still has the tab", () => {
-    const tab = makeTab("pullrequest", "#7", { slug: SLUG, number: "7" });
-    openSurface("thread:a", tab);
-    openSurface("thread:b", tab);
-    setInnerTab(prTabKey("thread:a", tab.id), "activity");
-    setInnerTab(prTabKey("thread:b", tab.id), "activity");
+  it("is dropped when its tab closes, and kept for a tab still open", async () => {
+    await openIn({ slug: SLUG, number: 7 });
+    await openIn({ slug: SLUG, number: 8 });
+    const [seven, eight] = tabPlace("thread:a").tabs.map((t) => t.id);
+    setInnerTab(seven ?? "", "activity");
+    setInnerTab(eight ?? "", "activity");
 
-    closePanelTab("thread:a", tab.id);
-    expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([prTabKey("thread:b", tab.id)]);
+    await applyLayoutOp({ op: "close_tab", tab: seven ?? "" });
+    await layoutSettled();
+    expect(Object.keys(usePrPanelStore.getState().byTab)).toEqual([eight]);
 
     // Reopened, it starts fresh.
-    openSurface("thread:a", tab);
-    expect(usePrPanelStore.getState().byTab[prTabKey("thread:a", tab.id)]).toBeUndefined();
+    await openIn({ slug: SLUG, number: 7 });
+    const again = tabPlace("thread:a").tabs.find((t) => t.params.number === "7")?.id ?? "";
+    expect(usePrPanelStore.getState().byTab[again]).toBeUndefined();
+  });
+
+  it("is kept for an unlinked tab (a page's) across a change of the layout", async () => {
+    await openIn({ slug: SLUG, number: 7 }, "view:pullrequests");
+    const page = Object.values(useLayoutStore.getState().tabs).find((t) => t.kind === "pullrequest" && !t.thread)?.id ?? "";
+    expect(page).not.toBe("");
+    setInnerTab(page, "code");
+    await openIn({ slug: SLUG, number: 8 });
+    expect(usePrPanelStore.getState().byTab[page]?.inner).toBe("code");
   });
 });

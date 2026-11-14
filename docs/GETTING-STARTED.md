@@ -13,12 +13,13 @@ one conversation with an agent working in that folder. Threads keep working when
 close the window; a thread keeps its history, and a message always continues it.
 
 New here, with no projects yet? Ask a thread for "the welcome tutorial": it opens a page of
-four steps in the side panel, beside the conversation, and walks you through the app.
+four steps in a tab beside the conversation, and walks you through the app.
 
 ### Add a project
 
 Click **New thread** at the top of the sidebar and pick **Add a project…** at the
-bottom of the list, or click **Add project** on the Projects page. Then choose:
+bottom of the list, or click **Add project** on the Projects page (a pane's **+** ›
+**Projects**). Then choose:
 
 * **Local folder**: any folder in your home folder. A git repository works, and so
   does a plain folder.
@@ -66,11 +67,38 @@ If a step fails, or you cancelled, the thread says why and your message waits. *
 again** picks up where it stopped, **Edit** brings everything back to the new-thread
 composer as if you had never sent it, and **Remove** forgets the thread.
 
+### The window
+
+The window is a sidebar and panes of tabs. A tab shows a thread, its diff, a file, a pull
+request, a terminal, or the Pull Requests or Projects page; **+** at the end of a pane's
+tabs opens one there. Drag a tab, or a whole pane by the empty part of its tab strip: into
+another pane, onto a pane's edge to split it, or onto the window's edge. Drag the gap
+between two panes to resize them. <kbd>⇧⌘↩</kbd> shows one pane over all of them, and
+<kbd>esc</kbd> brings the others back. A small window folds some panes into narrow strips
+of icons; click one to open it.
+
+What a thread opens (its diff, a file, a pull request, a terminal) is a tab beside it, with
+a line under the tabs naming the thread. <kbd>⌘W</kbd> closes a tab. Closing a thread's
+tab never archives it: its other tabs close with it and come back when you open the
+thread again.
+
+**Spaces** are the tabs in the bar at the top: separate layouts, each with its own threads.
+**+** adds one and a double click renames it; <kbd>⌃⌘1</kbd> to <kbd>⌃⌘9</kbd> switch.
+Drop a tab, a pane or a thread onto a space to move it there; a pane takes its threads
+along. <kbd>⌘[</kbd> and <kbd>⌘]</kbd> go
+back and forward through what you looked at, across panes and spaces.
+
+<kbd>⌘J</kbd> opens the thread's quick terminal under its conversation, a shell in the
+thread's folder; press it again to close it. <kbd>⌘T</kbd> opens a terminal tab in the
+thread's folder, <kbd>⇧⌘T</kbd> one in your home folder. Closing a terminal's tab ends it.
+
 ### While it runs
 
-The sidebar lists your threads. A thread whose second line is amber is waiting on you:
-a question, a permission, a plan to approve. Click it, answer, and it carries on. The
-window title and the badge on the Dock icon count what is waiting.
+The sidebar lists this space's threads. **Needs you** at the top lists the threads
+waiting on you: a question, a permission, a plan to approve. Hover one to see the whole
+ask (a command can be allowed or denied right there), click its title to answer in a
+popup, or press <kbd>⇧⌘A</kbd> for the next one. A thread's tab shows a dot while it
+waits. The window title and the badge on the Dock icon count what is waiting.
 
 When a thread's agent starts threads of its own, they belong to that thread: they stay
 out of the sidebar and the Dock badge, and its thread info card lists them. Click one
@@ -89,17 +117,18 @@ left it.
 
 The thread info card (<kbd>⇧⌘I</kbd>) beside the conversation shows more about the
 selected thread: its projects and branch, what changed, its pull requests, the agents and
-threads it started, its MCP servers and what it cost. Its **Changes** row opens the side
-panel (<kbd>⇧⌘E</kbd>) on the changed files and commits. Or ask the thread: "what changed?",
-"what did this cost?". The bottom panel (<kbd>⌘J</kbd>) is a terminal in the thread's folder.
+threads it started, its MCP servers and what it cost. Its **Changes** row opens the thread's
+diff in a tab beside it (<kbd>⇧⌘D</kbd>, again to go back) on the changed files and commits.
+Or ask the thread: "what changed?", "what did this cost?".
 
 When the work is done, ask the agent to commit and open a pull request, or use
-**Create Pull Request** from the command palette. The side panel follows its checks
-and reviews.
+**Create Pull Request** from the command palette. Its pull request tab (the thread's
+**⋯** › **Open**) follows its checks and reviews.
 
 ### Find anything
 
 <kbd>⌘K</kbd> opens the command palette: every action in the app, searchable by name.
+<kbd>⌘P</kbd> finds a file by name and opens it in a tab.
 <kbd>⌘/</kbd> opens this guide; its **Keyboard shortcuts** tab lists every shortcut.
 The **Help** menu has this guide too, and a way to report a problem.
 

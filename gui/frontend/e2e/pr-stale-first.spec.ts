@@ -1,9 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock } from "./fixtures";
+import { mockPost, resetMock } from "./fixtures";
+import { paneNode } from "./shell";
+import { openLayout, openPrBesidePage, PRS_TAB } from "./shell-pages";
 
 /**
  * A pull request answered from a stale copy (docs/notes/pr-detail-stale-first.md): what only a
- * browser shows, the panel's scroll staying put when the fetch lands. The tab, the cue, the
+ * browser shows, the surface's scroll staying put when the fetch lands (in a pull request's tab). The tab, the cue, the
  * banner and the readiness: src/components/pr/PullRequestSurface.test.tsx. Set SHOTS=<dir> to
  * save the screenshots of the cue and of the Pull Requests page before its first poll.
  */
@@ -15,17 +17,16 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-/** Opens #145 from the page's rows and waits for the surface. */
+/** Opens #145 from the page's rows and shows its tab (it opens behind the page: prs.spec.ts's shell gap). */
 async function openPr145(page: Page): Promise<void> {
-  await page.getByTestId("nav-pullrequests").click();
   await page.getByTestId("prs-authored").locator("[data-nav-key]").filter({ hasText: "#145" }).click();
+  await page.locator('[data-testid="shell-tab"][data-kind="pullrequest"] [role="tab"]').click();
   await expect(page.getByTestId("pr-surface")).toBeVisible();
 }
 
 test("the fetch landing behind a stale copy leaves the panel where it was scrolled", async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 500 });
-  await openApp(page);
-  await openPr145(page);
+  await openPrBesidePage(page, 145);
   await page.getByTestId("pr-tab-activity").click();
   const scrollTop = (to = -1) =>
     page.getByTestId("pr-surface").evaluate((surface, y) => {
@@ -64,8 +65,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.setViewportSize({ width: 1400, height: 900 });
 
     await mockPost("gh/dashboard-cold");
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openLayout(page, paneNode("p-1", [PRS_TAB]), "p-1");
     await expect(page.getByTestId("prs-loading")).toBeVisible();
     await page.screenshot({ path: `${shots ?? ""}/prs-first-poll${suffix}.png` });
     await mockPost("gh/dashboard-warm");

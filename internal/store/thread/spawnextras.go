@@ -70,7 +70,7 @@ func (m *Manager) SetSpawnExtras(fn SpawnExtrasFunc) {
 }
 
 // SpawnInfo is the SpawnInfo a spawn of thread id would pass now (no wait), for others
-// that start processes in the thread's scope: its bottom-panel shells get the plugins'
+// that start processes in the thread's scope: its shells get the plugins'
 // environment through the daemon's terminal hook. False for an unknown thread.
 func (m *Manager) SpawnInfo(id string) (SpawnInfo, bool) {
 	s, ok := m.Snapshot().Thread(id)

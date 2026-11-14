@@ -6,26 +6,24 @@ import type { ActionRunFinishedView, ActionRunOutputView } from "@/api/actions";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 const runs = vi.hoisted(() => new Map<string, ActionRunOutputView>());
 vi.mock("@/api/actions", async (orig) => ({ ...(await orig<typeof import("@/api/actions")>()), getActionRun: (runId: string) => Promise.resolve(runs.get(runId) ?? null) }));
-vi.mock("@/terminal/xterm", async () => (await import("@/test/terminalHost")).xtermFakes);
-vi.mock("@/api/terminal", async (orig) => ({ ...(await orig<typeof import("@/api/terminal")>()), ...(await import("@/test/terminalHost")).terminalApiFakes }));
 
 const { ActionRunDialog } = await import("./ActionRunDialog");
-const { BottomPanel } = await import("@/components/bottom/BottomPanel");
 const { Toaster } = await import("@/components/ui/sonner");
-const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
-const { attach } = await import("@/test/terminalHost");
+const { daemon, invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
+const { layoutOf, pane, row: split, seedLayout, space, tab } = await import("@/test/shellLayout");
 const { ACTION_IDS, actionRun, fakeActionCommands, seedActions } = await import("@/test/actionsWorld");
 const { CF, GP, seedWorld } = await import("@/test/projectsWorld");
 const { dispatchEvent } = await import("@/stores/events");
 const { useActionDialogStore } = await import("@/stores/actionDialog");
 const { useActionsStore } = await import("@/stores/actions");
-const { useBottomStore } = await import("@/stores/bottomPanel");
+const { resetLayout } = await import("@/stores/layout");
+const { useShellViewStore } = await import("@/stores/shellView");
 const { useUiStore } = await import("@/stores/ui");
 
 /**
  * A failed worktree-create run (docs/notes/actions-2-gui.md): its toast from the action
  * source's run_finished (stores/events.ts), Open selecting the thread and showing the run's
- * captured output (ActionRunDialog), and Run in terminal running it again as a tab.
+ * captured output (ActionRunDialog), and Run in terminal running it again (the keyboard into its tab).
  * e2e/actions.spec.ts keeps the dialog's meta line at a 360px window (one line, the path
  * giving way in the middle).
  */
@@ -53,11 +51,10 @@ async function settle(n = 3) {
 
 beforeEach(() => {
   resetDaemon();
-  attach.reset();
+  resetLayout();
   runs.clear();
   seedWorld();
   seedActions();
-  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
   useActionDialogStore.setState({ editor: null, runId: null, seq: 0 });
   const install = useActionsStore.getState().byId[ACTION_IDS.install];
   if (!install) throw new Error("no Install deps");
@@ -73,7 +70,6 @@ beforeEach(() => {
   render(
     <>
       <ActionRunDialog />
-      <BottomPanel columnHeight={800} />
       <Toaster />
     </>,
   );
@@ -87,8 +83,17 @@ afterEach(() => {
 });
 
 describe("a failed worktree-create run", () => {
-  it("toasts; Open selects its thread and shows the run's output; Run in terminal runs it again as the thread's tab", async () => {
+  it("toasts; Open selects its thread and shows the run's output; Run in terminal runs it again for the thread, the keyboard in its tab", async () => {
     fakeActionCommands((threadId) => (threadId === "s-2" ? { projectId: "repo-gp", worktree: GP } : { projectId: "repo-cf", worktree: CF }));
+    // The daemon opens the run's tab beside the thread's as it starts the run.
+    const run = daemon.handlers.get("action.run");
+    daemon.handlers.set("action.run", async (inv) => {
+      const res = await (run as NonNullable<typeof run>)(inv);
+      const { terminalId } = JSON.parse(res.resultJson) as { terminalId: string };
+      await seedLayout(layoutOf([space(split("r-1", [pane("p-1", [tab("t-th", "thread", "s-1")]), pane("p-2", [tab("t-run", "terminal", "s-1", { params: { terminal: terminalId } })])]), "p-1")]));
+      return res;
+    });
+    const seq = useShellViewStore.getState().focusRequest.seq;
     runFinished(finished({}));
     await waitFor(() => {
       expect(toastOf("Setup action Install deps failed (exit 1)")).toBeDefined();
@@ -110,7 +115,7 @@ describe("a failed worktree-create run", () => {
     await settle();
     expect(screen.queryByTestId("action-run-dialog")).toBeNull();
     expect(invocationsOf("action.run").map((i) => [i.args, i.context.activeThreadId])).toEqual([[{ action: ACTION_IDS.install, terminal: "true" }, "s-1"]]);
-    expect([...screen.getByTestId("bottom-panel").querySelectorAll('[data-kind="action"]')].map((e) => e.textContent)).toEqual(["Install deps"]);
+    expect(useShellViewStore.getState().focusRequest).toEqual({ paneId: "p-2", seq: seq + 1 });
   });
 
   it("a passing setup run stays quiet; a failure's toast stays until its × closes it", async () => {

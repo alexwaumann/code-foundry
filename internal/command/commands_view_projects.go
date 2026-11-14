@@ -15,7 +15,7 @@ type WorkspaceLister interface {
 	List(context.Context, *connect.Request[v1.ListWorkspacesRequest]) (*connect.Response[v1.ListWorkspacesResponse], error)
 }
 
-// The ShowView params of view.projects on one page: the project's or the workspace's id.
+// The Projects tab's params on one page: the project's or the workspace's id.
 const (
 	ViewProjectsProjectParam   = "project"
 	ViewProjectsWorkspaceParam = "workspace"
@@ -29,15 +29,16 @@ func (d ViewDeps) projectsCommand() Command {
 		Name:  "view.projects",
 		Page:  PageState,
 		Title: "Show Projects",
-		Description: "Show the Projects page in every app window: each project's worktrees and each workspace's members, with their git state and actions; " +
+		Description: "Show the Projects page, its tab in the current space: each project's worktrees and each workspace's members, with their git state and actions; " +
 			"--project or --workspace opens that one's page.",
-		Category:    "View",
-		Keybindings: []string{"cmd+shift+j"},
+		Category: "View",
+		// No default chord since the shell: cmd+shift+j is terminal.cycle (docs/notes/shell-model.md, "Keys").
 		Args: []ArgSpec{
 			pageFocusArg,
-			// No Context: the palette and the chord keep showing the page the window showed last.
+			// No Context: without one, the palette and a pane's + show the index.
 			{Name: ViewProjectsProjectParam, Type: String, ID: ProjectID, Description: "Open this project's page: " + ProjectRefHelp},
 			{Name: ViewProjectsWorkspaceParam, Type: String, Description: "Open this workspace's page: its id or name"},
+			openPaneArg,
 		},
 		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 			project, ws := a.String(ViewProjectsProjectParam), strings.TrimSpace(a.String(ViewProjectsWorkspaceParam))
@@ -45,18 +46,20 @@ func (d ViewDeps) projectsCommand() Command {
 			case project != "" && ws != "":
 				return Result{}, InvalidArg(ViewProjectsWorkspaceParam, "give --project or --workspace, not both")
 			case project != "":
-				return d.showPageWith(uctx, a, ViewProjects, map[string]string{ViewProjectsProjectParam: project})
+				return d.showPageTab(ctx, uctx, a, tabProjs, map[string]string{ViewProjectsProjectParam: project})
 			case ws != "":
 				if d.Workspaces == nil {
-					return d.showPageWith(uctx, a, ViewProjects, map[string]string{ViewProjectsWorkspaceParam: ws})
+					return d.showPageTab(ctx, uctx, a, tabProjs, map[string]string{ViewProjectsWorkspaceParam: ws})
 				}
 				w, err := findWorkspace(ctx, d.Workspaces, ws)
 				if err != nil {
 					return Result{}, err
 				}
-				return d.showPageWith(uctx, a, ViewProjects, map[string]string{ViewProjectsWorkspaceParam: w.GetId()})
+				return d.showPageTab(ctx, uctx, a, tabProjs, map[string]string{ViewProjectsWorkspaceParam: w.GetId()})
 			}
-			return d.showPage(uctx, a, ViewProjects)
+			// The index: an open tab on a project's page goes back to it. The window did so on
+			// this verb's ShowView until the tab became its whole effect (shell-22-retire-verbs.md).
+			return d.showPageTab(ctx, uctx, a, tabProjs, map[string]string{})
 		},
 	}
 }

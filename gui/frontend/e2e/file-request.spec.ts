@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { CF, invokeAs, mockPost, mockUrl, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { paneWith, stripTabs, threadTabOpen } from "./shell-surfaces";
 
 /**
  * A thread asking the user to edit a file, and the keyboard around it
@@ -35,6 +36,7 @@ async function inThread(page: Page): Promise<void> {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await threadTabOpen("s-1");
 }
 
 test.beforeEach(async () => {
@@ -101,7 +103,8 @@ test("a request for another file leaves the document under the user's fingers", 
 
   await fromThread("view.panel.file", { path: b, edit: "true", note: "Fill in B" });
 
-  await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText(["a.env", "b.env"]);
+  // Both in the thread's pane of files, a.env still the one shown.
+  await expect(stripTabs(paneWith(page, "file"))).toHaveText(["a.env", "b.env"]);
   await page.keyboard.type("2");
   await expect(line(page, 1)).toHaveText("A=12");
   await expect(file(page)).toHaveAttribute("data-path", a);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applySgr, index256, nearest16, parseAnsi, parseAnsiLine, sgrCss, stripAnsi, type AnsiSpan, type SgrStyle } from "./ansi";
 
 const E = "\x1b";
@@ -79,14 +79,19 @@ describe("parseAnsi", () => {
   });
 
   it("is one pass over the Log's largest buffer", () => {
-    // 2000 lines (LOG_MAX_LINES) of coloured test output, about 64 KB.
+    // 2000 lines (LOG_MAX_LINES) of coloured test output, about 64 KB. The work is counted, not
+    // timed (a busy machine slows any pass): the parser reads characters with charCodeAt, each
+    // at most twice in one pass; going back over earlier text would read far more.
     const lines = Array.from({ length: 2000 }, (_, i) => `${E}[32m✓${E}[0m pkg/${String(i)} ${E}[1m${String(i)} passed${E}[22m`);
-    const t0 = performance.now();
+    const chars = lines.reduce((n, l) => n + l.length, 0);
+    const reads = vi.spyOn(String.prototype, "charCodeAt");
     const out = parseAnsi(lines);
-    const ms = performance.now() - t0;
+    const n = reads.mock.calls.length;
+    reads.mockRestore();
     expect(out).toHaveLength(2000);
     expect(out[1999]?.text).toBe("✓ pkg/1999 1999 passed");
-    expect(ms).toBeLessThan(250);
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThanOrEqual(2 * chars);
   });
 });
 

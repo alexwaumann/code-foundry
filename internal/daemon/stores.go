@@ -24,6 +24,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/ember"
 	"github.com/alexwaumann/code-foundry/internal/store/gh"
 	"github.com/alexwaumann/code-foundry/internal/store/gitops"
+	"github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
@@ -129,6 +130,12 @@ type stores struct {
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
+	// layout is the window shell's layout (spaces, panes, tabs); it reads no other store.
+	// Closed before the db, writing a focus change still waiting.
+	layout *layout.Manager
+	// stopLayout stops the glue that keeps the layout true to threads and terminals
+	// (layout.go).
+	stopLayout func()
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -169,6 +176,10 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	if s.home, err = fsx.HomeRoot(); err != nil {
+		return nil, err
+	}
+	if s.layout, err = layout.New(ctx, layout.Options{DB: s.db, Bus: s.bus, Log: log.With("store", "layout"),
+		SmartSwap: func() bool { return s.settings.Settings().Layout.SmartSwap }}); err != nil {
 		return nil, err
 	}
 	if s.project, err = project.Start(ctx, project.Options{
@@ -307,6 +318,9 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		// An open thread view counts as the user seeing the thread only while a GUI
 		// window is visible and key (docs/notes/alerts-foreground.md).
 		Attended: func() bool { return pres.Current().Attended },
+		// Before a thread's shells go, the layout closes its tabs; a snooze keeps its
+		// terminal tabs to come back as fresh shells (layout.go).
+		ShellsGoing: layoutShellsGoing(log.With("store", "layout"), s.layout, s.terminal),
 	}); err != nil {
 		return nil, err
 	}
@@ -341,6 +355,12 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 			snap := s.thread.Snapshot()
 			return snap == nil || slices.ContainsFunc(snap.Threads, func(x thread.Thread) bool { return x.ID == id })
 		},
+	}); err != nil {
+		return nil, err
+	}
+	// After thread and terminal: the layout follows their lifecycles (layout.go).
+	if s.stopLayout, err = startLayoutGlue(ctx, layoutGlueOptions{
+		Log: log.With("store", "layout"), Layout: s.layout, Terminals: s.terminal, Bus: s.bus, Threads: s.thread.Snapshot,
 	}); err != nil {
 		return nil, err
 	}
@@ -434,6 +454,9 @@ func (s *stores) close() error {
 	if s.stopShells != nil {
 		s.stopShells()
 	}
+	if s.stopLayout != nil {
+		s.stopLayout()
+	}
 	if s.stopActions != nil {
 		s.stopActions()
 	}
@@ -490,6 +513,11 @@ func (s *stores) close() error {
 	}
 	if s.project != nil {
 		errs = append(errs, s.project.Close())
+	}
+	if s.layout != nil {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		errs = append(errs, s.layout.Close(closeCtx))
+		cancel()
 	}
 	if s.db != nil {
 		errs = append(errs, s.db.Close())

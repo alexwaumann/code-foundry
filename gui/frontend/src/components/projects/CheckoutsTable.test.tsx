@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
 // The table's own width (jsdom lays nothing out): what a test sets.
 const tableWidth = vi.hoisted(() => ({ px: 1100 }));
@@ -59,10 +60,10 @@ function openSub(trigger: HTMLElement, menuTestId: string): HTMLElement {
   return screen.getByTestId(menuTestId);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDaemon();
   seedWorld();
-  resetPanels();
+  await resetPanels();
   tableWidth.px = 1100;
   card.editors = [{ name: "VS Code", bundleId: "com.microsoft.VSCode", path: "/Applications/Visual Studio Code.app" }];
   editorAppsResource.store.setState({ entries: {} });

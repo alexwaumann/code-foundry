@@ -2,50 +2,38 @@ import { toast } from "sonner";
 import { playAlertSound } from "@/api/app";
 import type { UiIntentView } from "@/api/ui";
 import { threadFocus } from "@/lib/inSidebar";
-import { clearRevealOnArrival, revealShell } from "./bottomActions";
 import { stageInThreadComposer } from "./composerText";
 import { runCommandForResult } from "./commands";
 import { getUiContext } from "./context";
 import { notifyLinkAction, showingPage } from "./notifyLinks";
 import { usePluginsStore } from "./plugins";
-import { PENDING_FOCUS_MS } from "./bottomPanel";
 import { showAgentRun } from "./subagentView";
-import { useTerminalsStore } from "./terminals";
-import { showThreadView } from "./threadPanelIntent";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { showView } from "./views";
 import { showProjectOnProjectsPage } from "./projectsPage";
+import { followFocusTerminal } from "@/shell/terminalActions";
 
-/**
- * A focusTerminal intent whose terminal the stores did not know yet. revealShell shows it
- * when it arrives as a shell (bottomActions revealOnArrival); this only ends the wait
- * after PENDING_FOCUS_MS, with a toast when the terminal never showed up. Dropped by the
- * next intent that moves the window and by any change of selection.
- */
-let pendingTerminal: string | null = null;
-let expiry: ReturnType<typeof setTimeout> | undefined;
+/** How long a focusThread intent waits for its thread to arrive. */
+export const PENDING_FOCUS_MS = 10_000;
 
 /**
  * A focusThread intent whose thread the list did not have yet (the intent and the list
  * event arrive separately): decided once the thread arrives (threadFocus), within
- * PENDING_FOCUS_MS. Dropped like pendingTerminal.
+ * PENDING_FOCUS_MS. Dropped by the next intent that moves the window and by any change of
+ * selection.
  */
 let pendingThread: { id: string; stop: () => void } | null = null;
 
-/** Forgets every pending focusTerminal (this module's and revealShell's) and focusThread. Exported for tests too. */
+/** Forgets a pending focusThread. Exported for tests too. */
 export function clearPendingFocus(): void {
-  pendingTerminal = null;
-  clearTimeout(expiry);
-  expiry = undefined;
-  clearRevealOnArrival();
   pendingThread?.stop();
   pendingThread = null;
 }
 
 // A selection change (the user's, or a resolved reveal's) ends the wait.
 useUiStore.subscribe((s, prev) => {
-  if (s.selection !== prev.selection && (pendingTerminal !== null || pendingThread !== null)) clearPendingFocus();
+  if (s.selection !== prev.selection && pendingThread !== null) clearPendingFocus();
 });
 
 /**
@@ -79,27 +67,6 @@ function focusThread(id: string, explicit: boolean): void {
   };
 }
 
-/**
- * Shows a terminal: a shell in its owner's bottom panel (revealShell: a thread's, or the
- * Projects page's). One that has not arrived yet is shown when it does, within
- * PENDING_FOCUS_MS. A known terminal that is no owned shell (a raw TerminalService.Create)
- * has nowhere to show: a toast says so. Threads have no terminal of their own.
- */
-function focusTerminal(id: string): void {
-  clearPendingFocus();
-  if (revealShell(id)) return;
-  if (id in useTerminalsStore.getState().byId) {
-    toast.info(`Terminal ${id} belongs to no thread or project`, { description: "Terminals show in a thread's or the Projects page's bottom panel." });
-    return;
-  }
-  pendingTerminal = id;
-  expiry = setTimeout(() => {
-    if (pendingTerminal !== id) return;
-    clearPendingFocus();
-    if (!(id in useTerminalsStore.getState().byId)) toast.error(`Terminal ${id} not found`);
-  }, PENDING_FOCUS_MS);
-}
-
 /** Who asked, in words: a plugin's display name ("plugin:hello" → "Hello"), else as given. */
 function callerName(caller: string): string {
   const m = /^plugin:(.+)$/.exec(caller);
@@ -112,7 +79,8 @@ export function applyIntent(intent: UiIntentView): void {
   const ui = useUiStore.getState();
   switch (intent.kind) {
     case "focusTerminal":
-      focusTerminal(intent.terminalId);
+      // The layout shows the terminal (ui.focus.terminal's tab, with the focus); the keyboard follows it.
+      followFocusTerminal(intent.terminalId);
       break;
     case "focusThread":
       focusThread(intent.threadId, intent.explicit ?? false);
@@ -145,12 +113,8 @@ export function applyIntent(intent: UiIntentView): void {
       break;
     }
     case "showView":
-      if (intent.threadId) {
-        // A panel action scoped to one thread (a view.panel.* verb run inside it): the
-        // window does not move, so a pending focus stays pending too.
-        showThreadView(intent.name, intent.threadId, intent.params);
-        break;
-      }
+      // The item verbs (view.open.*) send none: their tab in the layout is the whole effect
+      // (docs/notes/shell-22-retire-verbs.md).
       clearPendingFocus();
       showView(intent.name, intent.params);
       break;

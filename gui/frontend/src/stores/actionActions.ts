@@ -14,15 +14,14 @@ import { ACTION_LABEL, PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib
 import { useActionsStore } from "./actions";
 import { openActionRunOutput } from "./actionDialog";
 import { clearStopRequested, markStopRequested } from "./actionStops";
-import { carryShownTerminal, closeBottomTerminal, revealShell, showOwnTerminal } from "./bottomActions";
-import { shownKeysOf } from "./bottomPanel";
+import { closeTerminal, focusTerminalTab, showTerminal } from "@/shell/terminalActions";
 import { refreshCommands, runCommandForResult, useCommandsStore } from "./commands";
 import { getUiContext, projectContext, worktreeContext } from "./context";
 import { useThreadsStore } from "./threads";
 import { useTerminalsStore } from "./terminals";
 import { useUiStore } from "./ui";
 
-/** Who a run belongs to: a thread (its bottom panel) or a worktree (the Projects page's panel). */
+/** Who a run belongs to: a thread or a worktree. */
 export type ActionOwner = { kind: "thread"; threadId: string } | { kind: "worktree"; projectId: string; path: string };
 
 /** The command context a run for `owner` is started in (action.run takes its owner from it). */
@@ -32,15 +31,15 @@ export function ownerContext(owner: ActionOwner): UiContextView {
 
 /**
  * action.run for `owner`, always in a terminal (--terminal: the GUI shows every run as a
- * tab; an action an agent made a background one still opens here). The new tab opens in
- * the owner's panel, active, and takes the keyboard when that panel is on screen. Quiet:
+ * tab; an action an agent made a background one still opens here). The daemon opens its tab,
+ * and the keyboard goes into it. Quiet:
  * the tab is the feedback (a failure toasts). Resolves to the run's terminal id, or null.
  */
 export async function runAction(actionId: string, owner: ActionOwner): Promise<string | null> {
   const res = await runCommandForResult("action.run", { action: actionId, terminal: "true" }, { ctx: ownerContext(owner), quiet: true });
   const run = res === null ? null : runFromResult(res.resultJson);
   if (!run?.terminalId) return null;
-  showOwnTerminal(run.terminalId);
+  void focusTerminalTab(run.terminalId);
   return run.terminalId;
 }
 
@@ -88,9 +87,8 @@ const rerunning = new Set<string>();
 /**
  * Rerun: the same action again for the same owner (a terminal runs one process, so there
  * is no restart in place), then the old tab closes. Run first: if the run fails (the action
- * was deleted meanwhile), the old tab and its output stay. The new tab is active, and it
- * takes the old one's place in any panel the run was rolled up in (showTerminalIn). A second
- * Rerun of the same tab while one is in flight does nothing.
+ * was deleted meanwhile), the old tab and its output stay. A second Rerun of the same tab
+ * while one is in flight does nothing.
  */
 export async function rerunAction(terminalId: string): Promise<string | null> {
   const t = useTerminalsStore.getState().byId[terminalId];
@@ -98,13 +96,9 @@ export async function rerunAction(terminalId: string): Promise<string | null> {
   const owner = t ? ownerOfTerminal(t.labels) : null;
   if (!actionId || owner === null || rerunning.has(terminalId)) return null;
   rerunning.add(terminalId);
-  const shownIn = shownKeysOf(useTerminalsStore.getState(), terminalId);
   try {
     const id = await runAction(actionId, owner);
-    if (id !== null) {
-      carryShownTerminal(id, shownIn);
-      await closeBottomTerminal(terminalId);
-    }
+    if (id !== null) await closeTerminal(terminalId);
     return id;
   } finally {
     rerunning.delete(terminalId);
@@ -165,7 +159,10 @@ export function setupFailedMessage(f: Pick<ActionRunFinishedView, "actionName" |
  * terminal, else (the daemon runs setup in the background) its captured output.
  */
 export function openFailedRun(f: Pick<ActionRunFinishedView, "runId" | "threadId" | "terminalId" | "actionName">): void {
-  if (f.terminalId && revealShell(f.terminalId)) return;
+  if (f.terminalId && f.terminalId in useTerminalsStore.getState().byId) {
+    void showTerminal(f.terminalId);
+    return;
+  }
   if (f.threadId && f.threadId in useThreadsStore.getState().byId) useUiStore.getState().select({ kind: "thread", id: f.threadId });
   openActionRunOutput(f.runId, f.actionName);
 }

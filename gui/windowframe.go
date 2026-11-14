@@ -22,9 +22,11 @@ import (
 // screen minus the menu bar and the Dock), centred (docs/notes/window-frame.md).
 
 const (
-	// windowMinWidth fits the default sidebar (260), the content pane's 360 minimum, the
-	// side panel's 280 minimum and their three 12px gaps: 936, rounded up. The panel
-	// shrinks, then hides, beside a wider sidebar (stores/ui.ts panelMax).
+	// The window's minimum fits the sidebar at its minimum width (240, lined up with the top
+	// bar's sidebar toggle) and one pane at its 480x400 minimum with a folded column beside
+	// it: 240 + 12 + 480 + 12 + 36 + 12 = 792 wide, under 940; 56 (the top bar) + 400 + 12 =
+	// 468 tall, under 500. Panes that cannot keep their minimum fold to rails
+	// (gui/frontend/src/shell/geometry/rails.ts; docs/notes/shell-25f-sizes.md).
 	windowMinWidth  = 940
 	windowMinHeight = 500
 	// firstLaunchShare is the share of the primary work area a first launch takes: nearly

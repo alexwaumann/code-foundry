@@ -1,12 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, emit, invocations, mockPost, openApp, resetMock, row, selectWorktree } from "./fixtures";
+import { emit, invocations, invokeAs, mockPost, resetMock } from "./fixtures";
+import { layoutState, openShellApp, paneNode, paneOf, paletteRun, seedLayout, threadTab } from "./shell";
+import { openPrsTab } from "./shell-pages";
 
 /**
- * Phase 3a: the Pull Requests page, against the mock daemon (mock/github.ts). Set SHOTS=<dir>
- * to save screenshots.
+ * Phase 3a: the Pull Requests page, in its tab, against the mock daemon (mock/github.ts). Set
+ * SHOTS=<dir> to save screenshots.
  */
 
-const CFW = `${CF}.worktrees`;
 const shots = process.env.SHOTS;
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -20,14 +21,22 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
+/** Sizes the window so the page's pane (the only one) is `width` wide. */
+async function paneWidth(page: Page, width: number): Promise<void> {
+  const pane = paneOf(page, "p-1");
+  const now = Math.round((await pane.boundingBox())?.width ?? 0);
+  const vp = page.viewportSize() ?? { width: 1280, height: 800 };
+  await page.setViewportSize({ width: vp.width + width - now, height: vp.height });
+  await expect.poll(async () => Math.round((await pane.boundingBox())?.width ?? 0)).toBe(width);
+}
+
 test.describe("Pull Requests page", () => {
   // A list past RowList's limit, under the sections above it: the keyboard's row is not mounted
   // and not in the window, so the list and the page around it both have to move.
   test("End and Home bring a virtualized list's cursor row into view", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await mockPost("gh/many-prs?count=150");
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openPrsTab(page);
     const listBox = page.getByTestId("prs-list");
     await expect(listBox.locator('[data-virtual="true"]').first()).toBeVisible();
     const inView = () =>
@@ -58,8 +67,7 @@ test.describe("Pull Requests page", () => {
   // src/components/prs/PullRequestsPage.test.tsx and pageModel.test.ts.
   test("page and inbox zero (screenshots)", async ({ page }) => {
     test.skip(!shots, "SHOTS=<dir> only: the screenshots are all it adds");
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openPrsTab(page);
     await expect(prRows(page, "merged")).toHaveCount(7);
     await shot(page, "prs-page");
     await mockPost("gh/inbox-zero");
@@ -68,8 +76,7 @@ test.describe("Pull Requests page", () => {
   });
 
   test("the five cards sit in one row under the half-height charts, and wrap beside the side panel", async ({ page }) => {
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openPrsTab(page);
     const cards = page.getByTestId("prs-cards").getByRole("button");
     await expect(cards).toHaveCount(5);
     const row = async () => {
@@ -88,10 +95,8 @@ test.describe("Pull Requests page", () => {
     const charts = await page.getByTestId("activity").boundingBox();
     const first = await cards.first().boundingBox();
     expect((first?.y ?? 0) >= (charts?.y ?? 0) + (charts?.height ?? 0)).toBe(true);
-    await page.getByTestId("prs-list").press("ArrowDown");
-    await page.getByTestId("prs-list").press("Enter");
-    await expect(page.getByTestId("pr-surface")).toBeVisible();
-    // A pull request open in the side panel narrows the page below 640px: three cards a row, none clipped.
+    // In a pane below 640px (as beside a pull request's pane): three cards a row, none clipped.
+    await paneWidth(page, 600);
     const narrow = await row();
     expect(narrow.tops).toBe(2);
     expect(narrow.minWidth).toBeGreaterThan(150);
@@ -104,8 +109,7 @@ test.describe("Pull Requests page", () => {
 
   // Which columns fit which width: src/components/prs/columns.test.ts; the cells per column: PrRows.test.tsx.
   test("beside the side panel, the tables drop columns instead of running past their right edge", async ({ page }) => {
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openPrsTab(page);
     const table = (s: string) => page.getByTestId(`prs-${s}`).locator("[data-columns]");
     /** How far any cell of the section's table reaches past the table's right edge (px). */
     const overflow = (s: string) =>
@@ -115,18 +119,15 @@ test.describe("Pull Requests page", () => {
       });
     const sections = ["review", "reviewed", "authored", "else", "merged"];
     await expect(table("review")).toHaveAttribute("data-columns", "Repository,#,Author,Title,Why,Checks,Diff,Age");
-    await page.getByTestId("prs-list").press("ArrowDown");
-    await page.getByTestId("prs-list").press("Enter");
-    await expect(page.getByTestId("pr-surface")).toBeVisible();
-    // Narrower: Diff went first, and nothing overflows.
+    // In a narrower pane (as beside a pull request's pane): Diff went first, and nothing overflows.
+    await paneWidth(page, 600);
     await expect(table("review")).not.toHaveAttribute("data-columns", /Diff/);
     await expect(table("review")).toHaveAttribute("data-columns", /^Repository,#,.*Title,Why/);
     for (const s of sections) expect(await overflow(s)).toBeLessThanOrEqual(0.5);
   });
 
   test("a capped project list arrives over the gh stream with its footer", async ({ page }) => {
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openPrsTab(page);
     await expect(prRows(page, "merged")).toHaveCount(7);
     await expect(page.getByTestId("prs-cap")).toHaveCount(0);
     await mockPost("gh/project-merged-capped?shown=3&total=64");
@@ -134,8 +135,7 @@ test.describe("Pull Requests page", () => {
   });
 
   test("activity charts share the hovered month; one tooltip, in the card under the pointer", async ({ page }) => {
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+    await openPrsTab(page);
     const merged = page.getByTestId("activity-merged");
     const commits = page.getByTestId("activity-commits");
     const tip = page.getByTestId("activity-tooltip");
@@ -157,35 +157,43 @@ test.describe("Pull Requests page", () => {
     await expect(page.getByTestId("activity-crosshair")).toHaveCount(0);
   });
 
-  // Keyboard order, Enter and click into the side panel, cmd+Enter and cmd+click on GitHub: src/components/prs/PullRequestsPage.test.tsx.
-  test("the list keeps focus while Enter opens a row in the side panel", async ({ page }) => {
-    await openApp(page);
-    await page.getByTestId("nav-pullrequests").click();
+  // Keyboard order, Enter and click opening a pull request, cmd+Enter and cmd+click on GitHub: src/components/prs/PullRequestsPage.test.tsx.
+  test("Enter on a row opens its pull request in the page's pane, shown", async ({ page }) => {
+    await openPrsTab(page);
     const list = page.getByTestId("prs-list");
     await expect(list).toBeFocused();
     await list.press("ArrowDown");
     await list.press("Enter");
-    await expect(page.getByTestId("panel-tabs").getByRole("tab")).toHaveText(["#139"]);
+    await expect(page.locator('[data-testid="shell-tab"][data-kind="pullrequest"]')).toHaveText("#139");
     await expect(page.getByTestId("pr-surface")).toBeVisible();
-    await expect(list).toBeFocused();
   });
 
-  test("cmd+shift+d runs view.pullrequests and the ShowView intent switches the page", async ({ page }) => {
-    await openApp(page);
-    await selectWorktree(page, "repo-cf", `${CFW}/feat-sidebar`);
-    await expect(page.getByTestId("diff-surface")).toBeVisible();
-    await page.keyboard.press("Meta+Shift+d");
+  // cmd+shift+d is the thread's diff in the shell (shell-model.md, Keys); Show Pull Requests has no
+  // chord: the palette and a pane's + open the page (+: src/components/shell/linkedTabs.test.tsx).
+  test("the palette runs view.pullrequests, and the CLI's opens the page's tab too", async ({ page }) => {
+    await seedLayout(paneNode("p-1", [threadTab("s-1")]), "p-1");
+    await openShellApp(page);
+    await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
+    await paletteRun(page, "Show Pull Requests", "view.pullrequests");
     await expect(page.getByTestId("prs-page")).toBeVisible();
     expect((await invocations()).some((i) => i.name === "view.pullrequests")).toBe(true);
 
-    // The intent a command emits does the same.
-    await row(page, "s:s-1").click();
+    // The CLI's (the user's, outside a thread) does the same through the layout alone: the space's
+    // one Pull Requests tab, shown (docs/notes/shell-22-retire-verbs.md).
+    await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').click();
     await expect(page.getByTestId("prs-page")).toHaveCount(0);
-    expect(await emit({ showView: { name: "pullrequests" } })).toBeGreaterThan(0);
+    expect((await invokeAs("", "view.pullrequests")).ok).toBe(true);
     await expect(page.getByTestId("prs-page")).toBeVisible();
-    // Unknown views are ignored.
+    const kinds = async () => {
+      const root = (await layoutState()).spaces[0]?.root;
+      return root?.t === "pane" ? root.tabs.map((t) => String(t.kind)) : [];
+    };
+    await expect.poll(kinds).toEqual(["thread", "prs"]);
+    // A ShowView of the page (an older daemon's) is no view any more: ignored.
+    await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').click();
+    await emit({ showView: { name: "pullrequests" } });
     await emit({ showView: { name: "nope" } });
-    await expect(page.getByTestId("prs-page")).toBeVisible();
+    await expect(page.locator('[data-testid="thread-pane"][data-thread-id="s-1"]')).toBeVisible();
   });
 
   // "gh events refresh the page; a failed poll shows stale and the error": src/components/prs/PullRequestsPage.test.tsx.

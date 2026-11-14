@@ -10,8 +10,8 @@
 // or a worktree, like a shell. Two runners:
 //
 //   - Terminal: a terminal in the terminal store labelled termlabel.ActionRun, so it
-//     shows in its owner's bottom panel. It stays EXITED when it ends (the daemon's
-//     reaper never removes an exited action terminal); the GUI closes it.
+//     shows as a tab beside its owner. It stays EXITED when it ends (the daemon's
+//     reaper never removes an exited action terminal); closing its tab removes it.
 //   - Background: a child process of the daemon in its own process group, with its
 //     combined output captured into a bounded buffer (the last 64 KiB).
 //
@@ -72,7 +72,7 @@ type Mode int
 const (
 	// ModeDefault (RunOptions only) is the action's own choice: InTerminal.
 	ModeDefault Mode = iota
-	// ModeTerminal runs in a terminal in the owner's bottom panel.
+	// ModeTerminal runs in a terminal, shown as a tab beside the owner.
 	ModeTerminal
 	// ModeBackground runs as a child process with captured output.
 	ModeBackground

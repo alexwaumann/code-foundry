@@ -1,33 +1,39 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { it, trackTests } from "@/test/isolate";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { prSummary, seedPrWorld, SLUG, VIEWER } = await import("@/test/prWorld");
-const { prTabs, resetPrStores, settle } = await import("@/test/prPanelHarness");
-const { SidePanel } = await import("@/components/panel/SidePanel");
+const { PR_PAGE, prTabs, resetPrStores, settle } = await import("@/test/prPanelHarness");
+const { ShellPanes } = await import("@/test/shellPanes");
+const { layoutSettled } = await import("@/test/fakeLayout");
 const { useSidebarDashboard } = await import("@/components/sidebar/useLinkedPrs");
 const { applyGhEvent, usePollStore } = await import("@/stores/gh");
 const { useUiStore } = await import("@/stores/ui");
 const { PREFETCH_DWELL_MS, resetPrefetch } = await import("@/stores/prPrefetch");
-const { PullRequestsNav, PullRequestsPage } = await import("./PullRequestsPage");
+const { PullRequestsPage } = await import("./PullRequestsPage");
 
 /**
- * The Pull Requests page (docs/notes/prs-inbox-2-gui.md, prs-page-2-gui.md) and the sidebar's entry with its
- * needs-review count, against the mock's dashboard (src/test/prWorld.ts). A gh event is
+ * The Pull Requests page (docs/notes/prs-inbox-2-gui.md, prs-page-2-gui.md), with the sidebar's
+ * dashboard watch, against the mock's dashboard (src/test/prWorld.ts). A gh event is
  * applied the way the stream applies it (applyGhEvent). e2e/prs.spec.ts keeps the list
- * keeping focus while a row opens in the side panel, the charts under a real pointer, and
+ * keeping focus while a row opens in a tab, the charts under a real pointer, and
  * the cmd+shift+d chord and ShowView intent.
  */
 
 let world: ReturnType<typeof seedPrWorld>;
 
-beforeEach(() => {
+// A test that times out under load must not run on into the next (src/test/isolate.ts).
+trackTests();
+
+beforeEach(async () => {
   resetDaemon();
   world = seedPrWorld();
-  resetPrStores({ kind: "none" });
+  await resetPrStores({ kind: "none" });
   usePollStore.setState({ fetchedAtMs: null, lastError: "", known: false, projectsFetchedAtMs: null, projectsLastError: "" });
 });
 
@@ -35,15 +41,14 @@ afterEach(() => {
   cleanup();
 });
 
-/** The sidebar's part (its dashboard watch and the entry), the page while it is selected, and the side panel. */
+/** The sidebar's part (its dashboard watch), the page while it is selected, and the panes (the tabs rows open). */
 function Harness() {
   useSidebarDashboard();
   const onPage = useUiStore((s) => s.selection.kind === "view" && s.selection.name === "pullrequests");
   return (
     <>
-      <PullRequestsNav />
       {onPage && <PullRequestsPage />}
-      <SidePanel />
+      <ShellPanes />
     </>
   );
 }
@@ -54,10 +59,13 @@ const keys = (section: string) => rows(section).map((r) => r.dataset.navKey);
 const groups = (section: string) => [...screen.getByTestId(`prs-${section}`).querySelectorAll("[data-testid=prs-group]")].map((g) => g.textContent);
 const textsIn = (els: HTMLElement[], testId: string) => els.flatMap((e) => [...e.querySelectorAll<HTMLElement>(`[data-testid="${testId}"]`)].map((x) => x.textContent));
 
+/** Selects the page (a pane's "+" or the palette opens it). */
 async function openPage() {
   render(<Harness />);
   await settle();
-  fireEvent.click(screen.getByTestId("nav-pullrequests"));
+  act(() => {
+    useUiStore.getState().select(PR_PAGE);
+  });
   await settle();
 }
 
@@ -162,10 +170,9 @@ describe("before the first poll", () => {
 });
 
 describe("the Pull Requests page", () => {
-  it("the sidebar entry opens it: charts, the five cards, then every section with rows", async () => {
+  it("charts, the five cards, then every section with rows", async () => {
     await openPage();
     const page = screen.getByTestId("prs-page");
-    expect(screen.getByTestId("nav-pullrequests").getAttribute("aria-current")).toBe("page");
     expect(screen.getByTestId("prs-viewer").textContent).toBe("@alexwaumann");
     expect(screen.getByTestId("prs-updated").textContent).toMatch(/updated \d+s ago/);
     // The charts on top (ActivityCharts.test.tsx has their labels), the cards, then the sections in order; no scope toggle.
@@ -234,17 +241,8 @@ describe("the Pull Requests page", () => {
     expect(screen.queryByTestId("prs-empty")).toBeNull();
   });
 
-  it("the sidebar counts the pull requests that need review before the page opens; at inbox zero the section hides, its card says so; one read per change, shared", async () => {
-    render(<Harness />);
-    await settle();
-    const pill = () => screen.queryByTestId("nav-pullrequests-count");
-    expect(pill()?.textContent).toBe("3");
-    fireEvent.pointerMove(pill() as HTMLElement, { pointerType: "mouse" });
-    await vi.waitFor(() => {
-      expect(screen.queryByRole("tooltip")?.textContent).toBe("3 pull requests need your review");
-    });
-    fireEvent.click(screen.getByTestId("nav-pullrequests"));
-    await settle();
+  it("at inbox zero the section hides, its card says so; one read per change, shared with the sidebar's watch", async () => {
+    await openPage();
     expect(rows("review")).toHaveLength(3);
     const reads = world.reads.dashboard;
 
@@ -259,7 +257,6 @@ describe("the Pull Requests page", () => {
     expect(card.disabled).toBe(true);
     expect(card.textContent).toBe("Needs your review0nothing waiting on you");
     expect(rows("reviewed")).toHaveLength(2);
-    expect(pill()).toBeNull();
     // One read per change, shared by the page and the sidebar.
     expect(world.reads.dashboard).toBe(reads + 1);
 
@@ -365,7 +362,7 @@ describe("the Pull Requests page", () => {
     expect(list.contains(screen.getByTestId("prs-cards"))).toBe(false);
   });
 
-  it("Enter and click open pull requests in the side panel; cmd+Enter and cmd+click open them on GitHub; keyboard order is page order", async () => {
+  it("Enter and click open pull requests as tabs; cmd+Enter and cmd+click open them on GitHub; keyboard order is page order", async () => {
     await openPage();
     const list = screen.getByTestId("prs-list");
     const selected = (section: string, i: number) => rows(section).at(i)?.getAttribute("aria-selected");
@@ -375,25 +372,50 @@ describe("the Pull Requests page", () => {
     expect(selected("reviewed", 0)).toBe("true");
     for (let i = 0; i < 2; i++) fireEvent.keyDown(list, { key: "j" });
     expect(selected("authored", 0)).toBe("true");
-    fireEvent.keyDown(list, { key: "Enter" });
+    await act(async () => {
+      fireEvent.keyDown(list, { key: "Enter" });
+      await layoutSettled();
+    });
     await settle();
     expect(prTabs()).toEqual(["#145"]);
     expect(screen.getByTestId("pr-title").textContent).toBe("fix(terminal): resize race between attach and first output");
     fireEvent.keyDown(list, { key: "Enter", metaKey: true });
     await settle();
     expect(invocationsOf("view.open.url").map((i) => i.args.url)).toEqual([`https://github.com/${SLUG}/pull/145`]);
-    // End jumps to the last row (merged section); a click opens any row in the panel.
+    // End jumps to the last row (merged section); a click opens any row as a tab.
     fireEvent.keyDown(list, { key: "End" });
     expect(selected("merged", -1)).toBe("true");
-    fireEvent.click(rows("review")[0] as HTMLElement);
+    await act(async () => {
+      fireEvent.click(rows("review")[0] as HTMLElement);
+      await layoutSettled();
+    });
     await settle();
     expect(prTabs()).toEqual(["#145", "#139"]);
     expect(selected("review", 0)).toBe("true");
     // cmd+click opens it on GitHub and adds no tab.
-    fireEvent.click(rows("review")[0] as HTMLElement, { metaKey: true });
+    await act(async () => {
+      fireEvent.click(rows("review")[0] as HTMLElement, { metaKey: true });
+      await layoutSettled();
+    });
     await settle();
     expect(invocationsOf("view.open.url").map((i) => i.args.url)).toEqual([`https://github.com/${SLUG}/pull/145`, `https://github.com/${SLUG}/pull/139`]);
     expect(prTabs()).toHaveLength(2);
+  });
+
+  it("a click on a row shows its pull request", async () => {
+    await openPage();
+    await act(async () => {
+      fireEvent.click(rows("authored")[0] as HTMLElement);
+      await layoutSettled();
+    });
+    await settle();
+    await act(async () => {
+      fireEvent.click(rows("review")[0] as HTMLElement);
+      await layoutSettled();
+    });
+    await settle();
+    expect(prTabs()).toEqual(["#145", "#139"]);
+    expect(screen.getByTestId("pr-repo").textContent).toBe(`${SLUG} #139`);
   });
 
   it("the header shows the older of the two fetches, and either's error", async () => {

@@ -1,16 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CF, invocations, invokeAs, openApp, resetMock, row } from "./fixtures";
+import { paneWith, stripTabs, threadTabOpen } from "./shell-surfaces";
 
 /**
- * view.panel.page (docs/notes/page-verbs.md): thread s-1 opens an HTML page in its own side
- * panel only, as its page's bridge would (cf.run in the thread's context). The File tab is
+ * view.panel.page (docs/notes/page-verbs.md): thread s-1 opens an HTML page as a tab linked to
+ * it, beside its own, as its page's bridge would (cf.run in the thread's context). The File tab is
  * titled, runs the page with s-1's bridge, and no card is added to the conversation.
  * SHOTS=<dir> saves screenshots.
  */
 
 const PAGE = `${CF}/docs/bridge.html`;
-const panel = (page: Page) => page.getByTestId("side-panel");
-const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
+/** The pane of the thread's linked tabs, beside its own. */
+const panel = (page: Page) => paneWith(page, "file");
+const tabs = (page: Page) => stripTabs(panel(page));
 const inner = (page: Page) => page.frameLocator('[data-testid="file-html-frame"]');
 
 /** Runs a command as the CLI (or a page's bridge) inside thread s-1 would: no active view. */
@@ -24,18 +26,19 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("view.panel.page opens the page in the thread's side panel with its bridge, and adds no card", async ({ page }) => {
+test("view.panel.page opens the page in a tab beside the thread with its bridge, and adds no card", async ({ page }) => {
   await page.setViewportSize({ width: 1300, height: 900 });
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-1");
+  await threadTabOpen("s-1");
   const cards = page.getByTestId("thread-html");
   await expect(cards).toHaveCount(0);
 
-  expect(await inS1("view.panel.page", { path: PAGE, title: "Welcome" })).toEqual({ ok: true, message: "windows=1 thread=s-1" });
+  expect(await inS1("view.panel.page", { path: PAGE, title: "Welcome" })).toEqual({ ok: true, message: "opened a file tab for thread s-1" });
 
-  await expect(panel(page)).toHaveAttribute("data-panel-key", "thread:s-1");
   await expect(tabs(page)).toHaveText(["Welcome"]);
+  await expect(panel(page).locator('[data-testid="shell-tab"][data-kind="file"]')).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("file-tab")).toHaveAttribute("data-path", PAGE);
   // The thread's bridge, though no html item names the page.
   await expect(inner(page).locator("body")).toHaveAttribute("data-ready", "1");

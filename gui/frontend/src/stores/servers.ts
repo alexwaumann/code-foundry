@@ -2,8 +2,7 @@
  * The thread info card's server rows (lib/servers, docs/notes/server-rollup.md): narrow
  * selectors over the thread list and the action runs, and what a row's click and its two
  * buttons do. Everything a row runs is a registry command (view.open.url, thread.shell.stop,
- * terminal.kill, action.stop); showing a terminal in this thread's panel is window state, as
- * a tab's click is.
+ * terminal.kill, action.stop, ui.focus.terminal).
  */
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -11,8 +10,8 @@ import { rollupThreadIds, runSource, serverRows, shellSource, type ServerSource 
 import { serverAddress } from "@/lib/threadInfo";
 import { stopActionRun, stopBackgroundRun } from "./actionActions";
 import { useActionsStore } from "./actions";
-import { showTerminalIn } from "./bottomActions";
-import { bottomKeyOf } from "./bottomPanel";
+import { showTerminal } from "@/shell/terminalActions";
+import { useTerminalsStore } from "./terminals";
 import { openUrl } from "./gh";
 import { stopShell } from "./threadActions";
 import { useThreadsStore } from "./threads";
@@ -47,13 +46,14 @@ export function openServerInBrowser(s: ServerSource): void {
 }
 
 /**
- * A row's click on `threadId`'s card: a server with a terminal shows it as a tab of that
- * thread's bottom panel, focused, whoever owns it (the view stays here); any other opens
- * the browser.
+ * A row's click on a thread's card: a server with a terminal shows its tab, focused (opened by
+ * the placement rules when it has none), whoever owns it; any other opens the browser.
  */
-export function openServer(s: ServerSource, threadId: string): void {
-  const key = bottomKeyOf({ kind: "thread", id: threadId });
-  if (s.terminalId && key !== null && showTerminalIn(s.terminalId, key)) return;
+export function openServer(s: ServerSource): void {
+  if (s.terminalId && s.terminalId in useTerminalsStore.getState().byId) {
+    void showTerminal(s.terminalId);
+    return;
+  }
   openServerInBrowser(s);
 }
 

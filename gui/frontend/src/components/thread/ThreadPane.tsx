@@ -1,10 +1,8 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { EmberBody } from "@/components/ember/EmberPane";
-import { ThreadTitle } from "@/components/thread/ThreadParts";
 import { DragBand } from "@/components/window/DragBand";
-import { PaneHeader } from "@/components/window/PaneHeader";
 import { ThreadInfoCard } from "@/components/threadinfo/ThreadInfoCard";
 import { ThreadInfoOverlay } from "@/components/threadinfo/ThreadInfoOverlay";
 import { useInfoRoom } from "@/components/threadinfo/useInfoRoom";
@@ -13,7 +11,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { startThreadWatch, useSetupShown } from "@/stores/thread";
 import { holdThreadPane, useThreadFindOpen } from "@/stores/threadFind";
 import { useShownRun } from "@/stores/subagentView";
-import { useUiStore } from "@/stores/ui";
+import { useThreadInfoOpen } from "@/stores/threadInfoOverlay";
 import { setupRowPhase } from "@/lib/threadSetup";
 import { useElementHeight, useThreadActivity } from "./activity";
 import { CiteLayer } from "./cite/CiteLayer";
@@ -21,7 +19,9 @@ import { FindBar } from "./find/FindBar";
 import { FindLayer } from "./find/FindLayer";
 import { SubagentPane } from "./SubagentPane";
 import { ThreadContext } from "./context";
-import { HeaderActions } from "./HeaderActions";
+import { ThreadHeader } from "./ThreadHeader";
+import { useShellPane } from "@/shell/paneContext";
+import { useAskStrip } from "@/shell/askStrip";
 import { PaneOverlay } from "./InlineHtml";
 import { Timeline } from "./Timeline";
 import { ThreadComposer } from "./ThreadComposer";
@@ -89,32 +89,43 @@ function ThreadBody({ threadId }: { threadId: string }) {
   const shown = useSetupShown(threadId).size > 0;
   const setupRow = useThreadsStore((s) => setupRowPhase(s.byId[threadId]?.setup, shown) !== "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
-  const [dockRef, dockHeight] = useElementHeight();
+  const [dockAttach, dockHeight] = useElementHeight();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const dockEl = useRef<HTMLDivElement>(null);
+  const dockRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      dockEl.current = el;
+      dockAttach(el);
+    },
+    [dockAttach],
+  );
+
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
-  const infoOpen = useUiStore((s) => s.threadInfoOpen);
+  const infoOpen = useThreadInfoOpen(threadId);
   const findOpen = useThreadFindOpen(threadId);
   const [rowRef, infoFits] = useInfoRoom(threadId);
+  // The pane's header (ThreadHeader): the tab above is the title. None outside a pane (tests).
+  const shellPane = useShellPane();
+  // A shell pane too short for the full ask draws it as one line above the composer (shell/askStrip.ts).
+  const askKey = open.map((p) => p.requestId).join(" ");
+  const askStrip = useAskStrip(shellPane !== null && open.length > 0, bodyRef, dockEl, askKey);
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread flex min-h-0 min-w-0 flex-1 flex-col outline-none" tabIndex={-1} aria-label="Thread" data-thread-id={threadId} data-testid="thread-pane" data-region="content">
-        <PaneHeader className="gap-2 px-3" data-testid="thread-header">
-          <ThreadTitle id={threadId} />
-          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2 text-cf-text-muted tabular-nums">
-            <HeaderActions />
-          </span>
-        </PaneHeader>
-        {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating. */}
+        {shellPane && <ThreadHeader threadId={threadId} paneId={shellPane.paneId} />}
+        {/* The find bar (thread.find) sits where the card starts, which moves down under it (--ti-find), inline or floating.
+            Clipped: in a pane narrower than a thread's minimum (200% zoom in a small window) the composer's
+            footer stacks and its dock grows taller than this box; it would cover the header above. */}
         <div
-          className="relative flex min-h-0 flex-1"
+          className="relative flex min-h-0 flex-1 overflow-hidden"
           ref={rowRef}
           data-testid="thread-pane-body"
           data-info-room={infoFits ? "" : undefined}
           style={findOpen ? ({ "--ti-find": "var(--ti-find-open)" } as CSSProperties) : undefined}
         >
           {/* The card lays over this column's right side (inside the list's scroller): the list, the dock, the chips and the page modal keep clear of it (--ti-inset) and the list's scrollbar stays at the pane's edge. */}
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef} style={{ "--ti-inset": infoOpen && infoFits ? "var(--ti-card)" : "0px" } as CSSProperties}>
-            {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and side panel stay usable. */}
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" ref={bodyRef} data-ask-strip={askStrip || undefined} style={{ "--ti-inset": infoOpen && infoFits ? "var(--ti-card)" : "0px" } as CSSProperties}>
+            {/* The page modal (an inline page's Expand) covers this body only: the header, sidebar and other panes stay usable. */}
             <PaneOverlay key={threadId} scope={threadId} threadId={threadId}>
               {/* The log on screen may be behind while the Watch stream retries (a dropped or silent stream). */}
               {loaded && catchingUp && (
@@ -153,7 +164,7 @@ function ThreadBody({ threadId }: { threadId: string }) {
               <div className="dock" ref={dockRef}>
                 <WaitingStrip key={`wait:${threadId}`} threadId={threadId} />
                 <SnoozeStrip key={`snooze:${threadId}`} threadId={threadId} />
-                <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} />
+                <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} askStrip={askStrip && shellPane ? shellPane.paneId : null} />
               </div>
               <CiteLayer key={`cite:${threadId}`} threadId={threadId} paneRef={bodyRef} />
               <FindLayer key={`find:${threadId}`} threadId={threadId} paneRef={bodyRef} />

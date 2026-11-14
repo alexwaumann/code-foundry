@@ -1,12 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openHelloDemo, resetMock } from "./fixtures";
+import { paneShowingSurface, setSurfaceWidth } from "./shell-surfaces";
 
 /**
  * The plugin picker (pluginsdk/ui Select.Search; docs/notes/plugin-picker.md) against the
  * mock's hello demo: its Layout toolbar's branch picker and its form's reviewers picker.
  * What the picker lists, which acts it sends, tokens, Backspace, Enter, Esc and focus going
  * back to the trigger: src/components/plugin/PickerControl.test.tsx and picker.test.ts. Here
- * only what needs the browser and the mock's streams: the popover fits the 360 px panel, a
+ * only what needs the browser and the mock's streams: the popover fits a pane the side panel's default width (420 px), a
  * typed query reaches the plugin and its answer comes back as a new view, and a pick filters
  * the runs.
  */
@@ -31,12 +32,13 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("a toolbar picker opens inside the panel, searches the plugin and filters the runs", async ({ page }) => {
+test("a toolbar picker opens inside its pane, searches the plugin and filters the runs", async ({ page }) => {
   await openDemo(page, "layout");
+  await setSurfaceWidth(page, "plugin-surface", 420);
   const trigger = surface(page).locator('[data-testid="plugin-select"][data-name="branch"]');
   await expect(trigger).toHaveAttribute("data-style", "picker-compact");
   await trigger.click();
-  const panel = await page.getByTestId("panel-body").boundingBox();
+  const panel = await paneShowingSurface(page, "plugin-surface").getByTestId("shell-pane-body").boundingBox();
   const pop = await picker(page).boundingBox();
   expect(panel && pop && pop.x >= panel.x && pop.x + pop.width <= panel.x + panel.width + 1).toBe(true);
   await search(page, "cf/");

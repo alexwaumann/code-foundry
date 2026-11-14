@@ -1,0 +1,56 @@
+{
+  "doc": "When the space already has an empty composer, the one without the focus closes: here the other one, and its pane goes with it.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"compose","params":{"draft":"d-1"}}
+              ],
+              "active": "t-d"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-c","kind":"compose"}],"active":"t-c"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-d","t-c"],
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"clear_draft","draft":"d-1"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"},{"id":"t-d","kind":"compose"}],
+          "active": "t-d"
+        },
+        "focus": "p-a",
+        "mru": ["t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-d","closed":["t-c"],"draft":"d-1"}
+}

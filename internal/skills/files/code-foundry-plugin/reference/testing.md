@@ -195,7 +195,7 @@ home directory; so must an unpacked release tarball you try):
 - `code-foundry plugin <name> <command> [args] --thread <id>`: a command, as its view
   button would run it.
 - `code-foundry plugin surface <name> <surface> --thread <id>` opens the surface for that
-  thread as the panel would and prints the view the host accepted and the elements an
+  thread as its tab would and prints the view the host accepted and the elements an
   act can name (a command button with its args). It returns at the first view: a surface
   that renders "Loading" first shows that; add `--settle 2s` to wait until no new view
   has come for 2 s (at most 30 s), or watch:
@@ -205,7 +205,7 @@ home directory; so must an unpacked release tarball you try):
   too.
 - **Look at what you drew**: `code-foundry plugin surface <name> <surface> --thread <id>
   --shot /tmp/s.png` prints the view, then writes a PNG of it as the open app draws it (in
-  its theme, 420 by 900 CSS px; `--width`, `--height`). Read the PNG: a valid view can
+  its theme, 420 by 900 CSS px, about a pane beside a thread; `--width`, `--height`: try 300). Read the PNG: a valid view can
   still be cramped, cut off or unreadable. A view taller than the shot says which
   `--height` to pass. With the app closed it prints the reason and exits 1; it never
   opens the app.
@@ -213,7 +213,7 @@ home directory; so must an unpacked release tarball you try):
   event name positionally or `--key <element key>`, `tab --key <tab key>` for a tab,
   `--value` for a field's change, `--values '{"field": "…"}'` for a submit. An event goes
   to the plugin; a command button (`--key <button>`, or its command name positionally)
-  runs its command with the panel's context, as the GUI does (a form's values become its
+  runs its command with the tab's context, as the GUI does (a form's values become its
   args; a command that asks first needs `--yes`), and prints the command's result. Then
   it prints the view once no new one has come for `--settle` (default 500ms), so there
   is no need for a `plugin surface` after it; `--quiet` prints only what happened.

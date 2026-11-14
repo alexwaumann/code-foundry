@@ -294,7 +294,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--cf-text);
 }
-/* The sidebar's app name: the one title-band brand mark, between heading and title. */
+/* The top bar's app name: the one brand mark, between heading and title. */
 @utility text-brand {
   font-size: 17px;
   line-height: 20px;
@@ -409,8 +409,8 @@
   }
 }
 
-/* While a side panel tab is dragged (SidePanel.tsx), the panel's iframes (an HTML render, a
-   plugin's frame) ignore the pointer. Over a frame the pointer's events go to the frame's
+/* While a tab or a composer is dragged (PaneTabStrip.tsx, PaneView.tsx, FloatingComposer.tsx),
+   iframes under it (an HTML render, a plugin's frame) ignore the pointer. Over a frame the pointer's events go to the frame's
    document, so dnd-kit's sensor on this one would hear nothing and the ghost would freeze. */
 [data-dragging] iframe {
   pointer-events: none;

@@ -1,0 +1,66 @@
+{
+  "doc": "A thread opened in the focused pane, when that pane holds only terminals and has no room for it, opens in the most recently focused pane that can take it.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-t","t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-x","focus":true,"w":900,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-n1","kind":"thread","thread":"th-x"}],
+              "active": "t-n1"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-t","t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused"}
+}

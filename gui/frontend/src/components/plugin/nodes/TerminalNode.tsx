@@ -1,9 +1,9 @@
 import { lazy, Suspense, useRef, useState } from "react";
-import { PanelBottom } from "lucide-react";
+import { SquareTerminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { showPluginTerminal, useInVisibleBottom } from "@/stores/pluginTerminals";
+import { showPluginTerminal, useTerminalShown } from "@/stores/pluginTerminals";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useUiStore } from "@/stores/ui";
 import { terminalAutoHeight, useNarrowerThan, useNodeHeight } from "../height";
@@ -23,10 +23,9 @@ const NARROW_PX = 400;
 
 /**
  * The plugin's own terminal, inline (docs/notes/plugins-6-thread-terminal.md): a title
- * bar with the plugin's buttons and "Open in bottom panel" (icons only on a narrow node),
- * over the terminal view. Its own Attach only while near the screen
- * (components/plugin/live.ts). While the bottom panel on screen shows the terminal, this
- * node says so instead of attaching a second view, and a later node naming the same terminal
+ * bar with the plugin's buttons and "Open in a tab" (icons only on a narrow node), over the
+ * terminal view. Its own Attach only while near the screen (components/plugin/live.ts). While a
+ * tab on screen shows the terminal, this node says so instead of attaching a second view, and a later node naming the same terminal
  * in the view says "Shown above" for the same reason. A terminal the GUI does not know shows
  * a muted empty state.
  */
@@ -40,11 +39,11 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
   const known = useTerminalsStore((s) => data.terminalId in s.byId);
   const loaded = useTerminalsStore((s) => s.loaded);
   const exited = useTerminalsStore((s) => s.byId[data.terminalId]?.state === "exited");
-  const inBottom = useInVisibleBottom(data.terminalId);
+  const inTab = useTerminalShown(data.terminalId);
   const narrow = useNarrowerThan(box, NARROW_PX);
   const onScreen = useOnScreen(el);
   const repeated = useRepeated(watchKey, data.terminalId, box);
-  const attached = known && onScreen && !inBottom && !repeated;
+  const attached = known && onScreen && !inTab && !repeated;
   if (!known) {
     return (
       <OwnedGone
@@ -55,20 +54,20 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
       />
     );
   }
-  const openBottom = (
+  const openTab = (
     <Button
       variant="ghost"
       size={narrow ? "icon-xs" : "xs"}
       className="text-cf-text-muted hover:text-cf-text"
-      disabled={inert || inBottom}
-      aria-label={narrow ? "Open in bottom panel" : undefined}
+      disabled={inert || inTab}
+      aria-label={narrow ? "Open in a tab" : undefined}
       onClick={() => {
-        showPluginTerminal(data.terminalId);
+        void showPluginTerminal(data.terminalId);
       }}
-      data-testid="plugin-terminal-open-bottom"
+      data-testid="plugin-terminal-open-tab"
     >
-      <PanelBottom aria-hidden />
-      {!narrow && "Open in bottom panel"}
+      <SquareTerminal aria-hidden />
+      {!narrow && "Open in a tab"}
     </Button>
   );
   return (
@@ -94,11 +93,11 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
             ))}
             {/* A disabled button gets no pointer events: the span carries the tooltip. */}
             {narrow ? (
-              <Tip label="Open in bottom panel">
-                <span className="inline-flex shrink-0">{openBottom}</span>
+              <Tip label="Open in a tab">
+                <span className="inline-flex shrink-0">{openTab}</span>
               </Tip>
             ) : (
-              openBottom
+              openTab
             )}
           </span>
         </div>
@@ -111,9 +110,9 @@ export function TerminalNode({ node, data }: NodeProps<"terminal">) {
         className={cn("relative flex min-h-0 flex-col", repeated && "grow")}
         style={repeated ? undefined : { height }}
       >
-        {inBottom ? (
-          <p className="m-auto px-4 text-center text-caption" data-testid="plugin-terminal-in-bottom">
-            Shown in the bottom panel.
+        {inTab ? (
+          <p className="m-auto px-4 text-center text-caption" data-testid="plugin-terminal-in-tab">
+            Shown in a tab.
           </p>
         ) : repeated ? (
           <ShownAbove />

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"maps"
 	"strings"
+	"sync"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -13,17 +14,13 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/all"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	core "github.com/alexwaumann/code-foundry/internal/layout"
+	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 )
 
-// panelVerbs are every verb that acts on a side panel and follows the thread, with the
-// ShowView name each emits.
-var panelVerbs = map[string]string{
-	"view.panel.toggle":  command.ViewPanelToggle,
-	"view.panel.expand":  command.ViewPanelExpand,
-	"view.panel.new-tab": command.ViewPanelNewTab,
-	"view.panel.split":   command.ViewPanelSplit,
-	"view.panel.mcp":     command.ViewPanelMcp,
-}
+// retiredVerbs are the classic window's side and bottom panel verbs, gone with it
+// (docs/notes/shell-22-retire-verbs.md).
+var retiredVerbs = []string{"view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.bottom.toggle"}
 
 // richThread can show every surface: placed in a workspace and a worktree, with a
 // linked pull request, a subagent run and a creator.
@@ -44,12 +41,71 @@ type panelDeps struct {
 	diffs    *commandtest.FileDiffs
 	projects *commandtest.Project
 	prs      *commandtest.PullRequestChecks
+	layout   *layouttest.Fake
+	terms    *commandtest.Terminal
 }
 
 // panelRegistry registers every command, with threads read from th and one window open.
 func panelRegistry(t *testing.T, th *commandtest.Thread) (*command.Registry, *commandtest.Emitter) {
 	t.Helper()
 	return panelRegistryWith(t, th, panelDeps{windows: 1})
+}
+
+// layouts are the layouts of the registries panelRegistryWith made (layoutOf).
+var layouts sync.Map
+
+// layoutOf is the layout reg's item verbs open their tabs in.
+func layoutOf(t *testing.T, reg *command.Registry) *layouttest.Fake {
+	t.Helper()
+	l, ok := layouts.Load(reg)
+	if !ok {
+		t.Fatal("not a registry of panelRegistryWith")
+	}
+	return l.(*layouttest.Fake)
+}
+
+// opened is the tab an item verb's result names, from reg's layout.
+func opened(t *testing.T, reg *command.Registry, res command.Result) *core.Tab {
+	t.Helper()
+	var id string
+	switch j := res.JSON.(type) {
+	case command.PanelResult:
+		id = j.Tab
+	case command.PageTabResult:
+		id = j.Tab
+	default:
+		t.Fatalf("result %+v names no tab", res.JSON)
+	}
+	_, _, tb := layoutOf(t, reg).Snapshot().State.FindTab(id)
+	if tb == nil {
+		t.Fatalf("tab %s is not in the layout", id)
+	}
+	return tb
+}
+
+// openedTab checks that res opened a tab of thread with params want and sent no intent. A
+// wanted "askId" of "*" is any fresh request id (fileAskParams makes one per call).
+func openedTab(t *testing.T, reg *command.Registry, emit *commandtest.Emitter, res command.Result, thread string, want map[string]string) *core.Tab {
+	t.Helper()
+	sameIntents(t, emit.Intents(), nil)
+	tb := opened(t, reg, res)
+	got := maps.Clone(tb.Params)
+	if want["askId"] == "*" && got["askId"] != "" {
+		got["askId"] = "*"
+	}
+	if tb.Thread != thread || !maps.Equal(got, want) {
+		t.Errorf("tab of %s with %v, want one of %s with %v", tb.Thread, tb.Params, thread, want)
+	}
+	return tb
+}
+
+// openedNothing checks that no op reached reg's layout and no intent went out: a refusal.
+func openedNothing(t *testing.T, reg *command.Registry, emit *commandtest.Emitter) {
+	t.Helper()
+	if ops := layoutOf(t, reg).Ops(); len(ops) != 0 {
+		t.Errorf("ops = %v, want none", ops)
+	}
+	sameIntents(t, emit.Intents(), nil)
 }
 
 func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*command.Registry, *commandtest.Emitter) {
@@ -78,22 +134,25 @@ func panelRegistryWith(t *testing.T, th *commandtest.Thread, d panelDeps) (*comm
 	if d.prs != nil {
 		deps.PullRequestChecks.Gh = d.prs
 	}
+	if d.layout == nil {
+		// A layout a window has loaded (the first-load import ran), as a daemon's is once the app opened.
+		d.layout = layouttest.New(nil)
+		d.layout.MarkImported()
+	}
+	deps.Layout = d.layout
+	layouts.Store(reg, d.layout)
+	t.Cleanup(func() { layouts.Delete(reg) })
+	if d.terms != nil {
+		deps.Terminal = d.terms
+	}
 	if err := all.Register(reg, deps); err != nil {
 		t.Fatal(err)
 	}
 	return reg, emit
 }
 
-func showView(name, thread string) *v1.UiIntent {
-	return showViewWith(name, thread, nil)
-}
-
-func showViewWith(name, thread string, params map[string]string) *v1.UiIntent {
-	return &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name, ThreadId: thread, Params: params}}}
-}
-
-func focusThread(id string) *v1.UiIntent {
-	return &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: id, Explicit: true}}}
+func showView(name string) *v1.UiIntent {
+	return &v1.UiIntent{Intent: &v1.UiIntent_ShowView_{ShowView: &v1.UiIntent_ShowView{Name: name}}}
 }
 
 func sameIntents(t *testing.T, got, want []*v1.UiIntent) {
@@ -108,10 +167,25 @@ func sameIntents(t *testing.T, got, want []*v1.UiIntent) {
 	}
 }
 
-// Every panel verb, from the GUI and the CLI: scoped to a thread only from the CLI with
-// one (or with an explicit --thread), unscoped otherwise, and --focus selects first,
-// explicitly.
-func TestPanelVerbsThreadScope(t *testing.T) {
+// The classic side and bottom panel verbs are gone: unknown commands, from the CLI and the app.
+func TestRetiredPanelVerbs(t *testing.T) {
+	reg, emit := panelRegistry(t, &commandtest.Thread{Current: richThread()})
+	for _, verb := range retiredVerbs {
+		if _, ok := reg.Get(verb); ok {
+			t.Errorf("%s is still registered", verb)
+		}
+		for _, uctx := range []command.Context{{}, {ActiveThreadID: "s-aaaaaaaaaaa1"}, {ActiveThreadID: "s-aaaaaaaaaaa1", ActiveView: "thread"}} {
+			if _, err := reg.Invoke(context.Background(), uctx, verb, nil); !errors.Is(err, command.ErrUnknownCommand) {
+				t.Errorf("%s from %+v: err = %v, want ErrUnknownCommand", verb, uctx, err)
+			}
+		}
+	}
+	openedNothing(t, reg, emit)
+}
+
+// view.open.mcp and its alias, from the app and the CLI: the tab of the thread --thread names
+// (the app's selected thread, the CLI's own), and no intent. --focus takes the user there.
+func TestItemVerbThreadScope(t *testing.T) {
 	gui := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1", ActiveWorkspaceID: "w1", ActiveProjectID: "r1", ActiveWorktreePath: "/wt", ActiveView: "thread"}
 	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
 	tests := []struct {
@@ -122,16 +196,17 @@ func TestPanelVerbsThreadScope(t *testing.T) {
 		wantFocus  bool
 		wantMsg    string
 	}{
-		{name: "the app's palette acts on each window's selection", ctx: gui},
-		{name: "the app's palette with --focus changes nothing", ctx: gui, args: map[string]string{"focus": "true"}},
-		{name: "the app with an explicit --thread", ctx: gui, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2"},
-		{name: "the CLI in a thread acts on that thread", ctx: inThread, wantThread: "s-aaaaaaaaaaa1", wantMsg: "windows=1 thread=s-aaaaaaaaaaa1"},
-		{name: "the CLI in a thread with --thread", ctx: inThread, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2", wantMsg: "windows=1 thread=s-bbbbbbbbbbb2"},
-		{name: "the CLI in a thread with --focus", ctx: inThread, args: map[string]string{"focus": "true"}, wantThread: "s-aaaaaaaaaaa1", wantFocus: true, wantMsg: "windows=1 thread=s-aaaaaaaaaaa1 focused"},
-		{name: "the CLI outside a thread with --thread", ctx: command.Context{}, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2", wantMsg: "windows=1 thread=s-bbbbbbbbbbb2"},
+		{name: "the app's palette: the selected thread", ctx: gui, wantThread: "s-aaaaaaaaaaa1", wantFocus: true},
+		{name: "the app with an explicit --thread", ctx: gui, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2", wantFocus: true},
+		{name: "the CLI in a thread acts on that thread", ctx: inThread, wantThread: "s-aaaaaaaaaaa1",
+			wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
+		{name: "the CLI in a thread with --thread", ctx: inThread, args: map[string]string{"thread": "s-bbbbbbbbbbb2"}, wantThread: "s-bbbbbbbbbbb2",
+			wantMsg: "thread s-bbbbbbbbbbb2's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; windows=1"},
+		{name: "the CLI in a thread with --focus", ctx: inThread, args: map[string]string{"focus": "true"}, wantThread: "s-aaaaaaaaaaa1", wantFocus: true,
+			wantMsg: "thread s-aaaaaaaaaaa1's tab is not open, so tab t-n1 opened in pane p-n1, the focused pane of its space; it has the user's focus; windows=1"},
 	}
 	th := &commandtest.Thread{Current: richThread()}
-	for verb, view := range panelVerbs {
+	for _, verb := range []string{"view.open.mcp", "view.panel.mcp"} {
 		for _, tt := range tests {
 			t.Run(verb+"/"+tt.name, func(t *testing.T) {
 				reg, emit := panelRegistry(t, th)
@@ -139,17 +214,12 @@ func TestPanelVerbsThreadScope(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				var want []*v1.UiIntent
-				if tt.wantFocus {
-					want = append(want, focusThread(tt.wantThread))
+				sameIntents(t, emit.Intents(), nil)
+				if tb := opened(t, reg, res); tb.Kind != "mcp" || tb.Thread != tt.wantThread {
+					t.Errorf("tab = %+v, want mcp of %s", tb, tt.wantThread)
 				}
-				sameIntents(t, emit.Intents(), append(want, showView(view, tt.wantThread)))
-				var wantJSON any = command.EmitResult{Windows: 1, Receivers: 1}
-				if tt.wantThread != "" {
-					wantJSON = command.PanelResult{Windows: 1, Receivers: 1, Thread: tt.wantThread, Focused: tt.wantFocus}
-				}
-				if res.JSON != wantJSON {
-					t.Errorf("JSON = %+v, want %+v", res.JSON, wantJSON)
+				if out := res.JSON.(command.PanelResult); out.Thread != tt.wantThread || out.TabFocused != tt.wantFocus || out.Windows != 1 {
+					t.Errorf("JSON = %+v, want thread %s, focused %v, windows 1", out, tt.wantThread, tt.wantFocus)
 				}
 				if res.Message != tt.wantMsg {
 					t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
@@ -159,88 +229,39 @@ func TestPanelVerbsThreadScope(t *testing.T) {
 	}
 }
 
-// The panel actions that need no thread run from the CLI outside one as before: every
-// window's selection, saying how many windows. --focus there has no thread to select.
-func TestPanelVerbsOutsideAThread(t *testing.T) {
-	for _, verb := range []string{"view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split"} {
-		t.Run(verb, func(t *testing.T) {
-			reg, emit := panelRegistry(t, &commandtest.Thread{})
-			res, err := reg.Invoke(context.Background(), command.Context{}, verb, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showView(panelVerbs[verb], "")})
-			if res.Message != "windows=1" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
-				t.Errorf("result = %+v, want windows=1", res)
-			}
-			_, err = reg.Invoke(context.Background(), command.Context{}, verb, map[string]string{"focus": "true"})
-			var argErr *command.ArgError
-			if !errors.As(err, &argErr) || argErr.Arg != "focus" {
-				t.Errorf("--focus outside a thread: err = %v, want an ArgError for focus", err)
-			}
-		})
+// With no app window open an item verb still opens its tab (the layout keeps it for the next
+// window) and says no window is open.
+func TestItemVerbWithoutAWindow(t *testing.T) {
+	reg, _ := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 0})
+	res, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.open.mcp", map[string]string{"focus": "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := res.JSON.(command.PanelResult); out.Windows != 0 || out.Tab == "" {
+		t.Errorf("JSON = %+v, want a tab and no window", out)
+	}
+	if !strings.HasSuffix(res.Message, "; no app window is open") {
+		t.Errorf("message = %q, want it to say no app window is open", res.Message)
 	}
 }
 
-// With no app window open a verb still succeeds (exit 0, JSON out) but says nothing
-// was shown, and --focus focused nothing. A CLI events stream receiving the intent
-// (receivers) does not count as a window.
-func TestPanelVerbsWithoutAWindow(t *testing.T) {
-	tests := []struct {
-		name     string
-		ctx      command.Context
-		args     map[string]string
-		wantJSON any
-	}{
-		{name: "scoped with --focus", ctx: command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, args: map[string]string{"focus": "true"},
-			wantJSON: command.PanelResult{Windows: 0, Receivers: 1, Thread: "s-aaaaaaaaaaa1"}},
-		{name: "unscoped", ctx: command.Context{}, wantJSON: command.EmitResult{Windows: 0, Receivers: 1}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reg, _ := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 0})
-			res, err := reg.Invoke(context.Background(), tt.ctx, "view.panel.toggle", tt.args)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if res.Message != command.NoWindowMessage || res.JSON != tt.wantJSON {
-				t.Errorf("result = %+v, want %q and %+v", res, command.NoWindowMessage, tt.wantJSON)
-			}
-		})
-	}
-}
-
-// A scoped call reads its thread: an unknown one fails, and nothing is emitted then (the
-// item verbs' refusals are TestPanelFile's and TestPanelDiff's).
-func TestPanelVerbsCheckTheThread(t *testing.T) {
-	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
+// An item verb reads its thread: an unknown one fails, and nothing opens then (the item
+// verbs' refusals are TestPanelFile's and TestPanelDiff's).
+func TestItemVerbChecksTheThread(t *testing.T) {
 	notFound := &commandtest.Thread{Err: connect.NewError(connect.CodeNotFound, errors.New("no thread"))}
-	tests := []struct {
-		name   string
-		verb   string
-		thread *commandtest.Thread
-		code   connect.Code
-	}{
-		{name: "unknown thread", verb: "view.panel.mcp", thread: notFound, code: connect.CodeNotFound},
-		{name: "unknown thread with --focus", verb: "view.panel.toggle", thread: notFound, code: connect.CodeNotFound},
+	reg, emit := panelRegistry(t, notFound)
+	_, err := reg.Invoke(context.Background(), command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}, "view.open.mcp", map[string]string{"focus": "true"})
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("err = %v, want NotFound", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reg, emit := panelRegistry(t, tt.thread)
-			_, err := reg.Invoke(context.Background(), inThread, tt.verb, map[string]string{"focus": "true"})
-			if connect.CodeOf(err) != tt.code {
-				t.Errorf("err = %v, want code %v", err, tt.code)
-			}
-			if got := emit.Intents(); len(got) != 0 {
-				t.Errorf("intents = %v, want none", got)
-			}
-		})
-	}
+	openedNothing(t, reg, emit)
 }
 
-// The page verbs move every window: from a thread's CLI they refuse while no window
-// shows that thread, unless --focus says the user asked. The app, the CLI outside a
-// thread and a viewed thread are unchanged; with no window open nothing is taken over.
+// The page verbs: from a thread's CLI they refuse while no window shows that thread, unless
+// --focus says the user asked. The app, the CLI outside a thread and a viewed thread are
+// unchanged; with no window open nothing is taken over. The sheets (usage, settings, help) go
+// to every window as a ShowView; Pull Requests and Projects are a tab of the layout, and no
+// intent goes out for them.
 func TestPageVerbs(t *testing.T) {
 	const self = "s-aaaaaaaaaaa1"
 	gui := command.Context{ActiveThreadID: self, CallerThreadID: self, ActiveView: "thread"}
@@ -250,7 +271,7 @@ func TestPageVerbs(t *testing.T) {
 		ctx     command.Context
 		args    map[string]string
 		deps    panelDeps
-		wantMsg string
+		wantMsg string // a sheet's; a tab's ends with its window part
 		refused bool
 	}{
 		{name: "the app", ctx: gui, deps: panelDeps{windows: 1, viewed: map[string]bool{}}},
@@ -261,11 +282,9 @@ func TestPageVerbs(t *testing.T) {
 		{name: "no window open", ctx: inThread, deps: panelDeps{windows: 0, viewed: map[string]bool{}}, wantMsg: command.NoWindowMessage},
 		{name: "no presence", ctx: inThread, deps: panelDeps{windows: 1}, wantMsg: "windows=1"},
 	}
-	pages := map[string]string{
-		"view.usage": command.ViewUsage, "view.pullrequests": command.ViewPullRequests,
-		"view.projects": command.ViewProjects, "view.settings": command.ViewSettings, "view.help": command.ViewHelp,
-	}
-	for verb, view := range pages {
+	sheets := map[string]string{"view.usage": command.ViewUsage, "view.settings": command.ViewSettings, "view.help": command.ViewHelp}
+	tabs := map[string]string{"view.pullrequests": "prs", "view.projects": "projects"}
+	for _, verb := range []string{"view.usage", "view.settings", "view.help", "view.pullrequests", "view.projects"} {
 		for _, tt := range tests {
 			t.Run(verb+"/"+tt.name, func(t *testing.T) {
 				reg, emit := panelRegistryWith(t, &commandtest.Thread{}, tt.deps)
@@ -274,13 +293,27 @@ func TestPageVerbs(t *testing.T) {
 					if connect.CodeOf(err) != connect.CodeFailedPrecondition || !strings.Contains(err.Error(), "pass --focus to take them there anyway") {
 						t.Errorf("err = %v, want the refusal", err)
 					}
-					sameIntents(t, emit.Intents(), nil)
+					openedNothing(t, reg, emit)
 					return
 				}
 				if err != nil {
 					t.Fatal(err)
 				}
-				sameIntents(t, emit.Intents(), []*v1.UiIntent{showView(view, "")})
+				if kind, ok := tabs[verb]; ok {
+					sameIntents(t, emit.Intents(), nil)
+					if tb := opened(t, reg, res); tb.Kind != kind {
+						t.Errorf("tab = %+v, want %s", tb, kind)
+					}
+					want := tt.wantMsg
+					if want == command.NoWindowMessage {
+						want = "no app window is open"
+					}
+					if (tt.wantMsg == "") != (res.Message == "") || !strings.HasSuffix(res.Message, want) {
+						t.Errorf("message = %q, want one ending %q", res.Message, want)
+					}
+					return
+				}
+				sameIntents(t, emit.Intents(), []*v1.UiIntent{showView(sheets[verb])})
 				if res.Message != tt.wantMsg {
 					t.Errorf("message = %q, want %q", res.Message, tt.wantMsg)
 				}
@@ -291,7 +324,7 @@ func TestPageVerbs(t *testing.T) {
 
 // The window actions that are no page answer from the CLI too (they printed nothing).
 func TestWindowActionsSayWhereTheyWent(t *testing.T) {
-	for _, verb := range []string{"view.back", "view.forward", "view.bottom.toggle", "thread.previous", "thread.next"} {
+	for _, verb := range []string{"view.back", "view.forward", "thread.previous", "thread.next"} {
 		for _, windows := range []int{0, 2} {
 			reg, _ := panelRegistryWith(t, &commandtest.Thread{}, panelDeps{windows: windows})
 			res, err := reg.Invoke(context.Background(), command.Context{}, verb, nil)
@@ -309,8 +342,8 @@ func TestWindowActionsSayWhereTheyWent(t *testing.T) {
 	}
 }
 
-// view.panel.file: the file must exist where ReadFile reads (it decides); the ShowView names
-// it absolute with the thread's checkout and project.
+// view.open.file: the file must exist where ReadFile reads (it decides); the tab names it
+// absolute with the thread's checkout and project.
 func TestPanelFile(t *testing.T) {
 	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
 	tests := []struct {
@@ -337,17 +370,20 @@ func TestPanelFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: richThread()}, panelDeps{windows: 1, files: tt.files})
-			_, err := reg.Invoke(context.Background(), inThread, "view.panel.file", tt.args)
+			res, err := reg.Invoke(context.Background(), inThread, "view.panel.file", tt.args)
 			if checkItemErr(t, err, tt.code, tt.argErr) {
-				sameIntents(t, emit.Intents(), nil)
+				openedNothing(t, reg, emit)
 				return
 			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelFile, "s-aaaaaaaaaaa1", tt.wantParams)})
+			sameIntents(t, emit.Intents(), nil)
+			if tb := opened(t, reg, res); tb.Kind != "file" || tb.Thread != "s-aaaaaaaaaaa1" || !maps.Equal(tb.Params, tt.wantParams) {
+				t.Errorf("tab = %+v, want a file tab of s-aaaaaaaaaaa1 with %v", tb, tt.wantParams)
+			}
 		})
 	}
 }
 
-// view.panel.pr: a number the thread links names that link's repository; otherwise the
+// view.open.pr: a number the thread links names that link's repository; otherwise the
 // thread's project's. The gh store must know it.
 func TestPanelPR(t *testing.T) {
 	inThread := command.Context{ActiveThreadID: "s-aaaaaaaaaaa1"}
@@ -381,12 +417,15 @@ func TestPanelPR(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg, emit := panelRegistryWith(t, &commandtest.Thread{Current: tt.thread}, panelDeps{windows: 1, projects: projects, prs: tt.prs})
-			_, err := reg.Invoke(context.Background(), inThread, "view.panel.pr", map[string]string{"number": tt.number})
+			res, err := reg.Invoke(context.Background(), inThread, "view.panel.pr", map[string]string{"number": tt.number})
 			if checkItemErr(t, err, tt.code, tt.argErr) {
-				sameIntents(t, emit.Intents(), nil)
+				openedNothing(t, reg, emit)
 				return
 			}
-			sameIntents(t, emit.Intents(), []*v1.UiIntent{showViewWith(command.ViewPanelPR, "s-aaaaaaaaaaa1", map[string]string{"slug": tt.wantSlug, "number": tt.number})})
+			sameIntents(t, emit.Intents(), nil)
+			if tb := opened(t, reg, res); tb.Kind != "pullrequest" || !maps.Equal(tb.Params, map[string]string{"slug": tt.wantSlug, "number": tt.number}) {
+				t.Errorf("tab = %+v, want pull request %s#%s", tb, tt.wantSlug, tt.number)
+			}
 		})
 	}
 }
@@ -410,9 +449,9 @@ func TestPanelItemVerbsScope(t *testing.T) {
 		t.Errorf("message in the app = %q, want none", res.Message)
 	}
 	want := map[string]string{"path": "/wt/a.go", "project": "r1", "base": "/wt"}
-	got := emit.Intents()
-	if len(got) != 1 || !maps.Equal(got[0].GetShowView().GetParams(), want) || got[0].GetShowView().GetThreadId() != "s-aaaaaaaaaaa1" {
-		t.Errorf("intents = %v", got)
+	sameIntents(t, emit.Intents(), nil)
+	if tb := opened(t, reg, res); tb.Thread != "s-aaaaaaaaaaa1" || !maps.Equal(tb.Params, want) {
+		t.Errorf("tab = %+v, want %v of s-aaaaaaaaaaa1", tb, want)
 	}
 }
 

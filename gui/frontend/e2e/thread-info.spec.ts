@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { expectTooltip, invocations, mockPost, openApp, openTooltip, resetMock, row, setZoom } from "./fixtures";
+import { expectTooltip, infoCardOff, invocations, mockPost, openApp, openTooltip, resetMock, row, setZoom } from "./fixtures";
+import { activeOfKind, paneWith } from "./shell-surfaces";
 
 /**
  * The thread info card (docs/notes/thread-info-card.md) over the mock's
@@ -23,15 +24,17 @@ async function openWithCard(page: Page, scenario: string): Promise<string> {
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
 });
 
 // The card's rows, menus, stop squares, tabs it opens and the Branch copied toast:
 // src/components/threadinfo/ThreadInfoCard.test.tsx ("ThreadInfoCard: one project").
-test("one project: the toggle, the usage card's lines, an open fold's background, the card stepping aside for the panel, a reload", async ({ page }) => {
+test("one project: the toggle, the usage card's lines, an open fold's background, the card stepping aside for a pane beside, a reload", async ({ page }) => {
   const { id } = (await mockPost("thread-info?scenario=single")) as { id: string };
   await openApp(page);
   await row(page, `s:${id}`).click();
-  // Off by default; the toggle (view.thread-info) shows it beside the conversation and composer.
+  // Off by the setting (infoCardOff); the toggle (view.thread-info) shows it beside the conversation and composer.
   await expect(page.getByTestId("thread-info")).toHaveCount(0);
   await expect(toggle(page)).toHaveAttribute("aria-pressed", "false");
   await toggle(page).click();
@@ -58,11 +61,13 @@ test("one project: the toggle, the usage card's lines, an open fold's background
   const bg = (l: typeof usage) => l.evaluate((el) => getComputedStyle(el).backgroundColor);
   await expect.poll(async () => bg(usage)).toBe(await bg(c.getByTestId("ti-context")));
 
-  // At 1280px the side panel leaves the conversation too little room: the card steps aside until it closes.
+  // At 1280px the diff's pane beside leaves the conversation too little room: the card steps aside
+  // (it floats on demand there: shell-linked.spec.ts) until the diff's tab closes.
   await c.getByTestId("ti-changes").click();
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
-  await expect(page.getByTestId("thread-info")).toHaveCount(0);
-  await page.getByTestId("panel-toggle").click();
+  await expect(activeOfKind(page, "diff")).toHaveCount(1);
+  await expect(page.getByTestId("thread-info-card")).toHaveCount(0);
+  await paneWith(page, "diff").getByTestId("shell-tab-close").click();
+  await expect(page.getByTestId("shell-pane")).toHaveCount(1);
   await expect(card(page)).toBeVisible();
 
   // The toggle is the window's: it stays on through a reload, and off hides the card.
@@ -120,6 +125,8 @@ async function expectUnderRow(menu: Locator, rowEl: Locator): Promise<void> {
 }
 
 test("split rows: a click runs the row, the ellipsis opens its menu under the row; values, ellipses and chevrons share one right edge", async ({ page }) => {
+  // Wide enough that the card stays beside the conversation once Open in › Terminal opens a terminal tab beside the thread.
+  await page.setViewportSize({ width: 2200, height: 900 });
   await openWithCard(page, "single");
   const c = card(page);
   const openIn = c.getByTestId("ti-open-in");
@@ -209,6 +216,8 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   // A menu item is the item's, not the row's click too (React bubbles portal events to the row).
   await openInMenu.getByTestId("ti-open-terminal").click();
   await expect(openInMenu).toHaveCount(0);
+  // Its terminal opens as a tab linked to the thread, beside it.
+  await expect(activeOfKind(page, "terminal")).toHaveCount(1);
   expect(await reveals()).toBe(0);
   // The row's click reveals; Enter on the row too; Tab reaches the ellipsis, whose Enter opens the menu.
   await openIn.click();
@@ -249,7 +258,7 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
 
   // A run re-reads the action picks (their key carries the newest run): the row keeps its
   // action meanwhile, the same element throughout (never the "Actions" row, which would
-  // remount it, flash and drop its focus). The run's terminal tab takes the keyboard.
+  // remount it, flash and drop its focus). The run's terminal tab: the test after this one.
   const runs = async () => (await invocations()).filter((i) => i.name === "action.run").length;
   await action.evaluate((el) => {
     el.setAttribute("data-mark", "");
@@ -264,7 +273,6 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
     await action.focus();
     await page.keyboard.press("Enter");
     await expect.poll(runs).toBe(n);
-    await expect(page.getByTestId("bottom-panel").locator('[data-kind="action"]')).toHaveCount(n);
   }
   await page.waitForTimeout(300);
   await expect(c.locator('[data-testid="ti-action"][data-mark]')).toHaveCount(1);
@@ -283,8 +291,20 @@ test("split rows: a click runs the row, the ellipsis opens its menu under the ro
   const prMenu = page.getByTestId("ti-pr-menu");
   await expect(prMenu.getByTestId("ti-pr-github")).toBeVisible();
   await expectUnderRow(prMenu, pr);
-  await expect(page.locator('[data-testid="panel-body"][data-surface="pullrequest"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="shell-tab"][data-kind="pullrequest"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
+});
+
+test("an action run from the card shows its terminal as a tab beside the thread, with the keyboard in it", async ({ page }) => {
+  await page.setViewportSize({ width: 2200, height: 900 });
+  await openWithCard(page, "single");
+  const action = card(page).getByTestId("ti-action");
+  await expect(action).toContainText("Dev");
+  await action.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "action.run").length).toBe(1);
+  await expect(activeOfKind(page, "terminal")).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-terminal-host]") !== null)).toBe(true);
 });
 
 test("the action menu: the gear's blocks, the item hovers as two blocks, arrows move the focus between item and gear", async ({ page }) => {

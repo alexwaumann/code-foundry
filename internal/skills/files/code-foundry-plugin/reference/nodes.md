@@ -88,9 +88,9 @@ Picking runs the item's action as a button's (a `click` act with the item's key 
 commands confirm, URLs and copies stay in the host). 24 entries per menu or submenu,
 labels 60 characters; items count as elements and share the view's keys
 (`plugintest.Host.PickItem` picks one in a test). **The fold:** a row narrower than its
-buttons need beside about 200 px of title (three buttons in the 420 px panel, not two)
-shows them in its ⋯ instead, first, then a separator, then its menu; an expanded panel
-or a page shows the buttons. A row with buttons and no menu gets a ⋯ only while folded.
+buttons need beside about 200 px of title (three buttons in a 420 px pane, not two)
+shows them in its ⋯ instead, first, then a separator, then its menu; a wider pane or full
+screen shows the buttons. A row with buttons and no menu gets a ⋯ only while folded.
 `h.HasCapability("view.menu")`: an older host drops menus.
 
 **Interactive rows** (a to-do list; capability `view.list.rows`):
@@ -226,9 +226,9 @@ A row of 1 to 6 figure cards, the app's Pull Requests counts: a label (40 charac
 the figure (`value`, a string you format: `"86%"`, `"4m 12s"`, `"1,288"`; 24 characters,
 one line) and a one-line `subtitle`. `tone` colours the figure: `ok` emerald, `attention`
 amber, `error` red, `muted`. A card with an `action` is a toggle (a filter): set `pressed`
-when its filter is on and render again. In the side panel the cards wrap onto balanced
-rows rather than shrink below 100 px (three fit; four go two by two) and the figure drops
-to a smaller type size so it never wraps; on a wide page one row of large figures. Use
+when its filter is on and render again. In a narrow pane the cards wrap onto balanced
+rows rather than shrink below 100 px (three fit in 360 px; four go two by two) and the
+figure drops to a smaller type size so it never wraps; wide, one row of large figures. Use
 stats for the few numbers someone checks first; for many facts about one thing, `pairs`.
 
 ## bars
@@ -253,7 +253,7 @@ bar, `pending`/`skipped`/`off` muted) or by `series` 1..5 (the app's chart palet
 both. `title` (required) and `meta` are the tooltip the host draws on hover or arrow keys;
 `action` acts on a click or Enter. The reference line's label shows in the card's top
 right; `startLabel`/`endLabel` under the first and last bar. Bars share the width (120 in
-the side panel are a few px each, a bar is at most 40 px wide). For one operation's
+a 400 px pane are a few px each, a bar is at most 40 px wide). For one operation's
 progress use `progress`; for a run of results over time, bars.
 
 Check `h.HasCapability("view.node.stats")` / `"view.node.bars"` before sending them: an
@@ -284,9 +284,10 @@ Rows of short facts compared down columns, drawn like the app's Pull Requests ta
 before it and `Pill` after it (`PillCell` alone). A column is `WithWidth(px)` (16..480) or
 `WithWeight(w, minPx)` (the free width, never under minPx, 80 by default); `AlignEnd` for
 numbers; `Style` `CellMuted`, `CellMono`, `CellCaption`; `label` may be "" (an icon column).
-**Narrow** (always the side panel), columns drop instead of squeezing: the lowest
-`priority` first, among equals the rightmost; the highest never drops. Rank the column that
-names the row highest and give the side panel 3 or 4 columns that fit (about 310 px).
+**Narrow** (a pane beside a thread usually is), columns drop instead of squeezing: the
+lowest `priority` first, among equals the rightmost; the highest never drops. Rank the
+column that names the row highest and give the narrowest pane (480 px) 4 or 5 columns that
+fit (about 450 px).
 Rows take a row `action`, `menu` (⋯ and right-click, as a list row's), `selected` and up to 3
 buttons, which fold into the ⋯ before any column drops. A cut cell shows whole in its
 tooltip. **Sorting is yours**: a `Sortable` header's click sends a `sort` act (`Key` the

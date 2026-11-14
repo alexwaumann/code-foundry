@@ -1,0 +1,84 @@
+{
+  "doc": "A thread opened on an edge of the whole pane area gets a new pane there at a thread's default size: a sidebar row dropped on the grid's outer edge.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-1","kind":"prs"},
+                {"id":"t-2","kind":"projects"},
+                {"id":"t-3","kind":"file","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-1"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-4","kind":"file","params":{"path":"/r/b.go"}}],
+              "active": "t-4"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-a","edge":"left","focus":true,"w":1600,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [{"id":"t-n1","kind":"thread","thread":"th-a"}],
+              "active": "t-n1"
+            },
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-1","kind":"prs"},
+                {"id":"t-2","kind":"projects"},
+                {"id":"t-3","kind":"file","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-1"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-4","kind":"file","params":{"path":"/r/b.go"}}],
+              "active": "t-4"
+            }
+          ],
+          "sizes": [0.5,0.25,0.25]
+        },
+        "focus": "p-n1",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1","rule":"edge"}
+}

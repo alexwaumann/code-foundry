@@ -432,7 +432,7 @@ export interface IndexColumns {
 /** The content widths the index drops its columns below: Activity first, then Updated, then Default branch. */
 export const INDEX_DROP_BELOW = { activity: 840, updated: 700, branch: 600 } as const;
 
-/** The index's columns at a content width (the scroll box's, which the side panel takes from). */
+/** The index's columns at a content width (the scroll box's, in its pane). */
 export function indexColumns(width: number): IndexColumns {
   return { activity: width >= INDEX_DROP_BELOW.activity, updated: width >= INDEX_DROP_BELOW.updated, branch: width >= INDEX_DROP_BELOW.branch };
 }
@@ -450,7 +450,7 @@ export interface CheckoutColumns {
 /** The table widths the Checkouts table drops its columns below: Sync first, then Threads, then Changes. */
 export const CHECKOUT_DROP_BELOW = { sync: 900, threads: 720, changes: 560 } as const;
 
-/** The Checkouts table's columns at its own width (the side panel takes from it), for a project with or without a remote, on GitHub or not. */
+/** The Checkouts table's columns at its own width (its pane's), for a project with or without a remote, on GitHub or not. */
 export function checkoutColumns(width: number, project: { remote: boolean; github: boolean }): CheckoutColumns {
   return {
     threads: width >= CHECKOUT_DROP_BELOW.threads,

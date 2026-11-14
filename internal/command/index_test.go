@@ -15,12 +15,31 @@ import (
 //     thread.shell.stop, view.thread-info, worktree.editors.
 //   - GUI pickers, where agents call the verb behind them: composer.history, thread.move.open
 //     (thread.move), thread.new-like (thread new --like), thread.workspace (workspace new).
+//   - The user's own moves around the window: the keys (pane.focus.<direction>,
+//     pane.move.<direction>, pane.split, tab.next, tab.previous; a model names panes and tabs
+//     by id with pane.move and tab.move), full screen (pane.fullscreen: window state),
+//     focusing a pane (pane.focus: a model never takes the focus unasked) and reordering the
+//     top bar (space.move).
+//   - The shell window's terminal keys (terminal.quick, terminal.cycle): the user's view; a
+//     model starts shells with terminal.new.
+//   - The shell's composer and its drafts (composer.new, composer.draft.*): a model starts
+//     threads with thread.new.
+//   - The classic names of the view.open.* verbs (view.panel.diff, .file, .gallery, .mcp,
+//     .page, .pr): aliases kept for one stable release; the index lists the new names.
+//   - The shell window's key between a thread and its diff (view.thread-diff): the user's
+//     view; a model opens a diff with view.open.diff.
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
 //     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe).
 var noIndex = []string{
-	"action.last", "composer.history", "file.export", "thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
+	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
+	"composer.draft.start", "composer.history", "composer.new", "file.export",
+	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",
+	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
+	"terminal.cycle", "terminal.quick",
+	"thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
 	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.workspace",
-	"view.thread-info", "worktree.editors",
+	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",
+	"view.thread-diff", "view.thread-info", "worktree.editors",
 }
 
 func TestNoIndexCommandsAreTheList(t *testing.T) {

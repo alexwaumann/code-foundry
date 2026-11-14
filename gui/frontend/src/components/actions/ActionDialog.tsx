@@ -134,7 +134,7 @@ function ActionForm({ target, keysRef }: { target: ActionEditorTarget; keysRef: 
       }}
     >
       <DialogDescription className="mt-1 pr-7 text-caption">
-        Saved for every thread in <span className="font-medium text-cf-text">{project}</span>. Runs in {where} and opens as a tab in the bottom panel.
+        Saved for every thread in <span className="font-medium text-cf-text">{project}</span>. Runs in {where} and opens as a terminal tab.
       </DialogDescription>
       <div className="mt-4 flex flex-col gap-3.5">
         <div className="flex flex-col gap-1.5">

@@ -54,7 +54,7 @@ describe("a terminal named by more than one node", () => {
     inView(<NodeList nodes={[node("a", "t1"), node("b", "t2"), node("c", "t1"), node("d", "t1")]} />);
     expect(live()).toEqual(["a", "b", null, null]);
     expect(screen.getAllByTestId("plugin-repeat").map((p) => p.textContent)).toEqual(["Shown above.", "Shown above."]);
-    expect(screen.getAllByTestId("plugin-terminal-open-bottom")).toHaveLength(2);
+    expect(screen.getAllByTestId("plugin-terminal-open-tab")).toHaveLength(2);
     expect(screen.queryAllByTestId("plugin-live-hidden")).toHaveLength(0);
   });
 

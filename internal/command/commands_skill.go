@@ -22,7 +22,7 @@ import (
 // the marketplaces Claude Code has; install, enable, disable, update and uninstall act
 // on a marketplace plugin (through `claude plugin`) or a standalone skill (a directory
 // in ~/.claude/skills); remove deletes a local skill; setup runs a skill's setup script
-// in a bottom-panel terminal. The plugin.* commands (Code Foundry's own plugins) are
+// in a terminal tab. The plugin.* commands (Code Foundry's own plugins) are
 // another thing.
 
 // SkillBackend is the skill store (*skill.Store) as the skill.* commands use it.
@@ -233,7 +233,7 @@ func RegisterSkill(r *Registry, d SkillDeps) error {
 			Name:      "skill.setup",
 			NoPalette: true,
 			Title:     "Run Skill Setup",
-			Description: "Run a skill's setup script (/bin/sh <script> in the skill's directory) in a terminal in the bottom panel " +
+			Description: "Run a skill's setup script (/bin/sh <script> in the skill's directory) in a terminal tab " +
 				"of the active thread or worktree; when it exits 0 the skill no longer needs setup.",
 			Category: "Skill",
 			Args:     []ArgSpec{{Name: "name", Type: String, Required: true, Positional: true, Description: "The skill's name"}},

@@ -1,0 +1,29 @@
+{
+  "doc": "A thread opens only in its own space: a pane of another space is refused.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-b","pane":"p-b"},
+  "error": "failed_precondition"
+}

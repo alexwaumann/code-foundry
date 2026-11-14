@@ -1,6 +1,6 @@
 ---
 name: code-foundry-plugin
-description: "Build, debug and publish a Code Foundry plugin: a Go executable with a plugin.json manifest that adds commands, side-panel surfaces, thread flags, event subscriptions, session environment or its own Claude threads and terminals. Use for anything touching a plugin, plugin.json, pluginsdk, pluginsdk/ui or plugintest, for the code-foundry plugin dev, logs, surface or act commands, or for a plugin registry."
+description: "Build, debug and publish a Code Foundry plugin: a Go executable with a plugin.json manifest that adds commands, surfaces (tabs), thread flags, event subscriptions, session environment or its own Claude threads and terminals. Use for anything touching a plugin, plugin.json, pluginsdk, pluginsdk/ui or plugintest, for the code-foundry plugin dev, logs, surface or act commands, or for a plugin registry."
 ---
 
 # Building a Code Foundry plugin
@@ -9,7 +9,7 @@ description: "Build, debug and publish a Code Foundry plugin: a Go executable wi
 
 A plugin is an executable the daemon starts and talks to over stdin and stdout
 (newline-delimited JSON-RPC 2.0). Its `plugin.json` declares everything up front: commands,
-surfaces (side-panel tabs drawn from a JSON view model; no HTML), wake sources, and the
+surfaces (tabs drawn from a JSON view model; no HTML), wake sources, and the
 permissions the user consents to. Write it in Go with `github.com/alexwaumann/code-foundry/pluginsdk`
 (`/ui` builds views, `/plugintest` is a fake host). This Code Foundry is {{cf.version}}.
 
@@ -32,7 +32,7 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 | Debug the wire: lifecycle, process, errors, timeouts, crashes | `protocol.md` |
 | Write tests, drive it against the daemon | `testing.md` |
 | Release, runners, the registry | `publishing.md` |
-| Look up a CLI flag, or a host command it may run | `cli.md`, `host-commands.md` |
+| Look up a CLI flag, or a host command it may run | `cli.md`, `host-commands.md` (threads, views: `host-commands-thread-view.md`) |
 
 `example/` is the plugin to copy. `go doc github.com/alexwaumann/code-foundry/pluginsdk`
 (`/ui`, `/plugintest`) has every type. For a working use of any component, `code-foundry

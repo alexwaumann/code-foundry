@@ -39,7 +39,7 @@ const (
 // EnvThread is the id of the thread a process belongs to. The daemon sets it in every
 // Claude process it spawns for a thread (and in a thread's action runs); the CLI sends it
 // as the default --context-thread, so `code-foundry terminal new` or `action run` from a
-// thread's agent lands in that thread's bottom panel.
+// thread's agent belongs to that thread (a tab linked to it).
 const EnvThread = "CODE_FOUNDRY_THREAD"
 
 // EnvPages is the directory a thread's claude writes the pages it shows in (Pages/<id>),

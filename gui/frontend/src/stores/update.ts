@@ -5,7 +5,7 @@ import { appInfo, onCheckForUpdatesMenu, relaunchApp } from "@/api/app";
 import { invokeCommand, isUnknownCommand } from "@/api/command";
 import { errorMessage } from "@/api/stream";
 import { getUpdateStatus, type UpdateEventView, type UpdateStatusView } from "@/api/update";
-import { predatesTunnel, type Restarting } from "@/lib/update";
+import { predatesShell, predatesTunnel, type Restarting } from "@/lib/update";
 import { invokeConfirmed, refreshCommands, useCommandsStore } from "./commands";
 import { getUiContext } from "./context";
 import { useHealthStore } from "./health";
@@ -19,7 +19,11 @@ interface UpdateSlice {
   status: UpdateStatusView | null;
   /** The window shell's own version; null outside Wails. */
   guiVersion: string | null;
-  /** The daemon predates the tunnel, so nothing streams to this window (lib/update.ts predatesTunnel). */
+  /**
+   * The daemon is one this window cannot follow: it predates the tunnel, so nothing streams to
+   * the window, or (with the window shell) it predates the layout, which the shell cannot draw
+   * without (lib/update.ts predatesTunnel, predatesShell).
+   */
   oldDaemon: boolean;
   dialogOpen: boolean;
   /** An action the dialog started and is waiting on. */
@@ -145,11 +149,12 @@ export async function runUpdateAction(action: UpdateAction): Promise<boolean> {
 }
 
 /**
- * Opens the dialog on a daemon from before the tunnel. Its status can only come from events,
- * which need the tunnel, so without this call a window updated by `install.sh` would sit on a
- * running old daemon with nothing live, no chip and no dialog. The dialog's Restart Now is
- * app.restart, a plain call, and the host follows it over the Unix socket. Restarting by itself
- * would cut off working threads, so it asks.
+ * Opens the dialog on a daemon from before the tunnel, or from before the window layout while the
+ * shell draws the window. A pre-tunnel daemon's status can only come from events, which need the
+ * tunnel, so without this call a window updated by `install.sh` would sit on a running old daemon
+ * with nothing live, no chip and no dialog; a pre-layout one streams, but the shell has nothing
+ * to draw. The dialog's Restart Now is app.restart, a plain call, and the host follows it over the
+ * Unix socket. Restarting by itself would cut off working threads, so it asks.
  */
 function watchForOldDaemon(): () => void {
   let seen = "";
@@ -157,7 +162,7 @@ function watchForOldDaemon(): () => void {
     const version = s.health?.version ?? "";
     if (version === seen) return;
     seen = version;
-    const oldDaemon = predatesTunnel(version);
+    const oldDaemon = isOldDaemon(version);
     // A restart from a terminal has settled it: the dialog that asked for one has nothing to say.
     if (useUpdateStore.getState().oldDaemon && !oldDaemon) closeUpdateDialog();
     useUpdateStore.setState({ oldDaemon });
@@ -170,6 +175,11 @@ function watchForOldDaemon(): () => void {
         seen = ""; // The next ping asks again.
       });
   });
+}
+
+/** Whether this window cannot follow a daemon of this version (see watchForOldDaemon). */
+export function isOldDaemon(version: string): boolean {
+  return predatesTunnel(version) || predatesShell(version);
 }
 
 /** Loads the GUI's own version, wires the app menu's "Check for Updates…" and watches for a daemon this window cannot follow. */

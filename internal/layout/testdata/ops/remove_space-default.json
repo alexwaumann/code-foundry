@@ -1,0 +1,143 @@
+{
+  "doc": "Removing the default space makes the target the default, so threads without a row follow; th-a closes as close_thread closes it, its linked tabs joining its remembered set.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "split",
+          "id": "s-b",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-b","kind":"thread","thread":"th-b"},{"id":"t-prs","kind":"prs"}],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-e",
+              "tabs": [
+                {"id":"t-f2","kind":"file","params":{"path":"/r/a.go"}},
+                {"id":"t-t2","kind":"terminal","params":{"terminal":"term-2"}}
+              ],
+              "active": "t-f2"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-c",
+        "mru": ["t-b"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-b":{"space":"sp-b"}}
+  },
+  "op": {"op":"remove_space","space":"sp-a","to":"sp-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "split",
+          "id": "s-b",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-c",
+              "tabs": [{"id":"t-b","kind":"thread","thread":"th-b"},{"id":"t-prs","kind":"prs"}],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-e",
+              "tabs": [
+                {"id":"t-f2","kind":"file","params":{"path":"/r/a.go"}},
+                {"id":"t-t2","kind":"terminal","params":{"terminal":"term-2"}}
+              ],
+              "active": "t-f2"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-c",
+        "mru": ["t-b"]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-b",
+    "threads": {
+      "th-a": {
+        "space": "sp-b",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj-1","worktree":"w-1"}
+              },
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true
+            },
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}},
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true,
+              "beside": {"neighbours":["p-a"],"edge":"right","frac":0.4}
+            }
+          ]
+        }
+      },
+      "th-b": {"space":"sp-b"}
+    }
+  },
+  "result": {"space":"sp-b","closed":["t-a"],"kept":["t-d","t-f"]}
+}

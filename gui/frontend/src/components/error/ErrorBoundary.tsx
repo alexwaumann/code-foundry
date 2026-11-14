@@ -22,7 +22,7 @@ interface State {
  * Catches a render error below it so one broken part degrades on its own instead of
  * unmounting the whole window (a drifted Claude payload, a bad persisted shape). React
  * has no hook for this; a class it is. Placed around each timeline row, each panel tab
- * body, the bottom panel and the app root (main.tsx).
+ * body, a pane and the app root (main.tsx).
  */
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null };

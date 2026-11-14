@@ -1,15 +1,13 @@
 import type { CommandView, UiContextView } from "@/api/command";
 import { promptedArgs } from "@/palette/args";
-import { sidebarAnchor } from "@/lib/inSidebar";
 import { lastInputWasKeyboard } from "@/lib/inputModality";
 import { keyTarget } from "@/lib/keyTarget";
 import { canNewLike, canRunElsewhere } from "@/lib/threadRow";
-import { nextAfter, threadOrder } from "@/lib/tree";
 import { refreshCommands, runCommandForResult, useCommandsStore, whenListed } from "@/stores/commands";
-import { contextKey, getListOptions, getListThreads, getUiContext } from "@/stores/context";
+import { contextKey, getUiContext } from "@/stores/context";
+import { sidebarThreadOrder } from "@/stores/shellList";
 import { openAddProject } from "@/stores/addProject";
 import { composeLike, openNewThreadPicker } from "@/stores/compose";
-import { getEmberAttentionId } from "@/stores/ember";
 import { canMoveThread, openMovePicker } from "@/stores/movePicker";
 import { openPublishDialog } from "@/stores/publish";
 import { openNewWorkspaceDialog } from "@/stores/workspaceActions";
@@ -28,18 +26,22 @@ import { presentSnooze } from "@/stores/snoozeDialog";
 import { getViewing, leaveSubagent } from "@/stores/subagentView";
 import { jumpToNeighbour } from "@/stores/threadNeighbours";
 import { toggleThreadInfo, useCardRoom } from "@/stores/threadInfoOverlay";
-import { attentionIds, useThreadsStore } from "@/stores/threads";
+import { useThreadsStore } from "@/stores/threads";
 import { zoomUi } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
 import { openUpdateDialog, runUpdateAction } from "@/stores/update";
-import { markTerminalNewFromHere, showBottomIfUnplaced, toggleBottomFromHere } from "@/stores/bottomActions";
-import { expandPanelCommand, historyCommand, newPanelTabCommand, openThemes, showView, splitPanelCommand, toggleHelp, togglePanelCommand, toggleView } from "@/stores/views";
+import { historyCommand, openThemes, showView, toggleHelp, toggleView } from "@/stores/views";
+import { presentShellCommand, SHELL_PRESENTERS } from "@/shell/keyPresenters";
+import { presentFullscreen } from "@/shell/fullscreen";
+import { switchSpaceAt } from "@/shell/spaceActions";
+import { shellDrawn } from "@/stores/shellView";
+import { openNextNeedsPopup } from "@/stores/needs";
 import { chordFromEvent, normalizeChord, terminalYieldable } from "./chord";
 
 /**
  * GUI-local view actions. They change only what the window shows (palette, sidebar,
  * zoom, which row is selected), never daemon state, so they are not registry commands.
- * Every chord here is "global": it wins even when a bottom panel shell has focus.
+ * Every chord here is "global": it wins even when a terminal has the keyboard.
  */
 export interface ViewAction {
   chord: string;
@@ -49,25 +51,17 @@ export interface ViewAction {
 
 /** Selects the Nth thread in sidebar order: only rows on screen count (not a collapsed section's, but for the open thread's, nor hidden threads). */
 function jumpTo(n: number): void {
-  const id = threadOrder(getListThreads(), getListOptions())[n - 1];
+  const id = sidebarThreadOrder()[n - 1];
   if (id !== undefined) useUiStore.getState().select({ kind: "thread", id }, { focusPrompt: true });
 }
 
-/** Selects the next thread that needs attention after the current one, wrapping. */
-export function jumpToAttention(): boolean {
-  const waiting = new Set(attentionIds(useThreadsStore.getState()));
-  const sel = useUiStore.getState().selection;
-  // Threads that need attention are never in the collapsible Working section (threadGroup).
-  // A hidden thread selected (from its creator's thread info card) starts from its creator's row.
-  const order = threadOrder(getListThreads(), getListOptions());
-  const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id) : null;
-  // Ember's row is the sidebar's first; it counts while it waits on the user (stores/ember.ts).
-  const ember = getEmberAttentionId();
-  if (ember) waiting.add(ember);
-  const next = nextAfter(ember ? [ember, ...order] : order, from, (id) => waiting.has(id));
-  if (next === null) return false;
-  useUiStore.getState().select({ kind: "thread", id: next }, { focusPrompt: true });
-  return true;
+/**
+ * cmd+shift+a: the popup of the next thread in the Needs you list (stores/needs.ts; nothing
+ * visible when none waits). Before the window's first draw (the first-load import) the popup
+ * shows once it draws. True when it went somewhere.
+ */
+export function nextAttention(): boolean {
+  return openNextNeedsPopup();
 }
 
 function togglePalette(): void {
@@ -81,7 +75,8 @@ function focusThreadPrompt(): void {
   if (useUiStore.getState().selection.kind === "thread") useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
 }
 
-function toggleSidebar(): void {
+/** cmd+b (a GUI view action), and the top bar's sidebar toggle. */
+export function toggleSidebar(): void {
   const ui = useUiStore.getState();
   if (ui.sidebarVisible) {
     ui.toggleSidebar();
@@ -100,12 +95,20 @@ export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+k", title: "Command palette", run: togglePalette },
   { chord: "cmd+shift+p", title: "Command palette", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
-  { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void jumpToAttention() },
+  { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void nextAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
     chord: `cmd+${String(i + 1)}`,
     title: `Jump to thread ${String(i + 1)}`,
     run: () => {
       jumpTo(i + 1);
+    },
+  })),
+  // space.switch --index n: a chord cannot carry an argument (internal/command chord.go ReservedChords).
+  ...Array.from({ length: 9 }, (_, i) => ({
+    chord: `cmd+ctrl+${String(i + 1)}`,
+    title: `Switch to space ${String(i + 1)}`,
+    run: () => {
+      if (shellDrawn()) switchSpaceAt(i + 1);
     },
   })),
   { chord: "cmd+=", title: "Zoom in", run: () => { zoom(1); } },
@@ -126,6 +129,14 @@ export function isViewActionChord(chord: string): boolean {
  * daemon lists them as unavailable, e.g. with nothing selected.
  */
 const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
+
+/**
+ * Commands whose chord the window presents even where the daemon lists them as unavailable:
+ * cmd+t's terminal.new opens a free terminal in the home directory where no thread is in
+ * context (shell/terminalActions.ts newTerminalTab; docs/notes/shell-model.md, "Keys"). The
+ * palette and buttons still follow the daemon: there the free terminal has its own entry.
+ */
+const chordSupplied: ReadonlySet<string> = new Set(["terminal.new"]);
 
 /**
  * What a subagent's view does not start from the keyboard, the palette or a command button
@@ -211,7 +222,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
   if (bindingCache?.commands === commands && bindingCache.inSubagent === inSubagent) return bindingCache.map;
   const map = new Map<string, CommandView>();
   for (const c of commands) {
-    if (!isStartable(c) || terminalScoped.has(c.name) || fileScoped.has(c.name)) continue;
+    if (!(isStartable(c) || chordSupplied.has(c.name)) || terminalScoped.has(c.name) || fileScoped.has(c.name)) continue;
     for (const k of c.keybindings) {
       const chord = normalizeChord(k);
       if (chord && !map.has(chord)) map.set(chord, c);
@@ -274,7 +285,7 @@ function fileCommand(e: KeyboardEvent, target: Element | null, code: boolean, ch
 const editorOnly: ReadonlySet<string> = new Set(["file.save"]);
 
 /**
- * The command a focused terminal (a bottom panel shell) or thread prompt
+ * The command a focused terminal (a terminal tab or the quick terminal) or thread prompt
  * ([data-chord-yield]) yields this chord to (see terminalYieldable), so
  * thread.rename, cmd+j and cmd+t still fire while typing to Claude or a shell. The code
  * editor (`code`) yields the same, and its own commands.
@@ -289,7 +300,7 @@ function terminalYields(chord: string, code = false): CommandView | undefined {
  * Commands whose chords also leave a focused text field (the settings search, which the
  * settings sheet focuses on open; a filter box): back and forward, as in Safari, and the
  * settings toggle, so cmd+, closes the sheet it just opened; and dictation, so a chord bound
- * to it works in a side panel's PR review composer (a plain textarea); and search.open, which works from
+ * to it works in a pull request tab's review composer (a plain textarea); and search.open, which works from
  * anywhere (a thread's find bar included). Only cmd chords that do not move or delete text
  * (a user may rebind these to cmd+arrow).
  */
@@ -424,28 +435,8 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
     toggleHelp();
     return true;
   },
-  // Window-local like view.settings: toggles this window's panel for its selection.
-  "view.panel.toggle": () => {
-    togglePanelCommand();
-    return true;
-  },
-  // Same for full width: this window's panel for its selection.
-  "view.panel.expand": () => {
-    expandPanelCommand();
-    return true;
-  },
-  // Same for the surface list ("+"): this window's panel for its selection.
-  "view.panel.new-tab": () => {
-    newPanelTabCommand();
-    return true;
-  },
-  // Same for splitting or joining the panel's tab groups: this window's panel for its selection.
-  "view.panel.split": () => {
-    splitPanelCommand();
-    return true;
-  },
-  // Window-local like view.panel.toggle: this window's own selection history (the CLI's
-  // view.back and view.forward reach every window through ShowView).
+  // Window-local: this window's own focus history (shell/focusHistory.ts; the CLI's view.back
+  // and view.forward reach every window through ShowView).
   "view.back": () => {
     historyCommand(-1);
     return true;
@@ -463,16 +454,10 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
     jumpToNeighbour(1);
     return true;
   },
-  // Window-local like view.panel.toggle: this window leaves its subagent view (Escape, the
+  // Window-local: this window leaves its subagent view (Escape, the
   // view's back buttons, the palette). The CLI's reaches every window through ShowView.
   "thread.agent.up": () => {
     leaveSubagent();
-    return true;
-  },
-  // And for the bottom terminal panel: this window's panel for its selection. Opening an
-  // empty one starts a shell there (the CLI's ShowView only toggles).
-  "view.bottom.toggle": () => {
-    toggleBottomFromHere();
     return true;
   },
   // Window-local: this window's thread info card, or its overlay on a narrow pane, focused
@@ -481,14 +466,9 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
     toggleThreadInfo(lastInputWasKeyboard());
     return true;
   },
-  // Not a presentation: terminal.new still runs as usual (false). Started here (cmd+t,
-  // the palette, a button), the shell it starts takes focus in the bottom panel. A thread
-  // with no checkout yet has none to start one in: its panel says so.
-  "terminal.new": () => {
-    if (showBottomIfUnplaced()) return true;
-    markTerminalNewFromHere();
-    return false;
-  },
+  // Window-local: the full screen pane (shell/fullscreen.ts); the CLI's reaches every window
+  // through ShowView. Nothing before the first draw.
+  "pane.fullscreen": (args) => !shellDrawn() || presentFullscreen(args),
   // Window-local: the focused composer's Previous prompts picker, else the palette's
   // prompts page (stores/promptHistory.ts). The CLI's reaches every window through ShowView.
   "composer.history": () => presentPromptHistory(),
@@ -542,9 +522,8 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
 };
 
 /**
- * A plugin surface's show command (plugin.<plugin>.show.<surface>), window-local like
- * view.panel.*: this window's panel for its selection opens the surface's tab (a page over
- * the content area closes). The CLI's runs on the daemon and reaches windows as a ShowView.
+ * A plugin surface's show command (plugin.<plugin>.show.<surface>), window-local: this window
+ * opens the surface's tab for its selection (a sheet over the window closes). The CLI's runs on the daemon and reaches windows as a ShowView.
  */
 function presentPluginShow(name: string): boolean {
   const m = allSurfaces().find((s) => s.showCommand === name);
@@ -560,8 +539,20 @@ function presentInterrupt(): boolean {
   return true;
 }
 
+/** Whether this window presents the command itself in the shell (a presenter here or in shell/keyPresenters.ts). */
+export function hasShellPresenter(name: string): boolean {
+  return name in SHELL_PRESENTERS || name in commandPresenters;
+}
+
 /** Runs the command's presenter, if it has one; false means "invoke it normally". */
 export function presentCommand(name: string, args?: Readonly<Record<string, string>>): boolean {
+  // The window's key table (shell/keyPresenters.ts); before the first draw there is no pane to act on.
+  if (shellDrawn()) {
+    const shell = presentShellCommand(name, args);
+    if (shell !== undefined) return shell;
+  } else if (name in SHELL_PRESENTERS && !(name in commandPresenters)) {
+    return true;
+  }
   return commandPresenters[name]?.(args) ?? presentPluginShow(name);
 }
 
@@ -572,7 +563,7 @@ export function presentInPalette(name: string): boolean {
 
 /**
  * Commands whose success this window shows by itself, so starting one here toasts only a
- * failure, not the result message: terminal.new's shell opens as a new bottom panel tab.
+ * failure, not the result message: terminal.new's shell opens as a new tab.
  * The CLI still prints the message.
  */
 const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.interrupt"]);
@@ -619,8 +610,8 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
- *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, zoom) always win
- *     (cmd+1..9 belong to the project picker while it is open).
+ *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, ctrl+cmd+1..9,
+ *     zoom) always win (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
  *     editor consumes everything else, except cmd chords bound to commands (see
  *     terminalYields); the editor keeps its own (see codeEditorChords). In a terminal its

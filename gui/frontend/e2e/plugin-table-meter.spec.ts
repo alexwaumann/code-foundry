@@ -1,21 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openHelloDemo, resetMock, setPanelWidth } from "./fixtures";
+import { openHelloDemo, resetMock } from "./fixtures";
+import { setSurfaceWidth } from "./shell-surfaces";
 
 /**
  * A table's meter cells in a real browser (docs/notes/plugin-table-meter.md) against the
- * mock's hello demo (the Runs tab's "Suites in #1285"): at the side panel's width each
+ * mock's hello demo (the Runs tab's "Suites in #1285"): in a pane as wide as the side panel was, each
  * track takes what its cell leaves beside the 40 px label slot, the tracks line up, and the
  * labels fit their slot uncut in WebKit's caption font; at the narrowest panel the labels
- * go and the tracks take the whole cell. The fill's width per value, the tone colours, the
+ * go and the tracks take the whole cell (the panel's widths, 420 and its narrowest 280 px, are now
+ * its pane's: 420, and a plugin pane's narrowest, 300). The fill's width per value, the tone colours, the
  * meter role and the tooltip: src/components/plugin/meter.test.ts and metercell.test.tsx.
  */
 
 const surface = (page: Page) => page.getByTestId("plugin-surface");
 const suites = (page: Page) => surface(page).locator('[data-testid="plugin-table"][data-key="suites"]');
 
-/** Thread s-3 selected, its panel showing the hello demo's Runs tab, the suites table in view. */
+/** The demo's pane `px` wide, as the side panel was. */
+const setPanelWidth = (page: Page, px: number) => setSurfaceWidth(page, "plugin-surface", px);
+
+/** Thread s-3 open, the hello demo's Runs tab beside it in a pane the side panel's default width, the suites table in view. */
 async function openSuites(page: Page): Promise<void> {
   await openHelloDemo(page);
+  await setPanelWidth(page, 420);
   await surface(page).getByRole("tab", { name: "Runs" }).click();
   await suites(page).scrollIntoViewIfNeeded();
 }
@@ -43,7 +49,7 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("in the side panel the tracks share the cell with the label slot and line up, and every label fits uncut", async ({ page }) => {
+test("in a pane the side panel's width the tracks share the cell with the label slot and line up, and every label fits uncut", async ({ page }) => {
   await openSuites(page);
   const ms = await meters(page);
   expect(ms).toHaveLength(6);
@@ -64,9 +70,9 @@ test("in the side panel the tracks share the cell with the label slot and line u
   expect(ms[5]?.fill).toBe(0);
 });
 
-test("at the narrowest panel the labels go and each track takes its whole cell", async ({ page }) => {
+test("at the narrowest pane the labels go and each track takes its whole cell", async ({ page }) => {
   await openSuites(page);
-  await setPanelWidth(page, 280);
+  await setPanelWidth(page, 300);
   await expect(suites(page).getByTestId("plugin-meter-label")).toHaveCount(0);
   const ms = await meters(page);
   expect(ms).toHaveLength(6);
@@ -79,7 +85,7 @@ test("at the narrowest panel the labels go and each track takes its whole cell",
   expect(ms[4]?.fill).toBeGreaterThanOrEqual(2);
 });
 
-/** SHOTS=<dir>: the PR's screenshots, WebKit at 2x, dark and light: the suites table at the side panel's width and at the narrowest. */
+/** SHOTS=<dir>: the PR's screenshots, WebKit at 2x, dark and light: the suites table at the side panel's width and at the narrowest, as a pane's. */
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
     test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
@@ -90,7 +96,7 @@ for (const scheme of ["dark", "light"] as const) {
       await openSuites(page);
       await page.mouse.move(0, 0);
       await suites(page).screenshot({ path: `${dir}/meter-panel-${scheme}.png` });
-      await setPanelWidth(page, 280);
+      await setPanelWidth(page, 300);
       await expect(suites(page).getByTestId("plugin-meter-label")).toHaveCount(0);
       const fuzz = suites(page).locator('[data-testid="plugin-table-row"][data-key="su-fuzz"]').getByTestId("plugin-meter-track");
       await fuzz.hover();

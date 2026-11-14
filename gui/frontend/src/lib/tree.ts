@@ -6,8 +6,7 @@
  * and the archived ones under a collapsible Archived header (the three footers,
  * buildSections; the thread open in the content pane keeps its row under a collapsed Snoozed
  * or Archived header), as rows for virtual lists. No project, worktree or terminal
- * rows: worktrees live on the Projects page, and shells in their owner's bottom panel
- * (stores/bottomPanel.ts). Pure functions over the minimal inputs that affect structure, so
+ * rows: worktrees live on the Projects page, and terminals in tabs. Pure functions over the minimal inputs that affect structure, so
  * the sidebar only rebuilds when membership, order, pin, group or a band's sort time changes
  * (not on name or status-text updates). The placement helper (which worktree a thread sits in) is here too;
  * the command context uses it.
@@ -44,20 +43,30 @@ export interface ListThread {
   statusChangedAtMs?: number | null;
   /** When it last did something (epoch ms): the idle band sorts by it, most recent first. Null or absent as for statusChangedAtMs. */
   lastActivityAtMs?: number | null;
+  /**
+   * It calls for the user without blocking (the "prompt" group without an actionable ask,
+   * lib/thread.ts isActionableAsk): woken from a snooze, a notification or bell, an API error at
+   * the prompt, another attention reason, a plugin's flag. The shell's sidebar lists it at the
+   * top of Active, not under Needs you (lib/shellSections.ts). Absent: not.
+   */
+  nudge?: boolean;
 }
 
 /**
- * The sort times that matter for where a thread sits (buildSections): statusChangedAtMs
- * for an unpinned live thread in the attention or done band, lastActivityAtMs for one in
- * the idle band, both null otherwise (pinned, working, snoozed and archived threads sort by
- * other things). The sidebar's list keys (stores/context.ts) carry only these, so a working
- * thread's activity ticks do not rebuild the list.
+ * The sort times that matter for where a thread sits (buildSections, and the shell's Needs you,
+ * lib/shellSections.ts): statusChangedAtMs for a live thread waiting on the user (pinned or not:
+ * Needs you lists pinned ones too, most recent ask first) and for an unpinned one in the error or
+ * done band, lastActivityAtMs for an unpinned one in the idle band, both null otherwise (other
+ * pinned, working, snoozed and archived threads sort by other things). The sidebar's list keys
+ * (stores/context.ts) and the keys' own reading (getListThreads) carry only these, so both see one
+ * order and a working thread's activity ticks do not rebuild the list.
  */
 export function bandSortTimes(
   t: Pick<ListThread, "pinned" | "group" | "archivedAtMs" | "snoozedUntilMs" | "savedAtMs" | "statusChangedAtMs" | "lastActivityAtMs">,
 ): { statusChangedAtMs: number | null; lastActivityAtMs: number | null } {
-  const live = !t.pinned && t.archivedAtMs === null && !isSnoozed(t);
-  const byStatus = live && (t.group === "prompt" || t.group === "error" || t.group === "done");
+  const unarchived = t.archivedAtMs === null && !isSnoozed(t);
+  const live = !t.pinned && unarchived;
+  const byStatus = (unarchived && t.group === "prompt") || (live && (t.group === "error" || t.group === "done"));
   return {
     statusChangedAtMs: byStatus ? (t.statusChangedAtMs ?? null) : null,
     lastActivityAtMs: live && t.group === "idle" ? (t.lastActivityAtMs ?? null) : null,
@@ -227,9 +236,9 @@ export function buildRows(threads: readonly ListThread[], opts: ListOptions = {}
 }
 
 /** Same row content: every field equal (rows are flat objects of strings, numbers and booleans). */
-function sameRow(a: Row, b: Row): boolean {
-  const ra: Record<string, unknown> = a;
-  const rb: Record<string, unknown> = b;
+function sameRow(a: object, b: object): boolean {
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
   const keys = Object.keys(ra);
   return keys.length === Object.keys(rb).length && keys.every((k) => ra[k] === rb[k]);
 }
@@ -241,7 +250,12 @@ function sameRow(a: Row, b: Row): boolean {
  * components see the same prop and skip rendering.
  */
 export function rowCache(): (rows: readonly Row[]) => Row[] {
-  let prev = new Map<string, Row>();
+  return keyedRowCache<Row>();
+}
+
+/** rowCache for any flat rows with a key (the shell sidebar's, lib/shellSections.ts). */
+export function keyedRowCache<R extends { key: string }>(): (rows: readonly R[]) => R[] {
+  let prev = new Map<string, R>();
   return (rows) => {
     const out = rows.map((r) => {
       const old = prev.get(r.key);

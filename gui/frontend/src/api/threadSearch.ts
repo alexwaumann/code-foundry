@@ -213,3 +213,16 @@ export async function readLastReply(threadId: string, conn: DaemonConnection = d
   const items = await readPage(threadId, { role: ThreadItemRole.ASSISTANT, last: 8 }, conn);
   return items.filter((it) => it.kind === "text" && it.parentToolUseId === "" && !it.apiError).at(-1) ?? null;
 }
+
+/** How many of a thread's last tool items the Needs-you card reads looking for the ask. */
+export const ASK_WINDOW = 12;
+
+/**
+ * A pending ask's own item and the last text Claude wrote (docs/notes/shell-17-needs-you.md),
+ * read without a Watch: the thread's last tool items (permissions and questions are tools) and
+ * its last two replies. The ask is null when it is not among them (answered meanwhile).
+ */
+export async function readAskItems(threadId: string, itemId: string, conn: DaemonConnection = daemon): Promise<{ ask: ThreadItemView | null; replies: ThreadItemView[] }> {
+  const [tools, replies] = await Promise.all([readPage(threadId, { last: ASK_WINDOW, role: ThreadItemRole.TOOL }, conn), readPage(threadId, { last: 2, role: ThreadItemRole.ASSISTANT }, conn)]);
+  return { ask: tools.find((it) => it.id === itemId) ?? null, replies };
+}

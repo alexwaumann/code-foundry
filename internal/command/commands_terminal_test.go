@@ -243,6 +243,7 @@ func TestTerminalClose(t *testing.T) {
 func TestTerminalList(t *testing.T) {
 	term := &commandtest.Terminal{Terminals: []*v1.Terminal{
 		{Id: "t-1", Cwd: "/src/app/sub", State: v1.TerminalState_TERMINAL_STATE_RUNNING, Labels: termlabel.Shell("", "r1", "/src/app")},
+		{Id: "t-3", Cwd: "/home", LiveCwd: "/home/src", Foreground: "sleep 5", State: v1.TerminalState_TERMINAL_STATE_RUNNING, Labels: termlabel.Free()},
 		{Id: "t-2", Cwd: "/tmp", State: v1.TerminalState_TERMINAL_STATE_EXITED, ExitCode: 2},
 	}}
 	reg := command.NewRegistry()
@@ -255,9 +256,10 @@ func TestTerminalList(t *testing.T) {
 	}
 	lines := strings.Split(res.Message, "\n")
 	want := [][]string{
-		{"ID", "STATE", "CWD", "LABELS"},
-		{"t-1", "running", "/src/app/sub", "kind=shell", "project=r1", "worktree=/src/app"},
-		{"t-2", "exited", "2", "/tmp", "-"},
+		{"ID", "STATE", "CWD", "RUNNING", "LABELS"},
+		{"t-1", "running", "/src/app/sub", "-", "kind=shell", "project=r1", "worktree=/src/app"},
+		{"t-3", "running", "/home/src", "sleep", "5", "kind=shell"},
+		{"t-2", "exited", "2", "/tmp", "-", "-"},
 	}
 	if len(lines) != len(want) {
 		t.Fatalf("lines = %q", lines)

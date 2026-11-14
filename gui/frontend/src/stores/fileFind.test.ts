@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { applyLayoutOp } from "@/api/layout";
+import { fileTab } from "@/surfaces/fileTarget";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import {
   canSearchFile,
   closeFileFind,
@@ -18,8 +21,11 @@ import {
   type FileFindHost,
 } from "./fileFind";
 import { fileEditKey } from "./fileEdit";
-import { usePanelStore, type Tab } from "./panel";
+import { openFileInPanel } from "./filePanel";
+import { useLayoutStore } from "./layout";
 import { useUiStore } from "./ui";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const session = (key: string) => useFileFindStore.getState().byTab[key];
 const releases: (() => void)[] = [];
@@ -41,7 +47,6 @@ afterEach(() => {
   for (const r of releases.splice(0)) r();
   document.body.replaceChildren();
   useFileFindStore.setState({ byTab: {} });
-  usePanelStore.setState({ byKey: {} });
 });
 
 describe("file find sessions", () => {
@@ -106,14 +111,18 @@ describe("file find sessions", () => {
     expect(session("k1")).toBeUndefined();
   });
 
-  it("a tab that closes takes its session; another tab's stays", () => {
-    const tab = (id: string): Tab => ({ id, kind: "files", title: id, params: {} });
-    const a = fileEditKey("thread:s1", "fa");
-    const b = fileEditKey("thread:s1", "fb");
-    usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [tab("fa"), tab("fb")], activeTabId: "fa" }] } } });
+  it("a tab that closes takes its session; another tab's stays", async () => {
+    await resetFakeLayout(threadSeed("s1"));
+    openFileInPanel("thread:s1", { project: "", base: "/w", path: "fa" });
+    openFileInPanel("thread:s1", { project: "", base: "/w", path: "fb" });
+    await layoutSettled();
+    const a = fileEditKey("thread:s1", fileTab({ project: "", base: "/w", path: "fa" }).id);
+    const b = fileEditKey("thread:s1", fileTab({ project: "", base: "/w", path: "fb" }).id);
     openFileFind(a);
     openFileFind(b);
-    usePanelStore.setState({ byKey: { "thread:s1": { open: true, groups: [{ tabs: [tab("fb")], activeTabId: "fb" }] } } });
+    const fa = Object.values(useLayoutStore.getState().tabs).find((t) => t.params.path === "/w/fa");
+    await applyLayoutOp({ op: "close_tab", tab: fa?.id ?? "" });
+    await layoutSettled();
     expect(session(a)).toBeUndefined();
     expect(session(b)).toBeDefined();
   });

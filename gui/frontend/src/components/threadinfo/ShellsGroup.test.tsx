@@ -6,9 +6,10 @@ import { daemon, invocationsOf, refuse, resetDaemon } from "@/test/daemonFakes";
 import { resetCard, seedChildServer, seedServers, updateThread } from "@/test/threadInfoWorld";
 import { terminalExited, terminalRemoved } from "@/test/actionsWorld";
 import { addThreads, thread } from "@/test/projectsWorld";
+import { layoutOf, pane, row as splitRow, seedLayout, space, tab } from "@/test/shellLayout";
 import { tooltipText } from "@/test/tooltip";
 import { useActionsStore } from "@/stores/actions";
-import { bottomTabIds, getBottom, useBottomStore } from "@/stores/bottomPanel";
+import { useShellViewStore } from "@/stores/shellView";
 import { useTerminalsStore } from "@/stores/terminals";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -39,6 +40,8 @@ const buttonOf = (el: HTMLElement, id: string) => {
   return b;
 };
 const opened = () => invocationsOf("view.open.url").map((i) => i.args.url);
+/** The terminals a click asked the daemon to show (ui.focus.terminal). */
+const shown = () => invocationsOf("ui.focus.terminal").map((i) => i.args.id);
 const setRun = (id: string, o: { running?: boolean; ports?: number[] }) => {
   act(() => {
     useActionsStore.setState((s) => {
@@ -64,8 +67,7 @@ async function renderGroup(id: string) {
 beforeEach(() => {
   resetDaemon();
   resetCard();
-  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
-  useTerminalsStore.setState({ byId: {}, order: [], shownIn: {}, loaded: true });
+  useTerminalsStore.setState({ byId: {}, order: [], loaded: true });
 });
 
 afterEach(() => {
@@ -147,17 +149,19 @@ describe("the flat list", () => {
 });
 
 describe("a row's click", () => {
-  it("a terminal run: a tab of this thread's panel, opened and focused; the view stays, no browser", async () => {
+  it("a terminal run: its tab, shown (ui.focus.terminal) with the keyboard in it; the selection stays, no browser", async () => {
     const { parent, devTerminal } = seedChildServer();
+    // The run's tab, in a second pane.
+    await seedLayout(layoutOf([space(splitRow("r-1", [pane("p-1", [tab("t-th", "thread", parent)]), pane("p-2", [tab("t-tab-dev", "terminal", "", { params: { terminal: devTerminal } })])]), "p-1")]));
     useUiStore.getState().select({ kind: "thread", id: parent });
-    const seq = useUiStore.getState().bottomFocusSeq;
     await renderGroup(parent);
-    expect(getBottom(`thread:${parent}`).open).toBe(false);
+    expect(shown()).toEqual([]);
     fireEvent.click(row(5173));
-    expect(getBottom(`thread:${parent}`)).toMatchObject({ open: true, activeTerminalId: devTerminal });
-    expect(bottomTabIds(useTerminalsStore.getState(), `thread:${parent}`)).toEqual([devTerminal]);
+    await waitFor(() => {
+      expect(useShellViewStore.getState().focusRequest.paneId).toBe("p-2");
+    });
+    expect(shown()).toEqual([devTerminal]);
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: parent });
-    expect(useUiStore.getState().bottomFocusSeq).toBe(seq + 1);
     expect(opened()).toEqual([]);
   });
 
@@ -165,7 +169,9 @@ describe("a row's click", () => {
     const { parent, devTerminal } = seedChildServer();
     await renderGroup(parent);
     fireEvent.keyDown(row(5173), { key: "Enter" });
-    expect(getBottom(`thread:${parent}`).activeTerminalId).toBe(devTerminal);
+    await waitFor(() => {
+      expect(shown()).toEqual([devTerminal]);
+    });
   });
 
   it("a background run and a shell open the browser", async () => {
@@ -176,7 +182,7 @@ describe("a row's click", () => {
     await waitFor(() => {
       expect(opened()).toEqual(["http://localhost:7788", "http://localhost:9399"]);
     });
-    expect(getBottom(`thread:${parent}`).open).toBe(false);
+    expect(shown()).toEqual([]);
   });
 
   it("a terminal the store lost opens the browser rather than nothing", async () => {
@@ -198,7 +204,7 @@ describe("the row's buttons", () => {
     await waitFor(() => {
       expect(opened()).toEqual(["http://localhost:5173"]);
     });
-    expect(getBottom(`thread:${parent}`).open).toBe(false);
+    expect(shown()).toEqual([]);
   });
 
   it("■ on a child's shell stops it through the child, once for a double press", async () => {
@@ -227,7 +233,7 @@ describe("the row's buttons", () => {
     terminalExited(devTerminal, 129);
     setRun(devRun, { running: false, ports: [] });
     expect(rows().map((r) => r.dataset.run)).not.toContain(devRun);
-    expect(bottomTabIds(useTerminalsStore.getState(), `thread:${parent}`)).toEqual([devTerminal]);
+    expect(invocationsOf("terminal.close")).toEqual([]);
   });
 
   it("■ on a background run runs action.stop, once", async () => {

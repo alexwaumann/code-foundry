@@ -17,7 +17,7 @@ import { moveArgs, moveLine, type MoveTarget } from "@/lib/move";
 import { tildify } from "@/lib/path";
 import { resolveSet, type ResolvedSet } from "@/lib/projectSet";
 import { cn } from "@/lib/utils";
-import { closeMovePicker, focusDropped, focusMovedThreadPrompt, moveThread, useMovePickerStore } from "@/stores/movePicker";
+import { closeMovePicker, focusDropped, focusMovedThreadPrompt, holdMovePicker, moveThread, useMovePickerStore } from "@/stores/movePicker";
 import { useProjectsStore } from "@/stores/projects";
 import { useWorkspacesStore } from "@/stores/workspaces";
 
@@ -284,15 +284,27 @@ function PlacementStep({ threadId, target, onBack }: { threadId: string; target:
 export function MovePicker({ threadId, children }: { threadId: string; children: ReactNode }) {
   const open = useMovePickerStore((s) => s.open === threadId);
   // Leaving the thread (its header unmounts) closes it, so coming back does not reopen it.
+  // A header that mounts again at once (its tab drawn as it opens, React's effect replay)
+  // is not leaving: the picker a menu asked for while the thread's tab opened stays open.
   // The thread moving (from here or the CLI) unmounts the trigger with the popover: when
-  // the keyboard was in either, it falls to the body, so the thread's prompt takes it.
-  useEffect(
-    () => () => {
-      closeMovePicker(threadId);
-      if (focusDropped()) focusMovedThreadPrompt(threadId);
-    },
-    [threadId],
-  );
+  // the keyboard was in either, it falls to the body, so the thread's prompt takes it. Only
+  // then: a header remounting while the keyboard is nowhere of its own (the menu that asked
+  // for the picker just went) must not leave a request the prompt serves once the picker
+  // has the keyboard, which would close it.
+  const hadKeyboard = useRef(false);
+  const onFocus = () => {
+    hadKeyboard.current = true;
+  };
+  const onBlur = () => {
+    hadKeyboard.current = false;
+  };
+  useEffect(() => {
+    const done = holdMovePicker(threadId);
+    return () => {
+      done();
+      if (hadKeyboard.current && focusDropped()) focusMovedThreadPrompt(threadId);
+    };
+  }, [threadId]);
   return (
     <Popover
       open={open}
@@ -306,6 +318,8 @@ export function MovePicker({ threadId, children }: { threadId: string; children:
           type="button"
           className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 outline-none [--wails-draggable:no-drag] hover:bg-cf-control-hover hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus aria-expanded:bg-cf-control-hover aria-expanded:text-cf-text"
           data-testid="thread-crumb-move"
+          onFocus={onFocus}
+          onBlur={onBlur}
         >
           {children}
           <ChevronDown className="size-3.5 shrink-0 opacity-70" aria-hidden />
@@ -318,6 +332,8 @@ export function MovePicker({ threadId, children }: { threadId: string; children:
           // The step's own focus (the filter) takes the keyboard, not the popover.
           e.preventDefault();
         }}
+        onFocus={onFocus}
+        onBlur={onBlur}
       >
         <MoveSteps threadId={threadId} />
       </PopoverContent>

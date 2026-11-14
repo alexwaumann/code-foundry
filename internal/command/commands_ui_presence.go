@@ -54,7 +54,7 @@ var presenceWords = map[presence.Kind]string{
 // RegisterPresence registers ui.presence, which reports whether the user is looking at
 // the app and whether a window shows the caller's thread: a thread's model reads it to
 // decide whether to mention that the window is in the background, not whether to open
-// something in its own side panel (control-7-skill-routing).
+// something as a tab beside it (control-7-skill-routing).
 func RegisterPresence(r *Registry, d PresenceDeps) error {
 	return r.Register(Command{
 		Name:      "ui.presence",

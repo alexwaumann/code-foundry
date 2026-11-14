@@ -20,14 +20,14 @@ func canFindFiles(c Context) bool {
 }
 
 // fileFindCommand is file.find. The GUI presents it in the window (keys/bindings.ts):
-// the palette's file finder, whose Enter opens a File tab in the thread's side panel.
+// the palette's file finder, whose Enter opens a File tab beside the thread.
 // The CLI's reaches every window through ShowView.
 func (d ViewDeps) fileFindCommand() Command {
 	return Command{
 		Name:        "file.find",
 		Page:        PageState,
 		Title:       "Go to File…",
-		Description: "Find a file in the thread's checkouts by name and open it in the thread's side panel (⌥⏎ puts it in the prompt as an @ file instead).",
+		Description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌥⏎ puts it in the prompt as an @ file instead).",
 		Category:    "View",
 		Keybindings: []string{"cmd+p"},
 		When:        canFindFiles,
@@ -38,7 +38,7 @@ func (d ViewDeps) fileFindCommand() Command {
 			return "no thread is on screen"
 		},
 		Run: func(_ context.Context, uctx Context, _ Args) (Result, error) {
-			return EmitTo(d.Emitter, showViewIntent(ViewFileFind, "", nil)).CLIResult(uctx), nil
+			return EmitTo(d.Emitter, showViewIntent(ViewFileFind, nil)).CLIResult(uctx), nil
 		},
 	}
 }

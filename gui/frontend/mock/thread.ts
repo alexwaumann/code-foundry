@@ -1161,6 +1161,41 @@ export class MockThreadLogs {
   }
 
   /**
+   * A Needs-you thread's history (World.addNeedsYou; docs/notes/shell-17-needs-you.md): the
+   * prompt, Claude's words, then a pending permission to run `command` or a pending question.
+   * Sets the thread's status to the ask and publishes it on the EventService thread source.
+   */
+  seedAsk(id: string, a: { prompt: string; intro: string; minutesAgo: number; ask: { command: string; description: string } | { questions: unknown[] } }): void {
+    this.logs.delete(id);
+    this.agents.delete(id);
+    this.shells.delete(id);
+    this.mcp.set(id, mcpFixture());
+    this.slash.set(id, slashCommandsFixture());
+    const l = this.log(id);
+    const at = (sec: number) => new Date(Date.now() - a.minutesAgo * 60_000 + sec * 1000);
+    const push = (payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}) => {
+      const x = this.item(id, payload, over);
+      l.items.push(x);
+      return x;
+    };
+    push({ case: "userMessage", value: { text: a.prompt, attachments: [] } }, { at: at(0) });
+    push({ case: "assistantText", value: { text: a.intro } }, { at: at(6) });
+    const isQuestion = "questions" in a.ask;
+    const name = isQuestion ? "AskUserQuestion" : "Bash";
+    const input = "questions" in a.ask ? { questions: a.ask.questions } : { command: a.ask.command, description: a.ask.description };
+    const toolUseId = `toolu_ask_${id}`;
+    push({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.RUNNING } }, { id: toolUseId, at: at(8) });
+    const requestId = `req-ask-${id}`;
+    const value = { requestId, toolName: name, displayName: name, toolUseId, inputJson: JSON.stringify(input), description: "questions" in a.ask ? "" : a.ask.description, state: ThreadRequestState.PENDING };
+    const item = push(isQuestion ? { case: "question", value } : { case: "permission", value }, { at: at(9) });
+    const first = "questions" in a.ask ? ((a.ask.questions[0] as { question?: string } | undefined)?.question ?? "") : `Bash ${a.ask.command.split("\n")[0] ?? ""}`;
+    l.pending = [{ requestId, itemId: item.id, question: isQuestion, toolName: name, summary: first }];
+    l.seq = l.items.length;
+    this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `${isQuestion ? "question" : "permission"}: ${first}`);
+    this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
+  }
+
+  /**
    * Ember's chat (mock/emberChat.ts): the resident thread's history, matching the seeded
    * board. Leaves the thread's status alone (idle at its prompt, as World.addResident makes it).
    */

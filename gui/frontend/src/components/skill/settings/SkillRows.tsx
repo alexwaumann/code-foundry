@@ -24,7 +24,7 @@ import { FailureLine, Pill, SkillNames, SourceLine } from "./parts";
 
 /** NO_SETUP_OWNER as a sentence: the Run setup button's tooltip, the menu item's hint. */
 const NO_OWNER = `${NO_SETUP_OWNER.charAt(0).toUpperCase()}${NO_SETUP_OWNER.slice(1)}`;
-const NO_OWNER_TIP = `${NO_OWNER}: setup runs in its bottom panel.`;
+const NO_OWNER_TIP = `${NO_OWNER}: setup runs in a terminal of its own.`;
 
 /** Whether skill.setup has an owner for its terminal now (re-checked when the selection changes). */
 function useSetupOwner(): boolean {
@@ -32,7 +32,7 @@ function useSetupOwner(): boolean {
   return canRunSetup();
 }
 
-/** The file in the side panel of what is selected, and Settings out of the way so it shows. */
+/** The file in a tab for what is selected, and Settings out of the way so it shows. */
 function viewSkillFile(r: InstalledSkillView): void {
   if (openLooseFile(r.dir, SKILL_FILE)) closeSettings();
 }

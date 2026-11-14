@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { emptyBottom, getBottom, sanitizeBottomState, toggleBottom, useBottomStore } from "./bottomPanel";
 import { setPreviewMode, useCodeViewStore } from "./codeView";
-import { usePanelStore } from "./panel";
 import { addRecentFile, useRecentFilesStore } from "./recentFiles";
 import { addRecentReviewer, useReviewerRecentsStore } from "./reviewerRecents";
 import { lastSearchMode, setSearchMode, useSearchDialogStore } from "./searchDialog";
 import { useSettingsPrefsStore } from "./settingsPrefs";
+import { toggleNeedsCollapsed, useShellSidebarStore } from "./shellSidebar";
 import { FONT_MAX, FONT_DEFAULT, HOME, SIDEBAR_DEFAULT, SIDEBAR_MIN, useUiStore, ZOOM_DEFAULT, ZOOM_MAX } from "./ui";
 
 // Every persisted store, with what a well-formed state must look like after loading and a
-// use of its reducers (what used to throw on a bad shape: getBottom on byKey null).
+// use of its reducers (what used to throw on a bad shape). The classic window's
+// "code-foundry.panel" and "code-foundry.bottom" have no store any more: the first-load
+// import reads them as raw strings (shell/legacyImport.ts).
 interface Persisted {
   name: string;
   version: number;
@@ -22,35 +23,14 @@ interface Persisted {
 
 const stores: Persisted[] = [
   {
-    name: "code-foundry.bottom",
-    version: 1,
-    rehydrate: () => useBottomStore.persist.rehydrate(),
-    fields: ["byKey"],
-    use: () => {
-      getBottom("thread:x");
-      toggleBottom("thread:x", true);
-      expect(getBottom("thread:x").open).toBe(true);
-    },
-  },
-  {
-    name: "code-foundry.panel",
-    version: 6,
-    rehydrate: () => usePanelStore.persist.rehydrate(),
-    fields: ["byKey"],
-    use: () => {
-      for (const e of Object.values(usePanelStore.getState().byKey)) expect(e.groups[0]?.tabs).toBeInstanceOf(Array);
-    },
-  },
-  {
     name: "code-foundry.ui",
     version: 4,
     rehydrate: () => useUiStore.persist.rehydrate(),
-    fields: ["sidebarVisible", "sidebarWidth", "fontSize", "zoom", "usageRange", "workingCollapsed", "archivedCollapsed", "snoozedCollapsed", "projectsLast", "emberShowWork", "selection"],
+    fields: ["sidebarVisible", "sidebarWidth", "fontSize", "zoom", "usageRange", "workingCollapsed", "archivedCollapsed", "snoozedCollapsed", "emberShowWork", "selection"],
     use: () => {
       const s = useUiStore.getState();
       for (const n of [s.sidebarWidth, s.fontSize, s.zoom]) expect(Number.isFinite(n)).toBe(true);
       expect(typeof s.sidebarVisible).toBe("boolean");
-      expect(typeof s.projectsLast).toBe("string");
       expect(s.selection).toEqual(HOME);
     },
   },
@@ -83,6 +63,17 @@ const stores: Persisted[] = [
     fields: ["boundOnly"],
     use: () => {
       expect(typeof useSettingsPrefsStore.getState().boundOnly).toBe("boolean");
+    },
+  },
+  {
+    name: "code-foundry.shellSidebar",
+    version: 1,
+    rehydrate: () => useShellSidebarStore.persist.rehydrate(),
+    fields: ["needsCollapsed", "activeCollapsed"],
+    use: () => {
+      toggleNeedsCollapsed();
+      expect(typeof useShellSidebarStore.getState().needsCollapsed).toBe("boolean");
+      expect(typeof useShellSidebarStore.getState().activeCollapsed).toBe("boolean");
     },
   },
   {
@@ -136,16 +127,6 @@ describe.each(stores)("persisted store $name", (s) => {
 });
 
 describe("repairs", () => {
-  it("bottom: keeps object entries, a boolean open, a finite height and a string tab", () => {
-    expect(sanitizeBottomState({ a: null, b: [1], c: { open: "yes", height: "x" }, d: { open: true, height: 300, activeTerminalId: "t" }, e: { height: Infinity, activeTerminalId: 3 } })).toEqual({
-      c: { open: false },
-      d: { open: true, height: 300, activeTerminalId: "t" },
-      e: { open: false },
-    });
-    expect(sanitizeBottomState(null)).toEqual({});
-    expect(getBottom("thread:none")).toEqual(emptyBottom);
-  });
-
   it("ui: numbers are clamped, wrong types fall back to the defaults", async () => {
     const ui = stores.find((x) => x.name === "code-foundry.ui") as Persisted;
     const reset = () => {

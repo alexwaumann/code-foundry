@@ -883,7 +883,7 @@ function seedPlugins(): MockPlugin[] {
       name: "test-watcher",
       displayName: "Test Watcher",
       version: "0.0.9",
-      description: "Runs the project's tests in a thread's worktree whenever files change, shows failures and output in the side panel, flags the thread while tests fail, and sends failures to Claude.",
+      description: "Runs the project's tests in a thread's worktree whenever files change, shows failures and output in a tab beside the thread, flags the thread while tests fail, and sends failures to Claude.",
       state: PluginState.RUNNING,
       enabled: true,
       dev: false,
@@ -902,7 +902,7 @@ function seedPlugins(): MockPlugin[] {
     // A longer list for Settings → Plugins: no commands or surfaces, so nothing else sees them.
     ...[
       ["linear-sync", "Linear Sync", "1.2.0", "Mirrors a thread's linked issues and posts when a pull request merges."],
-      ["sentry-feed", "Sentry Feed", "0.4.2", "Shows new issues for the thread's project in the side panel."],
+      ["sentry-feed", "Sentry Feed", "0.4.2", "Shows new issues for the thread's project in a tab beside it."],
       ["disk-watch", "Disk Watch", "0.2.1", "Warns before a worktree fills the disk."],
       ["pager-bridge", "Pager Bridge", "2.0.3", "Opens a thread when an incident pages you and links it back."],
       ["flag-audit", "Flag Audit", "0.7.0", "Lists feature flags a branch touches and who owns them."],
@@ -945,6 +945,12 @@ export interface PluginDeps {
   sendToThread: (id: string, text: string) => void;
   /** The plugins.registries setting (mock/pluginRegistry.ts). */
   registries: () => string;
+  /**
+   * Opens a tab in the layout by the placement rules (the daemon's plugin.TabOpener): a thread
+   * surface's show command opens its tab linked to the thread; without it, the command sends its
+   * ShowView as before.
+   */
+  openTab?: (tab: { kind: string; thread: string; title: string }, focus: boolean) => { pane?: string; tab?: string; existing?: boolean };
 }
 
 /** The daemon's home for the plugin directories (PluginService.List). */
@@ -1420,10 +1426,30 @@ export class MockPlugins {
       if (!p.enabled) continue;
       for (const s of p.surfaces) {
         out.push({
-          cmd: { name: `plugin.${p.name}.show.${s.id}`, title: `Show ${s.title}`, category: p.displayName, description: `Open ${s.title} in the side panel.`, keybindings: [], args: s.scope === "thread" ? [{ name: "thread", type: ArgType.STRING, required: false, description: "The thread" }] : [] },
+          cmd: {
+            name: `plugin.${p.name}.show.${s.id}`,
+            title: `Show ${s.title}`,
+            category: p.displayName,
+            description: `Open ${s.title} as a tab.`,
+            keybindings: [],
+            args:
+              s.scope === "thread"
+                ? [
+                    { name: "thread", type: ArgType.STRING, required: false, description: "The thread" },
+                    { name: "focus", type: ArgType.BOOL, required: false, description: "Also take the user's focus to the tab" },
+                  ]
+                : [],
+          },
           when: (ctx) => this.surfaceAvailable(p, s, ctx),
           run: (ctx, a) => {
             const id = a.thread || ctx?.activeThreadId || "";
+            // A thread's surface opens as a tab linked to it, placed by the rules (internal/store/plugin
+            // show.go openSurfaceTab): the app's own call takes the focus, a thread's only with --focus.
+            if (s.scope === "thread" && this.deps.openTab) {
+              const focus = a.focus ? a.focus === "true" : Boolean(ctx?.activeView);
+              const r = this.deps.openTab({ kind: `plugin.${p.name}.${s.id}`, thread: id, title: s.title }, focus);
+              return `${r.existing ? "found" : "opened"} ${s.title} for thread ${id} as tab ${r.tab ?? ""} in pane ${r.pane ?? ""}`;
+            }
             const name = `panel.plugin.${p.name}.${s.id}${s.scope === "thread" ? `?thread=${id}` : ""}`;
             return `delivered=${String(this.deps.emit({ intent: { case: "showView", value: { name } } }))}`;
           },

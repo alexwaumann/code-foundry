@@ -336,7 +336,7 @@ func (m *Manager) DeliverRestartWakes() {
 				"target", t.ID, "condition", sub.Condition, "interrupted", stopped, "fired_count", sub.FiredCount)
 			m.firedThreadLocked(r, t)
 		}
-		m.enqueueLocked(p.subscriber, delivery{restart: rw, queued: time.Now(), slot: now})
+		m.enqueueLocked(p.subscriber, delivery{restart: rw, queued: m.opts.batchClock.Now(), slot: now})
 		m.log.Info("restart wake queued", "thread", p.subscriber, "interrupted", len(p.notice.interrupted),
 			"wakes", len(p.fires), "own_turn_interrupted", p.notice.self, "subscriptions", p.notice.subscriptions,
 			"own_turn_only", p.selfOnly)

@@ -27,8 +27,9 @@ const { CF, FEAT, seedWorld } = await import("@/test/projectsWorld");
 const { applyIntent } = await import("@/stores/intents");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useTerminalsStore } = await import("@/stores/terminals");
-const { useBottomStore } = await import("@/stores/bottomPanel");
 const { HOME, useUiStore } = await import("@/stores/ui");
+const { resetLayout } = await import("@/stores/layout");
+const { layoutOf, pane, seedLayout, space, tab } = await import("@/test/shellLayout");
 
 /**
  * The command palette over a faked List (e2e/app.spec.ts): what it lists for the context it
@@ -85,7 +86,6 @@ beforeEach(() => {
   listed.commands = COMMANDS;
   listed.contexts.length = 0;
   useCommandsStore.setState({ commands: [], contextKey: "", loading: false, error: null });
-  useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
   act(() => {
     useUiStore.getState().closePalette();
     useUiStore.getState().select(HOME);
@@ -103,40 +103,42 @@ afterEach(() => {
     toast.dismiss();
     useUiStore.getState().closePalette();
   });
+  resetLayout();
   cleanup();
 });
 
 describe("what the palette lists", () => {
-  it("only commands startable in its context: thread.new by its picker with nothing selected; terminal ones with a shell; never a NoPalette verb", async () => {
+  it("only commands startable in its context: thread.new by its picker with nothing selected, no terminal ones without a shell; keybindings shown", async () => {
     await openPalette();
     expect(listed.contexts.at(-1)).toMatchObject({ activeThreadId: "", activeTerminalId: "" });
     expect(row("thread.new")).not.toBeNull();
     expect(row("terminal.new")).toBeNull();
     expect(row("terminal.kill")).toBeNull();
+    // Keybindings are shown.
+    expect(row("thread.new")?.textContent).toContain("⌘N");
     act(() => {
       useUiStore.getState().closePalette();
     });
     await settle();
     expect(palette()).toBeNull();
+  });
 
-    // A thread's shell with the keyboard in it: the shell is the context's terminal.
+  it("with the keyboard in a thread's shell, the shell is the context's terminal: its commands listed, never a NoPalette verb", async () => {
+    // s-1's shell in a tab linked to it, the tab focused.
+    await seedLayout(layoutOf([space(pane("p-1", [tab("t-th", "thread", "s-1"), tab("t-sh", "terminal", "s-1", { params: { terminal: "t-s1-shell" } })], "t-sh"), "p-1")]));
     useTerminalsStore.setState({
-      byId: { "t-s1-shell": { id: "t-s1-shell", argv: ["/bin/zsh"], cwd: CF, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, labels: { kind: "shell", thread: "s-1", project: "repo-cf", worktree: CF } } },
+      byId: { "t-s1-shell": { id: "t-s1-shell", argv: ["/bin/zsh"], cwd: CF, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: null, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels: { kind: "shell", thread: "s-1", project: "repo-cf", worktree: CF } } },
       order: ["t-s1-shell"],
       loaded: true,
     });
     act(() => {
       useUiStore.getState().select({ kind: "thread", id: "s-1" });
-      useBottomStore.setState({ byKey: { "thread:s-1": { open: true, activeTerminalId: "t-s1-shell" } } });
-      useUiStore.setState({ focus: "bottom" });
     });
     await openPalette();
     expect(listed.contexts.at(-1)).toMatchObject({ activeThreadId: "s-1", activeTerminalId: "t-s1-shell" });
     expect(row("terminal.kill")).not.toBeNull();
     expect(row("thread.new")).not.toBeNull();
     expect(row("terminal.remove")).toBeNull();
-    // Keybindings are shown.
-    expect(row("thread.new")?.textContent).toContain("⌘N");
   });
 });
 

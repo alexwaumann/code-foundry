@@ -35,10 +35,10 @@ func TestSystemPrompt(t *testing.T) {
 	for _, want := range []string{"how you should act in every project (always, never, keep answers short) goes to code-foundry memory add <their words> at once, without asking; " +
 		"a rule or skill for a workspace's projects: the folder code-foundry thread checkouts prints (CLAUDE.md, .claude/skills), not a repo; " +
 		"what you learn about the user, a project or its code goes in your memory files; asked what you remember, give both",
-		"code-foundry usage.show", "view.panel.file, diff or pr (your own panel; --focus only if asked)", "secrets: view.panel.file --edit --note, not chat",
+		"code-foundry usage.show", "view.open.file, diff or pr (a tab beside you; --focus only if asked)", "secrets: view.open.file --edit --note, not chat",
 		"a path in your reply is a clickable chip: write it in full, absolute or relative to your primary working directory (not a folder you cd into), with :line for a line", "a page, mockup, chart or form to fill in is an .html file in $CODE_FOUNDRY_PAGES, not the repo unless asked (skill code-foundry-pages first), shown with view.inline <file>, not markdown", "code-foundry pr.create (project.github.publish",
 		"thread new: the project checkout or --new-worktree (--base, --base-from-origin yes|no), your call",
-		"/model or /cost", "page verbs (view.*) move every window: prefer panel verbs", "not command or skill names"} {
+		"/model or /cost", "page verbs (view.*) move every window: prefer view.open", "not command or skill names"} {
 		if !strings.Contains(ThreadPrompt, want) {
 			t.Errorf("ThreadPrompt does not route %q: %q", want, ThreadPrompt)
 		}

@@ -1,0 +1,102 @@
+{
+  "doc": "A thread opened in another pane than the one it was in gets its set placed fresh by the rules beside it, in the old order; the pane shows the first tab that was active when the set was remembered.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-g","kind":"projects"}],"active":"t-g"},
+            {"t":"pane","id":"p-q","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-q"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-b",
+              "index": 0,
+              "adjacent": true
+            },
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true
+            },
+            {
+              "tab": {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}},
+              "pane": "p-c",
+              "index": 0,
+              "active": true,
+              "adjacent": true,
+              "beside": {"neighbours":["p-b"],"edge":"bottom","frac":0.4}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"open_thread","thread":"th-a","focus":true,"w":2400,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-g","kind":"projects"}],"active":"t-g"},
+            {
+              "t": "pane",
+              "id": "p-q",
+              "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-n1","kind":"thread","thread":"th-a"}],
+              "active": "t-n1"
+            },
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+                {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}}
+              ],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.5,0.275,0.22499999999999998]
+        },
+        "focus": "p-q",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a"}}
+  },
+  "result": {"space":"sp-a","pane":"p-q","tab":"t-n1","rule":"focused","placed":["t-d","t-f","t-x"]}
+}

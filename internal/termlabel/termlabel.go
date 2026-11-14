@@ -5,7 +5,7 @@
 // one set of names. It has no dependencies (in particular no cgo), so any package may
 // import it.
 //
-// Three kinds of terminal belong to a thread or worktree, shown in its bottom panel:
+// Three kinds of terminal belong to a thread or worktree, shown as its terminal tabs:
 //
 //   - A shell started by terminal.new has Kind = KindShell, Project and Worktree for the
 //     worktree it belongs to, and Thread when it belongs to a thread (Project and
@@ -18,6 +18,21 @@
 //     KindSetup, the same owner labels as a shell, plus Skill (the skill's name) and
 //     Title ("Setup <name>", the tab's title). Like an action run it stays when it exits,
 //     so the output can be read; the daemon records a setup that exited 0.
+//
+// A free shell (terminal.new-free; docs/notes/shell-5-terminal.md) has Kind = KindShell and
+// no owner labels at all: no Thread, Project or Worktree. It starts in the home directory
+// and belongs to the window's tab that shows it, not to a thread or a project: the
+// reaper removes it when it exits, and never because a thread, worktree or project went
+// away. IsFree tells it apart; it is an explicit case, not a shell whose owner is
+// missing.
+//
+// A thread's shell may sit in its quick slot (Slot = SlotQuick): the one terminal under the
+// thread's conversation. A thread has at most one running quick shell; terminal.new
+// --quick returns it when it exists.
+//
+// terminal.reset starts a fresh shell for an old one and labels it Replaces = the old
+// id, so whatever showed the old terminal (a tab) can move to the new one before the old
+// one is removed.
 //
 // A plugin's terminal (terminal/create; docs/notes/plugins-6-thread-terminal.md) has Kind
 // = KindPlugin, Plugin = the plugin's name and Title = the title it gave. It belongs to
@@ -52,7 +67,15 @@ const (
 	Title  = "title"
 	// Skill is the name of the skill a KindSetup terminal runs the setup script of.
 	Skill = "skill"
+	// Slot is the place a thread's shell has in the window: SlotQuick for its quick
+	// terminal. Absent: an ordinary terminal tab.
+	Slot = "slot"
+	// Replaces is the id of the terminal a shell was started to replace (terminal.reset).
+	Replaces = "replaces"
 )
+
+// SlotQuick is Slot's value on a thread's quick terminal.
+const SlotQuick = "quick"
 
 // KindShell is Kind's value on a shell started by terminal.new. The daemon removes such a
 // terminal as soon as it exits, and kills and removes it when its thread (Thread) or its
@@ -88,11 +111,34 @@ func IsAction(labels map[string]string) bool { return labels[Kind] == KindAction
 // IsSetup reports whether labels mark a skill's setup script in a terminal.
 func IsSetup(labels map[string]string) bool { return labels[Kind] == KindSetup }
 
-// IsPanel reports whether labels mark a terminal the bottom panel shows (a shell, an
+// IsPanel reports whether labels mark a terminal a terminal tab shows (a shell, an
 // action run or a skill's setup): one with an owner, closed with terminal.close, and
 // cleaned up when its owner goes away.
 func IsPanel(labels map[string]string) bool {
 	return IsShell(labels) || IsAction(labels) || IsSetup(labels)
+}
+
+// Free returns the labels of a free shell: one that belongs to no thread, project or
+// worktree (terminal.new-free).
+func Free() map[string]string { return map[string]string{Kind: KindShell} }
+
+// IsFree reports whether labels mark a free shell: KindShell without a Thread, Project
+// or Worktree.
+func IsFree(labels map[string]string) bool {
+	return IsShell(labels) && labels[Thread] == "" && labels[Project] == "" && labels[Worktree] == ""
+}
+
+// QuickShell returns the labels of thread threadID's quick terminal: Shell's, plus Slot =
+// SlotQuick.
+func QuickShell(threadID, projectID, worktree string) map[string]string {
+	l := Shell(threadID, projectID, worktree)
+	l[Slot] = SlotQuick
+	return l
+}
+
+// IsQuick reports whether labels mark a thread's quick terminal.
+func IsQuick(labels map[string]string) bool {
+	return IsShell(labels) && labels[Thread] != "" && labels[Slot] == SlotQuick
 }
 
 // Shell returns the labels of a shell owned by worktree path of project projectID, and by

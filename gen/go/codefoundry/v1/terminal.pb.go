@@ -112,9 +112,29 @@ type Terminal struct {
 	//	          terminal, kind "plugin", the title the plugin gave).
 	//
 	// An action terminal carries the same thread / project / worktree owner labels as a
-	// shell, so a bottom panel shows both the same way.
+	// shell, so a terminal tab shows both the same way.
 	// A terminal created through Create without labels belongs to nothing.
-	Labels        map[string]string `protobuf:"bytes,12,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	//
+	//	slot      "quick" on a thread's quick terminal (one per thread; terminal.new
+	//	          --quick). A shell without it is an ordinary terminal tab.
+	//	replaces  on a shell terminal.reset started: the id of the terminal it replaces
+	//	          (closed right after), so a tab can move to the new one.
+	//
+	// A free shell (terminal.new-free) is kind "shell" with no thread, project or
+	// worktree: it starts in the home directory, belongs to the tab that shows it, and
+	// is removed when it exits, never because a thread or project went away.
+	Labels map[string]string `protobuf:"bytes,12,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// What the process is doing now, read from the process table (no shell integration)
+	// shortly after output and while the terminal is quiet. An older daemon leaves them
+	// empty.
+	// The main process's working directory now (a shell's after cd); cwd until read.
+	LiveCwd string `protobuf:"bytes,13,opt,name=live_cwd,json=liveCwd,proto3" json:"live_cwd,omitempty"`
+	// The command line of the job in the terminal's foreground when it is not the main
+	// process (what runs in a shell; a pipeline's first process), quoted for a shell.
+	// Empty at the shell's prompt. A line over 4 KiB is cut and ends in "…".
+	Foreground string `protobuf:"bytes,14,opt,name=foreground,proto3" json:"foreground,omitempty"`
+	// The last foreground command that ended, or gave way to another job.
+	LastCommand   string `protobuf:"bytes,15,opt,name=last_command,json=lastCommand,proto3" json:"last_command,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -231,6 +251,27 @@ func (x *Terminal) GetLabels() map[string]string {
 		return x.Labels
 	}
 	return nil
+}
+
+func (x *Terminal) GetLiveCwd() string {
+	if x != nil {
+		return x.LiveCwd
+	}
+	return ""
+}
+
+func (x *Terminal) GetForeground() string {
+	if x != nil {
+		return x.Foreground
+	}
+	return ""
+}
+
+func (x *Terminal) GetLastCommand() string {
+	if x != nil {
+		return x.LastCommand
+	}
+	return ""
 }
 
 type CreateTerminalRequest struct {
@@ -1200,7 +1241,8 @@ type isTerminalEvent_Event interface {
 }
 
 type TerminalEvent_Updated struct {
-	// Emitted on create and whenever title/size/alt_screen/state change.
+	// Emitted on create and whenever title/size/alt_screen/state or
+	// live_cwd/foreground/last_command change.
 	Updated *Terminal `protobuf:"bytes,1,opt,name=updated,proto3,oneof"`
 }
 
@@ -1427,7 +1469,7 @@ var File_codefoundry_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	"\x1dcodefoundry/v1/terminal.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdc\x03\n" +
+	"\x1dcodefoundry/v1/terminal.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x04\n" +
 	"\bTerminal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04argv\x18\x02 \x03(\tR\x04argv\x12\x10\n" +
@@ -1443,7 +1485,12 @@ const file_codefoundry_v1_terminal_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\bexitedAt\x12\x1d\n" +
 	"\n" +
 	"alt_screen\x18\v \x01(\bR\taltScreen\x12<\n" +
-	"\x06labels\x18\f \x03(\v2$.codefoundry.v1.Terminal.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\f \x03(\v2$.codefoundry.v1.Terminal.LabelsEntryR\x06labels\x12\x19\n" +
+	"\blive_cwd\x18\r \x01(\tR\aliveCwd\x12\x1e\n" +
+	"\n" +
+	"foreground\x18\x0e \x01(\tR\n" +
+	"foreground\x12!\n" +
+	"\flast_command\x18\x0f \x01(\tR\vlastCommand\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfd\x01\n" +

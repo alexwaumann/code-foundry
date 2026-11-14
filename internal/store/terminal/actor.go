@@ -71,6 +71,10 @@ type actor struct {
 	hardC      <-chan time.Time
 	killTimer  *time.Timer // the SIGKILL escalation (killLeftovers); never stopped
 	compress   *time.Timer // idle scrollback compression; see onIdle
+	factsTimer *time.Timer // the next facts sample (facts.go)
+	factsC     <-chan time.Time
+	factsDue   time.Time
+	factsStep  int // the next of Options.FactsRecheck
 }
 
 func newActor(id string, cmd *exec.Cmd, master *os.File, initial Terminal, b *bus.Bus, log *slog.Logger, opts Options, drops *atomic.Uint64) *actor {
@@ -114,6 +118,7 @@ func (a *actor) run(ready chan<- error) {
 	a.setColors(a.colors)
 	a.compress = time.NewTimer(a.opts.CompressAfter)
 	defer a.compress.Stop()
+	defer a.stopFacts()
 	ready <- nil
 
 	go a.input.run(a.master)
@@ -149,6 +154,8 @@ func (a *actor) run(ready chan<- error) {
 			a.publish()
 		case <-a.compress.C:
 			a.onIdle()
+		case <-a.factsC:
+			a.onFacts()
 		}
 	}
 }
@@ -233,6 +240,7 @@ func (a *actor) feed(data []byte) {
 	a.broadcast(AttachEvent{Output: data})
 	a.observe(ObserveEvent{Output: data})
 	a.checkMetadata()
+	a.factsSoon()
 }
 
 // observe delivers ev to the terminal's Observer, if any.
@@ -270,9 +278,14 @@ func (a *actor) checkMetadata() {
 			a.observe(ObserveEvent{Title: &title})
 		}
 	}
-	if !changed {
-		return
+	if changed {
+		a.schedulePublish()
 	}
+}
+
+// schedulePublish publishes the current metadata now, or after the throttle's wait when
+// it published too recently.
+func (a *actor) schedulePublish() {
 	now, wait := a.th.next(time.Now())
 	switch {
 	case now:
@@ -345,7 +358,9 @@ func (a *actor) finish() {
 	a.input.close()
 	_ = a.master.Close()
 
+	a.stopFacts()
 	code := exitCode(a.procState)
+	a.cur = endFacts(a.cur)
 	a.cur.State = StateExited
 	a.cur.ExitCode = code
 	a.cur.ExitedAt = a.opts.Now()

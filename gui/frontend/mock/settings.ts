@@ -33,8 +33,10 @@ export const groups: GroupInit[] = [
   { id: "github", title: "GitHub", description: "Pull requests and checks, read with your gh login." },
   { id: "projects", title: "Projects", description: "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
-  { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density, backdrop, and the side panel. Applied live in every window." },
+  { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density and backdrop. Applied live in every window." },
   { id: "notifications", title: "Notifications", description: "How the Dock tells you a thread needs you. macOS banners aren't available to this app." },
+  { id: "layout", title: "Layout", description: "How the window's panes follow the thread you focus." },
+  { id: "sidebar", title: "Sidebar", description: "What the sidebar lists." },
   { id: "keybindings", title: "Keybindings", description: 'Override a command\'s chord, or "none" to unbind it. Reserved app chords (cmd+k, cmd+b, cmd+1..9, ...) cannot be bound.' },
   { id: "update", title: "Updates", description: "Which releases the app checks for and offers to install." },
   { id: "plugins", title: "Plugins", description: "Where plugins are installed from." },
@@ -72,6 +74,7 @@ export const staticPages: PageInit[] = [
     sections: [
       { id: "theme", title: "Theme" },
       { id: "window", title: "Window" },
+      { id: "panes", title: "Panes and sidebar" },
       { id: "terminal", title: "Terminal" },
     ],
   },
@@ -121,13 +124,15 @@ export const NO_KEYBINDING = new Set([
   "action.list", "action.runs", "action.stop", "action.wait", "app.version", "daemon.status", "daemon.version", "dictation.status", "file.export",
   "memory.add", "memory.clear", "memory.remove", "memory.show", "plugin.browse", "plugin.reload", "project.list",
   "search.agent", "search.clear", "search.find", "search.forget", "search.get", "search.open-hit", "search.promote", "search.recent", "search.seen", "search.stop",
+  "pane.focus", "pane.move", "pane.resize",
   "settings.get", "settings.path", "settings.reset", "settings.set", "skill.browse", "terminal.list",
+  "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "space.move", "space.rename", "space.switch", "tab.focus", "tab.move",
   "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
-  "thread.agent.open", "thread.agents", "thread.checkouts", "thread.commands", "thread.flag.clear", "thread.focus", "thread.items", "thread.list", "thread.mcp",
+  "thread.agent.open", "thread.agents", "thread.info", "thread.open", "thread.space.move", "thread.checkouts", "thread.commands", "thread.flag.clear", "thread.focus", "thread.items", "thread.list", "thread.mcp",
   "thread.move.open", "thread.new-like", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop",
   "thread.stop-waiting", "thread.unsubscribe", "thread.wait",
   "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "usage.show",
-  "view.open.url", "view.panel.gallery", "view.panel.page", "workspace.list",
+  "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url", "view.panel.gallery", "view.panel.page", "workspace.list",
 ]);
 
 /** A category's keybindings section id ("Pull Request" -> "pull-request"). */
@@ -219,7 +224,9 @@ const staticFields: FieldInit[] = [
   { key: "appearance.thread_width", group: "appearance", page: "appearance", section: "window", type: S.ENUM, title: "Thread width", description: "Width of the conversation column.", enumValues: ["compact", "comfortable", "full"], enumLabels: ["Compact", "Comfortable", "Full"], defaultValue: "comfortable" },
   { key: "appearance.backdrop", group: "appearance", page: "appearance", section: "window", type: S.ENUM, title: "Backdrop", description: "Faint artwork behind the new-thread composer.", enumValues: ["forest", "none", "custom"], enumLabels: ["Forest", "None", "Custom"], defaultValue: "forest" },
   { key: "appearance.backdrop_file", group: "appearance", page: "appearance", section: "window", type: S.STRING, title: "Backdrop image", description: "The file the Custom backdrop shows, from the backdrops folder of the Code Foundry home. Add and remove images on the settings page.", defaultValue: "" },
-  { key: "appearance.panel_keep_open", group: "appearance", page: "appearance", section: "window", type: S.BOOL, title: "Keep side panel open", description: "Keep the side panel open on its new tab page after its last tab closes.", defaultValue: "false" },
+  { key: "layout.smart_swap", group: "layout", page: "appearance", section: "panes", type: S.BOOL, title: "Smart swap", description: "When a thread's tab gains focus, panes showing another thread's diff, pull request or terminal switch to this thread's, if it is already open there. Nothing opens or closes.", defaultValue: "true" },
+  { key: "layout.thread_info", group: "layout", page: "appearance", section: "panes", type: S.BOOL, title: "Thread info by default", description: "Show the thread info card beside a thread's conversation when its pane is wide enough, for every thread you have not toggled it on. The header's button and ⌘⇧I show or hide it for one thread, and that thread keeps its choice.", defaultValue: "true" },
+  { key: "sidebar.needs_scope", group: "sidebar", page: "appearance", section: "panes", type: S.ENUM, title: "Needs you lists", description: "Which threads the sidebar's Needs you section lists: those of every space, or only the current space's. Its header's button switches it too.", enumValues: ["all", "space"], enumLabels: ["All spaces", "This space"], defaultValue: "all" },
   { key: "appearance.font_family", group: "appearance", page: "appearance", section: "terminal", type: S.STRING, title: "Font family", description: "Fonts to try, separated by commas; the first one installed is used. JetBrainsMono Nerd Font Mono ships with the app, and Menlo is always the last fallback.", defaultValue: "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo", placeholder: "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo" },
   { key: "appearance.font_size", group: "appearance", page: "appearance", section: "terminal", unit: "pt", type: S.INT, title: "Font size", description: "Size of terminal text, before zoom.", defaultValue: "13", min: 9n, max: 28n },
   { key: "appearance.scrollback_lines", group: "appearance", page: "appearance", section: "terminal", type: S.INT, title: "Scrollback rows", description: "Rows of history each terminal keeps. A long line takes several, more when the terminal is narrow.", defaultValue: "30000", min: 1000n, max: 100000n, restartRequired: true },
@@ -320,7 +327,8 @@ const staticFields: FieldInit[] = [
 
 const reserved = new Set([
   "cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
-  "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+w", "cmd+shift+c", "cmd+alt+\\", "cmd+q",
+  "cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
+  "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+shift+c", "cmd+q",
   "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",
 ]);
 

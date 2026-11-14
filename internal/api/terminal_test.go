@@ -179,3 +179,28 @@ func TestTerminalServiceCloseKillsThenRemoves(t *testing.T) {
 		t.Errorf("after Close, Get = %v, want ErrNotFound", err)
 	}
 }
+
+// The facts the store reads from the process table reach the client.
+func TestTerminalServiceFacts(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	c, fake := newTerminalClient(t)
+	created, err := c.Create(ctx, connect.NewRequest(&v1.CreateTerminalRequest{Argv: []string{"/bin/zsh"}, Cwd: "/w", Labels: termlabel.Free()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pt := created.Msg.GetTerminal()
+	if pt.GetLiveCwd() != "/w" || pt.GetForeground() != "" || pt.GetLastCommand() != "" {
+		t.Fatalf("Create = %v, want live_cwd /w and no commands", pt)
+	}
+	if err := fake.SetFacts(pt.GetId(), "/w/sub", "sleep 5", "ls -la"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.Get(ctx, connect.NewRequest(&v1.GetTerminalRequest{Id: pt.GetId()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g := got.Msg.GetTerminal(); g.GetLiveCwd() != "/w/sub" || g.GetForeground() != "sleep 5" || g.GetLastCommand() != "ls -la" || g.GetCwd() != "/w" {
+		t.Errorf("Get = %v", g)
+	}
+}

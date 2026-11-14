@@ -23,7 +23,8 @@ err := h.UpdateView(open.Instance, v)
 
 ## Design rules
 
-- The panel is 420 px wide by default, 280 px at the narrowest, and can be expanded: short
+- A surface is a tab as wide as its pane: 480 px at the narrowest (beside a thread too, in
+  a 1440 px window), the whole window's panes in full screen (`ui-layout.md`): short
   labels (pills of one or two words). Rows, pairs and chips wrap or truncate, table
   columns drop, and layout nodes degrade to one column (`ui-layout.md`). Titles get one line and
   the header sub-line two, then are cut for good: guidance is a `text` node.
@@ -125,16 +126,16 @@ the problem (`nodes[2].list.rows[0].title: required`; the first 50 problems are 
 `h.HasCapability("view.hint")` only if the view reads wrongly without it.
 
 **Actions.** An `event` reaches the plugin as a `surface/act` (`act.Action` is the event
-name, `act.Data` its data, at most 1 KB). A `command` runs a command with the panel's
+name, `act.Data` its data, at most 1 KB). A `command` runs a command with the tab's
 context through the host, with its confirm dialog: the plugin's own
 (`plugin.<name>.<command>`) or a host command its `permissions.commands` allow (the view
 is refused otherwise); its `context: thread` (and project, worktree) args default from
-the panel's context, so `args` can leave them out (at most 16 args, 4 KiB together, 2 KiB
-per value: pass ids, not text), and it runs with the viewer's panel,
+the tab's context, so `args` can leave them out (at most 16 args, 4 KiB together, 2 KiB
+per value: pass ids, not text), and it runs with the viewer's tab,
 which matters for shared instances (`reference/manifest.md`, "One instance, many
 viewers"). `openUrl` and `copy` are done by the host and never reach the plugin, and
 neither does a command button: `plugin act --key <button>` presses one as the GUI does
-(the command runs with the panel's context; `--yes` for one that asks first).
+(the command runs with the tab's context; `--yes` for one that asks first).
 
 ## Header and tabs
 
@@ -148,11 +149,11 @@ v := ui.View{Header: h, Tabs: tabs, Nodes: runsNodes} // NewTabs returns *ui.Tab
 ```
 
 The header stays pinned above the scrolling body. Empty `icon` and `title` use the
-manifest's; `tabTitle` (40 characters) renames the panel tab; up to 2 header buttons, drawn
+manifest's; `tabTitle` (40 characters) renames the tab; up to 2 header buttons, drawn
 icon-only (give them an icon) at the end of the sub-line, then the header's `menu` as a ⋯
 (`nodes.md`, menus). The title is one line; the
 sub-line (with `sublineIcon`, a neutral icon from the list, before it) wraps to two lines
-(about 50 characters each at 420 px, 30 at 280 px) and is cut after that, never revealed:
+(about 50 characters each at 420 px, 30 at 300 px) and is cut after that, never revealed:
 a sentence of guidance goes in a `text` node. **Tabs** switch views inside one surface: the host draws the strip, sends a
 `tab` act (`act.Kind == "tab"`, `act.Key` the tab's key) when the user switches, and
 keeps form drafts per tab. The plugin answers with the view of the new active tab:
@@ -212,10 +213,11 @@ For the last seven, `Action` is the kind. **Dispatch on `Kind`** first: a button
 mistakes it for a master-detail choice. `switch act.Kind { case pluginsdk.ActSelect: …;
 case pluginsdk.ActTab: …; case pluginsdk.ActClick: switch act.Action { … } }`.
 
-`act.Context` is what the panel the user acted in shows (`ThreadID`, `ProjectID`, …): a
+`act.Context` is what the tab the user acted in belongs to (`ThreadID`, `ProjectID`, …; a
+tab linked to a thread acts for it, an unlinked one for the window's focused tab): a
 shared instance (scope `pr`, `project`, `global`) learns from it which thread a click came
-from (capability `act.context`; empty from an older host). What the panel lacks is empty:
-beside a page with no thread (Projects, Usage) `ThreadID` is "", so a thread action
+from (capability `act.context`; empty from an older host). What the tab lacks is empty:
+an unlinked tab while a page has the focus (Pull Requests, Projects) has `ThreadID` "", so a thread action
 there checks for it and answers with an error ("open a thread first"). `Version` is the view version
 acted on. The host takes the kind, event, data and form
 from its own copy of that version, so a client cannot forge them; the plugin still

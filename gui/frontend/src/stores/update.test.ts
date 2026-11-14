@@ -15,7 +15,7 @@ vi.mock("@/api/update", async (orig) => ({ ...(await orig<typeof import("@/api/u
 
 const { useCommandsStore } = await import("./commands");
 const { useHealthStore } = await import("./health");
-const { applyUpdateEvent, runUpdateAction, startUpdateSync, useUpdateStore } = await import("./update");
+const { applyUpdateEvent, isOldDaemon, runUpdateAction, startUpdateSync, useUpdateStore } = await import("./update");
 const { presentCommand } = await import("@/keys/bindings");
 
 function cmd(name: string): CommandView {
@@ -194,7 +194,7 @@ describe("a daemon from before the tunnel", () => {
     });
   });
 
-  it.each(["v0.21.6-tip.2", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
+  it.each(["v0.22.0-tip.3", "v0.22.0", "dev", "mock"])("leaves %s alone", async (version) => {
     seen(version);
     await Promise.resolve();
     expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
@@ -208,5 +208,43 @@ describe("a daemon from before the tunnel", () => {
     });
     seen("v0.22.0");
     expect(useUpdateStore.getState()).toMatchObject({ oldDaemon: false, dialogOpen: false });
+  });
+});
+
+// The window shell has no fallback (docs/notes/shell-20-cutover.md): a daemon with the tunnel but
+// without the layout gets the same dialog, with Restart Now. The classic window (?shell=0) can
+// still follow it.
+describe("a daemon from before the window layout", () => {
+  const old = { state: "available", currentVersion: "v0.21.5" } as UpdateStatusView;
+  const seen = (version: string) => {
+    useHealthStore.setState({ status: "ok", health: { pid: 1, version, uptimeSeconds: 1 }, error: null });
+  };
+  let stop: () => void;
+
+  beforeEach(() => {
+    useUpdateStore.setState({ status: null, dialogOpen: false, oldDaemon: false });
+    useHealthStore.setState({ status: "connecting", health: null, error: null });
+    getUpdateStatus.mockResolvedValue({ ...old, state: "idle", currentVersion: "v0.21.8-tip.2" });
+  });
+  afterEach(() => {
+    stop();
+  });
+
+  it("opens the update dialog in the shell window", async () => {
+    stop = startUpdateSync();
+    seen("v0.21.8-tip.2");
+    await vi.waitFor(() => {
+      expect(useUpdateStore.getState().dialogOpen).toBe(true);
+    });
+    expect(useUpdateStore.getState().oldDaemon).toBe(true);
+  });
+
+  it.each([
+    ["v0.21.5", true],
+    ["v0.21.8-tip.2", true],
+    ["v0.22.0-tip.3", false],
+    ["dev", false],
+  ])("isOldDaemon(%s): %s", (version, want) => {
+    expect(isOldDaemon(version)).toBe(want);
   });
 });

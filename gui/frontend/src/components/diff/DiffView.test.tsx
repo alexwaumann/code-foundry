@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompareCommitView, CompareFileSidesView, CompareFileView, CompareLogView, CompareSideView, CompareTarget, CompareView } from "@/api/compare";
 import type { ProjectView, WorktreeView } from "@/api/project";
 import { useCodeViewStore } from "@/stores/codeView";
-import { getPanel, usePanelStore } from "@/stores/panel";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
@@ -38,6 +37,7 @@ const api = vi.hoisted(() => ({
   watched: new Map<string, Set<() => void>>(),
   dotGit: { isDir: true, path: "", text: null } as { isDir: boolean; path: string; text: string | null },
 }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/stores/fileStamps", () => ({
   fileWatcher: {
     watch: (path: string, onChange: () => void) => {
@@ -100,6 +100,8 @@ vi.mock("@pierre/diffs", async (orig) => {
 });
 
 const { DiffView, RAIL_MIN } = await import("./DiffView");
+const { appliedOps, layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
+const { tabPlace, useTabPlace } = await import("@/shell/host");
 
 const intoView = vi.fn<(this: Element) => void>();
 
@@ -135,20 +137,31 @@ function world(status: Partial<WorktreeView["status"]> = {}, project: Partial<Pr
   useProjectsStore.setState({ byId: { web: { id: "web", path: "/src/web", name: "web", defaultBranch: "main", githubSlug: "o/web", remotes: ["origin"], git: true, worktrees: [wt], ...project } }, order: ["web"] });
 }
 
-/** The tab as the panel holds it, rendered until both reads answered. */
+/** The tab as the layout holds it, rendered until both reads answered. */
 function Live() {
-  const tab = usePanelStore((s) => s.byKey[KEY]?.groups[0]?.tabs[0]);
+  const tab = useTabPlace(KEY, (p) => p.tabs[0]);
   const t = tab ? diffOfTab(tab) : null;
   return tab && t ? <DiffView tabId={tab.id} tabTitle={tab.title} target={t} /> : null;
 }
+/** A layout whose one pane holds thread s-1's tab and, in front, its Diff tab for `t`. */
 async function show(t: DiffTarget = target()): Promise<void> {
-  usePanelStore.setState({ byKey: { [KEY]: { open: true, groups: [{ tabs: [diffTab(t)], activeTabId: diffTab(t).id }] } } });
+  const seed = threadSeed("s-1");
+  const pane = seed.spaces[0]?.root;
+  const tab = diffTab(t);
+  pane?.tabs?.push({ id: "t-diff", kind: "diff", thread: "s-1", title: tab.title, params: { ...tab.params } });
+  if (pane) pane.active = "t-diff";
+  await resetFakeLayout(seed);
   render(<Live />);
   await act(async () => {
     for (let i = 0; i < 4; i++) await Promise.resolve();
   });
 }
-const tabNow = () => getPanel(KEY).groups[0]?.tabs[0];
+const tabNow = () => tabPlace(KEY).tabs[0];
+/** Waits for the layout to take what the tab sent (its params, its title): the tab reads them back from there. */
+const settle = () =>
+  act(async () => {
+    await layoutSettled();
+  });
 const rowOf = (path: string) => screen.getByTestId("diff-file-list").querySelector(`[data-nav-key="f:${path}"]`) as HTMLElement;
 const rowKeys = () => [...screen.getByTestId("diff-file-list").querySelectorAll("[data-nav-key]")].map((e) => e.getAttribute("data-nav-key"));
 
@@ -176,9 +189,11 @@ beforeEach(() => {
   world();
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   vi.useRealTimers();
+  // A tab's params update still on its way would land on the next test's layout.
+  await layoutSettled();
 });
 
 describe("the file list", () => {
@@ -262,18 +277,22 @@ describe("file by file", () => {
     await show(target({ file: "odd1.ts", filter: "odd" }));
     expect(screen.getByTestId("diff-position").textContent).toBe("1 of 4");
     fireEvent.click(screen.getByTestId("diff-next"));
+    await settle();
     expect(tabNow()?.params.path).toBe("odd3.ts");
     await waitFor(() => {
       expect(screen.getByTestId("diff-position").textContent).toBe("2 of 4");
     });
     fireEvent.click(screen.getByTestId("diff-fold"));
+    await settle();
     expect(screen.queryByTestId("diff-filter")).toBeNull();
     fireEvent.click(screen.getByTestId("diff-next"));
+    await settle();
     expect(tabNow()?.params.path).toBe("odd5.ts");
     await waitFor(() => {
       expect(screen.getByTestId("diff-position").textContent).toBe("3 of 4");
     });
     fireEvent.click(screen.getByTestId("diff-prev"));
+    await settle();
     expect(tabNow()?.params.path).toBe("odd3.ts");
   });
 
@@ -333,12 +352,13 @@ describe("the file being read stays until the reader moves", () => {
 
   it("the first file shown goes in the tab without opening or activating anything", async () => {
     list([file("a.ts")]);
-    const seq = useUiStore.getState().panelFocusSeq;
     await show();
     await waitFor(() => {
       expect(tabNow()?.params.path).toBe("a.ts");
     });
-    expect(useUiStore.getState().panelFocusSeq).toBe(seq);
+    await settle();
+    // Its params and its title: nothing opened or focused.
+    expect(new Set(appliedOps.map((o) => o.op))).toEqual(new Set(["set_tab_params"]));
   });
 
   it("a picked file that goes stays on screen and says so, and comes back without moving", async () => {
@@ -541,6 +561,7 @@ describe("the list keeps the reader's place", () => {
     list(Array.from({ length: 30 }, (_, i) => file(`f${String(i)}.ts`)));
     await show(target({ file: "f24.ts" }));
     fireEvent.click(screen.getByTestId("diff-fold"));
+    await settle();
     intoView.mockClear();
     fireEvent.click(screen.getByTestId("diff-fold"));
     await waitFor(() => {
@@ -596,9 +617,9 @@ describe("the file's states", () => {
     await show();
     fireEvent.click(screen.getByTestId("diff-open-file"));
     await waitFor(() => {
-      expect(getPanel(KEY).groups[0]?.tabs.map((t) => t.kind)).toEqual(["diff", "files"]);
+      expect(tabPlace(KEY).tabs.map((t) => t.kind)).toEqual(["diff", "files"]);
     });
-    expect(getPanel(KEY).groups[0]?.tabs[1]?.params.path).toBe(`${W}/src/a.ts`);
+    expect(tabPlace(KEY).tabs[1]?.params.path).toBe(`${W}/src/a.ts`);
   });
 });
 
@@ -830,6 +851,7 @@ describe("rail or list on top", () => {
     api.sides.set("a.ts", changed());
     await show();
     fireEvent.click(screen.getByTestId("diff-fold"));
+    await settle();
     expect(screen.queryByTestId("diff-file-rows")).toBeNull();
     expect(screen.getByTestId("code-diff")).toBeTruthy();
     expect(screen.getByTestId("diff-totals")).toBeTruthy();
@@ -844,8 +866,10 @@ describe("rail or list on top", () => {
     list(Array.from({ length: 6 }, (_, i) => file(`f${String(i)}.ts`)));
     await show();
     fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "f3" } });
+    await settle();
     expect(rowKeys()).toEqual(["f:f3.ts"]);
     fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "nope" } });
+    await settle();
     expect(screen.getByTestId("diff-filter-none")).toBeTruthy();
   });
 
@@ -856,11 +880,13 @@ describe("rail or list on top", () => {
     list(many(6));
     await show();
     fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "nope" } });
+    await settle();
     expect(screen.getByTestId("diff-filter-none")).toBeTruthy();
     await again(many(3));
     const box = screen.getByTestId("diff-filter") as HTMLInputElement;
     expect(box.value).toBe("nope");
     fireEvent.change(box, { target: { value: "" } });
+    await settle();
     expect(rowKeys()).toHaveLength(3);
     expect(screen.queryByTestId("diff-filter")).toBeNull();
   });
@@ -886,7 +912,9 @@ describe("rail or list on top", () => {
     list(many(6));
     await show();
     fireEvent.change(screen.getByTestId("diff-filter"), { target: { value: "f3" } });
+    await settle();
     fireEvent.click(screen.getByTestId("diff-fold"));
+    await settle();
     expect(tabNow()?.params).toMatchObject({ filter: "f3", fold: "1" });
     cleanup();
     render(<Live />);
@@ -895,6 +923,7 @@ describe("rail or list on top", () => {
     });
     expect(screen.queryByTestId("diff-file-rows")).toBeNull();
     fireEvent.click(screen.getByTestId("diff-fold"));
+    await settle();
     expect(rowKeys()).toEqual(["f:f3.ts"]);
     expect(tabNow()?.params.fold).toBe("0");
   });
@@ -908,6 +937,7 @@ describe("rail or list on top", () => {
     expect(screen.getByTestId("diff-totals")).toBeTruthy();
     expect(screen.getByTestId("diff-file")).toBeTruthy();
     fireEvent.click(screen.getByTestId("diff-fold"));
+    await settle();
     expect(screen.getByTestId("diff-file-rows")).toBeTruthy();
     expect(tabNow()?.params.fold).toBe("0");
   });

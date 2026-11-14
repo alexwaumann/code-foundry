@@ -1,14 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { versionStamp, type FileReadView, type FileWriteView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
-import { fileTab } from "@/surfaces/fileTarget";
+import { fileOfTab, fileTab } from "@/surfaces/fileTarget";
+import { applyLayoutOp } from "@/api/layout";
 import { answerAlternate, answerConfirm, useConfirmStore } from "./confirm";
 import { discardDraft, editorDetached, fileEditKey, noteDraft, noteEditor, observeRead, reloadDraft, saveFile, startEdit, useFileEditStore } from "./fileEdit";
 import { openFileInPanel } from "./filePanel";
 import { canTell, confirmCloseFile, dismissAsk, fileFacts, presentFileSave, saveAndTell, savedMessage } from "./fileRequest";
-import { allTabs, getPanel, keyOf, usePanelStore, type Tab } from "./panel";
+import { findTab, shownTab, tabPlace, targetOf, type Tab } from "@/shell/host";
+import { fakeLayoutState, layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 // The library's memory: a draft per key.
 const lib = vi.hoisted(() => ({ drafts: new Map<string, string>() }));
@@ -52,8 +56,10 @@ const target = { project: "repo", base: "/w", path: ENV, edit: true, ask: ASK };
 const tabId = fileTab(target).id;
 const KEY = fileEditKey(PANEL, tabId);
 const edit = () => useFileEditStore.getState().sessions[KEY];
-const tab = (): Tab => {
-  const t = allTabs(getPanel(PANEL)).find((x) => x.id === tabId);
+/** The request's File tab once the layout has every update sent so far. */
+const tab = async (): Promise<Tab> => {
+  await layoutSettled();
+  const t = findTab(PANEL, tabId);
   if (!t) throw new Error("no tab");
   return t;
 };
@@ -61,6 +67,7 @@ const tab = (): Tab => {
 /** A thread's request open on `read`, the editor on screen, the document `text` if given. */
 async function asked(text: string | null = null, read = view(), over: Partial<typeof target> = {}): Promise<void> {
   openFileInPanel(PANEL, { ...target, ...over });
+  await layoutSettled();
   await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, read, { create: true });
   const s = edit();
   if (!s) throw new Error("no session");
@@ -71,7 +78,8 @@ async function asked(text: string | null = null, read = view(), over: Partial<ty
 
 const sentArgs = (): unknown[] => api.send.mock.calls.map((c) => c[0] as unknown);
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed("s-1"));
   calls.length = 0;
   lib.drafts.clear();
   api.write.mockReset();
@@ -79,9 +87,39 @@ beforeEach(() => {
   api.send.mockReset();
   api.send.mockResolvedValue({ ok: true });
   useFileEditStore.setState({ sessions: {} });
-  usePanelStore.setState({ byKey: {} });
   useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Set up billing", projectId: "repo", worktreePath: "/w", workspaceId: "", pendingWorktreePath: "", state: "connected", linkedPullRequests: [], agentRuns: [] } as unknown as ThreadView }, order: ["s-1"] });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+});
+
+// A tab's params update still on its way would land on the next test's layout.
+afterEach(async () => {
+  await layoutSettled();
+});
+
+describe("a request as the daemon writes it (view.open.file --edit, shell-22-retire-verbs.md)", () => {
+  // The daemon's open_surface: the tab linked to the thread, the request whole in its params
+  // (internal/command fileAskParams), the asker another thread than the tab's.
+  it("the tab reads the asker and id from its params, and Save and tell answers that asker", async () => {
+    useThreadsStore.setState((st) => ({ byId: { ...st.byId, "s-2": { ...st.byId["s-1"], id: "s-2", name: "Lead" } as ThreadView }, order: ["s-1", "s-2"] }));
+    await applyLayoutOp({
+      op: "open_surface",
+      tab: { kind: "file", thread: "s-1", params: { path: ENV, project: "repo", base: "/w", edit: "1", asker: "s-2", askId: "d4e5f6a1b2c3", note: "Put the key on line 2", focus: "1" } },
+      focus: true,
+    });
+    await layoutSettled();
+    const t = await tab();
+    expect(fileOfTab(t)).toMatchObject({ edit: true, ask: { id: "d4e5f6a1b2c3", thread: "s-2", note: "Put the key on line 2" } });
+    await startEdit(KEY, { panelKey: PANEL, tabId, base: "/w" }, view(), { create: true });
+    lib.drafts.set(edit()?.stateKey ?? "", SECRET);
+    noteDraft(KEY, SECRET);
+    api.write.mockResolvedValue(written());
+    await expect(saveAndTell(KEY)).resolves.toBe("saved");
+    expect(sentArgs()).toEqual([{ id: "s-2", text: "I saved .env. Continue without reading its values." }]);
+    // The request is over: every param the daemon wrote for it goes, focus with them.
+    const after = (await tab()).params;
+    for (const k of ["edit", "asker", "askId", "note", "focus"]) expect(after[k]).toBeUndefined();
+    expect(after.path).toBe(ENV);
+  });
 });
 
 describe("Save and tell", () => {
@@ -91,9 +129,9 @@ describe("Save and tell", () => {
     await expect(saveAndTell(KEY)).resolves.toBe("saved");
     expect(calls).toEqual(["write", "send thread.send"]);
     expect(sentArgs()).toEqual([{ id: "s-1", text: "I saved .env. Continue without reading its values." }]);
-    expect(tab().params.asker).toBeUndefined();
-    expect(tab().params.note).toBeUndefined();
-    expect(tab().params.edit).toBeUndefined();
+    expect((await tab()).params.asker).toBeUndefined();
+    expect((await tab()).params.note).toBeUndefined();
+    expect((await tab()).params.edit).toBeUndefined();
     expect(edit()?.dirty).toBe(false);
   });
 
@@ -118,7 +156,7 @@ describe("Save and tell", () => {
     api.write.mockResolvedValue(written({ conflict: true }));
     await expect(saveAndTell(KEY)).resolves.toBe("conflict");
     expect(calls).toEqual(["write"]);
-    expect(tab().params.asker).toBe("s-1");
+    expect((await tab()).params.asker).toBe("s-1");
     expect(edit()?.conflict).toBe("changed");
   });
 
@@ -127,7 +165,7 @@ describe("Save and tell", () => {
     api.write.mockRejectedValue(new Error("read-only"));
     await expect(saveAndTell(KEY)).resolves.toBe("failed");
     expect(calls).toEqual(["write"]);
-    expect(tab().params.asker).toBe("s-1");
+    expect((await tab()).params.asker).toBe("s-1");
     expect(edit()?.failure).toContain("Could not save");
   });
 
@@ -138,7 +176,7 @@ describe("Save and tell", () => {
     await expect(saveAndTell(KEY)).resolves.toBe("untold");
     expect(edit()).toMatchObject({ dirty: false, failure: expect.stringContaining('Saved, but Thread "Set up billing" was not told') as string });
     expect(edit()?.failure).toContain("not found");
-    expect(tab().params.asker).toBeUndefined();
+    expect((await tab()).params.asker).toBeUndefined();
   });
 
   it("a removed thread's name reaches the band cleaned and cut", async () => {
@@ -182,7 +220,7 @@ describe("Save and tell", () => {
     api.write.mockResolvedValue(written());
     await saveFile(KEY);
     expect(calls).toEqual(["write"]);
-    expect(tab().params.asker).toBe("s-1");
+    expect((await tab()).params.asker).toBe("s-1");
     await saveAndTell(KEY);
     expect(calls).toEqual(["write", "send thread.send"]);
   });
@@ -191,10 +229,10 @@ describe("Save and tell", () => {
     await asked(SECRET);
     api.write.mockResolvedValue(written({ conflict: true }));
     await saveFile(KEY);
-    expect(tab().params.askSaved).toBeUndefined();
+    expect((await tab()).params.askSaved).toBeUndefined();
     api.write.mockResolvedValue(written());
     await saveFile(KEY, { force: true });
-    expect(tab().params.askSaved).toBe(`${String(SECRET.length)}:200`);
+    expect((await tab()).params.askSaved).toBe(`${String(SECRET.length)}:200`);
     await expect(saveAndTell(KEY)).resolves.toBe("saved");
   });
 
@@ -206,7 +244,7 @@ describe("Save and tell", () => {
       await asked(SECRET);
       api.write.mockResolvedValue(written());
       await saveFile(KEY);
-      expect(tab().params.askSaved).toBeTruthy();
+      expect((await tab()).params.askSaved).toBeTruthy();
       calls.length = 0;
     }
 
@@ -277,14 +315,14 @@ describe("Save and tell", () => {
     await asked(SECRET);
     api.write.mockRejectedValue(new Error("read-only"));
     await saveFile(KEY);
-    expect(tab().params.askSaved).toBeUndefined();
+    expect((await tab()).params.askSaved).toBeUndefined();
   });
 
   it("on an untouched document there is nothing to say: no write, no message, and the request stands", async () => {
     await asked();
     await expect(saveAndTell(KEY)).resolves.toBe("skipped");
     expect(calls).toEqual([]);
-    expect(tab().params.asker).toBe("s-1");
+    expect((await tab()).params.asker).toBe("s-1");
   });
 
   it.each([
@@ -310,10 +348,24 @@ describe("Save and tell", () => {
     }));
     const told = saveAndTell(KEY);
     openFileInPanel(PANEL, { ...target, ask: { ...ASK, id: "ask-2", note: "And line 3" } });
+    await layoutSettled();
     done(written());
     await told;
-    expect(tab().params.note).toBe("And line 3");
-    expect(tab().params.askSaved).toBeUndefined();
+    expect((await tab()).params.note).toBe("And line 3");
+    expect((await tab()).params.askSaved).toBeUndefined();
+  });
+
+  it("a newer request whose tab update has not landed when the write answers stands", async () => {
+    await asked(SECRET);
+    let done: (v: FileWriteView) => void = () => undefined;
+    api.write.mockReturnValue(new Promise<FileWriteView>((r) => {
+      done = r;
+    }));
+    const told = saveAndTell(KEY);
+    openFileInPanel(PANEL, { ...target, ask: { ...ASK, id: "ask-2", note: "And line 3" } });
+    done(written());
+    await told;
+    expect((await tab()).params.note).toBe("And line 3");
   });
 });
 
@@ -329,7 +381,7 @@ describe("Dismiss", () => {
   it("ends the request, sends nothing, and editing goes on", async () => {
     await asked("typed\n");
     dismissAsk(KEY);
-    expect(tab().params.asker).toBeUndefined();
+    expect((await tab()).params.asker).toBeUndefined();
     expect(edit()?.dirty).toBe(true);
     expect(calls).toEqual([]);
     api.write.mockResolvedValue(written());
@@ -343,7 +395,8 @@ describe("a request's life", () => {
     await asked(SECRET);
     api.write.mockResolvedValue(written());
     await saveAndTell(KEY);
-    const stored = JSON.stringify(usePanelStore.getState().byKey);
+    await layoutSettled();
+    const stored = JSON.stringify(fakeLayoutState());
     expect(stored).not.toContain(ASK.note);
     expect(stored).not.toContain('"asker"');
   });
@@ -352,22 +405,23 @@ describe("a request's life", () => {
     await asked("half typed\n");
     const before = edit();
     openFileInPanel(PANEL, { ...target, ask: { ...ASK, id: "ask-2", note: "Line 3 too" }, line: 3 });
-    expect(tab().params.note).toBe("Line 3 too");
-    expect(tab().params.line).toBe("3");
+    await layoutSettled();
+    expect((await tab()).params.note).toBe("Line 3 too");
+    expect((await tab()).params.line).toBe("3");
     expect(edit()).toBe(before);
-    expect(getPanel(PANEL).groups[0]?.activeTabId).toBe(tabId);
+    expect(shownTab(tabPlace(PANEL))?.id).toBe(tabId);
   });
 
   it("opening the file another way keeps the request", async () => {
     await asked();
     openFileInPanel(PANEL, { project: "repo", base: "/w", path: ENV, line: 7 });
-    expect(tab().params).toMatchObject({ asker: "s-1", note: ASK.note, edit: "1", line: "7" });
+    expect((await tab()).params).toMatchObject({ asker: "s-1", note: ASK.note, edit: "1", line: "7" });
   });
 
   it("the tab's close asks to save and tell, and that closes it having told", async () => {
     await asked(SECRET);
     api.write.mockResolvedValue(written());
-    const closing = confirmCloseFile(PANEL, tab());
+    const closing = confirmCloseFile(PANEL, await tab());
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending?.confirmLabel).toBe("Save and tell thread");
     });
@@ -378,7 +432,7 @@ describe("a request's life", () => {
 
   it("the close dialog's Discard sends nothing", async () => {
     await asked(SECRET);
-    const closing = confirmCloseFile(PANEL, tab());
+    const closing = confirmCloseFile(PANEL, await tab());
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending).not.toBeNull();
     });
@@ -391,7 +445,7 @@ describe("a request's life", () => {
     await asked(SECRET);
     api.write.mockResolvedValue(written());
     api.send.mockRejectedValue(new Error("gone"));
-    const closing = confirmCloseFile(PANEL, tab());
+    const closing = confirmCloseFile(PANEL, await tab());
     await vi.waitFor(() => {
       expect(useConfirmStore.getState().pending).not.toBeNull();
     });
@@ -406,13 +460,12 @@ describe("cmd+S", () => {
     presentFileSave();
     await new Promise((r) => setTimeout(r, 20));
     expect(calls).toEqual([]);
-    expect(tab().params.asker).toBe("s-1");
+    expect((await tab()).params.asker).toBe("s-1");
   });
 
   it("is Save and tell while the request stands, a plain save after", async () => {
-    usePanelStore.setState({ byKey: {} });
     await asked("one\n");
-    expect(keyOf(useUiStore.getState().selection)).toBe(PANEL);
+    expect(targetOf(useUiStore.getState().selection)).toBe(PANEL);
     api.write.mockResolvedValue(written());
     presentFileSave();
     await vi.waitFor(() => {
@@ -441,7 +494,7 @@ describe("a new file", () => {
     await fresh();
     await expect(saveAndTell(KEY)).resolves.toBe("skipped");
     await expect(saveFile(KEY)).resolves.toBe("skipped");
-    expect(confirmCloseFile(PANEL, tab())).toBe(true);
+    expect(confirmCloseFile(PANEL, await tab())).toBe(true);
     expect(calls).toEqual([]);
   });
 

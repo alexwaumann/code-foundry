@@ -1,6 +1,6 @@
 /**
  * The shot page (docs/notes/plugin-surface-shot-page.md): one plugin surface alone at the
- * window's width, drawn by the side panel's own body (PluginSurfaceBody) in the theme as
+ * window's width, drawn by a plugin tab's own body (PluginSurfaceBody) in the theme as
  * last published, with no app chrome. A request comes from the URL
  * (`?plugin=…&surface=…&scope=…&minVersion=…`) or from window.cfShot(request), which is
  * how the Wails host (gui/shot.go) sends them. Its report marks <html>: data-shot-ready (the

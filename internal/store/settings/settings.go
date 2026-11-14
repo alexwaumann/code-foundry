@@ -32,6 +32,8 @@ type Settings struct {
 	Projects   Projects
 	GitOps     GitOps
 	Appearance Appearance
+	Layout     Layout
+	Sidebar    Sidebar
 	// Notifications are consumed by the GUI (the Dock badge and alerts).
 	Notifications Notifications
 	// Keybindings are the valid overrides: command name -> canonical chord or
@@ -42,6 +44,23 @@ type Settings struct {
 	Ember       Ember
 	Dictation   Dictation
 	Advanced    Advanced
+}
+
+// Layout configures the window shell's panes (internal/store/layout).
+type Layout struct {
+	// SmartSwap switches panes to the focused thread's surfaces when they are open there
+	// (internal/layout swap.go).
+	SmartSwap bool
+	// ThreadInfo shows the info card of a thread whose card was never toggled (the GUI's
+	// thread pane; internal/layout info.go keeps each thread's own choice).
+	ThreadInfo bool
+}
+
+// Sidebar is consumed by the GUI.
+type Sidebar struct {
+	// NeedsScope is which threads the Needs you section lists: NeedsScopeAll or
+	// NeedsScopeSpace.
+	NeedsScope string
 }
 
 // Dictation configures voice dictation (internal/store/dictation).
@@ -169,11 +188,8 @@ type Appearance struct {
 	// BackdropFile is the image custom shows: a file name in the backdrops directory
 	// (paths.Backdrops, internal/store/backdrop).
 	BackdropFile string
-	// PanelKeepOpen keeps the side panel open on its new tab page when its last tab
-	// closes, instead of hiding it.
-	PanelKeepOpen bool
-	// ScrollbackLines is the rows of history each terminal (the bottom panel's shells)
-	// keeps; the daemon's emulators read it at start.
+	// ScrollbackLines is the rows of history each terminal keeps; the daemon's emulators
+	// read it at start.
 	ScrollbackLines int
 }
 

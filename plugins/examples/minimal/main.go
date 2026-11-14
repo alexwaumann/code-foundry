@@ -1,5 +1,5 @@
 // Command minimal is the smallest complete Code Foundry plugin: one command
-// (`code-foundry plugin minimal hello Ada`) and one surface, a side-panel tab per
+// (`code-foundry plugin minimal hello Ada`) and one surface, a tab per
 // thread with a counter. plugin.json beside it declares both. `code-foundry plugin new`
 // starts a plugin from this directory.
 package main

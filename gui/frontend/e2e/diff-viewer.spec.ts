@@ -1,9 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, mockPost, openApp, openThreadChanges, resetMock, row, setPanelWidth } from "./fixtures";
+import { CF, mockPost, resetMock } from "./fixtures";
+import { openShellApp, paneNode, rowNode, seedLayout, threadTab } from "./shell";
+import { diffTab, seedBeside, setPaneSize } from "./shell-surfaces";
 
 /**
  * The Diff tab where only a real browser can tell (docs/notes/diff-viewer-2.md): the file list
- * moving between rail and top with the panel's real width, and the list scrolling inside
+ * moving between rail and top with its pane's real width, and the list scrolling inside
  * itself. Everything else is src/components/diff/DiffView.test.tsx. Set SHOTS=<dir> to save the
  * pull request's screenshots (WebKit, dark and light, wide and narrow).
  */
@@ -12,21 +14,23 @@ const list = (page: Page) => page.getByTestId("diff-file-list");
 const column = (page: Page) => page.getByTestId("diff-list-column");
 const file = (page: Page) => page.getByTestId("diff-file");
 
+/** s-1's Diff tab in a pane right of the thread's, `width` px wide. */
 async function openDiff(page: Page, width: number): Promise<void> {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-  await openThreadChanges(page);
+  await seedBeside("s-1", [diffTab("s-1")]);
+  await openShellApp(page);
   await setPanelWidth(page, width);
   await expect(list(page)).toBeVisible();
 }
+
+/** The Diff tab's pane to `width` px, the window as it is. */
+const setPanelWidth = (page: Page, width: number) => setPaneSize(page, "p-2", width);
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
   await page.setViewportSize({ width: 1440, height: 900 });
 });
 
-test("the list follows the panel's own width, not the window's, and keeps the file on screen", async ({ page }) => {
+test("the list follows its pane's own width, not the window's, and keeps the file on screen", async ({ page }) => {
   await openDiff(page, 760);
   await expect(list(page)).toHaveAttribute("data-layout", "rail");
   await page.locator('[data-nav-key="f:README.md"]').click();
@@ -38,7 +42,7 @@ test("the list follows the panel's own width, not the window's, and keeps the fi
   expect(Math.abs(rail.x + rail.width - diff.x)).toBeLessThanOrEqual(1);
   expect(rail.height).toBeGreaterThan(400);
 
-  // The window stays as wide as it was: only the panel narrows.
+  // The window stays as wide as it was: only the pane narrows.
   await setPanelWidth(page, 480);
   await expect(list(page)).toHaveAttribute("data-layout", "top");
   await expect(file(page)).toHaveAttribute("data-path", "README.md");
@@ -148,7 +152,7 @@ for (const [layout, width] of [["top", 480], ["rail", 760]] as const) {
       await expect(rows).toHaveCount(0);
       await within(toggle, surface);
     }
-    // Left open as the panel shrinks, which is what `commits=1` keeps: it can still be folded.
+    // Left open as the pane shrinks, which is what `commits=1` keeps: it can still be folded.
     await surfaceHeight(page, 600);
     await toggle.click();
     for (const h of [500, 400, 300, 250]) {
@@ -302,24 +306,31 @@ test("the list on top comes back on the current row, not at the top", async ({ p
   await expect.poll(() => cursorInView(page)).toBe(true);
 });
 
-// The list on top, in the sizes it meets: alone in the panel, and a stacked split, where the
-// panel gives it half the height. At 1280x800 a split's tab is 342px, and the list used to leave
-// the code 33 of them. Too short for both, the list folds and the code has the whole tab.
+// The list on top, in the sizes it meets: alone in a pane, and in a pane over another, half the
+// height. The side panel's split tab was 342px at 1280x800 and the list used to leave the code 33
+// of them; a pane's Diff tab there is 282px (the top bar and the strip take more than the panel's
+// header did), 654px alone, and 202px at 1024x640. Too short for both, the list folds and the code has the whole tab.
+// Since every pane keeps 480 x 400 (docs/notes/shell-25f-sizes.md) a pane of a stacked split is
+// 400px tall at the least: the shortest met is 410 at 1280x900; at 1280x800 and 1024x640 the
+// column does not fit and folds beside the focused thread, so those sizes are gone.
 for (const [name, w, h, stacked, listed, code] of [
-  ["1280x800, alone", 1280, 800, false, true, 400],
-  ["1280x800, a stacked split", 1280, 800, true, false, 200],
-  ["1024x640, a stacked split", 1024, 640, true, false, 130],
+  ["1280x800, alone", 1280, 800, false, true, 320],
+  ["1280x900, a stacked split", 1280, 900, true, false, 140],
   ["1920x1080, a stacked split", 1920, 1080, true, true, 180],
 ] as const) {
   test(`the list on top leaves the code readable: ${name}`, async ({ page }) => {
     await mockPost("compare/files?count=40");
     await page.setViewportSize({ width: w, height: h });
-    await openDiff(page, 480);
-    await expect(list(page)).toHaveAttribute("data-layout", "top");
     if (stacked) {
-      await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.splitPanel("current"))`);
-      await expect(page.locator('[data-split="true"]').first()).toBeVisible();
+      // The diff over the Pull Requests page, in a column right of the thread.
+      const right: Parameters<typeof seedLayout>[0] = { t: "split", id: "s-c", dir: "col", kids: [paneNode("p-2", [diffTab("s-1")]), paneNode("p-3", [{ id: "t-prs", kind: "prs", title: "Pull Requests" }])], sizes: [0.5, 0.5] };
+      await seedLayout(rowNode([paneNode("p-1", [threadTab("s-1")]), right], [0.55, 0.45]), "p-1");
+      await openShellApp(page);
+      await setPaneSize(page, "p-2", 480);
+    } else {
+      await openDiff(page, 480);
     }
+    await expect(list(page)).toHaveAttribute("data-layout", "top");
     await expect(file(page)).toBeVisible();
     await expect(page.getByTestId("diff-file-rows")).toHaveCount(listed ? 1 : 0);
     const whole = await file(page).boundingBox();

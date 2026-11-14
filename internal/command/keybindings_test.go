@@ -1,7 +1,11 @@
 package command_test
 
 import (
+	"os"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
@@ -24,11 +28,14 @@ func TestNoKeybindingCommands(t *testing.T) {
 		"settings.get", "settings.path", "settings.reset", "settings.set",
 		"skill.browse",
 		"terminal.list", "theme.check", "theme.list", "theme.restore", "theme.save", "theme.show",
-		"thread.agent.open", "thread.agents", "thread.ask", "thread.checkouts", "thread.commands", "thread.focus", "thread.get", "thread.items", "thread.list", "thread.mcp", "thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts", "thread.search", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop", "thread.stop-waiting",
+		"thread.agent.open", "thread.agents", "thread.ask", "thread.checkouts", "thread.commands", "thread.focus", "thread.get", "thread.info", "thread.items", "thread.list", "thread.mcp", "thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts", "thread.search", "thread.read", "thread.report", "thread.reports", "thread.reseed", "thread.respond", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop", "thread.stop-waiting",
 		"thread.subscribe", "thread.subscriptions", "thread.unsubscribe", "thread.wait", "thread.flags", "thread.flag.clear",
 		"ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence",
-		"usage.show", "view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.page", "view.panel.pr",
+		"usage.show", "view.inline", "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url",
+		"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.page", "view.panel.pr",
 		"workspace.list", "worktree.editors",
+		"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "space.rename", "space.switch", "tab.focus", "tab.list", "tab.move", "thread.open", "thread.space.move",
+		"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start",
 	}
 	var got []string
 	for _, l := range f.reg.List(command.Context{}, true) {
@@ -88,40 +95,193 @@ func TestSharedChordsMatch(t *testing.T) {
 	}
 }
 
-// The chords the GUI expects on the panel toggles. cmd+j is the bottom panel's, like
-// VS Code's panel; it must stay free of GUI view actions (ReservedChords).
-func TestPanelKeybindings(t *testing.T) {
-	f := newFixture(t)
-	want := map[string]string{
-		"view.panel.toggle":  "cmd+shift+e",
-		"view.bottom.toggle": "cmd+j",
-		"terminal.new":       "cmd+t",
-		"view.thread-info":   "cmd+shift+i",
+// specKeyRows reads the key table of docs/notes/shell-model.md ("Keys"): each row's Key cell
+// and Does cell.
+func specKeyRows(t *testing.T) [][2]string {
+	t.Helper()
+	b, err := os.ReadFile("../../docs/notes/shell-model.md")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for name, chord := range want {
-		c, ok := f.reg.Get(name)
+	md := string(b)
+	i := strings.Index(md, "\n## Keys\n")
+	if i < 0 {
+		t.Fatal("shell-model.md has no Keys section")
+	}
+	section := md[i+1:]
+	if j := strings.Index(section[1:], "\n## "); j >= 0 {
+		section = section[:j+1]
+	}
+	var rows [][2]string
+	for _, line := range strings.Split(section, "\n") {
+		if !strings.HasPrefix(line, "| ") || strings.HasPrefix(line, "| Key") || strings.HasPrefix(line, "| ---") {
+			continue
+		}
+		cells := strings.Split(line, "|")
+		rows = append(rows, [2]string{strings.TrimSpace(cells[1]), strings.TrimSpace(cells[2])})
+	}
+	return rows
+}
+
+// specChords expands a Key cell: "a / b" is two chords, "ctrl+cmd+h j k l, ctrl+cmd+arrows"
+// the four letters and the four arrows, "cmd+1…9" nine chords.
+func specChords(cell string) []string {
+	var out []string
+	for _, part := range regexp.MustCompile(` / |, `).Split(cell, -1) {
+		switch {
+		case regexp.MustCompile(`^(.*\+)([a-z])((?: [a-z])+)$`).MatchString(part):
+			m := regexp.MustCompile(`^(.*\+)([a-z])((?: [a-z])+)$`).FindStringSubmatch(part)
+			for _, k := range append([]string{m[2]}, strings.Fields(m[3])...) {
+				out = append(out, m[1]+k)
+			}
+		case strings.HasSuffix(part, "+arrows"):
+			for _, a := range []string{"left", "down", "up", "right"} {
+				out = append(out, strings.TrimSuffix(part, "arrows")+a)
+			}
+		case strings.HasSuffix(part, "+1…9"):
+			for d := 1; d <= 9; d++ {
+				out = append(out, strings.TrimSuffix(part, "1…9")+strconv.Itoa(d))
+			}
+		default:
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+// view is a row's chords that are GUI view actions (ReservedChords), not registry commands.
+const view = "(view action)"
+
+// The spec's key table (docs/notes/shell-model.md, "Keys") is the keymap: each row's chords,
+// in its order, are the default chords of these commands (a row of several verbs spreads its
+// chords over them in turn), or GUI view actions, which are reserved. The GUI's half
+// (gui/frontend/src/keys/shellKeys.test.ts) checks the same table reaches the same verbs.
+func TestShellKeyTable(t *testing.T) {
+	want := map[string][]string{
+		"cmd+n":                             {"thread.new"},
+		"cmd+t":                             {"terminal.new"},
+		"cmd+shift+t":                       {"tab.reopen"},
+		"cmd+j":                             {"terminal.quick"},
+		"cmd+shift+j":                       {"terminal.cycle"},
+		"cmd+shift+d":                       {"view.thread-diff"},
+		"cmd+shift+i":                       {"view.thread-info"},
+		"cmd+p":                             {"file.find"},
+		"cmd+k":                             {view},
+		"cmd+w":                             {"tab.close"},
+		"cmd+shift+w":                       {"pane.close"},
+		"cmd+[ / cmd+]":                     {"view.back", "view.forward"},
+		"cmd+shift+[ / cmd+shift+]":         {"tab.previous", "tab.next"},
+		"ctrl+cmd+h j k l, ctrl+cmd+arrows": {"pane.focus.left", "pane.focus.down", "pane.focus.up", "pane.focus.right"},
+		"ctrl+cmd+1…9":                      {view},
+		"cmd+1…9":                           {view},
+		"cmd+shift+enter":                   {"pane.fullscreen"},
+		"cmd+shift+m":                       {"pane.collapse"},
+		"cmd+shift+a":                       {view},
+		"cmd+r":                             {"tab.rename"},
+		"cmd+shift+r":                       {"tab.auto-name"},
+		"cmd+b":                             {view},
+	}
+	f := newFixture(t)
+	owner := map[string]string{}
+	for _, l := range f.reg.List(command.Context{}, true) {
+		for _, k := range l.Command.Keybindings {
+			c, _ := command.NormalizeChord(k)
+			owner[c] = l.Command.Name
+		}
+	}
+	rows := specKeyRows(t)
+	if len(rows) != len(want) {
+		t.Errorf("the spec's table has %d rows, this test %d", len(rows), len(want))
+	}
+	for _, row := range rows {
+		verbs, ok := want[row[0]]
 		if !ok {
-			t.Fatalf("%s not registered", name)
+			t.Errorf("spec row %q is not in this test", row[0])
+			continue
 		}
-		if !slices.Equal(c.Keybindings, []string{chord}) {
-			t.Errorf("%s keybindings = %v, want [%s]", name, c.Keybindings, chord)
+		chords := specChords(row[0])
+		for i, ch := range chords {
+			c, err := command.NormalizeChord(ch)
+			if err != nil {
+				t.Errorf("row %q: chord %q: %v", row[0], ch, err)
+				continue
+			}
+			verb := verbs[i%len(verbs)]
+			if verb == view {
+				if !slices.Contains(command.ReservedChords, c) {
+					t.Errorf("row %q: %s is a view action but not reserved", row[0], c)
+				}
+				if owner[c] != "" {
+					t.Errorf("row %q: %s is a view action but %s binds it", row[0], c, owner[c])
+				}
+				continue
+			}
+			if owner[c] != verb {
+				t.Errorf("row %q: %s runs %q, want %q", row[0], c, owner[c], verb)
+			}
 		}
-		if slices.Contains(command.ReservedChords, chord) {
-			t.Errorf("%s binds reserved chord %s", name, chord)
+		// "with shift, move the pane": the same chords with shift move the pane that way.
+		if strings.Contains(row[1], "with shift, move the pane") {
+			for i, ch := range chords {
+				c, _ := command.NormalizeChord(strings.Replace(ch, "cmd+", "cmd+shift+", 1))
+				if w := strings.Replace(verbs[i%len(verbs)], "pane.focus.", "pane.move.", 1); owner[c] != w {
+					t.Errorf("row %q: %s runs %q, want %q", row[0], c, owner[c], w)
+				}
+			}
 		}
 	}
 }
 
-// Back and forward through the window's selection history: a browser's and Finder's
-// chords; previous and next thread in sidebar order. Commands, not GUI view actions, so they stay unreserved and rebindable.
+// The chords the spec retires (docs/notes/shell-model.md, "Keys") are bound to nothing and
+// not reserved: free for a user's own binding. The pages they opened keep no chord.
+func TestRetiredChords(t *testing.T) {
+	f := newFixture(t)
+	retired := map[string]string{
+		"cmd+shift+e": "the side panel",
+		`cmd+\`:       "the panel split",
+		`cmd+alt+\`:   "the split panel's other group",
+	}
+	for _, l := range f.reg.List(command.Context{}, true) {
+		for _, k := range l.Command.Keybindings {
+			c, _ := command.NormalizeChord(k)
+			if what, ok := retired[c]; ok {
+				t.Errorf("%s binds %s, retired with %s", l.Command.Name, c, what)
+			}
+		}
+	}
+	for c := range retired {
+		if got, err := command.ValidateBinding(c); err != nil || got != c {
+			t.Errorf("ValidateBinding(%q) = %q, %v; want it free", c, got, err)
+		}
+	}
+	for _, name := range []string{"view.pullrequests", "view.projects", "thread.previous", "thread.next", "thread.rename"} {
+		c, ok := f.reg.Get(name)
+		if !ok {
+			t.Fatalf("%s not registered", name)
+		}
+		if len(c.Keybindings) != 0 {
+			t.Errorf("%s keybindings = %v, want none", name, c.Keybindings)
+		}
+	}
+	// The side and bottom panel verbs went with their panels (docs/notes/shell-22-retire-verbs.md):
+	// a chord can name none of them.
+	for _, name := range []string{"view.panel.toggle", "view.panel.expand", "view.panel.new-tab", "view.panel.split", "view.bottom.toggle"} {
+		if _, ok := f.reg.Get(name); ok {
+			t.Errorf("%s is still registered", name)
+		}
+	}
+}
+
+// Back and forward through what was focused: a browser's and Finder's chords; the previous
+// and next tab in the pane: macOS tab switching (Safari, Terminal). Commands, not GUI view
+// actions, so they stay unreserved and rebindable.
 func TestHistoryKeybindings(t *testing.T) {
 	f := newFixture(t)
-	tests := []struct{ name, title, chord string }{
-		{name: "view.back", title: "Back", chord: "cmd+["},
-		{name: "view.forward", title: "Forward", chord: "cmd+]"},
-		// The positional companions: macOS tab switching (Safari, Terminal).
-		{name: "thread.previous", title: "Previous Thread", chord: "cmd+shift+["},
-		{name: "thread.next", title: "Next Thread", chord: "cmd+shift+]"},
+	tests := []struct{ name, title, category, chord string }{
+		{name: "view.back", title: "Back", category: "View", chord: "cmd+["},
+		{name: "view.forward", title: "Forward", category: "View", chord: "cmd+]"},
+		{name: "tab.previous", title: "Previous Tab", category: "Layout", chord: "cmd+shift+["},
+		{name: "tab.next", title: "Next Tab", category: "Layout", chord: "cmd+shift+]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -129,8 +289,8 @@ func TestHistoryKeybindings(t *testing.T) {
 			if !ok {
 				t.Fatalf("%s not registered", tt.name)
 			}
-			if c.Title != tt.title || c.Category != "View" {
-				t.Errorf("%s title, category = %q, %q; want %q, View", tt.name, c.Title, c.Category, tt.title)
+			if c.Title != tt.title || c.Category != tt.category {
+				t.Errorf("%s title, category = %q, %q; want %q, %s", tt.name, c.Title, c.Category, tt.title, tt.category)
 			}
 			if !slices.Equal(c.Keybindings, []string{tt.chord}) {
 				t.Errorf("%s keybindings = %v, want [%s]", tt.name, c.Keybindings, tt.chord)
@@ -139,24 +299,6 @@ func TestHistoryKeybindings(t *testing.T) {
 				t.Errorf("ValidateBinding(%q) = %q, %v; want it bindable", tt.chord, got, err)
 			}
 		})
-	}
-}
-
-// The chords the GUI (phase 2c) expects on the thread commands.
-func TestThreadKeybindings(t *testing.T) {
-	f := newFixture(t)
-	want := map[string]string{
-		"thread.new":    "cmd+n",
-		"thread.rename": "cmd+r",
-	}
-	for name, chord := range want {
-		c, ok := f.reg.Get(name)
-		if !ok {
-			t.Fatalf("%s not registered", name)
-		}
-		if !slices.Contains(c.Keybindings, chord) {
-			t.Errorf("%s keybindings = %v, want %s", name, c.Keybindings, chord)
-		}
 	}
 }
 
@@ -199,10 +341,13 @@ func TestValidateBinding(t *testing.T) {
 		{in: "shift+f5", want: "shift+f5"},
 		{in: "Cmd+K", err: "cmd+k is reserved by the app"},
 		{in: "cmd+shift+a", err: "cmd+shift+a is reserved by the app"},
-		{in: "cmd+w", err: "cmd+w is reserved by the app"},
-		// The side panel's other-group chord; view.panel.split's cmd+\ is bindable.
-		{in: `alt+cmd+\`, err: `cmd+alt+\ is reserved by the app`},
+		// tab.close's default since the shell: bindable, no longer the side panel's.
+		{in: "cmd+w", want: "cmd+w"},
+		// Retired with the side panel's split (shell-model.md, "Keys").
+		{in: `alt+cmd+\`, want: `cmd+alt+\`},
 		{in: `cmd+\`, want: `cmd+\`},
+		// The space chords are GUI view actions.
+		{in: "ctrl+cmd+3", err: "cmd+ctrl+3 is reserved by the app"},
 		{in: "ctrl+cmd+f", err: "cmd+ctrl+f is reserved by the app"},
 		{in: "f", err: "f needs cmd, ctrl, or alt (a bare key would steal typing)"},
 		{in: "shift+x", err: "shift+x needs cmd, ctrl, or alt (a bare key would steal typing)"},

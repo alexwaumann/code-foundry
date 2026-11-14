@@ -50,10 +50,13 @@ test("status kinds: cmd+1 and cmd+shift+a through the keymap, and the window tit
   await mockPost("status-kinds");
   await openApp(page);
   await list(page).focus();
+  // cmd+1 opens the list's first row, a Needs you row (the plan waiting for approval); cmd+shift+a
+  // opens the popup of Needs you's next thread after it (shell-model.md, Keys).
   await page.keyboard.press("Meta+1");
   await expect(row(page, "s:s-k-plan")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-k-plan");
   await page.keyboard.press("Meta+Shift+a");
-  await expect(row(page, "s:s-k-approval")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("needs-popup")).toHaveAttribute("data-thread-id", "s-k-approval");
   await expectAttention(page, 7);
 });
 
@@ -89,6 +92,9 @@ test("Working section: the header sits on the rows' edge; cmd+4/cmd+5 skip hidde
   await expect(row(page, "s:s-5")).toHaveAttribute("aria-selected", "true");
 });
 
+// The shell's rows (sidebar/shell/ShellSidebarList.tsx): a thread row is as tall as its lines (the
+// title wraps to two, the branch line only when there is one: lib/shellSections.test.ts, ShellRows),
+// a Snoozed or Archived row one 24px line.
 test("thread rows sit 8px apart, snoozed rows 2px and 24px tall, at both densities, each row's box (and its selection) the row's own height", async ({ page }) => {
   await openApp(page);
   await page.getByTestId("snoozed-header").click();
@@ -102,23 +108,22 @@ test("thread rows sit 8px apart, snoozed rows 2px and 24px tall, at both densiti
     expect(keys).toHaveLength(2);
     return gaps(keys[0] ?? "", keys[1] ?? "");
   };
-  // Thread rows are three lines (THREE_LINE_ROW, 60px), snoozed rows one (ONE_LINE_ROW, 24px), at both densities.
-  for (const [density, three, one] of [
-    ["comfortable", 60, 24],
-    ["compact", 60, 24],
-  ] as const) {
+  // The row's box is its slot in the list: the slot (the virtual item) is exactly the row's height.
+  const ownHeight = (key: string) => row(page, key).evaluate((e) => (e.parentElement ? e.parentElement.getBoundingClientRect().height : 0) - e.getBoundingClientRect().height);
+  for (const density of ["comfortable", "compact"] as const) {
     await mockPost(`settings/external?appearance.density=${density}`);
     await expect(page.locator("html")).toHaveAttribute("data-density", density);
-    // Main list and the Working footer: three-line rows; Snoozed: one-line rows.
-    await expect.poll(() => gaps("s:s-2", "s:s-6")).toEqual({ height: three, gap: 8 });
-    expect(await gaps("s:s-5", "s:s-1")).toEqual({ height: three, gap: 8 });
-    expect(await snoozed()).toEqual({ height: one, gap: 2 });
+    // Active and the Working footer: 8px apart; Snoozed: one-line rows 2px apart.
+    await expect.poll(async () => (await gaps("s:s-6", "s:s-4")).gap).toBe(8);
+    expect((await gaps("s:s-5", "s:s-1")).gap).toBe(8);
+    expect(await snoozed()).toEqual({ height: 24, gap: 2 });
+    for (const key of ["s:s-2", "s:s-6", "s:s-5"]) expect(await ownHeight(key), key).toBe(0);
   }
   // The selection background is the row's own box: the gap under it stays the sidebar's.
-  await row(page, "s:s-2").click();
-  await expect(row(page, "s:s-2")).toHaveClass(/bg-cf-sidebar-row-selected/);
-  const parent = await row(page, "s:s-2").evaluate((e) => (e.parentElement ? e.parentElement.getBoundingClientRect().height : 0));
-  expect(parent).toBe(60);
+  await row(page, "s:s-6").click();
+  await expect(row(page, "s:s-6")).toHaveClass(/bg-cf-sidebar-row-selected/);
+  expect(await ownHeight("s:s-6")).toBe(0);
+  expect((await gaps("s:s-6", "s:s-4")).gap).toBe(8);
   await mockPost("settings/external?appearance.density=");
 });
 
@@ -144,14 +149,16 @@ test("a snoozed row's text is at 60% until hovered, selected or under the cursor
   await expect.poll(() => opacity(second)).toBe("1");
 });
 
-test("the menu pane: under the band, gutter to edge, surface fill, divider border, pane radius, 4px inside; the threads 8px below", async ({ page }) => {
+// The band and the Pull Requests and Projects rows are gone (they are tabs: the "+" menu and the
+// palette); the menu pane keeps New thread under the top bar.
+test("the menu pane: under the top bar, gutter to edge, surface fill, divider border, pane radius, 4px inside; the list 8px below", async ({ page }) => {
   await openApp(page);
   await expect(row(page, "s:s-2")).toBeVisible();
   await expect(page.getByTestId("sidebar-divider")).toHaveCount(0);
   const m = await page.evaluate(() => {
-    const r = (id: string) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
-    const [menu, band, body, sidebar, newThread, projects] = [r("sidebar-menu"), r("sidebar-band"), r("sidebar-body"), r("sidebar"), r("sidebar-new-thread"), r("nav-projects")];
-    const first = document.querySelector('[data-testid="sidebar-main"] [role="option"]')?.getBoundingClientRect();
+    const r = (sel: string) => document.querySelector(sel)?.getBoundingClientRect();
+    const [menu, bar, body, sidebar, newThread] = [r('[data-testid="sidebar-menu"]'), r('[data-testid="top-bar"]'), r('[data-testid="sidebar-body"]'), r('[data-testid="sidebar"]'), r('[data-testid="sidebar-new-thread"]')];
+    const first = r('[data-testid="thread-list"] [data-row-key]');
     const el = document.querySelector('[data-testid="sidebar-menu"]');
     const resolve = (prop: "backgroundColor" | "borderTopColor", v: string) => {
       const probe = document.createElement("div");
@@ -164,21 +171,21 @@ test("the menu pane: under the band, gutter to edge, surface fill, divider borde
     };
     const cs = el ? getComputedStyle(el) : null;
     return {
-      top: (menu?.top ?? 0) - (band?.bottom ?? 0),
+      top: (menu?.top ?? 0) - (bar?.bottom ?? 0),
       left: (menu?.left ?? 0) - (body?.left ?? 0),
       right: menu?.right === sidebar?.right,
       radius: cs?.borderTopLeftRadius,
       border: cs?.borderTopWidth,
       fill: cs?.backgroundColor === resolve("backgroundColor", "var(--cf-surface)"),
       edge: cs?.borderTopColor === resolve("borderTopColor", "var(--cf-divider)"),
-      inset: [(newThread?.top ?? 0) - (menu?.top ?? 0), (newThread?.left ?? 0) - (menu?.left ?? 0), (menu?.bottom ?? 0) - (projects?.bottom ?? 0)],
-      rows: [newThread?.height, projects?.height],
+      inset: [(newThread?.top ?? 0) - (menu?.top ?? 0), (newThread?.left ?? 0) - (menu?.left ?? 0), (menu?.bottom ?? 0) - (newThread?.bottom ?? 0)],
+      rows: [newThread?.height],
       below: (first?.top ?? 0) - (menu?.bottom ?? 0),
     };
   });
-  // 12px gutter (pl-shell) on the left; 1px border + 4px padding to the rows; 8px gap plus the
-  // list's 4px paddingStart to the first thread row.
-  expect(m).toEqual({ top: 0, left: 12, right: true, radius: "12px", border: "1px", fill: true, edge: true, inset: [5, 5, 5], rows: [28, 28], below: 12 });
+  // 12px gutter (pl-shell) on the left; 1px border + 4px padding to New thread; 8px (mb-2) to the
+  // list's first row (the Needs you header here).
+  expect(m).toEqual({ top: 0, left: 12, right: true, radius: "12px", border: "1px", fill: true, edge: true, inset: [5, 5, 5], rows: [28], below: 8 });
 });
 
 // The Working header counting threads as they start and stop, a pinned working thread on top, the
@@ -196,13 +203,15 @@ test("hovering a thread row shows its card right of the sidebar, 260px wide; a c
   const box = await tip.boundingBox();
   expect(box && sidebar && box.x >= sidebar.x + sidebar.width - 1).toBe(true);
   expect(Math.round(box?.width ?? 0)).toBe(260);
-  // Moving to the next row moves the card.
-  await row(page, "s:s-2").hover();
-  await expect(tip).toHaveAttribute("data-thread-id", "s-2");
+  // Moving to the next row moves the card (a Needs you row, s-2's, has the inbox's card instead:
+  // e2e/shell-needs.spec.ts).
+  await row(page, "s:s-4").hover();
+  await expect(tip).toHaveAttribute("data-thread-id", "s-4");
 
-  // A click closes it and selects the row; the keyboard never opens one.
-  await row(page, "s:s-2").click();
+  // A click closes it and opens the thread; the keyboard never opens one.
+  await row(page, "s:s-4").click();
   await expect(tip).toHaveCount(0);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-4");
   await page.mouse.move(900, 600);
   await list(page).focus();
   await page.keyboard.press("Home");
@@ -234,49 +243,52 @@ test("a real pointer keeps the card open over the row's actions and PR tag", asy
   }
 });
 
+// The shell's row puts the hover controls in line 1, in the status's slot (e2e/shell-sidebar.spec.ts
+// "on hover the snooze and archive controls take the status's slot in line 1"); the branch has line 3
+// to itself. Here: at the narrowest sidebar, on a selected row too, with a long branch.
 test("at the narrowest sidebar the actions never cover the branch, on a selected row too, and the name and status stay", async ({ page }) => {
   await openApp(page);
   // The default width is the minimum (SIDEBAR_MIN).
-  expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(260);
+  expect((await page.getByTestId("sidebar").boundingBox())?.width).toBe(240);
   for (const select of [false, true]) {
     const r = row(page, "s:s-3");
     if (select) await r.click();
-    // A branch long enough to reach the actions: the branch gives way, not the actions.
+    if (select) await expect(r).toHaveAttribute("aria-selected", "true");
     await r.getByTestId("row-branch").evaluate((el) => {
       el.textContent = "cf/a-branch-name-long-enough-to-run-under-the-actions";
     });
+    await page.mouse.move(700, 450);
+    const nameBefore = await r.getByTestId("thread-name").boundingBox();
     await r.getByTestId("thread-name").hover();
     await expect(r.getByTestId("row-actions")).toHaveCSS("opacity", "1");
-    const [branch, actions, line3] = [await r.getByTestId("row-branch").boundingBox(), await r.getByTestId("row-actions").boundingBox(), await r.getByTestId("row-line-3").boundingBox()];
-    expect((branch?.x ?? 0) + (branch?.width ?? 0)).toBeLessThanOrEqual(actions?.x ?? 0);
-    // On the last line, inside it: the actions never reach up into the project line.
-    expect(Math.abs((actions?.y ?? 0) + (actions?.height ?? 0) / 2 - ((line3?.y ?? 0) + (line3?.height ?? 0) / 2))).toBeLessThanOrEqual(1);
-    await expect(r.getByTestId("row-time")).toHaveCSS("visibility", "visible");
+    const [branch, actions, line1, line3, project, name, box] = await Promise.all(
+      ["row-branch", "row-actions", "row-line-1", "row-line-3", "row-project", "thread-name"].map((id) => r.getByTestId(id).boundingBox()).concat(r.boundingBox()),
+    );
+    if (!branch || !actions || !line1 || !line3 || !project || !name || !box) throw new Error("no layout");
+    // The actions sit in line 1, at its right end; the branch is on line 3, below them, inside the row.
+    expect(Math.abs(actions.y + actions.height / 2 - (line1.y + line1.height / 2))).toBeLessThanOrEqual(1);
+    expect(branch.y).toBeGreaterThanOrEqual(actions.y + actions.height);
+    expect(branch.x + branch.width).toBeLessThanOrEqual(box.x + box.width);
+    expect(line3.y).toBeGreaterThan(line1.y + line1.height);
+    // The project stays (cut short) left of the actions, and the name does not move.
+    expect(project.width).toBeGreaterThan(0);
+    expect(project.x + project.width).toBeLessThanOrEqual(actions.x);
+    expect(name).toEqual(nameBefore);
   }
+  // A Needs you row has no hover controls: its ask stays.
   await row(page, "s:s-2").getByTestId("thread-name").hover();
-  await expect(row(page, "s:s-2").getByTestId("row-status")).toHaveCSS("visibility", "visible");
+  await expect(row(page, "s:s-2").getByTestId("row-ask")).toHaveCSS("visibility", "visible");
+  await expect(row(page, "s:s-2").getByTestId("row-actions")).toHaveCount(0);
 });
 
 // A multi-project thread's card (workspace or N projects, the run-in project and where it runs, branch, model) and line 1: src/components/sidebar/SidebarRow.test.tsx ("a workspace thread…", "an unnamed set…", "a thread in its workspace's folder…", "line 1 of a multi-project thread").
 
 // The status line's words, tones and times for every kind, and none for working or idle:
 // src/components/sidebar/SidebarRow.test.tsx ("SidebarRow card status time").
-test("a long permission prompt: the row keeps its branch; the card wraps all of it between the name and the project", async ({ page }) => {
-  await mockPost("status-kinds");
-  const long = "Do you want to create hello.txt in the scratch repository and then run the whole test suite?";
-  await mockPost(`thread/status?id=s-k-approval&status=attention&reason=${encodeURIComponent(`permission: ${long}`)}`);
-  await openApp(page);
-  const tip = page.locator('[data-testid="thread-tooltip"]:not([data-state="closed"])');
-  const approval = row(page, "s:s-k-approval");
-  await approval.hover();
-  await expect(tip).toHaveAttribute("data-thread-id", "s-k-approval");
-  const status = tip.getByTestId("tip-status");
-  await expect(status).toContainText(long);
-  expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(260);
-  const [name, st, project] = [await tip.getByTestId("tip-name").boundingBox(), await status.boundingBox(), await tip.getByTestId("tip-project").boundingBox()];
-  expect(st && st.height >= 40).toBe(true);
-  expect(name && st && project && name.y < st.y && st.y + st.height <= project.y).toBe(true);
-});
+// "a long permission prompt: the row keeps its branch; the card wraps all of it between the name and the
+// project": a thread asking is a Needs you row (project and ask, then the title; no branch line:
+// shell-model.md, Sidebar) with the inbox's card, not the classic one. The card growing with a long ask
+// up to its maximum and scrolling: e2e/shell-needs.spec.ts; what it shows: src/components/needs/NeedsCard.test.tsx.
 
 /** SHOTS=<dir>: Snoozed and Archived open, 24px rows 2px apart under Working's 8px, WebKit, 1280x800 at 2x, dark and light. */
 for (const scheme of ["dark", "light"] as const) {

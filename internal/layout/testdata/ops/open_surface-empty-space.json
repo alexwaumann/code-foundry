@@ -1,0 +1,34 @@
+{
+  "doc": "A surface opened in an empty space makes its first pane.",
+  "state": {
+    "v": 1,
+    "spaces": [{"id":"sp-a","name":"Space A","root":null}],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"file","thread":"th-a","params":{"path":"/r/new"}},
+    "focus": true
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-n1",
+          "tabs": [{"id":"t-n1","kind":"file","thread":"th-a","params":{"path":"/r/new"}}],
+          "active": "t-n1"
+        },
+        "focus": "p-n1",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1","rule":"focused"}
+}

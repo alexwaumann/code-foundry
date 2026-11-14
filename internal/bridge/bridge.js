@@ -93,7 +93,7 @@
   }
 
   // Gestures: transient user activation, or a real press, click or key in the page in the
-  // last 5 s. Either is enough: in the app's side panel WebKit reported isActive false
+  // last 5 s. Either is enough: in the app's old side panel WebKit reported isActive false
   // inside a genuine click's handler (docs/notes/bridge-fix-c-gui.md), so the API alone
   // refused it. Only trusted events count: a page's own el.click() is not the user.
   function noteGesture(e) {

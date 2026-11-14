@@ -176,11 +176,22 @@ export const BASE_FROM_ORIGIN_KEY = "projects.base_from_origin";
  * branch", thread.new-like), or no project at all (`home`: the thread runs in the
  * daemon's home directory, thread.new --no-project; docs/notes/no-project-2-gui.md).
  */
-export type ComposeTarget =
+export type ComposeTarget = (
   | { kind: "project"; projectId: string }
   | { kind: "workspace"; workspaceId: string }
   | { kind: "like"; threadId: string }
-  | { kind: "home" };
+  | { kind: "home" }
+) & {
+  /**
+   * The window shell's composer draft this composer is (a compose tab's `draft` param,
+   * docs/notes/shell-2b-drafts.md): its text is its own, under DRAFT_KEY + the id, whatever it
+   * starts from, so a space can hold several drafts for one project.
+   */
+  draft?: string;
+};
+
+/** The compose store's key prefix of a shell composer draft's own text. */
+export const DRAFT_KEY = "draft:";
 
 const WORKSPACE_KEY = "ws:";
 const LIKE_KEY = "like:";
@@ -188,8 +199,12 @@ const LIKE_KEY = "like:";
 /** The draft key (and picker row value) of the no-project target. */
 export const HOME_KEY = "home:";
 
-/** The compose store's key for a target's draft: the project id, "ws:<workspace id>", "like:<thread id>", or HOME_KEY. */
+/**
+ * The compose store's key for a target's draft: the project id, "ws:<workspace id>", "like:<thread
+ * id>", or HOME_KEY; a shell composer draft's own key, "draft:<id>", whatever it starts from.
+ */
 export function draftKey(t: ComposeTarget): string {
+  if (t.draft) return DRAFT_KEY + t.draft;
   switch (t.kind) {
     case "project":
       return t.projectId;

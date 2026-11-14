@@ -73,7 +73,7 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 
 | Key | Type | Grants |
 |---|---|---|
-| `commands` | globs | `Host.Invoke` and view command buttons for these host commands. Globs over dotted names: `*` within a segment, `**` across (`"thread.send"`, `"view.open.*"`, `"action.**"`). `plugin.<verb>` management commands are refused whatever the globs. The list: `reference/host-commands.md`. |
+| `commands` | globs | `Host.Invoke` and view command buttons for these host commands. Globs over dotted names: `*` within a segment, `**` across (`"thread.send"`, `"view.open.*"`, `"action.**"`). `plugin.<verb>` management commands are refused whatever the globs. The list: `reference/host-commands.md` and `reference/host-commands-thread-view.md`. |
 | `events` | sources | `Host.Subscribe` to these event sources: {{cf.eventSources}}. |
 | `threadStatus` | bool | `Host.SetFlag`: attention or error flags on threads. |
 | `sessionEnv` | bool | `Host.SetEnvironment`: env, PATH entries and `--add-dir`s for new Claude threads. |
@@ -147,7 +147,7 @@ The context carries ids and one path: `WorktreePath`, the folder the thread work
 | `title` | Required, up to 80 characters: the tab's title and `Show <title>` in the palette. |
 | `icon` | A lucide icon name from the list below; any other name draws a plain circle. |
 | `scope` | What one instance is for (below). Default `thread`. |
-| `placement` | `["panel"]` (default): the side panel. `settings` is accepted and reserved for a later version. |
+| `placement` | `["panel"]` (default): a tab in a pane of the window (the name is the old side panel's). `settings` is accepted and reserved for a later version. |
 | `when` | A clause; the surface is offered only where it holds (and its scope's context exists). |
 
 | Scope | One instance per | Context the plugin gets (`SurfaceOpen.Context`) | Debug it with |
@@ -165,8 +165,8 @@ The context carries ids and one path: `WorktreePath`, the folder the thread work
 but its `SurfaceOpen.Context` is the first opener's thread (the same holds for a `project`
 or `global` surface shown beside different threads). So an event that acts on "this
 thread" (send a failure to Claude) must read the thread from `act.Context`, the acting
-panel's, never from the open. A **command button** works too: the host runs it with the
-viewing panel's context, so the command's `context: thread` arg is the thread the user is
+tab's, never from the open. A **command button** works too: the host runs it with the
+viewing tab's context, so the command's `context: thread` arg is the thread the user is
 looking at.
 Command args travel inside the view (its 256 KB budget; an event's `data` is capped at
 1 KB): pass an id the command can look up (a run id, a job id), not the text itself.
@@ -174,8 +174,10 @@ Command args travel inside the view (its 256 KB budget; an event's `data` is cap
 The instance id is `<plugin>/<surface>/<scope id>` (`gh-actions/runs/pr:octo/app#12`,
 `minimal/status/thread:s-1f2e3d4c5b6a`). `SurfaceOpen.Facts` also carries the value of
 every fact the surface's `when` clause reads. Each surface gets a command
-`plugin.<name>.show.<id>` (`code-foundry plugin <name> show <id>`) that opens it in the
-GUI; it is available exactly where the surface is.
+`plugin.<name>.show.<id>` (`code-foundry plugin <name> show <id>`), available exactly where
+the surface is. A thread or pr surface opens as a tab linked to the thread, placed beside it
+by the app's rules; a second call finds that tab. It leaves the user's focus where it is:
+pass `--focus` only when the user asked to be taken there. Other scopes go to the windows.
 
 ## Icons
 

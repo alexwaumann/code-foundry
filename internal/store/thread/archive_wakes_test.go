@@ -22,7 +22,8 @@ func TestArchiveWakesNoOne(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := newFixtureEnvAt(t, hangFixture(t), nil, func(o *Options) { o.WakeBatch = tt.batch })
+			clock := newManualClock()
+			e := newFixtureEnvAt(t, hangFixture(t), nil, func(o *Options) { o.WakeBatch = tt.batch }, withManualClock(clock))
 			parent := e.stopped("Ember")
 			var kid Thread
 			if tt.fireFirst {
@@ -40,7 +41,8 @@ func TestArchiveWakesNoOne(t *testing.T) {
 			if _, err := e.m.Archive(e.ctx(), kid.ID, true); err != nil {
 				t.Fatal(err)
 			}
-			time.Sleep(600 * time.Millisecond) // past the batch window
+			clock.Advance(tt.batch) // the batch window ends after the archive
+			time.Sleep(600 * time.Millisecond)
 			if n := len(wakes(e.items(parent.ID).Items)); n != 0 {
 				t.Errorf("the subscriber got %d wakes about the thread archived", n)
 			}

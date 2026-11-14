@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Broom, FolderOpen, FolderPlus, Folders, GitPullRequest, Layers, Search } from "lucide-react";
-import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { GithubMark } from "@/components/icons/GithubMark";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PR_CELL_AGE } from "@/components/prs/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +55,7 @@ import { useProjectLastMs, useProjectOrder, useWorkspaceLastMs, useWorkspaceOrde
 import { useWorkspaceTerminal } from "./workspaceHooks";
 import { WORKSPACE_MENU_PARTS } from "./WorkspaceMenuParts";
 import { WorkspaceNameEditor } from "./WorkspaceNameEditor";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 const SEP = "\u0001";
 
@@ -391,7 +390,7 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
   const loaded = useProjectsStore((s) => s.loaded);
   const rootRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLInputElement>(null);
-  // The content pane's width (the side panel takes from it): the scroll box's.
+  // The pane's width: the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const scrollRef = usePageScroll(pageKey, widthRef);
   const { activity, updated, branch } = indexColumns(width);
@@ -400,8 +399,11 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
   const workspaceCols = useMemo(() => workspaceColumns(columns), [columns]);
   const projectTemplate = template(projectCols);
   const workspaceTemplate = template(workspaceCols);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
   const empty = loaded && order.length === 0;
   return (
@@ -439,8 +441,6 @@ export function ProjectsIndex({ pageKey }: { pageKey: string }) {
           )}
         </div>
         <span className="-mr-2 ml-auto flex shrink-0 items-center">
-          <BottomToggle />
-          <PanelToggle />
         </span>
       </PaneHeader>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">

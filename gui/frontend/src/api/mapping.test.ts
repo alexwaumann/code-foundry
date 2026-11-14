@@ -51,6 +51,9 @@ describe("terminal mapping", () => {
       exitedAt: timestampFromMs(5000),
       altScreen: true,
       labels: { worktree: "/src" },
+      liveCwd: "/tmp",
+      foreground: "make dev",
+      lastCommand: "git status",
     });
     expect(toTerminalView(t)).toEqual({
       id: "t1",
@@ -65,8 +68,11 @@ describe("terminal mapping", () => {
       exitedAtMs: 5000,
       altScreen: true,
       labels: { worktree: "/src" },
+      liveCwd: "/tmp",
+      foreground: "make dev",
+      lastCommand: "git status",
     });
-    expect(toTerminalView(create(TerminalSchema, { id: "x" }))).toMatchObject({ state: "unknown", startedAtMs: null, exitedAtMs: null });
+    expect(toTerminalView(create(TerminalSchema, { id: "x" }))).toMatchObject({ state: "unknown", startedAtMs: null, exitedAtMs: null, liveCwd: "", foreground: "", lastCommand: "" });
   });
 
   it.each([
@@ -163,13 +169,8 @@ describe("ui intent mapping", () => {
     [{ case: "focusTerminal" as const, value: { terminalId: "t" } }, { kind: "focusTerminal", terminalId: "t" }],
     [{ case: "focusThread" as const, value: { threadId: "s1" } }, { kind: "focusThread", threadId: "s1" }],
     [{ case: "focusThread" as const, value: { threadId: "s1", explicit: true } }, { kind: "focusThread", threadId: "s1", explicit: true }],
-    [{ case: "showView" as const, value: { name: "projects" } }, { kind: "showView", name: "projects" }],
-    [{ case: "showView" as const, value: { name: "projects", params: { workspace: "w-1" } } }, { kind: "showView", name: "projects", params: { workspace: "w-1" } }],
-    [{ case: "showView" as const, value: { name: "panel.mcp", threadId: "s1" } }, { kind: "showView", name: "panel.mcp", threadId: "s1" }],
-    [
-      { case: "showView" as const, value: { name: "panel.pr", threadId: "s1", params: { slug: "o/r", number: "7" } } },
-      { kind: "showView", name: "panel.pr", threadId: "s1", params: { slug: "o/r", number: "7" } },
-    ],
+    [{ case: "showView" as const, value: { name: "help" } }, { kind: "showView", name: "help" }],
+    [{ case: "showView" as const, value: { name: "search.open", params: { id: "q-1" } } }, { kind: "showView", name: "search.open", params: { id: "q-1" } }],
     [{ case: "focusProject" as const, value: { projectId: "r", worktreePath: "/w" } }, { kind: "focusProject", projectId: "r", worktreePath: "/w" }],
     [{ case: "openPalette" as const, value: { query: "new" } }, { kind: "openPalette", query: "new" }],
     [

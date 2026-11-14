@@ -200,7 +200,8 @@ test("a second project: files grouped by project, the primary first; tooltips na
 for (const zoom of [100, 125, 150]) {
   test(`at ${String(zoom)}%: the file card hangs under the worktree row, moves nothing and fits the window`, async ({ page }) => {
     await setFiles("repo-cf", MANY);
-    await page.setViewportSize({ width: 1280, height: 1000 });
+    // The window shell's top bar takes 60px of a classic window's height: 1060 is the old 1000.
+    await page.setViewportSize({ width: 1280, height: 1060 });
     await openApp(page);
     await setZoom(page, zoom);
     await expect(page.locator("html")).toHaveCSS("zoom", String(zoom / 100));
@@ -221,7 +222,7 @@ for (const zoom of [100, 125, 150]) {
     expect(pop.y + pop.height).toBeLessThanOrEqual(bottom - 16 * (zoom / 100) + 1);
     const fit = await listFit(page);
     expect(fit.scrolls).toBe(true);
-    // A 1000px window has room for the full card at 100%: ~8 rows (15.5rem).
+    // A 1000px (here 1060px) window has room for the full card at 100%: ~8 rows (15.5rem).
     // Zoomed in, the same window is shorter in layout px: fewer whole rows.
     if (zoom <= 100) expect(fit.height).toBe(248);
     else {
@@ -249,7 +250,8 @@ for (const zoom of [100, 125, 150]) {
 
 test("a short window shows fewer rows; a taller one all eight; a very short one drops the hints", async ({ page }) => {
   await setFiles("repo-cf", MANY);
-  await page.setViewportSize({ width: 1280, height: 560 });
+  // 620 under the window shell's top bar is the classic window's 560.
+  await page.setViewportSize({ width: 1280, height: 620 });
   // A fresh copy: no collision banner (s-1 runs in code-foundry's folder) taking the short window's room.
   await freshCopyByDefault();
   await openApp(page);
@@ -259,7 +261,7 @@ test("a short window shows fewer rows; a taller one all eight; a very short one 
   await expect(rows(page)).toHaveCount(21);
   expect(await composerBoxes(page)).toEqual(before);
   const pop = await boxOf(page, "completion-card");
-  expect(pop.y + pop.height).toBeLessThanOrEqual(560 - 16 + 1);
+  expect(pop.y + pop.height).toBeLessThanOrEqual(620 - 16 + 1);
   const short = await listFit(page);
   expect(short.height).toBeLessThan(248);
   expect((short.height - 8) % 28).toBe(0);
@@ -269,13 +271,13 @@ test("a short window shows fewer rows; a taller one all eight; a very short one 
   await expect(card(page).getByTestId("completion-hints")).toBeVisible();
 
   // Resizing the window refits the open card.
-  await page.setViewportSize({ width: 1280, height: 1000 });
+  await page.setViewportSize({ width: 1280, height: 1060 });
   await expect.poll(async () => (await listFit(page)).height).toBe(248);
   await expect(card(page).getByTestId("completion-hints")).toBeVisible();
-  await page.setViewportSize({ width: 1280, height: 400 });
+  await page.setViewportSize({ width: 1280, height: 460 });
   await expect.poll(async () => (await listFit(page)).height).toBeLessThanOrEqual(short.height);
   const tiny = await boxOf(page, "completion-card");
   // Under two rows' room the hints give their space to the rows.
   await expect(card(page).getByTestId("completion-hints")).toBeHidden();
-  expect(tiny.y + tiny.height).toBeLessThanOrEqual(400 - 16 + 1);
+  expect(tiny.y + tiny.height).toBeLessThanOrEqual(460 - 16 + 1);
 });

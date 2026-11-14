@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { CF, invokeAs, openApp, resetMock, row } from "./fixtures";
+import { paneWith, setPaneSize, threadTabOpen } from "./shell-surfaces";
 
 /**
  * The Gallery tab (docs/notes/gallery-surface.md): what only a browser shows. Which tiles,
@@ -17,6 +18,7 @@ const shots = (n: number) => Array.from({ length: n }, (_, i) => ({ path: `${CF}
 /** view.panel.gallery as the CLI inside thread s-1 runs it, with s-1 on screen. */
 async function show(page: Page, images: { path: string; caption?: string }[]): Promise<void> {
   await row(page, "s:s-1").click();
+  await threadTabOpen("s-1");
   await reopen(page, images);
 }
 
@@ -26,8 +28,8 @@ async function reopen(page: Page, images: { path: string; caption?: string }[]):
   await expect(tiles(page).first()).toBeVisible();
 }
 
-const setPanelWidth = (page: Page, width: number) =>
-  page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s-1": { ...s.byKey["thread:s-1"], width: ${String(width)} } } })))`);
+/** The gallery's pane (beside the thread's) to `width` px. */
+const setPanelWidth = async (page: Page, width: number) => setPaneSize(page, String(await paneWith(page, "gallery").getAttribute("data-pane-id")), width);
 
 test.beforeEach(async ({ page }) => {
   await resetMock();
@@ -47,7 +49,7 @@ test("the grid draws only what is near the scroll, and reaches the last image", 
   await expect(page.locator('[data-gallery-index="0"]')).toHaveCount(0);
 });
 
-test("it fits a narrow panel in two columns and takes more as the panel grows", async ({ page }) => {
+test("it fits a narrow pane in two columns and takes more as the pane grows", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 800 });
   await show(page, shots(8));
   await setPanelWidth(page, 360);

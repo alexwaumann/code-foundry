@@ -57,6 +57,8 @@ export interface ActionHost {
   thread(id: string): { projectId: string; worktreePath: string; checkouts: Record<string, string> } | undefined;
   /** Starts a kind=action terminal and returns its id. */
   startTerminal(argv: string[], cwd: string, labels: Record<string, string>): string;
+  /** action.run's terminal run gets its tab (internal/command openTerminalTab): linked to `thread` ("" for a worktree's run). */
+  openTerminalTab(terminalId: string, thread: string): void;
   /** Output to a running terminal (no-op when it is gone or exited). */
   write(terminalId: string, text: string): void;
   /** The terminal's process exits with code (world.kill); the world reports it back with terminalExited. */
@@ -906,11 +908,11 @@ export class MockActions {
         },
       },
       {
-        cmd: cmd("action.add", "Add Action", "Add an action to a project: a command line run as `$SHELL -lc <command>` in a worktree. It opens as a terminal in the bottom panel, or with --in-terminal=false runs in the background with its output captured.", [
+        cmd: cmd("action.add", "Add Action", "Add an action to a project: a command line run as `$SHELL -lc <command>` in a worktree. It opens as a terminal tab, or with --in-terminal=false runs in the background with its output captured.", [
           { name: "name", type: ArgType.STRING, required: true, description: "Name, unique in the project (ignoring case)" },
           { name: "command", type: ArgType.STRING, required: true, description: "Command line (may span lines)" },
           { ...iconArg, defaultValue: "play" },
-          bool("in-terminal", "Run in a terminal in the bottom panel (--in-terminal=false: in the background)", "true"),
+          bool("in-terminal", "Run in a terminal tab (--in-terminal=false: in the background)", "true"),
           bool("on-worktree-create", "Also run (in the background) when a new thread creates its worktree", "false"),
           projectArg,
           hereArg,
@@ -973,11 +975,11 @@ export class MockActions {
         cmd: cmd(
           "action.run",
           "Run Action",
-          "Run an action for the active thread (its bottom panel), else the active worktree, else the registered worktree containing the working directory. --background captures its output instead, --terminal opens it as a terminal. --wait waits for it to finish, prints a background run's output, and exits with the action's exit code.",
+          "Run an action for the active thread, else the active worktree, else the registered worktree containing the working directory. --background captures its output instead, --terminal opens it as a terminal. --wait waits for it to finish, prints a background run's output, and exits with the action's exit code.",
           [
             refArg,
             bool("background", "Run in the background with captured output, whatever the action says"),
-            bool("terminal", "Run in a terminal in the bottom panel, whatever the action says"),
+            bool("terminal", "Run in a terminal (a tab in the window), whatever the action says"),
             bool("wait", "Wait for the run to finish; print its output (background) and exit with its code"),
             { name: "here", type: ArgType.PATH, required: false, description: "Where the CLI runs: without a thread or worktree, the registered worktree containing it owns the run (CLI default: the working directory)" },
           ],
@@ -1001,6 +1003,7 @@ export class MockActions {
           const run = this.run({ action: args.action ?? "", threadId: ctx?.activeThreadId ?? "", worktreePath, mode });
           if (args.wait === "true") return this.waitMessage(run.id ?? "");
           const json = toJsonString(ActionRunSchema, create(ActionRunSchema, run));
+          if (run.mode === ActionRunMode.TERMINAL && run.terminalId) this.host.openTerminalTab(run.terminalId, run.threadId ?? "");
           if (run.mode === ActionRunMode.TERMINAL) return { message: `started ${run.actionName ?? ""} in terminal ${run.terminalId ?? ""} (run ${run.id ?? ""})`, resultJson: json };
           return { message: `started ${run.actionName ?? ""} in the background (run ${run.id ?? ""}); \`code-foundry action wait ${run.id ?? ""}\` prints its output`, resultJson: json };
         },

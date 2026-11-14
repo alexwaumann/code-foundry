@@ -18,6 +18,9 @@ function term(id: string, over: Partial<TerminalView> = {}): TerminalView {
     startedAtMs: 1,
     exitedAtMs: null,
     altScreen: false,
+    liveCwd: "",
+    foreground: "",
+    lastCommand: "",
     labels: {},
     ...over,
   };

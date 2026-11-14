@@ -8,7 +8,7 @@ import type { Row, ViewButton, ViewMenuItem } from "@/api/plugin";
 
 /**
  * The least width (px) a row keeps beside its buttons before they fold: its padding, glyph
- * and a title of about 20 characters. The side panel's row (about 400 px) keeps two short
+ * and a title of about 20 characters. A 420 px pane's row (about 400 px) keeps two short
  * buttons and folds three; an expanded panel's keeps three.
  */
 export const ROW_TITLE_MIN = 200;

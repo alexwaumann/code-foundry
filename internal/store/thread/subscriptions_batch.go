@@ -133,7 +133,7 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 		if due.After(limit) {
 			due = limit
 		}
-		wait := time.Until(due)
+		wait := due.Sub(m.opts.batchClock.Now())
 		if wait <= 0 || m.ctx.Err() != nil {
 			batch := []delivery{first}
 			if q != nil {
@@ -152,11 +152,11 @@ func (m *Manager) collectBatch(subscriber string, first delivery) []delivery {
 			return batch
 		}
 		s.mu.Unlock()
-		t := time.NewTimer(wait)
+		c, stop := m.opts.batchClock.After(wait)
 		select {
-		case <-t.C:
+		case <-c:
 		case <-m.ctx.Done():
-			t.Stop()
+			stop()
 		}
 	}
 }

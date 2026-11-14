@@ -1,0 +1,76 @@
+{
+  "doc": "Rule 2 counts the thread's own pane when it holds the thread's linked tabs (an earlier rule 6).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/t-g"}}],
+              "active": "t-g"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_surface","tab":{"kind":"file","thread":"th-a","params":{"path":"/r/new"}}},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-n1","kind":"file","thread":"th-a","params":{"path":"/r/new"}}
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/t-g"}}],
+              "active": "t-g"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"2"}
+}

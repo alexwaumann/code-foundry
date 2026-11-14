@@ -222,7 +222,7 @@ func NewTerminal(key, terminalID string) Node {
 }
 
 // NewColumns returns a columns node of 2 to 4 columns that stacks them in order when its
-// container is too narrow (always in the side panel).
+// container is too narrow (a pane beside a thread usually is).
 func NewColumns(key string, columns ...Column) Node {
 	return Node{Key: key, Columns: &Columns{Items: columns}}
 }
@@ -243,7 +243,7 @@ func NewPane(key string, height Height, children ...Node) Node {
 }
 
 // NewGrid returns a grid of items in as many columns of at least GridMinWidth px as fit
-// (one, stacked, in the side panel); set Grid.MinWidth for narrower or wider columns.
+// (one, stacked, in a narrow pane); set Grid.MinWidth for narrower or wider columns.
 func NewGrid(key string, items ...GridItem) Node {
 	return Node{Key: key, Grid: &Grid{Items: items}}
 }

@@ -1,7 +1,7 @@
 import { SHELL_GAP } from "@/design/tokens";
 
 /**
- * Height in CSS px of a pane's header (PaneHeader, the side panel's tab strip in TabGroup,
+ * Height in CSS px of a pane's header (PaneHeader, a pane's tab strip,
  * the headerless panes' DragBand, a sheet's SheetHeader). The one source: those components
  * set it as their height.
  */
@@ -43,4 +43,25 @@ export const TRAFFIC_LIGHT_GUTTER = 80;
  */
 export function trafficLightGutter(zoom: number): number {
   return Math.round((TRAFFIC_LIGHT_GUTTER * 100) / zoom);
+}
+
+/**
+ * The top bar's leading run after the traffic-light gutter, in CSS px (components/shell/TopBar.tsx
+ * draws it with these): its left padding (pl-3), the app name's box, the bar's gap (gap-1) and the
+ * toggle's margin (ml-2) before the sidebar toggle, and the toggle itself (size-7). The app name's
+ * box is fixed at its text's width in WebKit (17px semibold "Code Foundry": 107.1px, rounded up),
+ * so the toggle's right edge is a constant.
+ */
+export const TOP_BAR_PAD_LEFT = 12;
+export const APP_NAME_WIDTH = 108;
+export const TOGGLE_GAP = 4 + 8;
+export const TOGGLE_SIZE = 28;
+
+/**
+ * Where the sidebar toggle's right edge sits, in layout px from the window's left, at a page zoom
+ * (percent): 80 + 12 + 108 + 12 + 28 = 240 at 100%. The sidebar's minimum and default width line
+ * its right edge up with it (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-25f-sizes.md).
+ */
+export function sidebarToggleEnd(zoom: number): number {
+  return trafficLightGutter(zoom) + TOP_BAR_PAD_LEFT + APP_NAME_WIDTH + TOGGLE_GAP + TOGGLE_SIZE;
 }

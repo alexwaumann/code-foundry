@@ -54,6 +54,14 @@ export async function projectAt(path: string): Promise<{ id: string; path: strin
 }
 
 /** POSTs a /__mock control endpoint and returns its JSON. */
+/**
+ * The thread info card off for every thread never toggled (the setting layout.thread_info; on by
+ * default): a spec of the card turns it on with the header's toggle, from a known state.
+ */
+export async function infoCardOff(): Promise<void> {
+  await mockPost("settings/external?layout.thread_info=false");
+}
+
 export async function mockPost(pathAndQuery: string): Promise<unknown> {
   const res = await fetch(`${mockUrl}/__mock/${pathAndQuery}`, { method: "POST" });
   expect(res.ok, `${pathAndQuery}: ${String(res.status)}`).toBe(true);
@@ -95,6 +103,8 @@ export async function emit(intent: Record<string, unknown>): Promise<number> {
 export async function openApp(page: Page): Promise<void> {
   await page.goto(appPath);
   await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
+  // The window's first draw (the layout and the first-load import): the key table acts from then on.
+  await expect(page.locator('[data-testid="shell"][data-shell-mode="shell"]')).toBeVisible();
 }
 
 /**
@@ -121,13 +131,11 @@ export async function openAddProjectDialog(page: Page): Promise<void> {
 }
 
 /**
- * Shows the Projects index from its sidebar entry. The entry reopens the last Projects
- * page shown; from a project's or workspace's page a second click goes to the index.
+ * Shows the Projects index in a tab: the space's Projects tab (one per space), opened or focused by
+ * selecting the index (the selection bridge runs view.projects), in an empty space too.
  */
 export async function openProjects(page: Page): Promise<void> {
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
-  if ((await page.getByTestId("projects-page").getAttribute("data-page")) !== "index") await page.getByTestId("nav-projects").click();
+  await page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().select(m.PROJECTS_INDEX))`);
   await expect(page.getByTestId("projects-page")).toHaveAttribute("data-page", "index");
 }
 
@@ -343,11 +351,6 @@ export async function openHelloDemo(page: Page): Promise<void> {
   await page.keyboard.type("Show Hello Demo");
   await page.getByTestId("palette").locator('[data-command="plugin.hello.show.demo"]').click();
   await expect(page.getByTestId("plugin-surface")).toHaveAttribute("data-phase", "live");
-}
-
-/** The selection's side panel `width` px wide, through the app's own panel store. */
-export async function setPanelWidth(page: Page, width: number): Promise<void> {
-  await page.evaluate(`__cfModule("/src/stores/panel.ts").then((m) => m.setPanelWidth("current", ${String(width)}))`);
 }
 
 /** The page zoom at `percent`, through the app's own store (cmd+= / cmd+-), once applied. */

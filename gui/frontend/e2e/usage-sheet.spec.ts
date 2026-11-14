@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { emit, openApp, openTooltip, resetMock, row, threadPrompt } from "./fixtures";
+import { openShellApp, tabOfKind } from "./shell";
+import { diffTab, seedBeside } from "./shell-surfaces";
 
 // The Usage page in a modal sheet over the window (docs/notes/usage-sheet.md), the same
 // size as the settings sheet (settings-sheet.spec.ts): centred, at most 1280x1280, never
@@ -46,8 +48,8 @@ test("the sheet is a dialog with a 44px header, and its body scrolls inside it",
   // The body scrolls inside the sheet: nothing spills out of it.
   const body = await sheet(page).evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight }));
   expect(body.scroll).toBe(body.client);
-  // Nothing of it is left in the content pane.
-  await expect(page.getByTestId("content-pane").getByTestId("usage-page")).toHaveCount(0);
+  // Nothing of it is left in the panes.
+  await expect(page.getByTestId("shell-grid").getByTestId("usage-page")).toHaveCount(0);
 });
 
 test("the chart button toggles it; Escape, the backdrop and the × close it, and the thread's prompt takes the keyboard back", async ({ page }) => {
@@ -124,26 +126,31 @@ test("cmd+, from the usage sheet: the settings sheet replaces it, one dialog and
   await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(1);
 });
 
-test("the side and bottom panels stay laid out under it", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
-  await expect(page.getByTestId("side-panel")).toBeVisible();
-  await page.getByTestId("bottom-toggle").click();
-  await expect(page.getByTestId("bottom-panel")).toBeVisible();
+test("the panes stay laid out under it", async ({ page }) => {
+  // s-1's tab, its diff beside it, and its quick terminal open under the conversation.
+  await seedBeside("s-1", [diffTab("s-1")]);
+  await openShellApp(page);
+  await page.locator('[data-testid="shell-pane"][data-pane-id="p-1"]').getByTestId("thread-pane-body").click({ position: { x: 20, y: 200 } });
+  await page.keyboard.press("Meta+j");
+  await expect(page.getByTestId("quick-terminal")).toBeVisible();
   await openUsage(page);
-  await expect(page.getByTestId("side-panel")).toBeVisible();
-  await expect(page.getByTestId("bottom-panel")).toBeVisible();
-  // The content pane still shows the thread.
-  await expect(page.getByTestId("content-pane").getByTestId("thread-header")).toBeVisible();
+  await expect(page.getByTestId("shell-pane")).toHaveCount(2);
+  await expect(page.getByTestId("diff-surface")).toBeVisible();
+  await expect(page.getByTestId("quick-terminal")).toBeVisible();
+  // The thread's pane still shows the thread.
+  await expect(page.getByTestId("thread-header")).toBeVisible();
 
-  // A shell this window starts (cmd+t) takes the keyboard, which it could not under a
-  // modal: the sheet closes, as the settings sheet does.
-  // Not getByRole: the modal hides everything else from the accessibility tree.
-  const tabs = page.getByTestId("bottom-panel").locator('[role="tab"]');
-  // The mock's s-1 has one shell.
-  await expect(tabs).toHaveCount(1);
+});
+
+test("a terminal this window starts under it takes the keyboard: the sheet closes", async ({ page }) => {
+  await seedBeside("s-1", [diffTab("s-1")]);
+  await openShellApp(page);
+  await page.locator('[data-testid="shell-pane"][data-pane-id="p-1"]').getByTestId("thread-pane-body").click({ position: { x: 20, y: 200 } });
+  await openUsage(page);
+  // A terminal this window starts (cmd+t: a tab linked to the thread) takes the keyboard, which it
+  // could not under a modal: the sheet closes, as the settings sheet does.
+  await expect(tabOfKind(page, "terminal")).toHaveCount(0);
   await page.keyboard.press("Meta+t");
-  await expect(tabs).toHaveCount(2);
+  await expect(tabOfKind(page, "terminal")).toHaveCount(1);
   await expect(sheet(page)).toHaveCount(0);
 });

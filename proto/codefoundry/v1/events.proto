@@ -6,6 +6,7 @@ import "codefoundry/v1/action.proto";
 import "codefoundry/v1/gh.proto";
 import "codefoundry/v1/gitops.proto";
 import "codefoundry/v1/heartbeat.proto";
+import "codefoundry/v1/layout.proto";
 import "codefoundry/v1/memory.proto";
 import "codefoundry/v1/theme.proto";
 import "codefoundry/v1/plugin.proto";
@@ -26,7 +27,7 @@ import "codefoundry/v1/workspace.proto";
 // verb reads the same stream.
 service EventService {
   // Watch streams all events. Each store's snapshot event is sent first, in the order
-  // project, workspace, terminal, thread list, thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, so a
+  // project, workspace, terminal, thread list, thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout, so a
   // client can replace its state wholesale on connect.
   rpc Watch(WatchEventsRequest) returns (stream Event) {}
   // SetClientState updates what a GUI client's open Watch stream reported about itself
@@ -126,6 +127,9 @@ enum EventSource {
   // Agent searches, for the sidebar's search row: a SearchActivity (after memory), then
   // the whole of it again per change. Never a run's steps or hits (SearchService.Watch).
   EVENT_SOURCE_SEARCH = 18;
+  // The window shell's layout: a LayoutEvent with the whole layout (after search), then
+  // one LayoutEvent delta per commit (LayoutService, layout.proto).
+  EVENT_SOURCE_LAYOUT = 19;
 }
 
 message Event {
@@ -158,6 +162,9 @@ message Event {
     ThemeEvent theme = 18;
     // Agent searches: running and unseen, on connect and per change.
     SearchActivity search = 19;
+    // The layout: the whole of it, on connect, then one delta per commit. 20 and 21 are
+    // seq and epoch.
+    LayoutEvent layout = 22;
   }
   // Position of a live event in the daemon's one event sequence: 1, 2, 3, ... per
   // daemon lifetime, shared by every client and source (the same event has the same

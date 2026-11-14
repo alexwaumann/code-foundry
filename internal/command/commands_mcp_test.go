@@ -15,6 +15,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/command/commandtest"
+	"github.com/alexwaumann/code-foundry/internal/store/layout/layouttest"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
@@ -25,7 +26,7 @@ func newMcpRegistry(t *testing.T) (*command.Registry, *threadtest.Fake, *command
 	fake := threadtest.New(b)
 	reg := command.NewRegistry()
 	emit := &commandtest.Emitter{Delivered: 1, OpenWindows: 1}
-	if err := command.RegisterMcp(reg, api.NewThread(fake, b), emit); err != nil {
+	if err := command.RegisterMcp(reg, api.NewThread(fake, b), emit, command.WithMcpLayout(layouttest.New(nil))); err != nil {
 		t.Fatal(err)
 	}
 	fake.Put(thread.Thread{ID: "s1", Name: "fix", State: thread.StateConnected})
@@ -134,18 +135,20 @@ func TestMcpCommands(t *testing.T) {
 	}
 }
 
-func TestViewPanelMcpEmits(t *testing.T) {
+// view.panel.mcp (view.open.mcp's old name) from the app opens the selected thread's MCP tab, and
+// sends no intent.
+func TestViewPanelMcpOpensATab(t *testing.T) {
 	reg, _, emit := newMcpRegistry(t)
 	uctx := command.Context{ActiveThreadID: "s1", ActiveView: "thread"}
 	res, err := reg.Invoke(context.Background(), uctx, "view.panel.mcp", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Message != "" || res.JSON != (command.EmitResult{Windows: 1, Receivers: 1}) {
-		t.Errorf("result = %+v", res)
+	if out, ok := res.JSON.(command.PanelResult); res.Message != "" || !ok || out.Thread != "s1" || out.Tab == "" {
+		t.Errorf("result = %+v, want the thread's tab and no message in the app", res)
 	}
-	if got := emit.Intents(); len(got) != 1 || got[0].GetShowView().GetName() != command.ViewPanelMcp {
-		t.Errorf("intents = %v", got)
+	if got := emit.Intents(); len(got) != 0 {
+		t.Errorf("intents = %v, want none: the tab is the whole effect", got)
 	}
 }
 

@@ -2,13 +2,13 @@
  * The file finder's presentation and its two actions (file.find, cmd+P;
  * docs/notes/file-finder-2-gui.md). The finder is a page of the command palette
  * (components/palette/FileFinder.tsx) over the thread on screen. Enter opens the file as
- * a File tab in that thread's side panel; ⌥⏎ puts it in the thread's prompt as an @ file.
+ * a File tab beside that thread; ⌥⏎ puts it in the thread's prompt as an @ file.
  */
 import { threadDraftKey } from "@/lib/threadDraft";
 import { isNoProject } from "@/lib/threadRow";
 import { insertTagInto } from "./cite";
 import { openFileInPanel } from "./filePanel";
-import { keyOf } from "./panel";
+import { threadTarget } from "@/shell/host";
 import { useProjectsStore } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -45,16 +45,14 @@ export function presentFileFinder(): boolean {
 }
 
 /**
- * Enter: the file as a File tab in the thread's side panel (its focused group; the panel
- * opens if shut, an open tab of the file only activates), at `line` when given. The
- * palette closes and the keyboard goes to the panel.
+ * Enter: the file as a File tab linked to the thread (placed by the layout; an open tab of the
+ * file only activates), at `line` when given, with the keyboard in it. The palette closes
+ * without handing the keyboard to the thread's prompt: until the tab draws, it is back where
+ * it was.
  */
 export function openFoundFile(threadId: string, f: FinderFile, line?: number): void {
-  const panelKey = keyOf({ kind: "thread", id: threadId });
-  if (panelKey !== null) openFileInPanel(panelKey, { project: f.projectId, base: f.checkout, path: f.path, ...(line === undefined ? {} : { line }) });
-  // After the panel has the tab, so the panel that takes focus is mounted (closePalette).
-  useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  useUiStore.getState().closePalette();
+  useUiStore.getState().closePalette(true);
+  openFileInPanel(threadTarget(threadId), { project: f.projectId, base: f.checkout, path: f.path, ...(line === undefined ? {} : { line }) });
 }
 
 /**

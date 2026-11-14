@@ -1,0 +1,72 @@
+{
+  "doc": "Rule 5 in a row: the new pane takes its room from the thread's pane alone; the other pane keeps its share.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-x","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+    "w": 2400,
+    "h": 900
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-x","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [
+                {"id":"t-n1","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.5,0.275,0.22499999999999998]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1","rule":"5"}
+}

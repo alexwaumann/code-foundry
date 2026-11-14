@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { BottomToggle } from "@/components/bottom/BottomToggle";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
 import { NavProvider } from "@/lib/NavRow";
@@ -23,6 +21,7 @@ import { WorkspaceProjects } from "./WorkspaceProjects";
 import { openThread, useWorkspaceThreads } from "./workspaceHooks";
 import { WorkspaceThreads } from "./WorkspaceThreads";
 import { WorkspaceTitle } from "./WorkspaceTitle";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 /** The workspace's member ids by project name (lib/workspaceCard.ts membersByName); the stored order is by id. */
 function useMembersByName(workspaceId: string): string[] {
@@ -80,12 +79,15 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
     clearProjectsPageReveal(reveal);
   }, [reveal, navItems, setCursor]);
   const rootRef = useRef<HTMLDivElement>(null);
-  // The content pane's width (the side panel takes from it): the scroll box's.
+  // The pane's width: the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   const scrollRef = usePageScroll(pageKey, widthRef);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
   return (
@@ -113,8 +115,6 @@ export function WorkspacePage({ workspaceId, pageKey }: { workspaceId: string; p
           <PagePicker icon={<WorkspaceIcon />} name={name} currentWorkspace={workspaceId} />
         )}
         <span className="-mr-2 ml-auto flex shrink-0 items-center pl-2">
-          <BottomToggle />
-          <PanelToggle />
         </span>
       </PaneHeader>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">

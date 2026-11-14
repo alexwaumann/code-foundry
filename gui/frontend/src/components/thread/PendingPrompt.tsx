@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from "react";
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { Kbd } from "@/components/ui/kbd";
 import { Tip } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import {
   modeHint,
   NO_PICK,
   permissionChoices,
+  permissionTitle,
   pickOption,
   promptKey,
   questionsOf,
@@ -23,13 +24,13 @@ import {
   type PromptShape,
   type QuestionPick,
 } from "@/lib/threadRequest";
-import { diffStats, parseObject, relPath, str, toolDiff, toolDiffFiles, type Json } from "@/lib/toolSummary";
+import { parseObject, relPath, str } from "@/lib/toolSummary";
 import { useThreadsStore } from "@/stores/threads";
 import { useAgentInputOf, useThreadItem } from "@/stores/thread";
 import { respondThread } from "@/stores/threadActions";
 import { TokenSpans } from "./Code";
 import { useThreadCtx } from "./context";
-import { ToolDiffView } from "./ToolDiffView";
+import { PromptDiff } from "./PromptDiff";
 
 /**
  * The docked prompts (rendered threads PR 3, docs/notes/rendered-threads-3-interaction.md):
@@ -86,58 +87,12 @@ function usePromptKeys(shape: PromptShape, act: (a: PromptKeyAction) => void, ke
   };
 }
 
-/** The question the permission prompt asks. */
-function permissionTitle(r: ThreadRequestView, input: Json, cwd: string): string {
-  if (r.title) return r.title;
-  const path = str(input, "file_path") || str(input, "notebook_path");
-  switch (r.toolName) {
-    case "Bash":
-      return "Allow Claude to run this command?";
-    case "Edit":
-    case "MultiEdit":
-    case "NotebookEdit":
-      return path ? `Allow Claude to edit ${relPath(path, cwd)}?` : "Allow Claude to edit this file?";
-    case "Write":
-      return path ? `Allow Claude to write ${relPath(path, cwd)}?` : "Allow Claude to write this file?";
-    case "WebFetch":
-      return "Allow Claude to fetch this page?";
-    default:
-      return `Allow Claude to use ${r.displayName || r.toolName}?`;
-  }
-}
-
 /** A button's key hint, in the button's own colour. */
 function ButtonKey({ k }: { k: string }) {
   return (
     <Kbd variant="inherit" size="sm">
       {k}
     </Kbd>
-  );
-}
-
-/** An Edit/Write waiting for permission: its +/− summary, and the diff on demand. */
-function PromptDiff({ r }: { r: ThreadRequestView }) {
-  const { cwd } = useThreadCtx();
-  const diff = useMemo(() => toolDiff({ name: r.toolName, inputJson: r.inputJson, resultJson: "" }), [r.toolName, r.inputJson]);
-  const stats = useMemo(() => (diff ? diffStats(toolDiffFiles(diff)) : null), [diff]);
-  const [open, setOpen] = useState(false);
-  if (!diff || !stats) return null;
-  const { added, removed } = stats;
-  const Chevron = open ? ChevronDown : ChevronRight;
-  return (
-    <div className="pdiff" data-testid="thread-permission-diff">
-      <button type="button" className="pdiff-t" aria-expanded={open} onClick={() => { setOpen(!open); }}>
-        <Chevron aria-hidden />
-        {open ? "Hide the change" : "Show the change"}
-        <span className="n add">+{added}</span>
-        {removed > 0 && <span className="n del">−{removed}</span>}
-      </button>
-      {open && (
-        <div className="pdiff-body">
-          <ToolDiffView diff={diff} cwd={cwd} />
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -244,7 +199,7 @@ function PermissionPrompt({ r, keysRef, refocus }: PromptProps) {
       ) : (
         r.inputJson && <div className="cmdbox selectable">{JSON.stringify(input, null, 2)}</div>
       )}
-      <PromptDiff r={r} />
+      <PromptDiff r={r} cwd={cwd} />
       {(description || rules.length > 0 || sessionMode || why) && (
         <div className="desc">
           {description}

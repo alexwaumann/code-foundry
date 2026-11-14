@@ -1,0 +1,66 @@
+{
+  "doc": "A pane whose neighbours are all gone goes on the right edge of the pane area at its active tab's size.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "mru": ["t-a"],
+        "closed": [
+          {
+            "pane": "p-b",
+            "whole": true,
+            "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+            "active": "t-f",
+            "beside": {"neighbours":["p-z"],"edge":"left","frac":0.3}
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed","w":1000,"h":800},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.65,0.35]
+        },
+        "focus": "p-b",
+        "mru": ["t-f","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-f"}
+}

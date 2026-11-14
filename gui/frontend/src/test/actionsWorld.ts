@@ -5,7 +5,7 @@
  * src/test/daemonFakes.ts (the invocations) and src/test/projectsWorld.ts (the projects).
  *
  * A run's terminal arrives the way the daemon sends it, as a terminal event through
- * stores/events.ts (so the bottom panel opens on it), and leaves the same way.
+ * stores/events.ts (so its terminal tab opens), and leaves the same way.
  */
 import { act } from "@testing-library/react";
 import type { ActionIconName, ActionRunView, ActionView } from "@/api/actions";
@@ -48,7 +48,7 @@ let seq = 0;
 export function actionTerminal(id: string, a: ActionView, runId: string, owner: RunOwner, o: Partial<TerminalView> = {}): TerminalView {
   const labels: Record<string, string> = { kind: "action", project: owner.projectId, worktree: owner.worktree, action: a.id, "action.name": a.name, "action.run": runId };
   if (owner.threadId) labels.thread = owner.threadId;
-  return { id, argv: ["/bin/zsh", "-lc", a.command], cwd: owner.worktree, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: Date.now(), exitedAtMs: null, altScreen: false, labels, ...o };
+  return { id, argv: ["/bin/zsh", "-lc", a.command], cwd: owner.worktree, cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: Date.now(), exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels, ...o };
 }
 
 /** A terminal event, as the daemon sends one (stores/events.ts opens or hides panels). */

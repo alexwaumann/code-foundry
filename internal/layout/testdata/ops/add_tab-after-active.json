@@ -1,0 +1,103 @@
+{
+  "doc": "A tab added to a pane lands right after its active tab; with focus it takes the focus.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "add_tab",
+    "pane": "p-b",
+    "tab": {
+      "id": "t-new",
+      "kind": "pullrequest",
+      "thread": "th-a",
+      "params": {"slug":"Acme/App","number":"7"}
+    },
+    "focus": true
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {
+                  "id": "t-new",
+                  "kind": "pullrequest",
+                  "thread": "th-a",
+                  "params": {"number":"7","slug":"Acme/App"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-new"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-new","t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-new"}
+}

@@ -1,5 +1,6 @@
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
 import { mockPost, openApp, openStreams, resetMock, row } from "./fixtures";
+import { openRowThread } from "./shell-threads";
 
 /**
  * The visible thread's Watch across a thread switch, and the "reconnecting…" chip when a
@@ -39,9 +40,10 @@ test("a thread switch reopens the Watch without the reconnecting chip", async ({
   await row(page, "s:s-r1").click();
   await expect(timeline(page)).toBeVisible();
   const before = t.watches();
-  // A thread switch and back: a fresh Watch each time, never "reconnecting".
-  await row(page, "s:s-2").click();
-  await row(page, "s:s-r1").click();
+  // A thread switch and back (tabs of one pane: only the active one is drawn): a fresh Watch each
+  // time, never "reconnecting". s-2 waits on the user: its row's first line opens it.
+  await openRowThread(page, "s-2");
+  await openRowThread(page, "s-r1");
   await expect(timeline(page)).toBeVisible();
   await expect.poll(t.watches).toBeGreaterThanOrEqual(before + 2);
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);

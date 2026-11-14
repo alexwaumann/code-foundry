@@ -1,0 +1,25 @@
+{
+  "doc": "In an empty space New thread opens the composer as its first pane.",
+  "state": {
+    "v": 1,
+    "spaces": [{"id":"sp-a","name":"Space A","root":null}],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"new_thread","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-n1","tabs":[{"id":"t-n1","kind":"compose"}],"active":"t-n1"},
+        "focus": "p-n1",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1","rule":"focused"}
+}

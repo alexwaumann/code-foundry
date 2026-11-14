@@ -1,0 +1,82 @@
+{
+  "doc": "Behind: the tab lands in the pane showing the tab the user is typing in, which is not the focused pane, and waits behind it there.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-e","kind":"file","thread":"th-a","params":{"path":"/r/a.env","edit":"1"}},
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}}
+              ],
+              "active": "t-e"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"file","thread":"th-a","params":{"path":"/r/b.env","edit":"1"}},
+    "behind": "t-e"
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-e","kind":"file","thread":"th-a","params":{"edit":"1","path":"/r/a.env"}},
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+                {"id":"t-n1","kind":"file","thread":"th-a","params":{"edit":"1","path":"/r/b.env"}}
+              ],
+              "active": "t-e"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-n1","rule":"2"}
+}

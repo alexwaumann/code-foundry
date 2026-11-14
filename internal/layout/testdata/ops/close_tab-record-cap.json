@@ -1,0 +1,118 @@
+{
+  "doc": "The reopen history keeps the newest 20 entries.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-f","kind":"file","params":{"path":"/x"}},
+                {"id":"t-g","kind":"file","params":{"path":"/y"}}
+              ],
+              "active": "t-g"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b",
+        "mru": ["t-g","t-a","t-f"],
+        "closed": [
+          {"pane":"p-z","tabs":[{"id":"t-z0","kind":"file","params":{"path":"/z0"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z1","kind":"file","params":{"path":"/z1"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z2","kind":"file","params":{"path":"/z2"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z3","kind":"file","params":{"path":"/z3"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z4","kind":"file","params":{"path":"/z4"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z5","kind":"file","params":{"path":"/z5"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z6","kind":"file","params":{"path":"/z6"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z7","kind":"file","params":{"path":"/z7"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z8","kind":"file","params":{"path":"/z8"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z9","kind":"file","params":{"path":"/z9"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z10","kind":"file","params":{"path":"/z10"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z11","kind":"file","params":{"path":"/z11"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z12","kind":"file","params":{"path":"/z12"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z13","kind":"file","params":{"path":"/z13"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z14","kind":"file","params":{"path":"/z14"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z15","kind":"file","params":{"path":"/z15"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z16","kind":"file","params":{"path":"/z16"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z17","kind":"file","params":{"path":"/z17"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z18","kind":"file","params":{"path":"/z18"}}],"index":0},
+          {"pane":"p-z","tabs":[{"id":"t-z19","kind":"file","params":{"path":"/z19"}}],"index":0}
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_tab","tab":"t-g","record":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-f"],
+        "closed": [
+          {"pane":"p-b","tabs":[{"id":"t-g","kind":"file","params":{"path":"/y"}}],"index":1},
+          {"pane":"p-z","tabs":[{"id":"t-z0","kind":"file","params":{"path":"/z0"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z1","kind":"file","params":{"path":"/z1"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z2","kind":"file","params":{"path":"/z2"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z3","kind":"file","params":{"path":"/z3"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z4","kind":"file","params":{"path":"/z4"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z5","kind":"file","params":{"path":"/z5"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z6","kind":"file","params":{"path":"/z6"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z7","kind":"file","params":{"path":"/z7"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z8","kind":"file","params":{"path":"/z8"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z9","kind":"file","params":{"path":"/z9"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z10","kind":"file","params":{"path":"/z10"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z11","kind":"file","params":{"path":"/z11"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z12","kind":"file","params":{"path":"/z12"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z13","kind":"file","params":{"path":"/z13"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z14","kind":"file","params":{"path":"/z14"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z15","kind":"file","params":{"path":"/z15"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z16","kind":"file","params":{"path":"/z16"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z17","kind":"file","params":{"path":"/z17"}}]},
+          {"pane":"p-z","tabs":[{"id":"t-z18","kind":"file","params":{"path":"/z18"}}]}
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","closed":["t-g"]}
+}

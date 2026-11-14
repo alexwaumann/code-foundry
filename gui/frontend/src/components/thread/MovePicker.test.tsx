@@ -12,7 +12,8 @@ vi.mock("@/api/project", async (orig) => ({ ...(await orig<typeof import("@/api/
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), warning: vi.fn(), info: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
-const { ThreadTitle } = await import("./ThreadParts");
+const { ThreadCrumb } = await import("./ThreadParts");
+const { ThreadHeader } = await import("./ThreadHeader");
 const { useMovePickerStore, openMovePicker, canMoveThread } = await import("@/stores/movePicker");
 const { useCanMove } = await import("./useNoProject");
 const { useProjectsStore } = await import("@/stores/projects");
@@ -89,7 +90,7 @@ const crumb = () => screen.getByTestId("thread-crumb-place").textContent;
 const picker = () => screen.getByTestId("move-picker");
 
 function openPicker(): HTMLElement {
-  render(<ThreadTitle id="s-1" />);
+  render(<ThreadCrumb id="s-1" />);
   fireEvent.click(screen.getByTestId("thread-crumb-move"));
   return picker();
 }
@@ -104,16 +105,16 @@ function pick(id: string): HTMLElement {
 
 describe("the crumb as the move picker's trigger", () => {
   it("No project is a trigger; a project thread's place, and an archived thread's, is not", () => {
-    render(<ThreadTitle id="s-1" />);
+    render(<ThreadCrumb id="s-1" />);
     expect(screen.getByTestId("thread-crumb-move").textContent).toContain("No project");
     cleanup();
     setThread({ archivedAtMs: 1 });
-    render(<ThreadTitle id="s-1" />);
+    render(<ThreadCrumb id="s-1" />);
     expect(screen.queryByTestId("thread-crumb-move")).toBeNull();
     expect(crumb()).toBe("No project");
     cleanup();
     setThread({ projectId: "web", projectIds: ["web"], worktreePath: "/Users/me/src/web" });
-    render(<ThreadTitle id="s-1" />);
+    render(<ThreadCrumb id="s-1" />);
     expect(screen.queryByTestId("thread-crumb-move")).toBeNull();
   });
 
@@ -197,6 +198,26 @@ describe("step 2: where it works there", () => {
 });
 
 describe("Move", () => {
+  it("the shell's thread header says Moving to … from the send until the move is done", () => {
+    render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+    expect(screen.getByTestId("thread-header-place").textContent).toBe("No project");
+    // Sent, the daemon not answered yet.
+    act(() => {
+      useMovePickerStore.setState({ sending: { "s-1": "web" } });
+    });
+    expect(screen.getByTestId("thread-header-moving").textContent).toBe("Moving to web…");
+    expect(screen.queryByTestId("thread-header-place")).toBeNull();
+    // The daemon's pending move names it.
+    act(() => {
+      useMovePickerStore.setState({ sending: {} });
+    });
+    setThread({ pendingMove: { projectId: "web", workspaceId: "", worktreePath: "", branch: "" } });
+    expect(screen.getByTestId("thread-header-moving").textContent).toBe("Moving to web…");
+    // Moved: the branch chip.
+    setThread({ projectId: "web", projectIds: ["web"], worktreePath: "/Users/me/src/web", branch: "main" });
+    expect(screen.queryByTestId("thread-header-moving")).toBeNull();
+  });
+
   it("Enter moves: thread.move with the choice, the picker closes, the crumb says Moving to … until the daemon answers", async () => {
     let answer: () => void = () => undefined;
     daemon.handlers.set(
@@ -324,6 +345,43 @@ describe("the keyboard when the crumb's trigger unmounts", () => {
       useThreadsStore.setState({ byId: {}, order: [] });
     });
     expect(seq()).toBe(before);
+  });
+});
+
+describe("the picker across its header mounting", () => {
+  const frame = () =>
+    act(async () => {
+      await new Promise((r) => {
+        requestAnimationFrame(() => {
+          r(null);
+        });
+      });
+    });
+
+  it("asked for as the thread's tab draws, it survives the header mounting again at once", async () => {
+    useMovePickerStore.setState({ open: "s-1" });
+    const { rerender } = render(<ThreadCrumb key="first" id="s-1" />);
+    // The tab's body drawn again: the old header unmounts as the new one mounts, in one commit.
+    rerender(<ThreadCrumb key="again" id="s-1" />);
+    await frame();
+    expect(useMovePickerStore.getState().open).toBe("s-1");
+    expect(picker()).toBeTruthy();
+  });
+
+  it("a header remounting while the keyboard is nowhere (the menu that asked just went) does not ask the thread's prompt for it", () => {
+    const before = useUiStore.getState().promptFocusSeq;
+    (document.activeElement as HTMLElement | null)?.blur();
+    const { rerender } = render(<ThreadCrumb key="first" id="s-1" />);
+    rerender(<ThreadCrumb key="again" id="s-1" />);
+    expect(useUiStore.getState().promptFocusSeq).toBe(before);
+  });
+
+  it("leaving the thread (the header gone) closes it a frame later, so coming back does not reopen it", async () => {
+    useMovePickerStore.setState({ open: "s-1" });
+    const { unmount } = render(<ThreadCrumb id="s-1" />);
+    unmount();
+    await frame();
+    expect(useMovePickerStore.getState().open).toBeNull();
   });
 });
 

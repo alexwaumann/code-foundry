@@ -140,7 +140,11 @@ func threadLabel(s *v1.Thread) string {
 // thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive,
 // thread.snooze, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md).
-func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
+func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...ThreadLifecycleOption) error {
+	var o threadLifecycleOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
 	return r.RegisterAll(
 		Command{
@@ -185,6 +189,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				createdFocusArg,
 				{Name: "request-id", Type: String, Description: "An idempotency key (at most 128 characters): repeating thread.new with a key its creator used " +
 					"in the last 24 hours prints the thread made then and starts nothing"},
+				composeArg,
 			},
 			When: canStartThread,
 			Run: func(ctx context.Context, c Context, a Args) (Result, error) {
@@ -268,6 +273,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 					// thread (like, or the creating one) works in worktrees.
 					req.CheckoutMode = true
 				}
+				if err := o.checkComposer(a.String("compose")); err != nil {
+					return Result{}, err
+				}
 				res, err := b.Create(ctx, connect.NewRequest(req))
 				if err != nil {
 					return Result{}, err
@@ -280,20 +288,24 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				}
 				focusCreated(e, a, s)
 				msg := createdMessage(req, res.Msg, r.projectNamer(ctx))
+				// Collision hints, never a refusal: printed on stderr.
+				warnings := res.Msg.GetHints()
+				if w := o.sentFrom(ctx, c, a.String("compose"), s.GetId()); w != "" {
+					warnings = append(warnings, "thread "+s.GetId()+" was made, but "+w)
+				}
 				if req.GetNotify() {
 					msg += "; " + notifyLine(req)
 				}
-				// Collision hints, never a refusal: printed on stderr.
-				return Result{Message: msg, JSON: s, Warnings: res.Msg.GetHints()}, nil
+				return Result{Message: msg, JSON: s, Warnings: warnings}, nil
 			},
 		},
-		threadNewLike(r, b, e),
+		threadNewLike(r, b, e, o),
 		Command{
 			Name:         "thread.focus",
 			Page:         PageState,
 			NoPalette:    true,
 			Title:        "Focus Thread",
-			Description:  "Show a thread in every connected window.",
+			Description:  "Show a thread in every connected window: the shell window switches to the thread's space and focuses its tab, opening it when it is closed (thread.open --focus).",
 			Category:     "Thread",
 			NoKeybinding: true,
 			Args:         []ArgSpec{idArg},
@@ -302,9 +314,22 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 				if err := r.known(ctx, ThreadID, a.String("id")); err != nil {
 					return Result{}, err
 				}
+				archived := false
+				if res, err := b.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: a.String("id")})); err == nil {
+					archived = res.Msg.GetThread().GetArchivedAt() != nil
+				}
+				tab, err := o.focusThreadTab(ctx, a.String("id"), archived)
+				if err != nil {
+					return Result{}, err
+				}
 				// Explicit: asked for, so the window selects even a child hidden from the
 				// sidebar (docs/notes/child-never-takes-view.md).
-				return EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id"), Explicit: true}}}).Result(), nil
+				sent := EmitTo(e, &v1.UiIntent{Intent: &v1.UiIntent_FocusThread_{FocusThread: &v1.UiIntent_FocusThread{ThreadId: a.String("id"), Explicit: true}}})
+				res := sent.Result()
+				if tab != "" {
+					res.Message = tab + sent.windows()
+				}
+				return res, nil
 			},
 		},
 		Command{
@@ -313,9 +338,9 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter) error {
 			Title:       "Rename Thread",
 			Description: "Set the thread's name. Turns off automatic naming.",
 			Category:    "Thread",
-			Keybindings: []string{"cmd+r"},
-			Args:        []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Positional: true, Description: "New name"}},
-			When:        hasThread,
+			// cmd+r is tab.rename since the shell: on a thread's tab it renames the thread here.
+			Args: []ArgSpec{idArg, {Name: "name", Type: String, Required: true, Positional: true, Description: "New name"}},
+			When: hasThread,
 			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
 				res, err := b.Rename(ctx, connect.NewRequest(&v1.RenameThreadRequest{Id: a.String("id"), Name: a.String("name")}))
 				if err != nil {

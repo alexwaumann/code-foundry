@@ -1,0 +1,677 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+// LayoutService reads and changes the window shell's layout: the spaces, each space's tree
+// of panes, the tabs in them, and what is stored per thread. The daemon is the only writer
+// (internal/store/layout); every change is one LayoutOp, applied in the order calls arrive,
+// and every change that alters something is one commit with the next rev, published on
+// EventService's layout source. The model and its rules are internal/layout;
+// docs/notes/shell-model.md is the specification and docs/notes/shell-3-layout-store.md
+// records this service's decisions.
+service LayoutService {
+  // Get returns the whole layout.
+  rpc Get(GetLayoutRequest) returns (GetLayoutResponse) {}
+  // Apply runs one op. An op that names an id that is gone is NotFound and changes
+  // nothing; a bad argument is InvalidArgument; a surface already open where the op
+  // would put a second one is AlreadyExists; an op the state does not allow (removing the
+  // last space, moving a thread's tab to another space) is FailedPrecondition. An op this
+  // daemon does not run yet (a case of LayoutOp with no handler, or one from a newer
+  // client) is Unimplemented. An op that changes nothing answers the current rev and
+  // publishes nothing.
+  rpc Apply(ApplyLayoutRequest) returns (ApplyLayoutResponse) {}
+  // SetViewport reports the size of a window's pane area, in layout pixels (viewport
+  // pixels divided by the page zoom). The daemon lays out with the last size reported
+  // (1180 x 820 before any) where a rule needs pixels: placing a linked surface,
+  // restoring one, a direction verb.
+  rpc SetViewport(SetViewportRequest) returns (SetViewportResponse) {}
+  // ImportLegacy is the first-load import (docs/notes/shell-18-legacy-import.md): the
+  // classic window's side panel and bottom panel stores, which live in the window's
+  // localStorage, become each thread's remembered set and quick terminal. No thread is
+  // opened; a classic user's layout is left as one empty space. Running terminals keep
+  // running: a thread's first shell becomes its quick terminal (labelled slot=quick), its
+  // other terminals remembered terminal tabs. It runs once in the life of the database:
+  // later calls change nothing and answer imported false with the layout as it is.
+  rpc ImportLegacy(ImportLegacyRequest) returns (ImportLegacyResponse) {}
+}
+
+message GetLayoutRequest {}
+
+message GetLayoutResponse {
+  Layout layout = 1;
+}
+
+// Layout is the whole layout at one rev.
+message Layout {
+  // The commit this is: 1, 2, 3, ... for the life of the database (it survives a daemon
+  // restart).
+  uint64 rev = 1;
+  // Every space, in the order of the space tabs.
+  repeated LayoutSpace spaces = 2;
+  // The space the window shows.
+  string current_space_id = 3;
+  // The space of every thread not listed in threads.
+  string default_space_id = 4;
+  // Only threads with something stored; every other thread lives in default_space_id
+  // and has nothing remembered.
+  repeated ThreadLayout threads = 5;
+  // The first-load import ran (LayoutService.ImportLegacy).
+  bool legacy_imported = 6;
+  // What in the stored layout a newer build wrote (a document of a newer version, a tab or
+  // node of a kind this build does not know), one line each. When it is not empty the
+  // daemon left the stored layout as it was: this layout is what this build understands of
+  // it, changes to it live in memory only, and none is saved until the app is updated.
+  // Decided when the daemon loads the layout; no delta changes it.
+  repeated string newer = 7;
+}
+
+// LayoutSpace is a named layout: one tree of panes.
+message LayoutSpace {
+  // "sp-" + 8 base32 characters.
+  string id = 1;
+  string name = 2;
+  // The tree; unset for a space with no pane (it shows the composer).
+  LayoutNode root = 3;
+  // The focused pane; empty only when root is unset.
+  string focus_pane_id = 4;
+  // Tab ids of this space, most recently focused first, at most 64.
+  repeated string mru_tab_ids = 5;
+  // The space's composer drafts, newest first, open in a tab or not. The empty composer is
+  // never one of them.
+  repeated LayoutDraft drafts = 6;
+}
+
+// LayoutDraft is a composer with something typed in it. Its text is not in the layout.
+message LayoutDraft {
+  // "d-" + 8 base32 characters, or an id the window chose; the "draft" param of its
+  // compose tab.
+  string id = 1;
+  // One line for lists; empty draws a placeholder.
+  string label = 2;
+  // Its tab's other params (project, workspace, like), for reopening it.
+  map<string, string> params = 3;
+}
+
+// LayoutNode is a pane or a split.
+message LayoutNode {
+  oneof node {
+    LayoutPane pane = 1;
+    LayoutSplit split = 2;
+  }
+}
+
+// LayoutPane is one tile with a tab strip. It always has a tab.
+message LayoutPane {
+  // "p-" + 8 base32 characters.
+  string id = 1;
+  repeated LayoutTab tabs = 2;
+  string active_tab_id = 3;
+  // The user collapsed it to a rail (SetCollapsedOp); the window draws it folded until the
+  // user opens it again.
+  bool collapsed = 4;
+}
+
+// LayoutSplit lays out its children in a row or a column.
+message LayoutSplit {
+  // "s-" + 8 base32 characters.
+  string id = 1;
+  LayoutDir dir = 2;
+  // Two or more; never a split of the same direction.
+  repeated LayoutNode children = 3;
+  // Each child's share, positive, summing to 1.
+  repeated double sizes = 4;
+}
+
+enum LayoutDir {
+  LAYOUT_DIR_UNSPECIFIED = 0;
+  // Children left to right.
+  LAYOUT_DIR_ROW = 1;
+  // Children top to bottom.
+  LAYOUT_DIR_COL = 2;
+}
+
+// LayoutEdge is a side of a pane, or of the whole pane area.
+enum LayoutEdge {
+  LAYOUT_EDGE_UNSPECIFIED = 0;
+  LAYOUT_EDGE_LEFT = 1;
+  LAYOUT_EDGE_RIGHT = 2;
+  LAYOUT_EDGE_TOP = 3;
+  LAYOUT_EDGE_BOTTOM = 4;
+}
+
+// LayoutTab is one surface in a pane.
+message LayoutTab {
+  // "t-" + 8 base32 characters. Empty in an op that opens a tab: the daemon makes one.
+  string id = 1;
+  // What it shows: thread, diff, file, pullrequest, terminal, prs, projects, compose,
+  // mcp, gallery, ember.board, plugin.<plugin>.<surface> (internal/layout/identity.go).
+  string kind = 2;
+  // The thread it is linked to; empty for an unlinked tab; the thread itself for kind
+  // thread.
+  string thread_id = 3;
+  // Its identity: two tabs with one key in one space (one key anywhere, for a thread or
+  // a terminal) are the same tab. Computed by the daemon from kind, thread_id and params;
+  // ignored in an op.
+  string key = 4;
+  // What it shows and its own view state.
+  map<string, string> params = 5;
+  // The last automatic title.
+  string title = 6;
+  // A manual name (terminals only); empty is automatic.
+  string name = 7;
+}
+
+// ThreadLayout is what the layout stores for one thread.
+message ThreadLayout {
+  string thread_id = 1;
+  // The space it lives in.
+  string space_id = 2;
+  // Its quick terminal slot; unset when nothing is stored.
+  QuickTerminal quick = 3;
+  // The linked tabs it had open when its tab closed, which opening it again restores.
+  repeated RememberedTab remembered = 4;
+  // The pane its own tab was in when it closed; empty when the remembered tabs are to be
+  // placed fresh.
+  string remembered_pane_id = 5;
+  // Whether it shows its info card, as the user last toggled it; unset: never toggled (the
+  // setting layout.thread_info decides).
+  optional bool info = 6;
+}
+
+message QuickTerminal {
+  bool open = 1;
+  // In layout pixels; 0 is the default height.
+  double height = 2;
+  // The command its shell was running when a snooze ended it, shown with "Run again" over
+  // the fresh shell that replaced it; empty once that ran or was dismissed.
+  string ran = 3;
+}
+
+// RememberedTab is one remembered linked tab and where it was.
+message RememberedTab {
+  LayoutTab tab = 1;
+  string pane_id = 2;
+  int32 index = 3;
+  // It was its pane's active tab.
+  bool active = 4;
+  // Its pane sat next to the thread's pane.
+  bool adjacent = 5;
+  // Where its pane sat, when the pane is to be rebuilt; unset when not stored.
+  LayoutBeside beside = 6;
+  // A terminal that comes back as a fresh shell (after a snooze); unset otherwise.
+  FreshTerminal fresh = 7;
+  // The space it was in when that is not the thread's (a snooze takes the thread's terminal
+  // tabs from every space): it goes back there. Empty: the thread's space.
+  string space_id = 8;
+}
+
+message LayoutBeside {
+  repeated string neighbour_pane_ids = 1;
+  LayoutEdge edge = 2;
+  double frac = 3;
+}
+
+message FreshTerminal {
+  string name = 1;
+  // The command it last ran, for "Run again".
+  string ran = 2;
+}
+
+// LayoutEvent is EventService's layout source. On connect (and when a client missed
+// events) the source sends one LayoutEvent with the whole layout; after that, one delta
+// per commit. rev goes up by one per commit. A delta whose rev is not above the rev the
+// client holds was already in the snapshot it was sent after, and is skipped.
+message LayoutEvent {
+  // The commit the event brings the client to.
+  uint64 rev = 1;
+  oneof change {
+    Layout snapshot = 2;
+    LayoutDelta delta = 3;
+  }
+  // 4 is kept for a focus request (move the keyboard into a tab), set by ops that ask.
+  // ApplyLayoutRequest.client_id of the call that made the commit; empty when the daemon
+  // made it on its own.
+  string client_id = 5;
+}
+
+// LayoutDelta is everything one commit changed, applied as one step: whole spaces and
+// whole thread records, never a patch inside a tree.
+message LayoutDelta {
+  // Spaces that are new or changed, whole.
+  repeated LayoutSpace spaces = 1;
+  repeated string removed_space_ids = 2;
+  // Every space id in order; always set.
+  repeated string space_order = 3;
+  // Always set.
+  string current_space_id = 4;
+  // Always set.
+  string default_space_id = 5;
+  // Thread records that are new or changed, whole.
+  repeated ThreadLayout threads = 6;
+  // Threads whose record went: they now live in default_space_id with nothing stored.
+  repeated string removed_thread_ids = 7;
+  // Layout.legacy_imported after the commit; always set.
+  bool legacy_imported = 8;
+}
+
+message ApplyLayoutRequest {
+  LayoutOp op = 1;
+  // A token naming the calling window (EventService's WatchEventsRequest.client_id), so
+  // it can tell its own commits in the layout source. May be empty.
+  string client_id = 2;
+}
+
+message ApplyLayoutResponse {
+  // The commit the op made, or the current rev when it changed nothing.
+  uint64 rev = 1;
+  // What the op reports it acted on; empty when it says nothing.
+  string space_id = 2;
+  string pane_id = 3;
+  string tab_id = 4;
+  // The tab asked for was already open (same identity) and was used instead.
+  bool existing = 5;
+  // Tabs the op took out of the layout, in layout order: the caller ends what they hold
+  // (an unlinked terminal) or closes what they show (a thread).
+  repeated LayoutTab closed = 6;
+  // How placement chose where a tab went: "1" to "6" (the spec's rules), "pane" (the
+  // caller's pane), "focused" (the focused pane), "compose" (it replaced a composer).
+  string rule = 7;
+  // Linked tabs taken into their thread's remembered set; their terminals keep running.
+  repeated LayoutTab kept = 8;
+  // Terminal tabs whose terminals the caller ends although the op did not close them now
+  // (a snoozed or archived thread's remembered terminals).
+  repeated LayoutTab ended = 9;
+  // The remembered tabs an opened thread brought back: into their old panes, or placed
+  // fresh beside it; fresh are the terminal tabs among them that need a new shell.
+  repeated string back_tab_ids = 10;
+  repeated string placed_tab_ids = 11;
+  repeated string fresh_tab_ids = 12;
+  // The thread whose quick terminal came back open with the thread's tab after a snooze
+  // ended it: it needs a new shell (the daemon starts it).
+  string fresh_quick_thread_id = 15;
+  // The panes smart swap switched to the newly focused thread's surfaces.
+  repeated string swapped_pane_ids = 13;
+  // The composer draft the op started, opened or ended; after clear_draft, discard_draft
+  // and an open_thread that sent from a draft it is gone, and its stored text goes too.
+  string draft_id = 14;
+}
+
+message SetViewportRequest {
+  string client_id = 1;
+  // Positive, in layout pixels.
+  double width = 2;
+  double height = 3;
+}
+
+message SetViewportResponse {}
+
+message ImportLegacyRequest {
+  // The raw value of the window's localStorage "code-foundry.panel" (any version; empty
+  // when absent).
+  string panel_json = 1;
+  // The raw value of localStorage "code-foundry.bottom" (empty when absent).
+  string bottom_json = 2;
+  // As ApplyLayoutRequest.client_id.
+  string client_id = 3;
+}
+
+message ImportLegacyResponse {
+  // The layout after the call.
+  Layout layout = 1;
+  // False when the import ran before: nothing changed.
+  bool imported = 2;
+  // The threads given a remembered set or a quick terminal, by thread id.
+  repeated LegacyImportedThread threads = 3;
+  // Unlinked terminal tabs the classic window's shells had been given, taken out of the
+  // layout. Their terminals keep running (code-foundry terminal list shows them).
+  repeated string removed_tab_ids = 4;
+  // Open linked tabs moved into their thread's remembered set.
+  repeated string folded_tab_ids = 5;
+  // What could not be carried, one line each (a surface the shell does not have, a thread
+  // that is archived or gone).
+  repeated string dropped = 6;
+}
+
+message LegacyImportedThread {
+  string thread_id = 1;
+  // The tabs added to its remembered set, in order.
+  repeated string tab_ids = 2;
+  // The shell that became its quick terminal; empty when none did.
+  string quick_terminal_id = 3;
+}
+
+// LayoutOp is one operation. Each case names the op of internal/layout it runs (its JSON
+// name). Cases 1 to 9 are the thread ops (placement, opening, closing and restoring a
+// thread, moving it between spaces, archiving and snoozing it). An op that lays panes out
+// measures in the pane area the last window reported (SetViewport), else 1180 x 820.
+message LayoutOp {
+  oneof op {
+    OpenThreadOp open_thread = 1;
+    CloseThreadOp close_thread = 2;
+    OpenSurfaceOp open_surface = 3;
+    MoveThreadOp move_thread = 4;
+    ArchiveThreadOp archive_thread = 5;
+    SnoozeThreadOp snooze_thread = 6;
+
+    AddTabOp add_tab = 10;
+    SplitPaneOp split_pane = 11;
+    MoveTabOp move_tab = 12;
+    MovePaneOp move_pane = 13;
+    MergePaneOp merge_pane = 14;
+    SwapPaneOp swap_pane = 15;
+    CloseTabOp close_tab = 16;
+    ClosePaneOp close_pane = 17;
+    SetSizesOp set_sizes = 18;
+    FocusTabOp focus_tab = 19;
+    FocusPaneOp focus_pane = 20;
+    SetTabParamsOp set_tab_params = 21;
+    RenameTabOp rename_tab = 22;
+    ReopenClosedOp reopen_closed = 23;
+
+    NewSpaceOp new_space = 30;
+    RenameSpaceOp rename_space = 31;
+    RemoveSpaceOp remove_space = 32;
+    ReorderSpacesOp reorder_spaces = 33;
+    SwitchSpaceOp switch_space = 34;
+
+    NewThreadOp new_thread = 40;
+    StartDraftOp start_draft = 41;
+    LabelDraftOp label_draft = 42;
+    ClearDraftOp clear_draft = 43;
+    DiscardDraftOp discard_draft = 44;
+    OpenDraftOp open_draft = 45;
+
+    SetQuickOp set_quick = 50;
+    ReplaceTerminalOp replace_terminal = 51;
+    DropTerminalOp drop_terminal = 52;
+
+    SetInfoOp set_info = 60;
+
+    SetCollapsedOp set_collapsed = 70;
+  }
+}
+
+// OpenThreadOp opens a thread's tab (or focuses it), and restores its linked tabs.
+message OpenThreadOp {
+  string thread_id = 1;
+  // Where its tab opens; empty is the focused pane of the thread's space (or in place of
+  // that space's composer when it is the space's only tab).
+  string pane_id = 2;
+  bool focus = 3;
+  // The composer tab the thread was sent from: the thread's tab replaces it, and the
+  // thread lives in that composer's space.
+  string compose_tab_id = 4;
+  // With pane_id: its place in that pane's strip (default: after the active tab).
+  optional int32 index = 5;
+  // With pane_id: a new pane on this edge of that pane; without: a new pane on this edge of
+  // the space's whole pane area.
+  LayoutEdge edge = 6;
+}
+
+// CloseThreadOp closes a thread's tab and its linked tabs in its space, remembering them.
+message CloseThreadOp {
+  string thread_id = 1;
+  // The user closed it: its tab goes in its space's reopen history.
+  bool record = 2;
+}
+
+// OpenSurfaceOp opens a surface by the placement rules (a linked one beside its thread).
+message OpenSurfaceOp {
+  LayoutTab tab = 1;
+  // The pane the "+" menu was opened in, which wins except for a linked tab already open.
+  string pane_id = 2;
+  bool focus = 3;
+  // The space it opens in; empty: the pane's, else a linked tab's thread's, else the
+  // current space.
+  string space_id = 4;
+  // A tab the user is working in (typing in its editor): a tab landing in the pane that shows
+  // it waits behind it there; anywhere else it shows as usual. focus overrides it.
+  string behind_tab_id = 5;
+}
+
+// MoveThreadOp moves a thread to another space with the linked tabs in its space.
+message MoveThreadOp {
+  string thread_id = 1;
+  string space_id = 2;
+}
+
+// ArchiveThreadOp closes a thread's tab and its linked tabs in every space and forgets its
+// layout (ApplyLayoutResponse.ended: its remembered terminals, for the caller to end).
+message ArchiveThreadOp {
+  string thread_id = 1;
+}
+
+// SnoozeThreadOp closes a thread's tab and linked tabs as CloseThreadOp does, and marks its
+// remembered terminals to come back as fresh shells.
+message SnoozeThreadOp {
+  string thread_id = 1;
+  // The command each of its terminals ran last, by terminal id, shown with "Run again".
+  map<string, string> ran = 2;
+  // The command its quick terminal ran last, for the same line when it comes back.
+  string quick_ran = 3;
+}
+
+// SetQuickOp opens or closes a thread's quick terminal (LayoutThread.quick); height above
+// zero sets its height in layout pixels, zero keeps it.
+message SetQuickOp {
+  string thread_id = 1;
+  bool open = 2;
+  double height = 3;
+  // Drop its "Run again" line (QuickTerminal.ran): it ran, or the user dismissed it.
+  bool forget_ran = 4;
+}
+
+// SetInfoOp shows or hides a thread's info card (ThreadLayout.info), kept with the thread.
+message SetInfoOp {
+  string thread_id = 1;
+  bool open = 2;
+}
+
+// SetCollapsedOp collapses a pane to a rail or opens it again (LayoutPane.collapsed). The
+// last open pane of a space cannot be collapsed. Collapsing the focused pane hands the focus to
+// the most recently focused open pane; opening a pane focuses it.
+message SetCollapsedOp {
+  string pane_id = 1;
+  bool collapsed = 2;
+}
+
+// ReplaceTerminalOp points the tabs of terminal old_id (its open tab, and remembered tabs
+// still running) at terminal new_id: a reset terminal's tab follows the fresh shell. The
+// daemon applies it itself when a shell labelled replaces=<old id> starts.
+message ReplaceTerminalOp {
+  string old_id = 1;
+  string new_id = 2;
+}
+
+// DropTerminalOp is a terminal that went away: its open tab closes, and a remembered tab
+// of it still running is forgotten. The daemon applies it itself when a terminal is removed.
+message DropTerminalOp {
+  string terminal_id = 1;
+}
+
+// AddTabOp adds a tab to pane_id, else the focused pane of space_id (empty: the current
+// space), else a new pane when the space is empty; at index, else after the active tab.
+// A tab whose identity is open already is used instead (existing).
+message AddTabOp {
+  string space_id = 1;
+  string pane_id = 2;
+  LayoutTab tab = 3;
+  optional int32 index = 4;
+  // Take the focus. Without it the tab becomes active in its pane unless that pane is
+  // the focused one, where it waits behind the active tab.
+  bool focus = 5;
+}
+
+// SplitPaneOp opens a tab in a new pane on an edge of pane_id at frac of its room (0 is
+// half).
+message SplitPaneOp {
+  string pane_id = 1;
+  LayoutEdge edge = 2;
+  LayoutTab tab = 3;
+  double frac = 4;
+  bool focus = 5;
+}
+
+// MoveTabOp moves a tab: into a new pane on edge of pane_id; into pane_id's strip at
+// index; with edge alone, onto that edge of the pane area of space_id; with space_id
+// alone, into that space's focused pane.
+message MoveTabOp {
+  string tab_id = 1;
+  string space_id = 2;
+  string pane_id = 3;
+  optional int32 index = 4;
+  LayoutEdge edge = 5;
+  double frac = 6;
+}
+
+// MovePaneOp moves a whole pane beside target_pane_id on edge, onto an edge of the pane
+// area, or to another space.
+message MovePaneOp {
+  string pane_id = 1;
+  string target_pane_id = 2;
+  LayoutEdge edge = 3;
+  double frac = 4;
+  string space_id = 5;
+}
+
+// MergePaneOp moves every tab of pane_id into target_pane_id's strip at index (default:
+// the end).
+message MergePaneOp {
+  string pane_id = 1;
+  string target_pane_id = 2;
+  optional int32 index = 3;
+}
+
+// SwapPaneOp swaps two panes of one space.
+message SwapPaneOp {
+  string pane_id = 1;
+  string target_pane_id = 2;
+}
+
+// CloseTabOp takes a tab out of the layout (the plain close: closing a thread with its
+// linked tabs is CloseThreadOp).
+message CloseTabOp {
+  string tab_id = 1;
+  // The user closed it: it goes in its space's reopen history.
+  bool record = 2;
+}
+
+// ClosePaneOp takes a pane and its tabs out of the layout; each thread tab in it closes as
+// CloseThreadOp closes it (its linked tabs in its space are remembered).
+message ClosePaneOp {
+  string pane_id = 1;
+  // The user closed it: it goes in its space's reopen history, whole.
+  bool record = 2;
+}
+
+// ReopenClosedOp reopens the newest entry of a space's reopen history (the tabs and panes the
+// user closed) that can still be reopened, and drops it with those before it that cannot.
+message ReopenClosedOp {
+  // The space; empty is the current one.
+  string space_id = 1;
+  // Tabs of the history the caller found can no longer be reopened (a thread archived or
+  // removed, a file gone).
+  repeated string gone_tab_ids = 2;
+}
+
+// SetSizesOp sets a split's shares, one per child, each positive.
+message SetSizesOp {
+  string split_id = 1;
+  repeated double sizes = 2;
+}
+
+// FocusTabOp makes a tab active, focuses its pane and switches to its space.
+message FocusTabOp {
+  string tab_id = 1;
+}
+
+// FocusPaneOp focuses a pane and switches to its space.
+message FocusPaneOp {
+  string pane_id = 1;
+}
+
+// SetTabParamsOp replaces a tab's params, and its title when set.
+message SetTabParamsOp {
+  string tab_id = 1;
+  map<string, string> params = 2;
+  optional string title = 3;
+}
+
+// RenameTabOp sets a terminal tab's manual name; empty goes back to the automatic name.
+message RenameTabOp {
+  string tab_id = 1;
+  string name = 2;
+}
+
+// NewSpaceOp adds an empty space after the others ("Space <n>" when name is blank).
+message NewSpaceOp {
+  string name = 1;
+  // Make it the current space.
+  bool make_current = 2;
+}
+
+message RenameSpaceOp {
+  string space_id = 1;
+  string name = 2;
+}
+
+// RemoveSpaceOp removes a space with its panes and tabs (closed lists them); its threads
+// move to to_space_id (empty: the space on its left, else on its right). The last space
+// cannot be removed.
+message RemoveSpaceOp {
+  string space_id = 1;
+  string to_space_id = 2;
+}
+
+// ReorderSpacesOp puts the spaces in this order, which names each space once.
+message ReorderSpacesOp {
+  repeated string space_ids = 1;
+}
+
+message SwitchSpaceOp {
+  string space_id = 1;
+}
+
+// NewThreadOp focuses the space's empty composer (with params when given), or opens one in
+// the focused pane (pane_id: that pane, the "+" menu's), or as the first pane of an empty
+// space.
+message NewThreadOp {
+  // Empty: the pane's space, else the current one.
+  string space_id = 1;
+  string pane_id = 2;
+  // What the composer is for (project, workspace, like); never "draft".
+  map<string, string> params = 3;
+  bool focus = 4;
+}
+
+// StartDraftOp turns the empty composer tab_id into a draft (its first text typed).
+message StartDraftOp {
+  string tab_id = 1;
+  // The draft's id, chosen by the window so it can store the text first; empty: a new one.
+  // Refused when used anywhere in the layout.
+  string draft_id = 2;
+  string label = 3;
+}
+
+// LabelDraftOp sets a draft's label.
+message LabelDraftOp {
+  string draft_id = 1;
+  string label = 2;
+}
+
+// ClearDraftOp ends a draft whose text was all deleted: its tab is the space's empty
+// composer again (or closes, when the space has one already).
+message ClearDraftOp {
+  string draft_id = 1;
+}
+
+// DiscardDraftOp ends a draft and closes its tab when open.
+message DiscardDraftOp {
+  string draft_id = 1;
+}
+
+// OpenDraftOp focuses a draft's tab, or opens it in its space's focused pane.
+message OpenDraftOp {
+  string draft_id = 1;
+  bool focus = 2;
+}

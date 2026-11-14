@@ -123,7 +123,6 @@ export function SplitButton({
           collisionPadding={POPUP_COLLISION_PADDING}
           className={cn(menuClassName, POPUP_FIT)}
           data-testid={`${testId}-menu`}
-          data-region="panel"
           onKeyDown={stopPlainKeys}
         >
           {children(() => {

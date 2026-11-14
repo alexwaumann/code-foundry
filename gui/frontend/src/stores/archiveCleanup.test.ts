@@ -3,10 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileReadView } from "@/api/files";
 import type { ThreadView } from "@/api/threads";
 import { newlyArchived, newlyRemoved, newlySnoozed, putAwaySelected, startArchiveCleanup } from "./archiveCleanup";
-import { useBottomStore } from "./bottomPanel";
 import { reconcileThreads } from "./events";
 import { fileEditKey, noteDraft, startEdit, useFileEditStore } from "./fileEdit";
-import { emptyEntry, makeTab, usePanelStore } from "./panel";
+import { makeTab } from "@/shell/host";
 import { useRecentFilesStore } from "./recentFiles";
 import { applyThreadListEvent, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
 import { HOME, useUiStore, type Selection } from "./ui";
@@ -101,50 +100,15 @@ describe("putAwaySelected", () => {
 
 describe("startArchiveCleanup", () => {
   let stop: () => void;
-  const tab = makeTab("worktree", "Worktree");
   beforeEach(() => {
     useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("a"), thread("b")]), loaded: true });
-    usePanelStore.setState({
-      byKey: {
-        "thread:a": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }], width: 500 },
-        "thread:b": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }] },
-      },
-    });
-    useBottomStore.setState({ byKey: { "thread:a": { open: true, height: 300, activeTerminalId: "t1" }, "thread:b": { open: true } } });
     stop = startArchiveCleanup();
   });
   afterEach(() => {
     stop();
   });
 
-  it("an archived thread's side panel loses its tabs and closes, and its bottom panel closes; others are untouched", () => {
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-    expect(usePanelStore.getState().byKey["thread:a"]).toEqual(emptyEntry);
-    expect(useBottomStore.getState().byKey["thread:a"]).toEqual({ open: false });
-    expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
-    expect(useBottomStore.getState().byKey["thread:b"]?.open).toBe(true);
-  });
-
-  it("unarchiving, and opening an archived thread's panels afterwards, change nothing", () => {
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:a": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }] } } }));
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // unrelated update
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a") })); // unarchived
-    expect(usePanelStore.getState().byKey["thread:a"]?.open).toBe(true);
-  });
-
-  it("a snoozed thread's panels reset like an archived one's; a re-snooze or a wake changes nothing", () => {
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("b", 42) }));
-    expect(usePanelStore.getState().byKey["thread:b"]).toEqual(emptyEntry);
-    expect(useBottomStore.getState().byKey["thread:b"]).toEqual({ open: false });
-    expect(usePanelStore.getState().byKey["thread:a"]?.open).toBe(true);
-    expect(useBottomStore.getState().byKey["thread:a"]?.open).toBe(true);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:b": { open: true, groups: [{ tabs: [tab], activeTabId: tab.id }] } } }));
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: snoozed("b", 43) })); // another time
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("b") })); // woke
-    expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
-  });
-
+  // Where an archived or snoozed thread's tabs go is the layout's (the daemon's); only a removal drops what nothing can reach.
   describe("a File tab with unsaved edits", () => {
     const file = { ...makeTab("files", "File"), id: "files:env", title: ".env" };
     const key = fileEditKey("thread:a", file.id);
@@ -153,31 +117,10 @@ describe("startArchiveCleanup", () => {
 
     beforeEach(async () => {
       dropped.length = 0;
-      usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:a": { open: false, groups: [{ tabs: [tab, file], activeTabId: tab.id }] } } }));
       await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, view);
     });
     afterEach(() => {
       useFileEditStore.setState({ sessions: {} });
-    });
-
-    it.each([
-      ["archive", thread("a", 42)],
-      ["snooze", snoozed("a", 42)],
-      ["save for later", saved("a")],
-    ])("%s keeps it, draft and all, in a panel that shows it on return; the clean tabs go", (_name, next) => {
-      noteDraft(key, "SECRET=draft\n");
-      useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: next }));
-      const entry = usePanelStore.getState().byKey["thread:a"];
-      expect(entry?.open).toBe(true);
-      expect(entry?.groups).toEqual([{ tabs: [file], activeTabId: file.id }]);
-      expect(session()?.dirty).toBe(true);
-      expect(dropped).toEqual([]);
-    });
-
-    it("a clean one goes with the rest", () => {
-      useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("a", 42) }));
-      expect(usePanelStore.getState().byKey["thread:a"]).toEqual(emptyEntry);
-      expect(session()).toBeUndefined();
     });
 
     it.each<[string, Parameters<typeof applyThreadListEvent>[1]]>([
@@ -201,7 +144,6 @@ describe("startArchiveCleanup", () => {
     };
 
     beforeEach(async () => {
-      usePanelStore.setState({ byKey: { "thread:a": { open: true, groups: [{ tabs: [file], activeTabId: file.id }] } } });
       await startEdit(key, { panelKey: "thread:a", tabId: file.id, base: "/w" }, { path: "/w/.env", realPath: "", mode: 0, size: 4, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: 100, notFound: false, isDir: false, outsideHome: false, text: "a=1\n", lossless: true, image: null, pdf: null } satisfies FileReadView);
       noteDraft(key, "SECRET=draft\n");
     });
@@ -212,11 +154,10 @@ describe("startArchiveCleanup", () => {
     it.each<[string, Error]>([
       ["NotFound", new ConnectError("no such service", Code.NotFound)],
       ["Unavailable", new ConnectError("daemon restarting", Code.Unavailable)],
-    ])("%s: the list keeps its threads and says why, and no draft or panel goes", async (_name, err) => {
+    ])("%s: the list keeps its threads and says why, and no draft goes", async (_name, err) => {
       await fails(err);
       expect(useThreadsStore.getState()).toMatchObject({ order: ["a", "b"], error: (err as ConnectError).rawMessage });
       expect(useFileEditStore.getState().sessions[key]?.dirty).toBe(true);
-      expect("thread:a" in usePanelStore.getState().byKey).toBe(true);
     });
 
     it("the list coming back clears the error and finds the draft where it was", async () => {
@@ -237,23 +178,12 @@ describe("startArchiveCleanup", () => {
   it.each<[string, Parameters<typeof applyThreadListEvent>[1]]>([
     ["a removed event", { kind: "removed", id: "a" }],
     ["a snapshot without the thread", { kind: "snapshot", threads: [thread("b")], retiredUsage: [] }],
-  ])("a removed thread (%s) loses its side panel, bottom panel and recent files entries; others are untouched", (_name, event) => {
+  ])("a removed thread (%s) loses its recent files entry; others are untouched", (_name, event) => {
     const recent = { project: "p", base: "/w", path: "/w/a.go" };
     useRecentFilesStore.setState({ byKey: { "thread:a": [recent], "thread:b": [recent] } });
     useThreadsStore.setState((s) => applyThreadListEvent(s, event));
-    expect("thread:a" in usePanelStore.getState().byKey).toBe(false);
-    expect("thread:a" in useBottomStore.getState().byKey).toBe(false);
     expect("thread:a" in useRecentFilesStore.getState().byKey).toBe(false);
-    expect(usePanelStore.getState().byKey["thread:b"]?.open).toBe(true);
-    expect(useBottomStore.getState().byKey["thread:b"]?.open).toBe(true);
     expect(useRecentFilesStore.getState().byKey["thread:b"]).toEqual([recent]);
-  });
-
-  it("a thread with no stored panels gets no entries", () => {
-    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a"), thread("b"), thread("z")]) }));
-    useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("z", 1) }));
-    expect("thread:z" in usePanelStore.getState().byKey).toBe(false);
-    expect("thread:z" in useBottomStore.getState().byKey).toBe(false);
   });
 
   describe("selection", () => {

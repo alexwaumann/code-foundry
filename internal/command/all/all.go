@@ -10,6 +10,7 @@ import (
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // Deps are the dependencies of all command domains.
@@ -22,7 +23,7 @@ type Deps struct {
 	// shell's owner). Nil registers the commands against
 	// UnimplementedTerminalServiceHandler, so they list but fail with Unimplemented.
 	Terminal command.TerminalBackend
-	// IsShellTerminal reports whether a terminal is a bottom panel terminal (a shell
+	// IsShellTerminal reports whether a terminal is one a terminal tab shows (a shell
 	// terminal.new started, or an action run; termlabel.IsPanel); it gates
 	// terminal.close. Nil: any terminal.
 	IsShellTerminal func(id string) bool
@@ -108,18 +109,23 @@ type Deps struct {
 	// for a system scheme in the theme verbs' output; nil: unknown.
 	ThemeShowing func() (scheme string, ok bool)
 	// Files reads a file as the File tab does (FilesystemService.ReadFile), for
-	// view.panel.file. Nil makes it fail with Unimplemented.
+	// view.open.file. Nil makes it fail with Unimplemented.
 	Files command.FileReader
 	// FileEdits checks a file the File tab is to edit (Filesystem.CheckEdit), for
-	// view.panel.file --edit. Nil makes it fail with Unimplemented.
+	// view.open.file --edit. Nil makes it fail with Unimplemented.
 	FileEdits command.FileEditChecker
 	// FileExports writes a page's file into its thread's checkout (Filesystem.ExportFile),
 	// for file.export. Nil makes it fail with Unimplemented.
 	FileExports command.FileExporter
 	// FileDiffs reads what differs in a checkout as the Diff tab does
-	// (ProjectService.CompareWorktree), for view.panel.diff. Nil makes it fail with
+	// (ProjectService.CompareWorktree), for view.open.diff. Nil makes it fail with
 	// Unimplemented.
 	FileDiffs command.WorktreeComparer
+	// Layout backs layout.show, space.*, pane.*, tab.*, thread.open, thread.close and
+	// thread.space.move (which also use Thread). Nil registers them failing with
+	// Unimplemented. The view.open.* verbs, view.pullrequests, view.projects, thread.focus and
+	// ui.focus.terminal also open their tabs in it; nil: the classic window's intent alone.
+	Layout layoutstore.Store
 	// ShippedSkills lists the skills the daemon ships to every thread (skills.Shipped),
 	// for daemon.capabilities, which also reads Daemon, Settings, Memory, Plugin, Skills
 	// and Presence. Nil: none listed.
@@ -172,19 +178,19 @@ func Register(r *command.Registry, d Deps) error {
 	}
 	return errors.Join(
 		command.RegisterDaemon(r, d.Daemon),
-		command.RegisterUI(r, d.Emitter),
+		command.RegisterUI(r, d.Emitter, command.WithTerminalTabs(d.Layout, d.Terminal)),
 		command.RegisterPresence(r, d.Presence),
-		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste}),
+		command.RegisterTerminal(r, command.TerminalDeps{Terminal: d.Terminal, Project: d.Project, Thread: d.Thread, IsShell: d.IsShellTerminal, AwaitOutput: d.AwaitTerminalOutput, BracketedPaste: d.TerminalBracketedPaste, Layout: d.Layout}),
 		command.RegisterProject(r, d.Project, d.NotGit),
 		command.RegisterProjectAdd(r, d.Project, d.Clone, command.AddProjectDialog{Emitter: d.Emitter, Viewed: d.Presence.Viewed}),
 		command.RegisterProjectAddWorkspace(r, d.Project, d.Workspace),
 		command.RegisterProjectCleanup(r, command.ProjectCleanupDeps{Project: d.Project, GitOps: d.GitOps.Backend, NotGit: d.NotGit}),
 		command.RegisterNewProjects(r, d.NewProjects),
-		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter),
+		command.RegisterThreadLifecycle(r, d.Thread, d.Emitter, command.WithLayout(d.Layout)),
 		command.RegisterThreadList(r, command.ThreadListDeps{Thread: d.Thread, Project: d.Project, Workspace: d.Workspace}),
 		command.RegisterThreadReports(r, d.Thread),
 		command.RegisterThread(r, d.Thread),
-		command.RegisterMcp(r, d.Thread, d.Emitter),
+		command.RegisterMcp(r, d.Thread, d.Emitter, command.WithMcpLayout(d.Layout)),
 		command.RegisterAgents(r, d.Thread, d.Emitter),
 		command.RegisterSlash(r, d.Thread),
 		command.RegisterGitOps(r, d.GitOps),
@@ -202,14 +208,14 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterView(r, command.ViewDeps{
 			Emitter: d.Emitter, Thread: d.Thread, Viewed: d.Presence.Viewed, Files: d.Files, FileEdits: d.FileEdits, Diffs: d.FileDiffs,
 			Projects: d.Project, PullRequests: d.PullRequestChecks.Gh, Inline: d.Thread, Settings: d.Settings,
-			Workspaces: d.Workspace,
+			Workspaces: d.Workspace, Layout: d.Layout,
 		}),
 		command.RegisterFileExport(r, command.FileExportDeps{Thread: d.Thread, Files: d.FileExports}),
 		command.RegisterUsage(r, d.Thread),
 		command.RegisterWorkspace(r, d.Workspace),
 		command.RegisterWorkspaceReveal(r, d.Workspace, d.Reveal),
 		command.RegisterWorkspaceOpen(r, command.WorkspaceOpenDeps{Workspace: d.Workspace, Editors: d.GitOps.Backend}),
-		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread}),
+		command.RegisterAction(r, command.ActionDeps{Action: d.Action, Project: d.Project, Thread: d.Thread, Layout: d.Layout}),
 		command.RegisterPlugin(r, d.Plugin),
 		command.RegisterPluginSurface(r, d.PluginSurface),
 		command.RegisterPluginOwned(r, command.PluginOwnedDeps{Thread: d.Thread, Project: d.Project, Terminal: d.Terminal}),
@@ -221,6 +227,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterDictation(r, command.DictationDeps{Dictation: d.Dictation, Status: d.DictationStatus, Emitter: d.Emitter}),
 		command.RegisterSearch(r, command.SearchDeps{Search: d.Search, Wait: d.SearchWait}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
+		command.RegisterLayout(r, command.LayoutDeps{Layout: d.Layout, Thread: d.Thread, Settings: d.Settings}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,
 			Skills: d.Skills, Shipped: d.ShippedSkills, Presence: d.Presence,

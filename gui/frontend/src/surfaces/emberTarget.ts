@@ -4,7 +4,7 @@
  */
 import { EMBER_RESIDENT } from "@/stores/ember";
 import type { ThreadsData } from "@/stores/threads";
-import { makeTab, type Tab } from "@/stores/panel";
+import { makeTab, type Tab } from "@/shell/host";
 import type { Selection } from "@/stores/ui";
 
 export const EMBER_KIND = "ember";

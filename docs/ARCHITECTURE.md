@@ -102,7 +102,9 @@ proto/codefoundry/v1/      *.proto — the API. buf-managed. Generated code is c
 gen/go/                    generated Go (connect-go + protobuf-go)
 gui/frontend/src/gen/      generated TS (protobuf-es + connect-es)
 internal/
-  daemon/                  bootstrap, listeners (UDS, loopback API, loopback pages), token file, lifecycle
+  daemon/                  bootstrap, listeners (UDS, loopback API, loopback pages), token file, lifecycle,
+                           and the glue between stores (layout.go: thread and terminal events to
+                           layout ops, §14)
   wstunnel/                one Connect server stream over one WebSocket, replayed through
                            the loopback listener's bearer check and handlers
   presence/                whether the user is looking at the app (GUI clients' visibility
@@ -111,8 +113,12 @@ internal/
   bus/                     typed in-process event bus (generic pub/sub, bounded, non-blocking)
   command/                 command registry: name, arg schema, when-predicate, handler
   claudestream/            the stream-json / control protocol client (pure Go)
+  layout/                  the window shell's model and every rule on it, pure: spaces, pane trees,
+                           tabs, surface identity, placement, smart swap, a thread's remembered
+                           tabs, drafts, the first-load import (§14)
   store/
     terminal/              PTY + libghostty-vt actor per terminal; output tee; snapshots
+    layout/                the layout's one writer: SQLite rows, snapshot, events (§14)
     thread/                threads: claude -p over stream-json, items, naming, status, resume
     project/               registered projects, worktrees, git status, FSEvents stream
     gh/                    GitHub GraphQL/REST polling over HTTP (token via gh), PR/CI cache
@@ -166,7 +172,7 @@ internal/
   logfile/                 a size-capped log file with one rotation (daemon and plugin logs)
   model/                   the one list of Claude models the app offers
   pricing/                 Claude API token prices for the usage figures
-  termlabel/               the label contract on terminals (kind, owner)
+  termlabel/               the label contract on terminals (kind, owner, free shells, the quick slot)
   tcc/                     which process macOS's privacy checks (TCC) treat as responsible
   version/                 the build version and provenance
   bridge/, pagelib/,       what HTML pages the model shows load from /cf/ and the preview
@@ -208,7 +214,8 @@ Transport:
 
 Every Claude process also gets `CODE_FOUNDRY_THREAD=<its thread id>`, which the CLI sends
 as its default `--context-thread`: an agent's `code-foundry terminal new` or `action run`
-lands in its own thread's bottom panel (`docs/notes/actions-1-daemon.md`). The daemon puts
+belongs to its own thread and opens as a tab linked to it, placed beside it, without taking
+the user's focus (`docs/notes/actions-1-daemon.md`, `docs/notes/shell-6-lifecycle.md`). The daemon puts
 the directory of `CODE_FOUNDRY_BIN` (the CLI it runs as) on the PATH of everything it
 starts, so a thread finds `code-foundry` by name (`docs/notes/orch-small-fixes.md`).
 
@@ -358,14 +365,14 @@ Services (v1):
   default-branch CI, the viewer's PRs on a branch), GetPullRequest (on demand). The daemon
   tracks the GitHub repositories of registered projects itself. Its events are
   EventService's `gh` source: data events go out only when data changed; `Polled` after every poll carries the
-  freshness time. The PR detail panel: GetPullRequestDetail (on demand, cached per PR,
+  freshness time. The pull request tab: GetPullRequestDetail (on demand, cached per PR,
   invalidated by the poll's fingerprints), ListReviewerCandidates, SetReviewRequest,
   RevertPullRequest (`docs/notes/gh-pr-detail.md`), MergePullRequest, SetPullRequestDraft,
   SetPullRequestAutoMerge and SetPullRequestCheckbox (each invalidates the detail),
   SubmitPullRequestReview and
   AddPullRequestComment (GitHub's refusals relayed as FAILED_PRECONDITION;
   `docs/notes/pr-review-submit-1-daemon.md`), and GetPullRequestDiff and GetPullRequestFile
-  for the panel's Code tab (§7).
+  for its Code tab (§7).
 * `GitOpsService` — Fetch, Pull, Push, CreatePullRequest, OpenPullRequest, OpenEditor,
   Reveal, OpenUrl. One operation at a time per worktree; a failed operation
   is a result (state FAILED, output), not an RPC error. The GUI reaches it only through
@@ -384,14 +391,25 @@ Services (v1):
   published, for the dictation overlay's page); PublishThemeReport (the GUI's contrast
   report on a user theme, which `theme save` and `theme check` print); WatchShots and
   PublishShot (the app's host is the one capturer of `plugin surface --shot`'s PNGs,
-  `internal/shot`; it holds WatchShots and answers one request at a time, `gui/shot.go`). Commands emit intents in-process (`command.BusEmitter`). A ShowView with a `thread_id` (the `view.panel.*` verbs run inside a thread)
-  changes only that thread's side panel and never a window's selection; `ui.presence`
-  tells a thread's model whether the user is looking and whether a window shows its
-  thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
+  `internal/shot`; it holds WatchShots and answers one request at a time, `gui/shot.go`). Commands emit intents in-process (`command.BusEmitter`). Intents
+  carry only what the layout does not hold: a ShowView for window state (the sheets,
+  back and forward, thread info, full screen, the finds, a plugin surface's
+  `panel.<kind>`), FocusThread and FocusTerminal (the keyboard into a prompt or a terminal
+  once the layout has focused its tab). Tabs, panes and spaces are the layout's
+  (`LayoutService`); the `view.open.*` verbs send no intent (`docs/notes/shell-22-retire-verbs.md`).
+  `ui.presence` tells a thread's model whether the user is looking and whether a window
+  shows its thread (`docs/notes/control-1-thread-scoped-views.md`). A Notify may carry a `link`
   ("settings:<page>"), a button on the toast (`docs/notes/memory-page.md`).
+* `LayoutService` — Get, Apply, SetViewport, ImportLegacy: the window shell's spaces, pane
+  trees and tabs, which the daemon holds so the CLI and a thread's model arrange the same
+  layout a key press does (§14). Apply takes one `LayoutOp` (a case per op of
+  `internal/layout`) and answers where it landed (space, pane, tab, placement rule, what
+  closed, was kept or restored); every commit is a delta on EventService's `layout` source.
+  SetViewport reports a window's pane area, which placement measures in. ImportLegacy
+  brings a classic window's stored panels over once (§14).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, theme,
-  settings, update, action, plugin, skill, memory, search, ui; the thread source carries threads' pending requests only, a
+  settings, update, action, plugin, skill, memory, search, layout, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream, and `code-foundry events --source …` reads the same one. Live events pass
@@ -455,10 +473,11 @@ Services (v1):
   they do, so a temp file has no editing and no bridge (`docs/notes/read-temp-files.md`).
   The File tab's editor calls it directly; a draft lives only in the window's memory and only
   the window saves it: `file.save` refuses every caller that reaches the daemon
-  (`docs/notes/file-edit-2-gui.md`). `view.panel.file --edit` asks the user to edit a file: the
-  verb refuses what the tab could not edit, nothing from inside the file reaches its answer, and
-  the tab's Save and tell thread sends one ordinary message after the write
-  (`docs/notes/file-edit-3-agent.md`).
+  (`docs/notes/file-edit-2-gui.md`). `view.open.file --edit` asks the user to edit a file: the
+  verb refuses what the tab could not edit and writes the request into the File tab's params
+  (`asker`, `askId`, `note`), nothing from inside the file reaches its answer, and the tab's
+  Save and tell thread sends one ordinary message after the write
+  (`docs/notes/file-edit-3-agent.md`, `docs/notes/shell-22-retire-verbs.md`).
 * `ActionService` — List, Create, Update, Delete, Run, GetRun, WaitRun, StopRun, LastRun. Per-project
   actions (name unique per project ignoring case, command, icon, in terminal or in the
   background, run on worktree create, position; SQLite, cascading with the project) and
@@ -481,8 +500,9 @@ Services (v1):
   WatchSurface, GetSurface and Act serve plugin surfaces: views (the `pluginsdk/ui`
   JSON the daemon validates) per instance `<plugin>/<surface>/<scope>`, opened on the
   first watcher; each surface's `plugin.<name>.show.<surface>` command carries its
-  availability (a when clause over host facts) in CommandService.List
-  (`docs/notes/plugins-2-surfaces.md`).
+  availability (a when clause over host facts) in CommandService.List and opens a thread or
+  pr surface as a tab linked to the thread, placed by the layout's rules (`--focus` moves the
+  user's focus; `docs/notes/plugins-2-surfaces.md`, `shell-24a-import-moves.md`).
   Environment returns what plugins add to new threads
   (`session/setEnvironment`: env, PATH entries, `--add-dir`s, scoped by project; `plugin
   env`). Plugins subscribe to EventService's sources over the protocol (`events/subscribe`,
@@ -555,15 +575,30 @@ PTY (creack/pty) ──reader goroutine──► tee ──► libghostty-vt (fe
   `thread` (the owning thread), `project` and `worktree` (the owning worktree), and on
   action terminals `action`, `action.name` and `action.run`. `terminal.new`
   gives every shell an owner (thread, else worktree) and refuses a cwd outside every
-  registered project. The shell reaper (`internal/daemon/shells.go`) removes a shell when
-  it exits or when its worktree, project or thread goes away, with a periodic sweep for
-  dropped events (`docs/notes/bottom-panel-1-daemon.md`). An exited action terminal stays
-  (the user reads its output; the GUI closes it), but goes with its owner like a shell
-  (`docs/notes/actions-1-daemon.md`).
+  registered project. Two more cases: a **free shell** (`terminal.new-free`, cmd+shift+t:
+  `kind=shell` and no owner, in the home directory; `termlabel.Free`, `IsFree`) and a
+  thread's **quick terminal** (`slot=quick`, `terminal.new --quick`; one per thread, the
+  command serialising the check and the start). `terminal.reset` starts a fresh shell in the
+  owner's directory labelled `replaces=<old id>`, then closes the old one, so its tab can
+  follow (`docs/notes/shell-5-terminal.md`). `SetLabels` changes a running terminal's labels
+  without touching its process (the first-load import labels quick shells). The shell
+  reaper (`internal/daemon/shells.go`) removes a shell when it exits or when its worktree,
+  project or thread goes away (a free shell only when it exits), with a periodic sweep for
+  dropped events (`docs/notes/bottom-panel-1-daemon.md`). An exited action terminal stays,
+  its tab too (the user reads its output; closing the tab removes it), but goes with its
+  owner like a shell (`docs/notes/actions-1-daemon.md`).
+* Facts, for terminal tabs' names and the quick terminal's hint (`facts.go`, `proc.go`): the
+  shell's live directory (`live_cwd`, `proc_info` on its main pid), the foreground job's
+  command line (`foreground`, from the PTY's foreground group and `kern.procargs2`) and the
+  last command that ended (`last_command`), sampled on the actor 200 ms after output and
+  again 1 s and 4 s into a quiet spell, published with `TerminalUpdated`. No shell
+  integration: an idle terminal costs nothing (`docs/notes/shell-5-terminal.md`).
 
 ## 6. Thread store
 
-Owns the Claude processes. It uses the terminal store only to reap a thread's shells.
+Owns the Claude processes. It uses the terminal store only to reap a thread's shells;
+before it removes them for an archive, a snooze or a removal it calls `Options.ShellsGoing`
+with the reason, so the layout glue can record what each ran while they still exist (§14).
 
 * Spawns `claude -p` over stream-json in a worktree with the chosen
   model/effort/permission-mode flags through `internal/claudestream` and sends the first
@@ -853,14 +888,60 @@ prints in full, `thread` with its own conventions (`docs/notes/guide-command-ind
 Inside a thread's Claude process `help` leaves out flags only the GUI or the CLI sets and
 puts the common flags on one line; everywhere else it prints the whole text.
 
-Pull request commands: the detail panel's actions (`pr.merge`, `pr.revert`,
+Pull request commands: the pull request tab's actions (`pr.merge`, `pr.revert`,
 `pr.review.request`, `pr.refresh`; docs/notes/gh-pr-detail.md; `pr.review`, `pr.comment`;
-docs/notes/pr-review-submit-1-daemon.md, with the panel's Review menu in
+docs/notes/pr-review-submit-1-daemon.md, with the tab's Review menu in
 docs/notes/pr-review-submit-2-gui.md) and the thread starters `pr.ask`,
 `pr.explain`, `pr.fix.findings`, which pick or create a worktree and type a prompt built
-from the pull request (docs/notes/pr-thread-commands.md). The panel's Code tab is read-only
+from the pull request (docs/notes/pr-thread-commands.md). Its Code tab is read-only
 and has no commands: it reads `GhService.GetPullRequestDiff` and renders it in one
 virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
+
+The window shell's commands (§14) are families in the same registry, so a key, the palette,
+the CLI and a thread's model reach the same op:
+
+| Family | Verbs | Does |
+| --- | --- | --- |
+| layout | `layout.show` (`--json`), `space.list`, `tab.list` | read the layout: spaces, splits with sizes, panes, tabs, each thread's space and remembered tabs |
+| space | `space.new`, `.rename`, `.remove` (`--to` a space or `--archive` its threads; asks first), `.switch` (`--index n`), `.move` | the top bar's spaces |
+| pane | `pane.focus` and `.focus.<left/down/up/right>`, `.move.<dir>` (swap), `.move` (beside, into, the outer edge, another space), `.split`, `.close`, `.resize`, `.fullscreen`, `.collapse` | panes; the GUI passes the drawn neighbour as `--to` |
+| tab | `tab.focus`, `.move`, `.close`, `.next`, `.previous`, `.rename`, `.auto-name` | tabs; `tab.close` on a thread's tab is `thread.close` |
+| thread | `thread.open` (its tab, with its remembered tabs), `thread.close` (from its space, never archived), `thread.space.move`, `thread.new --compose <tab>` | a thread's own tab |
+| composer | `composer.new` (New thread in the shell), `composer.draft.start`, `.label`, `.clear`, `.discard`, `.open` | the composer tab and its drafts |
+| view.open | `view.open.file`, `.page`, `.diff`, `.pr`, `.gallery`, `.mcp` (`--thread`, `--pane`, `--focus`); `view.thread-diff`; `view.pullrequests`, `view.projects` | open a surface as a tab placed by the rules; the old `view.panel.<item>` names are unlisted aliases for one stable release |
+| terminal | `terminal.new` (`--pane`, `--quick`), `.new-free`, `.quick` (`--open`, `--close`, `--height`), `.cycle`, `.reset`, `.rerun` | terminal tabs and the quick terminal |
+
+A verb called from inside a thread (`Context.FromUser` false) gets no default from the
+user's focus: it names its space, pane or tab, and runs with `KeepFocus`, so a tab it opens
+waits behind the user's focused tab. Verbs that only move the focus (`space.switch`,
+`pane.focus`, `view.thread-diff`, `terminal.cycle`, `pane.fullscreen`) refuse it without
+`--focus` (`docs/notes/shell-4-commands.md`). `code-foundry guide layout` is their topic.
+
+The default key table is the specification's (`docs/notes/shell-model.md`, Keys), pinned
+by `TestShellKeyTable` in Go and `keys/shellKeys.test.ts` in the window; a chord is a
+command's `Keybindings` or one of the window's view actions, and `shell/keyPresenters.ts`
+says what each verb does in the window (`docs/notes/shell-20-cutover.md`):
+
+| Key | Runs |
+| --- | --- |
+| cmd+n | `thread.new` (the shell's New thread: focuses the space's empty composer or opens one) |
+| cmd+t / cmd+shift+t | `terminal.new` with the focused tab's thread / `terminal.new-free` |
+| cmd+j / cmd+shift+j | `terminal.quick` (open and focus, focus, close) / `terminal.cycle` |
+| cmd+shift+d / cmd+shift+i | `view.thread-diff` / `view.thread-info` |
+| cmd+p / cmd+k | `file.find` / the palette (view action) |
+| cmd+w / cmd+shift+w | `tab.close` / `pane.close` (a surface with unsaved work asks first) |
+| cmd+[ / cmd+] | `view.back` / `view.forward`: the focus history, across panes and spaces |
+| cmd+shift+[ / cmd+shift+] | `tab.previous` / `tab.next` |
+| ctrl+cmd+h j k l, arrows; with shift | `pane.focus.<dir>`; `pane.move.<dir>` (both do nothing in full screen) |
+| ctrl+cmd+1…9 / cmd+1…9 | `space.switch --index n` / the nth thread of the sidebar (view actions) |
+| cmd+shift+enter, escape | `pane.fullscreen`; escape leaves (a window listener) |
+| cmd+shift+m | `pane.collapse`: the focused pane to a rail, or open again (nothing in full screen) |
+| cmd+shift+a | the Needs-you popup of the next thread that waits (Ember first while it waits) |
+| cmd+r / cmd+shift+r | `tab.rename` / `tab.auto-name` (a thread's tab renames or renames again the thread) |
+| cmd+b | the sidebar (view action) |
+
+Retired with the panels: cmd+shift+e, cmd+\ and cmd+alt+\; a stale override of a removed
+verb in `settings.toml` is reported and dropped, never fatal.
 
 ## 8. Frontend
 
@@ -872,9 +953,13 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   components subscribe to the narrowest selector. Lists are virtualized. No global
   re-render on daemon events.
 * Streams: the GUI holds one `EventService.Watch` stream, one `ThreadService.WatchThread` per
-  visible thread view (the content pane's thread, a plugin's thread node; one stream when both
-  show the same thread) and one `TerminalService.Attach` per visible terminal view (the bottom
-  panel's active shell, a plugin's terminal node), each only while it is visible. The rest follow
+  visible thread view (a thread's tab, the floating composer while it is expanded, the Needs-you
+  popup, a plugin's thread node; one stream when several show the same thread) and one
+  `TerminalService.Attach` per visible terminal view (a terminal tab, a thread's quick terminal,
+  a plugin's terminal node), each only while it is visible. Off screen holds nothing: a tab
+  that is not its pane's active tab (a pane mounts only its active tab's body), a pane folded
+  to a rail (it mounts no body), a pane behind full screen (not mounted), another space's
+  panes, and a quick terminal whose thread's tab is not active. The rest follow
   what is open: `PluginService.WatchSurface` per open plugin surface, `EmberService.WatchBoard`
   while Ember is shown, the dictation streams below, `SearchService`'s `Watch` and `WatchRecent`
   while a search needs them, and `ProjectService.Clone` while the Add Project dialog clones a
@@ -886,8 +971,8 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 * Dictation (`stores/dictation.ts`, `docs/notes/dictation-4-gui.md`): one shared
   `DictationService.Watch` only while `dictation.enabled` is on (composers hold it) or the
   settings section is on screen, and one `DictationService.Session` while a composer dictates. A phrase lands at the caret of the
-  composer that pressed the mic (every composer: thread, new thread, Ember, the PR panel's
-  ask and review), tinted by a ProseMirror decoration, never a mark. The host's hold key
+  composer that pressed the mic (every composer: thread, new thread, Ember, a pull request
+  tab's ask and review), tinted by a ProseMirror decoration, never a mark. The host's hold key
   drives the same session through `dictation.hold`, and the window tells the daemon whether
   a composer can take it (`ComposerTarget`).
 * Stream liveness: the daemon sends a `StreamHeartbeat` on every long-lived stream the
@@ -899,7 +984,8 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   answer. Hiding or showing the window touches no stream. The post-snapshot flushes and
   the resync on show were for fetch in WKWebView, which held a stream's last bytes back,
   and went once every stream was on the tunnel (`docs/notes/ws-stall-workarounds.md`).
-* A thread's content pane is `components/thread`: a virtualized
+* A thread's tab is `components/thread`: a header (the branch chip, the thread info toggle,
+  one three-dot menu with Open ▸ and Move to space ▸; `ThreadHeader.tsx`) over a virtualized
   work-log timeline built from the items' structure (`lib/threadTimeline.ts`; text deltas
   re-render only their row), turns that fold under their header the moment they finish (the
   latest too), inline diffs on `components/code` (@pierre/diffs, themed from the app's syntax
@@ -916,7 +1002,7 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   thread's log (Claude Code's own in a last "Claude Code" group, inserted as plain text),
   and the ListSkills scan while there are none (`docs/notes/slash-commands-2-gui.md`).
   Every fenced code block and Bash command has Copy; a shell block in Claude's reply also
-  has Run in terminal, a new shell in the thread's bottom panel through `terminal.new
+  has Run in terminal, a new terminal tab linked to the thread through `terminal.new
   --run` (the daemon types the line once the shell has printed its prompt;
   `docs/notes/code-block-actions.md`). Text selected in one of Claude's answers can be
   cited into the composer with a comment: an amber `cf-cite://` chip whose body the draft
@@ -932,108 +1018,189 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
   (`terminal/find.ts`, `docs/notes/terminal-find.md`).
 * Only visible views are watched or attached: one WatchThread per thread on screen
   (`stores/thread.ts` `startThreadWatch` counts its holders), one Attach per terminal
-  view (a plugin terminal shown in the bottom panel is not attached in its node too).
-  Switching threads (or bottom panel tabs) ends the old stream and opens the new one. Background
+  view (a plugin terminal shown in a tab is not attached in its node too; the node steps
+  aside). Switching a pane's tab, folding a pane or switching space ends the old stream and
+  opens the new one. Background
   threads cost nothing in the frontend. Watching is also how the daemon knows a thread
   is being looked at: while a thread has a WatchThread subscriber and a GUI window is
   visible and key (attended), finished turns count as seen (`docs/notes/alerts-foreground.md`).
-* Layout: a draggable title strip under the hidden-inset traffic lights, sidebar (Pull
-  Requests and Projects entries, then a flat list of threads and nothing else: pinned
-  threads (newest created first), then the ones waiting on the user (prompts, then
-  errors) and finished turns (most recent status change first), and idle ones (most
-  recent activity first), with no headers, scrolling on its own;
-  pinned under it the collapsible footers Working, Snoozed (single-line rows with the
-  time left, soonest wake first, then "Saved" for those saved for later) and Archived (single-line rows with their age), each
-  counting its threads; each thread row says its status in words on its second line (or
-  project and branch; a thread of several projects names its workspace, else "N
-  projects", and its branch: `docs/notes/workspaces-v2-3-composer.md`) with a hover
-  tooltip; a status row at its foot; see
-  `docs/notes/workspaces-4-sidebar.md`, `docs/notes/thread-list.md`,
-  `docs/notes/sidebar-working-section.md`, `docs/notes/archive-threads-2-sidebar.md` and
-  `docs/notes/snooze-threads-2-sidebar.md`; a thread another thread created is hidden
-  from every sidebar list, the keyboard order and the attention counts while its creator
-  exists (no setting, no override; an orphan whose creator was removed is listed), one
-  rule in `lib/inSidebar.ts`, and a hidden selected thread highlights its nearest shown
-  ancestor: `docs/notes/no-sidebar-override-1-gui.md`; nothing in the GUI shows whether a thread's
+* The window (`App.tsx`, `components/shell`; the specification is
+  `docs/notes/shell-model.md`, what was built `docs/notes/shell-build.md`). The **top bar**
+  (`TopBar.tsx`) spans the window above the sidebar, not aligned to it, and is its drag band:
+  the traffic-light gutter, the app name, the sidebar toggle, the Needs-you control while the
+  sidebar is collapsed, back and forward, the **space tabs** (`SpaceTabs.tsx`: a glyph drawn
+  from the space's own tree, its name, how many of its threads need the user; click, rename in
+  place, drag to reorder, Remove space… through a dialog that moves or archives its threads)
+  and "+". Under it, the sidebar and the current space's **pane grid** (`PaneGrid.tsx`):
+  panes placed from the layout's tree, 12 px gutters that drag (`pane.resize`) and take the
+  keyboard. A pane (`PaneView.tsx`) is its tab strip (`PaneTabStrip.tsx`: the tab is the
+  title; tabs shorten, then go icon-only, `geometry/tabFit.ts`, with a tooltip only for a cut
+  name; the attention dot on a thread's icon; "+" at the end, `PanePlusMenu.tsx`, a menu of
+  surfaces; collapse and full screen at the right), the quiet row under the strip that names a linked
+  tab's thread and links back (`LinkedRow.tsx`), and the active tab's body only. A space with
+  no pane shows the composer (`EmptySpace.tsx`).
+* The layout slice (`stores/layout.ts`) is the daemon's layout and nothing else: a snapshot
+  then deltas by rev (a gap reads it again with `Get`), flattened into spaces, trees, panes,
+  tabs and thread records that keep their object identity across commits, so a pane
+  re-renders only when it changed. Only `focusTab` and `focusPane` apply before the daemon
+  answers (an overlay until the commit at their rev); every other change is a layout verb
+  (`shell/commands.ts`) and waits for its event (`docs/notes/shell-10-layout-slice.md`). What
+  depends on the drawn frame is window state, never stored (`stores/shellView.ts`): the
+  frame, rails, full screen, the floating composer, focus requests. The grid reports its box
+  with `SetViewport` (`shell/viewport.ts`).
+* Geometry (`shell/geometry`, pure; `docs/notes/shell-9-geometry.md`): `plainRects` equals
+  the daemon's `Rects` to the px (shared fixtures); `frameRects` holds each pane at its
+  minimum (480 × 400 whatever its tabs, 300 × 220 for a pane of terminals only; Go's
+  `internal/layout/fit.go` has the same numbers); `treeFits` says whether a tree fits with no
+  automatic fold, the daemon's `layout.Fits` (shared `fits.json`): an action that would add an
+  open pane or raise a pane's minimum is offered only when the result fits, in the daemon's ops
+  and placement and in the window's drag targets and "+" menu (`shell/drag/room.ts`;
+  `docs/notes/shell-25f-sizes.md`); `rails.ts`
+  folds the panes that cannot keep theirs into 36 px rails of tab icons (panes without a
+  thread tab first, least recently focused first; never the focused pane or its thread's),
+  computed per frame and never stored, so a larger window unfolds them; a pane the user
+  collapsed (`pane.collapse`, its `collapsed` mark stored with the pane) is always a rail and
+  never in that order (`docs/notes/shell-25d-collapse.md`); `neighbour` is the pane a direction
+  key goes to. A divider stops at the minimums as drawn, starts from what is drawn, and its
+  cursor says which ways it can still move (`shell/resize.ts`).
+* Surfaces: a tab's body comes from the shell's surface registry (`shell/surfaces`): thread,
+  compose, prs, projects, terminal, and the panel surfaces (file, diff, pullrequest, mcp,
+  gallery, ember.board, `plugin.*`), which draw the `src/surfaces` specs inside a scroll
+  box that is also the pane's focus root and dispatches the surface's own keys
+  (`surfaces/panel.ts`). Kinds and identity are the daemon's table, ported once
+  (`shell/identity.ts`, pinned to `internal/layout/testdata/kinds.json` and
+  `identity.json`). Surfaces reach their tabs only through the **host seam** (`shell/host.ts`,
+  `hostShell.ts`): `openTab` (a user's open takes the focus; `behind` keeps a new tab behind
+  the editor in use), `setTabParams` and `retitleTab` (each update from the one before),
+  `tabPlace` / `useTabPlace` (a thread's linked tabs in its space), `subscribeTabs`. Every
+  `LayoutService.Apply` the window sends (the seam's, a tab's or pane's focus) goes one at a
+  time in the order made (`stores/layout.ts` `applyLayout`), so one action's ops land in its
+  order (`docs/notes/shell-25i-open-order.md`). A linked tab's body
+  acts for its thread (`shell/panelKeyContext.ts`), an unlinked one for what the window has
+  focused (`docs/notes/shell-8-host-seam.md`, `shell-gaps-b-surfaces.md`,
+  `shell-gaps-c-identity.md`).
+* Focus: the layout holds which pane and tab have the focus; the window moves the keyboard
+  after it (`requestPaneFocus`: a thread's prompt, a composer, a page's `[data-focus-root]`).
+  The selection bridge (`stores/selectionBridge.ts`) writes `ui.selection` from the current
+  space's focused tab for code that reads one selection, and routes `select()` to
+  `thread.open --focus`. The focus history (`stores/focusHistory.ts`: space, pane and tab per
+  entry, per window, 100 kept) is cmd+[ and cmd+]. The command context's terminal is the
+  focused terminal tab's or the quick terminal with the keyboard
+  (`docs/notes/shell-gaps-a-focus.md`).
+* Drag (`shell/drag`, `ShellDnd.tsx`): any tab, a pane by its strip's free space, a sidebar
+  row. Hit-testing is geometry over the drawn frame (the grid's outer band, strips, a pane's
+  edge bands and middle, a rail as one target, a space tab), and the preview replays the
+  daemon's own tree edit and lays it out, so it is the rectangle that lands. A drop is one
+  `tab.move` or `pane.move` (a row: `thread.open` with its place); on a space tab a
+  thread's tab runs `thread.space.move`, and a pane `pane.move --space`, which moves it whole
+  with its threads and their linked tabs (`docs/notes/shell-14-drag.md`,
+  `shell-14b-outer-edge-size.md`, `shell-15-spaces.md`).
+* Full screen (`shell/fullscreen.ts`, `pane.fullscreen`): the space's focused pane over the
+  whole grid, the others unmounted; the top bar and the sidebar stay and the direction keys do
+  nothing. Over a linked tab the thread's own composer floats (`FloatingComposer.tsx`): a pill
+  that holds nothing, expanded by a click or ⌘L with the thread's WatchThread, its draft the
+  thread's (`docs/notes/shell-19-rails-fullscreen.md`).
+* Terminals (`docs/notes/shell-13-terminals.md`): a terminal tab (`TerminalTab.tsx`) is named
+  by what runs (`lib/terminalName.ts`: a manual name, else the foreground command, else
+  `<shell> · <folder>`) with an icon by program; when its thread is elsewhere the linked row
+  says so with Reset; a tab a snooze restored shows the last command and Run again, never run
+  by itself. The quick terminal (`QuickTerminal.tsx`) sits under a thread's conversation and
+  composer, pushing them up while the composer and 120 px of conversation fit, else over the
+  bottom of the pane.
+* The first draw (`shell/legacyImport.ts`, `ShellNotice.tsx`): the window waits for the
+  layout; while it says `legacy_imported` is false, it sends the classic window's stored
+  `code-foundry.panel` and `code-foundry.bottom` values to `ImportLegacy` once and draws from
+  the answer; a failure offers Try again and Open without them. A daemon with no layout
+  opens the update dialog (`SHELL_SINCE`, `lib/update.ts`; `docs/notes/shell-20-cutover.md`).
+* Sidebar (`components/sidebar/shell`; `docs/notes/shell-16-sidebar.md`): New thread and
+  search, then **Needs you** (the user's own threads that wait on them: a permission, a
+  question, a plan, a woken snooze, a plugin's flag; from every space or this one,
+  `sidebar.needs_scope`, switched by one pill), **Active** (this space's pinned threads, its
+  composer drafts, then errors and finished turns, then idle ones), and the collapsible footers
+  Working, Snoozed and Archived (Archived lists every space's), scrolling on its own, with a
+  status row at its foot. A thread row is three lines: the project and the status (the snooze
+  and archive controls on hover), the title up to two lines, the branch with its pull request
+  tag and counts. A click opens the thread's tab in the focused pane, or focuses it; a row
+  drags into the grid or onto a space tab; its menu has Open ▸ (the thread's surfaces) and
+  Move to space ▸. A Needs-you row's hover card shows the whole ask (a permission's Allow and
+  Deny once the request is known whole), its title opens a popup with the thread's
+  conversation and today's ask card, and a pane too short for the card shows the ask as one
+  line above the composer (`components/needs`, `docs/notes/shell-17-needs-you.md`). A thread
+  another thread created is hidden from every sidebar list, the keyboard order and the
+  attention counts while its creator exists (no setting, no override; an orphan whose creator
+  was removed is listed), one rule in `lib/inSidebar.ts`:
+  `docs/notes/no-sidebar-override-1-gui.md`; nothing in the GUI shows whether a thread's
   Claude runs: its composer always sends, starting looks like working, a stopped thread
-  reads as its status: `docs/notes/hide-connection-state.md`), content (a thread's conversation, the Pull Requests
-  page, the Projects view: an index of projects and workspaces by last activity that
-  drills into a project's page (its checkouts table and details) or a workspace's page,
-  each its own selection with its own side panel, the sidebar row reopening the last one
-  (`docs/notes/projects-redesign-1-index.md`); a workspace's page: its projects with
-  where new threads start (Start here, Remove, Add project), its threads with each
-  member's checkout for the thread's branch, its instructions file (View as a File tab,
-  Write/Edit instructions starting or steering a thread in the workspace's folder), skills
-  and folder, Open in Finder, Rename (in place) and Remove; a New workspace dialog:
-  `docs/notes/workspaces-v2-4-projects-page.md`, `docs/notes/projects-redesign-3-workspace-page.md`), or the composer: a project set
-  picked in the heading (a workspace row selects its members and the reference, projects
-  toggle), chips by project id, Work in, a Runs in picker for the primary (a project or
-  the workspace's folder), collision hints under the chips, and "New thread on this
-  branch" (`thread.new-like`) prefilled from a thread so only the prompt is typed:
-  `docs/notes/workspaces-v2-3-composer.md`; a shell is never selected), command palette overlay. Under the content pane, a thread and the Projects
-  page each have a bottom terminal panel (cmd+j, `view.bottom.toggle`; opening a thread's
-  empty one starts a shell, and a panel hides when its last shell goes:
-  `docs/notes/bottom-panel-autoshell.md`), the only place shells show: tabs for the shells it owns, derived from the terminal list by the owner
-  labels (`thread` for a thread's, none for the Projects page's worktree shells). Every
-  way to start one lands there: cmd+t and the palette's New Terminal, a thread row's New
-  terminal here, the Projects page's rows, the panel's own "+", a code block's Run in terminal, and `terminal new` on the CLI; the
-  focusTerminal intent reveals a shell there (threads have no terminal of their own)
-  (`docs/notes/bottom-panel-2-gui.md`, `docs/notes/bottom-panel-3-routing.md`). Strip and sidebar sit on one background (the sheet);
-  the content is a rounded pane on it (see `docs/notes/phase3-ui-panes.md`). Each
-  selection can open a side panel right of the content: a second pane with tabs whose
-  bodies come from the surface registry (`src/surfaces`, `docs/notes/side-panel.md`):
-  File (one file read from disk as code, rendered markdown or live HTML in a
-  sandboxed frame served by the daemon's `/preview/<grant>/` route (`internal/preview`,
-  `docs/notes/html-preview-interactive.md`), or
-  an image; opened from the Diff tab's Open file and path
-  chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`), one
-  tab per file; `docs/notes/file-viewer-3-tabs.md`), Diff (two sources of one checkout,
-  file by file, with the file list as a rail or on top by the panel's width; one tab per
-  checkout; opened from the thread info card's Changes row and per-project sub-rows, a
-  project page's checkout rows into the page's own panel, and `view.panel.diff`, whose
-  `--title`, `--note`, `--path` and `--hide` let a thread frame a tab of its own, the checkout's
-  staying the user's; `--hide` is the only way to reduce the controls, and the tab always offers
-  them back;
-  `docs/notes/diff-viewer-2.md`, `docs/notes/diff-viewer-3.md`), Pull request, whose menu starts threads about the pull
-  request through `pr.ask`, `pr.explain` and `pr.fix.findings`,
-  and MCP (the thread's MCP servers, one card each
-  with status, error, tools and Reconnect; opened by the card's MCP row and
-  `view.panel.mcp`; `docs/notes/mcp-panel.md`) and Gallery (a set of images a thread shows, a
-  grid that opens one over a filmstrip; only `view.panel.gallery` opens it, one tab per title;
-  `docs/notes/gallery-surface.md`). The Worktree, Workspace, Linked PRs,
-  Usage, Agents and Threads surfaces and their `view.panel.*` verbs are gone: the thread
+  reads as its status: `docs/notes/hide-connection-state.md`.
+* Pages are tabs, one of each per space (`view.pullrequests`, `view.projects`, a pane's "+"):
+  the Pull Requests page, and the Projects tab, whose location is in its params: an index of
+  projects and workspaces by last activity that drills into a project's page (its checkouts
+  table and details) or a workspace's page (`docs/notes/projects-redesign-1-index.md`); a
+  workspace's page: its projects with where new threads start (Start here, Remove, Add
+  project), its threads with each member's checkout for the thread's branch, its instructions
+  file (View as a File tab, Write/Edit instructions starting or steering a thread in the
+  workspace's folder), skills and folder, Open in Finder, Rename (in place) and Remove; a New
+  workspace dialog: `docs/notes/workspaces-v2-4-projects-page.md`,
+  `docs/notes/projects-redesign-3-workspace-page.md`.
+* The composer is a tab: at most one empty composer per space (New thread focuses it or opens
+  one in the focused pane); typing makes it a draft with its own identity, listed in the
+  sidebar and kept with its text through a closed tab and a reload
+  (`shell/composerDrafts.ts`); sending turns the tab into the thread's (`thread.new --compose`).
+  It holds a project set picked in the heading (a workspace row selects its members and the
+  reference, projects toggle), chips by project id, Work in, a Runs in picker for the primary
+  (a project or the workspace's folder), collision hints under the chips, and "New thread on
+  this branch" (`thread.new-like`) prefilled from a thread so only the prompt is typed:
+  `docs/notes/workspaces-v2-3-composer.md`.
+* The panel surfaces, each a tab placed beside its thread by the daemon's rules
+  (`view.open.*`; `src/surfaces`, `docs/notes/side-panel.md` for their history): File (one
+  file read from disk as code, rendered markdown or live HTML in a sandboxed frame served by
+  the daemon's `/preview/<grant>/` route (`internal/preview`,
+  `docs/notes/html-preview-interactive.md`), or an image; opened from the Diff tab's Open file,
+  path chips in Claude's markdown and file tool rows (`docs/notes/file-viewer-4-chips.md`) and
+  the file finder, one tab per path; `docs/notes/file-viewer-3-tabs.md`), Diff (two sources of
+  one checkout, file by file, with the file list as a rail or on top by the tab's width; one
+  tab per thread and checkout, plus one per thread that frames it with `view.open.diff`'s
+  `--title`, `--note`, `--path` or `--hide`, the checkout's staying the user's; `--hide` is the
+  only way to reduce the controls, and the tab always offers them back;
+  `docs/notes/diff-viewer-2.md`, `docs/notes/diff-viewer-3.md`), Pull request (one tab per pull
+  request), whose menu starts threads about it through `pr.ask`, `pr.explain` and
+  `pr.fix.findings`, MCP (the thread's MCP servers, one card each with status, error, tools
+  and Reconnect; opened by the card's MCP row and `view.open.mcp`; `docs/notes/mcp-panel.md`)
+  and Gallery (a set of images a thread shows, a grid that opens one over a filmstrip; only
+  `view.open.gallery` opens it, one tab per title; `docs/notes/gallery-surface.md`). The
+  Worktree, Workspace, Linked PRs, Usage, Agents and Threads surfaces are gone: the thread
   info card shows what they did (`docs/notes/thread-info-card.md`). A depth-1 subagent row
   or a strip name above the composer (background runs) shows that run read-only in the
-  content pane in the thread's place, the thread staying selected on its one WatchThread:
+  thread's tab in its place, the thread staying focused on its one WatchThread:
   `thread.agent.open`, back up by Escape or `thread.agent.up`;
-  `docs/notes/subagent-view.md`. Every
-  palette command is reachable without the mouse, and common ones also have buttons that
-  invoke the same registry command. The palette lists the commands the daemon does not
+  `docs/notes/subagent-view.md`.
+* Every palette command is reachable without the mouse, and common ones also have buttons
+  that invoke the same registry command. The palette lists the commands the daemon does not
   mark `NoPalette` (`Command.no_palette`): queries whose only output is a text toast,
   verbs for the model or the CLI to drive the app, Ember's task board, and verbs whose
   required arg is an opaque id a page offers on the right row;
-  `internal/command/palette_test.go` keeps that list (`docs/notes/palette-no-palette.md`). Chords are listed only in the palette and the
-  Keyboard Shortcuts overlay (`docs/notes/phase3-ui-buttons.md`), plus the hint on the
-  sidebar's New thread button. The native app menu's Settings…, Thread and Help items
-  run commands in the window through one host event and carry no key equivalents
-  (`docs/notes/onboarding-1-entry-points.md`). The help overlay's first tab is the
-  getting started guide, `docs/GETTING-STARTED.md` bundled at build time (and shipped to
-  threads in the `code-foundry-help` skill); keep every label and chord it names in step
-  with the app (`docs/notes/onboarding-2-guide.md`).
+  `internal/command/palette_test.go` keeps that list (`docs/notes/palette-no-palette.md`).
+  Chords are listed only in the palette and the Keyboard Shortcuts overlay
+  (`docs/notes/phase3-ui-buttons.md`), plus the hint on the sidebar's New thread button. The
+  native app menu's Settings…, Thread and Help items run commands in the window through one
+  host event and carry no key equivalents (`docs/notes/onboarding-1-entry-points.md`). The
+  help overlay's first tab is the getting started guide, `docs/GETTING-STARTED.md` bundled at
+  build time (and shipped to threads in the `code-foundry-help` skill); keep every label and
+  chord it names in step with the app (`docs/notes/onboarding-2-guide.md`).
 * Ember in the GUI (`docs/notes/ember-3-gui.md`): while `ember.enabled` is on and the
   resident thread exists, a pinned row above New thread (the flame glyph,
   `components/ember/Flame.tsx`, in its idle, thinking, working or attention state; "Ember"
-  and a status line; the thread list's arrows reach it) opens Ember's chat in the content
-  pane. The chat is the resident thread's own WatchThread and timeline list (ThreadPane routes a
+  and a status line; the thread list's arrows reach it) opens Ember's chat as a tab in the
+  focused pane. The chat is the resident thread's own WatchThread and timeline list (ThreadPane routes a
   resident `ember` thread to `components/ember/EmberPane.tsx`) with its own rows
   (`lib/ember.ts` `buildEmberRows`): the user's messages and Ember's text show, and every
   run of work between them (tool calls, subagents, wakes) folds into one "Worked for" row;
   task links (`[Title](cf-task://t-…)`) render as pointer lines that open the Board
-  surface (`surfaces/ember.ts`, Ember's panel only) at the task. One shared
+  surface (`surfaces/ember.ts`, a tab linked to Ember's thread) at the task. One shared
   `EmberService.WatchBoard` (`stores/ember.ts`) feeds the row, the chat header and the
   Board while any of them shows (inline for the row alone, core with the chat or the
-  Board). cmd+shift+a visits Ember's attention first; the window title, the Dock badge
-  and lists leave it out.
+  Board). cmd+shift+a visits Ember first while it waits, then the Needs-you popups; the
+  window title, the Dock badge, Needs you and the space tabs' counts leave it out.
 * Skills page (`docs/notes/skills-page-redesign.md`, over `docs/notes/skills-4-gui.md`):
   Settings → Skills is a GUI page (`components/settings/guiPages.ts`,
   `components/skill/settings`) on the shared catalog layout (`components/settings/catalog`)
@@ -1096,8 +1263,8 @@ virtualized `@pierre/diffs` CodeView (docs/notes/file-viewer-5-pr-code-tab.md).
 ## 10. Plugins
 
 Plugins extend the app without changing it: separate executables, written by users and
-mostly by agents, that the daemon runs and that contribute commands, side-panel
-surfaces, thread flags, a share of every new thread's environment, and Claude threads and
+mostly by agents, that the daemon runs and that contribute commands, surfaces
+(tabs), thread flags, a share of every new thread's environment, and Claude threads and
 terminals of their own. Design: `docs/sketches/plugins/` (`DECISIONS.md` wins); what was
 built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
 
@@ -1130,7 +1297,7 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   behalf; `confirm: ask` hands it to the GUI), `secret/*`, `view/update|append|toast`,
   `context/set`, `thread/setFlag`, `events/subscribe`, `session/setEnvironment`,
   `thread/create|send|archive|list`, `terminal/create|close|list`. A `surface/act`
-  carries the acting panel's context.
+  carries the acting tab's context (its thread when the tab is linked to one).
 * **Commands.** Manifest commands are `plugin.<name>.<command>` in the one registry
   (`Registry.ReplacePrefix` on enable and restart), so the palette, CLI and agents get
   them; each surface adds `plugin.<name>.show.<surface>`, whose availability is the
@@ -1170,8 +1337,10 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   `pluginsdk/plugintest` (a fake host). Releases are tagged `pluginsdk/vX.Y.Z`; plugin
   repositories `go get` the tag on the commit the daemon was built from, else that commit
   (`skills.SDKPin`).
-* **GUI**: plugin surfaces are a generic surface kind in the side panel
-  (`panel.plugin.<name>.<surface>`), available exactly when their show command is; one
+* **GUI**: plugin surfaces are a generic tab kind (`plugin.<name>.<surface>`), linked to a
+  thread when thread-scoped and placed by the daemon's rules, as wide as their pane (at
+  least 480 px, the whole grid in full screen), available exactly when their show command
+  is (which opens the tab from the window through a ShowView `panel.<kind>`); one
   renderer component per node kind, drawn with the app's own components (no HTML from
   plugins, no filled buttons, neutral header icon, emerald only for `ok`); one
   `WatchSurface` per visible surface; host-side `command`, `openUrl` and `copy`; form
@@ -1214,7 +1383,7 @@ publishes `skill.Changed{Epoch}`. The lifecycle (`docs/notes/skills-2-lifecycle.
 the store's too: a plugin is `claude plugin install|enable|disable|update|uninstall
 <name>@<marketplace> --json`, a skill is a directory it copies (staged beside, then
 renamed), moves to and from `<home>/skills/disabled` and records; a setup script runs
-only in a visible `kind=setup` bottom-panel terminal (`skill.setup`), whose exit 0 the
+only in a visible `kind=setup` terminal, shown as a tab (`skill.setup`), whose exit 0 the
 daemon records. The `skill.*` commands drive it. `SkillService`
 (`docs/notes/skills-3-api.md`) only reads (`Search`, `Installed`, `Registries`; the
 EventService skill source carries the epoch); the GUI's `stores/skill.ts` re-reads
@@ -1242,8 +1411,8 @@ on a new epoch while the page is open and runs the `skill.*` commands for every 
 
 ## 13. Pages
 
-HTML pages the model shows (`view.inline` in the conversation, `view.panel.page` and a File
-tab's preview in the side panel) run in sandboxed frames that never touch the API
+HTML pages the model shows (`view.inline` in the conversation, `view.open.page` and a File
+tab's preview) run in sandboxed frames that never touch the API
 (`docs/notes/bridge-1-daemon.md`).
 
 * **The pages listener** (`internal/daemon/pages.go`): a third loopback listener, its port
@@ -1254,6 +1423,8 @@ tab's preview in the side panel) run in sandboxed frames that never touch the AP
   CORS refuses the pages origin, so a page holding a leaked token still cannot call the API.
 * **`/cf/bridge.js`** (`internal/bridge`) gives a page `window.cf`: run the registry verbs its
   thread may run, subscribe to daemon events, read the theme, `cf.storage` and `cf.fetch`.
+  A page reads no terminal's command lines: the read verbs and the `terminal` source leave
+  them out for it (`internal/command/command_lines.go`, `stores/bridgeSources.ts`).
   Every call is a `postMessage` to the GUI (`lib/bridge.ts`, `stores/bridgeHost.ts`), which
   answers only its own frame and invokes the command with its own token
   (`docs/notes/bridge-2-gui.md`).
@@ -1284,3 +1455,103 @@ tab's preview in the side panel) run in sandboxed frames that never touch the AP
 * `ThreadService.ShowHtml` and `ShowTheme` put a page or a theme card in the conversation
   (`docs/notes/inline-html.md`, `docs/notes/theme-model-flow.md`); the `code-foundry-pages`
   skill teaches the model to write pages for the bridge and the library.
+
+## 14. Layout: spaces, panes and tabs
+
+The window shell's state lives in the daemon, so the CLI and a thread's model can read and
+change the layout a key press changes (`docs/notes/shell-model.md` is the specification,
+`docs/notes/shell-build.md` the summary of the build and its step notes). The daemon is the
+only writer; the GUI renders the published layout, sends commands, and keeps to itself only
+what depends on the drawn frame (rails, full screen, tab fitting, drag targets, the keyboard).
+
+* **The model** (`internal/layout`, pure, no I/O): a `State` of spaces in order, the current
+  space and the default one (a thread with no record lives there); a `Space` is a name, a
+  tree of `Node`s (a pane with its tabs, active tab and whether the user collapsed it, or a split with a direction, kids and
+  sizes that sum to 1), its focused pane, its MRU of tabs and its composer drafts; a `Tab` is
+  a kind, an optional thread link, params and a title; each thread has a record (its space,
+  its remembered tabs, its quick terminal's open state and height, its last tab per kind).
+  Every change is an op (`{"op": "move_tab", ...}`, a registry of structs by JSON name):
+  `Apply` runs it on a copy, normalises, checks the normal form, and returns the state it was
+  given on any error. The ops: the tree (`add_tab`, `split_pane`, `move_tab`, `move_pane`,
+  `merge_pane`, `swap_pane`, `close_tab`, `close_pane`, `set_sizes`, `focus_tab`,
+  `focus_pane`, `set_tab_params`, `rename_tab`), spaces (`new_space`, `rename_space`,
+  `remove_space`, `reorder_spaces`, `switch_space`), placement and threads (`open_surface`,
+  `open_thread`, `close_thread`, `move_thread`, `archive_thread`, `snooze_thread`), drafts
+  (`new_thread`, `start_draft`, `label_draft`, `clear_draft`, `discard_draft`, `open_draft`)
+  and terminals (`set_quick`, `replace_terminal`, `drop_terminal`). `testdata/ops/*.json` pins
+  each op case by case; the GUI's geometry, drag preview and the mock daemon run the same
+  files (`docs/notes/shell-1-layout-model.md`).
+* **Identity** (`identity.go`, a table, not a switch): each kind says what makes two tabs the
+  same (a diff per thread and checkout, plus one per asker and title; a file per path; a pull
+  request per slug and number; a terminal per terminal; one composer per space, a draft per
+  id; one Pull Requests and one Projects tab per space), whether it links to a thread, and
+  its default size. Opening a tab whose identity is open uses the open one. `kinds.json` and
+  `identity.json` hold the GUI's port to it (`docs/notes/shell-gaps-c-identity.md`).
+* **Placement** (`place.go`): a linked surface opened by a key, a menu, the palette or a model
+  goes, in order, to the open tab; a pane holding this thread's linked tabs; a pane beside
+  the thread's holding linked tabs (right, left, below, above); any pane holding them; a new
+  pane right of the thread's at the kind's size when the conversation keeps 480 px; else the
+  thread's own pane. A closed thread's surface goes to the focused pane, and so does a
+  thread's own tab. A joined pane is never resized. Placement measures in the pane area the
+  window reports (`SetViewport`; the newest report of a visible window, else 1180 × 820).
+  `Result.rule` says which rule placed it (`docs/notes/shell-2-placement.md`).
+* **A thread's tabs**: `close_thread` closes its linked tabs in its space and remembers where
+  each was; `open_thread` puts them back into their old panes when the thread is back in its
+  old pane, else places them fresh beside it. Moving a thread takes its linked tabs;
+  removing a space closes each of its threads as `close_thread` does, so their linked tabs
+  join their sets and their terminals keep running; archiving closes them everywhere and
+  ends its terminals; snoozing closes them, ends its terminals and remembers them as fresh
+  shells with the command each ran (a terminal tab in another space with that space, to go
+  back there). An archived thread lives in no space: `open_thread` with `archived` opens it
+  in the current space, and with a pane and an index or an edge it opens at a drop's place
+  in one op. **Smart swap**
+  (`swap.go`, setting `layout.smart_swap`): when a thread tab gains the focus, every pane
+  whose active tab is another thread's linked surface of a kind this thread also has open in
+  that pane switches to it.
+* **Focus from a thread**: `Options.KeepFocus` runs any op and puts back the user's current
+  space, focused tabs and MRU, so a model's tab waits behind the user's focused tab. The
+  commands use it for every call not made by the user in person (§7).
+* **The store** (`internal/store/layout`): one mutex, `core.Apply` on the current state, then
+  write, swap the snapshot, publish; an op that changes nothing is no commit. SQLite tables
+  `layout_spaces` (a JSON document per space), `layout_threads` (one per thread) and
+  `layout_meta` (`rev`, `current_space`, `default_space`, `legacy_import`). A structural
+  commit is written before it is published; a focus-only one is published at once and written
+  within a second, by the next structural commit or at `Close`. Rows that do not decode are
+  repaired at load and logged once. Rows a newer build wrote (a newer version, a tab kind or
+  node type this build does not know) are left as they are: the store shows what it
+  understands and writes nothing (`Snapshot.Newer`, `Layout.newer`; the window says so in a
+  line under the grid). The rev survives restarts; the event source's epoch tells
+  a client to take the snapshot again. `layouttest` is the fake with the real ops
+  (`docs/notes/shell-3-layout-store.md`).
+* **The event source and the service**: EventService's `layout` source sends the snapshot,
+  then a delta per commit (whole changed spaces and thread records, always the order and the
+  current and default space) with the rev and the client id that applied it. The bus event
+  also carries the op and its result for the daemon's own glue; clients never see them.
+  `LayoutService` (§4) converts each `LayoutOp` case through a registry of converters
+  (`internal/api/layout_ops*.go`); its errors map one to one (not found, invalid argument,
+  already exists, failed precondition).
+* **The glue** (`internal/daemon/layout.go`), so the store never imports the thread or
+  terminal stores: a new thread joins its creator's space or the current one (a plugin's
+  stays in the default space); an unarchived one joins the current space unless its tab is
+  open (opened while archived, it lives there); archive, snooze and
+  removal reach the layout through the thread store's `ShellsGoing` hook, before the shells
+  go, so a snooze can record each terminal's foreground or last command; a commit's closed
+  terminal tabs end their terminals (shells and action runs, never a plugin's), while tabs
+  closed with their thread keep running; a removed terminal closes its tab; a reset
+  terminal's tab follows the shell that `replaces` it; opening a snoozed thread starts a
+  fresh shell for each restored terminal tab; a sweep at start and every minute drops what
+  the layout holds of terminals that are gone (no terminal survives a daemon restart); and
+  when the bus dropped a layout or thread event for it, the glue catches up from the stores'
+  snapshots (`docs/notes/shell-6-lifecycle.md`, `docs/notes/shell-review-fixes-daemon.md`).
+* **The first-load import** (`internal/layout/legacy.go`, `legacy_panel.go`,
+  `internal/daemon/layout_import.go`): once per home, the first window sends the classic
+  window's stored side panel and bottom panel values; the daemon runs a Go port of the old
+  store's migrations (pinned to 57 captured cases), and each live thread's side panel tabs
+  and terminals become its remembered set, its oldest running shell its quick terminal
+  (labelled `slot=quick`). No thread is opened and no terminal ends: the first space stays
+  empty and shows the composer. Only terminals alive at import time come over; an update's
+  daemon restart has already ended the old ones. `legacy_import` in `layout_meta` makes it
+  run once (`docs/notes/shell-18-legacy-import.md`, `docs/notes/shell-20-cutover.md`).
+* **The mock daemon** (`gui/frontend/mock/layout.ts`, `layoutVerbs.ts`) ports the tree,
+  space and draft ops and runs them against the same JSON cases; placement rules 2 to 6,
+  restore and smart swap are tested in Go only, and the mock simplifies them.

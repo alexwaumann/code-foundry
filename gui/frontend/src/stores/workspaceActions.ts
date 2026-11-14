@@ -14,11 +14,10 @@ import { threadLabel } from "@/lib/prompt";
 import { WORKSPACE_PRIMARY } from "@/lib/projectSet";
 import { editInstructionsPrompt, instructionsStep, workspaceFolder } from "@/lib/workspaceCard";
 import { projectRef } from "@/lib/projects";
-import { newWorktreeTerminal } from "./bottomActions";
+import { newTerminalInContext } from "@/shell/terminalActions";
 import { runCommand, runCommandForResult } from "./commands";
-import { emptyContext } from "./context";
+import { emptyContext, worktreeContext } from "./context";
 import { openFileInPanel } from "./filePanel";
-import { togglePanel } from "./panel";
 import { mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -76,7 +75,7 @@ export function openWorkspaceInEditor(workspaceId: string, app: string): Promise
 /**
  * Where a workspace's New terminal starts and who owns the shell: its folder (workspaceFolder), owned by the
  * first registered member's main checkout (a shell belongs to a thread or a worktree, and the folder is
- * neither), so it lands in the Projects page's panel. Null without a folder or a registered member.
+ * neither). Null without a folder or a registered member.
  */
 export function workspaceTerminalPlace(ws: WorkspaceView | undefined, projects: ProjectsData): { projectId: string; path: string; cwd: string } | null {
   const cwd = ws ? workspaceFolder(ws) : "";
@@ -89,16 +88,14 @@ export function workspaceTerminalPlace(ws: WorkspaceView | undefined, projects: 
 /** terminal.new in the workspace's folder (workspaceTerminalPlace); false when it has no place for one. */
 export async function newWorkspaceTerminal(workspaceId: string): Promise<boolean> {
   const place = workspaceTerminalPlace(useWorkspacesStore.getState().byId[workspaceId], useProjectsStore.getState());
-  return place ? newWorktreeTerminal(place.projectId, place.path, place.cwd) : false;
+  return place ? newTerminalInContext(worktreeContext(place.projectId, place.path), place.cwd) : false;
 }
 
-/** The instructions file as a File tab in the page's side panel (shown, not focused, like the page's worktree rows). */
+/** The instructions file as a File tab beside the page (not focused, like the page's worktree rows). */
 export function openWorkspaceInstructions(workspaceId: string): boolean {
   const ws = useWorkspacesStore.getState().byId[workspaceId];
   if (!ws?.instructions) return false;
-  if (!openFileInPanel("current", { project: "", base: workspaceFolder(ws), path: ws.instructions })) return false;
-  togglePanel("current", true, { focus: false });
-  return true;
+  return openFileInPanel("current", { project: "", base: workspaceFolder(ws), path: ws.instructions });
 }
 
 /** Per workspace, the thread the last "Edit instructions" press sent to or started (lib/workspaceCard.ts instructionsStep). */

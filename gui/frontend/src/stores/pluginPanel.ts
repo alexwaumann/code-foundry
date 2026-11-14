@@ -8,7 +8,7 @@
  */
 import { toast } from "sonner";
 import { getUiContext } from "./context";
-import { openSurface } from "./panel";
+import { openTab } from "@/shell/host";
 import { surfaceManifestOf } from "./plugins";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
@@ -42,6 +42,6 @@ export function showPluginView(name: string): boolean {
   } else if (project && getUiContext().activeProjectId !== project) {
     ui.select({ kind: "compose", projectId: project });
   }
-  openSurface("current", surfaceTab(m));
+  openTab("current", surfaceTab(m));
   return true;
 }

@@ -1,0 +1,40 @@
+{
+  "doc": "A terminal that already has a tab cannot take another's.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}},
+                {"id":"t-n","kind":"terminal","thread":"th-a","params":{"terminal":"term-n"}}
+              ],
+              "active": "t-x"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-b"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"replace_terminal","old":"term-x","new":"term-n"},
+  "error": "already_exists"
+}

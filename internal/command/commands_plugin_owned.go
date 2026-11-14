@@ -63,12 +63,12 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 			ReadOnly:  true,
 			Title:     "List Plugin Terminals",
 			Description: "List the terminals a plugin owns (terminal/create): id, state, title, program and directory. " +
-				"terminal kill and terminal close take their ids, and the side panel's terminal node or the bottom panel shows " +
+				"terminal kill and terminal close take their ids, and the plugin's terminal node or a terminal tab shows " +
 				"them; the plugin closes them, and disabling it does too.",
 			Category:     "Plugin",
 			NoKeybinding: true,
 			Args:         []ArgSpec{nameArg},
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				res, err := d.Terminal.List(ctx, connect.NewRequest(&v1.ListTerminalsRequest{}))
 				if err != nil {
 					return Result{}, err
@@ -80,6 +80,7 @@ func RegisterPluginOwned(r *Registry, d PluginOwnedDeps) error {
 						out.Terminals = append(out.Terminals, t)
 					}
 				}
+				out.Terminals = terminalsFor(uctx, out.GetTerminals()) // command_lines.go
 				return Result{Message: formatPluginTerminals(name, out.GetTerminals()), JSON: out}, nil
 			},
 		},

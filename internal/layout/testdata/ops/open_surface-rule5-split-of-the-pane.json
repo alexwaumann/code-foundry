@@ -1,0 +1,83 @@
+{
+  "doc": "Rule 5 splits the thread's pane, not its column: the pane below keeps its full width.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {"t":"pane","id":"p-t","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-c",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "split",
+              "id": "s-n1",
+              "dir": "row",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-n1",
+                  "tabs": [
+                    {
+                      "id": "t-n1",
+                      "kind": "diff",
+                      "thread": "th-a",
+                      "params": {"project":"pj","worktree":"w"}
+                    }
+                  ],
+                  "active": "t-n1"
+                }
+              ],
+              "sizes": [0.55,0.45]
+            },
+            {"t":"pane","id":"p-t","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1","rule":"5"}
+}

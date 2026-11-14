@@ -1,0 +1,157 @@
+[
+  {"name":"thread","kind":"thread","thread":"th-1","key":"thread:th-1"},
+  {"name":"thread needs its thread","kind":"thread","refused":true},
+  {
+    "name": "diff of a thread",
+    "kind": "diff",
+    "thread": "th-1",
+    "params": {"project":"pj","worktree":"w"},
+    "key": "diff:th-1:pj:w"
+  },
+  {
+    "name": "diff unlinked, from a Projects row",
+    "kind": "diff",
+    "params": {"project":"pj","worktree":"w"},
+    "key": "diff::pj:w"
+  },
+  {
+    "name": "diff with a title of its own",
+    "kind": "diff",
+    "thread": "th-1",
+    "params": {"project":"pj","title":"Review","worktree":"w"},
+    "key": "diff:th-1:pj:w:Review"
+  },
+  {
+    "name": "diff ignores what it shows",
+    "kind": "diff",
+    "thread": "th-1",
+    "params": {
+      "base": "ref:main",
+      "filter": "go",
+      "fold": "1",
+      "path": "a.go",
+      "project": "pj",
+      "worktree": "w"
+    },
+    "key": "diff:th-1:pj:w"
+  },
+  {
+    "name": "diff a thread framed is its own",
+    "kind": "diff",
+    "thread": "th-1",
+    "params": {"note":"Why","project":"pj","thread":"th-2","worktree":"w"},
+    "key": "diff:th-1:pj:w:by:th-2"
+  },
+  {
+    "name": "diff a thread framed and titled",
+    "kind": "diff",
+    "thread": "th-1",
+    "params": {"project":"pj","thread":"th-1","title":"Review","worktree":"w"},
+    "key": "diff:th-1:pj:w:by:th-1:Review"
+  },
+  {
+    "name": "diff needs its checkout",
+    "kind": "diff",
+    "thread": "th-1",
+    "params": {"project":"pj"},
+    "refused": true
+  },
+  {
+    "name": "file by path alone",
+    "kind": "file",
+    "thread": "th-1",
+    "params": {"line":"3","path":"/r/a.go"},
+    "key": "file:/r/a.go"
+  },
+  {
+    "name": "file unlinked has the same key",
+    "kind": "file",
+    "params": {"path":"/r/a.go"},
+    "key": "file:/r/a.go"
+  },
+  {"name":"file needs a path","kind":"file","thread":"th-1","refused":true},
+  {
+    "name": "pull request slug in lower case",
+    "kind": "pullrequest",
+    "params": {"number":"12","slug":"Acme/App"},
+    "key": "pr:acme/app#12"
+  },
+  {
+    "name": "pull request number is a number",
+    "kind": "pullrequest",
+    "params": {"number":"012","slug":"a/b"},
+    "refused": true
+  },
+  {
+    "name": "pull request number is positive",
+    "kind": "pullrequest",
+    "params": {"number":"0","slug":"a/b"},
+    "refused": true
+  },
+  {
+    "name": "terminal by its terminal id",
+    "kind": "terminal",
+    "thread": "th-1",
+    "params": {"terminal":"term-1"},
+    "key": "term:term-1"
+  },
+  {"name":"free terminal","kind":"terminal","params":{"terminal":"term-1"},"key":"term:term-1"},
+  {"name":"terminal needs its terminal","kind":"terminal","thread":"th-1","refused":true},
+  {"name":"pull requests page","kind":"prs","key":"prs"},
+  {"name":"projects page","kind":"projects","key":"projects"},
+  {"name":"pages belong to no thread","kind":"prs","thread":"th-1","refused":true},
+  {
+    "name": "compose for a project is the space's one composer",
+    "kind": "compose",
+    "params": {"project":"pj"},
+    "key": "compose"
+  },
+  {
+    "name": "compose like a thread is the space's one composer",
+    "kind": "compose",
+    "params": {"like":"th-1"},
+    "key": "compose"
+  },
+  {"name":"compose at home","kind":"compose","key":"compose"},
+  {"name":"mcp of a thread","kind":"mcp","thread":"th-1","key":"mcp:th-1"},
+  {"name":"mcp needs a thread","kind":"mcp","refused":true},
+  {
+    "name": "gallery by title",
+    "kind": "gallery",
+    "thread": "th-1",
+    "params": {"images":"x","title":"Shots"},
+    "key": "gallery:th-1:Shots"
+  },
+  {"name":"gallery needs a title","kind":"gallery","thread":"th-1","refused":true},
+  {"name":"ember board","kind":"ember.board","thread":"th-e","key":"ember.board"},
+  {
+    "name": "plugin surface by scope",
+    "kind": "plugin.notes.board",
+    "thread": "th-1",
+    "params": {"scope":"th-1"},
+    "key": "plugin:notes/board/th-1"
+  },
+  {"name":"plugin surface without scope","kind":"plugin.notes.board","key":"plugin:notes/board/"},
+  {
+    "name": "plugin surface of a thread, no scope: one per thread",
+    "kind": "plugin.notes.board",
+    "thread": "th-1",
+    "key": "plugin:notes/board/thread:th-1"
+  },
+  {
+    "name": "plugin surface of another thread",
+    "kind": "plugin.notes.board",
+    "thread": "th-2",
+    "key": "plugin:notes/board/thread:th-2"
+  },
+  {
+    "name": "plugin surface of a thread naming its project scope",
+    "kind": "plugin.notes.board",
+    "thread": "th-1",
+    "params": {"scope":"project:pj"},
+    "key": "plugin:notes/board/project:pj"
+  },
+  {"name":"plugin kind needs plugin and surface","kind":"plugin.notes","refused":true},
+  {"name":"plugin kind with empty surface","kind":"plugin.notes.","refused":true},
+  {"name":"unknown kind","kind":"files","refused":true}
+]

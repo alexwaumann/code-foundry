@@ -13,6 +13,7 @@ import { useRecentFilesStore } from "@/stores/recentFiles";
 import { useUiStore } from "@/stores/ui";
 import { stubLayout, settle } from "@/test/composerWorld";
 import { daemon, resetDaemon } from "@/test/daemonFakes";
+import { layoutSettled, threadSeed } from "@/test/fakeLayout";
 import { addThreads, addWorkspace, CF, GP, HOME, panelActive, resetPanels, seedWorld, thread } from "@/test/projectsWorld";
 import { CommandPalette } from "./CommandPalette";
 import { FINDER_DEBOUNCE_MS } from "./useFileFinder";
@@ -20,6 +21,7 @@ import { FINDER_DEBOUNCE_MS } from "./useFileFinder";
 type Search = (req: { sources: readonly FinderSourceView[]; query: string; limit?: number }) => Promise<FinderMatchView[]>;
 const search = vi.fn<Search>();
 
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/filesystem", async (orig) => ({
   ...(await orig<typeof import("@/api/filesystem")>()),
   findFiles: (req: Parameters<Search>[0]) => search(req),
@@ -47,6 +49,13 @@ function match(projectId: string, checkout: string, path: string, pathPositions:
   return { projectId, checkout, path, pathPositions, projectPositions };
 }
 
+/** Every tab op sent so far answered by the layout. */
+async function laidOut(): Promise<void> {
+  await act(async () => {
+    await layoutSettled();
+  });
+}
+
 /** Past the debounce, and the answer rendered. */
 async function searched(): Promise<void> {
   await act(async () => {
@@ -55,11 +64,12 @@ async function searched(): Promise<void> {
   await settle(10);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   stubLayout();
   resetDaemon();
   seedWorld();
-  resetPanels();
+  // Thread s-1 in a pane: its tabs open beside it.
+  await resetPanels(threadSeed("s-1"));
   search.mockReset();
   search.mockResolvedValue([]);
   useRecentFilesStore.setState({ byKey: {} });
@@ -160,11 +170,12 @@ describe("opening the file finder", () => {
 });
 
 describe("the empty query", () => {
-  it("lists the thread's changed files (no deleted ones), then the panel's recent files not changed", async () => {
+  it("lists the thread's changed files (no deleted ones), then the thread's recent files not changed", async () => {
     daemon.worktreeDetail.set(`repo-cf\u0000${CF}`, detail("repo-cf", CF, [{ path: "gui/src/lib/tree.ts", status: "M" }, { path: "gone.ts", status: "D" }, { path: "gui/src/lib/virtualRows.ts", status: "A" }]));
     // The panel opened README.md, tree.ts and docs/PLAN.md; README.md's tab is still open.
     useRecentFilesStore.setState({ byKey: { "thread:s-1": [`${CF}/README.md`, `${CF}/gui/src/lib/tree.ts`, `${CF}/docs/PLAN.md`].map((path) => ({ project: "repo-cf", base: CF, path })) } });
     openFileInPanel("thread:s-1", { project: "repo-cf", base: CF, path: "README.md" });
+    await laidOut();
     await openFinder("s-1");
     await settle(10);
     expect(headings()).toEqual(["Changed in this thread", "Recently opened"]);
@@ -264,7 +275,7 @@ describe("a typed query", () => {
 });
 
 describe("picking a file", () => {
-  it("Enter opens it as a File tab in the thread's panel (shut before), at a typed line", async () => {
+  it("Enter opens it as a File tab among the thread's tabs (none before), at a typed line", async () => {
     search.mockResolvedValue([match("repo-cf", CF, "gui/src/lib/tree.ts", [12, 13, 14, 15])]);
     await openFinder("s-1");
     expect(panelActive("thread:s-1")).toBeNull();
@@ -272,6 +283,7 @@ describe("picking a file", () => {
     await searched();
     fireEvent.keyDown(input(), { key: "Enter" });
     await settle(5);
+    await laidOut();
     expect(useUiStore.getState().palette.open).toBe(false);
     expect(panelActive("thread:s-1")).toEqual({ open: true, kind: "files", title: "tree.ts", params: { project: "repo-cf", base: CF, path: `${CF}/gui/src/lib/tree.ts`, line: "42" } });
   });
@@ -297,6 +309,7 @@ describe("picking a file", () => {
       await Promise.resolve();
     });
     await settle(5);
+    await laidOut();
     expect(useUiStore.getState().palette.open).toBe(false);
     expect(panelActive("thread:s-1")?.params).toEqual({ project: "repo-cf", base: CF, path: `${CF}/src/app.ts`, line: "7" });
   });
@@ -319,6 +332,7 @@ describe("picking a file", () => {
     await searched();
     expect(screen.getByTestId("finder-error").textContent).toBe("Cannot search: boom");
     expect(useUiStore.getState().palette.open).toBe(true);
+    await laidOut();
     expect(panelActive("thread:s-1")).toBeNull();
   });
 
@@ -335,6 +349,7 @@ describe("picking a file", () => {
     expect(rows()).toEqual([]);
     fireEvent.keyDown(input(), { key: "Enter" });
     await settle(5);
+    await laidOut();
     expect(panelActive("thread:s-1")).toBeNull();
   });
 
@@ -342,10 +357,13 @@ describe("picking a file", () => {
     daemon.worktreeDetail.set(`repo-cf\u0000${CF}`, detail("repo-cf", CF, [{ path: "a.ts", status: "M" }]));
     openFileInPanel("thread:s-1", { project: "repo-cf", base: CF, path: "a.ts" });
     openFileInPanel("thread:s-1", { project: "repo-cf", base: CF, path: "b.ts" });
+    await laidOut();
+    expect(panelActive("thread:s-1")?.params.path).toBe(`${CF}/b.ts`);
     await openFinder("s-1");
     await settle(10);
     fireEvent.keyDown(input(), { key: "Enter" });
     await settle(5);
+    await laidOut();
     expect(panelActive("thread:s-1")?.params.path).toBe(`${CF}/a.ts`);
     expect(panelActive("thread:s-1")?.kind).toBe("files");
   });

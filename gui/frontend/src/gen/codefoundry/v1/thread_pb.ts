@@ -2420,7 +2420,7 @@ export type ShowThreadHtmlRequest = Message<"codefoundry.v1.ShowThreadHtmlReques
   again: boolean;
 
   /**
-   * The page also opens in the side panel (view.inline --panel): a card of it anywhere
+   * The page also opens as a tab beside the thread (view.inline --panel): a card of it anywhere
    * in the thread is reused, not only one since the last user message.
    *
    * @generated from field: bool panel = 5;

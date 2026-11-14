@@ -15,6 +15,7 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // ActionBackend is the slice of ActionService the action.* commands need, in generated
@@ -41,6 +42,9 @@ type ActionDeps struct {
 	Action  ActionBackend
 	Project ProjectBackend
 	Thread  ThreadBackend
+	// Layout is the window shell's layout: a terminal run gets a tab in it (openTerminalTab).
+	// Nil: no tab.
+	Layout layoutstore.Store
 }
 
 // actionIcons maps the icon names the commands take to the proto enum; the first is
@@ -164,14 +168,14 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Name:  "action.add",
 			Title: "Add Action",
 			Description: "Add an action to a project: a command line run as `$SHELL -lc <command>` in a worktree, with " +
-				"CODE_FOUNDRY_PROJECT_ROOT and CODE_FOUNDRY_WORKTREE set. It opens as a terminal in the bottom panel, " +
+				"CODE_FOUNDRY_PROJECT_ROOT and CODE_FOUNDRY_WORKTREE set. It opens as a terminal tab, " +
 				"or with --in-terminal=false runs in the background with its output captured.",
 			Category: "Action",
 			Args: []ArgSpec{
 				{Name: "name", Type: String, Required: true, Positional: true, Description: "Name, unique in the project (ignoring case)"},
 				{Name: "command", Type: String, Required: true, Description: "Command line (may span lines)"},
 				withDefault(iconArg, "play"),
-				{Name: "in-terminal", Type: Bool, Default: "true", Description: "Run in a terminal in the bottom panel (--in-terminal=false: in the background)"},
+				{Name: "in-terminal", Type: Bool, Default: "true", Description: "Run in a terminal tab (--in-terminal=false: in the background)"},
 				{Name: "on-worktree-create", Type: Bool, Default: "false", Description: "Also run (in the background) when a new thread creates its worktree"},
 				projectArg, hereArg,
 			},
@@ -277,16 +281,18 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 			Name:      "action.run",
 			NoPalette: true,
 			Title:     "Run Action",
-			Description: "Run an action for the active thread (an action of any of its projects, in its checkout of that project; " +
-				"its bottom panel), else the active worktree, else the registered worktree containing the working directory. " +
+			Description: "Run an action for the active thread (an action of any of its projects, in its checkout of that project), " +
+				"else the active worktree, else the registered worktree containing the working directory. " +
 				"It runs where the action says (a terminal, or the background); " +
-				"--background captures its output instead, --terminal opens it as a terminal. --wait waits for it to finish, " +
+				"--background captures its output instead, --terminal opens it as a terminal. A terminal run gets a tab in the window: " +
+				"linked to the thread and placed beside it, or, for a worktree, in the focused pane; it stays after the run ends. " +
+				"--wait waits for it to finish, " +
 				"prints a background run's output, and exits with the action's exit code.",
 			Category: "Action",
 			Args: []ArgSpec{
 				refArg,
 				{Name: "background", Type: Bool, Description: "Run in the background with captured output, whatever the action says"},
-				{Name: "terminal", Type: Bool, Description: "Run in a terminal in the bottom panel, whatever the action says"},
+				{Name: "terminal", Type: Bool, Description: "Run in a terminal (a tab in the window), whatever the action says"},
 				{Name: "wait", Type: Bool, Description: "Wait for the run to finish; print its output (background) and exit with its code. " +
 					"Interrupting the wait stops a background run"},
 				{Name: "here", Type: Path, DefaultToCwd: true, Description: "Where the CLI runs: without a thread or worktree, " +
@@ -323,6 +329,14 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 					return Result{}, err
 				}
 				run := res.Msg.GetRun()
+				var tab string
+				if run.GetMode() == v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL && run.GetTerminalId() != "" {
+					// The run is seen in its terminal's tab: linked to the run's thread and placed by the rules
+					// (a worktree's run: unlinked, in the focused pane). An exited run keeps it, to read its output.
+					if tab, err = openTerminalTab(ctx, d.Layout, c, o.thread, run.GetTerminalId(), ""); err != nil {
+						return Result{}, err
+					}
+				}
 				if a.Bool("wait") {
 					out, err := waitRun(ctx, d, run.GetId())
 					if err != nil && ctx.Err() != nil && run.GetMode() == v1.ActionRunMode_ACTION_RUN_MODE_BACKGROUND {
@@ -334,7 +348,7 @@ func RegisterAction(r *Registry, d ActionDeps) error {
 					return out, err
 				}
 				if run.GetMode() == v1.ActionRunMode_ACTION_RUN_MODE_TERMINAL {
-					return Result{Message: fmt.Sprintf("started %s in terminal %s (run %s)", run.GetActionName(), run.GetTerminalId(), run.GetId()), JSON: run}, nil
+					return Result{Message: fmt.Sprintf("started %s in terminal %s (run %s)%s", run.GetActionName(), run.GetTerminalId(), run.GetId(), tab), JSON: run}, nil
 				}
 				return Result{Message: fmt.Sprintf("started %s in the background (run %s); `code-foundry action wait %s` prints its output",
 					run.GetActionName(), run.GetId(), run.GetId()), JSON: run}, nil

@@ -642,8 +642,8 @@ type Thread struct {
 }
 
 // Terminal renders a plugin-owned terminal (permission terminals; Host.CreateTerminal)
-// with the host's terminal view and an "Open in bottom panel" button, which shows it as a
-// tab of the bottom panel of what the user is looking at. A terminal that is gone shows a
+// with the host's terminal view and an "Open in a tab" button, which shows it as a
+// terminal tab (the node steps aside while that tab shows it). A terminal that is gone shows a
 // muted empty state.
 type Terminal struct {
 	TerminalID string `json:"terminalId"`
@@ -652,12 +652,12 @@ type Terminal struct {
 	Title string `json:"title,omitempty"`
 	// Height: HeightAuto (the zero value: Rows), HeightFill or HeightPx(n).
 	Height Height `json:"height,omitzero"`
-	// Actions are up to 2 more buttons beside "Open in bottom panel" (Restart, Stop).
+	// Actions are up to 2 more buttons beside "Open in a tab" (Restart, Stop).
 	Actions []Button `json:"actions,omitempty"`
 }
 
 // ColumnsCollapse is how a Columns node degrades when its container is narrower than
-// the columns need (always in the side panel).
+// the columns need (a pane beside a thread usually is).
 type ColumnsCollapse string
 
 const (
@@ -721,7 +721,7 @@ type Pane struct {
 // Grid lays its items out in as many equal columns as fit its own width:
 // max(1, floor((width + GridGap) / (MinWidth + GridGap))), at most MaxGridColumns, GridGap
 // px apart both ways. MinWidth (MinGridMinWidth..MaxGridMinWidth, 0 = GridMinWidth) is
-// the least width of a column. In one column (always in the side panel with the default
+// the least width of a column. In one column (a pane beside a thread, with the default
 // MinWidth) the items stack in order like the list around the grid. 1 to MaxGridItems
 // items; the columns do not shrink to fewer items, so two items in a wide grid keep a
 // card's width and leave the rest of the row empty.
@@ -813,8 +813,8 @@ const (
 )
 
 // Container caps its nodes' width and centres them: Width ContainerNarrow (at most 680
-// px), ContainerWide (1080 px) or ContainerFull (the default: no cap). The side panel is
-// narrower than either cap, so there every width is full; on a page a narrow container
+// px), ContainerWide (1080 px) or ContainerFull (the default: no cap). A pane beside a thread is
+// narrower than either cap, so there every width is full; in a wide pane a narrow container
 // keeps text and forms at reading width. It draws nothing of its own, lays its nodes out
 // like the list around it, and counts as a container toward MaxDepth.
 type Container struct {
@@ -828,7 +828,7 @@ type Container struct {
 // and Detail filling the rest, MasterDetailGap px apart, each scrolling on its own; the
 // node is as tall as the taller side, never taller than the rest of its box (a pane with
 // a px or fill height, else the surface's body) below its top, at least 240 px. Narrower
-// (always in the side panel) it shows the list alone; choosing a row shows the detail
+// (a pane beside a thread usually is) it shows the list alone; choosing a row shows the detail
 // alone under a back button with the row's title, until the user goes back, Selected
 // changes to a key that is not a row, or ResetToken changes.
 //
@@ -890,7 +890,7 @@ var (
 	HeightAuto = Height{mode: "auto"}
 	// HeightFill takes the rest of its box's height below the node (at least 240 px): the
 	// nearest enclosing Pane with a HeightPx or HeightFill height, else the surface's
-	// scrolling body (the side panel, the page).
+	// scrolling body (the surface's, in its pane).
 	HeightFill = Height{mode: "fill"}
 )
 

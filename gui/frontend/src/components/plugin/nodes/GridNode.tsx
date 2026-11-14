@@ -10,7 +10,7 @@ import type { NodeProps } from "../registry";
  * node's own width at minWidth px each (components/plugin/layout.ts gridColumns: 240 px
  * unless set, at most 6), 12 px apart both ways; an item spans 1 or 2 of them (never more
  * than there are). An item's only node stretches to its row's height, so cards line up.
- * In one column (the side panel; and until the first measure) the items stack like the
+ * In one column (a narrow pane; and until the first measure) the items stack like the
  * list around the grid. One ResizeObserver per node follows its width.
  */
 export function GridNode({ node, data }: NodeProps<"grid">) {

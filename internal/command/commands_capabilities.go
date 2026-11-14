@@ -92,7 +92,7 @@ var capGroups = []capGroup{
 	{"build", "this build's version, commit and source", capBuild},
 	{"commands", "commands: the CLI verbs, which most buttons and menu items run too", capCommands},
 	{"pages", "main-pane pages and the verb that shows each", capPages},
-	{"panel", "side panel surfaces and the verb that opens each in a thread", capPanel},
+	{"panel", "surfaces and the verb that opens each as a tab beside a thread", capPanel},
 	{"rendering", "what the thread view renders: markdown, code, paths, images, PDFs, HTML, and the bridge pages call the app with", capRendering},
 	{"skills", "skills every thread gets, and ones installed for Claude Code", capSkills},
 	{"plugins", "installed plugins with their commands and surfaces", capPlugins},
@@ -291,9 +291,9 @@ type CapabilityView struct {
 }
 
 // notPages are the view.<name> verbs that act on a window rather than show a page
-// (back, forward, the thread info card's toggle), and view.inline, which shows a page in
-// a thread's conversation (the panel group tells it).
-var notPages = []string{ViewBack, ViewForward, ViewThreadInfo, "inline"}
+// (back, forward, the thread info card's toggle, the key between a thread and its diff), and
+// view.inline, which shows a page in a thread's conversation (the panel group tells it).
+var notPages = []string{ViewBack, ViewForward, ViewThreadInfo, "thread-diff", "inline"}
 
 // pageCommands are the main-pane pages: the view.<name> verbs (one segment after view.)
 // but those in notPages.
@@ -318,7 +318,7 @@ func capPages(_ context.Context, env capEnv) (capDetail, error) {
 	pages := pageCommands(env.r)
 	var b strings.Builder
 	fmt.Fprintf(&b, "pages: %d. Each verb shows its page in every app window, moving every window away from what the user sees: "+
-		"run one only when asked, and to show something prefer a panel verb. From a thread no window shows, a page verb refuses unless "+
+		"run one only when asked, and to show something prefer a view.open verb. From a thread no window shows, a page verb refuses unless "+
 		"--focus (the user asked to be taken there).\n", len(pages))
 	for _, p := range pages {
 		fmt.Fprintf(&b, "  %-20s %s\n", p.Command, p.Description)
@@ -329,29 +329,25 @@ func capPages(_ context.Context, env capEnv) (capDetail, error) {
 	return capDetail{Count: count(len(pages)), Text: b.String(), JSON: CapabilityViews{Pages: pages}}, nil
 }
 
-// panelActions are the view.panel.* verbs that change the panel rather than open a
-// surface in it.
-var panelActions = []string{ViewPanelToggle, ViewPanelExpand, ViewPanelNewTab, ViewPanelSplit}
-
 // panelItems is how the item verbs (commands_view_items.go) and replies open one file or
 // pull request.
-const panelItems = "view.panel.file (--path, --line), view.panel.diff (--path, --base, --head, --title, --note, --hide) and view.panel.pr (--number) open one item " +
-	"(view.panel.page (--path, --title) an .html page as your own, with its bridge and no card) and refuse one that does not exist or has nothing to show. " +
-	"view.panel.file --edit (--line, --note) asks the user to edit the file, a new one included, for a secret or a file you cannot read: end your turn, a message says when it is saved. " +
+const panelItems = "view.open.file (--path, --line), view.open.diff (--path, --base, --head, --title, --note, --hide) and view.open.pr (--number) open one item " +
+	"(view.open.page (--path, --title) an .html page as your own, with its bridge and no card) and refuse one that does not exist or has nothing to show. " +
+	"Their old view.panel.<item> names still work. view.open.file --edit (--line, --note) asks the user to edit the file, a new one included, for a secret or a file you cannot read: end your turn, a message says when it is saved. " +
 	"A file path written in a reply (prose or inline code) also renders as " +
 	"a chip the user clicks to open it in the File tab; .html files render there interactively (scripts on)."
 
 // inlinePage is how a thread shows an HTML page in its own conversation (view.inline,
 // commands_view_inline.go; docs/notes/inline-html.md).
 const inlinePage = "view.inline <path> (--title, --panel) shows an .html page inline in your own conversation, at your place in the " +
-	"turn: the File tab's sandboxed frame in a card the user can expand, view as source or open in the panel; --panel also opens it " +
-	"in the File tab. Write the page in $CODE_FOUNDRY_PAGES (your thread's own folder, removed with it), never the repository or the " +
+	"turn: the File tab's sandboxed frame in a card the user can expand, view as source or open as a tab; --panel also opens it " +
+	"in a File tab beside you. Write the page in $CODE_FOUNDRY_PAGES (your thread's own folder, removed with it), never the repository or the " +
 	"home folder's root. Its /cf/bridge.js sizes the card to the page (capped at 60% of the pane); " +
 	"view.inline warns when it is missing, when a page that uses the app's look or calls (cf.*, @cf/ui, --cf-* variables) does not " +
 	"link /cf/theme.css, and when React or TSX lacks /cf/jsx.js (the rendering group's react pages line)."
 
 // surfaceWhat is what a surface verb's description says the surface shows: what follows
-// its lead ("Open the X surface in a thread's side panel (from a thread: …): "), the
+// its lead ("Open the X surface beside a thread (from a thread: …): "), the
 // first ": " outside parentheses; the whole description without one.
 func surfaceWhat(desc string) string {
 	depth := 0
@@ -370,10 +366,10 @@ func surfaceWhat(desc string) string {
 	return desc
 }
 
-// presenceRule is when a thread opens something in its own side panel, and what
+// presenceRule is when a thread opens something in a tab beside it, and what
 // ui.presence is for (the help skill's "Showing things in the app",
 // docs/notes/control-7-skill-routing.md): on the user's request, no presence check.
-const presenceRule = "From a thread: when the user asks to see something, open it in your own panel (a \"show me\" is asking); " +
+const presenceRule = "From a thread: when the user asks to see something, open it beside you (a \"show me\" is asking); " +
 	"after something worth seeing on your own, open it too unless a remembered preference says not to, and say so in your reply " +
 	"(no ui.notify: the turn's end alerts). `code-foundry ui.presence --json` only tells you whether to mention that the window " +
 	"is in the background. Pass --focus only when the user asks to be taken there."
@@ -382,7 +378,6 @@ const presenceRule = "From a thread: when the user asks to see something, open i
 type CapabilityPanel struct {
 	Surfaces       []CapabilityView `json:"surfaces"`
 	PluginSurfaces []CapabilityView `json:"plugin_surfaces"`
-	Actions        []string         `json:"actions"`
 	// Items is how one file, diff or pull request opens (panelItems).
 	Items string `json:"items"`
 	// Inline is how a page shows in the conversation instead (inlinePage).
@@ -393,12 +388,8 @@ type CapabilityPanel struct {
 func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
 	js := CapabilityPanel{Surfaces: []CapabilityView{}, PluginSurfaces: []CapabilityView{}, Items: panelItems, Inline: inlinePage, Rule: presenceRule}
 	for _, c := range env.r.List(Context{}, true) {
-		name, ok := strings.CutPrefix(c.Name, "view.panel.")
-		switch {
-		case !ok:
-		case slices.Contains(panelActions, "panel."+name):
-			js.Actions = append(js.Actions, c.Name)
-		default:
+		// view.open.url opens a link in the browser (RegisterGitOps).
+		if name, isOpen := strings.CutPrefix(c.Name, "view.open."); isOpen && name != "url" {
 			js.Surfaces = append(js.Surfaces, CapabilityView{Name: name, Command: c.Name, Description: surfaceWhat(c.Description)})
 		}
 	}
@@ -413,27 +404,24 @@ func capPanel(ctx context.Context, env capEnv) (capDetail, error) {
 		}
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "panel: %d surfaces. Each verb opens its surface in a thread's side panel: --thread (default: "+
-		"the thread you run in) changes only that thread's panel, never what the user sees unless --focus.\n", len(js.Surfaces))
+	fmt.Fprintf(&b, "panel: %d surfaces. Each verb opens its surface as a tab beside a thread: --thread (default: "+
+		"the thread you run in) names the thread; it never moves what the user sees unless --focus.\n", len(js.Surfaces))
 	for _, s := range js.Surfaces {
 		fmt.Fprintf(&b, "  %-24s %s\n", s.Command, s.Description)
 	}
 	b.WriteString(panelItems + "\n")
 	b.WriteString(inlinePage + "\n")
 	if len(js.PluginSurfaces) > 0 {
-		b.WriteString("Plugin surfaces (their show verb acts on each window's selection, not a thread):\n")
+		b.WriteString("Plugin surfaces (a thread or pr surface opens as a tab beside the thread, as above; others in each window):\n")
 		for _, s := range js.PluginSurfaces {
 			fmt.Fprintf(&b, "  %-24s %s\n", s.Command, s.Description)
 		}
-	}
-	if len(js.Actions) > 0 {
-		fmt.Fprintf(&b, "Panel actions (they flip state you cannot see): %s.\n", strings.Join(js.Actions, ", "))
 	}
 	b.WriteString(presenceRule)
 	n := len(js.Surfaces) + len(js.PluginSurfaces)
 	sum := ""
 	if len(js.PluginSurfaces) > 0 {
-		sum = fmt.Sprintf("side panel surfaces (%d from plugins) and the verb that opens each in a thread", len(js.PluginSurfaces))
+		sum = fmt.Sprintf("surfaces (%d from plugins) and the verb that opens each as a tab beside a thread", len(js.PluginSurfaces))
 	}
 	return capDetail{Count: count(n), Summary: sum, Text: b.String(), JSON: js}, nil
 }

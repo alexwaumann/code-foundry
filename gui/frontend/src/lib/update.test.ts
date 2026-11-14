@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UpdateStateView, UpdateStatusView } from "@/api/update";
 import type { CutOff } from "./thread";
-import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, predatesTunnel, TUNNEL_SINCE, updateBadge, updateView, versionMismatch, type Restarting, type ThreadActivity, type UpdateVariant } from "./update";
+import { busyHeading, compareVersions, cutOffLabel, displayVersion, failureHeadline, olderStable, predatesShell, predatesTunnel, SHELL_SINCE, TUNNEL_SINCE, updateBadge, updateView, versionMismatch, type Restarting, type ThreadActivity, type UpdateVariant } from "./update";
 
 describe("displayVersion", () => {
   it.each([
@@ -465,6 +465,35 @@ describe("predatesTunnel", () => {
     ["", false],
   ])("%s: %s", (version, want) => {
     expect(predatesTunnel(version)).toBe(want);
+  });
+});
+
+describe("predatesShell", () => {
+  it.each([
+    ["v0.21.5", true],
+    ["v0.21.8-tip.2", true],
+    ["v0.21.8", true],
+    ["v0.21.99", true],
+    [SHELL_SINCE, false],
+    ["v0.22.0-tip.7", false],
+    ["v0.22.0", false],
+    ["v1.0.0", false],
+    ["dev", false],
+    ["mock", false],
+    ["", false],
+  ])("%s: %s", (version, want) => {
+    expect(predatesShell(version)).toBe(want);
+  });
+
+  it("comes after the tunnel, so every daemon before the tunnel is before the shell too", () => {
+    expect(compareVersions(TUNNEL_SINCE, SHELL_SINCE)).toBe(-1);
+  });
+
+  it("a daemon from before the layout gets Restart Now, as one from before the tunnel", () => {
+    const st = status("idle", { currentVersion: "v0.21.8-tip.2", targetVersion: "v0.21.8-tip.2" });
+    const v = updateView(st, "v0.22.0-tip.3", { busy: 0 }, null, true);
+    expect(v.variant).toBe("partlyApplied");
+    expect(v.primary).toBe("Restart Now");
   });
 });
 

@@ -1,5 +1,5 @@
 /**
- * Token usage, shared by the Usage side-panel surface and the Usage page
+ * Token usage, shared by the thread info card and the Usage page
  * (docs/sketches/session-usage/DESIGN.md): folds over the daemon's usage buckets, the
  * fixed model colour slots, and the number formats. Pure; buckets come from
  * ThreadView.usage and the threads store's retiredUsage.

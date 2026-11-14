@@ -28,7 +28,7 @@ import "fmt"
 // The plugin answers with a view that has the change (or not). Only a list node's list
 // has them: a master-detail's list does not.
 //
-// At the side panel's width (about 360 px) nothing is hidden: the grip and checkbox take
+// At a narrow pane's width (about 360 px) nothing is hidden: the grip and checkbox take
 // 36 px at the row's start and the add input is the list's width.
 
 // ListAdd is a list's add-row input.

@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { composeProject, invocations, leaveSidebar, mockPost, openApp, openStreams, resetMock, row, testPdf, threadCalls } from "./fixtures";
+import { composeProject, invocations, leaveSidebar, mockPost, openApp, openStreams, resetMock, row, testPdf, threadCalls, infoCardOff } from "./fixtures";
+import { openPageTab } from "./shell";
+import { openRowThread } from "./shell-threads";
 
 /**
  * A thread (components/thread, docs/notes/rendered-threads-2-gui.md) over the
@@ -10,6 +12,8 @@ import { composeProject, invocations, leaveSidebar, mockPost, openApp, openStrea
 
 test.beforeEach(async () => {
   await resetMock();
+  // Written for a conversation with no card beside it (layout.thread_info is on by default).
+  await infoCardOff();
 });
 
 type State = "permission" | "streaming" | "idle" | "crashed";
@@ -18,8 +22,8 @@ async function openThread(page: Page, state: State, scheme: "dark" | "light" = "
   await page.emulateMedia({ colorScheme: scheme });
   await mockPost(`thread?state=${state}`);
   await openApp(page);
-  await row(page, "s:s-r1").click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  // A thread asking waits under Needs you: its row's first line opens it (the title opens its popup).
+  await openRowThread(page, "s-r1");
   await expect(page.getByTestId("thread-timeline").locator("[data-row-type]").first()).toBeVisible();
 }
 
@@ -390,9 +394,10 @@ test("leaving a thread scrolled up: back on it, the list is pinned at the bottom
   await mockPost("thread/finish");
   await expect(page.getByTestId("thread-working")).toHaveCount(0);
 
-  await row(page, "s:s-2").click();
+  // s-2 opens as a tab beside it (only the active tab is drawn), then back to s-r1's tab.
+  await openRowThread(page, "s-2");
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-2");
-  await row(page, "s:s-r1").click();
+  await openRowThread(page, "s-r1");
   await expect(pane(page)).toHaveAttribute("data-thread-id", "s-r1");
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
   await expect(headers(page).last()).toHaveAttribute("data-folded", "true");
@@ -416,9 +421,9 @@ for (const scheme of ["dark", "light"] as const) {
 }
 
 test("a click on a header folds or unfolds its turn without moving the header on screen", async ({ page }) => {
-  // Tall enough for the whole folded thread: the list sits at the bottom (pinned) with the
-  // first turn's header (9 steps) on screen.
-  await page.setViewportSize({ width: 1280, height: 1100 });
+  // Tall enough for the whole folded thread under the window shell's top bar and tab strip: the
+  // list sits at the bottom (pinned) with the first turn's header (9 steps) on screen.
+  await page.setViewportSize({ width: 1280, height: 1200 });
   await openThread(page, "idle");
   const timeline = page.getByTestId("thread-timeline");
   await expect(timeline).toHaveAttribute("data-at-bottom", "true");
@@ -574,17 +579,19 @@ test("scrolled up, a Jump to bottom chip floats above the composer; a click scro
   await expect(chip).toBeHidden();
 });
 
+// The shell: a tab that is not active draws nothing and holds no stream (components/shell/PaneView.tsx).
 test("only the visible thread holds a Watch; a page holds none", async ({ page }) => {
   await openThread(page, "idle");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);
-  await page.getByTestId("nav-projects").click();
-  await expect(page.getByTestId("projects-page")).toBeVisible();
+  // The Projects page as a tab of the same pane, in front of the thread's.
+  await openPageTab(page, "projects");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(0);
   await row(page, "s:s-r1").click();
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-r1");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
-  // Another thread: its Watch replaces this one.
-  await row(page, "s:s-2").click();
+  // Another thread in the same pane: its Watch replaces this one.
+  await openRowThread(page, "s-2");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(1);
   expect((await openStreams())["TerminalService/Attach"] ?? 0).toBe(0);

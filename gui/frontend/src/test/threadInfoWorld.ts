@@ -14,7 +14,8 @@ import type { McpServerView } from "@/api/mcp";
 import type { BackgroundShellView, ThreadView, UsageBucketView } from "@/api/threads";
 import { useActionsStore } from "@/stores/actions";
 import { dashboardResource, pullRequestDetailResource } from "@/stores/gh";
-import { activeTab, getPanel, usePanelStore } from "@/stores/panel";
+import { shownTab, tabPlace } from "@/shell/host";
+import { resetLayout } from "@/stores/layout";
 import { placementResource } from "@/stores/placementChecks";
 import { useProjectsStore } from "@/stores/projects";
 import { actionPicksResource, editorAppsResource } from "@/stores/threadInfo";
@@ -141,7 +142,7 @@ export function resetCard(): void {
   placementResource.store.setState({ entries: {} });
   useActionsStore.setState({ byId: {}, byProject: {}, runs: {} });
   useThreadStore.setState({ logs: {} });
-  usePanelStore.setState({ byKey: {} });
+  resetLayout();
 }
 
 function putActions(actions: ActionView[]): void {
@@ -348,8 +349,12 @@ export function seedWs9(): string {
   return "s-ti-ws";
 }
 
-/** The window's panel's active tab (kind, title and params), or null. */
+/**
+ * The window's selection's tabs' active one (kind, title and params), or null: the last one when
+ * the focused pane holds none of them. Needs the fake layout daemon (src/test/fakeLayout.ts).
+ */
 export function activePanelTab(): { kind: string; title: string; params: Readonly<Record<string, string>> } | null {
-  const tab = activeTab(getPanel("current"));
+  const p = tabPlace("current");
+  const tab = shownTab(p) ?? p.tabs[p.tabs.length - 1] ?? null;
   return tab ? { kind: tab.kind, title: tab.title, params: tab.params } : null;
 }

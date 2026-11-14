@@ -70,6 +70,26 @@ export function focusDropped(): boolean {
   return a === null || a === document.body;
 }
 
+/** The mounted pickers (thread headers) per thread. */
+const held = new Map<string, number>();
+
+/**
+ * A thread's picker is mounted (its header is drawn). The returned release closes the thread's
+ * picker a frame later unless a picker for it is mounted again by then: a header remounting
+ * as the thread's tab draws keeps an opening asked for meanwhile.
+ */
+export function holdMovePicker(threadId: string): () => void {
+  held.set(threadId, (held.get(threadId) ?? 0) + 1);
+  return () => {
+    const n = (held.get(threadId) ?? 1) - 1;
+    if (n > 0) held.set(threadId, n);
+    else held.delete(threadId);
+    requestAnimationFrame(() => {
+      if (!held.has(threadId)) closeMovePicker(threadId);
+    });
+  };
+}
+
 export function closeMovePicker(threadId?: string): void {
   useMovePickerStore.setState((s) => (threadId === undefined || s.open === threadId ? { open: null } : s));
 }

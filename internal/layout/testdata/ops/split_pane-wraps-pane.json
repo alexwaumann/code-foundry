@@ -1,0 +1,71 @@
+{
+  "doc": "Splitting the only pane wraps it in a split of the edge's direction; the new pane takes frac of its room.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "split_pane",
+    "pane": "p-a",
+    "edge": "right",
+    "frac": 0.45,
+    "tab": {"id":"","kind":"diff","thread":"th-a","params":{"project":"pj-1","worktree":"w-1"}},
+    "focus": true
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [
+                {
+                  "id": "t-n1",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-n1",
+        "mru": ["t-n1","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1"}
+}

@@ -19,7 +19,7 @@ import (
 // view.inline: an HTML page shown inline in a thread's conversation
 // (docs/notes/inline-html.md). The daemon appends an html item at the thread's current
 // position (ThreadService.ShowHtml); the GUI renders it as a sandboxed frame, the File
-// tab's. --panel also opens the file in the thread's side panel (view.panel.file).
+// tab's. --panel also opens the file as a tab beside the thread (view.open.file's tab).
 
 // HTMLShower appends an html item to a thread (ThreadService.ShowHtml).
 type HTMLShower interface {
@@ -35,7 +35,7 @@ type InlineResult struct {
 	// when inside it, else absolute).
 	Item string `json:"item"`
 	Path string `json:"path"`
-	// Panel is the --panel result: the File tab's ShowView (view.panel.file's result).
+	// Panel is the --panel result: view.open.file's result.
 	Panel *PanelResult `json:"panel,omitempty"`
 	// Reused is set when the page's card was still live (shown since the thread's last
 	// user message, or ever with --panel), so no card was added: Item is that card.
@@ -169,7 +169,7 @@ func pollsCfRun(text string) bool {
 	return false
 }
 
-// pageWarnings reads the page shown (through Files, as view.panel.file's check does) and
+// pageWarnings reads the page shown (through Files, as view.open.file's check does) and
 // says what it misses or gets wrong (pageChecks). Nothing when the page cannot be read
 // (it was shown; the GUI says what is wrong).
 func (d ViewDeps) pageWarnings(ctx context.Context, base, path string) []string {
@@ -208,7 +208,7 @@ func (d ViewDeps) inlineCommand() Command {
 			{Name: "path", Type: Path, Required: true, Positional: true,
 				Description: "The .html or .htm file, under the home directory"},
 			{Name: "title", Type: String, Description: "Shown on its row"},
-			{Name: "panel", Type: Bool, Description: "Also open it in the thread's side panel"},
+			{Name: "panel", Type: Bool, Description: "Also open it as a tab beside the thread (view.open.page)"},
 			{Name: "again", Type: Bool, Description: "A second card though one is live (if the user asked)"},
 			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
 				Description: "Thread to show it in (default: yours)"},
@@ -251,22 +251,19 @@ func (d ViewDeps) runInline(ctx context.Context, uctx Context, a Args) (Result, 
 			"the change there and no card was added; run view.inline only for a new file", name, out.Path)
 	}
 	if a.Bool("panel") {
-		pr, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelFile, d.fileCheck)
+		pr, err := d.showItem(ctx, uctx, a, id, tabFile, d.fileCheck)
 		if err != nil {
-			return Result{}, fmt.Errorf("shown inline, but not in the side panel: %w", err)
+			return Result{}, fmt.Errorf("shown inline, but not in a tab: %w", err)
 		}
 		if p, ok := pr.JSON.(PanelResult); ok {
 			out.Panel = &p
-			switch {
-			case out.Reused && p.Windows == 0:
-				msg = fmt.Sprintf("%s is already shown inline in thread %s, so no card was added; not opened in its side panel (%s)",
-					out.Path, name, NoWindowMessage)
-			case out.Reused:
-				msg = fmt.Sprintf("opened %s in thread %s's side panel; it was shown inline before, so no card was added", out.Path, name)
-			case p.Windows == 0:
-				msg += " (" + NoWindowMessage + ")"
-			default:
-				msg += " and in its side panel"
+			if out.Reused {
+				msg = fmt.Sprintf("opened %s in tab %s beside thread %s; it was shown inline before, so no card was added", out.Path, p.Tab, name)
+			} else {
+				msg += fmt.Sprintf(" and in tab %s beside it", p.Tab)
+			}
+			if p.Windows == 0 {
+				msg += "; no app window is open"
 			}
 		}
 	}

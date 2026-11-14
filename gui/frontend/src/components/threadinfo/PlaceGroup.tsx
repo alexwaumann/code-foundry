@@ -36,8 +36,8 @@ import {
 import { cn } from "@/lib/utils";
 import { openActionEditor } from "@/stores/actionDialog";
 import { useAction, useActionsStore } from "@/stores/actions";
-import { bottomKeyOf } from "@/stores/bottomPanel";
-import { newBottomTerminal } from "@/stores/bottomActions";
+import { newTerminalInContext } from "@/shell/terminalActions";
+import { isUnplaced } from "@/lib/threadSetup";
 import { runCommand } from "@/stores/commands";
 import { useProjectRefusals } from "@/stores/placementChecks";
 import { useProjectsStore } from "@/stores/projects";
@@ -540,8 +540,8 @@ function OpenInRow({ threadId }: { threadId: string }) {
       <DropdownMenuItem
         data-testid="ti-open-terminal"
         onSelect={() => {
-          const key = bottomKeyOf({ kind: "thread", id: threadId });
-          if (key !== null) void newBottomTerminal(key);
+          // A thread with no checkout yet has nowhere to start one (terminal.new refuses it).
+          if (!isUnplaced(useThreadsStore.getState().byId[threadId])) void newTerminalInContext(ctx());
         }}
       >
         Terminal

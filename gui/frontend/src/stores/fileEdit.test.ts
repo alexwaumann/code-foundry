@@ -10,6 +10,7 @@ import {
   editorDetached,
   editorOpening,
   fileEditKey,
+  fileEditKeyOfTab,
   noteDraft,
   noteEditor,
   noteRead,
@@ -18,12 +19,17 @@ import {
   saveFile,
   startEdit,
   stopEdit,
-  unsavedTabs,
   useFileEditStore,
 } from "./fileEdit";
 import { confirmCloseFile, presentFileSave } from "./fileRequest";
-import { closePanelTab, openSurface, usePanelStore, type Tab } from "./panel";
+import { applyLayoutOp } from "@/api/layout";
+import { findTab, makeTab, openTab, tabPlace } from "@/shell/host";
+import { fileTab } from "@/surfaces/fileTarget";
+import { fakeLayoutState, layoutSettled, resetFakeLayout } from "@/test/fakeLayout";
+import { useLayoutStore } from "./layout";
 import { useUiStore } from "./ui";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 // The library's memory: a draft per key, and which keys an editor holds.
 const lib = vi.hoisted(() => ({ drafts: new Map<string, string>(), attached: new Set<string>() }));
@@ -46,15 +52,38 @@ const view = (over: Partial<FileReadView> = {}): FileReadView => ({ path: "/w/.e
 const gone = () => view({ notFound: true, text: null, lossless: false, size: 0, modifiedAtMs: null });
 const written = (over: Partial<FileWriteView> = {}): FileWriteView => ({ path: "/w/.env", size: 5, modifiedAtMs: 200, conflict: false, notFound: false, ...over });
 
-const TAB = "files:x";
-const PANEL = "thread:s1";
+// Thread s-1's File tabs (the "spaces" seed: s-1 in the current space, s-3 in another).
+const tab = fileTab({ project: "", base: "/w", path: ".env" });
+const tabY = fileTab({ project: "", base: "/w", path: "b.txt" });
+const TAB = tab.id;
+const PANEL = "thread:s-1";
 const KEY = fileEditKey(PANEL, TAB);
-const tab: Tab = { id: TAB, kind: "files", title: ".env", params: {} };
 const edit = () => useFileEditStore.getState().sessions[KEY];
+
+/** The layout id of the open tab showing `path`. */
+const layoutId = (path: string): string => Object.values(useLayoutStore.getState().tabs).find((t) => t.params.path === path)?.id ?? "";
+
+/** Opens `t` among `target`'s tabs (if it is not open there) and waits for the layout. */
+async function opened(target: string, t: typeof tab): Promise<void> {
+  if (!findTab(target, t.id)) openTab(target, t);
+  await layoutSettled();
+}
+
+/** b.txt in a pane of its own below .env's, focused: two panes holding the thread's files. */
+async function splitY(): Promise<void> {
+  await opened(PANEL, tabY);
+  const y = layoutId("/w/b.txt");
+  const pane = Object.values(useLayoutStore.getState().panes).find((p) => p.tabIds.includes(y))?.id ?? "";
+  await applyLayoutOp({ op: "move_tab", tab: y, pane, edge: "bottom" });
+  await applyLayoutOp({ op: "focus_tab", tab: y });
+  await layoutSettled();
+  const p = tabPlace(PANEL);
+  if (p.groups.length !== 2 || p.groups[p.focused]?.active?.id !== tabY.id) throw new Error("no split");
+}
 
 /** A session whose editor is on screen with `text` as its document. */
 async function editing(text: string | null = null, v = view()): Promise<void> {
-  usePanelStore.setState({ byKey: { [PANEL]: { open: true, groups: [{ tabs: [tab], activeTabId: TAB }] } } });
+  await opened(PANEL, tab);
   await startEdit(KEY, { panelKey: PANEL, tabId: TAB, base: "/w" }, v);
   const s = edit();
   if (!s) throw new Error("no session");
@@ -70,7 +99,8 @@ function detach(stateKey: string): void {
   editorDetached(KEY, stateKey);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout("spaces");
   api.write.mockReset();
   api.read.mockReset();
 });
@@ -79,7 +109,6 @@ afterEach(() => {
   lib.drafts.clear();
   lib.attached.clear();
   useFileEditStore.setState({ sessions: {} });
-  usePanelStore.setState({ byKey: {} });
   useConfirmStore.setState({ pending: null });
 });
 
@@ -504,13 +533,87 @@ describe("when the editor goes", () => {
 });
 
 describe("the tab going", () => {
-  it("closing it ends the session and drops the draft, however it closed", async () => {
-    await editing("a=22\n");
+  it("a clean session ends with its tab, however it closed", async () => {
+    await editing();
     const key = edit()?.stateKey ?? "";
     lib.attached.delete(key);
-    closePanelTab(PANEL, TAB, { keepOpen: true });
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
     expect(edit()).toBeUndefined();
     expect(lib.drafts.has(key)).toBe(false);
+  });
+
+  it("a dirty one closed by anything but the user's Discard (a model's tab.close) keeps its edits for when the file opens again for that thread", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    detach(key);
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+    expect(lib.drafts.get(key)).toBe("a=22\n");
+    await opened(PANEL, tab);
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+  });
+
+  it("put away with its thread (its tab closed), a dirty file keeps its edits and comes back dirty", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    detach(key);
+    await applyLayoutOp({ op: "close_thread", thread: "s-1" });
+    await layoutSettled();
+    expect(layoutId("/w/.env")).toBe("");
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+    await applyLayoutOp({ op: "open_thread", thread: "s-1", focus: true });
+    await opened(PANEL, tab);
+    expect(edit()).toMatchObject({ dirty: true, stateKey: key });
+    expect(lib.drafts.get(key)).toBe("a=22\n");
+  });
+
+  it("a session follows its file to another space: the key is the thread's and the path's, not the place's", async () => {
+    await editing("a=22\n");
+    const t = useLayoutStore.getState().tabs[layoutId("/w/.env")];
+    expect(t && fileEditKeyOfTab(t)).toBe(KEY);
+    await applyLayoutOp({ op: "move_tab", tab: layoutId("/w/.env"), space: "sp-review", pane: "p-2" });
+    await layoutSettled();
+    expect(useLayoutStore.getState().panes["p-2"]?.tabIds).toContain(layoutId("/w/.env"));
+    noteDraft(KEY, "a=1\n");
+    expect(edit()?.dirty).toBe(false);
+    // Clean and still open in the other space: it stays.
+    await applyLayoutOp({ op: "focus_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(edit()).toBeDefined();
+  });
+
+  it("a dirty session saved after its tab went ends then", async () => {
+    await editing("a=22\n");
+    const key = edit()?.stateKey ?? "";
+    detach(key);
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    api.write.mockResolvedValue(written());
+    await expect(saveFile(KEY)).resolves.toBe("saved");
+    expect(edit()).toBeUndefined();
+  });
+
+  it("an unlinked File tab's clean session ends with its tab too; a dirty one waits", async () => {
+    const pane = Object.keys(useLayoutStore.getState().panes)[0] ?? "";
+    const loose = fileEditKey("", TAB);
+    openTab(`pane:${pane}`, tab);
+    await layoutSettled();
+    expect(useLayoutStore.getState().tabs[layoutId("/w/.env")]?.thread ?? "").toBe("");
+    await startEdit(loose, { panelKey: "", tabId: TAB, base: "/w" }, view());
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(useFileEditStore.getState().sessions[loose]).toBeUndefined();
+    openTab(`pane:${pane}`, tab);
+    await layoutSettled();
+    await startEdit(loose, { panelKey: "", tabId: TAB, base: "/w" }, view());
+    const key = useFileEditStore.getState().sessions[loose]?.stateKey ?? "";
+    lib.drafts.set(key, "a=3\n");
+    noteDraft(loose, "a=3\n");
+    await applyLayoutOp({ op: "close_tab", tab: layoutId("/w/.env") });
+    await layoutSettled();
+    expect(useFileEditStore.getState().sessions[loose]?.dirty).toBe(true);
   });
 
   it("a removed thread's drafts go with it, and only its", async () => {
@@ -524,20 +627,12 @@ describe("the tab going", () => {
     expect(lib.drafts.has(key)).toBe(false);
   });
 
-  it("a panel names its dirty tabs, for a reset to keep", async () => {
-    await editing();
-    const entry = usePanelStore.getState().byKey[PANEL];
-    if (!entry) throw new Error("no panel");
-    expect(unsavedTabs(PANEL, entry)).toEqual([]);
-    noteDraft(KEY, "a=2\n");
-    expect(unsavedTabs(PANEL, entry)).toEqual([tab]);
-  });
-
-  it("two panels showing one file have a draft each", async () => {
+  it("two threads showing one file have a draft each", async () => {
     await editing("a=22\n");
-    const other = fileEditKey("thread:s2", TAB);
-    usePanelStore.setState((s) => ({ byKey: { ...s.byKey, "thread:s2": { open: true, groups: [{ tabs: [tab], activeTabId: TAB }] } } }));
-    await startEdit(other, { panelKey: "thread:s2", tabId: TAB, base: "/w" }, view());
+    const other = fileEditKey("thread:s-3", TAB);
+    await opened("thread:s-3", tab);
+    expect(tabPlace("thread:s-3").tabs.map((t) => t.id)).toEqual([TAB]);
+    await startEdit(other, { panelKey: "thread:s-3", tabId: TAB, base: "/w" }, view());
     const sessions = useFileEditStore.getState().sessions;
     expect(other).not.toBe(KEY);
     expect(sessions[other]?.stateKey).not.toBe(sessions[KEY]?.stateKey);
@@ -577,11 +672,12 @@ describe("closing a dirty tab", () => {
     expect(api.write).not.toHaveBeenCalled();
   });
 
-  it("Discard closes without writing", async () => {
+  it("Discard closes without writing, and the edits go for good", async () => {
     const { asked } = await ask();
     answerAlternate();
     await expect(asked).resolves.toBe(true);
     expect(api.write).not.toHaveBeenCalled();
+    expect(edit()).toBeUndefined();
   });
 
   it("Save writes, then closes", async () => {
@@ -606,7 +702,7 @@ describe("closing a dirty tab", () => {
 
 describe("file.save", () => {
   const select = () => {
-    useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
+    useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
   };
 
   /** The editor's DOM as CodeFile draws it, with the keyboard in it. */
@@ -640,16 +736,12 @@ describe("file.save", () => {
     });
   });
 
-  it("with the keyboard in an editor, saves that one, whatever group has focus", async () => {
+  it("with the keyboard in an editor, saves that one, whatever pane has focus", async () => {
     select();
     await editing("a=22\n");
-    const other = fileEditKey(PANEL, "files:y");
-    usePanelStore.setState({
-      byKey: {
-        [PANEL]: { open: true, focused: 1, groups: [{ tabs: [tab], activeTabId: TAB }, { tabs: [{ ...tab, id: "files:y" }], activeTabId: "files:y" }] },
-      },
-    });
-    await startEdit(other, { panelKey: PANEL, tabId: "files:y", base: "/w" }, view({ path: "/w/b.txt" }));
+    const other = fileEditKey(PANEL, tabY.id);
+    await splitY();
+    await startEdit(other, { panelKey: PANEL, tabId: tabY.id, base: "/w" }, view({ path: "/w/b.txt" }));
     const b = useFileEditStore.getState().sessions[other];
     lib.drafts.set(b?.stateKey ?? "", "b\n");
     noteDraft(other, "b\n");
@@ -674,16 +766,7 @@ describe("file.save", () => {
     expect(api.write).not.toHaveBeenCalled();
   });
 
-  it("a draft the user cannot see is not saved: the panel closed", async () => {
-    select();
-    await editing("a=22\n");
-    usePanelStore.setState({ byKey: { [PANEL]: { open: false, groups: [{ tabs: [tab], activeTabId: TAB }] } } });
-    expect(canSaveFile()).toBe(false);
-    presentFileSave();
-    expect(api.write).not.toHaveBeenCalled();
-  });
-
-  it("nor its editor gone from the screen", async () => {
+  it("a draft the user cannot see is not saved: its editor gone from the screen", async () => {
     select();
     await editing("a=22\n");
     detach(edit()?.stateKey ?? "");
@@ -695,7 +778,8 @@ describe("file.save", () => {
   it("not a tab behind another one", async () => {
     select();
     await editing("a=22\n");
-    openSurface(PANEL, { id: "other", kind: "changes", title: "Changes", params: {} });
+    await opened(PANEL, makeTab("pullrequest", "#1", { slug: "o/r", number: "1" }));
+    expect(tabPlace(PANEL).groups[0]?.active?.kind).toBe("pullrequest");
     expect(canSaveFile()).toBe(false);
     presentFileSave();
     expect(api.write).not.toHaveBeenCalled();
@@ -703,18 +787,16 @@ describe("file.save", () => {
 });
 
 describe("Save File from the palette", () => {
-  const OTHER = fileEditKey(PANEL, "files:y");
+  const OTHER = fileEditKey(PANEL, tabY.id);
   const other = () => useFileEditStore.getState().sessions[OTHER];
   const palette = { open: false, query: "", commandName: null, page: "commands", returnTo: "content" } as const;
 
-  /** a.txt with the caret, b.txt in the focused group: both dirty, a split panel. */
+  /** .env with the caret, b.txt in the focused pane: both dirty, in two panes. */
   async function split(): Promise<HTMLElement> {
-    useUiStore.setState({ selection: { kind: "thread", id: "s1" }, palette });
+    useUiStore.setState({ selection: { kind: "thread", id: "s-1" }, palette });
     await editing("a=22\n");
-    usePanelStore.setState({
-      byKey: { [PANEL]: { open: true, focused: 1, groups: [{ tabs: [tab], activeTabId: TAB }, { tabs: [{ ...tab, id: "files:y" }], activeTabId: "files:y" }] } },
-    });
-    await startEdit(OTHER, { panelKey: PANEL, tabId: "files:y", base: "/w" }, view({ path: "/w/b.txt" }));
+    await splitY();
+    await startEdit(OTHER, { panelKey: PANEL, tabId: tabY.id, base: "/w" }, view({ path: "/w/b.txt" }));
     lib.drafts.set(other()?.stateKey ?? "", "b\n");
     noteDraft(OTHER, "b\n");
     noteEditor(OTHER, { focus: vi.fn(), caret: () => null, select: vi.fn() });
@@ -741,7 +823,7 @@ describe("Save File from the palette", () => {
     useUiStore.setState({ palette });
   });
 
-  it("saves the editor that had the keyboard, not the focused group's tab", async () => {
+  it("saves the editor that had the keyboard, not the focused pane's tab", async () => {
     const wrap = await split();
     const input = openPalette();
     api.write.mockResolvedValue(written());
@@ -766,7 +848,8 @@ describe("Save File from the palette", () => {
       const { [KEY]: _gone, ...rest } = s.sessions;
       return { sessions: rest };
     });
-    usePanelStore.setState({ byKey: { [PANEL]: { open: false, groups: [{ tabs: [tab], activeTabId: TAB }] } } });
+    // And the window shows a page, with no File tab in front.
+    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
     expect(canSaveFile()).toBe(false);
     wrap.remove();
     input.remove();
@@ -787,7 +870,7 @@ describe("Save File from the palette", () => {
     input.remove();
   });
 
-  it("with no editor holding the keyboard it is the focused group's rule, and nothing moves the keyboard", async () => {
+  it("with no editor holding the keyboard it is the focused pane's rule, and nothing moves the keyboard", async () => {
     const wrap = await split();
     wrap.remove();
     const editor = { focus: vi.fn(), caret: () => null, select: vi.fn() };
@@ -948,11 +1031,11 @@ describe("a draft the library let go", () => {
 });
 
 describe("where a draft is not", () => {
-  it("is in nothing persisted: not localStorage, not the panel state", async () => {
+  it("is in nothing persisted: not localStorage, not the layout", async () => {
     localStorage.clear();
     await editing("SECRET=hunter2\n");
     const stored = Array.from({ length: localStorage.length }, (_, i) => localStorage.getItem(localStorage.key(i) ?? ""));
     expect(stored.join("")).not.toContain("hunter2");
-    expect(JSON.stringify(usePanelStore.getState().byKey)).not.toContain("hunter2");
+    expect(JSON.stringify(fakeLayoutState())).not.toContain("hunter2");
   });
 });

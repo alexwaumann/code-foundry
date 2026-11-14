@@ -98,7 +98,7 @@ func (m *Manager) queueAskLocked(s Thread, question, assuming string, now time.T
 		return false
 	}
 	msg := askWake(s, question, assuming, now)
-	m.enqueueLocked(s.CreatedBy, delivery{sub: "ask-" + itemSuffix(), msg: func(context.Context) Message { return msg }, queued: time.Now(), slot: now})
+	m.enqueueLocked(s.CreatedBy, delivery{sub: "ask-" + itemSuffix(), msg: func(context.Context) Message { return msg }, queued: m.opts.batchClock.Now(), slot: now})
 	return true
 }
 

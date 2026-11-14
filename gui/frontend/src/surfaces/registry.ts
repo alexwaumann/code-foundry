@@ -1,11 +1,11 @@
 /**
- * Side-panel surfaces, in the order the empty panel lists them. A surface is one file
+ * Panel surfaces, drawn as tabs (shell/surfaces/panel.ts), in their old list order. A surface is one file
  * exporting a SurfaceSpec (see types.ts); list it here. Plugin surfaces are not listed:
  * surfaceOf falls through to surfaces/plugin.ts, and the empty panel lists them after these. The panel finds renderers,
  * hotkeys and availability through these lookups, never by switching on the kind.
  */
 import { useCallback, useSyncExternalStore } from "react";
-import type { SurfaceKind } from "@/stores/panel";
+import type { SurfaceKind } from "@/shell/host";
 import { diffSurface } from "./diff";
 import { emberSurface } from "./ember";
 import { filesSurface } from "./files";

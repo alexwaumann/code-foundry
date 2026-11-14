@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openHelloDemo, pluginActs, resetMock } from "./fixtures";
+import { setSurfaceWidth } from "./shell-surfaces";
 
 /**
  * Plugin menus in a real browser (docs/notes/plugin-menu.md) against the mock's hello demo:
  * a right-click opens a row's menu at the pointer, Escape gives focus back to the row or
- * the ⋯, the keyboard opens both, the panel's width folds Build #2's buttons into its ⋯, and
+ * the ⋯, the keyboard opens both, its pane's width folds Build #2's buttons into its ⋯, and
  * a pick in a submenu reaches the plugin and comes back checked. What the menus hold and
  * which act a pick sends: src/components/plugin/menu.test.tsx.
  */
@@ -12,21 +13,14 @@ import { openHelloDemo, pluginActs, resetMock } from "./fixtures";
 const surface = (page: Page) => page.getByTestId("plugin-surface");
 const buildRow = (page: Page) => surface(page).locator('[data-testid="plugin-row"][data-key="run-2"]');
 
-/** Thread s-3 selected, its panel showing the hello demo's Overview, Build #2 in view. */
+/** Thread s-3 open, the hello demo's Overview in a tab beside it, Build #2 in view. */
 async function openDemo(page: Page): Promise<void> {
   await openHelloDemo(page);
   await buildRow(page).scrollIntoViewIfNeeded();
 }
 
-/** Drags the panel's edge `px` to the left: the panel widens. */
-async function widenPanel(page: Page, px: number): Promise<void> {
-  const h = await page.getByTestId("panel-resize-handle").boundingBox();
-  if (!h) throw new Error("no handle");
-  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(h.x - px, h.y + h.height / 2, { steps: 6 });
-  await page.mouse.up();
-}
+/** The demo's pane `px` wide (the side panel's 420 was its narrow width). */
+const panelWidth = (page: Page, px: number) => setSurfaceWidth(page, "plugin-surface", px);
 
 test.beforeEach(async () => {
   await resetMock();
@@ -34,6 +28,8 @@ test.beforeEach(async () => {
 
 test("a right-click opens a row's menu at the pointer; the keyboard opens it and Escape gives focus back", async ({ page }) => {
   await openDemo(page);
+  // Narrow, as the demo's pane opened before every pane kept 480px: the row's buttons fold into its ⋯.
+  await panelWidth(page, 420);
   const r = await buildRow(page).boundingBox();
   if (!r) throw new Error("no row");
   const at = { x: r.x + 120, y: r.y + 12 };
@@ -68,7 +64,9 @@ test("a right-click opens a row's menu at the pointer; the keyboard opens it and
 });
 
 test("a narrow row folds its buttons into the ⋯; a pick in the Priority submenu comes back checked; widening shows the buttons", async ({ page }) => {
+  await page.setViewportSize({ width: 1680, height: 800 });
   await openDemo(page);
+  await panelWidth(page, 420);
   await expect(buildRow(page)).toHaveAttribute("data-folded", "true");
   await expect(buildRow(page).getByTestId("plugin-button")).toHaveCount(0);
   await buildRow(page).hover();
@@ -89,7 +87,7 @@ test("a narrow row folds its buttons into the ⋯; a pick in the Priority submen
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
 
-  await widenPanel(page, 500);
+  await panelWidth(page, 920);
   await expect(buildRow(page)).not.toHaveAttribute("data-folded");
   await expect(buildRow(page).getByTestId("plugin-button")).toHaveText(["Rerun", "Open log", "Copy error"]);
 });
@@ -108,6 +106,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1440, height: 900 });
     await openDemo(page);
+    await panelWidth(page, 420);
     const r = await buildRow(page).boundingBox();
     if (!r) throw new Error("no row");
     await page.mouse.click(r.x + 90, r.y + 12, { button: "right" });
@@ -135,7 +134,7 @@ for (const scheme of ["dark", "light"] as const) {
     await page.screenshot({ path: `${shots ?? ""}/menu-button-${scheme}.png` });
     await page.keyboard.press("Escape");
 
-    await widenPanel(page, 420);
+    await panelWidth(page, 840);
     await buildRow(page).scrollIntoViewIfNeeded();
     await buildRow(page).hover();
     await buildRow(page).getByRole("button", { name: "More options" }).click();

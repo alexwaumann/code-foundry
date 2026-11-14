@@ -94,7 +94,7 @@ describe("the first-run welcome (docs/notes/welcome-composer.md)", () => {
 
   it("the exact prompt, naming the placed page", () => {
     expect(welcomePrompt(PAGE)).toBe(
-      "I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page /Users/me/.code-foundry/pages/welcome.html in the side panel and walk me through it.",
+      "I just installed Code Foundry and have no projects yet. This is the welcome tutorial: open the page /Users/me/.code-foundry/pages/welcome.html in a tab beside this conversation and walk me through it.",
     );
   });
 

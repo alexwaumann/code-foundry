@@ -62,6 +62,8 @@ func TestDecodeRetiredKeys(t *testing.T) {
 			want: map[string]string{"gitops.worktree_dir": "~/c"}, retired: "projects.worktree_dir"},
 		{name: "threads.show_created_threads is dropped", in: "[threads]\nauto_name = false\nshow_created_threads = true\n",
 			want: map[string]string{"threads.auto_name": "false"}, retired: "threads.show_created_threads"},
+		{name: "appearance.panel_keep_open is dropped", in: "[appearance]\nfont_size = 14\npanel_keep_open = true\n",
+			want: map[string]string{"appearance.font_size": "14"}, retired: "appearance.panel_keep_open"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

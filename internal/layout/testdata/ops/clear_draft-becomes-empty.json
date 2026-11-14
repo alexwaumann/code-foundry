@@ -1,0 +1,80 @@
+{
+  "doc": "A draft emptied again is the space's empty composer again, with its params, and leaves the list.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"compose","params":{"project":"pj","draft":"d-1"}}
+              ],
+              "active": "t-d"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-e","kind":"compose","params":{"draft":"d-2"}}],
+              "active": "t-e"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "drafts": [
+          {"id":"d-1","label":"Fix","params":{"project":"pj"}},
+          {"id":"d-2","label":"Other"}
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"clear_draft","draft":"d-1"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-d","kind":"compose","params":{"project":"pj"}}
+              ],
+              "active": "t-d"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-e","kind":"compose","params":{"draft":"d-2"}}],
+              "active": "t-e"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-2","label":"Other"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-d","draft":"d-1"}
+}

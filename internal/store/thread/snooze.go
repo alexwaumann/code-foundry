@@ -107,7 +107,7 @@ func (m *Manager) putAway(ctx context.Context, id string, closing *runner, set f
 	if err := m.closeAway(ctx, id, closing); err != nil {
 		return Thread{}, err
 	}
-	if err := m.removeShells(ctx, id); err != nil {
+	if err := m.removeShells(ctx, id, ShellsSnoozed); err != nil {
 		return Thread{}, err
 	}
 	m.mu.Lock()

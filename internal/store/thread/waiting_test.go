@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/bus"
 )
@@ -206,9 +207,18 @@ func TestWaitingUntilWake(t *testing.T) {
 			e.waitFor(parent.ID, "the wake's turn to end", func(s Thread) bool {
 				return s.Status == StatusNeedsAttention && s.StatusReason == "finished"
 			})
+			// The snapshot can show the end before its event is on the bus: read events up
+			// to the one that ends the wake's turn.
 			var seen []string
-			for len(sub.C()) > 0 {
-				if u, ok := (<-sub.C()).(Updated); ok && u.Thread.ID == parent.ID {
+			deadline := time.After(5 * time.Second)
+			for len(seen) == 0 || seen[len(seen)-1] != "needs attention (finished)" {
+				var ev Event
+				select {
+				case ev = <-sub.C():
+				case <-deadline:
+					t.Fatalf("no event for the wake's turn end; parent statuses = %q", seen)
+				}
+				if u, ok := ev.(Updated); ok && u.Thread.ID == parent.ID {
 					w := statusWords(u.Thread)
 					if len(seen) == 0 || seen[len(seen)-1] != w {
 						seen = append(seen, w)

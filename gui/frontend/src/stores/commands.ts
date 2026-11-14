@@ -4,8 +4,10 @@ import { confirmationOf, confirmButtonLabel, invokeCommand, listCommands, type C
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { isGitOpFailure, isGitOpResult } from "@/api/gitops";
 import { errorMessage, isAbort } from "@/api/stream";
+import { guardCommand } from "./commandGuards";
 import { confirmPresenter, requestConfirm, secondStagePresenter, type ConfirmPresenter } from "./confirm";
 import { contextKey, getUiContext } from "./context";
+import { useLayoutStore } from "./layout";
 import { useProjectsStore } from "./projects";
 import { useSubagentViewStore } from "./subagentView";
 import { useThreadsStore } from "./threads";
@@ -30,6 +32,11 @@ export const useCommandsStore = create<CommandsState>()(() => ({
   loading: false,
   error: null,
 }));
+
+/** A command's first chord as the user bound it; "" when none. */
+export function useCommandChord(name: string): string {
+  return useCommandsStore((s) => s.commands.find((c) => c.name === name)?.keybindings[0] ?? "");
+}
 
 /** The chord the user bound to dictation.toggle; "" when none, which is the default. */
 export function useDictateChord(): string {
@@ -157,7 +164,11 @@ export async function runCommandForResult(
 ): Promise<InvokeResultView | null> {
   const title = useCommandsStore.getState().commands.find((c) => c.name === name)?.title ?? name;
   try {
-    const res = await invokeConfirmed(name, args, opts.ctx ?? getUiContext(), opts.caller);
+    const ctx = opts.ctx ?? getUiContext();
+    // A plugin's call (`caller`) is not the user's: what it would end is kept, not asked about.
+    const guarded = opts.caller === undefined ? guardCommand(name, args, ctx) : true;
+    if (guarded !== true && !(await guarded)) return null;
+    const res = await invokeConfirmed(name, args, ctx, opts.caller);
     if (!res) return null;
     // Git operations report through their own toast (gitops events); skip the duplicate.
     if (!opts.quiet && res.message && !isGitOpResult(res.resultJson)) toast.success(res.message);
@@ -172,9 +183,9 @@ export async function runCommandForResult(
 }
 
 /**
- * Re-lists commands whenever the derived UiContext changes (debounced; the terminals
- * store decides which bottom panel shell is active), and when the selected thread's
- * state changes (availability often depends on it).
+ * Re-lists commands whenever the derived UiContext changes (debounced; the focused tab and
+ * the keyboard decide which terminal is active), and when the selected thread's state
+ * changes (availability often depends on it).
  */
 export function startCommandSync(debounceMs = 60): () => void {
   let lastKey = "";
@@ -191,7 +202,14 @@ export function startCommandSync(debounceMs = 60): () => void {
     clearTimeout(timer);
     timer = setTimeout(() => void refreshCommands(ctx), debounceMs);
   };
-  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check), useSubagentViewStore.subscribe(check)];
+  const unsubs = [useUiStore.subscribe(check), useTerminalsStore.subscribe(check), useProjectsStore.subscribe(check), useThreadsStore.subscribe(check), useSubagentViewStore.subscribe(check), useLayoutStore.subscribe(check)];
+  // The keyboard entering or leaving a quick terminal changes the context's terminal.
+  if (typeof document !== "undefined") {
+    document.addEventListener("focusin", check);
+    unsubs.push(() => {
+      document.removeEventListener("focusin", check);
+    });
+  }
   check();
   // Retry periodically while the list is failing (e.g. daemon restarting).
   const retry = setInterval(() => {

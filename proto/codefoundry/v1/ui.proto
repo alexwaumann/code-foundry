@@ -183,32 +183,25 @@ message UiIntent {
     int32 volume = 1;
   }
 
-  // ShowView opens a named GUI view: "help", "settings", "pullrequests". "settings.<page
+  // ShowView opens a named GUI view: "help", "settings", "usage". "settings.<page
   // id>" opens Settings on that page (view.settings --page); "project.add" opens the Add
   // Project dialog (project.add without a path). Unknown names are ignored.
   message ShowView {
     string name = 1;
-    // The thread whose side panel a panel action ("panel.toggle", "panel.mcp", ...)
-    // applies to, without changing what any window has selected: the thread's panel
-    // changes now if a window shows it, and is that way when the user opens it. Empty:
-    // the action applies to whatever each window has selected. Set by the view.panel.*
-    // verbs from inside a thread ($CODE_FOUNDRY_THREAD) or with --thread
-    // (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
-    // thread_id whose name is not a panel action.
-    string thread_id = 2;
-    // What the view shows, for the names that take more than the name: the panel
-    // actions that open one item ("panel.file", "panel.diff", "panel.pr",
-    // "panel.gallery"; docs/notes/control-5-fixes.md), the Projects page (one project's
-    // or workspace's) and search.open (an agent search). Each name's keys are documented
-    // with its name's constant in internal/command (ViewPanelFile, ViewPanelDiff,
-    // ViewPanelPR, ViewPanelGallery, ViewProjects, ViewSearch). Empty for every other
-    // name.
+    // thread_id scoped a classic side panel's action to one thread; the item verbs open
+    // tabs of the layout instead (docs/notes/shell-22-retire-verbs.md).
+    reserved 2;
+    reserved "thread_id";
+    // What the view shows, for the names that take more than the name: an agent search
+    // (search.open), a full screen pane, the dictation hold's phase, the move picker's
+    // thread. Each name's keys are documented with its name's constant in
+    // internal/command. Empty for every other name.
     map<string, string> params = 3;
   }
 
   message FocusThread {
     string thread_id = 1;
-    // Someone asked for this thread (thread.focus, a view.panel.* verb's --focus): the
+    // Someone asked for this thread (thread.focus): the
     // window selects it even when it is a hidden child, which a non-explicit FocusThread
     // (a thread-starting verb's) leaves alone so an agent's threads never take the view.
     bool explicit = 2;

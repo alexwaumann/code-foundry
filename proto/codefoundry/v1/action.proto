@@ -24,8 +24,8 @@ service ActionService {
   rpc Update(UpdateActionRequest) returns (UpdateActionResponse) {}
   // Delete forgets an action. Its runs keep going.
   rpc Delete(DeleteActionRequest) returns (DeleteActionResponse) {}
-  // Run starts an action for an owner: a thread (thread_id; the run belongs to its
-  // bottom panel) or a worktree (worktree_path). It returns the run as soon as it has
+  // Run starts an action for an owner: a thread (thread_id; its terminal tab is linked
+  // to the thread) or a worktree (worktree_path). It returns the run as soon as it has
   // started.
   rpc Run(RunActionRequest) returns (RunActionResponse) {}
   // GetRun returns one run with its output so far.
@@ -67,7 +67,7 @@ message Action {
   // A shell command line, run as `$SHELL -lc <command>`.
   string command = 4;
   ActionIcon icon = 5;
-  // Runs open as a terminal in the bottom panel; false: in the background.
+  // Runs open as a terminal (a terminal tab); false: in the background.
   bool in_terminal = 6;
   // Runs (in the background) when a new thread creates its worktree in this project.
   bool on_worktree_create = 7;
@@ -80,7 +80,7 @@ message Action {
 enum ActionRunMode {
   // On RunActionRequest: the action's own choice (in_terminal).
   ACTION_RUN_MODE_UNSPECIFIED = 0;
-  // In a terminal (labels kind=action) in the owner's bottom panel.
+  // In a terminal (labels kind=action), shown as a tab beside its owner.
   ACTION_RUN_MODE_TERMINAL = 1;
   // A child process of the daemon; combined stdout and stderr captured (last 64 KiB).
   ACTION_RUN_MODE_BACKGROUND = 2;
@@ -232,7 +232,7 @@ message RunActionRequest {
   // project first, then in the other members (one action, else INVALID_ARGUMENT).
   string action = 1;
   // The owning thread: the run goes to the thread's checkout of the action's project
-  // (its bottom panel, its run records). Wins over worktree_path.
+  // (its terminal tabs, its run records). Wins over worktree_path.
   string thread_id = 2;
   // The owning worktree when there is no thread: a registered worktree of the action's
   // project.

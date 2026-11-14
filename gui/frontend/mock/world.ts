@@ -38,6 +38,9 @@ import { shellCommands } from "./shells";
 import { mcpCommands } from "./mcp";
 import { HELLO_TERMINAL, HELLO_THREAD, MockPlugins } from "./plugins";
 import { MockActions } from "./actions";
+import { MockLayout, panes as layoutPanes } from "./layout";
+import { layoutCommands } from "./layoutVerbs";
+import { terminalShellCommands } from "./terminalVerbs";
 import { MockMemory } from "./memory";
 import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
@@ -46,8 +49,7 @@ import { MockDictation } from "./dictation";
 import { MockSearches } from "./agentSearch";
 import { CRASH_STDERR, MockThreadLogs, type SeedHistory, type ThreadState as ScriptedThreadState } from "./thread";
 import { contextFields, recordCompaction, recordResult, type MockContext } from "./context";
-import { panelThreadArgs, runPanelVerb } from "./panelVerbs";
-import { panelItemCommands } from "./panelItemVerbs";
+import { intoUsersDiff, panelItemCommands, type PlaceTab } from "./panelItemVerbs";
 import { createHints, type SetThread } from "./projectSets";
 
 type TerminalInit = MessageInitShape<typeof TerminalSchema>;
@@ -296,7 +298,7 @@ const KIND_SHELL = "shell";
 const KIND_ACTION = "action";
 const KIND_SETUP = "setup";
 
-/** termlabel.IsPanel: a shell, an action run or a skill's setup (the bottom panel's terminals; what close and thread removal take). */
+/** termlabel.IsPanel: a shell, an action run or a skill's setup (the terminals tabs show; what close and thread removal take). */
 const isPanel = (labels: Record<string, string>) => labels[LABEL_KIND] === KIND_SHELL || labels[LABEL_KIND] === KIND_ACTION || labels[LABEL_KIND] === KIND_SETUP;
 
 /** Labels of a shell terminal.new starts: owned by a worktree, and by a thread when threadId is set. */
@@ -402,6 +404,10 @@ interface MockTerm {
   attach: Hub<AttachItem>;
   /** A flood printing until ^C (flood()), else null. */
   flood: ReturnType<typeof setInterval> | null;
+  /** The process table's facts (Terminal.live_cwd, foreground, last_command): a `cd` moves liveCwd, a line typed becomes lastCommand. */
+  liveCwd: string;
+  foreground: string;
+  lastCommand: string;
 }
 
 interface MockWorktree {
@@ -467,6 +473,9 @@ export interface Invocation {
   confirmed: boolean;
   at: string;
 }
+
+/** --pane of terminal.new and terminal.new-free: the pane's "+" menu (internal/command terminalPaneArg). */
+const TERMINAL_PANE_ARG = { name: "pane", type: ArgType.STRING, required: false, description: "Open the terminal's tab in this pane (the pane's + menu) instead of placing it" };
 
 /** A destructive command invoked without confirmed=true (FailedPrecondition + detail). */
 export class ConfirmNeeded extends Error {
@@ -890,6 +899,9 @@ export class World {
       return { projectId: s.projectId, worktreePath: s.worktreePath, checkouts };
     },
     startTerminal: (argv, cwd, labels) => this.create(argv, cwd, labels, "action").id,
+    openTerminalTab: (id, thread) => {
+      this.openTerminalTab(id, thread);
+    },
     write: (id, text) => {
       const t = this.terms.get(id);
       if (t?.state === TerminalState.RUNNING) this.output(t, text);
@@ -908,6 +920,7 @@ export class World {
       this.logs.send(id, text, []);
     },
     registries: () => this.settings.value("plugins.registries"),
+    openTab: (tab, focus) => this.layout.apply({ op: "open_surface", tab, focus }, "", { keep_focus: !focus }).result,
   });
   /** The Skills marketplace (mock/skills.ts); the EventService skill source. */
   readonly skills = new MockSkills({
@@ -918,6 +931,13 @@ export class World {
   readonly memory = new MockMemory({
     publish: (v) => this.events.publish({ source: EventSource.MEMORY, event: { event: { case: "memory", value: v } } }),
     emit: (i) => this.emit(i),
+  });
+  /** The window shell's layout (mock/layout.ts); LayoutService and the EventService layout source. */
+  readonly layout = new MockLayout({
+    publish: (v) => this.events.publish({ source: EventSource.LAYOUT, event: { event: { case: "layout", value: v } } }),
+    applied: (op, result) => {
+      this.endClosedTerminals(op, result);
+    },
   });
   /** The user's themes (mock/userThemes.ts); the EventService theme source. */
   readonly themes: MockThemes = new MockThemes({
@@ -1019,10 +1039,11 @@ export class World {
     this.skills.reset();
     this.memory.reset();
     this.themes.reset();
+    this.layout.reset();
     const started = new Date(Date.now() - 42 * 60_000);
     // A shell terminal.new started on the Projects page for feat/sidebar (worktree-owned).
     this.addTerm({ id: "t-top", argv: ["top"], cwd: `${CFW}/feat-sidebar`, title: "", kind: "top", labels: shellLabels("", "repo-cf", `${CFW}/feat-sidebar`), startedAt: started });
-    // A shell terminal.new started in thread s-1 (thread-owned: s-1's bottom panel).
+    // A shell terminal.new started in thread s-1 (thread-owned: a tab linked to s-1).
     this.addTerm({ id: "t-s1-shell", argv: ["/bin/zsh", "-l"], cwd: CF, title: "", kind: "shell", labels: shellLabels("s-1", "repo-cf", CF), startedAt: started });
     // Threads in every state, each with a short history (SEEDS).
     this.threads.clear();
@@ -1467,6 +1488,119 @@ export class World {
    * "Watch the e2e run" waits on a shell alone ("waiting on 1 shell", no badge). All
    * held. POST /__mock/live-count. Idempotent; returns the ids.
    */
+  /**
+   * Scenario: the shell sidebar's rows (docs/notes/shell-16-sidebar.md): asks of each kind, one
+   * without a project; a long title; threads without a project with and without counts.
+   * Idempotent; returns the ids.
+   */
+  addShellSidebar(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const A = ThreadStatus.NEEDS_ATTENTION;
+    type Spec = Partial<MockThread> & Pick<MockThread, "id" | "name"> & { min: number };
+    const specs: Spec[] = [
+      { id: "s-sb-badge", name: "Fix stale PR badge after a force-push to the branch", status: A, statusReason: "permission: Bash git push --force-with-lease", min: 2 },
+      { id: "s-sb-notes", name: "Draft the 0.22 release notes", projectId: "", worktreePath: HOME, status: A, statusReason: "permission: Bash gh release list", min: 4 },
+      { id: "s-sb-flaky", name: "Investigate the flaky e2e run that only fails on the 4-worker WebKit job", worktreePath: `${CFW}/feat-sidebar`, status: ThreadStatus.IDLE, statusReason: "at prompt", min: 23 },
+      { id: "s-sb-trip", name: "Plan the spring trip", projectId: "", worktreePath: HOME, status: ThreadStatus.IDLE, statusReason: "at prompt", min: 41 },
+      { id: "s-sb-charts", name: "Compare three charting libraries", projectId: "", worktreePath: HOME, status: ThreadStatus.IDLE, statusReason: "at prompt", min: 62 },
+    ];
+    const runs: Record<string, AgentRunInit[]> = {
+      "s-sb-flaky": [backgroundRun("sb-a1", "Rerun the WebKit job", "Running make gui-e2e", 6), backgroundRun("sb-a2", "Bisect the flake", "Reading shell-drag.spec.ts", 5)],
+      "s-sb-charts": [backgroundRun("sb-a3", "Benchmark the libraries", "Running bun run bench", 4)],
+    };
+    const out: string[] = [];
+    for (const { min, ...o } of specs) {
+      out.push(o.id);
+      if (this.threads.has(o.id)) continue;
+      const s = this.addThread({ projectId: "repo-cf", worktreePath: CF, model: "claude-sonnet-5-5[1m]", effort: "medium", createdAt: ago(min + 20), lastActivityAt: ago(min), statusChangedAt: ago(min), held: true, ...o });
+      const r = runs[s.id];
+      if (r) this.logs.setAgents(s.id, r);
+      this.publishThread(s);
+    }
+    return out;
+  }
+
+  /**
+   * POST /__mock/needs-you (docs/notes/shell-17-needs-you.md): three of the user's threads that
+   * wait on real asks, as the hover card and popup read them: a permission for a long command
+   * (code-foundry), a question (ghostty-playground) and a short permission without a project.
+   */
+  addNeedsYou(): string[] {
+    const ago = (min: number) => new Date(Date.now() - min * 60_000);
+    const specs: { id: string; name: string; projectId: string; worktreePath: string; min: number; ask: Parameters<MockThreadLogs["seedAsk"]>[1] }[] = [
+      {
+        id: "s-ny-notes",
+        name: "Draft the 0.22 release notes",
+        projectId: "",
+        worktreePath: HOME,
+        min: 6,
+        ask: { prompt: "Draft the 0.22 release notes from the merged PRs.", intro: "I'll list the last releases first to match their format.", minutesAgo: 6, ask: { command: "gh release list --limit 5", description: "List the last five releases" } },
+      },
+      {
+        id: "s-ny-port",
+        name: "Port the renderer to libghostty-vt",
+        projectId: "repo-gp",
+        worktreePath: GP,
+        min: 4,
+        ask: {
+          prompt: "Port the grid renderer to libghostty-vt.",
+          intro: "The cell grid maps one to one. Before I start, one choice about the order.",
+          minutesAgo: 4,
+          ask: {
+            questions: [
+              {
+                question: "Which part of the renderer should I port first?",
+                header: "Order",
+                multiSelect: false,
+                options: [
+                  { label: "The cell grid (Recommended)", description: "Everything else draws on it" },
+                  { label: "The cursor", description: "Small, and shows the input path end to end" },
+                  { label: "Selection", description: "Needs the grid's coordinates first" },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        id: "s-ny-badge",
+        name: "Fix stale PR badge after a force-push to the branch",
+        projectId: "repo-cf",
+        worktreePath: CF,
+        min: 2,
+        ask: {
+          prompt: "The PR badge stays stale after a force-push. Find out why and fix it.",
+          intro: "The poller skipped PRs whose checks did not change.\n\nThe fingerprint now includes the head SHA; I'll check which open PRs moved since the last poll.",
+          minutesAgo: 2,
+          ask: {
+            command: [
+              "gh api graphql -f query='",
+              "  query($owner: String!, $name: String!) {",
+              "    repository(owner: $owner, name: $name) {",
+              "      pullRequests(states: OPEN, first: 50) {",
+              "        nodes { number headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }",
+              "      }",
+              "    }",
+              "  }' -F owner=alexwaumann -F name=code-foundry \\",
+              "  | jq '.data.repository.pullRequests.nodes[] | {number, headRefOid}' > /tmp/pr-heads.json",
+            ].join("\n"),
+            description: "List the open PRs' head commits",
+          },
+        },
+      },
+    ];
+    const out: string[] = [];
+    for (const { min, ask, ...o } of specs) {
+      out.push(o.id);
+      if (this.threads.has(o.id)) continue;
+      const s = this.addThread({ model: "claude-sonnet-5-5[1m]", effort: "medium", createdAt: ago(min + 20), lastActivityAt: ago(min), statusChangedAt: ago(min), ...o });
+      this.logs.seedAsk(s.id, ask);
+      s.statusChangedAt = ago(min);
+      this.publishThread(s);
+    }
+    return out;
+  }
+
   addLiveCount(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
     const A = ThreadStatus.NEEDS_ATTENTION;
@@ -2624,6 +2758,17 @@ export class World {
     if (args.focus !== "false" && !s.createdBy) this.focusThread(s.id);
   }
 
+  /**
+   * Opens an item verb's tab (view.open.*, panelItemVerbs.ts and mcp.ts) in the layout, as the
+   * daemon's tabs.open: a diff that frames nothing lands in the user's own tab, the file picked
+   * there when its sides list it (intoUsersDiff; a changed file of the checkout counts as listed).
+   */
+  private readonly placeItemTab: PlaceTab = (op, keepFocus) => {
+    const thread = (op.tab as { thread?: string } | undefined)?.thread ?? "";
+    const listed = (root: string, file: string) => (this.gh.details.get(root)?.files ?? []).some((f) => f.path === file);
+    this.layout.apply(intoUsersDiff(this.layout.state(), op, thread, listed), "", { keep_focus: keepFocus });
+  };
+
   /** An intent as a command emits it: delivered to WatchIntents watchers and EventService watchers with UI. */
   emit(intent: UiIntentInit): number {
     return this.intents.publish(intent) + this.uiEventWatchers;
@@ -2884,6 +3029,9 @@ export class World {
       tick: 0,
       attach: new Hub<AttachItem>(),
       flood: null,
+      liveCwd: o.cwd,
+      foreground: "",
+      lastCommand: "",
     };
     switch (o.kind) {
       case "top":
@@ -2993,6 +3141,10 @@ export class World {
       exitedAt: t.exitedAt ? timestampFromDate(t.exitedAt) : undefined,
       altScreen: t.altScreen,
       labels: t.labels,
+      // The daemon reads these from the process table; the mock keeps them by hand (a `cd`, a line typed, /__mock/terminal/facts).
+      liveCwd: t.liveCwd,
+      foreground: t.foreground,
+      lastCommand: t.lastCommand,
     };
   }
 
@@ -3044,7 +3196,19 @@ export class World {
         const cmd = t.line.trim();
         t.line = "";
         out += "\r\n";
-        out += cmd ? `zsh: command not found: ${cmd.split(" ")[0] ?? ""}\r\n${prompt(t.cwd)}` : prompt(t.cwd);
+        const cd = /^cd(?:\s+(\S+))?$/.exec(cmd);
+        if (cd) {
+          // A `cd` moves the shell (an absolute path or home), as the process table would show.
+          t.liveCwd = cd[1]?.startsWith("/") ? cd[1] : HOME;
+          out += prompt(t.liveCwd);
+          this.publishTerm(t);
+        } else {
+          if (cmd) {
+            t.lastCommand = cmd;
+            this.publishTerm(t);
+          }
+          out += cmd ? `zsh: command not found: ${cmd.split(" ")[0] ?? ""}\r\n${prompt(t.liveCwd)}` : prompt(t.liveCwd);
+        }
       } else if (ch === "\x7f") {
         if (t.line.length > 0) {
           t.line = t.line.slice(0, -1);
@@ -3192,6 +3356,83 @@ export class World {
     t.attach.publish("end");
     this.termEvents.publish({ event: { case: "removedId", value: id } });
     this.actions.terminalRemoved(id);
+    this.dropTerminalTab(id);
+  }
+
+  // ---- Terminals in the window shell's layout (the daemon's glue, internal/daemon/layout.go) ----
+
+  /** A new shell's tab (internal/command openTerminalTab): linked to its thread and placed beside it, else in the focused pane, or in `pane` (the "+" menu's); the user's call takes the focus. */
+  openTerminalTab(id: string, thread: string, pane = ""): void {
+    try {
+      this.layout.apply({ op: "open_surface", ...(pane ? { pane } : {}), tab: { id: "", kind: "terminal", ...(thread ? { thread } : {}), params: { terminal: id } }, focus: true });
+    } catch {
+      // No layout to open it in: the shell still runs, as the daemon's does.
+    }
+  }
+
+  /** A terminal gone closes its tab (drop_terminal, simplified: an open tab only). */
+  private dropTerminalTab(id: string): void {
+    for (const sp of this.layout.state().spaces) {
+      for (const p of layoutPanes(sp.root)) {
+        const tab = (p.tabs ?? []).find((t) => t.kind === "terminal" && t.params?.terminal === id);
+        if (tab) {
+          this.layout.apply({ op: "close_tab", tab: tab.id });
+          return;
+        }
+      }
+    }
+  }
+
+  /** A terminal tab closed by itself (close_tab, close_pane, remove_space) ends its shell; one closed with its thread keeps running. */
+  private endClosedTerminals(op: { op: string }, result: { closed?: { kind: string; params?: Record<string, string> }[] }): void {
+    if (!["close_tab", "close_pane", "remove_space"].includes(op.op)) return;
+    for (const tab of result.closed ?? []) {
+      const id = tab.kind === "terminal" ? (tab.params?.terminal ?? "") : "";
+      const t = id ? this.terms.get(id) : undefined;
+      if (t && isPanel(t.labels)) this.close(id);
+    }
+  }
+
+  /** The thread's running quick shell, else a new one in its checkout (terminal.quick). */
+  ensureQuick(threadId: string): MockTerm {
+    for (const t of this.terms.values()) if (t.state === TerminalState.RUNNING && t.labels[LABEL_THREAD] === threadId && t.labels.slot === "quick") return t;
+    const s = this.threads.get(threadId);
+    if (!s) throw new CommandError("notfound", `thread ${threadId} not found`);
+    return this.create(["/bin/zsh"], s.worktreePath || HOME, { ...shellLabels(s.id, s.projectId, s.worktreePath), slot: "quick" }, "shell");
+  }
+
+  /** terminal.reset: a fresh shell in the owner's directory under the same tab, then the old one closes. */
+  resetShell(id: string): MockTerm {
+    const old = this.term(id);
+    if (old.labels[LABEL_KIND] !== KIND_SHELL) throw new CommandError("unavailable", `terminal ${id} is not a shell`);
+    const thread = this.threads.get(old.labels[LABEL_THREAD] ?? "");
+    const cwd = thread ? thread.worktreePath || HOME : old.labels[LABEL_WORKTREE] || HOME;
+    const fresh = this.create(old.argv, cwd, { ...old.labels, replaces: id }, "shell");
+    for (const sp of this.layout.state().spaces)
+      for (const p of layoutPanes(sp.root))
+        for (const tab of p.tabs ?? []) if (tab.kind === "terminal" && tab.params?.terminal === id) this.layout.apply({ op: "set_tab_params", tab: tab.id, params: { ...tab.params, terminal: fresh.id } });
+    this.close(id);
+    return fresh;
+  }
+
+  /** terminal.rerun: types a command line into a shell at its prompt. */
+  rerun(id: string, command: string): string {
+    const t = this.term(id);
+    if (t.state !== TerminalState.RUNNING) throw new CommandError("unavailable", `terminal ${id} has exited`);
+    if (t.foreground) throw new CommandError("unavailable", `terminal ${id} is running ${t.foreground}; run it again once that has ended`);
+    const line = command || t.lastCommand;
+    if (!line.trim()) throw new CommandError("unavailable", `terminal ${id} has no last command`);
+    this.write(id, enc.encode(`${line}\r`));
+    return line;
+  }
+
+  /** POST /__mock/terminal/facts: what the process table would say (any of liveCwd, foreground, lastCommand). */
+  setTerminalFacts(id: string, facts: { liveCwd?: string; foreground?: string; lastCommand?: string }): void {
+    const t = this.term(id);
+    if (facts.liveCwd !== undefined) t.liveCwd = facts.liveCwd;
+    if (facts.foreground !== undefined) t.foreground = facts.foreground;
+    if (facts.lastCommand !== undefined) t.lastCommand = facts.lastCommand;
+    this.publishTerm(t);
   }
 
   /**
@@ -3913,11 +4154,13 @@ export class World {
     const activeThread = (ctx: UiContext | undefined) => (ctx?.activeThreadId ? this.threads.get(ctx.activeThreadId) : undefined);
     const always = () => true;
     return [
-      ...viewCommands((i) => this.emit(i)),
+      ...viewCommands((kind, pane, params, focus) => {
+        this.layout.apply({ op: "open_surface", ...(pane ? { pane } : {}), tab: { id: "", kind, ...(params ? { params } : {}) }, focus }, "", { keep_focus: !focus });
+      }),
       ...bridgeCommands(() => [...this.threads.values()]),
       ...fileExportCommands((id) => this.threads.get(id)?.worktreePath, () => this.exportDisk),
       ...this.logs.commands(),
-      ...mcpCommands(this.logs, (i) => this.emit(i)),
+      ...mcpCommands(this.logs, this.placeItemTab),
       ...panelItemCommands((id) => {
         const t = this.threads.get(id);
         if (!t) return undefined;
@@ -3928,7 +4171,7 @@ export class World {
           checkouts: Object.entries(t.checkoutPaths).filter(([, path]) => path).map(([projectId, path]) => ({ projectId, path })),
           changed: (root) => this.gh.details.get(root)?.files?.map((f) => f.path ?? ""),
         };
-      }, (i) => this.emit(i)),
+      }, this.placeItemTab),
       ...agentsCommands(this.logs, (i) => this.emit(i)),
       ...shellCommands(this.logs),
       ...this.actions.commands(),
@@ -3946,12 +4189,13 @@ export class World {
           args: [
             { name: "cwd", type: ArgType.PATH, required: false, description: "Working directory" },
             { name: "run", type: ArgType.STRING, required: false, description: "A command line typed into the new shell once it has printed its prompt, then Return" },
+            TERMINAL_PANE_ARG,
           ],
         },
         // Like the daemon: a thread, or a worktree to own the shell (never the dashboard or a page).
         when: (ctx) => Boolean(ctx?.activeThreadId || ctx?.activeWorktreePath),
         // Like the daemon: no focus intent; the result's JSON is the new terminal (the GUI
-        // focuses it in the bottom panel by its id).
+        // focuses its tab by its id).
         run: async (ctx, args) => {
           const owner = this.shellOwner(ctx, args.cwd ?? "");
           const fail = this.terminalNewFail;
@@ -3960,6 +4204,7 @@ export class World {
           if (fail !== null) throw new CommandError("unavailable", fail);
           const keys = runKeys(args.run ?? "");
           const t = this.create(["/bin/zsh"], owner.cwd, owner.labels, "shell");
+          this.openTerminalTab(t.id, owner.labels[LABEL_THREAD] ?? "", args.pane ?? "");
           const resultJson = JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels });
           if (keys === "") return { message: `created terminal ${t.id}`, resultJson };
           // Like the daemon: the shell is listed at once, and the command is typed once it
@@ -3967,6 +4212,24 @@ export class World {
           await new Promise((r) => setTimeout(r, RUN_PROMPT_MS));
           this.write(t.id, enc.encode(keys));
           return { message: `created terminal ${t.id} and ran the command in it`, resultJson };
+        },
+      },
+      {
+        cmd: {
+          name: "terminal.new-free",
+          title: "New Terminal in Home Folder",
+          category: "Terminal",
+          description: "Start a shell in the home folder, owned by nothing.",
+          // No key of its own: cmd+t opens one where no thread is in context, cmd+shift+t reopens a closed tab.
+          keybindings: [],
+          args: [TERMINAL_PANE_ARG],
+        },
+        when: always,
+        // Like the daemon: a free shell (kind shell, no owner labels), in the home directory.
+        run: (_ctx, args) => {
+          const t = this.create(["/bin/zsh"], HOME, { [LABEL_KIND]: KIND_SHELL }, "shell");
+          this.openTerminalTab(t.id, "", args.pane ?? "");
+          return Promise.resolve({ message: `created terminal ${t.id} in ${HOME}`, resultJson: JSON.stringify({ id: t.id, cwd: t.cwd, labels: t.labels }) });
         },
       },
       {
@@ -3997,12 +4260,18 @@ export class World {
             { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "created-by", type: ArgType.STRING, required: false, description: "The thread whose agent creates this one (default: $CODE_FOUNDRY_THREAD)", defaultToThreadEnv: true },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window (--focus=false: no window moves). Never for a thread another thread created (created-by): thread focus shows one on request", defaultValue: "true" },
+            { name: "compose", type: ArgType.STRING, required: false, description: "The composer tab it is sent from (the shell window sets it): the thread's tab takes its place, in its space" },
           ],
         },
         // Like the daemon: also in the composer, whose no-project target has no project, and from a thread's CLI or page.
         when: (ctx) =>
           this.worktreeOf(ctx) !== null || Boolean(ctx?.activeProjectId && this.projects.has(ctx.activeProjectId)) || ctx?.activeView === "compose" || (ctx?.activeView === "" && activeThread(ctx) !== undefined),
-        run: (ctx, args) => this.newThread(ctx, args),
+        run: async (ctx, args) => {
+          const out = await this.newThread(ctx, args);
+          // --compose (the shell's composer, internal/command commands_thread_compose.go): the thread's tab takes that composer's place.
+          if (args.compose) this.layout.apply({ op: "open_thread", thread: (JSON.parse(out.resultJson) as { id: string }).id, compose: args.compose, focus: true });
+          return out;
+        },
       },
       ...(
         [
@@ -4044,7 +4313,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the thread's name", keybindings: ["cmd+r"], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
+        cmd: { name: "thread.rename", title: "Rename Thread", category: "Thread", description: "Set the thread's name", keybindings: [], args: [{ name: "name", type: ArgType.STRING, required: true, description: "New name" }] },
         when: (ctx) => activeThread(ctx) !== undefined,
         run: (ctx, args) => {
           const s = activeThread(ctx);
@@ -4138,7 +4407,7 @@ export class World {
         // Like the daemon (canOpenMove): a thread without a project or workspace.
         when: (ctx) => Boolean(ctx?.activeThreadId) && !ctx?.activeProjectId && !ctx?.activeWorkspaceId,
         run: (ctx, args) => {
-          this.intents.publish({ intent: { case: "showView", value: { name: "thread.move", threadId: "", params: { id: args.id || (ctx?.activeThreadId ?? "") } } } });
+          this.intents.publish({ intent: { case: "showView", value: { name: "thread.move", params: { id: args.id || (ctx?.activeThreadId ?? "") } } } });
           return "";
         },
       },
@@ -4340,11 +4609,17 @@ export class World {
             { name: "draft-json", type: ArgType.STRING, required: false, description: "The composer's draft, kept until setup ends (the GUI sets it)" },
             { name: "name", type: ArgType.STRING, required: false, description: "Thread name" },
             { name: "focus", type: ArgType.BOOL, required: false, description: "Select the new thread in every window", defaultValue: "true" },
+            { name: "compose", type: ArgType.STRING, required: false, description: "The composer tab it is sent from (the shell window sets it): the thread's tab takes its place, in its space" },
           ],
         },
         // Like the daemon (canNewLike): in the GUI only for a thread with a project or a workspace.
         when: (ctx) => activeThread(ctx) !== undefined && (!ctx?.activeView || Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
-        run: (ctx, args) => this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args),
+        run: async (ctx, args) => {
+          const out = await this.newLikeThread(args.id || (ctx?.activeThreadId ?? ""), args);
+          // --compose, as thread.new's.
+          if (args.compose) this.layout.apply({ op: "open_thread", thread: (JSON.parse(out.resultJson) as { id: string }).id, compose: args.compose, focus: true });
+          return out;
+        },
       },
       {
         cmd: {
@@ -4667,6 +4942,29 @@ export class World {
         },
       },
       {
+        // internal/command commands_ui.go: the terminal's tab takes the focus, opened (in --pane, else
+        // by the rules) when it has none; the classic window gets FocusTerminal. The quick slot is not ported.
+        cmd: {
+          name: "ui.focus.terminal",
+          title: "Focus Terminal",
+          category: "View",
+          description: "Show a terminal in every connected window: the shell window focuses its tab, opening it by the placement rules when it is closed (--pane: in that pane).",
+          noPalette: true,
+          keybindings: [],
+          args: [
+            { name: "id", type: ArgType.STRING, required: true, description: "Terminal id" },
+            { name: "pane", type: ArgType.STRING, required: false, description: "A terminal with no tab opens it in this pane" },
+          ],
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const t = this.term(args.id ?? "");
+          this.openTerminalTab(t.id, t.labels[LABEL_THREAD] ?? "", args.pane ?? "");
+          this.intents.publish({ intent: { case: "focusTerminal", value: { terminalId: t.id } } });
+          return `terminal ${t.id} has the focus`;
+        },
+      },
+      {
         cmd: { name: "terminal.focus", title: "Focus Terminal…", category: "Terminal", description: "Show a terminal by id", keybindings: [], args: [{ name: "terminal_id", type: ArgType.ENUM, required: true, description: "Terminal", enumValues: [...this.terms.keys()] }] },
         when: () => this.terms.size > 0,
         run: (_ctx, args) => {
@@ -4948,6 +5246,26 @@ export class World {
       }),
       ...projectCommands(this),
       ...renameCommands(this),
+      ...layoutCommands({
+        layout: this.layout,
+        hasThread: (id) => this.threads.has(id),
+        sidebarThreads: () => [...this.threads.values()].filter((t) => (!t.createdBy || !this.threads.has(t.createdBy)) && t.archivedAt === null).map((t) => t.id),
+        isArchived: (id) => (this.threads.get(id)?.archivedAt ?? null) !== null,
+        archiveThread: (id) => {
+          this.archiveThread(id, true);
+        },
+        threadCheckout: (id) => {
+          const t = this.threads.get(id);
+          return { projectId: t?.projectId ?? "", worktreePath: t?.worktreePath ?? "" };
+        },
+        threadInfoDefault: () => this.settings.value("layout.thread_info") !== "false",
+      }),
+      ...terminalShellCommands({
+        layout: this.layout,
+        ensureQuick: (thread) => this.ensureQuick(thread).id,
+        reset: (id) => this.resetShell(id).id,
+        rerun: (id, command) => this.rerun(id, command),
+      }),
       {
         cmd: { name: "view.settings", title: "Settings", category: "View", description: "Show the settings page, or close it where it already shows", keybindings: ["cmd+,"], args: [] },
         when: always,
@@ -4964,23 +5282,23 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "help" } } }))}`,
       },
       {
-        cmd: { name: "view.panel.toggle", title: "Toggle Side Panel", category: "View", description: "Show or hide the side panel next to the selected thread or page.", keybindings: ["cmd+shift+e"], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.toggle", args),
-      },
-      {
-        cmd: { name: "view.bottom.toggle", title: "Toggle Bottom Panel", category: "View", description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.", keybindings: ["cmd+j"], args: [] },
-        when: always,
-        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "bottom.toggle" } } }))}`,
-      },
-      {
         cmd: { name: "view.thread-info", title: "Toggle Thread Info", category: "View", description: "Show or hide the thread info card beside a thread's conversation: its checkout, branch and pull requests, git state, shells, related threads and agents, MCP servers, context and usage.", keybindings: ["cmd+shift+i"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread-info" } } }))}`,
       },
       {
+        // internal/command pane.fullscreen: window state, a ShowView the shell window presents.
+        cmd: { name: "pane.fullscreen", title: "Toggle Full Screen Pane", category: "View", description: "Show one pane over the whole pane area of the window, the top bar and the sidebar staying, or every pane again. Window state: the stored layout does not change. Default: the focused pane, toggled.", keybindings: ["cmd+shift+enter"], args: [] },
+        when: always,
+        run: (_ctx, args) => {
+          const mode = args.off === "true" ? "off" : args.on === "true" ? "on" : "toggle";
+          const params: Record<string, string> = args.pane ? { mode, pane: args.pane } : { mode };
+          return `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "pane.fullscreen", params } } }))}`;
+        },
+      },
+      {
         // internal/command canFindFiles: a thread view with a project or workspace; the CLI always.
-        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it in the thread's side panel (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
+        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
         when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
       },
@@ -5025,7 +5343,7 @@ export class World {
       // internal/command canSearchFile: a thread view (the GUI's palette further asks for a File tab that can search); the CLI always.
       ...(
         [
-          ["file.search", "Find in File", "Find in the File tab. Searches the file the side panel's File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"],
+          ["file.search", "Find in File", "Find in the File tab. Searches the file a File tab shows, viewed or edited, or a markdown file as rendered; case-sensitive once the query has a capital letter.", "cmd+f"],
           ["file.search.next", "Find Next in File", "Next match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+g"],
           ["file.search.previous", "Find Previous in File", "Previous match in the File tab. Opens the File tab's find bar when it is closed.", "cmd+shift+g"],
         ] as const
@@ -5035,37 +5353,22 @@ export class World {
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name } } }))}`,
       })),
       {
-        cmd: { name: "view.panel.expand", title: "Expand Side Panel", category: "View", description: "Toggle the side panel between its split width and the full width of the content area for the selected thread or page.", keybindings: [], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.expand", args),
-      },
-      {
-        cmd: { name: "view.panel.new-tab", title: "New Side Panel Tab", category: "View", description: "Show the surface list in the side panel of the selected thread or page, to open another tab there.", keybindings: [], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.new-tab", args),
-      },
-      {
-        cmd: { name: "view.panel.split", title: "Split Side Panel", category: "View", description: "Split or unsplit the side panel of the selected thread or page into two tab groups.", keybindings: ["cmd+\\"], args: panelThreadArgs },
-        when: always,
-        run: (_ctx, args) => runPanelVerb((i) => this.emit(i), "panel.split", args),
-      },
-      {
-        cmd: { name: "view.back", title: "Back", category: "View", description: "Return to the previously selected thread or page.", keybindings: ["cmd+["], args: [] },
+        cmd: { name: "view.back", title: "Back", category: "View", description: "Go back to what was focused before: a tab, a pane, a space.", keybindings: ["cmd+["], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "back" } } }))}`,
       },
       {
-        cmd: { name: "view.forward", title: "Forward", category: "View", description: "Go to the thread or page selected before going back.", keybindings: ["cmd+]"], args: [] },
+        cmd: { name: "view.forward", title: "Forward", category: "View", description: "Go forward again to what was focused before going back.", keybindings: ["cmd+]"], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "forward" } } }))}`,
       },
       {
-        cmd: { name: "thread.previous", title: "Previous Thread", category: "View", description: "Select the thread above the current one in the sidebar.", keybindings: ["cmd+shift+["], args: [] },
+        cmd: { name: "thread.previous", title: "Previous Thread", category: "View", description: "Select the thread above the current one in the sidebar.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.previous" } } }))}`,
       },
       {
-        cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: ["cmd+shift+]"], args: [] },
+        cmd: { name: "thread.next", title: "Next Thread", category: "View", description: "Select the thread below the current one in the sidebar.", keybindings: [], args: [] },
         when: always,
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "thread.next" } } }))}`,
       },
@@ -5090,6 +5393,26 @@ export class World {
         cmd: { name: "settings.path", noPalette: true, title: "Settings File Path", category: "Settings", description: "Print the settings file's path", keybindings: [], args: [] },
         when: always,
         run: () => this.settings.snapshot().path ?? "",
+      },
+      {
+        cmd: {
+          name: "settings.set",
+          noPalette: true,
+          title: "Change Setting",
+          category: "Settings",
+          description: "Set one setting. The value is validated against the setting's type and written to the settings file.",
+          keybindings: [],
+          args: [
+            { name: "key", type: ArgType.STRING, required: true, positional: true, description: 'Setting key, e.g. "appearance.font_size"' },
+            { name: "value", type: ArgType.STRING, required: true, positional: true, description: "New value" },
+          ],
+        },
+        when: always,
+        run: (_ctx, args) => {
+          const key = args.key ?? "";
+          const snap = this.settings.update({ [key]: args.value ?? "" });
+          return `${key} = ${JSON.stringify(snap.values?.[key] ?? "")}`;
+        },
       },
       {
         cmd: {

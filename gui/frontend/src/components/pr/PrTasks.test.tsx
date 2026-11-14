@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { toast } from "sonner";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { bodyDone, it, trackTests } from "@/test/isolate";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { seedPrWorld, SLUG } = await import("@/test/prWorld");
@@ -15,7 +17,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { useUiStore } = await import("@/stores/ui");
 
 /**
- * The readiness rows' thread tasks (TaskButton, stores/prTasks.ts) in the real side panel
+ * The readiness rows' thread tasks (TaskButton, stores/prTasks.ts) in a pull request tab
  * against src/test/prWorld.ts: which rows get which button, where it routes, the pr.task
  * args each target sends, the busy state and the toasts. The routing rules themselves are
  * table-tested in taskRouting.test.ts.
@@ -23,13 +25,17 @@ const { useUiStore } = await import("@/stores/ui");
 
 let world: ReturnType<typeof seedPrWorld>;
 
+trackTests();
+
 beforeEach(() => {
   resetDaemon();
   world = seedPrWorld();
   usePrTasksStore.setState({ running: {} });
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // A body that timed out ends first, against its own world (src/test/isolate.ts).
+  await bodyDone();
   act(() => {
     toast.dismiss();
   });
@@ -54,9 +60,9 @@ function link(id: string, numbers: number[], slug = SLUG): void {
 }
 
 /** The seeded projects and threads, with `selected` selected. */
-function fromThread(selected: string): void {
+async function fromThread(selected: string): Promise<void> {
   seedWorld();
-  resetPrStores({ kind: "thread", id: selected });
+  await resetPrStores({ kind: "thread", id: selected });
 }
 
 function openTargets(kind: string): HTMLElement {
@@ -80,7 +86,7 @@ async function expectToast(text: string): Promise<void> {
 
 describe("which rows get which button", () => {
   it("#145 from a thread that links it: Fix / Address / Address in this thread; no icon", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     link("s-1", [145]);
     renderPrPanel();
     await openPr(145);
@@ -93,14 +99,14 @@ describe("which rows get which button", () => {
     [162, { behind: "Update in new thread" }],
     [139, { "review-request": "Review in new thread" }],
   ])("#%i from the Pull Requests page: %o", async (n, want) => {
-    resetPrStores();
+    await resetPrStores();
     renderPrPanel();
     await openPr(n);
     expect(buttons()).toEqual(want);
   });
 
   it("none on merged or closed pull requests", async () => {
-    resetPrStores();
+    await resetPrStores();
     renderPrPanel();
     for (const n of [138, 131]) {
       await openPr(n);
@@ -111,7 +117,7 @@ describe("which rows get which button", () => {
   it("a viewer who cannot push gets no push task, but still Review when asked", async () => {
     world.update(145, (d) => ({ ...d, viewerCanUpdate: false, viewerPermission: "read", pullRequest: { ...d.pullRequest, author: "teammate-kim" } }));
     world.update(139, (d) => ({ ...d, viewerCanUpdate: false, viewerPermission: "read" }));
-    resetPrStores();
+    await resetPrStores();
     renderPrPanel();
     await openPr(145);
     expect(screen.queryAllByTestId(/^pr-task-/)).toEqual([]);
@@ -122,7 +128,7 @@ describe("which rows get which button", () => {
 
 describe("running pr.task", () => {
   it("into this thread: --thread with the selection; the daemon's message, no Open", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     link("s-1", [145]);
     renderPrPanel();
     await openPr(145);
@@ -136,7 +142,7 @@ describe("running pr.task", () => {
   });
 
   it("an unrelated pull request: new thread by default (listed last); the menu lists the threads that link it, not this one; picking one sends there, Open selects it", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     link("s-1", [145]);
     link("s-3", [161]);
     link("s-7", [161]); // archived: not offered
@@ -157,7 +163,7 @@ describe("running pr.task", () => {
   });
 
   it("forwarded: a thread that links it through its child sends the task there; the toast names the child for this thread, Open selects the child", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     addThreads(thread("s-kid", { name: "Port the fix", createdBy: "s-1", lastActivityAtMs: Date.now() }));
     link("s-1", [145]);
     link("s-kid", [145]);
@@ -182,14 +188,14 @@ describe("running pr.task", () => {
   });
 
   it("no this thread in the menu when the selection does not link the pull request", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     renderPrPanel();
     await openPr(162);
     expect(targets(openTargets("behind"))).toEqual([{ text: "In a new thread", default: true }]);
   });
 
   it("a new thread: no --thread; Started thread … with Open", async () => {
-    resetPrStores();
+    await resetPrStores();
     renderPrPanel();
     await openPr(139);
     fireEvent.click(byTestId("pr-task-review-request"));
@@ -202,7 +208,7 @@ describe("running pr.task", () => {
   });
 
   it("a repository that is no project: the new thread's item says it clones first", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     act(() => {
       useProjectsStore.setState((s) => ({ order: s.order.filter((id) => s.byId[id]?.githubSlug !== SLUG) }));
     });
@@ -213,7 +219,7 @@ describe("running pr.task", () => {
   });
 
   it("busy: spinner, aria-disabled; a second press sends nothing; the other rows stay free", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     link("s-1", [145]);
     const release = world.hold("pr.task");
     renderPrPanel();
@@ -232,7 +238,7 @@ describe("running pr.task", () => {
   });
 
   it("a thread removed since: the daemon's message as an error, no Open", async () => {
-    fromThread("s-1");
+    await fromThread("s-1");
     link("s-1", [145]);
     world.removedThreads.add("s-1");
     renderPrPanel();
@@ -246,7 +252,7 @@ describe("running pr.task", () => {
 
   it("a refusal toasts the daemon's error", async () => {
     world.failNext.add("pr.task");
-    resetPrStores();
+    await resetPrStores();
     renderPrPanel();
     await openPr(161);
     fireEvent.click(byTestId("pr-task-conflicts"));

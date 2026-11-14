@@ -4,7 +4,6 @@ import type { TerminalView } from "@/api/terminal";
 import { windowTitle } from "@/lib/title";
 import { deriveContext, emptyContext } from "./context";
 import { dispatchEvent } from "./events";
-import { applyIntent } from "./intents";
 import { emptyProjects, replaceProjects, useProjectsStore } from "./projects";
 import { applyRetiredUsage, applyThreadListEvent, attentionIds, emptyThreads, replaceThreads, runningCount, useThreadsStore } from "./threads";
 import { emptyTerminals, useTerminalsStore } from "./terminals";
@@ -72,7 +71,7 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
 }
 
 function term(id: string, labels: Record<string, string> = {}): TerminalView {
-  return { id, argv: ["claude"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels };
+  return { id, argv: ["claude"], cwd: "/src/app", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels };
 }
 
 describe("thread reducers", () => {
@@ -316,15 +315,6 @@ describe("event dispatch", () => {
     expect(useThreadsStore.getState().epoch).toBe(start + 1);
     dispatchEvent({ source: "threadList", event: { kind: "snapshot", threads: [], retiredUsage: [] } });
     expect(useThreadsStore.getState().epoch).toBe(start + 2);
-  });
-
-  it("a FocusTerminal that races its shell reveals the shell once it arrives", () => {
-    useThreadsStore.setState({ ...replaceThreads(emptyThreads, [thread("s1")]), loaded: true });
-    useTerminalsStore.setState({ ...emptyTerminals, loaded: true });
-    applyIntent({ kind: "focusTerminal", terminalId: "t1" });
-    expect(useUiStore.getState().selection).toEqual({ kind: "none" });
-    dispatchEvent({ source: "terminal", event: { kind: "updated", terminal: term("t1", { thread: "s1", kind: "shell" }) } });
-    expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s1" });
   });
 });
 

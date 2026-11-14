@@ -6,9 +6,8 @@ import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
-import { tooltipText } from "@/test/tooltip";
 import { HeaderActions } from "./HeaderActions";
-import { ThreadTitle } from "./ThreadParts";
+import { ThreadCrumb } from "./ThreadParts";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
@@ -20,7 +19,7 @@ const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remo
 function show(o: Partial<ThreadView>, others: ThreadView[] = []): void {
   const all = [thread("s-1", o), ...others];
   useThreadsStore.setState({ byId: Object.fromEntries(all.map((t) => [t.id, t])), order: all.map((t) => t.id) });
-  render(<ThreadTitle id="s-1" />);
+  render(<ThreadCrumb id="s-1" />);
 }
 
 const crumb = () => screen.getByTestId("thread-crumb");
@@ -34,7 +33,8 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("the thread header's crumb", () => {
+// The crumb heads a subagent run's view (SubagentPane); a thread's own header is ThreadHeader's.
+describe("the crumb", () => {
   it.each<[string, Partial<ThreadView>, string, string, Record<string, string> | null]>([
     ["one project: its page", {}, "folder", "web", { project: "web" }],
     ["a named workspace: its page", { workspaceId: "w-1", projectIds: ["web", "api"] }, "layers", "platform", { workspace: "w-1" }],
@@ -47,7 +47,6 @@ describe("the thread header's crumb", () => {
     expect(crumb().dataset.icon).toBe(icon);
     expect(screen.getByTestId("thread-crumb-place").textContent).toBe(label);
     expect(screen.queryByTestId("thread-crumb-parent")).toBeNull();
-    expect(screen.getByTestId("thread-title-name").textContent).toBe("Thread s-1");
     const link = screen.queryByTestId("thread-crumb-place-link");
     if (args === null) {
       // Plain text: no button in the crumb.
@@ -70,11 +69,10 @@ describe("the thread header's crumb", () => {
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-0" });
   });
 
-  it("a child's crumb reads place, creator, title in that order; the user's own thread has no parent segment", () => {
+  it("a child's crumb reads place, then creator; the user's own thread has no parent segment", () => {
     show({ createdBy: "s-0" }, [thread("s-0", { name: "Fix login redirect" })]);
-    const [place, parent, title] = ["thread-crumb-place", "thread-crumb-parent", "thread-title-name"].map((id) => screen.getByTestId(id));
+    const [place, parent] = ["thread-crumb-place", "thread-crumb-parent"].map((id) => screen.getByTestId(id));
     expect(place?.compareDocumentPosition(parent as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(parent?.compareDocumentPosition(title as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     fireEvent.click(parent as HTMLElement);
     cleanup();
     show({}, [thread("s-0")]);
@@ -112,63 +110,14 @@ describe("the thread header's crumb", () => {
     expect(removed.tagName).toBe("SPAN");
     expect(removed.dataset.removed).toBe("true");
   });
-
-  it("a warning dot on the chevron while the plugin environment changed, its tooltip pointing at the menu", () => {
-    show({});
-    expect(screen.queryByTestId("thread-title-stale")).toBeNull();
-    expect(tooltipText(screen.getByTestId("thread-title"))).toBeNull();
-    act(() => {
-      screen.getByTestId("thread-title").blur();
-      useThreadsStore.setState((s) => ({ byId: { ...s.byId, "s-1": thread("s-1", { pluginEnvStale: true, pluginEnvChange: "Hello removed CF_HELLO" }) } }));
-    });
-    const dot = screen.getByTestId("thread-title-stale");
-    expect(dot.className).toContain("bg-cf-warning");
-    expect(dot.getAttribute("aria-label")).toBe("Plugin environment changed · Restart Claude from this menu");
-    expect(tooltipText(screen.getByTestId("thread-title"))).toBe("Plugin environment changed · Restart Claude from this menu");
-  });
-
-  it("Transcript deleted sits in the bar right after the title", () => {
-    show({ transcriptMissing: true });
-    const chip = screen.getByTestId("thread-transcript-deleted");
-    expect(chip.parentElement).toBe(screen.getByTestId("thread-title-bar"));
-    expect(chip.previousElementSibling).toBe(screen.getByTestId("thread-title"));
-  });
-
-  it("a provisional name is muted and italic", () => {
-    show({ nameProvisional: true });
-    expect(screen.getByTestId("thread-title-name").className).toContain("italic");
-  });
-
-  it("a name being regenerated is muted and italic, then plain once it lands", () => {
-    show({ naming: true });
-    expect(screen.getByTestId("thread-title-name").className).toContain("italic");
-    cleanup();
-    show({ naming: false });
-    expect(screen.getByTestId("thread-title-name").className).not.toContain("italic");
-  });
-
-  it("the title is a menu button with its chevron; Enter opens the thread's menu", () => {
-    show({});
-    const title = screen.getByTestId("thread-title");
-    expect(title.tagName).toBe("BUTTON");
-    expect(title.querySelector(".lucide-chevron-down")).not.toBeNull();
-    expect(title.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.keyDown(title, { key: "Enter" });
-    expect(title.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByTestId("thread-title-menu")).toBeTruthy();
-  });
 });
 
-describe("the thread header's right side", () => {
-  it("is the three toggles only", () => {
+describe("a subagent run's header's right side", () => {
+  it("is the thread info toggle only", () => {
     const cmd = (name: string) => ({ name, title: name, description: "", category: "", args: [], keybindings: [], available: true });
     useCommandsStore.setState({ commands: ["view.thread-info", "view.bottom.toggle", "view.panel.toggle", "thread.snooze", "thread.archive"].map(cmd) });
     useThreadsStore.setState({ byId: { "s-1": thread("s-1") }, order: ["s-1"] });
     render(<HeaderActions />);
-    expect([...screen.getByTestId("pane-actions").querySelectorAll("button")].map((b) => b.dataset.testid)).toEqual([
-      "thread-info-toggle",
-      "bottom-toggle",
-      "panel-toggle",
-    ]);
+    expect([...screen.getByTestId("pane-actions").querySelectorAll("button")].map((b) => b.dataset.testid)).toEqual(["thread-info-toggle"]);
   });
 });

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Eye, Loader2 } from "lucide-react";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { AgentsStrip } from "@/components/thread/AgentsStrip";
 import { CiteLayer } from "@/components/thread/cite/CiteLayer";
 import { FindBar } from "@/components/thread/find/FindBar";
@@ -15,7 +14,7 @@ import { projectPlace, type ProjectRoot } from "@/lib/pathChips";
 import { cn } from "@/lib/utils";
 import { clearWorkRowChoices, holdEmberBoard, useEmberEnabled, useFlameState, useHeaderDot, useHeaderSummary } from "@/stores/ember";
 import { toggleEmberBoard, useEmberBoardShown } from "@/stores/emberPanel";
-import { keyOf } from "@/stores/panel";
+import { useCurrentTarget } from "@/shell/host";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadFindOpen } from "@/stores/threadFind";
 import { useThreadsStore } from "@/stores/threads";
@@ -48,10 +47,10 @@ function HeaderStatus() {
   );
 }
 
-/** Board (the side panel on the Board surface) and Show work (every work row open), then the panel toggle. */
+/** Board (the Board surface beside the chat) and Show work (every work row open). */
 function HeaderActions({ threadId }: { threadId: string }) {
   const enabled = useEmberEnabled();
-  const panelKey = useUiStore((s) => keyOf(s.selection));
+  const panelKey = useCurrentTarget();
   const board = useEmberBoardShown(panelKey);
   const showWork = useUiStore((s) => s.emberShowWork);
   return (
@@ -92,7 +91,6 @@ function HeaderActions({ threadId }: { threadId: string }) {
         <Eye aria-hidden />
         Show work
       </Button>
-      <PanelToggle />
     </span>
   );
 }

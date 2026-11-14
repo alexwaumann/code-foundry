@@ -89,7 +89,7 @@ type ActionRunMode int32
 const (
 	// On RunActionRequest: the action's own choice (in_terminal).
 	ActionRunMode_ACTION_RUN_MODE_UNSPECIFIED ActionRunMode = 0
-	// In a terminal (labels kind=action) in the owner's bottom panel.
+	// In a terminal (labels kind=action), shown as a tab beside its owner.
 	ActionRunMode_ACTION_RUN_MODE_TERMINAL ActionRunMode = 1
 	// A child process of the daemon; combined stdout and stderr captured (last 64 KiB).
 	ActionRunMode_ACTION_RUN_MODE_BACKGROUND ActionRunMode = 2
@@ -305,7 +305,7 @@ type Action struct {
 	// A shell command line, run as `$SHELL -lc <command>`.
 	Command string     `protobuf:"bytes,4,opt,name=command,proto3" json:"command,omitempty"`
 	Icon    ActionIcon `protobuf:"varint,5,opt,name=icon,proto3,enum=codefoundry.v1.ActionIcon" json:"icon,omitempty"`
-	// Runs open as a terminal in the bottom panel; false: in the background.
+	// Runs open as a terminal (a terminal tab); false: in the background.
 	InTerminal bool `protobuf:"varint,6,opt,name=in_terminal,json=inTerminal,proto3" json:"in_terminal,omitempty"`
 	// Runs (in the background) when a new thread creates its worktree in this project.
 	OnWorktreeCreate bool `protobuf:"varint,7,opt,name=on_worktree_create,json=onWorktreeCreate,proto3" json:"on_worktree_create,omitempty"`
@@ -1277,7 +1277,7 @@ type RunActionRequest struct {
 	// project first, then in the other members (one action, else INVALID_ARGUMENT).
 	Action string `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
 	// The owning thread: the run goes to the thread's checkout of the action's project
-	// (its bottom panel, its run records). Wins over worktree_path.
+	// (its terminal tabs, its run records). Wins over worktree_path.
 	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
 	// The owning worktree when there is no thread: a registered worktree of the action's
 	// project.

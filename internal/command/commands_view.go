@@ -7,14 +7,8 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
-
-// ViewPullRequests is the ShowView name of the Pull Requests page.
-const ViewPullRequests = "pullrequests"
-
-// ViewProjects is the ShowView name of the Projects page: every project (registered
-// repository) with its worktrees, and every workspace with its members.
-const ViewProjects = "projects"
 
 // ViewUsage is the ShowView name of the Usage page: token usage and its cost over every
 // thread the daemon tracks (docs/notes/session-usage.md). A window shows it (a window
@@ -22,39 +16,9 @@ const ViewProjects = "projects"
 // it, like the settings page.
 const ViewUsage = "usage"
 
-// ViewPanelToggle is the ShowView name that toggles the side panel of whatever the
-// window has selected. It is an action, not a page: the GUI toggles its per-selection
-// panel state (gui/frontend/src/stores/panel.ts) and stays on the current selection.
-const ViewPanelToggle = "panel.toggle"
-
-// ViewBottomToggle is the ShowView name that toggles the bottom panel (the terminals
-// under the main content) of whatever the window has selected. Like ViewPanelToggle it
-// is an action on per-selection GUI state, not a page. It only toggles: the GUI's own
-// cmd+j (its presenter, not this intent) also starts a shell when the panel would open
-// empty, so a CLI call reaching every window does not start one per window.
-const ViewBottomToggle = "bottom.toggle"
-
-// ViewPanelExpand is the ShowView name that toggles the selection's side panel between
-// its split width and the full width of the content area. Like ViewPanelToggle it is an
-// action on per-selection GUI state, not a page; expanding a hidden panel shows it.
-const ViewPanelExpand = "panel.expand"
-
-// ViewPanelNewTab is the ShowView name that shows the selection's side panel with its
-// surface list ("Open a surface") so another tab can be opened next to the ones it has.
-// Like ViewPanelToggle it is an action on per-selection GUI state, not a page: it shows a
-// hidden panel, and no tab is added until a surface is picked.
-const ViewPanelNewTab = "panel.new-tab"
-
-// ViewPanelSplit is the ShowView name that splits the selection's side panel into two tab
-// groups, or joins a split one back into one. Like ViewPanelToggle it is an action on
-// per-selection GUI state, not a page: splitting shows a hidden panel, and a panel
-// without tabs has nothing to split.
-const ViewPanelSplit = "panel.split"
-
-// ViewBack is the ShowView name that selects the thread or page selected before the
-// current one, in the window's selection history (docs/notes/selection-history.md). Like
-// ViewPanelToggle it is an action on per-window GUI state, not a page: a window at the
-// start of its history ignores it.
+// ViewBack is the ShowView name that goes back to what had the focus before (a tab, a pane,
+// a space) in the window's focus history. It is an action on per-window GUI state, not a
+// page: a window at the start of its history ignores it.
 const ViewBack = "back"
 
 // ViewForward is the ShowView name that selects the thread or page after the current one
@@ -71,7 +35,7 @@ const ViewThreadPrevious = "thread.previous"
 // window's sidebar order, wrapping at the bottom; from a page it selects the first row.
 const ViewThreadNext = "thread.next"
 
-// hasWorktreeThreadContext is view.panel.diff's availability: a thread is active and
+// hasWorktreeThreadContext is view.open.diff's availability: a thread is active and
 // it sits in a registered worktree (the GUI passes the placement as ActiveProjectID and
 // ActiveWorktreePath; the CLI with --context-thread plus --context-project and
 // --context-worktree). A terminal alone does not count: the GUI never selects one (a
@@ -90,16 +54,16 @@ type ViewDeps struct {
 	// verb from the CLI in a thread no window shows refuses without --focus. Nil: page
 	// verbs never refuse.
 	Viewed func(threadID string) bool
-	// Files backs view.panel.file's check (FilesystemService.ReadFile).
+	// Files backs view.open.file's check (FilesystemService.ReadFile).
 	Files FileReader
-	// FileEdits backs view.panel.file --edit's check (Filesystem.CheckEdit).
+	// FileEdits backs view.open.file --edit's check (Filesystem.CheckEdit).
 	FileEdits FileEditChecker
-	// Diffs backs view.panel.diff's check (ProjectService.CompareWorktree).
+	// Diffs backs view.open.diff's check (ProjectService.CompareWorktree).
 	Diffs WorktreeComparer
-	// Projects finds a thread's project's GitHub repository for view.panel.pr
+	// Projects finds a thread's project's GitHub repository for view.open.pr
 	// (ProjectService.List).
 	Projects ProjectLister
-	// PullRequests backs view.panel.pr's check (GhService.GetPullRequest).
+	// PullRequests backs view.open.pr's check (GhService.GetPullRequest).
 	PullRequests PullRequestChecksBackend
 	// Inline backs view.inline (ThreadService.ShowHtml; commands_view_inline.go).
 	Inline HTMLShower
@@ -109,6 +73,10 @@ type ViewDeps struct {
 	// Workspaces resolves view.projects --workspace (an id or a name) to its id. Nil: the
 	// value goes to the GUI as given.
 	Workspaces WorkspaceLister
+	// Layout is the shell window's layout: the item verbs, view.pullrequests and
+	// view.projects open their tabs in it, and view.thread-diff moves between a thread and
+	// its diff (commands_view_open.go). Nil: those verbs refuse (there is nowhere to open a tab).
+	Layout layoutstore.Store
 }
 
 // noFileEdits is FileEdits when nothing backs it.
@@ -122,40 +90,43 @@ func (noFileEdits) CheckEdit(context.Context, string, string) (string, error) {
 var pageFocusArg = ArgSpec{Name: "focus", Type: Bool,
 	Description: "Show it even when no window shows the thread this runs in: every window moves there; only when the user asked to be taken there"}
 
-// showPage runs a page verb: ShowView name in every window. Every window moves to the
-// page, so a call from a thread's CLI (CallerThreadID set) is refused while no window
-// shows that thread, unless --focus says the user asked: a model must not take the
-// user's windows from what they are doing. The app's own palette and keys, and the CLI
-// outside a thread, are unchanged. With no window open there is nothing to take over:
-// it says so.
+// showPage runs a page verb whose page is a sheet over every window (usage, settings, help):
+// ShowView name in every window. Every window moves to the page, so a call from a thread's
+// CLI (CallerThreadID set) is refused while no window shows that thread, unless --focus says
+// the user asked: a model must not take the user's windows from what they are doing. The
+// app's own palette and keys, and the CLI outside a thread, are unchanged. With no window
+// open there is nothing to take over: it says so.
 func (d ViewDeps) showPage(uctx Context, a Args, name string) (Result, error) {
-	return d.showPageWith(uctx, a, name, nil)
+	if err := d.refusePage(uctx, a); err != nil {
+		return Result{}, err
+	}
+	return EmitTo(d.Emitter, showViewIntent(name, nil)).CLIResult(uctx), nil
 }
 
-// showPageWith is showPage with ShowView params (view.projects --project: which page).
-func (d ViewDeps) showPageWith(uctx Context, a Args, name string, params map[string]string) (Result, error) {
+// refusePage is a page verb's refusal from a thread's CLI while no window shows that thread.
+func (d ViewDeps) refusePage(uctx Context, a Args) error {
 	fromThread := uctx.ActiveView == "" && uctx.CallerThreadID != ""
 	if fromThread && !a.Bool("focus") && d.Viewed != nil && d.Emitter.Windows() > 0 && !d.Viewed(uctx.CallerThreadID) {
-		return Result{}, connect.NewError(connect.CodeFailedPrecondition, errNotViewed)
+		return connect.NewError(connect.CodeFailedPrecondition, errNotViewed)
 	}
-	return EmitTo(d.Emitter, showViewIntent(name, "", params)).CLIResult(uctx), nil
+	return nil
 }
 
-// RegisterView registers the View category's verbs, all emitted as UiIntent.ShowView:
+// RegisterView registers the View category's verbs:
 //
-//   - the pages, which move every window: view.usage, view.pullrequests,
-//     view.projects, view.settings and view.help (showPage);
-//   - actions on each window's state: view.bottom.toggle, view.back, view.forward,
-//     thread.previous and thread.next;
-//   - the side panel verbs (commands_view_thread.go), which act on a thread's panel:
-//     view.panel.toggle, expand, new-tab and split (view.panel.mcp lives with its
-//     domain);
-//   - the item verbs (commands_view_items.go): view.panel.file, view.panel.diff and
-//     view.panel.pr;
+//   - the pages: view.usage, view.settings and view.help, which move every window
+//     (UiIntent.ShowView, showPage), and view.pullrequests and view.projects, a tab of the
+//     layout (showPageTab);
+//   - actions on each window's state (ShowView): view.back, view.forward, thread.previous
+//     and thread.next;
+//   - the item verbs (commands_view_items.go): view.open.file, view.open.diff and
+//     view.open.pr, each a tab of the layout (commands_view_open.go), with its old
+//     view.panel.<item> name as an unlisted alias (view.open.mcp lives with its domain);
 //   - view.inline (commands_view_inline.go), which shows an HTML page in a thread's
-//     conversation (category Thread), and view.panel.page (commands_view_panel_page.go),
-//     which shows one in its side panel only, and view.panel.gallery
+//     conversation (category Thread), and view.open.page (commands_view_panel_page.go),
+//     which shows one in a tab only, and view.open.gallery
 //     (commands_view_panel_gallery.go), which shows a set of images there;
+//   - view.thread-diff (commands_view_open.go), the key between a thread and its diff;
 //   - composer.history (commands_view_composer.go), the Previous prompts picker, and
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
@@ -187,15 +158,15 @@ func RegisterView(r *Registry, d ViewDeps) error {
 	}
 	show := func(name string) func(context.Context, Context, Args) (Result, error) {
 		return func(_ context.Context, uctx Context, _ Args) (Result, error) {
-			return EmitTo(d.Emitter, showViewIntent(name, "", nil)).CLIResult(uctx), nil
-		}
-	}
-	panel := func(name string, check panelCheck) func(context.Context, Context, Args) (Result, error) {
-		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
-			return showPanel(ctx, d.Thread, d.Emitter, uctx, a, name, check)
+			return EmitTo(d.Emitter, showViewIntent(name, nil)).CLIResult(uctx), nil
 		}
 	}
 	pageArgs := []ArgSpec{pageFocusArg}
+	pageTab := func(kind string) func(context.Context, Context, Args) (Result, error) {
+		return func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			return d.showPageTab(ctx, uctx, a, kind, nil)
+		}
+	}
 	cmds := []Command{
 		{
 			Name:        "view.usage",
@@ -211,11 +182,12 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:        "view.pullrequests",
 			Page:        PageState,
 			Title:       "Show Pull Requests",
-			Description: "Show the Pull Requests page in every app window: pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
+			Description: "Show the Pull Requests page, its tab in the current space: pull requests that need your review, your open ones with what each needs, and recent merges, in every repository.",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+d"},
-			Args:        pageArgs,
-			Run:         page(ViewPullRequests),
+			// No default chord since the shell (docs/notes/shell-model.md, "Keys": the palette and a
+			// pane's "+" open it); bindable in settings.
+			Args: []ArgSpec{pageFocusArg, openPaneArg},
+			Run:  pageTab(tabPRs),
 		},
 		d.projectsCommand(),
 		d.settingsCommand(),
@@ -230,60 +202,10 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Run:         page(ViewHelp),
 		},
 		{
-			Name:        "view.panel.toggle",
-			Page:        PageState,
-			Title:       "Toggle Side Panel",
-			Description: "Show or hide a side panel (from a thread: its own; in the app: the selected thread's or page's).",
-			Category:    "View",
-			Keybindings: []string{"cmd+shift+e"},
-			Args:        panelThreadArgs(),
-			Run:         panel(ViewPanelToggle, nil),
-		},
-		{
-			Name:        "view.bottom.toggle",
-			Page:        PageState,
-			Title:       "Toggle Bottom Panel",
-			Description: "Show or hide the terminals under the selected thread or page. In the app, opening it with no terminal starts a shell.",
-			Category:    "View",
-			Keybindings: []string{"cmd+j"},
-			Run:         show(ViewBottomToggle),
-		},
-		{
-			Name:        "view.panel.expand",
-			Page:        PageState,
-			Title:       "Expand Side Panel",
-			Description: "Toggle a side panel between its split width and the full width of the content area (from a thread: its own; in the app: the selected thread's or page's).",
-			Category:    "View",
-			// No default chord (the user's choice); bindable in settings.
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelExpand, nil),
-		},
-		{
-			Name:        "view.panel.new-tab",
-			Page:        PageState,
-			Title:       "New Side Panel Tab",
-			Description: "Show the surface list in a side panel, to open another tab there (from a thread: its own; in the app: the selected thread's or page's).",
-			Category:    "View",
-			// No default chord, like view.panel.expand: the + after the panel's tabs runs
-			// it, and while the panel has focus each surface's letter opens that surface.
-			Args: panelThreadArgs(),
-			Run:  panel(ViewPanelNewTab, nil),
-		},
-		{
-			Name:        "view.panel.split",
-			Page:        PageState,
-			Title:       "Split Side Panel",
-			Description: "Split or unsplit a side panel into two tab groups (from a thread: its own; in the app: the selected thread's or page's).",
-			Category:    "View",
-			Keybindings: []string{`cmd+\`},
-			Args:        panelThreadArgs(),
-			Run:         panel(ViewPanelSplit, nil),
-		},
-		{
 			Name:        "view.back",
 			Page:        PageState,
 			Title:       "Back",
-			Description: "Return to the previously selected thread or page.",
+			Description: "Go back to what was focused before: a tab, a pane, a space.",
 			Category:    "View",
 			Keybindings: []string{"cmd+["},
 			Run:         show(ViewBack),
@@ -292,7 +214,7 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Name:        "view.forward",
 			Page:        PageState,
 			Title:       "Forward",
-			Description: "Go to the thread or page selected before going back.",
+			Description: "Go forward again to what was focused before going back.",
 			Category:    "View",
 			Keybindings: []string{"cmd+]"},
 			Run:         show(ViewForward),
@@ -303,8 +225,8 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Previous Thread",
 			Description: "Select the thread above the current one in the sidebar.",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+["},
-			Run:         show(ViewThreadPrevious),
+			// cmd+shift+[ is tab.previous since the shell (docs/notes/shell-model.md, "Keys").
+			Run: show(ViewThreadPrevious),
 		},
 		{
 			Name:        "thread.next",
@@ -312,10 +234,11 @@ func RegisterView(r *Registry, d ViewDeps) error {
 			Title:       "Next Thread",
 			Description: "Select the thread below the current one in the sidebar.",
 			Category:    "View",
-			Keybindings: []string{"cmd+shift+]"},
-			Run:         show(ViewThreadNext),
+			// cmd+shift+] is tab.next since the shell.
+			Run: show(ViewThreadNext),
 		},
 	}
-	cmds = append(append(cmds, d.itemCommands()...), d.inlineCommand(), d.panelPageCommand(), d.panelGalleryCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
+	cmds = append(append(cmds, d.itemCommands()...), withAliases(d.panelPageCommand(), d.panelGalleryCommand())...)
+	cmds = append(cmds, d.threadDiffCommand(), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.paneFullscreenCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
 	return r.RegisterAll(append(append(append(cmds, d.threadFindCommands()...), d.terminalFindCommands()...), d.fileSearchCommands()...)...)
 }

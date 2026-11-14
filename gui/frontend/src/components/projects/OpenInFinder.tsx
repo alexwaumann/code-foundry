@@ -78,7 +78,7 @@ const MORE =
  * A Details row's Open in Finder control: "Open in Finder" (the Finder icon and the label;
  * `compact` shows the icon alone, named by its tooltip) reveals the target, and its ⋯ opens
  * the thread info card's Open in list for it: Finder, the installed editors (their real
- * icons), then Terminal (a new terminal there, in the page's bottom panel). A picked item runs
+ * icons), then Terminal (a new terminal there, as a tab). A picked item runs
  * once the menu has closed and the keyboard is back on the page's list (OverflowMenu has
  * why). Test ids `<testId>-open-in`, `-reveal`, `-open-in-more`, `-open-in-menu`, the list's `-open-*`.
  */

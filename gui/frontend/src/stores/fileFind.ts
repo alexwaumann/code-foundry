@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { FileMatchKey } from "@/lib/fileFind";
-import { allTabs, usePanelStore } from "./panel";
+import { subscribeTabs } from "@/shell/host";
 import { useUiStore } from "./ui";
 
 /**
@@ -195,11 +195,10 @@ function afterPalette(run: () => void): void {
 }
 
 // A tab that closes takes its session with it (the key is fileEditKey's: panel key, NUL, tab id).
-usePanelStore.subscribe((st) => {
+subscribeTabs((places) => {
   for (const key of Object.keys(useFileFindStore.getState().byTab)) {
     const [panelKey = "", tabId = ""] = key.split("\u0000");
-    const entry = st.byKey[panelKey];
-    if (!entry || !allTabs(entry).some((t) => t.id === tabId)) closeFileFind(key);
+    if (!places[panelKey]?.tabs.some((t) => t.id === tabId)) closeFileFind(key);
   }
 });
 

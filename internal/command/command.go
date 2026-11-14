@@ -155,6 +155,12 @@ func (c Context) FromUser() bool {
 	return (c.Origin == originApp || c.Origin == OriginCLI) && (c.ActiveView != "" || c.CallerThreadID == "")
 }
 
+// FromWindow reports whether a window's own controls asked (its keys, palette or buttons): the
+// app's origin with a view. A page, a plugin and any CLI (a thread's too) are not a window.
+func (c Context) FromWindow() bool {
+	return c.Origin == originApp && c.ActiveView != ""
+}
+
 // ContextField names a Context field an argument can default from.
 type ContextField int
 

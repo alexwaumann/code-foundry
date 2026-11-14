@@ -1,0 +1,141 @@
+{
+  "doc": "Closing a thread closes its linked tabs in its space and remembers each one's pane, index, active state, adjacency and, for a pane it emptied, where that pane sat.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/t-g"}}
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-b",
+                  "tabs": [
+                    {
+                      "id": "t-d",
+                      "kind": "diff",
+                      "thread": "th-a",
+                      "params": {"project":"pj","worktree":"w"}
+                    },
+                    {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+                    {
+                      "id": "t-h",
+                      "kind": "diff",
+                      "thread": "th-b",
+                      "params": {"project":"pj","worktree":"w"}
+                    }
+                  ],
+                  "active": "t-f"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-c",
+                  "tabs": [
+                    {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}}
+                  ],
+                  "active": "t-x"
+                }
+              ],
+              "sizes": [0.6,0.4]
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-f","t-x"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_thread","thread":"th-a"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-g","kind":"file","thread":"th-b","params":{"path":"/r/t-g"}}],
+              "active": "t-g"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-h","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-h"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-b",
+              "index": 0,
+              "adjacent": true
+            },
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+              "pane": "p-b",
+              "index": 0,
+              "active": true,
+              "adjacent": true
+            },
+            {
+              "tab": {"id":"t-x","kind":"terminal","thread":"th-a","params":{"terminal":"term-x"}},
+              "pane": "p-c",
+              "index": 0,
+              "active": true,
+              "adjacent": true,
+              "beside": {"neighbours":["p-b"],"edge":"bottom","frac":0.4}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-a","closed":["t-a"],"kept":["t-d","t-f","t-x"]}
+}

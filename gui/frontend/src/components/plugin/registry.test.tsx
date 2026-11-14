@@ -96,7 +96,7 @@ describe("node renderer registry", () => {
     cleanup();
     useThreadsStore.setState({ byId: { [threadId]: { id: threadId, owner: "plugin:hello", worktreePath: "/h", state: "disconnected", status: "idle" } as ThreadView }, order: [], owned: [threadId] });
     useTerminalsStore.setState({
-      byId: { [terminalId]: { id: terminalId, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels: { kind: "plugin", plugin: "hello", title: "Clock" } } },
+      byId: { [terminalId]: { id: terminalId, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, liveCwd: "", foreground: "", lastCommand: "", labels: { kind: "plugin", plugin: "hello", title: "Clock" } } },
       order: [terminalId],
     });
     inView(<NodeList nodes={[...assistant, ...shell]} />, { viewTab: "assistant" });
@@ -104,9 +104,9 @@ describe("node renderer registry", () => {
     const term = screen.getByTestId("plugin-terminal");
     expect(term.getAttribute("data-terminal-id")).toBe(terminalId);
     expect(term.textContent).toContain("Clock");
-    // The plugin's Restart and the host's Open in bottom panel.
+    // The plugin's Restart and the host's Open in a tab.
     expect(screen.getAllByTestId("plugin-button").map((b) => b.getAttribute("data-key"))).toContain("restart-shell");
-    expect(screen.getByTestId("plugin-terminal-open-bottom")).toBeTruthy();
+    expect(screen.getByTestId("plugin-terminal-open-tab")).toBeTruthy();
   });
 
   it("renders the layout tab: two columns of a pane (log and list) beside markdown and pairs, stacked before a width; collapse first", () => {

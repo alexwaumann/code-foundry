@@ -1,31 +1,37 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, openApp, openThreadChanges, resetMock, row } from "./fixtures";
+import { CF, openApp, openThreadChanges, resetMock } from "./fixtures";
+import { openThread } from "./shell";
+import { activeOfKind, paneWith, stripTabs } from "./shell-surfaces";
 
 /**
- * The File and Diff panel tabs (docs/notes/file-viewer-3-tabs.md) against the mock
+ * The File and Diff tabs (docs/notes/file-viewer-3-tabs.md) against the mock
  * daemon's files (mock/files.ts), for what only a browser shows: @pierre/diffs drawing a
  * diff and marking a line (scrolled into view), the HTML sandbox's interactive page,
  * images decoding, pdf.js drawing a PDF's pages. Their headers, states and choices are
  * src/components/files/*.test.tsx's. SHOTS=<dir> saves screenshots.
  */
 
-const panel = (page: Page) => page.getByTestId("side-panel");
-const tabs = (page: Page) => page.getByTestId("panel-tabs").getByRole("tab");
-const activeTab = (page: Page) => page.getByTestId("panel-tabs").locator('[role="tab"][aria-selected="true"]');
+/** The pane of the thread's linked tabs, beside its own. */
+const panel = (page: Page) => paneWith(page, "diff");
+const tabs = (page: Page) => stripTabs(panel(page));
+const activeTab = (page: Page) => panel(page).getByTestId("shell-tab-strip").locator('[role="tab"][aria-selected="true"]');
 const diff = (page: Page) => page.getByTestId("diff-file");
 const file = (page: Page) => page.getByTestId("file-tab");
 
-/** Selects a thread and opens its own Diff tab in its panel (the card's Changes row). */
+/** Opens a thread's tab and its own Diff tab, linked to it (the card's Changes row). */
 async function worktreeTab(page: Page, threadId: string): Promise<void> {
-  await row(page, `s:${threadId}`).click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
+  await openThread(page, threadId);
   await openThreadChanges(page);
-  await expect(panel(page)).toHaveAttribute("data-panel-key", `thread:${threadId}`);
+  await expect(panel(page).locator(`[data-testid="shell-tab"][data-kind="diff"]`)).toHaveCount(1);
   await expect(page.getByTestId("diff-file-list")).toBeVisible();
 }
 
-/** Opens a File tab in the current panel the way path chips will (stores/filePanel.ts). */
+/**
+ * Opens a File tab linked to the current thread the way path chips do (stores/filePanel.ts):
+ * beside its diff, shown. A chip is in the conversation, so the thread's pane has the focus.
+ */
 async function openFile(page: Page, path: string, line?: number): Promise<void> {
+  await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').click();
   const target = JSON.stringify({ project: "repo-cf", base: CF, path, ...(line ? { line } : {}) });
   await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${target}))`);
 }
@@ -43,21 +49,20 @@ test("a row shows its file in the tab, and @pierre/diffs draws its lines", async
   await worktreeTab(page, "s-1");
   await changeRow(page, "README.md").click();
   await expect(tabs(page)).toHaveCount(1);
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "diff");
+  await expect(activeOfKind(page, "diff")).toHaveCount(1);
   await expect(diff(page)).toHaveAttribute("data-path", "README.md");
   // The library renders into its shadow root; CSS locators pierce it.
   await expect(diff(page).locator('[data-line-type="change-addition"]').first()).toBeVisible();
 });
 
 // Open file to the File tab: DiffView.test.tsx; Rendered ↔ Source, the meta, the wrap toggle and the remembered mode:
-// src/components/files/FileTab.test.tsx; the File and Diff entries and their letters: src/surfaces/files.test.ts and
-// src/components/panel/SidePanel.test.tsx. Left here: a local image decoding, and the library marking the line.
+// src/components/files/FileTab.test.tsx; the File and Diff entries: src/surfaces/files.test.ts. Left here: a local image decoding, and the library marking the line.
 test("Open file goes to the File tab: a markdown image decodes; Source marks the first change in the code view", async ({ page }) => {
   await openApp(page);
   await worktreeTab(page, "s-1");
   await changeRow(page, "README.md").click();
   await diff(page).getByTestId("diff-open-file").click();
-  await expect(page.getByTestId("panel-body")).toHaveAttribute("data-surface", "files");
+  await expect(activeOfKind(page, "file")).toHaveCount(1);
   await expect(file(page).getByTestId("file-markdown").getByTestId("md-local-image")).toHaveJSProperty("naturalWidth", 2);
   await file(page).getByTestId("file-mode-source").click();
   await expect(file(page).getByTestId("file-code").locator('[data-line="3"][data-selected-line]').first()).toBeVisible();

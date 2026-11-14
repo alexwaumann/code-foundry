@@ -3,7 +3,8 @@
  * permission suggestions ("Allow for session adds Bash(git push:*)") and an
  * AskUserQuestion's questions. Pure.
  */
-import { objects, parseObject, str } from "./toolSummary";
+import type { ThreadRequestView } from "@/api/thread";
+import { objects, parseObject, relPath, str, type Json } from "./toolSummary";
 
 /** "Bash(git push:*)" for each rule Claude suggests keeping for the session. */
 export function suggestedRules(json: string): string[] {
@@ -190,3 +191,23 @@ export function askingAgentLabel(agentInputJson: string): string {
 }
 
 const AGENT_LABEL_MAX = 100;
+
+/** The question a permission prompt asks (today's card, and the Needs-you hover card). */
+export function permissionTitle(r: Pick<ThreadRequestView, "title" | "toolName" | "displayName">, input: Json, cwd: string): string {
+  if (r.title) return r.title;
+  const path = str(input, "file_path") || str(input, "notebook_path");
+  switch (r.toolName) {
+    case "Bash":
+      return "Allow Claude to run this command?";
+    case "Edit":
+    case "MultiEdit":
+    case "NotebookEdit":
+      return path ? `Allow Claude to edit ${relPath(path, cwd)}?` : "Allow Claude to edit this file?";
+    case "Write":
+      return path ? `Allow Claude to write ${relPath(path, cwd)}?` : "Allow Claude to write this file?";
+    case "WebFetch":
+      return "Allow Claude to fetch this page?";
+    default:
+      return `Allow Claude to use ${r.displayName || r.toolName}?`;
+  }
+}

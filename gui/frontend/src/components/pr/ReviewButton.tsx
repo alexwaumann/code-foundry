@@ -84,7 +84,6 @@ export function ReviewButton({ prRef, detail, onChoose, primary = false }: { prR
         collisionPadding={POPUP_COLLISION_PADDING}
         className={cn("w-80", POPUP_FIT)}
         data-testid="pr-review-menu"
-        data-region="panel"
         onKeyDown={stopPlainKeys}
         onCloseAutoFocus={(e) => {
           if (!keepFocus.current) return;

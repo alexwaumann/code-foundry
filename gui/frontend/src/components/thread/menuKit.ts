@@ -30,9 +30,9 @@ type Tagged = Children & { "data-testid"?: string };
  * dropdown's (the thread header's title). Their props differ; the items need only these.
  */
 export interface MenuKit {
-  Item: ComponentType<Tagged & { onSelect: () => void; disabled?: boolean; "data-member"?: string; "data-preset"?: string }>;
+  Item: ComponentType<Tagged & { onSelect: () => void; disabled?: boolean; [data: `data-${string}`]: string | undefined }>;
   Separator: ComponentType;
-  Label: ComponentType<Children>;
+  Label: ComponentType<Children & { className?: string }>;
   Sub: ComponentType<Children>;
   SubTrigger: ComponentType<Tagged>;
   SubContent: ComponentType<Tagged>;

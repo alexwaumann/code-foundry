@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openHelloDemo, resetMock } from "./fixtures";
+import { fullScreenSurface, setSurfaceWidth } from "./shell-surfaces";
 
 /**
  * Plugin stats and bars in a real browser (docs/notes/plugin-stats-bars.md): what the unit
- * tests cannot see. The figures fit their cards in the side panel and expanded (real text
- * widths), a pointer over the chart shows the one tooltip inside the panel, and the
+ * tests cannot see. The figures fit their cards in a narrow pane and full screen (real text
+ * widths), a pointer over the chart shows the one tooltip inside the surface, and the
  * Failing toggle narrows the chart through the mock's hello demo. Set SHOTS=<dir> to save
  * the PR's screenshots.
  */
@@ -33,12 +34,13 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
-test("stats wrap to two by two in the side panel and one row expanded, figures on one line", async ({ page }) => {
+test("stats wrap to two by two in a narrow pane and one row full screen, figures on one line", async ({ page }) => {
   await openDemo(page);
+  await setSurfaceWidth(page, "plugin-surface", 420);
   await expect(stats(page)).toHaveAttribute("data-columns", "2");
   await expect(stats(page)).toHaveAttribute("data-role", "text-title");
   await figuresFit(page);
-  await page.getByRole("button", { name: "Expand Side Panel" }).click();
+  await fullScreenSurface(page, "plugin-surface");
   await expect(stats(page)).toHaveAttribute("data-columns", "4");
   await expect(stats(page)).toHaveAttribute("data-role", "text-display-sm");
   await figuresFit(page);
@@ -73,7 +75,7 @@ test("a pointer over a bar shows its tooltip inside the panel and dims the other
   await expect(surface(page).getByTestId("plugin-bars-axis")).toHaveText("#1264#1285");
 });
 
-/** SHOTS=<dir>: the PR's screenshots, WebKit, 1280x800 at 2x, dark and light: the side panel and the expanded panel, a bar hovered. */
+/** SHOTS=<dir>: the PR's screenshots, WebKit, 1280x800 at 2x, dark and light: a narrow pane and full screen, a bar hovered. */
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
     test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
@@ -84,6 +86,7 @@ for (const scheme of ["dark", "light"] as const) {
       const dir = String(shots);
       const settle = () => page.waitForTimeout(350);
       await openDemo(page);
+      await setSurfaceWidth(page, "plugin-surface", 420);
       const hover = async (f: number) => {
         const box = await plot(page).boundingBox();
         if (!box) throw new Error("no plot");
@@ -93,7 +96,7 @@ for (const scheme of ["dark", "light"] as const) {
       await hover(0.55);
       await settle();
       await page.screenshot({ path: `${dir}/stats-bars-panel-${scheme}.png` });
-      await page.getByRole("button", { name: "Expand Side Panel" }).click();
+      await fullScreenSurface(page, "plugin-surface");
       await expect(stats(page)).toHaveAttribute("data-columns", "4");
       await hover(0.72);
       await settle();

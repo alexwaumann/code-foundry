@@ -38,6 +38,17 @@ const (
 	// inside it (resolveProjectRef), never by a suffix. It resolves through the
 	// registry's RefResolver (RegisterProject sets it).
 	ProjectID
+	// TabID: a layout tab, "t-" + 8 base32 characters (RegisterLayout lists them).
+	TabID
+	// PaneID: a layout pane, "p-" + 8 base32 characters.
+	PaneID
+	// SplitID: a layout split, "s-" + 8 base32 characters.
+	SplitID
+	// SpaceID: a layout space, given by its id, a unique suffix of it, or its name
+	// (RegisterLayout's RefResolver).
+	SpaceID
+	// DraftID: a composer draft, "d-" + 8 base32 characters (or an id the window chose).
+	DraftID
 )
 
 // MinIDSuffix is the shortest suffix an id arg resolves.
@@ -51,6 +62,11 @@ var idKinds = map[IDKind]struct{ prefix, noun string }{
 	TerminalID:     {"t-", "terminal"},
 	EmberTaskID:    {"t-", "task"},
 	ProjectID:      {"", "project"},
+	TabID:          {"t-", "tab"},
+	PaneID:         {"p-", "pane"},
+	SplitID:        {"s-", "split"},
+	SpaceID:        {"", "space"},
+	DraftID:        {"d-", "draft"},
 }
 
 // IDLister returns every id of a kind the daemon knows now.

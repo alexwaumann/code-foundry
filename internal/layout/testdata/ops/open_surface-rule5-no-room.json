@@ -1,0 +1,51 @@
+{
+  "doc": "Rule 5 is skipped when a new pane beside the thread's would not fit (480 + 12 + 480 = 972px of 900): the diff opens in the thread's own pane (rule 6).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"id":"","kind":"diff","thread":"th-a","params":{"project":"pj-1","worktree":"w-1"}},
+    "w": 900,
+    "h": 900
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-a","kind":"thread","thread":"th-a"},
+            {"id":"t-n1","kind":"diff","thread":"th-a","params":{"project":"pj-1","worktree":"w-1"}}
+          ],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"6"}
+}

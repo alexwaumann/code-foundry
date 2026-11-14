@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useServesFocusRequests } from "@/shell/paneContext";
 import { ArrowUp, Gauge, Loader2, Paperclip, ShieldCheck } from "lucide-react";
 import type { ThreadPendingView } from "@/api/thread";
 import { AttachmentPreview } from "@/components/compose/AttachmentPreview";
@@ -34,7 +35,6 @@ const SETUP_PLACEHOLDER = "Add to your message. It goes in once Claude starts.";
 const BLOCKING_PLACEHOLDER = "You can reply once Claude has started.";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
-import { getPanel } from "@/stores/panel";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -49,6 +49,7 @@ import { FailedPromptNote } from "./FailedPromptNote";
 import { RetryNote } from "./RetryNote";
 import { SetupNote } from "./SetupNote";
 import { TranscriptDeletedNote } from "./TranscriptDeleted";
+import { AskStrip } from "@/components/needs/AskStrip";
 import { PendingPrompts, type PromptKeys } from "./PendingPrompt";
 
 const TRIGGERS: readonly TriggerChar[] = ["/", "@", "#"];
@@ -132,6 +133,7 @@ export function ThreadComposer({
   placeholder,
   busyPlaceholder,
   focusRequests = true,
+  askStrip = null,
 }: {
   threadId: string;
   pending: readonly ThreadPendingView[];
@@ -142,6 +144,8 @@ export function ThreadComposer({
   busyPlaceholder?: string | undefined;
   /** Whether focus requests for the content pane land here: the content pane's composer only, not a plugin's thread node's. */
   focusRequests?: boolean;
+  /** A shell pane too short for the full ask (shell/askStrip.ts): that pane's id, and the ask docks as one line (AskStrip). */
+  askStrip?: string | null;
 }) {
   const draftKey = threadDraftKey(threadId);
   const text = useDraft(draftKey, "text");
@@ -210,10 +214,9 @@ export function ThreadComposer({
   );
 
   // Focus requests land in the prompt: a thread selected to be typed in (ui
-  // promptFocusSeq), the content pane asked for (the side panel hid, ui contentFocusSeq).
+  // promptFocusSeq), the content asked for (a sheet closed, ui contentFocusSeq).
   // A composer that mounts with no request (Show worktree, a revealed shell) leaves the
-  // keyboard where that put it. Under an expanded side panel the panel takes the
-  // requested focus.
+  // keyboard where that put it.
   const focusSeq = useUiStore((s) => s.promptFocusSeq);
   const contentFocusSeq = useUiStore((s) => s.contentFocusSeq);
   const seenContent = useRef(contentFocusSeq);
@@ -232,8 +235,10 @@ export function ThreadComposer({
     };
   }, []);
   const inRoot = (el: Element | null): boolean => el !== null && rootRef.current?.contains(el) === true;
+  // In the window shell only the focused pane's thread takes a request (shell/paneContext.ts).
+  const serves = useServesFocusRequests();
   useEffect(() => {
-    if (!focusRequests) return;
+    if (!focusRequests || !serves) return;
     if (handledPromptSeq === focusSeq && seenContent.current === contentFocusSeq) return;
     const key = `${String(focusSeq)}:${String(contentFocusSeq)}`;
     if (request.current?.key !== key) request.current = { key, before: document.activeElement };
@@ -242,12 +247,7 @@ export function ThreadComposer({
     // prompt, not the palette input closing over it), else on the next frame (a composer
     // just mounted: its editor may still be replaced).
     const attempt = (): boolean => {
-      const panel = getPanel();
-      if (panel.open && panel.expanded) {
-        useUiStore.setState((u) => ({ panelFocusSeq: u.panelFocusSeq + 1 }));
-        return true;
-      }
-      // Something took the keyboard meanwhile (the side panel, the inline rename a
+      // Something took the keyboard meanwhile (another pane, the inline rename a
       // double-click on the sidebar row starts): leave it there.
       const now = document.activeElement;
       if (now !== before && now !== null && now !== document.body && !inRoot(now)) return true;
@@ -269,7 +269,7 @@ export function ThreadComposer({
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [focusSeq, contentFocusSeq, threadId, focusRequests]);
+  }, [focusSeq, contentFocusSeq, threadId, focusRequests, serves]);
 
   // The editor turns read-only while a send is in flight. Chromium drops its focus then;
   // WebKit keeps the element focused but no longer edits in it, and the editor's focus()
@@ -356,7 +356,7 @@ export function ThreadComposer({
           attach(files);
         }}
       >
-        {docked && <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />}
+        {docked && (askStrip !== null ? <AskStrip threadId={threadId} pending={pending} paneId={askStrip} /> : <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />)}
         <SnoozeNote threadId={threadId} />
         <SetupNote threadId={threadId} />
         <RetryNote threadId={threadId} />

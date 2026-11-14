@@ -290,7 +290,7 @@ function useFocusedTask(scroller: React.RefObject<HTMLDivElement | null>, tasks:
 }
 
 /**
- * The side panel's Board (docs/notes/ember-3-gui.md): Ember's task board, live from one
+ * The Board surface (docs/notes/ember-3-gui.md): Ember's task board, live from one
  * WatchBoard stream (held while the tab shows). In progress (doing and blocked), Up next
  * (todo), Scheduled (Ember's timers, each with an × that cancels it) and Done today (done or
  * cancelled since midnight, ten until "+N more"); a card per top-level task with its

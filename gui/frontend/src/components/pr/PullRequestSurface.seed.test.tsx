@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDetailView, PullRequestView } from "@/api/gh";
 
@@ -42,19 +42,20 @@ vi.mock("@/api/gh", async (orig) => {
 });
 vi.mock("@/api/prDiff", async (orig) => ({ ...(await orig<typeof import("@/api/prDiff")>()), getPullRequestDiff }));
 vi.mock("@pierre/diffs/react", () => ({ CodeView: () => <div data-testid="code-view-stub" /> }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { resetDaemon } = await import("@/test/daemonFakes");
 const { seedPrWorld, SLUG } = await import("@/test/prWorld");
-const { openPr, renderPrPanel, resetPrStores, settle, texts } = await import("@/test/prPanelHarness");
+const { openPr, renderPrPanel, resetPrStores, selectPrTab, settle, texts } = await import("@/test/prPanelHarness");
 const { applyGhEvent, DASHBOARD_KEY, dashboardResource, branchKey, branchPullRequestsResource, pullRequestDetailResource, pullRequestKey, usePollStore } = await import("@/stores/gh");
 const { DIFF_WARM_AFTER_MS, pullRequestDiffResource } = await import("@/stores/prDiff");
 
 let world: ReturnType<typeof seedPrWorld>;
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDaemon();
   world = seedPrWorld();
-  resetPrStores();
+  await resetPrStores();
   pullRequestDiffResource.store.setState({ entries: {} });
   branchPullRequestsResource.store.setState({ entries: {} });
   usePollStore.setState({ lastError: "" });
@@ -307,7 +308,7 @@ describe("switching between pull requests", () => {
     renderPrPanel();
     await openPr(142);
     await openPr(145);
-    fireEvent.click(within(byTestId("panel-tabs")).getByRole("tab", { name: "#142" }));
+    await selectPrTab("#142");
     await settle();
     expect(byTestId("pr-title").textContent).toBe("feat(gui): virtualized sidebar tree with thread rows");
     expect(byTestId("pr-surface").dataset.seeded).toBe("");
@@ -407,11 +408,11 @@ describe("the Code tab's diff", () => {
     await openPr(146);
     await wait();
     expect(reads()).toBe(2);
-    fireEvent.click(within(byTestId("panel-tabs")).getByRole("tab", { name: "#142" }));
+    await selectPrTab("#142");
     await settle();
     await wait(DIFF_WARM_AFTER_MS * 2);
     expect(reads()).toBe(2);
-    fireEvent.click(within(byTestId("panel-tabs")).getByRole("tab", { name: "#146" }));
+    await selectPrTab("#146");
     await settle();
     await wait(DIFF_WARM_AFTER_MS * 2);
     expect(reads()).toBe(2);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPost, openHelloDemo, openStreams, resetMock } from "./fixtures";
+import { paneShowing } from "./shell";
 
 /**
  * Plugin thread and terminal nodes each hold their own stream, with nothing rationing them
@@ -48,20 +49,51 @@ test("two threads and a terminal in one view: all live at once, past the old lim
   await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe((before["TerminalService/Attach"] ?? 0) - 1);
 });
 
-test("a shell in the bottom panel adds a stream and takes none from a node", async ({ page }) => {
+/** A free shell's tab over the focused surface: the palette's New Terminal in Home Folder (terminal.new-free; it has no key). */
+async function newFreeShell(page: Page): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/commands.ts").then((m) => m.runCommandForResult("terminal.new-free", {}, { quiet: true }))`);
+}
+
+test("a terminal tab beside the nodes adds a stream and takes none from a node", async ({ page }) => {
   await openStress(page);
   const threads = surface(page).getByTestId("plugin-thread");
   const term = surface(page).getByTestId("plugin-terminal");
   await expect(threads.nth(1)).toHaveAttribute("data-live", "true");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(3);
-  await term.getByTestId("plugin-terminal-open-bottom").click();
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-terminal-id", "t-hello-clock");
-  await expect(term.getByTestId("plugin-terminal-in-bottom")).toBeVisible();
+  await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe(1);
+  // A free shell's tab (the palette's New Terminal in Home Folder opens it over the focused surface),
+  // moved into a pane of its own under the thread's: the thread, the nodes and the shell all on screen.
+  const threadPane = (await paneShowing(page, "thread").getAttribute("data-pane-id")) ?? "";
+  await newFreeShell(page);
+  const shell = page.locator('[data-testid="shell-tab"][data-kind="terminal"]');
+  await expect(shell).toHaveCount(1);
+  const tabId = (await shell.getAttribute("data-tab-id")) ?? "";
+  await page.evaluate(`__cfModule("/src/stores/layout.ts").then((m) => m.applyLayout({ op: "move_tab", tab: ${JSON.stringify(tabId)}, pane: ${JSON.stringify(threadPane)}, edge: "bottom" }))`);
+  await expect(page.getByTestId("shell-pane")).toHaveCount(3);
+  // The surface takes the focus back: it draws for the window's selection (its thread's while it is focused).
+  await page.locator('[data-testid="shell-tab"][data-kind^="plugin."] [role="tab"]').click();
+  await expect(page.getByTestId("shell-terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  await expect(term.getByTestId("plugin-terminal-host")).toHaveAttribute("data-terminal-id", "t-hello-clock");
   await expect(threads.nth(0)).toHaveAttribute("data-live", "true");
   await expect(threads.nth(1)).toHaveAttribute("data-live", "true");
+  await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe(2);
   expect((await openStreams())["ThreadService/WatchThread"]).toBe(3);
   await surface(page).locator('[data-testid="plugin-button"][data-key="click"]').click();
   await expect(page.getByTestId("plugin-header")).toContainText("1 click");
+});
+
+test("a plugin surface linked to a thread keeps its view while an unlinked tab has the focus", async ({ page }) => {
+  await openStress(page);
+  const threadPane = (await paneShowing(page, "thread").getAttribute("data-pane-id")) ?? "";
+  await newFreeShell(page);
+  const shell = page.locator('[data-testid="shell-tab"][data-kind="terminal"]');
+  await expect(shell).toHaveCount(1);
+  const tabId = (await shell.getAttribute("data-tab-id")) ?? "";
+  await page.evaluate(`__cfModule("/src/stores/layout.ts").then((m) => m.applyLayout({ op: "move_tab", tab: ${JSON.stringify(tabId)}, pane: ${JSON.stringify(threadPane)}, edge: "bottom" }))`);
+  await expect(page.getByTestId("shell-pane")).toHaveCount(3);
+  await expect(page.locator('[data-testid="shell-pane"][data-focused]').getByTestId("shell-terminal-host")).toBeVisible();
+  await expect(surface(page).getByTestId("plugin-unavailable")).toHaveCount(0);
+  await expect(surface(page).getByTestId("plugin-thread").nth(1)).toHaveAttribute("data-live", "true");
 });
 
 // A wall four columns wide, each a grid of its own: what only a real layout settles. A grid inside
@@ -95,14 +127,18 @@ test("a wall holds a stream for what is on screen: never more at first, and scro
   await page.setViewportSize({ width: 1600, height: 900 });
   await mockPost(`plugin/terminals?count=${String(4 * WALL_ROWS)}`);
   await openHelloDemo(page);
-  await page.getByTestId("panel-expand").click();
+  // The surface's pane full screen: the whole pane area, as the expanded side panel was.
+  const own = page.locator('[data-testid="shell-pane"]').filter({ has: page.locator('[data-testid="shell-tab"][data-kind^="plugin."][data-active]') });
+  await own.getByTestId("shell-fullscreen").click();
+  await expect(own).toHaveAttribute("data-fullscreen", "true");
 
   // The most live nodes at any moment, from before the view lands.
+  // In the surface: full screen floats the thread's composer over the pane, which is live too.
   await page.evaluate(() => {
     const w = window as unknown as { __peakLive: number };
     w.__peakLive = 0;
     new MutationObserver(() => {
-      w.__peakLive = Math.max(w.__peakLive, document.querySelectorAll('[data-live="true"]').length);
+      w.__peakLive = Math.max(w.__peakLive, document.querySelectorAll('[data-testid="plugin-surface"] [data-live="true"]').length);
     }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-live"] });
   });
   await mockPost(`plugin/demotab?tab=${encodeURIComponent(`view:${JSON.stringify(wallView())}`)}`);

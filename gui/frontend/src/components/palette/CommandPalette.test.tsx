@@ -25,9 +25,9 @@ const COMMANDS = [
   cmd("thread.new", "New Thread", "Thread", ["cmd+n"]),
   cmd("view.help", "Keyboard Shortcuts and Help", "View", ["cmd+/"]),
   cmd("view.settings", "Settings", "View", ["cmd+,"]),
-  cmd("view.panel.expand", "Expand Side Panel", "View"),
-  cmd("view.panel.toggle", "Toggle Side Panel", "View", ["cmd+b"]),
-  cmd("view.panel.split", "Split Side Panel", "View", ["cmd+\\"]),
+  cmd("pane.fullscreen", "Full Screen Pane", "View"),
+  cmd("pane.close", "Close Pane", "View"),
+  cmd("pane.split", "Split Pane", "View", ["cmd+\\"]),
 ];
 
 beforeEach(() => {
@@ -66,7 +66,7 @@ const mode = () => screen.getByTestId("palette").getAttribute("data-mode");
 describe("the command palette's ranking (palette-rank.spec.ts)", () => {
   it.each([
     ["help", "view.help"],
-    ["split", "view.panel.split"],
+    ["split", "pane.split"],
     ["settings", "view.settings"],
   ])("%s: %s first and highlighted, in one Results group", async (query, want) => {
     await openPalette();
@@ -76,10 +76,10 @@ describe("the command palette's ranking (palette-rank.spec.ts)", () => {
     expect(headings()).toEqual(["Results"]);
   });
 
-  it("panel: a panel command first, not an early category's loose match", async () => {
+  it("pane: a pane command first, not an early category's loose match", async () => {
     await openPalette();
-    typeQuery("panel");
-    expect(first()?.textContent).toContain("Panel");
+    typeQuery("pane");
+    expect(first()?.textContent).toContain("Pane");
     expect(headings()).toEqual(["Results"]);
   });
 
@@ -132,5 +132,49 @@ describe("New thread on this branch and Run in, only where they apply (composer-
     const listed = Array.from(document.querySelectorAll<HTMLElement>("[cmdk-item]")).map((i) => i.dataset.command);
     expect(listed.includes("thread.new-like")).toBe(newLike);
     expect(listed.includes("thread.run-in")).toBe(runIn);
+  });
+});
+
+describe("where the keyboard goes as the palette closes", () => {
+  let outside: HTMLButtonElement;
+  beforeEach(() => {
+    // What had the keyboard: a diff, a terminal tab, the quick terminal.
+    outside = document.createElement("button");
+    document.body.append(outside);
+    outside.focus();
+  });
+  afterEach(() => {
+    outside.remove();
+  });
+
+  it("Escape hands it back to the element that had it; nothing asks a thread's prompt for it", async () => {
+    const seq = useUiStore.getState().contentFocusSeq;
+    await openPalette();
+    expect(document.activeElement).not.toBe(outside);
+    fireEvent.keyDown(input(), { key: "Escape" });
+    await settle(5);
+    expect(useUiStore.getState().palette.open).toBe(false);
+    expect(document.activeElement).toBe(outside);
+    expect(useUiStore.getState().contentFocusSeq).toBe(seq);
+  });
+
+  it("a command that ran: the content's focus request, as before (the command may have moved its target)", async () => {
+    const seq = useUiStore.getState().contentFocusSeq;
+    await openPalette();
+    act(() => {
+      useUiStore.getState().closePalette();
+    });
+    await settle(5);
+    expect(useUiStore.getState().contentFocusSeq).toBe(seq + 1);
+    expect(document.activeElement).not.toBe(outside);
+  });
+
+  it("Escape with the element gone: the content's focus request", async () => {
+    const seq = useUiStore.getState().contentFocusSeq;
+    await openPalette();
+    outside.remove();
+    fireEvent.keyDown(input(), { key: "Escape" });
+    await settle(5);
+    expect(useUiStore.getState().contentFocusSeq).toBe(seq + 1);
   });
 });

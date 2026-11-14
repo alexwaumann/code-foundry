@@ -22,7 +22,6 @@ const C = "s-l-child";
 /** Every thread P created (s-l-spike archived), and C's own child. */
 const CHILDREN = [C, "s-l-e2e", "s-l-cookie", "s-l-allow", "s-l-spike", "s-l-logs", "s-l-metrics"];
 const ALL = [...CHILDREN, "s-l-grand"];
-const header = (page: Page) => page.getByTestId("thread-header");
 const card = (page: Page) => page.getByTestId("thread-info-card");
 /** A thread's row in the thread info card's lineage group (finished ones under Previous). */
 const lineageRow = (page: Page, id: string) => card(page).locator(`[data-testid="ti-lineage-row"][data-id="${id}"]`);
@@ -45,7 +44,9 @@ async function openCard(page: Page): Promise<void> {
 async function openFromCard(page: Page, id: string, title: string): Promise<void> {
   await openCard(page);
   await lineageRow(page, id).click();
-  await expect(header(page).getByTestId("thread-title")).toHaveText(title);
+  await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", id);
+  // The tab is the title (the shell's header names the thread only while its tab is cut short).
+  await expect(page.locator('[data-testid="shell-tab"][data-kind="thread"][data-active]')).toContainText(title);
 }
 
 test.beforeEach(async () => {
@@ -69,34 +70,49 @@ test.describe("child threads", () => {
   // Not in the attention count while their creator exists, counted once orphaned:
   // src/stores/threads.test.ts ("attentionIds leaves out a child thread").
 
+  // cmd+shift+a opens the Needs-you popup of the next thread waiting on the user (shell-model.md, Keys);
+  // cmd+1..9 still open the list's rows.
   test("cmd+shift+a and cmd+1..9 walk the shown rows only", async ({ page }) => {
     await openApp(page);
     await expect(row(page, `s:${P}`)).toBeVisible();
-    const selectedId = () => page.getByTestId("thread-pane").getAttribute("data-thread-id");
+    const popup = page.getByTestId("needs-popup");
+    // The open popup's thread, or null (read at once: no wait for a popup).
+    const popupId = () => page.evaluate(() => document.querySelector('[data-testid="needs-popup"]')?.getAttribute("data-thread-id") ?? null);
+    const shownId = () => page.getByTestId("thread-pane").getAttribute("data-thread-id");
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press("Meta+Shift+a");
-      await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
+      await expect(popup).toHaveAttribute("data-thread-id", "s-2");
     }
+    await page.keyboard.press("Escape");
+    await expect(popup).toHaveCount(0);
     const keys = await sidebarKeys(page);
-    // Main list, then Working (P among them); Snoozed and Archived collapsed. No child.
+    // Needs you, Active, then Working (P among them); Snoozed and Archived collapsed. No child.
     expect(keys.filter((k) => ALL.includes(String(k).slice(2)))).toEqual([]);
     for (const n of [1, 5, keys.length]) {
       await page.keyboard.press(`Meta+${String(n)}`);
-      await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", String(keys[n - 1]).slice(2));
+      await expect.poll(shownId).toBe(String(keys[n - 1]).slice(2));
     }
-    // Their creator gone, the waiting orphans join the walk.
+    // Their creator gone, the orphans join the list's rows, and cmd+N reaches them.
     await mockPost(`thread/forget?id=${P}`);
-    await expect(row(page, `s:${C}`)).toBeVisible();
+    await expect(row(page, `s:${C}`)).toHaveAttribute("data-section", "done");
+    const n = (await sidebarKeys(page)).indexOf(`s:${C}`) + 1;
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThan(10);
+    await page.keyboard.press(`Meta+${String(n)}`);
+    await expect.poll(shownId).toBe(C);
+    // The orphan asking for a permission joins Needs you and cmd+shift+a's round; s-l-allow's API
+    // error is not an ask (shell-25c-keys-drafts.md: it goes to the top of Active), nor is C's
+    // finished turn. Opening a thread's popup can drop it from the list (and the round), so walk
+    // until both were reached.
     const visited = new Set<string>();
-    // Opening a thread can move it within its band (its sort time changes), so the walk's
-    // order shifts as it goes: walk until all four were reached, at most twice round.
-    for (let i = 0; i < 8 && visited.size < 4; i++) {
-      const prev = await selectedId();
+    for (let i = 0; i < 8 && visited.size < 2; i++) {
+      const prev = await popupId();
       await page.keyboard.press("Meta+Shift+a");
-      await expect.poll(selectedId).not.toBe(prev);
-      visited.add(String(await selectedId()));
+      await expect.poll(popupId).not.toBe(prev);
+      visited.add(String(await popupId()));
     }
-    expect([...visited].sort()).toEqual(["s-2", C, "s-l-allow", "s-l-cookie"].sort());
+    expect([...visited].sort()).toEqual(["s-2", "s-l-cookie"]);
+    await expect(row(page, "s:s-l-allow")).toHaveAttribute("data-section", "attention");
   });
 
   // No Show hidden in the lineage menu (LineageGroup.test.tsx), no sidebar items in the title or row

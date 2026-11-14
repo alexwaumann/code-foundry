@@ -33,7 +33,8 @@ function Overlay({ threadId, runId }: { threadId: string; runId?: string | undef
       if (e.target instanceof Element && e.target.closest(OWNS_ESCAPE)) return;
       e.preventDefault();
       hideThreadInfoOverlay();
-      document.querySelector<HTMLElement>(TOGGLE)?.focus();
+      // This thread's toggle: the window shell may show several threads' headers.
+      (document.querySelector<HTMLElement>(`[data-thread-id="${threadId}"] ${TOGGLE}`) ?? document.querySelector<HTMLElement>(TOGGLE))?.focus();
     };
     const onDown = (e: PointerEvent) => {
       const hit = inside.current;
@@ -54,7 +55,7 @@ function Overlay({ threadId, runId }: { threadId: string; runId?: string | undef
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("pointerdown", onDown);
     };
-  }, []);
+  }, [threadId]);
   return (
     <section
       ref={ref}

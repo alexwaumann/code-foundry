@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openApp, resetMock, row } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
 
 // The window's home is the new-thread composer on No project, its project picker closed
 // (docs/notes/remove-dashboard.md): where the window opens, and where it goes when its
@@ -39,17 +39,10 @@ test("with projects: the window opens on the No project composer, picker closed 
   await expectHome(page);
 });
 
-test("cmd+[ never goes past home: back from a thread lands on the composer, and again stays there", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-2").click();
-  await expect(composer(page)).toHaveCount(0);
-  await page.getByTestId("sidebar-menu").click({ position: { x: 4, y: 4 } });
-  await page.keyboard.press("Meta+BracketLeft");
-  await expectHome(page);
-  // Out of the composer's prompt (a text field keeps cmd+[ to itself).
-  await page.getByTestId("sidebar-menu").click({ position: { x: 4, y: 4 } });
-  await page.keyboard.press("Meta+BracketLeft");
-  await expectHome(page);
-});
+// "cmd+[ never goes past home: back from a thread lands on the composer, and again stays there": the
+// classic selection history is gone. In the window shell cmd+[ and cmd+] step through what was
+// focused, across panes and spaces (e2e/shell-spaces.spec.ts "back and forward go through the focus
+// across panes and spaces"; src/stores/focusHistory.test.ts), and a thread opened on the first
+// load's empty space replaces it, leaving no composer to go back to.
 
 // The backdrop (custom, none, a missing file): unit-tested in src/components/backdrop/Backdrop.test.tsx

@@ -5,7 +5,7 @@
  *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
  * Serves Health, Terminal, Project, Filesystem, Gh, Command, Settings, Ui, Thread, Action, GitOps, Update,
- * Plugin, Skill, Memory, Ember, Dictation, Search and Event over Connect (HTTP/1.1,
+ * Plugin, Skill, Memory, Ember, Dictation, Search, Layout and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
@@ -30,10 +30,24 @@
  *   POST /__mock/lineage                          (thread lineage: a creator, the child s-l-child with
  *        six siblings, one archived, and a child of its own; every child out of the
  *        sidebar while its creator exists; World.addLineage)
+ *   POST /__mock/shell-sidebar                    (the shell sidebar's rows: asks, a long title, threads without a
+ *        project with and without counts: World.addShellSidebar)
+ *   POST /__mock/needs-you                        (three threads waiting on real asks: a long command, a question,
+ *        a short command without a project: World.addNeedsYou)
  *   POST /__mock/live-count                       (the sidebar's live count: a working thread with background
  *        subagents, a lead "waiting on 2 child threads and 1 subagent" with a nested lead,
  *        one waiting on a shell alone; World.addLiveCount)
  *   POST /__mock/thread/focus?id=s-3     (FocusThread intent, explicit as thread.focus)
+ *   GET  /__mock/layout                           ({rev, state, viewport, applied, seeds}: the layout as internal/layout's
+ *        JSON, the last SetViewport, every Apply as an op and client id; mock/layout.ts)
+ *   POST /__mock/layout?seed=empty|one-thread|thread-and-diff|grid|spaces   (that layout as one commit; or
+ *        the body's state, internal/layout's JSON, for any other tree)
+ *   POST /__mock/layout/newer?on=1|0          (a newer build wrote the stored layout, or not: sent as a snapshot,
+ *        as a restarted daemon's; the window's line under the grid says changes are not saved)
+ *   POST /__mock/layout/service?off=1|0       (off: a daemon from before the shell: LayoutService is the mux's 404 and
+ *        the event stream sends no layout, for streams opened after it)
+ *   POST /__mock/layout/import?imported=0|1&fail=N&error=…&delay=ms   (the first-load import's mark; the
+ *        next N ImportLegacy calls fail; each answers after `delay`; GET /__mock/layout lists the calls as `imports`)
  *   POST /__mock/emit   (the body's {"intent": <UiIntent as Connect JSON>} to every window, as a
  *     command emits it; answers {"delivered": <watchers>})
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
@@ -72,6 +86,9 @@
  *                                                 does until the shell reads ^C)
  *   POST /__mock/terminal/new?delay=700&fail=reason   (terminal.new takes that long; its next run
  *                                                 fails with that reason; reset: at once, no failure)
+ *   POST /__mock/terminal/facts?id=t-new-1[&liveCwd=/tmp][&foreground=make dev][&lastCommand=…]
+ *                                                (what the process table says of a terminal: its
+ *                                                 directory, its foreground job, its last command)
  *   POST /__mock/daemon/restart                   (every shell goes without a removed event and the
  *                                                 event streams end: the GUI reconnects and Lists)
  *   POST /__mock/thread/hold?id=s-1&id=s-5   (the clock stops changing them: s-1 stops flipping
@@ -113,6 +130,7 @@
  *   thread.new takes workspace and/or projects (the set; new-worktree makes worktrees on a new
  *   branch), or no-project (a thread in the home directory with no project or workspace).
  *   GET  /__mock/attachments                      (StageAttachment uploads: path, name, type, size, pages)
+ *   POST /__mock/attachments/hold?on=true|false   (StageAttachment waits until on=false: a send mid-upload)
  *   FilesystemService.ListSkills / SearchFiles: mock/filesystem.ts (project skills review and
  *        deploy in every project, user skill commit; DEFAULT_FILES in every project)
  *   POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
@@ -160,6 +178,8 @@
  *   The pull request Code tab's diff and files: mock/prDiff.ts (one
  *        three-file diff for every pull request, #140's refused as too large; counts
  *        "GetPullRequestDiff", "GetPullRequestDiff refresh", "GetPullRequestFile <path>")
+ *   POST /__mock/gh/pr-diff-long?number=145   (that pull request's diff ends with a 1,200-line added
+ *        file, long enough to scroll; reset puts the short diff back)
  *   ActionService, the action event source and action.*: mock/actions.ts (repo-cf's six seeded
  *        actions, a-dev000000000 … a-debug0000000; every other project has none). A terminal run
  *        is a kind=action terminal that plays its script and stays EXITED; reset restores the seeds.
@@ -233,10 +253,12 @@ import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb"
 import { EmberService } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
 import { SearchService } from "../src/gen/codefoundry/v1/search_pb";
+import { LayoutService } from "../src/gen/codefoundry/v1/layout_pb";
 import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
+import { layoutRpcError, opFromProto, SEEDS, tabMsg, type State as LayoutState } from "./layout";
 import { frameTag, navigated } from "./frame";
 import { insertInHead, mockPaintTag, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
 import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
@@ -286,6 +308,15 @@ function rpcError(err: unknown): ConnectError {
     return new ConnectError(err.message, code);
   }
   return ConnectError.from(err);
+}
+
+/** While set, StageAttachment calls wait here (POST /__mock/attachments/hold?on=true); on=false lets them go. */
+let stageHold: (() => void)[] | null = null;
+
+function releaseStageHold(): void {
+  const held = stageHold ?? [];
+  stageHold = null;
+  for (const go of held) go();
 }
 
 function guard<T>(fn: () => T): T {
@@ -540,8 +571,12 @@ function routes(router: ConnectRouter): void {
         throw rpcError(err);
       }
     },
-    stageAttachment: (req) =>
-      guard(() => ({ path: req.path ? world.stageAttachmentPath(req.path, req.pages) : world.stageAttachment(req.name, req.mimeType, req.data, req.pages) })),
+    stageAttachment: async (req) => {
+      // Held (POST /__mock/attachments/hold): the upload waits until it is let go.
+      const held = stageHold;
+      if (held) await new Promise<void>((r) => held.push(r));
+      return guard(() => ({ path: req.path ? world.stageAttachmentPath(req.path, req.pages) : world.stageAttachment(req.name, req.mimeType, req.data, req.pages) }));
+    },
     // The scripted thread's image (mock/thread.ts); a staged PDF reads back as its bytes, a
     // staged image as that same PNG.
     readAttachment: (req) => {
@@ -715,16 +750,45 @@ function routes(router: ConnectRouter): void {
     },
   });
 
+  // The window shell's layout (mock/layout.ts): Go's mechanical ops, simplified thread ops.
+  router.service(LayoutService, {
+    get: () => ({ layout: world.layout.get() }),
+    apply: (req) => {
+      try {
+        const { rev, result } = world.layout.apply(opFromProto(req.op), req.clientId);
+        return { rev: BigInt(rev), spaceId: result.space ?? "", paneId: result.pane ?? "", tabId: result.tab ?? "", existing: result.existing ?? false, closed: (result.closed ?? []).map(tabMsg), rule: result.rule ?? "", draftId: result.draft ?? "" };
+      } catch (err) {
+        throw layoutRpcError(err);
+      }
+    },
+    setViewport: (req) => {
+      try {
+        world.layout.setViewport(req.clientId, req.width, req.height);
+        return {};
+      } catch (err) {
+        throw layoutRpcError(err);
+      }
+    },
+    importLegacy: async (req) => {
+      if (world.layout.importDelayMs > 0) await new Promise((r) => setTimeout(r, world.layout.importDelayMs));
+      try {
+        return world.layout.importLegacy(req.panelJson, req.bottomJson, req.clientId);
+      } catch (err) {
+        throw layoutRpcError(err);
+      }
+    },
+  });
+
   router.service(EventService, {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search), then everything published, filtered by `sources`.
+    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH, EventSource.LAYOUT],
       );
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.projects.values()].map((r) => world.projectMsg(r)) } } } } } },
@@ -742,6 +806,8 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.SKILL, event: { event: { case: "skill", value: world.skills.event() } } },
         { source: EventSource.MEMORY, event: { event: { case: "memory", value: world.memory.event() } } },
         { source: EventSource.SEARCH, event: { event: { case: "search", value: world.searches.activity() } } },
+        // A daemon from before the shell has no layout source (POST /__mock/layout/service?off=1).
+        ...(world.layout.serviceOff ? [] : [{ source: EventSource.LAYOUT, event: { event: { case: "layout" as const, value: world.layout.snapshotEvent() } } }]),
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -1029,6 +1095,41 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
         json(res, 404, { error: err instanceof Error ? err.message : String(err) });
       }
       break;
+    case "GET /__mock/layout":
+      json(res, 200, { rev: world.layout.rev, state: world.layout.state(), viewport: world.layout.viewport, applied: world.layout.applied, seeds: Object.keys(SEEDS), legacyImported: world.layout.legacyImported, imports: world.layout.imports });
+      break;
+    case "POST /__mock/layout/newer":
+      world.layout.setNewer(q.get("on") === "0" ? [] : ['space sp-main: tab t-newer of kind "notebook"']);
+      json(res, 200, { newer: world.layout.newer });
+      break;
+    case "POST /__mock/layout/service":
+      world.layout.serviceOff = q.get("off") === "1";
+      json(res, 200, { serviceOff: world.layout.serviceOff });
+      break;
+    case "POST /__mock/layout/import":
+      // The first-load import: ?imported=0|1 sets the mark; ?fail=N makes the next N calls fail (with ?error=…).
+      if (q.has("imported")) world.layout.legacyImported = q.get("imported") === "1";
+      if (q.has("fail")) {
+        world.layout.failImports = Number(q.get("fail") ?? 0);
+        world.layout.importError = q.get("error") ?? "";
+      }
+      if (q.has("delay")) world.layout.importDelayMs = Number(q.get("delay") ?? 0);
+      json(res, 200, { legacyImported: world.layout.legacyImported, imports: world.layout.imports });
+      break;
+    case "POST /__mock/layout": {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        try {
+          const text = Buffer.concat(chunks).toString("utf8").trim();
+          world.layout.seed(text ? (JSON.parse(text) as LayoutState) : (q.get("seed") ?? "empty"));
+          json(res, 200, { rev: world.layout.rev, state: world.layout.state() });
+        } catch (err) {
+          json(res, 400, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      break;
+    }
     case "POST /__mock/emit": {
       const chunks: Buffer[] = [];
       req.on("data", (c: Buffer) => chunks.push(c));
@@ -1059,6 +1160,19 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       });
       break;
     }
+    case "POST /__mock/terminal/facts":
+      try {
+        const facts: { liveCwd?: string; foreground?: string; lastCommand?: string } = {};
+        for (const k of ["liveCwd", "foreground", "lastCommand"] as const) {
+          const v = q.get(k);
+          if (v !== null) facts[k] = v;
+        }
+        world.setTerminalFacts(q.get("id") ?? "", facts);
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+      break;
     case "POST /__mock/terminal/new":
       if (q.has("delay")) world.terminalNewDelayMs = Number(q.get("delay"));
       if (q.has("fail")) world.terminalNewFail = q.get("fail") ?? "";
@@ -1235,6 +1349,12 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "POST /__mock/status-kinds":
       json(res, 200, world.addStatusKinds());
       break;
+    case "POST /__mock/shell-sidebar":
+      json(res, 200, world.addShellSidebar());
+      break;
+    case "POST /__mock/needs-you":
+      json(res, 200, world.addNeedsYou());
+      break;
     case "POST /__mock/live-count":
       json(res, 200, world.addLiveCount());
       break;
@@ -1268,6 +1388,11 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
     case "GET /__mock/attachments":
       json(res, 200, [...world.attachments].map(([path, a]) => ({ path, ...a })));
       break;
+    case "POST /__mock/attachments/hold":
+      if (q.get("on") === "false") releaseStageHold();
+      else stageHold ??= [];
+      json(res, 200, { held: stageHold !== null });
+      break;
     case "GET /__mock/update":
       json(res, 200, updateSummary());
       break;
@@ -1285,6 +1410,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       break;
     case "GET /__mock/gh/calls":
       json(res, 200, world.gh.calls);
+      break;
+    case "POST /__mock/gh/pr-diff-long":
+      world.gh.prDiffs.long.add(Number(q.get("number") ?? "0"));
+      json(res, 200, { long: [...world.gh.prDiffs.long] });
       break;
     case "POST /__mock/gh/pr-fail":
       // command=pr.refresh makes that pull request command's next run fail.
@@ -1379,6 +1508,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, world.writes);
       break;
     case "POST /__mock/reset":
+      releaseStageHold();
       world.reset();
       resetClones();
       resetCompletion();
@@ -1487,6 +1617,12 @@ const server = createServer((req, res) => {
     const dest = req.headers["sec-fetch-dest"];
     const tag = (themed ? mockPaintTag() : "") + (html && navigated(typeof dest === "string" ? dest : undefined, themed) ? frameTag : "");
     res.end(tag ? insertInHead(new TextDecoder().decode(e.data), tag) : e.data);
+    return;
+  }
+  // A daemon from before the shell: its mux has no LayoutService route (Go's ServeMux 404).
+  if (world.layout.serviceOff && url.pathname.startsWith("/codefoundry.v1.LayoutService/")) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("404 page not found\n");
     return;
   }
   if (req.headers.authorization !== `Bearer ${token}`) {

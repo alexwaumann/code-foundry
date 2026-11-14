@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { usePanelKey } from "@/components/panel/panelKeyContext";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { inlinePage } from "@/lib/inlinePage";
 import { useThreadStore } from "@/stores/thread";
 
@@ -8,7 +8,7 @@ const THREAD_KEY = "thread:";
 /**
  * The thread a File tab's HTML page belongs to, for its bridge (docs/notes/bridge-2-gui.md):
  * the thread whose panel holds the tab, when that thread showed this very file as a page
- * (an html item: view.inline, its card's Open in side panel, `--panel`), or opened it as
+ * (an html item: view.inline, its card's Open in a tab, `--panel`), or opened it as
  * its own with no card (view.panel.page: `own`, the tab's page flag, which only that verb's
  * intent sets). Any other HTML file, in any panel, has none: its bridge refuses every call.
  */

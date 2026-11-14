@@ -1,11 +1,14 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEmberStore } from "@/stores/ember";
-import { usePanelStore } from "@/stores/panel";
 import { useUiStore } from "@/stores/ui";
 import { EMBER_THREAD, EmberWorld, putEmberThread, setEmberEnabled } from "@/test/emberBoard";
+import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
+import { layoutTabs } from "@/test/layoutTabs";
 import { tooltipText } from "@/test/tooltip";
 import { EmberMarkdown, TaskPointer } from "./EmberTimeline";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 /**
  * A task link in Ember's chat as a pointer line (docs/notes/ember-3-gui.md,
@@ -22,11 +25,11 @@ function link(id: string, name: string) {
   return { el, part: (p: string) => within(el).queryByTestId(p)?.textContent ?? null, meta: () => within(el).getByTestId("ember-task-link-meta") };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetFakeLayout(threadSeed(EMBER_THREAD));
   setEmberEnabled(true);
   putEmberThread();
   useUiStore.setState({ selection: { kind: "thread", id: EMBER_THREAD } });
-  usePanelStore.setState({ byKey: {} });
   world = new EmberWorld();
   world.publish();
 });
@@ -37,16 +40,20 @@ afterEach(() => {
 });
 
 describe("TaskPointer", () => {
-  it("a blocked task: its title and state; a click opens the board at it; the state follows the board", () => {
+  it("a blocked task: its title and state; a click opens the board at it; the state follows the board", async () => {
     const { el, part } = link("t-9c0d1e2f", "Bump wails to v3.1");
     expect(el.dataset.task).toBe("t-9c0d1e2f");
     expect(part("ember-task-link-title")).toBe("Bump wails to v3.1");
     expect(part("ember-task-link-meta")).toBe("· blocked");
     expect(within(el).getByTestId("ember-task-link-glyph")).toBeTruthy();
-    fireEvent.click(el);
-    const panel = usePanelStore.getState().byKey[`thread:${EMBER_THREAD}`];
-    expect(panel?.open).toBe(true);
-    expect(panel?.groups[0]?.tabs.map((t) => t.kind)).toEqual(["ember"]);
+    await act(async () => {
+      fireEvent.click(el);
+      await layoutSettled();
+    });
+    expect(layoutTabs().map((t) => [t.kind, t.thread])).toEqual([
+      ["thread", EMBER_THREAD],
+      ["ember.board", EMBER_THREAD],
+    ]);
     expect(useEmberStore.getState().focus?.id).toBe("t-9c0d1e2f");
     act(() => {
       world.task("t-9c0d1e2f", { state: "done", outcome: "Pinned" });

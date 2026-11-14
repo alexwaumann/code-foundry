@@ -42,7 +42,7 @@ type contextFlags struct {
 // addContextFlags adds the --context-* flags. --context-thread defaults to
 // $CODE_FOUNDRY_THREAD, which the daemon sets in every thread's Claude process, so a
 // thread's agent running `code-foundry terminal new` or `action run` acts for its own
-// thread (its bottom panel). --context-thread= (empty) opts out.
+// thread (its terminal tabs, linked to it). --context-thread= (empty) opts out.
 func (cl *cli) addContextFlags(fs *flag.FlagSet) *contextFlags {
 	cf := &contextFlags{}
 	fs.StringVar(&cf.terminal, "context-terminal", "", "active terminal `id`")

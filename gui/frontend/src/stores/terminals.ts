@@ -5,15 +5,6 @@ export interface TerminalsData {
   byId: Readonly<Record<string, TerminalView>>;
   /** Display order: the daemon's list order, new terminals appended. */
   order: readonly string[];
-  /**
-   * Terminals the user opened in a bottom panel that is not their owner's, by terminal id:
-   * the panel keys whose strips show them as a tab (stores/bottomPanel.ts bottomTabIds). A
-   * plugin's ("Open in bottom panel" on a terminal node; one key,
-   * docs/notes/plugins-6-thread-terminal.md) or a descendant thread's server (the card's row;
-   * every ancestor it was opened from, docs/notes/server-rollup.md). Window-local; a terminal
-   * that goes takes its tabs with it.
-   */
-  shownIn?: Readonly<Record<string, readonly string[]>>;
 }
 
 interface TerminalsState extends TerminalsData {
@@ -41,6 +32,9 @@ export function sameTerminal(a: TerminalView, b: TerminalView): boolean {
     a.startedAtMs === b.startedAtMs &&
     a.exitedAtMs === b.exitedAtMs &&
     a.altScreen === b.altScreen &&
+    a.liveCwd === b.liveCwd &&
+    a.foreground === b.foreground &&
+    a.lastCommand === b.lastCommand &&
     a.argv.length === b.argv.length &&
     a.argv.every((v, i) => v === b.argv[i]) &&
     sameRecord(a.labels, b.labels)

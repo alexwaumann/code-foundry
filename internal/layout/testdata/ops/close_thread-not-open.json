@@ -1,0 +1,25 @@
+{
+  "doc": "Closing a thread whose tab is not open is refused.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+          ],
+          "active": "t-d"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_thread","thread":"th-a"},
+  "error": "not_found"
+}

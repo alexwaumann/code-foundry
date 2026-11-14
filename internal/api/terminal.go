@@ -171,14 +171,17 @@ func size(cols, rows uint32) (uint16, uint16, error) {
 
 func terminalToProto(t terminal.Terminal) *v1.Terminal {
 	p := &v1.Terminal{
-		Id:        t.ID,
-		Argv:      t.Argv,
-		Cwd:       t.Cwd,
-		Cols:      uint32(t.Cols),
-		Rows:      uint32(t.Rows),
-		Title:     t.Title,
-		AltScreen: t.AltScreen,
-		Labels:    t.Labels,
+		Id:          t.ID,
+		Argv:        t.Argv,
+		Cwd:         t.Cwd,
+		Cols:        uint32(t.Cols),
+		Rows:        uint32(t.Rows),
+		Title:       t.Title,
+		AltScreen:   t.AltScreen,
+		Labels:      t.Labels,
+		LiveCwd:     t.LiveCwd,
+		Foreground:  t.Foreground,
+		LastCommand: t.LastCommand,
 	}
 	p.StartedAt = timestamp(t.StartedAt)
 	switch t.State {

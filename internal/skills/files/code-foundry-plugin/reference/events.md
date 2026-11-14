@@ -111,5 +111,5 @@ a commit sends no files event (only `.git` changes), its new head comes as
 `worktreeUpdated`; a `git checkout` changes files, but `worktreeUpdated` says what
 happened.
 `worktreeDetailUpdated` is sent only for worktrees whose detail someone asked for in the
-last 10 minutes (the app's worktree panel), so a plugin cannot rely on it.
+last 10 minutes (while the app shows it), so a plugin cannot rely on it.
 

@@ -48,6 +48,7 @@ var readOnly = []string{
 	"ui.presence",
 	"usage.show",
 	"workspace.list", "worktree.editors",
+	"layout.show", "space.list", "tab.list",
 }
 
 // Every registered command is classified on purpose: the read-only ones are exactly the
@@ -110,6 +111,8 @@ func TestReadOnlyMarker(t *testing.T) {
 		{"view.panel.file", false},
 		{"view.panel.page", false},
 		{"view.panel.gallery", false},
+		{"view.open.file", false},
+		{"view.open.diff", false},
 		{"view.projects", false},
 		{"thread.focus", false},
 		{"ui.notify", false},
@@ -147,6 +150,8 @@ func TestPageContextIsTheThreadsCLI(t *testing.T) {
 		{"view.panel.file", true},
 		{"view.panel.page", true},
 		{"view.panel.gallery", true},
+		{"view.open.file", true},
+		{"view.open.gallery", true},
 		{"terminal.new", true},
 		{"action.run", true},
 		{"thread.new", true},

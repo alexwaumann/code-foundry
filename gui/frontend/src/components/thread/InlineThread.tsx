@@ -10,7 +10,7 @@ import { SnoozeStrip } from "./SnoozeStrip";
 import { ThreadComposer } from "./ThreadComposer";
 import "./thread.css";
 
-/** The rows' inset in a side panel (the content pane's is 40). */
+/** The rows' inset in a plugin's thread node (a thread tab's is 40). */
 const INLINE_INSET = 12;
 
 /**

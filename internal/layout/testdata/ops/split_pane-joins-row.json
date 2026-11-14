@@ -1,0 +1,95 @@
+{
+  "doc": "A split along the parent's direction joins the parent: the pane's share is divided, its siblings keep theirs.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"split_pane","pane":"p-b","edge":"right","tab":{"id":"","kind":"terminal","thread":"th-a","params":{"terminal":"term-9"}},"w":1600,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/a.go"}}
+              ],
+              "active": "t-d"
+            },
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [
+                {"id":"t-n1","kind":"terminal","thread":"th-a","params":{"terminal":"term-9"}}
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.6,0.2,0.2]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1"}
+}

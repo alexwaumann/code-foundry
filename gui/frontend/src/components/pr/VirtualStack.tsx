@@ -30,7 +30,7 @@ export interface Reveal {
 
 /**
  * The nearest scrolling ancestor where no VirtualScrollRoot is provided: the nearest marked
- * one first ([data-scroll-root], e.g. the side panel's body), else the nearest with overflow.
+ * one first ([data-scroll-root], e.g. a pane's scroll box), else the nearest with overflow.
  */
 function scrollParent(el: HTMLElement): HTMLElement | null {
   const marked = el.parentElement?.closest<HTMLElement>("[data-scroll-root]");

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, CornerDownLeft } from "lucide-react";
 import type { CommandView, UiContextView } from "@/api/command";
 import { errorMessage } from "@/api/stream";
@@ -19,7 +19,8 @@ import { rankCommands } from "@/palette/rank";
 import { refreshCommands, useCommandsStore } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
 import { useSearchDialogStore } from "@/stores/searchDialog";
-import { useUiStore } from "@/stores/ui";
+import { requestPaneFocus } from "@/stores/shellView";
+import { takePaletteRestore, useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/utils";
 
 function CommandRow({ c, onPick }: { c: CommandView; onPick: (c: CommandView) => void }) {
@@ -340,7 +341,25 @@ export function CommandPalette() {
   const searchTargetSeq = useSearchDialogStore((s) => s.targetSeq);
   const runInThread = useUiStore((s) => s.palette.threadId ?? "");
   const context = useUiStore((s) => s.palette.context);
-  const close = useUiStore((s) => s.closePalette);
+  const closePalette = useUiStore((s) => s.closePalette);
+  const close = useCallback(() => {
+    closePalette();
+  }, [closePalette]);
+  // Closed (by anything): the element Escape hands the keyboard back to takes it, unless
+  // something else took it meanwhile (a tab the pick opened). The dialog's focus trap is off by now.
+  // One that no longer takes it (a pane's body, focusable only while it had the keyboard) asks
+  // its pane, which puts the keyboard back into its tab.
+  useEffect(() => {
+    if (open) return;
+    const back = takePaletteRestore();
+    if (!back) return;
+    const now = document.activeElement;
+    if (now !== null && now !== document.body && now.closest('[data-region="palette"]') === null) return;
+    back.focus({ preventScroll: true });
+    if (document.activeElement === back) return;
+    const pane = back.closest<HTMLElement>('[data-testid="shell-pane"]')?.dataset.paneId;
+    if (pane) requestPaneFocus(pane);
+  }, [open]);
   const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : page === "prompts" ? "Previous prompts" : page === "files" ? "Go to file" : page === "search" ? "Search threads" : "Command palette";
   const description =
     page === "projects"
@@ -350,7 +369,7 @@ export function CommandPalette() {
         : page === "prompts"
           ? "Pick a prompt you sent to put it in the composer"
           : page === "files"
-            ? "Pick a file of the thread to open in its side panel"
+            ? "Pick a file of the thread to open in a tab beside it"
             : page === "search"
               ? "Find threads by name and messages, and open one at the match"
               : "Run a command in the current context";
@@ -358,7 +377,8 @@ export function CommandPalette() {
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) close();
+        // Escape or the backdrop: the keyboard goes back to what had it.
+        if (!o) closePalette(true);
       }}
     >
       <DialogContent

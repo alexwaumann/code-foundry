@@ -139,7 +139,7 @@ func TestViewInline(t *testing.T) {
 			wantMsg: "shown docs/page.html in thread Usage week"},
 		{name: "--panel on a page shown before: the panel only", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 1, shown: true,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
-			wantMsg: "opened docs/page.html in thread Usage week's side panel; it was shown inline before, so no card was added", wantPanel: true},
+			wantMsg: "opened docs/page.html in tab t-n1 beside thread Usage week; it was shown inline before, so no card was added", wantPanel: true},
 		{name: "shown in an earlier turn: a card, and a warning", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1, earlier: "html-0",
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
 			wantMsg: "shown docs/page.html in thread Usage week", wantWarn: []string{fmt.Sprintf(command.WarnShownBefore, "html-0")}},
@@ -148,7 +148,7 @@ func TestViewInline(t *testing.T) {
 			wantMsg: "shown docs/page.html in thread Usage week"},
 		{name: "--panel on a page shown before, no window", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 0, shown: true,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
-			wantMsg: "docs/page.html is already shown inline in thread Usage week, so no card was added; not opened in its side panel (" + command.NoWindowMessage + ")", wantPanel: true},
+			wantMsg: "opened docs/page.html in tab t-n1 beside thread Usage week; it was shown inline before, so no card was added; no app window is open", wantPanel: true},
 		{name: "the CLI outside a thread", uctx: command.Context{}, args: map[string]string{"path": "/wt/docs/page.html"}, argErr: "thread"},
 		{name: "the caller's thread", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html"}, windows: 1,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html"},
@@ -158,10 +158,10 @@ func TestViewInline(t *testing.T) {
 			wantMsg: "shown /home/a/x.htm in thread Usage week"},
 		{name: "--panel opens the File tab too", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 1,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
-			wantMsg: "shown docs/page.html in thread Usage week and in its side panel", wantPanel: true},
+			wantMsg: "shown docs/page.html in thread Usage week and in tab t-n1 beside it", wantPanel: true},
 		{name: "--panel with no window", uctx: inThread, args: map[string]string{"path": "/wt/docs/page.html", "panel": "true"}, windows: 0,
 			wantReq: &v1.ShowThreadHtmlRequest{ThreadId: "s-aaaaaaaaaaa1", Path: "/wt/docs/page.html", Panel: true},
-			wantMsg: "shown docs/page.html in thread Usage week (" + command.NoWindowMessage + ")", wantPanel: true},
+			wantMsg: "shown docs/page.html in thread Usage week and in tab t-n1 beside it; no app window is open", wantPanel: true},
 		{name: "not html", uctx: inThread, args: map[string]string{"path": "/wt/main.go"}, code: connect.CodeInvalidArgument},
 	}
 	for _, tt := range tests {
@@ -197,11 +197,12 @@ func TestViewInline(t *testing.T) {
 			if !slices.Equal(out.Warnings, tt.wantWarn) || !slices.Equal(res.Warnings, tt.wantWarn) {
 				t.Errorf("warnings = %q (result %q), want %q", out.Warnings, res.Warnings, tt.wantWarn)
 			}
-			var want []*v1.UiIntent
+			sameIntents(t, emit.Intents(), nil)
 			if tt.wantPanel {
-				want = append(want, showViewWith(command.ViewPanelFile, "s-aaaaaaaaaaa1", map[string]string{"path": "/wt/docs/page.html", "project": "r1", "base": "/wt"}))
+				openedTab(t, reg, emit, command.Result{JSON: *out.Panel}, "s-aaaaaaaaaaa1", map[string]string{"path": "/wt/docs/page.html", "project": "r1", "base": "/wt"})
+			} else if ops := layoutOf(t, reg).Ops(); len(ops) != 0 {
+				t.Errorf("ops = %v, want no tab", ops)
 			}
-			sameIntents(t, emit.Intents(), want)
 		})
 	}
 	// In the app with no thread selected it is not available (When: hasThreadOrCLI).

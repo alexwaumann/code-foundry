@@ -61,6 +61,21 @@ export function predatesTunnel(daemon: string): boolean {
   return compareVersions(daemon, TUNNEL_SINCE) === -1;
 }
 
+/**
+ * The first release whose daemon has the window layout (LayoutService and its event source, with
+ * the first-load import). The window shell cannot draw without it and has no fallback, so a window
+ * on anything older gets the update dialog with Restart Now, as on a daemon from before the tunnel
+ * (docs/notes/shell-20-cutover.md). The shell reaches `main` as one `feat!` merge, the first minor
+ * after v0.21; if another `feat` reaches `main` first, the merge (plan PR 25) sets this to the tip
+ * tag `scripts/next-version.sh --tip` prints for it.
+ */
+export const SHELL_SINCE = "v0.22.0-tip.3";
+
+/** Whether a daemon of this version has no window layout. A "dev" daemon has one. */
+export function predatesShell(daemon: string): boolean {
+  return compareVersions(daemon, SHELL_SINCE) === -1;
+}
+
 /** The window and the daemon run different versions (see versionMismatch). */
 export interface Mismatch {
   /** The window's version. */

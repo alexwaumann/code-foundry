@@ -18,7 +18,9 @@ vi.mock("@/stores/saveWorkspace", async (orig) => ({ ...(await orig<typeof impor
 
 const { ContextMenu, ContextMenuTrigger } = await import("@/components/ui/context-menu");
 const { RowMenu } = await import("@/components/sidebar/RowMenu");
-const { ThreadTitle } = await import("./ThreadParts");
+const { ThreadHeader } = await import("./ThreadHeader");
+const { layoutOf, pane, seedLayout, space, tab } = await import("@/test/shellLayout");
+const { resetLayout } = await import("@/stores/layout");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -56,7 +58,9 @@ function setThread(o: Partial<ThreadView>, others: ThreadView[] = []): void {
 
 const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remotes: [], worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
-beforeEach(() => {
+beforeEach(async () => {
+  resetLayout();
+  await seedLayout(layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1")]));
   useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.restart"), cmd("thread.flag.clear")] });
   useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
   useWorkspacesStore.setState({ byId: {}, order: [] });
@@ -80,10 +84,16 @@ function openRowMenu(): HTMLElement {
   return screen.getByTestId("row-menu");
 }
 
+/** The thread's header's one menu (ThreadHeader, in its pane): Open ▸, Move to space ▸, the thread's items, Close. */
 function openTitleMenu(): HTMLElement {
-  render(<ThreadTitle id="s-1" />);
-  fireEvent.keyDown(screen.getByTestId("thread-title"), { key: "Enter" });
-  return screen.getByTestId("thread-title-menu");
+  render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+  fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
+  return screen.getByTestId("thread-header-menu");
+}
+
+/** The header menu's own items (ThreadMenuItems): between its Open ▸ / Move to space ▸ group and its Close. */
+function shared(menu: HTMLElement): string[] {
+  return entries(menu).slice(3, -1);
 }
 
 /** The menu's items and separators in order ("—" for a separator). */
@@ -91,24 +101,24 @@ function entries(menu: HTMLElement): string[] {
   return [...menu.querySelectorAll('[role="menuitem"], [role="separator"]')].map((e) => (e.getAttribute("role") === "separator" ? "—" : e.textContent));
 }
 
-describe("ThreadMenuItems: one list for the sidebar row and the title menu", () => {
+describe("ThreadMenuItems: one list for the sidebar row and the thread header's menu", () => {
   it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in; Archive (no sidebar item on a child)", () => {
     setThread({ projectIds: ["web", "api"], createdBy: "s-0" }, [thread({ id: "s-0", name: "Parent" })]);
     const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in", "—", "Archive"];
-    expect(entries(openTitleMenu())).toEqual(want);
+    expect(entries(openTitleMenu())).toEqual(["Open", "Move to space", "—", ...want, "Close⌘W"]);
     cleanup();
     // The row adds what only it offers after the shared list.
-    expect(entries(openRowMenu())).toEqual([...want, "—", "New terminal here", "Fork", "Remove"]);
+    expect(entries(openRowMenu())).toEqual([...want, "—", "Fork", "Remove"]);
   });
 
   it("a one-project thread of the user's: no Save as workspace or Run in", () => {
     setThread({});
-    expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "—", "Archive"]);
+    expect(shared(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "—", "Archive"]);
   });
 
   it("a thread without a project: Move to project… after the names, no second group", () => {
     setThread({ projectId: "", projectIds: [], worktreePath: "/Users/me" });
-    expect(entries(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Move to project…", "—", "Pin", "Snooze", "—", "Archive"]);
+    expect(shared(openTitleMenu())).toEqual(["Rename", "Regenerate name", "Move to project…", "—", "Pin", "Snooze", "—", "Archive"]);
   });
 
   it.each<[string, Partial<ThreadView>]>([
@@ -174,7 +184,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     const flag = (plugin: string): ThreadView["flags"][number] => ({ plugin, pluginName: plugin, level: "attention", reason: "deploy needs approval", setAtMs: 1, untilSeen: false });
     setThread({ pluginEnvStale: true, flags: [flag("hello"), flag("gh-actions")] });
     const menu = openTitleMenu();
-    expect(entries(menu)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
+    expect(shared(menu)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
     fireEvent.click(within(menu).getByTestId("menu-clear-flags"));
     expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }));
     cleanup();
@@ -303,23 +313,23 @@ describe("ThreadMenuItems: one list for the sidebar row and the title menu", () 
     ["Pin", "menu-pin", {}],
     ["Archive", "menu-archive", {}],
     ["Unsnooze", "menu-unsnooze", { snoozedUntilMs: Date.now() + 3_600_000 }],
-  ])("%s from the title menu asks the thread's prompt for the keyboard", async (_label, testId, o) => {
+  ])("%s from the header's menu asks the thread's prompt for the keyboard", async (_label, testId, o) => {
     setThread(o);
     const before = useUiStore.getState().promptFocusSeq;
     fireEvent.click(within(openTitleMenu()).getByTestId(testId));
     await waitFor(() => {
-      expect(screen.queryByTestId("thread-title-menu")).toBeNull();
+      expect(screen.queryByTestId("thread-header-menu")).toBeNull();
     });
     expect(useUiStore.getState().promptFocusSeq).toBe(before + 1);
   });
 
-  it("a snooze preset from the title menu does too", async () => {
+  it("a snooze preset from the header's menu does too", async () => {
     setThread({});
     const before = useUiStore.getState().promptFocusSeq;
     fireEvent.keyDown(within(openTitleMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
     fireEvent.click(screen.getAllByTestId("snooze-preset")[0] as HTMLElement);
     await waitFor(() => {
-      expect(screen.queryByTestId("thread-title-menu")).toBeNull();
+      expect(screen.queryByTestId("thread-header-menu")).toBeNull();
     });
     expect(useUiStore.getState().promptFocusSeq).toBe(before + 1);
   });

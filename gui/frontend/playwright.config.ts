@@ -21,8 +21,8 @@ const MOCK_PORT_BASE = Number(process.env.E2E_MOCK_PORT ?? 7799);
 export const MOCK_PORT = MOCK_PORT_BASE + Number(process.env.TEST_PARALLEL_INDEX ?? 0);
 export const MOCK_TOKEN = "e2e-token";
 export const VITE_PORT = Number(process.env.E2E_VITE_PORT ?? 9255);
-/** Where the e2e build of the app goes (gitignored); rebuilt on every run. */
-const E2E_DIST = "dist-e2e";
+/** Where the e2e build of the app goes (gitignored); rebuilt on every run. E2E_DIST moves it (two runs at once in one checkout). */
+const E2E_DIST = process.env.E2E_DIST ?? "dist-e2e";
 
 export default defineConfig({
   testDir: "e2e",

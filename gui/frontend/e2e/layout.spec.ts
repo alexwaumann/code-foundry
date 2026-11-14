@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { composeProject, openApp, resetMock, row, setZoom } from "./fixtures";
+import { openApp, resetMock } from "./fixtures";
+import { openShellApp, paneNode, rowNode, seedLayout, threadTab } from "./shell";
 
 test.beforeEach(async () => {
   await resetMock();
@@ -16,23 +17,13 @@ function bg(page: Page, selector: string) {
   return page.locator(selector).first().evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
-/** Computed `--wails-draggable` of the element (inherited), "" when unset. */
-function drag(page: Page, selector: string) {
-  return page.locator(selector).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--wails-draggable").trim());
-}
-
-// Window geometry (components/window/titleBand.ts, docs/notes/design-system-2-shell.md):
-// a 56px title band with no full-width strip. The sidebar's band (80px traffic-light
-// gutter, then the app name) is 56px; the panes start a shell gap (12px) down and their
-// 44px headers end on the band (their 1px bottom border is the first row below it: the
-// pane's own 1px border puts the header at 13..57). The band's content centres on the
-// header, 34px down.
+// The window's geometry around the panes: the sidebar's width, its status row on the panes'
+// bottom edge, and the colours of the sheet, the panes and a terminal in one. The top bar (the
+// window's drag band, its gutter and history buttons) and the pane grid are the shell-*.spec.ts
+// files' (shell-spaces, shell-grid).
 const GAP = 12;
-const BAND = 56;
-const HEADER = 44;
-const CENTER = 34;
 
-test("the sidebar starts at 260, a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
+test("the sidebar starts at 240 (the top bar's toggle), a width saved by an older build resets once, and a dragged width is kept", async ({ page }) => {
   const width = async () => (await box(page, "sidebar")).width;
   // A store saved before version 4, at the old 280 default dragged to 360.
   await page.addInitScript(() => {
@@ -41,8 +32,8 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
     localStorage.setItem("code-foundry.ui", JSON.stringify({ state: { sidebarWidth: 360, workingCollapsed: true }, version: 3 }));
   });
   await openApp(page);
-  await expect.poll(width).toBe(260);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 260, workingCollapsed: true }, version: 4 });
+  await expect.poll(width).toBe(240);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("code-foundry.ui") ?? "{}") as unknown)).toMatchObject({ state: { sidebarWidth: 240, workingCollapsed: true }, version: 4 });
 
   // Dragging the handle: the width persists across a reload, capped at the maximum.
   const handle = page.getByRole("separator", { name: "Resize sidebar" });
@@ -51,7 +42,7 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
   const y = hb.y + hb.height / 2;
   await page.mouse.move(hb.x + hb.width / 2, y);
   await page.mouse.down();
-  await page.mouse.move(hb.x + hb.width / 2 + 90, y, { steps: 4 });
+  await page.mouse.move(hb.x + hb.width / 2 + 110, y, { steps: 4 });
   await page.mouse.up();
   await expect.poll(width).toBe(350);
   await page.reload();
@@ -66,12 +57,12 @@ test("the sidebar starts at 260, a width saved by an older build resets once, an
   await expect(page.getByTestId("thread-list").locator("[data-row-key]").first()).toBeVisible();
   await expect.poll(width).toBe(520);
 
-  // Double-click restores the 260 default.
+  // Double-click restores the 240 default.
   await handle.dblclick();
-  await expect.poll(width).toBe(260);
+  await expect.poll(width).toBe(240);
 });
 
-/** SHOTS=<dir>: the PR's screenshots of the 260px default, WebKit, 1280x800, dark and light. */
+/** SHOTS=<dir>: the PR's screenshots of the 240px default, WebKit, 1280x800, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`sidebar default screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
@@ -79,244 +70,23 @@ for (const scheme of ["dark", "light"] as const) {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.emulateMedia({ colorScheme: scheme });
     await openApp(page);
-    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(260);
+    await expect.poll(async () => (await box(page, "sidebar")).width).toBe(240);
     await page.mouse.move(640, 400);
-    await page.screenshot({ path: `${String(shots)}/sidebar-260-${scheme}.png` });
+    await page.screenshot({ path: `${String(shots)}/sidebar-240-${scheme}.png` });
   });
 }
 
-test("the app name and the history buttons fit whole at the minimum sidebar width, zoomed in and out", async ({ page }) => {
-  await openApp(page);
-  const title = page.getByTestId("sidebar-app-name");
-  const setWidth = (w: number) => page.evaluate(`__cfModule("/src/stores/ui.ts").then((m) => m.useUiStore.getState().setSidebarWidth(${String(w)}))`);
-  const fits = () => title.evaluate((el) => el.scrollWidth <= el.clientWidth);
-  await setWidth(260);
-  await expect.poll(async () => (await box(page, "sidebar")).width).toBe(260);
-  expect(await fits()).toBe(true);
-  // Zoomed out, the gutter is wider in layout px (80 screen px over 0.9): the tightest case.
-  await setZoom(page, 90);
-  await expect(page.locator("html")).toHaveAttribute("data-zoom", "90");
-  expect(await fits()).toBe(true);
-  await setZoom(page, 150);
-  await expect(page.locator("html")).toHaveAttribute("data-zoom", "150");
-  expect(await fits()).toBe(true);
-  await expect(title).toBeVisible();
-});
-
-test("the sidebar band holds the empty traffic-light gutter, the app name and the history buttons, and drags the window", async ({ page }) => {
-  await openApp(page);
-  const viewport = page.viewportSize();
-  const band = await box(page, "sidebar-band");
-  expect(band.top).toBe(0);
-  expect(band.left).toBe(0);
-  expect(band.height).toBe(BAND);
-  expect(band.width).toBe((await box(page, "sidebar")).width);
-  expect(await drag(page, '[data-testid="sidebar-band"]')).toBe("drag");
-  await expect(page.getByTestId("sidebar-band").locator("button")).toHaveCount(2);
-  expect(await drag(page, '[data-testid="sidebar-back"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="sidebar-forward"]')).toBe("no-drag");
-
-  const gutter = await box(page, "traffic-light-gutter");
-  expect([gutter.left, gutter.top, gutter.width, gutter.height]).toEqual([0, 0, 80, BAND]);
-  // Nothing sits on the lights.
-  expect(await page.getByTestId("traffic-light-gutter").evaluate((el) => [el.childElementCount, el.textContent])).toEqual([0, ""]);
-  const title = page.getByTestId("sidebar-app-name");
-  await expect(title).toHaveText("Code Foundry");
-  // 12px after the gutter, centred on the pane headers (34px down), not on the band.
-  expect(await title.evaluate((el) => el.getBoundingClientRect().left)).toBe(80 + 12);
-  const name = await box(page, "sidebar-app-name");
-  expect(name.top + name.height / 2).toBe(CENTER);
-  expect(await drag(page, '[data-testid="sidebar-app-name"]')).toBe("drag");
-
-  // The menu pane sits right under the band, in the sidebar body's 12px left
-  // gutter (#40: rows, the menu and status run to the sidebar's edges, a shell gap from the
-  // window and from the pane); it does not drag.
-  const menu = await box(page, "sidebar-menu");
-  expect([menu.top, menu.left]).toEqual([BAND, GAP]);
-  expect(await drag(page, '[data-testid="sidebar-menu"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="sidebar-new-thread"]')).toBe("no-drag");
-  // New thread is the menu's first row, drawn like Pull Requests and Projects (28px, same
-  // left edge and width), inside the pane's 1px border and 4px padding; the pane ends where
-  // the sidebar does (the content pane's 12px margin is the gap beyond it).
-  const newThread = await box(page, "sidebar-new-thread");
-  const prs = await box(page, "nav-pullrequests");
-  const sidebar = await box(page, "sidebar");
-  expect([newThread.left, newThread.top]).toEqual([GAP + 5, BAND + 5]);
-  expect(newThread.height).toBe(28);
-  expect(menu.left + menu.width).toBe(sidebar.left + sidebar.width);
-  expect(newThread.left + newThread.width).toBe(sidebar.left + sidebar.width - 5);
-  expect([prs.left, prs.width, prs.height]).toEqual([newThread.left, newThread.width, 28]);
-  // The gap to Pull Requests is the nav rows' own (2px), not the group's.
-  expect(prs.top - (newThread.top + newThread.height)).toBe(2);
-  // Labelled, with no chord hint: the chord lives in the palette and help.
-  await expect(page.getByTestId("sidebar-new-thread")).toHaveText("New thread");
-  await expect(page.getByTestId("sidebar-new-thread-chord")).toHaveCount(0);
-  // No chord on screen: the welcome panel names none either (onboarding-1).
-  await expect(page.locator("kbd")).toHaveCount(0);
-  // New terminal and Add project are not in the sidebar (palette, cmd+t and the row menu only).
-  await expect(page.getByTestId("sidebar-add-project")).toHaveCount(0);
-  await expect(page.getByTestId("sidebar-new-terminal")).toHaveCount(0);
-  // Pull Requests, Projects and the thread list do not drag.
-  expect(await drag(page, '[data-testid="nav-pullrequests"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="nav-projects"]')).toBe("no-drag");
-  expect(await drag(page, '[data-testid="thread-list"]')).toBe("");
-
-  // The sheet above the panes drags too; the panes themselves do not.
-  const edge = await box(page, "window-drag-edge");
-  expect([edge.top, edge.left, edge.width, edge.height]).toEqual([0, 0, viewport?.width, GAP]);
-  expect(await drag(page, '[data-testid="window-drag-edge"]')).toBe("drag");
-  expect(await drag(page, '[data-testid="content-pane"]')).toBe("");
-});
-
-test("the history buttons step through selections, float their tooltips down and clear the resize handle", async ({ page }) => {
-  await openApp(page);
-  await row(page, "s:s-1").click();
-  await row(page, "s:s-2").click();
-  const back = page.getByTestId("sidebar-back");
-  const forward = page.getByTestId("sidebar-forward");
-  await expect(forward).toBeDisabled();
-
-  await back.hover();
-  const tip = page.locator('[data-slot="tooltip-content"]:not([data-state="closed"])');
-  await expect(tip).toHaveText("Back");
-  expect((await tip.boundingBox())?.y).toBeGreaterThan((await box(page, "sidebar-back")).bottom);
-
-  await back.click();
-  await expect(row(page, "s:s-1")).toHaveAttribute("aria-selected", "true");
-  await expect(forward).toBeEnabled();
-
-  // The glyph ends on the sidebar's edge; the handle beyond it takes only the box's last 5px.
-  const f = await box(page, "sidebar-forward");
-  expect(f.right - 5).toBe((await box(page, "sidebar")).right);
-  const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("button")?.dataset.testid, { x: f.left + f.width / 2, y: f.top + f.height / 2 });
-  expect(hit).toBe("sidebar-forward");
-
-  await forward.click();
-  await expect(row(page, "s:s-2")).toHaveAttribute("aria-selected", "true");
-  await expect(forward).toBeDisabled();
-});
-
-test("the panes start a shell gap (12px) from the top and their 44px headers drag the window, with the sidebar shown and hidden", async ({ page }) => {
-  await openApp(page);
-  const viewport = page.viewportSize();
-  await row(page, "s:s-1").click();
-  await expect(page.getByTestId("thread-pane")).toBeVisible();
-  await page.getByTestId("thread-header").getByTestId("panel-toggle").click();
-  await expect(page.getByTestId("side-panel")).toBeVisible();
-
-  for (const visible of [true, false]) {
-    if (!visible) {
-      await page.keyboard.press("Meta+b");
-      await expect(page.getByTestId("sidebar")).toHaveCount(0);
-    }
-    const pane = await box(page, "content-pane");
-    expect(pane.top).toBe(GAP);
-    expect(pane.left).toBe(visible ? (await box(page, "sidebar")).right + GAP : GAP);
-    expect(viewport && viewport.height - pane.bottom).toBe(GAP);
-
-    const header = await box(page, "thread-header");
-    expect(header.top).toBe(pane.top + 1);
-    expect(header.height).toBe(HEADER);
-    expect(header.bottom - 1).toBe(BAND);
-    // Its content (inside the 1px bottom border) centres 34.5px down, half a pixel below
-    // the band's centre (the app name, the traffic lights).
-    expect(Math.abs((header.top + header.bottom - 1) / 2 - CENTER)).toBeLessThanOrEqual(0.5);
-    expect(await drag(page, '[data-testid="thread-header"]')).toBe("drag");
-    // The title is a button (its menu) and the crumb's place a link (its project's page): they
-    // do not drag; the crumb around them (its separators) does.
-    expect(await drag(page, '[data-testid="thread-title"]')).toBe("no-drag");
-    expect(await drag(page, '[data-testid="thread-crumb-place-link"]')).toBe("no-drag");
-    expect(await drag(page, '[data-testid="thread-crumb"]')).toBe("drag");
-    expect(await drag(page, '[data-testid="pane-actions"]')).toBe("no-drag");
-    // The conversation itself never drags.
-    expect(await drag(page, '[data-testid="thread-timeline"]')).toBe("");
-
-    // The side panel: same top, same header, ending on the band.
-    const wrapper = await box(page, "side-panel-wrapper");
-    expect(wrapper.top).toBe(GAP);
-    expect(viewport && viewport.width - wrapper.right).toBe(GAP);
-    const panelHeader = await box(page, "panel-header");
-    expect(panelHeader.top).toBe(header.top);
-    expect(panelHeader.height).toBe(HEADER);
-    expect(panelHeader.bottom).toBe(header.bottom);
-    expect(await drag(page, '[data-testid="panel-header"]')).toBe("drag");
-    expect(await drag(page, '[data-testid="panel-header"] [data-testid="panel-toggle"]')).toBe("no-drag");
-    expect(await drag(page, '[data-testid="panel-empty"]')).toBe("");
-    // The resize handle runs from the panel's top (just below the window's 12px edge) and never drags.
-    const handle = await box(page, "panel-resize-handle");
-    expect(handle.top).toBe(GAP);
-    expect(await drag(page, '[data-testid="panel-resize-handle"]')).toBe("no-drag");
-
-    // Hidden sidebar: the pane runs under the traffic lights, so the header content
-    // starts past the gutter.
-    const title = await box(page, "thread-title");
-    // (The name's button pulls its 6px hover padding into the header's own; its text starts past the gutter.)
-    if (!visible) expect(title.left + 6).toBeGreaterThanOrEqual(80 + GAP);
-  }
-  await expect(page.getByTestId("hints")).toHaveCount(0);
-});
-
-test("every page header is 44px, ends on the band and drags; its controls do not", async ({ page }) => {
-  await openApp(page);
-  const check = async (header: string, noDrag: string[]) => {
-    const h = await page.locator(header).first().evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { top: r.top, height: r.height, bottom: r.bottom };
-    });
-    expect(h, header).toEqual({ top: GAP + 1, height: HEADER, bottom: BAND + 1 });
-    expect(await drag(page, header)).toBe("drag");
-    for (const sel of noDrag) expect(await drag(page, `${header} ${sel}`), sel).toBe("no-drag");
-  };
-
-  await page.getByTestId("nav-pullrequests").click();
-  await check('[data-testid="prs-page"] > header', ['[data-testid="panel-toggle"]']);
-  await page.getByTestId("nav-projects").click();
-  await check('[data-testid="projects-page"] > header', ['[data-testid="projects-filter"]', '[data-testid="panel-toggle"]']);
-  // Settings is a sheet in the middle of the window (docs/notes/settings-sheet.md): its
-  // header is as tall as a page's, inside the sheet's 1px border, and never drags.
-  await page.keyboard.press("Meta+Comma");
-  await expect(page.getByTestId("settings-page")).toBeVisible();
-  const sheetTop = (await box(page, "settings-sheet")).top;
-  const sheetHeader = await page.locator('[data-testid="settings-page"] > header').evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    return { top: r.top, height: r.height };
-  });
-  expect(sheetHeader).toEqual({ top: sheetTop + 1, height: HEADER });
-  expect(await drag(page, '[data-testid="settings-page"] > header')).toBe("");
-  await page.getByRole("button", { name: "Close settings" }).click();
-
-  // A stopped thread keeps the thread header, with the bottom panel's toggle too.
-  await row(page, "s:s-3").click();
-  await expect(page.getByTestId("thread-composer")).toBeVisible();
-  await check('[data-testid="thread-header"]', ['[data-testid="pane-actions"]', '[data-testid="bottom-toggle"]', '[data-testid="panel-toggle"]']);
-});
-
-test("the headerless composer (home and a project's) drags the window from the same 44px band", async ({ page }) => {
-  await openApp(page);
-  const check = async (band: string, content: string) => {
-    const b = await page.locator(band).first().evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { top: r.top, height: r.height, bottom: r.bottom };
-    });
-    expect(b, band).toEqual({ top: GAP + 1, height: HEADER, bottom: BAND + 1 });
-    expect(await drag(page, band)).toBe("drag");
-    expect(await drag(page, content)).toBe("");
-  };
-  await expect(page.getByTestId("composer-project-name")).toHaveText("No project");
-  await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
-  await composeProject(page);
-  await check('[data-testid="composer"] ~ [data-testid="pane-drag-band"]', '[data-testid="composer-card"]');
-});
-
 test("the daemon status sits at the bottom of the sidebar, its glyphs on the pane's bottom edge", async ({ page }) => {
-  await openApp(page);
+  await seedLayout(paneNode("p-1", [threadTab("s-3")]), "p-1");
+  await openShellApp(page);
   const sidebar = await box(page, "sidebar");
   const status = await box(page, "daemon-status");
   expect(status.left).toBeGreaterThanOrEqual(sidebar.left);
   expect(status.right).toBeLessThanOrEqual(sidebar.right);
   // The row (24px) ends 7px above the window's bottom edge, so its 14px glyphs (centred in
-  // 24px boxes) end on the content pane's bottom edge, a shell gap (12px) up.
-  const pane = await box(page, "content-pane");
+  // 24px boxes) end on the panes' bottom edge, a shell gap (12px) up.
+  const pane = await box(page, "shell-pane");
+  expect((page.viewportSize()?.height ?? 0) - pane.bottom).toBe(GAP);
   const settings = await box(page, "status-settings");
   expect(settings.bottom - 5).toBe(pane.bottom);
   await expect(page.locator("footer")).toHaveCount(0);
@@ -331,20 +101,19 @@ test("the daemon status sits at the bottom of the sidebar, its glyphs on the pan
 });
 
 // Dark only: the per-scheme palette is src/terminal/theme.test.ts.
-test("sidebar sits on the sheet and the bottom panel's terminal matches its pane", async ({ page }) => {
-  await openApp(page);
+test("sidebar sits on the sheet and a terminal tab's terminal matches its pane", async ({ page }) => {
+  // s-1's shell in a terminal tab beside its thread.
+  await seedLayout(rowNode([paneNode("p-1", [threadTab("s-1")]), paneNode("p-2", [{ id: "t-sh", kind: "terminal", thread: "s-1", params: { terminal: "t-s1-shell" } }])]), "p-2");
+  await openShellApp(page);
   const sheet = await bg(page, "body");
   expect(await bg(page, '[data-testid="sidebar"]')).toBe(sheet);
-  const pane = await bg(page, '[data-testid="content-pane"]');
+  const pane = await bg(page, '[data-testid="shell-pane"]');
   expect(pane).not.toBe(sheet);
   expect(await page.getByTestId("sidebar").evaluate((el) => getComputedStyle(el).borderRightWidth)).toBe("0px");
 
-  // s-1's shell in its bottom panel: the xterm theme background (src/terminal/theme.ts)
-  // must be the pane colour.
-  await row(page, "s:s-1").click();
-  await page.keyboard.press("Meta+j");
-  await expect(page.getByTestId("bottom-terminal-host")).toHaveAttribute("data-attach-phase", "live");
-  expect(await bg(page, '[data-testid="bottom-panel"]')).toBe(pane);
+  // The xterm theme background (src/terminal/theme.ts) must be the pane colour.
+  await expect(page.getByTestId("shell-terminal-host")).toHaveAttribute("data-attach-phase", "live");
+  expect(await bg(page, '[data-testid="shell-pane"]:has([data-testid="shell-terminal"])')).toBe(pane);
   const xtermBg = () =>
     page.evaluate(() => {
       const w = window as unknown as { __cfTerminal?: { renderer: { term: { options: { theme?: { background?: string } } } } } };
@@ -356,5 +125,5 @@ test("sidebar sits on the sheet and the bottom panel's terminal matches its pane
       return c;
     });
   await expect.poll(xtermBg).toBe(pane);
-  expect(await bg(page, '[data-testid="bottom-terminal-host"] >> xpath=..')).toBe(pane);
+  expect(await bg(page, '[data-testid="shell-terminal-host"] >> xpath=..')).toBe(pane);
 });

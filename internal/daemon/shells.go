@@ -40,7 +40,7 @@ type shellReaperOptions struct {
 	ThreadExists  func(id string) bool
 }
 
-// shellReaper removes the bottom panel's terminals (termlabel.IsPanel: the shells
+// shellReaper removes the terminals tabs show (termlabel.IsPanel: the shells
 // terminal.new starts and the action runs the action store starts in a terminal) once
 // nothing shows them. Other terminals (unlabelled ones) are never touched.
 //
@@ -57,6 +57,9 @@ type shellReaperOptions struct {
 //     does it first, synchronously; this catches a shell started while that ran.
 //   - Every SweepEvery, and once at start, each of the above is re-checked from the
 //     current state, for events the bus dropped.
+//
+// A free shell (termlabel.IsFree: terminal.new-free, in the home directory) has no owner
+// to lose: only its exit removes it here. Its tab ending it is the window's business.
 type shellReaper struct {
 	opts   shellReaperOptions
 	ctx    context.Context
@@ -142,7 +145,7 @@ func (r *shellReaper) remove(id string) {
 }
 
 // reap kills and removes, in the background, every shell and action terminal whose
-// label key is value.
+// label key is value (never a free shell).
 func (r *shellReaper) reap(why, key, value string) {
 	if value == "" {
 		return
@@ -151,7 +154,7 @@ func (r *shellReaper) reap(why, key, value string) {
 		ctx, cancel := context.WithTimeout(r.ctx, reapTimeout)
 		defer cancel()
 		n, err := terminal.KillAndRemoveWhere(ctx, r.opts.Terminals, func(t terminal.Terminal) bool {
-			return termlabel.IsPanel(t.Labels) && t.Labels[key] == value
+			return termlabel.IsPanel(t.Labels) && !termlabel.IsFree(t.Labels) && t.Labels[key] == value
 		})
 		if err != nil && r.ctx.Err() == nil {
 			r.opts.Log.Warn("remove shells", "why", why, key, value, "err", err)
@@ -179,6 +182,8 @@ func (r *shellReaper) sweep() {
 		switch {
 		case t.State == terminal.StateExited && termlabel.IsShell(l):
 			r.remove(t.ID)
+		case termlabel.IsFree(l):
+			// No owner: nothing to check.
 		case l[termlabel.Worktree] != "" && r.opts.DirGone(l[termlabel.Worktree]):
 			reap("worktree gone", termlabel.Worktree, l[termlabel.Worktree])
 		case l[termlabel.Project] != "" && r.opts.ProjectExists != nil && !r.opts.ProjectExists(l[termlabel.Project]):

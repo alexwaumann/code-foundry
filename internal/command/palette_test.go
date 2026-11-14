@@ -39,14 +39,17 @@ var noPalette = []string{
 	"skill.install", "skill.remove", "skill.setup", "skill.uninstall", "terminal.list",
 	"theme.check", "theme.list", "theme.restore", "theme.save", "theme.show", "thread.agent.open",
 	"thread.agents", "thread.ask", "thread.budget", "thread.checkouts", "thread.commands", "thread.flag.clear",
-	"thread.flags", "thread.focus", "thread.get", "thread.items", "thread.label", "thread.list",
+	"thread.flags", "thread.focus", "thread.get", "thread.info", "thread.items", "thread.label", "thread.list",
 	"thread.mcp", "thread.mcp-reconnect", "thread.move", "thread.placement.check", "thread.pr.link", "thread.project.add", "thread.project.remove", "thread.prompts", "thread.search", "thread.read", "thread.report", "thread.reports",
 	"thread.reseed", "thread.respond", "thread.send", "thread.setup.cancel", "thread.setup.discard", "thread.setup.retry", "thread.shell.stop", "thread.subscribe", "thread.subscriptions",
 	"thread.unsubscribe", "thread.wait", "thread.workspace", "ui.focus.project",
 	"ui.focus.terminal", "ui.notify", "ui.palette.open", "ui.presence", "usage.show",
-	"view.inline", "view.open.url", "view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.page", "view.panel.pr",
+	"view.inline", "view.open.diff", "view.open.file", "view.open.gallery", "view.open.page", "view.open.pr", "view.open.url",
+	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",
 	"workspace.add-project", "workspace.list", "workspace.remove", "workspace.remove-project",
 	"workspace.open.editor", "workspace.set-primary", "worktree.editors",
+	"layout.show", "pane.focus", "pane.move", "pane.resize", "space.list", "space.move", "tab.focus", "tab.list", "tab.move", "thread.open",
+	"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "composer.new",
 }
 
 // Every registered command is classified on purpose: the unlisted ones are exactly the

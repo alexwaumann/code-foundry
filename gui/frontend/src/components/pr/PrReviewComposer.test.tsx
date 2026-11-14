@@ -29,13 +29,15 @@ beforeEach(() => {
 describe("PrReviewComposer", () => {
   const input = () => screen.getByTestId("pr-review-input");
 
-  it("cmd+Enter submits the verdict and text, closes on success and hands focus to the panel; Enter alone does not", async () => {
+  it("cmd+Enter submits the verdict and text, closes on success and hands focus to its pane; Enter alone does not", async () => {
     submitReview.mockResolvedValueOnce(true);
     const onClose = vi.fn();
     render(
-      <aside data-region="panel" tabIndex={-1} data-testid="panel">
-        <PrReviewComposer prRef={REF} verdict="request-changes" focusRequest={1} onClose={onClose} />
-      </aside>,
+      <section data-pane-box>
+        <div role="tabpanel" data-testid="pane-body">
+          <PrReviewComposer prRef={REF} verdict="request-changes" focusRequest={1} onClose={onClose} />
+        </div>
+      </section>,
     );
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(input());
@@ -48,7 +50,7 @@ describe("PrReviewComposer", () => {
     await vi.waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
-    expect(document.activeElement).toBe(screen.getByTestId("panel"));
+    expect(document.activeElement).toBe(screen.getByTestId("pane-body"));
   });
 
   it("a failed submit keeps the composer and its text", async () => {

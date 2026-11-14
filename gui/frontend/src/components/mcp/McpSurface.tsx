@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Clock, Eye, Globe, LoaderCircle, Pencil, Plug, RefreshCw, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { McpServerStatusView, McpToolView } from "@/api/mcp";
-import { usePanelKey } from "@/components/panel/panelKeyContext";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tip } from "@/components/ui/tooltip";
@@ -324,7 +324,7 @@ function EmptyTab({ threadId, bucket }: { threadId: string; bucket: McpBucket })
 }
 
 /**
- * The side panel's MCP surface (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md):
+ * The MCP surface (docs/sketches/mcp-panel variant B, docs/notes/mcp-panel.md):
  * the selected thread's MCP servers as Claude last reported them, one card each
  * (name, version, status pill; scope · transport · tools; the error or the login hint;
  * Reconnect and the tools disclosure), split into Connected / Failed / Disabled tabs with

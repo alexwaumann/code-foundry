@@ -11,7 +11,7 @@ import (
 
 // plugin.env (docs/notes/plugins-3-events-flags-env.md): what plugins contribute to new
 // Claude threads (session/setEnvironment), as applied, with the issues found; new
-// bottom-panel shells get the env and PATH entries too (plugins-env-restart.md).
+// shells get the env and PATH entries too (plugins-env-restart.md).
 
 // PluginEnvBackend is the slice of PluginService plugin.env needs.
 type PluginEnvBackend interface {
@@ -80,6 +80,6 @@ func formatPluginEnvs(name string, envs []*v1.PluginEnvironment) string {
 
 // pluginEnvApplies closes plugin.env's listing: who gets the contribution, and when
 // (docs/notes/plugins-env-restart.md).
-const pluginEnvApplies = "New threads in scope get this, and new bottom-panel shells in scope get the env and PATH " +
+const pluginEnvApplies = "New threads in scope get this, and new terminal shells in scope get the env and PATH " +
 	"entries too. Running threads and shells keep what they started with; a thread shows \"Plugin environment changed\" " +
 	"until restarted (thread restart <id>)."

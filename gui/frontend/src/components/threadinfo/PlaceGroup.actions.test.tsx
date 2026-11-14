@@ -16,7 +16,7 @@ const { useActionsStore } = await import("@/stores/actions");
 /**
  * The thread info card's action row (docs/notes/actions-2-gui.md): its ellipsis lists the
  * project's actions and an item runs one for the thread (action.run --terminal in the
- * thread's context). The run's tab is src/components/bottom/BottomPanel.test.tsx's.
+ * thread's context). The keyboard going into the run's tab is src/stores/actionActions.test.ts's.
  */
 
 beforeEach(() => {

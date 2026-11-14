@@ -52,7 +52,7 @@ export type Action = Message<"codefoundry.v1.Action"> & {
   icon: ActionIcon;
 
   /**
-   * Runs open as a terminal in the bottom panel; false: in the background.
+   * Runs open as a terminal (a terminal tab); false: in the background.
    *
    * @generated from field: bool in_terminal = 6;
    */
@@ -545,7 +545,7 @@ export type RunActionRequest = Message<"codefoundry.v1.RunActionRequest"> & {
 
   /**
    * The owning thread: the run goes to the thread's checkout of the action's project
-   * (its bottom panel, its run records). Wins over worktree_path.
+   * (its terminal tabs, its run records). Wins over worktree_path.
    *
    * @generated from field: string thread_id = 2;
    */
@@ -909,7 +909,7 @@ export enum ActionRunMode {
   UNSPECIFIED = 0,
 
   /**
-   * In a terminal (labels kind=action) in the owner's bottom panel.
+   * In a terminal (labels kind=action), shown as a tab beside its owner.
    *
    * @generated from enum value: ACTION_RUN_MODE_TERMINAL = 1;
    */
@@ -1085,8 +1085,8 @@ export const ActionService: GenService<{
     output: typeof DeleteActionResponseSchema;
   },
   /**
-   * Run starts an action for an owner: a thread (thread_id; the run belongs to its
-   * bottom panel) or a worktree (worktree_path). It returns the run as soon as it has
+   * Run starts an action for an owner: a thread (thread_id; its terminal tab is linked
+   * to the thread) or a worktree (worktree_path). It returns the run as soon as it has
    * started.
    *
    * @generated from rpc codefoundry.v1.ActionService.Run

@@ -4,7 +4,7 @@ import { threadKey } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { pullRequestDetailResource, pullRequestKey } from "@/stores/gh";
 import { usePrPrefetch } from "@/stores/prPrefetch";
-import { showThreadView } from "@/stores/threadPanelIntent";
+import { openPullRequestInPanel } from "@/stores/prPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { linkedPrTag, linkedPrTagText } from "./linkedPrTag";
@@ -19,10 +19,9 @@ function selectThread(id: string): void {
 }
 
 /**
- * Where a click on the tag goes: every counted pull request opens in the thread's PR panel
- * tab (view.panel.pr's ShowView, scoped to the thread: the repo slug comes from the
- * thread's own link, `keys` being their pullRequestKeys), the shown one last so its tab is
- * the active one. The thread is selected first, so what opened shows. Each one's detail is
+ * Where a click on the tag goes: every counted pull request opens in a tab linked to the
+ * thread (the repo slug comes from the thread's own link, `keys` being their
+ * pullRequestKeys), without the focus, the shown one last so its tab is the active one. The thread is selected first, so what opened shows. Each one's detail is
  * read once as well, the shown one first because the daemon answers in order (the entry
  * stays): only the active tab reads its own, and a closed one must leave the tag, as it did
  * when the card read them all.
@@ -36,7 +35,7 @@ function openLinked(id: string, keys: readonly string[], shown: string | null): 
   for (const key of [...lead, ...rest]) void pullRequestDetailResource.readOnce(key);
   for (const key of [...rest, ...lead]) {
     const link = linkOf(key);
-    if (link) showThreadView("panel.pr", id, { slug: link.slug, number: String(link.number) });
+    if (link) openPullRequestInPanel({ slug: link.slug, number: link.number }, `thread:${id}`, { focus: false });
   }
 }
 

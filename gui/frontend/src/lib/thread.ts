@@ -135,6 +135,17 @@ export function statusNote(s: Pick<ThreadView, "statusReason">): string {
  */
 export type AttentionTier = "prompt" | "done" | "";
 
+/**
+ * Whether the thread is blocked until the user acts (docs/notes/shell-model.md, "Needs you"): a
+ * permission prompt, a question from the model, a plan to approve, or a folder trust dialog. A
+ * notification or bell, an API error at the prompt, a woken snooze, any other attention reason
+ * and a plugin's flag call for the user without blocking: they are not actionable asks.
+ */
+export function isActionableAsk(s: Pick<ThreadView, "status" | "statusReason">): boolean {
+  const kind = statusKind(s);
+  return s.status === "attention" && (kind === "permission" || kind === "question" || kind === "plan" || kind === "trust");
+}
+
 export function attentionTier(s: Pick<ThreadView, "status" | "statusReason">): AttentionTier {
   if (s.status !== "attention") return "";
   return statusKind(s) === "done" ? "done" : "prompt";

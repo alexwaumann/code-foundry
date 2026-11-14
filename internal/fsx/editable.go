@@ -12,7 +12,7 @@ import (
 var byteOrderMark = []byte{0xEF, 0xBB, 0xBF}
 
 // Editable asks what Write and the File tab's editor would, before an agent sends the user
-// to a tab that cannot save (view.panel.file --edit): Write's reach, then the rule of canEdit
+// to a tab that cannot save (view.open.file --edit): Write's reach, then the rule of canEdit
 // in gui/frontend/src/api/files.ts. Paths are as for ReadFile. It returns the absolute, cleaned
 // path asked for, where nothing may be yet: a create can make it.
 //

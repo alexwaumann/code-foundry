@@ -6,7 +6,7 @@
  */
 import type { BranchPullRequestsView, PullRequestView } from "@/api/gh";
 import { deriveContext } from "@/stores/context";
-import { makeTab, pullRequestTabId, type Tab } from "@/stores/panel";
+import { makeTab, pullRequestTabId, type Tab } from "@/shell/host";
 import { findWorktree, type ProjectsData } from "@/stores/projects";
 import type { ResourceEntry } from "@/stores/resource";
 import type { ThreadsData } from "@/stores/threads";

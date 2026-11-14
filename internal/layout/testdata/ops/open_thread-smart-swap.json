@@ -1,0 +1,84 @@
+{
+  "doc": "Opening a thread whose tab is open focuses it and runs smart swap.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-b","kind":"thread","thread":"th-b"}
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-da","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-db","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-da"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-b","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-b","kind":"thread","thread":"th-b"}
+              ],
+              "active": "t-b"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-da","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-db","kind":"diff","thread":"th-b","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-db"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-b","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a","last":{"diff":"t-da"}}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-b","existing":true,"rule":"1","swapped":["p-b"]}
+}

@@ -1,10 +1,10 @@
 /**
- * Files each side panel showed in a File tab, most recent first: the file finder's
+ * Files each thread showed in a File tab, most recent first: the file finder's
  * "Recently opened" group (lib/fileFinder.ts emptyGroups). A file counts when its tab
  * becomes the active tab of one of the panel's groups (opened, or switched to), however
  * that happened (a path chip, the finder, view.panel.file), and stays after its tab
  * closes. A tab that is its thread's page (view.panel.page) does not count. Keyed by the
- * panel's key (stores/panel.ts keyOf), RECENT_FILES_MAX per panel, persisted beside the
+ * panel's key (shell/host.ts targetOf), RECENT_FILES_MAX per panel, persisted beside the
  * panel's state (localStorage "code-foundry.recent-files"); a removed thread's list is
  * dropped with its panel (stores/archiveCleanup.ts).
  */
@@ -12,7 +12,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { FILE_KIND, fileOfTab } from "@/surfaces/fileTarget";
 import { isRecord, persistedRecord, recordOf } from "./persisted";
-import { allTabs, usePanelStore, type PanelEntry } from "./panel";
+import { subscribeTabs, type TabPlace } from "@/shell/host";
 
 /** A file a File tab showed: its tab's params. */
 export interface RecentFile {
@@ -76,12 +76,12 @@ export function useRecentFiles(panelKey: string): readonly RecentFile[] {
  * that is a File tab (not a thread's page) and was not that group's active tab before.
  * Pure.
  */
-export function newlyShownFiles(prev: PanelEntry | undefined, next: PanelEntry): RecentFile[] {
+export function newlyShownFiles(prev: TabPlace | undefined, next: TabPlace): RecentFile[] {
   const out: RecentFile[] = [];
   next.groups.forEach((g, i) => {
-    if (!g.activeTabId || g.activeTabId === prev?.groups[i]?.activeTabId) return;
-    const tab = allTabs(next).find((t) => t.id === g.activeTabId);
-    if (tab?.kind !== FILE_KIND) return;
+    const tab = g.active;
+    if (!tab || tab.id === prev?.groups[i]?.active?.id) return;
+    if (tab.kind !== FILE_KIND) return;
     const f = fileOfTab(tab);
     if (!f || f.page || !f.path.startsWith("/")) return;
     out.push({ project: f.project, base: f.base, path: f.path });
@@ -91,10 +91,9 @@ export function newlyShownFiles(prev: PanelEntry | undefined, next: PanelEntry):
 
 /** Records the File tabs every panel shows from now on (App's startApp). Returns the stop. */
 export function startRecentFiles(): () => void {
-  return usePanelStore.subscribe((s, prev) => {
-    if (s.byKey === prev.byKey) return;
-    for (const [key, e] of Object.entries(s.byKey)) {
-      const before = prev.byKey[key];
+  return subscribeTabs((now, prev) => {
+    for (const [key, e] of Object.entries(now)) {
+      const before = prev[key];
       if (e === before) continue;
       for (const f of newlyShownFiles(before, e)) addRecentFile(key, f);
     }

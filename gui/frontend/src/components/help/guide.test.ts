@@ -39,6 +39,7 @@ describe("the bundled guide", () => {
       { level: 3, title: "Start a thread" },
       { level: 3, title: "Where changes go" },
       { level: 3, title: "Right after you send" },
+      { level: 3, title: "The window" },
       { level: 3, title: "While it runs" },
       { level: 3, title: "Review and ship" },
       { level: 3, title: "Find anything" },

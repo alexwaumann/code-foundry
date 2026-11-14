@@ -1,0 +1,117 @@
+{
+  "doc": "A tab dropped on the outer edge of the grid gets a full-length pane there.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-t",
+                  "tabs": [
+                    {"id":"t-t","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+                  ],
+                  "active": "t-t"
+                }
+              ],
+              "sizes": [0.62,0.38]
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"move_tab","tab":"t-t","edge":"bottom","frac":0.25},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "col",
+          "kids": [
+            {
+              "t": "split",
+              "id": "s-r",
+              "dir": "row",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-b",
+                  "tabs": [
+                    {
+                      "id": "t-d",
+                      "kind": "diff",
+                      "thread": "th-a",
+                      "params": {"project":"pj-1","worktree":"w-1"}
+                    }
+                  ],
+                  "active": "t-d"
+                }
+              ],
+              "sizes": [0.55,0.45]
+            },
+            {
+              "t": "pane",
+              "id": "p-n1",
+              "tabs": [
+                {"id":"t-t","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+              ],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.75,0.25]
+        },
+        "focus": "p-n1",
+        "mru": ["t-t","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-t"}
+}

@@ -36,7 +36,7 @@ plugin's validation message), `required`, `disabled`, and exactly one control:
   either "") bounds the days offered. Validate refuses a value that is not an ISO date or
   lies outside the bounds, and the host refuses such a submit or change, so a non-empty
   value always parses with `time.Parse(time.DateOnly, v)`. A date has no `pattern`,
-  `maxLength` or `mono`; it fits a toolbar or footer at its own width, and in the panel's
+  `maxLength` or `mono`; it fits a toolbar or footer at its own width, and in the body's
   column it is as wide as the form. `value` (never for a secret),
   `placeholder`, `maxLength`, `pattern` (a regular expression, at most 256 characters,
   no quantified group holding a quantifier such as `(a+)+`, `(-[a-z]+)*` or `(a+){30}`
@@ -103,7 +103,7 @@ who := ui.PickerField("f-who", "assignee", "Assignee", "search-people", // the s
 - In the body the trigger is the dropdown's. In a toolbar it is compact, the label then the
   picks ("Assignee  Me, Kim"); a toolbar form of only pickers is as wide as its triggers.
   The popover is the trigger's width in the body, 288 px from a toolbar; both fit the
-  420 px panel.
+  narrowest pane (480 px).
 
 **Drafts.** The host keeps what the user typed (per instance and tab) across new views,
 so re-rendering does not wipe a half-filled form. A submit the plugin takes drops the

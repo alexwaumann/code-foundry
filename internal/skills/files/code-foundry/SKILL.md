@@ -9,14 +9,14 @@ user-invocable: false
 {{cf.provenance}}
 
 Code Foundry is the macOS app this thread runs in: it runs Claude Code threads (conversations
-like this one) on the user's projects in one window with a sidebar, pages and a side panel per
-thread. The `code-foundry` CLI drives it (most buttons are commands too) and changes the real app.
+like this one) on the user's projects in one window with a sidebar and panes of tabs: a thread,
+and its diff, files and pull requests beside it. The `code-foundry` CLI drives it (most buttons are commands too) and changes the real app.
 
 ## The one rule
 
 If the CLI can do it, offer it and do it. A question ("how do I…?") gets the answer and the offer;
 run a change once the user says yes (code-foundry-help). Talk about the app as the user sees it:
-pages, buttons, the side panel, Settings labels; never skill or command names.
+pages, tabs, buttons, Settings labels; never skill or command names.
 
 ## Which skill or command
 
@@ -28,8 +28,8 @@ pages, buttons, the side panel, Settings labels; never skill or command names.
 | A thread's model, effort or permission mode | `thread get --json` reads them; `thread.set-model '<id>'` (ids: its `--help`), `thread.set-effort <level>`, `thread.set-mode <mode>` change them. The app replaces /model, /effort, /fast, /mcp, /rename and /clear: the composer's pickers, the MCP panel, Rename Thread, a new thread |
 | What changed in this thread | The branch's commits since its base (`baseRef` in `thread get --json`, else origin's default branch) plus uncommitted work, not uncommitted work alone |
 | This thread's checkouts, subagents, child threads, MCP servers, linked PRs | `thread checkouts`; `thread agents`; `thread list --created-by $CODE_FOUNDRY_THREAD`; `thread mcp` (your session's start list goes stale); `thread get --json`'s `linkedPullRequests`, `thread pr link <url>` adds one |
-| To see a file, a change, a PR or a set of images | `view.panel.file <path>`, `view.panel.diff [<path>…]` (`--base`, `--head`: any two sides; `--title`, `--note`, `--hide`: its `--help`), `view.panel.pr <n>`, `view.panel.mcp`, `view.panel.gallery --title <t> --images -` (JSON; its `--help`): your own side panel; `--focus` only when asked to be taken there |
-| A secret value, or a change to a file you cannot read (`.env`, `~/.aws/credentials`) | Never ask for it in chat or read the file: `view.panel.file <path> --edit --line N --note "<what goes where>"` (a missing file is made on save), then end your turn. Told it is saved, continue without reading its values |
+| To see a file, a change, a PR or a set of images | `view.open.file <path>`, `view.open.diff [<path>…]` (`--base`, `--head`: any two sides; `--title`, `--note`, `--hide`: its `--help`), `view.open.pr <n>`, `view.open.mcp`, `view.open.gallery --title <t> --images -` (JSON; its `--help`): a tab beside you, never the user's focus; `--focus` only when asked to be taken there |
+| A secret value, or a change to a file you cannot read (`.env`, `~/.aws/credentials`) | Never ask for it in chat or read the file: `view.open.file <path> --edit --line N --note "<what goes where>"` (a missing file is made on save), then end your turn. Told it is saved, continue without reading its values |
 | A page, chart, form, board, dashboard, mockup, checklist or tool you make; a to-do to tick off; anything "as a page" or "I can fill in" | the code-foundry-pages skill first: an `.html` file in `$CODE_FOUNDRY_PAGES` (never the repository) with `/cf/theme.css`, and `/cf/bridge.js`, which sizes its card; shown with `code-foundry view.inline <path>`, not markdown |
 | What's running or going on, their work | This app's threads, actions and terminals, never the Mac's processes: `code-foundry thread list`, `action runs`, `terminal list`; a board of it: the code-foundry-pages skill |
 | The app's colours: a theme, "sidebar quieter", "less contrast", the accent | `reference/making-a-theme.md`, before you change anything |

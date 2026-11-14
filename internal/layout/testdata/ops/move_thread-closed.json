@@ -1,0 +1,97 @@
+{
+  "doc": "Moving a thread with no tab open takes its linked tabs in its space to the target's focused pane and keeps its remembered set.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {"t":"pane","id":"p-x","tabs":[{"id":"t-q","kind":"projects"}],"active":"t-q"},
+        "focus": "p-x"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+              "pane": "p-b",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"move_thread","thread":"th-a","space":"sp-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-x",
+          "tabs": [
+            {"id":"t-q","kind":"projects"},
+            {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+          ],
+          "active": "t-q"
+        },
+        "focus": "p-x"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-b",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+              "pane": "p-b",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-b","placed":["t-d"]}
+}

@@ -143,3 +143,26 @@ describe("runCommand toasts", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 });
+
+describe("command guards", () => {
+  beforeEach(() => {
+    invokeCommand.mockReset();
+  });
+
+  it("a guard that says no stops the app's own call before the daemon sees it; a plugin's call is not guarded", async () => {
+    const { registerCommandGuard } = await import("./commandGuards");
+    const { runCommandForResult } = await import("./commands");
+    const guard = vi.fn(() => Promise.resolve(false));
+    const stop = registerCommandGuard("thread.archive", guard);
+    invokeCommand.mockResolvedValue(ok);
+    await expect(runCommand("thread.archive", { archived: "true" }, ctx)).resolves.toBe(false);
+    expect(guard).toHaveBeenCalledWith({ archived: "true" }, ctx);
+    expect(invokeCommand).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    await expect(runCommandForResult("thread.archive", {}, { ctx, caller: "a plugin" })).resolves.toEqual(ok);
+    expect(guard).toHaveBeenCalledTimes(1);
+    guard.mockResolvedValue(true);
+    await expect(runCommand("thread.archive", { archived: "true" }, ctx)).resolves.toBe(true);
+    stop();
+  });
+});

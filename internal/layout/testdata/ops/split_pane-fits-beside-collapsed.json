@@ -1,0 +1,81 @@
+{
+  "doc": "A pane the user collapsed costs only its 36px rail: 36 + 12 + 480 + 12 + 480 = 1020px fits a 1100px wide area, so the split goes ahead.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"}],
+              "active": "t-p",
+              "collapsed": true
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            }
+          ],
+          "sizes": [0.3,0.7]
+        },
+        "focus": "p-b",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "split_pane",
+    "pane": "p-b",
+    "edge": "right",
+    "tab": {"id":"","kind":"projects"},
+    "w": 1100,
+    "h": 900
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"}],
+              "active": "t-p",
+              "collapsed": true
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {"t":"pane","id":"p-n1","tabs":[{"id":"t-n1","kind":"projects"}],"active":"t-n1"}
+          ],
+          "sizes": [0.3,0.35,0.35]
+        },
+        "focus": "p-b",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-n1","tab":"t-n1"}
+}

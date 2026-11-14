@@ -80,9 +80,27 @@ message Terminal {
   //   title     on kind "setup": the tab's title, "Setup <skill>" (and on a plugin's
   //             terminal, kind "plugin", the title the plugin gave).
   // An action terminal carries the same thread / project / worktree owner labels as a
-  // shell, so a bottom panel shows both the same way.
+  // shell, so a terminal tab shows both the same way.
   // A terminal created through Create without labels belongs to nothing.
+  //   slot      "quick" on a thread's quick terminal (one per thread; terminal.new
+  //             --quick). A shell without it is an ordinary terminal tab.
+  //   replaces  on a shell terminal.reset started: the id of the terminal it replaces
+  //             (closed right after), so a tab can move to the new one.
+  // A free shell (terminal.new-free) is kind "shell" with no thread, project or
+  // worktree: it starts in the home directory, belongs to the tab that shows it, and
+  // is removed when it exits, never because a thread or project went away.
   map<string, string> labels = 12;
+  // What the process is doing now, read from the process table (no shell integration)
+  // shortly after output and while the terminal is quiet. An older daemon leaves them
+  // empty.
+  // The main process's working directory now (a shell's after cd); cwd until read.
+  string live_cwd = 13;
+  // The command line of the job in the terminal's foreground when it is not the main
+  // process (what runs in a shell; a pipeline's first process), quoted for a shell.
+  // Empty at the shell's prompt. A line over 4 KiB is cut and ends in "…".
+  string foreground = 14;
+  // The last foreground command that ended, or gave way to another job.
+  string last_command = 15;
 }
 
 message CreateTerminalRequest {
@@ -185,7 +203,8 @@ message CloseTerminalResponse {}
 
 message TerminalEvent {
   oneof event {
-    // Emitted on create and whenever title/size/alt_screen/state change.
+    // Emitted on create and whenever title/size/alt_screen/state or
+    // live_cwd/foreground/last_command change.
     Terminal updated = 1;
     // Emitted on Remove.
     string removed_id = 2;

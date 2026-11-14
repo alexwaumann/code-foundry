@@ -16,7 +16,7 @@ import type { TaskItem } from "@/lib/taskItems";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
 import { runCommand, runCommandForResult } from "./commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
-import { allTabs, getPanel, openSurface, usePanelStore, type PanelState, type PanelTarget, type Tab } from "./panel";
+import { findTab, openTab, subscribeTabs, type Tab, type TabPlaces, type TabTarget } from "@/shell/host";
 import { createResource, type Resource } from "./resource";
 
 export type PrInnerTab = "overview" | "activity" | "code";
@@ -44,7 +44,7 @@ export const defaultPrTabState: PrTabState = { inner: "overview", commentOrder: 
 export const sectionOpenByDefault: Record<PrSection, boolean> = { description: true, fullDescription: false, checks: false, comments: true, files: true };
 
 interface PrPanelState {
-  /** By prTabKey(panelKey, tabId). */
+  /** By the pull request tab's layout id, linked or not (a tab is known by its id wherever it is). */
   byTab: Readonly<Record<string, PrTabState>>;
   /** pullRequestKey → a pr.refresh in flight. */
   refreshing: Readonly<Record<string, boolean>>;
@@ -73,22 +73,21 @@ interface PrPanelState {
 
 export const usePrPanelStore = create<PrPanelState>()(() => ({ byTab: {}, refreshing: {}, requesting: {}, confirmed: {}, merging: {}, reviewing: {}, changing: {}, reverting: {}, taskChecks: {}, mergeMethods: {} }));
 
-export const prTabKey = (panelKey: string, tabId: string): string => `${panelKey}\u0000${tabId}`;
-
-/** Drops inner state of tabs no panel holds any more (a closed tab reopens fresh). */
-function pruneClosedTabs(panels: PanelState): void {
+/**
+ * Drops inner state of tabs no pane holds any more (a closed tab reopens fresh). Every open tab is
+ * in its pane's place, so a tab moved, resized around or shown from another selection keeps its own.
+ */
+function pruneClosedTabs(places: TabPlaces): void {
   const byTab = usePrPanelStore.getState().byTab;
   const keys = Object.keys(byTab);
   if (keys.length === 0) return;
   const live = new Set<string>();
-  for (const [panelKey, e] of Object.entries(panels.byKey)) for (const t of allTabs(e)) live.add(prTabKey(panelKey, t.id));
+  for (const p of Object.values(places)) for (const t of p.tabs) live.add(t.id);
   if (keys.every((k) => live.has(k))) return;
   usePrPanelStore.setState({ byTab: Object.fromEntries(Object.entries(byTab).filter(([k]) => live.has(k))) });
 }
 
-usePanelStore.subscribe((s, prev) => {
-  if (s.byKey !== prev.byKey) pruneClosedTabs(s);
-});
+subscribeTabs(pruneClosedTabs);
 
 export function updatePrTab(key: string, f: (s: PrTabState) => PrTabState): void {
   usePrPanelStore.setState((s) => ({ byTab: { ...s.byTab, [key]: f(s.byTab[key] ?? defaultPrTabState) } }));
@@ -124,18 +123,18 @@ export const reviewerCandidatesResource = createResource(
 );
 
 /**
- * Opens a pull request in a side panel: the current selection's (a row on the Pull
- * Requests page or the worktree overview), or a thread's (view.panel.pr,
- * stores/threadPanelIntent.ts). Returns false with nothing selected.
+ * Opens a pull request's tab: the current selection's (a row on the Pull Requests page or the
+ * worktree overview), or a thread's (the sidebar's linked pull request tag, with
+ * `focus: false`). Returns false with nothing selected.
  */
-export function openPullRequestInPanel(ref: PrRef, target: PanelTarget = "current"): boolean {
-  return openSurface(target, panelPullRequestTab(ref, target));
+export function openPullRequestInPanel(ref: PrRef, target: TabTarget = "current", opts: { focus?: boolean } = {}): boolean {
+  return openTab(target, panelPullRequestTab(ref, target), opts);
 }
 
 /** The tab to open for a pull request: the one the panel holds, so it keeps the slug it shows, else a new one. */
-export function panelPullRequestTab(ref: PrRef, target: PanelTarget): Tab {
+export function panelPullRequestTab(ref: PrRef, target: TabTarget): Tab {
   const tab = pullRequestTab(ref);
-  return allTabs(getPanel(target)).find((t) => t.id === tab.id) ?? tab;
+  return findTab(target, tab.id) ?? tab;
 }
 
 export const prArgs = (ref: PrRef): Record<string, string> => ({ "repo-slug": ref.slug, number: String(ref.number) });
@@ -248,7 +247,7 @@ export async function setReviewRequest(ref: PrRef, login: string, kind: "user" |
  * the same panel. Returns the new pull request, or null; a second call while one runs
  * sends nothing, so it cannot open a second revert.
  */
-export async function revertPullRequest(ref: PrRef, panel: PanelTarget): Promise<PrRef | null> {
+export async function revertPullRequest(ref: PrRef, panel: TabTarget): Promise<PrRef | null> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().reverting[key]) return null;
   usePrPanelStore.setState((s) => ({ reverting: { ...s.reverting, [key]: true } }));

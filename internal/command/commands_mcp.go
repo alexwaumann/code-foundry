@@ -11,10 +11,11 @@ import (
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
 )
 
 // A thread's MCP servers (docs/notes/mcp-panel.md): thread.mcp prints them,
-// thread.mcp-reconnect reconnects one, view.panel.mcp opens the GUI's MCP surface.
+// thread.mcp-reconnect reconnects one, view.open.mcp (view.panel.mcp) opens the GUI's MCP surface.
 
 // McpBackend is the slice of ThreadService the MCP commands need, in generated Connect
 // signatures. The API handler, any ThreadServiceHandler and a ThreadServiceClient
@@ -22,7 +23,7 @@ import (
 type McpBackend interface {
 	McpStatus(context.Context, *connect.Request[v1.McpStatusRequest]) (*connect.Response[v1.McpStatusResponse], error)
 	McpReconnect(context.Context, *connect.Request[v1.McpReconnectRequest]) (*connect.Response[v1.McpReconnectResponse], error)
-	// view.panel.mcp --thread checks the thread exists.
+	// view.open.mcp --thread checks the thread exists.
 	ThreadGetter
 }
 
@@ -31,17 +32,25 @@ var (
 	_ McpBackend = codefoundryv1connect.ThreadServiceClient(nil)
 )
 
-// ViewPanelMcp is the ShowView name that opens (or reveals) the MCP surface in the side
-// panel of the selected thread: its MCP servers with status, tools and Reconnect. An
-// action on per-selection GUI state like ViewPanelToggle; a window whose selection is
-// not a thread ignores it.
-const ViewPanelMcp = "panel.mcp"
+// McpOption configures RegisterMcp.
+type McpOption func(*tabs)
 
-// RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.panel.mcp.
-func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
+// WithMcpLayout gives view.open.mcp the window's layout, where it opens the thread's MCP tab.
+// Without it view.open.mcp refuses: there is nowhere to open the tab.
+func WithMcpLayout(l layoutstore.Store) McpOption {
+	return func(o *tabs) { o.store = l }
+}
+
+// RegisterMcp registers thread.mcp, thread.mcp-reconnect and view.open.mcp with its classic
+// alias view.panel.mcp.
+func RegisterMcp(r *Registry, b McpBackend, e Emitter, opts ...McpOption) error {
+	var o tabs
+	for _, opt := range opts {
+		opt(&o)
+	}
 	idArg := ArgSpec{Name: "id", Type: String, Required: true, Context: ContextThread, ID: ThreadID, Description: "Thread id" + IDHelp}
-	return r.RegisterAll(
-		Command{
+	cmds := []Command{
+		{
 			Name:      "thread.mcp",
 			Page:      PageDrives,
 			NoPalette: true,
@@ -71,7 +80,7 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 			NoPalette: true,
 			Title:     "Reconnect Thread MCP Server",
 			Description: "Reconnect one of a thread's MCP servers (starting Claude if it is not running), then check them again. " +
-				"It picks up a login made with /mcp in an interactive claude (a bottom-panel shell).",
+				"It picks up a login made with /mcp in an interactive claude (a terminal tab).",
 			Category: "Thread",
 			Args: []ArgSpec{
 				idArg,
@@ -97,21 +106,30 @@ func RegisterMcp(r *Registry, b McpBackend, e Emitter) error {
 				return Result{Message: msg, JSON: res.Msg}, nil
 			},
 		},
-		Command{
-			Name:  "view.panel.mcp",
-			Page:  PageState,
-			Title: "Show MCP Servers",
-			Description: "Open the MCP surface in a thread's side panel (from a thread: its own; in the app: the selected one): " +
-				"the thread's MCP servers with status, errors and tools, and Reconnect.",
-			Category: "View",
-			// No default chord: in the app the thread info card's MCP row opens it.
-			When: hasThread,
-			Args: panelThreadArgs(),
-			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
-				return showPanel(ctx, b, e, uctx, a, ViewPanelMcp, nil)
-			},
+	}
+	return r.RegisterAll(append(cmds, withAliases(mcpOpenCommand(o, b, e))...)...)
+}
+
+// mcpOpenCommand is view.open.mcp.
+func mcpOpenCommand(o tabs, b McpBackend, e Emitter) Command {
+	return Command{
+		Name:  "view.open.mcp",
+		Page:  PageState,
+		Title: "Show MCP Servers",
+		Description: "Open the MCP surface " + openLead +
+			"the thread's MCP servers with status, errors and tools, and Reconnect.",
+		Category: "View",
+		// No default chord: in the app the thread info card's MCP row opens it.
+		When: hasThread,
+		Args: []ArgSpec{openThreadArg, openFocusArg, openPaneArg},
+		Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+			id := a.String("thread")
+			if id == "" {
+				return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
+			}
+			return showTab(ctx, o, b, e, uctx, a, id, tabMcp, nil)
 		},
-	)
+	}
 }
 
 var mcpStatusWords = map[v1.McpServerStatus]string{

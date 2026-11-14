@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, openWorkspacePage, resetMock } from "./fixtures";
+import { mockPost, openWorkspacePage, resetMock } from "./fixtures";
+import { paneOf } from "./shell";
+import { openProjectsTab } from "./shell-pages";
 
 /**
  * A workspace's page on the Projects view (docs/notes/projects-redesign-3-workspace-page.md):
@@ -26,21 +28,22 @@ async function twoWorkspaces(): Promise<{ shop: string; mono: string }> {
 
 // A rooted workspace's folder row, its root marked missing, its instructions and skills, and View opening
 // the root's CLAUDE.md as a File tab in the page's own panel: src/components/projects/WorkspacePage.test.tsx.
-// Left: that tab drawn in the page's side panel.
-test("a rooted workspace: View opens the root's instructions as a File tab in the page's own panel", async ({ page }) => {
+// Left: that tab drawn, in the page's pane (shell-model.md: a surface that belongs to no thread).
+test("a rooted workspace: View opens the root's instructions as a File tab in the page's own pane, shown", async ({ page }) => {
   const { mono } = await twoWorkspaces();
-  await openApp(page);
+  await openProjectsTab(page);
   await openWorkspacePage(page, mono);
   await body(page, mono).getByTestId("workspace-instructions-open").click();
-  const panel = page.getByTestId("side-panel");
-  await expect(panel).toHaveAttribute("data-panel-key", `view:projects:workspace:${mono}`);
-  await expect(panel.getByRole("tab", { selected: true })).toHaveText("CLAUDE.md");
+  const tab = paneOf(page, "p-1").locator('[data-testid="shell-tab"][data-kind="file"]');
+  await expect(tab).toHaveText("CLAUDE.md");
+  await expect(tab).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("file-tab")).toBeVisible();
 });
 
 // Start here on a project and on a rooted workspace's folder, its args and the pill moving: WorkspacePage.test.tsx. Left: the hover-only CSS.
 test("a member's actions (Start here) are hidden at rest and shown on hover", async ({ page }) => {
   const { shop } = await twoWorkspaces();
-  await openApp(page);
+  await openProjectsTab(page);
   await openWorkspacePage(page, shop);
   const cf = member(page, shop, "repo-cf");
   await expect(cf.getByTestId("member-actions")).toHaveCSS("opacity", "0");
@@ -61,7 +64,7 @@ test("a member's actions (Start here) are hidden at rest and shown on hover", as
 // in a dropdown (not a context menu) hovers as two blocks, the › block the item's last 32px.
 test("the page ⋯'s Open in Finder is the split item: › block at full height, its submenu on hover there, a click on its text reveals", async ({ page }) => {
   const { mono } = await twoWorkspaces();
-  await openApp(page);
+  await openProjectsTab(page);
   await openWorkspacePage(page, mono);
   await page.getByTestId("workspace-page-more").click();
   const split = page.getByTestId("workspace-menu-reveal");

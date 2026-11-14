@@ -1,0 +1,64 @@
+{
+  "doc": "A draft opens in the space that lists it, which becomes current.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-b",
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_draft","draft":"d-1","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Space B",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-n1","kind":"compose","params":{"draft":"d-1"}}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-b",
+        "mru": ["t-n1"],
+        "drafts": [{"id":"d-1","label":"Fix"}]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-b","pane":"p-b","tab":"t-n1","rule":"focused","draft":"d-1"}
+}

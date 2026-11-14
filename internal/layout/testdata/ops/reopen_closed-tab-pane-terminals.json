@@ -1,0 +1,69 @@
+{
+  "doc": "A closed tab whose old pane now holds only terminals, and would not fit it, is placed as it would open now: the focused pane.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-p","t-t"],
+        "closed": [
+          {"pane":"p-b","tabs":[{"id":"t-f","kind":"file","params":{"path":"/f"}}],"index":0}
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed","w":900,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-f","kind":"file","params":{"path":"/f"}}],
+              "active": "t-f"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.6,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-f","t-p","t-t"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-f"}
+}

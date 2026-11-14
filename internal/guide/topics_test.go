@@ -33,6 +33,16 @@ func TestWriteTopic(t *testing.T) {
 	if i, j := strings.Index(out, "## Conventions"), strings.Index(out, "## Thread\n"); i < 0 || j < i || !strings.Contains(out, "- `thread.new") {
 		t.Errorf("topic thread:\n%s", out)
 	}
+	// So has the layout topic, with the verbs that arrange the window.
+	buf.Reset()
+	if err := WriteTopic(&buf, cmds, "layout"); err != nil {
+		t.Fatal(err)
+	}
+	out = buf.String()
+	if i, j := strings.Index(out, "Never move the user's focus"), strings.Index(out, "## Layout\n"); i < 0 || j < i ||
+		!strings.Contains(out, "- `layout.show") || !strings.Contains(out, "- `tab.move") || !strings.Contains(out, "- `thread.open") {
+		t.Errorf("topic layout:\n%s", out)
+	}
 	for _, name := range []string{"bogus", "plugin", "skill"} {
 		buf.Reset()
 		err := WriteTopic(&buf, cmds, name)

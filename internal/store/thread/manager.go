@@ -145,6 +145,13 @@ type Options struct {
 	// thread's worktree-mode worktrees nobody else has from it, as for an archive
 	// (docs/notes/remove-cleans-worktrees.md).
 	Removed func(t Thread)
+	// ShellsGoing, when set, is called when a thread's shells are about to be killed and
+	// removed because it is archived, snoozed (or saved for later), or removed: after its
+	// process closed, before its shells go, without the store's lock (shells.go). It runs
+	// synchronously, so what it reads of the shells (what runs in them) is still there.
+	// The daemon's layout glue closes the thread's tabs there, a snooze keeping its
+	// terminal tabs to come back as fresh shells (docs/notes/shell-6-lifecycle.md).
+	ShellsGoing func(ctx context.Context, id string, why ShellsGo)
 	// Home is the cwd of a thread without a project (CreateOptions.NoProject). Default:
 	// os.UserHomeDir().
 	Home string
@@ -239,6 +246,9 @@ type Options struct {
 	// Now is the wall clock: timestamps, snooze validation and wake-ups, idle stops.
 	// Default time.Now.
 	Now func() time.Time
+	// batchClock is the wake batch window's clock (batchclock.go); tests set a manual
+	// one. Default the monotonic clock.
+	batchClock batchClock
 }
 
 func (o Options) withDefaults() (Options, error) {
@@ -317,6 +327,9 @@ func (o Options) withDefaults() (Options, error) {
 	def(&o.McpPollInterval, mcpPendingInterval)
 	if o.Now == nil {
 		o.Now = time.Now
+	}
+	if o.batchClock == nil {
+		o.batchClock = realClock{}
 	}
 	if o.ServerProbe == nil {
 		o.ServerProbe = lsofProbe{}
@@ -1329,7 +1342,7 @@ func (m *Manager) removeOne(ctx context.Context, id string) error {
 	if err := m.Close(ctx, id); err != nil {
 		return err
 	}
-	if err := m.removeShells(ctx, id); err != nil {
+	if err := m.removeShells(ctx, id, ShellsRemoved); err != nil {
 		return err
 	}
 	m.stopStrays(ctx, id) // what its Bash calls left running in its worktree (strays.go)

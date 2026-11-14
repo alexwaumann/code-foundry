@@ -110,6 +110,16 @@ type Terminal struct {
 	ExitedAt  time.Time
 	AltScreen bool
 	Labels    map[string]string
+	// LiveCwd is the main process's working directory now (a shell's after cd); Cwd
+	// until it has been read. Read from the process table (facts.go).
+	LiveCwd string
+	// Foreground is the command line of the job in the PTY's foreground when it is not
+	// the main process: what runs in a shell, as the process table gives it (a
+	// pipeline's first process). "" at the shell's prompt, or for a program that does not
+	// hand the terminal to a job. Cut at 4 KiB with a trailing "…" (CommandCut).
+	Foreground string
+	// LastCommand is the last Foreground that ended (or gave way to another job).
+	LastCommand string
 }
 
 // Snapshot reproduces a terminal's screen when written to a freshly reset emulator of
@@ -145,8 +155,9 @@ type Exit struct{ Code int }
 
 // Bus events published by the store.
 
-// TerminalUpdated is published on create and whenever title, size, alt screen, or
-// state change. Title and alt-screen changes are throttled per terminal.
+// TerminalUpdated is published on create and whenever title, size, alt screen, state,
+// or the facts (LiveCwd, Foreground, LastCommand) change. Title, alt-screen and facts
+// changes are throttled per terminal.
 type TerminalUpdated struct{ Terminal Terminal }
 
 // TerminalRemoved is published when a terminal is removed.
@@ -193,4 +204,8 @@ type Store interface {
 	// in ESC[200~ … ESC[201~ is then inserted as is (tabs are not completion, newlines
 	// do not run lines one by one). Must not be called from an Observer.
 	BracketedPaste(ctx context.Context, id string) (bool, error)
+	// SetLabels replaces a terminal's labels (Terminal.Labels) and publishes the change. The
+	// process is not touched. The first-load import uses it to make a running shell a
+	// thread's quick terminal (docs/notes/shell-18-legacy-import.md).
+	SetLabels(ctx context.Context, id string, labels map[string]string) (Terminal, error)
 }

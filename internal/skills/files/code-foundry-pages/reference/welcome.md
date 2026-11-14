@@ -4,23 +4,23 @@
 
 For the code-foundry-pages skill. A new install prefills the composer with "I just installed
 Code Foundry and have no projects yet. This is the welcome tutorial: open the page
-~/.code-foundry/pages/welcome.html in the side panel and walk me through it." The app writes that page at every
+~/.code-foundry/pages/welcome.html in a tab beside this conversation and walk me through it." The app writes that page at every
 start, in the home's `pages` folder: here `{{cf.welcomePage}}` (the path the prompt names). Only
 if that file is missing, copy `welcome.html` beside this file to
 `$CODE_FOUNDRY_PAGES/welcome.html` and show the copy. Do not write or rewrite it, and build
 nothing else; show it, then stop:
 
 ```sh
-code-foundry view.panel.page "<the path>" --title "Welcome"
+code-foundry view.open.page "<the path>" --title "Welcome"
 ```
 
-It opens in the side panel beside this conversation, not as an inline card (never
-`view.inline`): the user learns the panel first; later pages they ask for show inline. Never clone or read the app's
+It opens as a tab beside this conversation, not as an inline card (never
+`view.inline`): the user learns tabs first; later pages they ask for show inline. Never clone or read the app's
 source for this, and read no other skill first.
 
 Then reply with exactly these two lines and nothing else:
 
-> Your welcome page is open in the panel on the right: four steps, each a sentence you could
+> Your welcome page is open in a tab beside this conversation: four steps, each a sentence you could
 > type here. Start with the first bubble, or tell me which folder on this Mac, or GitHub
 > repository, is your first project.
 

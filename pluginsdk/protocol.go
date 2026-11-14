@@ -601,7 +601,7 @@ type ThreadListResult struct {
 }
 
 // TerminalCreateParams is terminal/create's params: a terminal the plugin owns, shown
-// in its terminal nodes and, on the user's request, in the bottom panel.
+// in its terminal nodes and, on the user's request, in a terminal tab.
 type TerminalCreateParams struct {
 	// Argv is the program and its arguments (argv[0] is looked up on PATH). For the
 	// user's own tools and aliases run "$SHELL", "-lc", "…".
@@ -610,7 +610,7 @@ type TerminalCreateParams struct {
 	Cwd string `json:"cwd,omitempty"`
 	// Env is added to the daemon's environment (checked like a session environment's).
 	Env map[string]string `json:"env,omitempty"`
-	// Title is the tab's title in the bottom panel (default argv[0]).
+	// Title is the terminal tab's title (default argv[0]).
 	Title string `json:"title,omitempty"`
 }
 

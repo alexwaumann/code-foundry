@@ -1,0 +1,23 @@
+{
+  "doc": "A compose tab naming a draft no space lists is refused.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"add_tab","tab":{"kind":"compose","params":{"draft":"d-1"}}},
+  "error": "not_found"
+}

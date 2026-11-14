@@ -8,6 +8,7 @@ const getPullRequestDiff = vi.hoisted(() => vi.fn());
 vi.mock("@/api/prDiff", async (orig) => ({ ...(await orig<typeof import("@/api/prDiff")>()), getPullRequestDiff }));
 // The diff renderer needs a real browser (shadow roots, layout): e2e/pr-code.spec.ts covers it.
 vi.mock("@pierre/diffs/react", () => ({ CodeView: () => <div data-testid="code-view-stub" /> }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { seedPrWorld, SLUG } = await import("@/test/prWorld");
@@ -16,7 +17,7 @@ const { applyGhEvent } = await import("@/stores/gh");
 const { pullRequestDiffResource } = await import("@/stores/prDiff");
 
 /**
- * The Code tab (PrCode) in the side panel: the file list's fold, when the diff is read again
+ * The Code tab (PrCode) in a pull request tab: the file list's fold, when the diff is read again
  * (the head moved, the refresh button), and GitHub's too-large refusal. The diff itself (the
  * library's CodeView) is e2e/pr-code.spec.ts's.
  */
@@ -56,10 +57,10 @@ function diffFor(headSha: string): PullRequestDiffView {
   return { diff: DIFF, headSha, truncated: false, fetchedAtMs: Date.now() };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDaemon();
   world = seedPrWorld();
-  resetPrStores();
+  await resetPrStores();
   pullRequestDiffResource.store.setState({ entries: {} });
   getPullRequestDiff.mockImplementation((slug: string, number: number) => {
     if (number === 140) return Promise.reject(new Error("too large: Sorry, the diff exceeded the maximum number of files (300). Consider using 'List pull requests files' API or locally cloning the repository instead."));

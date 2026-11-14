@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { openRowThread } from "./shell-threads";
 
 /**
  * The timeline's bottom inset is the composer dock's height (components/thread/activity.ts
@@ -50,8 +51,9 @@ for (const scheme of schemes) {
   await mockPost("thread/finish?rest=" + encodeURIComponent("\n\nDone."));
   await expect(page.getByTestId("thread-timeline").getByText("Done.")).toBeVisible();
 
-  // Another thread, then back: the dock is a new element.
-  await row(page, "s:s-2").click();
+  // Another thread, then back (tabs of one pane: only the active one is drawn): the dock is a new
+  // element. s-2 waits on the user: its row's first line opens it.
+  await openRowThread(page, "s-2");
   await expect(page.getByTestId("thread-pane")).toHaveAttribute("data-thread-id", "s-2");
   await openScripted(page);
   await expect(page.getByTestId("thread-timeline")).toHaveAttribute("data-at-bottom", "true");

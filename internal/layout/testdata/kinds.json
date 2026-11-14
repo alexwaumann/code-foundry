@@ -1,0 +1,42 @@
+[
+  {"kind":"compose","link":"none","scope":"space","key_params":["draft"],"default_frac":0.5},
+  {
+    "kind": "diff",
+    "link": "optional",
+    "scope": "space",
+    "key_params": ["project","worktree","thread","title"],
+    "default_frac": 0.45,
+    "floor_px": 480
+  },
+  {"kind":"ember.board","link":"required","scope":"space","default_frac":0.5},
+  {"kind":"file","link":"optional","scope":"space","key_params":["path"],"default_frac":0.35},
+  {"kind":"gallery","link":"required","scope":"space","key_params":["title"],"default_frac":0.45},
+  {"kind":"mcp","link":"required","scope":"space","default_frac":0.35},
+  {
+    "kind": "plugin.",
+    "link": "optional",
+    "scope": "space",
+    "key_params": ["scope"],
+    "default_frac": 0.35,
+    "prefix": true
+  },
+  {"kind":"projects","link":"none","scope":"space","default_frac":0.5},
+  {"kind":"prs","link":"none","scope":"space","default_frac":0.5},
+  {
+    "kind": "pullrequest",
+    "link": "optional",
+    "scope": "space",
+    "key_params": ["slug","number"],
+    "default_frac": 0.45,
+    "floor_px": 480
+  },
+  {
+    "kind": "terminal",
+    "link": "optional",
+    "scope": "global",
+    "key_params": ["terminal"],
+    "renameable": true,
+    "default_frac": 0.3
+  },
+  {"kind":"thread","link":"self","scope":"global","default_frac":0.5}
+]

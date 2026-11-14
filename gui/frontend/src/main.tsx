@@ -18,7 +18,7 @@ if (!root) throw new Error("missing #root");
 void loadBundledFont().then(() => {
   createRoot(root).render(
     <StrictMode>
-      {/* Anything that escapes the inner boundaries (rows, panel tabs, bottom panel) shows
+      {/* Anything that escapes the inner boundaries (rows, tabs, panes) shows
           the error and a Reload button instead of a blank window. */}
       <ErrorBoundary label="app" fallback={AppError}>
         <App />

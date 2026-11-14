@@ -13,8 +13,9 @@ import (
 // project set, branch, primary, workspace reference and mode, through
 // CreateThreadRequest.like_thread_id (thread new --like). Only the prompt and the
 // Claude options are new; project picks another primary among the source's checkouts.
-// The GUI presents it as the composer prefilled from the thread.
-func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
+// The GUI presents it as the composer prefilled from the thread; sent from a composer tab
+// (--compose), the thread's tab takes its place and a draft sent ends, as thread.new's.
+func threadNewLike(r *Registry, b ThreadBackend, e Emitter, o threadLifecycleOptions) Command {
 	return Command{
 		Name:         "thread.new-like",
 		Page:         PageDrives,
@@ -34,10 +35,10 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			backgroundSetupArg, draftJSONArg,
 			{Name: "attachments", Type: String, Description: "Comma-separated image or PDF paths from StageAttachment, appended to the prompt"},
 			{Name: "name", Type: String, Description: "Thread name"},
-			createdFocusArg,
+			createdFocusArg, composeArg,
 		},
 		When: canNewLike,
-		Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+		Run: func(ctx context.Context, c Context, a Args) (Result, error) {
 			req := &v1.CreateThreadRequest{
 				LikeThreadId: a.String("id"), ProjectId: a.String("project"),
 				Model: a.String("model"), Effort: a.String("effort"), Name: a.String("name"),
@@ -48,6 +49,9 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 				EffortDefaulted: a.String("effort") != "" && !a.Given("effort"),
 				BackgroundSetup: a.Bool("background-setup"), DraftJson: a.String("draft-json"),
 			}
+			if err := o.checkComposer(a.String("compose")); err != nil {
+				return Result{}, err
+			}
 			res, err := b.Create(ctx, connect.NewRequest(req))
 			if err != nil {
 				return Result{}, err
@@ -55,7 +59,11 @@ func threadNewLike(r *Registry, b ThreadBackend, e Emitter) Command {
 			s := res.Msg.GetThread()
 			focusCreated(e, a, s)
 			// Collision hints, never a refusal: the source thread works there too.
-			return Result{Message: createdMessage(req, res.Msg, r.projectNamer(ctx)), JSON: s, Warnings: res.Msg.GetHints()}, nil
+			warnings := res.Msg.GetHints()
+			if w := o.sentFrom(ctx, c, a.String("compose"), s.GetId()); w != "" {
+				warnings = append(warnings, "thread "+s.GetId()+" was made, but "+w)
+			}
+			return Result{Message: createdMessage(req, res.Msg, r.projectNamer(ctx)), JSON: s, Warnings: warnings}, nil
 		},
 	}
 }

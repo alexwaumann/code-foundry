@@ -1,0 +1,90 @@
+{
+  "doc": "A linked surface opened by itself while its thread is closed leaves the thread's remembered set, so reopening the thread brings no second copy.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-b","kind":"thread","thread":"th-b"}],
+          "active": "t-b"
+        },
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-z",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-y",
+              "index": 0,
+              "active": true
+            },
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+              "pane": "p-y",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {
+    "op": "open_surface",
+    "tab": {"kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+    "focus": true
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-b","kind":"thread","thread":"th-b"},
+            {"id":"t-n1","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-z",
+          "tabs": [
+            {
+              "tab": {"id":"t-f","kind":"file","thread":"th-a","params":{"path":"/r/t-f"}},
+              "pane": "p-y",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused"}
+}

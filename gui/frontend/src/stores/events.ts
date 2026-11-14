@@ -7,11 +7,11 @@ import { errorMessage, HEARTBEAT_MS, isAbort, onPageStateChange, runStream, type
 import { listTerminals } from "@/api/terminal";
 import { applyActionEvent, useActionsStore } from "./actions";
 import { onActionRunFinished } from "./actionActions";
-import { closeEmptyPanels, onNewTerminal, onRemovedTerminal, revealArrived } from "./bottomActions";
 import { applyGhEvent } from "./gh";
 import { applyGitOpsEvent } from "./gitops";
 import { useHealthStore } from "./health";
 import { applyIntent } from "./intents";
+import { applyLayoutEvent } from "./layout";
 import { applyMemoryEvent } from "./memory";
 import { applySearchActivity } from "./searchActivity";
 import { applyThemeEvent } from "./themes";
@@ -58,16 +58,8 @@ const handlers: Handlers = {
     useWorkspacesStore.setState((s) => ({ ...applyWorkspaceEvent(s, ev), loaded: true }));
   },
   terminal: (ev) => {
-    // A terminal the store did not have (not one the reconnect's List already brought):
-    // a new shell opens its owner's bottom panel (stores/bottomActions.ts).
-    // A removed one that was its panel's active tab hands that to its neighbour; its
-    // panel's last tab hides the panel.
-    const before = useTerminalsStore.getState();
-    const fresh = ev.kind === "updated" && before.loaded && !(ev.terminal.id in before.byId) ? ev.terminal : null;
-    const removed = ev.kind === "removed" ? before.byId[ev.id] : undefined;
+    // Where a terminal shows is the layout's (its tab, the quick terminal): the daemon places it.
     useTerminalsStore.setState((s) => applyTerminalEvent(s, ev));
-    if (fresh) onNewTerminal(fresh);
-    if (removed) onRemovedTerminal(removed, before);
   },
   threadList: (ev) => {
     // A snapshot is the whole list, even if List failed transiently.
@@ -109,6 +101,8 @@ const handlers: Handlers = {
   search: applySearchActivity,
   // The user's own themes (stores/themes.ts; src/themes resolves them).
   theme: applyThemeEvent,
+  // The window's layout (stores/layout.ts).
+  layout: applyLayoutEvent,
 };
 
 const taps = new Set<(ev: EventView) => void>();
@@ -158,11 +152,6 @@ export function startEventSync(): () => void {
       const [projects, terminals] = await Promise.all([listProjects(daemon, signal), listTerminals(daemon, signal), reconcileThreads(signal)]);
       useProjectsStore.setState({ ...replaceProjects(projects), loaded: true });
       useTerminalsStore.setState((s) => ({ ...replaceTerminals(s, terminals), loaded: true }));
-      // The List brings terminals without updated events: a pending reveal's shell may be here now.
-      revealArrived();
-      // Nor removed events: a restarted daemon pruned its shells, so open panels left
-      // without tabs hide (as a last tab's removal does) instead of showing empty.
-      closeEmptyPanels();
     },
     onEvent: dispatchEvent,
     onStatus: (stream, err) => {

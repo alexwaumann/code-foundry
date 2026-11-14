@@ -1,16 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UiContextView } from "@/api/command";
-import { SHELL_GAP } from "@/design/tokens";
+import { sidebarToggleEnd } from "@/components/window/titleBand";
 import { bool, finite, persistedRecord } from "./persisted";
-import { useProjectsStore } from "./projects";
-import { useThreadsStore } from "./threads";
-import { useWorkspacesStore } from "./workspaces";
 
 /**
- * What the content area shows. Derived into the UiContext sent with List/Invoke. A shell
- * is never selected: it shows in its owner's bottom panel (a thread's, or the Projects
- * page's; stores/bottomPanel.ts).
+ * What the window shows: the focused tab's selection (stores/selectionBridge.ts writes it, and
+ * select() opens or focuses a selection's tab). Derived into the UiContext sent with List/Invoke.
+ * A terminal is never selected: it is a tab of its own.
  */
 export type Selection =
   | { kind: "none" }
@@ -25,8 +22,7 @@ export type Selection =
   /**
    * A top-level page that is not a sidebar row (see components/prs). The Projects pages
    * (`name` "projects") are the index without an id, a project's page with `projectId`,
-   * a workspace's page with `workspaceId` (components/projects/ProjectsPage.tsx); each has
-   * its own side panel (stores/panel.ts keyOf).
+   * a workspace's page with `workspaceId` (components/projects/ProjectsPage.tsx).
    */
   | { kind: "view"; name: string; projectId?: string; workspaceId?: string };
 
@@ -48,24 +44,6 @@ export function isProjectsView(sel: Selection): sel is Extract<Selection, { kind
   return sel.kind === "view" && sel.name === "projects";
 }
 
-/**
- * Where the Projects sidebar row goes back to: "" for the index, `project:<id>` or
- * `workspace:<id>` for a page (UiState.projectsLast).
- */
-export function projectsLocation(sel: Selection): string | null {
-  if (!isProjectsView(sel)) return null;
-  if (sel.projectId) return `project:${sel.projectId}`;
-  if (sel.workspaceId) return `workspace:${sel.workspaceId}`;
-  return "";
-}
-
-/** The selection a stored projectsLast names (the index for "" or anything unknown). */
-export function projectsLocationSelection(loc: string): Extract<Selection, { kind: "view" }> {
-  if (loc.startsWith("project:") && loc.length > 8) return projectPage(loc.slice(8));
-  if (loc.startsWith("workspace:") && loc.length > 10) return workspacePage(loc.slice(10));
-  return PROJECTS_INDEX;
-}
-
 /** Top-level page names (UiIntent.ShowView); unknown names are ignored. */
 export const viewNames: readonly string[] = ["pullrequests", "projects", "ember"];
 
@@ -78,7 +56,7 @@ export const viewNames: readonly string[] = ["pullrequests", "projects", "ember"
 export const HOME: Extract<Selection, { kind: "compose" }> = { kind: "compose", projectId: "", noProject: true };
 
 /** Which region has keyboard focus; the palette returns focus to it on close. */
-export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom";
+export type FocusRegion = "sidebar" | "content" | "palette";
 
 /**
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
@@ -90,46 +68,25 @@ export type FocusRegion = "sidebar" | "content" | "palette" | "panel" | "bottom"
 export type PalettePage = "commands" | "projects" | "runin" | "prompts" | "files" | "search";
 
 /**
- * The sidebar band must fit the traffic-light gutter, the app name and the Back and Forward
- * buttons, at every zoom (components/sidebar/Sidebar.tsx).
+ * The sidebar's width bounds (its resize handle). The minimum lines the sidebar's right edge up with
+ * the top bar's sidebar toggle (components/window/titleBand.ts sidebarToggleEnd: 240 at 100% zoom;
+ * docs/notes/shell-25f-sizes.md). The stored width is in layout px; at another zoom the gutter of
+ * the traffic lights changes, so a sidebar at its minimum follows the toggle (sidebarWidthAt).
  */
-export const SIDEBAR_MIN = 260;
+export const SIDEBAR_MIN = sidebarToggleEnd(100);
 export const SIDEBAR_MAX = 520;
-/** The initial width, and what double-clicking the resize handle restores. */
-export const SIDEBAR_DEFAULT = 260;
-/** Side panel width bounds; the upper bound depends on the window and sidebar (panelMax). */
-export const PANEL_MIN = 280;
-export const PANEL_MAX_FRACTION = 0.6;
-export const PANEL_DEFAULT = 420;
+/** The initial width, and what double-clicking the resize handle restores: the minimum. */
+export const SIDEBAR_DEFAULT = SIDEBAR_MIN;
+
 /**
- * The width a tab group needs to be worth reading side by side: CONTENT_MIN, the least the
- * content pane gets. PANEL_MIN (narrower) stays the CSS minimum a side-by-side group is
- * squeezed to by the split's ratio.
+ * The sidebar's drawn width for a stored width at a page zoom: a width at the minimum (or below,
+ * from an older build) follows the toggle's right edge at that zoom; a wider one is kept, and
+ * never drawn narrower than the toggle's edge.
  */
-export const PANEL_GROUP_SIDE_MIN = 360;
-/**
- * A split side panel shows its two tab groups side by side from this rendered width (two
- * PANEL_GROUP_SIDE_MIN groups and the 1px divider), stacked below it, expanded or not
- * (components/panel/splitLayout.ts).
- */
-export const PANEL_SIDE_BY_SIDE_MIN = 2 * PANEL_GROUP_SIDE_MIN + 1;
-/** A stacked split panel's tab group is never shorter than this (its header and some body). */
-export const PANEL_GROUP_MIN_HEIGHT = 160;
-/** The content pane never gets narrower than this to make room for the side panel. */
-export const CONTENT_MIN = 360;
-/**
- * Horizontal gaps around the panes when the side panel shows: the content pane's margins
- * on both sides plus the panel's right margin (App.tsx m-shell, SidePanel.tsx mr-shell),
- * three shell gaps.
- */
-export const PANE_GAPS = 3 * SHELL_GAP;
-/**
- * Bottom panel height bounds (components/bottom): the upper bound is a share of the
- * content column's measured height (bottomMax).
- */
-export const BOTTOM_MIN = 120;
-export const BOTTOM_DEFAULT = 280;
-export const BOTTOM_MAX_FRACTION = 0.7;
+export function sidebarWidthAt(stored: number, zoom: number): number {
+  const min = sidebarToggleEnd(zoom);
+  return stored <= SIDEBAR_MIN ? min : Math.max(stored, min);
+}
 export const FONT_MIN = 9;
 export const FONT_MAX = 28;
 export const FONT_DEFAULT = 13;
@@ -152,18 +109,8 @@ export function nextZoom(zoom: number, direction: 1 | -1): number {
   return ZOOM_MIN;
 }
 
-/** How many selections back/forward (view.back, view.forward) remember; the oldest go first. */
-export const HISTORY_MAX = 50;
-
 interface UiState {
   selection: Selection;
-  /**
-   * The selections this window visited, oldest first, for view.back and view.forward
-   * (docs/notes/selection-history.md): browser semantics, `historyIndex` being the current
-   * one. Not persisted, like the selection: a window starts with just HOME.
-   */
-  history: Selection[];
-  historyIndex: number;
   focus: FocusRegion;
   /**
    * Incremented to ask the selected thread's prompt to take focus (its composer,
@@ -173,20 +120,11 @@ interface UiState {
   promptFocusSeq: number;
   /** Incremented to ask the sidebar list to take focus. */
   sidebarFocusSeq: number;
-  /** Incremented to ask the visible side panel to take focus (components/panel/SidePanel.tsx). */
-  panelFocusSeq: number;
   /**
-   * Incremented to ask the visible bottom panel to take focus: its active terminal, else
-   * the panel itself (components/bottom/BottomPanel.tsx).
-   */
-  bottomFocusSeq: number;
-  /**
-   * Incremented to ask whatever fills the content pane to take focus: a thread's prompt
-   * (ThreadComposer), else the page's `[data-focus-root]` element (App.tsx).
+   * Incremented to ask the focused pane's tab to take focus: a thread's prompt (ThreadComposer),
+   * else the surface's own focus root (shell/paneContext.ts).
    */
   contentFocusSeq: number;
-  /** window.innerWidth, kept current by startApp; bounds the side panel (panelMax). */
-  windowWidth: number;
   /** Row key the sidebar keyboard cursor is on. */
   cursorKey: string | null;
   /**
@@ -202,7 +140,7 @@ interface UiState {
   // Persisted settings.
   sidebarVisible: boolean;
   sidebarWidth: number;
-  /** Terminal font size in px before zoom (appearance.font_size); the bottom panel's shells. */
+  /** Terminal font size in px before zoom (appearance.font_size). */
   fontSize: number;
   /** Page zoom in percent (appearance.zoom). */
   zoom: number;
@@ -214,28 +152,11 @@ interface UiState {
   archivedCollapsed: boolean;
   /** The sidebar's Snoozed section is collapsed (its threads hidden; the header counts them). Collapsed by default. */
   snoozedCollapsed: boolean;
-  /**
-   * The last Projects page shown (projectsLocation: "" the index, `project:<id>`,
-   * `workspace:<id>`): the Projects sidebar row reopens it.
-   */
-  projectsLast: string;
   /** Ember's chat opens every "Worked for" row (components/ember/EmberPane.tsx "Show work"). */
   emberShowWork: boolean;
-  /**
-   * The thread info card shows beside every thread's conversation and composer in this
-   * window (view.thread-info; components/threadinfo, docs/notes/thread-info-card.md).
-   */
-  threadInfoOpen: boolean;
 
   /** Selects; `focusPrompt` also asks a thread's prompt to take focus (promptFocusSeq). */
-  select: (sel: Selection, opts?: { focusPrompt?: boolean }) => void;
-  /**
-   * view.back: selects the entry before the current one in `history`, skipping (and
-   * dropping) ones whose thread, project or workspace is gone. False when there is none.
-   */
-  back: () => boolean;
-  /** view.forward: selects the entry after the current one, like back. False when there is none. */
-  forward: () => boolean;
+  select: (sel: Selection, opts?: SelectOptions) => void;
   setFocus: (f: FocusRegion) => void;
   focusSidebar: () => void;
   setCursor: (key: string | null) => void;
@@ -250,16 +171,17 @@ interface UiState {
   openFilesPalette: (threadId: string) => void;
   /** Opens the palette on the Find dialog over every thread (search.open's presenter). */
   openSearchPalette: () => void;
-  closePalette: () => void;
+  /**
+   * Closes the palette. The keyboard goes back to the region it came from (a thread's prompt for
+   * the content), where a command run from the palette may have moved that target first.
+   * `restore` (Escape, the backdrop, the file finder's pick): back to the very element that had
+   * it, a diff, a terminal tab or the quick terminal included (takePaletteRestore).
+   */
+  closePalette: (restore?: boolean) => void;
   focusComposer: () => void;
   setRenaming: (threadId: string | null) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
-  /**
-   * Records a window resize. Stored panel widths (stores/panel.ts, one per panel) are not
-   * re-clamped: the panel renders at min(stored, panelMax).
-   */
-  setWindowWidth: (w: number) => void;
   focusContent: () => void;
   setFontSize: (n: number) => void;
   setZoom: (percent: number) => void;
@@ -268,13 +190,6 @@ interface UiState {
   toggleArchivedCollapsed: () => void;
   toggleSnoozedCollapsed: () => void;
   setEmberShowWork: (on: boolean) => void;
-  /** view.thread-info: shows or hides the thread info card; returns the new state. */
-  toggleThreadInfo: () => boolean;
-  /**
-   * The Projects sidebar row: on a project's or workspace's page, the index; anywhere else,
-   * the last Projects page shown (the index when its project or workspace is gone).
-   */
-  openProjects: () => void;
 }
 
 /** The Usage page's ranges in days (UTC days, today inclusive); 30 by default. */
@@ -290,51 +205,9 @@ export function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
 }
 
-/**
- * Widest the side panel may be: 60% of the window, and no more than leaves CONTENT_MIN
- * for the content pane beside a sidebar this wide (0 when hidden). Below PANEL_MIN means
- * the panel does not fit; SidePanel then hides it (it stays open in the panel store).
- */
-export function panelMax(windowWidth: number, sidebarWidth: number): number {
-  return Math.floor(Math.min(windowWidth * PANEL_MAX_FRACTION, windowWidth - sidebarWidth - PANE_GAPS - CONTENT_MIN));
-}
-
-/**
- * The expanded side panel's rendered width: it replaces the content column, so it fills
- * the row beside a sidebar this wide (0 when hidden), less its own shell-gap margins on
- * both sides (SidePanel.tsx m-shell).
- */
-export function expandedPanelWidth(windowWidth: number, sidebarWidth: number): number {
-  return Math.max(0, windowWidth - sidebarWidth - 2 * SHELL_GAP);
-}
-
-/** The content pane keeps at least this much height above the bottom panel. */
-export const MAIN_MIN_HEIGHT = 160;
-/** The gap between the content pane and the bottom panel (components/bottom: mt-shell). */
-export const BOTTOM_GAP = SHELL_GAP;
-
-/**
- * Tallest the bottom panel may be: 70% of the content column (main pane, gap and bottom
- * pane together), and no more than leaves MAIN_MIN_HEIGHT for the content pane above the
- * gap. Never below BOTTOM_MIN.
- */
-export function bottomMax(columnHeight: number): number {
-  return Math.max(BOTTOM_MIN, Math.min(Math.floor(columnHeight * BOTTOM_MAX_FRACTION), Math.floor(columnHeight - MAIN_MIN_HEIGHT - BOTTOM_GAP)));
-}
-
-/** A bottom panel height clamped to [BOTTOM_MIN, bottomMax(columnHeight)]. */
-export function clampBottomHeight(h: number, columnHeight: number): number {
-  return clamp(Math.round(h), BOTTOM_MIN, bottomMax(columnHeight));
-}
-
 /** The sidebar's rendered width: 0 when hidden. */
-export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: number }): number {
-  return s.sidebarVisible ? s.sidebarWidth : 0;
-}
-
-/** A panel width clamped to [PANEL_MIN, panelMax] (PANEL_MIN when the panel does not fit). */
-export function clampPanelWidth(w: number, windowWidth: number, sidebarWidth: number): number {
-  return clamp(Math.round(w), PANEL_MIN, Math.max(PANEL_MIN, panelMax(windowWidth, sidebarWidth)));
+export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: number; zoom: number }): number {
+  return s.sidebarVisible ? sidebarWidthAt(s.sidebarWidth, s.zoom) : 0;
 }
 
 export function sameSelection(a: Selection, b: Selection): boolean {
@@ -352,98 +225,78 @@ export function sameSelection(a: Selection, b: Selection): boolean {
 }
 
 /**
- * Whether a remembered selection can no longer be shown: a removed thread (an archived one
- * still exists), a composer whose project or workspace was removed, or the page of a
- * removed project or workspace. Unknown before the
- * store holding it has loaded.
+ * How a selection is asked for. A thread sent from a compose tab takes that tab's place through
+ * the send itself (thread.new --compose, stores/compose.ts sendDraft), never through a selection.
  */
-function gone(sel: Selection): boolean {
-  switch (sel.kind) {
-    case "thread": {
-      const threads = useThreadsStore.getState();
-      return threads.loaded && !(sel.id in threads.byId);
-    }
-    case "compose": {
-      if (sel.likeThreadId) {
-        const threads = useThreadsStore.getState();
-        return threads.loaded && !(sel.likeThreadId in threads.byId);
-      }
-      if (sel.workspaceId) {
-        const workspaces = useWorkspacesStore.getState();
-        return workspaces.loaded && !(sel.workspaceId in workspaces.byId);
-      }
-      if (sel.noProject) return false;
-      const projects = useProjectsStore.getState();
-      return projects.loaded && !(sel.projectId in projects.byId);
-    }
-    case "view": {
-      if (sel.projectId) {
-        const projects = useProjectsStore.getState();
-        return projects.loaded && !(sel.projectId in projects.byId);
-      }
-      if (sel.workspaceId) {
-        const workspaces = useWorkspacesStore.getState();
-        return workspaces.loaded && !(sel.workspaceId in workspaces.byId);
-      }
-      return false;
-    }
-    default:
-      return false;
-  }
+export interface SelectOptions {
+  focusPrompt?: boolean;
 }
 
 /**
- * `history` without the entries that are gone (the current one stays, whatever it is) and
- * with the duplicates that leaves next to each other collapsed; `index` follows the current
- * entry.
+ * Takes a select() instead of the store: with the window shell on, the selection bridge
+ * (stores/selectionBridge.ts) opens or focuses the selection's tab, and the selection follows
+ * the focused tab (mirrorSelection). Answers false to leave the selection to the store.
  */
-export function pruneHistory(history: readonly Selection[], index: number, isGone: (sel: Selection) => boolean = gone): { history: Selection[]; index: number } {
-  const out: Selection[] = [];
-  let at = 0;
-  history.forEach((e, i) => {
-    if (i !== index && isGone(e)) return;
-    const last = out[out.length - 1];
-    if (last && sameSelection(last, e)) {
-      if (i === index) at = out.length - 1;
-      return;
-    }
-    if (i === index) at = out.length;
-    out.push(e);
-  });
-  return { history: out, index: at };
+export type SelectRoute = (sel: Selection, opts: SelectOptions) => boolean;
+
+let selectRoute: SelectRoute | null = null;
+
+/** The element that had the keyboard when the palette opened; null while it is closed or had none. */
+let paletteReturn: HTMLElement | null = null;
+/** The element a closed palette hands the keyboard back to, until the palette takes it (takePaletteRestore). */
+let pendingRestore: HTMLElement | null = null;
+
+/** As the palette opens (not when it switches page): where the keyboard was. */
+function noteReturn(open: boolean): void {
+  if (open) return;
+  const el = typeof document === "undefined" ? null : document.activeElement;
+  paletteReturn = el instanceof HTMLElement && el !== document.body ? el : null;
 }
 
 /**
- * The state a selection change sets. `push` (a normal select) records it after the current
- * history entry, dropping the forward ones, unless it is the current entry already; back
- * and forward move the index themselves and do not push.
+ * Where the user's keyboard is: the focused element, or while the palette is open the one that
+ * had it when it opened (the command context reads it: stores/context.ts).
  */
-function selectionUpdate(s: UiState, sel: Selection, opts: { focusPrompt?: boolean; push: boolean }): Partial<UiState> {
-  const loc = projectsLocation(sel);
-  const next: Partial<UiState> = {
+export function keyboardElement(): Element | null {
+  if (useUiStore.getState().palette.open) return paletteReturn;
+  return typeof document === "undefined" ? null : document.activeElement;
+}
+
+/** The element closePalette(true) hands the keyboard back to, once (the palette's close takes it). */
+export function takePaletteRestore(): HTMLElement | null {
+  const el = pendingRestore;
+  pendingRestore = null;
+  return el?.isConnected ? el : null;
+}
+
+/** Installs (or with null removes) the route select() goes through first. */
+export function setSelectRoute(route: SelectRoute | null): void {
+  selectRoute = route;
+}
+
+/**
+ * Sets the selection without the route: the selection bridge mirrors the focused tab with it.
+ */
+export function mirrorSelection(sel: Selection, opts: { focusPrompt?: boolean } = {}): void {
+  useUiStore.setState((s) => selectionUpdate(s, sel, { focusPrompt: opts.focusPrompt }));
+}
+
+/** The state a selection change sets. */
+function selectionUpdate(s: UiState, sel: Selection, opts: { focusPrompt?: boolean }): Partial<UiState> {
+  return {
     selection: sameSelection(s.selection, sel) ? s.selection : sel,
     promptFocusSeq: opts.focusPrompt && sel.kind === "thread" ? s.promptFocusSeq + 1 : s.promptFocusSeq,
-    ...(loc !== null && loc !== s.projectsLast ? { projectsLast: loc } : null),
   };
-  const current = s.history[s.historyIndex];
-  if (!opts.push || (current && sameSelection(current, sel))) return next;
-  const history = [...s.history.slice(0, s.historyIndex + 1), sel].slice(-HISTORY_MAX);
-  return { ...next, history, historyIndex: history.length - 1 };
 }
 
 export const useUiStore = create<UiState>()(
   persist(
     (set, get) => ({
       selection: HOME,
-      history: [HOME],
-      historyIndex: 0,
       focus: "content",
       promptFocusSeq: 0,
       sidebarFocusSeq: 0,
-      panelFocusSeq: 0,
-      bottomFocusSeq: 0,
       contentFocusSeq: 0,
-      windowWidth: typeof window === "undefined" ? 1280 : window.innerWidth,
       cursorKey: null,
       palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
       composerFocusSeq: 0,
@@ -456,15 +309,12 @@ export const useUiStore = create<UiState>()(
       workingCollapsed: false,
       archivedCollapsed: true,
       snoozedCollapsed: true,
-      projectsLast: "",
       emberShowWork: false,
-      threadInfoOpen: false,
 
       select: (sel, opts) => {
-        set((s) => selectionUpdate(s, sel, { focusPrompt: opts?.focusPrompt, push: true }));
+        if (selectRoute?.(sel, opts ?? {})) return;
+        set((s) => selectionUpdate(s, sel, { focusPrompt: opts?.focusPrompt }));
       },
-      back: () => stepHistory(-1),
-      forward: () => stepHistory(1),
       setRenaming: (renamingThreadId) => {
         set({ renamingThreadId });
       },
@@ -478,37 +328,45 @@ export const useUiStore = create<UiState>()(
         set({ cursorKey });
       },
       openPalette: (query = "", commandName = null, context) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query, commandName, page: "commands", returnTo: s.palette.open ? s.palette.returnTo : s.focus, ...(context ? { context } : {}) } }));
       },
       openProjectPicker: (returnTo) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "projects", returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
       openRunInPicker: (threadId, returnTo) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "runin", threadId, returnTo: returnTo ?? (s.palette.open ? s.palette.returnTo : s.focus) } }));
       },
       openPromptsPalette: () => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "prompts", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       openFilesPalette: (threadId) => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "files", threadId, returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       openSearchPalette: () => {
+        noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "search", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
       focusComposer: () => {
         set((s) => ({ composerFocusSeq: s.composerFocusSeq + 1 }));
       },
-      closePalette: () => {
+      closePalette: (restore = false) => {
         // Hand focus back to where it was before the palette opened. A command run from
-        // the palette may move that target first (togglePanelCommand in stores/views.ts).
+        // the palette may move that target first.
+        const back = paletteReturn;
+        paletteReturn = null;
+        pendingRestore = restore && back?.isConnected ? back : null;
+        const exact = pendingRestore !== null;
         set((s) => {
           const to = s.palette.returnTo;
           return {
             palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
-            sidebarFocusSeq: to === "sidebar" ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
-            panelFocusSeq: to === "panel" ? s.panelFocusSeq + 1 : s.panelFocusSeq,
-            bottomFocusSeq: to === "bottom" ? s.bottomFocusSeq + 1 : s.bottomFocusSeq,
-            contentFocusSeq: to === "content" ? s.contentFocusSeq + 1 : s.contentFocusSeq,
+            sidebarFocusSeq: to === "sidebar" && !exact ? s.sidebarFocusSeq + 1 : s.sidebarFocusSeq,
+            contentFocusSeq: to === "content" && !exact ? s.contentFocusSeq + 1 : s.contentFocusSeq,
           };
         });
       },
@@ -517,9 +375,6 @@ export const useUiStore = create<UiState>()(
       },
       setSidebarWidth: (w) => {
         set({ sidebarWidth: clamp(Math.round(w), SIDEBAR_MIN, SIDEBAR_MAX) });
-      },
-      setWindowWidth: (windowWidth) => {
-        set({ windowWidth });
       },
       focusContent: () => {
         set((s) => ({ contentFocusSeq: s.contentFocusSeq + 1 }));
@@ -545,18 +400,6 @@ export const useUiStore = create<UiState>()(
       setEmberShowWork: (emberShowWork) => {
         set({ emberShowWork });
       },
-      toggleThreadInfo: () => {
-        const open = !get().threadInfoOpen;
-        set({ threadInfoOpen: open });
-        return open;
-      },
-      openProjects: () => {
-        const s = get();
-        const sel = s.selection;
-        const onPage = isProjectsView(sel) && Boolean(sel.projectId || sel.workspaceId);
-        const want = onPage ? PROJECTS_INDEX : projectsLocationSelection(s.projectsLast);
-        s.select(gone(want) ? PROJECTS_INDEX : want);
-      },
     }),
     {
       name: "code-foundry.ui",
@@ -575,7 +418,8 @@ export const useUiStore = create<UiState>()(
       // Only the persisted fields, each checked (stores/persisted.ts): a store another build
       // wrote, or a hand edit, never puts a wrong-typed value in the window's state. Numbers
       // are clamped: a saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 220, saved before
-      // the minimum rose to 260) renders and drags from a valid width.
+      // the minimum rose to 260) renders and drags from a valid width. A width saved earlier that
+      // is at least the minimum (the old default 260 too) is kept.
       merge: (persisted, current) => {
         const p = persistedRecord(persisted);
         const num = (v: unknown, lo: number, hi: number, fallback: number): number => {
@@ -592,9 +436,7 @@ export const useUiStore = create<UiState>()(
           workingCollapsed: bool(p.workingCollapsed, current.workingCollapsed),
           archivedCollapsed: bool(p.archivedCollapsed, current.archivedCollapsed),
           snoozedCollapsed: bool(p.snoozedCollapsed, current.snoozedCollapsed),
-          projectsLast: typeof p.projectsLast === "string" ? p.projectsLast : current.projectsLast,
           emberShowWork: bool(p.emberShowWork, current.emberShowWork),
-          threadInfoOpen: bool(p.threadInfoOpen, current.threadInfoOpen),
         };
       },
       partialize: (s) => ({
@@ -606,29 +448,8 @@ export const useUiStore = create<UiState>()(
         workingCollapsed: s.workingCollapsed,
         archivedCollapsed: s.archivedCollapsed,
         snoozedCollapsed: s.snoozedCollapsed,
-        projectsLast: s.projectsLast,
         emberShowWork: s.emberShowWork,
-        threadInfoOpen: s.threadInfoOpen,
       }),
     },
   ),
 );
-
-/** Whether stepHistory would find a live entry; it only reads, so a selector may call it. */
-export function canStepHistory(s: Pick<UiState, "history" | "historyIndex">, by: 1 | -1): boolean {
-  const { history, index } = pruneHistory(s.history, s.historyIndex);
-  return history[index + by] !== undefined;
-}
-
-/** Moves through history by one live entry (view.back, view.forward); false, after pruning, when there is none. */
-function stepHistory(by: 1 | -1): boolean {
-  const s = useUiStore.getState();
-  const { history, index } = pruneHistory(s.history, s.historyIndex);
-  const target = history[index + by];
-  if (!target) {
-    if (history.length !== s.history.length) useUiStore.setState({ history, historyIndex: index });
-    return false;
-  }
-  useUiStore.setState((cur) => ({ ...selectionUpdate(cur, target, { focusPrompt: true, push: false }), history, historyIndex: index + by }));
-  return true;
-}

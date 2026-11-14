@@ -1,0 +1,37 @@
+{
+  "doc": "The caller may name the draft's id, so it can store the text under it without waiting for the reply.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-c","kind":"compose"}],"active":"t-c"},
+        "focus": "p-a"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"start_draft","tab":"t-c","draft":"d-client","label":"Hi"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Space A",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-c","kind":"compose","params":{"draft":"d-client"}}],
+          "active": "t-c"
+        },
+        "focus": "p-a",
+        "drafts": [{"id":"d-client","label":"Hi"}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-c","draft":"d-client"}
+}

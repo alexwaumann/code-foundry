@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CloudUpload, Folder, GitBranchPlus } from "lucide-react";
-import { BottomToggle } from "@/components/bottom/BottomToggle";
 import { useProjectKind } from "@/components/icons/projectKind";
-import { PanelToggle } from "@/components/panel/PanelToggle";
 import { Button } from "@/components/ui/button";
 import { PaneHeader } from "@/components/window/PaneHeader";
 import { useNav, type NavItem } from "@/lib/nav";
@@ -25,6 +23,7 @@ import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
 import { ProjectTitle } from "./ProjectTitle";
 import { openCursorRowMenu } from "./rowMenu";
+import { useServesFocusRequests } from "@/shell/paneContext";
 
 /** A note card at the top of a project page (no remote, no git) with its setup button. */
 function KindNote({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action: React.ReactNode }) {
@@ -106,7 +105,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
     if (loaded && seen && !exists) useUiStore.getState().select(PROJECTS_INDEX);
   }, [loaded, seen, exists]);
 
-  // The content pane's width (the side panel takes from it): the scroll box's.
+  // The pane's width: the scroll box's.
   const [widthRef, width] = useWidth(1200);
   const compact = width < PROJECT_TITLE_COMPACT_BELOW;
   // A checkout's or a leftover's row has no activation: its right-click menu (ContextMenu key, Shift+F10) holds what it does.
@@ -121,8 +120,11 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
   }, [reveal, navItems, setCursor]);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = usePageScroll(pageKey, widthRef);
+  // On mount the page takes the keyboard, unless it opens in a shell pane without the focus.
+  const takesFocus = useServesFocusRequests();
   useEffect(() => {
-    rootRef.current?.focus({ preventScroll: true });
+    if (takesFocus) rootRef.current?.focus({ preventScroll: true });
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
   return (
@@ -150,8 +152,6 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
           <PagePicker icon={<KindIcon kind={kind} />} name={name} currentProject={projectId} />
         )}
         <span className="-mr-2 ml-auto flex shrink-0 items-center pl-2">
-          <BottomToggle />
-          <PanelToggle />
         </span>
       </PaneHeader>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" data-testid="projects-scroll">

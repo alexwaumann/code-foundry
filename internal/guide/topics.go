@@ -17,7 +17,7 @@ import (
 
 // topicIntros are the hand-written sections above a topic's commands. A topic with one is
 // an entry here.
-var topicIntros = map[string]func(io.Writer){"thread": writeThreadConventions}
+var topicIntros = map[string]func(io.Writer){"thread": writeThreadConventions, "layout": writeLayoutConventions}
 
 // Topic is one category of commands, for `code-foundry guide <topic>`.
 type Topic struct {

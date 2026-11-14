@@ -1,22 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
-import { emit, mockPost, openApp, openStreams, resetMock, row, writes } from "./fixtures";
+import { infoCardOff, mockPost, openApp, resetMock, row, writes } from "./fixtures";
+import { attachStreams, keyboardIn, terminalTabs } from "./shell-terminals";
 
 /**
  * Servers roll up to the parent thread (docs/notes/server-rollup.md), what only a browser
- * shows: a child's terminal attaching in the parent's panel with the keyboard in it, one
- * Attach stream whichever panel shows it, and the hover buttons' place on the row. Which rows,
- * their words and what each press runs: src/components/threadinfo/ShellsGroup.test.tsx. The
- * tab's × and Rerun: src/components/bottom/BottomPanel.test.tsx.
+ * shows: a child's terminal attaching in its tab with the keyboard in it, one Attach stream
+ * however often the row shows it, and the hover buttons' place on the row. Which rows, their
+ * words and what each press runs: src/components/threadinfo/ShellsGroup.test.tsx.
  */
 
 const card = (page: Page) => page.getByTestId("thread-info-card");
 const server = (page: Page, port: number) => card(page).locator(`[data-testid="ti-server"][data-port="${String(port)}"]`);
-const bottom = (page: Page) => page.getByTestId("bottom-panel");
-const host = (page: Page) => page.getByTestId("bottom-terminal-host");
-const tabs = (page: Page) => page.getByTestId("bottom-tabs").getByRole("tab");
+const host = (page: Page) => page.getByTestId("shell-terminal-host");
+const tabs = (page: Page) => terminalTabs(page);
 const pane = (page: Page) => page.getByTestId("thread-pane");
-const attachStreams = async () => (await openStreams())["TerminalService/Attach"] ?? 0;
-const keyboardInTerminal = (page: Page) => page.evaluate(() => document.activeElement?.closest('[data-testid="bottom-terminal-host"]') != null);
+const keyboardInTerminal = (page: Page) => keyboardIn(page, "shell-terminal-host");
 
 async function openParent(page: Page): Promise<string> {
   const { id } = (await mockPost("thread-info?scenario=child-server")) as { id: string };
@@ -32,15 +30,18 @@ test.use({ viewport: { width: 1500, height: 900 } });
 
 test.beforeEach(async () => {
   await resetMock();
+  // The card off for threads never toggled (on by default), so its toggle shows it.
+  await infoCardOff();
 });
 
-test("a child's terminal opens in the parent's panel with the keyboard in it, on one Attach stream", async ({ page }) => {
-  const parent = await openParent(page);
+test("a child's terminal opens in a tab with the keyboard in it, on one Attach stream", async ({ page }) => {
+  await openParent(page);
   expect(await attachStreams()).toBe(0);
   await server(page, 5173).click();
+  // Its tab (the child's terminal, placed by the rules: the child's thread is not open, so the focused pane), live, with the keyboard.
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  await expect(tabs(page)).toHaveText(["Dev"]);
-  await expect(pane(page)).toHaveAttribute("data-thread-id", parent);
+  // Its name is what runs in it (lib/terminalName.test.ts).
+  await expect(tabs(page)).toHaveCount(1);
   await expect.poll(() => keyboardInTerminal(page)).toBe(true);
   await expect.poll(attachStreams).toBe(1);
   const id = (await host(page).getAttribute("data-terminal-id")) ?? "";
@@ -48,24 +49,24 @@ test("a child's terminal opens in the parent's panel with the keyboard in it, on
   await page.keyboard.type("q");
   await expect.poll(async () => (await writes()).some((w) => w.id === id && w.data.includes("q"))).toBe(true);
 
-  // The child's own panel shows the same terminal: its view replaces this one, never joins it.
-  await emit({ focusThread: { threadId: "s-ti-kid-srv", explicit: true } });
-  await expect(pane(page)).toHaveAttribute("data-thread-id", "s-ti-kid-srv");
-  await page.getByTestId("thread-header").getByTestId("bottom-toggle").click();
-  await expect(host(page)).toHaveAttribute("data-terminal-id", id);
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  await expect.poll(attachStreams).toBe(1);
-  await row(page, `s:${parent}`).click();
-  await expect(pane(page)).toHaveAttribute("data-thread-id", parent);
-  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
-  await expect.poll(attachStreams).toBe(1);
-
-  // × hides the last tab: the panel goes, and with it the stream; the run goes on, so the row can bring it back.
-  await page.getByRole("button", { name: "Hide Dev" }).click();
-  await expect(bottom(page)).toHaveCount(0);
+  // Back on the parent, the row again: the same tab is shown (one tab per terminal), still one stream.
+  await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').first().click();
+  await expect(server(page, 5173)).toBeVisible();
   await expect.poll(attachStreams).toBe(0);
   await server(page, 5173).click();
   await expect(host(page)).toHaveAttribute("data-terminal-id", id);
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  await expect(tabs(page)).toHaveCount(1);
+  await expect.poll(attachStreams).toBe(1);
+});
+
+test("a second press on the row shows the child's terminal tab again with the keyboard in it", async ({ page }) => {
+  await openParent(page);
+  await server(page, 5173).click();
+  await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
+  await page.locator('[data-testid="shell-tab"][data-kind="thread"] [role="tab"]').first().click();
+  await expect(server(page, 5173)).toBeVisible();
+  await server(page, 5173).click();
   await expect(host(page)).toHaveAttribute("data-attach-phase", "live");
   await expect.poll(() => keyboardInTerminal(page)).toBe(true);
 });
@@ -101,7 +102,7 @@ test("the row's buttons show on hover, over the row's end, and line 2 stops shor
 for (const scheme of ["dark", "light"] as const) {
   test.describe(`screenshots (${scheme})`, () => {
     test.use({ colorScheme: scheme, deviceScaleFactor: 2 });
-    test("the rolled-up rows, a hovered row, its terminal in the parent's panel", async ({ page }, info) => {
+    test("the rolled-up rows, a hovered row, its terminal in a tab", async ({ page }, info) => {
       const shots = process.env.SHOTS;
       test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
       const dir = String(shots);

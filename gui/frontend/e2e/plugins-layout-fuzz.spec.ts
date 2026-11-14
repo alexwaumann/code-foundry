@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockPost, openHelloDemo, pluginActs, resetMock } from "./fixtures";
+import { dragGutterBeside, setSurfaceWidth } from "./shell-surfaces";
 
 /**
  * Exploratory layout checks on the mock (WebKit). Custom views go through the mock's
@@ -32,15 +33,8 @@ async function showView(page: Page, spec: Record<string, unknown>): Promise<void
   await expect.poll(async () => Number((await surface(page).getAttribute("data-version")) ?? "0")).toBeGreaterThan(before);
 }
 
-/** Drags the panel's edge by dx px (negative: wider). */
-async function dragPanel(page: Page, dx: number, steps = 4): Promise<void> {
-  const h = await page.getByTestId("panel-resize-handle").boundingBox();
-  if (!h) throw new Error("no handle");
-  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(h.x + h.width / 2 + dx, h.y + h.height / 2, { steps });
-  await page.mouse.up();
-}
+/** Drags the gutter left of the demo's pane by dx px (negative: wider), as the side panel's edge was. */
+const dragPanel = (page: Page, dx: number, steps = 4) => dragGutterBeside(page, "plugin-surface", dx, steps);
 
 const rows = (n: number, prefix = "r") => Array.from({ length: n }, (_, i) => ({ key: `${prefix}${String(i)}`, title: `Row ${String(i)}` }));
 
@@ -238,6 +232,8 @@ test("Back from a row far down a narrow list scrolls the body to that row", asyn
 test("a fill pane in the second of stacked columns follows its top when the columns go side by side", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await openHelloDemo(page);
+  // The side panel's default width, to widen from.
+  await setSurfaceWidth(page, "plugin-surface", 420);
   await showView(page, {
     view: {
       nodes: [

@@ -149,6 +149,24 @@ func TestClientsWindows(t *testing.T) {
 	}
 }
 
+// Visible answers per client id: a joined GUI stream that reports its window visible.
+func TestClientsVisible(t *testing.T) {
+	c := NewClients(nil)
+	leave := c.Join("a", presence.Client{Visible: true})
+	c.Join("b", presence.Client{})
+	c.Join("", presence.Client{Visible: true})
+	for id, want := range map[string]bool{"a": true, "b": false, "": false, "nope": false} {
+		if got := c.Visible(id); got != want {
+			t.Errorf("Visible(%q) = %v, want %v", id, got, want)
+		}
+	}
+	c.SetState("b", presence.Client{Visible: true})
+	leave()
+	if !c.Visible("b") || c.Visible("a") {
+		t.Error("b turned visible and a left")
+	}
+}
+
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

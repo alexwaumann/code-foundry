@@ -1,28 +1,32 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { toast } from "sonner";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+import { bodyDone, it, trackTests } from "@/test/isolate";
+import type { Selection } from "@/stores/ui";
 
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/prWorld")).prGhFakes }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 const { HEAD_142, seedPrWorld, SLUG } = await import("@/test/prWorld");
-const { openPr, pick, press, prTabs, renderPrPanel, resetPrStores, settle, texts, toastTexts, PR_PAGE } = await import("@/test/prPanelHarness");
+const { closePrTab, openPr, pick, press, prTabs, renderPrPanel, resetPrStores, selectPrTab, settle, texts, toastTexts, PR_PAGE } = await import("@/test/prPanelHarness");
 const { seedWorld, CF } = await import("@/test/projectsWorld");
 const { tooltipText } = await import("@/test/tooltip");
 const { runCommandForResult } = await import("@/stores/commands");
-const { closePanelTab, usePanelStore } = await import("@/stores/panel");
 const { mergePullRequest, usePrPanelStore } = await import("@/stores/prPanel");
 const { useUiStore } = await import("@/stores/ui");
+const { applyLayoutOp } = await import("@/api/layout");
+const { layoutSettled } = await import("@/test/fakeLayout");
 const { applyGhEvent } = await import("@/stores/gh");
 const { UPDATING_AFTER_MS } = await import("./PullRequestSurface");
 const { useThreadsStore } = await import("@/stores/threads");
 const { PREPARING_TOAST_DELAY_MS } = await import("@/stores/prThreads");
 
 /**
- * The Pull request surface (components/pr) in the real side panel, against the mock's pull
+ * The Pull request surface (components/pr) in a pane's tab, against the mock's pull
  * requests (src/test/prWorld.ts): #145 open with failing checks, threads and reviewers; #138
  * merged; #131 closed; #140 read-only; #142 mergeable; #146 from a fork; #139 a teammate's.
  * e2e/pr-panel.spec.ts keeps what needs the browser: widths, overflow and popups inside the
@@ -32,13 +36,17 @@ const { PREPARING_TOAST_DELAY_MS } = await import("@/stores/prThreads");
 
 let world: ReturnType<typeof seedPrWorld>;
 
-beforeEach(() => {
+trackTests();
+
+beforeEach(async () => {
   resetDaemon();
   world = seedPrWorld();
-  resetPrStores();
+  await resetPrStores();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // A body that timed out ends first, against its own world (src/test/isolate.ts).
+  await bodyDone();
   act(() => {
     toast.dismiss();
   });
@@ -64,9 +72,13 @@ function toastCount(text: string): number {
   return toastTexts().filter((t) => t.includes(text)).length;
 }
 
-/** Clicks a panel tab by its title. */
-function selectPanelTab(title: string): void {
-  fireEvent.click(within(byTestId("panel-tabs")).getByRole("tab", { name: title }));
+/** Switches to a space (switch_space) and selects what it shows. */
+async function showSpace(space: string, selection: Selection): Promise<void> {
+  await act(async () => {
+    useUiStore.setState({ selection });
+    await applyLayoutOp({ op: "switch_space", space });
+    await layoutSettled();
+  });
 }
 
 /** Opens the ⋯ menu. */
@@ -74,9 +86,6 @@ function openMenu(): HTMLElement {
   press(byTestId("pr-menu-button"));
   return byTestId("pr-menu");
 }
-
-/** Which region holds focus ([data-region]). */
-const focusedRegion = () => document.activeElement?.closest("[data-region]")?.getAttribute("data-region");
 
 describe("Overview", () => {
   it("#145: header, readiness box, reviewers, description, checks unfold from the box, comments newest first with threads; links open through view.open.url", async () => {
@@ -177,7 +186,7 @@ describe("Overview", () => {
 });
 
 describe("Activity", () => {
-  it("lists commits, reviews and the end state; the order toggles; a commit opens on GitHub; inner tabs stay per panel tab", async () => {
+  it("lists commits, reviews and the end state; the order toggles; a commit opens on GitHub; another tab starts on Overview", async () => {
     renderPrPanel();
     await openPr(145);
     fireEvent.click(byTestId("pr-tab-activity"));
@@ -209,24 +218,46 @@ describe("Activity", () => {
     fireEvent.click(byTestId("pr-tab-activity"));
     expect(entries()[0]?.dataset.kind).toBe("merged");
     fireEvent.click(byTestId("pr-tab-overview"));
-    selectPanelTab("#145");
+    await selectPrTab("#145");
     await settle();
-    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
-    expect(byTestId("pr-timeline").dataset.order).toBe("oldest");
     expect((byTestId("pr-tab-code") as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("inner tabs stay per tab: coming back to a thread's tab finds Activity still selected", async () => {
+    seedWorld();
+    await resetPrStores({ kind: "thread", id: "s-1" });
+    renderPrPanel();
+    await openPr(145);
+    fireEvent.click(byTestId("pr-tab-activity"));
+    fireEvent.click(byTestId("pr-timeline-order"));
+    await openPr(138);
+    expect(prTabs()).toEqual(["#145", "#138"]);
+    expect(byTestId("pr-tab-overview").getAttribute("aria-selected")).toBe("true");
+    await selectPrTab("#145");
+    await settle();
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
+    expect(byTestId("pr-timeline").dataset.order).toBe("oldest");
+  });
+
+  it("inner tabs stay per tab on the Pull Requests page too (an unlinked tab)", async () => {
+    renderPrPanel();
+    await openPr(145);
+    fireEvent.click(byTestId("pr-tab-activity"));
+    await openPr(138);
+    await selectPrTab("#145");
+    await settle();
+    expect(byTestId("pr-tab-activity").getAttribute("aria-selected")).toBe("true");
+  });
+
   it("closing a tab drops its inner state: reopened, it starts on Overview with the activity newest first", async () => {
+    seedWorld();
+    await resetPrStores({ kind: "thread", id: "s-1" });
     renderPrPanel();
     await openPr(145);
     fireEvent.click(byTestId("pr-tab-activity"));
     fireEvent.click(byTestId("pr-timeline-order"));
     expect(byTestId("pr-timeline").dataset.order).toBe("oldest");
-    const key = Object.keys(usePanelStore.getState().byKey)[0] ?? "";
-    const tab = usePanelStore.getState().byKey[key]?.groups[0]?.tabs[0];
-    act(() => {
-      closePanelTab(key, tab?.id ?? "");
-    });
+    await closePrTab("#145");
     expect(queryTestId("pr-surface")).toBeNull();
     await openPr(145);
     expect(byTestId("pr-tab-overview").getAttribute("aria-selected")).toBe("true");
@@ -430,6 +461,18 @@ describe("the ⋯ menu", () => {
     expect(urlsOpened().at(-1)).toBe(`https://github.com/${SLUG}/pull/145`);
   });
 
+  it("the pane dispatches the surface's own key: shift+cmd+c copies the link, not from a text field", async () => {
+    renderPrPanel();
+    await openPr(145);
+    fireEvent.keyDown(byTestId("pr-title"), { key: "c", code: "KeyC", metaKey: true, shiftKey: true });
+    expect(copyText).toHaveBeenCalledExactlyOnceWith(`https://github.com/${SLUG}/pull/145`);
+    await expectToast("Link copied");
+    openMenu();
+    await pick(byTestId("pr-menu-ask"));
+    fireEvent.keyDown(input("pr-ask-input"), { key: "c", code: "KeyC", metaKey: true, shiftKey: true });
+    expect(copyText).toHaveBeenCalledTimes(1);
+  });
+
   it("#138 (merged) offers Revert: it confirms, runs pr.revert and opens the new pull request as a tab", async () => {
     renderPrPanel();
     await openPr(138);
@@ -452,8 +495,19 @@ describe("the ⋯ menu", () => {
       ["138", true],
     ]);
     expect(prTabs()).toEqual(["#138", "#151"]);
-    expect(byTestId("pr-title").textContent).toBe('Revert "chore(gh): pace requests through one worker"');
     await expectToast("Opened #151 to revert #138");
+    await selectPrTab("#151");
+    expect(byTestId("pr-title").textContent).toBe('Revert "chore(gh): pace requests through one worker"');
+  });
+
+  it("the revert's new pull request is shown at once", async () => {
+    renderPrPanel();
+    await openPr(138);
+    fireEvent.click(byTestId("pr-revert"));
+    await settle();
+    fireEvent.click(byTestId("confirm-ok"));
+    await settle(3);
+    expect(byTestId("pr-title").textContent).toBe('Revert "chore(gh): pace requests through one worker"');
   });
 
   it("declining the revert's confirmation sends nothing", async () => {
@@ -519,9 +573,9 @@ describe("threads about a pull request", () => {
     ]);
   });
 
-  it("Ask a question from a thread: a composer under the header; Escape cancels into the panel; Enter sends pr.ask with the thread's worktree", async () => {
+  it("Ask a question from a thread: a composer under the header; Escape cancels; Enter sends pr.ask with the thread's worktree", async () => {
     seedWorld();
-    resetPrStores({ kind: "thread", id: "s-1" });
+    await resetPrStores({ kind: "thread", id: "s-1" });
     renderPrPanel();
     await openPr(145);
     openMenu();
@@ -534,9 +588,8 @@ describe("threads about a pull request", () => {
     fireEvent.change(input("pr-ask-input"), { target: { value: "never mind" } });
     fireEvent.keyDown(input("pr-ask-input"), { key: "Escape" });
     expect(queryTestId("pr-ask")).toBeNull();
-    // Escape stays in the composer: the panel keeps its tab and has focus.
+    // Escape stays in the composer: the tab stays.
     expect(prTabs()).toEqual(["#145"]);
-    expect(focusedRegion()).toBe("panel");
 
     openMenu();
     await pick(byTestId("pr-menu-ask"));
@@ -554,6 +607,18 @@ describe("threads about a pull request", () => {
       { args: { "repo-slug": SLUG, number: "145", question: "Why does attach race the first output?\nAnd is the fix covered by a test?" }, worktree: CF },
     ]);
     expect(queryTestId("pr-ask")).toBeNull();
+  });
+
+  it("Escape from the Ask composer hands focus back to the tab's pane, so its keys keep working", async () => {
+    renderPrPanel();
+    await openPr(145);
+    openMenu();
+    await pick(byTestId("pr-menu-ask"));
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(input("pr-ask-input"));
+    });
+    fireEvent.keyDown(input("pr-ask-input"), { key: "Escape" });
+    expect(document.activeElement?.closest('[data-testid="shell-pane"]')).toBeTruthy();
   });
 
   it("Ask from the Pull Requests page sends no worktree; while it starts, Cancel is disabled, the field read-only and Escape does nothing", async () => {
@@ -603,11 +668,12 @@ describe("threads about a pull request", () => {
     await expectToast(/^Started thread s-new-\d+ for PR #145/);
   });
 
-  it("a pull request's running threads show on every surface that shows it (a thread's panel and the Pull Requests page)", async () => {
+  it("a pull request's running threads show on every surface that shows it (a thread's tab and the Pull Requests page's, in another space)", async () => {
     seedWorld();
-    resetPrStores({ kind: "thread", id: "s-1" });
+    // One pull request tab per space: thread s-1 in Main, the page's tab in Review.
+    await resetPrStores({ kind: "thread", id: "s-1" }, "spaces");
     renderPrPanel();
-    // Ask from thread s-1's panel.
+    // Ask from thread s-1's tab.
     await openPr(145);
     const releaseAsk = world.hold("pr.ask");
     openMenu();
@@ -618,9 +684,7 @@ describe("threads about a pull request", () => {
     expect(byTestId("pr-ask-send").getAttribute("aria-busy")).toBe("true");
 
     // Meanwhile #145 on the Pull Requests page: its composer says so and sends nothing.
-    act(() => {
-      useUiStore.setState({ selection: PR_PAGE });
-    });
+    await showSpace("sp-review", PR_PAGE);
     await openPr(145);
     expect(prTabs()).toEqual(["#145"]);
     openMenu();
@@ -645,9 +709,7 @@ describe("threads about a pull request", () => {
     await pick(byTestId("pr-menu-explain"));
     expect(byTestId("pr-menu-explain").getAttribute("aria-busy")).toBe("true");
     expect(byTestId("pr-menu-explain").getAttribute("aria-disabled")).toBe("true");
-    act(() => {
-      useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
-    });
+    await showSpace("sp-main", { kind: "thread", id: "s-1" });
     await settle();
     expect(prTabs()).toEqual(["#145"]);
     openMenu();
@@ -836,9 +898,9 @@ describe("the merge button", () => {
     await expectToast("deleted origin/feat/sidebar");
   });
 
-  it("draft, read-only and merged pull requests; a method from the menu becomes the default; unchecking the branch, declining, a spinner, a refusal", async () => {
+  // Four cases that were one test: each opens only what it needs, so none nears the timeout under load.
+  it("#145 (draft): disabled with the reason; a click sends nothing; the menu says why and offers nothing", async () => {
     renderPrPanel();
-    // #145 is a draft: disabled with the reason; a click sends nothing; the menu says why and offers nothing.
     await openPr(145);
     expect(button().getAttribute("aria-disabled")).toBe("true");
     // Visibly disabled, both parts (the app's disabled opacity), never like Review beside it.
@@ -852,17 +914,21 @@ describe("the merge button", () => {
     press(chevron());
     expect(texts("pr-merge-note")).toEqual(["Draft pull requests cannot be merged"]);
     expect(byTestId("pr-merge-method-squash").hasAttribute("data-disabled")).toBe(true);
-    fireEvent.keyDown(byTestId("pr-merge-button-menu"), { key: "Escape" });
-    // #138 is merged: no button.
+    expect(merges()).toEqual([]);
+  });
+
+  it("#138 (merged) has no merge button; #140 (read access) no merge controls at all", async () => {
+    renderPrPanel();
     await openPr(138);
     expect(byTestId("pr-state").textContent).toBe("Merged");
     expect(queryTestId("pr-merge-button")).toBeNull();
-    // #140: read access only: no merge controls at all.
     await openPr(140);
     expect(queryTestId("pr-merge-button")).toBeNull();
     expect(queryTestId("pr-auto-merge-button")).toBeNull();
+  });
 
-    // #142: keep the branch, then decline: nothing is sent.
+  it("#142: unchecking the branch and a method from the menu, then declining, sends nothing; the button is idle and its default unchanged", async () => {
+    renderPrPanel();
     await openPr(142);
     expect(byTestId("pr-merge-button-split").dataset.blocked).toBeUndefined();
     for (const part of [button(), chevron()]) expect(part.classList.contains("opacity-50")).toBe(false);
@@ -881,12 +947,18 @@ describe("the merge button", () => {
     expect(queryTestId("pr-merge-button-menu")).toBeNull();
     expect(button().textContent).toBe("Squash and merge");
     expect(merges().filter(([, confirmed]) => confirmed)).toEqual([]);
+    // The branch stays unchecked for the next merge of this pull request.
+    press(chevron());
+    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
+  });
 
-    // GitHub refuses (the head moved): toasted, still open, the button usable again.
+  it("#142: GitHub refuses (the head moved): a spinner while it runs, then toasted, still open, the button usable again and its default unchanged", async () => {
+    renderPrPanel();
+    await openPr(142);
     world.failNext.add("pr.merge");
     const release = world.hold("pr.merge");
     press(chevron());
-    expect(byTestId("pr-merge-delete-branch").getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(byTestId("pr-merge-delete-branch"));
     await pick(byTestId("pr-merge-method-rebase"));
     fireEvent.click(byTestId("confirm-ok"));
     await settle();
@@ -1145,7 +1217,7 @@ describe("draft and links", () => {
     cleanup();
 
     seedWorld();
-    resetPrStores({ kind: "thread", id: "s-1" });
+    await resetPrStores({ kind: "thread", id: "s-1" });
     const setLinks = (links: { slug: string; number: number }[]) => {
       act(() => {
         useThreadsStore.setState((s) => {
@@ -1391,7 +1463,6 @@ describe("Review ▾", () => {
     });
     expect(reviews()).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read it through.\nShip it." }]);
     await expectToast("Approved #139");
-    expect(focusedRegion()).toBe("panel");
 
     // The refreshed detail: the chip in place of Review, the reviewer entry, the review in Comments.
     const chip = byTestId("pr-your-review");
@@ -1439,11 +1510,10 @@ describe("Review ▾", () => {
     fireEvent.change(reviewInput(), { target: { value: "" } });
     expect(byTestId("pr-review-hint").textContent).toBe("Write a comment");
 
-    // Escape cancels and hands focus to the panel; nothing was sent.
+    // Escape cancels; nothing was sent.
     fireEvent.keyDown(reviewInput(), { key: "Escape" });
     expect(queryTestId("pr-review-composer")).toBeNull();
     expect(prTabs()).toEqual(["#139"]);
-    expect(focusedRegion()).toBe("panel");
     expect(reviews()).toEqual([]);
 
     // Ask and Review share the slot: opening one closes the other.

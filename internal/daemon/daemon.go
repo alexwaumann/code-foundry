@@ -177,6 +177,8 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		return err
 	}
 	defer func() { _ = st.close() }() // after the servers have shut down
+	// The layout lays panes out in the pane area of a visible window when one reported it.
+	st.layout.SetWindowVisible(clients.Visible)
 	pres.Subscribe(func(from, to presence.State) {
 		if from.Kind != to.Kind {
 			st.gh.PresenceChanged(from.Kind, to.Kind)
@@ -231,7 +233,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Dir: p.Plugins(), DataDir: p.PluginData(), LogDir: p.PluginLogs(),
 		DB: st.db, Commands: settingsCommandHost{Registry: commands, settings: st.settings}, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
-		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows},
+		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows}, Tabs: pluginTabs{layout: st.layout},
 		Flags: pluginFlags{threads: st.thread},
 		// Wake sources: the thread store keeps the subscriptions (plugin_wakes.go).
 		Wakes:   pluginWakeSink{threads: st.thread},
@@ -245,13 +247,13 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer func() { _ = plugins.Close() }()
 	pluginAPI := api.NewPlugin(plugins).WithSurfaces(plugins).WithShots(shots).WithDirs(p.Plugins(), p.PluginData())
 	// Every claude spawn gets the plugins' session environments (plugin_hooks.go), and
-	// so does every new bottom-panel shell, without the add-dirs (plugin_env.go).
+	// so does every new shell, without the add-dirs (plugin_env.go).
 	st.thread.SetSpawnExtras(pluginSpawnExtras(plugins))
 	// Subscriptions to the plugins' wake sources resolve their args with the plugin store
 	// and tell the plugins as they come and go (plugin_wakes.go).
 	st.thread.SetPluginWakes(threadPluginWakes{plugins: plugins})
 	st.terminal.SetSpawnExtras(pluginShellExtras(plugins, st.thread))
-	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Themes: st.themes, Search: st.search, Done: ctx.Done(), Clients: clients})
+	eventsAPI := api.NewEvents(api.EventsDeps{Bus: events, Project: st.project, Terminal: st.terminal, Thread: st.thread, Gh: st.gh, GitOps: st.gitops, Settings: st.settings, Update: st.update, Workspace: st.workspace, Action: st.action, Plugin: plugins, Skill: st.skills, Memory: st.memory, Themes: st.themes, Search: st.search, Layout: st.layout, Done: ctx.Done(), Clients: clients})
 	// Plugins subscribe to the same events (events/subscribe).
 	plugins.SetEvents(api.NewPluginFeed(eventsAPI, log.With("component", "plugins")))
 	if err := all.Register(commands, all.Deps{
@@ -320,6 +322,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 			return f.Scheme, ok
 		},
 		ShippedSkills: shippedSkills(log, p.Claude()),
+		Layout:        st.layout,
 		// plugin new pins the SDK as the plugin skill does (skills.go).
 		PluginScaffolder: pluginscaffold.Scaffolder{
 			Home: st.home, Pin: skills.SDKPin(opts.Version.Commit, opts.Version.PluginSDKTag), Go: pluginscaffold.ShellGo,
@@ -366,6 +369,10 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		dictationAPI.Route(),
 		searchAPI.Route(),
 		filesystemAPI.Route(),
+		api.NewLayout(st.layout).WithImporter(legacyImport{
+			log: log.With("store", "layout"), layout: st.layout, terminals: st.terminal, threads: st.thread.Snapshot,
+			projects: st.project.Snapshot, plugins: plugins.Snapshot,
+		}).Route(),
 		eventsAPI.Route(),
 	}
 	mux := http.NewServeMux()

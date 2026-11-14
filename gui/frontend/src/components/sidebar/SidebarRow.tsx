@@ -44,7 +44,7 @@ interface RowProps {
  * Enter and Escape give focus back to what had it when the rename began; a blur leaves
  * focus where it went.
  */
-function RenameField({ id, name }: { id: string; name: string }) {
+export function RenameField({ id, name }: { id: string; name: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
   const opened = useRef(name);
@@ -116,7 +116,7 @@ function Elapsed({ at, className }: { at: number; className?: string }) {
  * is not shown (the hover card says it, docs/notes/sidebar-title-first.md); it stays for
  * screen readers.
  */
-function RowStatus({ id }: { id: string }) {
+export function RowStatus({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
   const at = useThreadsStore((st) => statusTimeAt(line, st.byId[id]));
   const badge = statusBadge(line);
@@ -212,7 +212,7 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
  * actions (RowActions) in its place, keeping at least their own width so they never cover the
  * text before them. They stay while one of them has the keyboard or the snooze menu is open.
  */
-function HoverSlot({ id, cursor, children }: { id: string; cursor: boolean; children?: ReactNode }) {
+export function HoverSlot({ id, cursor, children }: { id: string; cursor: boolean; children?: ReactNode }) {
   const [actionsShown, setActionsShown] = useState(false);
   return (
     <span className={cn("relative ml-auto flex shrink-0 items-center justify-end pl-1.5 group-hover/row:min-w-[97px]", actionsShown && "min-w-[97px]")} data-testid="row-hover-slot">
@@ -238,7 +238,7 @@ function Count({ icon: Icon, n, className, label, testId }: { icon: LucideIcon; 
  * live child threads, one number whatever the model started), the background shells (muted),
  * then the linked PR tag.
  */
-function RowCounts({ id }: { id: string }) {
+export function RowCounts({ id }: { id: string }) {
   const agents = useLiveCount(id);
   const shells = useThreadsStore((s) => s.byId[id]?.backgroundShellsRunning ?? 0);
   return (
@@ -255,7 +255,7 @@ function RowCounts({ id }: { id: string }) {
  * Layers for a thread across a workspace's projects or in its workspace's folder, House for a
  * thread without a project.
  */
-function PlaceIcon({ id, noProject, set }: { id: string; noProject: boolean; set: boolean }) {
+export function PlaceIcon({ id, noProject, set }: { id: string; noProject: boolean; set: boolean }) {
   const projectId = useThreadsStore((s) => s.byId[id]?.projectId ?? "");
   const kind = useProjectKind(projectId);
   if (noProject) return <House className="size-3 shrink-0" aria-hidden data-testid="row-place-icon" data-place="none" />;
@@ -318,7 +318,7 @@ function LineBranch({ id, cursor, branch }: { id: string; cursor: boolean; branc
  * sketch variant A); nothing for the user's threads. No tooltip of its own: the row's
  * tooltip says who created it.
  */
-function MadeByThreadGlyph({ id }: { id: string }) {
+export function MadeByThreadGlyph({ id }: { id: string }) {
   const made = useMadeByThread(id);
   if (!made) return null;
   return <CornerDownRight className="-mr-px size-3 shrink-0 text-cf-icon-muted opacity-85" aria-label="Created by a thread" data-testid="row-created-by" />;
@@ -346,7 +346,7 @@ function nameClass(name: string, provisional: boolean, quiet = false): string {
 }
 
 /** The muted pin before a pinned thread's name; nothing for the rest. */
-function PinGlyph({ id }: { id: string }) {
+export function PinGlyph({ id }: { id: string }) {
   const pinned = useThreadsStore((s) => s.byId[id]?.pinned ?? false);
   if (!pinned) return null;
   return <Pin className="-mr-px size-3 shrink-0 text-cf-icon-muted" aria-label="pinned" data-testid="row-pinned" />;
@@ -515,7 +515,7 @@ function ThreadTipBody({ id }: { id: string }) {
  * over the row's portalled snooze menu; a click or right-click closes it. It stays open over
  * everything in the row, its actions and the linked PR tag too. Not while renaming.
  */
-function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
+export function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
   const enabled = useContext(RowTooltipsEnabled);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   const [open, setOpen] = useState(false);

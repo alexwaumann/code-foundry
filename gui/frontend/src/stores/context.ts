@@ -2,16 +2,17 @@ import { useShallow } from "zustand/react/shallow";
 import type { UiContextView } from "@/api/command";
 import type { ThreadView } from "@/api/threads";
 import { bandSortTimes, placeThread, type ListOptions, type ListThread, type WorktreeRef } from "@/lib/tree";
-import { PROJECT_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
-import { focusedBottomShell, ownerKeyOf, PROJECTS_KEY, useBottomStore } from "./bottomPanel";
 import { useProjectsStore, type ProjectsData } from "./projects";
 import { getViewing, SUBAGENT_VIEW } from "./subagentView";
 import { useThreadsStore, type ThreadsData } from "./threads";
 import { inSidebar, type ThreadsById } from "@/lib/inSidebar";
-import { isThreadGroup, threadGroup } from "@/lib/thread";
+import { isActionableAsk, isThreadGroup, threadGroup } from "@/lib/thread";
 import { isNoProject } from "@/lib/threadRow";
+import { PROJECT_LABEL, THREAD_LABEL, WORKTREE_LABEL } from "@/lib/termlabel";
+import { quickTerminalOf } from "@/shell/quickTerminal";
+import { useLayoutStore } from "./layout";
 import { useTerminalsStore } from "./terminals";
-import { useUiStore, type Selection } from "./ui";
+import { keyboardElement, useUiStore, type Selection } from "./ui";
 
 /** No thread, project, worktree or terminal: HOME's context (the composer on No project). */
 export const emptyContext: UiContextView = {
@@ -37,45 +38,13 @@ export function projectContext(projectId: string): UiContextView {
   return { ...emptyContext, activeProjectId: projectId, activeView: "projects" };
 }
 
-/** A terminal as the command context needs it: its id and owner labels. */
-export interface ContextShell {
-  id: string;
-  labels: Readonly<Record<string, string>>;
-}
-
-/**
- * The worktree a Projects-page shell belongs to (its project and worktree labels); null for
- * any other terminal. Both the Projects page's "+" (bottomActions paneContext) and the
- * command context with the keyboard in that shell use it.
- */
-export function projectsShellPlace(t: ContextShell | undefined): WorktreeRef | null {
-  if (!t || ownerKeyOf(t) !== PROJECTS_KEY) return null;
-  const projectId = t.labels[PROJECT_LABEL] ?? "";
-  const path = t.labels[WORKTREE_LABEL] ?? "";
-  return projectId && path ? { projectId, path } : null;
-}
-
 /**
  * Derives the UiContext the daemon sees from the current selection. A thread contributes
- * its place (project, worktree) and its workspace; a thread has no terminal of its own, so
- * activeTerminalId comes only from a focused bottom panel shell (focusedShell). The
- * composer looks only at its project. Actions on a worktree that is not
- * selected (the Projects page) build their context with
- * worktreeContext / projectContext.
+ * its place (project, worktree) and its workspace. The composer looks only at its project.
+ * Actions on a worktree that is not selected (the Projects page) build their context with
+ * worktreeContext / projectContext; the terminal the user is on is getUiContext's.
  */
-export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }, focusedShell?: ContextShell): UiContextView {
-  const ctx = deriveSelectionContext(sel, projects, threads);
-  if (!focusedShell) return ctx;
-  // The keyboard is in a bottom panel shell (focusedBottomShell): terminal commands act on
-  // it. On the Projects page, which carries no worktree, the shell's worktree is the
-  // context too, so cmd+t (terminal.new) starts another shell beside it.
-  const place = projectsShellPlace(focusedShell);
-  return place
-    ? { ...ctx, activeTerminalId: focusedShell.id, activeProjectId: place.projectId, activeWorktreePath: place.path }
-    : { ...ctx, activeTerminalId: focusedShell.id };
-}
-
-function deriveSelectionContext(sel: Selection, projects: ProjectsData, threads: ThreadsData): UiContextView {
+export function deriveContext(sel: Selection, projects: ProjectsData, threads: ThreadsData = { byId: {}, order: [] }): UiContextView {
   switch (sel.kind) {
     // `none` shows HOME (App.tsx), whose context is emptyContext.
     case "none":
@@ -113,16 +82,43 @@ export function contextKey(c: UiContextView): string {
 }
 
 /**
- * Current context, read imperatively (keybindings, invoke). For the window's own
- * selection (no `sel`), a bottom panel shell with the keyboard (or the palette's return)
- * is the active terminal (and, on the Projects page, its worktree the active one). An explicit selection gets that selection's context only.
+ * The terminal the user is on: the current space's focused tab when it shows a terminal, else
+ * the quick terminal with the keyboard (keyboardElement: while the palette is open, the one that
+ * had it when it opened). "" for none.
+ */
+export function activeTerminalId(): string {
+  const s = useLayoutStore.getState();
+  const pane = s.panes[s.spaces[s.currentSpaceId]?.focus ?? ""];
+  const tab = pane ? s.tabs[pane.active] : undefined;
+  if (tab?.kind === "terminal") return tab.params.terminal ?? "";
+  const thread = keyboardElement()?.closest("[data-quick-terminal]")?.getAttribute("data-quick-terminal") ?? "";
+  if (!thread) return "";
+  const t = useTerminalsStore.getState();
+  return quickTerminalOf(t.byId, t.order, thread)?.id ?? "";
+}
+
+/**
+ * The window's context with the terminal the user is on (activeTerminalId): terminal commands act
+ * on it. A shell of a worktree and no thread (a Projects page's) also brings its project and
+ * worktree, so cmd+t starts another shell beside it.
+ */
+function withTerminal(ctx: UiContextView): UiContextView {
+  const id = activeTerminalId();
+  if (!id) return ctx;
+  const labels = useTerminalsStore.getState().byId[id]?.labels ?? {};
+  const project = labels[PROJECT_LABEL] ?? "";
+  const worktree = labels[WORKTREE_LABEL] ?? "";
+  if (!labels[THREAD_LABEL] && project && worktree) return { ...ctx, activeTerminalId: id, activeProjectId: project, activeWorktreePath: worktree };
+  return { ...ctx, activeTerminalId: id };
+}
+
+/**
+ * Current context, read imperatively (keybindings, invoke): the window's selection's with the
+ * terminal the user is on, or an explicit selection's alone.
  */
 export function getUiContext(sel?: Selection): UiContextView {
-  const ui = useUiStore.getState();
-  const terminals = useTerminalsStore.getState();
-  const focused = sel === undefined ? focusedBottomShell(ui, terminals, useBottomStore.getState().byKey) : "";
-  const shell = focused ? (terminals.byId[focused] ?? { id: focused, labels: {} }) : undefined;
-  return deriveContext(sel ?? ui.selection, useProjectsStore.getState(), useThreadsStore.getState(), shell);
+  if (sel !== undefined) return deriveContext(sel, useProjectsStore.getState(), useThreadsStore.getState());
+  return withTerminal(deriveContext(useUiStore.getState().selection, useProjectsStore.getState(), useThreadsStore.getState()));
 }
 
 const SEP = "\u0001";
@@ -130,7 +126,7 @@ const SEP = "\u0001";
 /**
  * One string per thread for the sidebar list: id + pin + group + archive time + snooze
  * end + hidden + its band's sort time (lib/tree.ts bandSortTimes: the status change for
- * attention and done, the last activity for idle). Name, model, a working thread's activity
+ * attention and done, the last activity for idle) + whether it calls without blocking (ListThread.nudge). Name, model, a working thread's activity
  * and the status line's text don't rebuild the list; a question turning into a finished
  * turn, an idle thread starting work, a new prompt, archiving, snoozing, its creator
  * being removed (lib/inSidebar.ts) and their undoing do, since it moves. In the store's
@@ -149,12 +145,13 @@ export function encodeThreadListKey(id: string, x: ThreadView | undefined, byId:
   const hidden = x !== undefined && !inSidebar(x, byId);
   const group = x ? threadGroup(x) : "idle";
   const times = x ? bandSortTimes({ ...x, group }) : { statusChangedAtMs: null, lastActivityAtMs: null };
-  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), ms(x?.savedAtMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs)].join(SEP);
+  const nudge = x !== undefined && group === "prompt" && !isActionableAsk(x);
+  return [id, x?.pinned ? "1" : "", group, ms(x?.archivedAtMs), ms(x?.snoozedUntilMs), ms(x?.savedAtMs), hidden ? "1" : "", ms(times.statusChangedAtMs), ms(times.lastActivityAtMs), nudge ? "1" : ""].join(SEP);
 }
 
 export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
   return keys.map((k) => {
-    const [id = "", pinned = "", group = "", archived = "", snoozed = "", saved = "", hidden = "", statusChanged = "", lastActivity = ""] = k.split(SEP);
+    const [id = "", pinned = "", group = "", archived = "", snoozed = "", saved = "", hidden = "", statusChanged = "", lastActivity = "", nudge = ""] = k.split(SEP);
     return {
       id,
       pinned: pinned === "1",
@@ -165,28 +162,18 @@ export function decodeThreadListKeys(keys: readonly string[]): ListThread[] {
       lastActivityAtMs: lastActivity === "" ? null : Number(lastActivity),
       ...(saved === "" ? {} : { savedAtMs: Number(saved) }),
       ...(hidden === "1" ? { hidden: true } : {}),
+      ...(nudge === "1" ? { nudge: true } : {}),
     };
   });
 }
 
-/** The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a). */
+/**
+ * The sidebar list's threads read imperatively (cmd+1..9, cmd+shift+a): what its keys decode to
+ * (encodeThreadListKey), so the keys walk the list in the order it is drawn.
+ */
 export function getListThreads(): ListThread[] {
   const s = useThreadsStore.getState();
-  return s.order.flatMap((id) => {
-    const x = s.byId[id];
-    if (!x) return [];
-    const t: ListThread = {
-      id,
-      pinned: x.pinned,
-      group: threadGroup(x),
-      archivedAtMs: x.archivedAtMs,
-      snoozedUntilMs: x.snoozedUntilMs,
-      savedAtMs: x.savedAtMs,
-      statusChangedAtMs: x.statusChangedAtMs,
-      lastActivityAtMs: x.lastActivityAtMs,
-    };
-    return [inSidebar(x, s.byId) ? t : { ...t, hidden: true }];
-  });
+  return decodeThreadListKeys(s.order.map((id) => encodeThreadListKey(id, s.byId[id], s.byId))).filter((t) => t.id in s.byId);
 }
 
 /** The sidebar list's display options read imperatively, so cmd+1..9 and cmd+shift+a see the rendered list. */

@@ -1,30 +1,38 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const openPullRequestInPanel = vi.hoisted(() => vi.fn<(ref: unknown, target?: string) => boolean>(() => true));
 vi.mock("@/stores/gh", () => ({ openUrl }));
 vi.mock("@/stores/prPanel", () => ({ openPullRequestInPanel }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 
 const { Markdown } = await import("./Markdown");
 const { openPullRequestLink, usePanelMarkdownExtras } = await import("./prLinks");
 const { ThreadMarkdown } = await import("@/components/thread/Code");
-const { PanelKeyContext } = await import("@/components/panel/panelKeyContext");
+const { PanelKeyContext } = await import("@/shell/panelKeyContext");
 const { AgentReport } = await import("@/components/thread/ToolDetail");
-const { usePanelStore, makeTab } = await import("@/stores/panel");
+const { resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
 
-/** Puts pull request tabs into a panel's one group, the active one first given. */
-function seedPanel(key: string, refs: { slug: string; number: number }[], active: number): void {
-  const tabs = refs.map((r) => makeTab("pullrequest", `#${String(r.number)}`, { slug: r.slug, number: String(r.number) }));
-  usePanelStore.setState((s) => ({ byKey: { ...s.byKey, [key]: { open: true, groups: [{ tabs, activeTabId: tabs[active]?.id ?? null }], focused: 0 } } }));
+/** Thread t1's tab, and its pull request tabs in a pane beside it, `active` the one it shows. */
+async function seedPanel(thread: string, refs: { slug: string; number: number }[], active: number): Promise<void> {
+  const st = threadSeed(thread);
+  const space = st.spaces[0];
+  if (!space?.root) throw new Error("no pane");
+  const tabs = refs.map((r, i) => ({ id: `t-pr-${String(i)}`, kind: "pullrequest", thread, title: `#${String(r.number)}`, params: { slug: r.slug, number: String(r.number) } }));
+  space.root = { t: "split", id: "s-1", dir: "row", kids: [space.root, { t: "pane", id: "p-2", tabs, active: tabs[active]?.id ?? "" }], sizes: [0.55, 0.45] };
+  await resetFakeLayout(st);
 }
+
+beforeEach(async () => {
+  await resetFakeLayout("empty");
+});
 
 afterEach(() => {
   cleanup();
   openUrl.mockClear();
   openPullRequestInPanel.mockClear();
   openPullRequestInPanel.mockImplementation(() => true);
-  usePanelStore.setState({ byKey: {} });
 });
 
 const PR = "https://github.com/octo/hello/pull/42/files#discussion_r7";
@@ -47,20 +55,20 @@ describe("openPullRequestLink", () => {
     expect(openPullRequestLink("current")(PR)).toBe(false);
   });
 
-  it("knows the pull request showing in another letter case", () => {
-    seedPanel("thread:t1", [{ slug: "octo/hello", number: 42 }], 0);
+  it("knows the pull request showing in another letter case", async () => {
+    await seedPanel("t1", [{ slug: "octo/hello", number: 42 }], 0);
     expect(openPullRequestLink("thread:t1")("https://github.com/Octo/Hello/pull/42/files#discussion_r7")).toBe(false);
     expect(openPullRequestInPanel).not.toHaveBeenCalled();
   });
 
-  it("sends a link into the page of the pull request already showing to the browser", () => {
-    seedPanel("thread:t1", [{ slug: "octo/hello", number: 42 }], 0);
+  it("sends a link into the page of the pull request already showing to the browser", async () => {
+    await seedPanel("t1", [{ slug: "octo/hello", number: 42 }], 0);
     expect(openPullRequestLink("thread:t1")(PR)).toBe(false);
     expect(openPullRequestInPanel).not.toHaveBeenCalled();
   });
 
-  it("opens an anchored link of a pull request that is open but not showing", () => {
-    seedPanel("thread:t1", [{ slug: "octo/other", number: 1 }, { slug: "octo/hello", number: 42 }], 0);
+  it("opens an anchored link of a pull request that is open but not showing", async () => {
+    await seedPanel("t1", [{ slug: "octo/other", number: 1 }, { slug: "octo/hello", number: 42 }], 0);
     expect(openPullRequestLink("thread:t1")(PR)).toBe(true);
     expect(openPullRequestInPanel).toHaveBeenCalledWith(REF, "thread:t1");
   });

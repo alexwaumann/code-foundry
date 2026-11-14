@@ -1,8 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { TabPlace } from "@/shell/host";
 import { fileTab } from "@/surfaces/fileTarget";
-import { openFileInPanel } from "./filePanel";
-import { closePanelTab, usePanelStore } from "./panel";
-import { RECENT_FILES_MAX, newlyShownFiles, startRecentFiles, useRecentFilesStore, withRecent, type RecentFile } from "./recentFiles";
+
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
+
+const { applyLayoutOp } = await import("@/api/layout");
+const { layoutSettled, resetFakeLayout, threadSeed } = await import("@/test/fakeLayout");
+const { useLayoutStore } = await import("./layout");
+const { openFileInPanel } = await import("./filePanel");
+const { RECENT_FILES_MAX, newlyShownFiles, startRecentFiles, useRecentFilesStore, withRecent } = await import("./recentFiles");
+type RecentFile = import("./recentFiles").RecentFile;
 
 const CF = "/Users/dev/src/code-foundry";
 const KEY = "thread:s-1";
@@ -24,18 +31,19 @@ describe("newlyShownFiles", () => {
   const page = fileTab({ project: "cf", base: CF, path: "page.html", page: { title: "Page" } });
 
   it("is a group's newly active File tab, not one still active or a thread's page", () => {
-    const before = { open: true, groups: [{ tabs: [a, b, page], activeTabId: a.id }] };
-    expect(newlyShownFiles(before, { ...before, groups: [{ tabs: [a, b, page], activeTabId: b.id }] })).toEqual([file("b.ts")]);
-    expect(newlyShownFiles(before, { ...before, open: false })).toEqual([]);
-    expect(newlyShownFiles(before, { ...before, groups: [{ tabs: [a, b, page], activeTabId: page.id }] })).toEqual([]);
+    const tabs = [a, b, page];
+    const before: TabPlace = { shown: true, tabs, groups: [{ tabs, active: a }], focused: 0 };
+    expect(newlyShownFiles(before, { ...before, groups: [{ tabs, active: b }] })).toEqual([file("b.ts")]);
+    expect(newlyShownFiles(before, { ...before, shown: false })).toEqual([]);
+    expect(newlyShownFiles(before, { ...before, groups: [{ tabs, active: page }] })).toEqual([]);
     expect(newlyShownFiles(undefined, before)).toEqual([file("a.ts")]);
   });
 });
 
 describe("startRecentFiles", () => {
   let stop: () => void = () => undefined;
-  beforeEach(() => {
-    usePanelStore.setState({ byKey: {} });
+  beforeEach(async () => {
+    await resetFakeLayout(threadSeed("s-1"));
     useRecentFilesStore.setState({ byKey: {} });
     stop = startRecentFiles();
   });
@@ -43,13 +51,18 @@ describe("startRecentFiles", () => {
     stop();
   });
 
-  it("keeps the panel's files most recent first, including ones whose tab closed", () => {
+  it("keeps the thread's files most recent first, including ones whose tab closed", async () => {
     openFileInPanel(KEY, { project: "cf", base: CF, path: "a.ts" });
+    await layoutSettled();
     openFileInPanel(KEY, { project: "cf", base: CF, path: "b.ts" });
+    await layoutSettled();
     openFileInPanel(KEY, { project: "cf", base: CF, path: "a.ts", line: 3 });
+    await layoutSettled();
     expect(useRecentFilesStore.getState().byKey[KEY]?.map((f) => f.path)).toEqual([`${CF}/a.ts`, `${CF}/b.ts`]);
     // Closing a.ts shows b.ts again (its neighbour becomes active); a.ts stays listed.
-    closePanelTab(KEY, fileTab({ project: "cf", base: CF, path: "a.ts" }).id);
+    const a = Object.values(useLayoutStore.getState().tabs).find((t) => t.params.path === fileTab({ project: "cf", base: CF, path: "a.ts" }).params.path);
+    await applyLayoutOp({ op: "close_tab", tab: a?.id ?? "" });
+    await layoutSettled();
     expect(useRecentFilesStore.getState().byKey[KEY]?.map((f) => f.path)).toEqual([`${CF}/b.ts`, `${CF}/a.ts`]);
     expect(useRecentFilesStore.getState().byKey["thread:s-2"]).toBeUndefined();
   });

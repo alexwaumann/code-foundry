@@ -1294,27 +1294,16 @@ func (x *UiIntent_PlayAlertSound) GetVolume() int32 {
 	return 0
 }
 
-// ShowView opens a named GUI view: "help", "settings", "pullrequests". "settings.<page
+// ShowView opens a named GUI view: "help", "settings", "usage". "settings.<page
 // id>" opens Settings on that page (view.settings --page); "project.add" opens the Add
 // Project dialog (project.add without a path). Unknown names are ignored.
 type UiIntent_ShowView struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// The thread whose side panel a panel action ("panel.toggle", "panel.mcp", ...)
-	// applies to, without changing what any window has selected: the thread's panel
-	// changes now if a window shows it, and is that way when the user opens it. Empty:
-	// the action applies to whatever each window has selected. Set by the view.panel.*
-	// verbs from inside a thread ($CODE_FOUNDRY_THREAD) or with --thread
-	// (docs/notes/control-1-thread-scoped-views.md). A window ignores a ShowView with a
-	// thread_id whose name is not a panel action.
-	ThreadId string `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// What the view shows, for the names that take more than the name: the panel
-	// actions that open one item ("panel.file", "panel.diff", "panel.pr",
-	// "panel.gallery"; docs/notes/control-5-fixes.md), the Projects page (one project's
-	// or workspace's) and search.open (an agent search). Each name's keys are documented
-	// with its name's constant in internal/command (ViewPanelFile, ViewPanelDiff,
-	// ViewPanelPR, ViewPanelGallery, ViewProjects, ViewSearch). Empty for every other
-	// name.
+	// What the view shows, for the names that take more than the name: an agent search
+	// (search.open), a full screen pane, the dictation hold's phase, the move picker's
+	// thread. Each name's keys are documented with its name's constant in
+	// internal/command. Empty for every other name.
 	Params        map[string]string `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1357,13 +1346,6 @@ func (x *UiIntent_ShowView) GetName() string {
 	return ""
 }
 
-func (x *UiIntent_ShowView) GetThreadId() string {
-	if x != nil {
-		return x.ThreadId
-	}
-	return ""
-}
-
 func (x *UiIntent_ShowView) GetParams() map[string]string {
 	if x != nil {
 		return x.Params
@@ -1374,7 +1356,7 @@ func (x *UiIntent_ShowView) GetParams() map[string]string {
 type UiIntent_FocusThread struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	ThreadId string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	// Someone asked for this thread (thread.focus, a view.panel.* verb's --focus): the
+	// Someone asked for this thread (thread.focus): the
 	// window selects it even when it is a hidden child, which a non-explicit FocusThread
 	// (a thread-starting verb's) leaves alone so an agent's threads never take the view.
 	Explicit      bool `protobuf:"varint,2,opt,name=explicit,proto3" json:"explicit,omitempty"`
@@ -1731,7 +1713,7 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tVarsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xda\x0f\n" +
+	"\x13WatchIntentsRequest\"\xce\x0f\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
 	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
@@ -1759,14 +1741,13 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\x1a(\n" +
 	"\x0ePlayAlertSound\x12\x16\n" +
-	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a\xbd\x01\n" +
+	"\x06volume\x18\x01 \x01(\x05R\x06volume\x1a\xb1\x01\n" +
 	"\bShowView\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12E\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\x06params\x18\x03 \x03(\v2-.codefoundry.v1.UiIntent.ShowView.ParamsEntryR\x06params\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aF\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x02\x10\x03R\tthread_id\x1aF\n" +
 	"\vFocusThread\x12\x1b\n" +
 	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x1a\n" +
 	"\bexplicit\x18\x02 \x01(\bR\bexplicit\x1a0\n" +

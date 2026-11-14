@@ -1,55 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TerminalView } from "@/api/terminal";
+import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
 
-const invokeConfirmed = vi.hoisted(() => vi.fn(() => Promise.resolve()));
-vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), invokeConfirmed, refreshCommands: () => Promise.resolve() }));
+const runCommandForResult = vi.hoisted(() => vi.fn<(name: string, args: Record<string, string>, opts: unknown) => Promise<{ resultJson: string } | null>>(() => Promise.resolve({ resultJson: "" })));
+vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
 
-const { bottomTabIds, bottomTabTitle, getBottom, useBottomStore } = await import("./bottomPanel");
-const { closeBottomTerminal } = await import("./bottomActions");
-const { hidePluginTerminalTab, showPluginTerminal } = await import("./pluginTerminals");
-const { useTerminalsStore } = await import("./terminals");
-const { useUiStore } = await import("./ui");
+const { showPluginTerminal, terminalShown } = await import("./pluginTerminals");
+const { resetLayout, useLayoutStore } = await import("./layout");
 
-function term(id: string, labels: Record<string, string>): TerminalView {
-  return { id, argv: ["sh"], cwd: "/h", cols: 80, rows: 24, title: "", state: "running", exitCode: 0, startedAtMs: 1, exitedAtMs: null, altScreen: false, labels };
-}
-
-const shell = term("t-shell", { kind: "shell", project: "r1", worktree: "/w", thread: "s-1" });
-const clock = term("t-clock", { kind: "plugin", plugin: "hello", title: "Clock" });
-
-// docs/notes/plugins-6-thread-terminal.md: a plugin's terminal joins a bottom panel's strip
-// only where the user opened it, and its tab's × takes it off the strip without closing it.
-describe("plugin terminals in the bottom panel", () => {
-  beforeEach(() => {
-    useTerminalsStore.setState({ byId: { [shell.id]: shell, [clock.id]: clock }, order: [shell.id, clock.id], shownIn: {}, loaded: true });
-    useBottomStore.setState({ byKey: {}, pendingFocus: null, pendingFocusId: null, starting: {} });
-    useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
-    invokeConfirmed.mockClear();
+// docs/notes/plugins-6-thread-terminal.md: a plugin's terminal has a tab only once the user opens one.
+describe("plugin terminals in tabs", () => {
+  beforeEach(async () => {
+    resetLayout();
+    runCommandForResult.mockClear();
+    await seedLayout(
+      layoutOf([
+        space(pane("p-1", [tab("t-th", "thread", "s-1"), tab("t-clock", "terminal", "", { params: { terminal: "clock" } })], "t-th"), "p-1"),
+        space(pane("p-2", [tab("t-other", "terminal", "", { params: { terminal: "other" } })], "t-other"), "p-2", { id: "sp-2", name: "Two" }),
+      ]),
+    );
   });
 
-  it("is no tab until opened, then a tab of the current thread's panel, titled by the plugin", () => {
-    expect(bottomTabIds(useTerminalsStore.getState(), "thread:s-1")).toEqual(["t-shell"]);
-    expect(showPluginTerminal("t-clock")).toBe(true);
-    expect(bottomTabIds(useTerminalsStore.getState(), "thread:s-1")).toEqual(["t-shell", "t-clock"]);
-    expect(bottomTabIds(useTerminalsStore.getState(), "thread:s-2")).toEqual([]);
-    expect(getBottom("thread:s-1")).toMatchObject({ open: true, activeTerminalId: "t-clock" });
-    expect(bottomTabTitle(clock, "thread:s-1")).toBe("Clock");
+  it("Open in a tab asks the daemon to show the terminal (ui.focus.terminal), quietly", async () => {
+    expect(await showPluginTerminal("clock")).toBe(true);
+    expect(runCommandForResult).toHaveBeenCalledWith("ui.focus.terminal", { id: "clock" }, { quiet: true });
+    runCommandForResult.mockResolvedValueOnce(null);
+    expect(await showPluginTerminal("clock")).toBe(false);
   });
 
-  it("closing its tab hides it and leaves the terminal running; a shell's tab still runs terminal.close", async () => {
-    showPluginTerminal("t-clock");
-    await closeBottomTerminal("t-clock");
-    expect(invokeConfirmed).not.toHaveBeenCalled();
-    expect(bottomTabIds(useTerminalsStore.getState(), "thread:s-1")).toEqual(["t-shell"]);
-    expect("t-clock" in useTerminalsStore.getState().byId).toBe(true);
-    expect(hidePluginTerminalTab("t-shell")).toBe(false);
-    await closeBottomTerminal("t-shell");
-    expect(invokeConfirmed).toHaveBeenCalledWith("terminal.close", { id: "t-shell" }, expect.anything());
-  });
-
-  it("needs a selection with a bottom panel", () => {
-    useUiStore.setState({ selection: { kind: "none" } });
-    expect(showPluginTerminal("t-clock")).toBe(false);
-    expect(useTerminalsStore.getState().shownIn).toEqual({});
+  it("a terminal counts as shown while its tab is its pane's active one in the current space", () => {
+    const s = useLayoutStore.getState();
+    expect(terminalShown(s, "clock")).toBe(false);
+    expect(terminalShown(s, "other")).toBe(false);
+    const p1 = s.panes["p-1"];
+    if (!p1) throw new Error("no pane p-1");
+    expect(terminalShown({ ...s, panes: { ...s.panes, "p-1": { ...p1, active: "t-clock" } } }, "clock")).toBe(true);
   });
 });

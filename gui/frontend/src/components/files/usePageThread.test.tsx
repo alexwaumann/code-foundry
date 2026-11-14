@@ -1,7 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import { PanelKeyContext } from "@/components/panel/panelKeyContext";
+import { PanelKeyContext } from "@/shell/panelKeyContext";
 import { usePageThread } from "./usePageThread";
 
 const PAGE = "/Users/me/p/welcome.html";

@@ -2,7 +2,7 @@
  * From a plugin's flag on a thread to that plugin's surface (docs/notes/plugins-11-gui-gaps.md):
  * a click on a sidebar row whose line 2 shows a flag opens the thread and, when the flag's
  * plugin has a thread- or pr-scoped surface available for it, that surface's tab in the
- * thread's side panel, through the ShowView path its show command takes.
+ * tab beside the thread, through the ShowView path its show command takes.
  *
  * Availability is the show command's, listed for the thread's context (surfaces/plugin.ts
  * showState): right after the click the commands list is still the old selection's, so the
@@ -13,6 +13,7 @@ import { statusLine } from "@/lib/statusLine";
 import { topFlag } from "@/lib/thread";
 import { showState } from "@/surfaces/plugin";
 import { useCommandsStore } from "./commands";
+import { useThreadsStore } from "./threads";
 import { allSurfaces, usePluginsStore, type PluginsState, type SurfaceManifest } from "./plugins";
 import { useUiStore, type Selection } from "./ui";
 import { showView } from "./views";
@@ -96,4 +97,15 @@ export function openFlagSurface(threadId: string, plugin: string, timeoutMs = 30
 /** Opens a flag surface by kind in a thread's panel. */
 export function showFlagSurface(kind: string, threadId: string): void {
   showView(`panel.${kind}?thread=${encodeURIComponent(threadId)}`);
+}
+
+/**
+ * Opens a thread from a sidebar row or a Needs you card or popup: selects it (its tab focused or
+ * opened in the focused pane) and, when its line shows a plugin's flag, opens that plugin's
+ * surface for it (openFlagSurface: in the window shell a linked tab placed by the rules).
+ */
+export function selectThreadAndFlag(threadId: string): void {
+  const flag = shownFlag(useThreadsStore.getState().byId[threadId]);
+  useUiStore.getState().select({ kind: "thread", id: threadId }, { focusPrompt: true });
+  if (flag) void openFlagSurface(threadId, flag.plugin);
 }

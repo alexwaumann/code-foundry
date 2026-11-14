@@ -42,7 +42,7 @@ export function columnWeight(c: ColumnData): number {
 
 /**
  * The width the columns need side by side: COLUMN_MIN_WIDTH a column (a fixed one wider
- * than that, its width) and the gaps. So the side panel (about 360 px) always stacks.
+ * than that, its width) and the gaps. So a narrow pane (about 360 px) always stacks.
  */
 export function columnsMinWidth(items: readonly ColumnData[]): number {
   const widths = items.reduce((sum, c) => sum + Math.max(COLUMN_MIN_WIDTH, fixedWidth(c) ?? 0), 0);
@@ -129,7 +129,7 @@ export function masterDetailListWidth(data: MasterDetailData): number {
 /**
  * Whether a master-detail `width` px wide shows its list and detail side by side: at least
  * listWidth + MASTER_DETAIL_GAP + MASTER_DETAIL_MIN_DETAIL (612 px by default). Not
- * measured yet (null): no, the list alone, so the side panel never flashes two sides.
+ * measured yet (null): no, the list alone, so a narrow pane never flashes two sides.
  */
 export function masterDetailWide(width: number | null, listWidth: number): boolean {
   return width !== null && width >= listWidth + MASTER_DETAIL_GAP + MASTER_DETAIL_MIN_DETAIL;

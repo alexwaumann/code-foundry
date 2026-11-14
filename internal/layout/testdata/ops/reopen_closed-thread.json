@@ -1,0 +1,69 @@
+{
+  "doc": "A thread's tab opens the thread back in its pane at its place, and its remembered set comes back.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+          "active": "t-f"
+        },
+        "focus": "p-a",
+        "mru": ["t-f"],
+        "closed": [{"pane":"p-a","tabs":[{"id":"t-a","kind":"thread","thread":"th-a"}],"index":1}]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj-1","worktree":"w-1"}
+              },
+              "pane": "p-a",
+              "index": 2
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-f","kind":"file","params":{"path":"/x"}},
+            {"id":"t-n1","kind":"thread","thread":"th-a"},
+            {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj-1","worktree":"w-1"}}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-f"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a"}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","back":["t-d"]}
+}

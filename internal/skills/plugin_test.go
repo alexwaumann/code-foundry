@@ -24,6 +24,7 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/reference/wakes.md", "code-foundry-plugin/reference/owned.md", "code-foundry-plugin/reference/icons.md",
 	"code-foundry-plugin/reference/testing.md", "code-foundry-plugin/reference/publishing.md",
 	"code-foundry-plugin/reference/cli.md", "code-foundry-plugin/reference/host-commands.md",
+	"code-foundry-plugin/reference/host-commands-thread-view.md",
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",
 	"code-foundry-plugin/example/main_test.go", "code-foundry-plugin/example/Makefile",
 	"code-foundry-plugin/example/.gitignore", "code-foundry-plugin/example/.github/workflows/release.yml",
@@ -94,15 +95,25 @@ func TestRenderPluginSkill(t *testing.T) {
 		t.Error("cli.md lists an installed plugin's command")
 	}
 
-	// host-commands.md: the registry without the plugin namespace.
+	// host-commands.md and host-commands-thread-view.md: the registry without the plugin
+	// namespace, the thread and view categories in the second.
 	host := string(files[skills.Plugin+"/reference/host-commands.md"])
-	for _, want := range []string{"- `thread.send", "- `pr.checks", "## Thread\n"} {
-		if !strings.Contains(host, want) {
-			t.Errorf("host-commands.md lacks %q", want)
+	threadView := string(files[skills.Plugin+"/reference/host-commands-thread-view.md"])
+	for file, wants := range map[string][]string{
+		host:       {"- `pr.checks", "- `terminal.new", "## Terminal\n", "host-commands-thread-view.md"},
+		threadView: {"- `thread.send", "- `view.settings", "## Thread\n", "## View\n", "host-commands.md"},
+	} {
+		for _, want := range wants {
+			if !strings.Contains(file, want) {
+				t.Errorf("%.60q lacks %q", file, want)
+			}
 		}
 	}
-	if regexp.MustCompile("- `plugin\\.").MatchString(host) {
-		t.Error("host-commands.md lists a plugin.* command")
+	if strings.Contains(host, "## Thread\n") || strings.Contains(host, "- `thread.send") || strings.Contains(threadView, "- `pr.checks") {
+		t.Error("a category is in both host command files")
+	}
+	if regexp.MustCompile("- `plugin\\.").MatchString(host + threadView) {
+		t.Error("the host command files list a plugin.* command")
 	}
 
 	// The example is plugins/examples/minimal, byte for byte.

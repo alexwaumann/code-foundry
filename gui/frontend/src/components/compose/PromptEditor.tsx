@@ -502,8 +502,9 @@ export function PromptEditor({
     <TagDraftContext.Provider value={draftKey}>
       {/* data-value: the prompt as stored (tag tokens included), for tests and debugging. */}
       <div className="relative" data-testid="composer-prompt" data-value={value}>
+        {/* At most the empty editor's two lines (min-h-16): a narrow composer never wraps it over its controls. */}
         {value === "" && (
-          <span aria-hidden className="pointer-events-none absolute top-3.5 left-4 text-body text-cf-placeholder select-none">
+          <span aria-hidden className="pointer-events-none absolute top-3.5 right-4 left-4 line-clamp-2 text-body text-cf-placeholder select-none">
             {placeholder}
           </span>
         )}

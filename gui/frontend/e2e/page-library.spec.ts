@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock, row } from "./fixtures";
+import { mockPost, openApp, resetMock, row, infoCardOff } from "./fixtures";
 
 /**
  * The page library (docs/notes/page-library.md): pages the model shows inline, built on the
@@ -10,6 +10,8 @@ import { mockPost, openApp, resetMock, row } from "./fixtures";
 
 test.beforeEach(async () => {
   await resetMock();
+  // Written for a conversation with no card beside it (layout.thread_info is on by default).
+  await infoCardOff();
 });
 
 const shots = process.env.SHOTS;

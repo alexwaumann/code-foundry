@@ -1,0 +1,53 @@
+{
+  "doc": "Merging a pane into a pane of terminals raises its minimum; refused when the row would then not fit: 480 + 12 + 480 + 12 + 480 = 1464px of 1300.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            },
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-c",
+                  "tabs": [{"id":"t-f","kind":"file","params":{"path":"/f"}}],
+                  "active": "t-f"
+                },
+                {"t":"pane","id":"p-d","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+              ],
+              "sizes": [0.5,0.5]
+            }
+          ],
+          "sizes": [0.4,0.2,0.4]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"merge_pane","pane":"p-d","target":"p-b","w":1300,"h":900},
+  "error": "failed_precondition"
+}

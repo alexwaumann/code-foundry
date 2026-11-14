@@ -18,15 +18,15 @@ import { errorMessage } from "@/api/stream";
 import { fileName, relativeTo } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { plainLine, plainName, plainPath } from "@/lib/plainText";
-import { ASK_PARAMS, fileOfTab, type FileAsk } from "@/surfaces/fileTarget";
+import { ASK_PARAMS, fileOfTab, withoutParams, type FileAsk } from "@/surfaces/fileTarget";
 import { requestChoice } from "./confirm";
-import { fileEditKey, fileEditOf, focusEditor, focusedEdit, noteEditFailure, returnFromPalette, saveFile, type FileEdit, type FileWhere, type SaveOutcome } from "./fileEdit";
-import { activatePanelTab, allTabs, dropPanelTabParams, getPanel, type Tab } from "./panel";
+import { discardEdit, fileEditKey, fileEditOf, focusEditor, focusedEdit, noteEditFailure, returnFromPalette, saveFile, type FileEdit, type FileWhere, type SaveOutcome } from "./fileEdit";
+import { activateTab, findTab, setTabParams, type Tab } from "@/shell/host";
 import { deliverThreadPrompt } from "./threadInfo";
 import { useThreadsStore } from "./threads";
 
 function tabOf(s: FileEdit): Tab | undefined {
-  return allTabs(getPanel(s.panelKey)).find((t) => t.id === s.tabId);
+  return findTab(s.panelKey, s.tabId);
 }
 
 /** The request standing on a session's tab; null without one. */
@@ -74,9 +74,15 @@ export function fileFacts(file: FileWhere): string[] {
   return facts;
 }
 
-/** The request is over, unless a newer one took its place while a write was out. */
+/**
+ * The request is over, unless a newer one took its place while a write was out. Decided on the
+ * tab's newest params, those of an update still on its way included (the seam's queue): a newer
+ * request sent but not yet landed stands.
+ */
 function finish(s: FileEdit, ask: FileAsk): void {
-  if (askOf(s)?.id === ask.id) dropPanelTabParams(s.panelKey, s.tabId, ASK_PARAMS);
+  if (askOf(s)?.id !== ask.id) return;
+  const end = withoutParams(ASK_PARAMS);
+  setTabParams(s.panelKey, s.tabId, (now) => (now.askId === ask.id ? end(now) : now));
 }
 
 /** "saved" and told; "untold" when the write stood and the thread did not hear; otherwise the write's outcome and nothing was sent. */
@@ -133,18 +139,36 @@ export function presentFileSave(): boolean {
 /**
  * Asked before a File tab closes (SurfaceSpec.beforeClose): a dirty one asks Save, Discard
  * or Keep editing. A save that does not go through keeps the tab, on screen, showing why.
+ * Discard throws the edits away now: a closed tab's dirty session would otherwise wait for the
+ * file to come back (stores/fileEdit.ts prune).
  */
 export function confirmCloseFile(panelKey: string, tab: Tab): true | Promise<boolean> {
   const key = fileEditKey(panelKey, tab.id);
   const s = fileEditOf(key);
   if (!s?.dirty) return true;
-  return askClose(key, panelKey, tab, s);
+  return askEnd(key, s, { title: tab.title, message: "Unsaved edits are lost if you discard them." });
 }
 
-async function askClose(key: string, panelKey: string, tab: Tab, s: FileEdit): Promise<boolean> {
+/**
+ * Asked before something the user does ends dirty edit sessions for good (archiving their
+ * thread, removing its space with its threads archived), one file at a time: Save, Discard or
+ * Keep editing. Resolves true when every one was saved or discarded; false at the first Keep
+ * editing or failed save, and then nothing is to happen. `why` says what ends them.
+ */
+export async function confirmEndEdits(keys: readonly string[], why: string): Promise<boolean> {
+  for (const key of keys) {
+    const s = fileEditOf(key);
+    if (!s?.dirty) continue;
+    if (!(await askEnd(key, s, { title: "", message: `${why} Unsaved edits are lost if you discard them.` }))) return false;
+  }
+  return true;
+}
+
+/** The Save, Discard, Keep editing question about one session; true once it may end. */
+async function askEnd(key: string, s: FileEdit, opts: { title: string; message: string }): Promise<boolean> {
   const answer = await requestChoice({
-    title: `Save changes to ${fileName(s.view?.path ?? "") || tab.title}?`,
-    message: "Unsaved edits are lost if you discard them.",
+    title: `Save changes to ${fileName(s.view?.path ?? s.path) || opts.title}?`,
+    message: opts.message,
     confirmLabel: askOf(s) ? "Save and tell thread" : "Save",
     alternateLabel: "Discard",
     cancelLabel: "Keep editing",
@@ -157,8 +181,12 @@ async function askClose(key: string, panelKey: string, tab: Tab, s: FileEdit): P
     });
     return false;
   }
-  if (answer === "alternate") return true;
+  if (answer === "alternate") {
+    discardEdit(key);
+    return true;
+  }
   if ((await saveTab(key)) === "saved") return true;
-  activatePanelTab(panelKey, tab.id);
+  // Shown where it is, with why (a tab put away says so when its file is opened again).
+  activateTab(s.panelKey, s.tabId);
   return false;
 }

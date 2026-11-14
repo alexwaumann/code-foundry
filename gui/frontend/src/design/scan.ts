@@ -59,10 +59,23 @@ const STRING_KINDS = new Set([
   ts.SyntaxKind.TemplateTail,
 ]);
 
+const parsed = new Map<string, { source: string; sf: ts.SourceFile }>();
+
+/**
+ * `source` parsed, once per file and text: the guards read every file three ways
+ * (guards.test.ts), and parsing is most of their work.
+ */
+function parse(fileName: string, source: string): ts.SourceFile {
+  const hit = parsed.get(fileName);
+  if (hit?.source === source) return hit.sf;
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  parsed.set(fileName, { source, sf });
+  return sf;
+}
+
 /** Every banned class in `source`'s string and template literals, in source order. */
 export function scanSource(fileName: string, source: string): Hit[] {
-  const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
+  const sf = parse(fileName, source);
   const lines = source.split("\n");
   const hits: Hit[] = [];
   const visit = (node: ts.Node): void => {
@@ -158,8 +171,7 @@ function colourHits(raw: string, lineAt: (offset: number) => number, lines: read
 
 /** Every shadcn colour name in `source`'s string and template literals (an object key declares a name, so it is not read as a use). */
 export function scanColours(fileName: string, source: string): ColourHit[] {
-  const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
+  const sf = parse(fileName, source);
   const lines = source.split("\n");
   const hits: ColourHit[] = [];
   const visit = (node: ts.Node): void => {
@@ -230,8 +242,7 @@ function ownerOf(node: ts.Node): string | undefined {
 
 /** Every string and template literal in a TS/TSX source (JSX attribute values included), in source order. */
 export function stringLiterals(fileName: string, source: string): Literal[] {
-  const kind = fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
+  const sf = parse(fileName, source);
   const out: Literal[] = [];
   const visit = (node: ts.Node): void => {
     if (STRING_KINDS.has(node.kind)) {
@@ -298,7 +309,7 @@ export function scanSlotRefs(fileName: string, source: string, known: (name: str
     const src = source.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
     return slotRefs(src, (o) => src.slice(0, o).split("\n").length - 1, lines, known).sort((a, b) => a.line - b.line);
   }
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const sf = parse(fileName, source);
   return stringLiterals(fileName, source)
     .flatMap((l) => slotRefs(l.raw, (o) => sf.getLineAndCharacterOfPosition(l.start + o).line, lines, known))
     .sort((a, b) => a.line - b.line);

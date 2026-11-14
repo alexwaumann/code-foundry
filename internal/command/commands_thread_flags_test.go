@@ -87,7 +87,7 @@ func TestPluginEnvCommand(t *testing.T) {
 	res, err := reg.Invoke(context.Background(), command.Context{}, "plugin.env", map[string]string{"name": "hello"})
 	want := "plugin hello\n  scope: projects p1, and threads without a project\n  env CF_HELLO\n  PATH += /h/bin\n  --add-dir /h/data\n" +
 		"  issue: env PATH is reserved for Code Foundry and Claude\n\n" +
-		"New threads in scope get this, and new bottom-panel shells in scope get the env and PATH entries too. " +
+		"New threads in scope get this, and new terminal shells in scope get the env and PATH entries too. " +
 		"Running threads and shells keep what they started with; a thread shows \"Plugin environment changed\" until restarted (thread restart <id>)."
 	if err != nil || res.Message != want {
 		t.Errorf("plugin.env hello = %q, %v; want %q", res.Message, err, want)

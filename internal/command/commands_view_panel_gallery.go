@@ -17,7 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 )
 
-// view.panel.gallery: a set of images in a thread's side panel, as a grid that opens one image
+// view.open.gallery (view.panel.gallery): a set of images in a tab beside a thread, as a grid that opens one image
 // over a filmstrip (docs/notes/gallery-surface.md). The verb is the only way in: no palette
 // entry, no button. The tab is keyed by its title, so opening a title again updates that tab.
 //
@@ -25,9 +25,8 @@ import (
 // flag's values are joined by newlines, so two of them would lose the pairing at the first
 // image without a caption, and a newline in a caption would start another image.
 
-// ViewPanelGallery opens a Gallery tab: params title, images (a JSON list of galleryImage),
-// project and base (the thread's project and checkout, which relative paths read against).
-const ViewPanelGallery = "panel.gallery"
+// A Gallery tab's params: title, images (a JSON list of galleryImage), project and base (the
+// thread's project and checkout, which relative paths read against).
 
 const (
 	// maxGalleryImages is the most images in a gallery. Tiles are virtualized, so it is not
@@ -60,14 +59,14 @@ type galleryImage struct {
 	Stamp int64 `json:"stamp,omitempty"`
 }
 
-// panelGalleryCommand is view.panel.gallery.
+// panelGalleryCommand is view.open.gallery.
 func (d ViewDeps) panelGalleryCommand() Command {
 	return Command{
-		Name:      "view.panel.gallery",
+		Name:      "view.open.gallery",
 		Page:      PageState,
 		NoPalette: true,
-		Title:     "Show Images in Side Panel",
-		Description: "Open a set of images in a Gallery tab in a thread's side panel (from a thread: its own; in the app: the selected one): " +
+		Title:     "Open Images Tab",
+		Description: "Open a set of images in a Gallery tab " + openLead +
 			"a grid of captioned images, each opening large over a filmstrip. Opening the same --title again updates that tab. " +
 			"An image that cannot be shown warns and stays as a failed tile; refused when none can.",
 		Category:     "View",
@@ -80,10 +79,7 @@ func (d ViewDeps) panelGalleryCommand() Command {
 				Description: fmt.Sprintf(`The images in order, a JSON array: [{"path":"/tmp/a.png","caption":"Before"},{"path":"b.png"}] (-: stdin, @file: a file). `+
 					"Each path is absolute, ~/…, or relative to the thread's checkout, under the home directory or in a temp folder (/tmp, $TMPDIR). "+
 					"At most %d images; a caption is optional, at most %d characters", maxGalleryImages, maxGalleryCaption)},
-			{Name: "thread", Type: String, Context: ContextThread, ID: ThreadID,
-				Description: "Thread whose side panel it opens in, without changing what any window shows " +
-					"(default: the thread this runs in, $CODE_FOUNDRY_THREAD; in the app: the selected thread)" + IDHelp},
-			panelThreadArgs()[1],
+			openThreadArg, openFocusArg, openPaneArg,
 		},
 		Run: d.runPanelGallery,
 	}
@@ -92,10 +88,10 @@ func (d ViewDeps) panelGalleryCommand() Command {
 func (d ViewDeps) runPanelGallery(ctx context.Context, uctx Context, a Args) (Result, error) {
 	id := a.String("thread")
 	if id == "" {
-		return Result{}, InvalidArg("thread", "needs a thread whose panel to open it in (--thread, or run it inside a thread)")
+		return Result{}, InvalidArg("thread", "needs a thread whose tab to open (--thread, or run it inside a thread)")
 	}
 	var warnings []string
-	res, err := showScoped(ctx, d.Thread, d.Emitter, uctx, a, id, ViewPanelGallery, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
+	res, err := d.showItem(ctx, uctx, a, id, tabGallery, func(ctx context.Context, t *v1.Thread, a Args) (map[string]string, error) {
 		params, failed, err := d.galleryCheck(ctx, t, a)
 		warnings = failed
 		return params, err
@@ -107,7 +103,7 @@ func (d ViewDeps) runPanelGallery(ctx context.Context, uctx Context, a Args) (Re
 	return res, nil
 }
 
-// galleryCheck is view.panel.gallery's check: the arguments are good and at least one image
+// galleryCheck is view.open.gallery's check: the arguments are good and at least one image
 // can show. The rest are warnings, not a refusal: their tiles say what went wrong, and a
 // thread can fix one path without losing the others.
 func (d ViewDeps) galleryCheck(ctx context.Context, t *v1.Thread, a Args) (map[string]string, []string, error) {

@@ -21,7 +21,7 @@ export function ErrorDetails({ error, raw }: { error: Error; raw?: string }) {
   );
 }
 
-/** A panel tab body's or the bottom panel's fallback: what broke, and Try again. */
+/** A tab body's or a terminal's fallback: what broke, and Try again. */
 export function PaneError({ error, reset }: FallbackProps) {
   return (
     <div className="flex flex-col gap-2 p-4 text-body-sm" role="alert" data-testid="pane-error">

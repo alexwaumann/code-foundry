@@ -76,7 +76,7 @@ const threadExtras: MarkdownExtras = {
     const m = linkPath(href);
     return m ? <PathChip match={m} /> : <span data-testid="link-plain">{children}</span>;
   },
-  // A GitHub pull request link opens in the side panel (cmd+click: the browser).
+  // A GitHub pull request link opens in a tab (cmd+click: the browser).
   openLink: openPullRequestLinkInCurrentPanel,
   image: (src, alt) => <LocalImage src={src} alt={alt} />,
   // The frame (rounded, scrolling sideways when too wide) is the wrapper's: thread.css.

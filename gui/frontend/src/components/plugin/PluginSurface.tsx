@@ -7,10 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { runCommand } from "@/stores/commands";
 import { contextKey, getUiContext } from "@/stores/context";
-import { retitlePanelTab, useCurrentPanelKey, type Tab } from "@/stores/panel";
+import { retitleTab, useCurrentTarget, type Tab } from "@/shell/host";
 import { surfaceManifestOf, usePluginsStore } from "@/stores/plugins";
 import { chooserKeyOf, startSurfaceWatch, useChoice, useSurfaceEntry, watchKeyOf } from "@/stores/pluginSurfaces";
-import { useUiStore } from "@/stores/ui";
+import { useUiStore, type Selection } from "@/stores/ui";
+import { usePanelKey } from "@/shell/panelKeyContext";
 import { useShowState } from "@/surfaces/plugin";
 import { ViewContext, type ViewCtx } from "./context";
 import { SurfaceHeader } from "./Header";
@@ -78,13 +79,24 @@ const downWords: Partial<Record<PluginStateView, string>> = {
   stopped: "is stopped",
 };
 
+/** The selection a plugin tab draws for: its linked thread (panel key `thread:<id>`), else the window's. */
+function useTabSelection(linked: string): Selection {
+  const windowSelection = useUiStore((s) => s.selection);
+  const thread = linked.startsWith("thread:") ? linked.slice("thread:".length) : "";
+  return useMemo<Selection>(() => (thread ? { kind: "thread", id: thread } : windowSelection), [thread, windowSelection]);
+}
+
 /**
  * One plugin surface tab (docs/notes/plugins-5-gui.md): holds the instance open while the
  * tab shows (one WatchSurface), names the tab after the view, and draws the body
- * (PluginSurfaceBody) with the panel's selection, or says the surface is gone.
+ * (PluginSurfaceBody) for its linked thread or the window's selection, or says the surface is gone.
  */
 export function PluginSurface({ tab }: { tab: Tab }) {
-  const panelKey = useCurrentPanelKey() ?? "";
+  // A tab linked to a thread draws for its thread wherever the window's selection is; an unlinked
+  // one for the window's selection.
+  const linked = usePanelKey();
+  const current = useCurrentTarget();
+  const panelKey = linked || (current ?? "");
   const watchKey = watchKeyOf(panelKey, tab.id);
   const { plugin, surface } = parseKind(tab.kind);
   const loaded = usePluginsStore((s) => s.loaded);
@@ -92,7 +104,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
     const m = surfaceManifestOf(tab.kind, s);
     return Boolean(m?.title) || Boolean(m?.icon);
   });
-  const selection = useUiStore((s) => s.selection);
+  const selection = useTabSelection(linked);
   const uiContext = useMemo(() => getUiContext(selection), [selection]);
   const ctxKey = contextKey(uiContext);
   const show = useShowState(tab.kind, selection);
@@ -109,7 +121,7 @@ export function PluginSurface({ tab }: { tab: Tab }) {
   // The view's tab title names the tab in the strip.
   const tabTitle = useSurfaceEntry(watchKey, (e) => e?.view?.header?.tabTitle ?? "");
   useEffect(() => {
-    if (tabTitle) retitlePanelTab(panelKey, tab.id, tabTitle);
+    if (tabTitle) retitleTab(panelKey, tab.id, tabTitle);
   }, [panelKey, tab.id, tabTitle]);
 
   if (!loaded) return <Opening />;
@@ -142,7 +154,7 @@ export interface PluginSurfaceBodyProps {
  * nodes scrolling between them (the surface's own scroll area, [data-scroll-root]: fill
  * nodes fill it and live nodes count as on screen in it), and the host's states around it
  * (opening, not responding, the plugin down with its last view dimmed, failed, not
- * available here). docs/notes/plugins-layout-3-chrome.md has the strips. The side panel's
+ * available here). docs/notes/plugins-layout-3-chrome.md has the strips. A plugin
  * tab (PluginSurface) and the shot page (src/shot) draw it.
  */
 export function PluginSurfaceBody({ watchKey, plugin, surface, context: uiContext, unavailable = false }: PluginSurfaceBodyProps) {

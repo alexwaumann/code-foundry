@@ -4,7 +4,7 @@
  * owns it. An action run in a terminal (action.run) carries kind=action, the same owner
  * labels, and the action, its name at the start, and the run. Threads have no terminal of
  * their own (Claude runs headless), but only kind identifies a panel terminal: a terminal
- * from a raw TerminalService.Create may carry any labels, and the bottom panel shows
+ * from a raw TerminalService.Create may carry any labels, and a terminal tab shows
  * shells and action runs only.
  */
 export const KIND_LABEL = "kind";
@@ -22,7 +22,7 @@ export const KIND_ACTION = "action";
 /**
  * A plugin's own terminal (terminal/create; docs/notes/plugins-6-thread-terminal.md):
  * kind=plugin, plugin=<name>, title=<the plugin's title>. It belongs to no thread or
- * worktree; the bottom panel shows it only where the user opened it (TerminalsData.shownIn).
+ * worktree; it has a tab only once the user opens one (stores/pluginTerminals.ts).
  */
 export const KIND_PLUGIN = "plugin";
 export const PLUGIN_LABEL = "plugin";
@@ -55,7 +55,7 @@ export function isSetupLabels(labels: Readonly<Record<string, string>>): boolean
   return labels[KIND_LABEL] === KIND_SETUP;
 }
 
-/** Whether the bottom panel shows the terminal: a shell, an action run or a skill's setup (termlabel.IsPanel). */
+/** Whether a terminal tab shows the terminal: a shell, an action run or a skill's setup (termlabel.IsPanel). */
 export function isPanelLabels(labels: Readonly<Record<string, string>>): boolean {
   return isShellLabels(labels) || isActionLabels(labels) || isSetupLabels(labels);
 }

@@ -5,7 +5,7 @@ import type { NodeProps } from "../registry";
 
 /**
  * Caps its nodes' width and centres them (docs/notes/plugins-layout-3-chrome.md): "narrow"
- * at most 680 px, "wide" 1080 px, "full" (absent) no cap. In the side panel every width is
+ * at most 680 px, "wide" 1080 px, "full" (absent) no cap. In a pane beside a thread every width is
  * full; the cap applies where the surface is wider (a widened panel, a page). It draws
  * nothing of its own and lays its nodes out like the list around it.
  */

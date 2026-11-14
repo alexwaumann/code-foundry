@@ -99,7 +99,7 @@ export interface MarkdownExtras {
   link?: (href: string, children: ReactNode) => ReactNode;
   /**
    * A plain click on a link that goes somewhere (its resolved URL): true when the surface
-   * opened it itself (a GitHub pull request in the side panel: components/pr/prLinks.ts),
+   * opened it itself (a GitHub pull request in a tab: components/pr/prLinks.ts),
    * false to open the browser. Cmd, ctrl and middle clicks always open the browser. Without
    * it, every link opens the browser.
    */

@@ -213,7 +213,7 @@ export function TimelineList<R extends ListRow>({
   citable?: boolean;
   /** Opens what folds the item away (Ember's work row, a thread's folded turn), for the cite layer and the find bar; false when nothing hides it. */
   unfold?: (rows: readonly R[], itemId: string) => boolean;
-  /** The rows' left and right inset in px (40 in the content pane, less in a narrow side panel). */
+  /** The rows' left and right inset in px (40 in a thread's tab, less in a plugin's thread node). */
   inset?: number | undefined;
   /** A layer over the list, outside the scroller (the thread's prompt rail in the left gutter). */
   overlay?: ((o: TimelineOverlay<R>) => ReactNode) | undefined;
@@ -233,7 +233,7 @@ export function TimelineList<R extends ListRow>({
   const innerRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
-  /** When the user last gave scroll input (wheel, touch, key); Infinity while a pointer is down on the list (its scrollbar). */
+  /** When the user last gave scroll input (wheel, touch, key, a press that moved the list); Infinity while a pointer is down on the list (its scrollbar). */
   const userInput = useRef(-Infinity);
   const markInput = useCallback(() => {
     if (userInput.current !== Infinity) userInput.current = performance.now();
@@ -394,7 +394,7 @@ export function TimelineList<R extends ListRow>({
   );
 
   // Follow the bottom while pinned: whenever the content's height changes (rows measured,
-  // text streaming in, the composer growing), or the list's own (the bottom panel opening
+  // text streaming in, the composer growing), or the list's own (a quick terminal opening
   // under the pane, e.g. a code block's Run in terminal).
   useLayoutEffect(() => {
     const inner = innerRef.current;
@@ -516,9 +516,15 @@ export function TimelineList<R extends ListRow>({
           }}
           onPointerDown={(e) => {
             if (!inList(e)) return;
+            const el = e.currentTarget;
+            const from = el.scrollTop;
+            const before = userInput.current;
             userInput.current = Infinity;
             const up = () => {
-              userInput.current = performance.now();
+              // A press that moved the list (its scrollbar dragged, a selection scrolling it) is the
+              // user's scroll until a moment after; a click that did not (a row's button, Run in
+              // terminal narrowing the pane) leaves the layout's scrolls to the layout.
+              userInput.current = Math.abs(el.scrollTop - from) >= 1 ? performance.now() : before;
               window.removeEventListener("pointerup", up);
               window.removeEventListener("pointercancel", up);
             };

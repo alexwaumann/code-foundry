@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
 vi.mock("@/api/gh", async (orig) => ({ ...(await orig<typeof import("@/api/gh")>()), ...(await import("@/test/daemonFakes")).ghFakes }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
+vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 // The cleanup dialog's dry run: the store's merged, clean worktrees (what the daemon's would list).
 vi.mock("@/api/project", async (orig) => ({
   ...(await orig<typeof import("@/api/project")>()),
@@ -35,9 +36,9 @@ const { hoverTooltipText, tooltipText } = await import("@/test/tooltip");
  * A project's page (docs/notes/projects-redesign-1-index.md) and its Worktrees without threads
  * with the remove confirm (docs/notes/projects-redesign-2-leftovers.md, project-page-3-leftovers.md), against the mock's world
  * (src/test/projectsWorld.ts). What the daemon changes after a command (git init, a removal) is a
- * fake handler changing the store, and a tab a row opens is read off the panel store (panelActive).
- * e2e/projects.spec.ts keeps what needs the browser: the narrow layout (real width), the Changes tab
- * drawn in the page's side panel, scroll memory, and a CLI terminal and Resume over the stream.
+ * fake handler changing the store, and a tab a row opens is read off the fake daemon's layout
+ * (panelActive). e2e/projects.spec.ts keeps what needs the browser: the narrow layout (real width),
+ * the Changes tab drawn, scroll memory, and a CLI terminal and Resume over the stream.
  */
 
 const page = () => screen.getByTestId("projects-page");
@@ -112,13 +113,13 @@ function toIndex() {
   fireEvent.click(screen.getByTestId("projects-crumb"));
 }
 
-/** The project page's own side panel (its key), as e2e reads it off the rendered panel. */
+/** The tab the project page opened last (its target's: the current space's unlinked tabs), off the layout. */
 const pagePanel = (projectId = "repo-cf") => panelActive(`view:projects:project:${projectId}`);
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDaemon();
   seedWorld();
-  resetPanels();
+  await resetPanels();
   usePublishDialogStore.setState({ open: false, projectId: "" });
   useComposeStore.setState({ drafts: {} });
   card.editors = [];
@@ -476,13 +477,14 @@ describe("Worktrees without threads", () => {
     expect(inEl(leftover(SHADERS), "leftover-reason")?.textContent).toBe("made outside Code Foundry · 2 uncommitted files · merged otherwise");
     expect(inEl(leftover(SHADERS), "leftover-show-diff")).not.toBeNull();
 
-    // A row has no click (it tints on hover): no tab opens, the cursor stays put. Show diff: the worktree's Changes tab in this page's panel.
+    // A row has no click (it tints on hover): no tab opens, the cursor stays put. Show diff: the worktree's Changes tab, for this page.
     fireEvent.click(leftoverRow(COPY));
     fireEvent.doubleClick(leftoverRow(COPY));
     expect(pagePanel()).toBeNull();
     expect(leftoverRow(COPY).getAttribute("aria-selected")).toBe("false");
     expect(leftoverRow(COPY).className).toContain("hover:bg-cf-control-hover/50");
     fireEvent.click(inEl(leftover(COPY), "leftover-show-diff") as HTMLElement);
+    await settle();
     expect(pagePanel()).toMatchObject({ open: true, kind: "diff", params: { project: "repo-cf", worktree: COPY } });
     expect(page().getAttribute("data-project")).toBe("repo-cf");
   });
@@ -547,7 +549,7 @@ describe("Worktrees without threads", () => {
     await settle();
     expect(screen.queryByTestId("remove-worktree-dialog")).toBeNull();
     expect(invocationsOf("project.worktree.remove").map((i) => i.confirmed)).toEqual([false]);
-    // ... and opens the worktree's Changes tab in this page's panel; the leftover stays.
+    // ... and opens the worktree's Changes tab; the leftover stays.
     expect(pagePanel()).toMatchObject({ open: true, kind: "diff", params: { project: "repo-cf", worktree: COPY } });
     expect(leftover(COPY)).not.toBeNull();
 

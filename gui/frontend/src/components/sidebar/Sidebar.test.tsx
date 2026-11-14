@@ -14,7 +14,7 @@ vi.mock("@tanstack/react-virtual", () => ({
       items.push({ index: i, key: o.getItemKey(i), start: at, size, end: at + size });
       at += size + (o.gap ?? 0);
     }
-    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, scrollToIndex: () => undefined };
+    return { getVirtualItems: () => items, getTotalSize: () => at, measure: () => undefined, scrollToIndex: () => undefined, scrollToOffset: () => undefined };
   },
 }));
 // The board stream and the viewer's dashboard are the stores'; nothing here reads them.
@@ -56,13 +56,20 @@ beforeEach(() => {
   useCommandsStore.setState({ commands: [cmd("thread.new", "New Thread"), cmd("thread.pin", "Pin Thread")] });
   daemon.commands = [...useCommandsStore.getState().commands];
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+});
 
 const list = () => screen.getByTestId("thread-list");
 const rowOf = (key: string) => list().querySelector<HTMLElement>(`[data-row-key="${CSS.escape(key)}"]`);
-/** Row keys in display order, headers as "# Label". */
+/**
+ * Row keys in display order, the footers' headers as "# Label". The main list's own headers
+ * (Needs you, Active: sidebar/shell's tests) are left out, so this reads the order and the footers.
+ */
 const rowKeys = () =>
-  [...list().querySelectorAll("[data-row-key]")].map((e) => (e.getAttribute("data-row-kind") === "header" ? `# ${e.textContent}` : (e.getAttribute("data-row-key") ?? "")));
+  [...list().querySelectorAll("[data-row-key]")]
+    .map((e) => (e.getAttribute("data-row-kind") === "header" ? `# ${e.textContent}` : (e.getAttribute("data-row-key") ?? "")))
+    .filter((k) => !/^# (Needs you|Active)/.test(k));
 const press = (key: string) => {
   fireEvent.keyDown(list(), { key });
 };
@@ -77,16 +84,6 @@ const setThread = (id: string, o: Partial<ThreadView>) => {
 };
 
 describe("Sidebar: the thread list", () => {
-  it("is a flat listbox of thread rows: waiting on top, idle newest first, then the Working, Snoozed and Archived headers", () => {
-    render(<Sidebar />);
-    expect(rowKeys()).toEqual(DEFAULT_ORDER);
-    expect(list().getAttribute("role")).toBe("listbox");
-    expect(list().getAttribute("aria-label")).toBe("Threads");
-    // No project, worktree or terminal rows: only threads and the footers' headers.
-    expect(list().querySelectorAll('[data-row-kind]:not([data-row-kind="thread"]):not([data-row-kind="header"])')).toHaveLength(0);
-    expect(screen.getByTestId("sidebar-band").textContent).toContain("Code Foundry");
-  });
-
   it("the keyboard: Home is the first row, ↓ moves, Enter selects; End is the last row; ↑ skips the Working header", () => {
     render(<Sidebar />);
     press("Home");
@@ -101,33 +98,6 @@ describe("Sidebar: the thread list", () => {
     press("ArrowUp");
     press("ArrowUp");
     expect(active()).toBe("row-s:s-3");
-  });
-
-  it("each row carries its badge: stopped (crashed or closing) reads idle, starting reads working; nothing says whether Claude runs", () => {
-    setThread("s-5", { statusChangedAtMs: Date.now() - 5_000 });
-    render(<Sidebar />);
-    const badge = (id: string) => rowOf(`s:${id}`)?.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge");
-    expect(["s-1", "s-2", "s-3", "s-4", "s-5", "s-6"].map(badge)).toEqual(["busy", "attention", "idle", "idle", "busy", "idle"]);
-    expect(rowOf("s:s-5")?.getAttribute("data-section")).toBe("working");
-    expect(within(rowOf("s:s-5") as HTMLElement).getByTestId("row-status").textContent).toMatch(/^Working\d+[smhd]/);
-    expect(list().textContent).not.toMatch(/disconnected|starting|closing/i);
-  });
-
-  it("a stopped thread keeps its status: busy ends interrupted; a prompt stays on top, waiting, with its word; the branch stays on line 3", () => {
-    render(<Sidebar />);
-    // The daemon's stop of a busy thread (internal/store/thread): error, interrupted.
-    setThread("s-1", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: Date.now() });
-    const s1 = rowOf("s:s-1") as HTMLElement;
-    expect(s1.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("error");
-    expect(within(s1).getByTestId("row-status").textContent).toBe("Interrupted");
-    // In the main list's waiting band (as after an Unsnooze of an interrupted thread).
-    expect(s1.getAttribute("data-section")).toBe("attention");
-    setThread("s-2", { state: "disconnected", status: "attention", statusReason: "permission: Bash zig build -Doptimize=ReleaseFast" });
-    expect(rowKeys()[0]).toBe("s:s-2");
-    const s2 = rowOf("s:s-2") as HTMLElement;
-    expect(s2.querySelector("[data-thread-badge]")?.getAttribute("data-thread-badge")).toBe("attention");
-    expect(within(s2).getByTestId("row-status").textContent).toBe("Permission");
-    expect(within(s2).getByTestId("row-branch").textContent).not.toBe("");
   });
 
   it("empty once loaded: the list is simply empty, no placeholder", () => {
@@ -187,24 +157,6 @@ describe("Sidebar: the Working footer", () => {
     expect(rowOf("s:s-2")).not.toBeNull();
   });
 
-  it("counts threads as they start and stop working; a pinned working thread stays on top; the header goes with the last one", () => {
-    render(<Sidebar />);
-    live(() => {
-      addThreads(thread("s-job", { name: "Job 1", state: "connected", status: "busy", createdAtMs: Date.now() + 1, flags: [], linkedPullRequests: [] }));
-    });
-    expect(screen.getByTestId("working-count").textContent).toBe("3");
-    expect(rowKeys().slice(4, 8)).toEqual(["# Working 3", "s:s-job", "s:s-5", "s:s-1"]);
-    setThread("s-job", { pinned: true });
-    expect(rowKeys()[0]).toBe("s:s-job");
-    expect(rowOf("s:s-job")?.getAttribute("data-section")).toBe("pinned");
-    expect(screen.getByTestId("working-count").textContent).toBe("2");
-    setThread("s-1", { status: "idle" });
-    expect(screen.getByTestId("working-count").textContent).toBe("1");
-    expect(rowOf("s:s-1")?.getAttribute("data-section")).toBe("idle");
-    setThread("s-5", { state: "disconnected", status: "idle" });
-    expect(screen.queryByTestId("working-header")).toBeNull();
-    expect(rowKeys().filter((k) => k.startsWith("#"))).toEqual(["# Snoozed 2", "# Archived 1"]);
-  });
 });
 
 describe("Sidebar: the Snoozed and Archived footers", () => {
@@ -236,17 +188,6 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     setThread("s-9", { snoozedUntilMs: null });
     expect(screen.queryByTestId("sidebar-snoozed")).toBeNull();
     expect(rowOf("s:s-8")?.getAttribute("data-section")).toBe("done");
-  });
-
-  it("a wake brings the thread back to the top of the main list: Woke in amber", () => {
-    render(<Sidebar />);
-    setThread("s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() });
-    expect(screen.getByTestId("snoozed-count").textContent).toBe("1");
-    expect([...screen.getByTestId("sidebar-main").querySelectorAll("[data-row-key]")].map((e) => e.getAttribute("data-row-key"))).toEqual(["s:s-8", "s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
-    const s8 = rowOf("s:s-8") as HTMLElement;
-    expect(s8.getAttribute("data-section")).toBe("attention");
-    expect(within(s8).getByTestId("row-status").textContent).toBe("Woke");
-    expect(within(s8).getByTestId("row-status").className).toContain("text-cf-warning-text");
   });
 
   it("Archived: collapsed by default with its count, last; expanded, the one-line row with its age; gone with no archived thread, back with one", () => {
@@ -354,6 +295,7 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
     });
 
     it.each([
+      // Woken: the top of Active, not Needs you (docs/notes/shell-model.md, "Sidebar").
       ["woken", "s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() }, "snoozed", "attention"],
       ["unarchived", "s-7", { archivedAtMs: null, statusReason: "finished" }, "archived", "done"],
     ])("%s while open, it just moves to the main list", (_name, id, change, from, to) => {
@@ -367,54 +309,6 @@ describe("Sidebar: the Snoozed and Archived footers", () => {
       if (from === "snoozed") expect(screen.getByTestId("snoozed-count").textContent).toBe("1");
       else expect(screen.queryByTestId("sidebar-archived")).toBeNull();
     });
-  });
-
-  it("their rows sit 2px apart; the main list's and Working's stay 8px apart", () => {
-    setThread("s-8", { statusReason: "finished" });
-    setThread("s-6", { archivedAtMs: Date.now() });
-    render(<Sidebar />);
-    fireEvent.click(screen.getByTestId("snoozed-header"));
-    fireEvent.click(screen.getByTestId("archived-header"));
-    /** The space between two neighbouring rows of one panel, from where the virtualizer put them. */
-    const space = (panel: string) => {
-      const boxes = [...screen.getByTestId(panel).querySelectorAll<HTMLElement>("[data-row-key]")].map((r) => r.parentElement as HTMLElement);
-      const [a, b] = boxes as [HTMLElement, HTMLElement];
-      const top = (e: HTMLElement) => Number(/translateY\((\d+)px\)/.exec(e.style.transform)?.[1]);
-      return top(b) - top(a) - parseFloat(a.style.height);
-    };
-    expect(space("sidebar-snoozed-rows")).toBe(2);
-    expect(space("sidebar-archived-rows")).toBe(2);
-    expect(space("sidebar-working-rows")).toBe(8);
-    expect(space("sidebar-main")).toBe(8);
-  });
-});
-
-describe("Sidebar: the row menu", () => {
-  it("Pin runs thread.pin for the row; pinned, the row moves to the top with its glyph; Unpin moves it back", async () => {
-    daemon.handlers.set("thread.pin", (inv) => {
-      setThread(inv.context.activeThreadId, { pinned: inv.args.pinned === "true" });
-      return { message: "", resultJson: "" };
-    });
-    render(<Sidebar />);
-    const openMenu = async (key: string) => {
-      fireEvent.contextMenu(rowOf(key) as HTMLElement);
-      return screen.findByTestId("row-menu");
-    };
-    fireEvent.click(within(await openMenu("s:s-3")).getByTestId("menu-pin"));
-    await vi.waitFor(() => {
-      expect(rowKeys().slice(0, 2)).toEqual(["s:s-3", "s:s-2"]);
-    });
-    expect(lastInvocation("thread.pin")).toMatchObject({ args: { pinned: "true" }, context: { activeThreadId: "s-3" } });
-    expect(rowOf("s:s-3")?.getAttribute("data-section")).toBe("pinned");
-    expect(within(rowOf("s:s-3") as HTMLElement).getByTestId("row-pinned")).toBeTruthy();
-
-    const menu = await openMenu("s:s-3");
-    expect(within(menu).getByTestId("menu-pin").textContent).toBe("Unpin");
-    fireEvent.click(within(menu).getByTestId("menu-pin"));
-    await vi.waitFor(() => {
-      expect(rowKeys().slice(0, 4)).toEqual(["s:s-2", "s:s-6", "s:s-4", "s:s-3"]);
-    });
-    expect(rowOf("s:s-3")?.getAttribute("data-section")).toBe("idle");
   });
 });
 
@@ -441,23 +335,18 @@ describe("Sidebar: Regenerate name", () => {
 });
 
 describe("Sidebar: the menu pane", () => {
-  const current = () => [...screen.getByTestId("sidebar-menu").querySelectorAll('[aria-current="page"]')].map((e) => e.getAttribute("data-testid"));
-
-  it("marks the current page: New thread on a composer, Projects, Pull Requests", () => {
+  it("has New thread, current on a composer, and no Pull Requests or Projects rows (they are tabs); no title band", () => {
     useUiStore.setState({ selection: { kind: "compose", projectId: "" } as never });
     render(<Sidebar />);
     expect(current()).toEqual(["sidebar-new-thread"]);
     expect(screen.getByTestId("sidebar-new-thread").className).toContain("bg-cf-sidebar-row-selected");
-    for (const id of ["nav-projects", "nav-pullrequests"]) {
-      fireEvent.click(screen.getByTestId(id));
-      expect(current()).toEqual([id]);
-      expect(screen.getByTestId(id).className).toContain("bg-cf-sidebar-row-selected");
-    }
-    live(() => {
-      useUiStore.getState().select({ kind: "compose", projectId: "repo-cf" } as never);
-    });
-    expect(current()).toEqual(["sidebar-new-thread"]);
+    expect(screen.queryByTestId("nav-pullrequests")).toBeNull();
+    expect(screen.queryByTestId("nav-projects")).toBeNull();
+    expect(screen.queryByTestId("sidebar-band")).toBeNull();
+    expect(list().hasAttribute("data-shell-list")).toBe(true);
   });
+  const current = () => [...screen.getByTestId("sidebar-menu").querySelectorAll('[aria-current="page"]')].map((e) => e.getAttribute("data-testid"));
+
 });
 
 describe("Sidebar: Ember's row", () => {

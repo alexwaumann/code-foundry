@@ -1,0 +1,101 @@
+{
+  "doc": "Closing the focused pane gives the focus back to the newest open tab in the MRU.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "split",
+              "id": "s-c",
+              "dir": "col",
+              "kids": [
+                {
+                  "t": "pane",
+                  "id": "p-a",
+                  "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+                  "active": "t-a"
+                },
+                {
+                  "t": "pane",
+                  "id": "p-t",
+                  "tabs": [
+                    {"id":"t-t","kind":"terminal","thread":"th-a","params":{"terminal":"term-1"}}
+                  ],
+                  "active": "t-t"
+                }
+              ],
+              "sizes": [0.62,0.38]
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-t",
+        "mru": ["t-t","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_pane","pane":"p-t"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.55,0.45]
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","closed":["t-t"]}
+}

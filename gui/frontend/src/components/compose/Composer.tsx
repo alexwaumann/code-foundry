@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ArrowUp, FolderGit2, Gauge, GitBranch, GitCommitHorizontal, Loader2, Paperclip, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { AttachmentPreview } from "./AttachmentPreview";
@@ -276,7 +276,21 @@ export const SEND_DISABLED = "disabled:bg-cf-surface-sunken disabled:text-cf-tex
  * A like draft ("New thread on this branch") shows what thread.new-like copies (the set,
  * branch, workspace and mode, read-only) and lets only the primary change.
  */
-function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: ComposeTarget; set: ResolvedSet; workspaceName: string; promptFocusRef: RefObject<() => void> }) {
+function ComposerCard({
+  target,
+  set,
+  workspaceName,
+  promptFocusRef,
+  onTextChange,
+  tabId,
+}: {
+  target: ComposeTarget;
+  set: ResolvedSet;
+  workspaceName: string;
+  promptFocusRef: RefObject<() => void>;
+  onTextChange?: (text: string) => void;
+  tabId?: string;
+}) {
   const draftKey = keyOf(target);
   const defaults = useDefaults();
   const modelChoices = useModelChoices();
@@ -334,9 +348,15 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
     [like, likeSrc.paths, single, existingPath],
   );
   const sources = useMemo(() => skillSources({ projectIds: sourceIds, paths: sourcePaths }), [sourceIds, sourcePaths]);
+  // Loaded per list, not per array: a shell composer starting its draft gets an equal list anew.
+  const sourcesKey = skillSourcesKey(sources);
+  const latestSources = useRef(sources);
+  useLayoutEffect(() => {
+    latestSources.current = sources;
+  });
   useEffect(() => {
-    void loadSkills(sources);
-  }, [sources]);
+    void loadSkills(latestSources.current);
+  }, [sourcesKey]);
   const primaryMain = useProjectsStore((s) => {
     const p = s.byId[primaryProject];
     return p ? mainCheckout(p) : "";
@@ -345,7 +365,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   // checkout the thread will work in, the primary's main checkout for new worktrees, else home.
   const hostFiles = useHostFiles({ draftKey, editorRef, disabled: busy, startDir: existingPath || sourcePaths[primaryProject] || primaryMain || "" });
   const [trigger, setTrigger] = useState<EditorTrigger | null>(null);
-  const skillSource = useSkillSource(trigger, skillSourcesKey(sources), sourceIds);
+  const skillSource = useSkillSource(trigger, sourcesKey, sourceIds);
   const fileSource = useFileSource(trigger, sources, sourceIds, primaryProject);
   const mentionSource = useMentionSource(trigger, home ? null : fileSource, "");
   const prSource = usePrSource(trigger, useProjectSlugs(sourceIds));
@@ -367,6 +387,8 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const historySource = useMemo(() => (historyIds ? { projectIds: historyIds } : {}), [historyIds]);
   const picker = usePromptPicker({
     draftKey,
+    // The shell's draft id arriving with the first key is the same composer: its picker stays open.
+    resetKey: keyOf({ ...target, draft: undefined }),
     editorRef,
     rootRef,
     threadId: "",
@@ -376,9 +398,19 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   });
 
   // Focus on mount and on request (the picker, the sidebar "+"). Deferred a frame so the
-  // closing palette dialog has released focus.
+  // closing palette dialog has released focus. On mount under an open dialog (the palette, opened
+  // before the window first drew), the dialog keeps the keyboard; so does a text field that took
+  // it within that frame (the top bar's "+" shows a new space's composer and opens its name field).
+  const mountSeq = useRef(focusSeq);
   useEffect(() => {
-    const raf = requestAnimationFrame(() => editorRef.current?.focus());
+    const onMount = focusSeq === mountSeq.current;
+    const before = document.activeElement;
+    const raf = requestAnimationFrame(() => {
+      if (onMount && document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return;
+      const now = document.activeElement;
+      if (onMount && now !== before && (now instanceof HTMLInputElement || now instanceof HTMLTextAreaElement)) return;
+      editorRef.current?.focus();
+    });
     return () => {
       cancelAnimationFrame(raf);
     };
@@ -425,10 +457,10 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
   const send = () => {
     // Dictating: stop, let the last phrase land, then send what the prompt holds.
     if (dictation.phase) {
-      if (!busy && !empty) void dictation.flush().then(() => sendDraft(target, defaults, hints));
+      if (!busy && !empty) void dictation.flush().then(() => sendDraft(target, defaults, hints, { composeTab: tabId }));
       return;
     }
-    if (canSend) void sendDraft(target, defaults, hints);
+    if (canSend) void sendDraft(target, defaults, hints, { composeTab: tabId });
   };
 
   /** Pasted, dropped or picked files: thumbnails, and chips at the caret. */
@@ -520,6 +552,7 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
               placeholder={picker.placeholder ?? (dictation.listening ? LISTENING_PLACEHOLDER : like ? "What's next on this branch…" : "Ask anything. @ files and threads, / skills and commands")}
               onChange={(t) => {
                 updateDraft(draftKey, { text: t, error: null });
+                onTextChange?.(t);
               }}
               onSubmit={send}
               onEscape={() => {
@@ -780,11 +813,33 @@ function ComposerCard({ target, set, workspaceName, promptFocusRef }: { target: 
  * workspace with workspaceId, no project with noProject, or "New thread on this branch"
  * with likeThreadId (Selection kind "compose").
  */
-export function Composer({ projectId, workspaceId, noProject = false, likeThreadId }: { projectId: string; workspaceId?: string; noProject?: boolean; likeThreadId?: string }) {
-  const target = useMemo<ComposeTarget>(
-    () => (likeThreadId ? { kind: "like", threadId: likeThreadId } : workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", projectId }),
-    [projectId, workspaceId, noProject, likeThreadId],
-  );
+/**
+ * `draftId`: the window shell's composer draft this is (its text has its own key, lib/compose
+ * draftKey). `onTextChange`: the user changed the text (typing, a paste, a tag), not a prefill.
+ * `tabId`: the compose tab it is drawn in, which its send names (thread.new --compose): the
+ * thread's tab takes that tab's place, whatever has the focus when the send goes out.
+ */
+export function Composer({
+  projectId,
+  workspaceId,
+  noProject = false,
+  likeThreadId,
+  draftId,
+  onTextChange,
+  tabId,
+}: {
+  projectId: string;
+  workspaceId?: string;
+  noProject?: boolean;
+  likeThreadId?: string;
+  draftId?: string;
+  onTextChange?: (text: string) => void;
+  tabId?: string;
+}) {
+  const target = useMemo<ComposeTarget>(() => {
+    const t: ComposeTarget = likeThreadId ? { kind: "like", threadId: likeThreadId } : workspaceId ? { kind: "workspace", workspaceId } : noProject ? { kind: "home" } : { kind: "project", projectId };
+    return draftId ? { ...t, draft: draftId } : t;
+  }, [projectId, workspaceId, noProject, likeThreadId, draftId]);
   const key = keyOf(target);
   const { set, workspaceName } = useDraftSet(target, key);
   // Set by ComposerCard once the prompt is mounted; the heading's picker focuses it at once.
@@ -870,7 +925,7 @@ export function Composer({ projectId, workspaceId, noProject = false, likeThread
                 </>
               )}
             </h1>
-            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} />
+            <ComposerCard target={target} set={set} workspaceName={workspaceName} promptFocusRef={promptFocus} onTextChange={onTextChange} tabId={tabId} />
           </div>
         )}
       </section>

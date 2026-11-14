@@ -22,7 +22,7 @@ first-run welcome page).
 - **A wake** to be told, reminded or have it done later or again: `thread subscribe` (`--pr
   owner/name#4 --until checks_passed`, `--every 1h`; the code-foundry skill), never cron or a `--watch` loop.
 - **A plugin** (the code-foundry-plugin skill) when it must work with no thread at all, as
-  its own side panel tab, or on every new PR in every project.
+  its own tab, or on every new PR in every project.
 - **A plain reply** when one answer is enough ("which PRs are green?").
 
 ## Before you write it
@@ -118,7 +118,7 @@ app restarts: keep what the user typed or chose. Every page of this thread share
 Run `code-foundry view.inline <path> --title "<what it is>"` once per file; fix every
 warning it prints by editing the file in place: the card shown reloads by itself, so never
 run view.inline for that file again, not even for "show me" after an edit (`--panel` opens
-it beside the thread; `view.panel.page <path>` opens it there with no card). Reply in two or
+it beside the thread; `view.open.page <path>` opens it there with no card). Reply in two or
 three sentences: what it shows, what each button does, that the app asks before merging or
 archiving; for "track" or "watch", that it updates only while shown (offer a wake). You have not
 clicked anything: never say it worked.

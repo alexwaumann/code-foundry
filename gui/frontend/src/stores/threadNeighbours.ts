@@ -4,8 +4,8 @@
  * window-local chord presenters (keys/bindings.ts) and the CLI's ShowView (stores/views.ts).
  */
 import { sidebarAnchor } from "@/lib/inSidebar";
-import { neighbourIn, threadOrder } from "@/lib/tree";
-import { getListOptions, getListThreads } from "./context";
+import { neighbourIn } from "@/lib/tree";
+import { sidebarThreadOrder } from "./shellList";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 
@@ -19,7 +19,7 @@ import { useUiStore } from "./ui";
  */
 export function jumpToNeighbour(by: 1 | -1): boolean {
   const sel = useUiStore.getState().selection;
-  const order = threadOrder(getListThreads(), getListOptions());
+  const order = sidebarThreadOrder();
   const from = sel.kind === "thread" ? sidebarAnchor(useThreadsStore.getState().byId, sel.id) : null;
   const id = neighbourIn(order, from, by);
   if (id === null) return false;

@@ -21,7 +21,7 @@ var pageRuns = []string{
 	"project.add-workspace", "project.branch.delete", "project.clone", "project.delete", "project.git.init",
 	"project.github.publish", "project.worktree.cleanup", "project.worktree.new",
 	"project.worktree.remove", "skill.disable", "skill.enable", "skill.install", "skill.remove",
-	"skill.setup", "skill.uninstall", "skill.update", "thread.setup.retry", "workspace.open.editor",
+	"skill.setup", "skill.uninstall", "skill.update", "terminal.rerun", "thread.setup.retry", "workspace.open.editor",
 	"worktree.open.editor",
 }
 
@@ -51,9 +51,9 @@ var pageState = []string{
 	"project.create", "project.refresh", "project.rename", "project.unregister", "search.clear",
 	"search.find", "search.forget", "search.open", "search.open-hit", "search.promote",
 	"search.report", "search.seen", "search.stop", "settings.reset", "settings.reveal",
-	"settings.set", "skill.browse", "skill.refresh", "terminal.close", "terminal.find",
-	"terminal.find.next", "terminal.find.previous", "terminal.kill", "terminal.new",
-	"terminal.remove", "theme.delete", "theme.duplicate", "theme.edit", "theme.pick", "theme.reset",
+	"settings.set", "skill.browse", "skill.refresh", "terminal.close", "terminal.cycle", "terminal.find",
+	"terminal.find.next", "terminal.find.previous", "terminal.kill", "terminal.new", "terminal.new-free",
+	"terminal.quick", "terminal.remove", "terminal.reset", "theme.delete", "theme.duplicate", "theme.edit", "theme.pick", "theme.reset",
 	"theme.restore", "theme.save", "theme.set-dark", "theme.set-light", "theme.set-scheme",
 	"thread.agent.open", "thread.agent.up", "thread.archive", "thread.budget", "thread.find",
 	"thread.find.next", "thread.find.previous", "thread.flag.clear", "thread.focus", "thread.fork",
@@ -61,19 +61,25 @@ var pageState = []string{
 	"thread.previous", "thread.regenerate-name", "thread.remove", "thread.rename", "thread.report",
 	"thread.setup.cancel", "thread.setup.discard", "thread.shell.stop", "thread.snooze",
 	"thread.unsubscribe", "ui.focus.project", "ui.focus.terminal", "ui.notify", "ui.palette.open",
-	"view.back", "view.bottom.toggle", "view.forward", "view.help", "view.inline", "view.open.url",
-	"view.panel.diff", "view.panel.expand", "view.panel.file", "view.panel.gallery", "view.panel.mcp",
-	"view.panel.new-tab", "view.panel.page", "view.panel.pr", "view.panel.split", "view.panel.toggle",
-	"view.projects", "view.pullrequests", "view.settings", "view.thread-info", "view.usage",
+	"view.back", "view.forward", "view.help", "view.inline", "view.open.diff",
+	"view.open.file", "view.open.gallery", "view.open.mcp", "view.open.page", "view.open.pr", "view.open.url",
+	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp",
+	"view.panel.page", "view.panel.pr",
+	"view.projects", "view.pullrequests", "view.settings", "view.thread-diff", "view.thread-info", "view.usage",
 	"workspace.add-project", "workspace.new", "workspace.remove", "workspace.remove-project",
 	"workspace.rename", "workspace.reveal", "workspace.set-primary", "workspace.set-root",
 	"worktree.reveal",
+	"pane.close", "pane.collapse", "pane.focus", "pane.focus.left", "pane.fullscreen", "pane.focus.down", "pane.focus.up", "pane.focus.right", "pane.move", "pane.move.left", "pane.move.down", "pane.move.up", "pane.move.right",
+	"pane.resize", "pane.split", "space.move", "space.new", "space.remove", "space.rename", "space.switch", "tab.close", "tab.focus", "tab.move", "tab.reopen", "tab.rename", "tab.auto-name", "tab.next", "tab.previous",
+	"thread.close", "thread.info", "thread.open", "thread.space.move",
+	"composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open", "composer.draft.start", "composer.new",
 }
 
 // pageAskFlags are the flags that make a pageState verb ask a page.
 var pageAskFlags = map[string][]string{
-	"project.add":  {"path"},
-	"terminal.new": {"argv", "run"},
+	"project.add":       {"path"},
+	"terminal.new":      {"argv", "run"},
+	"terminal.new-free": {"argv", "run"},
 }
 
 func TestEveryCommandHasAPageClass(t *testing.T) {

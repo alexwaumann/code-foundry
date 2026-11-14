@@ -6,7 +6,7 @@ import { changeStatuses, emptyGroups, MAX_WORDS, parseFinderQuery, searchRows, t
 import { useFirstRowSelection } from "@/lib/useFirstRowSelection";
 import { cn } from "@/lib/utils";
 import { openFoundFile, tagFoundFile } from "@/stores/fileFinder";
-import { keyOf } from "@/stores/panel";
+import { threadTarget } from "@/shell/host";
 import { useRecentFiles } from "@/stores/recentFiles";
 import { useCheckoutChanges, useFinderCheckouts, useFinderScopeName, useFinderSearch, useOpenFilePaths, type FindFilesFn } from "./useFileFinder";
 
@@ -99,13 +99,13 @@ function Hints() {
  * The file finder (file.find, cmd+P; docs/notes/file-finder-2-gui.md): the palette's
  * chrome over a thread's checkouts. An empty query lists the files changed in the thread
  * and the panel's recently opened files; a query lists the daemon's ranked matches across
- * the checkouts (lib/fileFinder.ts). Enter opens the file in the thread's side panel (at
+ * the checkouts (lib/fileFinder.ts). Enter opens the file in a tab beside the thread (at
  * the line of a trailing `:<line>`), ⌥⏎ puts it in the prompt as an @ file.
  */
 export function FileFinder({ threadId, search }: { threadId: string; search?: FindFilesFn }) {
   const [input, setInput] = useState("");
   const parsed = parseFinderQuery(input);
-  const panelKey = keyOf({ kind: "thread", id: threadId }) ?? "";
+  const panelKey = threadTarget(threadId);
   const { checkouts, names, git } = useFinderCheckouts(threadId);
   const multi = checkouts.length > 1;
   const scope = useFinderScopeName(threadId, names, checkouts[0]?.projectId ?? "");

@@ -85,7 +85,7 @@ func (e pageNotFound) Is(target error) bool { return target == ErrNotFound }
 type ShowHTMLOptions struct {
 	// Again adds a card even when the page's card is still live.
 	Again bool
-	// Panel: the page also opens in the side panel, so a card of it anywhere in the
+	// Panel: the page also opens as a tab beside the thread, so a card of it anywhere in the
 	// thread is enough, not only one since the last user message.
 	Panel bool
 }

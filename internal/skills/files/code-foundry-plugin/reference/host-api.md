@@ -34,7 +34,8 @@ res, err := h.Invoke(ctx, "thread.send", map[string]string{"text": "The deploy f
 
 - The command must match a glob in `permissions.commands`; `plugin.<verb>` management
   commands never do. The list of commands and their positional args:
-  `reference/host-commands.md`; every flag of one: `code-foundry help <command>`.
+  `reference/host-commands.md` (thread and view ones: `host-commands-thread-view.md`); every
+  flag of one: `code-foundry help <command>`.
 - `args` are the command's arg names (its flags) as strings; booleans "true"/"false".
   The context (`UiContext{ThreadID, ProjectID, WorktreePath, TerminalID, WorkspaceID}`)
   is what "the active thread" etc. means to the command: pass the thread the user is
@@ -154,7 +155,7 @@ for _, issue := range res.Issues { h.Log().Warn("environment", "issue", issue) }
   one. A running thread keeps what it started with: its header shows "Plugin environment
   changed · Restart to apply" (only when what it would get really differs: pushing the
   same values again changes nothing), and the user restarts Claude for it
-  (`thread restart`, the same conversation). New bottom-panel shells in scope get the
+  (`thread restart`, the same conversation). New shells in scope (terminal tabs, quick terminals) get the
   `Env` and `PathPrepend` too (not `AddDirs`); running shells keep theirs. Do not push on
   a timer: every real change asks the user to restart their threads.
 - `Env`: names `[A-Za-z_][A-Za-z0-9_]*`, text values up to 8 KiB, at most 64. Reserved,
@@ -224,8 +225,8 @@ start hands over what was granted (`h.Granted()`). Test it with plugintest's
 toaster (bottom right) with the plugin's display name as its title (`ToastAttention`,
 `ToastError` for the other levels, which differ by icon, not colour).
 `h.ToastIn(instance, level, text)` shows it in the same toaster, without the name, only
-to whoever has that instance on screen: not inside the panel. For a message that should
-stay with the panel, render a `notice` node. Up to 200 characters, at most one a second per plugin
+to whoever has that instance on screen: not inside the surface. For a message that should
+stay with the surface, render a `notice` node. Up to 200 characters, at most one a second per plugin
 (more are dropped). A command's `Message` is toasted anyway when it runs from the GUI: do
 not toast it twice.
 

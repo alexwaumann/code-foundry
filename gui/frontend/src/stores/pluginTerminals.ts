@@ -1,52 +1,30 @@
 /**
- * Plugins' own terminals in the bottom panel (docs/notes/plugins-6-thread-terminal.md). A
- * plugin terminal (lib/termlabel isPluginLabels) belongs to no thread or worktree, so no
- * bottom panel shows it by itself: "Open in bottom panel" on its terminal node adds it to
- * the current selection's strip (TerminalsData.shownIn) and activates it. Its tab's ×
- * only takes it off the strip; the plugin closes the terminal. One Attach per terminal
- * view: while the terminal is the active tab of the bottom panel on screen, its node shows
- * a note instead of a second xterm (two would fight over the PTY's size).
+ * Plugins' own terminals as tabs (docs/notes/plugins-6-thread-terminal.md). A plugin terminal
+ * (lib/termlabel isPluginLabels) belongs to no thread or worktree, so it has no tab by itself:
+ * "Open in a tab" on its terminal node asks the daemon to show it (ui.focus.terminal), which opens
+ * its tab by the placement rules and focuses it. One Attach per terminal view: while the
+ * terminal's tab shows in the current space, its node shows a note instead of a second xterm (two
+ * would fight over the PTY's size). It was a tab of the classic bottom panel's strip until that
+ * went (docs/notes/shell-21-remove-classic.md).
  */
-import { toast } from "sonner";
-import { isPluginLabels } from "@/lib/termlabel";
-import { activeTabOf, bottomKeyOf, bottomTabIds, bottomVisible, forgetShown, openOn, requestBottomFocus, updateBottom, useBottomStore } from "./bottomPanel";
-import { keyOf, usePanelStore } from "./panel";
-import { useTerminalsStore } from "./terminals";
-import { useUiStore } from "./ui";
+import { runCommandForResult } from "./commands";
+import { useLayoutStore, type LayoutState } from "./layout";
 
-/**
- * Shows a plugin's terminal as a tab of the current selection's bottom panel, opens the
- * panel on it and focuses it. False (and a toast) when the selection has no bottom panel.
- */
-export function showPluginTerminal(id: string): boolean {
-  const key = bottomKeyOf(useUiStore.getState().selection);
-  if (key === null) {
-    toast.error("Select a thread to open the terminal in its bottom panel");
-    return false;
-  }
-  useTerminalsStore.setState((s) => ({ shownIn: { ...s.shownIn, [id]: [key] } }));
-  updateBottom(key, (e) => openOn(e, id));
-  requestBottomFocus();
-  return true;
+/** Shows a plugin's terminal in a tab of its own, with the keyboard; false when the daemon refused. */
+export async function showPluginTerminal(id: string): Promise<boolean> {
+  return (await runCommandForResult("ui.focus.terminal", { id }, { quiet: true })) !== null;
 }
 
-/** Takes a plugin terminal's tab off the strip it was opened in; false for any other terminal. */
-export function hidePluginTerminalTab(id: string): boolean {
-  const t = useTerminalsStore.getState().byId[id];
-  if (!t || !isPluginLabels(t.labels)) return false;
-  forgetShown(id);
-  return true;
-}
-
-/** Whether a terminal is the active tab of the bottom panel on screen now (it holds the terminal's view). */
-export function useInVisibleBottom(id: string): boolean {
-  const key = useUiStore((s) => bottomKeyOf(s.selection));
-  const open = useBottomStore((s) => (key === null ? false : (s.byKey[key]?.open ?? false)));
-  const remembered = useBottomStore((s) => (key === null ? undefined : s.byKey[key]?.activeTerminalId));
-  const sideExpanded = usePanelStore((s) => {
-    const k = keyOf(useUiStore.getState().selection);
-    return k !== null && (s.byKey[k]?.open ?? false) && (s.byKey[k]?.expanded ?? false);
+/** Whether a tab of the current space shows terminal `id` now (it holds the terminal's view). */
+export function terminalShown(s: Pick<LayoutState, "currentSpaceId" | "panes" | "tabs">, id: string): boolean {
+  return Object.values(s.panes).some((p) => {
+    if (p.spaceId !== s.currentSpaceId) return false;
+    const tab = s.tabs[p.active];
+    return tab?.kind === "terminal" && tab.params.terminal === id;
   });
-  const active = useTerminalsStore((s) => (key === null ? null : activeTabOf(remembered === undefined ? { open: true } : { open: true, activeTerminalId: remembered }, bottomTabIds(s, key))));
-  return bottomVisible(key, open, sideExpanded) && active === id;
+}
+
+/** terminalShown as a hook. */
+export function useTerminalShown(id: string): boolean {
+  return useLayoutStore((s) => terminalShown(s, id));
 }

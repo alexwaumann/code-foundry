@@ -1,73 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SHELL_GAP } from "@/design/tokens";
-import { BOTTOM_GAP, BOTTOM_MIN, bottomMax, clampBottomHeight, CONTENT_MIN, HOME, PANE_GAPS, PANEL_MIN, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, clampPanelWidth, expandedPanelWidth, panelMax, viewNames, useUiStore, type FocusRegion } from "./ui";
-
-describe("shell gaps", () => {
-  it("the panes' horizontal gaps are three shell gaps (sidebar | gap | content | gap | panel | gap), 36px", () => {
-    expect(PANE_GAPS).toBe(3 * SHELL_GAP);
-    expect(PANE_GAPS).toBe(36);
-  });
-  it("the bottom panel sits one shell gap under the content pane", () => {
-    expect(BOTTOM_GAP).toBe(SHELL_GAP);
-  });
-});
-
-describe("panelMax", () => {
-  const cases: [string, number, number, number][] = [
-    ["60% of a wide window", 2000, 260, 1200],
-    ["room beside the sidebar when that is less", 1400, 520, 1400 - 520 - PANE_GAPS - CONTENT_MIN],
-    ["sidebar hidden", 1000, 0, 600],
-    ["no room: below the minimum", 1000, 520, 1000 - 520 - PANE_GAPS - CONTENT_MIN],
-    ["940px minimum window, default sidebar", 940, SIDEBAR_DEFAULT, 940 - SIDEBAR_DEFAULT - PANE_GAPS - CONTENT_MIN],
-  ];
-  it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
-    expect(panelMax(windowWidth, sidebar)).toBe(want);
-  });
-
-  it("leaves the content pane its minimum whenever the panel fits", () => {
-    for (const windowWidth of [900, 1000, 1280, 1600]) {
-      for (const sidebar of [0, SIDEBAR_MIN, 260, SIDEBAR_MAX]) {
-        const max = panelMax(windowWidth, sidebar);
-        if (max < PANEL_MIN) continue;
-        expect(windowWidth - sidebar - PANE_GAPS - max).toBeGreaterThanOrEqual(CONTENT_MIN);
-      }
-    }
-  });
-});
-
-describe("expandedPanelWidth", () => {
-  const cases: [string, number, number, number][] = [
-    ["the row beside the sidebar less the panel's two margins", 1400, SIDEBAR_DEFAULT, 1400 - SIDEBAR_DEFAULT - 2 * SHELL_GAP],
-    ["sidebar hidden", 900, 0, 876],
-    ["940px window, default sidebar: stacks a split", 940, SIDEBAR_DEFAULT, 656],
-    ["800px window, default sidebar", 800, SIDEBAR_DEFAULT, 516],
-    ["never negative", 200, SIDEBAR_MAX, 0],
-  ];
-  it.each(cases)("%s", (_name, windowWidth, sidebar, want) => {
-    expect(expandedPanelWidth(windowWidth, sidebar)).toBe(want);
-  });
-});
-
-describe("clampPanelWidth", () => {
-  const cases: [string, number, number, number, number][] = [
-    ["below the minimum", 100, 1400, 260, PANEL_MIN],
-    ["inside the bounds, rounded", 500.4, 1400, 260, 500],
-    ["above 60% of the window", 1000, 1400, 0, 840],
-    ["above the room beside a wide sidebar", 700, 1400, 520, 484],
-    ["no room keeps the minimum", 400, 1000, 520, PANEL_MIN],
-  ];
-  it.each(cases)("%s", (_name, w, windowWidth, sidebar, want) => {
-    expect(clampPanelWidth(w, windowWidth, sidebar)).toBe(want);
-  });
-});
-
-describe("window width", () => {
-  it("setWindowWidth only records the width (panel widths live in stores/panel.ts)", () => {
-    useUiStore.getState().setWindowWidth(1100);
-    expect(useUiStore.getState().windowWidth).toBe(1100);
-    expect(useUiStore.getState()).not.toHaveProperty("panelWidth");
-  });
-});
+import { HOME, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, sidebarWidthAt, viewNames, useUiStore, type FocusRegion } from "./ui";
 
 describe("ui persistence", () => {
   it("migrating drops the old global panelWidth, the tree's collapsed rows and the sidebar width saved before v4, and keeps the rest", async () => {
@@ -95,6 +27,7 @@ describe("ui persistence", () => {
     ["a width saved under the old 220 minimum is raised", { sidebarWidth: 220 }, SIDEBAR_MIN],
     ["a width above the maximum is lowered", { sidebarWidth: 900 }, SIDEBAR_MAX],
     ["a width inside the bounds is kept, rounded", { sidebarWidth: 300.4 }, 300],
+    ["the old default 260, at least the new minimum, is kept", { sidebarWidth: 260 }, 260],
     ["no saved width keeps the default", { fontSize: 14 }, SIDEBAR_DEFAULT],
     ["nothing saved keeps the default", undefined, SIDEBAR_DEFAULT],
   ];
@@ -102,6 +35,21 @@ describe("ui persistence", () => {
     const merge = useUiStore.persist.getOptions().merge;
     const current = { ...useUiStore.getState(), sidebarWidth: SIDEBAR_DEFAULT };
     expect(merge?.(persisted, current).sidebarWidth).toBe(want);
+  });
+
+  it("the minimum and default line the sidebar up with the top bar's toggle: 80 + 12 + 108 + 12 + 28", () => {
+    expect(SIDEBAR_MIN).toBe(240);
+    expect(SIDEBAR_DEFAULT).toBe(SIDEBAR_MIN);
+  });
+
+  it.each<[string, number, number, number]>([
+    ["at the minimum, at 100%: the toggle's edge", SIDEBAR_MIN, 100, 240],
+    ["at the minimum, zoomed in: the toggle's edge (the lights' gutter narrows in layout px)", SIDEBAR_MIN, 125, 64 + 160],
+    ["at the minimum, zoomed out", SIDEBAR_MIN, 90, 89 + 160],
+    ["wider than the minimum: kept", 300, 90, 300],
+    ["wider at 100% but under the toggle's edge zoomed out: the toggle's edge", 245, 80, 100 + 160],
+  ])("drawn: %s", (_name, stored, zoom, want) => {
+    expect(sidebarWidthAt(stored, zoom)).toBe(want);
   });
 
   it("loading keeps the other saved fields", () => {
@@ -114,8 +62,6 @@ describe("ui persistence", () => {
     expect(saved).not.toHaveProperty("selection");
     expect(HOME).toEqual({ kind: "compose", projectId: "", noProject: true });
     expect(useUiStore.getInitialState().selection).toEqual(HOME);
-    expect(useUiStore.getInitialState().history).toEqual([HOME]);
-    expect(useUiStore.getInitialState().historyIndex).toBe(0);
   });
 
   it("landing on HOME leaves the project picker closed", () => {
@@ -181,54 +127,30 @@ describe("ui persistence", () => {
     expect(useUiStore.getState().snoozedCollapsed).toBe(true);
   });
 
-  it("saves and loads the last Projects page; ignores a saved collapsedWorkspaces; defaults for a bad value", () => {
-    expect(useUiStore.getInitialState().projectsLast).toBe("");
+  it("ignores what older builds saved for the classic window: the last Projects page, collapsedWorkspaces", () => {
     const opts = useUiStore.persist.getOptions();
     const current = useUiStore.getState();
     expect(opts.partialize?.(current)).not.toHaveProperty("collapsedWorkspaces");
+    expect(opts.partialize?.(current)).not.toHaveProperty("projectsLast");
     const merged = opts.merge?.({ collapsedWorkspaces: ["b"], projectsLast: "project:repo-cf" }, current);
-    expect(merged).toMatchObject({ projectsLast: "project:repo-cf" });
     expect(merged).not.toHaveProperty("collapsedWorkspaces");
-    expect(opts.merge?.({ projectsLast: 3 }, { ...current, projectsLast: "" })).toMatchObject({ projectsLast: "" });
-  });
-});
-
-describe("bottomMax and clampBottomHeight", () => {
-  const cases: [string, number, number][] = [
-    ["70% of the column", 1000, 700],
-    ["floored", 784, 548],
-    ["a short column keeps 160 for the content pane (plus the 12px gap)", 500, 500 - 160 - 12],
-    ["never below the minimum", 250, BOTTOM_MIN],
-    ["an unmeasured column", 0, BOTTOM_MIN],
-  ];
-  it.each(cases)("bottomMax: %s", (_name, column, want) => {
-    expect(bottomMax(column)).toBe(want);
-  });
-  const clamps: [string, number, number, number][] = [
-    ["within bounds, rounded", 300.4, 1000, 300],
-    ["below the minimum", 40, 1000, BOTTOM_MIN],
-    ["above the maximum", 900, 1000, 700],
-  ];
-  it.each(clamps)("clampBottomHeight: %s", (_name, h, column, want) => {
-    expect(clampBottomHeight(h, column)).toBe(want);
+    expect(merged).not.toHaveProperty("projectsLast");
   });
 });
 
 describe("closePalette", () => {
   const seqs = (): Record<string, number> => {
     const s = useUiStore.getState();
-    return { prompt: s.promptFocusSeq, sidebar: s.sidebarFocusSeq, panel: s.panelFocusSeq, bottom: s.bottomFocusSeq, content: s.contentFocusSeq };
+    return { prompt: s.promptFocusSeq, sidebar: s.sidebarFocusSeq, content: s.contentFocusSeq };
   };
   const cases: [FocusRegion, string][] = [
     ["sidebar", "sidebar"],
-    ["panel", "panel"],
-    ["bottom", "bottom"],
     ["content", "content"],
   ];
   it.each(cases)("returns focus to %s", (returnTo, bumped) => {
-    useUiStore.setState({ promptFocusSeq: 0, sidebarFocusSeq: 0, panelFocusSeq: 0, bottomFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
+    useUiStore.setState({ promptFocusSeq: 0, sidebarFocusSeq: 0, contentFocusSeq: 0, palette: { open: true, query: "", commandName: null, page: "commands", returnTo } });
     useUiStore.getState().closePalette();
-    const want = { prompt: 0, sidebar: 0, panel: 0, bottom: 0, content: 0, [bumped]: 1 };
+    const want = { prompt: 0, sidebar: 0, content: 0, [bumped]: 1 };
     expect(seqs()).toEqual(want);
     expect(useUiStore.getState().palette.open).toBe(false);
   });

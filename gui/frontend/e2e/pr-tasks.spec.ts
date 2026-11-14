@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockPost, openApp, resetMock } from "./fixtures";
+import { mockPost, resetMock } from "./fixtures";
+import { openShellApp } from "./shell";
+import { openPrBesidePage } from "./shell-pages";
 
 /**
  * A description's task boxes (docs/notes/pr-checkbox-gui.md): what only a browser shows, the
@@ -16,16 +18,14 @@ test.beforeEach(async () => {
   await resetMock();
 });
 
+/** #145 in its tab beside the Pull Requests page. */
 async function openPr145(page: Page): Promise<void> {
-  await page.getByTestId("nav-pullrequests").click();
-  await page.getByTestId("prs-authored").locator("[data-nav-key]").filter({ hasText: "#145" }).click();
-  await expect(page.getByTestId("pr-surface")).toBeVisible();
+  await openPrBesidePage(page, 145);
 }
 
 const box = (page: Page, name: string) => page.getByTestId("pr-description").getByRole("checkbox", { name });
 
 test("the box hangs in the gutter, rings on hover, and a tick comes back from the daemon", async ({ page }) => {
-  await openApp(page);
   await openPr145(page);
   const manual = box(page, MANUAL);
   const b = await manual.boundingBox();
@@ -47,8 +47,7 @@ test("the box hangs in the gutter, rings on hover, and a tick comes back from th
   await expect(manual).toHaveAttribute("aria-checked", "true");
   await expect(manual).toHaveAttribute("aria-busy", "false");
   // Read again: this is the mock's body now, not the click's state.
-  await openApp(page);
-  await openPr145(page);
+  await openShellApp(page);
   await expect(box(page, MANUAL)).toHaveAttribute("aria-checked", "true");
 });
 
@@ -58,11 +57,10 @@ for (const scheme of ["dark", "light"] as const) {
     const suffix = scheme === "light" ? "-light" : "";
     await page.emulateMedia({ colorScheme: scheme });
     await page.setViewportSize({ width: 1400, height: 900 });
-    await openApp(page);
     await openPr145(page);
     const manual = box(page, MANUAL);
     await manual.scrollIntoViewIfNeeded();
-    // The side panel, toasts included.
+    // The pull request's pane, toasts included.
     const panel = await page.getByTestId("pr-surface").boundingBox();
     if (!panel) throw new Error("no panel");
     const shoot = (name: string) => page.screenshot({ path: `${shots ?? ""}/${name}${suffix}.png`, clip: { x: panel.x - 12, y: 0, width: 1400 - panel.x + 12, height: 900 } });

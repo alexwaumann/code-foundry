@@ -3,17 +3,13 @@
  * over the window showing Settings or Themes, docs/notes/settings-sheet.md), the usage
  * sheet (docs/notes/usage-sheet.md; at most one of the three is open) and the help
  * overlay. None replaces the content area: the window stays laid out under them.
- * Top-level pages that are selections (ui.ts `viewNames`, the Pull Requests page) are
- * routed to `select`. Opened by view.settings / view.help (their chords are presented
+ * Opened by view.settings / view.help (their chords are presented
  * locally, see keys/bindings.ts) or by a UiIntent.ShowView from the daemon. The
  * window's own settings and usage keys and buttons toggle (toggleView); a ShowView only shows.
  */
 import { toast } from "sonner";
 import { create } from "zustand";
-import { bottomKeyOf, bottomVisible, getBottom, toggleBottom } from "./bottomPanel";
-import { expandPanel, getPanel, isSplit, splitPanel, startPanelPicking, togglePanel, unsplitPanel } from "./panel";
-import { projectPage, useUiStore, viewNames, workspacePage, type FocusRegion, type Selection } from "./ui";
-import { openMcpSurface } from "./mcpPanel";
+import { useUiStore } from "./ui";
 import { parsePluginView, showPluginView } from "./pluginPanel";
 import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
@@ -31,6 +27,10 @@ import { isActingWindow } from "./windowFocus";
 import { previewTheme, resetThemePicker, setPickerQuery, setPickerSlot, useThemePickerStore, whenTheme, type ThemeSlot } from "./themePicker";
 import { afterLeavingEditor, editorBack, editorDirty, leaveEditor, startEditing, stopEditing, syncFromDisk, useThemeEditorStore } from "./themeEditor";
 import { themeById } from "@/themes";
+import { canStepFocus, stepFocus, useFocusHistoryStore } from "./focusHistory";
+import { useLayoutStore } from "./layout";
+import { shellDrawn, useShellViewStore } from "./shellView";
+import { presentFullscreen } from "@/shell/fullscreen";
 
 interface ViewsState {
   settingsOpen: boolean;
@@ -83,26 +83,6 @@ function anyViewOpen(): boolean {
   return selectAnyViewOpen(useViewsStore.getState());
 }
 
-/** Whether the current selection's side panel is open and expanded over the content column. */
-function sideExpanded(): boolean {
-  const side = getPanel();
-  return side.open && (side.expanded ?? false);
-}
-
-/** The key whose bottom panel is on screen now (bottomVisible, read imperatively), or null. */
-export function visibleBottomKey(): string | null {
-  const key = bottomKeyOf(useUiStore.getState().selection);
-  return key !== null && bottomVisible(key, getBottom(key).open, sideExpanded()) ? key : null;
-}
-
-/**
- * Whether a key's bottom panel would be on screen if it were open: the side panel is not
- * expanded over the content column.
- */
-export function bottomCanShow(key: string): boolean {
-  return bottomVisible(key, true, sideExpanded());
-}
-
 /**
  * The window's own settings and usage keys and sidebar buttons (keys/bindings.ts): a
  * toggle, closing the page that is already open (for settings, the sheet, whether it
@@ -153,30 +133,6 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "help":
       openHelp();
       return true;
-    case "panel.toggle":
-      // view.panel.toggle: an action on the current selection's side panel, not a page.
-      togglePanelCommand();
-      return true;
-    case "panel.expand":
-      // view.panel.expand: like panel.toggle, an action on the current selection's panel.
-      expandPanelCommand();
-      return true;
-    case "panel.new-tab":
-      // view.panel.new-tab: the surface list in the current selection's panel (its "+").
-      newPanelTabCommand();
-      return true;
-    case "panel.split":
-      // view.panel.split: splits or joins the current selection's panel's tab groups.
-      splitPanelCommand();
-      return true;
-    case "panel.mcp":
-      // view.panel.mcp: the MCP surface in the current thread's panel.
-      mcpPanelCommand();
-      return true;
-    case "bottom.toggle":
-      // view.bottom.toggle: the current selection's bottom terminal panel.
-      toggleBottomCommand();
-      return true;
     case "agent.up":
       // thread.agent.up from the CLI: out of the subagent view, back to its thread.
       leaveSubagent();
@@ -198,9 +154,12 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
       jumpToNeighbour(1);
       return true;
     case "thread-info":
-      // view.thread-info: the thread info card beside every thread in this window (its overlay on a narrow pane).
+      // view.thread-info: the focused thread's info card, kept per thread (thread.info; its overlay on a narrow pane).
       toggleThreadInfo();
       return true;
+    case "pane.fullscreen":
+      // pane.fullscreen: the shell window's full screen pane (shell/fullscreen.ts); the classic window has none.
+      return !shellDrawn() || presentFullscreen(params);
     case "composer.history":
       // composer.history: the focused composer's Previous prompts, else the palette's.
       return presentPromptHistory();
@@ -265,21 +224,10 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
         setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => void showPluginView(name));
         return true;
       }
-      // Top-level pages (the Pull Requests page) are selections. Closing settings and
-      // usage here too covers re-selecting the page that is already selected.
-      if (!viewNames.includes(name)) return false;
-      setPages({ settingsOpen: false, usageOpen: false, themesOpen: false, helpOpen: false }, () => {
-        useUiStore.getState().select(pageSelection(name, params));
-      });
-      return true;
+      // The Pull Requests and Projects pages are tabs: view.pullrequests and view.projects open
+      // them in the layout and send nothing (docs/notes/shell-22-retire-verbs.md).
+      return false;
   }
-}
-
-/** The selection a top-level page's ShowView names: a project's or workspace's page for "projects" with one in params. */
-function pageSelection(name: string, params: Readonly<Record<string, string>> | undefined): Extract<Selection, { kind: "view" }> {
-  if (name === "projects" && params?.project) return projectPage(params.project);
-  if (name === "projects" && params?.workspace) return workspacePage(params.workspace);
-  return { kind: "view", name };
 }
 
 /**
@@ -288,7 +236,8 @@ function pageSelection(name: string, params: Readonly<Record<string, string>> | 
  * not history entries: back with one of them up closes it like its Esc or × (the Themes
  * page opened from Settings goes back to Settings), revealing what was on screen before
  * it, and does not step. Stepping to another selection closes such a page anyway
- * (startViewSync). Returns whether anything changed.
+ * (startViewSync). Returns whether anything changed. It steps through the window's focus
+ * history (stores/focusHistory.ts): what was focused, across panes and spaces.
  */
 export function historyCommand(by: 1 | -1): boolean {
   if (by === -1) {
@@ -299,142 +248,9 @@ export function historyCommand(by: 1 | -1): boolean {
       return true;
     }
   }
-  const ui = useUiStore.getState();
-  return by === -1 ? ui.back() : ui.forward();
-}
-
-/**
- * view.panel.toggle for the current selection. Under a sheet (Settings, Themes, Usage) it
- * acts on the panel under the backdrop; the sheet's focus trap keeps the keyboard.
- *
- * Focus: toggling on focuses the panel. Hiding the panel while it has focus hands focus
- * to the content pane (a thread's prompt, or the page's focus root). With the palette open
- * (the command was picked there), focus is the palette's, so the palette's return target
- * is what moves: to the panel when it opens, off it when it hides.
- */
-export function togglePanelCommand(): boolean {
-  const ui = useUiStore.getState();
-  const inPalette = ui.palette.open;
-  const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
-  const open = togglePanel("current", undefined, { focus: !inPalette });
-  if (inPalette) {
-    const returnTo: FocusRegion = open ? "panel" : from === "panel" ? "content" : from;
-    useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo } }));
-  } else if (!open && from === "panel") {
-    ui.focusContent();
-  }
-  return open;
-}
-
-/**
- * view.bottom.toggle for the current selection (a thread or the Projects page; other
- * selections have no bottom panel and it does nothing). A no-op while the side panel
- * fills the content area: it hides the bottom panel, so a toggle there would flip state
- * the user cannot see.
- *
- * Focus works like view.panel.toggle: showing focuses the panel (its active terminal, else
- * the panel), hiding it while it has focus hands focus to the content pane, and with the
- * palette open its return target moves instead.
- *
- * This is the plain toggle, which the CLI's ShowView reaches in every window. This
- * window's own cmd+j, header button and palette go through toggleBottomFromHere
- * (stores/bottomActions.ts), which starts a shell when the panel would open empty.
- */
-export function toggleBottomCommand(): boolean {
-  const ui = useUiStore.getState();
-  const key = bottomKeyOf(ui.selection);
-  if (key === null) return false;
-  // Whether it could show if open: otherwise a toggle flips state nobody sees.
-  if (!bottomCanShow(key)) return getBottom().open;
-  const inPalette = ui.palette.open;
-  const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
-  const open = toggleBottom("current", undefined, { focus: !inPalette });
-  if (inPalette) {
-    const returnTo: FocusRegion = open ? "bottom" : from === "bottom" ? "content" : from;
-    useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo } }));
-  } else if (!open && from === "bottom") {
-    ui.focusContent();
-  }
-  return open;
-}
-
-/**
- * view.panel.expand for the current selection: flips its panel between the split and the
- * full width of the content area. A hidden panel is shown expanded. A no-op with nothing
- * selected.
- *
- * Focus stays where it was, unless it was in the content pane, which expanding hides:
- * then it moves to the panel. With the palette open, its return target moves instead.
- * Restoring the split leaves focus alone (in the panel, typically).
- */
-export function expandPanelCommand(): boolean {
-  const ui = useUiStore.getState();
-  const inPalette = ui.palette.open;
-  const from: FocusRegion = inPalette ? ui.palette.returnTo : ui.focus;
-  // Expanding hides the content column, the bottom panel with it.
-  const fromContent = from === "content" || from === "bottom";
-  const expanded = expandPanel("current", getPanel().open ? undefined : true, { focus: fromContent && !inPalette });
-  if (inPalette && expanded && fromContent) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return expanded;
-}
-
-/**
- * view.panel.new-tab for the current selection (the "+" after the panel's tabs): shows
- * its panel if hidden, with the surface list ("Open a surface") instead of the active
- * tab (stores/panel.ts startPicking). No tab is added until a surface is picked; Escape
- * goes back. A panel without tabs shows the list anyway, so it is only shown. A no-op
- * with nothing selected. In a split panel it
- * picks in the focused group; a group's own "+" focuses that group before it runs.
- *
- * Focus moves to the panel, like toggling it on, so Escape and the surface letters work
- * at once; with the palette open, its return target moves there instead.
- */
-export function newPanelTabCommand(): boolean {
-  const inPalette = useUiStore.getState().palette.open;
-  if (!startPanelPicking("current", { focus: !inPalette })) return false;
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
-}
-
-/**
- * view.panel.split for the current selection: splits its panel into two tab groups
- * (stores/panel.ts split: the active tab moves into the new second group; with a single
- * tab the new group starts on its surface list), or joins a split panel's groups back
- * into one (unsplit). A hidden panel is shown, split: a hidden split panel just shows,
- * since joining groups the user cannot see would be a surprise. A panel without tabs has
- * nothing to split (it is only shown). A no-op with nothing selected. Returns whether the panel is split afterwards.
- *
- * Focus: splitting moves it to the panel (the new group is the focused one), like
- * view.panel.new-tab; with the palette open, its return target moves there instead.
- * Joining keeps focus in the panel when it was there (the second group's strip is gone).
- */
-export function splitPanelCommand(): boolean {
-  const ui = useUiStore.getState();
-  const inPalette = ui.palette.open;
-  const e = getPanel();
-  if (e.open && isSplit(e)) {
-    unsplitPanel("current");
-    if (!inPalette && ui.focus === "panel") useUiStore.setState((s) => ({ panelFocusSeq: s.panelFocusSeq + 1 }));
-    return false;
-  }
-  const split = splitPanel("current", { focus: !inPalette });
-  if (inPalette && getPanel().open) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return split;
-}
-
-/**
- * view.panel.mcp for the current selection: opens (or activates) the MCP tab in the
- * selected thread's panel and shows the panel. A no-op when no thread is selected.
- *
- * Focus moves to the panel; with the palette open, its return target moves there instead.
- */
-export function mcpPanelCommand(): boolean {
-  const key = openMcpSurface();
-  if (key === null) return false;
-  const inPalette = useUiStore.getState().palette.open;
-  togglePanel(key, true, { focus: !inPalette });
-  if (inPalette) useUiStore.setState((s) => ({ palette: { ...s.palette, returnTo: "panel" } }));
-  return true;
+  const can = canStepFocus(useFocusHistoryStore.getState(), useLayoutStore.getState(), by);
+  if (can) void stepFocus(by);
+  return can;
 }
 
 /** Asks the selected thread's prompt for the keyboard; nothing when no thread is selected. */
@@ -624,7 +440,7 @@ export function startViewSync(): () => void {
     // Cancel in the Themes editor's confirm: the page and its edits stay, and so does what was selected under it.
     const back = () => {
       restoring = true;
-      useUiStore.setState({ selection: prev.selection, history: prev.history, historyIndex: prev.historyIndex });
+      useUiStore.setState({ selection: prev.selection });
       restoring = false;
     };
     setPages({ settingsOpen: false, usageOpen: false, themesOpen: false }, undefined, back);
@@ -633,8 +449,14 @@ export function startViewSync(): () => void {
   const unsubViews = useViewsStore.subscribe((s, prev) => {
     if (prev.themesOpen && !s.themesOpen) stopEditing();
   });
+  // A terminal this window started or showed asks for the keyboard, which it cannot get under a
+  // sheet over the window: the sheet closes, as selecting something does.
+  const unsubPane = useShellViewStore.subscribe((s, prev) => {
+    if (s.overSheetsSeq !== prev.overSheetsSeq && anyViewOpen()) setPages({ settingsOpen: false, usageOpen: false, themesOpen: false });
+  });
   return () => {
     unsubUi();
     unsubViews();
+    unsubPane();
   };
 }

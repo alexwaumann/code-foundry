@@ -1,0 +1,30 @@
+{
+  "doc": "Closing a space's last tab leaves it with no panes.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "mru": ["t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_tab","tab":"t-a"},
+  "want": {
+    "v": 1,
+    "spaces": [{"id":"sp-a","name":"Main","root":null}],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","closed":["t-a"]}
+}

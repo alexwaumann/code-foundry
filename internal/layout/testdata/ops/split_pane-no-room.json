@@ -1,0 +1,53 @@
+{
+  "doc": "A split whose result would not fit the pane area is refused: in a 1000px wide area a third pane needs 480 + 12 + 480 + 12 + 480 = 1464px (docs/notes/shell-25f-sizes.md).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                },
+                {"id":"t-f","kind":"file","params":{"path":"/r/a.go"},"thread":"th-a"}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-d"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "split_pane",
+    "pane": "p-b",
+    "edge": "right",
+    "tab": {"id":"","kind":"projects"},
+    "w": 1000,
+    "h": 900
+  },
+  "error": "failed_precondition"
+}
