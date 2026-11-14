@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { EmberRow } from "@/components/ember/EmberRow";
 import { useHeight } from "@/lib/useWidth";
-import { useUiStore } from "@/stores/ui";
+import { sidebarWidthAt, useUiStore } from "@/stores/ui";
 import { ResizeHandle } from "./ResizeHandle";
 import { useSidebarDashboard } from "./useLinkedPrs";
 import { SidebarStatus } from "./SidebarStatus";
@@ -15,7 +15,7 @@ import { ShellSidebarList } from "./shell/ShellSidebarList";
  */
 export function Sidebar() {
   const visible = useUiStore((s) => s.sidebarVisible);
-  const width = useUiStore((s) => s.sidebarWidth);
+  const width = useUiStore((s) => sidebarWidthAt(s.sidebarWidth, s.zoom));
   if (!visible) return null;
   return <SidebarShown width={width} />;
 }

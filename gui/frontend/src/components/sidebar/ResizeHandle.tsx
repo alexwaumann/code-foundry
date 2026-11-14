@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { SIDEBAR_DEFAULT, useUiStore } from "@/stores/ui";
+import { SIDEBAR_DEFAULT, sidebarWidthAt, useUiStore } from "@/stores/ui";
 
 /**
  * Drag handle filling the shell gap right of the sidebar, its hairline in the middle (as
@@ -18,7 +18,9 @@ export function ResizeHandle() {
       onPointerDown={(e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { x: e.clientX, w: useUiStore.getState().sidebarWidth };
+        // From the width as drawn (at its minimum, the toggle's edge at this zoom).
+        const ui = useUiStore.getState();
+        drag.current = { x: e.clientX, w: sidebarWidthAt(ui.sidebarWidth, ui.zoom) };
       }}
       onPointerMove={(e) => {
         const d = drag.current;

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UiContextView } from "@/api/command";
+import { sidebarToggleEnd } from "@/components/window/titleBand";
 import { bool, finite, persistedRecord } from "./persisted";
 
 /**
@@ -66,11 +67,26 @@ export type FocusRegion = "sidebar" | "content" | "palette";
  */
 export type PalettePage = "commands" | "projects" | "runin" | "prompts" | "files" | "search";
 
-/** The sidebar's width bounds (its resize handle). */
-export const SIDEBAR_MIN = 260;
+/**
+ * The sidebar's width bounds (its resize handle). The minimum lines the sidebar's right edge up with
+ * the top bar's sidebar toggle (components/window/titleBand.ts sidebarToggleEnd: 240 at 100% zoom;
+ * docs/notes/shell-25f-sizes.md). The stored width is in layout px; at another zoom the gutter of
+ * the traffic lights changes, so a sidebar at its minimum follows the toggle (sidebarWidthAt).
+ */
+export const SIDEBAR_MIN = sidebarToggleEnd(100);
 export const SIDEBAR_MAX = 520;
-/** The initial width, and what double-clicking the resize handle restores. */
-export const SIDEBAR_DEFAULT = 260;
+/** The initial width, and what double-clicking the resize handle restores: the minimum. */
+export const SIDEBAR_DEFAULT = SIDEBAR_MIN;
+
+/**
+ * The sidebar's drawn width for a stored width at a page zoom: a width at the minimum (or below,
+ * from an older build) follows the toggle's right edge at that zoom; a wider one is kept, and
+ * never drawn narrower than the toggle's edge.
+ */
+export function sidebarWidthAt(stored: number, zoom: number): number {
+  const min = sidebarToggleEnd(zoom);
+  return stored <= SIDEBAR_MIN ? min : Math.max(stored, min);
+}
 export const FONT_MIN = 9;
 export const FONT_MAX = 28;
 export const FONT_DEFAULT = 13;
@@ -190,8 +206,8 @@ export function clamp(n: number, lo: number, hi: number): number {
 }
 
 /** The sidebar's rendered width: 0 when hidden. */
-export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: number }): number {
-  return s.sidebarVisible ? s.sidebarWidth : 0;
+export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: number; zoom: number }): number {
+  return s.sidebarVisible ? sidebarWidthAt(s.sidebarWidth, s.zoom) : 0;
 }
 
 export function sameSelection(a: Selection, b: Selection): boolean {
@@ -402,7 +418,8 @@ export const useUiStore = create<UiState>()(
       // Only the persisted fields, each checked (stores/persisted.ts): a store another build
       // wrote, or a hand edit, never puts a wrong-typed value in the window's state. Numbers
       // are clamped: a saved width outside [SIDEBAR_MIN, SIDEBAR_MAX] (e.g. 220, saved before
-      // the minimum rose to 260) renders and drags from a valid width.
+      // the minimum rose to 260) renders and drags from a valid width. A width saved earlier that
+      // is at least the minimum (the old default 260 too) is kept.
       merge: (persisted, current) => {
         const p = persistedRecord(persisted);
         const num = (v: unknown, lo: number, hi: number, fallback: number): number => {
