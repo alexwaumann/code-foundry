@@ -12,7 +12,8 @@
 import { afterRev, focusTabNow, runLayoutCommand } from "./commands";
 import { closePaneAsked, closeTabAsked } from "./closeTab";
 import { neighbour, type Direction } from "./geometry/neighbours";
-import { focusPane, useLayoutStore } from "@/stores/layout";
+import { shellFrame } from "./geometry/rails";
+import { focusPane, geoTree, useLayoutStore } from "@/stores/layout";
 import { focusedTab } from "@/stores/selectionBridge";
 import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
 import { autoNameFocusedTab, cycleTerminals, newFreeTerminalTab, newTerminalTab, quickKey, renameFocusedTab } from "./terminalActions";
@@ -32,13 +33,68 @@ async function thenFocus(rev: number | undefined): Promise<void> {
   if (pane) requestPaneFocus(pane);
 }
 
-/** The neighbour on that side of the drawn frame (rails included); null in full screen or with none. */
-function neighbourOn(dir: Direction): { from: string; to: string } | null {
+/**
+ * The pane the last focus key left, and the one it reached. The daemon's MRU holds the focused
+ * pane's tab only when a focus touched it (a pane that took the focus because its neighbour
+ * closed, or a layout loaded as stored, is not in it), so the pane a key just left counts as the
+ * most recently focused one, whatever the MRU says, while the focus is still where the key took it.
+ */
+let left: { space: string; from: string; to: string; head: string } | null = null;
+
+/** The head of a space's MRU, which tells whether anything was focused since a key moved the focus. */
+const headOf = (mru: readonly string[]) => mru.slice(0, 2).join("\n");
+
+/**
+ * The neighbour on that side (rails included), the most recently focused of several; null in full
+ * screen or with none. On the frame the grid draws for the layout as it is now: the drawn frame in
+ * the view store lags a focus applied at once by a render, and with rails the focus decides what
+ * folds, so a second key before the redraw would go from a stale frame (docs/notes/shell-25b-audits.md).
+ */
+function neighbourOn(dir: Direction): { space: string; from: string; to: string } | null {
   if (fullscreenOn()) return null;
-  const from = focusedPane();
-  const frame = useShellViewStore.getState().frame;
-  const to = frame && from ? neighbour(frame, from, dir) : null;
-  return to ? { from, to } : null;
+  const s = useLayoutStore.getState();
+  const space = s.spaces[s.currentSpaceId];
+  const from = space?.focus ?? "";
+  const drawn = useShellViewStore.getState().frame;
+  if (!space || !from || !drawn) return null;
+  const root = geoTree(s, space.id);
+  const frame = shellFrame({ root, w: drawn.w, h: drawn.h, focus: from, mru: space.mru });
+  const came = left?.space === space.id && left.to === from && left.head === headOf(space.mru) ? s.panes[left.from]?.active : undefined;
+  const mru = came ? [came, ...space.mru.filter((m) => m !== came)] : space.mru;
+  const to = neighbour(frame, from, dir, { root, mru });
+  return to ? { space: space.id, from, to } : null;
+}
+
+/**
+ * The pane moves sent and not yet in the layout. A move is not applied before the daemon answers,
+ * so a second key meanwhile would find the same neighbour in the old tree and swap the pane back
+ * (or focus a pane that is about to change places): a direction key waits for the moves before it
+ * to land, then finds its neighbour. With none on its way it runs at once.
+ */
+let moving: Promise<void> | null = null;
+
+/** The longest a move holds the keys back: a daemon that never answers must not stop them for good. */
+export const MOVE_HOLD_MS = 3000;
+
+function afterMoves(run: () => Promise<void> | void): void {
+  if (!moving) {
+    const p = run();
+    if (p) track(p);
+    return;
+  }
+  track(moving.then(run));
+}
+
+function track(p: Promise<void>): void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const held = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, MOVE_HOLD_MS);
+  });
+  const mine: Promise<void> = Promise.race([p.catch(() => undefined), held]).finally(() => {
+    clearTimeout(timer);
+    if (moving === mine) moving = null;
+  });
+  moving = mine;
 }
 
 /** Focuses the neighbour on that side, and moves the keyboard there. Nothing in full screen. */
@@ -46,13 +102,23 @@ function focusSide(dir: Direction): void {
   const n = neighbourOn(dir);
   if (!n) return;
   void focusPane(n.to, async () => (await runLayoutCommand(`pane.focus.${dir}`, { pane: n.from, to: n.to, focus: "true" }))?.rev ?? null);
+  // The focus is applied at once: the MRU's head now is the key's.
+  left = { ...n, head: headOf(useLayoutStore.getState().spaces[n.space]?.mru ?? []) };
   requestPaneFocus(n.to);
 }
 
 /** Swaps the focused pane with its neighbour on that side. Nothing in full screen. */
-function moveSide(dir: Direction): void {
+async function moveSide(dir: Direction): Promise<void> {
   const n = neighbourOn(dir);
-  if (n) void runLayoutCommand(`pane.move.${dir}`, { pane: n.from, to: n.to });
+  if (!n) return;
+  const res = await runLayoutCommand(`pane.move.${dir}`, { pane: n.from, to: n.to });
+  if (res) await afterRev(res.rev);
+}
+
+/** Back to the start: no pane remembered, no move on its way (tests). */
+export function resetKeyPresenters(): void {
+  left = null;
+  moving = null;
 }
 
 /** Focuses the tab `step` away from the focused one in its pane, round the strip. */
@@ -101,10 +167,12 @@ export const SHELL_PRESENTERS: Readonly<Record<string, () => void>> = {
   ...Object.fromEntries(
     DIRECTIONS.flatMap((dir) => [
       [`pane.focus.${dir}`, () => {
-        focusSide(dir);
+        afterMoves(() => {
+          focusSide(dir);
+        });
       }],
       [`pane.move.${dir}`, () => {
-        moveSide(dir);
+        afterMoves(() => moveSide(dir));
       }],
     ]),
   ),
