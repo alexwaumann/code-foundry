@@ -43,7 +43,10 @@ import (
 //
 // The glue's own ops carry no client id. A sweep at start and every layoutSweepEvery drops
 // what the layout holds of terminals that are gone (after a restart every terminal is), for
-// the terminal events the bus dropped.
+// the terminal events the bus dropped. The sweep, like a terminal's removal, judges only what
+// the layout held after the last commit the glue acted on: a tab a later commit restored
+// still names its old, ended terminal until the glue starts its fresh shell, and is judged
+// after that (docs/notes/shell-25g-race-chord.md).
 //
 // The bus drops an event for a subscriber whose buffer is full and counts the drop. When the
 // layout or thread subscription has dropped one, the glue catches up from the stores'
@@ -87,11 +90,34 @@ type layoutGlue struct {
 	prevRev uint64
 	// layoutDrops and threadDrops are the drops of each subscription already caught up on.
 	layoutDrops, threadDrops uint64
+	// waiting are terminals the layout holds that are gone, and waitingQuick threads whose
+	// quick terminal is drawn open with no shell, seen before the glue acted on the commit
+	// that put them there (prev does not have them): a terminal tab restored as a fresh
+	// shell, or a quick terminal brought back, waiting for that shell. They are judged again
+	// once the glue has acted on the commits after them (settle).
+	waiting      map[string]bool
+	waitingQuick map[string]bool
+
+	terms        <-chan terminal.Event
+	threadEvents *bus.Subscription[thread.Event]
+	layoutEvents *bus.Subscription[layoutstore.Event]
 }
 
 // startLayoutGlue starts the glue's loop. The returned func stops it and waits for terminals
 // it is ending (they end with its context).
 func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error) {
+	g, err := newLayoutGlue(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	g.sweep()
+	g.wg.Go(g.run)
+	return g.stop, nil
+}
+
+// newLayoutGlue subscribes the glue and reads the stores' state, without the start sweep or
+// the loop (startLayoutGlue runs both; a test drives the glue's steps in its own order).
+func newLayoutGlue(ctx context.Context, opts layoutGlueOptions) (*layoutGlue, error) {
 	if opts.Log == nil {
 		opts.Log = slog.Default()
 	}
@@ -104,7 +130,10 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 	if opts.Buffer <= 0 {
 		opts.Buffer = 256
 	}
-	g := &layoutGlue{opts: opts, labels: map[string]map[string]string{}, archived: map[string]bool{}}
+	g := &layoutGlue{
+		opts: opts, labels: map[string]map[string]string{}, archived: map[string]bool{},
+		waiting: map[string]bool{}, waitingQuick: map[string]bool{},
+	}
 	g.ctx, g.cancel = context.WithCancel(ctx)
 	// Subscribe before reading the state, so nothing between the two is missed.
 	terms, err := opts.Terminals.Watch(g.ctx)
@@ -112,8 +141,9 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 		g.cancel()
 		return nil, err
 	}
-	threadEvents := bus.Subscribe[thread.Event](opts.Bus, opts.Buffer)
-	layoutEvents := bus.Subscribe[layoutstore.Event](opts.Bus, opts.Buffer)
+	g.terms = terms
+	g.threadEvents = bus.Subscribe[thread.Event](opts.Bus, opts.Buffer)
+	g.layoutEvents = bus.Subscribe[layoutstore.Event](opts.Bus, opts.Buffer)
 	for _, t := range opts.Terminals.List(g.ctx) {
 		g.labels[t.ID] = t.Labels
 	}
@@ -123,37 +153,41 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 		}
 	}
 	g.prev = opts.Layout.Snapshot().State
-	g.sweep()
-	g.wg.Go(func() {
-		defer threadEvents.Close()
-		defer layoutEvents.Close()
-		tick := time.NewTicker(opts.SweepEvery)
-		defer tick.Stop()
-		for {
-			select {
-			case <-g.ctx.Done():
+	return g, nil
+}
+
+// run is the glue's loop, until its context ends.
+func (g *layoutGlue) run() {
+	defer g.threadEvents.Close()
+	defer g.layoutEvents.Close()
+	tick := time.NewTicker(g.opts.SweepEvery)
+	defer tick.Stop()
+	for {
+		select {
+		case <-g.ctx.Done():
+			return
+		case <-tick.C:
+			g.resync()
+			g.sweep()
+		case ev, ok := <-g.terms:
+			if !ok {
 				return
-			case <-tick.C:
-				g.resync(threadEvents, layoutEvents)
-				g.sweep()
-			case ev, ok := <-terms:
-				if !ok {
-					return
-				}
-				g.terminalEvent(ev)
-			case ev := <-threadEvents.C():
-				g.threadEvent(ev)
-				g.resync(threadEvents, layoutEvents)
-			case ev := <-layoutEvents.C():
-				g.commit(ev)
-				g.resync(threadEvents, layoutEvents)
 			}
+			g.terminalEvent(ev)
+		case ev := <-g.threadEvents.C():
+			g.threadEvent(ev)
+			g.resync()
+		case ev := <-g.layoutEvents.C():
+			g.commit(ev)
+			g.resync()
 		}
-	})
-	return func() {
-		g.cancel()
-		g.wg.Wait()
-	}, nil
+	}
+}
+
+// stop ends the glue and waits for terminals it is ending (they end with its context).
+func (g *layoutGlue) stop() {
+	g.cancel()
+	g.wg.Wait()
 }
 
 // loginShell is the user's login shell, as terminal.new starts it.
@@ -258,16 +292,20 @@ func (g *layoutGlue) terminalEvent(ev terminal.Event) {
 // drawn closed unless its thread has another; a terminal a reset replaced has its tab follow
 // the new one (the removal may arrive before the new shell's first event); any other has its
 // tab closed and is forgotten.
+//
+// Only what the layout held after the last commit the glue acted on (prev) is judged: a tab
+// a later commit put back (a reopen, a snooze's restore) names its old, ended terminal until
+// the glue acts on that commit and starts its fresh shell. Such a terminal waits (settle).
 func (g *layoutGlue) gone(id string, labels map[string]string) {
-	st := g.state()
 	if termlabel.IsQuick(labels) {
-		th := labels[termlabel.Thread]
-		if ts := st.Threads[th]; ts != nil && ts.Quick != nil && ts.Quick.Open && !g.hasQuick(th) {
-			g.apply(&core.SetQuick{Thread: th, Open: false})
-		}
+		g.quickGone(labels[termlabel.Thread])
 		return
 	}
-	if !core.Holds(st, id) {
+	if !core.Holds(g.state(), id) {
+		return
+	}
+	if g.prev == nil || !core.Holds(g.prev, id) {
+		g.waiting[id] = true
 		return
 	}
 	for _, t := range g.opts.Terminals.List(g.ctx) {
@@ -277,6 +315,30 @@ func (g *layoutGlue) gone(id string, labels map[string]string) {
 		}
 	}
 	g.apply(&core.DropTerminal{Terminal: id})
+}
+
+// quickGone draws thread's quick terminal closed when it is open with no shell, unless the
+// commit that opened it is one the glue has not acted on yet (a quick terminal a snooze
+// ended, brought back with its thread's tab: its fresh shell is coming): that one waits
+// (settle).
+func (g *layoutGlue) quickGone(thread string) {
+	if !quickOpen(g.state(), thread) || g.hasQuick(thread) {
+		return
+	}
+	if !quickOpen(g.prev, thread) {
+		g.waitingQuick[thread] = true
+		return
+	}
+	g.apply(&core.SetQuick{Thread: thread, Open: false})
+}
+
+// quickOpen reports whether st draws thread's quick terminal open.
+func quickOpen(st *core.State, thread string) bool {
+	if st == nil {
+		return false
+	}
+	ts := st.Threads[thread]
+	return ts != nil && ts.Quick != nil && ts.Quick.Open
 }
 
 // hasQuick reports whether thread has a running quick terminal.
@@ -300,18 +362,41 @@ func (g *layoutGlue) commit(ev layoutstore.Event) {
 	if g.prev == nil {
 		g.prev = g.state()
 	}
+	g.settle()
+}
+
+// settle judges again what was waiting for the glue to act on a commit (waiting,
+// waitingQuick): a terminal still gone and still held has its tab closed, a quick terminal
+// still without a shell is drawn closed; one the commit's fresh shell took over is let be.
+// What is still ahead of the commits acted on waits again.
+func (g *layoutGlue) settle() {
+	if len(g.waiting) == 0 && len(g.waitingQuick) == 0 {
+		return
+	}
+	ids, threads := g.waiting, g.waitingQuick
+	g.waiting, g.waitingQuick = map[string]bool{}, map[string]bool{}
+	for id := range ids {
+		if _, err := g.opts.Terminals.Get(g.ctx, id); errors.Is(err, terminal.ErrNotFound) {
+			g.gone(id, nil)
+		}
+	}
+	for th := range threads {
+		g.quickGone(th)
+	}
 }
 
 // resync catches up on what a subscription dropped: for layout events, what the commits in
 // between did to terminals (catchUp from the state after the last commit acted on to the
 // state now); for thread events, every thread as the thread store has it now.
-func (g *layoutGlue) resync(threads *bus.Subscription[thread.Event], layouts *bus.Subscription[layoutstore.Event]) {
+func (g *layoutGlue) resync() {
+	threads, layouts := g.threadEvents, g.layoutEvents
 	if n := layouts.Dropped(); n != g.layoutDrops {
 		g.opts.Log.Warn("layout: the glue missed layout events; catching up from the layout", "dropped", n-g.layoutDrops)
 		g.layoutDrops = n
 		snap := g.opts.Layout.Snapshot()
 		g.catchUp(g.prev, snap.State)
 		g.prev, g.prevRev = snap.State, snap.Rev
+		g.settle()
 	}
 	if n := threads.Dropped(); n != g.threadDrops {
 		g.opts.Log.Warn("layout: the glue missed thread events; catching up from the threads", "dropped", n-g.threadDrops)
@@ -508,7 +593,8 @@ func (g *layoutGlue) freshQuick(thread string) {
 }
 
 // sweep drops what the layout holds of terminals that no longer exist, and draws closed the
-// quick terminals that have no shell.
+// quick terminals that have no shell; what a commit the glue has not acted on yet put back
+// waits for it (gone, quickGone).
 func (g *layoutGlue) sweep() {
 	st := g.state()
 	for _, id := range core.HeldTerminals(st) {
@@ -516,10 +602,8 @@ func (g *layoutGlue) sweep() {
 			g.gone(id, nil)
 		}
 	}
-	for th, ts := range st.Threads {
-		if ts.Quick != nil && ts.Quick.Open && !g.hasQuick(th) {
-			g.apply(&core.SetQuick{Thread: th, Open: false})
-		}
+	for th := range st.Threads {
+		g.quickGone(th)
 	}
 }
 
