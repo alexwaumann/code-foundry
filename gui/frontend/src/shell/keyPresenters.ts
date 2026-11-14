@@ -147,6 +147,10 @@ export const SHELL_PRESENTERS: Readonly<Record<string, () => void>> = {
     const pane = focusedPane();
     if (pane) void closePaneAsked(pane).then((r) => thenFocus(r?.rev));
   },
+  // cmd+shift+t: the space's most recently closed tab or pane comes back with the focus, and the keyboard follows.
+  "tab.reopen": () => {
+    void runLayoutCommand("tab.reopen").then((r) => thenFocus(r?.changed ? r.rev : undefined));
+  },
   "tab.previous": () => {
     stepTab(-1);
   },

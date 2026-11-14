@@ -158,9 +158,16 @@ func randomOp(s *bytesrc, st *State) Op {
 	case *SwapPane:
 		o.Pane, o.Target = pick(s, panes...), pick(s, panes...)
 	case *CloseTab:
-		o.Tab = pick(s, tabs...)
+		o.Tab, o.Record = pick(s, tabs...), s.n(2) == 0
 	case *ClosePane:
-		o.Pane = pick(s, panes...)
+		o.Pane, o.Record = pick(s, panes...), s.n(2) == 0
+		o.W, o.H = viewportOf(s)
+	case *ReopenClosed:
+		o.Space = pick(s, "", "", spaces[len(spaces)-1])
+		if s.n(4) == 0 {
+			o.Gone = []string{pick(s, tabs...)}
+		}
+		o.W, o.H = viewportOf(s)
 	case *SetSizes:
 		o.Split = pick(s, splits...)
 		_, split := st.FindSplit(o.Split)
@@ -221,7 +228,7 @@ func randomOp(s *bytesrc, st *State) Op {
 		}
 		o.W, o.H = viewportOf(s)
 	case *CloseThread:
-		o.Thread = pick(s, threads...)
+		o.Thread, o.Record = pick(s, threads...), s.n(2) == 0
 		o.W, o.H = viewportOf(s)
 	case *MoveThreadToSpace:
 		o.Thread, o.Space = pick(s, threads...), pick(s, spaces...)

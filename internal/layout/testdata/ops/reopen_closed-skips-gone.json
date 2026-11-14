@@ -1,0 +1,62 @@
+{
+  "doc": "Entries the caller found gone (a thread archived, a file removed) and tabs that cannot come back here are dropped, and the next entry reopens.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+          "active": "t-f"
+        },
+        "focus": "p-a",
+        "mru": ["t-f"],
+        "closed": [
+          {"pane":"p-a","tabs":[{"id":"t-g","kind":"file","params":{"path":"/gone"}}],"index":0},
+          {"pane":"p-a","tabs":[{"id":"t-o","kind":"thread","thread":"th-other"}],"index":0},
+          {
+            "pane": "p-a",
+            "tabs": [{"id":"t-c","kind":"compose","params":{"draft":"d-gone"}}],
+            "index": 0
+          },
+          {"pane":"p-a","tabs":[{"id":"t-h","kind":"file","params":{"path":"/y"}}],"index":0},
+          {"pane":"p-a","tabs":[{"id":"t-i","kind":"file","params":{"path":"/z"}}],"index":0}
+        ]
+      },
+      {"id":"sp-b","name":"Other","root":null}
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-other":{"space":"sp-b"}}
+  },
+  "op": {"op":"reopen_closed","gone":["t-g"]},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-h","kind":"file","params":{"path":"/y"}},
+            {"id":"t-f","kind":"file","params":{"path":"/x"}}
+          ],
+          "active": "t-h"
+        },
+        "focus": "p-a",
+        "mru": ["t-h","t-f"],
+        "closed": [{"pane":"p-a","tabs":[{"id":"t-i","kind":"file","params":{"path":"/z"}}]}]
+      },
+      {"id":"sp-b","name":"Other","root":null}
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-other":{"space":"sp-b"}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-h"}
+}

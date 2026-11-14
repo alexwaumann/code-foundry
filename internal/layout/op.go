@@ -220,7 +220,8 @@ func (t *tx) newID(prefix string) string {
 	}
 }
 
-// usedIDs is every space, node and tab id in the state, and every pane id a thread remembers.
+// usedIDs is every space, node and tab id in the state, every pane id a thread remembers, and
+// every pane and tab id of a reopen history (so a reopened tab or pane can take its own back).
 // It reads states not yet sanitised too, so it skips nils.
 func usedIDs(st *State) map[string]bool {
 	used := map[string]bool{}
@@ -232,6 +233,17 @@ func usedIDs(st *State) map[string]bool {
 		for _, d := range sp.Drafts {
 			if d != nil {
 				used[d.ID] = true
+			}
+		}
+		for _, e := range sp.Closed {
+			if e == nil {
+				continue
+			}
+			used[e.Pane] = true
+			for _, tb := range e.Tabs {
+				if tb != nil {
+					used[tb.ID] = true
+				}
 			}
 		}
 		walk(sp.Root, func(n *Node) {

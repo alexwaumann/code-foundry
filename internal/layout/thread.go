@@ -476,11 +476,13 @@ func (t *tx) putAwayElsewhere(sp *Space, thread string) []*Tab {
 
 // CloseThread closes a thread's tab and the linked tabs in its space, remembering which were
 // open and where; opening the thread again restores them. Terminals closed this way keep
-// running (Result.Kept). The focus returns as close_tab's.
+// running (Result.Kept). The focus returns as close_tab's. Record puts the thread's tab in its
+// space's reopen history (reopen.go): the user closed it; reopening it opens the thread.
 type CloseThread struct {
 	Thread string  `json:"thread"`
 	W      float64 `json:"w,omitempty"`
 	H      float64 `json:"h,omitempty"`
+	Record bool    `json:"record,omitempty"`
 }
 
 // OpName implements Op.
@@ -492,15 +494,19 @@ func (o *CloseThread) apply(t *tx) (Result, error) {
 		return Result{}, fmt.Errorf("thread %q has no open tab: %w", o.Thread, ErrNotFound)
 	}
 	w, h := viewport(o.W, o.H)
-	res := t.closeThread(o.Thread, id, w, h)
+	res := t.closeThread(o.Thread, id, w, h, o.Record)
 	return res, nil
 }
 
-// closeThread closes thread's open tab id with its linked tabs (putAway).
-func (t *tx) closeThread(thread, id string, w, h float64) Result {
+// closeThread closes thread's open tab id with its linked tabs (putAway); record puts the tab,
+// where it is once they are put away, in its space's reopen history.
+func (t *tx) closeThread(thread, id string, w, h float64, record bool) Result {
 	sp, p, tb := t.st.FindTab(id)
 	kept := t.putAway(sp, thread, p.ID, w, h)
 	_, p, _ = t.st.FindTab(id)
+	if record {
+		recordTab(sp, p, tb)
+	}
 	wasFocused := focusedTab(sp) == id
 	detach(sp, p, id)
 	forget(sp, id)
@@ -692,7 +698,7 @@ func (o *SnoozeThread) apply(t *tx) (Result, error) {
 	var res Result
 	sp := t.st.Space(t.st.SpaceOf(o.Thread))
 	if id := threadTabID(t.st, o.Thread); id != "" {
-		res = t.closeThread(o.Thread, id, w, h)
+		res = t.closeThread(o.Thread, id, w, h, false)
 	} else if sp != nil {
 		res = Result{Space: sp.ID, Kept: t.putAway(sp, o.Thread, "", w, h)}
 	}

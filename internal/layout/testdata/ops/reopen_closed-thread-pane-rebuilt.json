@@ -1,0 +1,93 @@
+{
+  "doc": "A thread's tab that was its pane's only tab rebuilds its pane, and its remembered set comes back into it.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+          "active": "t-f"
+        },
+        "focus": "p-b",
+        "mru": ["t-f"],
+        "closed": [
+          {
+            "pane": "p-a",
+            "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+            "beside": {"neighbours":["p-b"],"edge":"left","frac":0.5}
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-a": {
+        "space": "sp-a",
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-a",
+                "params": {"project":"pj-1","worktree":"w-1"}
+              },
+              "pane": "p-a",
+              "index": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-n1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {
+                  "id": "t-d",
+                  "kind": "diff",
+                  "thread": "th-a",
+                  "params": {"project":"pj-1","worktree":"w-1"}
+                }
+              ],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-f","kind":"file","params":{"path":"/x"}}],
+              "active": "t-f"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-a","t-f"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-a":{"space":"sp-a"}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-a","back":["t-d"]}
+}

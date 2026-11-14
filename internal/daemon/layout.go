@@ -36,7 +36,9 @@ import (
 //   - A commit that closed terminal tabs by themselves (Result.Closed) or ended a thread's
 //     terminals (Result.Ended): those terminals end. Tabs closed with their thread
 //     (Result.Kept) keep theirs running. A commit that restored fresh shells (Result.Fresh,
-//     after a snooze): a new shell for each, and the tab follows it. A commit that opened a
+//     after a snooze, or a terminal's tab reopened from the reopen history): a new shell for
+//     each, in its thread's checkout or, for a free terminal, the home directory, and the tab
+//     follows it. A commit that opened a
 //     quick terminal a snooze ended (Result.FreshQuick): a new quick shell for its thread.
 //
 // The glue's own ops carry no client id. A sweep at start and every layoutSweepEvery drops
@@ -443,26 +445,36 @@ func (g *layoutGlue) end(id string) {
 	})
 }
 
-// fresh starts a new shell for terminal tab id, restored after a snooze, in its thread's
-// checkout, and points the tab at it. A thread with no checkout (or gone) gets no shell, and
-// the tab closes.
+// fresh starts a new shell for terminal tab id, restored after a snooze or reopened, in its
+// thread's checkout (a free terminal's: the home directory), and points the tab at it. A
+// thread with no checkout (or gone) gets no shell, and the tab closes.
 func (g *layoutGlue) fresh(tabID string) {
 	_, _, tb := g.state().FindTab(tabID)
 	if tb == nil || tb.Kind != "terminal" {
 		return
 	}
 	old := tb.Params[core.TerminalParam]
-	th, ok := g.opts.Threads().Thread(tb.Thread)
-	if !ok || th.WorktreePath == "" {
-		g.opts.Log.Info("layout: no checkout for a restored terminal; its tab closes", "thread", tb.Thread, "tab", tabID)
-		g.apply(&core.CloseTab{Tab: tabID})
-		return
+	var spec terminal.Spec
+	if tb.Thread == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			g.opts.Log.Warn("layout: no home directory for a reopened terminal; its tab closes", "tab", tabID, "err", err)
+			g.apply(&core.CloseTab{Tab: tabID})
+			return
+		}
+		spec = terminal.Spec{Argv: g.opts.Shell(), Cwd: home, Labels: termlabel.Free()}
+	} else {
+		th, ok := g.opts.Threads().Thread(tb.Thread)
+		if !ok || th.WorktreePath == "" {
+			g.opts.Log.Info("layout: no checkout for a restored terminal; its tab closes", "thread", tb.Thread, "tab", tabID)
+			g.apply(&core.CloseTab{Tab: tabID})
+			return
+		}
+		spec = terminal.Spec{Argv: g.opts.Shell(), Cwd: th.WorktreePath, Labels: termlabel.Shell(th.ID, th.ProjectID, th.WorktreePath)}
 	}
-	t, err := g.opts.Terminals.Create(g.ctx, terminal.Spec{
-		Argv: g.opts.Shell(), Cwd: th.WorktreePath, Labels: termlabel.Shell(th.ID, th.ProjectID, th.WorktreePath),
-	})
+	t, err := g.opts.Terminals.Create(g.ctx, spec)
 	if err != nil {
-		g.opts.Log.Warn("layout: start a restored terminal; its tab closes", "thread", th.ID, "tab", tabID, "err", err)
+		g.opts.Log.Warn("layout: start a restored terminal; its tab closes", "thread", tb.Thread, "tab", tabID, "err", err)
 		g.apply(&core.CloseTab{Tab: tabID})
 		return
 	}

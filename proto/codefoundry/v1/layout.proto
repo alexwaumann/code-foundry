@@ -363,6 +363,7 @@ message LayoutOp {
     FocusPaneOp focus_pane = 20;
     SetTabParamsOp set_tab_params = 21;
     RenameTabOp rename_tab = 22;
+    ReopenClosedOp reopen_closed = 23;
 
     NewSpaceOp new_space = 30;
     RenameSpaceOp rename_space = 31;
@@ -405,6 +406,8 @@ message OpenThreadOp {
 // CloseThreadOp closes a thread's tab and its linked tabs in its space, remembering them.
 message CloseThreadOp {
   string thread_id = 1;
+  // The user closed it: its tab goes in its space's reopen history.
+  bool record = 2;
 }
 
 // OpenSurfaceOp opens a surface by the placement rules (a linked one beside its thread).
@@ -536,12 +539,26 @@ message SwapPaneOp {
 // linked tabs is CloseThreadOp).
 message CloseTabOp {
   string tab_id = 1;
+  // The user closed it: it goes in its space's reopen history.
+  bool record = 2;
 }
 
 // ClosePaneOp takes a pane and its tabs out of the layout; each thread tab in it closes as
 // CloseThreadOp closes it (its linked tabs in its space are remembered).
 message ClosePaneOp {
   string pane_id = 1;
+  // The user closed it: it goes in its space's reopen history, whole.
+  bool record = 2;
+}
+
+// ReopenClosedOp reopens the newest entry of a space's reopen history (the tabs and panes the
+// user closed) that can still be reopened, and drops it with those before it that cannot.
+message ReopenClosedOp {
+  // The space; empty is the current one.
+  string space_id = 1;
+  // Tabs of the history the caller found can no longer be reopened (a thread archived or
+  // removed, a file gone).
+  repeated string gone_tab_ids = 2;
 }
 
 // SetSizesOp sets a split's shares, one per child, each positive.

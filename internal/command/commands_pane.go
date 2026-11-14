@@ -132,7 +132,8 @@ func (l layout) paneCommands() []Command {
 		{
 			Name: "pane.close", Title: "Close Pane", Category: layoutCategory, Page: PageState,
 			Description: "Close a pane and its tabs (default: the focused pane). Each thread in it closes as thread.close closes " +
-				"it: its linked tabs are remembered and come back when it opens again.",
+				"it: its linked tabs are remembered and come back when it opens again. Closed by the user, the pane goes in its " +
+				"space's reopen history (tab.reopen).",
 			Args:        []ArgSpec{positional(paneIDArg("pane", "The pane (default: the focused one; from inside a thread, required)"))},
 			Keybindings: []string{"cmd+shift+w"},
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -144,7 +145,8 @@ func (l layout) paneCommands() []Command {
 				if err != nil {
 					return Result{}, err
 				}
-				c, err := l.apply(ctx, &core.ClosePane{Pane: p.ID}, !uctx.FromUser())
+				// A close by the user is recorded for tab.reopen; a model's is not.
+				c, err := l.apply(ctx, &core.ClosePane{Pane: p.ID, Record: uctx.FromUser()}, !uctx.FromUser())
 				if err != nil {
 					return Result{}, err
 				}

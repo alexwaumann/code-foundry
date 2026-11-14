@@ -20,7 +20,7 @@ func init() {
 		return &core.OpenThread{Thread: o.GetThreadId(), Pane: o.GetPaneId(), Index: optionalIndex(o.Index), Edge: edge, Compose: o.GetComposeTabId(), Focus: o.GetFocus()}, nil
 	})
 	registerLayoutOp("close_thread", func(m *v1.LayoutOp) (core.Op, error) {
-		return &core.CloseThread{Thread: m.GetCloseThread().GetThreadId()}, nil
+		return &core.CloseThread{Thread: m.GetCloseThread().GetThreadId(), Record: m.GetCloseThread().GetRecord()}, nil
 	})
 	registerLayoutOp("open_surface", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetOpenSurface()

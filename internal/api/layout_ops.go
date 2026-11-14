@@ -113,10 +113,14 @@ func init() {
 		return &core.SwapPane{Pane: o.GetPaneId(), Target: o.GetTargetPaneId()}, nil
 	})
 	registerLayoutOp("close_tab", func(m *v1.LayoutOp) (core.Op, error) {
-		return &core.CloseTab{Tab: m.GetCloseTab().GetTabId()}, nil
+		return &core.CloseTab{Tab: m.GetCloseTab().GetTabId(), Record: m.GetCloseTab().GetRecord()}, nil
 	})
 	registerLayoutOp("close_pane", func(m *v1.LayoutOp) (core.Op, error) {
-		return &core.ClosePane{Pane: m.GetClosePane().GetPaneId()}, nil
+		return &core.ClosePane{Pane: m.GetClosePane().GetPaneId(), Record: m.GetClosePane().GetRecord()}, nil
+	})
+	registerLayoutOp("reopen_closed", func(m *v1.LayoutOp) (core.Op, error) {
+		o := m.GetReopenClosed()
+		return &core.ReopenClosed{Space: o.GetSpaceId(), Gone: append([]string(nil), o.GetGoneTabIds()...)}, nil
 	})
 	registerLayoutOp("set_sizes", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetSetSizes()

@@ -1,0 +1,71 @@
+{
+  "doc": "A terminal's tab comes back as a fresh shell (Result.fresh) under its manual name, without its Run again line.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-a","kind":"thread","thread":"th-a"},
+            {"id":"t-x","kind":"terminal","params":{"terminal":"term-9","ran":"make"},"name":"Logs"}
+          ],
+          "active": "t-a"
+        },
+        "focus": "p-a",
+        "mru": ["t-a"],
+        "closed": [
+          {
+            "pane": "p-a",
+            "tabs": [
+              {
+                "id": "t-t",
+                "kind": "terminal",
+                "params": {"terminal":"term-1","ran":"npm start"},
+                "thread": "th-a",
+                "name": "Server"
+              }
+            ],
+            "index": 1
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"reopen_closed"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-a","kind":"thread","thread":"th-a"},
+            {
+              "id": "t-t",
+              "kind": "terminal",
+              "thread": "th-a",
+              "params": {"terminal":"term-1"},
+              "name": "Server"
+            },
+            {"id":"t-x","kind":"terminal","params":{"ran":"make","terminal":"term-9"},"name":"Logs"}
+          ],
+          "active": "t-t"
+        },
+        "focus": "p-a",
+        "mru": ["t-t","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-t","fresh":["t-t"]}
+}

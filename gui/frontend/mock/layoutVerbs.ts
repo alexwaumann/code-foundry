@@ -12,7 +12,7 @@ import { neighbour, type Direction } from "../src/shell/geometry/neighbours";
 import { plainRects } from "../src/shell/geometry/rects";
 import type { GeoNode } from "../src/shell/geometry/types";
 import { CommandError } from "./errors";
-import { identify, layoutRpcError, panes, type MockLayout, type Node, type Op, type Space, type State } from "./layout";
+import { identify, layoutRpcError, panes, type MockLayout, type Node, type Op, type Space, type State, type Tab } from "./layout";
 
 interface Arg {
   name: string;
@@ -145,6 +145,17 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
     return { message: msg(out), resultJson: JSON.stringify({ rev: out.rev, changed: out.rev !== before, ...out.result }) };
   };
   const area = () => L.viewport ?? DEFAULT_AREA;
+  // The reopen history, kept here and not in the mock's state (Go keeps it in the layout,
+  // internal/layout reopen.go): per space, newest first, a tab with its pane and place, or a
+  // pane's tabs. Its rules are not ported: a tab goes back into its pane while that is open,
+  // else into the focused pane; a pane's tabs come back as a new pane right of the focused one.
+  // A terminal comes back over its old id (no fresh shell here).
+  const history = new Map<string, { pane: string; index: number; tabs: Tab[]; whole: boolean }[]>();
+  const remember = (space: string, entry: { pane: string; index: number; tabs: Tab[]; whole: boolean }) => {
+    const tabs = entry.tabs.filter((t) => t.kind !== "compose" || Boolean(t.params?.draft)).map((t) => ({ ...t, key: undefined }));
+    if (tabs.length === 0) return;
+    history.set(space, [{ ...entry, tabs }, ...(history.get(space) ?? [])].slice(0, 20));
+  };
   const neighbourOf = (sp: Space, pane: string, dir: Direction): string | null => {
     const { width, height } = area();
     return neighbour(plainRects(sp.root as GeoNode | null, width, height), pane, dir);
@@ -291,8 +302,34 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       cmd: { name: "tab.close", title: "Close Tab", category: CATEGORY, description: "Close a tab (default: the focused tab); the focus returns to what had it before. A thread's tab closes the thread from its space.", keybindings: ["cmd+w"], args: [str("tab", "The tab (default: the focused one)", { positional: true })] },
       when: always,
       run: (_c, a) => {
-        const { tab } = resolveTab(L.state(), a.tab);
-        return run(tab.kind === "thread" ? { op: "close_thread", thread: tab.thread ?? "" } : { op: "close_tab", tab: tab.id }, () => `closed tab ${tab.id}`);
+        const { sp, pane, tab } = resolveTab(L.state(), a.tab);
+        const index = (pane.tabs ?? []).findIndex((t) => t.id === tab.id);
+        const out = run(tab.kind === "thread" ? { op: "close_thread", thread: tab.thread ?? "" } : { op: "close_tab", tab: tab.id }, () => `closed tab ${tab.id}`);
+        remember(sp.id, { pane: pane.id, index, tabs: [structuredClone(tab)], whole: false });
+        return out;
+      },
+    },
+    {
+      cmd: { name: "tab.reopen", title: "Reopen Closed Tab", category: CATEGORY, description: "Reopen the most recently closed tab or pane of a space (default: the current one).", keybindings: ["cmd+shift+t"], args: [str("space", "The space (default: the current one)"), focusArg] },
+      when: always,
+      run: (_c, a) => {
+        const st = L.state();
+        const sp = a.space ? resolveSpace(st, a.space) : currentSpace(st);
+        const entry = history.get(sp.id)?.shift();
+        if (!entry) return { message: "nothing to reopen", resultJson: "" };
+        const open = (id: string) => panes(sp.root ?? null).some((p) => p.id === id);
+        const [first, ...rest] = entry.tabs;
+        if (!first) return { message: "nothing to reopen", resultJson: "" };
+        if (entry.whole) {
+          const focused = sp.focus ?? "";
+          const out = run(focused ? { op: "split_pane", pane: focused, edge: "right", tab: first, focus: true } : { op: "add_tab", space: sp.id, tab: first, focus: true }, (r) => `reopened pane ${r.result.pane ?? ""}`);
+          const pane = (JSON.parse(out.resultJson) as { pane?: string }).pane ?? "";
+          for (const t of rest) L.apply({ op: "add_tab", pane, tab: t });
+          return out;
+        }
+        const at = open(entry.pane) ? { pane: entry.pane, index: entry.index } : {};
+        if (first.kind === "thread") return run({ op: "open_thread", thread: first.thread ?? "", ...at, focus: true }, (r) => `reopened tab ${r.result.tab ?? ""}`);
+        return run({ op: "add_tab", space: sp.id, ...at, tab: first, focus: true }, (r) => `reopened tab ${r.result.tab ?? ""}`);
       },
     },
     ...([
@@ -410,8 +447,11 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       cmd: { name: "pane.close", title: "Close Pane", category: CATEGORY, description: "Close a pane and its tabs (default: the focused pane). Each thread in it closes as thread.close closes it.", keybindings: ["cmd+shift+w"], args: [str("pane", "The pane (default: the focused one)", { positional: true })] },
       when: always,
       run: (_c, a) => {
-        const { pane } = resolvePane(L.state(), a.pane);
-        return run({ op: "close_pane", pane: pane.id }, () => `closed pane ${pane.id}`);
+        const { sp, pane } = resolvePane(L.state(), a.pane);
+        const tabs = structuredClone(pane.tabs ?? []);
+        const out = run({ op: "close_pane", pane: pane.id }, () => `closed pane ${pane.id}`);
+        remember(sp.id, { pane: pane.id, index: 0, tabs, whole: true });
+        return out;
       },
     },
     {

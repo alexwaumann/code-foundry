@@ -96,6 +96,7 @@ func TestApplyPersistsAndReloads(t *testing.T) {
 	if c.Result.Pane == "" || c.Result.Tab == "" {
 		t.Fatalf("split result %+v", c.Result)
 	}
+	prs := c.Result.Tab
 	apply(t, m, &core.NewSpace{Name: "Review"})
 	c = apply(t, m, &core.RenameSpace{Space: "sp-n2", Name: "Later"})
 	if c.Rev != 4 || !c.Changed {
@@ -103,24 +104,29 @@ func TestApplyPersistsAndReloads(t *testing.T) {
 	}
 	// A thread's info card choice is stored with the thread (and nothing else of it).
 	apply(t, m, &core.SetInfo{Thread: "s-1", Open: false})
+	// A tab the user closed is in its space's reopen history, which is stored with the space.
+	apply(t, m, &core.CloseTab{Tab: prs, Record: true})
 	want := m.Snapshot()
 	if err := m.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := metaValue(t, db, metaRev); got != "5" {
-		t.Errorf("rev on disk %s; want 5", got)
+	if got := metaValue(t, db, metaRev); got != "6" {
+		t.Errorf("rev on disk %s; want 6", got)
 	}
 	m2 := open(t, db, nil, nil)
 	got := m2.Snapshot()
-	if got.Rev != 5 || !reflect.DeepEqual(got.State, want.State) {
-		t.Errorf("reloaded rev %d %+v; want rev 5 %+v", got.Rev, got.State, want.State)
+	if got.Rev != 6 || !reflect.DeepEqual(got.State, want.State) {
+		t.Errorf("reloaded rev %d %+v; want rev 6 %+v", got.Rev, got.State, want.State)
 	}
 	if ts := got.State.Threads["s-1"]; ts == nil || ts.Info == nil || *ts.Info {
 		t.Errorf("reloaded s-1 %+v; want its info card hidden", ts)
 	}
+	if h := got.State.Space(got.State.DefaultSpace).Closed; len(h) != 1 || h[0].Tabs[0].Kind != "prs" {
+		t.Errorf("reloaded reopen history %+v; want the closed Pull Requests tab", h)
+	}
 	// Revs go on from the stored one.
-	if c := apply(t, m2, &core.SwitchSpace{Space: "sp-n2"}); c.Rev != 6 {
-		t.Errorf("next rev %d; want 6", c.Rev)
+	if c := apply(t, m2, &core.SwitchSpace{Space: "sp-n2"}); c.Rev != 7 {
+		t.Errorf("next rev %d; want 7", c.Rev)
 	}
 }
 
