@@ -15,7 +15,16 @@ function world(seed = "grid") {
   const st = (): State => layout.state();
   const focus = () => st().spaces[0]?.focus;
   const pane = (id: string) => panes(st().spaces[0]?.root).find((p) => p.id === id);
-  return { layout, run, st, focus, pane };
+  return { layout, run, st, focus, pane, cmds };
+}
+
+/** A verb's raw output (a verb that changed nothing may answer no JSON). */
+function cmdsOf(w: ReturnType<typeof world>) {
+  return async (name: string, args: Record<string, string> = {}) => {
+    const c = w.cmds.find((x) => x.cmd.name === name);
+    if (!c) throw new Error(`no ${name}`);
+    return c.run(undefined, args);
+  };
 }
 
 describe("the mock's layout verbs", () => {
@@ -140,5 +149,28 @@ describe("the mock's layout verbs", () => {
     await expect(w.run("thread.open", { id: "nope" })).rejects.toThrow(/not found/);
     await expect(w.run("pane.close", { pane: "p-zz" })).rejects.toThrow(/no pane/);
     await expect(w.run("pane.resize", { split: "s-1", sizes: "a,b" })).rejects.toThrow(/comma-separated/);
+  });
+});
+
+describe("the mock's reopen history (internal/layout reopen.go, simplified)", () => {
+  it("tab.reopen brings back the closed tab into its pane at its place, then the closed pane's tabs", async () => {
+    const w = world();
+    const p = panes(w.st().spaces[0]?.root).find((x) => (x.tabs?.length ?? 0) > 1);
+    if (!p?.tabs) throw new Error("no pane with two tabs in the seed");
+    const [first, second] = p.tabs;
+    await w.run("tab.close", { tab: second?.id ?? "" });
+    expect(w.pane(p.id)?.tabs?.map((t) => t.id)).toEqual(p.tabs.filter((t) => t.id !== second?.id).map((t) => t.id));
+    // A reopened tab gets a new id here (Go's takes its own back while it is free).
+    const kinds = (id: string) => w.pane(id)?.tabs?.map((t) => `${t.kind}:${t.thread ?? ""}`);
+    const r = await w.run("tab.reopen");
+    expect(r).toMatchObject({ changed: true, pane: p.id });
+    expect(kinds(p.id)).toEqual([first, second].map((t) => `${t?.kind ?? ""}:${t?.thread ?? ""}`));
+    expect(w.pane(p.id)?.active).toBe(r.tab);
+    expect(w.focus()).toBe(p.id);
+    await w.run("pane.close", { pane: p.id });
+    const again = await w.run("tab.reopen");
+    expect(kinds(again.pane ?? "")).toEqual([first, second].map((t) => `${t?.kind ?? ""}:${t?.thread ?? ""}`));
+    // Nothing left: nothing changes.
+    expect((await cmdsOf(w)("tab.reopen")).resultJson).toBe("");
   });
 });

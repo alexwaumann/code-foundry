@@ -49,6 +49,11 @@ test("two threads and a terminal in one view: all live at once, past the old lim
   await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe((before["TerminalService/Attach"] ?? 0) - 1);
 });
 
+/** A free shell's tab over the focused surface: the palette's New Terminal in Home Folder (terminal.new-free; it has no key). */
+async function newFreeShell(page: Page): Promise<void> {
+  await page.evaluate(`__cfModule("/src/stores/commands.ts").then((m) => m.runCommandForResult("terminal.new-free", {}, { quiet: true }))`);
+}
+
 test("a terminal tab beside the nodes adds a stream and takes none from a node", async ({ page }) => {
   await openStress(page);
   const threads = surface(page).getByTestId("plugin-thread");
@@ -56,10 +61,10 @@ test("a terminal tab beside the nodes adds a stream and takes none from a node",
   await expect(threads.nth(1)).toHaveAttribute("data-live", "true");
   await expect.poll(async () => (await openStreams())["ThreadService/WatchThread"] ?? 0).toBe(3);
   await expect.poll(async () => (await openStreams())["TerminalService/Attach"] ?? 0).toBe(1);
-  // A free shell's tab (cmd+shift+t opens it over the focused surface), moved into a pane of its own
-  // under the thread's: the thread, the nodes and the shell all on screen.
+  // A free shell's tab (the palette's New Terminal in Home Folder opens it over the focused surface),
+  // moved into a pane of its own under the thread's: the thread, the nodes and the shell all on screen.
   const threadPane = (await paneShowing(page, "thread").getAttribute("data-pane-id")) ?? "";
-  await page.keyboard.press("Meta+Shift+t");
+  await newFreeShell(page);
   const shell = page.locator('[data-testid="shell-tab"][data-kind="terminal"]');
   await expect(shell).toHaveCount(1);
   const tabId = (await shell.getAttribute("data-tab-id")) ?? "";
@@ -80,7 +85,7 @@ test("a terminal tab beside the nodes adds a stream and takes none from a node",
 test("a plugin surface linked to a thread keeps its view while an unlinked tab has the focus", async ({ page }) => {
   await openStress(page);
   const threadPane = (await paneShowing(page, "thread").getAttribute("data-pane-id")) ?? "";
-  await page.keyboard.press("Meta+Shift+t");
+  await newFreeShell(page);
   const shell = page.locator('[data-testid="shell-tab"][data-kind="terminal"]');
   await expect(shell).toHaveCount(1);
   const tabId = (await shell.getAttribute("data-tab-id")) ?? "";

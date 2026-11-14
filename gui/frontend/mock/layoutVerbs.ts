@@ -131,6 +131,9 @@ export function layoutCommands(world: LayoutVerbsWorld): (Omit<Entry, "run"> & {
   }));
 }
 
+/** One entry of the mock's reopen history (MockLayout.closed): a closed tab with its pane and place, or a pane's tabs. */
+type ClosedEntry = { pane: string; index: number; tabs: Tab[]; whole: boolean };
+
 function verbs(world: LayoutVerbsWorld): Entry[] {
   const L = world.layout;
   const always = () => true;
@@ -145,13 +148,11 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
     return { message: msg(out), resultJson: JSON.stringify({ rev: out.rev, changed: out.rev !== before, ...out.result }) };
   };
   const area = () => L.viewport ?? DEFAULT_AREA;
-  // The reopen history, kept here and not in the mock's state (Go keeps it in the layout,
-  // internal/layout reopen.go): per space, newest first, a tab with its pane and place, or a
-  // pane's tabs. Its rules are not ported: a tab goes back into its pane while that is open,
-  // else into the focused pane; a pane's tabs come back as a new pane right of the focused one.
-  // A terminal comes back over its old id (no fresh shell here).
-  const history = new Map<string, { pane: string; index: number; tabs: Tab[]; whole: boolean }[]>();
-  const remember = (space: string, entry: { pane: string; index: number; tabs: Tab[]; whole: boolean }) => {
+  // The reopen history (MockLayout.closed). Its rules are not ported: a tab goes back into its pane
+  // while that is open, else into the focused pane; a pane's tabs come back as a new pane right of
+  // the focused one. A terminal comes back over its old id (no fresh shell here).
+  const history = L.closed;
+  const remember = (space: string, entry: ClosedEntry) => {
     const tabs = entry.tabs.filter((t) => t.kind !== "compose" || Boolean(t.params?.draft)).map((t) => ({ ...t, key: undefined }));
     if (tabs.length === 0) return;
     history.set(space, [{ ...entry, tabs }, ...(history.get(space) ?? [])].slice(0, 20));
