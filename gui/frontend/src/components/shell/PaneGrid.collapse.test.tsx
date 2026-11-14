@@ -1,7 +1,8 @@
 /**
- * Collapsed panes in the pane grid (docs/notes/shell-model.md, "Collapsing a pane";
- * docs/notes/shell-25d-collapse.md): a collapsed pane is a rail with an open control, and the
- * strip's control collapses (not the last open pane).
+ * Collapsed panes and dividers in the pane grid (docs/notes/shell-model.md, "Collapsing a pane" and
+ * "Dividers"; docs/notes/shell-25d-collapse.md): a collapsed pane is a rail with an open control,
+ * the strip's control collapses (not the last open pane), and each divider's cursor says which ways
+ * it can still move.
  */
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -170,5 +171,44 @@ describe("the strip's collapse control", () => {
       enterFullscreen();
     });
     expect(screen.queryByTestId("shell-collapse")).toBeNull();
+  });
+});
+
+describe("dividers' cursors", () => {
+  const gutters = () => screen.queryAllByTestId("shell-gutter").map((g) => [g.getAttribute("data-index"), g.style.cursor]);
+  const fixed = () => screen.queryAllByTestId("shell-gutter-fixed").map((g) => [g.getAttribute("data-index"), g.style.cursor]);
+
+  it("beside a collapsed pane: not-allowed, no handle to grab and no keyboard", async () => {
+    await seed();
+    render(<PaneGrid />);
+    expect(gutters()).toEqual([]);
+    expect(fixed()).toEqual([
+      ["0", "not-allowed"],
+      ["1", "not-allowed"],
+    ]);
+    expect(screen.getAllByTestId("shell-gutter-fixed").every((g) => g.getAttribute("tabindex") === null)).toBe(true);
+  });
+
+  it("both ways with room, one way when a side is at its minimum, not-allowed when both are", async () => {
+    const two = row("s-r", [pane("p-a", [tab("t-th", "thread", "s-1")]), pane("p-c", [tab("t-d", "diff", "s-1")])]);
+    await seed(two);
+    const { unmount } = render(<PaneGrid />);
+    expect(gutters()).toEqual([["0", "col-resize"]]);
+    unmount();
+    // 360 + 12 + 300: the thread at its minimum, the diff 40 over its 260.
+    width = 672;
+    await seed(row("s-r", [pane("p-a", [tab("t-th", "thread", "s-1")]), pane("p-c", [tab("t-d", "diff", "s-1")])], [0.2, 0.8]));
+    const second = render(<PaneGrid />);
+    expect(gutters()).toEqual([["0", "e-resize"]]);
+    second.unmount();
+    width = 632;
+    await seed(two);
+    render(<PaneGrid />);
+    expect(gutters()).toEqual([["0", "not-allowed"]]);
+    // A press there starts no drag.
+    const g = screen.getByTestId("shell-gutter");
+    fireEvent.pointerDown(g, { button: 0, pointerId: 1, clientX: 366 });
+    expect(screen.queryByTestId("shell-gutter-drag")).toBeNull();
+    expect(g.querySelector("span")?.hidden).toBe(true);
   });
 });

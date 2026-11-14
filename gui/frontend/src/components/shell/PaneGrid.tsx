@@ -4,7 +4,7 @@ import { afterRev, runLayoutCommand } from "@/shell/commands";
 import { leaveFullscreen, useFullscreenPane } from "@/shell/fullscreen";
 import { shellFrame } from "@/shell/geometry/rails";
 import { panesOf, type Frame, type GeoNode } from "@/shell/geometry/types";
-import { dragSizes, evenSizes, sizesArg, startDrag, withSizes, type GutterDrag } from "@/shell/resize";
+import { dragSizes, evenSizes, gutterCursor, gutterReach, sizesArg, startDrag, withSizes, type GutterDrag } from "@/shell/resize";
 import { reportViewport } from "@/shell/viewport";
 import { geoTree, useCurrentSpaceId, useLayoutStore, useTree, type LayoutState } from "@/stores/layout";
 import { setShellFrame, useShellViewStore } from "@/stores/shellView";
@@ -51,7 +51,7 @@ export function PaneGrid() {
   const fullscreenSpace = useShellViewStore((s) => s.fullscreen);
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  const [drag, setDrag] = useState<{ d: GutterDrag; sizes: number[] } | null>(null);
+  const [drag, setDrag] = useState<{ d: GutterDrag; sizes: number[]; delta?: number } | null>(null);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -98,7 +98,9 @@ export function PaneGrid() {
   );
 
   /** pane.resize with these sizes; their preview stays until the daemon's commit arrives (or a newer one replaces it), so the panes do not jump back. */
-  const commit = (next: { d: GutterDrag; sizes: number[] }) => {
+  const commit = (next: { d: GutterDrag; sizes: number[]; delta?: number }) => {
+    // Committed: the preview stays, no longer a drag in progress (the grid's cursor is the panes' again).
+    next = { d: next.d, sizes: next.sizes };
     setDrag(next);
     void runLayoutCommand("pane.resize", { split: next.d.split, sizes: sizesArg(next.sizes) })
       .then((res) => (res ? afterRev(res.rev) : undefined))
@@ -108,6 +110,24 @@ export function PaneGrid() {
   };
 
   const panes = useMemo(() => (full ? [full] : panesOf(shown).map((p) => p.id)), [shown, full]);
+  // Each gutter's cursor (docs/notes/shell-model.md, "Dividers"): which ways it can still move, from
+  // what is drawn; the one being dragged from where the drag took it.
+  const cursors = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!frame) return out;
+    for (const g of frame.gutters) {
+      const key = `${g.split}/${String(g.i)}`;
+      if (g.fixed) {
+        out.set(key, gutterCursor(g.row, null));
+        continue;
+      }
+      const dragging = drag && drag.d.split === g.split && drag.d.i === g.i ? drag : null;
+      const d = dragging ? dragging.d : startDrag(shown, frame, g.split, g.i);
+      out.set(key, gutterCursor(g.row, d ? gutterReach(d, dragging?.delta ?? 0) : null));
+    }
+    return out;
+  }, [frame, shown, drag]);
+  const dragCursor = drag?.delta !== undefined ? cursors.get(`${drag.d.split}/${String(drag.d.i)}`) : undefined;
   return (
     <div ref={ref} className="relative min-h-0 min-w-0 flex-1" data-testid="shell-grid" data-space-id={spaceId}>
       {tree === null && <EmptySpace />}
@@ -121,14 +141,16 @@ export function PaneGrid() {
           <Gutter
             key={`${g.split}/${String(g.i)}`}
             gutter={g}
+            cursor={cursors.get(`${g.split}/${String(g.i)}`) ?? "not-allowed"}
             onStart={() => {
               const d = startDrag(stored, frame, g.split, g.i);
-              if (!d) return false;
-              setDrag({ d, sizes: [...d.sizes] });
+              // A gutter that cannot move either way does nothing (docs/notes/shell-model.md, "Dividers").
+              if (!d || gutterCursor(g.row, gutterReach(d)) === "not-allowed") return false;
+              setDrag({ d, sizes: [...d.sizes], delta: 0 });
               return true;
             }}
             onDrag={(delta) => {
-              setDrag((cur) => (cur ? { d: cur.d, sizes: dragSizes(cur.d, delta) } : cur));
+              setDrag((cur) => (cur ? { d: cur.d, sizes: dragSizes(cur.d, delta), delta } : cur));
             }}
             onEnd={(moved) => {
               const cur = drag;
@@ -141,7 +163,9 @@ export function PaneGrid() {
             onStep={(delta) => {
               // From what is drawn (a step whose commit is on its way included), so quick presses add up.
               const d = startDrag(shown, frame, g.split, g.i);
-              if (d) commit({ d, sizes: dragSizes(d, delta) });
+              const reach = d ? gutterReach(d) : null;
+              // A key the way it cannot go does nothing (no commit of the same sizes).
+              if (d && reach && (delta < 0 ? reach.back : reach.forward)) commit({ d, sizes: dragSizes(d, delta) });
             }}
             onReset={() => {
               const d = startDrag(shown, frame, g.split, g.i);
@@ -149,6 +173,8 @@ export function PaneGrid() {
             }}
           />
         ))}
+      {/* While a gutter is dragged, the cursor says which ways it can still go wherever the pointer is. */}
+      {dragCursor && <div aria-hidden className="absolute inset-0 z-20" style={{ cursor: dragCursor }} data-testid="shell-gutter-drag" />}
     </div>
   );
 }

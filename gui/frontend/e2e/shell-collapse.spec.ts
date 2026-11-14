@@ -2,11 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { appPath, CF, invocations, mockUrl, resetMock } from "./fixtures";
 
 /**
- * Collapsing a pane on demand (docs/notes/shell-model.md, "Collapsing a pane";
- * docs/notes/shell-25d-collapse.md), what only a browser shows: the chord through the keymap, the
- * rail's and the strip's geometry in a row and a column, the direction keys passing over a
- * collapsed pane, and a drop on one. Which verb a control runs and the tooltips are vitest's
- * (components/shell/PaneGrid.collapse.test.tsx, shell/collapse.test.ts).
+ * Collapsing a pane on demand and dividers that say they stopped (docs/notes/shell-model.md,
+ * "Collapsing a pane" and "Dividers"; docs/notes/shell-25d-collapse.md), what only a browser shows:
+ * the chord through the keymap, the rail's and the strip's geometry in a row and a column, the
+ * direction keys passing over a collapsed pane, a drop on one, and the divider's computed cursor
+ * under a real pointer. Which verb a control runs, the tooltips and the cursor rule's table are
+ * vitest's (components/shell/PaneGrid.collapse.test.tsx, shell/collapse.test.ts, shell/resize.test.ts).
  * SHOTS=<dir> for the PR's screenshots (WebKit, dark and light).
  */
 
@@ -70,6 +71,14 @@ async function openShell(page: Page, width = 1500, height = 900): Promise<void> 
   await page.setViewportSize({ width, height });
   await page.goto(`${appPath}&shell=1`);
   await expect(page.getByTestId("shell-grid")).toBeVisible();
+}
+
+/** The computed cursor under a point, as WebKit hit-tests it. */
+async function cursorAt(page: Page, x: number, y: number): Promise<string> {
+  return page.evaluate(([px, py]) => {
+    const el = document.elementFromPoint(px ?? 0, py ?? 0);
+    return el ? getComputedStyle(el).cursor : "";
+  }, [x, y]);
 }
 
 test.beforeEach(async () => {
@@ -161,6 +170,55 @@ test("a tab dropped on a collapsed pane opens it, and the highlight is where it 
   await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getTiming().iterations === Infinity));
   const b = await landed.boundingBox();
   expect([b?.x, b?.y, b?.width, b?.height].map((v) => Math.round(v ?? -1))).toEqual([preview.x, preview.y, preview.width, preview.height].map(Math.round));
+});
+
+test("a divider's cursor says which ways it can move, it stops at the minimum, and beside a collapsed pane it cannot move", async ({ page }) => {
+  // The thread's pane held at its 360px minimum (its share is a tenth), a diff beside it.
+  const two: Node = { t: "split", id: "s-r", dir: "row", kids: [pane("p-m", [thread("s-1")]), pane("p-r", [diff("s-1")])], sizes: [0.1, 0.9] };
+  await seed(two, "p-m");
+  await openShell(page);
+  const gutter = page.locator('[data-testid="shell-gutter"][data-split="s-r"]');
+  const g = await gutter.boundingBox();
+  if (!g) throw new Error("no gutter");
+  const at = { x: g.x + g.width / 2, y: g.y + g.height / 2 };
+  const thread0 = await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]');
+  expect(thread0.w).toBe(360);
+  // Only the diff side can give: it moves right only.
+  await page.mouse.move(at.x, at.y);
+  expect(await cursorAt(page, at.x, at.y)).toBe("e-resize");
+  // Grabbed and dragged left, nothing moves (it starts from what is drawn, and the thread is at its minimum).
+  await page.mouse.down();
+  await page.mouse.move(at.x - 1, at.y);
+  await page.mouse.move(at.x - 80, at.y, { steps: 4 });
+  expect((await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(360);
+  expect(await cursorAt(page, at.x - 80, at.y)).toBe("e-resize");
+  // Right: it moves, both ways now.
+  await page.mouse.move(at.x + 100, at.y, { steps: 4 });
+  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(460);
+  expect(await cursorAt(page, at.x + 100, at.y)).toBe("col-resize");
+  await page.mouse.up();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "pane.resize").length).toBe(1);
+  await expect.poll(async () => (await box(page, '[data-testid="shell-pane"][data-pane-id="p-m"]')).w).toBe(460);
+  const g2 = await gutter.boundingBox();
+  if (!g2) throw new Error("no gutter");
+  expect(await cursorAt(page, g2.x + g2.width / 2, g2.y + g2.height / 2)).toBe("col-resize");
+
+  // Beside a collapsed pane: not-allowed, and a drag changes nothing.
+  await seed({ ...ROW, kids: [pane("p-l", [prs, projects]), collapsed(pane("p-m", [thread("s-1")])), pane("p-r", [diff("s-1")])] }, "p-l");
+  await page.reload();
+  const fixed = page.locator('[data-testid="shell-gutter-fixed"]').first();
+  const f = await fixed.boundingBox();
+  if (!f) throw new Error("no fixed gutter");
+  const fx = f.x + f.width / 2;
+  const fy = f.y + f.height / 2;
+  expect(await cursorAt(page, fx, fy)).toBe("not-allowed");
+  const left = await box(page, '[data-testid="shell-pane"][data-pane-id="p-l"]');
+  await page.mouse.move(fx, fy);
+  await page.mouse.down();
+  await page.mouse.move(fx + 120, fy, { steps: 4 });
+  await page.mouse.up();
+  expect(await box(page, '[data-testid="shell-pane"][data-pane-id="p-l"]')).toEqual(left);
+  expect((await invocations()).filter((i) => i.name === "pane.resize")).toHaveLength(1);
 });
 
 /** SHOTS=<dir>: a pane collapsed in a row and in a column (before: open), the strip's button, dark and light. */
