@@ -10,6 +10,7 @@
  * screen then shows that pane. It ends when the window leaves the space or the space has no pane.
  * See docs/notes/shell-19-rails-fullscreen.md.
  */
+import { useDictationStore } from "@/stores/dictation";
 import { useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus, setFullscreen, useShellViewStore } from "@/stores/shellView";
 import { focusPaneNow } from "./commands";
@@ -90,6 +91,24 @@ export function escapeLeaves(e: Pick<KeyboardEvent, "key" | "defaultPrevented" |
   // Something under the key went away with it (a popover closed by its own Escape).
   if (t && !t.isConnected) return false;
   return !t?.closest('[data-terminal-host], [role="dialog"], [role="alertdialog"], [role="menu"], [data-keys-local]');
+}
+
+/**
+ * Whether a bare Escape typed in a prompt leaves full screen, decided before the prompt sees it
+ * (Shell's capture listener). The prompt's editor marks every Escape handled (ProseMirror's own
+ * key handling does for Escape and Enter), so the bubbling listener never sees one from there:
+ * focus in a prompt, full screen would not end. The prompt keeps it while it has a use for it: a
+ * completion or history card open (the editor names it: aria-controls), dictation running (Escape
+ * stops it), or the floating composer's prompt (Escape collapses it). An empty composer's Escape
+ * back to its project's page waits until full screen is off. See
+ * docs/notes/shell-25b-audits.md.
+ */
+export function promptEscapeLeaves(e: Pick<KeyboardEvent, "key" | "defaultPrevented" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "isComposing" | "target">): boolean {
+  if (e.key !== "Escape" || e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
+  const t = e.target instanceof Element ? e.target : null;
+  const prompt = t?.closest<HTMLElement>('[data-testid="composer-input"]');
+  if (!prompt || prompt.hasAttribute("aria-controls") || prompt.closest('[data-testid="floating-composer"]')) return false;
+  return useDictationStore.getState().active === null;
 }
 
 /** The thread whose composer floats over a full-screened tab: a linked surface's thread; "" for others. */

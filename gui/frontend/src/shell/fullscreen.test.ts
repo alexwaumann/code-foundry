@@ -21,7 +21,7 @@ vi.mock("@/shell/commands", () => ({
   closeTabNow: () => Promise.resolve(null),
 }));
 
-const { clampFloat, enterFullscreen, escapeLeaves, floatingThreadOf, fullscreenOn, fullscreenPaneOf, leaveFullscreen, presentFullscreen, toggleFullscreen } = await import("./fullscreen");
+const { clampFloat, enterFullscreen, escapeLeaves, promptEscapeLeaves, floatingThreadOf, fullscreenOn, fullscreenPaneOf, leaveFullscreen, presentFullscreen, toggleFullscreen } = await import("./fullscreen");
 const { presentShellCommand } = await import("./keyPresenters");
 const { normalizeChord } = await import("@/keys/chord");
 
@@ -191,6 +191,34 @@ describe("Escape", () => {
     ["a popover that closed with it", key({ target: document.createElement("button") })],
   ])("stays: %s", (_name, e) => {
     expect(escapeLeaves(e)).toBe(false);
+  });
+
+  // The prompt's editor marks every Escape handled: one typed there is decided before it (in capture).
+  const PROMPT = '<div contenteditable="true" data-testid="composer-input" data-hit></div>';
+  it("in a prompt with no use for it, leaves", () => {
+    expect(promptEscapeLeaves(key({ target: inside(PROMPT) }))).toBe(true);
+  });
+
+  it.each([
+    ["outside a prompt", () => key({ target: inside('<div><button data-hit></button></div>') })],
+    ["another key", () => key({ key: "Enter", target: inside(PROMPT) })],
+    ["with a modifier", () => key({ shiftKey: true, target: inside(PROMPT) })],
+    ["composing", () => key({ isComposing: true, target: inside(PROMPT) })],
+    ["taken before", () => key({ defaultPrevented: true, target: inside(PROMPT) })],
+    ["a card open on it", () => key({ target: inside('<div contenteditable="true" data-testid="composer-input" aria-controls="list-1" data-hit></div>') })],
+    ["the floating composer's prompt (Escape collapses it)", () => key({ target: inside(`<div data-testid="floating-composer">${PROMPT}</div>`) })],
+  ])("in a prompt, stays: %s", (_name, e) => {
+    expect(promptEscapeLeaves(e())).toBe(false);
+  });
+
+  it("in a prompt while dictating, stays (Escape stops the dictation)", async () => {
+    const { useDictationStore } = await import("@/stores/dictation");
+    useDictationStore.setState({ active: { clientId: "c-1", phase: "listening", sessionId: "d-1", startedAtMs: 1 } });
+    try {
+      expect(promptEscapeLeaves(key({ target: inside(PROMPT) }))).toBe(false);
+    } finally {
+      useDictationStore.setState({ active: null });
+    }
   });
 });
 

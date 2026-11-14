@@ -92,6 +92,29 @@ test("cmd+shift+enter shows the pane over the whole grid, the others unmounted; 
   await expect(page.getByTestId("shell-pane")).toHaveCount(2);
 });
 
+test("full screen from a rail moves the keyboard into the thread's prompt, and Escape there leaves", async ({ page }) => {
+  // s-1 focused beside s-5's thread, in a grid too narrow for both: s-5's pane is a rail.
+  await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [thread("s-1")]), pane("p-2", [thread("s-5")])], sizes: [0.5, 0.5] }, "p-1");
+  await openShell(page);
+  const grid = await boxOf(page, "shell-grid");
+  await page.setViewportSize({ width: Math.round(1400 - grid.w + 600), height: 900 });
+  const rail = page.locator('[data-testid="shell-rail"][data-pane-id="p-2"]');
+  await expect(rail).toBeVisible();
+  await rail.getByTestId("shell-rail-fullscreen").click();
+  await expect(paneEl(page, "p-2")).toHaveAttribute("data-fullscreen", "true");
+  // The pane took the focus, so the keyboard is in its prompt, whose editor marks every Escape
+  // handled: full screen must still leave (docs/notes/shell-25b-audits.md).
+  await expect(paneEl(page, "p-2").getByTestId("composer-input")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("shell-fullscreen-exit")).toHaveCount(0);
+  await expect(paneEl(page, "p-2").getByTestId("composer-input")).toBeFocused();
+  // And again by its key, from the prompt.
+  await page.keyboard.press("Meta+Shift+Enter");
+  await expect(paneEl(page, "p-2")).toHaveAttribute("data-fullscreen", "true");
+  await page.keyboard.press("Meta+Shift+Enter");
+  await expect(page.getByTestId("shell-fullscreen-exit")).toHaveCount(0);
+});
+
 test("the floating composer: a pill; ⌘L expands it; a send reaches the thread and collapses it", async ({ page }) => {
   await fullscreenDiff(page);
   await expect(page.getByTestId("floating-composer-pill")).toBeVisible();

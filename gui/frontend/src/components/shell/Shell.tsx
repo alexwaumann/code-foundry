@@ -7,7 +7,7 @@ import { startFocusHistory } from "@/stores/focusHistory";
 import { startFileRequests } from "@/stores/fileRequestArrivals";
 import { useLayoutStore } from "@/stores/layout";
 import { setShellMode, useShellViewStore } from "@/stores/shellView";
-import { escapeLeaves, fullscreenOn, leaveFullscreen } from "@/shell/fullscreen";
+import { escapeLeaves, fullscreenOn, leaveFullscreen, promptEscapeLeaves } from "@/shell/fullscreen";
 import { NeedsPopup } from "@/components/needs/NeedsPopup";
 import { PaneGrid } from "./PaneGrid";
 import { NewerLayoutLine, ShellNotice } from "./ShellNotice";
@@ -72,6 +72,8 @@ export function Shell() {
   useEffect(() => (mode === "shell" ? startFileRequests() : undefined), [mode]);
   // Escape leaves full screen when nothing before it took the key (a menu, a popover, the
   // floating composer collapsing, a terminal): this listener bubbles last, after the keymap's.
+  // A prompt marks every Escape handled, so one typed there is taken first, in capture, unless
+  // the prompt has a use for it (promptEscapeLeaves).
   useEffect(() => {
     if (mode !== "shell") return;
     const onKey = (e: KeyboardEvent) => {
@@ -79,9 +81,17 @@ export function Shell() {
       e.preventDefault();
       leaveFullscreen();
     };
+    const onPromptKey = (e: KeyboardEvent) => {
+      if (!fullscreenOn() || !promptEscapeLeaves(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      leaveFullscreen();
+    };
     window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onPromptKey, true);
     return () => {
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onPromptKey, true);
       leaveFullscreen();
     };
   }, [mode]);
