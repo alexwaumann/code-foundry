@@ -101,6 +101,10 @@ their stores and their verbs are gone.
     220), a space holds only as many open panes as fit (drags, placement, verbs and the "+" menu
     offer only what fits; one fit function in Go and the window, `fits.json`), and the sidebar's
     minimum and default width (240) line it up with the top bar's toggle.
+35. `shell-25g-race-chord.md`: the layout glue's sweep and a terminal's removal judge only what
+    the glue has acted on, so a tab or quick terminal waiting for its fresh shell is never
+    closed; a settings file's old dictation chord (cmd+shift+m) is cleared; one full e2e run on
+    the combined branch.
 
 ## Where the build departs from the plan
 

@@ -91,9 +91,9 @@ first (one commit), then each was built.
 - **The mock** keeps its own simplified history on `MockLayout.closed` (its verbs are rebuilt on
   every listing, so a closure lost it: found by the e2e test), cleared by a seed or a reset. The
   record cases are skipped in its port of the Go cases ("the reopen history").
-- **Race left alone:** a sweep (every 60 s) that runs between a reopen's commit and the glue's
-  fresh shell sees the old, ended terminal id and closes the tab. The snooze restore has the same
-  window; both are microseconds wide.
+- **Race left alone (fixed in `shell-25g-race-chord.md`):** a sweep (every 60 s) that runs
+  between a reopen's commit and the glue's fresh shell sees the old, ended terminal id and closes
+  the tab. The snooze restore has the same window.
 
 ## 3. Needs you lists only actionable asks
 
