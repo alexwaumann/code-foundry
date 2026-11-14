@@ -97,6 +97,10 @@ their stores and their verbs are gone.
 33. `shell-25d-collapse.md`: any pane collapses to a rail on demand (`pane.collapse`,
     cmd+shift+m, a strip button), kept per pane in the daemon's layout; a divider stops at the
     minimum from what is drawn and says with its cursor which ways it can still move.
+34. `shell-25f-sizes.md`: one minimum for every pane (480 x 400, a pane of terminals only 300 x
+    220), a space holds only as many open panes as fit (drags, placement, verbs and the "+" menu
+    offer only what fits; one fit function in Go and the window, `fits.json`), and the sidebar's
+    minimum and default width (240) line it up with the top bar's toggle.
 
 ## Where the build departs from the plan
 
