@@ -157,6 +157,26 @@ test("focus moves between panes by a press and by ctrl+cmd+h/j/k/l, and the keyb
   await expect(focused).toHaveAttribute("data-pane-id", "p-1");
 });
 
+test("ctrl+cmd+l goes back to the pane ctrl+cmd+h came from", async ({ page }) => {
+  // a | (b over d), b the shorter: right from a used to go to d, which shares more of a's edge,
+  // so h then l from b never came back (docs/notes/shell-25b-audits.md). Which pane wins, the
+  // stale frame and quick moves are vitest's (shell/keyPresenters.test.ts).
+  const prs = (id: string) => ({ id: `t-${id}`, kind: "prs", title: "Pull Requests" });
+  const projects = (id: string) => ({ id: `t-${id}`, kind: "projects", title: "Projects" });
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await seed(
+    { t: "split", id: "s-r", dir: "row", kids: [pane("p-a", [thread("s-1")]), { t: "split", id: "s-c", dir: "col", kids: [pane("p-b", [prs("b")]), pane("p-d", [projects("d")])], sizes: [0.3, 0.7] }], sizes: [0.5, 0.5] },
+    "p-b",
+  );
+  await openShell(page);
+  const focused = page.locator('[data-testid="shell-pane"][data-focused]');
+  await paneEl(page, "p-b").getByTestId("shell-pane-body").click({ position: { x: 40, y: 100 } });
+  await page.keyboard.press("Control+Meta+h");
+  await expect(focused).toHaveAttribute("data-pane-id", "p-a");
+  await page.keyboard.press("Control+Meta+l");
+  await expect(focused).toHaveAttribute("data-pane-id", "p-b");
+});
+
 test("two panes showing two threads hold two WatchThread streams; a hidden tab holds none", async ({ page }) => {
   await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [thread("s-1"), thread("s-3")]), pane("p-2", [thread("s-5")])], sizes: [0.5, 0.5] }, "p-1");
   await openShell(page);

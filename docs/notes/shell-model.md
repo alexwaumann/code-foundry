@@ -36,6 +36,9 @@ when the first working version is whole. Nothing partial is released.
   pane's edge splits that pane in half; a tab or pane dropped on the grid's outer edge takes its
   kind's default size (a pane's: its active tab's kind) as a share of the grid along that axis,
   raised to the kind's pixel floor while the rest keeps room. A pane that is joined is never resized.
+  While a drag is on, the highlight is the rectangle the tab or pane will be drawn at after the
+  drop, minimums held and rails folded as they will be then: on a pane's middle or a rail too (the
+  pane takes the dropped tab and the focus, so a rail opens). A place in a strip shows its bar.
 - **The focused pane is marked**: its border takes a tint of the theme's accent colour. Only one
   pane has it, and it moves with focus.
 - **The tab is the title.** The active tab shows its full name; others may shorten. A tooltip shows
@@ -97,7 +100,10 @@ when the first working version is whole. Nothing partial is released.
   than a thread's minimum keeps its header on top: what does not fit under it (the composer too) is
   cut, never drawn over it.
 - **Full screen** (one pane over the whole pane area): the top bar and the sidebar stay. Pane focus
-  and move keys do nothing while it is on. When the tab is a linked surface, the thread's own composer
+  and move keys do nothing while it is on. Escape leaves it from anywhere but a terminal (the shell's own Escape;
+  cmd+shift+enter leaves from there), a menu or dialog, and a prompt that has a use for the key: an
+  open completion or history card, dictation, or the floating composer (which collapses first). An
+  empty composer's Escape back to its project's page waits until full screen is off. When the tab is a linked surface, the thread's own composer
   floats over it: collapsed to a pill, expanded on demand, with the thread's chip centred above it.
   The pill and the chip are one button: a click toggles collapsed and expanded, and a press that
   moves drags it, in either state, without toggling. It has no other collapse control. It always
@@ -231,6 +237,12 @@ when the first working version is whole. Nothing partial is released.
 | cmd+r | Rename the focused tab, where it can be renamed |
 | cmd+shift+r | Automatic name: a thread's is generated again, a terminal goes back to its automatic name |
 | cmd+b | Sidebar |
+
+The direction keys go to a pane that touches that side of the focused pane, as drawn (rails
+included). Of several, the one focused most recently wins (the pane the last direction key left
+counts as such, so a key and its opposite come back), then the one sharing the longest stretch of
+edge, then the upper (left and right) or the left (up and down). A direction key pressed while a
+pane move is on its way to the daemon waits for it to land.
 
 Retired: cmd+shift+e (side panel), cmd+\ and cmd+alt+\ (panel split and its other group), the
 bindings for Show Pull Requests and Show Projects (the palette and "+" open them), and the old

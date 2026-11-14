@@ -7,9 +7,8 @@ import { zoomFactor } from "@/lib/zoom";
 import { afterRev, runLayoutCommand } from "@/shell/commands";
 import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, sourceText, type DragNames } from "@/shell/drag/announce";
 import { sourceOf } from "@/shell/drag/draggable";
-import { dropCommand, dropPreview, type DropLayout } from "@/shell/drag/drop";
+import { dropCommand, dropPreview, shellDropLayout, type DropLayout } from "@/shell/drag/drop";
 import { fullscreenOn } from "@/shell/fullscreen";
-import { shellFrame } from "@/shell/geometry/rails";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
 import { threadDropArgs } from "@/shell/drag/threadDrop";
@@ -94,7 +93,7 @@ function snapshot(grid: HTMLElement | null, spaceId: string): Snapshot | null {
     origin: { x: g.left / z, y: g.top / z },
     scene: { frame, strips, stripHeight: PANE_HEADER_HEIGHT },
     tree: geoTree(layout, spaceId),
-    lay: (root, w, h, moved) => shellFrame({ root, w, h, focus: moved, mru: layout.spaces[spaceId]?.mru }),
+    lay: shellDropLayout(layout.spaces[spaceId]?.mru),
     names,
   };
 }
