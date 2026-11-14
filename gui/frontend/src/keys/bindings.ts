@@ -125,12 +125,18 @@ export function isViewActionChord(chord: string): boolean {
 
 /**
  * Commands whose GUI presenter supplies the context the daemon needs: thread.new's
- * project picker picks the project; cmd+t's terminal.new opens a free terminal in the home
- * directory where no thread is in context (shell/terminalActions.ts newTerminalTab). They start
- * (palette, chord, button) even where the daemon lists them as unavailable, e.g. with nothing
- * selected.
+ * project picker picks the project. They start (palette, chord, button) even where the
+ * daemon lists them as unavailable, e.g. with nothing selected.
  */
-const contextSupplied: ReadonlySet<string> = new Set(["thread.new", "terminal.new"]);
+const contextSupplied: ReadonlySet<string> = new Set(["thread.new"]);
+
+/**
+ * Commands whose chord the window presents even where the daemon lists them as unavailable:
+ * cmd+t's terminal.new opens a free terminal in the home directory where no thread is in
+ * context (shell/terminalActions.ts newTerminalTab; docs/notes/shell-model.md, "Keys"). The
+ * palette and buttons still follow the daemon: there the free terminal has its own entry.
+ */
+const chordSupplied: ReadonlySet<string> = new Set(["terminal.new"]);
 
 /**
  * What a subagent's view does not start from the keyboard, the palette or a command button
@@ -216,7 +222,7 @@ export function commandBindings(commands: readonly CommandView[]): Map<string, C
   if (bindingCache?.commands === commands && bindingCache.inSubagent === inSubagent) return bindingCache.map;
   const map = new Map<string, CommandView>();
   for (const c of commands) {
-    if (!isStartable(c) || terminalScoped.has(c.name) || fileScoped.has(c.name)) continue;
+    if (!(isStartable(c) || chordSupplied.has(c.name)) || terminalScoped.has(c.name) || fileScoped.has(c.name)) continue;
     for (const k of c.keybindings) {
       const chord = normalizeChord(k);
       if (chord && !map.has(chord)) map.set(chord, c);
