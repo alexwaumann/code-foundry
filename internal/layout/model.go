@@ -218,6 +218,9 @@ type RememberedTab struct {
 	Adjacent bool    `json:"adjacent,omitempty"`
 	Beside   *Beside `json:"beside,omitempty"`
 	Fresh    *Fresh  `json:"fresh,omitempty"`
+	// Collapsed: its pane, which went with it (Beside), was folded to a rail: rebuilt, it
+	// comes back folded.
+	Collapsed bool `json:"collapsed,omitempty"`
 }
 
 // Beside says where a pane sat: next to which panes, on which of their edges, at what share

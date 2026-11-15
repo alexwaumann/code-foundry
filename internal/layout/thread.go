@@ -351,7 +351,8 @@ func (t *tx) restore(sp *Space, thread string, w, h float64, res *Result) error 
 
 // putBack puts a remembered tab back where it was: into its old pane at its old index when
 // that pane is still there and can take it (fit.go canTake), else into its old pane rebuilt
-// beside the neighbours it had, at its old share, when the result fits the pane area. A tab that sat in or beside the thread's pane (Adjacent) goes back only where
+// beside the neighbours it had, at its old share and folded if it was (Collapsed), when the
+// result fits the pane area. A tab that sat in or beside the thread's pane (Adjacent) goes back only where
 // it is still beside it. It reports whether it put the tab back; when not, nothing changed.
 func (t *tx) putBack(sp *Space, rec RememberedTab, tb *Tab, threadTab string, w, h float64) bool {
 	besideThread := func() bool {
@@ -385,7 +386,9 @@ func (t *tx) putBack(sp *Space, rec RememberedTab, tb *Tab, threadTab string, w,
 	}
 	saved := sp.Root.clone()
 	target := groupRun(Lca(sp.Root, ids), ids, rec.Beside.Edge, func() string { return t.newID("s-") })
-	np := &Node{T: NodePane, ID: rec.Pane, Tabs: []*Tab{tb}, Active: tb.ID}
+	// A pane the user had folded comes back folded: it is rebuilt as it was, and costs the
+	// tree only its rail, so it fits where it would not open.
+	np := &Node{T: NodePane, ID: rec.Pane, Tabs: []*Tab{tb}, Active: tb.ID, Collapsed: rec.Collapsed}
 	if err := insertBeside(sp, target.ID, rec.Beside.Edge, np, rec.Beside.Frac, t.newID("s-")); err != nil || !besideThread() || !Fits(sp.Root, w, h) {
 		sp.Root = saved
 		return false
@@ -491,7 +494,7 @@ func (t *tx) putAway(sp *Space, thread, threadPane string, w, h float64) []*Tab 
 			Adjacent: threadPane != "" && L.Adjacent(p.ID, threadPane),
 		}
 		if len(p.Tabs) == 1 {
-			rec.Beside = BesideInfo(sp.Root, p.ID)
+			rec.Beside, rec.Collapsed = BesideInfo(sp.Root, p.ID), p.Collapsed
 		}
 		ts.Remembered.Tabs = append(ts.Remembered.Tabs, rec)
 		wasFocused = wasFocused || focusedTab(sp) == tb.ID
@@ -518,7 +521,7 @@ func (t *tx) putAwayElsewhere(sp *Space, thread string) []*Tab {
 			_, p, _ := t.st.FindTab(tb.ID)
 			rec := RememberedTab{Tab: tb, Space: sp.ID, Pane: p.ID, Index: p.TabIndex(tb.ID), Active: p.Active == tb.ID}
 			if len(p.Tabs) == 1 {
-				rec.Beside = BesideInfo(sp.Root, p.ID)
+				rec.Beside, rec.Collapsed = BesideInfo(sp.Root, p.ID), p.Collapsed
 			}
 			ts := threadState(t.st, thread)
 			if ts.Remembered == nil {
