@@ -121,7 +121,7 @@ export function planRoute(sel: Selection, s: LayoutState, opts: SelectOptions = 
   switch (sel.kind) {
     case "thread":
       if (focused?.kind === "thread" && focused.thread === sel.id) return { kind: "stay" };
-      return { kind: "command", name: "thread.open", args: { id: sel.id, focus: "true" } };
+      return { kind: "command", name: "thread.open", args: opts.preview ? { id: sel.id, focus: "true", preview: "true" } : { id: sel.id, focus: "true" } };
     case "view": {
       if (sel.name === EMBER_VIEW) return emberThread ? planRoute({ kind: "thread", id: emberThread }, s, opts) : { kind: "none" };
       if (sel.name === "pullrequests") {

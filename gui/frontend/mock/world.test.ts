@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ActionRunMode, ActionRunState } from "../src/gen/codefoundry/v1/action_pb";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { PermissionMode } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { panes } from "./layout";
 import { World } from "./world";
 
 const ctx = (c: Partial<UiContext>) => c as UiContext;
@@ -87,5 +88,40 @@ describe("the mock world", () => {
     const c = { activeProjectId: "repo-cf" };
     await run(w, "project.worktree.new", c, { branch: "feat/dup" });
     await expect(run(w, "project.worktree.new", c, { branch: "feat/dup" })).rejects.toThrow(/already exists/);
+  });
+});
+
+describe("the mock's layout glue (internal/daemon/layout.go): what keeps a preview", () => {
+  /** s-7 (archived) and s-8 (snoozed) opened as previews in turn: the last one is the preview. */
+  async function previewOf(id: string) {
+    const w = new World();
+    await w.invoke("thread.open", ctx({}), { id, preview: "true", focus: "true" }, false);
+    const tab = () => w.layout.state().spaces.flatMap((sp) => panes(sp.root)).flatMap((p) => p.tabs ?? []).find((t) => t.thread === id);
+    expect(tab()?.preview).toBe(true);
+    return { w, tab };
+  }
+
+  it.each([
+    ["unarchived", "s-7", (w: World) => w.archiveThread("s-7", false)],
+    ["woken", "s-8", (w: World) => { w.wakeThread("s-8"); }],
+    ["renamed", "s-7", (w: World) => w.invoke("thread.rename", ctx({ activeThreadId: "s-7" }), { name: "Kept" }, false)],
+    ["pinned", "s-8", (w: World) => w.invoke("thread.pin", ctx({ activeThreadId: "s-8" }), { pinned: "true" }, false)],
+  ] as const)("%s keeps it", async (_how, id, act) => {
+    const { w, tab } = await previewOf(id);
+    await act(w);
+    expect(tab()?.preview).toBeUndefined();
+  });
+
+  it("a wake clears the layout's snoozed mark, so the next --preview of it opens a kept tab", async () => {
+    const { w } = await previewOf("s-8");
+    expect(w.layout.state().threads?.["s-8"]?.snoozed).toBe(true);
+    w.wakeThread("s-8");
+    expect(w.layout.state().threads?.["s-8"]?.snoozed).toBeUndefined();
+  });
+
+  it("an unrelated change (a status) leaves it a preview", async () => {
+    const { w, tab } = await previewOf("s-7");
+    w.stopThread("s-7", "closed", 0);
+    expect(tab()?.preview).toBe(true);
   });
 });

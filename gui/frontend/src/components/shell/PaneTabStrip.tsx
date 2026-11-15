@@ -6,6 +6,7 @@ import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { focusTabNow } from "@/shell/commands";
+import { keepPreviewTab } from "@/shell/preview";
 import { closeTabAsked } from "@/shell/closeTab";
 import { fitTabs, TAB_ICON_WIDTH, type TabFit } from "@/shell/geometry/tabFit";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
@@ -25,6 +26,13 @@ import { PaneCollapseButton } from "./PaneCollapseButton";
 /** The active tab: full tint in the focused pane, lighter in the others (the side panel's tints). */
 const ACTIVE_FOCUSED = "bg-cf-control-hover text-cf-text dark:bg-cf-control-hover/50";
 const ACTIVE_UNFOCUSED = "bg-cf-control-hover/40 text-cf-text dark:bg-cf-control-hover/25";
+
+/**
+ * A preview tab's mark (docs/notes/shell-model.md, "Preview tabs"): a 1px dashed outline in a
+ * quiet neutral, drawn over the tab's box so its size (and the strip's measuring) is unchanged.
+ * The rail's icon carries the same square (PaneRail).
+ */
+export const PREVIEW_DASHES = "after:pointer-events-none after:absolute after:inset-0 after:rounded-md after:border after:border-dashed after:border-cf-text-muted/60";
 
 /** Gap between tabs and the strip's side padding, in px (gap-0.5, px-1.5). */
 const TAB_GAP = 2;
@@ -56,6 +64,7 @@ function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"
       <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate")} data-testid="shell-tab-label">
         {title}
       </span>
+      {!room && tab.preview && <span className="sr-only">, preview</span>}
       {surface.useUnsaved && <UnsavedDot use={surface.useUnsaved} tab={tab} measure={room} />}
       {room && <span className="size-4 shrink-0" aria-hidden />}
     </>
@@ -85,7 +94,8 @@ function useTabTitle(tab: TabEntry): string {
 
 /**
  * One tab of the strip: a click focuses it (its pane too), the × or a middle click closes it
- * (tab.close: a thread's tab closes the thread from the space). The active tab shows its whole
+ * (tab.close: a thread's tab closes the thread from the space); a preview has dashes around it
+ * and a double click keeps it (tab.keep). The active tab shows its whole
  * name while it fits; the others shorten first; tight, tabs go icon-only (tabFit). The tooltip
  * shows the name only while it is cut off or hidden.
  */
@@ -182,10 +192,12 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
       data-kind={tab.kind}
       data-active={active || undefined}
       data-label={label}
+      data-preview={tab.preview || undefined}
       className={cn(
         "group relative flex h-7 shrink-0 items-center rounded-md text-body-sm [--wails-draggable:no-drag]",
         icon ? "justify-center" : "pr-1",
         active ? (paneFocused ? ACTIVE_FOCUSED : ACTIVE_UNFOCUSED) : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
+        tab.preview && PREVIEW_DASHES,
         dragging && "opacity-40",
       )}
       style={fit ? { width: fit.width } : undefined}
@@ -194,6 +206,10 @@ function ShellTabBox({ tab, active, paneFocused, fit, focusable, ref: triggerRef
       }}
       onAuxClick={(e) => {
         if (e.button === 1) void closeTabAsked(tab.id);
+      }}
+      onDoubleClick={() => {
+        // A double click keeps a preview (a kept tab's double click does nothing).
+        if (tab.preview) void keepPreviewTab(tab.id);
       }}
     >
       <Tip label={linked ? <LinkedTip tab={tab} tabName={title} cut={label !== "full"} /> : title} whenTruncated={!linked} side="bottom">

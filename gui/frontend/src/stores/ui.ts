@@ -230,6 +230,11 @@ export function sameSelection(a: Selection, b: Selection): boolean {
  */
 export interface SelectOptions {
   focusPrompt?: boolean;
+  /**
+   * A thread opens as its space's preview tab (thread.open --preview): a click on an Archived or
+   * Snoozed sidebar row. The daemon honours it only for an archived or snoozed thread.
+   */
+  preview?: boolean;
 }
 
 /**

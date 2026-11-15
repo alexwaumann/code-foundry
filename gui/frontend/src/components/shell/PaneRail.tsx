@@ -10,10 +10,14 @@ import type { PaneRect } from "@/shell/geometry/types";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
-import { AttentionDot, LinkedTip, TabContentIcon } from "./PaneTabStrip";
+import { keepPreviewTab } from "@/shell/preview";
+import { AttentionDot, LinkedTip, PREVIEW_DASHES, TabContentIcon } from "./PaneTabStrip";
 import { PaneExpandButton } from "./PaneCollapseButton";
 
-/** One tab of a rail: its icon, the selected one marked, its attention dot; a click unfolds the pane on it. */
+/**
+ * One tab of a rail: its icon, the selected one marked, its attention dot; a click unfolds the
+ * pane on it. A preview has a dashed square around its icon, and a double click keeps it.
+ */
 function RailTab({ tabId, paneId, selected, vertical }: { tabId: string; paneId: string; selected: boolean; vertical: boolean }) {
   const tab = useTab(tabId);
   return tab ? <RailTabOf tab={tab} paneId={paneId} selected={selected} vertical={vertical} /> : null;
@@ -34,13 +38,14 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
         type="button"
         role="tab"
         aria-selected={selected}
-        aria-label={title}
+        aria-label={tab.preview ? `${title}, preview` : title}
         aria-describedby={describedBy}
         tabIndex={selected ? 0 : -1}
         data-testid="shell-rail-tab"
         data-tab-id={tabId}
         data-kind={tab.kind}
         data-active={selected || undefined}
+        data-preview={tab.preview || undefined}
         className={cn(
           "relative flex size-7 shrink-0 cursor-default items-center justify-center rounded-md outline-none focus-visible:ring-1 focus-visible:ring-cf-focus",
           // The selected tab: the strip's active tint, its icon at full contrast, and an accent bar on the rail's inner side.
@@ -50,11 +55,16 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
                 vertical ? "before:inset-y-1.5 before:left-0 before:w-0.5" : "before:inset-x-1.5 before:bottom-0 before:h-0.5",
               )
             : "text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
+          // A preview: the strip's dashed square around the icon.
+          tab.preview && PREVIEW_DASHES,
           dragging && "opacity-40",
         )}
         onClick={() => {
           void focusTabNow(tabId);
           requestPaneFocus(paneId);
+        }}
+        onDoubleClick={() => {
+          if (tab.preview) void keepPreviewTab(tabId);
         }}
       >
         <span className="relative flex">

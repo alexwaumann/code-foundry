@@ -393,8 +393,12 @@ when the first working version is whole. Nothing partial is released.
   place in its strip, another pane or another space, alone or with its pane, or the thread moved to
   another space); one of its surfaces is opened (diff, file, pull request, terminal, quick
   terminal, a plugin's surface); an explicit keep (`tab.keep`, which the window sends for typing in
-  its composer, a double click on the tab and "Keep open" in the tab's menu).
+  its composer, a double click on the tab or its rail icon, and "Keep open" in the thread's
+  three-dot menu, since a thread's tab has no menu of its own).
 - **What does not.** Reading: focus, scroll, find, the thread info toggle.
+- **How it looks.** A 1px dashed outline in a quiet neutral around the tab, in every state, over
+  the tab's usual fills; the name upright and the ordinary thread icon. In a rail, a dashed square
+  around the icon. A screen reader hears "<name>, preview".
 - **No trace.** A preview, replaced or closed by the user, is not recorded for cmd+shift+t, and a
   replaced one is gone from the focus history (cmd+[ and cmd+] skip it, as they skip a tab that
   closed).

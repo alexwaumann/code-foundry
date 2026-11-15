@@ -262,7 +262,8 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
 
   /**
    * A thread row adds its tab in the focused pane, or focuses it when it is open in the space
-   * (select() through the selection bridge: thread.open); a draft row focuses or reopens its
+   * (select() through the selection bridge: thread.open; an Archived or Snoozed row's with
+   * --preview); a draft row focuses or reopens its
    * composer (composer.draft.open).
    */
   const activate = useCallback((row: ShellRow) => {
@@ -273,7 +274,8 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
       void openDraft(row.draftId);
       return;
     }
-    selectThreadAndFlag(row.threadId);
+    // An Archived or Snoozed row opens the thread as the space's preview tab (shell-model.md, "Preview tabs").
+    selectThreadAndFlag(row.threadId, { preview: row.section === "archived" || row.section === "snoozed" });
   }, []);
 
   const panels: Readonly<Record<Panel, { rows: readonly ShellRow[]; scrollTo: RefObject<ScrollTo | null> }>> = {

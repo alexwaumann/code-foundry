@@ -19,6 +19,7 @@ import { movingLabel } from "@/lib/move";
 import { cn } from "@/lib/utils";
 import { closeThreadAction, type LinkedAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
+import { keepPreviewTab } from "@/shell/preview";
 import { usePaneTabCut } from "@/shell/tabCut";
 import { useLayoutStore } from "@/stores/layout";
 import { useThreadsStore } from "@/stores/threads";
@@ -80,12 +81,18 @@ function PlaceChip({ threadId }: { threadId: string }) {
 }
 
 /**
- * The thread's one menu (docs/notes/shell-model.md, "The thread's header"): Open ▸ (its surfaces,
+ * The thread's one menu (docs/notes/shell-model.md, "The thread's header"): for a preview tab,
+ * Keep open (tab.keep; thread tabs have no menu of their own), then Open ▸ (its surfaces,
  * shell/linked.ts), Move to space ▸, the thread's own items (the sidebar row's, ThreadMenuItems:
  * rename, pin, snooze, archive, …), then Close (thread.close: its tab leaves the space).
  */
 function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: string }) {
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
+  // The pane's tab of this thread when it is a preview: "Keep open" keeps it (tab.keep).
+  const preview = useLayoutStore((s) => {
+    const tab = s.tabs[s.panes[paneId]?.active ?? ""];
+    return tab?.preview && tab.kind === "thread" && tab.thread === threadId ? tab.id : "";
+  });
   const [open, setOpen] = useState(false);
   // An item that moved the keyboard (to a tab) keeps it there when the menu closes.
   const moved = useRef(false);
@@ -122,6 +129,19 @@ function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: stri
           focusPromptAfterMenu(threadId);
         }}
       >
+        {preview && (
+          <>
+            <DropdownMenuItem
+              data-testid="menu-keep-open"
+              onSelect={() => {
+                void keepPreviewTab(preview);
+              }}
+            >
+              Keep open
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger data-testid="menu-open">Open</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-52" data-testid="menu-open-surfaces">

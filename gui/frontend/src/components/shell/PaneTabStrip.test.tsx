@@ -13,6 +13,10 @@ vi.mock("@/shell/commands", () => ({
     return Promise.resolve(true);
   },
   focusPaneNow: () => Promise.resolve(true),
+  runLayoutCommand: (name: string, args: Record<string, string>) => {
+    calls.push([name, args.tab ?? ""]);
+    return Promise.resolve({ rev: 2, changed: true });
+  },
 }));
 
 const { PaneTabStrip } = await import("./PaneTabStrip");
@@ -162,5 +166,64 @@ describe("PaneTabStrip", () => {
     // A strip that goes forgets its pane.
     cleanup();
     expect("p-1" in useTabCut.getState().cut).toBe(false);
+  });
+});
+
+describe("a preview tab (docs/notes/shell-model.md, \"Preview tabs\")", () => {
+  const withPreview = (active: string) =>
+    layoutOf([space(pane("p-1", [tab("t-a", "thread", "s-1"), tab("t-pv", "thread", "s-2", { preview: true })], active), "p-1")]);
+  const tabOf = (id: string) => tabs().find((t) => t.getAttribute("data-tab-id") === id) as HTMLElement;
+  const dashed = (el: HTMLElement) => el.className.split(" ").includes("after:border-dashed");
+
+  beforeEach(async () => {
+    useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Sizes" }, "s-2": { id: "s-2", name: "Reviewer", archivedAtMs: 1 } } as never });
+    await seedLayout(withPreview("t-pv"));
+  });
+
+  it.each([
+    ["shown in the focused pane", "t-pv", true, "bg-cf-control-hover"],
+    ["shown in a pane without the focus", "t-pv", false, "bg-cf-control-hover/40"],
+    ["behind another tab", "t-a", true, "text-cf-text-muted"],
+  ])("%s: dashed in a quiet neutral, with that state's usual fill", async (_name, active, focused, fill) => {
+    await seedLayout(withPreview(active));
+    render(<PaneTabStrip paneId="p-1" focused={focused} />);
+    const pv = tabOf("t-pv");
+    expect(pv.hasAttribute("data-preview")).toBe(true);
+    expect(dashed(pv)).toBe(true);
+    expect(pv.className.split(" ")).toEqual(expect.arrayContaining(["after:border-cf-text-muted/60", "after:rounded-md", "after:inset-0", fill]));
+    // Upright, no accent.
+    expect(pv.className).not.toMatch(/italic|accent/);
+    expect(tabOf("t-a").hasAttribute("data-preview")).toBe(false);
+    expect(dashed(tabOf("t-a"))).toBe(false);
+  });
+
+  it("shows the ordinary thread icon and the name, and says it is a preview to a screen reader only", () => {
+    render(<PaneTabStrip paneId="p-1" focused />);
+    const [kept, pv] = screen.getAllByRole("tab");
+    if (!kept || !pv) throw new Error("tabs");
+    expect(pv.querySelector("svg")?.getAttribute("class")).toBe(kept.querySelector("svg")?.getAttribute("class"));
+    expect(pv.textContent).toBe("Reviewer, preview");
+    expect(pv.querySelector(".sr-only")?.textContent).toBe(", preview");
+    expect(kept.textContent).toBe("Sizes");
+    // The measuring copy is the plain tab: the dashes and the words take no room.
+    const measure = screen.getByTestId("shell-tab-measure");
+    expect(measure.textContent).toBe("SizesReviewer");
+  });
+
+  it("a double click keeps a preview (tab.keep, once); a kept tab's double click does nothing", () => {
+    render(<PaneTabStrip paneId="p-1" focused />);
+    fireEvent.doubleClick(tabOf("t-a"));
+    expect(calls).toEqual([]);
+    fireEvent.doubleClick(tabOf("t-pv").querySelector('[data-testid="shell-tab-label"]') as HTMLElement);
+    expect(calls).toEqual([["tab.keep", "t-pv"]]);
+  });
+
+  it("reading keeps nothing: a click on it, its keyboard focus", () => {
+    render(<PaneTabStrip paneId="p-1" focused={false} />);
+    const pv = screen.getAllByRole("tab")[1];
+    if (!pv) throw new Error("tab");
+    pv.focus();
+    fireEvent.click(pv);
+    expect(calls).toEqual([["tab.focus", "t-pv"]]);
   });
 });
