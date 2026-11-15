@@ -103,13 +103,17 @@ type projectMeta struct {
 	// then kept by reconcile.
 	Git   bool
 	Error string
+	// IncludeIgnored are the project's include patterns (include.go); replaced, never
+	// mutated in place.
+	IncludeIgnored []string
 }
 
 // equal reports whether m and o hold the same metadata. Update it with the fields.
 func (m *projectMeta) equal(o *projectMeta) bool {
 	return m.ID == o.ID && m.Path == o.Path && m.Name == o.Name && m.RegisteredAt.Equal(o.RegisteredAt) &&
 		m.DefaultBranch == o.DefaultBranch && m.GitHubSlug == o.GitHubSlug && m.OriginURL == o.OriginURL &&
-		slices.Equal(m.Remotes, o.Remotes) && m.Git == o.Git && m.Error == o.Error
+		slices.Equal(m.Remotes, o.Remotes) && m.Git == o.Git && m.Error == o.Error &&
+		slices.Equal(m.IncludeIgnored, o.IncludeIgnored)
 }
 
 func (m *projectMeta) commonDir() string { return filepath.Join(m.Path, ".git") }
@@ -336,6 +340,13 @@ func (g *Git) load(ctx context.Context) ([]*projectMeta, error) {
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("project: load: %w", err)
 	}
+	includes, err := g.loadIncludes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range out {
+		m.IncludeIgnored = includes[m.ID]
+	}
 	return out, nil
 }
 
@@ -365,7 +376,8 @@ func (g *Git) buildLocked() *Snapshot {
 		r := Project{
 			ID: m.ID, Path: m.Path, Name: m.Name, RegisteredAt: m.RegisteredAt,
 			DefaultBranch: m.DefaultBranch, GitHubSlug: m.GitHubSlug, OriginPath: originPath(m.OriginURL),
-			Remotes: m.Remotes, Git: m.Git, Error: m.Error, Worktrees: make([]Worktree, 0, len(st.wts)),
+			Remotes: m.Remotes, Git: m.Git, Error: m.Error, IncludeIgnored: m.IncludeIgnored,
+			Worktrees: make([]Worktree, 0, len(st.wts)),
 		}
 		for _, slot := range st.wts {
 			w := *slot.cur.Load()
@@ -1132,6 +1144,7 @@ func (g *Git) reconcile(ctx context.Context, id string) {
 		stale = g.staleMadeLocked(id, seen, listedAt)
 	}
 	next.Name = renamedLocked(st, prev)
+	next.IncludeIgnored = keptIncludesLocked(st, prev)
 	metaChanged := !next.equal(st.meta.Load())
 	if metaChanged {
 		st.meta.Store(&next)

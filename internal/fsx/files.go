@@ -71,6 +71,9 @@ type FileEntry struct {
 	// Path is relative to the checkout, "/"-separated, without "./" or a trailing "/".
 	Path  string
 	IsDir bool
+	// Ignored: git ignores it, and an include pattern brought it in (a directory: only
+	// included files are under it).
+	Ignored bool
 }
 
 // WithParentDirs returns files plus every directory they imply ("a/b/c.go" implies
@@ -105,6 +108,35 @@ func WithParentDirs(files []string) []FileEntry {
 // ignored (git ls-files -co --exclude-standard), with their parent directories. At
 // most MaxGitFiles files are read; truncated reports more.
 func GitFiles(ctx context.Context, dir string) (entries []FileEntry, truncated bool, err error) {
+	files, truncated, err := gitPaths(ctx, dir)
+	if err != nil {
+		return nil, false, err
+	}
+	return WithParentDirs(files), truncated, nil
+}
+
+// WithIncluded is WithParentDirs(files) followed by the included ignored files and the
+// directories only they imply, all marked Ignored. A path already listed stays as it is.
+func WithIncluded(files, ignored []string) []FileEntry {
+	out := WithParentDirs(files)
+	if len(ignored) == 0 {
+		return out
+	}
+	have := make(map[string]bool, len(out))
+	for _, e := range out {
+		have[e.Path] = true
+	}
+	for _, e := range WithParentDirs(ignored) {
+		if !have[e.Path] {
+			e.Ignored = true
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// gitPaths is GitFiles' file list, without the directories.
+func gitPaths(ctx context.Context, dir string) (files []string, truncated bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, gitFilesTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "ls-files", "-co", "--exclude-standard", "-z")
@@ -115,7 +147,6 @@ func GitFiles(ctx context.Context, dir string) (entries []FileEntry, truncated b
 	if err != nil {
 		return nil, false, fmt.Errorf("fsx: git ls-files in %s: %w: %s", dir, err, strings.TrimSpace(stderr.String()))
 	}
-	var files []string
 	seen := map[string]bool{} // -co can list a path twice (tracked and deleted-but-present)
 	for _, p := range bytes.Split(outb, []byte{0}) {
 		if len(p) == 0 {
@@ -132,7 +163,7 @@ func GitFiles(ctx context.Context, dir string) (entries []FileEntry, truncated b
 		seen[s] = true
 		files = append(files, s)
 	}
-	return WithParentDirs(files), truncated, nil
+	return files, truncated, nil
 }
 
 // WalkFiles walks a checkout without git: files and directories, skipping .git,
@@ -191,7 +222,7 @@ type FileIndex struct {
 	now func() time.Time
 	log *slog.Logger
 	// list produces a checkout's candidates (listFiles; tests replace it).
-	list func(ctx context.Context, dir string, git bool) ([]FileEntry, error)
+	list func(ctx context.Context, dir string, git bool, include []string) ([]FileEntry, error)
 
 	mu       sync.Mutex
 	entries  map[string]cachedFiles
@@ -235,6 +266,9 @@ type Source struct {
 	// Name is the checkout's project name, which leading or trailing query words may
 	// match instead of the path when a search has several sources (fuzzy.Splits).
 	Name string
+	// Include are the patterns of git-ignored files to list too (IncludedIgnored): the
+	// files.include_ignored setting's plus the project's. Ignored without Git.
+	Include []string
 }
 
 // Match is one result of SearchSources.
@@ -260,7 +294,7 @@ func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query s
 	limit = min(limit, MaxFileLimit)
 	pending := make([]*listing, len(sources))
 	for i, src := range sources {
-		pending[i] = x.start(ctx, src.Dir, src.Git)
+		pending[i] = x.start(ctx, src)
 	}
 	lists := make([]cachedFiles, len(sources))
 	ranked := make([]fuzzy.Source, len(sources))
@@ -291,10 +325,18 @@ func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query s
 	return matches, truncated, nil
 }
 
-// start returns the listing of dir: a finished one holding the cached list when it is
-// fresh, else the one in flight for it, starting one if there is none.
-func (x *FileIndex) start(ctx context.Context, dir string, git bool) *listing {
+// start returns the listing of src: a finished one holding the cached list when it is
+// fresh, else the one in flight for it, starting one if there is none. The key holds
+// the include patterns, so a list made with other patterns is never served.
+func (x *FileIndex) start(ctx context.Context, src Source) *listing {
+	dir, git, include := src.Dir, src.Git, src.Include
+	if !git {
+		include = nil // no ignore notion without git
+	}
 	key := fmt.Sprintf("%t:%s", git, dir)
+	for _, p := range include {
+		key += "\x00" + p
+	}
 	now := x.now()
 	x.mu.Lock()
 	defer x.mu.Unlock()
@@ -308,16 +350,16 @@ func (x *FileIndex) start(ctx context.Context, dir string, git bool) *listing {
 	if !ok {
 		l = &listing{done: make(chan struct{})}
 		x.inflight[key] = l
-		go x.fill(context.WithoutCancel(ctx), key, dir, git, l)
+		go x.fill(context.WithoutCancel(ctx), key, dir, git, slices.Clone(include), l)
 	}
 	return l
 }
 
 // fill lists dir, caches the list under key on success, and finishes l.
-func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, l *listing) {
+func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include []string, l *listing) {
 	ctx, cancel := context.WithTimeout(ctx, listTimeout)
 	defer cancel()
-	files, err := x.list(ctx, dir, git)
+	files, err := x.list(ctx, dir, git, include)
 	var c cachedFiles
 	if err == nil {
 		// Stamp the entry when the listing is done: one slower than the TTL (a huge
@@ -359,16 +401,35 @@ func (x *FileIndex) dropExpired(now time.Time) {
 	}
 }
 
-// listFiles lists a checkout's candidates: git's view, else (no git, or git failed)
-// the walk.
-func (x *FileIndex) listFiles(ctx context.Context, dir string, git bool) ([]FileEntry, error) {
+// listFiles lists a checkout's candidates: git's view plus the ignored files include
+// brings in (listed at the same time), else (no git, or git failed) the walk.
+func (x *FileIndex) listFiles(ctx context.Context, dir string, git bool, include []string) ([]FileEntry, error) {
 	var files []FileEntry
 	var truncated bool
 	var err error
 	if git {
-		files, truncated, err = GitFiles(ctx, dir)
-		if err != nil {
+		var (
+			ignored     []string
+			ignoredFull bool
+			ignoredErr  error
+			wg          sync.WaitGroup
+		)
+		if len(include) > 0 {
+			wg.Go(func() { ignored, ignoredFull, ignoredErr = IncludedIgnored(ctx, dir, include) })
+		}
+		var paths []string
+		paths, truncated, err = gitPaths(ctx, dir)
+		wg.Wait()
+		switch {
+		case err != nil:
 			x.log.Debug("git ls-files failed; walking instead", "dir", dir, "err", err)
+		case ignoredErr != nil: // the ignored files are extra: list the rest
+			x.log.Warn("listing included ignored files failed", "dir", dir, "err", ignoredErr)
+		case ignoredFull:
+			x.log.Info("included ignored files capped", "dir", dir, "files", len(ignored))
+		}
+		if err == nil {
+			files = WithIncluded(paths, ignored)
 		}
 	}
 	if !git || err != nil {

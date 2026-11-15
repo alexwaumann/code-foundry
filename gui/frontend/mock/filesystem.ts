@@ -13,6 +13,7 @@ import {
   type SearchFilesResponseSchema,
   type SkillSchema,
 } from "../src/gen/codefoundry/v1/filesystem_pb";
+import { includedIgnored, mergeIncludes, setMockIgnored } from "./includeIgnored";
 
 export const HOME = "/Users/dev";
 const MAX_ENTRIES = 200;
@@ -174,6 +175,10 @@ export interface CompletionProject {
   id: string;
   name: string;
   path: string;
+  /** false: no git, so no ignored files (absent means git). */
+  git?: boolean;
+  /** The project's own include patterns (mock/includeIgnored.ts). */
+  includeIgnored?: string[];
 }
 
 export const DEFAULT_FILES: readonly string[] = [
@@ -201,8 +206,10 @@ const filesByProject = new Map<string, string[]>();
 /** "skills <project,project|-> <user>" and "search <project> <query>", for specs that assert calls. */
 export const completionCalls: string[] = [];
 
+/** A project's files; it then has no ignored entries until POST /__mock/ignored gives it some. */
 export function setMockFiles(projectId: string, files: string[]): void {
   filesByProject.set(projectId, files);
+  setMockIgnored(projectId, []);
 }
 
 export function resetCompletion(): void {
@@ -242,6 +249,16 @@ export function listSkills(
     for (const s of USER_SKILLS) out.push({ name: s.name, description: s.description, scope: SkillScope.USER, projectId: "", path: s.path });
   }
   return out;
+}
+
+/**
+ * fsx.WithIncluded: the files and their directories, then the included ignored files and the
+ * directories only they imply, marked ignored.
+ */
+function withIncluded(files: readonly string[], ignored: readonly string[]): { path: string; isDir: boolean; ignored: boolean }[] {
+  const base = withParentDirs(files).map((e) => ({ ...e, ignored: false }));
+  const have = new Set(base.map((e) => e.path));
+  return [...base, ...withParentDirs(ignored).filter((e) => !have.has(e.path)).map((e) => ({ ...e, ignored: true }))];
 }
 
 /** Files plus every directory they imply, directories first (internal/fsx WithParentDirs). */
@@ -302,7 +319,11 @@ function wordMatch(path: string, word: string): { tier: number; pos: number[] } 
   return pos.length === want.length ? { tier: 1, pos } : { tier: 0, pos: [] };
 }
 
-export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest): SearchInit {
+/**
+ * settingIncludes is files.include_ignored's patterns; each git project adds its own and the
+ * ignored files they include are listed too, marked (mock/includeIgnored.ts).
+ */
+export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, req: SearchRequest, settingIncludes: readonly string[] = []): SearchInit {
   const { query, limit } = req;
   if (limit < 0) throw invalid(`limit ${String(limit)} is negative`);
   let named: readonly SearchSource[] = req.sources;
@@ -319,7 +340,10 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
   }
   completionCalls.push(`search ${sources.map((s) => s.project.id).join(",")} ${query}`);
   const hits = sources.flatMap((src, si) =>
-    withParentDirs(filesByProject.get(src.project.id) ?? DEFAULT_FILES)
+    withIncluded(
+      filesByProject.get(src.project.id) ?? DEFAULT_FILES,
+      src.project.git === false ? [] : includedIgnored(src.project.id, mergeIncludes(settingIncludes, src.project.includeIgnored ?? [])),
+    )
       .filter((e) => !req.filesOnly || !e.isDir)
       .map((e) => {
         const each = words.map((w) => wordMatch(e.path, w));
@@ -332,7 +356,9 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
   hits.sort((a, b) => b.tier - a.tier || a.path.length - b.path.length || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || a.si - b.si);
   const n = Math.min(limit === 0 ? DEFAULT_FILE_LIMIT : limit, MAX_FILE_LIMIT);
   return {
-    matches: hits.slice(0, n).map((h) => ({ path: h.path, isDir: h.isDir, projectId: h.src.project.id, checkout: h.src.checkout, pathPositions: h.pos, projectPositions: [] })),
+    matches: hits
+      .slice(0, n)
+      .map((h) => ({ path: h.path, isDir: h.isDir, projectId: h.src.project.id, checkout: h.src.checkout, pathPositions: h.pos, projectPositions: [], ignored: h.ignored })),
     truncated: hits.length > n,
   };
 }

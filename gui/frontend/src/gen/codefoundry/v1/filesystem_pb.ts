@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJSCg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMSDAoEdGFpbBgEIAEoCCKmAgoQUmVhZEZpbGVSZXNwb25zZRIQCghjb250ZW50cxgBIAEoDBIMCgRzaXplGAIgASgDEhEKCXRydW5jYXRlZBgDIAEoCBIOCgZiaW5hcnkYBCABKAgSEQoJbWltZV90eXBlGAUgASgJEhMKC21vZGlmaWVkX2F0GAYgASgDEhUKDXJlc29sdmVkX3BhdGgYByABKAkSEQoJbm90X2ZvdW5kGAggASgIEg4KBmlzX2RpchgJIAEoCBIRCglyZWFsX3BhdGgYCiABKAkSDAoEbW9kZRgLIAEoDRIUCgxvdXRzaWRlX2hvbWUYDCABKAgSFwoPdHJ1bmNhdGVkX3N0YXJ0GA0gASgIEg4KBm9mZnNldBgOIAEoAxINCgVtZWRpYRgPIAEoCCKGAQoQV3JpdGVGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJEhAKCGNvbnRlbnRzGAMgASgMEhMKC21vZGlmaWVkX2F0GAQgASgDEgwKBHNpemUYBSABKAMSDQoFZm9yY2UYBiABKAgSDgoGY3JlYXRlGAcgASgIInIKEVdyaXRlRmlsZVJlc3BvbnNlEhMKC21vZGlmaWVkX2F0GAEgASgDEgwKBHNpemUYAiABKAMSFQoNcmVzb2x2ZWRfcGF0aBgDIAEoCRIQCghjb25mbGljdBgEIAEoCBIRCglub3RfZm91bmQYBSABKAgiNAoSUHJldmlld0ZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkiMwoRU3RyZWFtRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCSJXChJTdHJlYW1GaWxlUmVzcG9uc2USCwoDdXJsGAEgASgJEhEKCW1pbWVfdHlwZRgCIAEoCRIMCgRzaXplGAMgASgDEhMKC21vZGlmaWVkX2F0GAQgASgDIkYKE1ByZXZpZXdGaWxlUmVzcG9uc2USCwoDdXJsGAEgASgJEg0KBXNjb3BlGAIgASgJEhMKC3NpbmdsZV9maWxlGAMgASgIKlgKClNraWxsU2NvcGUSGwoXU0tJTExfU0NPUEVfVU5TUEVDSUZJRUQQABIUChBTS0lMTF9TQ09QRV9VU0VSEAESFwoTU0tJTExfU0NPUEVfUFJPSkVDVBACMoAFChFGaWxlc3lzdGVtU2VydmljZRJkCg9MaXN0RGlyZWN0b3JpZXMSJi5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVzcG9uc2UiABJVCgpMaXN0U2tpbGxzEiEuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVzcG9uc2UiABJYCgtTZWFyY2hGaWxlcxIiLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVzcG9uc2UiABJPCghSZWFkRmlsZRIfLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVzcG9uc2UiABJSCglXcml0ZUZpbGUSIC5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVzcG9uc2UiABJYCgtQcmV2aWV3RmlsZRIiLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVzcG9uc2UiABJVCgpTdHJlYW1GaWxlEiEuY29kZWZvdW5kcnkudjEuU3RyZWFtRmlsZVJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5TdHJlYW1GaWxlUmVzcG9uc2UiAELHAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg9GaWxlc3lzdGVtUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKTAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUSDwoHaWdub3JlZBgHIAEoCCJUChNTZWFyY2hGaWxlc1Jlc3BvbnNlEioKB21hdGNoZXMYASADKAsyGS5jb2RlZm91bmRyeS52MS5GaWxlTWF0Y2gSEQoJdHJ1bmNhdGVkGAIgASgIIk8KHFN1Z2dlc3RJbmNsdWRlSWdub3JlZFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIMCgR0ZXh0GAIgASgJEg0KBWxpbWl0GAMgASgFIqABChFJZ25vcmVkU3VnZ2VzdGlvbhIMCgRwYXRoGAEgASgJEg4KBmlzX2RpchgCIAEoCBISCgpmaWxlX2NvdW50GAMgASgFEhkKEWZpbGVfY291bnRfY2FwcGVkGAQgASgIEhAKCGluY2x1ZGVkGAUgASgIEhQKDG1hdGNoZXNfdGV4dBgGIAEoCBIWCg5wYXRoX3Bvc2l0aW9ucxgHIAMoBSKtAQodU3VnZ2VzdEluY2x1ZGVJZ25vcmVkUmVzcG9uc2USNgoLc3VnZ2VzdGlvbnMYASADKAsyIS5jb2RlZm91bmRyeS52MS5JZ25vcmVkU3VnZ2VzdGlvbhIRCgl0cnVuY2F0ZWQYAiABKAgSEgoKdGV4dF9maWxlcxgDIAEoBRIZChF0ZXh0X2ZpbGVzX2NhcHBlZBgEIAEoCBISCgp0ZXh0X2Vycm9yGAUgASgJIlIKD1JlYWRGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJEhEKCW1heF9ieXRlcxgDIAEoAxIMCgR0YWlsGAQgASgIIqYCChBSZWFkRmlsZVJlc3BvbnNlEhAKCGNvbnRlbnRzGAEgASgMEgwKBHNpemUYAiABKAMSEQoJdHJ1bmNhdGVkGAMgASgIEg4KBmJpbmFyeRgEIAEoCBIRCgltaW1lX3R5cGUYBSABKAkSEwoLbW9kaWZpZWRfYXQYBiABKAMSFQoNcmVzb2x2ZWRfcGF0aBgHIAEoCRIRCglub3RfZm91bmQYCCABKAgSDgoGaXNfZGlyGAkgASgIEhEKCXJlYWxfcGF0aBgKIAEoCRIMCgRtb2RlGAsgASgNEhQKDG91dHNpZGVfaG9tZRgMIAEoCBIXCg90cnVuY2F0ZWRfc3RhcnQYDSABKAgSDgoGb2Zmc2V0GA4gASgDEg0KBW1lZGlhGA8gASgIIoYBChBXcml0ZUZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkSEAoIY29udGVudHMYAyABKAwSEwoLbW9kaWZpZWRfYXQYBCABKAMSDAoEc2l6ZRgFIAEoAxINCgVmb3JjZRgGIAEoCBIOCgZjcmVhdGUYByABKAgicgoRV3JpdGVGaWxlUmVzcG9uc2USEwoLbW9kaWZpZWRfYXQYASABKAMSDAoEc2l6ZRgCIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAMgASgJEhAKCGNvbmZsaWN0GAQgASgIEhEKCW5vdF9mb3VuZBgFIAEoCCI0ChJQcmV2aWV3RmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCSIzChFTdHJlYW1GaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJIlcKElN0cmVhbUZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSEQoJbWltZV90eXBlGAIgASgJEgwKBHNpemUYAyABKAMSEwoLbW9kaWZpZWRfYXQYBCABKAMiRgoTUHJldmlld0ZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSDQoFc2NvcGUYAiABKAkSEwoLc2luZ2xlX2ZpbGUYAyABKAgqWAoKU2tpbGxTY29wZRIbChdTS0lMTF9TQ09QRV9VTlNQRUNJRklFRBAAEhQKEFNLSUxMX1NDT1BFX1VTRVIQARIXChNTS0lMTF9TQ09QRV9QUk9KRUNUEAIy+AUKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAElUKCkxpc3RTa2lsbHMSIS5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXNwb25zZSIAElgKC1NlYXJjaEZpbGVzEiIuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXNwb25zZSIAEnYKFVN1Z2dlc3RJbmNsdWRlSWdub3JlZBIsLmNvZGVmb3VuZHJ5LnYxLlN1Z2dlc3RJbmNsdWRlSWdub3JlZFJlcXVlc3QaLS5jb2RlZm91bmRyeS52MS5TdWdnZXN0SW5jbHVkZUlnbm9yZWRSZXNwb25zZSIAEk8KCFJlYWRGaWxlEh8uY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXNwb25zZSIAElIKCVdyaXRlRmlsZRIgLmNvZGVmb3VuZHJ5LnYxLldyaXRlRmlsZVJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXNwb25zZSIAElgKC1ByZXZpZXdGaWxlEiIuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXNwb25zZSIAElUKClN0cmVhbUZpbGUSIS5jb2RlZm91bmRyeS52MS5TdHJlYW1GaWxlUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUZpbGVSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -357,6 +357,15 @@ export type FileMatch = Message<"codefoundry.v1.FileMatch"> & {
    * @generated from field: repeated int32 project_positions = 6;
    */
   projectPositions: number[];
+
+  /**
+   * Git ignores this file, and an include pattern lists it anyway: the files.include_ignored
+   * setting's or the project's (Project.include_ignored). A directory: only included
+   * ignored files are under it.
+   *
+   * @generated from field: bool ignored = 7;
+   */
+  ignored: boolean;
 };
 
 /**
@@ -391,6 +400,145 @@ export type SearchFilesResponse = Message<"codefoundry.v1.SearchFilesResponse"> 
  */
 export const SearchFilesResponseSchema: GenMessage<SearchFilesResponse> = /*@__PURE__*/
   messageDesc(file_codefoundry_v1_filesystem, 10);
+
+/**
+ * @generated from message codefoundry.v1.SuggestIncludeIgnoredRequest
+ */
+export type SuggestIncludeIgnoredRequest = Message<"codefoundry.v1.SuggestIncludeIgnoredRequest"> & {
+  /**
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * What the user typed in the add field.
+   *
+   * @generated from field: string text = 2;
+   */
+  text: string;
+
+  /**
+   * Maximum suggestions. Zero means 20; at most 100.
+   *
+   * @generated from field: int32 limit = 3;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.SuggestIncludeIgnoredRequest.
+ * Use `create(SuggestIncludeIgnoredRequestSchema)` to create a new message.
+ */
+export const SuggestIncludeIgnoredRequestSchema: GenMessage<SuggestIncludeIgnoredRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 11);
+
+/**
+ * @generated from message codefoundry.v1.IgnoredSuggestion
+ */
+export type IgnoredSuggestion = Message<"codefoundry.v1.IgnoredSuggestion"> & {
+  /**
+   * Relative to the project's main worktree, forward slashes, no trailing "/".
+   *
+   * @generated from field: string path = 1;
+   */
+  path: string;
+
+  /**
+   * A folder git ignores as a whole (git did not look inside it).
+   *
+   * @generated from field: bool is_dir = 2;
+   */
+  isDir: boolean;
+
+  /**
+   * The folder's files, links counted as files, .git skipped; 0 for a file. With
+   * file_count_capped, at least this many (0 and capped: not counted, the budget ran out).
+   *
+   * @generated from field: int32 file_count = 3;
+   */
+  fileCount: number;
+
+  /**
+   * @generated from field: bool file_count_capped = 4;
+   */
+  fileCountCapped: boolean;
+
+  /**
+   * The project's effective patterns (the setting's and its own) already include it as a
+   * whole: the file, or every file in the folder.
+   *
+   * @generated from field: bool included = 5;
+   */
+  included: boolean;
+
+  /**
+   * The typed text, as a pattern, includes it as a whole.
+   *
+   * @generated from field: bool matches_text = 6;
+   */
+  matchesText: boolean;
+
+  /**
+   * Indices (code points) of the characters of path the text matched, for highlighting.
+   *
+   * @generated from field: repeated int32 path_positions = 7;
+   */
+  pathPositions: number[];
+};
+
+/**
+ * Describes the message codefoundry.v1.IgnoredSuggestion.
+ * Use `create(IgnoredSuggestionSchema)` to create a new message.
+ */
+export const IgnoredSuggestionSchema: GenMessage<IgnoredSuggestion> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 12);
+
+/**
+ * @generated from message codefoundry.v1.SuggestIncludeIgnoredResponse
+ */
+export type SuggestIncludeIgnoredResponse = Message<"codefoundry.v1.SuggestIncludeIgnoredResponse"> & {
+  /**
+   * Best match first.
+   *
+   * @generated from field: repeated codefoundry.v1.IgnoredSuggestion suggestions = 1;
+   */
+  suggestions: IgnoredSuggestion[];
+
+  /**
+   * More entries matched than were returned.
+   *
+   * @generated from field: bool truncated = 2;
+   */
+  truncated: boolean;
+
+  /**
+   * How many files the typed text includes as a pattern on its own, in the main worktree;
+   * 0 for an empty or invalid text. With text_files_capped, at least this many.
+   *
+   * @generated from field: int32 text_files = 3;
+   */
+  textFiles: number;
+
+  /**
+   * @generated from field: bool text_files_capped = 4;
+   */
+  textFilesCapped: boolean;
+
+  /**
+   * Why the typed text is not a valid pattern (SetIncludeIgnored's rules), for showing
+   * under the field; empty when it is valid or empty.
+   *
+   * @generated from field: string text_error = 5;
+   */
+  textError: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.SuggestIncludeIgnoredResponse.
+ * Use `create(SuggestIncludeIgnoredResponseSchema)` to create a new message.
+ */
+export const SuggestIncludeIgnoredResponseSchema: GenMessage<SuggestIncludeIgnoredResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 13);
 
 /**
  * @generated from message codefoundry.v1.ReadFileRequest
@@ -436,7 +584,7 @@ export type ReadFileRequest = Message<"codefoundry.v1.ReadFileRequest"> & {
  * Use `create(ReadFileRequestSchema)` to create a new message.
  */
 export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 11);
+  messageDesc(file_codefoundry_v1_filesystem, 14);
 
 /**
  * @generated from message codefoundry.v1.ReadFileResponse
@@ -563,7 +711,7 @@ export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
  * Use `create(ReadFileResponseSchema)` to create a new message.
  */
 export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 12);
+  messageDesc(file_codefoundry_v1_filesystem, 15);
 
 /**
  * @generated from message codefoundry.v1.WriteFileRequest
@@ -626,7 +774,7 @@ export type WriteFileRequest = Message<"codefoundry.v1.WriteFileRequest"> & {
  * Use `create(WriteFileRequestSchema)` to create a new message.
  */
 export const WriteFileRequestSchema: GenMessage<WriteFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 13);
+  messageDesc(file_codefoundry_v1_filesystem, 16);
 
 /**
  * @generated from message codefoundry.v1.WriteFileResponse
@@ -675,7 +823,7 @@ export type WriteFileResponse = Message<"codefoundry.v1.WriteFileResponse"> & {
  * Use `create(WriteFileResponseSchema)` to create a new message.
  */
 export const WriteFileResponseSchema: GenMessage<WriteFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 14);
+  messageDesc(file_codefoundry_v1_filesystem, 17);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileRequest
@@ -702,7 +850,7 @@ export type PreviewFileRequest = Message<"codefoundry.v1.PreviewFileRequest"> & 
  * Use `create(PreviewFileRequestSchema)` to create a new message.
  */
 export const PreviewFileRequestSchema: GenMessage<PreviewFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 15);
+  messageDesc(file_codefoundry_v1_filesystem, 18);
 
 /**
  * @generated from message codefoundry.v1.StreamFileRequest
@@ -729,7 +877,7 @@ export type StreamFileRequest = Message<"codefoundry.v1.StreamFileRequest"> & {
  * Use `create(StreamFileRequestSchema)` to create a new message.
  */
 export const StreamFileRequestSchema: GenMessage<StreamFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 16);
+  messageDesc(file_codefoundry_v1_filesystem, 19);
 
 /**
  * @generated from message codefoundry.v1.StreamFileResponse
@@ -770,7 +918,7 @@ export type StreamFileResponse = Message<"codefoundry.v1.StreamFileResponse"> & 
  * Use `create(StreamFileResponseSchema)` to create a new message.
  */
 export const StreamFileResponseSchema: GenMessage<StreamFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 17);
+  messageDesc(file_codefoundry_v1_filesystem, 20);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileResponse
@@ -807,7 +955,7 @@ export type PreviewFileResponse = Message<"codefoundry.v1.PreviewFileResponse"> 
  * Use `create(PreviewFileResponseSchema)` to create a new message.
  */
 export const PreviewFileResponseSchema: GenMessage<PreviewFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 18);
+  messageDesc(file_codefoundry_v1_filesystem, 21);
 
 /**
  * @generated from enum codefoundry.v1.SkillScope
@@ -918,6 +1066,26 @@ export const FilesystemService: GenService<{
     methodKind: "unary";
     input: typeof SearchFilesRequestSchema;
     output: typeof SearchFilesResponseSchema;
+  },
+  /**
+   * SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
+   * project or to the files.include_ignored setting. It lists the git-ignored entries of
+   * the project's main worktree as git reports them (git ls-files -oi --exclude-standard
+   * --directory): files git looked at one by one, and wholly ignored folders collapsed,
+   * each with its file count. The typed text filters and ranks them like a file search
+   * (glob characters dropped; an empty text lists the shallowest first), and is counted as
+   * a pattern on its own: how many files it would include. Folders are counted up to
+   * 1,000 files each, within 50,000 entries read for the whole answer, never following
+   * links. Bounded at 10 seconds; cancelling the request stops it. NotFound for an unknown
+   * project; FailedPrecondition for a project without git (it has no ignored files);
+   * InvalidArgument for a negative limit.
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.SuggestIncludeIgnored
+   */
+  suggestIncludeIgnored: {
+    methodKind: "unary";
+    input: typeof SuggestIncludeIgnoredRequestSchema;
+    output: typeof SuggestIncludeIgnoredResponseSchema;
   },
   /**
    * ReadFile reads one file for the file viewer. path is absolute, or relative to

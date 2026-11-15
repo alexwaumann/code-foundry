@@ -30,6 +30,7 @@ type Settings struct {
 	Models     Models
 	GitHub     GitHub
 	Projects   Projects
+	Files      Files
 	GitOps     GitOps
 	Appearance Appearance
 	Layout     Layout
@@ -44,6 +45,13 @@ type Settings struct {
 	Ember       Ember
 	Dictation   Dictation
 	Advanced    Advanced
+}
+
+// Files configures file search (FilesystemService.SearchFiles).
+type Files struct {
+	// IncludeIgnored is the comma-separated patterns of git-ignored files every project's
+	// search lists too, or fsx.IncludeNone (fsx.SplitIncludeSetting reads it).
+	IncludeIgnored string
 }
 
 // Layout configures the window shell's panes (internal/store/layout).

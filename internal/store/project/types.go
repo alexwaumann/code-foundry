@@ -41,9 +41,13 @@ type Project struct {
 	// Head and a zero Status, no remotes and no DefaultBranch. No git command runs for
 	// it; it becomes a git project when .git appears (InitGit, or `git init` outside
 	// the app, seen on the next refresh or poll).
-	Git       bool
-	Error     string // last reconcile error, if any
-	Worktrees []Worktree
+	Git   bool
+	Error string // last reconcile error, if any
+	// IncludeIgnored are the project's own patterns of git-ignored files its file search
+	// lists too, added to the files.include_ignored setting's (fsx.IncludedIgnored);
+	// fsx.CleanIncludePatterns' form. Never mutate.
+	IncludeIgnored []string
+	Worktrees      []Worktree
 }
 
 // Worktree is one checkout of a repository. The main worktree comes first.
@@ -382,6 +386,10 @@ type Store interface {
 	// Rename sets a project's display name (CheckName's rules) and publishes it. Nothing
 	// on disk changes. Renaming to the current name is a no-op.
 	Rename(ctx context.Context, id, name string) (Project, error)
+	// SetIncludeIgnored replaces a project's include patterns (include.go): trimmed,
+	// repeats dropped, ErrInvalidArgument for an invalid one (fsx.CleanIncludePatterns);
+	// none clears them. Publishes ProjectUpdated when they change.
+	SetIncludeIgnored(ctx context.Context, id string, patterns []string) (Project, error)
 	// SetLiveWorktrees replaces the set of worktree paths that have a live thread (not
 	// archived, not snoozed). A project with one of them is polled and fetched on the
 	// live tier (activity.go); one that turns live is fetched now if its last fetch is

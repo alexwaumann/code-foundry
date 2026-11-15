@@ -42,6 +42,9 @@ const (
 	// FilesystemServiceSearchFilesProcedure is the fully-qualified name of the FilesystemService's
 	// SearchFiles RPC.
 	FilesystemServiceSearchFilesProcedure = "/codefoundry.v1.FilesystemService/SearchFiles"
+	// FilesystemServiceSuggestIncludeIgnoredProcedure is the fully-qualified name of the
+	// FilesystemService's SuggestIncludeIgnored RPC.
+	FilesystemServiceSuggestIncludeIgnoredProcedure = "/codefoundry.v1.FilesystemService/SuggestIncludeIgnored"
 	// FilesystemServiceReadFileProcedure is the fully-qualified name of the FilesystemService's
 	// ReadFile RPC.
 	FilesystemServiceReadFileProcedure = "/codefoundry.v1.FilesystemService/ReadFile"
@@ -106,6 +109,18 @@ type FilesystemServiceClient interface {
 	// a project, both sources and project_id/path, more than 16 sources, or a query of
 	// more than 8 words is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
+	// SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
+	// project or to the files.include_ignored setting. It lists the git-ignored entries of
+	// the project's main worktree as git reports them (git ls-files -oi --exclude-standard
+	// --directory): files git looked at one by one, and wholly ignored folders collapsed,
+	// each with its file count. The typed text filters and ranks them like a file search
+	// (glob characters dropped; an empty text lists the shallowest first), and is counted as
+	// a pattern on its own: how many files it would include. Folders are counted up to
+	// 1,000 files each, within 50,000 entries read for the whole answer, never following
+	// links. Bounded at 10 seconds; cancelling the request stops it. NotFound for an unknown
+	// project; FailedPrecondition for a project without git (it has no ignored files);
+	// InvalidArgument for a negative limit.
+	SuggestIncludeIgnored(context.Context, *connect.Request[v1.SuggestIncludeIgnoredRequest]) (*connect.Response[v1.SuggestIncludeIgnoredResponse], error)
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home
 	// directory. Symlinks are followed, and the file they lead to must be under the
@@ -203,6 +218,12 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
 			connect.WithClientOptions(opts...),
 		),
+		suggestIncludeIgnored: connect.NewClient[v1.SuggestIncludeIgnoredRequest, v1.SuggestIncludeIgnoredResponse](
+			httpClient,
+			baseURL+FilesystemServiceSuggestIncludeIgnoredProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("SuggestIncludeIgnored")),
+			connect.WithClientOptions(opts...),
+		),
 		readFile: connect.NewClient[v1.ReadFileRequest, v1.ReadFileResponse](
 			httpClient,
 			baseURL+FilesystemServiceReadFileProcedure,
@@ -232,13 +253,14 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 
 // filesystemServiceClient implements FilesystemServiceClient.
 type filesystemServiceClient struct {
-	listDirectories *connect.Client[v1.ListDirectoriesRequest, v1.ListDirectoriesResponse]
-	listSkills      *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
-	searchFiles     *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
-	readFile        *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
-	writeFile       *connect.Client[v1.WriteFileRequest, v1.WriteFileResponse]
-	previewFile     *connect.Client[v1.PreviewFileRequest, v1.PreviewFileResponse]
-	streamFile      *connect.Client[v1.StreamFileRequest, v1.StreamFileResponse]
+	listDirectories       *connect.Client[v1.ListDirectoriesRequest, v1.ListDirectoriesResponse]
+	listSkills            *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
+	searchFiles           *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
+	suggestIncludeIgnored *connect.Client[v1.SuggestIncludeIgnoredRequest, v1.SuggestIncludeIgnoredResponse]
+	readFile              *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
+	writeFile             *connect.Client[v1.WriteFileRequest, v1.WriteFileResponse]
+	previewFile           *connect.Client[v1.PreviewFileRequest, v1.PreviewFileResponse]
+	streamFile            *connect.Client[v1.StreamFileRequest, v1.StreamFileResponse]
 }
 
 // ListDirectories calls codefoundry.v1.FilesystemService.ListDirectories.
@@ -254,6 +276,11 @@ func (c *filesystemServiceClient) ListSkills(ctx context.Context, req *connect.R
 // SearchFiles calls codefoundry.v1.FilesystemService.SearchFiles.
 func (c *filesystemServiceClient) SearchFiles(ctx context.Context, req *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
 	return c.searchFiles.CallUnary(ctx, req)
+}
+
+// SuggestIncludeIgnored calls codefoundry.v1.FilesystemService.SuggestIncludeIgnored.
+func (c *filesystemServiceClient) SuggestIncludeIgnored(ctx context.Context, req *connect.Request[v1.SuggestIncludeIgnoredRequest]) (*connect.Response[v1.SuggestIncludeIgnoredResponse], error) {
+	return c.suggestIncludeIgnored.CallUnary(ctx, req)
 }
 
 // ReadFile calls codefoundry.v1.FilesystemService.ReadFile.
@@ -326,6 +353,18 @@ type FilesystemServiceHandler interface {
 	// a project, both sources and project_id/path, more than 16 sources, or a query of
 	// more than 8 words is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
+	// SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
+	// project or to the files.include_ignored setting. It lists the git-ignored entries of
+	// the project's main worktree as git reports them (git ls-files -oi --exclude-standard
+	// --directory): files git looked at one by one, and wholly ignored folders collapsed,
+	// each with its file count. The typed text filters and ranks them like a file search
+	// (glob characters dropped; an empty text lists the shallowest first), and is counted as
+	// a pattern on its own: how many files it would include. Folders are counted up to
+	// 1,000 files each, within 50,000 entries read for the whole answer, never following
+	// links. Bounded at 10 seconds; cancelling the request stops it. NotFound for an unknown
+	// project; FailedPrecondition for a project without git (it has no ignored files);
+	// InvalidArgument for a negative limit.
+	SuggestIncludeIgnored(context.Context, *connect.Request[v1.SuggestIncludeIgnoredRequest]) (*connect.Response[v1.SuggestIncludeIgnoredResponse], error)
 	// ReadFile reads one file for the file viewer. path is absolute, or relative to
 	// base_dir (a thread's worktree, or the home directory); "~/" is the home
 	// directory. Symlinks are followed, and the file they lead to must be under the
@@ -419,6 +458,12 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServiceSuggestIncludeIgnoredHandler := connect.NewUnaryHandler(
+		FilesystemServiceSuggestIncludeIgnoredProcedure,
+		svc.SuggestIncludeIgnored,
+		connect.WithSchema(filesystemServiceMethods.ByName("SuggestIncludeIgnored")),
+		connect.WithHandlerOptions(opts...),
+	)
 	filesystemServiceReadFileHandler := connect.NewUnaryHandler(
 		FilesystemServiceReadFileProcedure,
 		svc.ReadFile,
@@ -451,6 +496,8 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 			filesystemServiceListSkillsHandler.ServeHTTP(w, r)
 		case FilesystemServiceSearchFilesProcedure:
 			filesystemServiceSearchFilesHandler.ServeHTTP(w, r)
+		case FilesystemServiceSuggestIncludeIgnoredProcedure:
+			filesystemServiceSuggestIncludeIgnoredHandler.ServeHTTP(w, r)
 		case FilesystemServiceReadFileProcedure:
 			filesystemServiceReadFileHandler.ServeHTTP(w, r)
 		case FilesystemServiceWriteFileProcedure:
@@ -478,6 +525,10 @@ func (UnimplementedFilesystemServiceHandler) ListSkills(context.Context, *connec
 
 func (UnimplementedFilesystemServiceHandler) SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.SearchFiles is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) SuggestIncludeIgnored(context.Context, *connect.Request[v1.SuggestIncludeIgnoredRequest]) (*connect.Response[v1.SuggestIncludeIgnoredResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.SuggestIncludeIgnored is not implemented"))
 }
 
 func (UnimplementedFilesystemServiceHandler) ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {

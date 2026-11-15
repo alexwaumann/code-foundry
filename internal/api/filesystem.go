@@ -33,7 +33,10 @@ type Filesystem struct {
 	// pagesOrigin is where the preview route is served (the daemon's pages listener);
 	// PreviewFile's URLs are on it. Empty: root-relative URLs.
 	pagesOrigin string
-	log         *slog.Logger
+	// includeAll reads the files.include_ignored setting's patterns (WithIncludeIgnored);
+	// nil: none.
+	includeAll func() []string
+	log        *slog.Logger
 }
 
 var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
@@ -57,6 +60,23 @@ func NewFilesystem(root string, projects project.Store, grants *preview.Grants) 
 func (h *Filesystem) WithPagesOrigin(origin string) *Filesystem {
 	h.pagesOrigin = origin
 	return h
+}
+
+// WithIncludeIgnored makes file search list the git-ignored files that all's patterns
+// (the files.include_ignored setting's, read at every search) and each project's own
+// include (docs/notes/file-search-1-includes.md).
+func (h *Filesystem) WithIncludeIgnored(all func() []string) *Filesystem {
+	h.includeAll = all
+	return h
+}
+
+// includes are a project's effective include patterns: the setting's, then its own.
+func (h *Filesystem) includes(p project.Project) []string {
+	var all []string
+	if h.includeAll != nil {
+		all = h.includeAll()
+	}
+	return fsx.MergeIncludes(all, p.IncludeIgnored)
 }
 
 // WithTemp lets ReadFile and PreviewFile read the temp folders temps (fsx.TempRoots), where
@@ -165,7 +185,7 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 			continue
 		}
 		seen[c.dir] = true
-		srcs = append(srcs, fsx.Source{Dir: c.dir, Git: c.git, Name: c.project.Name})
+		srcs = append(srcs, fsx.Source{Dir: c.dir, Git: c.git, Name: c.project.Name, Include: h.includes(c.project)})
 		meta = append(meta, source{projectID: c.project.ID, checkout: c.named})
 	}
 	matches, truncated, err := h.files.SearchSources(ctx, srcs, msg.GetQuery(), int(msg.GetLimit()), msg.GetFilesOnly())
@@ -183,7 +203,7 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 		src := meta[m.Source]
 		out.Matches[i] = &v1.FileMatch{
 			Path: m.Path, IsDir: m.IsDir, ProjectId: src.projectID, Checkout: src.checkout,
-			PathPositions: int32s(m.PathPositions), ProjectPositions: int32s(m.NamePositions),
+			PathPositions: int32s(m.PathPositions), ProjectPositions: int32s(m.NamePositions), Ignored: m.Ignored,
 		}
 	}
 	return connect.NewResponse(out), nil

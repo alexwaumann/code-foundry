@@ -48,7 +48,7 @@ var pageState = []string{
 	"file.find", "file.save", "file.search", "file.search.next", "file.search.previous", "memory.clear", "memory.remove", "notifications.test",
 	"plugin.act", "plugin.browse", "plugin.disable", "plugin.reload", "plugin.restart",
 	"plugin.surface", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "project.add",
-	"project.create", "project.refresh", "project.rename", "project.unregister", "search.clear",
+	"project.create", "project.files.include", "project.refresh", "project.rename", "project.unregister", "search.clear",
 	"search.find", "search.forget", "search.open", "search.open-hit", "search.promote",
 	"search.report", "search.seen", "search.stop", "settings.reset", "settings.reveal",
 	"settings.set", "skill.browse", "skill.refresh", "terminal.close", "terminal.cycle", "terminal.find",

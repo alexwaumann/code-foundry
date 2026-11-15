@@ -10,9 +10,14 @@
 -- the classic window's own side panels were never removed from its storage, so they come back
 -- as they were. A later update runs 0061 again and imports the classic panels once more.
 -- docs/notes/shell-24a-import-moves.md, item 6.
+--
+-- Migrations after 0061 are undone too, since the older build refuses any it does not know:
+-- 0062 (projects' include patterns for file search) loses each project's own patterns, and a
+-- later update makes the empty table again (docs/notes/file-search-1-includes.md).
 BEGIN;
 DROP TABLE IF EXISTS layout_spaces;
 DROP TABLE IF EXISTS layout_threads;
 DROP TABLE IF EXISTS layout_meta;
-DELETE FROM schema_migrations WHERE version = 61;
+DROP TABLE IF EXISTS project_include_ignored;
+DELETE FROM schema_migrations WHERE version IN (61, 62);
 COMMIT;

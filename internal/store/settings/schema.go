@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/model"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
 	"github.com/alexwaumann/code-foundry/internal/theme"
@@ -130,6 +131,7 @@ const (
 	GroupModels      = "models"
 	GroupGitHub      = "github"
 	GroupProjects    = "projects"
+	GroupFiles       = "files"
 	GroupGitOps      = "gitops"
 	GroupAppearance  = "appearance"
 	GroupLayout      = "layout"
@@ -164,6 +166,7 @@ var Pages = []Page{
 		{ID: "threads", Title: "Threads"},
 		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
 		{ID: "lifecycle", Title: "Lifecycle"},
+		{ID: "files", Title: "Files", Description: "What Go to File and @ completion find."},
 		{ID: "dictation", Title: "Dictation", Description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it."},
 		{ID: "updates", Title: "Updates"},
 	}},
@@ -201,6 +204,7 @@ var Groups = []Group{
 	{GroupModels, "Models", "The models Code Foundry uses for its own jobs."},
 	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
 	{GroupProjects, "Projects", "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin."},
+	{GroupFiles, "Files", "What Go to File and @ completion find."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
@@ -232,6 +236,7 @@ const (
 	KeyBranchInstructions        = "projects.branch_instructions"
 	KeyBaseFromOrigin            = "projects.base_from_origin"
 	KeyEditorCommand             = "gitops.editor_command"
+	KeyIncludeIgnored            = "files.include_ignored"
 	KeyTheme                     = "appearance.theme"
 	KeyThemeDark                 = "appearance.theme_dark"
 	KeyThemeLight                = "appearance.theme_light"
@@ -273,16 +278,19 @@ const (
 	KeyEmberEpochTokens          = "ember.epoch_context_tokens"
 	KeyEmberEpochHours           = "ember.epoch_max_hours"
 	keybindingKeyPrefix          = GroupKeybindings + "."
-	defaultFontFamily            = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
-	defaultScrollback            = 30000
-	defaultCloseGrace            = 10
-	defaultCacheTTL              = 3600
-	defaultGhPollSeconds         = 60
-	defaultFetchSeconds          = 120
-	defaultSoundVolume           = 50
-	defaultAlertCooldown         = 60
-	defaultEmberEpochTokens      = 400000
-	defaultEmberEpochHours       = 24
+	// DefaultIncludeIgnored is files.include_ignored's default: the ignored files people
+	// most often want to open (fsx.SplitIncludeSetting reads it).
+	DefaultIncludeIgnored   = ".env*, CLAUDE.local.md, .claude/settings.local.json"
+	defaultFontFamily       = "JetBrainsMono Nerd Font Mono, JetBrains Mono, SF Mono, Menlo"
+	defaultScrollback       = 30000
+	defaultCloseGrace       = 10
+	defaultCacheTTL         = 3600
+	defaultGhPollSeconds    = 60
+	defaultFetchSeconds     = 120
+	defaultSoundVolume      = 50
+	defaultAlertCooldown    = 60
+	defaultEmberEpochTokens = 400000
+	defaultEmberEpochHours  = 24
 )
 
 // emberEfforts are ember.effort's levels.
@@ -426,6 +434,17 @@ var staticFields = []Field{
 	},
 	// General › Dictation. The rest of the section is the dictation store's state
 	// (DictationService.Watch): the model, its download, this Mac.
+	// General › Files.
+	{
+		Key: KeyIncludeIgnored, Group: GroupFiles, Page: PageGeneral, Section: "files", Type: String, Title: "Ignored files to include",
+		Description: "Git-ignored files that Go to File and @ still find, in every project, as .gitignore-style patterns separated by commas. " +
+			"A pattern without a slash matches a name at any depth (.env*), one with a slash a path from the project's folder (docs/scratch/), " +
+			"and a trailing slash only folders. A name never reaches inside an ignored folder that does not match itself, so .env* skips node_modules. " +
+			"A project can add its own patterns. none for no patterns.",
+		Default: DefaultIncludeIgnored, Placeholder: ".env*, docs/scratch/",
+		check: fsx.CheckIncludeSetting,
+		bind:  func(s *Settings) any { return &s.Files.IncludeIgnored },
+	},
 	{
 		Key: KeyDictationEnabled, Group: GroupDictation, Page: PageGeneral, Section: "dictation", Type: Bool, Title: "Dictation",
 		Description: "Adds a microphone button to every composer.",
