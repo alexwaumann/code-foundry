@@ -1,0 +1,11 @@
+/*
+ * The log preview (LogBody.tsx): rows of the code view's mono type (code.css, 12px on a
+ * 20px row) so a log reads like the file's Source, tabs at 4.
+ */
+.cf-file-log {
+  font-family: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  tab-size: 4;
+  color: var(--cf-text);
+}

@@ -54,18 +54,20 @@ Source), and the header gains Copy contents.
   whose kind sets `wrap`; find works in Source and in a preview whose kind sets `find`
   (markdown). An SVG's Image mode lost the wrap toggle it used to show by mistake.
 - **Copy contents** sits right after Copy path, with the same check for a moment. It shows for
-  a whole text read only (not a truncated one: that would copy part of the file silently; not
+  a whole text read only (not a truncated one, nor a tail read: that would copy part of the file silently; not
   images, PDFs, binaries, folders). It copies the draft while editing, `kind.copy(file)` in a
   preview mode when the kind has one (tables will copy tab-separated text), else the text.
 - **Too large.** `tooLarge: "Image"` makes a cut read show "Image · 48 MB · too large to show"
   (test id `file-<kind>-too-large`) in the preview mode. A truncated SVG still has Source.
 - **SVG Source is highlighted as XML.** @pierre/diffs maps no `.svg`, so `source: { lang:
   "xml", name: "SVG" }` passes `lang` through CodeBody to the library's `FileContents.lang`.
-- **Reads.** `read?: "whole"` is the only read today. Which read a file gets has to be known
-  before reading, so it is the read of `previewKindOf(path, null)` (extension only). PR 2 added
-  `readFileTail` (logs) and `streamFile` (media) to `src/api/files.ts`; the kind that first
-  needs one adds its value to `read` in types.ts and the choice to FileTab's `readTarget`
-  (`readFile` for "whole").
+- **Reads.** `read?: PreviewRead` (types.ts): "whole" (the default, `readFile`) or "tail"
+  (`readFileTail`, the log kind's: file-previews-6-logs.md). Which read a file gets has to be
+  known before reading, so it is the read of `previewKindOf(path, null)` (extension only);
+  FileTab's `READS` maps each value to its call and `readTarget` uses it for every read of
+  the tab (the first, a found path, an edit session's). A kind with a new read adds its value
+  to `PreviewRead` and one entry to `READS`. FileTab says "Showing the last 1 MiB of 38 MB"
+  when a read's `truncatedStart` is set, whatever the kind.
 - **Bodies in their own files.** oxlint's `react/only-export-components` refuses a component
   in a file whose default export is a kind, so a kind file holds the object and its body lives
   beside it (`previews/<Name>Body.tsx`).
