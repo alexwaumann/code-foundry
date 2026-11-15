@@ -136,7 +136,13 @@
  *   POST /__mock/files?project=repo-cf&path=a.ts&path=src/b.ts   (that project's files; no path:
  *                                                 none; reset restores DEFAULT_FILES; several
  *                                                 projects: project=a&path=x&project=b&path=y)
- *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
+ *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>",
+ *                                                 "text <project,…> <query>")
+ *   FilesystemService.SearchText: mock/textSearch.ts (SearchFiles' files; contents from the mock
+ *        disk, DEFAULT_TEXT, or one line naming the file)
+ *   POST /__mock/text?project=repo-cf&path=src/a.ts&text=…   (files' contents for text search: path=
+ *                                                 then its text=, repeated; reset forgets them)
+ *   POST /__mock/text/delay?ms=300               (each SearchText message waits this long; reset: 0)
  *   Include patterns (files.include_ignored, ProjectService.SetIncludeIgnored, SuggestIncludeIgnored,
  *        FileMatch.ignored): mock/includeIgnored.ts (every git project has its IGNORED entries; one
  *        whose files POST /__mock/files set has none until this sets them)
@@ -274,6 +280,7 @@ import { bridgeRoute, holdWait, mockWaits, resetWaits } from "./bridge";
 import { pagelibRoute } from "./pagelib";
 import { serveTunnel } from "./tunnel";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFiles, setMockFiles } from "./filesystem";
+import { resetText, searchText, setMockText, setTextDelay } from "./textSearch";
 import { cloneRepo, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { renameProjectIn } from "./projectRename";
 import { type MockIgnored, resetIgnored, setIncludeIgnoredIn, setMockIgnored, splitIncludeSetting, suggestIncludeIgnored } from "./includeIgnored";
@@ -464,6 +471,11 @@ function routes(router: ConnectRouter): void {
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
     searchFiles: (req) => searchFiles(world.projects, req, splitIncludeSetting(world.settings.value("files.include_ignored"))),
+    searchText: (req, ctx) =>
+      tracked(
+        "FilesystemService/SearchText",
+        searchText(world.projects, req, splitIncludeSetting(world.settings.value("files.include_ignored")), (abs) => mockFiles.textOf(abs), ctx.signal),
+      ),
     suggestIncludeIgnored: (req) => {
       const p = world.projects.get(req.projectId);
       if (req.projectId === "") throw new ConnectError("project_id is required", Code.InvalidArgument);
@@ -1537,6 +1549,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       world.reset();
       resetClones();
       resetCompletion();
+      resetText();
       resetIgnored();
       mockFiles.reset();
       resetPageStorage();
@@ -1577,6 +1590,29 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { project, entries });
       break;
     }
+    case "POST /__mock/text": {
+      // Each path= is followed by its text=.
+      const project = q.get("project") ?? "";
+      if (!world.projects.has(project)) {
+        json(res, 404, { error: `unknown project ${project}` });
+        break;
+      }
+      const set: { path: string; text: string }[] = [];
+      for (const [k, v] of q) {
+        if (k === "path") set.push({ path: v, text: "" });
+        else if (k === "text") {
+          const last = set.at(-1);
+          if (last) last.text = v;
+        }
+      }
+      for (const f of set) setMockText(project, f.path, f.text);
+      json(res, 200, { project, files: set.map((f) => f.path) });
+      break;
+    }
+    case "POST /__mock/text/delay":
+      setTextDelay(Number(q.get("ms") ?? "0"));
+      json(res, 200, { ok: true });
+      break;
     case "GET /__mock/files/calls":
       json(res, 200, completionCalls);
       break;

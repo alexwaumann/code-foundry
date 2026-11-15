@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -178,4 +179,40 @@ func ParseVersion(out string) (string, error) {
 		return "", fmt.Errorf("--version printed %q, not ripgrep's version line", first)
 	}
 	return m[1], nil
+}
+
+// Engine finds and checks ripgrep once, on first use, and keeps the outcome for the
+// daemon's lifetime: text search asks it on every query without running anything again.
+// An install that is missing or broken stays so until the daemon restarts (an update or
+// reinstall restarts it). Safe for concurrent use.
+type Engine struct {
+	find func() (Binary, error)
+	once sync.Once
+	bin  Binary
+	ver  string
+	err  error
+}
+
+// NewEngine returns an Engine that finds ripgrep with find (nil: Find).
+func NewEngine(find func() (Binary, error)) *Engine {
+	if find == nil {
+		find = Find
+	}
+	return &Engine{find: find}
+}
+
+// Get returns the binary and its version, finding and checking it on the first call
+// (the first caller's context does not bound the check: one cancelled keystroke must not
+// mark ripgrep broken for good). The error wraps ErrMissing or ErrBroken.
+func (e *Engine) Get() (Binary, string, error) {
+	e.once.Do(func() {
+		bin, err := e.find()
+		if err != nil {
+			e.err = err
+			return
+		}
+		e.bin = bin
+		e.ver, e.err = bin.Check(context.Background())
+	})
+	return e.bin, e.ver, e.err
 }

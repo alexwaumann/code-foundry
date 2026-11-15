@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -539,5 +540,42 @@ func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
 	}
 	if len(ms) != 2 || ms[0].Path != "a.go" || ms[1].Path != "b.go" {
 		t.Fatalf("matches = %+v", ms)
+	}
+}
+
+// Files hands text search the cached lists file search ranks: files only, by path, without
+// paths a protobuf string cannot carry, and no second listing.
+func TestFileIndexFiles(t *testing.T) {
+	x := NewFileIndex(nil)
+	var listings atomic.Int32
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, error) {
+		listings.Add(1)
+		if dir == "/b" {
+			return []FileEntry{{Path: "z.go"}}, nil
+		}
+		return []FileEntry{
+			{Path: "src", IsDir: true}, {Path: "src/b.go"}, {Path: "a.go"}, {Path: "bad\xff.go"},
+			{Path: ".env", Ignored: true}, {Path: "src/a.go"},
+		}, nil
+	}
+	srcs := []Source{{Dir: "/a", Git: true}, {Dir: "/b", Git: true}}
+	if _, _, err := x.SearchSources(context.Background(), srcs, "go", 10, true); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		lists, err := x.Files(context.Background(), srcs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := [][]FileEntry{
+			{{Path: ".env", Ignored: true}, {Path: "a.go"}, {Path: "src/a.go"}, {Path: "src/b.go"}},
+			{{Path: "z.go"}},
+		}
+		if !reflect.DeepEqual(lists, want) {
+			t.Errorf("Files = %v, want %v", lists, want)
+		}
+	}
+	if n := listings.Load(); n != 2 {
+		t.Errorf("%d listings, want one per checkout", n)
 	}
 }

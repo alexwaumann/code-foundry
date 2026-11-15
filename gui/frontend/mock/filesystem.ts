@@ -277,6 +277,34 @@ function withParentDirs(files: readonly string[]): { path: string; isDir: boolea
   return [...dirs.map((path) => ({ path, isDir: true })), ...files.map((path) => ({ path, isDir: false }))];
 }
 
+/** A search's checkout: its project and the path as named (or the main worktree). */
+export interface ResolvedSource {
+  project: CompletionProject;
+  checkout: string;
+}
+
+/** A search's sources resolved, a checkout named twice kept once (SearchFiles, SearchText). */
+export function resolveSources(projects: ReadonlyMap<string, CompletionProject>, named: readonly SearchSource[]): ResolvedSource[] {
+  const sources: ResolvedSource[] = [];
+  for (const n of named) {
+    const project = completionCheckout(projects, n.projectId, n.path);
+    const checkout = n.path === "" ? project.path : clean(n.path);
+    if (!sources.some((s) => s.checkout === checkout)) sources.push({ project, checkout });
+  }
+  return sources;
+}
+
+/**
+ * A source's files and directories as file search lists them: the project's files, then the
+ * ignored files its effective patterns include (settingIncludes, then its own), marked.
+ */
+export function sourceEntries(src: ResolvedSource, settingIncludes: readonly string[]): { path: string; isDir: boolean; ignored: boolean }[] {
+  return withIncluded(
+    filesByProject.get(src.project.id) ?? DEFAULT_FILES,
+    src.project.git === false ? [] : includedIgnored(src.project.id, mergeIncludes(settingIncludes, src.project.includeIgnored ?? [])),
+  );
+}
+
 /** One checkout of a SearchFiles request. */
 export interface SearchSource {
   projectId: string;
@@ -332,18 +360,10 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
   else if (named.length > MAX_SOURCES) throw invalid(`${String(named.length)} sources, at most ${String(MAX_SOURCES)}`);
   const words = query.split(/\s+/).filter((w) => w !== "");
   if (words.length > MAX_WORDS) throw invalid(`query has ${String(words.length)} words, at most ${String(MAX_WORDS)}`);
-  const sources: { project: CompletionProject; checkout: string }[] = [];
-  for (const n of named) {
-    const project = completionCheckout(projects, n.projectId, n.path);
-    const checkout = n.path === "" ? project.path : clean(n.path);
-    if (!sources.some((s) => s.checkout === checkout)) sources.push({ project, checkout });
-  }
+  const sources = resolveSources(projects, named);
   completionCalls.push(`search ${sources.map((s) => s.project.id).join(",")} ${query}`);
   const hits = sources.flatMap((src, si) =>
-    withIncluded(
-      filesByProject.get(src.project.id) ?? DEFAULT_FILES,
-      src.project.git === false ? [] : includedIgnored(src.project.id, mergeIncludes(settingIncludes, src.project.includeIgnored ?? [])),
-    )
+    sourceEntries(src, settingIncludes)
       .filter((e) => !req.filesOnly || !e.isDir)
       .map((e) => {
         const each = words.map((w) => wordMatch(e.path, w));

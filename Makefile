@@ -204,8 +204,9 @@ fuzz:
 
 # go test -race over both modules, the slow packages split into groups that run side by
 # side (scripts/go-test.sh, docs/notes/check-speed.md). GO_TEST_SPLIT= runs them whole.
-go-test: gui-dist-stub ghostty-vt whisper-cpp
-	@scripts/go-test.sh
+# The text search tests run the pinned ripgrep (ripgreptest.Real).
+go-test: gui-dist-stub ghostty-vt whisper-cpp ripgrep
+	@CODE_FOUNDRY_RG_BIN="$(RIPGREP_BIN)" scripts/go-test.sh
 
 frontend-deps: bun-version
 	bun install --cwd $(FRONTEND) --frozen-lockfile

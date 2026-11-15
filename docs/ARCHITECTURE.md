@@ -175,6 +175,8 @@ internal/
   fsx/                     the home-directory boundary, directory completion, file reads and writes,
                            file search's candidates and the ignored files include patterns add
   fuzzy/                   path ranking for `@` completion and the file finder (pure)
+  textsearch/              text search (SearchText): ripgrep over exactly file search's files, in
+                           ordered chunks, caps and code-point ranges (docs/notes/file-search-4-text-rpc.md)
   logfile/                 a size-capped log file with one rotation (daemon and plugin logs)
   model/                   the one list of Claude models the app offers
   pricing/                 Claude API token prices for the usage figures
@@ -477,6 +479,8 @@ Services (v1):
   marked `ignored`; SuggestIncludeIgnored helps add one (`docs/notes/file-search-1-includes.md`).
   The GUI edits both lists (Settings › General's list and a git project's Search section) and
   labels such rows `ignored` in cmd+P and the `@` card (`docs/notes/file-search-2-includes-gui.md`).
+  SearchText streams the content matches of the same files (the shipped ripgrep over their
+  paths; smart case, word, regex; stable order, capped; `docs/notes/file-search-4-text-rpc.md`).
   ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
   anywhere under home except the config home outside its checkouts, and answers a file
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).

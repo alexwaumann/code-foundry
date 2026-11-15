@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKTAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUSDwoHaWdub3JlZBgHIAEoCCJUChNTZWFyY2hGaWxlc1Jlc3BvbnNlEioKB21hdGNoZXMYASADKAsyGS5jb2RlZm91bmRyeS52MS5GaWxlTWF0Y2gSEQoJdHJ1bmNhdGVkGAIgASgIIk8KHFN1Z2dlc3RJbmNsdWRlSWdub3JlZFJlcXVlc3QSEgoKcHJvamVjdF9pZBgBIAEoCRIMCgR0ZXh0GAIgASgJEg0KBWxpbWl0GAMgASgFIqABChFJZ25vcmVkU3VnZ2VzdGlvbhIMCgRwYXRoGAEgASgJEg4KBmlzX2RpchgCIAEoCBISCgpmaWxlX2NvdW50GAMgASgFEhkKEWZpbGVfY291bnRfY2FwcGVkGAQgASgIEhAKCGluY2x1ZGVkGAUgASgIEhQKDG1hdGNoZXNfdGV4dBgGIAEoCBIWCg5wYXRoX3Bvc2l0aW9ucxgHIAMoBSKtAQodU3VnZ2VzdEluY2x1ZGVJZ25vcmVkUmVzcG9uc2USNgoLc3VnZ2VzdGlvbnMYASADKAsyIS5jb2RlZm91bmRyeS52MS5JZ25vcmVkU3VnZ2VzdGlvbhIRCgl0cnVuY2F0ZWQYAiABKAgSEgoKdGV4dF9maWxlcxgDIAEoBRIZChF0ZXh0X2ZpbGVzX2NhcHBlZBgEIAEoCBISCgp0ZXh0X2Vycm9yGAUgASgJIlIKD1JlYWRGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJEhEKCW1heF9ieXRlcxgDIAEoAxIMCgR0YWlsGAQgASgIIqYCChBSZWFkRmlsZVJlc3BvbnNlEhAKCGNvbnRlbnRzGAEgASgMEgwKBHNpemUYAiABKAMSEQoJdHJ1bmNhdGVkGAMgASgIEg4KBmJpbmFyeRgEIAEoCBIRCgltaW1lX3R5cGUYBSABKAkSEwoLbW9kaWZpZWRfYXQYBiABKAMSFQoNcmVzb2x2ZWRfcGF0aBgHIAEoCRIRCglub3RfZm91bmQYCCABKAgSDgoGaXNfZGlyGAkgASgIEhEKCXJlYWxfcGF0aBgKIAEoCRIMCgRtb2RlGAsgASgNEhQKDG91dHNpZGVfaG9tZRgMIAEoCBIXCg90cnVuY2F0ZWRfc3RhcnQYDSABKAgSDgoGb2Zmc2V0GA4gASgDEg0KBW1lZGlhGA8gASgIIoYBChBXcml0ZUZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkSEAoIY29udGVudHMYAyABKAwSEwoLbW9kaWZpZWRfYXQYBCABKAMSDAoEc2l6ZRgFIAEoAxINCgVmb3JjZRgGIAEoCBIOCgZjcmVhdGUYByABKAgicgoRV3JpdGVGaWxlUmVzcG9uc2USEwoLbW9kaWZpZWRfYXQYASABKAMSDAoEc2l6ZRgCIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAMgASgJEhAKCGNvbmZsaWN0GAQgASgIEhEKCW5vdF9mb3VuZBgFIAEoCCI0ChJQcmV2aWV3RmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCSIzChFTdHJlYW1GaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJIlcKElN0cmVhbUZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSEQoJbWltZV90eXBlGAIgASgJEgwKBHNpemUYAyABKAMSEwoLbW9kaWZpZWRfYXQYBCABKAMiRgoTUHJldmlld0ZpbGVSZXNwb25zZRILCgN1cmwYASABKAkSDQoFc2NvcGUYAiABKAkSEwoLc2luZ2xlX2ZpbGUYAyABKAgqWAoKU2tpbGxTY29wZRIbChdTS0lMTF9TQ09QRV9VTlNQRUNJRklFRBAAEhQKEFNLSUxMX1NDT1BFX1VTRVIQARIXChNTS0lMTF9TQ09QRV9QUk9KRUNUEAIy+AUKEUZpbGVzeXN0ZW1TZXJ2aWNlEmQKD0xpc3REaXJlY3RvcmllcxImLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1JlcXVlc3QaJy5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXNwb25zZSIAElUKCkxpc3RTa2lsbHMSIS5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXNwb25zZSIAElgKC1NlYXJjaEZpbGVzEiIuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuU2VhcmNoRmlsZXNSZXNwb25zZSIAEnYKFVN1Z2dlc3RJbmNsdWRlSWdub3JlZBIsLmNvZGVmb3VuZHJ5LnYxLlN1Z2dlc3RJbmNsdWRlSWdub3JlZFJlcXVlc3QaLS5jb2RlZm91bmRyeS52MS5TdWdnZXN0SW5jbHVkZUlnbm9yZWRSZXNwb25zZSIAEk8KCFJlYWRGaWxlEh8uY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXF1ZXN0GiAuY29kZWZvdW5kcnkudjEuUmVhZEZpbGVSZXNwb25zZSIAElIKCVdyaXRlRmlsZRIgLmNvZGVmb3VuZHJ5LnYxLldyaXRlRmlsZVJlcXVlc3QaIS5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXNwb25zZSIAElgKC1ByZXZpZXdGaWxlEiIuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXF1ZXN0GiMuY29kZWZvdW5kcnkudjEuUHJldmlld0ZpbGVSZXNwb25zZSIAElUKClN0cmVhbUZpbGUSIS5jb2RlZm91bmRyeS52MS5TdHJlYW1GaWxlUmVxdWVzdBoiLmNvZGVmb3VuZHJ5LnYxLlN0cmVhbUZpbGVSZXNwb25zZSIAQscBChJjb20uY29kZWZvdW5kcnkudjFCD0ZpbGVzeXN0ZW1Qcm90b1ABWkdnaXRodWIuY29tL2FsZXh3YXVtYW5uL2NvZGUtZm91bmRyeS9nZW4vZ28vY29kZWZvdW5kcnkvdjE7Y29kZWZvdW5kcnl2MaICA0NYWKoCDkNvZGVmb3VuZHJ5LlYxygIOQ29kZWZvdW5kcnlcVjHiAhpDb2RlZm91bmRyeVxWMVxHUEJNZXRhZGF0YeoCD0NvZGVmb3VuZHJ5OjpWMWIGcHJvdG8z");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKTAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUSDwoHaWdub3JlZBgHIAEoCCJUChNTZWFyY2hGaWxlc1Jlc3BvbnNlEioKB21hdGNoZXMYASADKAsyGS5jb2RlZm91bmRyeS52MS5GaWxlTWF0Y2gSEQoJdHJ1bmNhdGVkGAIgASgIIoYBChFTZWFyY2hUZXh0UmVxdWVzdBIrCgdzb3VyY2VzGAEgAygLMhouY29kZWZvdW5kcnkudjEuRmlsZVNvdXJjZRINCgVxdWVyeRgCIAEoCRISCgptYXRjaF9jYXNlGAMgASgIEhIKCndob2xlX3dvcmQYBCABKAgSDQoFcmVnZXgYBSABKAgidgoSU2VhcmNoVGV4dFJlc3BvbnNlEiwKBWZpbGVzGAEgAygLMh0uY29kZWZvdW5kcnkudjEuVGV4dEZpbGVNYXRjaBIyCgdzdW1tYXJ5GAIgASgLMiEuY29kZWZvdW5kcnkudjEuU2VhcmNoVGV4dFN1bW1hcnkisQEKDVRleHRGaWxlTWF0Y2gSEgoKcHJvamVjdF9pZBgBIAEoCRIQCghjaGVja291dBgCIAEoCRIMCgRwYXRoGAMgASgJEg8KB2lnbm9yZWQYBCABKAgSLAoFbGluZXMYBSADKAsyHS5jb2RlZm91bmRyeS52MS5UZXh0TGluZU1hdGNoEhIKCmxpbmVfY291bnQYBiABKAUSGQoRbGluZV9jb3VudF9jYXBwZWQYByABKAgiegoNVGV4dExpbmVNYXRjaBIMCgRsaW5lGAEgASgFEgwKBHRleHQYAiABKAkSKQoGcmFuZ2VzGAMgAygLMhkuY29kZWZvdW5kcnkudjEuVGV4dFJhbmdlEhEKCWN1dF9zdGFydBgEIAEoCBIPCgdjdXRfZW5kGAUgASgIIicKCVRleHRSYW5nZRINCgVzdGFydBgBIAEoBRILCgNlbmQYAiABKAUirgEKEVNlYXJjaFRleHRTdW1tYXJ5Eg0KBWxpbmVzGAEgASgFEg0KBWZpbGVzGAIgASgFEhEKCXRydW5jYXRlZBgDIAEoCBITCgtmaWxlX2NhcHBlZBgEIAEoCBIUCgx0b3RhbF9jYXBwZWQYBSABKAgSEQoJdGltZWRfb3V0GAYgASgIEhYKDmNhc2Vfc2Vuc2l0aXZlGAcgASgIEhIKCmVsYXBzZWRfbXMYCCABKAMiTwocU3VnZ2VzdEluY2x1ZGVJZ25vcmVkUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHRleHQYAiABKAkSDQoFbGltaXQYAyABKAUioAEKEUlnbm9yZWRTdWdnZXN0aW9uEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCmZpbGVfY291bnQYAyABKAUSGQoRZmlsZV9jb3VudF9jYXBwZWQYBCABKAgSEAoIaW5jbHVkZWQYBSABKAgSFAoMbWF0Y2hlc190ZXh0GAYgASgIEhYKDnBhdGhfcG9zaXRpb25zGAcgAygFIq0BCh1TdWdnZXN0SW5jbHVkZUlnbm9yZWRSZXNwb25zZRI2CgtzdWdnZXN0aW9ucxgBIAMoCzIhLmNvZGVmb3VuZHJ5LnYxLklnbm9yZWRTdWdnZXN0aW9uEhEKCXRydW5jYXRlZBgCIAEoCBISCgp0ZXh0X2ZpbGVzGAMgASgFEhkKEXRleHRfZmlsZXNfY2FwcGVkGAQgASgIEhIKCnRleHRfZXJyb3IYBSABKAkiUgoPUmVhZEZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkSEQoJbWF4X2J5dGVzGAMgASgDEgwKBHRhaWwYBCABKAgipgIKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgSEQoJcmVhbF9wYXRoGAogASgJEgwKBG1vZGUYCyABKA0SFAoMb3V0c2lkZV9ob21lGAwgASgIEhcKD3RydW5jYXRlZF9zdGFydBgNIAEoCBIOCgZvZmZzZXQYDiABKAMSDQoFbWVkaWEYDyABKAgihgEKEFdyaXRlRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIQCghjb250ZW50cxgDIAEoDBITCgttb2RpZmllZF9hdBgEIAEoAxIMCgRzaXplGAUgASgDEg0KBWZvcmNlGAYgASgIEg4KBmNyZWF0ZRgHIAEoCCJyChFXcml0ZUZpbGVSZXNwb25zZRITCgttb2RpZmllZF9hdBgBIAEoAxIMCgRzaXplGAIgASgDEhUKDXJlc29sdmVkX3BhdGgYAyABKAkSEAoIY29uZmxpY3QYBCABKAgSEQoJbm90X2ZvdW5kGAUgASgIIjQKElByZXZpZXdGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJIjMKEVN0cmVhbUZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkiVwoSU3RyZWFtRmlsZVJlc3BvbnNlEgsKA3VybBgBIAEoCRIRCgltaW1lX3R5cGUYAiABKAkSDAoEc2l6ZRgDIAEoAxITCgttb2RpZmllZF9hdBgEIAEoAyJGChNQcmV2aWV3RmlsZVJlc3BvbnNlEgsKA3VybBgBIAEoCRINCgVzY29wZRgCIAEoCRITCgtzaW5nbGVfZmlsZRgDIAEoCCpYCgpTa2lsbFNjb3BlEhsKF1NLSUxMX1NDT1BFX1VOU1BFQ0lGSUVEEAASFAoQU0tJTExfU0NPUEVfVVNFUhABEhcKE1NLSUxMX1NDT1BFX1BST0pFQ1QQAjLRBgoRRmlsZXN5c3RlbVNlcnZpY2USZAoPTGlzdERpcmVjdG9yaWVzEiYuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1Jlc3BvbnNlIgASVQoKTGlzdFNraWxscxIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1Jlc3BvbnNlIgASWAoLU2VhcmNoRmlsZXMSIi5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1Jlc3BvbnNlIgASVwoKU2VhcmNoVGV4dBIhLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaFRleHRSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuU2VhcmNoVGV4dFJlc3BvbnNlIgAwARJ2ChVTdWdnZXN0SW5jbHVkZUlnbm9yZWQSLC5jb2RlZm91bmRyeS52MS5TdWdnZXN0SW5jbHVkZUlnbm9yZWRSZXF1ZXN0Gi0uY29kZWZvdW5kcnkudjEuU3VnZ2VzdEluY2x1ZGVJZ25vcmVkUmVzcG9uc2UiABJPCghSZWFkRmlsZRIfLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVzcG9uc2UiABJSCglXcml0ZUZpbGUSIC5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVzcG9uc2UiABJYCgtQcmV2aWV3RmlsZRIiLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVzcG9uc2UiABJVCgpTdHJlYW1GaWxlEiEuY29kZWZvdW5kcnkudjEuU3RyZWFtRmlsZVJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5TdHJlYW1GaWxlUmVzcG9uc2UiAELHAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg9GaWxlc3lzdGVtUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -402,6 +402,288 @@ export const SearchFilesResponseSchema: GenMessage<SearchFilesResponse> = /*@__P
   messageDesc(file_codefoundry_v1_filesystem, 10);
 
 /**
+ * @generated from message codefoundry.v1.SearchTextRequest
+ */
+export type SearchTextRequest = Message<"codefoundry.v1.SearchTextRequest"> & {
+  /**
+   * The checkouts to search, in order (a thread sends its primary project first; its
+   * files come first). At most 16; a checkout named twice is searched once.
+   *
+   * @generated from field: repeated codefoundry.v1.FileSource sources = 1;
+   */
+  sources: FileSource[];
+
+  /**
+   * Literal text, or a regular expression with regex. One line, at most 500 characters.
+   *
+   * @generated from field: string query = 2;
+   */
+  query: string;
+
+  /**
+   * Match case even when the query is all lower case (smart case otherwise).
+   *
+   * @generated from field: bool match_case = 3;
+   */
+  matchCase: boolean;
+
+  /**
+   * Match only whole words (ripgrep's --word-regexp).
+   *
+   * @generated from field: bool whole_word = 4;
+   */
+  wholeWord: boolean;
+
+  /**
+   * The query is a regular expression (ripgrep's Rust syntax).
+   *
+   * @generated from field: bool regex = 5;
+   */
+  regex: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchTextRequest.
+ * Use `create(SearchTextRequestSchema)` to create a new message.
+ */
+export const SearchTextRequestSchema: GenMessage<SearchTextRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 11);
+
+/**
+ * @generated from message codefoundry.v1.SearchTextResponse
+ */
+export type SearchTextResponse = Message<"codefoundry.v1.SearchTextResponse"> & {
+  /**
+   * Files with matches, in the search's order, continuing the previous message's.
+   *
+   * @generated from field: repeated codefoundry.v1.TextFileMatch files = 1;
+   */
+  files: TextFileMatch[];
+
+  /**
+   * Set on the last message only, which has no files.
+   *
+   * @generated from field: codefoundry.v1.SearchTextSummary summary = 2;
+   */
+  summary?: SearchTextSummary | undefined;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchTextResponse.
+ * Use `create(SearchTextResponseSchema)` to create a new message.
+ */
+export const SearchTextResponseSchema: GenMessage<SearchTextResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 12);
+
+/**
+ * TextFileMatch is one file with matching lines.
+ *
+ * @generated from message codefoundry.v1.TextFileMatch
+ */
+export type TextFileMatch = Message<"codefoundry.v1.TextFileMatch"> & {
+  /**
+   * The project of the source the file is from.
+   *
+   * @generated from field: string project_id = 1;
+   */
+  projectId: string;
+
+  /**
+   * Absolute path of the checkout path is relative to: the source's path as given
+   * (cleaned), or the project's main worktree (as FileMatch.checkout).
+   *
+   * @generated from field: string checkout = 2;
+   */
+  checkout: string;
+
+  /**
+   * Relative to the checkout, forward slashes.
+   *
+   * @generated from field: string path = 3;
+   */
+  path: string;
+
+  /**
+   * Git ignores this file and an include pattern lists it anyway (as FileMatch.ignored).
+   *
+   * @generated from field: bool ignored = 4;
+   */
+  ignored: boolean;
+
+  /**
+   * The matching lines, in line order: at most 50, fewer when the search's 2,000 lines ran
+   * out in this file.
+   *
+   * @generated from field: repeated codefoundry.v1.TextLineMatch lines = 5;
+   */
+  lines: TextLineMatch[];
+
+  /**
+   * How many lines of the file match ("N in this file"), counted up to 999 even when
+   * fewer lines were sent; line_count_capped: more than that.
+   *
+   * @generated from field: int32 line_count = 6;
+   */
+  lineCount: number;
+
+  /**
+   * @generated from field: bool line_count_capped = 7;
+   */
+  lineCountCapped: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.TextFileMatch.
+ * Use `create(TextFileMatchSchema)` to create a new message.
+ */
+export const TextFileMatchSchema: GenMessage<TextFileMatch> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 13);
+
+/**
+ * TextLineMatch is one line with a match.
+ *
+ * @generated from message codefoundry.v1.TextLineMatch
+ */
+export type TextLineMatch = Message<"codefoundry.v1.TextLineMatch"> & {
+  /**
+   * 1-based.
+   *
+   * @generated from field: int32 line = 1;
+   */
+  line: number;
+
+  /**
+   * The line without its line break. Bytes that are not UTF-8 read as U+FFFD, one each.
+   * A line over 300 characters is cut to 300 around its first match (up to 40 characters
+   * before it): cut_start and cut_end say text begins after the line's start or ends
+   * before its end, for the GUI to show an ellipsis there.
+   *
+   * @generated from field: string text = 2;
+   */
+  text: string;
+
+  /**
+   * Every match in text, in order; one the cut crosses is clipped to text.
+   *
+   * @generated from field: repeated codefoundry.v1.TextRange ranges = 3;
+   */
+  ranges: TextRange[];
+
+  /**
+   * @generated from field: bool cut_start = 4;
+   */
+  cutStart: boolean;
+
+  /**
+   * @generated from field: bool cut_end = 5;
+   */
+  cutEnd: boolean;
+};
+
+/**
+ * Describes the message codefoundry.v1.TextLineMatch.
+ * Use `create(TextLineMatchSchema)` to create a new message.
+ */
+export const TextLineMatchSchema: GenMessage<TextLineMatch> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 14);
+
+/**
+ * TextRange is a span of TextLineMatch.text in code points (Go runes; in JavaScript the
+ * indices of Array.from(text)), not bytes or UTF-16 units. end is exclusive; a regex may
+ * match an empty span (start == end).
+ *
+ * @generated from message codefoundry.v1.TextRange
+ */
+export type TextRange = Message<"codefoundry.v1.TextRange"> & {
+  /**
+   * @generated from field: int32 start = 1;
+   */
+  start: number;
+
+  /**
+   * @generated from field: int32 end = 2;
+   */
+  end: number;
+};
+
+/**
+ * Describes the message codefoundry.v1.TextRange.
+ * Use `create(TextRangeSchema)` to create a new message.
+ */
+export const TextRangeSchema: GenMessage<TextRange> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 15);
+
+/**
+ * SearchTextSummary ends a search.
+ *
+ * @generated from message codefoundry.v1.SearchTextSummary
+ */
+export type SearchTextSummary = Message<"codefoundry.v1.SearchTextSummary"> & {
+  /**
+   * Lines and files sent.
+   *
+   * @generated from field: int32 lines = 1;
+   */
+  lines: number;
+
+  /**
+   * @generated from field: int32 files = 2;
+   */
+  files: number;
+
+  /**
+   * There may be matches that were not sent: file_capped, total_capped or timed_out.
+   *
+   * @generated from field: bool truncated = 3;
+   */
+  truncated: boolean;
+
+  /**
+   * Some file has more matching lines than the 50 sent for it (its line_count says how
+   * many).
+   *
+   * @generated from field: bool file_capped = 4;
+   */
+  fileCapped: boolean;
+
+  /**
+   * The search stopped at 2,000 lines; files after the last one sent were not searched.
+   *
+   * @generated from field: bool total_capped = 5;
+   */
+  totalCapped: boolean;
+
+  /**
+   * The search stopped at its 15 seconds; files after the last one sent were not searched.
+   *
+   * @generated from field: bool timed_out = 6;
+   */
+  timedOut: boolean;
+
+  /**
+   * The query matched case-sensitively: match_case, or smart case found an upper-case
+   * letter.
+   *
+   * @generated from field: bool case_sensitive = 7;
+   */
+  caseSensitive: boolean;
+
+  /**
+   * From the request to the summary.
+   *
+   * @generated from field: int64 elapsed_ms = 8;
+   */
+  elapsedMs: bigint;
+};
+
+/**
+ * Describes the message codefoundry.v1.SearchTextSummary.
+ * Use `create(SearchTextSummarySchema)` to create a new message.
+ */
+export const SearchTextSummarySchema: GenMessage<SearchTextSummary> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 16);
+
+/**
  * @generated from message codefoundry.v1.SuggestIncludeIgnoredRequest
  */
 export type SuggestIncludeIgnoredRequest = Message<"codefoundry.v1.SuggestIncludeIgnoredRequest"> & {
@@ -430,7 +712,7 @@ export type SuggestIncludeIgnoredRequest = Message<"codefoundry.v1.SuggestInclud
  * Use `create(SuggestIncludeIgnoredRequestSchema)` to create a new message.
  */
 export const SuggestIncludeIgnoredRequestSchema: GenMessage<SuggestIncludeIgnoredRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 11);
+  messageDesc(file_codefoundry_v1_filesystem, 17);
 
 /**
  * @generated from message codefoundry.v1.IgnoredSuggestion
@@ -491,7 +773,7 @@ export type IgnoredSuggestion = Message<"codefoundry.v1.IgnoredSuggestion"> & {
  * Use `create(IgnoredSuggestionSchema)` to create a new message.
  */
 export const IgnoredSuggestionSchema: GenMessage<IgnoredSuggestion> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 12);
+  messageDesc(file_codefoundry_v1_filesystem, 18);
 
 /**
  * @generated from message codefoundry.v1.SuggestIncludeIgnoredResponse
@@ -538,7 +820,7 @@ export type SuggestIncludeIgnoredResponse = Message<"codefoundry.v1.SuggestInclu
  * Use `create(SuggestIncludeIgnoredResponseSchema)` to create a new message.
  */
 export const SuggestIncludeIgnoredResponseSchema: GenMessage<SuggestIncludeIgnoredResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 13);
+  messageDesc(file_codefoundry_v1_filesystem, 19);
 
 /**
  * @generated from message codefoundry.v1.ReadFileRequest
@@ -584,7 +866,7 @@ export type ReadFileRequest = Message<"codefoundry.v1.ReadFileRequest"> & {
  * Use `create(ReadFileRequestSchema)` to create a new message.
  */
 export const ReadFileRequestSchema: GenMessage<ReadFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 14);
+  messageDesc(file_codefoundry_v1_filesystem, 20);
 
 /**
  * @generated from message codefoundry.v1.ReadFileResponse
@@ -711,7 +993,7 @@ export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
  * Use `create(ReadFileResponseSchema)` to create a new message.
  */
 export const ReadFileResponseSchema: GenMessage<ReadFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 15);
+  messageDesc(file_codefoundry_v1_filesystem, 21);
 
 /**
  * @generated from message codefoundry.v1.WriteFileRequest
@@ -774,7 +1056,7 @@ export type WriteFileRequest = Message<"codefoundry.v1.WriteFileRequest"> & {
  * Use `create(WriteFileRequestSchema)` to create a new message.
  */
 export const WriteFileRequestSchema: GenMessage<WriteFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 16);
+  messageDesc(file_codefoundry_v1_filesystem, 22);
 
 /**
  * @generated from message codefoundry.v1.WriteFileResponse
@@ -823,7 +1105,7 @@ export type WriteFileResponse = Message<"codefoundry.v1.WriteFileResponse"> & {
  * Use `create(WriteFileResponseSchema)` to create a new message.
  */
 export const WriteFileResponseSchema: GenMessage<WriteFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 17);
+  messageDesc(file_codefoundry_v1_filesystem, 23);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileRequest
@@ -850,7 +1132,7 @@ export type PreviewFileRequest = Message<"codefoundry.v1.PreviewFileRequest"> & 
  * Use `create(PreviewFileRequestSchema)` to create a new message.
  */
 export const PreviewFileRequestSchema: GenMessage<PreviewFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 18);
+  messageDesc(file_codefoundry_v1_filesystem, 24);
 
 /**
  * @generated from message codefoundry.v1.StreamFileRequest
@@ -877,7 +1159,7 @@ export type StreamFileRequest = Message<"codefoundry.v1.StreamFileRequest"> & {
  * Use `create(StreamFileRequestSchema)` to create a new message.
  */
 export const StreamFileRequestSchema: GenMessage<StreamFileRequest> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 19);
+  messageDesc(file_codefoundry_v1_filesystem, 25);
 
 /**
  * @generated from message codefoundry.v1.StreamFileResponse
@@ -918,7 +1200,7 @@ export type StreamFileResponse = Message<"codefoundry.v1.StreamFileResponse"> & 
  * Use `create(StreamFileResponseSchema)` to create a new message.
  */
 export const StreamFileResponseSchema: GenMessage<StreamFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 20);
+  messageDesc(file_codefoundry_v1_filesystem, 26);
 
 /**
  * @generated from message codefoundry.v1.PreviewFileResponse
@@ -955,7 +1237,7 @@ export type PreviewFileResponse = Message<"codefoundry.v1.PreviewFileResponse"> 
  * Use `create(PreviewFileResponseSchema)` to create a new message.
  */
 export const PreviewFileResponseSchema: GenMessage<PreviewFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 21);
+  messageDesc(file_codefoundry_v1_filesystem, 27);
 
 /**
  * @generated from enum codefoundry.v1.SkillScope
@@ -1066,6 +1348,42 @@ export const FilesystemService: GenService<{
     methodKind: "unary";
     input: typeof SearchFilesRequestSchema;
     output: typeof SearchFilesResponseSchema;
+  },
+  /**
+   * SearchText searches the contents of the files SearchFiles lists for the same sources
+   * (git's view plus the included ignored files, or the walk of a project without git):
+   * a file is findable by name and by contents, or by neither. It runs the shipped
+   * ripgrep over those files' paths.
+   *
+   * Matching: query is literal text, spaces included ("func Home" is a phrase), one line.
+   * Smart case: without match_case, a query with no upper-case letter ignores case and
+   * one with an upper-case letter matches it (in a regex, a letter after a backslash, as
+   * in \W or \p{Lu}, does not count); the summary says which. whole_word matches at word
+   * boundaries. regex reads the query as a regular expression in ripgrep's (Rust) syntax.
+   * No fuzzy matching. A file with a NUL byte (binary) is skipped.
+   *
+   * The stream: messages with files in a stable order (the sources in the order given, a
+   * source's files by path; each file whole in one message), the first as soon as the first
+   * few files are searched, then one last message with the summary alone. The same query
+   * over the same files gives the same order. Cancelling the request stops ripgrep at once.
+   *
+   * Bounds: at most 50 lines sent per file (line_count counts on to 999), 2,000 lines per
+   * search, 300 characters per line (a longer line is cut around its first match), a
+   * query of at most 500 characters, 15 seconds (then the summary says timed_out, with what
+   * was found). An empty query sends the summary alone.
+   *
+   * Errors: InvalidArgument for no sources, more than 16, a source without a project, a
+   * path outside home, a query that is too long, more than one line or holds a NUL, and a
+   * regex ripgrep cannot compile (the message is ripgrep's reason, readable as is after
+   * "invalid argument: "); NotFound for an unknown project or checkout; FailedPrecondition
+   * when ripgrep is missing or broken (the message says to update or reinstall).
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.SearchText
+   */
+  searchText: {
+    methodKind: "server_streaming";
+    input: typeof SearchTextRequestSchema;
+    output: typeof SearchTextResponseSchema;
   },
   /**
    * SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a

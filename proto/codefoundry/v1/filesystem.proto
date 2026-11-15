@@ -57,6 +57,35 @@ service FilesystemService {
   // more than 8 words is InvalidArgument.
   rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {}
 
+  // SearchText searches the contents of the files SearchFiles lists for the same sources
+  // (git's view plus the included ignored files, or the walk of a project without git):
+  // a file is findable by name and by contents, or by neither. It runs the shipped
+  // ripgrep over those files' paths.
+  //
+  // Matching: query is literal text, spaces included ("func Home" is a phrase), one line.
+  // Smart case: without match_case, a query with no upper-case letter ignores case and
+  // one with an upper-case letter matches it (in a regex, a letter after a backslash, as
+  // in \W or \p{Lu}, does not count); the summary says which. whole_word matches at word
+  // boundaries. regex reads the query as a regular expression in ripgrep's (Rust) syntax.
+  // No fuzzy matching. A file with a NUL byte (binary) is skipped.
+  //
+  // The stream: messages with files in a stable order (the sources in the order given, a
+  // source's files by path; each file whole in one message), the first as soon as the first
+  // few files are searched, then one last message with the summary alone. The same query
+  // over the same files gives the same order. Cancelling the request stops ripgrep at once.
+  //
+  // Bounds: at most 50 lines sent per file (line_count counts on to 999), 2,000 lines per
+  // search, 300 characters per line (a longer line is cut around its first match), a
+  // query of at most 500 characters, 15 seconds (then the summary says timed_out, with what
+  // was found). An empty query sends the summary alone.
+  //
+  // Errors: InvalidArgument for no sources, more than 16, a source without a project, a
+  // path outside home, a query that is too long, more than one line or holds a NUL, and a
+  // regex ripgrep cannot compile (the message is ripgrep's reason, readable as is after
+  // "invalid argument: "); NotFound for an unknown project or checkout; FailedPrecondition
+  // when ripgrep is missing or broken (the message says to update or reinstall).
+  rpc SearchText(SearchTextRequest) returns (stream SearchTextResponse) {}
+
   // SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
   // project or to the files.include_ignored setting. It lists the git-ignored entries of
   // the project's main worktree as git reports them (git ls-files -oi --exclude-standard
@@ -264,6 +293,91 @@ message SearchFilesResponse {
   repeated FileMatch matches = 1;
   // More entries matched than were returned.
   bool truncated = 2;
+}
+
+message SearchTextRequest {
+  // The checkouts to search, in order (a thread sends its primary project first; its
+  // files come first). At most 16; a checkout named twice is searched once.
+  repeated FileSource sources = 1;
+  // Literal text, or a regular expression with regex. One line, at most 500 characters.
+  string query = 2;
+  // Match case even when the query is all lower case (smart case otherwise).
+  bool match_case = 3;
+  // Match only whole words (ripgrep's --word-regexp).
+  bool whole_word = 4;
+  // The query is a regular expression (ripgrep's Rust syntax).
+  bool regex = 5;
+}
+
+message SearchTextResponse {
+  // Files with matches, in the search's order, continuing the previous message's.
+  repeated TextFileMatch files = 1;
+  // Set on the last message only, which has no files.
+  SearchTextSummary summary = 2;
+}
+
+// TextFileMatch is one file with matching lines.
+message TextFileMatch {
+  // The project of the source the file is from.
+  string project_id = 1;
+  // Absolute path of the checkout path is relative to: the source's path as given
+  // (cleaned), or the project's main worktree (as FileMatch.checkout).
+  string checkout = 2;
+  // Relative to the checkout, forward slashes.
+  string path = 3;
+  // Git ignores this file and an include pattern lists it anyway (as FileMatch.ignored).
+  bool ignored = 4;
+  // The matching lines, in line order: at most 50, fewer when the search's 2,000 lines ran
+  // out in this file.
+  repeated TextLineMatch lines = 5;
+  // How many lines of the file match ("N in this file"), counted up to 999 even when
+  // fewer lines were sent; line_count_capped: more than that.
+  int32 line_count = 6;
+  bool line_count_capped = 7;
+}
+
+// TextLineMatch is one line with a match.
+message TextLineMatch {
+  // 1-based.
+  int32 line = 1;
+  // The line without its line break. Bytes that are not UTF-8 read as U+FFFD, one each.
+  // A line over 300 characters is cut to 300 around its first match (up to 40 characters
+  // before it): cut_start and cut_end say text begins after the line's start or ends
+  // before its end, for the GUI to show an ellipsis there.
+  string text = 2;
+  // Every match in text, in order; one the cut crosses is clipped to text.
+  repeated TextRange ranges = 3;
+  bool cut_start = 4;
+  bool cut_end = 5;
+}
+
+// TextRange is a span of TextLineMatch.text in code points (Go runes; in JavaScript the
+// indices of Array.from(text)), not bytes or UTF-16 units. end is exclusive; a regex may
+// match an empty span (start == end).
+message TextRange {
+  int32 start = 1;
+  int32 end = 2;
+}
+
+// SearchTextSummary ends a search.
+message SearchTextSummary {
+  // Lines and files sent.
+  int32 lines = 1;
+  int32 files = 2;
+  // There may be matches that were not sent: file_capped, total_capped or timed_out.
+  bool truncated = 3;
+  // Some file has more matching lines than the 50 sent for it (its line_count says how
+  // many).
+  bool file_capped = 4;
+  // The search stopped at 2,000 lines; files after the last one sent were not searched.
+  bool total_capped = 5;
+  // The search stopped at its 15 seconds; files after the last one sent were not searched.
+  bool timed_out = 6;
+  // The query matched case-sensitively: match_case, or smart case found an upper-case
+  // letter.
+  bool case_sensitive = 7;
+  // From the request to the summary.
+  int64 elapsed_ms = 8;
 }
 
 message SuggestIncludeIgnoredRequest {

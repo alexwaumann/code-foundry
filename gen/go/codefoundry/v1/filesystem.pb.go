@@ -797,6 +797,492 @@ func (x *SearchFilesResponse) GetTruncated() bool {
 	return false
 }
 
+type SearchTextRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The checkouts to search, in order (a thread sends its primary project first; its
+	// files come first). At most 16; a checkout named twice is searched once.
+	Sources []*FileSource `protobuf:"bytes,1,rep,name=sources,proto3" json:"sources,omitempty"`
+	// Literal text, or a regular expression with regex. One line, at most 500 characters.
+	Query string `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	// Match case even when the query is all lower case (smart case otherwise).
+	MatchCase bool `protobuf:"varint,3,opt,name=match_case,json=matchCase,proto3" json:"match_case,omitempty"`
+	// Match only whole words (ripgrep's --word-regexp).
+	WholeWord bool `protobuf:"varint,4,opt,name=whole_word,json=wholeWord,proto3" json:"whole_word,omitempty"`
+	// The query is a regular expression (ripgrep's Rust syntax).
+	Regex         bool `protobuf:"varint,5,opt,name=regex,proto3" json:"regex,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchTextRequest) Reset() {
+	*x = SearchTextRequest{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchTextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchTextRequest) ProtoMessage() {}
+
+func (x *SearchTextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchTextRequest.ProtoReflect.Descriptor instead.
+func (*SearchTextRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SearchTextRequest) GetSources() []*FileSource {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
+}
+
+func (x *SearchTextRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchTextRequest) GetMatchCase() bool {
+	if x != nil {
+		return x.MatchCase
+	}
+	return false
+}
+
+func (x *SearchTextRequest) GetWholeWord() bool {
+	if x != nil {
+		return x.WholeWord
+	}
+	return false
+}
+
+func (x *SearchTextRequest) GetRegex() bool {
+	if x != nil {
+		return x.Regex
+	}
+	return false
+}
+
+type SearchTextResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Files with matches, in the search's order, continuing the previous message's.
+	Files []*TextFileMatch `protobuf:"bytes,1,rep,name=files,proto3" json:"files,omitempty"`
+	// Set on the last message only, which has no files.
+	Summary       *SearchTextSummary `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchTextResponse) Reset() {
+	*x = SearchTextResponse{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchTextResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchTextResponse) ProtoMessage() {}
+
+func (x *SearchTextResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchTextResponse.ProtoReflect.Descriptor instead.
+func (*SearchTextResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SearchTextResponse) GetFiles() []*TextFileMatch {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+func (x *SearchTextResponse) GetSummary() *SearchTextSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
+// TextFileMatch is one file with matching lines.
+type TextFileMatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The project of the source the file is from.
+	ProjectId string `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	// Absolute path of the checkout path is relative to: the source's path as given
+	// (cleaned), or the project's main worktree (as FileMatch.checkout).
+	Checkout string `protobuf:"bytes,2,opt,name=checkout,proto3" json:"checkout,omitempty"`
+	// Relative to the checkout, forward slashes.
+	Path string `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
+	// Git ignores this file and an include pattern lists it anyway (as FileMatch.ignored).
+	Ignored bool `protobuf:"varint,4,opt,name=ignored,proto3" json:"ignored,omitempty"`
+	// The matching lines, in line order: at most 50, fewer when the search's 2,000 lines ran
+	// out in this file.
+	Lines []*TextLineMatch `protobuf:"bytes,5,rep,name=lines,proto3" json:"lines,omitempty"`
+	// How many lines of the file match ("N in this file"), counted up to 999 even when
+	// fewer lines were sent; line_count_capped: more than that.
+	LineCount       int32 `protobuf:"varint,6,opt,name=line_count,json=lineCount,proto3" json:"line_count,omitempty"`
+	LineCountCapped bool  `protobuf:"varint,7,opt,name=line_count_capped,json=lineCountCapped,proto3" json:"line_count_capped,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TextFileMatch) Reset() {
+	*x = TextFileMatch{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextFileMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextFileMatch) ProtoMessage() {}
+
+func (x *TextFileMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextFileMatch.ProtoReflect.Descriptor instead.
+func (*TextFileMatch) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *TextFileMatch) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *TextFileMatch) GetCheckout() string {
+	if x != nil {
+		return x.Checkout
+	}
+	return ""
+}
+
+func (x *TextFileMatch) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *TextFileMatch) GetIgnored() bool {
+	if x != nil {
+		return x.Ignored
+	}
+	return false
+}
+
+func (x *TextFileMatch) GetLines() []*TextLineMatch {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+func (x *TextFileMatch) GetLineCount() int32 {
+	if x != nil {
+		return x.LineCount
+	}
+	return 0
+}
+
+func (x *TextFileMatch) GetLineCountCapped() bool {
+	if x != nil {
+		return x.LineCountCapped
+	}
+	return false
+}
+
+// TextLineMatch is one line with a match.
+type TextLineMatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1-based.
+	Line int32 `protobuf:"varint,1,opt,name=line,proto3" json:"line,omitempty"`
+	// The line without its line break. Bytes that are not UTF-8 read as U+FFFD, one each.
+	// A line over 300 characters is cut to 300 around its first match (up to 40 characters
+	// before it): cut_start and cut_end say text begins after the line's start or ends
+	// before its end, for the GUI to show an ellipsis there.
+	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	// Every match in text, in order; one the cut crosses is clipped to text.
+	Ranges        []*TextRange `protobuf:"bytes,3,rep,name=ranges,proto3" json:"ranges,omitempty"`
+	CutStart      bool         `protobuf:"varint,4,opt,name=cut_start,json=cutStart,proto3" json:"cut_start,omitempty"`
+	CutEnd        bool         `protobuf:"varint,5,opt,name=cut_end,json=cutEnd,proto3" json:"cut_end,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextLineMatch) Reset() {
+	*x = TextLineMatch{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextLineMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextLineMatch) ProtoMessage() {}
+
+func (x *TextLineMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextLineMatch.ProtoReflect.Descriptor instead.
+func (*TextLineMatch) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *TextLineMatch) GetLine() int32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *TextLineMatch) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *TextLineMatch) GetRanges() []*TextRange {
+	if x != nil {
+		return x.Ranges
+	}
+	return nil
+}
+
+func (x *TextLineMatch) GetCutStart() bool {
+	if x != nil {
+		return x.CutStart
+	}
+	return false
+}
+
+func (x *TextLineMatch) GetCutEnd() bool {
+	if x != nil {
+		return x.CutEnd
+	}
+	return false
+}
+
+// TextRange is a span of TextLineMatch.text in code points (Go runes; in JavaScript the
+// indices of Array.from(text)), not bytes or UTF-16 units. end is exclusive; a regex may
+// match an empty span (start == end).
+type TextRange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Start         int32                  `protobuf:"varint,1,opt,name=start,proto3" json:"start,omitempty"`
+	End           int32                  `protobuf:"varint,2,opt,name=end,proto3" json:"end,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextRange) Reset() {
+	*x = TextRange{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextRange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextRange) ProtoMessage() {}
+
+func (x *TextRange) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextRange.ProtoReflect.Descriptor instead.
+func (*TextRange) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *TextRange) GetStart() int32 {
+	if x != nil {
+		return x.Start
+	}
+	return 0
+}
+
+func (x *TextRange) GetEnd() int32 {
+	if x != nil {
+		return x.End
+	}
+	return 0
+}
+
+// SearchTextSummary ends a search.
+type SearchTextSummary struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Lines and files sent.
+	Lines int32 `protobuf:"varint,1,opt,name=lines,proto3" json:"lines,omitempty"`
+	Files int32 `protobuf:"varint,2,opt,name=files,proto3" json:"files,omitempty"`
+	// There may be matches that were not sent: file_capped, total_capped or timed_out.
+	Truncated bool `protobuf:"varint,3,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// Some file has more matching lines than the 50 sent for it (its line_count says how
+	// many).
+	FileCapped bool `protobuf:"varint,4,opt,name=file_capped,json=fileCapped,proto3" json:"file_capped,omitempty"`
+	// The search stopped at 2,000 lines; files after the last one sent were not searched.
+	TotalCapped bool `protobuf:"varint,5,opt,name=total_capped,json=totalCapped,proto3" json:"total_capped,omitempty"`
+	// The search stopped at its 15 seconds; files after the last one sent were not searched.
+	TimedOut bool `protobuf:"varint,6,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
+	// The query matched case-sensitively: match_case, or smart case found an upper-case
+	// letter.
+	CaseSensitive bool `protobuf:"varint,7,opt,name=case_sensitive,json=caseSensitive,proto3" json:"case_sensitive,omitempty"`
+	// From the request to the summary.
+	ElapsedMs     int64 `protobuf:"varint,8,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchTextSummary) Reset() {
+	*x = SearchTextSummary{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchTextSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchTextSummary) ProtoMessage() {}
+
+func (x *SearchTextSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchTextSummary.ProtoReflect.Descriptor instead.
+func (*SearchTextSummary) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *SearchTextSummary) GetLines() int32 {
+	if x != nil {
+		return x.Lines
+	}
+	return 0
+}
+
+func (x *SearchTextSummary) GetFiles() int32 {
+	if x != nil {
+		return x.Files
+	}
+	return 0
+}
+
+func (x *SearchTextSummary) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+func (x *SearchTextSummary) GetFileCapped() bool {
+	if x != nil {
+		return x.FileCapped
+	}
+	return false
+}
+
+func (x *SearchTextSummary) GetTotalCapped() bool {
+	if x != nil {
+		return x.TotalCapped
+	}
+	return false
+}
+
+func (x *SearchTextSummary) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
+}
+
+func (x *SearchTextSummary) GetCaseSensitive() bool {
+	if x != nil {
+		return x.CaseSensitive
+	}
+	return false
+}
+
+func (x *SearchTextSummary) GetElapsedMs() int64 {
+	if x != nil {
+		return x.ElapsedMs
+	}
+	return 0
+}
+
 type SuggestIncludeIgnoredRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
@@ -810,7 +1296,7 @@ type SuggestIncludeIgnoredRequest struct {
 
 func (x *SuggestIncludeIgnoredRequest) Reset() {
 	*x = SuggestIncludeIgnoredRequest{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -822,7 +1308,7 @@ func (x *SuggestIncludeIgnoredRequest) String() string {
 func (*SuggestIncludeIgnoredRequest) ProtoMessage() {}
 
 func (x *SuggestIncludeIgnoredRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[11]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -835,7 +1321,7 @@ func (x *SuggestIncludeIgnoredRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestIncludeIgnoredRequest.ProtoReflect.Descriptor instead.
 func (*SuggestIncludeIgnoredRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{11}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SuggestIncludeIgnoredRequest) GetProjectId() string {
@@ -882,7 +1368,7 @@ type IgnoredSuggestion struct {
 
 func (x *IgnoredSuggestion) Reset() {
 	*x = IgnoredSuggestion{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -894,7 +1380,7 @@ func (x *IgnoredSuggestion) String() string {
 func (*IgnoredSuggestion) ProtoMessage() {}
 
 func (x *IgnoredSuggestion) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[12]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -907,7 +1393,7 @@ func (x *IgnoredSuggestion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IgnoredSuggestion.ProtoReflect.Descriptor instead.
 func (*IgnoredSuggestion) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{12}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *IgnoredSuggestion) GetPath() string {
@@ -978,7 +1464,7 @@ type SuggestIncludeIgnoredResponse struct {
 
 func (x *SuggestIncludeIgnoredResponse) Reset() {
 	*x = SuggestIncludeIgnoredResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1476,7 @@ func (x *SuggestIncludeIgnoredResponse) String() string {
 func (*SuggestIncludeIgnoredResponse) ProtoMessage() {}
 
 func (x *SuggestIncludeIgnoredResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[13]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1489,7 @@ func (x *SuggestIncludeIgnoredResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestIncludeIgnoredResponse.ProtoReflect.Descriptor instead.
 func (*SuggestIncludeIgnoredResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{13}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SuggestIncludeIgnoredResponse) GetSuggestions() []*IgnoredSuggestion {
@@ -1063,7 +1549,7 @@ type ReadFileRequest struct {
 
 func (x *ReadFileRequest) Reset() {
 	*x = ReadFileRequest{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1075,7 +1561,7 @@ func (x *ReadFileRequest) String() string {
 func (*ReadFileRequest) ProtoMessage() {}
 
 func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[14]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1088,7 +1574,7 @@ func (x *ReadFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileRequest.ProtoReflect.Descriptor instead.
 func (*ReadFileRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{14}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ReadFileRequest) GetBaseDir() string {
@@ -1167,7 +1653,7 @@ type ReadFileResponse struct {
 
 func (x *ReadFileResponse) Reset() {
 	*x = ReadFileResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1179,7 +1665,7 @@ func (x *ReadFileResponse) String() string {
 func (*ReadFileResponse) ProtoMessage() {}
 
 func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[15]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1192,7 +1678,7 @@ func (x *ReadFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadFileResponse.ProtoReflect.Descriptor instead.
 func (*ReadFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{15}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ReadFileResponse) GetContents() []byte {
@@ -1324,7 +1810,7 @@ type WriteFileRequest struct {
 
 func (x *WriteFileRequest) Reset() {
 	*x = WriteFileRequest{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1336,7 +1822,7 @@ func (x *WriteFileRequest) String() string {
 func (*WriteFileRequest) ProtoMessage() {}
 
 func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1349,7 +1835,7 @@ func (x *WriteFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteFileRequest.ProtoReflect.Descriptor instead.
 func (*WriteFileRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *WriteFileRequest) GetBaseDir() string {
@@ -1421,7 +1907,7 @@ type WriteFileResponse struct {
 
 func (x *WriteFileResponse) Reset() {
 	*x = WriteFileResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1433,7 +1919,7 @@ func (x *WriteFileResponse) String() string {
 func (*WriteFileResponse) ProtoMessage() {}
 
 func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[17]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1446,7 +1932,7 @@ func (x *WriteFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteFileResponse.ProtoReflect.Descriptor instead.
 func (*WriteFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{17}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *WriteFileResponse) GetModifiedAt() int64 {
@@ -1497,7 +1983,7 @@ type PreviewFileRequest struct {
 
 func (x *PreviewFileRequest) Reset() {
 	*x = PreviewFileRequest{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1509,7 +1995,7 @@ func (x *PreviewFileRequest) String() string {
 func (*PreviewFileRequest) ProtoMessage() {}
 
 func (x *PreviewFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[18]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1522,7 +2008,7 @@ func (x *PreviewFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewFileRequest.ProtoReflect.Descriptor instead.
 func (*PreviewFileRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{18}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PreviewFileRequest) GetBaseDir() string {
@@ -1552,7 +2038,7 @@ type StreamFileRequest struct {
 
 func (x *StreamFileRequest) Reset() {
 	*x = StreamFileRequest{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1564,7 +2050,7 @@ func (x *StreamFileRequest) String() string {
 func (*StreamFileRequest) ProtoMessage() {}
 
 func (x *StreamFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[19]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1577,7 +2063,7 @@ func (x *StreamFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamFileRequest.ProtoReflect.Descriptor instead.
 func (*StreamFileRequest) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{19}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *StreamFileRequest) GetBaseDir() string {
@@ -1611,7 +2097,7 @@ type StreamFileResponse struct {
 
 func (x *StreamFileResponse) Reset() {
 	*x = StreamFileResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1623,7 +2109,7 @@ func (x *StreamFileResponse) String() string {
 func (*StreamFileResponse) ProtoMessage() {}
 
 func (x *StreamFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[20]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1636,7 +2122,7 @@ func (x *StreamFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamFileResponse.ProtoReflect.Descriptor instead.
 func (*StreamFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{20}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *StreamFileResponse) GetUrl() string {
@@ -1685,7 +2171,7 @@ type PreviewFileResponse struct {
 
 func (x *PreviewFileResponse) Reset() {
 	*x = PreviewFileResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1697,7 +2183,7 @@ func (x *PreviewFileResponse) String() string {
 func (*PreviewFileResponse) ProtoMessage() {}
 
 func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[21]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1710,7 +2196,7 @@ func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewFileResponse.ProtoReflect.Descriptor instead.
 func (*PreviewFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{21}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *PreviewFileResponse) GetUrl() string {
@@ -1795,7 +2281,48 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\aignored\x18\a \x01(\bR\aignored\"h\n" +
 	"\x13SearchFilesResponse\x123\n" +
 	"\amatches\x18\x01 \x03(\v2\x19.codefoundry.v1.FileMatchR\amatches\x12\x1c\n" +
-	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"g\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"\xb3\x01\n" +
+	"\x11SearchTextRequest\x124\n" +
+	"\asources\x18\x01 \x03(\v2\x1a.codefoundry.v1.FileSourceR\asources\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12\x1d\n" +
+	"\n" +
+	"match_case\x18\x03 \x01(\bR\tmatchCase\x12\x1d\n" +
+	"\n" +
+	"whole_word\x18\x04 \x01(\bR\twholeWord\x12\x14\n" +
+	"\x05regex\x18\x05 \x01(\bR\x05regex\"\x86\x01\n" +
+	"\x12SearchTextResponse\x123\n" +
+	"\x05files\x18\x01 \x03(\v2\x1d.codefoundry.v1.TextFileMatchR\x05files\x12;\n" +
+	"\asummary\x18\x02 \x01(\v2!.codefoundry.v1.SearchTextSummaryR\asummary\"\xf8\x01\n" +
+	"\rTextFileMatch\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x1a\n" +
+	"\bcheckout\x18\x02 \x01(\tR\bcheckout\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\x12\x18\n" +
+	"\aignored\x18\x04 \x01(\bR\aignored\x123\n" +
+	"\x05lines\x18\x05 \x03(\v2\x1d.codefoundry.v1.TextLineMatchR\x05lines\x12\x1d\n" +
+	"\n" +
+	"line_count\x18\x06 \x01(\x05R\tlineCount\x12*\n" +
+	"\x11line_count_capped\x18\a \x01(\bR\x0flineCountCapped\"\xa0\x01\n" +
+	"\rTextLineMatch\x12\x12\n" +
+	"\x04line\x18\x01 \x01(\x05R\x04line\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x121\n" +
+	"\x06ranges\x18\x03 \x03(\v2\x19.codefoundry.v1.TextRangeR\x06ranges\x12\x1b\n" +
+	"\tcut_start\x18\x04 \x01(\bR\bcutStart\x12\x17\n" +
+	"\acut_end\x18\x05 \x01(\bR\x06cutEnd\"3\n" +
+	"\tTextRange\x12\x14\n" +
+	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x10\n" +
+	"\x03end\x18\x02 \x01(\x05R\x03end\"\x84\x02\n" +
+	"\x11SearchTextSummary\x12\x14\n" +
+	"\x05lines\x18\x01 \x01(\x05R\x05lines\x12\x14\n" +
+	"\x05files\x18\x02 \x01(\x05R\x05files\x12\x1c\n" +
+	"\ttruncated\x18\x03 \x01(\bR\ttruncated\x12\x1f\n" +
+	"\vfile_capped\x18\x04 \x01(\bR\n" +
+	"fileCapped\x12!\n" +
+	"\ftotal_capped\x18\x05 \x01(\bR\vtotalCapped\x12\x1b\n" +
+	"\ttimed_out\x18\x06 \x01(\bR\btimedOut\x12%\n" +
+	"\x0ecase_sensitive\x18\a \x01(\bR\rcaseSensitive\x12\x1d\n" +
+	"\n" +
+	"elapsed_ms\x18\b \x01(\x03R\telapsedMs\"g\n" +
 	"\x1cSuggestIncludeIgnoredRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
@@ -1878,12 +2405,14 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10SKILL_SCOPE_USER\x10\x01\x12\x17\n" +
-	"\x13SKILL_SCOPE_PROJECT\x10\x022\xf8\x05\n" +
+	"\x13SKILL_SCOPE_PROJECT\x10\x022\xd1\x06\n" +
 	"\x11FilesystemService\x12d\n" +
 	"\x0fListDirectories\x12&.codefoundry.v1.ListDirectoriesRequest\x1a'.codefoundry.v1.ListDirectoriesResponse\"\x00\x12U\n" +
 	"\n" +
 	"ListSkills\x12!.codefoundry.v1.ListSkillsRequest\x1a\".codefoundry.v1.ListSkillsResponse\"\x00\x12X\n" +
-	"\vSearchFiles\x12\".codefoundry.v1.SearchFilesRequest\x1a#.codefoundry.v1.SearchFilesResponse\"\x00\x12v\n" +
+	"\vSearchFiles\x12\".codefoundry.v1.SearchFilesRequest\x1a#.codefoundry.v1.SearchFilesResponse\"\x00\x12W\n" +
+	"\n" +
+	"SearchText\x12!.codefoundry.v1.SearchTextRequest\x1a\".codefoundry.v1.SearchTextResponse\"\x000\x01\x12v\n" +
 	"\x15SuggestIncludeIgnored\x12,.codefoundry.v1.SuggestIncludeIgnoredRequest\x1a-.codefoundry.v1.SuggestIncludeIgnoredResponse\"\x00\x12O\n" +
 	"\bReadFile\x12\x1f.codefoundry.v1.ReadFileRequest\x1a .codefoundry.v1.ReadFileResponse\"\x00\x12R\n" +
 	"\tWriteFile\x12 .codefoundry.v1.WriteFileRequest\x1a!.codefoundry.v1.WriteFileResponse\"\x00\x12X\n" +
@@ -1905,7 +2434,7 @@ func file_codefoundry_v1_filesystem_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_filesystem_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(SkillScope)(0),                       // 0: codefoundry.v1.SkillScope
 	(*ListDirectoriesRequest)(nil),        // 1: codefoundry.v1.ListDirectoriesRequest
@@ -1919,17 +2448,23 @@ var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(*SearchFilesRequest)(nil),            // 9: codefoundry.v1.SearchFilesRequest
 	(*FileMatch)(nil),                     // 10: codefoundry.v1.FileMatch
 	(*SearchFilesResponse)(nil),           // 11: codefoundry.v1.SearchFilesResponse
-	(*SuggestIncludeIgnoredRequest)(nil),  // 12: codefoundry.v1.SuggestIncludeIgnoredRequest
-	(*IgnoredSuggestion)(nil),             // 13: codefoundry.v1.IgnoredSuggestion
-	(*SuggestIncludeIgnoredResponse)(nil), // 14: codefoundry.v1.SuggestIncludeIgnoredResponse
-	(*ReadFileRequest)(nil),               // 15: codefoundry.v1.ReadFileRequest
-	(*ReadFileResponse)(nil),              // 16: codefoundry.v1.ReadFileResponse
-	(*WriteFileRequest)(nil),              // 17: codefoundry.v1.WriteFileRequest
-	(*WriteFileResponse)(nil),             // 18: codefoundry.v1.WriteFileResponse
-	(*PreviewFileRequest)(nil),            // 19: codefoundry.v1.PreviewFileRequest
-	(*StreamFileRequest)(nil),             // 20: codefoundry.v1.StreamFileRequest
-	(*StreamFileResponse)(nil),            // 21: codefoundry.v1.StreamFileResponse
-	(*PreviewFileResponse)(nil),           // 22: codefoundry.v1.PreviewFileResponse
+	(*SearchTextRequest)(nil),             // 12: codefoundry.v1.SearchTextRequest
+	(*SearchTextResponse)(nil),            // 13: codefoundry.v1.SearchTextResponse
+	(*TextFileMatch)(nil),                 // 14: codefoundry.v1.TextFileMatch
+	(*TextLineMatch)(nil),                 // 15: codefoundry.v1.TextLineMatch
+	(*TextRange)(nil),                     // 16: codefoundry.v1.TextRange
+	(*SearchTextSummary)(nil),             // 17: codefoundry.v1.SearchTextSummary
+	(*SuggestIncludeIgnoredRequest)(nil),  // 18: codefoundry.v1.SuggestIncludeIgnoredRequest
+	(*IgnoredSuggestion)(nil),             // 19: codefoundry.v1.IgnoredSuggestion
+	(*SuggestIncludeIgnoredResponse)(nil), // 20: codefoundry.v1.SuggestIncludeIgnoredResponse
+	(*ReadFileRequest)(nil),               // 21: codefoundry.v1.ReadFileRequest
+	(*ReadFileResponse)(nil),              // 22: codefoundry.v1.ReadFileResponse
+	(*WriteFileRequest)(nil),              // 23: codefoundry.v1.WriteFileRequest
+	(*WriteFileResponse)(nil),             // 24: codefoundry.v1.WriteFileResponse
+	(*PreviewFileRequest)(nil),            // 25: codefoundry.v1.PreviewFileRequest
+	(*StreamFileRequest)(nil),             // 26: codefoundry.v1.StreamFileRequest
+	(*StreamFileResponse)(nil),            // 27: codefoundry.v1.StreamFileResponse
+	(*PreviewFileResponse)(nil),           // 28: codefoundry.v1.PreviewFileResponse
 }
 var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	2,  // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
@@ -1938,28 +2473,35 @@ var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	6,  // 3: codefoundry.v1.ListSkillsResponse.skills:type_name -> codefoundry.v1.Skill
 	8,  // 4: codefoundry.v1.SearchFilesRequest.sources:type_name -> codefoundry.v1.FileSource
 	10, // 5: codefoundry.v1.SearchFilesResponse.matches:type_name -> codefoundry.v1.FileMatch
-	13, // 6: codefoundry.v1.SuggestIncludeIgnoredResponse.suggestions:type_name -> codefoundry.v1.IgnoredSuggestion
-	1,  // 7: codefoundry.v1.FilesystemService.ListDirectories:input_type -> codefoundry.v1.ListDirectoriesRequest
-	5,  // 8: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
-	9,  // 9: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
-	12, // 10: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:input_type -> codefoundry.v1.SuggestIncludeIgnoredRequest
-	15, // 11: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
-	17, // 12: codefoundry.v1.FilesystemService.WriteFile:input_type -> codefoundry.v1.WriteFileRequest
-	19, // 13: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
-	20, // 14: codefoundry.v1.FilesystemService.StreamFile:input_type -> codefoundry.v1.StreamFileRequest
-	3,  // 15: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
-	7,  // 16: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
-	11, // 17: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
-	14, // 18: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:output_type -> codefoundry.v1.SuggestIncludeIgnoredResponse
-	16, // 19: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
-	18, // 20: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
-	22, // 21: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
-	21, // 22: codefoundry.v1.FilesystemService.StreamFile:output_type -> codefoundry.v1.StreamFileResponse
-	15, // [15:23] is the sub-list for method output_type
-	7,  // [7:15] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	8,  // 6: codefoundry.v1.SearchTextRequest.sources:type_name -> codefoundry.v1.FileSource
+	14, // 7: codefoundry.v1.SearchTextResponse.files:type_name -> codefoundry.v1.TextFileMatch
+	17, // 8: codefoundry.v1.SearchTextResponse.summary:type_name -> codefoundry.v1.SearchTextSummary
+	15, // 9: codefoundry.v1.TextFileMatch.lines:type_name -> codefoundry.v1.TextLineMatch
+	16, // 10: codefoundry.v1.TextLineMatch.ranges:type_name -> codefoundry.v1.TextRange
+	19, // 11: codefoundry.v1.SuggestIncludeIgnoredResponse.suggestions:type_name -> codefoundry.v1.IgnoredSuggestion
+	1,  // 12: codefoundry.v1.FilesystemService.ListDirectories:input_type -> codefoundry.v1.ListDirectoriesRequest
+	5,  // 13: codefoundry.v1.FilesystemService.ListSkills:input_type -> codefoundry.v1.ListSkillsRequest
+	9,  // 14: codefoundry.v1.FilesystemService.SearchFiles:input_type -> codefoundry.v1.SearchFilesRequest
+	12, // 15: codefoundry.v1.FilesystemService.SearchText:input_type -> codefoundry.v1.SearchTextRequest
+	18, // 16: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:input_type -> codefoundry.v1.SuggestIncludeIgnoredRequest
+	21, // 17: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
+	23, // 18: codefoundry.v1.FilesystemService.WriteFile:input_type -> codefoundry.v1.WriteFileRequest
+	25, // 19: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
+	26, // 20: codefoundry.v1.FilesystemService.StreamFile:input_type -> codefoundry.v1.StreamFileRequest
+	3,  // 21: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
+	7,  // 22: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
+	11, // 23: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
+	13, // 24: codefoundry.v1.FilesystemService.SearchText:output_type -> codefoundry.v1.SearchTextResponse
+	20, // 25: codefoundry.v1.FilesystemService.SuggestIncludeIgnored:output_type -> codefoundry.v1.SuggestIncludeIgnoredResponse
+	22, // 26: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
+	24, // 27: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
+	28, // 28: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
+	27, // 29: codefoundry.v1.FilesystemService.StreamFile:output_type -> codefoundry.v1.StreamFileResponse
+	21, // [21:30] is the sub-list for method output_type
+	12, // [12:21] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_codefoundry_v1_filesystem_proto_init() }
@@ -1973,7 +2515,7 @@ func file_codefoundry_v1_filesystem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_filesystem_proto_rawDesc), len(file_codefoundry_v1_filesystem_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
