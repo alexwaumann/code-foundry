@@ -31,8 +31,9 @@ export type Edge = "left" | "right" | "top" | "bottom";
 /**
  * What is dragged: one tab (from its pane), a whole pane by its strip, or a sidebar row's thread
  * whose tab is not open in the space (docs/notes/shell-16-sidebar.md; an open one drags as its tab).
+ * `archived`: the row's thread is archived, so it lives in no space (shell/drag/threadSource.ts).
  */
-export type DragSource = { kind: "tab"; tab: string; pane: string } | { kind: "pane"; pane: string } | { kind: "thread"; thread: string };
+export type DragSource = { kind: "tab"; tab: string; pane: string } | { kind: "pane"; pane: string } | { kind: "thread"; thread: string; archived?: boolean };
 
 /** Where it lands. */
 export type DropTarget =

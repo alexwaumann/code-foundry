@@ -22,7 +22,7 @@ import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { linkedPrTag } from "../linkedPrTag";
-import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, ThreadTooltip } from "../SidebarRow";
+import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, SingleLineLabel, ThreadTooltip } from "../SidebarRow";
 import { useLinkedPrFacts, useLinkKeys } from "../useLinkedPrs";
 import { RowTooltipsEnabled } from "../rowTooltips";
 import { NeedsHoverCard } from "@/components/needs/NeedsCard";
@@ -31,8 +31,8 @@ import { openNeedsPopup, useNeedsStore } from "@/stores/needs";
 /**
  * The shell sidebar's rows (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-16-sidebar.md):
  * the thread row's three lines, a Needs you row, a composer draft, and the Needs you and Active
- * headers with the scope button. The footers' headers and the Snoozed and Archived rows are the
- * classic ones (SidebarRow).
+ * headers with the scope button. The footers' headers are the classic ones (SidebarRow); the
+ * Snoozed and Archived rows keep the classic one line (SingleLineLabel) and drag as the others do.
  */
 
 /** A row's box: the classic row's colours, the lines stacked. */
@@ -243,6 +243,48 @@ export const ShellThreadRowView = memo(function ShellThreadRowView({ row, select
     <NeedsHoverCard threadId={id} anchor={anchor} keyboardOpen={cursor && keyCursor} enabled={cards}>
       {body}
     </NeedsHoverCard>
+  );
+});
+
+/**
+ * A Snoozed or Archived row: the classic one line (the quiet name and the time on the right), and
+ * a drag source like every thread row (docs/notes/preview-tabs-2-row-drag.md). A snoozed thread
+ * drags as an active one does; an archived one, living in no space, drops in the grid and onto a
+ * space tab only while its tab is open (shell/drag/threadSource.ts). A drop never unarchives or
+ * unsnoozes. A click opens the thread as before.
+ */
+export const ShellQuietRowView = memo(function ShellQuietRowView({ row, selected, cursor, onActivate }: RowProps<ShellThreadRow>) {
+  const id = row.threadId;
+  const { setNodeRef, listeners, describedBy, dragging } = useThreadDrag(id);
+  return (
+    <ThreadTooltip id={id}>
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        id={`row-${row.key}`}
+        role="option"
+        aria-selected={selected}
+        aria-describedby={describedBy}
+        data-row-kind="thread"
+        data-row-key={row.key}
+        data-section={row.section}
+        data-cursor={cursor || undefined}
+        className={cn(
+          "group/row flex h-full cursor-default items-center gap-1.5 rounded-md px-2 text-body-sm select-none",
+          selected ? "bg-cf-sidebar-row-selected text-cf-sidebar-foreground" : "text-cf-sidebar-foreground/90 hover:bg-cf-sidebar-row-hover",
+          cursor && "group-focus:ring-1 group-focus:ring-cf-focus group-focus:ring-inset",
+          dragging && "opacity-60",
+        )}
+        onClick={() => {
+          onActivate(row);
+        }}
+        onDoubleClick={() => {
+          useUiStore.getState().setRenaming(id);
+        }}
+      >
+        <SingleLineLabel id={id} section={row.section === "archived" ? "archived" : "snoozed"} />
+      </div>
+    </ThreadTooltip>
   );
 });
 

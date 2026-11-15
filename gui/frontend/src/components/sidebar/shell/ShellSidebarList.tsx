@@ -21,7 +21,7 @@ import { useUiStore } from "@/stores/ui";
 import { HEADER_HEIGHT, ONE_LINE_ROW, QUIET_ROW_GAP, ROW_GAP } from "../rowSizes";
 import { RowTooltipsEnabled } from "../rowTooltips";
 import { SidebarRow } from "../SidebarRow";
-import { DraftRowView, MainHeaderView, ShellThreadRowView } from "./ShellRows";
+import { DraftRowView, MainHeaderView, ShellQuietRowView, ShellThreadRowView } from "./ShellRows";
 import { DraftRowMenu, ShellRowMenu } from "./ShellRowMenus";
 
 /**
@@ -153,7 +153,7 @@ function RowView({ row, selected, cursor, onActivate }: RowViewProps) {
     case "draft":
       return <DraftRowView row={row} selected={selected} cursor={cursor} onActivate={onActivate} />;
     case "thread":
-      if (row.section === "snoozed" || row.section === "archived") return <SidebarRow row={row as Row} selected={selected} cursor={cursor} onActivate={onActivate} />;
+      if (row.section === "snoozed" || row.section === "archived") return <ShellQuietRowView row={row} selected={selected} cursor={cursor} onActivate={onActivate} />;
       return <ShellThreadRowView row={row} selected={selected} cursor={cursor} onActivate={onActivate} />;
   }
 }

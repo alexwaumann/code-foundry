@@ -1,4 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragStartEvent } from "@dnd-kit/core";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadView } from "@/api/threads";
 import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
@@ -31,6 +33,7 @@ const { useShellSidebarStore } = await import("@/stores/shellSidebar");
 const { HOME, useUiStore } = await import("@/stores/ui");
 const { startSelectionBridge } = await import("@/stores/selectionBridge");
 const { resetNeeds, useNeedsStore } = await import("@/stores/needs");
+const { resetShellDrag, useShellDragStore } = await import("@/shell/drag/state");
 // The Needs-you card reads its ask without a Watch: nothing comes back here.
 vi.mock("@/api/threadSearch", async (orig) => ({ ...(await orig<typeof import("@/api/threadSearch")>()), readAskItems: () => new Promise(() => undefined) }));
 
@@ -354,4 +357,124 @@ describe("the shell sidebar list", () => {
     });
     expect(rowKeys()).toEqual(["h:needs", "h:active", "s:s-5", "s:s-4", "s:s-1"]);
   });
+});
+
+/**
+ * Snoozed and Archived rows drag as the others do (docs/notes/preview-tabs-2-row-drag.md). What a
+ * drop runs is shell/drag/threadSource.test.ts's; here, which rows are drag sources and with what.
+ */
+describe("dragging Snoozed and Archived rows", () => {
+  const started: DragStartEvent["active"]["data"]["current"][] = [];
+  /** dnd-kit's context with ShellDnd's sensor (4px), recording each drag's source. */
+  function Dnd({ children }: { children: ReactNode }) {
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+    return (
+      <DndContext
+        sensors={sensors}
+        onDragStart={({ active }) => {
+          started.push(active.data.current);
+        }}
+      >
+        {children}
+      </DndContext>
+    );
+  }
+  /** Presses on the row and moves 10px: a drag starts if the row is a source. */
+  const drag = (el: HTMLElement) => {
+    fireEvent.pointerDown(el, { button: 0, isPrimary: true, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(document, { clientX: 20, clientY: 10 });
+    fireEvent.pointerUp(document, { clientX: 20, clientY: 10 });
+  };
+
+  beforeEach(() => {
+    started.length = 0;
+    useUiStore.setState({ snoozedCollapsed: false, archivedCollapsed: false });
+    setThreads(
+      thread({ id: "s-1" }),
+      thread({ id: "s-7", name: "Spike a canvas sidebar", archivedAtMs: Date.now() - 60_000 }),
+      thread({ id: "s-8", name: "Refactor the gh poller", snoozedUntilMs: Date.now() + 3_600_000 }),
+    );
+  });
+  afterEach(() => {
+    resetShellDrag();
+  });
+
+  // First: after a drag, dnd-kit swallows the next click for 50 ms (docs/notes/testing-gotchas.md).
+  it("a click still opens the thread (thread.open), archived or snoozed", async () => {
+    render(
+      <Dnd>
+        <ShellSidebarList bodyHeight={800} />
+      </Dnd>,
+    );
+    fireEvent.click(rowOf("s:s-7"));
+    await settle();
+    fireEvent.click(rowOf("s:s-8"));
+    await settle();
+    expect(runs).toEqual([
+      { name: "thread.open", args: { id: "s-7", focus: "true" } },
+      { name: "thread.open", args: { id: "s-8", focus: "true" } },
+    ]);
+  });
+
+  it("keep their one line and carry the drag instructions, as an active row does", () => {
+    render(
+      <Dnd>
+        <ShellSidebarList bodyHeight={800} />
+      </Dnd>,
+    );
+    const [active, snoozed, archived] = [rowOf("s:s-1"), rowOf("s:s-8"), rowOf("s:s-7")];
+    expect(snoozed.dataset.section).toBe("snoozed");
+    expect(archived.dataset.section).toBe("archived");
+    // The one-line look: the quiet name and the time, no status or branch lines.
+    expect(within(archived).getByTestId("row-archived-age")).toBeTruthy();
+    expect(within(snoozed).getByTestId("row-snooze-left")).toBeTruthy();
+    expect(within(archived).queryByTestId("row-line-1")).toBeNull();
+    const instructions = active.getAttribute("aria-describedby");
+    expect(instructions).toBeTruthy();
+    expect(snoozed.getAttribute("aria-describedby")).toBe(instructions);
+    expect(archived.getAttribute("aria-describedby")).toBe(instructions);
+  });
+
+  it("a pointer drag lifts the row's thread; an archived one says so", () => {
+    render(
+      <Dnd>
+        <ShellSidebarList bodyHeight={800} />
+      </Dnd>,
+    );
+    drag(rowOf("s:s-7"));
+    drag(rowOf("s:s-8"));
+    expect(started).toEqual([
+      { kind: "thread", thread: "s-7", archived: true },
+      { kind: "thread", thread: "s-8" },
+    ]);
+  });
+
+  it("no drag starts while the row's name is being edited", () => {
+    useUiStore.setState({ renamingThreadId: "s-7" });
+    render(
+      <Dnd>
+        <ShellSidebarList bodyHeight={800} />
+      </Dnd>,
+    );
+    drag(screen.getByTestId("rename-input"));
+    expect(started).toEqual([]);
+    act(() => {
+      useUiStore.setState({ renamingThreadId: null });
+    });
+  });
+
+  it("the dragged row dims, as the other rows do", () => {
+    render(
+      <Dnd>
+        <ShellSidebarList bodyHeight={800} />
+      </Dnd>,
+    );
+    expect(rowOf("s:s-7").className).not.toContain("opacity-60");
+    act(() => {
+      useShellDragStore.setState({ source: { kind: "thread", thread: "s-7", archived: true } });
+    });
+    expect(rowOf("s:s-7").className).toContain("opacity-60");
+    expect(rowOf("s:s-8").className).not.toContain("opacity-60");
+  });
+
 });

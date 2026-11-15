@@ -9,6 +9,7 @@
 import { plainRects } from "@/shell/geometry/rects";
 import type { GeoNode, Rect } from "@/shell/geometry/types";
 import type { DragSource } from "@/shell/drag/targets";
+import { openThreadTab } from "@/shell/drag/threadSource";
 import { spaceOfThread, type LayoutState } from "@/stores/layout";
 
 /** The glyph's box in CSS px. */
@@ -54,10 +55,13 @@ function spaceOfSource(source: DragSource, s: Pick<LayoutState, "panes" | "tabs"
  * there, dormant. A pane moves whole (`pane.move --space`), in one step: each thread whose tab it
  * holds moves with it and takes its other linked tabs along, so a drop never ends half moved.
  * A sidebar row's thread moves as its tab would, open or not
- * (docs/notes/shell-16-sidebar.md). Null when the drop does nothing: its own space, or a source
+ * (docs/notes/shell-16-sidebar.md), but an archived one only while its tab is open: it lives in
+ * no space, so a space tab takes only its open tab (docs/notes/preview-tabs-2-row-drag.md). Null
+ * when the drop does nothing: its own space, an archived thread with no tab open, or a source
  * that went.
  */
 export function spaceDropCommands(source: DragSource, space: string, s: Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId">): SpaceCommand[] | null {
+  if (source.kind === "thread" && source.archived && !openThreadTab(s, source.thread)) return null;
   const from = spaceOfSource(source, s);
   if (!from || from === space) return null;
   if (source.kind === "thread") return [{ name: "thread.space.move", args: { id: source.thread, space } }];
