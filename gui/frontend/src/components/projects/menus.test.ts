@@ -12,10 +12,12 @@ const openPullRequestInPanel = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const removeWorkspace = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/workspaceActions", async (orig) => ({ ...(await orig<typeof import("@/stores/workspaceActions")>()), removeWorkspace }));
 
-const { checkoutMenu, leftoverMenu, projectMenu, workspaceMenu } = await import("./menus");
+const { checkoutMenu, copyWithToast, leftoverMenu, projectMenu, workspaceMenu } = await import("./menus");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useProjectRenameStore } = await import("@/stores/projectRename");
 const { useWorkspaceRenameStore } = await import("@/stores/workspaceRename");
@@ -263,4 +265,22 @@ it("no item ends in an ellipsis (the app's menu style)", () => {
     ...workspaceMenu("w-1", { folder: true }).flatMap((x) => (x === "separator" || !("kind" in x) ? [x] : [])),
   ];
   for (const it of all) if (it !== "separator") expect(it.label).not.toMatch(/(…|\.\.\.)$/);
+});
+
+describe("copyWithToast (a menu's Copy path and Copy branch name)", () => {
+  beforeEach(() => {
+    notify.mockReset();
+  });
+
+  it("the menu closed as it copied: the copy is toasted", async () => {
+    await copyWithToast("/w/a", "Path");
+    expect(copyText).toHaveBeenCalledWith("/w/a");
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Path copied", description: "/w/a" });
+  });
+
+  it("a failed copy says so", async () => {
+    copyText.mockImplementationOnce(() => Promise.reject(new Error("denied")));
+    await copyWithToast("/w/a", "Path");
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "Copy failed" });
+  });
 });
