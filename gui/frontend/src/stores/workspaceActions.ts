@@ -5,12 +5,10 @@
  * args and the page's context, so the palette and the CLI reach the same code; opening
  * the instructions file is a File tab (GUI state, like a path chip).
  */
-import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import type { UiContextView } from "@/api/command";
 import type { WorkspaceView } from "@/api/workspace";
 import { createdThreadId } from "@/lib/compose";
-import { threadLabel } from "@/lib/prompt";
 import { WORKSPACE_PRIMARY } from "@/lib/projectSet";
 import { editInstructionsPrompt, instructionsStep, workspaceFolder } from "@/lib/workspaceCard";
 import { projectRef } from "@/lib/projects";
@@ -118,8 +116,8 @@ function selectThread(id: string): void {
  * --workspace <id> --project workspace, in the members' own checkouts: it edits
  * instructions, not code, so no worktrees are made) with the file as context; the daemon
  * focuses a new thread itself. While the thread a press sent to is still live, a press
- * only selects it (no second copy of the prompt). The steer's toast names the thread:
- * thread.send's own message is the CLI's ("wait with: code-foundry thread wait …").
+ * only selects it (no second copy of the prompt). No success toast: the selected thread
+ * shows the prompt it was sent (and the button's tooltip named it).
  */
 export async function editWorkspaceInstructions(workspaceId: string): Promise<boolean> {
   const ws = useWorkspacesStore.getState().byId[workspaceId];
@@ -135,7 +133,6 @@ export async function editWorkspaceInstructions(workspaceId: string): Promise<bo
     if (!res) return false;
     lastEdit.set(workspaceId, step.id);
     selectThread(step.id);
-    notify({ level: "success", title: `Sent to ${threadLabel(useThreadsStore.getState().byId[step.id]?.name ?? "", step.id)}` });
     return true;
   }
   const res = await runCommandForResult(
