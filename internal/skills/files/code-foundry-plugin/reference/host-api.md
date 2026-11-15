@@ -222,15 +222,16 @@ start hands over what was granted (`h.Granted()`). Test it with plugintest's
 ## Toasts
 
 `h.Toast(pluginsdk.ToastInfo, "Rerun started")` shows a short message in the app's
-toaster (bottom right) with the plugin's display name as its title and the text under it.
-`h.ToastIn(instance, level, text)` shows it in the same toaster, without the name, the
-text as the title, only to whoever has that instance on screen: not inside the surface.
+toaster (bottom right), in every window, the text as its title.
+`h.ToastIn(instance, level, text)` shows the same toast only to whoever has that
+instance on screen: not inside the surface. The plugin's name is not on a toast, so the
+text has to say what it is about.
 Levels: `ToastSuccess`, `ToastInfo`, `ToastAttention` (the app's warning), `ToastError`;
 each tints the card. For a message that should stay with the surface, render a `notice` node.
 
 `h.ToastWith(pluginsdk.ToastParams{Instance, Level, Text, Description})` adds a
-description: `Text` is the title and the description goes under it (without an
-instance too, which then drops the plugin's name). Keep the text short, it is the title
+description: `Text` is the title and the description goes under it, with or without an
+instance. Keep the text short, it is the title
 ("Note saved", "Build #42 queued again"); the detail goes in the description ("On build
 #41"). Text up to 200 characters, description up to 500, at most one toast a second per
 plugin (more are dropped). A command's `Message` is toasted anyway when it runs from the

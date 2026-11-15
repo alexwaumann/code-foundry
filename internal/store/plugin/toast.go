@@ -53,8 +53,7 @@ func (a *actor) viewToast(params json.RawMessage) {
 	if a.m.opts.Emitter == nil {
 		return
 	}
-	pl, _ := a.m.Snapshot().Plugin(a.name)
-	a.m.opts.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: toastNotify(t, pl.DisplayName())}})
+	a.m.opts.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: toastNotify(t)}})
 }
 
 // toastLevels are view/toast's levels and the notify intent's level for each.
@@ -86,13 +85,9 @@ func truncateToast(s string, limit int) string {
 	return s
 }
 
-// toastNotify is a toast without an instance as a notification. Without a description it
-// is titled with the plugin's name and the text under it, as before descriptions; with
-// one, the text is the title and the description goes under it, like every other toast.
-func toastNotify(t SurfaceToast, pluginName string) *v1.UiIntent_Notify {
-	n := &v1.UiIntent_Notify{Level: toastLevels[t.Level], Title: pluginName, Body: t.Text}
-	if t.Description != "" {
-		n.Title, n.Body = t.Text, t.Description
-	}
-	return n
+// toastNotify is a toast without an instance as a notification: the text is the title and
+// the description (if any) goes under it, like every other toast. The plugin's name is not
+// on it (docs/notes/toast-plugin-levels.md).
+func toastNotify(t SurfaceToast) *v1.UiIntent_Notify {
+	return &v1.UiIntent_Notify{Level: toastLevels[t.Level], Title: t.Text, Body: t.Description}
 }
