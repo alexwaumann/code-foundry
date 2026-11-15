@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CF, infoCardOff, mockPost, openApp, openProjectPage, resetMock, row } from "./fixtures";
+import { CF, infoCardOff, mockPost, openApp, openHelloDemo, openProjectPage, resetMock, row } from "./fixtures";
 
 /**
  * A copy shows where it was pressed (docs/notes/toast-success-rule.md): what only the real
@@ -122,5 +122,32 @@ test("screenshots: a copy button and the card's branch row at rest and copied; a
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${shots}/branch-row-copied-${scheme}.png` });
     await page.evaluate(`__cfModule("/src/lib/notify.ts").then((m) => m.dismissNotice())`);
+  }
+
+});
+
+test("screenshots: a plugin's copy action at rest and copied (the hello demo's Copy error)", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
+  const shots = process.env.SHOTS ?? "";
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openHelloDemo(page);
+  const copyError = page.locator('[data-testid="plugin-button"][data-key="run-2-copy-error"]');
+  const runRow = page.locator('[data-testid="plugin-row"]', { has: copyError });
+  await copyError.scrollIntoViewIfNeeded();
+  await expect(copyError).toBeVisible();
+  const clip = async () => {
+    const b = await runRow.boundingBox();
+    if (!b) throw new Error("no row");
+    return { x: b.x - 12, y: b.y - 12, width: b.width + 24, height: b.height + 24 };
+  };
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(1600);
+    await page.screenshot({ path: `${shots}/plugin-copy-rest-${scheme}.png`, clip: await clip() });
+    await copyError.click();
+    await page.mouse.move(5, 5);
+    await expect(copyError).toHaveAttribute("data-copied", "true");
+    await page.screenshot({ path: `${shots}/plugin-copy-copied-${scheme}.png`, clip: await clip() });
   }
 });
