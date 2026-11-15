@@ -121,7 +121,9 @@ normally and text search reports `ErrMissing` until the next update.
 * TCC: ripgrep is a child of the daemon, so macOS judges the daemon's responsible process
   (as for git), never `code-foundry-rg`; it keeps the default (cdhash) ad-hoc requirement
   like the dictation engine.
-* The whisper.cpp MIT notice is not shipped anywhere yet (it is statically linked into
-  `code-foundry-dictate`); `THIRD-PARTY-NOTICES.txt` is where it belongs. Not done here.
+* The whisper.cpp MIT notice (statically linked into `code-foundry-dictate`) was not
+  shipped anywhere; a follow-up added it to `THIRD-PARTY-NOTICES.txt`. When
+  `WHISPER_TAG` in `scripts/whisper-cpp.sh` changes, update the version and the licence
+  text there.
 * `make package` (its `wails3 build`) leaves `gui/build/darwin/icons.icns` modified and
   `gui/build/darwin/Assets.car` untracked. Not from this change; do not commit them.
