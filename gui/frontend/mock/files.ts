@@ -25,6 +25,7 @@ import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
 import { mockLog, tailOf } from "./media";
 import { MERMAID_FILES } from "./mermaid";
+import { DAEMON_LOG, TEST_RUN } from "./logs";
 import { pagelibPages } from "./pagelib";
 import { tableFiles } from "./tables";
 import { testPdf } from "./pdf";
@@ -358,6 +359,8 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/logs/server.log`, text(mockLog(8 * 1024))],
     // The data previews' CSV, JSON and JSON Lines (mock/tables.ts).
     ...tableFiles().map(([path, s, mime]): [string, Entry] => [`${CF}/${path}`, text(s, mime)]),
+    [`${CF}/logs/daemon.log`, text(DAEMON_LOG)],
+    [`${CF}/logs/test-run.txt`, text(TEST_RUN)],
   ]);
 }
 

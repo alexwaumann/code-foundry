@@ -80,6 +80,13 @@ describe("LogBody", () => {
     expect(texts()).toEqual(["just text", "more text"]);
   });
 
+  it("an empty log has no rows and no filter", () => {
+    render(<LogBody {...props("/w/empty.log", "")} />);
+    expect(screen.queryAllByTestId("file-log-row")).toEqual([]);
+    expect(screen.queryByTestId("file-log-filter")).toBeNull();
+    expect(screen.getByTestId("file-log-rows").dataset.count).toBe("0");
+  });
+
   it("a JSON log line: time, level, message, then the other keys", () => {
     render(<LogBody {...props("/w/app.log", '{"time":"2026-11-14T09:14:02.113Z","level":"warn","msg":"slow","id":"t-1","ms":812}\n')} />);
     expect(texts()).toEqual(["09:14:02.113WARNslow id=t-1 ms=812"]);
