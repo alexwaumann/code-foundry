@@ -42,11 +42,11 @@ async function settle() {
   });
 }
 
-/** Starts the cleanup the way the project page does and waits for its question; `done` settles with its answer. */
-async function start(): Promise<{ done: Promise<boolean> }> {
+/** Starts the cleanup the way the project menu does (or the leftover list's button: `inView`) and waits for its question; `done` settles with its answer. */
+async function start(source: { inView?: boolean } = {}): Promise<{ done: Promise<boolean> }> {
   let done!: Promise<boolean>;
   act(() => {
-    done = cleanupMergedWorktrees("repo-cf");
+    done = cleanupMergedWorktrees("repo-cf", source);
   });
   await settle();
   return { done };
@@ -112,6 +112,15 @@ describe("CleanupWorktreesDialog", () => {
     fireEvent.click(within(dialog).getByTestId("cleanup-ok"));
     await done;
     expect(notify.mock.calls[0]?.[0].title).toBe("Removed 1 worktree");
+  });
+
+  it("from the leftover list's button (inView) the rows going are the result: no toast", async () => {
+    preview.rows = [row("cf/usage-polish", "merged")];
+    fakeCleanup(preview.rows);
+    const { done } = await start({ inView: true });
+    fireEvent.click(within(screen.getByTestId("cleanup-dialog")).getByTestId("cleanup-ok"));
+    expect(await done).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("nothing merged right now: offers the fetch alone; nothing removed says so", async () => {

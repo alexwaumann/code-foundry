@@ -84,7 +84,7 @@ function LeftoverRow({ projectId, path }: { projectId: string; path: string }) {
             ) : (
               <span className="size-6 shrink-0" aria-hidden />
             )}
-            <RowAction label="Remove worktree" destructive testId="leftover-remove" onClick={() => void removeWorktree(projectId, path)}>
+            <RowAction label="Remove worktree" destructive testId="leftover-remove" onClick={() => void removeWorktree(projectId, path, { inView: true })}>
               <Trash2 />
             </RowAction>
           </span>
@@ -113,7 +113,7 @@ export function LeftoverWorktrees({ projectId, paths }: { projectId: string; pat
         testId="leftover-title"
         right={
           clean > 0 ? (
-            <Button type="button" variant="ghost" size="sm" className="h-6 text-cf-text-secondary" data-testid="leftover-remove-clean" onClick={() => void cleanupMergedWorktrees(projectId)}>
+            <Button type="button" variant="ghost" size="sm" className="h-6 text-cf-text-secondary" data-testid="leftover-remove-clean" onClick={() => void cleanupMergedWorktrees(projectId, { inView: true })}>
               <Broom />
               {removeCleanLabel(clean)}
             </Button>

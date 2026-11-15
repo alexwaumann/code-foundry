@@ -653,7 +653,7 @@ describe("the workspace's Instructions and skills", () => {
     expect(selection()).toEqual({ kind: "thread", id: "s-new" });
   });
 
-  it("Edit instructions steers once: the toast names the thread (no CLI text); while it works a press only shows it", async () => {
+  it("Edit instructions steers once and shows the thread (no toast); while it works a press only shows it", async () => {
     const { mono } = twoWorkspaces();
     daemon.handlers.set("thread.send", () => ({ message: "Sent. wait with: code-foundry thread wait s-driver", resultJson: "" }));
     addThreads(thread("s-driver", { name: "driver", projectId: "", projectIds: ["repo-dot"], workspaceId: mono, worktreePath: "/Users/dev/mono", state: "connected", status: "busy" }));
@@ -663,7 +663,8 @@ describe("the workspace's Instructions and skills", () => {
     fireEvent.click(by(body(mono), "workspace-edit-instructions"));
     await settle();
     expect(selection()).toEqual({ kind: "thread", id: "s-driver" });
-    expect(notify.mock.calls.map(([n]) => [n.level, n.title])).toEqual([["success", "Sent to driver"]]);
+    // The selected thread shows the prompt: no success toast.
+    expect(notify).not.toHaveBeenCalled();
     expect(invocationsOf("thread.send")).toHaveLength(1);
 
     // Still working on it: shown again, not sent again.

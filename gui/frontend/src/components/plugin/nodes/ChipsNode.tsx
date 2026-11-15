@@ -4,6 +4,8 @@ import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useRunAction } from "../actions";
 import { useViewCtx } from "../context";
+import { CopyIcon } from "@/components/copy/CopyButton";
+import { useCopiedHere } from "../useCopiedHere";
 import { InlineView } from "../parts";
 import type { NodeProps } from "../registry";
 import { statusIcon, statusTone } from "../tones";
@@ -13,6 +15,8 @@ function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
   const { inert } = useViewCtx();
   // A chip without a status has no glyph (the empty status would draw as pending).
   const glyph = chip.status ? statusIcon[chip.status] : null;
+  // A copy action's check takes the glyph's place for a moment (no toast).
+  const copied = useCopiedHere(chip.key);
   const tone = statusTone(chip.status);
   const clickable = chip.action !== undefined && !inert;
   return (
@@ -32,11 +36,12 @@ function ChipView({ chip, focusable }: { chip: Chip; focusable: boolean }) {
         data-key={chip.key}
         data-status={chip.status || undefined}
         data-selected={chip.selected || undefined}
+        data-copied={copied || undefined}
         onClick={() => {
           if (clickable) run(chip.key, chip.action);
         }}
       >
-        {glyph && <glyph.icon className={cn("size-3.5 shrink-0", glyph.className)} aria-hidden />}
+        {copied ? <CopyIcon copied className="size-3.5 shrink-0" /> : glyph && <glyph.icon className={cn("size-3.5 shrink-0", glyph.className)} aria-hidden />}
         <span className="truncate">{chip.label}</span>
         {chip.meta !== undefined && <InlineView value={chip.meta} className="shrink-0 text-caption-sm tabular-nums" />}
       </button>

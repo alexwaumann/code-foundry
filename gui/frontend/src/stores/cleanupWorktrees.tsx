@@ -10,6 +10,7 @@
 import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { previewCleanup, removedByCleanup, type CleanupRowView } from "@/api/project";
+import type { CommandSource } from "./commands";
 import { registerConfirmPresenter, registerOwnDialog, requestConfirm, type ConfirmRequest } from "./confirm";
 import { getUiContext } from "./context";
 
@@ -52,13 +53,17 @@ async function present(req: ConfirmRequest): Promise<boolean> {
 registerConfirmPresenter(CLEANUP_COMMAND, present);
 registerOwnDialog(useCleanupWorktreesStore, (s) => s.pending !== null);
 
-/** "Removed 4 worktrees" with the branches under it, or "No merged worktrees to remove". */
-export function toastCleanupResult(resultJson: string): void {
+/**
+ * "Removed 4 worktrees" with the branches under it, or "No merged worktrees to remove".
+ * `inView` (run from the list whose rows go): only the second, as the list shows the first.
+ */
+export function toastCleanupResult(resultJson: string, source: CommandSource = {}): void {
   const gone = removedByCleanup(resultJson);
   if (gone.length === 0) {
     notify({ level: "success", title: "No merged worktrees to remove" });
     return;
   }
+  if (source.inView) return;
   notify({
     level: "success",
     title: `Removed ${String(gone.length)} ${gone.length === 1 ? "worktree" : "worktrees"}`,

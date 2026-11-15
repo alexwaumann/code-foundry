@@ -77,12 +77,54 @@ export function openStartedThread(id: string): void {
 }
 
 /**
+ * How long a started thread's toast waits for the daemon's FocusThread to select the thread
+ * (it travels on the event stream, apart from the command's answer, and may wait for the
+ * thread to reach the list).
+ */
+export const FOCUS_GRACE_MS = 1000;
+
+/** The wait unlessSelected uses; a component test with no FocusThread sets it to 0. */
+export const focusGrace = { ms: FOCUS_GRACE_MS };
+
+/**
+ * Calls `show` unless thread `id` is, or within FOCUS_GRACE_MS becomes, the selected one
+ * (docs/notes/toast-success-rule.md: the thread on screen is the result). A selection that
+ * moves elsewhere first shows it at once. An empty id (the result named no thread) shows it.
+ */
+export function unlessSelected(id: string, show: () => void, graceMs = focusGrace.ms): void {
+  const selected = () => {
+    const sel = useUiStore.getState().selection;
+    return sel.kind === "thread" && sel.id === id;
+  };
+  if (id === "") {
+    show();
+    return;
+  }
+  if (selected()) return;
+  let done = false;
+  const finish = (shown: boolean) => {
+    if (done) return;
+    done = true;
+    stop();
+    clearTimeout(timer);
+    if (shown) show();
+  };
+  const stop = useUiStore.subscribe((s, prev) => {
+    if (s.selection !== prev.selection) finish(!selected());
+  });
+  const timer = setTimeout(() => {
+    finish(!selected());
+  }, graceMs);
+}
+
+/**
  * Runs the command for kind. Resolves the new thread's id (an empty string when the
  * result names none), or null when it failed (toasted by runCommandForResult), the
  * question is blank, or the same command for this pull request is already running.
  * pr.fix.findings shows a "Preparing worktree" toast while it runs (preparingToast), as it
- * may fetch and create a worktree. The success toast has an Open action
- * (openStartedThread) when the result names the thread.
+ * may fetch and create a worktree. "Thread started" with Open (openStartedThread) shows only
+ * when the new thread did not become the selected one (unlessSelected): the daemon's
+ * FocusThread normally selects it, and the thread on screen is the result.
  */
 export async function startPrThread(kind: PrThreadKind, ref: PrRef, question = ""): Promise<string | null> {
   const args = prThreadArgs(kind, ref, question);
@@ -96,10 +138,13 @@ export async function startPrThread(kind: PrThreadKind, ref: PrRef, question = "
     if (!res) return null;
     const id = parseThreadResult(res.resultJson) ?? "";
     if (res.message) {
+      const message = res.message;
       const open = () => {
         openStartedThread(id);
       };
-      notify({ level: "success", title: "Thread started", description: res.message, ...(id ? { action: { label: "Open", onClick: open } } : {}) });
+      unlessSelected(id, () => {
+        notify({ level: "success", title: "Thread started", description: message, ...(id ? { action: { label: "Open", onClick: open } } : {}) });
+      });
     }
     return id;
   } finally {

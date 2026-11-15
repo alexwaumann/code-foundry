@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectView } from "@/api/project";
-import { finishAddProject, openAddProject, selectAddedProject, showAddedWorkspace, useAddProjectStore } from "./addProject";
+import { finishAddProject, noticeAdded, openAddProject, selectAddedProject, showAddedWorkspace, useAddProjectStore } from "./addProject";
 import { useProjectsStore } from "./projects";
 import { showProjectOnProjectsPage, showWorkspacePage } from "./projectsPage";
 
 vi.mock("./projectsPage", () => ({ showWorkspacePage: vi.fn(), showProjectOnProjectsPage: vi.fn(() => true) }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 const project = (id: string): ProjectView => ({ id, path: `/Users/dev/src/${id}`, name: id, defaultBranch: "main", githubSlug: "", remotes: [], git: true, worktrees: [] });
 
@@ -75,5 +77,22 @@ describe("what the Add Project dialog shows once a project is added", () => {
     openAddProject("github");
     await Promise.resolve();
     expect(useAddProjectStore.getState()).toMatchObject({ tab: "github", stay: false });
+  });
+});
+
+describe("noticeAdded", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    // [what, stay, toasted]
+    ["opened in the app: the dialog closes onto the new project, no toast", false, false],
+    ["opened by a page or the CLI: the window stays, so it is toasted", true, true],
+  ])("%s", (_what, stay, toasted) => {
+    useAddProjectStore.setState({ stay });
+    noticeAdded({ title: "Added api" });
+    if (toasted) expect(notify).toHaveBeenCalledWith({ level: "success", title: "Added api" });
+    else expect(notify).not.toHaveBeenCalled();
   });
 });

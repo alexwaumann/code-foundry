@@ -5,7 +5,6 @@
  * what only the page shows: the files that did not load and the directory.
  */
 import { useSyncExternalStore } from "react";
-import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import type { ThemeFileIssueView, ThemesSnapshotView } from "@/api/theme";
 import { setUserThemes, subscribeUserThemes, userThemes, type Theme } from "@/themes";
@@ -40,13 +39,11 @@ export function applyThemeEvent(ev: ThemesSnapshotView): void {
 
 /**
  * Removes a file of the themes directory that did not load (theme.delete --file, which
- * asks first; docs/notes/theme-fuzz-daemon.md). False when it failed or was cancelled.
+ * asks first; docs/notes/theme-fuzz-daemon.md). False when it failed or was cancelled. No
+ * success toast: the file's row goes.
  */
 export async function deleteThemeFile(file: string): Promise<boolean> {
-  const res = await runCommandForResult("theme.delete", { file }, { quiet: true });
-  if (!res) return false;
-  notify({ level: "success", title: `Deleted ${file}` });
-  return true;
+  return (await runCommandForResult("theme.delete", { file }, { quiet: true })) !== null;
 }
 
 /** The user's themes (by name); re-renders when they change. */

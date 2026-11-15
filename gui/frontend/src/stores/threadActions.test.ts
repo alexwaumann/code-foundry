@@ -10,7 +10,7 @@ vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice:
 const levels = () => notify.mock.calls.map(([n]) => n.level);
 
 
-const { archiveThread, respondThread, saveThreadForLater, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
+const { archiveThread, renameThread, respondThread, saveThreadForLater, setThreadModel, setThreadPermission, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
 const { useThreadStore } = await import("./thread");
 
 type Opts = { expected?: (err: unknown) => boolean };
@@ -34,18 +34,22 @@ beforeEach(() => {
 describe("snoozeThread", () => {
   it("sends an absolute time as RFC 3339 in the thread's context", async () => {
     expect(await snoozeThread("s1", Date.UTC(2026, 9, 15, 14, 0))).toBe(true);
-    expect(commands.runCommand).toHaveBeenCalledWith(THREAD_COMMANDS.snooze, { until: "2026-10-15T14:00:00.000Z" }, { activeThreadId: "s1" });
+    expect(commands.runCommand).toHaveBeenCalledWith(THREAD_COMMANDS.snooze, { until: "2026-10-15T14:00:00.000Z" }, { activeThreadId: "s1" }, {});
     expect(THREAD_COMMANDS.snooze).toBe("thread.snooze");
   });
 
-  it("null unsnoozes with clear", async () => {
+  it("null unsnoozes with clear; the strip's Dismiss snooze shows it (inView: no success toast)", async () => {
     await snoozeThread("s2", null);
-    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { clear: "true" }, { activeThreadId: "s2" });
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { clear: "true" }, { activeThreadId: "s2" }, {});
+    await snoozeThread("s2", null, { inView: true });
+    expect(commands.runCommand).toHaveBeenLastCalledWith("thread.snooze", { clear: "true" }, { activeThreadId: "s2" }, { inView: true });
   });
 
   it("saving for later sends save, with no time", async () => {
     await saveThreadForLater("s3");
-    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" });
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" }, {});
+    await saveThreadForLater("s3", { inView: true });
+    expect(commands.runCommand).toHaveBeenLastCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" }, { inView: true });
   });
 });
 
@@ -55,8 +59,19 @@ describe("archiveThread", () => {
     ["unarchives", false, "false"],
   ] as const)("%s in the thread's context", async (_, archived, arg) => {
     expect(await archiveThread("s3", archived)).toBe(true);
-    expect(commands.runCommand).toHaveBeenCalledWith("thread.archive", { archived: arg }, { activeThreadId: "s3" });
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.archive", { archived: arg }, { activeThreadId: "s3" }, {});
     expect(THREAD_COMMANDS.archive).toBe("thread.archive");
+  });
+});
+
+describe("controls that show their own result", () => {
+  it.each([
+    ["renameThread (the row's name editor)", () => renameThread("s4", "New name"), THREAD_COMMANDS.rename],
+    ["setThreadModel (the composer's picker)", () => setThreadModel("s4", "opus"), THREAD_COMMANDS.setModel],
+    ["setThreadPermission (the composer's picker)", () => setThreadPermission("s4", "auto"), THREAD_COMMANDS.setMode],
+  ] as const)("%s runs inView: no success toast", async (_what, run, name) => {
+    await run();
+    expect(commands.runCommand).toHaveBeenCalledWith(name, expect.anything(), { activeThreadId: "s4" }, { inView: true });
   });
 });
 

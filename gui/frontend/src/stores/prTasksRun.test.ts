@@ -46,4 +46,13 @@ describe("runPrTask", () => {
     await run;
     expect(notify.mock.calls[0]?.[0].description).toBe("Sent to Port the fix for Fix resize race");
   });
+
+  it("sent into the selected thread: the thread shows the task, so nothing is toasted", async () => {
+    useThreadsStore.setState({ byId: { "s-3": thread("s-3", { name: "Fix resize race" }) } });
+    useUiStore.setState({ selection: { kind: "thread", id: "s-3" } });
+    const run = runPrTask({ slug: "o/r", number: 7 }, "checks", { kind: "this", threadId: "s-3" });
+    answer.resolve?.({ message: "Sent to Fix resize race (s-3) (#4)", resultJson: '{"threadId":"s-3","sent":true}' });
+    await expect(run).resolves.toBe("s-3");
+    expect(notify).not.toHaveBeenCalled();
+  });
 });

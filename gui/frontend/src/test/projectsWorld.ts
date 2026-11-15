@@ -351,6 +351,6 @@ export function fakeGitInit(): void {
       defaultBranch: "main",
       worktrees: p.worktrees.map((w) => (w.isMain ? { ...w, branch: "main", head: "1a1t1a10", status: status({ upstream: "", baseRef: "", untracked: 3, dirty: true }) } : w)),
     }));
-    return { message: "", resultJson: "" };
+    return { message: "initialized git in ~/Documents/writing", resultJson: "" };
   });
 }

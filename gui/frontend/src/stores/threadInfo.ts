@@ -11,7 +11,6 @@ import { useShallow } from "zustand/react/shallow";
 import { getActionPick } from "@/api/actions";
 import { listEditorApps, type EditorAppView } from "@/api/gitops";
 import { sendErrorMessage } from "@/api/stream";
-import { copyText } from "@/lib/clipboard";
 import { otherModelWorksIn, type MemberPick } from "@/lib/threadInfo";
 import { useActionsStore } from "./actions";
 import { runAction } from "./actionActions";
@@ -169,16 +168,6 @@ export async function deliverThreadPrompt(threadId: string, text: string): Promi
  */
 export async function runCardAction(actionId: string, threadId: string): Promise<void> {
   await runAction(actionId, { kind: "thread", threadId });
-}
-
-/** Copies a branch name, with the copy toast the pull request's link uses. */
-export async function copyBranchName(branch: string): Promise<void> {
-  try {
-    await copyText(branch);
-    notify({ level: "success", title: "Branch copied", description: branch });
-  } catch {
-    notify({ level: "error", title: "Copy failed" });
-  }
 }
 
 /** Watches several resource keys at once (a workspace's checkouts); the caller selects from the resource's store. */

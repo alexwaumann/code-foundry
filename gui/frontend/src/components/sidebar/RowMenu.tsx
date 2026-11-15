@@ -33,7 +33,8 @@ export function RowMenu({ id, lead, keepFocus }: { id: string; lead?: ReactNode;
           // Nothing to fork from once Claude Code deleted the transcript (docs/notes/transcript-deleted.md).
           disabled={transcriptMissing}
           onSelect={() => {
-            void forkThread(id);
+            // The fork's row comes in (and the daemon selects it).
+            void forkThread(id, { inView: true });
           }}
         >
           Fork
@@ -42,7 +43,7 @@ export function RowMenu({ id, lead, keepFocus }: { id: string; lead?: ReactNode;
       <ContextMenuItem
         variant="destructive"
         onSelect={() => {
-          void removeThread(id);
+          void removeThread(id, { inView: true });
         }}
       >
         Remove

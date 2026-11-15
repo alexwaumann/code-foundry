@@ -127,7 +127,7 @@ describe("which rows get which button", () => {
 });
 
 describe("running pr.task", () => {
-  it("into this thread: --thread with the selection; the daemon's message, no Open", async () => {
+  it("into this thread: --thread with the selection; the thread shows the task, so no toast", async () => {
     await fromThread("s-1");
     link("s-1", [145]);
     renderPrPanel();
@@ -135,10 +135,8 @@ describe("running pr.task", () => {
     fireEvent.click(byTestId("pr-task-checks"));
     await settle();
     expect(tasks()).toEqual([{ "repo-slug": SLUG, number: "145", kind: "checks", thread: "s-1" }]);
-    await expectToast("Sent to s-1 (#7)");
-    // The CLI's wait hint is for agents, not the window.
-    expect(toastTexts().join(" ")).not.toContain("thread wait");
-    expect(toastOpen("Sent to s-1")).toBeNull();
+    await settle();
+    expect(toastTexts().join(" ")).not.toContain("Sent to s-1");
   });
 
   it("an unrelated pull request: new thread by default (listed last); the menu lists the threads that link it, not this one; picking one sends there, Open selects it", async () => {

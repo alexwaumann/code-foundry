@@ -38,6 +38,7 @@ import type { UiContextView } from "@/api/command";
 import { errorMessage, runStream } from "@/api/stream";
 import { copyText } from "@/lib/clipboard";
 import { runCommandForResult } from "./commands";
+import { markElementCopied } from "./pluginCopied";
 import { openUrl } from "./gh";
 
 /** At most this many lines stay in a log node on screen (the daemon keeps the same). */
@@ -670,9 +671,21 @@ export function openElementUrl(url: string): void {
   void openUrl(url);
 }
 
-export async function copyElementText(text: string): Promise<void> {
-  await copyText(text);
-  notify({ level: "success", title: "Copied" });
+/**
+ * A copy action: the text goes on the clipboard. From a visible control (`at`: its watch
+ * key and element key) the element shows a check in place (stores/pluginCopied.ts) and
+ * nothing is toasted; from a menu (no `at`), which closed as it ran, "Copied" is toasted
+ * (docs/notes/toast-success-rule.md). A failed copy toasts "Copy failed".
+ */
+export async function copyElementText(text: string, at?: { watchKey: string; key: string }): Promise<void> {
+  try {
+    await copyText(text);
+  } catch {
+    notify({ level: "error", title: "Copy failed" });
+    return;
+  }
+  if (at) markElementCopied(at.watchKey, at.key);
+  else notify({ level: "success", title: "Copied" });
 }
 
 export function setDraft(draftKey: string, name: string, value: FieldValue): void {

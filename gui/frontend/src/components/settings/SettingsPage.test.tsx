@@ -256,15 +256,18 @@ describe("the settings page", () => {
     }
   });
 
-  it("a bool saves and says so; a number out of range is refused inline; the restart badge shows once changed", async () => {
+  it("a bool saves and its switch says so (no toast); a number out of range is refused inline; the restart badge shows once changed", async () => {
     open();
     const sw = within(row("threads.auto_name")).getByRole("switch");
     expect(sw.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(sw);
     await waitFor(() => {
-      expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "success", title: "Saved Name threads automatically" }));
+      expect(sw.getAttribute("aria-checked")).toBe("false");
     });
-    expect(sw.getAttribute("aria-checked")).toBe("false");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(notify).not.toHaveBeenCalledWith(expect.objectContaining({ level: "success" }));
 
     fireEvent.click(nav("appearance"));
     spin("appearance.font_size").focus();

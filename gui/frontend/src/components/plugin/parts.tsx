@@ -3,19 +3,20 @@
  * ticking times), pills, status glyphs and buttons (PRIMITIVES.md §A, shared value types).
  */
 import { createElement } from "react";
-import { Check, ChevronDown, Circle, Copy, ExternalLink, LoaderCircle } from "lucide-react";
+import { ChevronDown, Circle, ExternalLink, LoaderCircle } from "lucide-react";
 import type { Glyph as GlyphValue, Inline, Pill as PillValue, Span, ViewButton } from "@/api/plugin";
 import { inlineSpans, inlineText } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
+import { CopyButton, CopyIcon } from "@/components/copy/CopyButton";
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
-import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { usePending } from "@/stores/pluginSurfaces";
 import { openElementUrl } from "@/stores/pluginSurfaces";
 import { useRunAction } from "./actions";
 import { useFormCtx, useViewCtx } from "./context";
+import { useCopiedHere } from "./useCopiedHere";
 import { formatFixedDuration, formatTime } from "./format";
 import { iconByName } from "./icons";
 import { useMenuPending } from "./menuPending";
@@ -155,7 +156,8 @@ const buttonStyle: Record<NonNullable<ViewButton["style"]>, string> = {
  * gets its label as a tooltip (the label is otherwise hidden), then the plugin's hint;
  * any other button shows the hint, or its label when that is cut. A button with a menu
  * opens it (a chevron after its label; PluginMenu.tsx MenuButtonMenu) and spins while one
- * of its items' acts is in flight.
+ * of its items' acts is in flight. A copy action shows the copy check in its icon's place
+ * for a moment (an icon-only button is named "Copied" meanwhile), and no toast.
  */
 export function PluginButton({ button, submit }: { button: ViewButton; submit?: boolean }) {
   const { watchKey, inert } = useViewCtx();
@@ -163,8 +165,10 @@ export function PluginButton({ button, submit }: { button: ViewButton; submit?: 
   const run = useRunAction();
   const menuPending = useMenuPending(button.menu?.items);
   const pending = usePending(watchKey, button.key) || (button.busy ?? false) || menuPending;
+  const copied = useCopiedHere(button.key);
   const style = button.style ?? "muted";
-  const icon = pending ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden /> : button.icon ? <PluginIcon name={button.icon} /> : null;
+  const icon = pending ? <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden /> : copied ? <CopyIcon copied /> : button.icon ? <PluginIcon name={button.icon} /> : null;
+  const name = copied ? "Copied" : button.label;
   const disabled = (button.disabled ?? false) || pending || inert || (form?.locked ?? false);
   const external = button.action?.openUrl && style === "link" && !button.iconOnly;
   const click = () => {
@@ -177,8 +181,9 @@ export function PluginButton({ button, submit }: { button: ViewButton; submit?: 
       size={button.iconOnly ? "icon-xs" : "xs"}
       className={cn(buttonStyle[style], style === "outline" && "bg-transparent dark:bg-transparent", !button.iconOnly && "max-w-full min-w-0")}
       disabled={disabled}
-      aria-label={button.iconOnly ? button.label : undefined}
+      aria-label={button.iconOnly ? name : undefined}
       aria-busy={pending || undefined}
+      data-copied={copied || undefined}
       data-testid="plugin-button"
       data-key={button.key}
       data-style={style}
@@ -205,7 +210,7 @@ export function PluginButton({ button, submit }: { button: ViewButton; submit?: 
       </Tip>
     ) : (
       // The span carries the tooltip while the button is disabled (no pointer events).
-      <Tip label={button.iconOnly ? [button.label, button.hint].filter(Boolean).join("\n") : button.hint}>
+      <Tip label={button.iconOnly ? [name, button.hint].filter(Boolean).join("\n") : button.hint}>
         <span className={cn("inline-flex", button.iconOnly ? "shrink-0" : "max-w-full min-w-0")}>{trigger}</span>
       </Tip>
     );
@@ -232,26 +237,9 @@ export function ButtonBar({ buttons, align, className }: { buttons: readonly Vie
 
 /**
  * A muted Copy icon button (always visible): copies `text` on the host and shows a check
- * for a moment, no toast (an icon button's feedback is its check; a plugin's other copy
- * actions toast through copyElementText).
+ * for a moment, no toast (components/copy/CopyButton; a plugin's copy actions show the same
+ * check on their element, or toast from a menu: copyElementText).
  */
 export function CopyIconButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const { copied, copy } = useCopied();
-  return (
-    <Tip label={copied ? "Copied" : label}>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        className="shrink-0 text-cf-text-muted hover:text-cf-text"
-        aria-label={copied ? "Copied" : label}
-        data-copied={copied || undefined}
-        data-testid="plugin-copy"
-        onClick={() => {
-          void copy(text);
-        }}
-      >
-        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-      </Button>
-    </Tip>
-  );
+  return <CopyButton text={text} label={label} testId="plugin-copy" />;
 }

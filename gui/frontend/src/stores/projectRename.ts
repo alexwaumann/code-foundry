@@ -24,7 +24,7 @@ export function endProjectRename(projectId: string): void {
   if (useProjectRenameStore.getState().renamingProjectId === projectId) useProjectRenameStore.setState({ renamingProjectId: null });
 }
 
-/** project.rename: only the name in Code Foundry changes (the folder, worktrees and branches stay). */
+/** project.rename: only the name in Code Foundry changes (the folder, worktrees and branches stay). From the name editor: the new name is the result, so no success toast. */
 export function renameProject(projectId: string, name: string): Promise<boolean> {
-  return runCommand("project.rename", { project: projectId, name: name.trim() }, projectContext(projectId));
+  return runCommand("project.rename", { project: projectId, name: name.trim() }, projectContext(projectId), { inView: true });
 }

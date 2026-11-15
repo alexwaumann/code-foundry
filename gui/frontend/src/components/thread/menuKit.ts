@@ -42,6 +42,13 @@ export interface MenuKit {
    * title menu's. The sidebar row's menu hands it back to the list as before.
    */
   promptAfterInPlace: boolean;
+  /**
+   * The menu is the thread's sidebar row's own, so the row is on screen and shows what an
+   * item did (the pin, the row leaving for Archived, the flag going): no success toast for
+   * those (docs/notes/toast-success-rule.md). The header's menu has no such row in view (the
+   * sidebar may be hidden), so they toast from there.
+   */
+  rowInView: boolean;
 }
 
 export const contextMenuKit: MenuKit = {
@@ -52,6 +59,7 @@ export const contextMenuKit: MenuKit = {
   SubTrigger: ContextMenuSubTrigger,
   SubContent: ContextMenuSubContent,
   promptAfterInPlace: false,
+  rowInView: true,
 };
 
 export const dropdownMenuKit: MenuKit = {
@@ -62,6 +70,7 @@ export const dropdownMenuKit: MenuKit = {
   SubTrigger: DropdownMenuSubTrigger,
   SubContent: DropdownMenuSubContent,
   promptAfterInPlace: true,
+  rowInView: false,
 };
 
 /** The thread an in-place item just ran for from a promptAfterInPlace menu (markInPlace). */

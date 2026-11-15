@@ -162,7 +162,7 @@ function ActionButton({ action, prRef, panelKey }: { action: RowAction; prRef: P
   const reverting = usePrPanelStore((s) => s.reverting[pullRequestKey(prRef.slug, prRef.number)] ?? false);
   switch (action.kind) {
     case "ready":
-      return <ChangeButton label="Ready for review" busyLabel="Marking ready…" running={change === "ready"} inert={change !== null} onRun={() => void setPullRequestDraft(prRef, false)} testId="pr-ready-for-review" />;
+      return <ChangeButton label="Ready for review" busyLabel="Marking ready…" running={change === "ready"} inert={change !== null} onRun={() => void setPullRequestDraft(prRef, false, { inView: true })} testId="pr-ready-for-review" />;
     case "approve-workflow":
       return (
         <Button variant="outline" size="xs" data-testid="pr-approve-workflow" onClick={() => void openUrl(action.url)}>

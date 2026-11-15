@@ -26,7 +26,7 @@ function nameArg(action: ConfirmedSkillAction, item: SkillItemRef): string {
 }
 
 const run: Record<ConfirmedSkillAction, (item: SkillItemRef) => Promise<boolean>> = {
-  disable: (item) => disableSkill(item, { quiet: true }),
+  disable: disableSkill,
   uninstall: uninstallSkill,
   remove: removeLocalSkill,
 };

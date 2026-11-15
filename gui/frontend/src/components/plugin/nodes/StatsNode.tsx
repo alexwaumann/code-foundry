@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useRunAction } from "../actions";
 import { figureRole, statCardWidth, statsColumns, statToneClass } from "../charts";
 import { useViewCtx } from "../context";
+import { CopiedMark } from "../copied";
 import { useElementWidth } from "../layout";
 import { InlineLine } from "../parts";
 import type { NodeProps } from "../registry";
@@ -43,9 +44,13 @@ export function StatsNode({ node, data }: NodeProps<"stats">) {
           <FigureCard
             key={c.key}
             label={
-              <Tip label={c.label} whenTruncated>
-                <span className="block truncate">{c.label}</span>
-              </Tip>
+              <span className="flex min-w-0 items-center gap-1">
+                <Tip label={c.label} whenTruncated>
+                  <span className="block truncate">{c.label}</span>
+                </Tip>
+                {/* A copy action's check, for a moment (no toast). */}
+                <CopiedMark elementKey={c.key} />
+              </span>
             }
             figure={
               <Tip label={c.value} whenTruncated>

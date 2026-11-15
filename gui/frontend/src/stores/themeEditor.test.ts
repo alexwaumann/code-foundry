@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runCommandForResult = vi.hoisted(() => vi.fn());
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const invokeCommand = vi.hoisted(() => vi.fn());
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), invokeCommand }));
 
@@ -126,7 +128,8 @@ describe("the editor", () => {
     expect(draft().base.accent).toBe(gh.base.accent);
   });
 
-  it("Save writes the file through theme.save (renamed, same id) and applies when asked", async () => {
+  it("Save writes the file through theme.save (renamed, same id) and applies when asked, with no success toast", async () => {
+    notify.mockClear();
     startEditing("ocean");
     setBaseColour("accent", "#ff00ff");
     expect(await saveEdits({ name: " Ocean, pink ", apply: true })).toBe(true);
@@ -141,6 +144,7 @@ describe("the editor", () => {
     expect((file.base as Record<string, string>).accent).toBe("#ff00ff");
     expect(editorDirty()).toBe(false);
     expect(state().id).toBe("ocean");
+    expect(notify).not.toHaveBeenCalled();
     // Without apply, no apply arg.
     setBaseColour("accent", "#00ff00");
     await saveEdits({ name: "Ocean, pink", apply: false });

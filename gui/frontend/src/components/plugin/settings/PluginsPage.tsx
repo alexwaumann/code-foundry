@@ -75,7 +75,7 @@ function UpdateAllPlugins() {
       scope="plugins"
       available={available}
       testId="plugin-update-all"
-      steps={() => updatablePlugins(Object.values(usePluginsStore.getState().byName)).map((p) => ({ key: p.name, version: p.updateVersion, run: () => updatePlugin(p.name, { quiet: true }) }))}
+      steps={() => updatablePlugins(Object.values(usePluginsStore.getState().byName)).map((p) => ({ key: p.name, version: p.updateVersion, run: () => updatePlugin(p.name) }))}
     />
   );
 }

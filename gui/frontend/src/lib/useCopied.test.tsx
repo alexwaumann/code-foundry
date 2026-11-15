@@ -3,9 +3,13 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COPIED_MS, useCopied } from "./useCopied";
 
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
+
 const writeText = vi.fn<(text: string) => Promise<void>>();
 
 beforeEach(() => {
+  notify.mockReset();
   writeText.mockReset();
   writeText.mockImplementation(() => Promise.resolve());
   Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
@@ -33,6 +37,7 @@ describe("useCopied", () => {
     });
     expect(ok).toBe(true);
     expect(writeText).toHaveBeenCalledWith("hello");
+    expect(notify).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(after);
     });
@@ -61,7 +66,7 @@ describe("useCopied", () => {
     expect(result.current.copied).toBe(false);
   });
 
-  it("a failed copy shows nothing and resolves false", async () => {
+  it("a failed copy shows no check, toasts Copy failed and resolves false", async () => {
     writeText.mockImplementation(() => Promise.reject(new Error("denied")));
     // The textarea fallback (execCommand) fails too.
     Object.defineProperty(document, "execCommand", {
@@ -77,6 +82,7 @@ describe("useCopied", () => {
     });
     expect(ok).toBe(false);
     expect(result.current.copied).toBe(false);
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "Copy failed" });
   });
 
   it("unmounting while copied clears the timer", async () => {

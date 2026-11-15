@@ -65,9 +65,9 @@ describe("RowMenu: a child thread (docs/notes/no-sidebar-override-1-gui.md)", ()
 });
 
 describe("RowMenu: Remove", () => {
-  it("removes the thread through thread.remove, which asks first (ConfirmDialog.test)", () => {
+  it("removes the thread through thread.remove, which asks first (ConfirmDialog.test); the row goes, so no success toast", () => {
     openMenu({});
     fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
-    expect(removeThread).toHaveBeenCalledExactlyOnceWith("s-1");
+    expect(removeThread).toHaveBeenCalledExactlyOnceWith("s-1", { inView: true });
   });
 });

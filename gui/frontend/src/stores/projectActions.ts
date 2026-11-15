@@ -7,7 +7,7 @@ import { startCommandNamed } from "@/keys/bindings";
 import { openAddProject } from "./addProject";
 import { newTerminalInContext } from "@/shell/terminalActions";
 import { toastCleanupResult } from "./cleanupWorktrees";
-import { runCommand, runCommandForResult } from "./commands";
+import { runCommand, runCommandForResult, type CommandSource } from "./commands";
 import { composeIn } from "./compose";
 import { projectContext, worktreeContext } from "./context";
 import { openPublishDialog } from "./publish";
@@ -25,8 +25,8 @@ export function newTerminalIn(projectId: string, path: string): Promise<boolean>
  * the path that goes, the branch that stays, the uncommitted files that are lost). The path
  * is passed as an arg so the dialog knows the worktree.
  */
-export function removeWorktree(projectId: string, path: string): Promise<boolean> {
-  return runCommand("project.worktree.remove", { path }, worktreeContext(projectId, path));
+export function removeWorktree(projectId: string, path: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand("project.worktree.remove", { path }, worktreeContext(projectId, path), source);
 }
 
 /**
@@ -39,21 +39,20 @@ export async function resumeWorktree(projectId: string, path: string, archivedTh
     composeIn(projectId, path);
     return;
   }
-  if (await archiveThread(archivedThreadId, false)) useUiStore.getState().select({ kind: "thread", id: archivedThreadId }, { focusPrompt: true });
+  // The thread opens: that is the result, so no success toast.
+  if (await archiveThread(archivedThreadId, false, { inView: true })) useUiStore.getState().select({ kind: "thread", id: archivedThreadId }, { focusPrompt: true });
 }
 
 /**
  * project.worktree.cleanup for every merged, clean, unheld worktree of the project
  * (confirmed in the cleanup dialog, which lists them). A worktree with uncommitted work is
- * never part of it. The result toast names only what went.
+ * never part of it. The result toast names only what went; from the leftover list's button
+ * (`inView`) the rows going are the result, so only "nothing to remove" is toasted.
  */
-export async function cleanupMergedWorktrees(projectId: string): Promise<boolean> {
-  return reportCleanup(await runCommandForResult("project.worktree.cleanup", { project: projectId }, { ctx: projectContext(projectId), quiet: true }));
-}
-
-function reportCleanup(res: { resultJson: string } | null): boolean {
+export async function cleanupMergedWorktrees(projectId: string, source: CommandSource = {}): Promise<boolean> {
+  const res = await runCommandForResult("project.worktree.cleanup", { project: projectId }, { ctx: projectContext(projectId), quiet: true });
   if (!res) return false;
-  toastCleanupResult(res.resultJson);
+  toastCleanupResult(res.resultJson, source);
   return true;
 }
 
@@ -64,8 +63,8 @@ export function revealProject(projectId: string): Promise<boolean> {
 }
 
 /** project.unregister (confirmed). */
-export function unregisterProject(projectId: string): Promise<boolean> {
-  return runCommand("project.unregister", {}, projectContext(projectId));
+export function unregisterProject(projectId: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand("project.unregister", {}, projectContext(projectId), source);
 }
 
 /** project.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */
@@ -74,8 +73,8 @@ export function publishProject(projectId: string): void {
 }
 
 /** project.git.init: a folder without git becomes a repository with an empty first commit. */
-export function initGitIn(projectId: string): Promise<boolean> {
-  return runCommand("project.git.init", { project: projectId }, projectContext(projectId));
+export function initGitIn(projectId: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand("project.git.init", { project: projectId }, projectContext(projectId), source);
 }
 
 /**

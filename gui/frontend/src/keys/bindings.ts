@@ -562,13 +562,6 @@ export function presentInPalette(name: string): boolean {
 }
 
 /**
- * Commands whose success this window shows by itself, so starting one here toasts only a
- * failure, not the result message: terminal.new's shell opens as a new tab.
- * The CLI still prints the message.
- */
-const quietCommands: ReadonlySet<string> = new Set(["terminal.new", "thread.interrupt"]);
-
-/**
  * Whether a command's chord fires for this key event: a key without cmd, ctrl or alt (a
  * bare Escape) only fires inside the content pane and outside elements that handle their
  * own keys ([data-keys-local], the docked prompts), so it never steals keys from lists,
@@ -581,9 +574,13 @@ export function chordFires(chord: string, target: Element | null): boolean {
   return Boolean(target?.closest('[data-region="content"]')) && !target?.closest("[data-keys-local]");
 }
 
-/** Invokes a command started in this window (a chord, the palette, a CommandButton), toasting the result unless it is quiet. */
+/**
+ * Invokes a command started in this window (a chord, the palette, a CommandButton), toasting
+ * the result: the palette or the chord leaves nothing on screen that shows it (a command
+ * whose result shows itself is quiet in runCommandForResult).
+ */
 export function invokeStarted(name: string, args: Record<string, string> = {}, ctx: UiContextView = getUiContext()): void {
-  void runCommandForResult(name, args, { ctx, quiet: quietCommands.has(name) });
+  void runCommandForResult(name, args, { ctx });
 }
 
 /** Starts a command from the keyboard or palette: prompts for args it needs, else invokes. */

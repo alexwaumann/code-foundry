@@ -22,7 +22,7 @@ import { appendToDraft, draftOfSent, sentAttachmentNames, type SentMessage } fro
 import { sentComposerText } from "@/lib/userMessage";
 import { threadDraftKey } from "@/lib/threadDraft";
 import { readAttachmentFile } from "./attachments";
-import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore } from "./commands";
+import { invokeConfirmed, refreshCommands, runCommand, runCommandForResult, useCommandsStore, type CommandSource } from "./commands";
 import { addStagedAttachments, clearDraft, findCitation, getDraft, isDraftEmpty, NOTHING_TO_SEND, putCitation, updateDraft } from "./compose";
 import { getUiContext } from "./context";
 import { holdFailedNotice } from "./failedNotice";
@@ -61,8 +61,9 @@ export function renameArgName(): string {
   return spec?.args.find((a) => a.required && a.type === "string")?.name ?? "name";
 }
 
+/** thread.rename, from the sidebar row's name editor: the new name is the result, so no success toast. */
 export function renameThread(id: string, name: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.rename, { [renameArgName()]: name }, threadContext(id));
+  return runCommand(THREAD_COMMANDS.rename, { [renameArgName()]: name }, threadContext(id), { inView: true });
 }
 
 /**
@@ -70,21 +71,21 @@ export function renameThread(id: string, name: string): Promise<boolean> {
  * replacing its name. The daemon answers once the model did; meanwhile the thread's
  * `naming` flag shows the name muted. A failure keeps the name and toasts.
  */
-export function regenerateThreadName(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.regenerateName, { id }, threadContext(id));
+export function regenerateThreadName(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.regenerateName, { id }, threadContext(id), source);
 }
 
-export function removeThread(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.remove, {}, threadContext(id));
+export function removeThread(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.remove, {}, threadContext(id), source);
 }
 
-export function forkThread(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.fork, {}, threadContext(id));
+export function forkThread(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.fork, {}, threadContext(id), source);
 }
 
 /** thread.pin with an explicit value (the menu knows the current pin). */
-export function pinThread(id: string, pinned: boolean): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.pin, { pinned: String(pinned) }, threadContext(id));
+export function pinThread(id: string, pinned: boolean, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.pin, { pinned: String(pinned) }, threadContext(id), source);
 }
 
 /**
@@ -93,8 +94,8 @@ export function pinThread(id: string, pinned: boolean): Promise<boolean> {
  * while Claude is working, waiting on an answer or running background work. Unarchiving
  * never asks; a message starts Claude again.
  */
-export function archiveThread(id: string, archived: boolean): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.archive, { archived: String(archived) }, threadContext(id));
+export function archiveThread(id: string, archived: boolean, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.archive, { archived: String(archived) }, threadContext(id), source);
 }
 
 /**
@@ -104,22 +105,22 @@ export function archiveThread(id: string, archived: boolean): Promise<boolean> {
  * confirmation (runCommand opens the dialog) only while Claude is working or waiting on an
  * answer, and refuses a time that is not in the future. Unsnoozing never asks.
  */
-export function snoozeThread(id: string, untilMs: number | null): Promise<boolean> {
+export function snoozeThread(id: string, untilMs: number | null, source: CommandSource = {}): Promise<boolean> {
   const args: Record<string, string> = untilMs === null ? { clear: "true" } : { until: new Date(untilMs).toISOString() };
-  return runCommand(THREAD_COMMANDS.snooze, args, threadContext(id));
+  return runCommand(THREAD_COMMANDS.snooze, args, threadContext(id), source);
 }
 
 /**
  * thread.snooze with save: a snooze with no wake time. Everything else is as snoozeThread
  * (the daemon's confirmation mid-turn; snoozeThread(id, null) ends it).
  */
-export function saveThreadForLater(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.snooze, { save: "true" }, threadContext(id));
+export function saveThreadForLater(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.snooze, { save: "true" }, threadContext(id), source);
 }
 
 /** thread.run-in ("Run in…"): moves a workspace thread to the member in projectId. */
-export function runThreadIn(id: string, projectId: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id));
+export function runThreadIn(id: string, projectId: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id), source);
 }
 
 /** The compose store key of a thread's follow-up draft (lib/threadDraft.ts). */
@@ -311,12 +312,12 @@ export async function setThreadEffort(threadId: string, effort: string): Promise
   return (await runCommandForResult(THREAD_COMMANDS.setEffort, { id: threadId, effort }, { ctx: threadContext(threadId), quiet: true })) !== null;
 }
 
-/** Switches the model from the next request (thread.set-model). */
+/** Switches the model from the next request (thread.set-model). From the composer's picker, which shows it: no success toast. */
 export function setThreadModel(threadId: string, model: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.setModel, { id: threadId, model }, threadContext(threadId));
+  return runCommand(THREAD_COMMANDS.setModel, { id: threadId, model }, threadContext(threadId), { inView: true });
 }
 
-/** Switches the permission mode (thread.set-mode); Claude's default cannot be chosen live. */
+/** Switches the permission mode (thread.set-mode); Claude's default cannot be chosen live. From the composer's picker, which shows it: no success toast. */
 export function setThreadPermission(threadId: string, permission: ComposePermission): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.setMode, { id: threadId, permission }, threadContext(threadId));
+  return runCommand(THREAD_COMMANDS.setMode, { id: threadId, permission }, threadContext(threadId), { inView: true });
 }

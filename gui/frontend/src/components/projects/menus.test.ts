@@ -12,10 +12,12 @@ const openPullRequestInPanel = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 const removeWorkspace = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@/stores/workspaceActions", async (orig) => ({ ...(await orig<typeof import("@/stores/workspaceActions")>()), removeWorkspace }));
 
-const { checkoutMenu, leftoverMenu, projectMenu, workspaceMenu } = await import("./menus");
+const { checkoutMenu, copyWithToast, leftoverMenu, projectMenu, workspaceMenu } = await import("./menus");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useProjectRenameStore } = await import("@/stores/projectRename");
 const { useWorkspaceRenameStore } = await import("@/stores/workspaceRename");
@@ -95,11 +97,16 @@ describe("projectMenu (an index row's context menu, the project page's ⋯)", ()
     const clean = item(items, "project-cleanup");
     expect(clean.disabled).toBe(false);
     clean.onSelect();
-    expect(cleanupMergedWorktrees).toHaveBeenCalledWith("p-1");
+    // From the index, which shows no worktrees: what went is toasted.
+    expect(cleanupMergedWorktrees).toHaveBeenCalledWith("p-1", { inView: false });
+    // From the page, whose leftover rows go: not.
+    item(projectMenu("p-1", { kind: "github", step: null, cleanup: 1 }, { page: true }), "project-cleanup").onSelect();
+    expect(cleanupMergedWorktrees).toHaveBeenLastCalledWith("p-1", { inView: true });
     const remove = item(items, "project-unregister");
     expect(remove.destructive).toBe(true);
+    // The row goes (or the page goes back to the index): no success toast.
     remove.onSelect();
-    expect(unregisterProject).toHaveBeenCalledWith("p-1");
+    expect(unregisterProject).toHaveBeenCalledExactlyOnceWith("p-1", { inView: true });
     expect(items.filter((x) => x !== "separator" && x.destructive)).toHaveLength(1);
   });
 
@@ -136,7 +143,7 @@ describe("workspaceMenu (an index row's context menu, the workspace page's ⋯)"
     const remove = item(items, "workspace-menu-remove");
     expect(remove.destructive).toBe(true);
     remove.onSelect();
-    expect(removeWorkspace).toHaveBeenCalledWith("w-1");
+    expect(removeWorkspace).toHaveBeenCalledWith("w-1", { inView: true });
   });
 });
 
@@ -195,7 +202,7 @@ describe("checkoutMenu (a checkout's right-click menu on its project page)", () 
     expect(copyText.mock.calls).toEqual([["/u/app.wt/feat"], ["feat/x"]]);
     const remove = run("checkout-menu-remove");
     expect(remove.destructive).toBe(true);
-    expect(removeWorktree).toHaveBeenCalledWith("p-1", "/u/app.wt/feat");
+    expect(removeWorktree).toHaveBeenCalledWith("p-1", "/u/app.wt/feat", { inView: true });
     run("checkout-menu-new-thread");
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "p-1" });
     expect(useComposeStore.getState().drafts["p-1"]?.worktree).toEqual({ kind: "existing", path: "/u/app.wt/feat" });
@@ -247,7 +254,7 @@ describe("leftoverMenu (a worktree without threads' right-click menu on its proj
     expect(copyText.mock.calls).toEqual([["/u/app.wt/spike"], ["cf/perf-spike"]]);
     const remove = run("leftover-menu-remove");
     expect(remove.destructive).toBe(true);
-    expect(removeWorktree).toHaveBeenCalledWith("p-1", "/u/app.wt/spike");
+    expect(removeWorktree).toHaveBeenCalledWith("p-1", "/u/app.wt/spike", { inView: true });
     run("leftover-menu-new-thread");
     expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "p-1" });
     expect(useComposeStore.getState().drafts["p-1"]?.worktree).toEqual({ kind: "existing", path: "/u/app.wt/spike" });
@@ -263,4 +270,22 @@ it("no item ends in an ellipsis (the app's menu style)", () => {
     ...workspaceMenu("w-1", { folder: true }).flatMap((x) => (x === "separator" || !("kind" in x) ? [x] : [])),
   ];
   for (const it of all) if (it !== "separator") expect(it.label).not.toMatch(/(…|\.\.\.)$/);
+});
+
+describe("copyWithToast (a menu's Copy path and Copy branch name)", () => {
+  beforeEach(() => {
+    notify.mockReset();
+  });
+
+  it("the menu closed as it copied: the copy is toasted", async () => {
+    await copyWithToast("/w/a", "Path");
+    expect(copyText).toHaveBeenCalledWith("/w/a");
+    expect(notify).toHaveBeenCalledWith({ level: "success", title: "Path copied", description: "/w/a" });
+  });
+
+  it("a failed copy says so", async () => {
+    copyText.mockImplementationOnce(() => Promise.reject(new Error("denied")));
+    await copyWithToast("/w/a", "Path");
+    expect(notify).toHaveBeenCalledWith({ level: "error", title: "Copy failed" });
+  });
 });

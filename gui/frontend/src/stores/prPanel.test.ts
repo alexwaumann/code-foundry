@@ -201,7 +201,8 @@ describe("submitReview", () => {
     await expect(first).resolves.toBe(true);
     expect(busy()).toBe(false);
     expect(entry(key)?.data?.body).toBe("after");
-    expect(notify).toHaveBeenCalledWith({ level: "success", title: "pr.review", description: "Approved #5" });
+    // The review in Comments and the header's chip show it: no success toast.
+    expect(notify).not.toHaveBeenCalled();
     release();
   });
 

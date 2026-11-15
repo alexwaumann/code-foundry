@@ -50,7 +50,7 @@ function StateNotice({ tone, heading, children, action, testId }: { tone: "atten
 
 function RestartButton({ plugin, label }: { plugin: string; label: string }) {
   return (
-    <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.restart", { name: plugin })} data-testid="plugin-restart">
+    <Button variant="ghost" size="xs" className="text-cf-text-muted hover:text-cf-text" onClick={() => void runCommand("plugin.restart", { name: plugin }, undefined, { inView: true })} data-testid="plugin-restart">
       <RotateCcw aria-hidden />
       Restart {label}
     </Button>

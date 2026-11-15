@@ -1,10 +1,10 @@
 import type { ComponentType, ReactNode } from "react";
-import { Check, ClipboardCopy, Copy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
+import { ClipboardCopy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
 import { FinderIcon, type AppIconSlotProps } from "@/components/icons/AppIcon";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/copy/CopyButton";
 import { Tip } from "@/components/ui/tooltip";
-import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
 import { setWrap, useCodeViewStore } from "@/stores/codeView";
 import { openInEditor, revealInFinder, type FilePlace } from "./fileActions";
@@ -61,34 +61,14 @@ export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { 
   );
 }
 
-/** Copy path: copies the absolute path; a check for a moment after. */
+/** Copy path: copies the absolute path; a check for a moment after (components/copy/CopyButton). */
 export function CopyPathAction({ path }: { path: string }) {
-  const { copied, copy } = useCopied();
-  return (
-    <HeaderAction
-      icon={copied ? Check : Copy}
-      label={copied ? "Copied" : "Copy path"}
-      testId="file-copy-path"
-      onClick={() => {
-        void copy(path);
-      }}
-    />
-  );
+  return <CopyButton text={path} label="Copy path" testId="file-copy-path" />;
 }
 
-/** Copy contents: copies what `contents` gives when pressed (the text, a draft, a table as tab-separated text); a check for a moment after. */
+/** Copy contents: copies what `contents` gives when pressed (the text, a draft, a table as tab-separated text); a check for a moment after (components/copy/CopyButton). */
 export function CopyContentsAction({ contents }: { contents: () => string }) {
-  const { copied, copy } = useCopied();
-  return (
-    <HeaderAction
-      icon={copied ? Check : ClipboardCopy}
-      label={copied ? "Copied" : "Copy contents"}
-      testId="file-copy-contents"
-      onClick={() => {
-        void copy(contents());
-      }}
-    />
-  );
+  return <CopyButton text={contents} label="Copy contents" icon={ClipboardCopy} testId="file-copy-contents" />;
 }
 
 /** Copy path, Copy contents (given `contents`), Open in editor, Open in Finder and Refresh: row one's actions. */
