@@ -8,6 +8,8 @@ const runs: { name: string; args: Record<string, string>; thread: string }[] = [
 const focused: string[] = [];
 const runCommandForResult = vi.hoisted(() => vi.fn());
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", async (orig) => ({ ...(await orig<typeof import("@/lib/notify")>()), notify }));
 const focusTabNow = vi.hoisted(() => vi.fn());
 vi.mock("@/shell/commands", async (orig) => ({ ...(await orig<typeof import("@/shell/commands")>()), focusTabNow }));
 
@@ -377,6 +379,24 @@ describe("the thread's header in a shell pane", () => {
     if (!review) throw new Error("no Review item");
     fireEvent.click(review);
     await settle();
-    expect(runs).toEqual([{ name: "thread.space.move", args: { id: "s-1", space: "sp-b" }, thread: "" }]);
+    expect(runs).toEqual([{ name: "thread.space.move", args: { id: "s-1", space: "sp-b" }, thread: "s-1" }]);
+    // The thread's tab leaves this space and nothing here shows where it went: a toast that goes there.
+    expect(notify).toHaveBeenCalledTimes(1);
+    const n = notify.mock.calls[0]?.[0] as { level: string; title: string; action: { label: string; onClick: () => void } };
+    expect(n).toMatchObject({ level: "success", title: "Moved to Review", action: { label: "Go to space" } });
+    n.action.onClick();
+    await settle();
+    expect(runs.at(-1)).toEqual({ name: "space.switch", args: { space: "sp-b", focus: "true" }, thread: "" });
+  });
+
+  it("Move to space ▸ that fails toasts no move", async () => {
+    await seedLayout({ ...LAYOUT, rev: 2, spaces: [...LAYOUT.spaces, space(pane("p-9", [tab("t-9", "prs")]), "p-9", { id: "sp-b", name: "Review" })] });
+    runCommandForResult.mockImplementation(() => Promise.resolve(null));
+    render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+    fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
+    fireEvent.keyDown(within(screen.getByTestId("thread-header-menu")).getByTestId("menu-move-to-space"), { key: "ArrowRight" });
+    fireEvent.click(within(await screen.findByTestId("menu-move-to-space-spaces")).getByText("Review"));
+    await settle();
+    expect(notify).not.toHaveBeenCalled();
   });
 });

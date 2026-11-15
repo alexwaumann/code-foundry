@@ -151,7 +151,7 @@ function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: stri
         <DropdownMenuSub>
           <DropdownMenuSubTrigger data-testid="menu-move-to-space">Move to space</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="min-w-44" data-testid="menu-move-to-space-spaces">
-            <MoveToSpaceItems threadId={threadId} onPick={pick} />
+            <MoveToSpaceItems threadId={threadId} />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />

@@ -12,11 +12,12 @@ type MenuItem = ComponentType<{ onSelect: () => void; children?: ReactNode; "dat
  * its resolved time on the right, then "Pick a date and time" (the custom dialog) and
  * "Save for later" (no wake time; left out of a thread already saved). A preset invokes thread.snooze with the absolute time (snoozeThread); the daemon asks
  * for confirmation only mid-turn. The Snooze submenu of a thread's menu
- * (components/thread/ThreadMenuItems.tsx) and the row's Snooze button. Every place it opens
- * from shows the snooze (the row leaves for Snoozed; the open thread's snooze strip), so
- * no success toast (docs/notes/toast-success-rule.md).
+ * (components/thread/ThreadMenuItems.tsx) and the row's Snooze button. The row shows the
+ * snooze (it leaves for Snoozed), so no success toast from the row's button and menu
+ * (`inView`, the default); the thread header's menu passes false: the snooze closes the
+ * thread's tab and the sidebar may be hidden, so it toasts (docs/notes/toast-success-rule.md).
  */
-export function SnoozePresetItems({ id, Item, Separator, onPreset }: { id: string; Item: MenuItem; Separator: ComponentType; onPreset?: () => void }) {
+export function SnoozePresetItems({ id, Item, Separator, onPreset, inView = true }: { id: string; Item: MenuItem; Separator: ComponentType; onPreset?: () => void; inView?: boolean }) {
   // Mounted when the menu opens: the times are as of then.
   const [now] = useState(() => Date.now());
   const saved = useThreadsStore((s) => (s.byId[id]?.savedAtMs ?? null) !== null);
@@ -29,7 +30,7 @@ export function SnoozePresetItems({ id, Item, Separator, onPreset }: { id: strin
           data-preset={p.id}
           onSelect={() => {
             onPreset?.();
-            void snoozeThread(id, p.untilMs, { inView: true });
+            void snoozeThread(id, p.untilMs, { inView });
           }}
         >
           {p.label}
@@ -52,7 +53,7 @@ export function SnoozePresetItems({ id, Item, Separator, onPreset }: { id: strin
           data-testid="snooze-save"
           onSelect={() => {
             onPreset?.();
-            void saveThreadForLater(id, { inView: true });
+            void saveThreadForLater(id, { inView });
           }}
         >
           Save for later

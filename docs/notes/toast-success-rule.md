@@ -47,11 +47,17 @@ Anything else that only repeats the screen is silent.
 
 - A thread's menu (ThreadMenuItems) opens from the sidebar row (`contextMenuKit`) and the
   header's ⋯ (`dropdownMenuKit`). `MenuKit.rowInView` says the row is on screen. Silent from
-  both: Regenerate name (the row and the tab), Snooze presets, Save for later, Unsnooze (the
-  row; the pane's snooze strip), Run in (the row's queued move; the header's chip). Silent
-  from the row only: Pin, Clear flags, Archive/Unarchive (only the row shows them; the
-  sidebar can be hidden). Fork and Remove are the row's own: silent. Restart Claude shows
-  nowhere: toasts from both. The row's Snooze button (SnoozePresetItems) is silent too.
+  both: Regenerate name (the row and the tab), Unsnooze (the row; the pane's snooze strip),
+  Run in (the row's queued move; the header's chip). Silent from the row only: Pin, Clear
+  flags, Archive/Unarchive, Snooze presets and Save for later (only the row shows them: a
+  snooze closes the thread's tab, and the sidebar can be hidden). Fork and Remove are the
+  row's own: silent. Restart Claude shows nowhere: toasts from both. The row's Snooze button
+  (SnoozePresetItems, `inView` by default) is silent too.
+- Move to space ▸ (a space, or New space; shell/spaceActions.ts moveThreadToSpace) is in
+  both the header's menu and the shell row's: the thread's tab and row leave this space. From
+  the row's menu the row going is the result: silent. From the header's, "Moved to <space>"
+  with Go to space (space.switch). A thread dropped on a space tab stays silent: the tab it
+  landed on is the place.
 - Projects menus (components/projects/menus.ts): Remove project, Remove workspace (the row
   goes, or the page falls back to the index without it), Remove worktree (checkout and
   leftover rows), Initialize git (the kind changes), Resume (the thread opens): silent. Clean

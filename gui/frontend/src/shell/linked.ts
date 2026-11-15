@@ -185,11 +185,6 @@ export function spaceChoices(s: Pick<LayoutState, "spaceOrder" | "spaces" | "thr
   return s.spaceOrder.map((id) => ({ id, name: s.spaces[id]?.name ?? id, here: id === home }));
 }
 
-/** Move to space ▸ <space>: thread.space.move, which takes the thread's linked tabs along. */
-export function moveToSpaceAction(thread: string, space: string): LinkedAction {
-  return { run: "thread.space.move", args: { id: thread, space } };
-}
-
 /** The header menu's Close: thread.close, the thread's tab out of its space (never an archive). */
 export function closeThreadAction(thread: string): LinkedAction {
   return { run: "thread.close", args: { id: thread } };

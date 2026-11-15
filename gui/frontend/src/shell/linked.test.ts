@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LayoutState, PaneEntry, TabEntry } from "@/stores/layout";
 import type { TerminalView } from "@/api/terminal";
-import { closeThreadAction, diffKey, linkedRowOf, moveToSpaceAction, newTerminalAction, plusAction, prKey, rowAction, showTerminalAction, spaceChoices, spaceTabs, surfaceAction, tabbedTerminalIds, threadSurfaces, untabbedTerminals } from "./linked";
+import { closeThreadAction, diffKey, linkedRowOf, newTerminalAction, plusAction, prKey, rowAction, showTerminalAction, spaceChoices, spaceTabs, surfaceAction, tabbedTerminalIds, threadSurfaces, untabbedTerminals } from "./linked";
 
 const t = (id: string, kind: string, thread: string, key: string, paneId: string): TabEntry => ({ id, kind, thread, key, params: {}, title: "", name: "", preview: false, paneId });
 
@@ -65,7 +65,6 @@ describe("the actions", () => {
     expect(showTerminalAction("t-9", "p-2")).toEqual({ terminal: "show", id: "t-9", pane: "p-2" });
     expect(plusAction("prs", "p-2")).toEqual({ run: "view.pullrequests", args: { pane: "p-2" } });
     expect(plusAction("projects", "p-2")).toEqual({ run: "view.projects", args: { pane: "p-2" } });
-    expect(moveToSpaceAction("s-1", "sp-b")).toEqual({ run: "thread.space.move", args: { id: "s-1", space: "sp-b" } });
     expect(closeThreadAction("s-1")).toEqual({ run: "thread.close", args: { id: "s-1" } });
   });
 });

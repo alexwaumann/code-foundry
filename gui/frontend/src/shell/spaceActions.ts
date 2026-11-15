@@ -7,7 +7,7 @@
 import { guardRemoveSpaceArchive } from "@/stores/fileEditGuards";
 import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
-import { invokeConfirmed } from "@/stores/commands";
+import { invokeConfirmed, runCommandForResult, type CommandSource } from "@/stores/commands";
 import { getUiContext } from "@/stores/context";
 import { useLayoutStore } from "@/stores/layout";
 import { requestPaneFocus } from "@/stores/shellView";
@@ -43,12 +43,38 @@ export async function newSpace(): Promise<string> {
   return res.space ?? "";
 }
 
-/** Move to space ▸ New space: a new space after the others (not shown), then the thread moves there with its linked tabs. */
-export async function moveToNewSpace(thread: string): Promise<void> {
+/**
+ * Move to space ▸ <space> from a thread's menu: thread.space.move, which takes its linked tabs
+ * along. The thread's tab and row leave this space; unless the menu's row was the place that
+ * showed it going (`inView`, the sidebar row's menu), "Moved to <space>" with Go to space
+ * (docs/notes/toast-success-rule.md). A drop on a space tab (runSpaceDrop) stays silent: the
+ * tab it was dropped on is the place.
+ */
+export async function moveThreadToSpace(thread: string, space: string, source: CommandSource = {}): Promise<void> {
+  const res = await runCommandForResult("thread.space.move", { id: thread, space }, { quiet: true, ctx: getUiContext({ kind: "thread", id: thread }) });
+  if (res && !source.inView) noticeMoved(space);
+}
+
+function noticeMoved(space: string): void {
+  const name = useLayoutStore.getState().spaces[space]?.name ?? space;
+  notify({
+    level: "success",
+    title: `Moved to ${name}`,
+    action: {
+      label: "Go to space",
+      onClick: () => {
+        void switchSpace(space);
+      },
+    },
+  });
+}
+
+/** Move to space ▸ New space: a new space after the others (not shown), then the thread moves there with its linked tabs (moveThreadToSpace). */
+export async function moveToNewSpace(thread: string, source: CommandSource = {}): Promise<void> {
   const made = await runLayoutCommand("space.new", { focus: "false" });
   if (!made?.space) return;
   await afterRev(made.rev);
-  await runLayoutCommand("thread.space.move", { id: thread, space: made.space });
+  await moveThreadToSpace(thread, made.space, source);
 }
 
 /** Renames a space (space.rename); an empty or unchanged name does nothing. */

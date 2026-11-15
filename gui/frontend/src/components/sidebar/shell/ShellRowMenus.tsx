@@ -46,7 +46,7 @@ export function ShellRowMenu({ id }: { id: string }) {
           <ContextMenuSub>
             <ContextMenuSubTrigger data-testid="row-menu-move-to-space">Move to space</ContextMenuSubTrigger>
             <ContextMenuSubContent className="min-w-44" data-testid="row-menu-move-to-space-spaces">
-              <MoveToSpaceItems threadId={id} kit={contextMenuKit} onPick={pick} />
+              <MoveToSpaceItems threadId={id} kit={contextMenuKit} />
             </ContextMenuSubContent>
           </ContextMenuSub>
           <ContextMenuSeparator />
