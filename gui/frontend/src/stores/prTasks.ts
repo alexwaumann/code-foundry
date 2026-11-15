@@ -84,9 +84,9 @@ const selectedThread = (): string | null => {
  * (toasted by runCommandForResult with the daemon's error), went nowhere (the target
  * thread was removed: the daemon's message toasts as an error, without Open), or the same
  * task for this pull request is already running (a second press sends nothing). Otherwise
- * the daemon's message toasts with an Open action that selects the thread, unless that
+ * the daemon's message toasts with an Open action that selects the thread. When that
  * thread is already selected (a send into this thread, or a new thread the daemon's
- * FocusThread has selected already). A forwarded task's toast names the owner and the
+ * FocusThread has selected already) nothing is toasted: the thread shows the task. A forwarded task's toast names the owner and the
  * sender (forwardToast; "this thread" is the one selected when the task was run, not
  * when the answer came); Open selects the owner (a child thread opens like one picked in
  * the thread info card's lineage group).
@@ -107,8 +107,8 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
       return null;
     }
     const id = out.threadId || (target.threadId ?? "");
-    if (res.message) {
-      const open = id !== "" && selectedThread() !== id;
+    const open = id !== "" && selectedThread() !== id;
+    if (res.message && open) {
       const action = {
         label: "Open",
         onClick: () => {
@@ -116,7 +116,7 @@ export async function runPrTask(ref: PrRef, kind: TaskKind, target: TaskTarget):
         },
       };
       const text = out.viaThreadId && id ? forwardToast(id, out.viaThreadId, pressedIn) : taskToast(res.message, out.sent);
-      notify({ level: "success", title: "Task sent", description: text, ...(open ? { action } : {}) });
+      notify({ level: "success", title: "Task sent", description: text, action });
     }
     return id;
   } finally {
