@@ -61,6 +61,8 @@ async function forget(id: string): Promise<void> {
     "memory.remove",
     { id },
     {
+      // The entry leaving the list is the result: no success toast.
+      inView: true,
       expected: (err) => {
         seen.gone = isMemoryEntryGone(err);
         return seen.gone;
@@ -152,7 +154,7 @@ function RememberedAside() {
           variant="outline"
           size="xs"
           onClick={() => {
-            void runCommand("memory.clear");
+            void runCommand("memory.clear", {}, undefined, { inView: true });
           }}
           data-testid="memory-forget-all"
         >

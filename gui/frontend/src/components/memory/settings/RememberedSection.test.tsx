@@ -111,13 +111,14 @@ describe("RememberedSection", () => {
     const second = screen.getAllByTestId("memory-row")[1];
     if (!second) throw new Error("no row");
     fireEvent.click(within(second).getByTestId("memory-forget"));
-    expect(runForResult).toHaveBeenCalledWith("memory.remove", { id: "e2" }, expect.anything());
+    // The row leaving is the result: no success toast.
+    expect(runForResult).toHaveBeenCalledWith("memory.remove", { id: "e2" }, expect.objectContaining({ inView: true }));
     await vi.waitFor(() => {
       expect(within(second).getByTestId<HTMLButtonElement>("memory-forget").disabled).toBe(false);
     });
     expect(notify).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("memory-forget-all"));
-    expect(run).toHaveBeenCalledWith("memory.clear");
+    expect(run).toHaveBeenCalledWith("memory.clear", {}, undefined, { inView: true });
   });
 
   it("an entry gone since the list was shown: says so and reads the memory again", async () => {
