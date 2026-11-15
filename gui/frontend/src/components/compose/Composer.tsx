@@ -917,11 +917,11 @@ export function Composer({
                 // Nothing to pick yet: no switcher.
                 "Welcome to Code Foundry"
               ) : emptied ? (
-                <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} />
+                <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} tabId={tabId} />
               ) : (
                 <>
                   {/* "build with No project" reads as "with no project"; "in" would not. */}
-                  What should we build {noProject ? "with" : "in"} <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} />?
+                  What should we build {noProject ? "with" : "in"} <ProjectSwitcher target={target} name={name} set={set} disabled={busy} focusPrompt={focusPrompt} tabId={tabId} />?
                 </>
               )}
             </h1>
