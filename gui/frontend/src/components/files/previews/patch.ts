@@ -316,6 +316,60 @@ function fileOf(section: string, git: boolean, id: string): PatchFile | null {
   };
 }
 
+/**
+ * A file's section as the library reads it, forgiving what git apply and GNU patch forgive: an
+ * empty line inside a hunk is a context line whose space an editor stripped, and after the
+ * last hunk ends (by its counts) what follows is not the file's (format-patch's `-- ` and
+ * git version, `Only in …` from diff -r) and is left out.
+ */
+export function sectionText(lines: readonly string[], from: number, to: number): string {
+  const out: string[] = [];
+  let old = 0;
+  let neu = 0;
+  let hunks = 0;
+  for (let i = from; i < to; i++) {
+    const l = lines[i] ?? "";
+    if (old > 0 || neu > 0) {
+      const c = l[0];
+      if (c === "\\") {
+        out.push(l);
+        continue;
+      }
+      if (c === " " || l === "") {
+        old--;
+        neu--;
+        out.push(l === "" ? " " : l);
+        continue;
+      }
+      if (c === "-" || c === "+") {
+        if (c === "-") old--;
+        else neu--;
+        out.push(l);
+        continue;
+      }
+      old = 0;
+      neu = 0;
+    }
+    if (l.startsWith("@@ ")) {
+      const m = HUNK.exec(l);
+      if (m) {
+        hunks++;
+        old = m[1] === undefined ? 1 : Number(m[1]);
+        neu = m[2] === undefined ? 1 : Number(m[2]);
+      }
+      out.push(l);
+      continue;
+    }
+    if (hunks > 0) {
+      // Past a hunk's end: more hunk lines are the library's to flag (a wrong count); a
+      // signature or anything else is not this file's.
+      if (l === "-- " || l === "--" || !(l[0] === " " || l[0] === "+" || l[0] === "-")) break;
+    }
+    out.push(l);
+  }
+  return out.join("\n") + "\n";
+}
+
 /** One commit's lines (its header, if any, first): the header and its files. */
 function commitOf(lines: readonly string[], index: number): PatchCommit {
   const first = lines[0] ?? "";
@@ -330,17 +384,8 @@ function commitOf(lines: readonly string[], index: number): PatchCommit {
   const files: PatchFile[] = [];
   for (let s = 0; s < starts.length; s++) {
     const from = starts[s] ?? 0;
-    let to = starts[s + 1] ?? lines.length;
-    // format-patch's signature ("-- " then git's version) ends the last file.
-    if (s === starts.length - 1 && fmt) {
-      for (let i = to - 1; i > from; i--) {
-        if (lines[i] === "-- ") {
-          to = i;
-          break;
-        }
-      }
-    }
-    const f = fileOf(lines.slice(from, to).join("\n") + "\n", git, `${String(index)}:${String(s)}`);
+    const to = starts[s + 1] ?? lines.length;
+    const f = fileOf(sectionText(lines, from, to), git, `${String(index)}:${String(s)}`);
     if (f) files.push(f);
   }
   return { header, files };

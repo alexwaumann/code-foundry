@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commitDate, decodeMimeWords, fileStarts, parsePatch, patchModelOf, stripPatchPrefix } from "./patch";
+import { commitDate, decodeMimeWords, fileStarts, parsePatch, patchModelOf, sectionText, stripPatchPrefix } from "./patch";
 
 const A = `diff --git a/src/a.ts b/src/a.ts
 index 3f813da..a4a92c6 100644
@@ -244,5 +244,25 @@ describe("header text", () => {
     ["", /^$/],
   ])("commitDate(%j)", (raw, want) => {
     expect(commitDate(raw)).toMatch(want);
+  });
+});
+
+describe("sectionText", () => {
+  it.each([
+    ["an empty line inside a hunk is context", "--- a\n+++ b\n@@ -1,3 +1,3 @@\n x\n\n-y\n+z\n", "--- a\n+++ b\n@@ -1,3 +1,3 @@\n x\n \n-y\n+z\n"],
+    ["format-patch's signature is left out", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n-- \n2.47.1\n", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n"],
+    ["a stripped signature too", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n--\n2.47.1\n", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n"],
+    ["diff -r's notes after the last hunk", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\nOnly in a: q\n", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n"],
+    ["extra hunk lines stay, for the library to flag", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n+w\n", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n+z\n+w\n"],
+    ["no newline at end", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n\\ No newline at end of file\n+z\n", "--- a\n+++ b\n@@ -1 +1 @@\n-y\n\\ No newline at end of file\n+z\n"],
+  ])("%s", (_, text, want) => {
+    const lines = text.split("\n").slice(0, -1);
+    expect(sectionText(lines, 0, lines.length)).toBe(want);
+  });
+
+  it("parses a patch whose blank context lines lost their space, without a problem", () => {
+    const m = parsePatch(FORMAT_PATCH.replace(/^ $/gm, "").replace("-- \n", "--\n"));
+    expect(m.problems).toBe(0);
+    expect([m.added, m.deleted]).toEqual([4, 1]);
   });
 });
