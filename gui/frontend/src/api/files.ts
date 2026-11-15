@@ -20,6 +20,17 @@ export interface FileReadView {
   size: number;
   /** Only part came back: the first MiB of a text file, the first READ_MAX_BYTES of any other. */
   truncated: boolean;
+  /**
+   * A tail read (readFileTail) left out the start: `text` is the file from `offset` (a line's
+   * start, or a character's when the last MiB holds no line break) to its end, which the GUI
+   * labels "Showing the last 1 MiB of 38 MB" from `size`. This and the next two are always set
+   * by a read (toFileReadView); absent is false or 0, for a view made by hand.
+   */
+  truncatedStart?: boolean;
+  /** The byte of the file `text` begins at: 0 but with truncatedStart. */
+  offset?: number;
+  /** A video or audio file: no bytes came back; play it from streamFile's URL. `binary` is set too. */
+  media?: boolean;
   binary: boolean;
   /** "text/markdown", "image/png", "text/plain; charset=utf-8", … ("" when not found). */
   mime: string;
@@ -67,7 +78,7 @@ function decodeText(bytes: Uint8Array): { text: string; lossless: boolean } {
 
 /** What a tab edits where no file is yet: an empty text document at `path`, nothing on disk behind it. */
 export function blankFile(path: string, realPath = ""): FileReadView {
-  return { path, realPath, mode: 0, size: 0, truncated: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: "", lossless: true, image: null, pdf: null };
+  return { path, realPath, mode: 0, size: 0, truncated: false, truncatedStart: false, offset: 0, media: false, binary: false, mime: "text/plain", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: "", lossless: true, image: null, pdf: null };
 }
 
 /** Whether a MIME type is an image the webview can show (`image/svg+xml` included). */
@@ -75,15 +86,22 @@ export function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
 }
 
+/** Whether a MIME type is one the player streams: "video" (video/*), "audio" (audio/*), or null. */
+export function mediaKind(mime: string): "video" | "audio" | null {
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  return null;
+}
+
 /**
  * Whether the File tab offers to edit a read: whole text whose bytes survive the round
- * trip. A truncated read would save without the rest of the file, and the daemon does not
+ * trip. A truncated read (at either end) would save without the rest of the file, and the daemon does not
  * know a read was truncated; a file with invalid UTF-8 or a BOM would lose those bytes.
  * Images (an SVG is text) show as pictures, so there is no code to edit. A file outside home
  * (a temp folder's) is only for reading: the daemon would refuse the save.
  */
 export function canEdit(file: FileReadView | null): boolean {
-  return file !== null && file.text !== null && file.lossless && !file.truncated && !file.binary && !file.notFound && !file.isDir && !file.outsideHome && file.image === null && file.pdf === null;
+  return file !== null && file.text !== null && file.lossless && !file.truncated && file.truncatedStart !== true && file.media !== true && !file.binary && !file.notFound && !file.isDir && !file.outsideHome && file.image === null && file.pdf === null;
 }
 
 export function toFileReadView(r: ReadFileResponse): FileReadView {
@@ -97,6 +115,9 @@ export function toFileReadView(r: ReadFileResponse): FileReadView {
     mode: r.mode,
     size: Number(r.size),
     truncated: r.truncated,
+    truncatedStart: r.truncatedStart,
+    offset: Number(r.offset),
+    media: r.media,
     binary: r.binary,
     mime: r.mimeType,
     modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null,
@@ -119,6 +140,23 @@ export async function readFile(baseDir: string, path: string, conn: DaemonConnec
   const c = await conn.client(FilesystemService);
   try {
     return toFileReadView(await c.readFile({ baseDir, path, maxBytes: BigInt(READ_MAX_BYTES) }, { signal }));
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
+/**
+ * Reads the end of a file, as readFile reads its start: a text file over 1 MiB comes back
+ * from the first line that starts in its last MiB, with `truncatedStart` and `offset` set (the
+ * log view opens on the newest lines). A smaller file, and anything that is not text, reads
+ * as with readFile. A daemon older than the option reads the start: `truncated` set and
+ * `truncatedStart` not, which the caller can tell apart. A daemon older than the RPC fails
+ * with OutdatedDaemonError.
+ */
+export async function readFileTail(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileReadView> {
+  const c = await conn.client(FilesystemService);
+  try {
+    return toFileReadView(await c.readFile({ baseDir, path, maxBytes: BigInt(READ_MAX_BYTES), tail: true }, { signal }));
   } catch (err) {
     throw orOutdatedDaemon(err);
   }
@@ -206,6 +244,37 @@ export async function previewFile(baseDir: string, path: string, conn: DaemonCon
     const r = await c.previewFile({ baseDir, path }, { signal });
     const { baseUrl } = await conn.resolveEndpoint();
     return { url: new URL(r.url, baseUrl).toString(), scope: r.scope, singleFile: r.singleFile };
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
+/** Where the player streams a video or audio file from (FilesystemService.StreamFile). */
+export interface FileStream {
+  /** Absolute URL on the daemon's API listener, for `<video src>` / `<audio src>`: no token needed (the grant is in the path); Range requests answered. */
+  url: string;
+  /** What the URL serves as Content-Type ("video/mp4", "audio/mpeg"). */
+  mime: string;
+  /** The file's size when granted, in bytes. */
+  size: number;
+  modifiedAtMs: number | null;
+}
+
+/**
+ * A playable URL for the video or audio file at `path` (as for readFile; a read with `media`
+ * set), joined to the daemon's base URL. The grant lasts until the daemon stops, and the
+ * daemon checks the file again on every request: after a restart (or when the file is gone)
+ * the URL is 404, so ask again when the daemon's pid changes or the element reports an error.
+ * A missing file is NotFound; a directory, a path outside home, or a file that is not video
+ * or audio is InvalidArgument; macOS privacy is PermissionDenied. A daemon older than the
+ * RPC fails with OutdatedDaemonError.
+ */
+export async function streamFile(baseDir: string, path: string, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<FileStream> {
+  const c = await conn.client(FilesystemService);
+  try {
+    const r = await c.streamFile({ baseDir, path }, { signal });
+    const { baseUrl } = await conn.resolveEndpoint();
+    return { url: new URL(r.url, baseUrl).toString(), mime: r.mimeType, size: Number(r.size), modifiedAtMs: r.modifiedAt > 0n ? Number(r.modifiedAt) : null };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

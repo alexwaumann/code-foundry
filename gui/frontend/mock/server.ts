@@ -144,6 +144,8 @@
  *        subject: N more characters on the newest commit's subject; reset: none)
  *   POST /__mock/fs/write?path=…&text=…[&touch=1] (a file's contents on disk, or touch=1: only its time; reset restores the fixtures)
  *   POST /__mock/fs/link?path=…&real=…            (ReadFile says a link leads from the path to real)
+ *   POST /__mock/fs/log?path=…&bytes=N            (a generated log, default ~/src/code-foundry/logs/big.log of 3 MiB: ReadFile's tail)
+ *   GET  /media/<grant>/<name>                    (StreamFile's URL: the media file, Range requests answered; mock/media.ts)
  *   GET  /__mock/fs/text?path=…                   ({ text }: a file's contents, null when absent)
  *   thread.new with a prompt containing FAIL fails (after the worktree delay, if any).
  *   GET  /__mock/settings                          ({ raw, values } of the settings "file")
@@ -258,6 +260,7 @@ import { EDITOR_APPS } from "./gitops";
 import { groups as settingsGroups, SettingsValidation } from "./settings";
 import { type UpdateEventInit } from "./update";
 import { MockFiles, WELCOME_PAGE } from "./files";
+import { serveMedia } from "./media";
 import { layoutRpcError, opFromProto, SEEDS, tabMsg, type State as LayoutState } from "./layout";
 import { frameTag, navigated } from "./frame";
 import { insertInHead, mockPaintTag, mockThemeJson, publishMockTheme, resetMockTheme, themeRoute } from "./theme";
@@ -447,9 +450,10 @@ function routes(router: ConnectRouter): void {
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
     searchFiles: (req) => searchFiles(world.projects, req),
-    readFile: (req) => mockFiles.readWithLink(req.baseDir, req.path, req.maxBytes),
+    readFile: (req) => mockFiles.readWithLink(req.baseDir, req.path, req.maxBytes, req.tail),
     writeFile: (req) => mockFiles.writeFile(req),
     previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
+    streamFile: (req) => mockFiles.streamFile(req.baseDir, req.path),
   });
 
   router.service(GhService, {
@@ -1556,6 +1560,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       mockFiles.links.set(q.get("path") ?? "", q.get("real") ?? "");
       json(res, 200, { ok: true });
       break;
+    case "POST /__mock/fs/log":
+      mockFiles.writeLog(q.get("path"), Number(q.get("bytes") ?? String(3 * 1024 * 1024)));
+      json(res, 200, { ok: true });
+      break;
     case "GET /__mock/fs/text":
       json(res, 200, { text: mockFiles.textOf(q.get("path") ?? "") });
       break;
@@ -1617,6 +1625,19 @@ const server = createServer((req, res) => {
     const dest = req.headers["sec-fetch-dest"];
     const tag = (themed ? mockPaintTag() : "") + (html && navigated(typeof dest === "string" ? dest : undefined, themed) ? frameTag : "");
     res.end(tag ? insertInHead(new TextDecoder().decode(e.data), tag) : e.data);
+    return;
+  }
+  // The media route authenticates by the grant in its URL, like the daemon's (internal/preview/media.go).
+  if (url.pathname.startsWith("/media/")) {
+    // No CORS here, as on the daemon: a media element needs none, and no page may read the bytes.
+    for (const h of ["Access-Control-Allow-Origin", "Vary", "Access-Control-Expose-Headers"]) res.removeHeader(h);
+    const e = req.method === "GET" || req.method === "HEAD" ? mockFiles.mediaEntry(url.pathname) : undefined;
+    if (!e) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("not found\n");
+      return;
+    }
+    serveMedia(req, res, e.data, e.mime);
     return;
   }
   // A daemon from before the shell: its mux has no LayoutService route (Go's ServeMux 404).
