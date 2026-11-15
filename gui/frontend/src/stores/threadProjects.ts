@@ -36,7 +36,7 @@ export async function addThreadProject(threadId: string, projectId: string): Pro
   }
 }
 
-/** Removes a member that is not the cwd's; its checkout stays on disk. */
+/** Removes a member that is not the cwd's; its checkout stays on disk. The card's project row shows one fewer: no success toast. */
 export async function removeThreadProject(threadId: string, projectId: string): Promise<boolean> {
-  return (await runCommandForResult("thread.project.remove", { project: projectId }, { ctx: threadContext(threadId) })) !== null;
+  return (await runCommandForResult("thread.project.remove", { project: projectId }, { ctx: threadContext(threadId), inView: true })) !== null;
 }

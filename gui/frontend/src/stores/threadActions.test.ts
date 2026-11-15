@@ -47,7 +47,9 @@ describe("snoozeThread", () => {
 
   it("saving for later sends save, with no time", async () => {
     await saveThreadForLater("s3");
-    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" });
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" }, {});
+    await saveThreadForLater("s3", { inView: true });
+    expect(commands.runCommand).toHaveBeenLastCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" }, { inView: true });
   });
 });
 

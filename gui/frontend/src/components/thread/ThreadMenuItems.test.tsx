@@ -186,7 +186,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     const menu = openTitleMenu();
     expect(shared(menu)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
     fireEvent.click(within(menu).getByTestId("menu-clear-flags"));
-    expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }));
+    expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }), { inView: false });
     cleanup();
     setThread({ flags: [flag("hello")] });
     expect(within(openTitleMenu()).getByTestId("menu-clear-flags").textContent).toBe("Clear flag");
@@ -242,35 +242,70 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
 
   it.each([
     ["Pin", {}, "menu-pin", () => {
-        expect(pinThread).toHaveBeenCalledWith("s-1", true);
+        expect(pinThread).toHaveBeenCalledWith("s-1", true, { inView: false });
       }],
     ["Unpin", { pinned: true }, "menu-pin", () => {
-        expect(pinThread).toHaveBeenCalledWith("s-1", false);
+        expect(pinThread).toHaveBeenCalledWith("s-1", false, { inView: false });
       }],
     ["Archive", {}, "menu-archive", () => {
-        expect(archiveThread).toHaveBeenCalledWith("s-1", true);
+        expect(archiveThread).toHaveBeenCalledWith("s-1", true, { inView: false });
       }],
     ["Unarchive", { archivedAtMs: 5 }, "menu-archive", () => {
-        expect(archiveThread).toHaveBeenCalledWith("s-1", false);
+        expect(archiveThread).toHaveBeenCalledWith("s-1", false, { inView: false });
       }],
     ["Unsnooze", { snoozedUntilMs: Date.now() + 3_600_000 }, "menu-unsnooze", () => {
-        expect(snoozeThread).toHaveBeenCalledWith("s-1", null);
+        expect(snoozeThread).toHaveBeenCalledWith("s-1", null, { inView: true });
       }],
     ["Unsnooze", { savedAtMs: Date.now() }, "menu-unsnooze", () => {
-        expect(snoozeThread).toHaveBeenCalledWith("s-1", null);
+        expect(snoozeThread).toHaveBeenCalledWith("s-1", null, { inView: true });
       }],
     ["Save as workspace", { projectIds: ["web", "api"] }, "menu-save-workspace", () => {
         expect(openSaveWorkspace).toHaveBeenCalledWith("s-1");
       }],
     ["Regenerate name", {}, "menu-regenerate-name", () => {
-        expect(regenerateThreadName).toHaveBeenCalledWith("s-1");
+        expect(regenerateThreadName).toHaveBeenCalledWith("s-1", { inView: true });
       }],
-  ])("%s runs its command for the thread", (label, o, testId, check) => {
+  ])("%s runs its command for the thread (from the header's menu)", (label, o, testId, check) => {
     setThread(o);
     const item = within(openTitleMenu()).getByTestId(testId);
     expect(item.textContent).toBe(label);
     fireEvent.click(item);
     check();
+  });
+
+  // docs/notes/toast-success-rule.md: the row's menu has the row in view, which shows a pin,
+  // an archive and a cleared flag; the header's has not (the sidebar may be hidden).
+  it.each([
+    ["Pin", {}, "menu-pin", () => {
+        expect(pinThread).toHaveBeenCalledWith("s-1", true, { inView: true });
+      }],
+    ["Archive", {}, "menu-archive", () => {
+        expect(archiveThread).toHaveBeenCalledWith("s-1", true, { inView: true });
+      }],
+    ["Unarchive", { archivedAtMs: 5 }, "menu-archive", () => {
+        expect(archiveThread).toHaveBeenCalledWith("s-1", false, { inView: true });
+      }],
+    ["Clear flag", { flags: [{ plugin: "hello", pluginName: "hello", level: "attention", reason: "r", setAtMs: 1, untilSeen: false }] }, "menu-clear-flags", () => {
+        expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }), { inView: true });
+      }],
+    ["Unsnooze", { snoozedUntilMs: Date.now() + 3_600_000 }, "menu-unsnooze", () => {
+        expect(snoozeThread).toHaveBeenCalledWith("s-1", null, { inView: true });
+      }],
+    ["Regenerate name", {}, "menu-regenerate-name", () => {
+        expect(regenerateThreadName).toHaveBeenCalledWith("s-1", { inView: true });
+      }],
+  ] as [string, Partial<ThreadView>, string, () => void][])("%s from the sidebar row's menu runs with no success toast (the row shows it)", (label, o, testId, check) => {
+    setThread(o);
+    const item = within(openRowMenu()).getByTestId(testId);
+    expect(item.textContent).toBe(label);
+    fireEvent.click(item);
+    check();
+  });
+
+  it("Restart Claude toasts from either menu: nothing on screen shows the restart", () => {
+    setThread({ pluginEnvStale: true });
+    fireEvent.click(within(openRowMenu()).getByTestId("menu-restart"));
+    expect(runCommand).toHaveBeenCalledWith("thread.restart", {}, expect.objectContaining({ activeThreadId: "s-1" }));
   });
 
   it("Snooze ▸ lists the presets with their times; a preset snoozes; Pick a date and time opens the dialog", () => {
@@ -281,8 +316,10 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     expect(presets.map((i) => i.dataset.preset)).toEqual(["1h", "3h", "tomorrow", "next-week"]);
     const before = Date.now();
     fireEvent.click(presets[0] as HTMLElement);
-    const [id, until] = snoozeThread.mock.calls[0] as unknown as [string, number];
+    const [id, until, source] = snoozeThread.mock.calls[0] as unknown as [string, number, unknown];
     expect(id).toBe("s-1");
+    // The row leaves for Snoozed; the pane shows its snooze strip: no success toast.
+    expect(source).toEqual({ inView: true });
     expect(until - before).toBeGreaterThan(3_600_000 - 5_000);
     cleanup();
     setThread({});
@@ -298,7 +335,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     expect(item.textContent).toBe("Save for laterNo alarm");
     expect(screen.getByTestId("snooze-pick").compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(item);
-    expect(saveThreadForLater).toHaveBeenCalledWith("s-1");
+    expect(saveThreadForLater).toHaveBeenCalledWith("s-1", { inView: true });
     expect(snoozeThread).not.toHaveBeenCalled();
   });
 

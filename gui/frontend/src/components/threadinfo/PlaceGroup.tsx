@@ -134,7 +134,8 @@ function RunInItem({
       data-refused={tip ? "" : undefined}
       className="group/runin"
       onSelect={() => {
-        if (!cwd) void runThreadIn(threadId, projectId);
+        // The card's row and the header's chip show where it runs now.
+        if (!cwd) void runThreadIn(threadId, projectId, { inView: true });
       }}
       onKeyDown={(e) => {
         if (!cwd && (e.key === "Delete" || e.key === "Backspace")) {

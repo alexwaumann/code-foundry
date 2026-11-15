@@ -26,7 +26,8 @@ function MemberItem({ kit, threadId, projectId, path, current, queued }: { kit: 
       disabled={current}
       data-member={projectId}
       onSelect={() => {
-        void runThreadIn(threadId, projectId);
+        // The row shows the move queued, the header's chip where it goes.
+        void runThreadIn(threadId, projectId, { inView: true });
       }}
     >
       <ProjectIcon projectId={projectId} />
@@ -63,7 +64,7 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
             disabled={primary === ""}
             data-member="workspace"
             onSelect={() => {
-              void runThreadIn(threadId, "workspace");
+              void runThreadIn(threadId, "workspace", { inView: true });
             }}
           >
             <Layers className="text-cf-highlight-text" />
@@ -93,6 +94,12 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
  * flagged the thread: thread.flag.clear, every plugin's); Archive. An item a thread cannot
  * use is left out.
+ *
+ * Success toasts (docs/notes/toast-success-rule.md): none where both menus' places show the
+ * result (Regenerate name: the row and the tab; Snooze, Unsnooze: the row and the pane's
+ * snooze strip; Run in: the row and the header's chip). Pin, Clear flags and Archive show
+ * only in the sidebar row: silent from the row's menu, toasted from the header's
+ * (kit.rowInView). Restart Claude shows nowhere and toasts from both.
  */
 export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const noProject = useNoProjectThread(id);
@@ -137,7 +144,8 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           disabled={naming}
           onSelect={() => {
             markInPlace(kit, id);
-            void regenerateThreadName(id);
+            // The new name shows in the row and the tab.
+            void regenerateThreadName(id, { inView: true });
           }}
         >
           Regenerate name
@@ -161,7 +169,7 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         data-testid="menu-pin"
         onSelect={() => {
           markInPlace(kit, id);
-          void pinThread(id, !pinned);
+          void pinThread(id, !pinned, { inView: kit.rowInView });
         }}
       >
         {pinned ? "Unpin" : "Pin"}
@@ -188,7 +196,8 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
           data-testid="menu-unsnooze"
           onSelect={() => {
             markInPlace(kit, id);
-          void snoozeThread(id, null);
+            // The row comes back from Snoozed; the pane's snooze strip goes.
+            void snoozeThread(id, null, { inView: true });
           }}
         >
           Unsnooze
@@ -230,7 +239,8 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         <kit.Item
           data-testid="menu-clear-flags"
           onSelect={() => {
-            void runCommand("thread.flag.clear", { id }, threadContext(id));
+            // The row leaves the attention group as its flag goes.
+            void runCommand("thread.flag.clear", { id }, threadContext(id), { inView: kit.rowInView });
           }}
         >
           {flags === 1 ? "Clear flag" : "Clear flags"}
@@ -241,7 +251,7 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         data-testid="menu-archive"
         onSelect={() => {
           markInPlace(kit, id);
-          void archiveThread(id, !archived);
+          void archiveThread(id, !archived, { inView: kit.rowInView });
         }}
       >
         {archived ? "Unarchive" : "Archive"}

@@ -424,7 +424,8 @@ describe("SidebarRow hover actions", () => {
     expect(presets.map((p) => p.getAttribute("data-preset"))).toEqual(["1h", "3h", "tomorrow", "next-week"]);
     expect(screen.getByTestId("row-actions").getAttribute("data-shown")).toBe("true");
     fireEvent.click(presets[0] as HTMLElement);
-    expect(snoozeThread).toHaveBeenCalledWith("s-1", expect.any(Number));
+    // The row leaves for Snoozed: no success toast.
+    expect(snoozeThread).toHaveBeenCalledWith("s-1", expect.any(Number), { inView: true });
     expect(onActivate).not.toHaveBeenCalled();
   });
 

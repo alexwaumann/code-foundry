@@ -71,21 +71,21 @@ export function renameThread(id: string, name: string): Promise<boolean> {
  * replacing its name. The daemon answers once the model did; meanwhile the thread's
  * `naming` flag shows the name muted. A failure keeps the name and toasts.
  */
-export function regenerateThreadName(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.regenerateName, { id }, threadContext(id));
+export function regenerateThreadName(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.regenerateName, { id }, threadContext(id), source);
 }
 
-export function removeThread(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.remove, {}, threadContext(id));
+export function removeThread(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.remove, {}, threadContext(id), source);
 }
 
-export function forkThread(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.fork, {}, threadContext(id));
+export function forkThread(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.fork, {}, threadContext(id), source);
 }
 
 /** thread.pin with an explicit value (the menu knows the current pin). */
-export function pinThread(id: string, pinned: boolean): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.pin, { pinned: String(pinned) }, threadContext(id));
+export function pinThread(id: string, pinned: boolean, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.pin, { pinned: String(pinned) }, threadContext(id), source);
 }
 
 /**
@@ -114,13 +114,13 @@ export function snoozeThread(id: string, untilMs: number | null, source: Command
  * thread.snooze with save: a snooze with no wake time. Everything else is as snoozeThread
  * (the daemon's confirmation mid-turn; snoozeThread(id, null) ends it).
  */
-export function saveThreadForLater(id: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.snooze, { save: "true" }, threadContext(id));
+export function saveThreadForLater(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.snooze, { save: "true" }, threadContext(id), source);
 }
 
 /** thread.run-in ("Run in…"): moves a workspace thread to the member in projectId. */
-export function runThreadIn(id: string, projectId: string): Promise<boolean> {
-  return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id));
+export function runThreadIn(id: string, projectId: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.runIn, { project: projectId }, threadContext(id), source);
 }
 
 /** The compose store key of a thread's follow-up draft (lib/threadDraft.ts). */
