@@ -62,9 +62,10 @@ Source), and the header gains Copy contents.
 - **SVG Source is highlighted as XML.** @pierre/diffs maps no `.svg`, so `source: { lang:
   "xml", name: "SVG" }` passes `lang` through CodeBody to the library's `FileContents.lang`.
 - **Reads.** `read?: "whole"` is the only read today. Which read a file gets has to be known
-  before reading, so it is the read of `previewKindOf(path, null)` (extension only). The tail
-  read (logs) and stream URL (media) are PR 2's (`src/api/files.ts`); FileTab's `readTarget` is
-  where a kind's `read` will choose between them.
+  before reading, so it is the read of `previewKindOf(path, null)` (extension only). PR 2 added
+  `readFileTail` (logs) and `streamFile` (media) to `src/api/files.ts`; the kind that first
+  needs one adds its value to `read` in types.ts and the choice to FileTab's `readTarget`
+  (`readFile` for "whole").
 - **Bodies in their own files.** oxlint's `react/only-export-components` refuses a component
   in a file whose default export is a kind, so a kind file holds the object and its body lives
   beside it (`previews/<Name>Body.tsx`).
