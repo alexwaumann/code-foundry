@@ -145,6 +145,24 @@ export const APP_TS = Array.from({ length: 80 }, (_, i) => {
   return n % 10 === 0 ? `// section ${String(n / 10)}` : `const value${String(n)} = ${String(n)} * 2;`;
 }).join("\n") + "\n";
 
+/** An SVG (the File tab's Image | Source switch, docs/notes/file-previews-1-registry.md): a flame on a glow. */
+export const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="62%" r="45%">
+      <stop offset="0" stop-color="#ff8a3d" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc24a"/>
+      <stop offset="1" stop-color="#ff5a36"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="320" r="230" fill="url(#glow)"/>
+  <path d="M262 64c-22 70-30 130-24 196-26-6-40-30-46-60-48 50-70 100-62 160 10 64 64 108 128 108s118-44 126-108c10-86-50-150-90-196-20-24-30-60-32-100z" fill="url(#flame)"/>
+  <circle cx="256" cy="380" r="56" fill="#fff4d6"/>
+</svg>
+`;
+
 export const PREVIEW_HTML = `<!doctype html>
 <html><head><title>Preview</title><style>body{font-family:sans-serif;color:#123;margin:24px} h1{color:#0a6}</style></head>
 <body>
@@ -321,6 +339,7 @@ function fixtures(): Map<string, Entry> {
     // Outside the checkout, so it is served under a grant of its own.
     [`${HOME}/elsewhere/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
+    [`${CF}/docs/logo.svg`, text(LOGO_SVG, "image/svg+xml")],
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],
     // A gallery's worth (e2e/gallery.spec.ts), and one that is no picture whatever its name says.
