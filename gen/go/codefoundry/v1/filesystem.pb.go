@@ -796,7 +796,12 @@ type ReadFileRequest struct {
 	// Maximum bytes of contents. Zero means 1 MiB. A text file (a text MIME type and no
 	// NUL in the first 8 KiB) is always capped at 1 MiB whatever this asks; any other
 	// file (images, PDFs, archives) is read up to this, at most 32 MiB.
-	MaxBytes      int64 `protobuf:"varint,3,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	MaxBytes int64 `protobuf:"varint,3,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	// Read the end of a text file rather than its start (a log's newest lines): a file over
+	// the cap comes back from the first line that starts in its last max_bytes (at most
+	// 1 MiB), or, with no line break there, from its first whole UTF-8 character. A file
+	// within the cap, and anything that is not text, reads as without it.
+	Tail          bool `protobuf:"varint,4,opt,name=tail,proto3" json:"tail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -852,6 +857,13 @@ func (x *ReadFileRequest) GetMaxBytes() int64 {
 	return 0
 }
 
+func (x *ReadFileRequest) GetTail() bool {
+	if x != nil {
+		return x.Tail
+	}
+	return false
+}
+
 type ReadFileResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The first max_bytes of the file (zero: 1 MiB), at most 1 MiB for text and 32 MiB
@@ -884,7 +896,16 @@ type ReadFileResponse struct {
 	// the path leads to can change. The File tab offers no editing and no page gets the
 	// bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
 	// link in a temp folder that leads into home.
-	OutsideHome   bool `protobuf:"varint,12,opt,name=outside_home,json=outsideHome,proto3" json:"outside_home,omitempty"`
+	OutsideHome bool `protobuf:"varint,12,opt,name=outside_home,json=outsideHome,proto3" json:"outside_home,omitempty"`
+	// A tail read left out the file's start: contents begin at offset, a line's start (or a
+	// character's, when no line break was in reach), and run to the end. truncated is then
+	// false. Like truncated, the File tab does not edit such a read.
+	TruncatedStart bool `protobuf:"varint,13,opt,name=truncated_start,json=truncatedStart,proto3" json:"truncated_start,omitempty"`
+	// The byte of the file contents begin at: 0 but with truncated_start.
+	Offset int64 `protobuf:"varint,14,opt,name=offset,proto3" json:"offset,omitempty"`
+	// A video or audio file (by its name): contents are empty and truncated false; binary,
+	// mime_type, size and modified_at are set. Stream it with StreamFile.
+	Media         bool `protobuf:"varint,15,opt,name=media,proto3" json:"media,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -999,6 +1020,27 @@ func (x *ReadFileResponse) GetMode() uint32 {
 func (x *ReadFileResponse) GetOutsideHome() bool {
 	if x != nil {
 		return x.OutsideHome
+	}
+	return false
+}
+
+func (x *ReadFileResponse) GetTruncatedStart() bool {
+	if x != nil {
+		return x.TruncatedStart
+	}
+	return false
+}
+
+func (x *ReadFileResponse) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *ReadFileResponse) GetMedia() bool {
+	if x != nil {
+		return x.Media
 	}
 	return false
 }
@@ -1242,6 +1284,134 @@ func (x *PreviewFileRequest) GetPath() string {
 	return ""
 }
 
+type StreamFileRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absolute directory a relative path is resolved against. Ignored for an absolute
+	// path.
+	BaseDir string `protobuf:"bytes,1,opt,name=base_dir,json=baseDir,proto3" json:"base_dir,omitempty"`
+	// Absolute, "~/"-prefixed, or relative to base_dir.
+	Path          string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamFileRequest) Reset() {
+	*x = StreamFileRequest{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamFileRequest) ProtoMessage() {}
+
+func (x *StreamFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamFileRequest.ProtoReflect.Descriptor instead.
+func (*StreamFileRequest) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *StreamFileRequest) GetBaseDir() string {
+	if x != nil {
+		return x.BaseDir
+	}
+	return ""
+}
+
+func (x *StreamFileRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+type StreamFileResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Root-relative URL on the daemon's API listener ("/media/<grant>/clip.mp4"); the GUI
+	// joins it to the daemon's base URL. It needs no bearer token: the grant is in the path.
+	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	// What the route sends as Content-Type ("video/mp4", "audio/mpeg").
+	MimeType string `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	// The file's size in bytes when granted.
+	Size int64 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+	// Modification time when granted, unix milliseconds.
+	ModifiedAt    int64 `protobuf:"varint,4,opt,name=modified_at,json=modifiedAt,proto3" json:"modified_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamFileResponse) Reset() {
+	*x = StreamFileResponse{}
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamFileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamFileResponse) ProtoMessage() {}
+
+func (x *StreamFileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamFileResponse.ProtoReflect.Descriptor instead.
+func (*StreamFileResponse) Descriptor() ([]byte, []int) {
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *StreamFileResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *StreamFileResponse) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+func (x *StreamFileResponse) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *StreamFileResponse) GetModifiedAt() int64 {
+	if x != nil {
+		return x.ModifiedAt
+	}
+	return 0
+}
+
 type PreviewFileResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Root-relative URL of the file on the daemon's loopback listener
@@ -1260,7 +1430,7 @@ type PreviewFileResponse struct {
 
 func (x *PreviewFileResponse) Reset() {
 	*x = PreviewFileResponse{}
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1272,7 +1442,7 @@ func (x *PreviewFileResponse) String() string {
 func (*PreviewFileResponse) ProtoMessage() {}
 
 func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[16]
+	mi := &file_codefoundry_v1_filesystem_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1285,7 +1455,7 @@ func (x *PreviewFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewFileResponse.ProtoReflect.Descriptor instead.
 func (*PreviewFileResponse) Descriptor() ([]byte, []int) {
-	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{16}
+	return file_codefoundry_v1_filesystem_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PreviewFileResponse) GetUrl() string {
@@ -1369,11 +1539,12 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\x11project_positions\x18\x06 \x03(\x05R\x10projectPositions\"h\n" +
 	"\x13SearchFilesResponse\x123\n" +
 	"\amatches\x18\x01 \x03(\v2\x19.codefoundry.v1.FileMatchR\amatches\x12\x1c\n" +
-	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"]\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"q\n" +
 	"\x0fReadFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
-	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"\xe3\x02\n" +
+	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\x12\x12\n" +
+	"\x04tail\x18\x04 \x01(\bR\x04tail\"\xba\x03\n" +
 	"\x10ReadFileResponse\x12\x1a\n" +
 	"\bcontents\x18\x01 \x01(\fR\bcontents\x12\x12\n" +
 	"\x04size\x18\x02 \x01(\x03R\x04size\x12\x1c\n" +
@@ -1388,7 +1559,10 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\treal_path\x18\n" +
 	" \x01(\tR\brealPath\x12\x12\n" +
 	"\x04mode\x18\v \x01(\rR\x04mode\x12!\n" +
-	"\foutside_home\x18\f \x01(\bR\voutsideHome\"\xc0\x01\n" +
+	"\foutside_home\x18\f \x01(\bR\voutsideHome\x12'\n" +
+	"\x0ftruncated_start\x18\r \x01(\bR\x0etruncatedStart\x12\x16\n" +
+	"\x06offset\x18\x0e \x01(\x03R\x06offset\x12\x14\n" +
+	"\x05media\x18\x0f \x01(\bR\x05media\"\xc0\x01\n" +
 	"\x10WriteFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1a\n" +
@@ -1407,7 +1581,16 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\tnot_found\x18\x05 \x01(\bR\bnotFound\"C\n" +
 	"\x12PreviewFileRequest\x12\x19\n" +
 	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
-	"\x04path\x18\x02 \x01(\tR\x04path\"^\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"B\n" +
+	"\x11StreamFileRequest\x12\x19\n" +
+	"\bbase_dir\x18\x01 \x01(\tR\abaseDir\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\"x\n" +
+	"\x12StreamFileResponse\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x1b\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\x03R\x04size\x12\x1f\n" +
+	"\vmodified_at\x18\x04 \x01(\x03R\n" +
+	"modifiedAt\"^\n" +
 	"\x13PreviewFileResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
 	"\x05scope\x18\x02 \x01(\tR\x05scope\x12\x1f\n" +
@@ -1417,7 +1600,7 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"SkillScope\x12\x1b\n" +
 	"\x17SKILL_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10SKILL_SCOPE_USER\x10\x01\x12\x17\n" +
-	"\x13SKILL_SCOPE_PROJECT\x10\x022\xa9\x04\n" +
+	"\x13SKILL_SCOPE_PROJECT\x10\x022\x80\x05\n" +
 	"\x11FilesystemService\x12d\n" +
 	"\x0fListDirectories\x12&.codefoundry.v1.ListDirectoriesRequest\x1a'.codefoundry.v1.ListDirectoriesResponse\"\x00\x12U\n" +
 	"\n" +
@@ -1425,7 +1608,9 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\vSearchFiles\x12\".codefoundry.v1.SearchFilesRequest\x1a#.codefoundry.v1.SearchFilesResponse\"\x00\x12O\n" +
 	"\bReadFile\x12\x1f.codefoundry.v1.ReadFileRequest\x1a .codefoundry.v1.ReadFileResponse\"\x00\x12R\n" +
 	"\tWriteFile\x12 .codefoundry.v1.WriteFileRequest\x1a!.codefoundry.v1.WriteFileResponse\"\x00\x12X\n" +
-	"\vPreviewFile\x12\".codefoundry.v1.PreviewFileRequest\x1a#.codefoundry.v1.PreviewFileResponse\"\x00B\xc7\x01\n" +
+	"\vPreviewFile\x12\".codefoundry.v1.PreviewFileRequest\x1a#.codefoundry.v1.PreviewFileResponse\"\x00\x12U\n" +
+	"\n" +
+	"StreamFile\x12!.codefoundry.v1.StreamFileRequest\x1a\".codefoundry.v1.StreamFileResponse\"\x00B\xc7\x01\n" +
 	"\x12com.codefoundry.v1B\x0fFilesystemProtoP\x01ZGgithub.com/alexwaumann/code-foundry/gen/go/codefoundry/v1;codefoundryv1\xa2\x02\x03CXX\xaa\x02\x0eCodefoundry.V1\xca\x02\x0eCodefoundry\\V1\xe2\x02\x1aCodefoundry\\V1\\GPBMetadata\xea\x02\x0fCodefoundry::V1b\x06proto3"
 
 var (
@@ -1441,7 +1626,7 @@ func file_codefoundry_v1_filesystem_proto_rawDescGZIP() []byte {
 }
 
 var file_codefoundry_v1_filesystem_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_codefoundry_v1_filesystem_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(SkillScope)(0),                 // 0: codefoundry.v1.SkillScope
 	(*ListDirectoriesRequest)(nil),  // 1: codefoundry.v1.ListDirectoriesRequest
@@ -1460,7 +1645,9 @@ var file_codefoundry_v1_filesystem_proto_goTypes = []any{
 	(*WriteFileRequest)(nil),        // 14: codefoundry.v1.WriteFileRequest
 	(*WriteFileResponse)(nil),       // 15: codefoundry.v1.WriteFileResponse
 	(*PreviewFileRequest)(nil),      // 16: codefoundry.v1.PreviewFileRequest
-	(*PreviewFileResponse)(nil),     // 17: codefoundry.v1.PreviewFileResponse
+	(*StreamFileRequest)(nil),       // 17: codefoundry.v1.StreamFileRequest
+	(*StreamFileResponse)(nil),      // 18: codefoundry.v1.StreamFileResponse
+	(*PreviewFileResponse)(nil),     // 19: codefoundry.v1.PreviewFileResponse
 }
 var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	2,  // 0: codefoundry.v1.ListDirectoriesResponse.entries:type_name -> codefoundry.v1.DirectoryEntry
@@ -1475,14 +1662,16 @@ var file_codefoundry_v1_filesystem_proto_depIdxs = []int32{
 	12, // 9: codefoundry.v1.FilesystemService.ReadFile:input_type -> codefoundry.v1.ReadFileRequest
 	14, // 10: codefoundry.v1.FilesystemService.WriteFile:input_type -> codefoundry.v1.WriteFileRequest
 	16, // 11: codefoundry.v1.FilesystemService.PreviewFile:input_type -> codefoundry.v1.PreviewFileRequest
-	3,  // 12: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
-	7,  // 13: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
-	11, // 14: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
-	13, // 15: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
-	15, // 16: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
-	17, // 17: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
+	17, // 12: codefoundry.v1.FilesystemService.StreamFile:input_type -> codefoundry.v1.StreamFileRequest
+	3,  // 13: codefoundry.v1.FilesystemService.ListDirectories:output_type -> codefoundry.v1.ListDirectoriesResponse
+	7,  // 14: codefoundry.v1.FilesystemService.ListSkills:output_type -> codefoundry.v1.ListSkillsResponse
+	11, // 15: codefoundry.v1.FilesystemService.SearchFiles:output_type -> codefoundry.v1.SearchFilesResponse
+	13, // 16: codefoundry.v1.FilesystemService.ReadFile:output_type -> codefoundry.v1.ReadFileResponse
+	15, // 17: codefoundry.v1.FilesystemService.WriteFile:output_type -> codefoundry.v1.WriteFileResponse
+	19, // 18: codefoundry.v1.FilesystemService.PreviewFile:output_type -> codefoundry.v1.PreviewFileResponse
+	18, // 19: codefoundry.v1.FilesystemService.StreamFile:output_type -> codefoundry.v1.StreamFileResponse
+	13, // [13:20] is the sub-list for method output_type
+	6,  // [6:13] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -1499,7 +1688,7 @@ func file_codefoundry_v1_filesystem_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_codefoundry_v1_filesystem_proto_rawDesc), len(file_codefoundry_v1_filesystem_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

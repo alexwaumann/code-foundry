@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file codefoundry/v1/filesystem.proto.
  */
 export const file_codefoundry_v1_filesystem: GenFile = /*@__PURE__*/
-  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJECg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMi7gEKEFJlYWRGaWxlUmVzcG9uc2USEAoIY29udGVudHMYASABKAwSDAoEc2l6ZRgCIAEoAxIRCgl0cnVuY2F0ZWQYAyABKAgSDgoGYmluYXJ5GAQgASgIEhEKCW1pbWVfdHlwZRgFIAEoCRITCgttb2RpZmllZF9hdBgGIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAcgASgJEhEKCW5vdF9mb3VuZBgIIAEoCBIOCgZpc19kaXIYCSABKAgSEQoJcmVhbF9wYXRoGAogASgJEgwKBG1vZGUYCyABKA0SFAoMb3V0c2lkZV9ob21lGAwgASgIIoYBChBXcml0ZUZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkSEAoIY29udGVudHMYAyABKAwSEwoLbW9kaWZpZWRfYXQYBCABKAMSDAoEc2l6ZRgFIAEoAxINCgVmb3JjZRgGIAEoCBIOCgZjcmVhdGUYByABKAgicgoRV3JpdGVGaWxlUmVzcG9uc2USEwoLbW9kaWZpZWRfYXQYASABKAMSDAoEc2l6ZRgCIAEoAxIVCg1yZXNvbHZlZF9wYXRoGAMgASgJEhAKCGNvbmZsaWN0GAQgASgIEhEKCW5vdF9mb3VuZBgFIAEoCCI0ChJQcmV2aWV3RmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCSJGChNQcmV2aWV3RmlsZVJlc3BvbnNlEgsKA3VybBgBIAEoCRINCgVzY29wZRgCIAEoCRITCgtzaW5nbGVfZmlsZRgDIAEoCCpYCgpTa2lsbFNjb3BlEhsKF1NLSUxMX1NDT1BFX1VOU1BFQ0lGSUVEEAASFAoQU0tJTExfU0NPUEVfVVNFUhABEhcKE1NLSUxMX1NDT1BFX1BST0pFQ1QQAjKpBAoRRmlsZXN5c3RlbVNlcnZpY2USZAoPTGlzdERpcmVjdG9yaWVzEiYuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVxdWVzdBonLmNvZGVmb3VuZHJ5LnYxLkxpc3REaXJlY3Rvcmllc1Jlc3BvbnNlIgASVQoKTGlzdFNraWxscxIhLmNvZGVmb3VuZHJ5LnYxLkxpc3RTa2lsbHNSZXF1ZXN0GiIuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1Jlc3BvbnNlIgASWAoLU2VhcmNoRmlsZXMSIi5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1JlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5TZWFyY2hGaWxlc1Jlc3BvbnNlIgASTwoIUmVhZEZpbGUSHy5jb2RlZm91bmRyeS52MS5SZWFkRmlsZVJlcXVlc3QaIC5jb2RlZm91bmRyeS52MS5SZWFkRmlsZVJlc3BvbnNlIgASUgoJV3JpdGVGaWxlEiAuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVxdWVzdBohLmNvZGVmb3VuZHJ5LnYxLldyaXRlRmlsZVJlc3BvbnNlIgASWAoLUHJldmlld0ZpbGUSIi5jb2RlZm91bmRyeS52MS5QcmV2aWV3RmlsZVJlcXVlc3QaIy5jb2RlZm91bmRyeS52MS5QcmV2aWV3RmlsZVJlc3BvbnNlIgBCxwEKEmNvbS5jb2RlZm91bmRyeS52MUIPRmlsZXN5c3RlbVByb3RvUAFaR2dpdGh1Yi5jb20vYWxleHdhdW1hbm4vY29kZS1mb3VuZHJ5L2dlbi9nby9jb2RlZm91bmRyeS92MTtjb2RlZm91bmRyeXYxogIDQ1hYqgIOQ29kZWZvdW5kcnkuVjHKAg5Db2RlZm91bmRyeVxWMeICGkNvZGVmb3VuZHJ5XFYxXEdQQk1ldGFkYXRh6gIPQ29kZWZvdW5kcnk6OlYxYgZwcm90bzM");
+  fileDesc("Ch9jb2RlZm91bmRyeS92MS9maWxlc3lzdGVtLnByb3RvEg5jb2RlZm91bmRyeS52MSIoChZMaXN0RGlyZWN0b3JpZXNSZXF1ZXN0Eg4KBnByZWZpeBgBIAEoCSJQCg5EaXJlY3RvcnlFbnRyeRIMCgRwYXRoGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGaXNfZ2l0GAMgASgIEhIKCnJlZ2lzdGVyZWQYBCABKAgicQoXTGlzdERpcmVjdG9yaWVzUmVzcG9uc2USLwoHZW50cmllcxgBIAMoCzIeLmNvZGVmb3VuZHJ5LnYxLkRpcmVjdG9yeUVudHJ5EhIKCmNvbXBsZXRpb24YAiABKAkSEQoJdHJ1bmNhdGVkGAMgASgIIi8KC1NraWxsU291cmNlEhIKCnByb2plY3RfaWQYASABKAkSDAoEcGF0aBgCIAEoCSJXChFMaXN0U2tpbGxzUmVxdWVzdBIsCgdzb3VyY2VzGAEgAygLMhsuY29kZWZvdW5kcnkudjEuU2tpbGxTb3VyY2USFAoMaW5jbHVkZV91c2VyGAIgASgIIncKBVNraWxsEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoFc2NvcGUYAyABKA4yGi5jb2RlZm91bmRyeS52MS5Ta2lsbFNjb3BlEhIKCnByb2plY3RfaWQYBCABKAkSDAoEcGF0aBgFIAEoCSI7ChJMaXN0U2tpbGxzUmVzcG9uc2USJQoGc2tpbGxzGAEgAygLMhUuY29kZWZvdW5kcnkudjEuU2tpbGwiLgoKRmlsZVNvdXJjZRISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkilQEKElNlYXJjaEZpbGVzUmVxdWVzdBISCgpwcm9qZWN0X2lkGAEgASgJEgwKBHBhdGgYAiABKAkSDQoFcXVlcnkYAyABKAkSDQoFbGltaXQYBCABKAUSKwoHc291cmNlcxgFIAMoCzIaLmNvZGVmb3VuZHJ5LnYxLkZpbGVTb3VyY2USEgoKZmlsZXNfb25seRgGIAEoCCKCAQoJRmlsZU1hdGNoEgwKBHBhdGgYASABKAkSDgoGaXNfZGlyGAIgASgIEhIKCnByb2plY3RfaWQYAyABKAkSEAoIY2hlY2tvdXQYBCABKAkSFgoOcGF0aF9wb3NpdGlvbnMYBSADKAUSGQoRcHJvamVjdF9wb3NpdGlvbnMYBiADKAUiVAoTU2VhcmNoRmlsZXNSZXNwb25zZRIqCgdtYXRjaGVzGAEgAygLMhkuY29kZWZvdW5kcnkudjEuRmlsZU1hdGNoEhEKCXRydW5jYXRlZBgCIAEoCCJSCg9SZWFkRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCRIRCgltYXhfYnl0ZXMYAyABKAMSDAoEdGFpbBgEIAEoCCKmAgoQUmVhZEZpbGVSZXNwb25zZRIQCghjb250ZW50cxgBIAEoDBIMCgRzaXplGAIgASgDEhEKCXRydW5jYXRlZBgDIAEoCBIOCgZiaW5hcnkYBCABKAgSEQoJbWltZV90eXBlGAUgASgJEhMKC21vZGlmaWVkX2F0GAYgASgDEhUKDXJlc29sdmVkX3BhdGgYByABKAkSEQoJbm90X2ZvdW5kGAggASgIEg4KBmlzX2RpchgJIAEoCBIRCglyZWFsX3BhdGgYCiABKAkSDAoEbW9kZRgLIAEoDRIUCgxvdXRzaWRlX2hvbWUYDCABKAgSFwoPdHJ1bmNhdGVkX3N0YXJ0GA0gASgIEg4KBm9mZnNldBgOIAEoAxINCgVtZWRpYRgPIAEoCCKGAQoQV3JpdGVGaWxlUmVxdWVzdBIQCghiYXNlX2RpchgBIAEoCRIMCgRwYXRoGAIgASgJEhAKCGNvbnRlbnRzGAMgASgMEhMKC21vZGlmaWVkX2F0GAQgASgDEgwKBHNpemUYBSABKAMSDQoFZm9yY2UYBiABKAgSDgoGY3JlYXRlGAcgASgIInIKEVdyaXRlRmlsZVJlc3BvbnNlEhMKC21vZGlmaWVkX2F0GAEgASgDEgwKBHNpemUYAiABKAMSFQoNcmVzb2x2ZWRfcGF0aBgDIAEoCRIQCghjb25mbGljdBgEIAEoCBIRCglub3RfZm91bmQYBSABKAgiNAoSUHJldmlld0ZpbGVSZXF1ZXN0EhAKCGJhc2VfZGlyGAEgASgJEgwKBHBhdGgYAiABKAkiMwoRU3RyZWFtRmlsZVJlcXVlc3QSEAoIYmFzZV9kaXIYASABKAkSDAoEcGF0aBgCIAEoCSJXChJTdHJlYW1GaWxlUmVzcG9uc2USCwoDdXJsGAEgASgJEhEKCW1pbWVfdHlwZRgCIAEoCRIMCgRzaXplGAMgASgDEhMKC21vZGlmaWVkX2F0GAQgASgDIkYKE1ByZXZpZXdGaWxlUmVzcG9uc2USCwoDdXJsGAEgASgJEg0KBXNjb3BlGAIgASgJEhMKC3NpbmdsZV9maWxlGAMgASgIKlgKClNraWxsU2NvcGUSGwoXU0tJTExfU0NPUEVfVU5TUEVDSUZJRUQQABIUChBTS0lMTF9TQ09QRV9VU0VSEAESFwoTU0tJTExfU0NPUEVfUFJPSkVDVBACMoAFChFGaWxlc3lzdGVtU2VydmljZRJkCg9MaXN0RGlyZWN0b3JpZXMSJi5jb2RlZm91bmRyeS52MS5MaXN0RGlyZWN0b3JpZXNSZXF1ZXN0GicuY29kZWZvdW5kcnkudjEuTGlzdERpcmVjdG9yaWVzUmVzcG9uc2UiABJVCgpMaXN0U2tpbGxzEiEuY29kZWZvdW5kcnkudjEuTGlzdFNraWxsc1JlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5MaXN0U2tpbGxzUmVzcG9uc2UiABJYCgtTZWFyY2hGaWxlcxIiLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlNlYXJjaEZpbGVzUmVzcG9uc2UiABJPCghSZWFkRmlsZRIfLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVxdWVzdBogLmNvZGVmb3VuZHJ5LnYxLlJlYWRGaWxlUmVzcG9uc2UiABJSCglXcml0ZUZpbGUSIC5jb2RlZm91bmRyeS52MS5Xcml0ZUZpbGVSZXF1ZXN0GiEuY29kZWZvdW5kcnkudjEuV3JpdGVGaWxlUmVzcG9uc2UiABJYCgtQcmV2aWV3RmlsZRIiLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVxdWVzdBojLmNvZGVmb3VuZHJ5LnYxLlByZXZpZXdGaWxlUmVzcG9uc2UiABJVCgpTdHJlYW1GaWxlEiEuY29kZWZvdW5kcnkudjEuU3RyZWFtRmlsZVJlcXVlc3QaIi5jb2RlZm91bmRyeS52MS5TdHJlYW1GaWxlUmVzcG9uc2UiAELHAQoSY29tLmNvZGVmb3VuZHJ5LnYxQg9GaWxlc3lzdGVtUHJvdG9QAVpHZ2l0aHViLmNvbS9hbGV4d2F1bWFubi9jb2RlLWZvdW5kcnkvZ2VuL2dvL2NvZGVmb3VuZHJ5L3YxO2NvZGVmb3VuZHJ5djGiAgNDWFiqAg5Db2RlZm91bmRyeS5WMcoCDkNvZGVmb3VuZHJ5XFYx4gIaQ29kZWZvdW5kcnlcVjFcR1BCTWV0YWRhdGHqAg9Db2RlZm91bmRyeTo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message codefoundry.v1.ListDirectoriesRequest
@@ -419,6 +419,16 @@ export type ReadFileRequest = Message<"codefoundry.v1.ReadFileRequest"> & {
    * @generated from field: int64 max_bytes = 3;
    */
   maxBytes: bigint;
+
+  /**
+   * Read the end of a text file rather than its start (a log's newest lines): a file over
+   * the cap comes back from the first line that starts in its last max_bytes (at most
+   * 1 MiB), or, with no line break there, from its first whole UTF-8 character. A file
+   * within the cap, and anything that is not text, reads as without it.
+   *
+   * @generated from field: bool tail = 4;
+   */
+  tail: boolean;
 };
 
 /**
@@ -522,6 +532,30 @@ export type ReadFileResponse = Message<"codefoundry.v1.ReadFileResponse"> & {
    * @generated from field: bool outside_home = 12;
    */
   outsideHome: boolean;
+
+  /**
+   * A tail read left out the file's start: contents begin at offset, a line's start (or a
+   * character's, when no line break was in reach), and run to the end. truncated is then
+   * false. Like truncated, the File tab does not edit such a read.
+   *
+   * @generated from field: bool truncated_start = 13;
+   */
+  truncatedStart: boolean;
+
+  /**
+   * The byte of the file contents begin at: 0 but with truncated_start.
+   *
+   * @generated from field: int64 offset = 14;
+   */
+  offset: bigint;
+
+  /**
+   * A video or audio file (by its name): contents are empty and truncated false; binary,
+   * mime_type, size and modified_at are set. Stream it with StreamFile.
+   *
+   * @generated from field: bool media = 15;
+   */
+  media: boolean;
 };
 
 /**
@@ -671,6 +705,74 @@ export const PreviewFileRequestSchema: GenMessage<PreviewFileRequest> = /*@__PUR
   messageDesc(file_codefoundry_v1_filesystem, 15);
 
 /**
+ * @generated from message codefoundry.v1.StreamFileRequest
+ */
+export type StreamFileRequest = Message<"codefoundry.v1.StreamFileRequest"> & {
+  /**
+   * Absolute directory a relative path is resolved against. Ignored for an absolute
+   * path.
+   *
+   * @generated from field: string base_dir = 1;
+   */
+  baseDir: string;
+
+  /**
+   * Absolute, "~/"-prefixed, or relative to base_dir.
+   *
+   * @generated from field: string path = 2;
+   */
+  path: string;
+};
+
+/**
+ * Describes the message codefoundry.v1.StreamFileRequest.
+ * Use `create(StreamFileRequestSchema)` to create a new message.
+ */
+export const StreamFileRequestSchema: GenMessage<StreamFileRequest> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 16);
+
+/**
+ * @generated from message codefoundry.v1.StreamFileResponse
+ */
+export type StreamFileResponse = Message<"codefoundry.v1.StreamFileResponse"> & {
+  /**
+   * Root-relative URL on the daemon's API listener ("/media/<grant>/clip.mp4"); the GUI
+   * joins it to the daemon's base URL. It needs no bearer token: the grant is in the path.
+   *
+   * @generated from field: string url = 1;
+   */
+  url: string;
+
+  /**
+   * What the route sends as Content-Type ("video/mp4", "audio/mpeg").
+   *
+   * @generated from field: string mime_type = 2;
+   */
+  mimeType: string;
+
+  /**
+   * The file's size in bytes when granted.
+   *
+   * @generated from field: int64 size = 3;
+   */
+  size: bigint;
+
+  /**
+   * Modification time when granted, unix milliseconds.
+   *
+   * @generated from field: int64 modified_at = 4;
+   */
+  modifiedAt: bigint;
+};
+
+/**
+ * Describes the message codefoundry.v1.StreamFileResponse.
+ * Use `create(StreamFileResponseSchema)` to create a new message.
+ */
+export const StreamFileResponseSchema: GenMessage<StreamFileResponse> = /*@__PURE__*/
+  messageDesc(file_codefoundry_v1_filesystem, 17);
+
+/**
  * @generated from message codefoundry.v1.PreviewFileResponse
  */
 export type PreviewFileResponse = Message<"codefoundry.v1.PreviewFileResponse"> & {
@@ -705,7 +807,7 @@ export type PreviewFileResponse = Message<"codefoundry.v1.PreviewFileResponse"> 
  * Use `create(PreviewFileResponseSchema)` to create a new message.
  */
 export const PreviewFileResponseSchema: GenMessage<PreviewFileResponse> = /*@__PURE__*/
-  messageDesc(file_codefoundry_v1_filesystem, 16);
+  messageDesc(file_codefoundry_v1_filesystem, 18);
 
 /**
  * @generated from enum codefoundry.v1.SkillScope
@@ -826,7 +928,9 @@ export const FilesystemService: GenService<{
    * an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
    * path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
    * (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
-   * PDFs) at 32 MiB.
+   * PDFs) at 32 MiB. With tail, a text file over the cap is read from its end instead
+   * (truncated_start, offset). A video or audio file is never read: it is media, for
+   * StreamFile.
    *
    * @generated from rpc codefoundry.v1.FilesystemService.ReadFile
    */
@@ -892,6 +996,26 @@ export const FilesystemService: GenService<{
     methodKind: "unary";
     input: typeof PreviewFileRequestSchema;
     output: typeof PreviewFileResponseSchema;
+  },
+  /**
+   * StreamFile grants the File tab's player a URL on the daemon's API listener that
+   * streams one video or audio file (ReadFileResponse.media) without the bearer token, as
+   * a <video src> or <audio src> must load it: GET /media/<grant>/<name>, with Range
+   * requests, at any size. The grant is an unguessable id bound to the path as asked, one
+   * per path, kept until the daemon stops. Each request applies ReadFile's rules again
+   * (the file the path leads to now, under home or a temp folder) and serves only a media
+   * type, so the route is 404 once the file is gone, moved out of reach, or no longer
+   * media. path is as for ReadFile: InvalidArgument when ReadFile refuses it, for a
+   * directory, and for a file whose name, or the name of the file its links lead to, is no
+   * media type (mp4 m4v mov webm mp3 wav m4a aac ogg flac); NotFound for a missing file;
+   * PermissionDenied when macOS's privacy protection keeps it closed.
+   *
+   * @generated from rpc codefoundry.v1.FilesystemService.StreamFile
+   */
+  streamFile: {
+    methodKind: "unary";
+    input: typeof StreamFileRequestSchema;
+    output: typeof StreamFileResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_codefoundry_v1_filesystem, 0);
