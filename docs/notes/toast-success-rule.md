@@ -106,8 +106,10 @@ multi-line one goes under the command's title as before.
   restarts the wait. A failed copy now toasts "Copy failed" (it showed nothing before).
 - `components/copy/CopyButton.tsx`:
   - `CopyButton`: a muted ghost icon Button (shadcn), Tip and aria-label "Copied" while
-    copied, `data-copied`; `text` may be a function read on press. Used by Details' Copy
-    path, the File header's Copy path, a diff's Copy diff and the plugin `CopyIconButton`.
+    copied, `data-copied`; `text` may be a function read on press; `icon` replaces Copy at
+    rest. Used by Details' Copy path, the File header's Copy path and Copy contents
+    (ClipboardCopy, added on main while this PR was open), a diff's Copy diff and the plugin
+    `CopyIconButton`.
   - `CopyIcon`: the icon alone, `icon` at rest (Copy by default) and a check in
     `text-cf-success-text` while copied, the same size so nothing moves. For controls
     styled their own way: the code blocks' Copy (keeps its "Copied" text), Copy answer and

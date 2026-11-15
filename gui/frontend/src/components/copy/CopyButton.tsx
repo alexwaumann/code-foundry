@@ -17,17 +17,19 @@ export function CopyIcon({ copied, icon: Icon = Copy, className }: { copied: boo
  * The app's copy icon button (docs/notes/toast-success-rule.md): copies `text` (or what the
  * function returns, read on press) and shows the result where it was pressed: for
  * COPIED_MS its icon is a check in the success colour and its name and tooltip read
- * "Copied". No toast, except "Copy failed". A muted ghost icon button by default; other
- * Button props (size, className, tabIndex) pass through.
+ * "Copied". No toast, except "Copy failed". A muted ghost icon button by default; `icon`
+ * replaces the Copy icon at rest (Copy contents' ClipboardCopy); other Button props (size,
+ * className, tabIndex) pass through.
  */
 export function CopyButton({
   text,
   label = "Copy",
+  icon,
   testId,
   className,
   iconClassName,
   ...props
-}: { text: string | (() => string); label?: string; testId?: string; iconClassName?: string } & Omit<ComponentProps<typeof Button>, "onClick" | "children" | "aria-label">) {
+}: { text: string | (() => string); label?: string; icon?: LucideIcon; testId?: string; iconClassName?: string } & Omit<ComponentProps<typeof Button>, "onClick" | "children" | "aria-label">) {
   const { copied, copy } = useCopied();
   const name = copied ? "Copied" : label;
   return (
@@ -45,7 +47,7 @@ export function CopyButton({
         }}
         {...props}
       >
-        <CopyIcon copied={copied} className={iconClassName} />
+        <CopyIcon copied={copied} icon={icon} className={iconClassName} />
       </Button>
     </Tip>
   );

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { ClipboardCopy } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COPIED_MS } from "@/lib/useCopied";
 import { CopyButton } from "./CopyButton";
@@ -54,6 +55,14 @@ describe("CopyButton", () => {
     expect(btn.dataset.copied).toBeUndefined();
     expect(btn.querySelector("svg")?.classList.contains("lucide-copy")).toBe(true);
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("an icon of its own at rest (Copy contents' ClipboardCopy), the same check while copied", async () => {
+    render(<CopyButton text="x" label="Copy contents" icon={ClipboardCopy} />);
+    expect(screen.getByRole("button", { name: "Copy contents" }).querySelector("svg")?.classList.contains("lucide-clipboard-copy")).toBe(true);
+    const btn = await press("Copy contents");
+    expect(btn.querySelector("svg")?.classList.contains("lucide-check")).toBe(true);
+    expect(btn.querySelector("svg")?.classList.contains("text-cf-success-text")).toBe(true);
   });
 
   it("reads a function's text on press", async () => {
