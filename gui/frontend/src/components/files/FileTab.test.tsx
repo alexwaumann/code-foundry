@@ -104,6 +104,28 @@ vi.mock("./previews/registry", async (orig) => {
   const kinds = [...real.PREVIEW_KINDS, grid];
   return { ...real, PREVIEW_KINDS: kinds, previewKindOf: (path: string, file: FileReadView | null) => real.previewKindOf(path, file, kinds) };
 });
+// The file-stamp watcher (stores/fileStamps.ts): what each path's listeners are; `written` calls them.
+const stamps = vi.hoisted(() => ({ watched: new Map<string, Set<() => void>>() }));
+vi.mock("@/stores/fileStamps", () => ({
+  fileWatcher: {
+    watch: (path: string, onChange: () => void) => {
+      const listeners = stamps.watched.get(path) ?? new Set();
+      stamps.watched.set(path, listeners.add(onChange));
+      return () => {
+        listeners.delete(onChange);
+        if (listeners.size === 0) stamps.watched.delete(path);
+      };
+    },
+    check: () => undefined,
+  },
+}));
+const written = (path: string) => {
+  act(() => {
+    stamps.watched.get(path)?.forEach((f) => {
+      f();
+    });
+  });
+};
 // Held, readFile's next answers wait for release(): a read still out while something else happens.
 const held = vi.hoisted(() => ({ on: false, pending: [] as (() => void)[] }));
 // The worktree detail a project's File tab watches (worktree_detail_updated re-reads it).
@@ -1193,5 +1215,91 @@ describe("previews", () => {
     open("README.md");
     await screen.findByTestId("file-markdown");
     expect(tab().dataset.mode).toBe("rendered");
+  });
+});
+
+describe("opened at a line", () => {
+  const CF = "/Users/dev/src/code-foundry";
+  const JSON_TEXT = '{\n  "a": 1,\n  "b": 2,\n  "c": 3\n}\n';
+  const CSV = "id,name\n1,a\n2,b\n3,c\n";
+  const at = (path: string, line?: number) => <FileTab target={{ project: "repo-cf", base: CF, path, ...(line ? { line } : {}) }} />;
+  const tab = () => screen.getByTestId("file-tab");
+  const marked = () => screen.getByTestId("code-file").dataset.selected;
+
+  it.each([
+    ["a JSON file", "package.json", JSON_TEXT, "application/json", "file-json-tree"],
+    ["a CSV file", "data.csv", CSV, "text/csv", "file-table"],
+  ])("%s shows Source at the line until a mode is picked, and the remembered mode stays as it was", async (_n, path, text, mime, previewId) => {
+    files.set(`${CF}/${path}`, { text, lossless: true, binary: false, mime, size: text.length });
+    const { rerender } = render(at(path, 3));
+    await screen.findByTestId("code-file");
+    expect(tab().dataset.mode).toBe("source");
+    expect(marked()).toBe("3");
+    expect(useCodeViewStore.getState().preview).toEqual({});
+
+    // The user picks the preview: it shows, and is remembered as any pick is.
+    const kind = tab().dataset.kind ?? "";
+    fireEvent.click(within(screen.getByTestId("file-mode")).getAllByRole("radio")[0] as HTMLElement);
+    expect(await screen.findByTestId(previewId)).toBeTruthy();
+    expect(useCodeViewStore.getState().preview[kind]).not.toBe("source");
+
+    // Another line (a second chip into the same tab): Source at that one.
+    rerender(at(path, 2));
+    await waitFor(() => {
+      expect(marked()).toBe("2");
+    });
+  });
+
+  it("without a line the kind's own mode shows", async () => {
+    files.set(`${CF}/data.csv`, { text: CSV, lossless: true, binary: false, mime: "text/csv", size: CSV.length });
+    render(at("data.csv"));
+    expect(await screen.findByTestId("file-table")).toBeTruthy();
+  });
+
+  it("markdown keeps its Rendered view at a line", async () => {
+    files.set(`${CF}/README.md`, { text: "# T\n\nx\n", binary: false, mime: "text/markdown", size: 8 });
+    render(at("README.md", 3));
+    expect(await screen.findByTestId("file-markdown")).toBeTruthy();
+  });
+
+  it("a log read from its end opens as usual and its Source marks no line: the read's lines are not the file's", async () => {
+    const text = "a\nb\nc\n";
+    files.set(`${CF}/logs/big.log`, { text, lossless: true, binary: false, mime: "text/plain", size: 4 * MiB, truncatedStart: true, offset: 4 * MiB - 6 });
+    render(at("logs/big.log", 2));
+    expect(await screen.findByTestId("file-log")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    expect(screen.getByTestId("code-file").textContent).toBe(text);
+    expect(marked()).toBeUndefined();
+    expect(screen.getByTestId("file-truncated-start")).toBeTruthy();
+  });
+
+  it("a whole log at a line shows Source there", async () => {
+    const text = "a\nb\nc\n";
+    files.set(`${CF}/logs/small.log`, { text, lossless: true, binary: false, mime: "text/plain", size: text.length });
+    render(at("logs/small.log", 2));
+    await screen.findByTestId("code-file");
+    expect(marked()).toBe("2");
+  });
+});
+
+describe("a project's file written on disk", () => {
+  const CF = "/Users/dev/src/code-foundry";
+
+  it("reads again when its stamp changes, as a gitignored log's does with no worktree change", async () => {
+    const path = `${CF}/tmp-logs/dev.log`;
+    files.set(path, { text: "one\n", lossless: true, binary: false, mime: "text/plain", size: 4 });
+    render(<FileTab target={{ project: "repo-cf", base: CF, path: "tmp-logs/dev.log" }} />);
+    await screen.findByTestId("file-log");
+    expect(screen.getByTestId("file-meta").textContent).toBe("1 line · 4 B · Log");
+    await waitFor(() => {
+      expect(stamps.watched.has(path)).toBe(true);
+    });
+    files.set(path, { text: "one\ntwo\n", lossless: true, binary: false, mime: "text/plain", size: 8 });
+    written(path);
+    await waitFor(() => {
+      expect(screen.getByTestId("file-meta").textContent).toBe("2 lines · 8 B · Log");
+    });
+    cleanup();
+    expect(stamps.watched.has(path)).toBe(false);
   });
 });

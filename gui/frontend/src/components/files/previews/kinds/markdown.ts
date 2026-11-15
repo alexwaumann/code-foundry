@@ -10,6 +10,7 @@ const markdown: PreviewKind = {
   Body: MarkdownBody,
   meta: savedMeta,
   find: true,
+  line: false,
 };
 
 export default markdown;

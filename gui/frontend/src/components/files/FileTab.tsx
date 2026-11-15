@@ -26,7 +26,7 @@ import { SOURCE, type PreviewBodyProps, type PreviewKind, type PreviewRead } fro
 import { FileFindBar } from "./FileFind";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
 import { useFileHold } from "./useFileHold";
-import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
+import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useWorktreeChanges } from "./useTabRead";
 
 /**
  * The File tab (surfaces/files.ts): one file read with FilesystemService.ReadFile, under
@@ -37,8 +37,8 @@ import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEd
  * binaries, folders and missing paths get a placeholder; a missing path is first looked
  * for once in the checkout (findMissing: a model's path written from a subfolder or cut
  * short), and the file found is the tab's. Read again when the tab shows, on
- * Refresh, when the worktree changes and when the thread edits the file (useTabRead);
- * outside every project, whenever the file is written (useFileChanges). The pencil edits
+ * Refresh, when the worktree changes, when the thread edits the file and whenever the file
+ * is written (useTabRead, useFileChanges). The pencil edits
  * a whole text file in place (stores/fileEdit.ts): while it does, the tab shows the
  * session's version, and those reads only go through observeRead, so none of them can
  * replace a draft. A thread can ask the user to edit it (`ask`, stores/fileRequest.ts): the
@@ -103,10 +103,11 @@ export function FileTab({ target }: { target: FileTarget }) {
   }, [savedView, replace]);
   useOnWindowVisible(later);
   useWorktreeChanges(project, project ? base : null, later);
-  useToolEdits(project ? abs : "", later);
-  // Outside every project (a thread's pages, the welcome page) no worktree reports a
-  // write, so the file's stamp is watched instead (docs/notes/welcome-page.md).
-  useFileChanges(project ? "" : abs, later);
+  // The file's own stamp too, in a project as well: outside every project (a thread's pages,
+  // the welcome page) no worktree reports a write (docs/notes/welcome-page.md), and inside
+  // one a write that leaves the git summary as it was (a gitignored log growing, a video
+  // being written) reports none either. It also reads at once after a thread's own edit.
+  useFileChanges(abs, later);
 
   const name = fileName(abs) || abs;
   const rel = project ? relativeTo(abs, base) : null;
@@ -117,8 +118,14 @@ export function FileTab({ target }: { target: FileTarget }) {
   const kind = useMemo(() => previewKindOf(abs, file ?? null), [abs, file]);
   const modes = useMemo(() => (kind && file ? previewModes(kind, file) : null), [kind, file]);
   const remembered = useCodeViewStore((s) => (kind ? s.preview[kind.id] : undefined));
-  // Editing is on the source, for this tab only: the remembered choice stays for the viewer.
-  const mode = !modes || editing ? SOURCE.id : pickMode(modes, remembered);
+  // Opened at a line, the tab shows Source there until the user picks a mode (the line it
+  // was picked at): no preview body has lines (PreviewKind.line). A tail read's Source counts
+  // from its cut, so the line is not one of its own: it shows as usual, with no mark.
+  const [pickedAt, setPickedAt] = useState<number | null>(null);
+  const tailCut = file?.truncatedStart === true;
+  const atLine = line !== undefined && pickedAt !== line && kind?.line !== false && !tailCut && modes?.some((m) => m.id === SOURCE.id) === true;
+  // Editing and a line are on the source, for this tab only: the remembered choice stays for the viewer.
+  const mode = !modes || editing || atLine ? SOURCE.id : pickMode(modes, remembered);
   const previewing = kind !== null && modes !== null && mode !== SOURCE.id;
   const text = file?.text ?? null;
   const lines = useMemo(() => (text === null ? 0 : lineCount(text)), [text]);
@@ -161,6 +168,7 @@ export function FileTab({ target }: { target: FileTarget }) {
   const onMode = (m: string) => {
     if (!kind || (editing && m === SOURCE.id)) return;
     if (editing) leaveEdit();
+    setPickedAt(line ?? null);
     setPreviewMode(kind.id, m);
   };
   // The pencil puts the keyboard in the editor where the reader is, and the view stays put
@@ -312,7 +320,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
       {file?.truncatedStart && text !== null && <NoticeBar testId="file-truncated-start">{tailNotice(file.size)}</NoticeBar>}
-      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} preview={previewing ? kind : null} lang={kind?.source?.lang} mode={mode} edit={edit} findKey={findKey} onMeta={onMeta} onMode={onMode} />
+      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={tailCut ? undefined : line} page={page} preview={previewing ? kind : null} lang={kind?.source?.lang} mode={mode} edit={edit} findKey={findKey} onMeta={onMeta} onMode={onMode} />
     </div>
   );
 }

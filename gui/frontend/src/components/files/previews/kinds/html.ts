@@ -9,6 +9,7 @@ const html: PreviewKind = {
   modes: [{ id: "rendered", label: "Rendered" }],
   Body: HtmlBody,
   meta: savedMeta,
+  line: false,
 };
 
 export default html;

@@ -50,6 +50,12 @@ export interface PreviewKind {
   readonly find?: boolean;
   /** false: no Edit (pencil) for this kind, even in Source. Otherwise Edit switches to Source and edits there. */
   readonly edit?: false;
+  /**
+   * false: a tab opened at a line (a path chip `README.md:40`, the finder's Text mode) still
+   * opens in the kind's preview, which reads as a page, not as lines. Otherwise such a tab
+   * shows Source at the line until the user picks a mode (no body but Source has lines).
+   */
+  readonly line?: false;
   /** false: no Open in editor, in the header or the too-large state (a video means nothing to a code editor; Open in Finder stays). */
   readonly editor?: false;
   /** What Copy contents copies in a preview mode (a table's tab-separated text); default the file's text. Source always copies the text. */
