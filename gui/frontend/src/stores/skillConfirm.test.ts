@@ -27,7 +27,7 @@ describe("setSkillEnabled", () => {
     setSkillMarketplaceDeps({ run });
     seed(true);
     expect(await setSkillEnabled(item, false)).toBe(true);
-    expect(run).toHaveBeenCalledWith("skill.disable", { name: "pr-review", kind: "skill" }, expect.objectContaining({ quiet: true }));
+    expect(run).toHaveBeenCalledWith("skill.disable", { name: "pr-review", kind: "skill" }, expect.objectContaining({ inView: true }));
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "warning", title: "Disabled pr-review", description: RESTART_WARNING }));
   });

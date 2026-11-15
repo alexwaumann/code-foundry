@@ -72,7 +72,8 @@ describe("installPlugin", () => {
     expect(during?.phase).toBe("resolving");
     expect(usePluginRegistryStore.getState().progress).toEqual({});
     expect(usePluginRegistryStore.getState().busy).toEqual({});
-    expect(m.runCommand).toHaveBeenCalledWith("plugin.enable", { name: "gh-actions" });
+    // The row shows it enabled: no success toast.
+    expect(m.runCommand).toHaveBeenCalledWith("plugin.enable", { name: "gh-actions" }, undefined, { inView: true });
     expect(m.browse).toHaveBeenCalled();
   });
 
@@ -100,7 +101,7 @@ describe("installPlugin", () => {
     await installPlugin("gh-actions");
     expect(during?.phase).toBe("resolving");
     expect(usePluginRegistryStore.getState().progress["gh-actions"]).toBeUndefined();
-    expect(m.runCommand).toHaveBeenCalledWith("plugin.enable", { name: "gh-actions" });
+    expect(m.runCommand).toHaveBeenCalledWith("plugin.enable", { name: "gh-actions" }, undefined, { inView: true });
   });
 });
 
@@ -169,7 +170,7 @@ describe("a row's actions", () => {
     ["disable", { name: "hello" }],
     ["restart", { name: "hello" }],
     ["reload", {}],
-  ] as const)("%s is busy while it runs, then not", async (action, args) => {
+  ] as const)("%s is busy while it runs, then not, with no success toast (the row shows it)", async (action, args) => {
     let during: string | undefined;
     m.runCommandForResult.mockImplementation(() => {
       during = usePluginRegistryStore.getState().busy.hello;
@@ -177,7 +178,7 @@ describe("a row's actions", () => {
     });
     expect(await runPluginAction("hello", action)).toBe(true);
     expect(during).toBe(action);
-    expect(m.runCommandForResult).toHaveBeenCalledWith(`plugin.${action}`, args, expect.anything());
+    expect(m.runCommandForResult).toHaveBeenCalledWith(`plugin.${action}`, args, expect.objectContaining({ inView: true }));
     expect(usePluginRegistryStore.getState().busy.hello).toBeUndefined();
   });
 
@@ -205,9 +206,9 @@ describe("a row's actions", () => {
     expect(m.runCommandForResult).not.toHaveBeenCalled();
   });
 
-  it("updatePlugin says how it went, keeps a failure and can stay quiet", async () => {
-    expect(await updatePlugin("hello", { quiet: true })).toBe(true);
-    expect(m.runCommandForResult).toHaveBeenCalledWith("plugin.update", { name: "hello" }, expect.objectContaining({ quiet: true }));
+  it("updatePlugin runs with no success toast (the row shows the version) and keeps a failure", async () => {
+    expect(await updatePlugin("hello")).toBe(true);
+    expect(m.runCommandForResult).toHaveBeenCalledWith("plugin.update", { name: "hello" }, expect.objectContaining({ inView: true }));
     m.runCommandForResult.mockImplementationOnce(fails("offline"));
     expect(await updatePlugin("hello")).toBe(false);
     expect(usePluginRegistryStore.getState().failures.hello).toEqual({ action: "update", message: "offline" });

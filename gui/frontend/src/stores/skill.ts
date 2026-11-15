@@ -114,7 +114,7 @@ export interface SkillMarketplaceDeps {
   search: (q: SkillQuery, limit: number, offset: number, signal?: AbortSignal) => Promise<SkillSearchView>;
   installed: (signal?: AbortSignal) => Promise<InstalledListView>;
   registries: (signal?: AbortSignal) => Promise<SkillRegistriesView>;
-  run: (name: string, args: Record<string, string>, opts: { ctx?: UiContextView; quiet?: boolean; onError?: (message: string) => void }) => Promise<InvokeResultView | null>;
+  run: (name: string, args: Record<string, string>, opts: { ctx?: UiContextView; inView?: boolean; onError?: (message: string) => void }) => Promise<InvokeResultView | null>;
   context: () => UiContextView;
   /** Shows a setup terminal: its tab takes the focus, over any open sheet (Settings). */
   reveal: (terminalId: string) => void;
@@ -341,15 +341,17 @@ function markEnabled(key: string, enabled: boolean): void {
 /**
  * Runs one skill.* command for a row: busy while it runs, its failure kept under the row
  * (and toasted), a re-read after it. Null when it failed or the user declined a confirm.
- * A row already busy is left alone (null). `quiet` skips the success toast (the caller says it).
+ * A row already busy is left alone (null). No success toast: the row shows the new state
+ * (its switch, Installed, its version; an uninstalled or removed row goes; setup's terminal
+ * tab comes forward), as a saved setting does (docs/notes/toast-success-rule.md).
  */
-async function act(item: SkillItemRef, action: SkillAction, args: Record<string, string>, opts: { ctx?: UiContextView; quiet?: boolean } = {}): Promise<InvokeResultView | null> {
+async function act(item: SkillItemRef, action: SkillAction, args: Record<string, string>, opts: { ctx?: UiContextView } = {}): Promise<InvokeResultView | null> {
   const key = skillItemKey(item.kind, item.name, item.registry);
   if (useSkillMarketplaceStore.getState().busy[key]) return null;
   setBusy(key, action);
   let failure = "";
   try {
-    const res = await deps.run(`skill.${action}`, args, { ...opts, onError: (m) => (failure = m) });
+    const res = await deps.run(`skill.${action}`, args, { ...opts, inView: true, onError: (m) => (failure = m) });
     useSkillMarketplaceStore.setState((s) => ({ failures: applySkillFailure(s.failures, key, res === null && failure ? { action, message: failure } : null) }));
     if (res !== null && (action === "enable" || action === "disable")) markEnabled(key, action === "enable");
     if (res !== null) scheduleReload();
@@ -373,14 +375,14 @@ export async function enableSkill(item: SkillItemRef): Promise<boolean> {
   return (await act(item, "enable", nameKind(item))) !== null;
 }
 
-/** Disables (the daemon asks first, with the restart warning). `quiet`: no success toast. */
-export async function disableSkill(item: SkillItemRef, opts: { quiet?: boolean } = {}): Promise<boolean> {
-  return (await act(item, "disable", nameKind(item), opts)) !== null;
+/** Disables (the daemon asks first, with the restart warning). */
+export async function disableSkill(item: SkillItemRef): Promise<boolean> {
+  return (await act(item, "disable", nameKind(item))) !== null;
 }
 
-/** Updates to the marketplace's version (a missing skill is reinstalled). `quiet`: no success toast (an Update all's row says it). */
-export async function updateSkill(item: SkillItemRef, opts: { quiet?: boolean } = {}): Promise<boolean> {
-  return (await act(item, "update", nameKind(item), opts)) !== null;
+/** Updates to the marketplace's version (a missing skill is reinstalled). */
+export async function updateSkill(item: SkillItemRef): Promise<boolean> {
+  return (await act(item, "update", nameKind(item))) !== null;
 }
 
 /** Uninstalls a plugin or a skill Code Foundry installed (the daemon asks first, with the restart warning). */

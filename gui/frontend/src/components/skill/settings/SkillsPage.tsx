@@ -153,7 +153,7 @@ function UpdateAllSkills() {
       scope="skills"
       available={available}
       testId="skill-update-all"
-      steps={() => updatableRows(useSkillMarketplaceStore.getState().installed?.installed ?? []).map((r) => ({ key: r.key, version: r.update?.version ?? "", run: () => updateSkill(r, { quiet: true }) }))}
+      steps={() => updatableRows(useSkillMarketplaceStore.getState().installed?.installed ?? []).map((r) => ({ key: r.key, version: r.update?.version ?? "", run: () => updateSkill(r) }))}
     />
   );
 }

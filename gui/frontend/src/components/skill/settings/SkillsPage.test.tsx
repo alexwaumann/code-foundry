@@ -322,7 +322,7 @@ describe("the switch", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(m.disable).toHaveBeenCalledWith(expect.objectContaining({ name: "pr-review" }), { quiet: true });
+    expect(m.disable).toHaveBeenCalledWith(expect.objectContaining({ name: "pr-review" }));
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ level: "warning", title: "Disabled pr-review", description: RESTART }));
   });
 
@@ -452,7 +452,7 @@ describe("Update all", () => {
     });
     expect(button().disabled).toBe(true);
     expect(m.update).toHaveBeenCalledTimes(1);
-    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ name: "incident-postmortem" }), { quiet: true });
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ name: "incident-postmortem" }));
     await act(async () => {
       finish[0]?.(true);
       await Promise.resolve();

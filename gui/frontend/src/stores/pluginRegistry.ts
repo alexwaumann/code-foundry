@@ -110,7 +110,8 @@ export async function installPlugin(name: string): Promise<void> {
     }
     usePluginRegistryStore.setState((s) => ({ progress: applyInstallProgress(s.progress, { ref: name, name, version: out?.version ?? "", phase: "done", message: "", bytes: 0 }) }));
     void loadBrowse();
-    if (out && !out.enabled) await runCommand("plugin.enable", { name: out.name || name });
+    // The row shows it enabled: no success toast (Settings' rows, docs/notes/toast-success-rule.md).
+    if (out && !out.enabled) await runCommand("plugin.enable", { name: out.name || name }, undefined, { inView: true });
   } catch (err) {
     usePluginRegistryStore.setState((s) => ({ progress: { ...s.progress, [name]: { ref: name, name, version: "", phase: "failed", message: errorMessage(err), bytes: 0 } } }));
   } finally {
@@ -143,14 +144,15 @@ export function dismissInstallFailure(name: string): void {
 /**
  * Runs one command for a row: busy while it runs, its failure kept under the row (and
  * toasted). Null when it failed or the user declined a confirm. A row already busy is left
- * alone (null). `quiet` skips the success toast (the row says it).
+ * alone (null). No success toast: the row shows the new state (its switch, version or
+ * status; an uninstalled row goes), as a saved setting does (docs/notes/toast-success-rule.md).
  */
-async function act(name: string, action: RegistryAction, command: string, args: Record<string, string>, opts: { quiet?: boolean } = {}): Promise<InvokeResultView | null> {
+async function act(name: string, action: RegistryAction, command: string, args: Record<string, string>): Promise<InvokeResultView | null> {
   if (usePluginRegistryStore.getState().busy[name]) return null;
   setBusy(name, action);
   let failure = "";
   try {
-    const res = await runCommandForResult(command, args, { ...opts, onError: (m) => (failure = m) });
+    const res = await runCommandForResult(command, args, { inView: true, onError: (m) => (failure = m) });
     usePluginRegistryStore.setState((s) => ({ failures: applyPluginFailure(s.failures, name, res === null && failure ? { action, message: failure } : null) }));
     return res;
   } finally {
@@ -178,9 +180,9 @@ export async function runPluginAction(name: string, action: "enable" | "disable"
   return (await act(name, action, `plugin.${action}`, action === "reload" ? {} : { name })) !== null;
 }
 
-/** Installs the newer version a registry lists (plugin.update <name>). `quiet`: no success toast (an Update all's row says it). */
-export async function updatePlugin(name: string, opts: { quiet?: boolean } = {}): Promise<boolean> {
-  const done = (await act(name, "update", "plugin.update", { name }, opts)) !== null;
+/** Installs the newer version a registry lists (plugin.update <name>). */
+export async function updatePlugin(name: string): Promise<boolean> {
+  const done = (await act(name, "update", "plugin.update", { name })) !== null;
   if (done) void loadBrowse();
   return done;
 }

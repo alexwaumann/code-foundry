@@ -583,7 +583,7 @@ describe("Settings → Plugins: Update all", () => {
     await waitFor(() => {
       expect(screen.getByTestId("plugin-update-all").textContent).toBe("Updating 2 of 2…");
     });
-    expect(m.update).toHaveBeenLastCalledWith(expect.any(String), { quiet: true });
+    expect(m.update).toHaveBeenLastCalledWith(expect.any(String));
     await act(async () => {
       finish[1]?.(true);
       await Promise.resolve();
