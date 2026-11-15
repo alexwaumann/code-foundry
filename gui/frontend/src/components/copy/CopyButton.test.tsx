@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COPIED_MS } from "@/lib/useCopied";
-import { CopyButton } from "./copy-button";
+import { CopyButton } from "./CopyButton";
 
 const notify = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));

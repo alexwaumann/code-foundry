@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { CodeDiff, CodeScroll } from "@/components/code/CodeDiff";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton } from "@/components/copy/CopyButton";
 import { Tip } from "@/components/ui/tooltip";
 import { diffText, relPath, splitPath, toolDiffFiles, type ToolDiff } from "@/lib/toolSummary";
 

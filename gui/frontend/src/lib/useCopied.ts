@@ -8,7 +8,7 @@ export const COPIED_MS = 1500;
 /**
  * A visible copy control's state: `copy(text)` puts `text` on the clipboard (lib/clipboard)
  * and, once it is there, `copied` is true for `ms`; another copy meanwhile restarts the wait.
- * The control shows the result itself (components/ui/copy-button: a check in the success
+ * The control shows the result itself (components/copy/CopyButton: a check in the success
  * colour and "Copied"), with no toast; a failed copy toasts "Copy failed" and resolves false
  * (docs/notes/toast-success-rule.md).
  */

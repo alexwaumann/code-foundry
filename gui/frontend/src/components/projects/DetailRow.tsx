@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton } from "@/components/copy/CopyButton";
 import { Tip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,7 @@ export function DetailRow({
   );
 }
 
-/** The path's copy button: a check in the success colour for a moment after (components/ui/copy-button), no toast. */
+/** The path's copy button: a check in the success colour for a moment after (components/copy/CopyButton), no toast. */
 export function CopyPath({ path, testId = "details-copy-path" }: { path: string; testId?: string }) {
   return <CopyButton text={path} label="Copy path" testId={testId} tabIndex={-1} className="size-7 [&_svg]:size-3.5" />;
 }

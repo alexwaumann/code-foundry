@@ -3,7 +3,7 @@ import { Check, ClipboardCopy, RefreshCw, SquareArrowOutUpRight, WrapText, type 
 import { FinderIcon, type AppIconSlotProps } from "@/components/icons/AppIcon";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton } from "@/components/copy/CopyButton";
 import { Tip } from "@/components/ui/tooltip";
 import { useCopied } from "@/lib/useCopied";
 import { cn } from "@/lib/utils";
@@ -62,7 +62,7 @@ export function HeaderAction({ icon: Icon, label, onClick, testId, pressed }: { 
   );
 }
 
-/** Copy path: copies the absolute path; a check for a moment after (components/ui/copy-button). */
+/** Copy path: copies the absolute path; a check for a moment after (components/copy/CopyButton). */
 export function CopyPathAction({ path }: { path: string }) {
   return <CopyButton text={path} label="Copy path" testId="file-copy-path" />;
 }

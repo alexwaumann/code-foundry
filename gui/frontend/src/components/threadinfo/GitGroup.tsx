@@ -17,7 +17,7 @@ import {
   Upload,
   WandSparkles,
 } from "lucide-react";
-import { CopyIcon } from "@/components/ui/copy-button";
+import { CopyIcon } from "@/components/copy/CopyButton";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { fileTotals } from "@/components/diff/files";

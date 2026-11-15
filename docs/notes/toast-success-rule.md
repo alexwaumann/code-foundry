@@ -47,7 +47,7 @@ multi-line one goes under the command's title as before.
 
 - `lib/useCopied.ts`: `{ copied, copy(text) }`. `copied` for COPIED_MS (1.5 s), a recopy
   restarts the wait. A failed copy now toasts "Copy failed" (it showed nothing before).
-- `components/ui/copy-button.tsx`:
+- `components/copy/CopyButton.tsx`:
   - `CopyButton`: a muted ghost icon Button (shadcn), Tip and aria-label "Copied" while
     copied, `data-copied`; `text` may be a function read on press. Used by Details' Copy
     path, the File header's Copy path, a diff's Copy diff and the plugin `CopyIconButton`.
@@ -60,6 +60,9 @@ multi-line one goes under the command's title as before.
 
 ## Gotchas
 
+- The copy piece lives in `components/copy`, not `components/ui`: every file under
+  `components/ui` is re-exported to pages as `@cf/ui` (src/pagelib/ui.test.ts fails on one that
+  is not), and widening the page API was not this PR's to do.
 - `CopyIcon` sets the colour on the svg itself, so a button's `hover:text-…` cannot turn the
   check back to the muted colour.
 - The branch row is a `role="button"` div: its name comes from its text, so the copied state
@@ -74,7 +77,7 @@ multi-line one goes under the command's title as before.
 
 ## Tests
 
-- vitest: copy-button.test.tsx (check, name, timing, function text, failure toast),
+- vitest: components/copy/CopyButton.test.tsx (check, name, timing, function text, failure toast),
   useCopied.test.tsx (failure toasts), commands.test.ts (title shape, inView, SHOWS_ITSELF),
   and the call sites' tests (ThreadInfoCard, ProjectPage, CleanupWorktreesDialog,
   PullRequestSurface, PrTasks, prPanel, threadActions, SidebarRow, RememberedSection,

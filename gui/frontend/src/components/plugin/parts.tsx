@@ -7,7 +7,7 @@ import { ChevronDown, Circle, ExternalLink, LoaderCircle } from "lucide-react";
 import type { Glyph as GlyphValue, Inline, Pill as PillValue, Span, ViewButton } from "@/api/plugin";
 import { inlineSpans, inlineText } from "@/api/plugin";
 import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
+import { CopyButton } from "@/components/copy/CopyButton";
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { useNow } from "@/lib/clock";
@@ -232,7 +232,7 @@ export function ButtonBar({ buttons, align, className }: { buttons: readonly Vie
 
 /**
  * A muted Copy icon button (always visible): copies `text` on the host and shows a check
- * for a moment, no toast (components/ui/copy-button; a plugin's other copy actions toast
+ * for a moment, no toast (components/copy/CopyButton; a plugin's other copy actions toast
  * through copyElementText).
  */
 export function CopyIconButton({ text, label = "Copy" }: { text: string; label?: string }) {

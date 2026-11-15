@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import type { AgentRunView } from "@/api/agents";
 import type { ThreadItemView, ToolCallView, WakeView } from "@/api/thread";
-import { CopyIcon } from "@/components/ui/copy-button";
+import { CopyIcon } from "@/components/copy/CopyButton";
 import { Tip } from "@/components/ui/tooltip";
 import { agentElapsedMs, agentName, parseAgentNote } from "@/lib/agents";
 import { useNow, useNowSelect } from "@/lib/clock";

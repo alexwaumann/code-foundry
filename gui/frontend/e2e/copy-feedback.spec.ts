@@ -4,7 +4,7 @@ import { CF, infoCardOff, mockPost, openApp, openProjectPage, resetMock, row } f
 /**
  * A copy shows where it was pressed (docs/notes/toast-success-rule.md): what only the real
  * theme CSS shows is the check's colour, the success slot, in both schemes. The check, its
- * name and its timing: src/components/ui/copy-button.test.tsx; no toast, and a menu's copy
+ * name and its timing: src/components/copy/CopyButton.test.tsx; no toast, and a menu's copy
  * that keeps its toast: ThreadInfoCard.test.tsx and menus.test.ts. SHOTS=<dir> saves the
  * pull request's screenshots.
  */

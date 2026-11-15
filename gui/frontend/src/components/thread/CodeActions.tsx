@@ -1,5 +1,5 @@
 import { Play } from "lucide-react";
-import { CopyIcon } from "@/components/ui/copy-button";
+import { CopyIcon } from "@/components/copy/CopyButton";
 import { Tip } from "@/components/ui/tooltip";
 import { isStreamingBlock, runnableCommand } from "@/lib/codeActions";
 import { useCopied } from "@/lib/useCopied";
