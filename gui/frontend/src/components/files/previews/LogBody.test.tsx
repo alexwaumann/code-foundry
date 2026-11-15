@@ -31,7 +31,7 @@ const DAEMON = [
 ].join("\n");
 
 function props(path: string, text: string, over: Partial<FileReadView> = {}): PreviewBodyProps {
-  return { file: { ...blankFile(path), text, size: text.length, ...over }, path, mode: "rendered", name: path, place: { project: "", dir: "/w", file: path }, page: undefined, reloads: 0, findKey: undefined, onMeta: vi.fn() };
+  return { file: { ...blankFile(path), text, size: text.length, ...over }, path, mode: "rendered", name: path, place: { project: "", dir: "/w", file: path }, page: undefined, reloads: 0, findKey: undefined, onMeta: vi.fn(), onMode: vi.fn() };
 }
 
 afterEach(() => {
