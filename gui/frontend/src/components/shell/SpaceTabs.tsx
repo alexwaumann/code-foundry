@@ -72,6 +72,9 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
   // dnd-kit's attributes are left out: the tab is a tab (role, tabIndex), and their aria-disabled
   // while renaming would mark the name field inside it disabled too.
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: spaceId, disabled: renaming });
+  // Rename… picked in the menu starts as the menu closes: started earlier, the menu's focus trap and
+  // then its focus return to the tab take the field's focus, and the blur ends the rename at once.
+  const renameOnClose = useRef(false);
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -133,13 +136,18 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
           )}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent data-testid="space-tab-menu">
+      <ContextMenuContent
+        data-testid="space-tab-menu"
+        onCloseAutoFocus={(e) => {
+          if (!renameOnClose.current) return;
+          renameOnClose.current = false;
+          e.preventDefault();
+          onRename(true);
+        }}
+      >
         <ContextMenuItem
           onSelect={() => {
-            // After the menu hands the focus back, so the field keeps it.
-            setTimeout(() => {
-              onRename(true);
-            }, 0);
+            renameOnClose.current = true;
           }}
           data-testid="space-tab-rename"
         >
