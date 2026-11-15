@@ -6,7 +6,7 @@
  */
 import type { FileReadView } from "@/api/files";
 import { ansiLine, hasAnsi, hasControls, PLAIN, stripAnsi, type AnsiRun, type AnsiStyle } from "./ansi";
-import { detectLevel, ERROR, FATAL, startsEntry, timeAt, viewLine, type Level, type LogLineView } from "./logLine";
+import { detectLevel, entryTime, ERROR, FATAL, startsEntry, viewLine, type Level, type LogLineView } from "./logLine";
 
 export interface LogDoc {
   readonly text: string;
@@ -89,8 +89,11 @@ export function parseLog(text: string, structured: boolean, offset = 0): LogDoc 
       own[i] = 1;
       leveled = true;
     }
-    const t = timeAt(line);
-    if (t && t.short.length > timeCols) timeCols = t.short.length;
+    // The widest short time is 12 ("09:14:02.113"); past that, no line can widen the column.
+    if (timeCols < 12) {
+      const t = entryTime(line);
+      if (t !== null && t.length > timeCols) timeCols = t.length;
+    }
     // A line that says no level continues the entry above unless it starts one itself.
     if (!said) level = startsEntry(line) && !/^\s/.test(line) ? 0 : above;
     levels[i] = level;

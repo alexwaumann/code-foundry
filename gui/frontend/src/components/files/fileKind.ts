@@ -100,6 +100,11 @@ export function tooLargeHeading(kind: string, size: number): string {
   return `${kind} · ${formatSize(size)} · too large to show`;
 }
 
+/** "Showing the last 1 MiB of 38.0 MB": a tail read (readFileTail) keeps the lines that start in the file's last MiB. */
+export function tailNotice(size: number): string {
+  return `Showing the last 1 MiB of ${formatSize(size)}`;
+}
+
 /** "Showing the first 1 MiB of 4.2 MB": the daemon returns at most 1 MiB of a text file, so a truncated text read is exactly that. */
 export function truncatedNotice(size: number): string {
   return `Showing the first 1 MiB of ${formatSize(size)}`;

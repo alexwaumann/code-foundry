@@ -138,6 +138,23 @@ export function timeOfValue(v: unknown): Omit<LogTime, "end"> | null {
   return { short: (m[1] ?? "") + (m[2] ? `.${m[2].slice(0, 3)}` : ""), full: v };
 }
 
+const JSON_TIME = /"(?:time|ts|timestamp|@timestamp|t|date)"\s*:\s*(?:"([^"]*)"|(\d+(?:\.\d+)?))/;
+const KV_TIME = /^(?:time|ts|t|timestamp)=("[^"]*"|\S+)/;
+
+/** The short form of the time an entry starts with: a leading timestamp, a logfmt time first, a JSON line's time key. */
+export function entryTime(line: string): string | null {
+  const c = line.charCodeAt(0);
+  if (c === 123) {
+    const m = JSON_TIME.exec(line);
+    return m ? (timeOfValue(m[2] !== undefined ? Number(m[2]) : (m[1] ?? ""))?.short ?? null) : null;
+  }
+  if (c === 116) {
+    const m = KV_TIME.exec(line);
+    if (m) return timeOfValue(unquote(m[1] ?? ""))?.short ?? null;
+  }
+  return timeAt(line)?.short ?? null;
+}
+
 /** Whether a line starts an entry: a timestamp, a logfmt time, or a JSON object. Others continue the one above. */
 export function startsEntry(line: string): boolean {
   const c = line.charCodeAt(0);

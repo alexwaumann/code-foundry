@@ -44,6 +44,16 @@ describe("the registered kinds", () => {
     ["app.ts", { mime: "text/typescript" }, null],
     ["Makefile", {}, null],
     ["notes.txt", { mime: "text/plain; charset=utf-8" }, null],
+    ["server.log", { mime: "text/plain; charset=utf-8" }, "log"],
+    ["SERVER.LOG", {}, "log"],
+    // Terminal output: a plain-text file with an escape sequence in it.
+    ["run.txt", { text: "\u001b[32mok\u001b[0m" }, "ansi"],
+    ["build.out", { text: "\u001b[1mbold" }, "ansi"],
+    ["output", { text: "\u001b[31mred" }, "ansi"],
+    // An ESC that starts no CSI, and code with an escape in it, stay the code view.
+    ["title.txt", { text: "\u001b]0;title\u0007" }, null],
+    ["colors.sh", { text: "echo \u001b[31mred" }, null],
+    ["main.go", { text: "\u001b[0m" }, null],
     // A kind that cannot show the read leaves it to the code view or the binary state.
     ["blob.md", { text: null, binary: true }, null],
     ["broken.png", { mime: "image/png", text: null, binary: true }, null],
@@ -56,6 +66,8 @@ describe("the registered kinds", () => {
     expect(previewKindOf("/w/logo.svg", null)?.id).toBe("svg");
     expect(previewKindOf("/w/logo.png", null)).toBeNull();
     expect(previewKindOf("/w/Makefile", null)).toBeNull();
+    expect(previewKindOf("/w/logs/server.log", null)?.read).toBe("tail");
+    expect(previewKindOf("/w/run.txt", null)).toBeNull();
   });
 
   it("the switch: a text kind ends with Source; an image has one mode, so no switch", () => {

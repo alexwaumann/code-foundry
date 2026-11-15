@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEBUG, detectLevel, ERROR, FATAL, INFO, levelOfNumber, startsEntry, timeAt, TRACE, trailingFields, viewLine, WARN, type Level } from "./logLine";
+import { DEBUG, detectLevel, entryTime, ERROR, FATAL, INFO, levelOfNumber, startsEntry, timeAt, TRACE, trailingFields, viewLine, WARN, type Level } from "./logLine";
 
 describe("detectLevel", () => {
   it.each<[string, string, Level]>([
@@ -67,6 +67,18 @@ describe("timeAt", () => {
 
   it("ends after the space that follows", () => {
     expect(timeAt("09:14:02   x")?.end).toBe(11);
+  });
+
+  it.each<[string, string, string | null]>([
+    ["logfmt", "time=2026-11-14T09:14:02.113-08:00 level=INFO", "09:14:02.113"],
+    ["logfmt quoted", 'ts="2026-11-14 09:14:02" msg=x', "09:14:02"],
+    ["JSON string", '{"level":"info","time":"2026-11-14T09:14:02Z"}', "09:14:02"],
+    ["JSON epoch seconds", '{"ts":1731574442.5}', expect.stringMatching(/^\d\d:\d\d:02\.500$/)],
+    ["JSON without a time", '{"msg":"x"}', null],
+    ["a leading timestamp", "09:14:02 x", "09:14:02"],
+    ["none", "text", null],
+  ])("entryTime: %s", (_name, line, want) => {
+    expect(entryTime(line)).toEqual(want);
   });
 
   it.each([

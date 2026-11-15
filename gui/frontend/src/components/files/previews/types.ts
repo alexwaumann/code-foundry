@@ -30,11 +30,12 @@ export interface PreviewKind {
   readonly modes: readonly [PreviewMode, ...PreviewMode[]];
   /**
    * How the file is read for this kind; decided from the path alone (`previewKindOf(path,
-   * null)`), so a kind with a read of its own matches by extension. Only "whole" (ReadFile
-   * up to READ_MAX_BYTES) exists today; a tail read (logs) and a stream URL (media) come with
-   * their kinds.
+   * null)`), so a kind with a read of its own matches by extension. "whole" (the default):
+   * ReadFile from the start, up to READ_MAX_BYTES. "tail": the last MiB (readFileTail; a log),
+   * `truncatedStart` and `offset` set when the start was left out. FileTab's `READS` maps each
+   * to its call.
    */
-  readonly read?: "whole";
+  readonly read?: PreviewRead;
   /** The body in a preview mode. Wrap a heavy one in React.lazy: FileTab renders it under Suspense. */
   readonly Body: ComponentType<PreviewBodyProps>;
   /** Row two's meta in a preview mode, before the body says more (`PreviewBodyProps.onMeta`). */
@@ -60,6 +61,9 @@ export interface PreviewKind {
   /** The header's icon, in place of fileIconOf's. */
   readonly icon?: LucideIcon;
 }
+
+/** How a kind's file is read (PreviewKind.read). */
+export type PreviewRead = "whole" | "tail";
 
 /** Which files a kind is. Every list is lower case; the registry tries the tiers in this order across all kinds. */
 export interface PreviewMatch {

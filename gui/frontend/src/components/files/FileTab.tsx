@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FileQuestion, FileX, Folder, Pencil, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
-import { canEdit, readFile, type FileReadView } from "@/api/files";
+import { canEdit, readFile, readFileTail, type FileReadView } from "@/api/files";
 import type { SupportedLanguages } from "@pierre/diffs";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
 import { draftText, type EditorHandle } from "@/lib/codeEditor";
@@ -20,9 +20,9 @@ import { ConflictBand, EditButtons, EditFailedBand, EditStatus } from "./FileEdi
 import { FileRequestBand } from "./FileRequestBand";
 import { FileActions, FileHeader, HeaderAction, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
 import { findMissing } from "./findMissing";
-import { fileIconOf, formatSize, languageOf, lineCount, tooLargeHeading, truncatedNotice } from "./fileKind";
+import { fileIconOf, formatSize, languageOf, lineCount, tailNotice, tooLargeHeading, truncatedNotice } from "./fileKind";
 import { pickMode, previewKindOf, previewModes } from "./previews/registry";
-import { SOURCE, type PreviewBodyProps, type PreviewKind } from "./previews/types";
+import { SOURCE, type PreviewBodyProps, type PreviewKind, type PreviewRead } from "./previews/types";
 import { FileFindBar } from "./FileFind";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
 import { useFileHold } from "./useFileHold";
@@ -46,6 +46,10 @@ import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEd
  * (viewed or edited) and rendered markdown have a find (file.search, FileFind.tsx): a band
  * under the header that stays across the pencil.
  */
+/** Each kind's read (PreviewKind.read), by the path's kind before reading; the code view reads whole. */
+const READS: Record<PreviewRead, typeof readFile> = { whole: readFile, tail: readFileTail };
+const readOf = (p: string) => READS[previewKindOf(p, null)?.read ?? "whole"];
+
 export function FileTab({ target }: { target: FileTarget }) {
   const { project, base, path, line, page, ask } = target;
   const wantsNew = ask !== undefined;
@@ -61,16 +65,16 @@ export function FileTab({ target }: { target: FileTarget }) {
     const pinned = editPath(editKey);
     if (pinned !== null) {
       found.current = { key, path: pinned };
-      return readFile(base, pinned, undefined, signal);
+      return readOf(pinned)(base, pinned, undefined, signal);
     }
     // A file to make is asked for by name: a namesake elsewhere is not it.
     const tried = found.current?.key === key && !wantsNew ? found.current : null;
-    const first = await readFile(base, tried?.path ?? path, undefined, signal);
+    const first = await readOf(tried?.path ?? path)(base, tried?.path ?? path, undefined, signal);
     if (tried || !first.notFound || !project || wantsNew) return first;
     const alt = await findMissing(project, base, first.path || resolvePath(base, path), signal);
     found.current = { key, path: alt };
     if (alt === null) return first;
-    const second = await readFile(base, alt, undefined, signal);
+    const second = await readOf(alt)(base, alt, undefined, signal);
     return second.notFound ? first : second;
   };
   const read = useTabRead<FileReadView>(key, async (signal) => {
@@ -213,9 +217,10 @@ export function FileTab({ target }: { target: FileTarget }) {
     </>
   );
 
-  // Copy contents: a whole text read (a cut one would copy part of the file). It copies the
-  // draft while editing, the kind's own text in a preview mode that has one, else the text.
-  const copyable = file !== null && !opening && !creating && text !== null && !file.truncated;
+  // Copy contents: a whole text read (a cut one, at its end or its start, would copy part of
+  // the file). It copies the draft while editing, the kind's own text in a preview mode
+  // that has one, else the text.
+  const copyable = file !== null && !opening && !creating && text !== null && !file.truncated && file.truncatedStart !== true;
   const contents = copyable
     ? () => {
         if (session?.view) return draftText(session.stateKey) ?? session.seed;
@@ -304,6 +309,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
+      {file?.truncatedStart && text !== null && <NoticeBar testId="file-truncated-start">{tailNotice(file.size)}</NoticeBar>}
       <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} preview={previewing ? kind : null} lang={kind?.source?.lang} mode={mode} edit={edit} findKey={findKey} onMeta={onMeta} onMode={onMode} />
     </div>
   );

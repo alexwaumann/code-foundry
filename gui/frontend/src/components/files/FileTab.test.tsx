@@ -22,9 +22,15 @@ const files = vi.hoisted(() => new Map<string, Partial<FileReadView>>());
 const reads = vi.hoisted(() => [] as string[]);
 const writes = vi.hoisted(() => ({ fn: vi.fn() }));
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
+const tails = vi.hoisted(() => [] as string[]);
 vi.mock("@/api/files", async (orig) => ({
   ...(await orig<typeof import("@/api/files")>()),
   writeFile: writes.fn,
+  // A tail read (a .log) answers the same, and is noted.
+  readFileTail: (base: string, path: string) => {
+    tails.push(path.startsWith("/") ? path : `${base}/${path}`);
+    return Promise.resolve({ path: path.startsWith("/") ? path : `${base}/${path}`, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: null, lossless: false, image: null, pdf: null, ...(files.get(path.startsWith("/") ? path : `${base}/${path}`) ?? { notFound: true }) });
+  },
   readFile: (base: string, path: string) => {
     const abs = path.startsWith("/") ? path : `${base}/${path}`;
     reads.push(abs);
@@ -122,6 +128,7 @@ afterEach(() => {
   listed.paths = [];
   listed.calls = [];
   reads.length = 0;
+  tails.length = 0;
   loadPdf.mockClear();
   useCodeViewStore.setState({ diffStyle: "unified", wrap: false, preview: {} });
   useFileEditStore.setState({ sessions: {} });
@@ -1016,6 +1023,61 @@ describe("previews", () => {
     await loaded();
     expect(screen.getByTestId("file-copy-path")).toBeTruthy();
     expect(screen.queryByTestId("file-copy-contents")).toBeNull();
+  });
+
+  it("a .log is read from its end: Rendered | Source, the tail notice, its lines in the meta, and no Copy contents for the cut read", async () => {
+    const text = "09:14:02 INFO one\n09:14:03 \u001b[31mERROR\u001b[0m two\n";
+    files.set(`${W}/logs/server.log`, { text, lossless: true, binary: false, mime: "text/plain; charset=utf-8", size: 38 * MiB, truncatedStart: true, offset: 38 * MiB - 40 });
+    open("logs/server.log");
+    await screen.findByTestId("file-log");
+    expect(tails).toContain(`${W}/logs/server.log`);
+    expect(reads).not.toContain(`${W}/logs/server.log`);
+    expect(tab().dataset.kind).toBe("log");
+    expect(within(screen.getByTestId("file-mode")).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Rendered", "Source"]);
+    expect(meta()).toBe("2 lines · 38.0 MB · Log");
+    expect(screen.getByTestId("file-truncated-start").textContent).toBe("Showing the last 1 MiB of 38.0 MB");
+    expect(screen.queryByTestId("file-truncated")).toBeNull();
+    expect(screen.queryByTestId("file-copy-contents")).toBeNull();
+    expect(screen.getByTestId("file-wrap")).toBeTruthy();
+    // A tail read is not editable (api/files canEdit).
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    expect(screen.getByTestId("code-file").textContent).toBe(text);
+    expect(screen.getByTestId("file-truncated-start")).toBeTruthy();
+  });
+
+  it("a whole .log: Copy contents copies what Rendered shows (no escapes), Source the text as written", async () => {
+    const text = "\u001b[32mok\u001b[0m\n 10%\r100%\n";
+    files.set(`${W}/run.log`, { text, lossless: true, binary: false, mime: "text/plain", size: text.length });
+    open("run.log");
+    await screen.findByTestId("file-log");
+    expect(screen.queryByTestId("file-truncated-start")).toBeNull();
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith("ok\n100%\n");
+    });
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith(text);
+    });
+  });
+
+  it("a .txt with escape sequences is terminal output, read whole; one without stays the code view", async () => {
+    files.set(`${W}/run.txt`, { text: "\u001b[1mPASS\u001b[0m all\n", lossless: true, binary: false, mime: "text/plain", size: 20 });
+    files.set(`${W}/notes.txt`, { text: "ERROR: not a log\n", lossless: true, binary: false, mime: "text/plain", size: 17 });
+    const first = open("run.txt");
+    await screen.findByTestId("file-log");
+    expect(tab().dataset.kind).toBe("ansi");
+    expect(reads).toContain(`${W}/run.txt`);
+    expect(meta()).toBe("1 line · 20 B · Terminal output");
+    first.unmount();
+    open("notes.txt");
+    await screen.findByTestId("code-file");
+    expect(tab().dataset.kind).toBeUndefined();
+    expect(screen.queryByTestId("file-mode")).toBeNull();
+    expect(meta()).toBe("1 line · 17 B · Plain text");
+    expect(tails).not.toContain(`${W}/notes.txt`);
   });
 
   it("no Copy contents for a file that is not there", async () => {

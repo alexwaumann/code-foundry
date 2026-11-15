@@ -28,6 +28,7 @@ describe("parseLog", () => {
     expect([...doc.levels]).toEqual([INFO, DEBUG, WARN, ERROR, ERROR, ERROR, ERROR, ERROR, INFO]);
     expect([...doc.own]).toEqual([1, 1, 1, 1, 0, 0, 0, 0, 1]);
     expect(doc.leveled).toBe(true);
+    expect(doc.timeCols).toBe(12);
     expect(filterCount(doc, ERROR)).toBe(5);
     expect(filterCount(doc, "all")).toBe(9);
     expect([...(filterRows(doc, ERROR) ?? [])]).toEqual([3, 4, 5, 6, 7]);
