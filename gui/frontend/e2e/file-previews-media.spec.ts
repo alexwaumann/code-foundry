@@ -123,11 +123,15 @@ test("media player screenshots", async ({ page }) => {
   // Playing at half speed (6 s of clip), with the speed menu open.
   await page.evaluate(`__cfModule("/src/stores/mediaPlayer.ts").then((m) => m.setPlaybackRate(0.5))`);
   await shot("video-playing-speed", async () => {
-    if (await page.getByTestId("media-speed-menu").isVisible()) await page.keyboard.press("Escape");
-    await scrubTo(0.1);
-    if ((await player(page).getAttribute("data-playing")) === null) await player(page).getByTestId("media-stage").click();
+    // From near the start, so the clip is still playing for the shot; the menu stays open across both.
+    await page.evaluate(() => {
+      const el = document.querySelector<HTMLMediaElement>('[data-testid="media-element"]');
+      if (!el) return;
+      el.currentTime = 0.3;
+      void el.play();
+    });
     await expect(player(page)).toHaveAttribute("data-playing", "true");
-    await player(page).getByTestId("media-speed").click();
+    if (!(await page.getByTestId("media-speed-menu").isVisible())) await player(page).getByTestId("media-speed").click();
     await expect(page.getByTestId("media-speed-menu")).toBeVisible();
   });
   await page.keyboard.press("Escape");
