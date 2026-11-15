@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { actOnElement, CHOICE_HOLD_MS, draftKeyOf, setCollapsed, usePluginSurfacesStore } from "@/stores/pluginSurfaces";
 import { useRunAction } from "../actions";
 import { useViewCtx } from "../context";
+import { CopiedMark } from "../copied";
 import { useElementWidth } from "../layout";
 import { openRowMenuFromKey, rowMenuItems } from "../menu";
 import { GlyphView, InlineLine, PillView, PluginButton } from "../parts";
@@ -205,7 +206,7 @@ function RowLine({ row, layout, widths, dense }: { row: TableRow; layout: TableL
       >
         <RowGrid template={layout.template}>
           {layout.columns.map((c, i) => (
-            <CellView key={c.key} col={c} row={row} width={widths[i] ?? null} />
+            <CellView key={c.key} col={c} row={row} width={widths[i] ?? null} first={i === 0} />
           ))}
           {layout.buttons > 0 && (
             // Buttons stop the row's own click.
@@ -226,8 +227,11 @@ function RowLine({ row, layout, widths, dense }: { row: TableRow; layout: TableL
   );
 }
 
-/** A cell: its glyph, its value (one line, its tooltip only when cut) and its pill, in the column's style and alignment; or its meter alone, as wide as the column (`width`). */
-function CellView({ col, row, width }: { col: TableColumn; row: TableRow; width: number | null }) {
+/**
+ * A cell: its glyph, its value (one line, its tooltip only when cut) and its pill, in the column's style and alignment; or its meter alone, as wide as the column (`width`).
+ * The row's first cell shows its copy action's check for a moment (no toast).
+ */
+function CellView({ col, row, width, first }: { col: TableColumn; row: TableRow; width: number | null; first: boolean }) {
   const { value, glyph, pill, meter } = cellParts(row.cells?.[col.key]);
   if (meter) {
     return (
@@ -241,6 +245,7 @@ function CellView({ col, row, width }: { col: TableColumn; row: TableRow; width:
       {glyph && <GlyphView glyph={glyph} style="icon" named={pill !== undefined} />}
       <InlineLine value={value} />
       {pill && <PillView pill={pill} className="min-w-0 shrink truncate" />}
+      {first && <CopiedMark elementKey={row.key} />}
     </div>
   );
 }

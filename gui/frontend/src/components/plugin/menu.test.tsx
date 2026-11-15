@@ -15,7 +15,7 @@ import { SurfaceHeader } from "./Header";
 import { buttonItem, buttonsWidth, buttonWidth, foldRowActions, isContextMenuKey, menuBlocks, menuKeys, ROW_TITLE_MIN, rowMenuItems } from "./menu";
 import { NodeList } from "./NodeList";
 
-const host = vi.hoisted(() => ({ acts: [] as ActRequestView[], commands: [] as unknown[][], urls: [] as string[], copies: [] as string[] }));
+const host = vi.hoisted(() => ({ acts: [] as ActRequestView[], commands: [] as unknown[][], urls: [] as string[], copies: [] as string[], copiedAt: [] as unknown[] }));
 
 vi.mock("@/api/plugin", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/plugin")>()),
@@ -34,8 +34,9 @@ vi.mock("@/stores/pluginSurfaces", async (importOriginal) => ({
   openElementUrl: vi.fn((url: string) => {
     host.urls.push(url);
   }),
-  copyElementText: vi.fn((text: string) => {
+  copyElementText: vi.fn((text: string, at?: unknown) => {
     host.copies.push(text);
+    host.copiedAt.push(at);
     return Promise.resolve();
   }),
 }));
@@ -112,6 +113,7 @@ beforeEach(() => {
   host.commands = [];
   host.urls = [];
   host.copies = [];
+  host.copiedAt = [];
   usePluginSurfacesStore.setState({ watches: { w: { instance: "jira/board/global", version: 1 } } } as never);
 });
 
@@ -226,6 +228,8 @@ describe("a row's menu", () => {
     await pick(openMore(), key);
     expect(got()).toEqual(want);
     if (key !== "start") expect(host.acts).toEqual([]);
+    // A copy from a menu names no element to show a check on: it is toasted (copied.test.tsx).
+    if (key === "copy") expect(host.copiedAt).toEqual([undefined]);
     expect(screen.queryByTestId("plugin-more-menu")).toBeNull();
   });
 

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useRunAction } from "../actions";
 import { BAR_PLOT_HEIGHT, barAt, barGeometry, barHeight, barOpacity, barPaint, barScaleTop, barValueY, nextBar } from "../charts";
 import { useViewCtx } from "../context";
+import { CopiedMark } from "../copied";
 import { GlyphView, InlineView } from "../parts";
 import type { NodeProps } from "../registry";
 
@@ -29,6 +30,8 @@ function BarTip({ bar }: { bar: Bar }) {
           </svg>
         )}
         <span className="truncate">{bar.title}</span>
+        {/* A copy action's check, for a moment (no toast): the bar is pointed at or focused, so its tooltip shows. */}
+        <CopiedMark elementKey={bar.key} />
       </div>
       {bar.meta !== undefined && <InlineView value={bar.meta} className="block truncate text-cf-text-muted" />}
     </>

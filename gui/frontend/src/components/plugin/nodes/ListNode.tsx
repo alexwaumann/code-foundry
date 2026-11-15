@@ -5,6 +5,7 @@ import { VirtualStack } from "@/components/pr/VirtualStack";
 import { cn } from "@/lib/utils";
 import { useRunAction } from "../actions";
 import { useViewCtx } from "../context";
+import { CopiedMark } from "../copied";
 import { useElementWidth } from "../layout";
 import { AddRowInput, RowCheck, RowGrip, TitleEditor } from "../ListRows";
 import { useKeyMove, useRowChanges, useRowDrag, type RowOps } from "../listRowsState";
@@ -136,6 +137,8 @@ export function RowView({ row, glyphStyle, dense, onActivate, selected: shown, o
                   <InlineLine value={row.title} className={cn("max-w-full shrink-0 font-medium", checked && "text-cf-text-muted line-through")} />
                 </span>
                 <InlineLine value={row.titleMeta} className="font-mono text-caption-sm" />
+                {/* A copy action's check, for a moment (no toast). */}
+                <CopiedMark elementKey={row.key} />
               </span>
             )}
             <PillView pill={row.pill} />

@@ -140,7 +140,8 @@ function Blocks({ blocks, kit, onPick, inert }: { blocks: readonly MenuBlock[]; 
  * do, so a dialog the action opens (a command's confirm) keeps its focus.
  */
 function usePicked(): { pick: (it: ViewMenuItem & { key: string }) => void; flush: () => void } {
-  const run = useRunAction();
+  // The menu is gone by now: a copy is toasted.
+  const run = useRunAction({ menu: true });
   const picked = useRef<(ViewMenuItem & { key: string }) | null>(null);
   return {
     pick: (it) => {
