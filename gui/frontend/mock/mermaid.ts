@@ -27,7 +27,7 @@ export const SEQUENCE_MMD = `sequenceDiagram
   Daemon-->>GUI: WatchThread items
   Claude-->>Daemon: result
   deactivate Claude
-  Note over GUI,Daemon: the thread view re-renders from the snapshot
+  Note over GUI,Daemon: the view re-renders
   Daemon-->>GUI: turn settled
 `;
 
@@ -45,6 +45,11 @@ flowchart LR
   c --> d[Link]
   click d "javascript:window.__cfPwned=4"
   click a call window.alert()
+`;
+
+/** Fourteen steps in a row: wider than a side pane at 60% of its size, so it scrolls sideways. */
+export const WIDE_MMD = `flowchart LR
+${Array.from({ length: 13 }, (_, i) => `  s${String(i)}[Step ${String(i + 1)}] --> s${String(i + 1)}[Step ${String(i + 2)}]`).join("\n")}
 `;
 
 export const DIAGRAMS_MD = `# code-foundry
@@ -78,6 +83,7 @@ export const MERMAID_FILES: Readonly<Record<string, { text: string; mime: string
   "docs/sequence.mmd": { text: SEQUENCE_MMD, mime: "text/vnd.mermaid" },
   "docs/broken.mmd": { text: BROKEN_MMD, mime: "text/vnd.mermaid" },
   "docs/hostile.mmd": { text: HOSTILE_MMD, mime: "text/vnd.mermaid" },
+  "docs/wide.mmd": { text: WIDE_MMD, mime: "text/vnd.mermaid" },
   "docs/empty.mmd": { text: "", mime: "text/vnd.mermaid" },
   "docs/diagrams.md": { text: DIAGRAMS_MD, mime: "text/markdown" },
 };

@@ -73,13 +73,14 @@ export function useMermaid(source: string): MermaidState {
     if (early || cache.has(key)) return;
     let live = true;
     void import("./render")
+      .then((m) => m.renderDiagram(source, look))
       .then(
-        // A render's outcome is the text's: kept. The library failing to load is not, so the next mount tries again.
-        (m) =>
-          m.renderDiagram(source, look).then((r) => {
-            remember(key, r);
-            return r;
-          }),
+        // A render's outcome is the text's: kept. The library failing to load (or to run) is
+        // not, so the next mount tries again.
+        (result) => {
+          remember(key, result);
+          return result;
+        },
         (e: unknown): RenderedDiagram => ({ ok: false, message: `Mermaid did not load: ${e instanceof Error ? e.message : String(e)}` }),
       )
       .then((result) => {

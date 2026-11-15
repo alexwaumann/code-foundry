@@ -43,17 +43,15 @@ export function mermaidThemeVariables(theme: Theme): Record<string, string | boo
   const accent = slot(theme, "--cf-accent", "--cf-info");
   const error = slot(theme, "--cf-error", "--cf-error");
   const charts = chartColors(theme);
-  const series = Object.fromEntries(
-    Array.from({ length: 12 }, (_, i) => {
-      const c = charts[i % charts.length] ?? accent;
-      return [
-        [`cScale${String(i)}`, c],
-        [`cScaleLabel${String(i)}`, surface],
-        [`pie${String(i + 1)}`, c],
-        [`git${String(i)}`, c],
-      ];
-    }).flat(),
-  );
+  // The series colours: a mindmap's or timeline's levels, pie slices, git branches.
+  const series: Record<string, string> = {};
+  for (let i = 0; i < 12; i++) {
+    const c = charts[i % charts.length] ?? accent;
+    series[`cScale${String(i)}`] = c;
+    series[`cScaleLabel${String(i)}`] = surface;
+    series[`pie${String(i + 1)}`] = c;
+    series[`git${String(i)}`] = c;
+  }
   return {
     darkMode: theme.scheme === "dark",
     background: surface,

@@ -12,4 +12,7 @@
   height: auto;
   max-width: var(--cf-diagram-w);
   min-width: calc(var(--cf-diagram-w) * 0.6);
+  /* Text as wide as Mermaid measured it at any scale: WebKit otherwise lays out the system
+     font at the shrunk size, where its tracking is wider, and a label runs past its box. */
+  text-rendering: geometricPrecision;
 }

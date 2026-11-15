@@ -28,11 +28,15 @@ export function mermaidConfig(look: DiagramTheme): MermaidConfig {
     themeCSS: look.css,
     darkMode: look.variables.darkMode === true,
     fontFamily: DIAGRAM_FONT,
+    fontSize: 13,
     // Dagre's curved edges, as GitHub draws a fenced diagram; a diagram can still ask for ELK.
     layout: "dagre",
     // Tighter than Mermaid's defaults (50 / 50 / 8), so a diagram fits a side pane at its
     // natural size more often instead of shrinking its text.
-    flowchart: { htmlLabels: false, nodeSpacing: 28, rankSpacing: 40, diagramPadding: 4, padding: 12 },
+    flowchart: { nodeSpacing: 28, rankSpacing: 40, diagramPadding: 4, padding: 12 },
+    // Sequence diagrams measure their text with fonts of their own (Trebuchet by default):
+    // the app's, or a label runs past its box.
+    sequence: { actorFontFamily: DIAGRAM_FONT, noteFontFamily: DIAGRAM_FONT, messageFontFamily: DIAGRAM_FONT, actorFontSize: 13, noteFontSize: 13, messageFontSize: 13 },
     logLevel: "fatal",
   };
 }
