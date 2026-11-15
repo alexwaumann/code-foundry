@@ -235,3 +235,8 @@ after rates. What they add to the rounds above:
   from its name field when its focus frame came second, and one fs event delivery could be split
   into two files events. Fix those in the app and say so.
 
+- **A library's timer outlives the file.** sonner removes a dismissed toast 200 ms later, on a
+  timer of its own. A test that dismissed its toasts and unmounted left that timer running; when
+  it fired after the file's jsdom was gone, React threw "window is not defined" as an unhandled
+  error, which fails the run with every test passing (`src/lib/notify.test.tsx`, the sweep at
+  5d0a3af9c). Wait for what the timer does (the toasts leaving the document) before unmounting.
