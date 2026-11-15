@@ -122,11 +122,12 @@ describe("colours and CSS", () => {
   it.each<[number | string, string]>([
     [1, "var(--terminal-ansi-1)"],
     [15, "var(--terminal-ansi-15)"],
-    [16, "rgb(0, 0, 0)"],
-    [196, "rgb(255, 0, 0)"],
-    [231, "rgb(255, 255, 255)"],
-    [232, "rgb(8, 8, 8)"],
-    [255, "rgb(238, 238, 238)"],
+    [16, "#000000"],
+    [196, "#ff0000"],
+    [208, "#ff8700"],
+    [231, "#ffffff"],
+    [232, "#080808"],
+    [255, "#eeeeee"],
     ["#123456", "#123456"],
   ])("%s", (c, want) => {
     expect(colorCss(c)).toBe(want);

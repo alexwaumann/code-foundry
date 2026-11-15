@@ -327,16 +327,19 @@ export function stripAnsi(text: string): string {
 
 const CUBE = [0, 95, 135, 175, 215, 255];
 
-/** A colour as CSS: the 16 as the terminal palette's variables, the 256's cube and greys, true colour as is. */
+/**
+ * A colour as CSS: the 16 as the terminal palette's variables, the 256's cube and greys as
+ * xterm computes them (the file's data, like true colour, not the app's palette), true colour as is.
+ */
 export function colorCss(c: number | string): string {
   if (typeof c === "string") return c;
   if (c < 16) return `var(--terminal-ansi-${String(c)})`;
   if (c >= 232) {
-    const v = 8 + (c - 232) * 10;
-    return `rgb(${String(v)}, ${String(v)}, ${String(v)})`;
+    const v = String(8 + (c - 232) * 10);
+    return hex(v, v, v);
   }
   const n = c - 16;
-  return `rgb(${String(CUBE[Math.floor(n / 36)])}, ${String(CUBE[Math.floor(n / 6) % 6])}, ${String(CUBE[n % 6])})`;
+  return hex(String(CUBE[Math.floor(n / 36)]), String(CUBE[Math.floor(n / 6) % 6]), String(CUBE[n % 6]));
 }
 
 /** CSS declarations for a style (camelCase keys, React's style prop). */
