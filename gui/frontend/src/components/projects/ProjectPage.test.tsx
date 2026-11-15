@@ -17,6 +17,9 @@ vi.mock("@/api/project", async (orig) => ({
 vi.mock("@/api/gitops", async (orig) => ({ ...(await orig<typeof import("@/api/gitops")>()), ...(await import("@/test/cardFakes")).cardGitopsFakes }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/lib/clipboard", () => ({ copyText }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
+const successes = () => notify.mock.calls.map((c) => c[0] as { level: string; title: string }).filter((n) => n.level === "success");
 
 const { ConfirmDialog } = await import("@/components/confirm/ConfirmDialog");
 const { RemoveWorktreeDialog } = await import("./RemoveWorktreeDialog");
@@ -117,6 +120,7 @@ function toIndex() {
 const pagePanel = (projectId = "repo-cf") => panelActive(`view:projects:project:${projectId}`);
 
 beforeEach(async () => {
+  notify.mockReset();
   resetDaemon();
   seedWorld();
   await resetPanels();
@@ -245,7 +249,7 @@ describe("a project's page", () => {
       });
       expect(copyText).toHaveBeenCalledWith(CF);
       expect(copy.getAttribute("data-copied")).toBe("true");
-      expect(document.querySelector("[data-sonner-toast]")).toBeNull();
+      expect(notify).not.toHaveBeenCalled();
       act(() => {
         vi.advanceTimersByTime(1500);
       });
@@ -320,6 +324,8 @@ describe("a project's page", () => {
     expect(screen.getByTestId("checkouts-table")).toBeTruthy();
     expect(texts(document, "worktree-branch")).toEqual(["main"]);
     expect(screen.getByTestId("project-note").textContent).toContain("no remote");
+    // The page changing is the result: no success toast.
+    expect(successes()).toEqual([]);
   });
 
   it("a project without git: the header menu's Initialize git runs project.git.init on it; then it is a git repository on main", async () => {
@@ -332,6 +338,8 @@ describe("a project's page", () => {
     expect(lastInvocation("project.git.init")?.context).toMatchObject({ activeProjectId: "repo-wr" });
     expect(page().getAttribute("data-kind")).toBe("git");
     expect(texts(document, "worktree-branch")).toEqual(["main"]);
+    // The menu closed as it ran: its success is toasted, the daemon's message as the title.
+    expect(successes().map((n) => n.title)).toEqual(["Initialized git in ~/Documents/writing"]);
   });
 
   it("Refresh fetches (with a remote) then refreshes, disabled and spinning meanwhile; without a remote only refreshes", async () => {

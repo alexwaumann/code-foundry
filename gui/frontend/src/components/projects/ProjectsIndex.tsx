@@ -219,7 +219,7 @@ function ProjectRow({ id, columns, cols }: { id: string; columns: IndexColumns; 
                 data-testid="index-init-git"
                 onClick={(e) => {
                   e.stopPropagation();
-                  void initGitIn(id);
+                  void initGitIn(id, { inView: true });
                 }}
               >
                 Initialize git

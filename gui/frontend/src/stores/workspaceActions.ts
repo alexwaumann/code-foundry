@@ -32,9 +32,9 @@ function ref(projectId: string): string {
   return projectRef(useProjectsStore.getState(), projectId);
 }
 
-/** workspace.rename. */
+/** workspace.rename, from the page's name editor: the new name is the result, so no success toast. */
 export function renameWorkspace(workspaceId: string, name: string): Promise<boolean> {
-  return runCommand("workspace.rename", { name: name.trim(), workspace: workspaceId }, workspaceContext(workspaceId));
+  return runCommand("workspace.rename", { name: name.trim(), workspace: workspaceId }, workspaceContext(workspaceId), { inView: true });
 }
 
 /**
@@ -43,17 +43,19 @@ export function renameWorkspace(workspaceId: string, name: string): Promise<bool
  * as the folder, so a project named so would set the folder (ids never collide with it).
  */
 export function setWorkspacePrimary(workspaceId: string, primary: string): Promise<boolean> {
-  return runCommand("workspace.set-primary", { primary, workspace: workspaceId }, workspaceContext(workspaceId));
+  // A member row's Start here: the row's default mark moves, so no success toast.
+  return runCommand("workspace.set-primary", { primary, workspace: workspaceId }, workspaceContext(workspaceId), { inView: true });
 }
 
-/** workspace.add-project, by the project's id: nothing on disk changes. */
+/** workspace.add-project, by the project's id: nothing on disk changes. From the page's picker: the new member row shows it, so no success toast. */
 export function addWorkspaceProject(workspaceId: string, projectId: string): Promise<boolean> {
-  return runCommand("workspace.add-project", { project: projectId, workspace: workspaceId }, workspaceContext(workspaceId));
+  return runCommand("workspace.add-project", { project: projectId, workspace: workspaceId }, workspaceContext(workspaceId), { inView: true });
 }
 
 /** workspace.remove-project, by the project's id (an unregistered member too): nothing on disk changes; threads keep their projects. */
 export function removeWorkspaceProject(workspaceId: string, projectId: string): Promise<boolean> {
-  return runCommand("workspace.remove-project", { project: projectId, workspace: workspaceId }, workspaceContext(workspaceId));
+  // A member row's Remove: the row goes, so no success toast.
+  return runCommand("workspace.remove-project", { project: projectId, workspace: workspaceId }, workspaceContext(workspaceId), { inView: true });
 }
 
 /** workspace.remove (the daemon confirms: a synthetic workspace's instructions and skills go too). Named by name, which reads better in the prompt. */

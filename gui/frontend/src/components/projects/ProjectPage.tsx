@@ -189,7 +189,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                   <KindNote
                     icon={<Folder />}
                     action={
-                      <Button type="button" variant="outline" size="sm" className="h-7" data-testid="project-init-git" onClick={() => void initGitIn(projectId)}>
+                      <Button type="button" variant="outline" size="sm" className="h-7" data-testid="project-init-git" onClick={() => void initGitIn(projectId, { inView: true })}>
                         <GitBranchPlus />
                         Initialize git
                       </Button>
