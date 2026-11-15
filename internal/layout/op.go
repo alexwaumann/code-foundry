@@ -322,6 +322,8 @@ func (t *tx) prepare(sp *Space, tb *Tab) (*Tab, error) {
 		return nil, err
 	}
 	tb.Key = key
+	// Only open_thread makes a preview, after prepare (preview.go).
+	tb.Preview = false
 	if err := checkDraftTab(t.st, sp, tb); err != nil {
 		return nil, err
 	}

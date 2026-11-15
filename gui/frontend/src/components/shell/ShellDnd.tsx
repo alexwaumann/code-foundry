@@ -207,7 +207,7 @@ const ghostTabs = new Map<string, TabEntry>();
 function threadGhostTab(thread: string): TabEntry {
   let t = ghostTabs.get(thread);
   if (!t) {
-    t = { id: "", kind: "thread", thread, key: "", params: {}, title: "", name: "", paneId: "" };
+    t = { id: "", kind: "thread", thread, key: "", params: {}, title: "", name: "", preview: false, paneId: "" };
     ghostTabs.set(thread, t);
   }
   return t;

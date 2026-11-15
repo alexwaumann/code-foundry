@@ -1,0 +1,44 @@
+{
+  "doc": "set_snoozed marks a thread snoozed and changes nothing else (its open tab stays).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-k","kind":"thread","thread":"th-s"}],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"set_snoozed","thread":"th-s","snoozed":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-k","kind":"thread","thread":"th-s"}],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-s":{"space":"sp-a","snoozed":true}}
+  },
+  "result": {}
+}

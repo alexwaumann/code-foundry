@@ -15,7 +15,7 @@ func tabIDArg(desc string) ArgSpec {
 	return ArgSpec{Name: "tab", Type: String, ID: TabID, Description: desc + IDHelp}
 }
 
-// tabCommands are tab.focus, tab.move, tab.close, tab.reopen, tab.rename, tab.auto-name, tab.next and tab.previous.
+// tabCommands are tab.focus, tab.move, tab.close, tab.reopen, tab.keep, tab.rename, tab.auto-name, tab.next and tab.previous.
 func (l layout) tabCommands() []Command {
 	return []Command{
 		{
@@ -83,6 +83,32 @@ func (l layout) tabCommands() []Command {
 			},
 		},
 		l.reopenCommand(),
+		{
+			Name: "tab.keep", Title: "Keep Tab Open", Category: layoutCategory, Page: PageState,
+			Description: "Keep a preview tab (default: the focused tab): it stays open as a normal tab, and the next preview " +
+				"no longer replaces it. A tab that is no preview is left as it is.",
+			Args:      []ArgSpec{positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)"))},
+			NoPalette: true, NoKeybinding: true,
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
+				snap, err := l.state()
+				if err != nil {
+					return Result{}, err
+				}
+				_, _, tb, err := l.tab(snap.State, uctx, a, "tab")
+				if err != nil {
+					return Result{}, err
+				}
+				c, err := l.apply(ctx, &core.KeepTab{Tab: tb.ID}, !uctx.FromUser())
+				if err != nil {
+					return Result{}, err
+				}
+				msg := "kept tab " + tb.ID
+				if !tb.Preview {
+					msg = "tab " + tb.ID + " is no preview: nothing to keep"
+				}
+				return layoutResult(uctx, c, msg), nil
+			},
+		},
 		{
 			Name: "tab.rename", Title: "Rename Tab", Category: layoutCategory, Page: PageState,
 			Description: "Rename a tab (default: the focused tab). A thread's tab renames the thread (as thread.rename; in the app, " +

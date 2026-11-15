@@ -29,6 +29,8 @@ export interface Tab {
   params?: Record<string, string>;
   title?: string;
   name?: string;
+  /** A preview: the space's one tab of an archived or snoozed thread that the next preview replaces (internal/layout preview.go). */
+  preview?: boolean;
 }
 
 export type Dir = "row" | "col";
@@ -80,6 +82,8 @@ export interface ThreadState {
   last?: Record<string, string>;
   /** The info card shown or hidden as the user last toggled it; absent: never toggled (Go's info.go). */
   info?: boolean;
+  /** The thread is snoozed: its tab opens without its set (Go's preview.go; the daemon's glue keeps it). */
+  snoozed?: boolean;
 }
 
 export interface State {
@@ -421,6 +425,8 @@ class Tx {
   prepare(sp: Space, tb: Tab): Tab | null {
     const { kind, key } = identify(tb);
     tb.key = key;
+    // Only open_thread makes a preview (Go's prepare).
+    delete tb.preview;
     const draft = draftOf(tb);
     if (draft) {
       const dsp = findDraft(this.st, draft)?.sp;
@@ -700,6 +706,28 @@ function hostPane(sp: Space, a: Area, tb: Tab): Node | undefined {
 type OpFn = (t: Tx, o: Op) => Result;
 
 /** The ops the mock runs, by internal/layout's names. */
+/** Keeps tb when it is a preview (internal/layout preview.go). */
+function keepTab(tb: Tab | undefined): void {
+  if (tb) delete tb.preview;
+}
+
+/** Keeps the previews pane p carries: a pane moved keeps its tabs. */
+function keepPane(p: Node): void {
+  for (const tb of p.tabs ?? []) keepTab(tb);
+}
+
+/** Keeps thread's tab when it is a preview: one of its surfaces opened. */
+function keepThread(st: State, thread: string | undefined): void {
+  if (!thread) return;
+  for (const sp of st.spaces) for (const p of panes(sp.root)) for (const tb of p.tabs ?? []) if (tb.kind === "thread" && tb.thread === thread) keepTab(tb);
+}
+
+/** The space's preview tab and its pane. */
+function previewIn(sp: Space): { pane: Node; tab: Tab } | null {
+  for (const p of panes(sp.root)) for (const tb of p.tabs ?? []) if (tb.preview) return { pane: p, tab: tb };
+  return null;
+}
+
 const ops = {
   add_tab(t: Tx, o: Op): Result {
     let sp = t.space(str(o, "space"));
@@ -712,6 +740,7 @@ const ops = {
     }
     const tb = tabArg(o);
     const same = t.prepare(sp, tb);
+    if (isLinked(tb)) keepThread(t.st, tb.thread);
     if (same) {
       const at = t.findTab(same.id);
       if (tb.params !== undefined) same.params = tb.params;
@@ -741,6 +770,7 @@ const ops = {
     const tb = tabArg(o);
     const same = t.prepare(sp, tb);
     if (same) fail("already_exists", `${same.key ?? ""} is already open as ${same.id}`);
+    if (isLinked(tb)) keepThread(t.st, tb.thread);
     const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
     insertBeside(sp, target.id, edge, np, num(o, "frac"), t.newID("s-"));
     needRoom(sp, areaOf(o));
@@ -773,6 +803,7 @@ const ops = {
     let raised = false;
     if (target && edge) {
       if (target === src && (src.tabs ?? []).length === 1) {
+        keepTab(tb);
         focusTab(to, src, tb.id);
         return { space: to.id, pane: src.id, tab: tb.id };
       }
@@ -815,6 +846,7 @@ const ops = {
       forget(from, tb.id);
       if (wasFocused) refocus(from);
     }
+    keepTab(tb); // a tab moved is kept
     t.focusTab(to, target, tb.id);
     return { space: to.id, pane: target.id, tab: tb.id };
   },
@@ -835,6 +867,7 @@ const ops = {
         if (same) fail("already_exists", `${tb.key ?? ""} is already open in space ${to.id} as ${same.id}`);
         ids.push(tb.id);
       }
+      keepPane(pane);
       let wasFocused = from.focus === pane.id;
       dropPane(from, pane.id);
       forget(from, ...ids);
@@ -880,6 +913,7 @@ const ops = {
       insertBeside(from, target.id, edge, pane, num(o, "frac"), t.newID("s-"));
     }
     needRoom(from, areaOf(o));
+    keepPane(pane);
     focusTab(from, pane, pane.active ?? "");
     return { space: from.id, pane: pane.id, tab: pane.active };
   },
@@ -889,6 +923,7 @@ const ops = {
     const { sp: tsp, pane: target } = t.pane(str(o, "target"));
     if (tsp !== sp || target === pane) fail("invalid_argument", `pane ${pane.id} cannot merge into ${target.id}`);
     const raised = !target.collapsed && raises(target, pane.tabs ?? []);
+    keepPane(pane);
     removeNode(sp, pane.id);
     const tabs = (target.tabs ??= []);
     const index = num(o, "index");
@@ -909,6 +944,8 @@ const ops = {
       pa.par.kids[pa.idx] = b;
       pb.par.kids[pb.idx] = a;
     }
+    keepPane(a);
+    keepPane(b);
     return { space: sp.id, pane: a.id };
   },
 
@@ -997,6 +1034,21 @@ const ops = {
     return { space: sp.id, pane: pane.id, tab: tab.id };
   },
 
+  /** internal/layout preview.go: a preview tab, or a thread's tab, kept. */
+  keep_tab(t: Tx, o: Op): Result {
+    const tab = str(o, "tab");
+    const thread = str(o, "thread");
+    if (!tab === !thread) fail("invalid_argument", "keep_tab takes a tab or a thread");
+    let id = tab;
+    if (thread) {
+      for (const sp of t.st.spaces) for (const p of panes(sp.root)) for (const tb of p.tabs ?? []) if (tb.kind === "thread" && tb.thread === thread) id = tb.id;
+      if (!id) fail("not_found", `thread "${thread}" has no open tab`);
+    }
+    const at = t.tab(id);
+    keepTab(at.tab);
+    return { space: at.sp.id, pane: at.pane.id, tab: at.tab.id };
+  },
+
   // ---- Terminals (internal/layout/terminals.go) ----
 
   set_quick(t: Tx, o: Op): Result {
@@ -1008,6 +1060,7 @@ const ops = {
     const threads = t.st.threads ?? {};
     let ts = threads[thread];
     if (!ts && !open && height === 0) return {};
+    if (open) keepThread(t.st, thread);
     if (!ts) {
       ts = { space: t.spaceOf(thread) };
       t.st.threads = { ...threads, [thread]: ts };
@@ -1021,7 +1074,7 @@ const ops = {
     if (q.open || q.height || q.ran) ts.quick = q;
     else delete ts.quick;
     // Go's prune: a record that stores nothing the default would not give goes.
-    if (!ts.quick && !ts.remembered && Object.keys(ts.last ?? {}).length === 0 && ts.info === undefined && ts.space === t.st.default_space) {
+    if (!ts.quick && !ts.remembered && Object.keys(ts.last ?? {}).length === 0 && ts.info === undefined && !ts.snoozed && ts.space === t.st.default_space) {
       const rest = Object.fromEntries(Object.entries(t.st.threads ?? {}).filter(([id]) => id !== thread));
       if (Object.keys(rest).length > 0) t.st.threads = rest;
       else delete t.st.threads;
@@ -1132,13 +1185,39 @@ const ops = {
     const index = num(o, "index");
     if (index !== undefined && (!str(o, "pane") || edge)) fail("invalid_argument", "an index is a place in a pane's strip: give the pane and no edge");
     if (str(o, "compose") && (edge || index !== undefined)) fail("invalid_argument", "a thread sent from a composer takes its place");
+    const asked = o.preview === true;
+    if (asked && (str(o, "pane") || edge || index !== undefined || str(o, "compose"))) fail("invalid_argument", "a preview opens where a thread's tab opens: no pane, edge, index or composer");
+    if (o.snoozed === true) ((t.st.threads ??= {})[thread] ??= { space: t.spaceOf(thread) }).snoozed = true;
     for (const sp of t.st.spaces)
       for (const p of panes(sp.root))
         for (const tb of p.tabs ?? [])
           if (tb.kind === "thread" && tb.thread === thread) {
+            if (!asked) keepTab(tb);
             t.show(sp, p, tb.id, o.focus === true);
             return { space: sp.id, pane: p.id, tab: tb.id, existing: true };
           }
+    // A preview (Go's preview.go, simplified): the space's last preview goes; in the pane the new
+    // one opens in, the new one takes its place.
+    const preview = asked && (o.archived === true || t.st.threads?.[thread]?.snoozed === true);
+    if (preview) {
+      if (o.archived === true && t.spaceOf(thread) !== t.st.current_space) ((t.st.threads ??= {})[thread] ??= { space: t.st.current_space }).space = t.st.current_space;
+      const sp = t.space(t.spaceOf(thread));
+      const old = previewIn(sp);
+      const host = hostPane(sp, areaOf(o), { id: "", kind: "thread", thread });
+      if (old && host === old.pane) {
+        const tb: Tab = { id: t.newID("t-"), kind: "thread", thread, key: `thread:${thread}`, preview: true };
+        const tabs = old.pane.tabs ?? [];
+        tabs[tabIndex(old.pane, old.tab.id)] = tb;
+        if (old.pane.active === old.tab.id) old.pane.active = tb.id;
+        forget(sp, old.tab.id);
+        t.show(sp, old.pane, tb.id, o.focus === true);
+        return { space: sp.id, pane: old.pane.id, tab: tb.id, closed: [old.tab], rule: "preview" };
+      }
+      const closed = old ? ops.close_tab(t, { op: "close_tab", tab: old.tab.id }).closed : undefined;
+      const res = ops.open_thread(t, { ...o, preview: false, archived: false });
+      t.tab(res.tab).tab.preview = true;
+      return closed ? { ...res, closed: [...closed, ...(res.closed ?? [])] } : res;
+    }
     // Sent from a composer (or opened in a space whose only tab is its empty composer): the
     // thread's tab takes the composer's place, and a draft ends.
     let compose: { sp: Space; pane: Node; tab: Tab } | null = null;
@@ -1374,6 +1453,7 @@ function needDraft(t: Tx, id: string): { sp: Space; draft: Draft } {
  */
 function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean, a: Area = DEFAULT_AREA): Result {
   const same = t.prepare(sp, tb);
+  if (isLinked(tb)) keepThread(t.st, tb.thread);
   if (same) {
     if (tb.params !== undefined) same.params = tb.params;
     if (tb.title) same.title = tb.title;
@@ -1506,7 +1586,7 @@ function edgeName(e: LayoutEdge): Edge | undefined {
 }
 
 export function tabMsg(t: Tab): TabInit {
-  return { id: t.id, kind: t.kind, threadId: t.thread ?? "", key: t.key ?? "", params: t.params ?? {}, title: t.title ?? "", name: t.name ?? "" };
+  return { id: t.id, kind: t.kind, threadId: t.thread ?? "", key: t.key ?? "", params: t.params ?? {}, title: t.title ?? "", name: t.name ?? "", preview: t.preview === true };
 }
 
 function nodeMsg(n: Node): NodeInit {
@@ -1657,6 +1737,8 @@ export function opFromProto(m: LayoutOp | undefined): Op {
       return { op: "discard_draft", draft: c.value.draftId };
     case "openDraft":
       return { op: "open_draft", draft: c.value.draftId, focus: c.value.focus };
+    case "keepTab":
+      return { op: "keep_tab", tab: c.value.tabId, thread: c.value.threadId };
     case "setQuick":
       return { op: "set_quick", thread: c.value.threadId, open: c.value.open, height: c.value.height, forget_ran: c.value.forgetRan };
     case "setInfo":

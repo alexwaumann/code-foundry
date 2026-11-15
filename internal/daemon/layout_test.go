@@ -139,6 +139,22 @@ func (e *glueEnv) eventually(what string, cond func() bool) {
 	}
 }
 
+// woken waits for the glue to tell the layout that thread woke (set_snoozed).
+func (e *glueEnv) woken(thread string) {
+	e.t.Helper()
+	e.eventually(thread+" woken in the layout", func() bool {
+		ts := e.state().Threads[thread]
+		return ts == nil || !ts.Snoozed
+	})
+}
+
+// snoozedTh is thread id as the thread store has it while snoozed.
+func snoozedTh(id string) thread.Thread {
+	t := th(id)
+	t.SnoozedUntil = time.Unix(4e9, 0)
+	return t
+}
+
 // settle lets the glue drain what it has been sent: a no-op op's turn through the loop
 // can't be observed, so it waits a moment for a negative check.
 func settle() { time.Sleep(80 * time.Millisecond) }
@@ -251,8 +267,9 @@ func TestLayoutGlueSnoozeKeepsTheSetWithFreshShells(t *testing.T) {
 		t.Errorf("ran %v: the foreground job, else the last command", ran)
 	}
 
-	// Unsnoozing changes nothing in the layout (the store publishes an update); opening does.
+	// Unsnoozing with no tab open only wakes the thread in the layout; opening brings the set.
 	e.publish(thread.Updated{Thread: th("th-a")})
+	e.woken("th-a")
 	c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
 	if len(c.Result.Fresh) != 2 {
 		t.Fatalf("fresh %v", c.Result.Fresh)
@@ -463,8 +480,11 @@ func TestLayoutGlueFreshWithoutACheckout(t *testing.T) {
 	noCheckout := th("th-a")
 	noCheckout.WorktreePath = ""
 	e.publish(thread.Updated{Thread: noCheckout})
-	settle()
+	e.woken("th-a")
 	c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
+	if len(c.Result.Fresh) == 0 {
+		t.Fatal("no terminal tab came back")
+	}
 	e.eventually("the restored terminal tabs close", func() bool {
 		for _, tab := range c.Result.Fresh {
 			if _, _, tb := e.state().FindTab(tab); tb != nil {
@@ -481,8 +501,9 @@ func TestLayoutGlueFreshWithoutACheckout(t *testing.T) {
 
 // A snooze in the thread store's order with the quick terminal open: the hook reads what runs
 // in it and marks it fresh, then its shell goes (and must not settle the mark). Opening the
-// thread brings it back open over a fresh quick shell in the checkout, the command kept for
-// "Run again". One started meanwhile (terminal.quick) is kept: no second shell.
+// thread's tab while it is still snoozed brings nothing back; when it wakes with its tab open,
+// the quick terminal comes back open over a fresh quick shell in the checkout, the command
+// kept for "Run again". One started meanwhile (terminal.quick) is kept: no second shell.
 func TestLayoutGlueSnoozeBringsTheQuickTerminalBack(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -516,15 +537,18 @@ func TestLayoutGlueSnoozeBringsTheQuickTerminalBack(t *testing.T) {
 				t.Fatalf("quick after the snooze: %+v, want closed, fresh, ran npm run dev, 200 high", q)
 			}
 
-			e.publish(thread.Updated{Thread: th("th-a")})
+			e.publish(thread.Updated{Thread: snoozedTh("th-a")})
+			settle()
+			c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
+			if c.Result.FreshQuick != "" {
+				t.Fatalf("opened while snoozed: FreshQuick = %q", c.Result.FreshQuick)
+			}
 			meantime := ""
 			if tc.meantime {
 				meantime = startQuick()
 			}
-			c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
-			if c.Result.FreshQuick != "th-a" {
-				t.Fatalf("FreshQuick = %q", c.Result.FreshQuick)
-			}
+			e.publish(thread.Updated{Thread: th("th-a")})
+			e.woken("th-a")
 			quicks := func() []terminal.Terminal {
 				var out []terminal.Terminal
 				for _, tm := range e.terms.List(e.ctx) {

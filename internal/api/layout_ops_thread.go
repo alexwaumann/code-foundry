@@ -33,6 +33,14 @@ func init() {
 	registerLayoutOp("archive_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		return &core.ArchiveThread{Thread: m.GetArchiveThread().GetThreadId()}, nil
 	})
+	registerLayoutOp("keep_tab", func(m *v1.LayoutOp) (core.Op, error) {
+		o := m.GetKeepTab()
+		return &core.KeepTab{Tab: o.GetTabId(), Thread: o.GetThreadId()}, nil
+	})
+	registerLayoutOp("set_snoozed", func(m *v1.LayoutOp) (core.Op, error) {
+		o := m.GetSetSnoozed()
+		return &core.SetSnoozed{Thread: o.GetThreadId(), Snoozed: o.GetSnoozed()}, nil
+	})
 	registerLayoutOp("snooze_thread", func(m *v1.LayoutOp) (core.Op, error) {
 		o := m.GetSnoozeThread()
 		return &core.SnoozeThread{Thread: o.GetThreadId(), Ran: maps.Clone(o.GetRan()), QuickRan: o.GetQuickRan()}, nil

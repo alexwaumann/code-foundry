@@ -129,6 +129,7 @@ func TestLayoutGlueCatchesUpAfterDroppedEvents(t *testing.T) {
 		tabs = append(tabs, e.termTab("", id))
 	}
 	settle()
+	e.apply(&core.SetSnoozed{Thread: "th-a"}) // it woke: opening it restores its set
 	e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
 	select {
 	case <-entered:

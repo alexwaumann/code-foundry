@@ -1,0 +1,59 @@
+{
+  "doc": "A pane merged into another keeps the preview it holds.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-p","kind":"prs"},
+                {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+              ],
+              "active": "t-v"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-v"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"merge_pane","pane":"p-a","target":"p-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-b",
+          "tabs": [
+            {"id":"t-j","kind":"projects"},
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v"}
+          ],
+          "active": "t-v"
+        },
+        "focus": "p-b",
+        "mru": ["t-v"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-v"}
+}

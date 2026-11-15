@@ -1,0 +1,49 @@
+{
+  "doc": "keep_tab on a tab that is no preview changes nothing.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"keep_tab","tab":"t-p"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-p"}
+}

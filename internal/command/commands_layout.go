@@ -535,6 +535,9 @@ func tabWords(tb *core.Tab, names map[string]string) string {
 	case tb.Title != "":
 		w += fmt.Sprintf(" %q", tb.Title)
 	}
+	if tb.Preview {
+		w += " (preview)"
+	}
 	return w
 }
 

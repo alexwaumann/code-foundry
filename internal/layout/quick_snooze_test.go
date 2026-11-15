@@ -38,12 +38,18 @@ func TestQuickTerminalAcrossASnooze(t *testing.T) {
 		if threadTabID(st, "th-a") != "" {
 			t.Fatal("the snooze left the thread's tab open")
 		}
+		// Opened while still snoozed: only the conversation (preview.go).
 		st, res := apply(t, st, &OpenThread{Thread: "th-a", Focus: true})
+		if res.FreshQuick != "" || !quick(st).Fresh {
+			t.Errorf("opened while snoozed: FreshQuick = %q, %+v; want it to wait", res.FreshQuick, quick(st))
+		}
+		// It wakes with its tab open: the quick terminal comes back.
+		st, res = apply(t, st, &SetSnoozed{Thread: "th-a"})
 		if res.FreshQuick != "th-a" {
 			t.Errorf("FreshQuick = %q, want th-a", res.FreshQuick)
 		}
 		if got, want := quick(st), (Quick{Open: true, Height: 200, Ran: "npm run dev"}); got != want {
-			t.Errorf("after opening: %+v, want %+v", got, want)
+			t.Errorf("after waking: %+v, want %+v", got, want)
 		}
 		// Open again (focused where it is): nothing more to start.
 		if _, res := apply(t, st, &OpenThread{Thread: "th-a", Focus: true}); res.FreshQuick != "" {
@@ -58,6 +64,18 @@ func TestQuickTerminalAcrossASnooze(t *testing.T) {
 		st, _ = apply(t, st, &SetQuick{Thread: "th-a", Open: true, ForgetRan: true})
 		if got, want := quick(st), (Quick{Open: true, Height: 300}); got != want {
 			t.Errorf("after ForgetRan: %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("woken with no tab open: back with its next open", func(t *testing.T) {
+		st := opened(t, true)
+		st, _ = apply(t, st, &SnoozeThread{Thread: "th-a", QuickRan: "make"})
+		st, res := apply(t, st, &SetSnoozed{Thread: "th-a"})
+		if res.FreshQuick != "" || !quick(st).Fresh {
+			t.Fatalf("woken with no tab: FreshQuick = %q, %+v", res.FreshQuick, quick(st))
+		}
+		if _, res := apply(t, st, &OpenThread{Thread: "th-a", Focus: true}); res.FreshQuick != "th-a" {
+			t.Errorf("FreshQuick = %q, want th-a", res.FreshQuick)
 		}
 	})
 

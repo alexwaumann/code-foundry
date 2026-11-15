@@ -67,6 +67,9 @@ func (o *AddTab) apply(t *tx) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	if tb.IsLinked() {
+		t.keepThread(tb.Thread) // one of its thread's surfaces opened (preview.go)
+	}
 	if same != nil {
 		ssp, sp2, _ := t.st.FindTab(same.ID)
 		if tb.Params != nil {
@@ -132,6 +135,9 @@ func (o *SplitPane) apply(t *tx) (Result, error) {
 	}
 	if same != nil {
 		return Result{}, fmt.Errorf("%s is already open as %s: %w", same.Key, same.ID, ErrAlreadyExists)
+	}
+	if tb.IsLinked() {
+		t.keepThread(tb.Thread) // one of its thread's surfaces opened (preview.go)
 	}
 	np := &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
 	if err := insertBeside(sp, target.ID, o.Edge, np, o.Frac, t.newID("s-")); err != nil {
@@ -214,6 +220,7 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 	switch {
 	case target != nil && o.Edge != "":
 		if target == src && len(src.Tabs) == 1 {
+			keepTab(tb)
 			focusTab(to, src, tb.ID)
 			return Result{Space: to.ID, Pane: src.ID, Tab: tb.ID}, nil
 		}
@@ -273,6 +280,7 @@ func (o *MoveTab) apply(t *tx) (Result, error) {
 			refocus(from)
 		}
 	}
+	keepTab(tb) // a tab moved is kept (preview.go)
 	t.focusTab(to, target, tb.ID)
 	return Result{Space: to.ID, Pane: target.ID, Tab: tb.ID}, nil
 }
@@ -379,6 +387,7 @@ func (o *MovePane) apply(t *tx) (Result, error) {
 	if err := needRoom(from, o.W, o.H); err != nil {
 		return Result{}, err
 	}
+	keepPane(pane) // the tabs of a pane moved are kept (preview.go)
 	focusTab(from, pane, pane.Active)
 	return Result{Space: from.ID, Pane: pane.ID, Tab: pane.Active}, nil
 }
@@ -403,6 +412,7 @@ func (o *MovePane) toSpace(t *tx, from *Space, pane *Node) (Result, error) {
 		}
 		ids = append(ids, tb.ID)
 	}
+	keepPane(pane) // the tabs of a pane moved are kept (preview.go)
 	wasFocused := from.Focus == pane.ID
 	dropPane(from, pane.ID)
 	forget(from, ids...)
@@ -482,6 +492,7 @@ func (o *MergePane) apply(t *tx) (Result, error) {
 		return Result{}, fmt.Errorf("pane %s cannot merge into %s: %w", pane.ID, target.ID, ErrInvalidArgument)
 	}
 	raised := !target.Collapsed && raises(target, pane.Tabs...)
+	keepPane(pane) // the tabs moved to another pane are kept (preview.go)
 	removeNode(sp, pane.ID)
 	at := len(target.Tabs)
 	if o.Index != nil {
@@ -522,6 +533,8 @@ func (o *SwapPane) apply(t *tx) (Result, error) {
 	pa, ia, _ := parentOf(sp.Root, a.ID)
 	pb, ib, _ := parentOf(sp.Root, b.ID)
 	pa.Kids[ia], pb.Kids[ib] = b, a
+	keepPane(a) // both panes moved: their tabs are kept (preview.go)
+	keepPane(b)
 	return Result{Space: sp.ID, Pane: a.ID}, nil
 }
 

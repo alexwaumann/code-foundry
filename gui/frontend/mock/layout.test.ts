@@ -30,10 +30,11 @@ const cases = Object.entries(files).map(([path, raw]) => ({ name: path.replace(/
  * Go: the thread ops (open_thread with its restore, close_thread, move_thread, archive, snooze),
  * placement rules 2 to 6 for a linked surface beside its open thread, a thread's remembered
  * set, and smart swap. Nor the terminal ops the daemon's lifecycle glue applies itself
- * (internal/daemon/layout.go; docs/notes/shell-6-lifecycle.md): no GUI sends them. set_quick is
- * ported: the quick terminal's height drag sends it (docs/notes/shell-13-terminals.md).
+ * (internal/daemon/layout.go; docs/notes/shell-6-lifecycle.md): no GUI sends them, and nor does
+ * it send set_snoozed, the glue's word that a thread was snoozed or woke (preview.go). set_quick
+ * is ported: the quick terminal's height drag sends it (docs/notes/shell-13-terminals.md).
  */
-const TERMINAL_GLUE_OPS = ["drop_terminal", "replace_terminal"];
+const TERMINAL_GLUE_OPS = ["drop_terminal", "replace_terminal", "set_snoozed"];
 
 function notPorted(c: OpCase): string | null {
   if (TERMINAL_GLUE_OPS.includes(c.op.op)) return "the daemon's terminal glue";
@@ -77,7 +78,7 @@ describe("the mock's layout ops against internal/layout's cases", () => {
     const skipped = (why: string) => cases.filter(({ c }) => notPorted(c) === why).map(({ name }) => name).sort();
     const ops = new Set(cases.filter(({ c }) => notPorted(c)?.endsWith("is a rule")).map(({ c }) => c.op.op));
     expect([...ops].sort()).toEqual(["archive_thread", "close_thread", "move_thread", "open_thread", "reopen_closed", "snooze_thread"]);
-    expect(skipped("the reopen history")).toEqual(["close_pane-record", "close_tab-record", "close_tab-record-cap", "close_tab-record-empty-composer", "close_tab-record-last"]);
+    expect(skipped("the reopen history")).toEqual(["close_pane-record", "close_pane-record-preview", "close_tab-record", "close_tab-record-cap", "close_tab-record-empty-composer", "close_tab-record-last", "close_tab-record-preview"]);
     expect(skipped("smart swap")).toEqual(["close_tab-smart-swap-on-return", "focus_tab-smart-swap", "focus_tab-smart-swap-last", "focus_tab-smart-swap-mru"]);
     // remove_space puts a moved thread's linked tabs into its set (Result.kept).
     expect(skipped("a remembered set")).toEqual(["close_pane-closes-threads", "open_surface-drops-remembered", "remove_space-default", "remove_space-keeps-linked-terminals"]);

@@ -18,12 +18,13 @@ func init() {
 }
 
 // record puts e first in sp's reopen history, without the space's empty composer (New thread
-// makes one); an entry left with no tab is not recorded. The tabs are copies without their
+// makes one) and without a preview tab (preview.go: it leaves no trace); an entry left with
+// no tab is not recorded. The tabs are copies without their
 // keys, which reopening computes again.
 func record(sp *Space, e *Closed) {
 	var tabs []*Tab
 	for _, tb := range e.Tabs {
-		if tb.Kind == "compose" && draftOf(tb) == "" {
+		if (tb.Kind == "compose" && draftOf(tb) == "") || tb.Preview {
 			continue
 		}
 		c := tb.Clone()

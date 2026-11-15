@@ -38,7 +38,7 @@ async function flush(): Promise<void> {
 }
 
 function tabView(t: Tab): LayoutTabView {
-  return { id: t.id, kind: t.kind, thread: t.thread ?? "", key: t.key ?? "", params: t.params ?? {}, title: t.title ?? "", name: t.name ?? "" };
+  return { id: t.id, kind: t.kind, thread: t.thread ?? "", key: t.key ?? "", params: t.params ?? {}, title: t.title ?? "", name: t.name ?? "", preview: t.preview ?? false };
 }
 
 const inflight = new Set<Promise<unknown>>();

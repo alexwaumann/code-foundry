@@ -41,8 +41,19 @@ func init() {
 // and so is a Pane of terminals the thread would not fit in (ErrNoRoom); a focused pane of
 // terminals that cannot take it gives way to the most recently focused pane that can.
 //
-// Then the thread's remembered set comes back (Restore). W and H are the pane area for
-// placement (default DefaultW x DefaultH).
+// Then the thread's remembered set comes back (Restore), unless the thread is snoozed
+// (Snoozed, or ThreadState.Snoozed): then it waits for the thread to wake (preview.go). W and
+// H are the pane area for placement (default DefaultW x DefaultH).
+//
+// Preview opens it as a preview tab (preview.go) when the thread is archived or snoozed, and
+// as a kept tab otherwise; it takes no place in a pane and no composer. The space's previous
+// preview goes: in the pane the new one opens in, the new one takes its place in the strip;
+// elsewhere it closes (Result.Closed; its linked tabs are remembered, Result.Kept). It is not
+// recorded for reopen_closed. An open thread is focused where it is: a preview stays one
+// when Preview asks again, and is kept otherwise.
+//
+// Snoozed says the thread is snoozed, as Archived says it is archived; the layout remembers
+// it (ThreadState.Snoozed) until set_snoozed wakes it.
 type OpenThread struct {
 	Thread   string  `json:"thread"`
 	Pane     string  `json:"pane,omitempty"`
@@ -50,6 +61,8 @@ type OpenThread struct {
 	Edge     Edge    `json:"edge,omitempty"`
 	Compose  string  `json:"compose,omitempty"`
 	Archived bool    `json:"archived,omitempty"`
+	Snoozed  bool    `json:"snoozed,omitempty"`
+	Preview  bool    `json:"preview,omitempty"`
 	Focus    bool    `json:"focus,omitempty"`
 	W        float64 `json:"w,omitempty"`
 	H        float64 `json:"h,omitempty"`
@@ -62,11 +75,22 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 	if o.Thread == "" {
 		return Result{}, fmt.Errorf("no thread given: %w", ErrInvalidArgument)
 	}
+	if o.Preview && (o.Pane != "" || o.Edge != "" || o.Index != nil || o.Compose != "") {
+		return Result{}, fmt.Errorf("a preview opens where a thread's tab opens: no pane, edge, index or composer: %w", ErrInvalidArgument)
+	}
+	if o.Snoozed && o.Compose == "" {
+		threadState(t.st, o.Thread).Snoozed = true
+	}
+	snoozed := t.snoozed(o.Thread)
+	preview := o.Preview && (o.Archived || snoozed)
 	if id := threadTabID(t.st, o.Thread); id != "" {
 		if o.Compose != "" {
 			return Result{}, fmt.Errorf("thread %s is already open as %s: %w", o.Thread, id, ErrFailedPrecondition)
 		}
-		sp, p, _ := t.st.FindTab(id)
+		sp, p, tb := t.st.FindTab(id)
+		if !o.Preview {
+			keepTab(tb)
+		}
 		t.show(sp, p, id, o.Focus)
 		return Result{Space: sp.ID, Pane: p.ID, Tab: id, Existing: true, Rule: "1"}, nil
 	}
@@ -82,6 +106,8 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 	var sp *Space
 	var pane *Node
 	var compose *Tab
+	var kept []*Tab
+	var closed *Tab // the space's previous preview, closed in another pane than the new one's
 	rule := "focused"
 	switch {
 	case o.Compose != "":
@@ -120,17 +146,42 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		if sp, err = t.space(t.st.SpaceOf(o.Thread)); err != nil {
 			return Result{}, err
 		}
+		var old *Tab
+		if preview {
+			var op *Node
+			if op, old = previewIn(sp); old != nil {
+				kept = t.putAway(sp, old.Thread, op.ID, w, h)
+			}
+		}
 		if ps := Panes(sp.Root); len(ps) == 1 && len(ps[0].Tabs) == 1 && ps[0].Tabs[0].Kind == "compose" && draftOf(ps[0].Tabs[0]) == "" {
 			pane, compose, rule = ps[0], ps[0].Tabs[0], "compose"
 		} else {
 			pane = hostPane(sp, w, h, &Tab{Kind: "thread"})
+		}
+		switch {
+		case old == nil:
+		case pane != nil && pane.TabIndex(old.ID) >= 0:
+			compose, rule = old, "preview"
+		default:
+			_, op, _ := t.st.FindTab(old.ID)
+			wasFocused := focusedTab(sp) == old.ID
+			detach(sp, op, old.ID)
+			forget(sp, old.ID)
+			if wasFocused {
+				refocus(sp)
+			}
+			closed = old
 		}
 	}
 	tb := &Tab{Kind: "thread", Thread: o.Thread}
 	if _, err := t.prepare(sp, tb); err != nil {
 		return Result{}, err
 	}
-	res := Result{Space: sp.ID, Tab: tb.ID, Rule: rule}
+	tb.Preview = preview
+	res := Result{Space: sp.ID, Tab: tb.ID, Rule: rule, Kept: kept}
+	if closed != nil {
+		res.Closed = []*Tab{closed}
+	}
 	switch {
 	case compose != nil:
 		i := pane.TabIndex(compose.ID)
@@ -180,12 +231,11 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		pane = &Node{T: NodePane, ID: id, Tabs: []*Tab{tb}, Active: tb.ID}
 		sp.Root = pane
 	}
-	if err := t.restore(sp, o.Thread, w, h, &res); err != nil {
-		return Result{}, err
-	}
-	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Quick != nil && ts.Quick.Fresh {
-		ts.Quick.Fresh, ts.Quick.Open = false, true
-		res.FreshQuick = o.Thread
+	if !snoozed {
+		if err := t.restore(sp, o.Thread, w, h, &res); err != nil {
+			return Result{}, err
+		}
+		t.freshQuick(o.Thread, &res)
 	}
 	_, pane, _ = t.st.FindTab(tb.ID)
 	t.show(sp, pane, tb.ID, o.Focus)
@@ -593,6 +643,7 @@ func (o *MoveThreadToSpace) apply(t *tx) (Result, error) {
 	t.setThreadSpace(o.Thread, to.ID)
 
 	if res.Tab != "" {
+		// A moved tab is kept: no Preview on the new one.
 		tb := &Tab{ID: res.Tab, Kind: "thread", Thread: o.Thread}
 		if _, err := t.prepare(to, tb); err != nil {
 			return Result{}, err
@@ -691,7 +742,8 @@ func runningTerminals(r *Remembered) []*Tab {
 // marked the same way (Quick.Fresh, with QuickRan for its line): drawn closed now, it opens
 // again with a fresh shell when the thread's tab opens. Result.Kept lists the tabs it took,
 // Result.Ended the terminals the caller ends (the quick terminal is not a tab: the thread's
-// shells end with the snooze).
+// shells end with the snooze). The layout then knows the thread is snoozed
+// (ThreadState.Snoozed): its tab opens with none of that until set_snoozed wakes it.
 type SnoozeThread struct {
 	Thread   string            `json:"thread"`
 	Ran      map[string]string `json:"ran,omitempty"`
@@ -731,5 +783,6 @@ func (o *SnoozeThread) apply(t *tx) (Result, error) {
 	if ts := t.st.Threads[o.Thread]; ts != nil && ts.Quick != nil && ts.Quick.Open {
 		ts.Quick.Open, ts.Quick.Fresh, ts.Quick.Ran = false, true, o.QuickRan
 	}
+	threadState(t.st, o.Thread).Snoozed = true
 	return res, nil
 }

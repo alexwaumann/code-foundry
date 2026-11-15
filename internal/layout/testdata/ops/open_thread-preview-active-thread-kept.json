@@ -1,0 +1,50 @@
+{
+  "doc": "Preview on a thread that is neither archived nor snoozed opens a kept tab, and the space's preview stays.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-1","preview":true,"focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-n1","kind":"thread","thread":"th-1"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused"}
+}

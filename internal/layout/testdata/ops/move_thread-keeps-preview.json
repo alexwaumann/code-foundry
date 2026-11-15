@@ -1,0 +1,59 @@
+{
+  "doc": "A preview's thread moved to another space opens there as a kept tab.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-v"
+        },
+        "focus": "p-a",
+        "mru": ["t-v"]
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {"t":"pane","id":"p-q","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"},
+        "focus": "p-q"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-v":{"space":"sp-a","snoozed":true}}
+  },
+  "op": {"op":"move_thread","thread":"th-v","space":"sp-b"},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a"
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "pane",
+          "id": "p-q",
+          "tabs": [{"id":"t-j","kind":"projects"},{"id":"t-v","kind":"thread","thread":"th-v"}],
+          "active": "t-v"
+        },
+        "focus": "p-q"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-v":{"space":"sp-b","snoozed":true}}
+  },
+  "result": {"space":"sp-b","pane":"p-q","tab":"t-v"}
+}

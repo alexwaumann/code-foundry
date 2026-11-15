@@ -42,6 +42,8 @@ export interface LayoutVerbsWorld {
   sidebarThreads?(): string[];
   /** Whether a thread is archived (it lives in no space: thread.open puts it in the current one). */
   isArchived?(id: string): boolean;
+  /** Whether a thread is snoozed or saved for later: thread.open --preview opens it as a preview. */
+  isSnoozed?(id: string): boolean;
   /** Archives a thread (space.remove --archive). */
   archiveThread?(id: string): void;
   /** Whether a thread exists. */
@@ -179,6 +181,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
           edgeArg("edge", "With --split: the edge"),
           edgeArg("outer", "In a new pane on this edge of the whole area"),
           focusArg,
+          bool("preview", "As the space's preview tab when the thread is archived or snoozed (otherwise a kept tab)"),
         ],
       },
       when: always,
@@ -196,6 +199,11 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         if (a.split) op.edge = a.edge;
         if (a.outer) op.edge = a.outer;
         if (world.isArchived?.(id)) op.archived = true;
+        if (a.preview === "true") {
+          if (a.pane || a.split || a.outer) refuse("invalid argument: a preview opens where a thread's tab opens: no --pane, --split or --outer");
+          op.preview = true;
+          if (world.isSnoozed?.(id)) op.snoozed = true;
+        }
         return run(op, (r) => `opened thread ${id} as tab ${r.result.tab ?? ""}`);
       },
     },
@@ -307,8 +315,17 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         const { sp, pane, tab } = resolveTab(L.state(), a.tab);
         const index = (pane.tabs ?? []).findIndex((t) => t.id === tab.id);
         const out = run(tab.kind === "thread" ? { op: "close_thread", thread: tab.thread ?? "" } : { op: "close_tab", tab: tab.id }, () => `closed tab ${tab.id}`);
-        remember(sp.id, { pane: pane.id, index, tabs: [structuredClone(tab)], whole: false });
+        // A preview leaves no trace (internal/layout reopen.go).
+        if (!tab.preview) remember(sp.id, { pane: pane.id, index, tabs: [structuredClone(tab)], whole: false });
         return out;
+      },
+    },
+    {
+      cmd: { name: "tab.keep", title: "Keep Tab Open", category: CATEGORY, description: "Keep a preview tab (default: the focused tab): it stays open as a normal tab.", keybindings: [], noPalette: true, args: [str("tab", "The tab (default: the focused one)", { positional: true })] },
+      when: always,
+      run: (_c, a) => {
+        const { tab } = resolveTab(L.state(), a.tab);
+        return run({ op: "keep_tab", tab: tab.id }, () => (tab.preview ? `kept tab ${tab.id}` : `tab ${tab.id} is no preview: nothing to keep`));
       },
     },
     {
@@ -450,9 +467,9 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       when: always,
       run: (_c, a) => {
         const { sp, pane } = resolvePane(L.state(), a.pane);
-        const tabs = structuredClone(pane.tabs ?? []);
+        const tabs = structuredClone(pane.tabs ?? []).filter((t) => !t.preview);
         const out = run({ op: "close_pane", pane: pane.id }, () => `closed pane ${pane.id}`);
-        remember(sp.id, { pane: pane.id, index: 0, tabs, whole: true });
+        if (tabs.length > 0) remember(sp.id, { pane: pane.id, index: 0, tabs, whole: true });
         return out;
       },
     },

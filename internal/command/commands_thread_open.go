@@ -66,7 +66,9 @@ func (l layout) threadCommands() []Command {
 				"that pane, at --index from 0; --split with --edge: a new pane on that edge of a pane; --outer: a new pane on " +
 				"that edge of the whole pane area), in place of the space's composer when that is all the space shows. An " +
 				"archived thread lives in no space: it opens in the current space (or --pane's). The linked tabs it had open " +
-				"when it closed come back. From inside a thread it opens without taking the user's focus unless --focus.",
+				"when it closed come back (a snoozed thread's when it wakes). From inside a thread it opens without taking the " +
+				"user's focus unless --focus. --preview (the user only, without a place) opens an archived or snoozed thread " +
+				"as the space's preview tab, replacing the last one, until tab.keep or a move, a send or its surfaces keep it.",
 			Args: []ArgSpec{
 				layoutThreadArg(true),
 				paneIDArg("pane", "The pane its tab opens in (a pane of the thread's space)"),
@@ -75,6 +77,7 @@ func (l layout) threadCommands() []Command {
 				edgeArg("edge", "With --split: the edge of that pane"),
 				edgeArg("outer", "In a new pane on this edge of the whole pane area of the thread's space"),
 				focusArg,
+				{Name: "preview", Type: Bool, Description: "As the space's preview tab when the thread is archived or snoozed (otherwise a kept tab)"},
 			},
 			NoPalette: true, NoKeybinding: true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
@@ -82,8 +85,15 @@ func (l layout) threadCommands() []Command {
 				if err != nil {
 					return Result{}, err
 				}
-				op := &core.OpenThread{Thread: id, Pane: a.String("pane"), Archived: th.GetArchivedAt() != nil}
+				op := &core.OpenThread{
+					Thread: id, Pane: a.String("pane"), Archived: th.GetArchivedAt() != nil,
+					Snoozed: th.GetSnoozedUntil() != nil || th.GetSavedAt() != nil, Preview: a.Bool("preview"),
+				}
 				switch {
+				case op.Preview && !uctx.FromUser():
+					return Result{}, InvalidArg("preview", "only the user opens a preview; a thread or a page opens a kept tab")
+				case op.Preview && (a.String("pane") != "" || a.String("split") != "" || a.String("outer") != ""):
+					return Result{}, InvalidArg("preview", "a preview opens where a thread's tab opens: no --pane, --split or --outer")
 				case a.String("pane") != "" && (a.String("split") != "" || a.String("outer") != ""),
 					a.String("split") != "" && a.String("outer") != "":
 					return Result{}, InvalidArg("pane", "give one of --pane, --split (with --edge) or --outer")
@@ -109,9 +119,15 @@ func (l layout) threadCommands() []Command {
 				if err != nil {
 					return Result{}, err
 				}
-				msg := fmt.Sprintf("opened thread %s as tab %s in pane %s of space %s", id, c.Result.Tab, c.Result.Pane, c.Result.Space)
+				what := "tab"
+				if snap, err := l.state(); err == nil {
+					if _, _, tb := snap.State.FindTab(c.Result.Tab); tb != nil && tb.Preview {
+						what = "preview tab"
+					}
+				}
+				msg := fmt.Sprintf("opened thread %s as %s %s in pane %s of space %s", id, what, c.Result.Tab, c.Result.Pane, c.Result.Space)
 				if c.Result.Existing {
-					msg = fmt.Sprintf("thread %s is open as tab %s in pane %s of space %s", id, c.Result.Tab, c.Result.Pane, c.Result.Space)
+					msg = fmt.Sprintf("thread %s is open as %s %s in pane %s of space %s", id, what, c.Result.Tab, c.Result.Pane, c.Result.Space)
 				}
 				if n := len(c.Result.Back) + len(c.Result.Placed); n > 0 {
 					msg += fmt.Sprintf("; %s came back", plural(n, "linked tab"))

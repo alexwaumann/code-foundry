@@ -16,6 +16,8 @@ when the first working version is whole. Nothing partial is released.
   Requests page, the Projects page, and later a plugin's.
 - **Linked surface**: a surface that belongs to a thread (its diff, its files, its pull requests,
   its terminal tabs).
+- **Preview tab**: a temporary tab of an archived or snoozed thread, opened by a click on its
+  sidebar row, which the next preview in its space replaces ("Preview tabs").
 
 ## Structure
 
@@ -106,7 +108,8 @@ when the first working version is whole. Nothing partial is released.
     its own: the linked tabs that close with their thread (they are in its remembered set), a
     thread archived, snoozed or moved, a space removed, a terminal whose shell exited, a composer
     replaced by its thread, smart swap. The space's empty composer is not recorded (New thread
-    makes one).
+    makes one), and neither is a preview tab, whether a new preview replaced it or the user
+    closed it ("Preview tabs").
   - **An entry.** Closing a tab records the tab, the pane it was in and its place in the strip,
     and, when it was its pane's only tab, where that pane sat. Closing a pane records the pane
     with all its tabs, which one was active, and where it sat (beside which panes, on which edge,
@@ -294,7 +297,11 @@ when the first working version is whole. Nothing partial is released.
 - **Moving a thread** to another space takes the linked tabs that are in its space. Archiving closes
   its linked tabs everywhere and ends its terminals. Snoozing closes them, ends its terminals and
   keeps the set, so the terminals come back as fresh shells in the same places; an open quick
-  terminal comes back open, as a fresh shell, when the thread's tab opens.
+  terminal comes back open, as a fresh shell. They come back when the thread stops being snoozed
+  (unsnoozed, its snooze ends, a message sent to it) while its tab is open in its space, placed as
+  any restore is; with no tab open then, when its tab next opens. A tab opened while the thread is
+  still snoozed (a preview or a kept tab) shows only the conversation and brings back nothing: no
+  linked tabs, no terminals, no quick terminal.
 - **The thread's header** in a pane holds the branch chip, the thread info toggle and one three-dot
   menu with submenus (Open, Move to space, rename, snooze, archive, close).
 - **Thread info is per thread.** The toggle (and cmd+shift+i, for the focused tab's thread) shows or
@@ -329,7 +336,8 @@ when the first working version is whole. Nothing partial is released.
   and the toggle). The user can widen it; a width stored earlier that is at least the minimum is
   kept.
 - Sections, in order: **Needs you**, **Active**, then **Working**, **Snoozed** and **Archived** at
-  the bottom as today. A click on a thread always adds a tab (or focuses it when it is open). Active
+  the bottom as today. A click on a thread adds a tab (or focuses it when it is open); on a
+  Snoozed or Archived row the tab is a preview ("Preview tabs"). Active
   keeps today's order (pinned, then the space's drafts, then the threads that call without
   blocking, below, then finished, then idle) and Pin stays in the row's menu.
 - **A thread that calls without blocking** is not in Needs you: a thread woken from a snooze, a
@@ -358,6 +366,42 @@ when the first working version is whole. Nothing partial is released.
 - **In a pane**, a thread that needs the user marks its tab icon with the attention dot, in a strip
   and in a rail. When the pane is too short for the full ask, the ask shows as a one-line strip above
   the composer with the same hover card and popup.
+
+## Preview tabs
+
+- **What a preview is.** A thread tab can be a preview: temporary. Only a tab of an archived or
+  snoozed thread can be one; an active thread never previews. The daemon keeps the flag on the
+  tab, so the CLI's `tab.list` and `layout show` mark it.
+- **Opening one.** A click on an Archived or Snoozed sidebar row opens the thread as a preview tab
+  where a thread's own tab opens (the focused pane, by the same rule). Every other open is a kept
+  tab: a drop from the sidebar (an open at a place), the CLI without `--preview`, a thread's model,
+  a restore, cmd+shift+t. A preview is asked for explicitly (`thread.open --preview`, the user
+  only, without a place), and the daemon honours it only for a thread that is archived or snoozed;
+  for any other it opens a kept tab. A thread or a page cannot ask for one.
+- **One per space.** Opening a preview closes the space's previous preview wherever it is in the
+  space. When the previous one is in the pane the new one opens in, the new one takes its place in
+  the strip; otherwise the old one closes and the new one opens by the usual rule. A replaced
+  preview's linked tabs (opened from its row's menu before it opened) are remembered as a closed
+  thread's are.
+- **What replaces or closes it.** Only another preview, or the user closing it. Opening an active
+  thread, or moving the focus to another pane, leaves it alone.
+- **Opening what is open.** Opening a thread that has a kept tab focuses that tab and does not touch
+  the preview. Opening as a preview the thread that is the preview focuses it; it stays a preview.
+  Opening it any other way (a drop on the grid, the CLI) focuses it and keeps it.
+- **What keeps it** (it becomes a normal tab, for good): the thread is unarchived, unsnoozed, or
+  its snooze ends; a message is sent to it; it is renamed or pinned; its tab is moved (to another
+  place in its strip, another pane or another space, alone or with its pane, or the thread moved to
+  another space); one of its surfaces is opened (diff, file, pull request, terminal, quick
+  terminal, a plugin's surface); an explicit keep (`tab.keep`, which the window sends for typing in
+  its composer, a double click on the tab and "Keep open" in the tab's menu).
+- **What does not.** Reading: focus, scroll, find, the thread info toggle.
+- **No trace.** A preview, replaced or closed by the user, is not recorded for cmd+shift+t, and a
+  replaced one is gone from the focus history (cmd+[ and cmd+] skip it, as they skip a tab that
+  closed).
+- **Snoozed threads.** Its tab opened while the thread is still snoozed shows only the
+  conversation: the remembered set comes back when the thread wakes ("Moving a thread" above).
+  Archived threads keep no set. An open archived thread's tab moved to another space is an
+  ordinary move, and keeps it.
 
 ## Keys
 
@@ -421,7 +465,7 @@ longer exists is not carried over, and no fresh shell is started in its place.
 ## Not in this change
 
 Thread colours, drawers inside a thread pane, panes that follow focus, replacing a tab on a sidebar
-click, a file browser surface, content search across files, and the surface contract for plugins
+click (beyond an archived or snoozed thread's preview), a file browser surface, content search across files, and the surface contract for plugins
 beyond the identity rule above.
 
 ## Build

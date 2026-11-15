@@ -110,7 +110,8 @@
               "fresh": {}
             }
           ]
-        }
+        },
+        "snoozed": true
       }
     }
   },

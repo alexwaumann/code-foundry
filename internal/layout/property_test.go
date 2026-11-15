@@ -227,6 +227,16 @@ func randomOp(s *bytesrc, st *State) Op {
 		case 2:
 			o.Compose = pick(s, composeTabs(st)...)
 		}
+		o.Preview, o.Archived, o.Snoozed = s.n(2) == 0, s.n(3) == 0, s.n(4) == 0
+		o.W, o.H = viewportOf(s)
+	case *KeepTab:
+		if s.n(2) == 0 {
+			o.Thread = pick(s, threads...)
+		} else {
+			o.Tab = pick(s, tabs...)
+		}
+	case *SetSnoozed:
+		o.Thread, o.Snoozed = pick(s, threads...), s.n(2) == 0
 		o.W, o.H = viewportOf(s)
 	case *CloseThread:
 		o.Thread, o.Record = pick(s, threads...), s.n(2) == 0

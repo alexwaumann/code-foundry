@@ -55,6 +55,20 @@ func TestDecodeRepairs(t *testing.T) {
 			repairs: []string{"key \"wrong\"", "dropped tab \"t-b\", a second prs", "tab \"t-a\": new id"},
 		},
 		{
+			name: "one preview per space, thread tabs only; a preview in the reopen history is dropped",
+			in: `{"v":1,"spaces":[{"id":"sp-a","name":"Main","root":{"t":"pane","id":"p-a","tabs":[
+			        {"id":"t-a","kind":"thread","thread":"th-1","preview":true},{"id":"t-b","kind":"thread","thread":"th-2","preview":true},{"id":"t-c","kind":"prs","preview":true}],"active":"t-a"},"focus":"p-a",
+			        "closed":[{"pane":"p-a","tabs":[{"id":"t-d","kind":"thread","thread":"th-3","preview":true}]}]}],
+			      "current_space":"sp-a","default_space":"sp-a"}`,
+			repairs: []string{"tab t-c: a prs tab is kept", "tab t-b kept, t-a is its preview", "reopen history kept 0 of 1"},
+			check: func(t *testing.T, st *State) {
+				p := st.Spaces[0].Root
+				if !p.Tabs[0].Preview || p.Tabs[1].Preview || p.Tabs[2].Preview || st.Spaces[0].Closed != nil {
+					t.Errorf("tabs %+v %+v %+v closed %v", *p.Tabs[0], *p.Tabs[1], *p.Tabs[2], st.Spaces[0].Closed)
+				}
+			},
+		},
+		{
 			name: "a split of an unknown direction becomes a row; one with sizes missing gets equal ones; unknown nodes go",
 			in: `{"v":1,"spaces":[{"id":"sp-a","name":"Main","root":{"t":"split","id":"s-1","dir":"diagonal","kids":[
 			        {"t":"pane","id":"p-a","tabs":[{"id":"t-a","kind":"prs"}]},{"t":"blob","id":"x"},{"t":"pane","id":"p-b","tabs":[{"id":"t-b","kind":"projects"}]}]},"focus":"p-a"}],

@@ -1,0 +1,72 @@
+{
+  "doc": "One preview per space: a snoozed thread of the second space opens as that space's preview, and the first space's preview stays.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {"t":"pane","id":"p-q","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"},
+        "focus": "p-q"
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-s":{"space":"sp-b","snoozed":true}}
+  },
+  "op": {"op":"open_thread","thread":"th-s","preview":true,"focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [
+            {"id":"t-p","kind":"prs"},
+            {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+          ],
+          "active": "t-p"
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      },
+      {
+        "id": "sp-b",
+        "name": "Second",
+        "root": {
+          "t": "pane",
+          "id": "p-q",
+          "tabs": [
+            {"id":"t-j","kind":"projects"},
+            {"id":"t-n1","kind":"thread","thread":"th-s","preview":true}
+          ],
+          "active": "t-n1"
+        },
+        "focus": "p-q",
+        "mru": ["t-n1"]
+      }
+    ],
+    "current_space": "sp-b",
+    "default_space": "sp-a",
+    "threads": {"th-s":{"space":"sp-b","snoozed":true}}
+  },
+  "result": {"space":"sp-b","pane":"p-q","tab":"t-n1","rule":"focused"}
+}

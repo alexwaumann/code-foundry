@@ -37,6 +37,12 @@ export interface LayoutTabView {
   title: string;
   /** A manual name (terminals); "" is automatic. */
   name: string;
+  /**
+   * A preview: a thread tab opened to look at an archived or snoozed thread, which the next
+   * preview in its space replaces until something keeps it (tab.keep, a move, a send, opening
+   * one of its surfaces). At most one per space (docs/notes/shell-model.md, "Preview tabs").
+   */
+  preview: boolean;
 }
 
 /** A pane: one tile with a tab strip. Always has a tab. */
@@ -171,7 +177,7 @@ const edges: Record<LayoutEdgeName, LayoutEdge> = {
 };
 
 function toTab(t: LayoutTab | undefined): LayoutTabView {
-  return { id: t?.id ?? "", kind: t?.kind ?? "", thread: t?.threadId ?? "", key: t?.key ?? "", params: { ...t?.params }, title: t?.title ?? "", name: t?.name ?? "" };
+  return { id: t?.id ?? "", kind: t?.kind ?? "", thread: t?.threadId ?? "", key: t?.key ?? "", params: { ...t?.params }, title: t?.title ?? "", name: t?.name ?? "", preview: t?.preview ?? false };
 }
 
 /** A node; null for an empty one (no case, a pane without tabs, a split without kids), which normal form never sends. */
@@ -310,6 +316,8 @@ export type LayoutOpView =
   | { op: "move_thread"; thread: string; space: string }
   | { op: "archive_thread"; thread: string }
   | { op: "snooze_thread"; thread: string; ran?: Record<string, string> }
+  /** Keeps a preview tab: tab, or thread's tab (tab.keep). */
+  | { op: "keep_tab"; tab?: string; thread?: string }
   | { op: "new_thread"; space?: string; pane?: string; params?: Record<string, string>; focus?: boolean }
   | { op: "start_draft"; tab: string; draft?: string; label?: string }
   | { op: "label_draft"; draft: string; label: string }
@@ -383,6 +391,8 @@ export function toLayoutOpMessage(o: LayoutOpView): LayoutOp {
         return { case: "archiveThread", value: { threadId: o.thread } };
       case "snooze_thread":
         return { case: "snoozeThread", value: { threadId: o.thread, ran: o.ran ?? {} } };
+      case "keep_tab":
+        return { case: "keepTab", value: { tabId: o.tab ?? "", threadId: o.thread ?? "" } };
       case "new_thread":
         return { case: "newThread", value: { spaceId: o.space ?? "", paneId: o.pane ?? "", params: o.params ?? {}, focus: o.focus ?? false } };
       case "start_draft":

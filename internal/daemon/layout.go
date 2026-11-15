@@ -25,6 +25,11 @@ import (
 //   - A new thread joins its creator's space, else the current space. (A user's thread sent
 //     from a composer tab takes the composer's place: thread.new --compose applies that.)
 //     An unarchived thread joins the current space.
+//   - Preview tabs (docs/notes/preview-tabs-1-daemon.md): a thread unarchived, woken (a
+//     message wakes it too), renamed or pinned keeps its preview tab (keep_tab). The layout
+//     is told when a thread is snoozed or woke (set_snoozed; snooze_thread marks it too), so a
+//     snoozed thread's tab opens without its set, which comes back when it wakes with its tab
+//     open (the commit's Fresh and FreshQuick start their shells as any restore's do).
 //   - A thread being archived, snoozed or removed (thread.Options.ShellsGoing, called before
 //     its shells go): archive_thread or snooze_thread. A snooze first reads what runs in each
 //     of its terminals, for the "Run again" line of the fresh shell that replaces it.
@@ -81,9 +86,9 @@ type layoutGlue struct {
 	wg     sync.WaitGroup
 	// labels are each terminal's labels as last seen: a removal names only the id.
 	labels map[string]map[string]string
-	// archived is, for each thread seen, whether it was archived: a thread not in it is new,
-	// one that goes from true to false was unarchived.
-	archived map[string]bool
+	// seen is, for each thread seen, what the glue last saw of it: a thread not in it is
+	// new, one whose archived goes from true to false was unarchived.
+	seen map[string]threadSeen
 	// prev is the layout state after the last commit the glue acted on, and prevRev that
 	// commit's rev once a resync set it: a commit at or below it is covered already.
 	prev    *core.State
@@ -111,6 +116,7 @@ func startLayoutGlue(ctx context.Context, opts layoutGlueOptions) (func(), error
 		return nil, err
 	}
 	g.sweep()
+	g.syncSnoozed()
 	g.wg.Go(g.run)
 	return g.stop, nil
 }
@@ -131,7 +137,7 @@ func newLayoutGlue(ctx context.Context, opts layoutGlueOptions) (*layoutGlue, er
 		opts.Buffer = 256
 	}
 	g := &layoutGlue{
-		opts: opts, labels: map[string]map[string]string{}, archived: map[string]bool{},
+		opts: opts, labels: map[string]map[string]string{}, seen: map[string]threadSeen{},
 		waiting: map[string]bool{}, waitingQuick: map[string]bool{},
 	}
 	g.ctx, g.cancel = context.WithCancel(ctx)
@@ -149,7 +155,7 @@ func newLayoutGlue(ctx context.Context, opts layoutGlueOptions) (*layoutGlue, er
 	}
 	if snap := opts.Threads(); snap != nil {
 		for _, t := range snap.Threads {
-			g.archived[t.ID] = !t.ArchivedAt.IsZero()
+			g.seen[t.ID] = seenOf(t)
 		}
 	}
 	g.prev = opts.Layout.Snapshot().State
@@ -223,19 +229,111 @@ func (g *layoutGlue) threadEvent(ev thread.Event) {
 	switch e := ev.(type) {
 	case thread.Updated:
 		t := e.Thread
-		was, seen := g.archived[t.ID]
-		g.archived[t.ID] = !t.ArchivedAt.IsZero()
+		was, seen := g.seen[t.ID]
+		now := seenOf(t)
+		g.seen[t.ID] = now
 		switch {
 		case t.Removing || t.Owner != "":
 			// going, or someone else's (a plugin's): not in any space's list
+			return
 		case !seen:
 			g.joinSpace(t, true)
-		case was && t.ArchivedAt.IsZero():
+		case was.archived && !now.archived:
 			g.joinSpace(t, false)
 		}
+		if seen && was.keeps(now) {
+			g.keepPreview(t.ID)
+		}
+		if ts := g.state().Threads[t.ID]; now.snoozed != (ts != nil && ts.Snoozed) {
+			g.syncThreadSnoozed(t.ID)
+		}
 	case thread.Removed:
-		delete(g.archived, e.ID)
+		delete(g.seen, e.ID)
 		g.apply(&core.ArchiveThread{Thread: e.ID})
+	}
+}
+
+// threadSeen is what the glue remembers of a thread between its events.
+type threadSeen struct {
+	archived, snoozed, pinned bool
+	name                      string
+}
+
+func seenOf(t thread.Thread) threadSeen {
+	return threadSeen{archived: !t.ArchivedAt.IsZero(), snoozed: t.Snoozed(), pinned: t.Pinned, name: t.Name}
+}
+
+// keeps reports whether going from s to now keeps the thread's preview tab: it was
+// unarchived or woke (a sent message does both), or it was renamed or pinned.
+func (s threadSeen) keeps(now threadSeen) bool {
+	return (s.archived && !now.archived) || (s.snoozed && !now.snoozed) || s.name != now.name || s.pinned != now.pinned
+}
+
+// keepPreview keeps thread's tab when it is a preview.
+func (g *layoutGlue) keepPreview(thread string) {
+	if previewOpen(g.state(), thread) {
+		g.apply(&core.KeepTab{Thread: thread})
+	}
+}
+
+// previewOpen reports whether thread's tab is open as a preview.
+func previewOpen(st *core.State, thread string) bool {
+	for _, sp := range st.Spaces {
+		for _, p := range core.Panes(sp.Root) {
+			for _, tb := range p.Tabs {
+				if tb.Kind == "thread" && tb.Thread == thread {
+					return tb.Preview
+				}
+			}
+		}
+	}
+	return false
+}
+
+// syncThreadSnoozed tells the layout whether thread is snoozed when it holds otherwise, by
+// the thread store's state now (an event may be older than a snooze the layout already
+// marked): a thread woken is woken in the layout (set_snoozed: its set comes back when its
+// tab is open), and a thread snoozed the layout does not know of (snoozed by an older build)
+// is marked.
+func (g *layoutGlue) syncThreadSnoozed(id string) {
+	snap := g.opts.Threads()
+	if snap == nil {
+		return
+	}
+	t, ok := snap.Thread(id)
+	if !ok || t.Removing {
+		return
+	}
+	ts := g.state().Threads[id]
+	marked := ts != nil && ts.Snoozed
+	if snoozed := t.Snoozed(); snoozed != marked {
+		g.apply(&core.SetSnoozed{Thread: id, Snoozed: snoozed})
+	}
+}
+
+// syncSnoozed is syncThreadSnoozed for every thread the layout or the thread store holds:
+// at start, a thread that woke while the daemon was down, or was snoozed by an older build.
+func (g *layoutGlue) syncSnoozed() {
+	snap := g.opts.Threads()
+	if snap == nil {
+		return
+	}
+	ids := map[string]bool{}
+	for _, t := range snap.Threads {
+		if t.Snoozed() {
+			ids[t.ID] = true
+		}
+	}
+	for id, ts := range g.state().Threads {
+		if ts.Snoozed {
+			ids[id] = true
+		}
+	}
+	for id := range ids {
+		if _, ok := snap.Thread(id); !ok {
+			continue // gone: archive_thread forgets it when its removal is seen
+		}
+		g.syncThreadSnoozed(id)
 	}
 }
 
@@ -477,7 +575,7 @@ func (g *layoutGlue) resyncThreads() {
 		seen[t.ID] = true
 		g.threadEvent(thread.Updated{Thread: t})
 	}
-	for id := range g.archived {
+	for id := range g.seen {
 		if !seen[id] {
 			g.threadEvent(thread.Removed{ID: id})
 		}
