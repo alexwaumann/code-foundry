@@ -552,7 +552,8 @@ describe("editing", () => {
         finish = resolve;
       }),
     );
-    fireEvent.click(screen.getByTestId("file-overwrite"));
+    // The conflict band comes with the re-read, which refresh() can return before.
+    fireEvent.click(await screen.findByTestId("file-overwrite"));
     await waitFor(() => {
       expect(screen.getByTestId<HTMLButtonElement>("file-reload").disabled).toBe(true);
     });
