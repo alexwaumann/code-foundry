@@ -14,7 +14,7 @@ import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, 
 import { rowDragSource, threadDropsInGrid } from "@/shell/drag/threadSource";
 import { panesOf, type GeoNode } from "@/shell/geometry/types";
 import { paneFitsInSpace } from "@/shell/drag/room";
-import { runSpaceDrop } from "@/shell/spaceActions";
+import { runGridDrop, runSpaceDrop } from "@/shell/spaceActions";
 import { spaceDropCommands } from "@/shell/spaces";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { geoTree, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
@@ -341,7 +341,8 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     // The layout as it is now: a dragged tab or pane closed mid-drag moves nothing.
     const plan = dropPlan(src, target, space, useLayoutStore.getState());
     endedSpace.current = plan?.space ?? "";
-    if (plan) void runSpaceDrop(plan.commands);
+    // A drop on a space tab leaves the keyboard here; one in the grid hands it to the pane it focused.
+    if (plan) void (plan.space ? runSpaceDrop(plan.commands) : runGridDrop(plan.commands));
   };
   const onDragCancel = () => {
     const { source: src } = useShellDragStore.getState();
