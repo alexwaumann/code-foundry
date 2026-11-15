@@ -10,7 +10,7 @@ const notifyProgress = vi.hoisted(() => vi.fn(() => "t1"));
 const dismissNotice = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/notify", () => ({ notify, notifyProgress, dismissNotice }));
 
-const { PREPARING_TOAST_DELAY_MS, openStartedThread, prThreadArgs, startingKey, startPrThread, usePrThreadsStore } = await import("./prThreads");
+const { FOCUS_GRACE_MS, PREPARING_TOAST_DELAY_MS, openStartedThread, prThreadArgs, startingKey, startPrThread, unlessSelected, usePrThreadsStore } = await import("./prThreads");
 const { useUiStore } = await import("./ui");
 
 const REF = { slug: "acme/repo", number: 12 };
@@ -25,10 +25,15 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  // Fake throughout: a started thread's toast waits FOCUS_GRACE_MS on a timer and a
+  // selection subscription, which afterEach ends so none outlives its test.
+  vi.useFakeTimers();
   usePrThreadsStore.setState({ starting: {} });
 });
 
 afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -51,8 +56,11 @@ describe("startPrThread", () => {
     ["fix", "pr.fix.findings", "", {}],
     ["ask", "pr.ask", "What does this change?", { question: "What does this change?" }],
   ] as const)("%s runs %s and resolves the new thread's id", async (kind, name, question, extra) => {
+    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
     invokeCommand.mockResolvedValueOnce(started("s-9"));
     await expect(startPrThread(kind, REF, question)).resolves.toBe("s-9");
+    // No FocusThread selected it within the grace: the toast with Open.
+    vi.advanceTimersByTime(FOCUS_GRACE_MS);
     expect(invokeCommand).toHaveBeenCalledWith(name, expect.anything(), { "repo-slug": "acme/repo", number: "12", ...extra });
     expect(notify).toHaveBeenCalledTimes(1); // runCommandForResult's own toast is skipped
     const opts = notify.mock.calls[0]?.[0];
@@ -80,36 +88,26 @@ describe("startPrThread", () => {
   });
 
   it("fix findings shows a preparing toast while it runs and dismisses it after sonner has added it", async () => {
-    vi.useFakeTimers();
-    try {
-      const d = deferred<ReturnType<typeof started>>();
-      invokeCommand.mockReturnValueOnce(d.promise);
-      const run = startPrThread("fix", REF);
-      expect(notifyProgress).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(PREPARING_TOAST_DELAY_MS);
-      expect(notifyProgress).toHaveBeenCalledWith({ title: "Preparing worktree for #12…" });
-      d.resolve(started("s-2"));
-      await run;
-      // Deferred to a timeout queued after sonner's own add.
-      expect(dismissNotice).not.toHaveBeenCalled();
-      vi.runAllTimers();
-      expect(dismissNotice).toHaveBeenCalledWith("t1");
-    } finally {
-      vi.useRealTimers();
-    }
+    const d = deferred<ReturnType<typeof started>>();
+    invokeCommand.mockReturnValueOnce(d.promise);
+    const run = startPrThread("fix", REF);
+    expect(notifyProgress).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(PREPARING_TOAST_DELAY_MS);
+    expect(notifyProgress).toHaveBeenCalledWith({ title: "Preparing worktree for #12…" });
+    d.resolve(started("s-2"));
+    await run;
+    // Deferred to a timeout queued after sonner's own add.
+    expect(dismissNotice).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(dismissNotice).toHaveBeenCalledWith("t1");
   });
 
   it("a quick answer shows no preparing toast", async () => {
-    vi.useFakeTimers();
-    try {
-      invokeCommand.mockResolvedValueOnce(started("s-2"));
-      await startPrThread("fix", REF);
-      vi.runAllTimers();
-      expect(notifyProgress).not.toHaveBeenCalled();
-      expect(dismissNotice).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    invokeCommand.mockResolvedValueOnce(started("s-2"));
+    await startPrThread("fix", REF);
+    vi.runAllTimers();
+    expect(notifyProgress).not.toHaveBeenCalled();
+    expect(dismissNotice).not.toHaveBeenCalled();
   });
 
   it("explain shows no preparing toast", async () => {
@@ -136,9 +134,53 @@ describe("startPrThread", () => {
     useUiStore.setState({ selection: { kind: "view", name: "pullrequests" }, promptFocusSeq: 0 });
     invokeCommand.mockResolvedValueOnce(started("s-9"));
     await startPrThread("explain", REF);
+    vi.advanceTimersByTime(FOCUS_GRACE_MS);
     notify.mock.calls[0]?.[0].action?.onClick();
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-9" });
     expect(useUiStore.getState().promptFocusSeq).toBe(1);
+  });
+});
+
+describe("Thread started only when the new thread is not the selected one", () => {
+  beforeEach(() => {
+    useUiStore.setState({ selection: { kind: "view", name: "pullrequests" } });
+  });
+
+  it("FocusThread selected it before the answer: no toast", async () => {
+    invokeCommand.mockImplementationOnce(() => {
+      useUiStore.setState({ selection: { kind: "thread", id: "s-9" } });
+      return Promise.resolve(started("s-9"));
+    });
+    await startPrThread("ask", REF, "Why?");
+    vi.runAllTimers();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("FocusThread selects it after the answer, within the grace: no toast", async () => {
+    invokeCommand.mockResolvedValueOnce(started("s-9"));
+    await startPrThread("explain", REF);
+    vi.advanceTimersByTime(FOCUS_GRACE_MS / 2);
+    useUiStore.setState({ selection: { kind: "thread", id: "s-9" } });
+    vi.runAllTimers();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("the selection moves elsewhere first: the toast at once", () => {
+    const show = vi.fn();
+    unlessSelected("s-9", show);
+    useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+    expect(show).toHaveBeenCalledTimes(1);
+    vi.runAllTimers();
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
+  it("nothing selects it: the toast once the grace is over", () => {
+    const show = vi.fn();
+    unlessSelected("s-9", show);
+    vi.advanceTimersByTime(FOCUS_GRACE_MS - 1);
+    expect(show).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(show).toHaveBeenCalledTimes(1);
   });
 });
 

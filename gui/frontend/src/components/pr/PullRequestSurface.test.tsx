@@ -23,7 +23,7 @@ const { layoutSettled } = await import("@/test/fakeLayout");
 const { applyGhEvent } = await import("@/stores/gh");
 const { UPDATING_AFTER_MS } = await import("./PullRequestSurface");
 const { useThreadsStore } = await import("@/stores/threads");
-const { PREPARING_TOAST_DELAY_MS } = await import("@/stores/prThreads");
+const { PREPARING_TOAST_DELAY_MS, focusGrace } = await import("@/stores/prThreads");
 
 /**
  * The Pull request surface (components/pr) in a pane's tab, against the mock's pull
@@ -39,6 +39,9 @@ let world: ReturnType<typeof seedPrWorld>;
 trackTests();
 
 beforeEach(async () => {
+  // No FocusThread here (e2e/pr-panel.spec.ts has the daemon's): a started thread's toast
+  // shows as soon as the answer is in, not after its wait for one.
+  focusGrace.ms = 0;
   resetDaemon();
   world = seedPrWorld();
   await resetPrStores();
