@@ -64,11 +64,12 @@ const (
 	// keptFor after a newer one replaced it, at most keptVersions of them (the GUI's view
 	// lags the plugin's by the coalesce interval and a round trip: at 40 views a second,
 	// four versions were gone before a click on one arrived).
-	keptFor       = 3 * time.Second
-	keptVersions  = 64
-	maxClosed     = 64
-	maxActPayload = 64 << 10
-	maxToastText  = 200
+	keptFor             = 3 * time.Second
+	keptVersions        = 64
+	maxClosed           = 64
+	maxActPayload       = 64 << 10
+	maxToastText        = 200
+	maxToastDescription = 500
 )
 
 // SurfacePhase is an instance's host-side state.
@@ -140,6 +141,8 @@ type SurfaceAppend struct {
 // SurfaceToast is a toast for an instance's viewers.
 type SurfaceToast struct {
 	Instance, Level, Text string
+	// Description is optional detail under the text (the title).
+	Description string
 }
 
 // SurfaceUpdate is one item of a watcher's stream: exactly one field is set.

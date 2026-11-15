@@ -76,7 +76,7 @@ func TestRunsMasterDetail(t *testing.T) {
 	if got := tb.Children[1].Form.Fields[0].Input.Value; got != "flaky" {
 		t.Errorf("the note %q", got)
 	}
-	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1].Text != "note saved" {
+	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1] != (pluginsdk.ToastParams{Instance: inst, Level: pluginsdk.ToastSuccess, Text: "Note saved", Description: "On build #4"}) {
 		t.Errorf("toasts %+v", ts)
 	}
 	tb = tabs(md(act(pluginsdk.SurfaceAct{Kind: pluginsdk.ActSelect, Action: "select", Key: "runs-run-5", Value: "runs-run-5", Node: "runs-md"})))

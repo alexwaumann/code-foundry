@@ -106,7 +106,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `secret/get` / `set` / `delete` / `list` | request | `{key}` → `{value, found}`; `{key, value}`; `{key}`; → `{secrets: [{key, updatedAt}]}` | `h.Secrets()` | `secrets` |
 | `view/update` | request (or notification) | `{instance, view}` → `{version}` | `UpdateView` | |
 | `view/append` | request (or notification) | `{instance, key, text \| lines}` → `{version}` | `AppendLog`, `AppendLogLines` | |
-| `view/toast` | notification | `{instance?, level: info\|attention\|error, text}` | `Toast`, `ToastIn` | |
+| `view/toast` | notification | `{instance?, level: success\|info\|attention\|error, text, description?}`: text is the title; success and description need capability `view.toast.description` (an older host shows success as info, drops description) | `Toast`, `ToastIn`, `ToastWith` | |
 | `context/set` | notification | `{key, value, threadId? \| projectId?}` | `SetContext` | |
 | `thread/setFlag` | request | `{threadId, level, reason, untilSeen}` → `{changed}` | `SetFlag` | `threadStatus` |
 | `events/subscribe` | request | `{sources}` → `{subscription}` | `Subscribe` | `events` |
@@ -149,7 +149,7 @@ hosts: `invoke`, `invoke.ask`, `secrets`, `log`, `surfaces`, `view.v1`, `view.ap
 `view.node.<kind>` for each node kind it renders, `view.tabs`, `view.fieldset`,
 `view.optionsSource`, `view.duration`, `view.hint`, `view.input.multiline`,
 `view.input.number`, `view.input.live`, `view.select.search`, `view.input.date`, `view.log.ansi`, `context`, `events`, `flags`, `sessionEnv`,
-`threads`, `terminals`, `act.context`, `wakes`. Check `h.HasCapability("view.node.thread")` before
+`threads`, `terminals`, `act.context`, `wakes`, `view.toast.description`. Check `h.HasCapability("view.node.thread")` before
 relying on something newer than protocol 1's first release.
 
 ## Without the SDK

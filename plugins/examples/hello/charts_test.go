@@ -80,7 +80,7 @@ func TestOverviewFigures(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.WaitFor(5*time.Second, func(h *plugintest.Host) bool { return len(h.Toasts()) == 1 })
-	if tt := h.Toasts()[0]; tt.Text != "build #1280" {
+	if tt := h.Toasts()[0]; tt.Text != "Build #1280" || tt.Level != pluginsdk.ToastInfo {
 		t.Errorf("toast %+v", tt)
 	}
 }

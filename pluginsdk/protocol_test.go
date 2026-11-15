@@ -37,3 +37,23 @@ func TestLogParamsKeepsIntegers(t *testing.T) {
 		t.Errorf("%+v", p)
 	}
 }
+
+// A toast without a description is the shape every host knows, so an older host shows it
+// as before; the description is a field an older host's decoder drops.
+func TestToastParamsWire(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		p    ToastParams
+		want string
+	}{
+		{"Toast", ToastParams{Level: ToastInfo, Text: "Saved"}, `{"level":"info","text":"Saved"}`},
+		{"ToastIn", ToastParams{Instance: "i-1", Level: ToastAttention, Text: "Quota low"}, `{"instance":"i-1","level":"attention","text":"Quota low"}`},
+		{"success with a description", ToastParams{Level: ToastSuccess, Text: "Note saved", Description: "3 lines"},
+			`{"level":"success","text":"Note saved","description":"3 lines"}`},
+	} {
+		b, err := json.Marshal(tt.p)
+		if err != nil || string(b) != tt.want {
+			t.Errorf("%s: %s, %v; want %s", tt.name, b, err, tt.want)
+		}
+	}
+}

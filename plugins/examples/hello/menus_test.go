@@ -63,7 +63,7 @@ func TestDemoMenus(t *testing.T) {
 	}
 	// A toast is a notification: it lands after the act returns.
 	h.WaitFor(5*time.Second, func(h *plugintest.Host) bool { return len(h.Toasts()) > 0 })
-	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1].Text != "build #2 queued again" {
+	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1].Text != "Build #2 queued again" || ts[len(ts)-1].Level != pluginsdk.ToastSuccess {
 		t.Errorf("toasts %+v", ts)
 	}
 	ver = h.Version(inst)

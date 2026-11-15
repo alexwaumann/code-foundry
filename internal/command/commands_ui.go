@@ -59,6 +59,7 @@ func (r EmitResult) CLIResult(uctx Context) Result {
 }
 
 var notifyLevels = map[string]v1.UiIntent_Notify_Level{
+	"success": v1.UiIntent_Notify_LEVEL_SUCCESS,
 	"info":    v1.UiIntent_Notify_LEVEL_INFO,
 	"warning": v1.UiIntent_Notify_LEVEL_WARNING,
 	"error":   v1.UiIntent_Notify_LEVEL_ERROR,
@@ -109,7 +110,7 @@ func RegisterUI(r *Registry, e Emitter, opts ...UIOption) error {
 			Args: []ArgSpec{
 				{Name: "title", Type: String, Required: true, Description: "Notification title"},
 				{Name: "body", Type: String, Description: "Notification body"},
-				{Name: "level", Type: Enum, Enum: []string{"info", "warning", "error"}, Default: "info", Description: "Severity"},
+				{Name: "level", Type: Enum, Enum: []string{"success", "info", "warning", "error"}, Default: "info", Description: "Severity"},
 			},
 			Run: func(_ context.Context, _ Context, a Args) (Result, error) {
 				return emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{

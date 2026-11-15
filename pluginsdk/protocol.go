@@ -358,18 +358,28 @@ type Event struct {
 	Event        json.RawMessage `json:"event"`
 }
 
-// Toast levels.
+// Toast levels. ToastSuccess needs a host announcing ToastDescriptionCapability; an older
+// host shows it as ToastInfo.
 const (
+	ToastSuccess   = "success"
 	ToastInfo      = "info"
 	ToastAttention = "attention"
 	ToastError     = "error"
 )
 
+// ToastDescriptionCapability is announced by a host that knows ToastSuccess and
+// ToastParams.Description. An older host shows a success toast as info and drops the
+// description, so a toast must read right from its text alone.
+const ToastDescriptionCapability = "view.toast.description"
+
 // ToastParams is view/toast's params.
 type ToastParams struct {
 	Instance string `json:"instance,omitempty"`
 	Level    string `json:"level"`
-	Text     string `json:"text"`
+	// Text is the toast's title: short ("Note saved", "Build #42 queued again").
+	Text string `json:"text"`
+	// Description is optional detail under the title (ToastDescriptionCapability).
+	Description string `json:"description,omitempty"`
 }
 
 // SurfaceOpen is surface/open's params.

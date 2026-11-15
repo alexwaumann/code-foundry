@@ -934,7 +934,9 @@ const phases: Record<SurfacePhase, SurfacePhaseView> = {
   [SurfacePhase.FAILED]: "failed",
 };
 
-export type ToastLevel = "info" | "attention" | "error";
+/** A plugin toast's level (pluginsdk's ToastSuccess…ToastError); attention is the app's warning. */
+export type ToastLevel = "success" | "info" | "attention" | "error";
+const toastLevels: readonly string[] = ["success", "info", "attention", "error"] satisfies ToastLevel[];
 
 /** One update of WatchSurface. */
 export type SurfaceUpdateView =
@@ -942,7 +944,8 @@ export type SurfaceUpdateView =
   /** view null: the JSON did not parse (never from a sane daemon). */
   | { kind: "view"; instance: string; version: number; view: PluginViewModel | null; hostRendered: boolean }
   | { kind: "append"; instance: string; version: number; key: string; text: string; lines: LogLine[] }
-  | { kind: "toast"; instance: string; level: ToastLevel; text: string };
+  /** `text` is the toast's title; `description`, when the plugin sent one, goes under it. */
+  | { kind: "toast"; instance: string; level: ToastLevel; text: string; description?: string };
 
 export function toSurfaceUpdateView(u: SurfaceUpdate): SurfaceUpdateView | Heartbeat | null {
   const e = u.update;
@@ -961,7 +964,13 @@ export function toSurfaceUpdateView(u: SurfaceUpdate): SurfaceUpdateView | Heart
         lines: e.value.lines.map((l) => (l.tone ? { text: l.text, tone: l.tone as Tone } : { text: l.text })),
       };
     case "toast":
-      return { kind: "toast", instance: e.value.instance, level: e.value.level === "error" || e.value.level === "attention" ? e.value.level : "info", text: e.value.text };
+      return {
+        kind: "toast",
+        instance: e.value.instance,
+        level: toastLevels.includes(e.value.level) ? (e.value.level as ToastLevel) : "info",
+        text: e.value.text,
+        ...(e.value.description ? { description: e.value.description } : {}),
+      };
     case "heartbeat":
       return HEARTBEAT;
     default:

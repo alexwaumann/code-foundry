@@ -102,7 +102,7 @@ func TestLayoutChrome(t *testing.T) {
 		t.Errorf("after clear: %v", got)
 	}
 	act(pluginsdk.SurfaceAct{Kind: pluginsdk.ActClick, Action: "layout-rerun", Key: "layout-rerun"})
-	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1].Text != "build #6 queued again" {
+	if ts := h.Toasts(); len(ts) == 0 || ts[len(ts)-1].Text != "Build #6 queued again" || ts[len(ts)-1].Level != pluginsdk.ToastSuccess {
 		t.Errorf("toasts %+v", ts)
 	}
 	// The strips are the Layout tab's: the next tab's view has none.

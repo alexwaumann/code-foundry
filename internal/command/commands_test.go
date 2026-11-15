@@ -203,6 +203,10 @@ func TestBuiltinCommands(t *testing.T) {
 			wantMsg: "windows=2", wantJSON: `{"windows":2,"receivers":3}`,
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
 				Level: v1.UiIntent_Notify_LEVEL_WARNING, Title: "hi", Body: "there"}}}},
+		{name: "ui.notify success", cmd: "ui.notify", args: map[string]string{"title": "Deployed", "level": "success"}, wantMsg: "windows=2",
+			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
+				Level: v1.UiIntent_Notify_LEVEL_SUCCESS, Title: "Deployed"}}}},
+		{name: "ui.notify unknown level", cmd: "ui.notify", args: map[string]string{"title": "hi", "level": "attention"}, wantErr: command.ErrInvalidArgs},
 		{name: "ui.notify default level", cmd: "ui.notify", args: map[string]string{"title": "hi"}, wantMsg: "windows=2",
 			wantReq: &v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{
 				Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "hi"}}}},

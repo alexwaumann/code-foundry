@@ -223,6 +223,11 @@ describe("notify", () => {
     useViewsStore.setState({ themesOpen: false });
   });
 
+  it.each(["success", "info", "warning", "error"] as const)("a %s notification is a toast of that level", (level) => {
+    applyIntent({ kind: "notify", level, title: "Remembered: Use tabs", body: 'By thread "Fix login".' });
+    expect(notify).toHaveBeenCalledWith({ level, title: "Remembered: Use tabs", description: 'By thread "Fix login".' });
+  });
+
   it.each([
     ["no link", undefined, undefined],
     ["a link this window does not know", "nowhere:at-all", { description: "b" }],

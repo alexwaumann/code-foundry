@@ -283,13 +283,13 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		if err := d.own.sendHello(ctx, d.h); err != nil {
 			return err
 		}
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "sent to the assistant")
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastSuccess, "Sent to the assistant")
 		return nil
 	case "click:ask-main":
 		if err := askMain(ctx, d.h, act, d.open.Context.ThreadID); err != nil {
 			return err
 		}
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "sent to the thread")
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastSuccess, "Sent to the thread")
 		return nil
 	case "click:restart-shell":
 		if err := d.own.restartShell(ctx, d.h); err != nil {
@@ -311,12 +311,15 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 			return err
 		}
 	case "submit:runs-note":
-		if err := d.runs.saveNote(act.Values); err != nil {
+		run, err := d.runs.saveNote(act.Values)
+		if err != nil {
 			d.mu.Unlock()
 			return err
 		}
 		d.mu.Unlock()
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "note saved")
+		// The text is the title; the description says which run. An older host shows it as
+		// info without the description, and "Note saved" still reads right alone.
+		_ = d.h.ToastWith(pluginsdk.ToastParams{Instance: act.Instance, Level: pluginsdk.ToastSuccess, Text: "Note saved", Description: "On " + run})
 		return d.render()
 	case "check:check", "move:move", "add:add", "edit:edit":
 		if err := d.todo.act(act); err != nil {
@@ -330,7 +333,7 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		}
 	case "click:abort-build":
 		d.mu.Unlock()
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #"+act.Data+" aborted")
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastSuccess, "Build #"+act.Data+" aborted")
 		return nil
 	case "click:click", "click:refresh":
 		d.clicks++
@@ -342,7 +345,7 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		d.tab = "log"
 	case "click:rerun-run":
 		d.mu.Unlock()
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #"+act.Data+" queued again")
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastSuccess, "Build #"+act.Data+" queued again")
 		return nil
 	case "click:goto-form":
 		d.tab = "form"
@@ -360,7 +363,7 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		}
 		d.saved = act.Values
 		d.mu.Unlock()
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "saved")
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastSuccess, "Saved")
 		return d.render()
 	case "click:reset":
 		d.saved = nil
@@ -378,13 +381,13 @@ func (d *demo) Act(ctx context.Context, act pluginsdk.SurfaceAct) error {
 		d.peopleQuery = act.Query()
 	case "click:layout-rerun":
 		d.mu.Unlock()
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #6 queued again")
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastSuccess, "Build #6 queued again")
 		return nil
 	case "click:stat-filter":
 		d.failed = !d.failed
 	case "click:open-build":
 		d.mu.Unlock()
-		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "build #"+act.Data)
+		_ = d.h.ToastIn(act.Instance, pluginsdk.ToastInfo, "Build #"+act.Data)
 		return nil
 	case "click:start-log":
 		if !d.running {

@@ -144,6 +144,16 @@ describe("mapping", () => {
       lines: [{ text: "a", tone: "error" }, { text: "b" }],
     });
     expect(toSurfaceUpdateView(create(SurfaceUpdateSchema, { update: { case: "toast", value: { instance: "i", level: "weird", text: "t" } } }))).toEqual({ kind: "toast", instance: "i", level: "info", text: "t" });
+    for (const level of ["success", "info", "attention", "error"]) {
+      expect(toSurfaceUpdateView(create(SurfaceUpdateSchema, { update: { case: "toast", value: { instance: "i", level, text: "t" } } }))).toEqual({ kind: "toast", instance: "i", level, text: "t" });
+    }
+    expect(toSurfaceUpdateView(create(SurfaceUpdateSchema, { update: { case: "toast", value: { instance: "i", level: "success", text: "Note saved", description: "3 lines" } } }))).toEqual({
+      kind: "toast",
+      instance: "i",
+      level: "success",
+      text: "Note saved",
+      description: "3 lines",
+    });
     expect(toSurfaceUpdateView(create(SurfaceUpdateSchema, { update: { case: "heartbeat", value: {} } }))).toBe(HEARTBEAT);
   });
 });

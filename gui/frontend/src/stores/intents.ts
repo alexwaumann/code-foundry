@@ -107,7 +107,7 @@ export function applyIntent(intent: UiIntentView): void {
             }
           : undefined;
       const title = intent.title || intent.body;
-      notify({ level: intent.level === "error" || intent.level === "warning" ? intent.level : "info", title, ...opts });
+      notify({ level: intent.level, title, ...opts });
       break;
     }
     case "showView":

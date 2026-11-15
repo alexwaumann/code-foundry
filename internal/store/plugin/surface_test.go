@@ -174,6 +174,9 @@ func surfacePlugin() pluginsdk.Plugin {
 				return h.InvokeAsk(ctx, "thread.archive", nil, pluginsdk.UiContext{ThreadID: "s-1"})
 			},
 			"toast": func(_ context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+				if d := req.Arg("description"); d != "" {
+					return pluginsdk.CommandResult{}, h.ToastWith(pluginsdk.ToastParams{Instance: req.Arg("instance"), Level: pluginsdk.ToastSuccess, Text: "Saved", Description: d})
+				}
 				return pluginsdk.CommandResult{}, h.ToastIn(req.Arg("instance"), pluginsdk.ToastError, "boom")
 			},
 			"hold-open": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
@@ -244,7 +247,7 @@ func surfaceManifest() pluginsdk.Manifest {
 		Permissions: pluginsdk.Permissions{Commands: []string{"thread.archive"}, Secrets: true},
 		Commands: []pluginsdk.CommandSpec{
 			{Name: "on", Title: "On"}, {Name: "off", Title: "Off"}, {Name: "ask", Title: "Ask"},
-			{Name: "toast", Title: "Toast", Args: []pluginsdk.ArgSpec{{Name: "instance"}}},
+			{Name: "toast", Title: "Toast", Args: []pluginsdk.ArgSpec{{Name: "instance"}, {Name: "description"}}},
 			{Name: "gated-cmd", Title: "Gated", When: "surf.on"},
 			{Name: "broken-when", Title: "Broken when", When: "thread &&"},
 			{Name: "hold-open", Title: "Hold open"}, {Name: "release-open", Title: "Release open"},
@@ -841,8 +844,45 @@ func TestInvokeAskAndToasts(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := w.until("toast", func(u plugin.SurfaceUpdate) bool { return u.Toast != nil })
-	if u.Toast.Level != "error" || u.Toast.Text != "boom" {
+	if u.Toast.Level != "error" || u.Toast.Text != "boom" || u.Toast.Description != "" {
 		t.Errorf("toast %+v", u.Toast)
+	}
+}
+
+// ToastWith's success level and description reach an instance's viewers, and a toast
+// without an instance reaches every window as a notification titled with its text.
+func TestToastWithDescription(t *testing.T) {
+	for _, instance := range []bool{true, false} {
+		e := newSurfEnv(t, nil)
+		w := e.watch("panel", s1)
+		w.view("first", contains("count 0"))
+		args := map[string]string{"description": "to notes.md"}
+		if instance {
+			args["instance"] = w.key
+		}
+		if _, err := e.invoke("plugin.surf.toast", args, command.Context{}); err != nil {
+			t.Fatal(err)
+		}
+		if instance {
+			u := w.until("toast", func(u plugin.SurfaceUpdate) bool { return u.Toast != nil })
+			if want := (plugin.SurfaceToast{Instance: w.key, Level: "success", Text: "Saved", Description: "to notes.md"}); *u.Toast != want {
+				t.Errorf("toast %+v, want %+v", *u.Toast, want)
+			}
+			continue
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		var n *v1.UiIntent_Notify
+		for n == nil && time.Now().Before(deadline) {
+			for _, in := range e.emit.Intents() {
+				if in.GetNotify() != nil {
+					n = in.GetNotify()
+				}
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		if n.GetLevel() != v1.UiIntent_Notify_LEVEL_SUCCESS || n.GetTitle() != "Saved" || n.GetBody() != "to notes.md" {
+			t.Errorf("notify %v", n)
+		}
 	}
 }
 

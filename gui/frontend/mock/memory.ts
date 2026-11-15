@@ -137,7 +137,7 @@ export class MockMemory {
 
   private notify(title: string, by: string): void {
     this.deps.emit({
-      intent: { case: "notify", value: { level: UiIntent_Notify_Level.INFO, title: title.slice(0, 120), body: `By thread "${by}".`, link: "settings:memory", linkLabel: "Show in Settings" } },
+      intent: { case: "notify", value: { level: UiIntent_Notify_Level.SUCCESS, title: title.slice(0, 120), body: `By thread "${by}".`, link: "settings:memory", linkLabel: "Show in Settings" } },
     });
   }
 

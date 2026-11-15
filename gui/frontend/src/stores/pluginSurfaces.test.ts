@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { viewNodes, type PluginViewModel, type ViewNode } from "@/api/plugin";
 import { demoView } from "@/test/pluginFixtures";
-import { appendToLog, appendToView, applySurfaceUpdate, draftKeyOf, emptyEntry, formHasErrors, formsOf, LOG_MAX_LINES, reconcileResets, settleSubmits, unknownNodes } from "./pluginSurfaces";
+import { appendToLog, appendToView, applySurfaceUpdate, draftKeyOf, emptyEntry, formHasErrors, formsOf, LOG_MAX_LINES, pluginToastNotice, reconcileResets, settleSubmits, unknownNodes } from "./pluginSurfaces";
 
 const entry = emptyEntry({ plugin: "hello", surface: "demo" });
 
@@ -22,6 +22,25 @@ describe("applySurfaceUpdate", () => {
     expect(next.view?.nodes.find((n) => n.key === "build-log")?.log?.text).toBe("[1/6] fetching sources\n");
     expect(applySurfaceUpdate(e, { kind: "append", instance: "", version: 3, key: "build-log", text: "x", lines: [] })).toBe(e);
     expect(applySurfaceUpdate(e, { kind: "toast", instance: "", level: "info", text: "saved" })).toBe(e);
+  });
+});
+
+describe("pluginToastNotice", () => {
+  it.each([
+    ["success", "success"],
+    ["info", "info"],
+    ["attention", "warning"],
+    ["error", "error"],
+  ] as const)("a plugin's %s toast is the app's %s, its text the title", (level, want) => {
+    expect(pluginToastNotice({ kind: "toast", instance: "i", level, text: "Note saved" })).toEqual({ level: want, title: "Note saved" });
+  });
+
+  it("a description goes under the title", () => {
+    expect(pluginToastNotice({ kind: "toast", instance: "i", level: "success", text: "Note saved", description: "3 lines in notes.md" })).toEqual({
+      level: "success",
+      title: "Note saved",
+      description: "3 lines in notes.md",
+    });
   });
 });
 

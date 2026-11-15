@@ -28,6 +28,9 @@ const (
 	UiIntent_Notify_LEVEL_INFO        UiIntent_Notify_Level = 1
 	UiIntent_Notify_LEVEL_WARNING     UiIntent_Notify_Level = 2
 	UiIntent_Notify_LEVEL_ERROR       UiIntent_Notify_Level = 3
+	// Something the user or a thread did is done, and where it happened is not on
+	// screen (a thread remembered a preference).
+	UiIntent_Notify_LEVEL_SUCCESS UiIntent_Notify_Level = 4
 )
 
 // Enum value maps for UiIntent_Notify_Level.
@@ -37,12 +40,14 @@ var (
 		1: "LEVEL_INFO",
 		2: "LEVEL_WARNING",
 		3: "LEVEL_ERROR",
+		4: "LEVEL_SUCCESS",
 	}
 	UiIntent_Notify_Level_value = map[string]int32{
 		"LEVEL_UNSPECIFIED": 0,
 		"LEVEL_INFO":        1,
 		"LEVEL_WARNING":     2,
 		"LEVEL_ERROR":       3,
+		"LEVEL_SUCCESS":     4,
 	}
 )
 
@@ -1713,7 +1718,7 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"\tVarsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x15\n" +
-	"\x13WatchIntentsRequest\"\xce\x0f\n" +
+	"\x13WatchIntentsRequest\"\xe1\x0f\n" +
 	"\bUiIntent\x12O\n" +
 	"\x0efocus_terminal\x18\x01 \x01(\v2&.codefoundry.v1.UiIntent.FocusTerminalH\x00R\rfocusTerminal\x12L\n" +
 	"\rfocus_project\x18\x02 \x01(\v2%.codefoundry.v1.UiIntent.FocusProjectH\x00R\ffocusProject\x12I\n" +
@@ -1759,7 +1764,7 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12#\n" +
 	"\rworktree_path\x18\x02 \x01(\tR\fworktreePath\x1a#\n" +
 	"\vOpenPalette\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\x1a\xf6\x02\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x1a\x89\x03\n" +
 	"\x06Notify\x12;\n" +
 	"\x05level\x18\x01 \x01(\x0e2%.codefoundry.v1.UiIntent.Notify.LevelR\x05level\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
@@ -1769,13 +1774,14 @@ const file_codefoundry_v1_ui_proto_rawDesc = "" +
 	"link_label\x18\x05 \x01(\tR\tlinkLabel\x12%\n" +
 	"\x0esecondary_link\x18\x06 \x01(\tR\rsecondaryLink\x120\n" +
 	"\x14secondary_link_label\x18\a \x01(\tR\x12secondaryLinkLabel\x12%\n" +
-	"\x0eunless_showing\x18\b \x01(\tR\runlessShowing\"R\n" +
+	"\x0eunless_showing\x18\b \x01(\tR\runlessShowing\"e\n" +
 	"\x05Level\x12\x15\n" +
 	"\x11LEVEL_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +
 	"LEVEL_INFO\x10\x01\x12\x11\n" +
 	"\rLEVEL_WARNING\x10\x02\x12\x0f\n" +
-	"\vLEVEL_ERROR\x10\x03B\b\n" +
+	"\vLEVEL_ERROR\x10\x03\x12\x11\n" +
+	"\rLEVEL_SUCCESS\x10\x04B\b\n" +
 	"\x06intent2\xa7\x04\n" +
 	"\tUiService\x12Q\n" +
 	"\fWatchIntents\x12#.codefoundry.v1.WatchIntentsRequest\x1a\x18.codefoundry.v1.UiIntent\"\x000\x01\x12[\n" +
