@@ -39,7 +39,8 @@ export async function resumeWorktree(projectId: string, path: string, archivedTh
     composeIn(projectId, path);
     return;
   }
-  if (await archiveThread(archivedThreadId, false)) useUiStore.getState().select({ kind: "thread", id: archivedThreadId }, { focusPrompt: true });
+  // The thread opens: that is the result, so no success toast.
+  if (await archiveThread(archivedThreadId, false, { inView: true })) useUiStore.getState().select({ kind: "thread", id: archivedThreadId }, { focusPrompt: true });
 }
 
 /**
@@ -62,8 +63,8 @@ export function revealProject(projectId: string): Promise<boolean> {
 }
 
 /** project.unregister (confirmed). */
-export function unregisterProject(projectId: string): Promise<boolean> {
-  return runCommand("project.unregister", {}, projectContext(projectId));
+export function unregisterProject(projectId: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand("project.unregister", {}, projectContext(projectId), source);
 }
 
 /** project.github.publish's presenter for the project: the publish dialog (owner, name, visibility). */

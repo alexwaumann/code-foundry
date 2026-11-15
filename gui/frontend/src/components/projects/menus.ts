@@ -32,6 +32,11 @@ export interface ProjectMenuFacts {
  * agents (project.worktree.new stays for the CLI and the palette). No New action: Details'
  * Actions row has it. docs/notes/projects-table-2-context-menus.md,
  * docs/notes/project-page-1-title-block.md.
+ *
+ * No success toast where the result shows (docs/notes/toast-success-rule.md): Remove project
+ * (the row goes; the page goes back to the index without it), Initialize git (the kind
+ * changes), and Clean up on the page (its rows go). Clean up from the index, which lists no
+ * worktrees, still toasts what went.
  */
 export function projectMenu(projectId: string, { kind, step, cleanup }: ProjectMenuFacts, opts: { page?: boolean } = {}): OverflowItem[] {
   const main = () => mainWorktreePath(useProjectsStore.getState(), projectId);
@@ -42,11 +47,11 @@ export function projectMenu(projectId: string, { kind, step, cleanup }: ProjectM
   if (!opts.page) items.push({ label: "Open in Finder", testId: "project-menu-reveal", onSelect: () => void revealProject(projectId) });
   items.push("separator", { label: "Rename", testId: "project-menu-rename", onSelect: () => { startProjectRename(projectId); } });
   if (kind !== "nogit" && cleanup !== null) {
-    items.push({ label: "Clean up merged worktrees", testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(projectId) });
+    items.push({ label: "Clean up merged worktrees", testId: "project-cleanup", badge: cleanup, disabled: cleanup === 0, onSelect: () => void cleanupMergedWorktrees(projectId, { inView: opts.page === true }) });
   }
   if (step === "publish") items.push({ label: "Publish to GitHub", testId: "project-menu-publish", onSelect: () => { publishProject(projectId); } });
-  if (step === "init") items.push({ label: "Initialize git", testId: "project-menu-init-git", onSelect: () => void initGitIn(projectId) });
-  items.push("separator", { label: "Remove project", destructive: true, testId: "project-unregister", onSelect: () => void unregisterProject(projectId) });
+  if (step === "init") items.push({ label: "Initialize git", testId: "project-menu-init-git", onSelect: () => void initGitIn(projectId, { inView: true }) });
+  items.push("separator", { label: "Remove project", destructive: true, testId: "project-unregister", onSelect: () => void unregisterProject(projectId, { inView: true }) });
   return items;
 }
 
@@ -63,7 +68,8 @@ export interface WorkspaceMenuPart {
  * A workspace's menu, one list for its index row's context menu and its page's ⋯: New thread,
  * New terminal (in its own folder; left out when it has none, `folder`), Open in Finder (a split
  * item whose › opens the apps for its folder, as a checkout's); Rename, Add project (its page's
- * Add project list); Remove workspace. docs/notes/workspace-page-polish.md.
+ * Add project list); Remove workspace (no success toast: the row goes, or the page goes back
+ * to the index without it). docs/notes/workspace-page-polish.md.
  */
 export function workspaceMenu(workspaceId: string, { folder }: { folder: boolean }): RowMenuEntry<WorkspaceMenuPart>[] {
   const items: RowMenuEntry<WorkspaceMenuPart>[] = [{ label: "New thread", testId: "workspace-menu-new-thread", onSelect: () => { composeInWorkspace(workspaceId); } }];
@@ -74,7 +80,7 @@ export function workspaceMenu(workspaceId: string, { folder }: { folder: boolean
     { label: "Rename", testId: "workspace-menu-rename", onSelect: () => { startWorkspaceRename(workspaceId); } },
     { label: "Add project", testId: "workspace-menu-add-project", onSelect: () => { openWorkspaceAddProject(workspaceId); } },
     "separator",
-    { label: "Remove workspace", destructive: true, testId: "workspace-menu-remove", onSelect: () => void removeWorkspace(workspaceId) },
+    { label: "Remove workspace", destructive: true, testId: "workspace-menu-remove", onSelect: () => void removeWorkspace(workspaceId, { inView: true }) },
   );
   return items;
 }
@@ -125,7 +131,7 @@ export async function copyWithToast(text: string, what: string): Promise<void> {
  * New thread here, New terminal here; Show changes (with something to show) and Open pull
  * request #N (with one); Open in Finder (a split item whose › opens the apps), Copy path, Copy
  * branch name (on a branch), Run action (a submenu, when the project has actions); Remove
- * worktree (not on main). Text only, like every Projects page menu.
+ * worktree (not on main; its row goes, so no success toast). Text only, like every Projects page menu.
  */
 export function checkoutMenu(f: CheckoutMenuFacts): RowMenuEntry<CheckoutMenuPart>[] {
   const { projectId, path } = f;
@@ -150,7 +156,7 @@ export function checkoutMenu(f: CheckoutMenuFacts): RowMenuEntry<CheckoutMenuPar
   const branch = f.branch;
   if (branch) items.push({ label: "Copy branch name", testId: "checkout-menu-copy-branch", onSelect: () => void copyWithToast(branch, "Branch name") });
   if (f.actions) items.push({ kind: "actions", testId: "checkout-menu-actions", projectId, path });
-  if (!f.isMain) items.push("separator", { label: "Remove worktree", destructive: true, testId: "checkout-menu-remove", onSelect: () => void removeWorktree(projectId, path) });
+  if (!f.isMain) items.push("separator", { label: "Remove worktree", destructive: true, testId: "checkout-menu-remove", onSelect: () => void removeWorktree(projectId, path, { inView: true }) });
   return items;
 }
 
@@ -173,7 +179,8 @@ export type LeftoverMenuPart = Extract<CheckoutMenuPart, { kind: "open-in" }>;
  * A leftover worktree's right-click menu on its project's page, in "Worktrees without threads"
  * (docs/notes/project-page-3-leftovers.md): Resume “<name>” (its last archived thread, when one
  * was), New thread here, New terminal here; Show changes (while it holds work); Open in Finder
- * (the checkouts' split item), Copy path, Copy branch name (on a branch); Remove worktree.
+ * (the checkouts' split item), Copy path, Copy branch name (on a branch); Remove worktree
+ * (its row goes: no success toast). Resume opens the thread, so it does not toast either.
  */
 export function leftoverMenu(f: LeftoverMenuFacts): RowMenuEntry<LeftoverMenuPart>[] {
   const { projectId, path } = f;
@@ -192,6 +199,6 @@ export function leftoverMenu(f: LeftoverMenuFacts): RowMenuEntry<LeftoverMenuPar
   );
   const branch = f.branch;
   if (branch) items.push({ label: "Copy branch name", testId: "leftover-menu-copy-branch", onSelect: () => void copyWithToast(branch, "Branch name") });
-  items.push("separator", { label: "Remove worktree", destructive: true, testId: "leftover-menu-remove", onSelect: () => void removeWorktree(projectId, path) });
+  items.push("separator", { label: "Remove worktree", destructive: true, testId: "leftover-menu-remove", onSelect: () => void removeWorktree(projectId, path, { inView: true }) });
   return items;
 }

@@ -338,8 +338,8 @@ describe("a project's page", () => {
     expect(lastInvocation("project.git.init")?.context).toMatchObject({ activeProjectId: "repo-wr" });
     expect(page().getAttribute("data-kind")).toBe("git");
     expect(texts(document, "worktree-branch")).toEqual(["main"]);
-    // The menu closed as it ran: its success is toasted, the daemon's message as the title.
-    expect(successes().map((n) => n.title)).toEqual(["Initialized git in ~/Documents/writing"]);
+    // The page's kind changing is the result, from its menu too: no success toast.
+    expect(successes()).toEqual([]);
   });
 
   it("Refresh fetches (with a remote) then refreshes, disabled and spinning meanwhile; without a remote only refreshes", async () => {

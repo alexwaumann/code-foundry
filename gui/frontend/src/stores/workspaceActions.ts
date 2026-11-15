@@ -13,7 +13,7 @@ import { WORKSPACE_PRIMARY } from "@/lib/projectSet";
 import { editInstructionsPrompt, instructionsStep, workspaceFolder } from "@/lib/workspaceCard";
 import { projectRef } from "@/lib/projects";
 import { newTerminalInContext } from "@/shell/terminalActions";
-import { runCommand, runCommandForResult } from "./commands";
+import { runCommand, runCommandForResult, type CommandSource } from "./commands";
 import { emptyContext, worktreeContext } from "./context";
 import { openFileInPanel } from "./filePanel";
 import { mainWorktreePath, useProjectsStore, type ProjectsData } from "./projects";
@@ -57,9 +57,9 @@ export function removeWorkspaceProject(workspaceId: string, projectId: string): 
 }
 
 /** workspace.remove (the daemon confirms: a synthetic workspace's instructions and skills go too). Named by name, which reads better in the prompt. */
-export function removeWorkspace(workspaceId: string): Promise<boolean> {
+export function removeWorkspace(workspaceId: string, source: CommandSource = {}): Promise<boolean> {
   const name = useWorkspacesStore.getState().byId[workspaceId]?.name ?? workspaceId;
-  return runCommand("workspace.remove", { workspace: name }, workspaceContext(workspaceId));
+  return runCommand("workspace.remove", { workspace: name }, workspaceContext(workspaceId), source);
 }
 
 /** workspace.reveal: its root, else its own folder, in Finder. */
