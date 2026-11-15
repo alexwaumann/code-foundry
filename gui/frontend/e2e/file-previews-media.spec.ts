@@ -23,7 +23,7 @@ async function openFile(page: Page, path: string): Promise<void> {
 }
 
 /** The element's clock, in seconds. */
-const clock = (page: Page) => page.evaluate(() => (document.querySelector('[data-testid="media-element"]') as HTMLMediaElement | null)?.currentTime ?? -1);
+const clock = (page: Page) => page.evaluate(() => document.querySelector<HTMLMediaElement>('[data-testid="media-element"]')?.currentTime ?? -1);
 
 test.beforeEach(async ({ page }) => {
   await resetMock();

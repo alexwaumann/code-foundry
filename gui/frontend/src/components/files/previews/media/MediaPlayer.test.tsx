@@ -109,10 +109,10 @@ function player(kind: MediaKind = "video", path = PATH, onMeta = vi.fn()) {
   const file = read({ path, mime: kind === "video" ? "video/webm" : "audio/mpeg" });
   return render(<MediaPlayer kind={kind} file={file} path={path} name={path.split("/").pop() ?? ""} mode="play" place={{ project: "p", dir: "/Users/me/w", file: path }} page={undefined} reloads={0} findKey={undefined} onMeta={onMeta} onMode={vi.fn()} />);
 }
-const element = (root: HTMLElement | Document = document) => within(root as HTMLElement).getByTestId("media-element") as HTMLMediaElement;
-const streaming = async (url: string, root?: HTMLElement) => {
+const element = () => screen.getByTestId<HTMLMediaElement>("media-element");
+const streaming = async (url: string) => {
   await waitFor(() => {
-    expect(element(root).getAttribute("src")).toBe(url);
+    expect(element().getAttribute("src")).toBe(url);
   });
 };
 /** The element loaded its metadata: a 42 s, 1440 × 900 video. */
@@ -147,6 +147,15 @@ describe("MediaPlayer", () => {
     expect(onMeta).toHaveBeenLastCalledWith("0:42 · 1440 × 900 · 3.1 MB · WebM");
     expect(screen.getByTestId("media-duration").textContent).toBe("0:42");
     expect(screen.getByTestId("media-time").textContent).toBe("0:00");
+    // A hair past the start, so a paused video shows its first frame rather than black.
+    expect(element().currentTime).toBe(0.001);
+  });
+
+  it("audio stays at the start: it has no frame to show", async () => {
+    player("audio", "/Users/me/w/song.mp3");
+    await streaming("http://127.0.0.1:7/media/g1/a.webm");
+    loaded(element(), { videoWidth: 0, videoHeight: 0 });
+    expect(element().currentTime).toBe(0);
   });
 
   it("a file WebKit cannot play gets a clear state with Open in Finder, and is not asked for again", async () => {

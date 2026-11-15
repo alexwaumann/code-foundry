@@ -17,6 +17,9 @@ import { useMediaGrant } from "./useMediaGrant";
 
 export type MediaKind = "video" | "audio";
 
+/** Where a paused video is put to show its first frame (seconds; under a frame at any rate). */
+const FIRST_FRAME = 0.001;
+
 const HEADINGS: Readonly<Record<MediaKind, string>> = {
   video: "This video format cannot be played here",
   audio: "This audio format cannot be played here",
@@ -163,6 +166,9 @@ export function MediaPlayer({ kind, file, path, name, place, reloads, onMeta }: 
         if (r.play) el.play().catch(() => undefined);
       }
       const v = el instanceof HTMLVideoElement ? el : null;
+      // The Wails window's WKWebView paints a paused video black until it decodes a frame,
+      // which preload="metadata" stops short of: a seek just past the start shows the first.
+      if (!r && v && el.currentTime === 0) el.currentTime = FIRST_FRAME;
       dispatch({ type: "meta", facts: { duration: el.duration, width: v?.videoWidth ?? 0, height: v?.videoHeight ?? 0 } });
       dispatch({ type: "time", time: el.currentTime, ranges: rangesOf(el.buffered) });
     },
@@ -228,7 +234,7 @@ export function MediaPlayer({ kind, file, path, name, place, reloads, onMeta }: 
       tabIndex={0}
       // Bare keys inside are the player's (keys/bindings.ts chordFires).
       data-keys-local=""
-      className="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      className="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-cf-focus focus-visible:ring-inset"
       data-testid="media-player"
       data-kind={kind}
       data-status={blocked ? (failure !== null ? "failed" : "unplayable") : state.status}
