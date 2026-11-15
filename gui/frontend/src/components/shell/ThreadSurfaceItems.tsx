@@ -3,8 +3,8 @@ import { GitPullRequest, Plus, SquareTerminal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { dropdownMenuKit, type MenuKit } from "@/components/thread/menuKit";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
-import { moveToSpaceAction, newTerminalAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces, type LinkedAction, type ThreadSurfaceItem } from "@/shell/linked";
-import { moveToNewSpace } from "@/shell/spaceActions";
+import { newTerminalAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces, type LinkedAction, type ThreadSurfaceItem } from "@/shell/linked";
+import { moveThreadToSpace, moveToNewSpace } from "@/shell/spaceActions";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, useTab } from "@/stores/layout";
 import { useProjectsStore } from "@/stores/projects";
@@ -132,9 +132,11 @@ export function ThreadSurfaceItems({
 /**
  * Move to space ▸: the spaces in the top bar's order, each with its layout glyph, the thread's own
  * marked "here" and disabled; then New space, which makes one (without showing it) and moves the
- * thread there. thread.space.move takes the thread's linked tabs in its space along.
+ * thread there. thread.space.move takes the thread's linked tabs in its space along. Toasted
+ * "Moved to <space>" from the header's menu, silent from the sidebar row's (kit.rowInView: the
+ * row leaving is the result).
  */
-export function MoveToSpaceItems({ threadId, kit = dropdownMenuKit, onPick }: { threadId: string; kit?: MenuKit; onPick: (a: LinkedAction) => void }) {
+export function MoveToSpaceItems({ threadId, kit = dropdownMenuKit }: { threadId: string; kit?: MenuKit }) {
   const spaces = useLayoutStore(useShallow((s) => spaceChoices(s, threadId).map((c) => [c.id, c.name, c.here ? "1" : ""].join(SEP))));
   return (
     <>
@@ -147,7 +149,7 @@ export function MoveToSpaceItems({ threadId, kit = dropdownMenuKit, onPick }: { 
             data-testid="move-to-space-item"
             data-space-id={id}
             onSelect={() => {
-              onPick(moveToSpaceAction(threadId, id));
+              void moveThreadToSpace(threadId, id, { inView: kit.rowInView });
             }}
           >
             <SpaceIcon spaceId={id} />
@@ -160,7 +162,7 @@ export function MoveToSpaceItems({ threadId, kit = dropdownMenuKit, onPick }: { 
       <kit.Item
         data-testid="move-to-new-space"
         onSelect={() => {
-          void moveToNewSpace(threadId);
+          void moveToNewSpace(threadId, { inView: kit.rowInView });
         }}
       >
         <Plus />

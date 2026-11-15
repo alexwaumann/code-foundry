@@ -318,8 +318,8 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     fireEvent.click(presets[0] as HTMLElement);
     const [id, until, source] = snoozeThread.mock.calls[0] as unknown as [string, number, unknown];
     expect(id).toBe("s-1");
-    // The row leaves for Snoozed; the pane shows its snooze strip: no success toast.
-    expect(source).toEqual({ inView: true });
+    // The snooze closes the thread's tab and the sidebar may be hidden: the header's menu toasts.
+    expect(source).toEqual({ inView: false });
     expect(until - before).toBeGreaterThan(3_600_000 - 5_000);
     cleanup();
     setThread({});
@@ -335,8 +335,23 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     expect(item.textContent).toBe("Save for laterNo alarm");
     expect(screen.getByTestId("snooze-pick").compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(item);
-    expect(saveThreadForLater).toHaveBeenCalledWith("s-1", { inView: true });
+    expect(saveThreadForLater).toHaveBeenCalledWith("s-1", { inView: false });
     expect(snoozeThread).not.toHaveBeenCalled();
+  });
+
+  // docs/notes/toast-success-rule.md: the row leaves for Snoozed, so the row's menu is silent.
+  it.each([
+    ["snooze-preset", () => {
+        expect(snoozeThread).toHaveBeenCalledWith("s-1", expect.any(Number), { inView: true });
+      }],
+    ["snooze-save", () => {
+        expect(saveThreadForLater).toHaveBeenCalledWith("s-1", { inView: true });
+      }],
+  ] as [string, () => void][])("Snooze ▸ %s from the sidebar row's menu runs with no success toast (the row shows it)", (testId, check) => {
+    setThread({});
+    fireEvent.keyDown(within(openRowMenu()).getByTestId("menu-snooze"), { key: "ArrowRight" });
+    fireEvent.click(screen.getAllByTestId(testId)[0] as HTMLElement);
+    check();
   });
 
   it("Snooze ▸ leaves Save for later out for a thread already saved", () => {

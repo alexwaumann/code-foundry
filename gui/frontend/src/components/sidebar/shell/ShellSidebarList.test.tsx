@@ -23,6 +23,8 @@ vi.mock("@/stores/ember", async (orig) => ({ ...(await orig<typeof import("@/sto
 const runs: { name: string; args: Record<string, string>; thread?: string }[] = [];
 const runCommandForResult = vi.hoisted(() => vi.fn());
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", async (orig) => ({ ...(await orig<typeof import("@/lib/notify")>()), notify }));
 
 const { ShellSidebarList } = await import("./ShellSidebarList");
 const { resetLayout } = await import("@/stores/layout");
@@ -331,6 +333,8 @@ describe("the shell sidebar list", () => {
     fireEvent.click(within(sub).getByText("Review"));
     await settle();
     expect(runs).toEqual([{ name: "thread.space.move", args: { id: "s-5", space: "sp-b" }, thread: "s-5" }]);
+    // The row leaving the list is the result: no toast (docs/notes/toast-success-rule.md).
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("lists the current space's threads and follows a space switch; Needs you keeps every space's asks", async () => {

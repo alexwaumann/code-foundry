@@ -96,10 +96,11 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * use is left out.
  *
  * Success toasts (docs/notes/toast-success-rule.md): none where both menus' places show the
- * result (Regenerate name: the row and the tab; Snooze, Unsnooze: the row and the pane's
- * snooze strip; Run in: the row and the header's chip). Pin, Clear flags and Archive show
- * only in the sidebar row: silent from the row's menu, toasted from the header's
- * (kit.rowInView). Restart Claude shows nowhere and toasts from both.
+ * result (Regenerate name: the row and the tab; Unsnooze: the row and the pane's snooze
+ * strip; Run in: the row and the header's chip). Pin, Snooze, Save for later, Clear flags and
+ * Archive show only in the sidebar row (a snooze closes the thread's tab): silent from the
+ * row's menu, toasted from the header's (kit.rowInView). Restart Claude shows nowhere and
+ * toasts from both.
  */
 export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
   const noProject = useNoProjectThread(id);
@@ -184,6 +185,7 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
               id={id}
               Item={kit.Item}
               Separator={kit.Separator}
+              inView={kit.rowInView}
               onPreset={() => {
                 markInPlace(kit, id);
               }}
