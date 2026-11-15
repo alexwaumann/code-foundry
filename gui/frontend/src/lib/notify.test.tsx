@@ -23,9 +23,15 @@ beforeEach(() => {
   render(<Toaster />);
 });
 
-afterEach(() => {
+// sonner takes a dismissed toast out on a timer of its own. Left running, it fires after the
+// file's jsdom is gone ("window is not defined", an unhandled error that fails the run), so
+// each test waits for the toasts to be gone before it unmounts the Toaster.
+afterEach(async () => {
   act(() => {
     dismissNotice();
+  });
+  await waitFor(() => {
+    expect(toasts()).toHaveLength(0);
   });
   cleanup();
 });
