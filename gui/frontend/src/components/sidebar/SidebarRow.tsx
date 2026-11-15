@@ -648,7 +648,7 @@ function SnoozeLeft({ id }: { id: string }) {
  * badges or pin (such a thread is unpinned): the whole section is such threads. All of it is
  * dimmed (QUIET) but the rename field, which is being typed in.
  */
-function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
+export function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   // A provisional name, or one being regenerated: muted and italic until the model's title lands.
   const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);

@@ -4,20 +4,20 @@ import { DndContext, PointerSensor, useSensor, useSensors, type Announcements, t
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
-import { afterRev, runLayoutCommand } from "@/shell/commands";
 import { cancelledText, DRAG_INSTRUCTIONS, droppedText, overText, pickedUpText, sourceText, type DragNames } from "@/shell/drag/announce";
 import { sourceOf } from "@/shell/drag/draggable";
-import { dropCommand, dropPreview, shellDropLayout, type DropLayout } from "@/shell/drag/drop";
+import { dropPreview, shellDropLayout, type DropLayout } from "@/shell/drag/drop";
+import { dropPlan } from "@/shell/drag/dropPlan";
 import { fullscreenOn } from "@/shell/fullscreen";
 import { resetShellDrag, useShellDragStore } from "@/shell/drag/state";
 import { dropTarget, insertionBar, sameTarget, type DragScene, type DragSource, type DropTarget, type StripTab } from "@/shell/drag/targets";
-import { threadDropArgs } from "@/shell/drag/threadDrop";
+import { rowDragSource, threadDropsInGrid } from "@/shell/drag/threadSource";
 import { panesOf, type GeoNode } from "@/shell/geometry/types";
 import { paneFitsInSpace } from "@/shell/drag/room";
 import { runSpaceDrop } from "@/shell/spaceActions";
 import { spaceDropCommands } from "@/shell/spaces";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { geoTree, spaceOfThread, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
+import { geoTree, useCurrentSpaceId, useLayoutStore, type TabEntry } from "@/stores/layout";
 import { useThreadsStore } from "@/stores/threads";
 import { useShellViewStore } from "@/stores/shellView";
 
@@ -219,30 +219,13 @@ function GhostTitle({ tab }: { tab: TabEntry }) {
 }
 
 /**
- * A sidebar thread whose tab is open in the space drags as that tab (a move, never a second
- * tab). One of another space (a Needs you row) stays a thread: it can only go to a space tab.
- */
-function openThreadAsTab(src: DragSource | null, spaceId: string): DragSource | null {
-  if (src?.kind !== "thread") return src;
-  const s = useLayoutStore.getState();
-  if (spaceOfThread(s, src.thread) !== spaceId) return src;
-  const tab = Object.values(s.tabs).find((t) => t.kind === "thread" && t.thread === src.thread && s.panes[t.paneId]?.spaceId === spaceId);
-  return tab ? { kind: "tab", tab: tab.id, pane: tab.paneId } : src;
-}
-
-/** Opens a sidebar thread where it was dropped (shell/drag/threadDrop.ts): one thread.open with the place. */
-async function dropThread(thread: string, target: DropTarget): Promise<void> {
-  const opened = await runLayoutCommand("thread.open", threadDropArgs(thread, target));
-  if (opened) await afterRev(opened.rev);
-}
-
-/**
  * The pane grid's drag layer (docs/notes/shell-model.md, "Structure"): any tab drags (active or
  * not) to a place in a strip, onto a pane, onto a pane's edge, or onto the grid's outer edge; a
  * whole pane drags by its strip's free space to the same places. Hit-testing is
  * shell/drag/targets.ts on the drawn frame; the drop is one `tab.move` or `pane.move`
- * (shell/drag/drop.ts); a thread row from the sidebar opens where it lands (shell/drag/threadDrop.ts),
- * so the context wraps the sidebar too (ShellDndRoot). While a drag is on, a transparent shield over the window takes the
+ * (shell/drag/drop.ts); a thread row from the sidebar, of any section, opens where it lands
+ * (shell/drag/threadDrop.ts, shell/drag/threadSource.ts), so the context wraps the sidebar too
+ * (ShellDndRoot); shell/drag/dropPlan.ts says what a drop runs. While a drag is on, a transparent shield over the window takes the
  * pointer, so a terminal or an iframe under it never swallows the moves. Escape cancels
  * (dnd-kit's pointer sensor). It wraps the sidebar and the shell (App.tsx) and finds the grid inside itself.
  * See docs/notes/shell-14-drag.md.
@@ -296,8 +279,9 @@ export function ShellDnd({ children }: { children: ReactNode }) {
       return;
     }
     if (st.space) useShellDragStore.setState({ space: "" });
-    // A thread of another space has no place in this grid: only a space tab takes it.
-    if (st.source.kind === "thread" && spaceOfThread(useLayoutStore.getState(), st.source.thread) !== spaceId) {
+    // A thread of another space has no place in this grid: only a space tab takes it (an archived
+    // one with no tab open lives in none, so it does: shell/drag/threadSource.ts).
+    if (st.source.kind === "thread" && !threadDropsInGrid(st.source, useLayoutStore.getState(), spaceId)) {
       useShellDragStore.setState({ client, target: null, preview: null, bar: null });
       return;
     }
@@ -318,7 +302,8 @@ export function ShellDnd({ children }: { children: ReactNode }) {
   };
 
   const onDragStart = ({ active, activatorEvent }: DragStartEvent) => {
-    const src = openThreadAsTab(sourceOf(active.data.current), spaceId);
+    // A sidebar thread whose tab is open in the space drags as that tab (a move, never a second tab).
+    const src = rowDragSource(sourceOf(active.data.current), useLayoutStore.getState(), spaceId);
     snap.current = snapshot(gridEl(), spaceId);
     if (!src || !snap.current) return;
     const p = activatorEvent as PointerEvent;
@@ -353,23 +338,10 @@ export function ShellDnd({ children }: { children: ReactNode }) {
     resetShellDrag();
     if (!src) return;
     ended.current = { source: src, target };
-    if (space) {
-      const cmds = spaceDropCommands(src, space, useLayoutStore.getState());
-      endedSpace.current = cmds ? space : "";
-      if (cmds) void runSpaceDrop(cmds);
-      return;
-    }
-    if (!target) return;
-    if (src.kind === "thread") {
-      void dropThread(src.thread, target);
-      return;
-    }
-    const layout = useLayoutStore.getState();
     // The layout as it is now: a dragged tab or pane closed mid-drag moves nothing.
-    if (src.kind === "tab" ? !layout.tabs[src.tab] : !layout.panes[src.pane]) return;
-    const cmd = dropCommand(src, target, layout.panes[src.pane]?.tabIds ?? []);
-    if (!cmd) return;
-    void runLayoutCommand(cmd.name, cmd.args).then((res) => (res ? afterRev(res.rev) : undefined));
+    const plan = dropPlan(src, target, space, useLayoutStore.getState());
+    endedSpace.current = plan?.space ?? "";
+    if (plan) void runSpaceDrop(plan.commands);
   };
   const onDragCancel = () => {
     const { source: src } = useShellDragStore.getState();

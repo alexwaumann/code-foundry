@@ -22,7 +22,7 @@ export interface DropCommand {
  * place. `ownTabs` is the source pane's tab ids in strip order.
  */
 export function dropCommand(source: DragSource, target: DropTarget, ownTabs: readonly string[]): DropCommand | null {
-  // A sidebar thread opens first (threadDropSteps).
+  // A sidebar thread opens where it lands (thread.open: threadDrop.ts, dropPlan.ts).
   if (source.kind === "thread") return null;
   if (source.kind === "pane") {
     const pane = source.pane;
