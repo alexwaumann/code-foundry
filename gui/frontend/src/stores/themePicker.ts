@@ -6,7 +6,6 @@
  * The user's own themes (docs/notes/user-themes.md) list first; Customise copies a theme
  * into them (theme.duplicate) and Delete removes one (theme.delete).
  */
-import { notify } from "@/lib/notify";
 import { create } from "zustand";
 import { effectiveScheme, themeSlots, type ColorScheme, type ThemePreference } from "@/lib/theme";
 import { subscribeUserThemes, themeById, themesFor } from "@/themes";
@@ -202,28 +201,13 @@ export async function editTheme(id: string): Promise<boolean> {
 
 /**
  * Delete: removes one of the user's themes (theme.delete, which asks first). A slot that
- * used it moves to the theme it was copied from (the daemon says which); a preview of it
- * goes back to the slot's theme.
+ * used it moves to the theme it was copied from; a preview of it goes back to the slot's
+ * theme. No success toast: the row goes and the page's slots show where they moved.
  */
 export async function deleteTheme(id: string): Promise<boolean> {
-  const name = themeById.get(id)?.name ?? id;
   const res = await runCommandForResult("theme.delete", { theme: id }, { quiet: true });
   if (!res) return false;
   if (useThemeEditorStore.getState().id === id) stopEditing({ keepCopy: true });
   useThemePickerStore.setState((s) => (s.preview === id ? { preview: null } : s));
-  notify({ level: "success", title: `Deleted ${name}`, description: movedSlots(res.resultJson) });
   return true;
-}
-
-/** theme.delete's slots ({ "appearance.theme_dark": id }) as a sentence, or undefined. */
-function movedSlots(resultJson: string): string | undefined {
-  try {
-    const slots = (JSON.parse(resultJson) as { slots?: Record<string, string> }).slots ?? {};
-    const words = Object.entries(slots).map(([key, to]) => `the ${key.endsWith("_light") ? "light" : "dark"} theme is ${themeById.get(to)?.name ?? to} now`);
-    if (words.length === 0) return undefined;
-    const text = words.join("; ");
-    return text.charAt(0).toUpperCase() + text.slice(1) + ".";
-  } catch {
-    return undefined;
-  }
 }

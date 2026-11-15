@@ -3,6 +3,8 @@ import { setThemePreference, setThemeSlots } from "@/lib/theme";
 
 const runCommandForResult = vi.hoisted(() => vi.fn());
 vi.mock("./commands", async (orig) => ({ ...(await orig<typeof import("./commands")>()), runCommandForResult }));
+const notify = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice: vi.fn() }));
 
 import { setUserThemes, themeById, type UserThemeFile } from "@/themes";
 import {
@@ -214,13 +216,15 @@ describe("the user's themes", () => {
     expect(useThemePickerStore.getState().preview).toBe("nord");
   });
 
-  it("Delete runs theme.delete and drops a preview of it", async () => {
+  it("Delete runs theme.delete and drops a preview of it, with no success toast (the row goes, the slots show the move)", async () => {
+    notify.mockClear();
     setUserThemes([copyOf("nord-copy", "nord")]);
     useThemePickerStore.setState({ slot: "dark", preview: "nord-copy" });
     runCommandForResult.mockResolvedValue({ message: "deleted", resultJson: JSON.stringify({ id: "nord-copy", slots: { "appearance.theme_dark": "nord" } }) });
     await expect(deleteTheme("nord-copy")).resolves.toBe(true);
     expect(runCommandForResult).toHaveBeenCalledWith("theme.delete", { theme: "nord-copy" }, { quiet: true });
     expect(useThemePickerStore.getState().preview).toBeNull();
+    expect(notify).not.toHaveBeenCalled();
     setUserThemes([]);
   });
 
