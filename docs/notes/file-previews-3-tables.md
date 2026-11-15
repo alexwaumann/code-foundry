@@ -111,6 +111,7 @@ Five runs each, ms (WebKit's timer is coarse):
   imports `render`: `DataPreviews.test.tsx` calls `cleanup()` in `afterEach`.
 - `ch` is the width of `0` in the cell's font: keep the header and cells in the same font
   (the grid sets it once) or the widths disagree.
-- A big highlighted JSON that falls back to the code view (over the cap) can open scrolled
-  to its end. It does the same with the json kind removed, so it is the code view's, not
-  this change's.
+- A big highlighted JSON that falls back to the code view (over the cap) could open scrolled
+  to its end. It was the code view's, not this change's, and any long file's: fixed in the
+  virtualizer's scroll anchor (`patches/@pierre__diffs@1.5.2.patch`) and CodeBody's line
+  jump, docs/notes/file-tab-large-file-scroll.md.

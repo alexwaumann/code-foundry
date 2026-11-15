@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { DIFFS_TAG_NAME, type SupportedLanguages } from "@pierre/diffs";
+import { DEFAULT_VIRTUAL_FILE_METRICS, DIFFS_TAG_NAME, type SupportedLanguages } from "@pierre/diffs";
 import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
 import { zoomFactor } from "@/lib/zoom";
@@ -8,8 +8,8 @@ import { useKeepTopLine } from "./useKeepTopLine";
 
 /** Above this many lines the file lays out only its visible lines (the library's virtualizer). */
 export const VIRTUALIZE_LINES = 400;
-/** components/code/code.css --diffs-line-height. */
-const LINE_H = 19;
+/** Where the virtualizer lays out a line it has not measured yet (its 20 px; a drawn row is code.css's 19). */
+const LINE_H = DEFAULT_VIRTUAL_FILE_METRICS.lineHeight;
 /** How long to wait for the library to render the line (theme and grammar load first). */
 const SCROLL_WAIT_MS = 3000;
 
@@ -17,7 +17,7 @@ const SCROLL_WAIT_MS = 3000;
  * Scrolls the line into view, a third down the box, once the library has rendered it. A
  * virtualized file renders only what is near the viewport, so the box first jumps to where
  * the line would be with unwrapped lines, which makes the library render it, then lands on
- * the rendered row.
+ * the rendered row. The jump waits for the file's first rows (docs/notes/file-tab-large-file-scroll.md).
  */
 function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | undefined, virtual: boolean) {
   useEffect(() => {
@@ -29,14 +29,16 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
     let jumped = false;
     let frame = 0;
     const step = () => {
-      const row = root.querySelector(DIFFS_TAG_NAME)?.shadowRoot?.querySelector<HTMLElement>(`[data-line="${String(line)}"]`);
+      const shadow = root.querySelector(DIFFS_TAG_NAME)?.shadowRoot;
+      const row = shadow?.querySelector<HTMLElement>(`[data-line="${String(line)}"]`);
       if (row) {
         // Rects are viewport px, scrollTop layout px: under a page zoom the distance is divided back.
         const top = (row.getBoundingClientRect().top - root.getBoundingClientRect().top) / zoomFactor() + root.scrollTop;
         root.scrollTop = Math.max(0, top - root.clientHeight / 3);
         return;
       }
-      if (!jumped && virtual) {
+      // Not before the file has rows: until its highlighter loads it is 0 px tall, and the jump would be clamped to 0.
+      if (!jumped && virtual && shadow?.querySelector("[data-line]")) {
         jumped = true;
         root.scrollTop = Math.max(0, (line - 1) * LINE_H - root.clientHeight / 3);
       }
