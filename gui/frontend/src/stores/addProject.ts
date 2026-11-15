@@ -67,6 +67,15 @@ export function finishAddProject(): void {
   useAddProjectStore.setState({ open: false, created: null, busy: false });
 }
 
+/**
+ * The success toast for what the dialog added ("Added api"), only when the window stays
+ * where it is (`stay`: a page or the CLI opened it). Otherwise the dialog closes onto the
+ * new project or workspace (selectAddedProject, showAddedWorkspace), which shows it.
+ */
+export function noticeAdded(n: { title: string; description?: string }): void {
+  if (useAddProjectStore.getState().stay) notify({ level: "success", ...n });
+}
+
 /** The New tab's project awaiting Keep it local or a publish (null once decided). */
 export function setCreatedProject(created: CreatedProject | null): void {
   useAddProjectStore.setState({ created });

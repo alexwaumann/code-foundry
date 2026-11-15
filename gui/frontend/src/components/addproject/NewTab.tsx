@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CloudUpload, FolderPlus, Loader2 } from "lucide-react";
-import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
 import { PublishPicker } from "@/components/publish/PublishPicker";
 import { usePublishOwners, type PublishChoice } from "@/components/publish/usePublishOwners";
@@ -10,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { tildify } from "@/lib/path";
 import { projectNameError, projectsDirFrom, type PublishOwnerView } from "@/lib/publish";
-import { finishAddProject, selectAddedProject, setAddProjectBusy, setCreatedProject } from "@/stores/addProject";
+import { finishAddProject, noticeAdded, selectAddedProject, setAddProjectBusy, setCreatedProject } from "@/stores/addProject";
 import { createProject, publishProject, type CreatedProject } from "@/stores/publish";
 import { useSettingsStore } from "@/stores/settings";
 
@@ -67,7 +66,7 @@ export function NewTab({ active }: { active: boolean }) {
   const canPublish = !publish || (choice.owner !== "" && choice.visibility !== null);
 
   const finish = (project: CreatedProject, description?: string) => {
-    notify({ level: "success", title: `Created ${project.name}`, ...(description ? { description } : {}) });
+    noticeAdded({ title: `Created ${project.name}`, ...(description ? { description } : {}) });
     finishAddProject();
     selectAddedProject(project.id);
   };

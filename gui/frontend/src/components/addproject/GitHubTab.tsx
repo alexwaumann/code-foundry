@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, FolderPlus, Loader2, Search } from "lucide-react";
-import { notify } from "@/lib/notify";
 import { appendProgress, cloneRepo, lookupGitHub, searchGitHub, type CloneProgressView, type GitHubRepoView } from "@/api/addProject";
 import { errorMessage, isAbort } from "@/api/stream";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseGitHubInput } from "@/lib/githubRef";
 import { tildify } from "@/lib/path";
-import { finishAddProject, registerFolder, selectAddedProject } from "@/stores/addProject";
+import { finishAddProject, noticeAdded, registerFolder, selectAddedProject } from "@/stores/addProject";
 
 /** What the tab shows under the input. */
 type View =
@@ -108,7 +107,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
         undefined,
         ac.signal,
       );
-      notify({ level: "success", title: `Cloned ${repo.slug}` });
+      noticeAdded({ title: `Cloned ${repo.slug}` });
       finishAddProject();
       selectAddedProject(added.id);
     } catch (err) {
@@ -123,7 +122,7 @@ function RepoCard({ repo, onBack, onRunning }: { repo: GitHubRepoView; onBack: (
     setAdding(true);
     try {
       const added = await registerFolder(repo.clonePath);
-      notify({ level: "success", title: `Added ${added.name}` });
+      noticeAdded({ title: `Added ${added.name}` });
       finishAddProject();
       selectAddedProject(added.id);
     } catch (err) {

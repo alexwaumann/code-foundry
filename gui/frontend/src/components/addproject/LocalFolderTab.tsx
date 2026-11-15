@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { FolderPlus, Loader2, SearchIcon } from "lucide-react";
-import { notify } from "@/lib/notify";
 import { errorMessage } from "@/api/stream";
 import { PathSuggestions, PickFolderButton } from "@/components/palette/pathCompletion";
 import { usePathCompletion } from "@/components/palette/usePathListing";
@@ -11,6 +10,7 @@ import type { FolderInfoView } from "@/api/addProject";
 import {
   addFolderAsWorkspace,
   finishAddProject,
+  noticeAdded,
   folderOfRepos,
   onAddProjectEscape,
   registerFolder,
@@ -93,7 +93,7 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     }
     try {
       const project = await registerFolder(p);
-      notify({ level: "success", title: `Added ${project.name}` });
+      noticeAdded({ title: `Added ${project.name}` });
       finishAddProject();
       selectAddedProject(project.id);
     } catch (err) {
@@ -109,12 +109,12 @@ export function LocalFolderTab({ active }: { active: boolean }) {
     try {
       if (as === "workspace") {
         const w = await addFolderAsWorkspace(choice.typed);
-        notify({ level: "success", title: `Added workspace ${w.name}` });
+        noticeAdded({ title: `Added workspace ${w.name}` });
         finishAddProject();
         showAddedWorkspace(w.id);
       } else {
         const project = await registerFolder(choice.typed);
-        notify({ level: "success", title: `Added ${project.name}` });
+        noticeAdded({ title: `Added ${project.name}` });
         finishAddProject();
         selectAddedProject(project.id);
       }
