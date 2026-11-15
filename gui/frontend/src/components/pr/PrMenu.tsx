@@ -208,9 +208,10 @@ export function PrMenu({ prRef, detail, panelKey, onAsk }: { prRef: PrRef; detai
             aria-busy={drafting || undefined}
             aria-disabled={change !== null || undefined}
             onSelect={(e) => {
-              // Stay open with a spinner until the detail shows the draft.
+              // Stay open with a spinner until the detail shows the draft, which is the
+              // result: no success toast.
               e.preventDefault();
-              void setPullRequestDraft(prRef, true).then((ok) => {
+              void setPullRequestDraft(prRef, true, { inView: true }).then((ok) => {
                 if (ok) setOpen(false);
               });
             }}

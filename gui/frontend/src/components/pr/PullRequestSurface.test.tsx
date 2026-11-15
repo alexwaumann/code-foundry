@@ -1199,8 +1199,8 @@ describe("draft and links", () => {
     await vi.waitFor(() => {
       expect(byTestId("pr-state").textContent).toBe("Draft");
     });
-    // The menu's item closes as it runs: its success is toasted, saying what happened.
-    await expectToast("Converted #145 to a draft");
+    // The panel showing Draft (the menu waits for it) is the result: no success toast.
+    expect(toastCount("draft")).toBe(0);
   });
 
   it("Convert to draft needs write access or authorship; merged pull requests have none", async () => {

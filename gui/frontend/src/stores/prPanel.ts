@@ -375,7 +375,7 @@ export function usePullRequestChange(ref: PrRef): PrChange | null {
   return usePrPanelStore((s) => s.changing[pullRequestKey(ref.slug, ref.number)] ?? null);
 }
 
-/** The draft row's Ready for review (pr.ready, `inView`) and the menu's Convert to draft (pr.draft). */
+/** The draft row's Ready for review (pr.ready) and the menu's Convert to draft (pr.draft), both `inView`: the panel shows the change. */
 export function setPullRequestDraft(ref: PrRef, draft: boolean, source: CommandSource = {}): Promise<boolean> {
   return changePullRequest(ref, draft ? "draft" : "ready", draft ? "pr.draft" : "pr.ready", prArgs(ref), source);
 }
