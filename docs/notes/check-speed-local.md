@@ -99,4 +99,40 @@ not.
   (93 s against 93 to 108 s). The frontend phase is bounded by per-file environment and
   import time, not by that test.
 - Running the DOM-free `.test.ts` files under the node environment (146 qualify as they
-  are) and the slowest thread-store tests are the next candidates.
+  are) is the next candidate for the frontend phase.
+
+## The thread store, looked at and not changed
+
+`internal/store/thread` is the longest thing in a full Go run (783 tests, run one after
+another). Measured alone, `go test -race -count=1`, idle machine:
+
+- 260 s as one process; 175 s without `-race`. Its 67 tests of a second or more hold 171
+  of the 260 s, mostly table tests whose rows each wait out a fixed window (a 300 ms
+  "nothing fires" settle, the one-second `cdSettle`, the two-second stream kill grace,
+  `StrayGrace`).
+- It uses about 333 CPU-seconds, more than the next four packages together (project 94,
+  plugin 56, `pluginsdk/ui` 55, `internal/db` 44). A CPU profile of the test process:
+  about half is the race detector's runtime, a fifth is the scheduler looking for work
+  between the 10 to 20 ms polls, a tenth is sqlite parsing the statement of every
+  `saveThread`. No single hot spot.
+
+`t.Parallel()` on every test was tried. All but 17 can take it: 12 set environment
+variables (`t.Setenv`) and 5 search tests reassign `maxSearchCandidates` or
+`searchBackfillChunk`, which the race detector caught at once.
+
+| | Serial | Parallel |
+|---|---|---|
+| The package alone | 260 s | 66 to 78 s (six runs, all green) |
+| `make go-test` after an edit in the package | 118 s | 96 s |
+| `make go-test`, everything re-run | 114 s | 121 s |
+
+Not kept. A full run is no shorter, because all 12 cores are already busy during it and
+the package's CPU does not shrink: the per-test times summed to 598 s in parallel
+against 258 s serial, and single tests stretched two to five times
+(`TestSendRacesTheLanding` 2.0 s to 10.3 s). That stretch is the margin the timing
+tests have, which is what the check lock exists to protect, and 22 s on one scenario
+does not pay for it. Unsplit, in the `./...` run, the parallel package was slower again
+(128 s after an edit).
+
+Worth trying again on a machine with cores to spare, where the parallel run would not
+saturate it. On this one, a full run gets shorter only by using less CPU.
