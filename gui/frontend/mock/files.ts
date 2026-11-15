@@ -26,6 +26,7 @@ import { HOME } from "./filesystem";
 import { mockLog, tailOf } from "./media";
 import { MERMAID_FILES } from "./mermaid";
 import { pagelibPages } from "./pagelib";
+import { tableFiles } from "./tables";
 import { testPdf } from "./pdf";
 
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
@@ -355,6 +356,8 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/media/tone.m4a`, { data: TONE_M4A, mime: "audio/mp4", binary: true, media: true }],
     // A log within the cap; POST /__mock/fs/log makes one over it.
     [`${CF}/logs/server.log`, text(mockLog(8 * 1024))],
+    // The data previews' CSV, JSON and JSON Lines (mock/tables.ts).
+    ...tableFiles().map(([path, s, mime]): [string, Entry] => [`${CF}/${path}`, text(s, mime)]),
   ]);
 }
 
