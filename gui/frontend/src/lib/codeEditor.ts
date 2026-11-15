@@ -22,8 +22,13 @@ export interface EditorPlace {
 
 /** What the app asks of an editor on screen. */
 export interface EditorHandle {
-  /** Takes the keyboard, at a place or where the caret was. */
+  /** Takes the keyboard, at a place or where the caret was, and scrolls the caret into view. */
   focus: (at?: EditorPlace) => void;
+  /**
+   * Takes the keyboard without moving the view (the pencil, Discard, Reload): the caret at `at`,
+   * a place on screen; with none, where the caret was.
+   */
+  focusInPlace: (at: EditorPlace | null) => void;
   /** Where the caret is; null before there is one. */
   caret: () => EditorPlace | null;
   /** Selects from one place to another (on one line: a find's match) and takes the keyboard. */
@@ -34,6 +39,10 @@ export function editorHandle(editor: Pick<CodeEditor, "focus" | "getViewState" |
   return {
     focus: (at) => {
       editor.focus(at && { lineNumber: at.line + 1, character: at.character });
+    },
+    // Without preventScroll the library scrolls to the caret, which a new document has at line 1.
+    focusInPlace: (at) => {
+      editor.focus(at ? { lineNumber: at.line + 1, character: at.character, preventScroll: true } : { preventScroll: true });
     },
     caret: () => {
       const s = editor.getViewState().selections?.at(-1);

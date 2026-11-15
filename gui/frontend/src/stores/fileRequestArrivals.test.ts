@@ -71,7 +71,7 @@ describe("a thread's request to edit a file, as it arrives in the layout", () =>
     await request({ focus: "1", line: "2" });
     await layoutSettled();
     const focus = vi.fn();
-    noteEditor(fileEditKey(KEY, b.id), { focus, caret: () => null, select: vi.fn() });
+    noteEditor(fileEditKey(KEY, b.id), { focus, caret: () => null, select: vi.fn(), focusInPlace: vi.fn() });
     expect(focus).toHaveBeenCalledTimes(1);
   });
 
@@ -80,7 +80,7 @@ describe("a thread's request to edit a file, as it arrives in the layout", () =>
     await request();
     await layoutSettled();
     const focus = vi.fn();
-    noteEditor(fileEditKey(KEY, b.id), { focus, caret: () => null, select: vi.fn() });
+    noteEditor(fileEditKey(KEY, b.id), { focus, caret: () => null, select: vi.fn(), focusInPlace: vi.fn() });
     expect(focus).not.toHaveBeenCalled();
   });
 
@@ -149,7 +149,7 @@ describe("a thread's request to edit a file, as it arrives in the layout", () =>
     await layoutSettled();
     stop = startFileRequests();
     const focus = vi.fn();
-    noteEditor(fileEditKey(KEY, b.id), { focus, caret: () => null, select: vi.fn() });
+    noteEditor(fileEditKey(KEY, b.id), { focus, caret: () => null, select: vi.fn(), focusInPlace: vi.fn() });
     expect(focus).not.toHaveBeenCalled();
   });
 });

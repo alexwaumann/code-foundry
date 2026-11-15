@@ -37,7 +37,7 @@ function host(key: string) {
   code.tabIndex = -1;
   root.append(code);
   document.body.append(root);
-  const h = { root, code, step: vi.fn<(dir: 1 | -1) => void>(), opened: vi.fn<() => void>(), finish: vi.fn<() => void>(), handOff: vi.fn<(query: string) => void>() };
+  const h = { root, code, step: vi.fn<(dir: 1 | -1) => void>(), opened: vi.fn<() => void>(), finish: vi.fn<() => void>(), handOff: vi.fn<(query: string) => void>(), place: () => null };
   const asHost: FileFindHost = h;
   releases.push(registerFileFindHost(key, asHost));
   return h;
@@ -166,7 +166,7 @@ describe("presentFileFind", () => {
 
   it("not to a last tab that left the screen, but to one still on it", () => {
     host("k1");
-    const gone = { root: document.createElement("div"), step: vi.fn(), opened: vi.fn(), finish: vi.fn(), handOff: vi.fn() };
+    const gone = { root: document.createElement("div"), step: vi.fn(), opened: vi.fn(), finish: vi.fn(), handOff: vi.fn(), place: () => null };
     const release = registerFileFindHost("k2", gone);
     noteFileKeyboard("k2");
     release();

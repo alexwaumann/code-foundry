@@ -343,6 +343,63 @@ test("a draft survives leaving the tab, and a long file edits through the virtua
   await expect.poll(() => disk(long)).toMatch(/line 600\ntail$/);
 });
 
+/** The first line on screen and the first whose top is (the pencil's caret goes there); nulls before rows are drawn. */
+async function onScreen(page: Page): Promise<{ first: number | null; whole: number | null }> {
+  return file(page)
+    .getByTestId("file-code")
+    .evaluate((box) => {
+      const sc = (box.dataset.virtual === undefined ? box : box.firstElementChild) as HTMLElement;
+      const s = sc.getBoundingClientRect();
+      const rows = [...(sc.querySelector("diffs-container")?.shadowRoot?.querySelectorAll<HTMLElement>("[data-content] [data-line]") ?? [])].map((r) => ({ n: Number(r.dataset.line), r: r.getBoundingClientRect() }));
+      const shown = rows.filter(({ r }) => r.height > 0 && r.bottom > s.top + 1 && r.top < s.bottom - 1);
+      const whole = shown.filter(({ r }) => r.top >= s.top - 1);
+      return { first: shown.length ? Math.min(...shown.map((x) => x.n)) : null, whole: whole.length ? Math.min(...whole.map((x) => x.n)) : null };
+    });
+}
+
+/** Scrolls the file's box (a long file's inner scroller) down to `top` and waits for the rows there. */
+async function scrollCode(page: Page, top: number): Promise<{ first: number; whole: number }> {
+  await file(page)
+    .getByTestId("file-code")
+    .evaluate((box, y) => {
+      ((box.dataset.virtual === undefined ? box : box.firstElementChild) as HTMLElement).scrollTop = y;
+    }, top);
+  await expect.poll(async () => (await onScreen(page)).first).toBeGreaterThan(50);
+  const at = await onScreen(page);
+  return { first: at.first ?? 0, whole: at.whole ?? 0 };
+}
+
+test("the pencil keeps the reader's place and puts the caret there; Discard and leaving keep it too", async ({ page }) => {
+  // A long file (the virtualizer): the editor takes the keyboard on the first whole line on screen.
+  await writeDisk(`${CF}/long.txt`, Array.from({ length: 600 }, (_, i) => `line ${String(i + 1)}`).join("\n"));
+  await writeDisk(`${CF}/short.txt`, Array.from({ length: 120 }, (_, i) => `line ${String(i + 1)}`).join("\n"));
+  await openFile(page, "long.txt");
+  await expect(file(page).getByTestId("file-code")).toHaveAttribute("data-virtual", "");
+  const long = await scrollCode(page, 3005);
+  await startEditing(page);
+  await page.keyboard.type("X");
+  await expect(line(page, long.whole)).toHaveText(`Xline ${String(long.whole)}`);
+  expect(await onScreen(page)).toEqual({ first: long.first, whole: long.whole });
+  await file(page).getByTestId("file-discard").click();
+  await expect(status(page)).toHaveText("Editing");
+  await page.keyboard.type("Y");
+  await expect(line(page, long.whole)).toHaveText(`Yline ${String(long.whole)}`);
+  expect(await onScreen(page)).toEqual({ first: long.first, whole: long.whole });
+
+  // A short file is laid out whole: turning the editor off re-renders its rows, which once dropped the box to its top.
+  await file(page).getByTestId("file-discard").click();
+  await expect(status(page)).toHaveText("Editing");
+  await page.evaluate(`__cfModule("/src/stores/filePanel.ts").then((m) => m.openFileInPanel("current", ${JSON.stringify({ project: "repo-cf", base: CF, path: "short.txt" })}))`);
+  await expect(file(page)).toHaveAttribute("data-path", `${CF}/short.txt`);
+  await expect(file(page).getByTestId("file-code")).not.toHaveAttribute("data-virtual", "");
+  const short = await scrollCode(page, 1500);
+  await startEditing(page);
+  await expect(file(page).locator("diffs-container")).toBeFocused();
+  await file(page).getByTestId("file-edit").click();
+  await expect(editor(page)).toHaveCount(0);
+  await expect.poll(async () => (await onScreen(page)).first).toBe(short.first);
+});
+
 /**
  * Where grapheme `index` of line `n` starts, and its row's middle, in viewport px: the grapheme
  * wrapped in a span, in a copy of the row laid out beside it and removed in the same task, so

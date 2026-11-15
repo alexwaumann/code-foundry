@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { EditorPlace } from "@/lib/codeEditor";
 import type { FileMatchKey } from "@/lib/fileFind";
 import { subscribeTabs } from "@/shell/host";
 import { useUiStore } from "./ui";
@@ -106,6 +107,8 @@ export interface FileFindHost {
   finish: () => void;
   /** The editor's own find panel is opening (cmd+alt+F, replace): it takes the query. */
   handOff: (query: string) => void;
+  /** Where the reader is in the body (components/files/readerPlace.ts); null when it cannot tell. */
+  place: () => EditorPlace | null;
 }
 
 /** The File tabs on screen that can search, by key. */
@@ -142,6 +145,15 @@ export function handOffFileFind(key: string): void {
   if (!s) return;
   closeFileFind(key);
   if (s.query !== "") hosts.get(key)?.handOff(s.query);
+}
+
+/**
+ * Where the reader of a File tab on screen is, for a caret that must not move the view (the
+ * pencil): the bar's current match while it shows, else the first whole line on screen. Null
+ * for a tab that is not on screen or cannot tell.
+ */
+export function readerPlaceOf(key: string): EditorPlace | null {
+  return hosts.get(key)?.place() ?? null;
 }
 
 /** Whether some File tab on screen can search: the palette lists the verbs only then. */
