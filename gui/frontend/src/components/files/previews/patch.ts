@@ -417,12 +417,18 @@ export function parsePatch(text: string): PatchModel {
   return { commits, files, added, deleted, problems };
 }
 
-let cached: { text: string; model: PatchModel } | null = null;
+/** The last few texts' models, newest last: two patch tabs side by side do not parse each other out. */
+const cache = new Map<string, PatchModel>();
+const CACHE_SIZE = 4;
 
-/** parsePatch, remembered for the last text: the meta line and the body read the same model. */
+/** parsePatch, remembered for the last few texts: the meta line and the body read the same model. */
 export function patchModelOf(text: string): PatchModel {
-  if (cached?.text !== text) cached = { text, model: parsePatch(text) };
-  return cached.model;
+  let model = cache.get(text);
+  if (model) cache.delete(text);
+  else model = parsePatch(text);
+  cache.set(text, model);
+  if (cache.size > CACHE_SIZE) cache.delete(cache.keys().next().value ?? "");
+  return model;
 }
 
 /** "a4a92c61b0…" → "a4a92c6". */

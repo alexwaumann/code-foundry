@@ -138,7 +138,7 @@ export function FileRow({ f, collapsed, onToggle, place }: { f: PatchFile; colla
         {f.added > 0 && <span className="text-cf-diff-addition">+{f.added.toLocaleString()}</span>}
         {f.deleted > 0 && <span className="text-cf-diff-deletion">−{f.deleted.toLocaleString()}</span>}
       </span>
-      {canOpen && (
+      {canOpen ? (
         <Tip label="Open file">
           <Button
             type="button"
@@ -155,6 +155,9 @@ export function FileRow({ f, collapsed, onToggle, place }: { f: PatchFile; colla
             <FileText aria-hidden />
           </Button>
         </Tip>
+      ) : (
+        // Its place stays, so + and − line up with the rows that have Open.
+        <span className="size-6 shrink-0" />
       )}
     </div>
   );
