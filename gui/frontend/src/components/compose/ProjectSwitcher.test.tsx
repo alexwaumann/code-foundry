@@ -43,7 +43,9 @@ describe("ProjectSwitcher in a compose tab", () => {
   ])("%s moves the tab itself", async (_what, row, to) => {
     mount(cf, "t-c");
     await pick(row);
-    await waitFor(() => expect(retargetComposeTab).toHaveBeenCalledWith("t-c", cf, to));
+    await waitFor(() => {
+      expect(retargetComposeTab).toHaveBeenCalledWith("t-c", cf, to);
+    });
     expect(switchDraftTarget).not.toHaveBeenCalled();
     expect(setDraftProject).not.toHaveBeenCalled();
   });
@@ -51,14 +53,18 @@ describe("ProjectSwitcher in a compose tab", () => {
   it("its own project narrows the set in place", async () => {
     mount(cf, "t-c");
     await pick("repo-cf");
-    await waitFor(() => expect(setDraftProject).toHaveBeenCalledWith(cf, "repo-cf"));
+    await waitFor(() => {
+      expect(setDraftProject).toHaveBeenCalledWith(cf, "repo-cf");
+    });
     expect(retargetComposeTab).not.toHaveBeenCalled();
   });
 
   it("outside the shell, No project moves the selection as before", async () => {
     mount({ kind: "project", projectId: "repo-cf" });
     await pick("No project");
-    await waitFor(() => expect(switchDraftTarget).toHaveBeenCalledWith({ kind: "project", projectId: "repo-cf" }, { kind: "home" }));
+    await waitFor(() => {
+      expect(switchDraftTarget).toHaveBeenCalledWith({ kind: "project", projectId: "repo-cf" }, { kind: "home" });
+    });
     expect(retargetComposeTab).not.toHaveBeenCalled();
   });
 });

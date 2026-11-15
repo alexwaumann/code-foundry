@@ -373,7 +373,8 @@ describe("switchDraftTarget", () => {
       await expect(retargetComposeTab("t-c", { ...cf, draft: "d-1" }, gp)).resolves.toBe(true);
       expect(getDraft("draft:d-1")).toMatchObject({ text: "hi", model: "haiku", projects: null });
       expect(getDraft("repo-gp").text).toBe("the project's own");
-      expect(applyLayoutOp.mock.calls.map((c) => c[0])).toEqual([{ op: "set_tab_params", tab: "t-c", params: { project: "repo-gp" } }]);
+      expect(applyLayoutOp).toHaveBeenCalledTimes(1);
+      expect(applyLayoutOp).toHaveBeenCalledWith({ op: "set_tab_params", tab: "t-c", params: { project: "repo-gp" } });
       // No select(): the space's empty composer is not opened.
       expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-cf" });
       await expect(retargetComposeTab("t-c", { ...gp, draft: "d-1" }, gp)).resolves.toBe(false);
@@ -398,7 +399,9 @@ describe("switchDraftTarget", () => {
     it("cancelled at the tags confirm: nothing moves", async () => {
       updateDraft("draft:d-1", { text: `use ${tagToken({ tagKind: "skill", name: "deploy", projectId: "repo-cf" })}` });
       const res = retargetComposeTab("t-c", { ...cf, draft: "d-1" }, gp);
-      await vi.waitFor(() => expect(useConfirmStore.getState().pending).not.toBeNull());
+      await vi.waitFor(() => {
+        expect(useConfirmStore.getState().pending).not.toBeNull();
+      });
       answerConfirm(false);
       await expect(res).resolves.toBe(false);
       expect(applyLayoutOp).not.toHaveBeenCalled();
