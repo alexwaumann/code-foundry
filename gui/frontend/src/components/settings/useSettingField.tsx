@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { notify } from "@/lib/notify";
 import type { SettingFieldView } from "@/api/settings";
 import { validateSetting } from "@/settings/validate";
 import { saveSettings, useSettingsStore, useSettingValue } from "@/stores/settings";
 import type { SettingEditor } from "./editor";
 import { BoolEditor, EnumEditor, KeybindingEditor, TextEditor } from "./editors";
 import { keyEditors } from "./keyEditors";
-import { displayValue } from "./model";
 
 const editors: Record<SettingFieldView["type"], SettingEditor> = {
   bool: BoolEditor,
@@ -35,16 +33,8 @@ export function useSettingField(field: SettingFieldView) {
     setPending(true);
     void saveSettings({ [field.key]: v.value }).then((res) => {
       setPending(false);
-      if (!res.ok) {
-        setError(res.issues[field.key] ?? res.error);
-        return;
-      }
-      const shown = displayValue(field, useSettingsStore.getState().snapshot?.values[field.key] ?? v.value);
-      notify({
-        level: "success",
-        title: `Saved ${field.title}`,
-        description: `${shown}${field.restartRequired ? " · applies after a daemon restart" : ""}`,
-      });
+      // No success toast: the field shows the saved value, and its restart chip a restart it waits for.
+      if (!res.ok) setError(res.issues[field.key] ?? res.error);
     });
   };
 
