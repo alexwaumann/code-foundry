@@ -1,0 +1,50 @@
+/*
+ * The data previews (CSV/TSV Table, JSON Tree, JSON Lines Records): the grid's sticky header
+ * and row-number gutter, row states, and values in the syntax slots
+ * (docs/notes/file-previews-3-tables.md).
+ */
+@reference "../../../../index.css";
+
+/* Values, in the code's syntax colours. */
+.cf-json-key {
+  color: var(--syn-fn);
+}
+.cf-json-str {
+  color: var(--syn-str);
+}
+.cf-json-num {
+  color: var(--syn-num);
+}
+.cf-json-kw {
+  color: var(--syn-kw);
+}
+
+/* The grid. A row's state tints every cell; the sticky gutter lays the tint over an opaque
+   surface so cells scrolled under it do not show through. */
+.cf-grid {
+  --row-bg: transparent;
+}
+.cf-grid-row {
+  --row-bg: transparent;
+}
+.cf-grid-row:hover {
+  --row-bg: var(--cf-control-hover);
+}
+.cf-grid-row[data-open] {
+  --row-bg: var(--cf-sidebar-row-selected);
+}
+.cf-grid:focus-visible .cf-grid-row[data-active] {
+  --row-bg: var(--cf-selection);
+}
+.cf-grid-row > .cf-grid-line > * {
+  background-color: var(--row-bg);
+}
+.cf-grid-row > .cf-grid-line > .cf-grid-gutter {
+  background: linear-gradient(var(--row-bg), var(--row-bg)), var(--cf-surface);
+}
+.cf-grid-row[data-flagged] > .cf-grid-line > * {
+  background-color: color-mix(in oklab, var(--cf-error-surface) 70%, var(--row-bg));
+}
+.cf-grid-row[data-flagged] > .cf-grid-line > .cf-grid-gutter {
+  background: linear-gradient(var(--cf-error-surface), var(--cf-error-surface)), var(--cf-surface);
+}

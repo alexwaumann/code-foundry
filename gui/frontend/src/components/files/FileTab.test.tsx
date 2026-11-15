@@ -971,6 +971,39 @@ describe("previews", () => {
     });
   });
 
+  it("a CSV's Table copies tab-separated text, its Source the file; a JSON's Tree copies the file; a cut JSON is code", async () => {
+    const CSV = 'id,label\n1,"a, b"\n';
+    files.set(`${W}/t.csv`, { text: CSV, lossless: true, binary: false, mime: "text/csv", size: CSV.length });
+    const first = open("t.csv");
+    await screen.findByTestId("file-table");
+    expect(within(screen.getByTestId("file-mode")).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Table", "Source"]);
+    expect(meta()).toBe("1 row · 2 columns · 18 B · CSV");
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith("id\tlabel\n1\ta, b\n");
+    });
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    fireEvent.click(await screen.findByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith(CSV);
+    });
+    first.unmount();
+    files.set(`${W}/p.json`, { text: '{"a":1}\n', lossless: true, binary: false, mime: "application/json", size: 8 });
+    const second = open("p.json");
+    await screen.findByTestId("file-json-tree");
+    expect(meta()).toBe("1 key · 8 B · JSON");
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith('{"a":1}\n');
+    });
+    second.unmount();
+    files.set(`${W}/big.json`, { text: '{"a": [1,', binary: false, truncated: true, mime: "application/json", size: 4 * MiB });
+    open("big.json");
+    await screen.findByTestId("code-file");
+    expect(tab().dataset.kind).toBeUndefined();
+    expect(screen.getByTestId("file-truncated")).toBeTruthy();
+  });
+
   it.each<[string, string, Partial<FileReadView>]>([
     ["an image", "logo.png", { mime: "image/png", image: new Uint8Array([1]), size: 1 }],
     ["a PDF", "spec.pdf", { mime: "application/pdf", pdf: new Uint8Array([1]), size: 1 }],
