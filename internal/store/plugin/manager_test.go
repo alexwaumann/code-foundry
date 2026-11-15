@@ -111,8 +111,8 @@ func testManifest(name string) pluginsdk.Manifest {
 	}
 }
 
-// install writes a package at <dir>/<name> whose bin/plugin re-executes this test
-// binary in mode.
+// install writes a package at <dir>/<name> whose bin/plugin runs the test binary's
+// uninstrumented build (plugin.HelperBin) in mode.
 func (e *env) install(dir, name, mode string, mf pluginsdk.Manifest) string {
 	e.t.Helper()
 	pkg := filepath.Join(dir, name)
@@ -129,11 +129,7 @@ func (e *env) install(dir, name, mode string, mf pluginsdk.Manifest) string {
 
 func (e *env) setMode(pkg, mode string) {
 	e.t.Helper()
-	self, err := os.Executable()
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	script := fmt.Sprintf("#!/bin/sh\nCF_PLUGIN_HELPER=%s exec '%s'\n", mode, self)
+	script := fmt.Sprintf("#!/bin/sh\nCF_PLUGIN_HELPER=%s exec '%s'\n", mode, plugin.HelperBin(e.t))
 	tmp := filepath.Join(pkg, "bin", ".plugin.tmp")
 	if err := os.WriteFile(tmp, []byte(script), 0o755); err != nil {
 		e.t.Fatal(err)

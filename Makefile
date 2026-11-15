@@ -127,7 +127,8 @@ endif
 check-unlocked:
 	@scripts/check-commits.sh
 	@scripts/attest.sh start
-	@$(MAKE) --no-print-directory go-check frontend-check
+	@$(MAKE) --no-print-directory go-check
+	@if scripts/check-scope.sh frontend; then $(MAKE) --no-print-directory frontend-check; fi
 	@scripts/attest.sh record
 
 ## attest: post a "local-check" commit status on the pushed HEAD, provided its tree is the

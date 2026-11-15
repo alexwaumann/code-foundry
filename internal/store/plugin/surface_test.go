@@ -329,8 +329,7 @@ func newSurfEnv(t *testing.T, mod func(*plugin.Options)) *surfEnv {
 	if err := os.WriteFile(filepath.Join(pkg, "plugin.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	self, _ := os.Executable()
-	script := fmt.Sprintf("#!/bin/sh\n%s=1 exec '%s'\n", surfaceHelperEnv, self)
+	script := fmt.Sprintf("#!/bin/sh\n%s=1 exec '%s'\n", surfaceHelperEnv, plugin.HelperBin(t))
 	if err := os.WriteFile(filepath.Join(pkg, "bin", "plugin"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

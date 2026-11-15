@@ -1,0 +1,33 @@
+# What the frontend phase of `make check` (make frontend-check) reads. A branch that
+# touches none of these skips that phase (scripts/check-scope.sh); the sweep on main
+# still runs it. One path a line: a trailing "/" is a directory and everything under
+# it, anything else is one file. scripts/check_scope_test.go fails when a frontend
+# file reads a path outside gui/frontend/ that is missing here.
+gui/frontend/
+
+# The check itself.
+Makefile
+scripts/
+
+# The generated API types.
+proto/
+buf.yaml
+buf.gen.yaml
+
+# The page library is built from the frontend into internal/pagelib/dist.
+internal/pagelib/
+
+# Read by the tests and the mock daemon.
+docs/GETTING-STARTED.md
+docs/THEMES.md
+docs/notes/shell-model.md
+internal/bridge/bridge.js
+internal/command/
+internal/layout/testdata/
+internal/preview/frame.js
+internal/skills/files/code-foundry-pages/reference/
+internal/store/gh/testdata/task_items.json
+internal/store/plugin/testdata/hello-demo/
+internal/store/thread/testdata/rendered_text.json
+internal/theme/
+pluginsdk/ui/icons.go
