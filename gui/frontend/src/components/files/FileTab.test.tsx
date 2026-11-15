@@ -1012,6 +1012,27 @@ describe("previews", () => {
     expect(screen.getByTestId("file-truncated")).toBeTruthy();
   });
 
+  it("a patch: Diff | Source with Unified | Split in Diff only; Copy contents copies the text; Edit goes to Source", async () => {
+    const PATCH = "diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-a\n+b\n";
+    files.set(`${W}/fix.patch`, { text: PATCH, lossless: true, binary: false, mime: "text/x-diff", size: PATCH.length, modifiedAtMs: 100 });
+    open("fix.patch");
+    await screen.findByTestId("file-patch");
+    expect([tab().dataset.kind, tab().dataset.mode]).toEqual(["patch", "diff"]);
+    const labels = (id: string) => within(screen.getByTestId(id)).getAllByRole("radio").map((r) => r.textContent);
+    expect(labels("file-mode")).toEqual(["Diff", "Source"]);
+    expect(labels("file-patch-style")).toEqual(["Unified", "Split"]);
+    expect(meta()).toBe("1 file · +1 −1 · Patch");
+    expect(screen.getByTestId("file-wrap")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenCalledWith(PATCH);
+    });
+    fireEvent.click(screen.getByTestId("file-edit"));
+    await screen.findByTestId("code-file");
+    expect(tab().dataset.mode).toBe("source");
+    expect(screen.queryByTestId("file-patch-style")).toBeNull();
+  });
+
   it.each<[string, string, Partial<FileReadView>]>([
     ["an image", "logo.png", { mime: "image/png", image: new Uint8Array([1]), size: 1 }],
     ["a PDF", "spec.pdf", { mime: "application/pdf", pdf: new Uint8Array([1]), size: 1 }],
