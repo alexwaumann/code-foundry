@@ -37,6 +37,9 @@ export function mermaidConfig(look: DiagramTheme): MermaidConfig {
     // Sequence diagrams measure their text with fonts of their own (Trebuchet by default):
     // the app's, or a label runs past its box.
     sequence: { actorFontFamily: DIAGRAM_FONT, noteFontFamily: DIAGRAM_FONT, messageFontFamily: DIAGRAM_FONT, actorFontSize: 13, noteFontSize: 13, messageFontSize: 13 },
+    // A Gantt chart takes the width of the box it draws in (the others size to their
+    // content), and draw's box is 2000px: a width of its own that fits a pane.
+    gantt: { useWidth: 800 },
     logLevel: "fatal",
   };
 }

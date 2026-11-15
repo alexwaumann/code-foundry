@@ -52,6 +52,19 @@ export const WIDE_MMD = `flowchart LR
 ${Array.from({ length: 13 }, (_, i) => `  s${String(i)}[Step ${String(i + 1)}] --> s${String(i + 1)}[Step ${String(i + 2)}]`).join("\n")}
 `;
 
+/** A Gantt chart: Mermaid draws one as wide as the box it renders in, unless told its width (render.ts). */
+export const GANTT_MMD = `gantt
+    title Release plan
+    dateFormat YYYY-MM-DD
+    section Build
+    Design the API         :a1, 2026-11-02, 5d
+    Write the daemon side  :a2, after a1, 7d
+    Write the GUI side     :a3, after a1, 9d
+    section Ship
+    Test on real projects  :b1, after a3, 4d
+    Write the notes        :b2, after b1, 2d
+`;
+
 export const DIAGRAMS_MD = `# code-foundry
 
 Run fleets of **Claude Code** threads across git worktrees, from one window.
@@ -84,6 +97,7 @@ export const MERMAID_FILES: Readonly<Record<string, { text: string; mime: string
   "docs/broken.mmd": { text: BROKEN_MMD, mime: "text/vnd.mermaid" },
   "docs/hostile.mmd": { text: HOSTILE_MMD, mime: "text/vnd.mermaid" },
   "docs/wide.mmd": { text: WIDE_MMD, mime: "text/vnd.mermaid" },
+  "docs/plan.mmd": { text: GANTT_MMD, mime: "text/vnd.mermaid" },
   "docs/empty.mmd": { text: "", mime: "text/vnd.mermaid" },
   "docs/diagrams.md": { text: DIAGRAMS_MD, mime: "text/markdown" },
 };
