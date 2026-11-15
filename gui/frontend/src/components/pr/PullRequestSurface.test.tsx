@@ -1186,7 +1186,8 @@ describe("draft and links", () => {
       expect(byTestId("pr-state").textContent).toBe("Open");
     });
     expect(screen.getAllByTestId("pr-ready-row").map((r) => r.dataset.row)).not.toContain("draft");
-    await expectToast("Marked #145 ready for review");
+    // The box shows the change: no success toast for its button.
+    expect(toastCount("ready for review")).toBe(0);
 
     openMenu();
     await pick(byTestId("pr-menu-draft"));
@@ -1195,6 +1196,8 @@ describe("draft and links", () => {
     await vi.waitFor(() => {
       expect(byTestId("pr-state").textContent).toBe("Draft");
     });
+    // The menu's item closes as it runs: its success is toasted, saying what happened.
+    await expectToast("Converted #145 to a draft");
   });
 
   it("Convert to draft needs write access or authorship; merged pull requests have none", async () => {
@@ -1462,7 +1465,8 @@ describe("Review ▾", () => {
       expect(queryTestId("pr-review-composer")).toBeNull();
     });
     expect(reviews()).toEqual([{ "repo-slug": SLUG, number: "139", verdict: "approve", body: "Read it through.\nShip it." }]);
-    await expectToast("Approved #139");
+    // The chip and the review in Comments show it: no success toast.
+    expect(toastCount("Approved #139")).toBe(0);
 
     // The refreshed detail: the chip in place of Review, the reviewer entry, the review in Comments.
     const chip = byTestId("pr-your-review");

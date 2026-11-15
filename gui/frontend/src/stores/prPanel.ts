@@ -14,7 +14,7 @@ import type { Verdict } from "@/components/pr/review";
 import { copyText } from "@/lib/clipboard";
 import type { TaskItem } from "@/lib/taskItems";
 import { pullRequestTab, type PrRef } from "@/surfaces/pullrequestTarget";
-import { runCommand, runCommandForResult } from "./commands";
+import { runCommand, runCommandForResult, type CommandSource } from "./commands";
 import { openUrl, pullRequestDetailResource, pullRequestKey } from "./gh";
 import { findTab, openTab, subscribeTabs, type Tab, type TabPlaces, type TabTarget } from "@/shell/host";
 import { createResource, type Resource } from "./resource";
@@ -226,7 +226,8 @@ export async function setReviewRequest(ref: PrRef, login: string, kind: "user" |
   });
   const key = pullRequestKey(ref.slug, ref.number);
   try {
-    const ok = await runCommand("pr.review.request", { ...prArgs(ref), login, kind, requested: String(requested) });
+    // The picker's row shows the new state: no success toast.
+    const ok = await runCommand("pr.review.request", { ...prArgs(ref), login, kind, requested: String(requested) }, undefined, { inView: true });
     if (ok) usePrPanelStore.setState((s) => ({ confirmed: { ...s.confirmed, [busy]: requested } }));
     return ok;
   } finally {
@@ -323,7 +324,8 @@ export async function submitReview(ref: PrRef, verdict: Verdict, body: string): 
   usePrPanelStore.setState((s) => ({ reviewing: { ...s.reviewing, [key]: true } }));
   let ok = false;
   try {
-    ok = await runCommand("pr.review", reviewArgs(ref, verdict, body));
+    // The composer closes onto the review in Comments and the header's chip: no success toast.
+    ok = await runCommand("pr.review", reviewArgs(ref, verdict, body), undefined, { inView: true });
     return ok;
   } finally {
     pullRequestDetailResource.invalidate(key);
@@ -346,17 +348,17 @@ export function rememberMergeMethod(slug: string, method: MergeMethodView): void
 
 /**
  * Runs one of the pull request's state changes (pr.ready, pr.draft, pr.auto-merge), the
- * daemon's message toasted. Busy (`changing`) until the detail is read again, so the box
+ * daemon's message toasted unless `source` is a control the panel shows the change in. Busy (`changing`) until the detail is read again, so the box
  * shows the new state when its button comes back; a failure frees it at once. A second
  * call while one runs sends nothing.
  */
-async function changePullRequest(ref: PrRef, change: PrChange, command: string, args: Record<string, string>): Promise<boolean> {
+async function changePullRequest(ref: PrRef, change: PrChange, command: string, args: Record<string, string>, source: CommandSource): Promise<boolean> {
   const key = pullRequestKey(ref.slug, ref.number);
   if (usePrPanelStore.getState().changing[key]) return false;
   usePrPanelStore.setState((s) => ({ changing: { ...s.changing, [key]: change } }));
   let ok = false;
   try {
-    ok = await runCommand(command, args);
+    ok = await runCommand(command, args, undefined, source);
     return ok;
   } finally {
     pullRequestDetailResource.invalidate(key);
@@ -373,9 +375,9 @@ export function usePullRequestChange(ref: PrRef): PrChange | null {
   return usePrPanelStore((s) => s.changing[pullRequestKey(ref.slug, ref.number)] ?? null);
 }
 
-/** The draft row's Ready for review (pr.ready) and the menu's Convert to draft (pr.draft). */
-export function setPullRequestDraft(ref: PrRef, draft: boolean): Promise<boolean> {
-  return changePullRequest(ref, draft ? "draft" : "ready", draft ? "pr.draft" : "pr.ready", prArgs(ref));
+/** The draft row's Ready for review (pr.ready, `inView`) and the menu's Convert to draft (pr.draft). */
+export function setPullRequestDraft(ref: PrRef, draft: boolean, source: CommandSource = {}): Promise<boolean> {
+  return changePullRequest(ref, draft ? "draft" : "ready", draft ? "pr.draft" : "pr.ready", prArgs(ref), source);
 }
 
 /** A task box of a pull request's description: its pullRequestKey and its index. */
@@ -417,10 +419,11 @@ export function autoMergeArgs(ref: PrRef, method: MergeMethodView | null, headSh
 /**
  * The footer's Auto-merge (a method: GitHub merges it once its requirements pass; the
  * daemon confirms first) and Cancel auto-merge (null). The method becomes the
- * repository's default only once auto-merge is on (not when declined or refused).
+ * repository's default only once auto-merge is on (not when declined or refused). Both
+ * are buttons in the box that then shows the change: no success toast.
  */
 export async function setAutoMerge(ref: PrRef, method: MergeMethodView | null, headSha: string): Promise<boolean> {
-  const ok = await changePullRequest(ref, method === null ? "cancel-auto-merge" : "auto-merge", "pr.auto-merge", autoMergeArgs(ref, method, headSha));
+  const ok = await changePullRequest(ref, method === null ? "cancel-auto-merge" : "auto-merge", "pr.auto-merge", autoMergeArgs(ref, method, headSha), { inView: true });
   if (ok && method !== null) rememberMergeMethod(ref.slug, method);
   return ok;
 }
