@@ -320,6 +320,14 @@ describe("fileItems", () => {
   };
   const api: FileResults = { projectId: "api", matches: [{ path: "internal/api/thread.go", isDir: false }] };
 
+  it("a git-ignored match an include pattern listed carries the quiet note ignored; others none", () => {
+    const groups = fileItems([{ projectId: "cf", matches: [{ path: ".env.local", isDir: false, ignored: true }, { path: "src/env.ts", isDir: false, ignored: false }] }], "env", ["cf"], "cf");
+    expect(groups[0]?.items.map((i) => [i.label, i.note])).toEqual([
+      [".env.local", "ignored"],
+      ["env.ts", undefined],
+    ]);
+  });
+
   it("one project: no heading; base name, path, emphasis and the tag (a directory keeps its /)", () => {
     const groups = fileItems([cf], "thr", ["cf"], "cf");
     expect(groups).toHaveLength(1);

@@ -5,6 +5,7 @@ import {
   type ListDirectoriesResponse,
   type SearchFilesResponse,
   type Skill,
+  type SuggestIncludeIgnoredResponse,
 } from "@/gen/codefoundry/v1/filesystem_pb";
 import { daemon, type DaemonConnection } from "./endpoint";
 import { orOutdatedDaemon } from "./errors";
@@ -86,6 +87,8 @@ export interface FileMatchView {
   /** Relative to the checkout, "/"-separated, no trailing "/". */
   path: string;
   isDir: boolean;
+  /** Git ignores it; an include pattern (the setting's or the project's) lists it anyway. Absent: false. */
+  ignored?: boolean;
 }
 
 export interface FileSearchView {
@@ -106,7 +109,7 @@ export function toSkillView(s: Skill): SkillView {
 }
 
 export function toFileSearchView(res: SearchFilesResponse): FileSearchView {
-  return { matches: res.matches.map((m) => ({ path: m.path, isDir: m.isDir })), truncated: res.truncated };
+  return { matches: res.matches.map((m) => ({ path: m.path, isDir: m.isDir, ignored: m.ignored })), truncated: res.truncated };
 }
 
 /**
@@ -171,6 +174,8 @@ export interface FinderMatchView {
   pathPositions: number[];
   /** Code-point indices of the project's name that project words matched; empty when none did. */
   projectPositions: number[];
+  /** Git ignores it; an include pattern lists it anyway. Absent: false. */
+  ignored?: boolean;
 }
 
 /**
@@ -186,7 +191,58 @@ export async function findFiles(
   const c = await conn.client(FilesystemService);
   try {
     const res = await c.searchFiles({ sources: req.sources.map((s) => ({ projectId: s.projectId, path: s.path })), query: req.query, limit: req.limit ?? 0, filesOnly: true }, { signal });
-    return res.matches.map((m) => ({ projectId: m.projectId, checkout: m.checkout, path: m.path, pathPositions: [...m.pathPositions], projectPositions: [...m.projectPositions] }));
+    return res.matches.map((m) => ({ projectId: m.projectId, checkout: m.checkout, path: m.path, pathPositions: [...m.pathPositions], projectPositions: [...m.projectPositions], ignored: m.ignored }));
+  } catch (err) {
+    throw orOutdatedDaemon(err);
+  }
+}
+
+// ---- include patterns -----------------------------------------------------------------------
+
+/** One git-ignored entry of a project the include field suggests (IgnoredSuggestion). */
+export interface IgnoredSuggestionView {
+  /** Relative to the main worktree, "/"-separated, no trailing "/". */
+  path: string;
+  /** A folder git ignores whole. */
+  isDir: boolean;
+  /** The folder's files (0 for a file); with fileCountCapped, at least this many. */
+  fileCount: number;
+  fileCountCapped: boolean;
+  /** The effective patterns already include all of it. */
+  included: boolean;
+  /** Code-point indices of path the typed text matched. */
+  pathPositions: number[];
+}
+
+export interface IncludeSuggestionsView {
+  /** Best first. */
+  suggestions: IgnoredSuggestionView[];
+  /** How many files the typed text includes as a pattern on its own (0 when empty or invalid); capped: at least. */
+  textFiles: number;
+  textFilesCapped: boolean;
+  /** Why the typed text is not a valid pattern; "" when it is (or is empty). */
+  textError: string;
+}
+
+export function toIncludeSuggestionsView(res: SuggestIncludeIgnoredResponse): IncludeSuggestionsView {
+  return {
+    suggestions: res.suggestions.map((s) => ({ path: s.path, isDir: s.isDir, fileCount: s.fileCount, fileCountCapped: s.fileCountCapped, included: s.included, pathPositions: [...s.pathPositions] })),
+    textFiles: res.textFiles,
+    textFilesCapped: res.textFilesCapped,
+    textError: res.textError,
+  };
+}
+
+/**
+ * The include field's suggestions for a project (FilesystemService.SuggestIncludeIgnored):
+ * its ignored entries ranked by the typed text, and the text's own file count or error.
+ * FailedPrecondition for a project without git; a daemon older than the RPC fails with
+ * OutdatedDaemonError.
+ */
+export async function suggestIncludeIgnored(req: { projectId: string; text: string; limit?: number }, conn: DaemonConnection = daemon, signal?: AbortSignal): Promise<IncludeSuggestionsView> {
+  const c = await conn.client(FilesystemService);
+  try {
+    return toIncludeSuggestionsView(await c.suggestIncludeIgnored({ projectId: req.projectId, text: req.text, limit: req.limit ?? 0 }, { signal }));
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

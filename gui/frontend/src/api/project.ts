@@ -76,6 +76,8 @@ export interface ProjectView {
    */
   git: boolean;
   worktrees: WorktreeView[];
+  /** The project's own include patterns (git-ignored files its file search lists too), in order; the setting's are not here. Absent: none. */
+  includeIgnored?: string[];
 }
 
 /**
@@ -150,6 +152,7 @@ export function toProjectView(r: Project): ProjectView {
     remotes: [...r.remotes],
     git: r.git,
     worktrees: r.worktrees.map(toWorktreeView),
+    includeIgnored: [...r.includeIgnored],
   };
 }
 

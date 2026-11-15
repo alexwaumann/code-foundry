@@ -169,7 +169,7 @@ describe("a project's page", () => {
     expect(screen.getByTestId("details-remote-value").textContent).toBe("origin · github.com/alexwaumann/code-foundry");
     expect(screen.getByTestId("details-worktrees-value").textContent).toBe("2 in ~/src/code-foundry.worktrees");
     // Worktrees without threads sits between Checkouts and Details; threads hold both worktrees here.
-    expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-title", "project-checkouts", "leftover-worktrees", "project-details"]);
+    expect([...list().children].map((c) => c.getAttribute("data-testid"))).toEqual(["project-title", "project-checkouts", "leftover-worktrees", "project-details", "project-search"]);
     expect(screen.getByTestId("leftover-empty")).toBeTruthy();
 
     // A row has no click: no tab opens, the cursor stays put.
@@ -682,5 +682,16 @@ describe("a project's page and its threads", () => {
     expect(checkout(SPIKE)).not.toBeNull();
     expect(within(screen.getByTestId("leftover-title")).getByTestId("section-count").textContent).toBe("(2)");
     expect(page().getAttribute("data-project")).toBe("repo-cf");
+  });
+});
+
+describe("a project page's Search section", () => {
+  it("shows for a git project, after Details, and not for a folder without git", () => {
+    const view = renderPage("repo-cf");
+    const sections = Array.from(page().querySelectorAll('[data-testid="project-details"], [data-testid="project-search"]')).map((el) => el.getAttribute("data-testid"));
+    expect(sections).toEqual(["project-details", "project-search"]);
+    view.unmount();
+    renderPage("repo-wr");
+    expect(screen.queryByTestId("project-search")).toBeNull();
   });
 });

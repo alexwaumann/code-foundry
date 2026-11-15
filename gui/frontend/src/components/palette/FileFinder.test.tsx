@@ -105,13 +105,13 @@ const typeQuery = (q: string) => {
 };
 const mode = () => screen.queryByTestId("palette")?.getAttribute("data-mode") ?? null;
 const headings = () => Array.from(document.querySelectorAll("[cmdk-group-heading]")).map((h) => h.textContent);
-/** Each row as "name dir | open project status", bold letters in [brackets]. */
+/** Each row as "name dir | ignored open project status", bold letters in [brackets]. */
 function rows(): string[] {
   return screen.queryAllByTestId("finder-row").map((r) => {
     const bold = (el: Element | null) => (el ? Array.from(el.childNodes).map((n) => (n instanceof Element && n.hasAttribute("data-hit") ? `[${n.textContent}]` : (n.textContent ?? ""))).join("") : "");
     const name = bold(r.querySelector('[data-testid="finder-name"]'));
     const dir = (r.querySelector('[data-testid="finder-dir"]')?.textContent ?? "").replace(/‎/g, "");
-    const right = [r.querySelector('[data-testid="finder-open"]') ? "open" : "", bold(r.querySelector('[data-testid="finder-project"]')), r.querySelector('[data-testid="finder-status"]')?.textContent ?? ""].filter(Boolean).join(" ");
+    const right = [r.querySelector('[data-testid="finder-ignored"]') ? "ignored" : "", r.querySelector('[data-testid="finder-open"]') ? "open" : "", bold(r.querySelector('[data-testid="finder-project"]')), r.querySelector('[data-testid="finder-status"]')?.textContent ?? ""].filter(Boolean).join(" ");
     return `${name}${dir ? ` ${dir}` : ""}${right ? ` | ${right}` : ""}`;
   });
 }
@@ -222,6 +222,22 @@ describe("a typed query", () => {
     typeQuery("tree");
     await searched();
     expect(rows()).toEqual(["[tree].ts gui/src/lib | M", "[tree].go"]);
+  });
+
+  it("marks a git-ignored file an include pattern listed: ignored on its right, before open", async () => {
+    search.mockResolvedValue([{ ...match("repo-cf", CF, ".env.local", [1, 2, 3]), ignored: true }, match("repo-cf", CF, "src/env.ts", [4, 5, 6])]);
+    await openFinder("s-1");
+    typeQuery("env");
+    await searched();
+    expect(rows()).toEqual([".[env].local | ignored", "[env].ts src"]);
+    act(() => {
+      openFileInPanel("thread:s-1", { project: "repo-cf", base: CF, path: ".env.local" });
+    });
+    await laidOut();
+    await openFinder("s-1");
+    typeQuery("env");
+    await searched();
+    expect(rows()[0]).toBe(".[env].local | ignored open");
   });
 
   it("sends a name:line query without the line", async () => {
@@ -368,14 +384,14 @@ describe("picking a file", () => {
     expect(panelActive("thread:s-1")?.kind).toBe("files");
   });
 
-  it("⌥⏎ puts the file in the thread's prompt as an @ file and closes", async () => {
+  it("⌘⏎ puts the file in the thread's prompt as an @ file and closes", async () => {
     const insertTag = vi.fn();
     const unregister = registerCiteTarget("thread:s-two", { insert: () => undefined, insertTag, focus: () => undefined });
     search.mockResolvedValue([match("repo-cf", CF, "gui/src/lib/tree.ts")]);
     await openFinder("s-two");
     typeQuery("tree");
     await searched();
-    fireEvent.keyDown(input(), { key: "Enter", altKey: true });
+    fireEvent.keyDown(input(), { key: "Enter", metaKey: true });
     await act(async () => {
       await new Promise((r) => requestAnimationFrame(r));
     });
@@ -383,5 +399,40 @@ describe("picking a file", () => {
     expect(insertTag).toHaveBeenCalledWith({ tagKind: "file", projectId: "repo-cf", path: "gui/src/lib/tree.ts" });
     expect(panelActive("thread:s-two")).toBeNull();
     unregister();
+  });
+
+  it("⌥⏎ no longer tags: it opens the file like Enter", async () => {
+    const insertTag = vi.fn();
+    const unregister = registerCiteTarget("thread:s-two", { insert: () => undefined, insertTag, focus: () => undefined });
+    search.mockResolvedValue([match("repo-cf", CF, "gui/src/lib/tree.ts")]);
+    await openFinder("s-two");
+    typeQuery("tree");
+    await searched();
+    fireEvent.keyDown(input(), { key: "Enter", altKey: true });
+    await settle(5);
+    await laidOut();
+    expect(insertTag).not.toHaveBeenCalled();
+    expect(panelActive("thread:s-two")?.params.path).toBe(`${CF}/gui/src/lib/tree.ts`);
+    unregister();
+  });
+
+  it("⌘⏎ before the typed query's answer waits for it and tags its first row", async () => {
+    const insertTag = vi.fn();
+    const unregister = registerCiteTarget("thread:s-two", { insert: () => undefined, insertTag, focus: () => undefined });
+    search.mockResolvedValue([match("repo-cf", CF, "gui/src/lib/tree.ts")]);
+    await openFinder("s-two");
+    typeQuery("tree");
+    fireEvent.keyDown(input(), { key: "Enter", metaKey: true });
+    await searched();
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+    });
+    expect(insertTag).toHaveBeenCalledWith({ tagKind: "file", projectId: "repo-cf", path: "gui/src/lib/tree.ts" });
+    unregister();
+  });
+
+  it("the hints say ⌘⏎ for @ in prompt", async () => {
+    await openFinder("s-1");
+    expect(screen.getByTestId("finder-hints").textContent).toContain("⌘⏎ @ in prompt");
   });
 });

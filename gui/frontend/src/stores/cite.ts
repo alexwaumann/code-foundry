@@ -55,7 +55,7 @@ export function takeFlash(seq: number): void {
 export interface CiteTarget {
   /** Inserts a citation tag at the caret and focuses the prompt after it. */
   insert(citationId: string): void;
-  /** Inserts any tag at the caret the same way (the file finder's ⌥⏎). */
+  /** Inserts any tag at the caret the same way (the file finder's ⌘⏎). */
   insertTag(tag: PromptTag): void;
   /** Focuses the prompt with a collapsed caret (a clicked chip is no longer selected, so typing does not replace it). */
   focus(): void;

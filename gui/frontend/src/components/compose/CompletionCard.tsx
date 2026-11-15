@@ -127,6 +127,11 @@ export function CompletionCard({ completion, above = false }: { completion: Comp
                       </span>
                     )}
                     <Detail item={item} />
+                    {item.note && (
+                      <span className="shrink-0 text-caption text-cf-text-muted" data-testid="completion-note">
+                        {item.note}
+                      </span>
+                    )}
                     {on && (
                       <span aria-hidden className="shrink-0 text-caption">
                         ⏎

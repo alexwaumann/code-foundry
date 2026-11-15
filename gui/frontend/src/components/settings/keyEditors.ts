@@ -4,6 +4,7 @@ import { BackdropEditor } from "./BackdropEditor";
 import { BranchNamingOff } from "./BranchNamingOff";
 import { DictationMicrophoneDescription, DictationMicrophoneEditor, DictationNeedsModel, DictationStateChip, DictationToggleEditor } from "./DictationSettings";
 import type { SettingEditor } from "./editor";
+import { IncludeIgnoredEditor } from "./IncludeIgnoredSettings";
 import { ThemeDarkEditor, ThemeLightEditor } from "./ThemeSlotEditor";
 import { VolumeEditor } from "./VolumeEditor";
 import { WorkerModelsEditor } from "./WorkerModelsEditor";
@@ -20,6 +21,8 @@ export const keyEditors: Readonly<Partial<Record<string, SettingEditor>>> = {
   "ember.worker_models": WorkerModelsEditor,
   "dictation.enabled": DictationToggleEditor,
   "dictation.microphone": DictationMicrophoneEditor,
+  // On its page the section draws the list (sectionBodies); this is its search result's editor.
+  "files.include_ignored": IncludeIgnoredEditor,
 };
 
 /**
@@ -45,4 +48,4 @@ export const keyDescriptions: Readonly<Partial<Record<string, ComponentType<{ fa
  * Key editors taller than one control (the backdrop's gallery): their row aligns to the
  * top, so the title sits beside the editor's first control and the reset arrow beside it.
  */
-export const tallKeyEditors: ReadonlySet<string> = new Set(["appearance.backdrop", "ember.worker_models"]);
+export const tallKeyEditors: ReadonlySet<string> = new Set(["appearance.backdrop", "ember.worker_models", "files.include_ignored"]);

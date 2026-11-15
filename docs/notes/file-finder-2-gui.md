@@ -6,6 +6,9 @@ ranked list and code-point positions. This PR adds the command and the dialog. T
 was agreed from sketches (A for one project, W1 for a workspace: flat list, label on the
 right).
 
+Since file search 2 (`docs/notes/file-search-2-includes-gui.md`): ⌘⏎ puts the file in the
+prompt; ⌥⏎ below is its earlier chord.
+
 ## What landed
 
 | Path | What |

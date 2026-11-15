@@ -7,11 +7,12 @@ import {
   SearchFilesResponseSchema,
   SkillSchema,
   SkillScope,
+  SuggestIncludeIgnoredResponseSchema,
 } from "@/gen/codefoundry/v1/filesystem_pb";
 import { listingMessage } from "@/components/palette/usePathListing";
 import type { DaemonConnection } from "./endpoint";
 import { OUTDATED_DAEMON_MESSAGE, OutdatedDaemonError } from "./errors";
-import { listSkills, PathRejectedError, searchFiles, toDirectoryListingView, toFileSearchView, toSkillView } from "./filesystem";
+import { listSkills, PathRejectedError, searchFiles, suggestIncludeIgnored, toDirectoryListingView, toFileSearchView, toSkillView } from "./filesystem";
 
 describe("toDirectoryListingView", () => {
   it("maps entries and the completion", () => {
@@ -54,13 +55,14 @@ describe("toSkillView", () => {
 describe("toFileSearchView", () => {
   it("maps matches in order", () => {
     const res = create(SearchFilesResponseSchema, {
-      matches: [{ path: "src", isDir: true }, { path: "src/index.ts" }],
+      matches: [{ path: "src", isDir: true }, { path: "src/index.ts" }, { path: ".env", ignored: true }],
       truncated: true,
     });
     expect(toFileSearchView(res)).toEqual({
       matches: [
-        { path: "src", isDir: true },
-        { path: "src/index.ts", isDir: false },
+        { path: "src", isDir: true, ignored: false },
+        { path: "src/index.ts", isDir: false, ignored: false },
+        { path: ".env", isDir: false, ignored: true },
       ],
       truncated: true,
     });
@@ -85,7 +87,7 @@ describe("listSkills and searchFiles requests", () => {
       calls.push({ method, req });
       return err === undefined ? Promise.resolve(res) : Promise.reject(err);
     };
-    const client = { listSkills: handler("listSkills"), searchFiles: handler("searchFiles") };
+    const client = { listSkills: handler("listSkills"), searchFiles: handler("searchFiles"), suggestIncludeIgnored: handler("suggestIncludeIgnored") };
     const conn = { client: () => Promise.resolve(client) } as unknown as DaemonConnection;
     return { conn, calls };
   }
@@ -114,7 +116,22 @@ describe("listSkills and searchFiles requests", () => {
     const { conn, calls } = fakeConn(create(SearchFilesResponseSchema, { matches: [{ path: "a.ts" }] }));
     const got = await searchFiles({ projectId: "r-1", query: "a" }, conn);
     expect(calls).toEqual([{ method: "searchFiles", req: { projectId: "r-1", path: "", query: "a", limit: 0 } }]);
-    expect(got).toEqual({ matches: [{ path: "a.ts", isDir: false }], truncated: false });
+    expect(got).toEqual({ matches: [{ path: "a.ts", isDir: false, ignored: false }], truncated: false });
+  });
+
+  it("suggestIncludeIgnored sends the project and text (limit 0 by default) and maps the answer", async () => {
+    const { conn, calls } = fakeConn(
+      create(SuggestIncludeIgnoredResponseSchema, {
+        suggestions: [{ path: "dist", isDir: true, fileCount: 1000, fileCountCapped: true, included: true, matchesText: true, pathPositions: [0, 1] }],
+        truncated: true,
+        textFiles: 3,
+        textFilesCapped: false,
+        textError: "",
+      }),
+    );
+    const got = await suggestIncludeIgnored({ projectId: "r-1", text: "di" }, conn);
+    expect(calls).toEqual([{ method: "suggestIncludeIgnored", req: { projectId: "r-1", text: "di", limit: 0 } }]);
+    expect(got).toEqual({ suggestions: [{ path: "dist", isDir: true, fileCount: 1000, fileCountCapped: true, included: true, pathPositions: [0, 1] }], textFiles: 3, textFilesCapped: false, textError: "" });
   });
 
   it.each([

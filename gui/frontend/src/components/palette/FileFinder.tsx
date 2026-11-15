@@ -29,7 +29,8 @@ function Runs({ runs }: { runs: readonly Run[] }) {
 
 /**
  * One file, text only: its name (matched letters bold), its directory dimmed and cut from
- * the left so the end stays; on the right `open` when the panel has its tab, the project's
+ * the left so the end stays; on the right `ignored` when git ignores it (an include pattern
+ * brought it in), `open` when the panel has its tab, the project's
  * name in a thread with several (matched letters bold), and its git status letter in a
  * fixed column (always reserved with several projects, so the names line up).
  */
@@ -55,6 +56,11 @@ function FinderItem({ row, multi, onOpen }: { row: FinderRow; multi: boolean; on
           </span>
         )}
       </span>
+      {row.ignored && (
+        <span className="shrink-0 text-caption text-cf-text-muted" data-testid="finder-ignored">
+          ignored
+        </span>
+      )}
       {row.open && (
         <span className="shrink-0 text-caption text-cf-text-muted" data-testid="finder-open">
           open
@@ -85,7 +91,7 @@ function Hints() {
         <Kbd size="sm">⏎</Kbd> open
       </span>
       <span className="flex items-center gap-1">
-        <Kbd size="sm">⌥</Kbd>
+        <Kbd size="sm">⌘</Kbd>
         <Kbd size="sm">⏎</Kbd> @ in prompt
       </span>
       <span className="ml-auto flex items-center gap-1">
@@ -100,7 +106,7 @@ function Hints() {
  * chrome over a thread's checkouts. An empty query lists the files changed in the thread
  * and the panel's recently opened files; a query lists the daemon's ranked matches across
  * the checkouts (lib/fileFinder.ts). Enter opens the file in a tab beside the thread (at
- * the line of a trailing `:<line>`), ⌥⏎ puts it in the prompt as an @ file.
+ * the line of a trailing `:<line>`), ⌘⏎ puts it in the prompt as an @ file.
  */
 export function FileFinder({ threadId, search }: { threadId: string; search?: FindFilesFn }) {
   const [input, setInput] = useState("");
@@ -135,7 +141,7 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
   };
 
   // The rows on screen answer an older query while the typed one's search is out (or still
-  // debounced). Enter or ⌥⏎ then waits for the answer and takes its first row: typing a name
+  // debounced). Enter or ⌘⏎ then waits for the answer and takes its first row: typing a name
   // and pressing Enter at once must not open the previous query's file (nor do nothing on
   // the first query).
   const waiting = searching && !parsed.tooMany && found.answered !== parsed.query;
@@ -178,10 +184,10 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
         if (waiting) {
           e.preventDefault();
           e.stopPropagation();
-          pending.current = { query: parsed.query, tag: e.altKey };
+          pending.current = { query: parsed.query, tag: e.metaKey };
           return;
         }
-        if (!e.altKey) return;
+        if (!e.metaKey) return;
         e.preventDefault();
         e.stopPropagation();
         const r = rows.find((x) => x.key === selected);

@@ -65,3 +65,12 @@ describe("CompletionCard under the pointer", () => {
     expect(rows()[1]?.getAttribute("aria-selected")).toBe("true");
   });
 });
+
+describe("CompletionCard file rows", () => {
+  it("shows a row's note (ignored) at its right, and nothing for a row without one", () => {
+    const item = (path: string, note?: string) => ({ key: path, label: path, detail: "", ...(note ? { note } : {}), tag: { tagKind: "file" as const, projectId: "r", path } });
+    render(<Card source={files({ query: "READM", groups: [{ key: "r", heading: null, items: [item(".env.local", "ignored"), item("env.ts")] }] })} />);
+    const rows = screen.getAllByTestId("completion-item");
+    expect(rows.map((r) => r.querySelector('[data-testid="completion-note"]')?.textContent ?? null)).toEqual(["ignored", null]);
+  });
+});
