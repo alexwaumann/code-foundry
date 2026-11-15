@@ -1,0 +1,15 @@
+/*
+ * A Mermaid diagram (DiagramSvg.tsx): the width it is given, centred, at most its natural
+ * width (--cf-diagram-w, its viewBox), at least 60% of it; past that its container scrolls.
+ */
+.cf-mermaid {
+  width: 100%;
+}
+.cf-mermaid > svg {
+  display: block;
+  margin-inline: auto;
+  width: 100%;
+  height: auto;
+  max-width: var(--cf-diagram-w);
+  min-width: calc(var(--cf-diagram-w) * 0.6);
+}
