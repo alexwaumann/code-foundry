@@ -293,7 +293,7 @@ describe("the composer of a space with no pane", () => {
   it("a send on its way stays where it is", async () => {
     await seedLayout(EMPTY("sp-a", 2));
     stop = startComposerDrafts();
-    updateDraft("home:", { text: "sending", phase: "sending" });
+    updateDraft("home:", { text: "sending", phase: "starting" });
     await act(() => seedLayout(EMPTY("sp-b", 3)));
     expect(getDraft("home:").text).toBe("sending");
     expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
