@@ -334,6 +334,7 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
   const active = pane?.active ?? "";
   const stripRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState<TabFit[] | null>(null);
   const { setNodeRef: setPaneNode, listeners: paneListeners } = usePaneDrag(paneId);
   const key = tabIds.join(",");
@@ -367,6 +368,18 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
     },
     [paneId],
   );
+  // The active tab in view when it changes, a tab comes or goes, or the tabs refit.
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    const el = scroller?.querySelector<HTMLElement>(`[data-testid="shell-tab"][data-tab-id="${active}"]`);
+    if (!scroller || !el) return;
+    const z = zoomFactor();
+    // Inside its 1px padding, which keeps the tab's focus ring from being cut.
+    const [s, t] = [scroller.getBoundingClientRect(), el.getBoundingClientRect()];
+    const [from, to] = [s.left + z, s.right - z];
+    if (t.left < from) scroller.scrollLeft -= (from - t.left) / z;
+    else if (t.right > to) scroller.scrollLeft += (t.right - to) / z;
+  }, [active, key, fits]);
 
   return (
     <div
@@ -383,9 +396,12 @@ export function PaneTabStrip({ paneId, focused, fullscreen = false }: { paneId: 
       style={{ height: PANE_HEADER_HEIGHT, paddingLeft: STRIP_PAD }}
       onKeyDown={onStripKeyDown}
     >
-      {tabIds.map((id, i) => (
-        <ShellTab key={id} tabId={id} active={id === active} paneFocused={focused} fit={fits?.[i]} focusable={id === active} />
-      ))}
+      {/* More tabs than room even as icons: they scroll here, the controls after them stay in the pane. */}
+      <div ref={scrollerRef} className="-mx-px flex min-w-0 items-center gap-0.5 self-stretch overflow-x-auto px-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="shell-tab-scroller">
+        {tabIds.map((id, i) => (
+          <ShellTab key={id} tabId={id} active={id === active} paneFocused={focused} fit={fits?.[i]} focusable={id === active} />
+        ))}
+      </div>
       <PanePlusMenu paneId={paneId} />
       {/* Collapse, then full screen, at the right end; in full screen only its exit. */}
       {!fullscreen && <PaneCollapseButton paneId={paneId} className="ml-auto" />}

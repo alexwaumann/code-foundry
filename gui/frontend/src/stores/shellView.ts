@@ -7,7 +7,9 @@
  * - `frame`: the pane grid as last drawn (rectangles in layout px): the direction keys find
  *   neighbours on it (shell/keyPresenters.ts), as the spec says they do on the rendered frame.
  * - `focusRequest`: asks a pane to take the keyboard into its active tab (a key or a command
- *   moved the focus; a click puts the keyboard where it clicked by itself).
+ *   moved the focus; a click puts the keyboard where it clicked by itself). Each request is served
+ *   once (takeFocusRequest): a pane that remounts later (full screen ends, a space shown again, a
+ *   fold or unfold) does not take the keyboard back from where the user has since put it.
  * - `fullscreen`: the space full screen was turned on in ("" off). The pane it shows is always
  *   that space's focused pane (shell/fullscreen.ts); it ends when the window leaves the space.
  * - `floating`: the floating composer of a full-screened linked tab: expanded or a pill, and
@@ -25,6 +27,9 @@ interface ShellViewState {
   frame: Frame | null;
   /** The pane asked to take the keyboard, and a counter so the same pane can be asked again. */
   focusRequest: { paneId: string; seq: number };
+  /** The last request a rail or an open pane served, and the last an open pane served (takeFocusRequest). */
+  servedSeq: number;
+  servedOpenSeq: number;
   /** Counts the focus requests that close a sheet over the window (requestPaneFocusOverSheets). */
   overSheetsSeq: number;
   /** The space full screen is on in; "" when it is off. */
@@ -41,7 +46,7 @@ export interface FloatingState {
 
 export const FLOATING_START: FloatingState = { expanded: false, x: 0, y: 0 };
 
-const INITIAL: ShellViewState = { mode: "waiting", frame: null, focusRequest: { paneId: "", seq: 0 }, overSheetsSeq: 0, fullscreen: "", floating: FLOATING_START };
+const INITIAL: ShellViewState = { mode: "waiting", frame: null, focusRequest: { paneId: "", seq: 0 }, servedSeq: 0, servedOpenSeq: 0, overSheetsSeq: 0, fullscreen: "", floating: FLOATING_START };
 
 export const useShellViewStore = create<ShellViewState>()(() => INITIAL);
 
@@ -61,6 +66,18 @@ export function setShellFrame(frame: Frame | null): void {
 /** Asks a pane to move the keyboard into its active tab. */
 export function requestPaneFocus(paneId: string): void {
   useShellViewStore.setState((s) => ({ focusRequest: { paneId, seq: s.focusRequest.seq + 1 } }));
+}
+
+/**
+ * Whether a pane should serve focus request `seq` now, marking it served: each request moves the
+ * keyboard once. An open pane serves one a rail has served: a click on a rail's icon puts the
+ * keyboard on the icon, then the pane unfolds and its active tab takes it.
+ */
+export function takeFocusRequest(seq: number, where: "rail" | "open"): boolean {
+  const s = useShellViewStore.getState();
+  if (seq === 0 || seq <= (where === "open" ? s.servedOpenSeq : s.servedSeq)) return false;
+  useShellViewStore.setState(where === "open" ? { servedSeq: seq, servedOpenSeq: seq } : { servedSeq: seq });
+  return true;
 }
 
 /**

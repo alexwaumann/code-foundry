@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { appPath, CF, invocations, mockUrl, resetMock } from "./fixtures";
+import { keyboardPane } from "./shell-surfaces";
 
 /**
  * Dragging tabs and panes in the window shell (docs/notes/shell-14-drag.md), against the mock's
@@ -192,6 +193,18 @@ test("a tab dropped on a pane's edge splits it, into the rectangle the preview s
   const landed = await boxOf(page, '[data-testid="shell-pane"]:has([data-tab-id="t-prs"])');
   expectSameBox(landed, shown);
   await expectTiled(page);
+});
+
+test("after a drop, the keyboard is in the pane that took the tab, not on the page's body", async ({ page }) => {
+  await seed(THREE, "p-1");
+  await openShell(page);
+  const p1 = await paneBox(page, "p-1");
+  await tabEl(page, "t-diff-s-1").getByRole("tab").focus();
+  await lift(page, centre(await tabBox(page, "t-diff-s-1")), { x: p1.x + p1.w - 30, y: p1.y + p1.h / 2 });
+  await drop(page);
+  await expectStored("row([t-s-1,t-s-3] [t-diff-s-1] [t-prs])");
+  const into = await page.locator('[data-testid="shell-pane"]:has([data-tab-id="t-diff-s-1"])').getAttribute("data-pane-id");
+  await expect.poll(() => keyboardPane(page)).toBe(into);
 });
 
 test("a whole pane drags by its strip onto another pane's edge", async ({ page }) => {

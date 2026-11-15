@@ -14,13 +14,18 @@ import { requestPaneFocus } from "@/stores/shellView";
 import { afterRev, runLayoutCommand, type LayoutCommandResult } from "./commands";
 import { removeSpaceArgs, spaceAtIndex, type RemoveChoice, type SpaceCommand } from "./spaces";
 
+/** The keyboard goes into the current space's focused pane. */
+function keyboardIntoFocusedPane(): void {
+  const s = useLayoutStore.getState();
+  const pane = s.spaces[s.currentSpaceId]?.focus ?? "";
+  if (pane) requestPaneFocus(pane);
+}
+
 /** After a commit that showed another space, the keyboard goes into its focused pane. */
 async function keyboardInto(res: LayoutCommandResult | null): Promise<void> {
   if (!res) return;
   await afterRev(res.rev);
-  const s = useLayoutStore.getState();
-  const pane = s.spaces[s.currentSpaceId]?.focus ?? "";
-  if (pane) requestPaneFocus(pane);
+  keyboardIntoFocusedPane();
 }
 
 /** Shows a space (space.switch), the keyboard following into its focused pane. */
@@ -106,11 +111,20 @@ export async function removeSpace(id: string, choice: RemoveChoice): Promise<boo
   }
 }
 
-/** Runs a drop on a space tab (spaces.ts spaceDropCommands), one verb after the other; stops at a refusal. */
-export async function runSpaceDrop(cmds: readonly SpaceCommand[]): Promise<void> {
+/** Runs a drop on a space tab (spaces.ts spaceDropCommands), one verb after the other; stops at a refusal. Resolves whether every verb ran. */
+export async function runSpaceDrop(cmds: readonly SpaceCommand[]): Promise<boolean> {
   for (const c of cmds) {
     const res = await runLayoutCommand(c.name, c.args);
-    if (!res) return;
+    if (!res) return false;
     await afterRev(res.rev);
   }
+  return true;
+}
+
+/**
+ * Runs a drop in the grid (a tab or pane moved, a thread opened), then the keyboard goes into the
+ * pane the drop focused: the dragged tab's node, which had it, went with the move.
+ */
+export async function runGridDrop(cmds: readonly SpaceCommand[]): Promise<void> {
+  if (await runSpaceDrop(cmds)) keyboardIntoFocusedPane();
 }

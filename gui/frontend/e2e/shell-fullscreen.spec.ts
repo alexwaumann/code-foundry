@@ -92,6 +92,24 @@ test("cmd+shift+enter shows the pane over the whole grid, the others unmounted; 
   await expect(page.getByTestId("shell-pane")).toHaveCount(2);
 });
 
+test("leaving full screen keeps the keyboard where the user put it, not in the pane a key last moved it to", async ({ page }) => {
+  const prs: Tab = { id: "t-prs", kind: "prs", title: "Pull Requests" };
+  await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [prs]), pane("p-2", [diff("s-1")])], sizes: [0.5, 0.5] }, "p-2");
+  await openShell(page);
+  // A key moves the focus (and the keyboard) left, then a click puts it back in the diff.
+  await paneEl(page, "p-2").getByTestId("shell-pane-body").click({ position: { x: 300, y: 300 } });
+  await page.keyboard.press("Control+Meta+ArrowLeft");
+  await expect(paneEl(page, "p-1")).toHaveAttribute("data-focused", "true");
+  await paneEl(page, "p-2").getByTestId("shell-pane-body").click({ position: { x: 300, y: 300 } });
+  await expect(paneEl(page, "p-2")).toHaveAttribute("data-focused", "true");
+  await page.keyboard.press("Meta+Shift+Enter");
+  await expect(page.getByTestId("shell-pane")).toHaveCount(1);
+  await page.keyboard.press("Meta+Shift+Enter");
+  await expect(page.getByTestId("shell-pane")).toHaveCount(2);
+  await expect(paneEl(page, "p-2")).toHaveAttribute("data-focused", "true");
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest<HTMLElement>('[data-testid="shell-pane"]')?.dataset.paneId ?? "")).toBe("p-2");
+});
+
 test("full screen from a rail moves the keyboard into the thread's prompt, and Escape there leaves", async ({ page }) => {
   // s-1 focused beside s-5's thread, in a grid too narrow for both: s-5's pane is a rail.
   await seed({ t: "split", id: "s-r", dir: "row", kids: [pane("p-1", [thread("s-1")]), pane("p-2", [thread("s-5")])], sizes: [0.5, 0.5] }, "p-1");
