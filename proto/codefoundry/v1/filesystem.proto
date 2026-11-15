@@ -65,7 +65,9 @@ service FilesystemService {
   // an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
   // path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
   // (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
-  // PDFs) at 32 MiB.
+  // PDFs) at 32 MiB. With tail, a text file over the cap is read from its end instead
+  // (truncated_start, offset). A video or audio file is never read: it is media, for
+  // StreamFile.
   rpc ReadFile(ReadFileRequest) returns (ReadFileResponse) {}
 
   // WriteFile replaces one file for the file viewer, or creates it. path is as for
@@ -111,6 +113,19 @@ service FilesystemService {
   // file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
   // ~/Library and other credential folders).
   rpc PreviewFile(PreviewFileRequest) returns (PreviewFileResponse) {}
+
+  // StreamFile grants the File tab's player a URL on the daemon's API listener that
+  // streams one video or audio file (ReadFileResponse.media) without the bearer token, as
+  // a <video src> or <audio src> must load it: GET /media/<grant>/<name>, with Range
+  // requests, at any size. The grant is an unguessable id bound to the path as asked, one
+  // per path, kept until the daemon stops. Each request applies ReadFile's rules again
+  // (the file the path leads to now, under home or a temp folder) and serves only a media
+  // type, so the route is 404 once the file is gone, moved out of reach, or no longer
+  // media. path is as for ReadFile: InvalidArgument when ReadFile refuses it, for a
+  // directory, and for a file whose name, or the name of the file its links lead to, is no
+  // media type (mp4 m4v mov webm mp3 wav m4a aac ogg flac); NotFound for a missing file;
+  // PermissionDenied when macOS's privacy protection keeps it closed.
+  rpc StreamFile(StreamFileRequest) returns (StreamFileResponse) {}
 }
 
 message ListDirectoriesRequest {
@@ -244,6 +259,11 @@ message ReadFileRequest {
   // NUL in the first 8 KiB) is always capped at 1 MiB whatever this asks; any other
   // file (images, PDFs, archives) is read up to this, at most 32 MiB.
   int64 max_bytes = 3;
+  // Read the end of a text file rather than its start (a log's newest lines): a file over
+  // the cap comes back from the first line that starts in its last max_bytes (at most
+  // 1 MiB), or, with no line break there, from its first whole UTF-8 character. A file
+  // within the cap, and anything that is not text, reads as without it.
+  bool tail = 4;
 }
 
 message ReadFileResponse {
@@ -278,6 +298,15 @@ message ReadFileResponse {
   // bridge. WriteFile goes by the real file alone: it refuses one outside home, and takes a
   // link in a temp folder that leads into home.
   bool outside_home = 12;
+  // A tail read left out the file's start: contents begin at offset, a line's start (or a
+  // character's, when no line break was in reach), and run to the end. truncated is then
+  // false. Like truncated, the File tab does not edit such a read.
+  bool truncated_start = 13;
+  // The byte of the file contents begin at: 0 but with truncated_start.
+  int64 offset = 14;
+  // A video or audio file (by its name): contents are empty and truncated false; binary,
+  // mime_type, size and modified_at are set. Stream it with StreamFile.
+  bool media = 15;
 }
 
 message WriteFileRequest {
@@ -320,6 +349,26 @@ message PreviewFileRequest {
   string base_dir = 1;
   // Absolute, "~/"-prefixed, or relative to base_dir.
   string path = 2;
+}
+
+message StreamFileRequest {
+  // Absolute directory a relative path is resolved against. Ignored for an absolute
+  // path.
+  string base_dir = 1;
+  // Absolute, "~/"-prefixed, or relative to base_dir.
+  string path = 2;
+}
+
+message StreamFileResponse {
+  // Root-relative URL on the daemon's API listener ("/media/<grant>/clip.mp4"); the GUI
+  // joins it to the daemon's base URL. It needs no bearer token: the grant is in the path.
+  string url = 1;
+  // What the route sends as Content-Type ("video/mp4", "audio/mpeg").
+  string mime_type = 2;
+  // The file's size in bytes when granted.
+  int64 size = 3;
+  // Modification time when granted, unix milliseconds.
+  int64 modified_at = 4;
 }
 
 message PreviewFileResponse {

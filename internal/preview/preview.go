@@ -51,8 +51,12 @@ type Grants struct {
 	byID  map[string]entry
 }
 
-// entry is what a grant serves: the tree dir, or only file (in dir) when file is set.
-type entry struct{ dir, file string }
+// entry is what a grant serves: the tree dir, or only file (in dir) when file is set. A
+// media grant (media.go) serves file on the media route, and nothing on the preview route.
+type entry struct {
+	dir, file string
+	media     bool
+}
 
 // NewGrants returns an empty grant table whose grants clear floor.
 func NewGrants(floor Floor) *Grants {
@@ -167,7 +171,7 @@ func Handler(g *Grants, paint Paint, log *slog.Logger) http.Handler {
 			return
 		}
 		e, ok := g.lookup(grant)
-		if !ok {
+		if !ok || e.media {
 			http.NotFound(w, r)
 			return
 		}

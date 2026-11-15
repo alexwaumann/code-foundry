@@ -254,14 +254,18 @@ func (h *Filesystem) resolve(projectID, path string) (resolvedCheckout, error) {
 // ReadFile reads one file under home or a temp folder for the file viewer.
 func (h *Filesystem) ReadFile(_ context.Context, req *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error) {
 	m := req.Msg
-	f, err := fsx.ReadFile(h.readRoots(), m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
+	read := fsx.ReadFile
+	if m.GetTail() {
+		read = fsx.ReadTail
+	}
+	f, err := read(h.readRoots(), m.GetBaseDir(), m.GetPath(), m.GetMaxBytes())
 	if err != nil {
 		return nil, fileError(err)
 	}
 	out := &v1.ReadFileResponse{
 		Contents: f.Contents, Size: f.Size, Truncated: f.Truncated, Binary: f.Binary, MimeType: f.MIMEType,
 		ResolvedPath: f.Path, NotFound: f.NotFound, IsDir: f.IsDir, RealPath: f.RealPath, Mode: uint32(f.Mode),
-		OutsideHome: f.OutsideHome,
+		OutsideHome: f.OutsideHome, TruncatedStart: f.TruncatedStart, Offset: f.Offset, Media: f.Media,
 	}
 	if !f.ModifiedAt.IsZero() {
 		out.ModifiedAt = f.ModifiedAt.UnixMilli()

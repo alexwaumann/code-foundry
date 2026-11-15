@@ -471,6 +471,11 @@ Services (v1):
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).
   ReadFile and PreviewFile also read the temp folders (`/tmp`, `$TMPDIR`), where agents write; only
   they do, so a temp file has no editing and no bridge (`docs/notes/read-temp-files.md`).
+  ReadFile's `tail` reads a text file's last MiB from a line start, and it reads no bytes of
+  video or audio (`media`): StreamFile mints a media grant in the preview's table, and
+  `GET /media/<grant>/<name>` on the API listener (outside the bearer check and CORS) streams
+  the file with Range support, applying ReadFile's rules on every request and serving only
+  media types (`docs/notes/file-previews-2-daemon.md`).
   The File tab's editor calls it directly; a draft lives only in the window's memory and only
   the window saves it: `file.save` refuses every caller that reaches the daemon
   (`docs/notes/file-edit-2-gui.md`). `view.open.file --edit` asks the user to edit a file: the

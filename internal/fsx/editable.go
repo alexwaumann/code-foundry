@@ -19,7 +19,7 @@ var byteOrderMark = []byte{0xEF, 0xBB, 0xBF}
 // The file may be one the agent is not to read, so an error says only which rule it failed,
 // by its path: no contents, and no size. A path Write would not reach, a
 // directory, anything else that is not a regular file, a symlink leading nowhere, a missing
-// directory, binary contents, an image, more than MaxReadBytes, invalid UTF-8 and a byte
+// directory, binary contents, an image, a video or audio file, more than MaxReadBytes, invalid UTF-8 and a byte
 // order mark all wrap ErrInvalidArgument. A file with no owner write bit is an
 // ErrNotWritable error.
 func (w *Writer) Editable(baseDir, path string) (string, error) {
@@ -63,9 +63,11 @@ func notEditable(f FileContents) string {
 	switch {
 	case strings.HasPrefix(f.MIMEType, "image/"): // an SVG is text, and shows as a picture
 		return "is an image, which the File tab shows but does not edit"
+	case f.Media:
+		return "is a video or audio file, which the File tab plays but does not edit"
 	case f.Binary:
 		return "is a binary file, which the File tab does not edit"
-	case f.Truncated:
+	case f.Truncated || f.TruncatedStart:
 		return "is over 1 MiB, the most the File tab edits"
 	case bytes.HasPrefix(f.Contents, byteOrderMark):
 		return "starts with a byte order mark, which saving would drop"

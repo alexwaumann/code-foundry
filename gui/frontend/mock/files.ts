@@ -9,21 +9,28 @@
  *   POST /__mock/fs/write?path=…&text=…   (a file's new contents on disk; reset restores the fixtures)
  *   POST /__mock/fs/link?path=…&real=…    (ReadFile says a link leads from the path to real; reset forgets it)
  *   GET  /__mock/fs/text?path=…           ({ text }: a file's contents on disk, null when absent)
+ *   POST /__mock/fs/log?path=…&bytes=N    (a generated log of N bytes at path, default
+ *                                          ~/src/code-foundry/logs/big.log and 3 MiB: the tail read's)
+ *
+ * Video and audio (docs/media/clip.mp4, docs/media/tone.m4a, from mock/media/) read as media
+ * with no bytes and stream from GET /media/<grant>/<name> (StreamFile; mock/media.ts).
  */
 import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
-import type { PreviewFileResponseSchema, ReadFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
+import type { PreviewFileResponseSchema, ReadFileResponseSchema, StreamFileResponseSchema, WriteFileRequest, WriteFileResponseSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { DiffSourceKind, type CompareWorktreeResponseSchema, type DiffSource, type GetWorktreeCompareFileResponseSchema, type ListCompareCommitsResponseSchema } from "../src/gen/codefoundry/v1/project_pb";
 import { readFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
+import { mockLog, tailOf } from "./media";
 import { pagelibPages } from "./pagelib";
 import { testPdf } from "./pdf";
 
 type ReadInit = MessageInitShape<typeof ReadFileResponseSchema>;
 type WriteInit = MessageInitShape<typeof WriteFileResponseSchema>;
 type PreviewInit = MessageInitShape<typeof PreviewFileResponseSchema>;
+type StreamInit = MessageInitShape<typeof StreamFileResponseSchema>;
 type CompareInit = MessageInitShape<typeof CompareWorktreeResponseSchema>;
 type CompareLogInit = MessageInitShape<typeof ListCompareCommitsResponseSchema>;
 
@@ -278,6 +285,8 @@ interface Entry {
   /** The size on disk when it is more than the data (a truncated read). */
   size?: number;
   dir?: boolean;
+  /** Video or audio: ReadFile returns no bytes, StreamFile a URL (binary too). */
+  media?: boolean;
   /** When it was last written (unix ms); unset: two minutes before the read. */
   modifiedAt?: number;
 }
@@ -285,6 +294,9 @@ interface Entry {
 function text(s: string, mime = "text/plain; charset=utf-8"): Entry {
   return { data: enc.encode(s), mime };
 }
+
+const CLIP_MP4 = Uint8Array.from(readFileSync(new URL("./media/clip.mp4", import.meta.url)));
+const TONE_M4A = Uint8Array.from(readFileSync(new URL("./media/tone.m4a", import.meta.url)));
 
 /** The fixtures' modification time: fixed, so a stamp (size and time) changes only with a write. */
 const FIXTURE_MTIME = Date.now() - 2 * 60_000;
@@ -317,6 +329,11 @@ function fixtures(): Map<string, Entry> {
     [`${CF}/docs/shots/broken.png`, { data: enc.encode("not a picture"), mime: "image/png", binary: true }],
     [`${CF}/docs/spec.pdf`, { data: Uint8Array.from(testPdf(3, Math.round(1.2 * MiB))), mime: "application/pdf", binary: true }],
     [`${CF}/docs`, { data: new Uint8Array(), mime: "", dir: true, size: 192 }],
+    // Tiny real media WebKit decodes: 3 s of H.264 at 160×90, 2 s of AAC (docs/notes/file-previews-2-daemon.md).
+    [`${CF}/docs/media/clip.mp4`, { data: CLIP_MP4, mime: "video/mp4", binary: true, media: true }],
+    [`${CF}/docs/media/tone.m4a`, { data: TONE_M4A, mime: "audio/mp4", binary: true, media: true }],
+    // A log within the cap; POST /__mock/fs/log makes one over it.
+    [`${CF}/logs/server.log`, text(mockLog(8 * 1024))],
   ]);
 }
 
@@ -348,6 +365,7 @@ export class MockFiles {
   longCommitSubject = 0;
 
   reset(): void {
+    this.mediaGrants.clear();
     this.extraCompareFiles = 0;
     this.firstCompareFiles = 0;
     this.extraCompareCommits = 0;
@@ -360,8 +378,8 @@ export class MockFiles {
   readonly links = new Map<string, string>();
 
   /** ReadFile's answer with where its file really is: a link if one was set, and 0644 behind one. */
-  readWithLink(baseDir: string, path: string, maxBytes: bigint): ReadInit {
-    const r = this.readFile(baseDir, path, maxBytes);
+  readWithLink(baseDir: string, path: string, maxBytes: bigint, tail = false): ReadInit {
+    const r = this.readFile(baseDir, path, maxBytes, tail);
     const real = this.links.get(r.resolvedPath ?? "");
     return real === undefined ? r : { ...r, realPath: real, mode: 0o644 };
   }
@@ -444,7 +462,41 @@ export class MockFiles {
     return e && !e.dir ? { data: e.data, mime: e.mime } : undefined;
   }
 
-  readFile(baseDir: string, path: string, maxBytes: bigint): ReadInit {
+  /** POST /__mock/fs/log: a generated log of `bytes` at `path` (mock/media.ts mockLog). */
+  writeLog(path: string | null, bytes: number): void {
+    this.disk.set(path ?? `${CF}/logs/big.log`, { ...text(mockLog(bytes)), modifiedAt: Date.now() });
+  }
+
+  /** StreamFile's grants: mock-media-<n> per path, as asked. */
+  private mediaGrants = new Map<string, string>();
+
+  /** StreamFile: a URL streaming a video or audio file; ReadFile's refusals, and InvalidArgument for anything else. */
+  streamFile(baseDir: string, path: string): StreamInit {
+    const r = this.readFile(baseDir, path, 1n);
+    const abs = r.resolvedPath ?? "";
+    if (r.notFound) throw new ConnectError(`${abs} does not exist`, Code.NotFound);
+    if (r.isDir) throw new ConnectError(`${abs} is a directory`, Code.InvalidArgument);
+    if (!r.media) throw new ConnectError(`${abs} is not a video or audio file`, Code.InvalidArgument);
+    let grant = this.mediaGrants.get(abs);
+    if (!grant) {
+      grant = `mock-media-${String(this.mediaGrants.size + 1)}`;
+      this.mediaGrants.set(abs, grant);
+    }
+    const name = abs.slice(abs.lastIndexOf("/") + 1);
+    return { url: `/media/${grant}/${encodeURIComponent(name)}`, mimeType: r.mimeType, size: r.size, modifiedAt: r.modifiedAt };
+  }
+
+  /** GET /media/<grant>/<name>: the media file the grant streams, or undefined (404) for anything else. */
+  mediaEntry(pathname: string): { data: Uint8Array; mime: string } | undefined {
+    const m = /^\/media\/([^/]+)\/([^/]+)$/.exec(pathname);
+    if (!m) return undefined;
+    const abs = [...this.mediaGrants].find(([, id]) => id === m[1])?.[0];
+    if (abs === undefined || decodeURIComponent(m[2] ?? "") !== abs.slice(abs.lastIndexOf("/") + 1)) return undefined;
+    const e = this.onDisk(abs);
+    return e?.media ? { data: e.data, mime: e.mime } : undefined;
+  }
+
+  readFile(baseDir: string, path: string, maxBytes: bigint, tail = false): ReadInit {
     if (maxBytes < 0n) throw new ConnectError("max_bytes is negative", Code.InvalidArgument);
     let abs = path;
     if (path === "~" || path.startsWith("~/")) abs = HOME + path.slice(1);
@@ -460,9 +512,14 @@ export class MockFiles {
     const modifiedAt = BigInt(e.modifiedAt ?? FIXTURE_MTIME);
     if (e.dir) return { resolvedPath: abs, isDir: true, size: BigInt(e.size ?? 0), modifiedAt, outsideHome };
     const size = e.size ?? e.data.length;
+    if (e.media) return { resolvedPath: abs, size: BigInt(size), binary: true, media: true, mimeType: e.mime, modifiedAt, outsideHome };
     // Zero is 1 MiB; text never more than 1 MiB, anything else up to 32 MiB.
     const cap = e.binary ? READ_MAX : TEXT_MAX;
     const limit = maxBytes === 0n ? TEXT_MAX : Number(maxBytes > BigInt(cap) ? BigInt(cap) : maxBytes);
+    if (tail && !e.binary && e.data.length > limit) {
+      const t = tailOf(e.data, limit);
+      return { resolvedPath: abs, contents: t.contents, size: BigInt(size), truncatedStart: true, offset: BigInt(t.offset), mimeType: e.mime, modifiedAt, outsideHome };
+    }
     return {
       resolvedPath: abs,
       contents: e.data.slice(0, limit),

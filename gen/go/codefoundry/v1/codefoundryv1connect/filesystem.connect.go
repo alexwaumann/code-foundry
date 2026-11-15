@@ -51,6 +51,9 @@ const (
 	// FilesystemServicePreviewFileProcedure is the fully-qualified name of the FilesystemService's
 	// PreviewFile RPC.
 	FilesystemServicePreviewFileProcedure = "/codefoundry.v1.FilesystemService/PreviewFile"
+	// FilesystemServiceStreamFileProcedure is the fully-qualified name of the FilesystemService's
+	// StreamFile RPC.
+	FilesystemServiceStreamFileProcedure = "/codefoundry.v1.FilesystemService/StreamFile"
 )
 
 // FilesystemServiceClient is a client for the codefoundry.v1.FilesystemService service.
@@ -111,7 +114,9 @@ type FilesystemServiceClient interface {
 	// an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
 	// path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
 	// (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
-	// PDFs) at 32 MiB.
+	// PDFs) at 32 MiB. With tail, a text file over the cap is read from its end instead
+	// (truncated_start, offset). A video or audio file is never read: it is media, for
+	// StreamFile.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 	// WriteFile replaces one file for the file viewer, or creates it. path is as for
 	// ReadFile, and symlinks are written through: the file they lead to is replaced, never
@@ -155,6 +160,18 @@ type FilesystemServiceClient interface {
 	// file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
 	// ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
+	// StreamFile grants the File tab's player a URL on the daemon's API listener that
+	// streams one video or audio file (ReadFileResponse.media) without the bearer token, as
+	// a <video src> or <audio src> must load it: GET /media/<grant>/<name>, with Range
+	// requests, at any size. The grant is an unguessable id bound to the path as asked, one
+	// per path, kept until the daemon stops. Each request applies ReadFile's rules again
+	// (the file the path leads to now, under home or a temp folder) and serves only a media
+	// type, so the route is 404 once the file is gone, moved out of reach, or no longer
+	// media. path is as for ReadFile: InvalidArgument when ReadFile refuses it, for a
+	// directory, and for a file whose name, or the name of the file its links lead to, is no
+	// media type (mp4 m4v mov webm mp3 wav m4a aac ogg flac); NotFound for a missing file;
+	// PermissionDenied when macOS's privacy protection keeps it closed.
+	StreamFile(context.Context, *connect.Request[v1.StreamFileRequest]) (*connect.Response[v1.StreamFileResponse], error)
 }
 
 // NewFilesystemServiceClient constructs a client for the codefoundry.v1.FilesystemService service.
@@ -204,6 +221,12 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("PreviewFile")),
 			connect.WithClientOptions(opts...),
 		),
+		streamFile: connect.NewClient[v1.StreamFileRequest, v1.StreamFileResponse](
+			httpClient,
+			baseURL+FilesystemServiceStreamFileProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("StreamFile")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -215,6 +238,7 @@ type filesystemServiceClient struct {
 	readFile        *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
 	writeFile       *connect.Client[v1.WriteFileRequest, v1.WriteFileResponse]
 	previewFile     *connect.Client[v1.PreviewFileRequest, v1.PreviewFileResponse]
+	streamFile      *connect.Client[v1.StreamFileRequest, v1.StreamFileResponse]
 }
 
 // ListDirectories calls codefoundry.v1.FilesystemService.ListDirectories.
@@ -245,6 +269,11 @@ func (c *filesystemServiceClient) WriteFile(ctx context.Context, req *connect.Re
 // PreviewFile calls codefoundry.v1.FilesystemService.PreviewFile.
 func (c *filesystemServiceClient) PreviewFile(ctx context.Context, req *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
 	return c.previewFile.CallUnary(ctx, req)
+}
+
+// StreamFile calls codefoundry.v1.FilesystemService.StreamFile.
+func (c *filesystemServiceClient) StreamFile(ctx context.Context, req *connect.Request[v1.StreamFileRequest]) (*connect.Response[v1.StreamFileResponse], error) {
+	return c.streamFile.CallUnary(ctx, req)
 }
 
 // FilesystemServiceHandler is an implementation of the codefoundry.v1.FilesystemService service.
@@ -305,7 +334,9 @@ type FilesystemServiceHandler interface {
 	// an absolute base_dir). A temp folder is only for reading: see outside_home. A missing
 	// path is not_found and a directory is_dir, not errors. Contents are at most max_bytes
 	// (zero means 1 MiB): a text file is always capped at 1 MiB, any other file (images,
-	// PDFs) at 32 MiB.
+	// PDFs) at 32 MiB. With tail, a text file over the cap is read from its end instead
+	// (truncated_start, offset). A video or audio file is never read: it is media, for
+	// StreamFile.
 	ReadFile(context.Context, *connect.Request[v1.ReadFileRequest]) (*connect.Response[v1.ReadFileResponse], error)
 	// WriteFile replaces one file for the file viewer, or creates it. path is as for
 	// ReadFile, and symlinks are written through: the file they lead to is replaced, never
@@ -349,6 +380,18 @@ type FilesystemServiceHandler interface {
 	// file, or in a protected folder (the config home outside its checkouts, ~/.ssh,
 	// ~/Library and other credential folders).
 	PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error)
+	// StreamFile grants the File tab's player a URL on the daemon's API listener that
+	// streams one video or audio file (ReadFileResponse.media) without the bearer token, as
+	// a <video src> or <audio src> must load it: GET /media/<grant>/<name>, with Range
+	// requests, at any size. The grant is an unguessable id bound to the path as asked, one
+	// per path, kept until the daemon stops. Each request applies ReadFile's rules again
+	// (the file the path leads to now, under home or a temp folder) and serves only a media
+	// type, so the route is 404 once the file is gone, moved out of reach, or no longer
+	// media. path is as for ReadFile: InvalidArgument when ReadFile refuses it, for a
+	// directory, and for a file whose name, or the name of the file its links lead to, is no
+	// media type (mp4 m4v mov webm mp3 wav m4a aac ogg flac); NotFound for a missing file;
+	// PermissionDenied when macOS's privacy protection keeps it closed.
+	StreamFile(context.Context, *connect.Request[v1.StreamFileRequest]) (*connect.Response[v1.StreamFileResponse], error)
 }
 
 // NewFilesystemServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -394,6 +437,12 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("PreviewFile")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServiceStreamFileHandler := connect.NewUnaryHandler(
+		FilesystemServiceStreamFileProcedure,
+		svc.StreamFile,
+		connect.WithSchema(filesystemServiceMethods.ByName("StreamFile")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/codefoundry.v1.FilesystemService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FilesystemServiceListDirectoriesProcedure:
@@ -408,6 +457,8 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 			filesystemServiceWriteFileHandler.ServeHTTP(w, r)
 		case FilesystemServicePreviewFileProcedure:
 			filesystemServicePreviewFileHandler.ServeHTTP(w, r)
+		case FilesystemServiceStreamFileProcedure:
+			filesystemServiceStreamFileHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -439,4 +490,8 @@ func (UnimplementedFilesystemServiceHandler) WriteFile(context.Context, *connect
 
 func (UnimplementedFilesystemServiceHandler) PreviewFile(context.Context, *connect.Request[v1.PreviewFileRequest]) (*connect.Response[v1.PreviewFileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.PreviewFile is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) StreamFile(context.Context, *connect.Request[v1.StreamFileRequest]) (*connect.Response[v1.StreamFileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.StreamFile is not implemented"))
 }
