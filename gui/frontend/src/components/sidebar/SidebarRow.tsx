@@ -197,7 +197,7 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
         data-testid="row-archive"
         onClick={(e) => {
           e.stopPropagation();
-          void archiveThread(id, true);
+          void archiveThread(id, true, { inView: true });
         }}
       >
         <Check className="size-3 shrink-0" aria-hidden />

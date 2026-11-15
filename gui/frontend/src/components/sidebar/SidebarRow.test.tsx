@@ -403,7 +403,7 @@ describe("SidebarRow hover actions", () => {
       </TooltipProvider>,
     );
     fireEvent.click(screen.getByTestId("row-archive"));
-    expect(archiveThread).toHaveBeenCalledWith("s-1", true);
+    expect(archiveThread).toHaveBeenCalledWith("s-1", true, { inView: true });
     expect(onActivate).not.toHaveBeenCalled();
   });
 

@@ -21,7 +21,7 @@ function Snoozed({ threadId, until }: { threadId: string; until: number | null }
           data-testid="snooze-dismiss"
           onClick={() => {
             setPending(true);
-            void snoozeThread(threadId, null).finally(() => {
+            void snoozeThread(threadId, null, { inView: true }).finally(() => {
               setPending(false);
             });
           }}
