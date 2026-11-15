@@ -13,11 +13,15 @@ function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownM
   return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
-function DropdownMenuContent({ className, sideOffset = 4, alignOffset, collisionPadding, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+/**
+ * `container`: where the menu is portalled (default the body). An element in full screen
+ * passes itself, since nothing outside the full-screen element is drawn.
+ */
+function DropdownMenuContent({ className, sideOffset = 4, alignOffset, collisionPadding, container, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content> & { container?: HTMLElement | null }) {
   // Offsets are viewport px; scale them with the page zoom (lib/zoom.ts).
   const z = useZoomFactor()
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={zoomPx(sideOffset, z)}

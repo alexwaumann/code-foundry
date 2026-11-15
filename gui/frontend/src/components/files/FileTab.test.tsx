@@ -31,6 +31,7 @@ vi.mock("@/api/files", async (orig) => ({
     tails.push(path.startsWith("/") ? path : `${base}/${path}`);
     return Promise.resolve({ path: path.startsWith("/") ? path : `${base}/${path}`, size: 0, truncated: false, binary: true, mime: "", modifiedAtMs: null, notFound: false, isDir: false, outsideHome: false, text: null, lossless: false, image: null, pdf: null, ...(files.get(path.startsWith("/") ? path : `${base}/${path}`) ?? { notFound: true }) });
   },
+  streamFile: (_base: string, path: string) => Promise.resolve({ url: `http://127.0.0.1:1/media/g1/${path.split("/").pop() ?? ""}`, mime: "video/mp4", size: 1, modifiedAtMs: null }),
   readFile: (base: string, path: string) => {
     const abs = path.startsWith("/") ? path : `${base}/${path}`;
     reads.push(abs);
@@ -934,6 +935,17 @@ describe("previews", () => {
     expect(await screen.findByTestId("file-image")).toBeTruthy();
     // Back in Image: the meta waits for this picture's size, not the last mode's.
     expect(meta()).toBe("1 KB · SVG");
+  });
+
+  it("a video: the player, no switch; Copy path, Open in Finder and Refresh only", async () => {
+    files.set(`${W}/clip.mp4`, { media: true, binary: true, mime: "video/mp4", size: 2700 });
+    open("clip.mp4");
+    expect((await screen.findByTestId("media-player")).dataset.kind).toBe("video");
+    expect(tab().dataset.kind).toBe("video");
+    expect(screen.queryByTestId("file-mode")).toBeNull();
+    expect(meta()).toBe("3 KB · MP4");
+    const actions = [...screen.getByTestId("file-header").querySelectorAll("button[data-testid]")].map((b) => b.getAttribute("data-testid"));
+    expect(actions).toEqual(["file-copy-path", "file-reveal", "file-refresh"]);
   });
 
   it("a truncated SVG is too large to show as a picture; Source shows what came back", async () => {

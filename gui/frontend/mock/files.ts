@@ -24,6 +24,7 @@ import { readFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
 import { mockLog, tailOf } from "./media";
+import { UNPLAYABLE_WEBM } from "./mediaPlayer";
 import { MERMAID_FILES } from "./mermaid";
 import { DAEMON_LOG, TEST_RUN } from "./logs";
 import { patchFixtures } from "./patches";
@@ -356,6 +357,7 @@ function fixtures(): Map<string, Entry> {
     // Tiny real media WebKit decodes: 3 s of H.264 at 160×90, 2 s of AAC (docs/notes/file-previews-2-daemon.md).
     [`${CF}/docs/media/clip.mp4`, { data: CLIP_MP4, mime: "video/mp4", binary: true, media: true }],
     [`${CF}/docs/media/tone.m4a`, { data: TONE_M4A, mime: "audio/mp4", binary: true, media: true }],
+    [`${CF}/docs/media/broken.webm`, { data: UNPLAYABLE_WEBM, mime: "video/webm", binary: true, media: true }],
     // A log within the cap; POST /__mock/fs/log makes one over it.
     [`${CF}/logs/server.log`, text(mockLog(8 * 1024))],
     // The data previews' CSV, JSON and JSON Lines (mock/tables.ts).

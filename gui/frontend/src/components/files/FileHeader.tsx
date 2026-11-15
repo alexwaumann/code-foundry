@@ -71,21 +71,23 @@ export function CopyContentsAction({ contents }: { contents: () => string }) {
   return <CopyButton text={contents} label="Copy contents" icon={ClipboardCopy} testId="file-copy-contents" />;
 }
 
-/** Copy path, Copy contents (given `contents`), Open in editor, Open in Finder and Refresh: row one's actions. */
-export function FileActions({ place, line, onRefresh, extra, contents }: { place: FilePlace; line?: number; onRefresh: () => void; extra?: ReactNode; contents?: () => string }) {
+/** Copy path, Copy contents (given `contents`), Open in editor (unless `editor` is false), Open in Finder and Refresh: row one's actions. */
+export function FileActions({ place, line, onRefresh, extra, contents, editor = true }: { place: FilePlace; line?: number; onRefresh: () => void; extra?: ReactNode; contents?: () => string; editor?: boolean }) {
   return (
     <>
       {extra}
       <CopyPathAction path={place.file} />
       {contents && <CopyContentsAction contents={contents} />}
-      <HeaderAction
-        icon={SquareArrowOutUpRight}
-        label="Open in editor"
-        testId="file-open-editor"
-        onClick={() => {
-          openInEditor(place, line);
-        }}
-      />
+      {editor && (
+        <HeaderAction
+          icon={SquareArrowOutUpRight}
+          label="Open in editor"
+          testId="file-open-editor"
+          onClick={() => {
+            openInEditor(place, line);
+          }}
+        />
+      )}
       <HeaderAction
         icon={FinderIcon}
         label="Open in Finder"
