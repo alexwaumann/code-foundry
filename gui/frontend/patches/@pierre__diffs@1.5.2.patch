@@ -101,7 +101,7 @@ index 96f970f1c09c6de6edc1b355813520fa4d366d2b..9ea494e3fd2db9a6aca18eccb4487353
  	}
  	return height;
 diff --git a/dist/components/Virtualizer.js b/dist/components/Virtualizer.js
-index 4063b992bf7c4958c0d8a305977280ea9a3a7330..be6abd10c31945c7660953381f3ae9d1ace171f2 100644
+index 4063b992bf7c4958c0d8a305977280ea9a3a7330..b6980f84b037294de6374765ebd0bf6c92a38727 100644
 --- a/dist/components/Virtualizer.js
 +++ b/dist/components/Virtualizer.js
 @@ -1,6 +1,7 @@
@@ -140,7 +140,20 @@ index 4063b992bf7c4958c0d8a305977280ea9a3a7330..be6abd10c31945c7660953381f3ae9d1
  			if (bottom !== fileOffset) this.applyScrollFix(bottom - fileOffset);
  		}
  	}
-@@ -409,7 +415,7 @@ var Virtualizer = class Virtualizer {
+@@ -306,7 +312,11 @@ var Virtualizer = class Virtualizer {
+ 			const fileBottom = fileTop + fileElement.offsetHeight;
+ 			let fileOffset;
+ 			let fileTypeOffset;
+-			if (fileBottom <= 0) {
++			// Anchored by its bottom only when the file is above the view. A file
++			// not rendered yet (0 px: its highlighter still loading) at the top has
++			// its bottom at 0 too; anchored by it, its first render scrolled the
++			// box by the file's whole height, to its end.
++			if (fileBottom <= 0 && fileTop < 0) {
+ 				fileOffset = fileBottom;
+ 				fileTypeOffset = "bottom";
+ 			} else {
+@@ -409,7 +419,7 @@ var Virtualizer = class Virtualizer {
  		this.height = (() => {
  			if (this.root == null) return 0;
  			if (this.root instanceof Document) return globalThis.innerHeight;
@@ -149,7 +162,7 @@ index 4063b992bf7c4958c0d8a305977280ea9a3a7330..be6abd10c31945c7660953381f3ae9d1
  		})();
  		return this.height;
  	}
-@@ -422,10 +428,15 @@ var Virtualizer = class Virtualizer {
+@@ -422,10 +432,15 @@ var Virtualizer = class Virtualizer {
  		return this.root == null || this.root instanceof Document ? void 0 : this.root;
  	}
  };
