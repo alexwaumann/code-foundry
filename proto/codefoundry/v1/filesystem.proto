@@ -293,6 +293,9 @@ message SearchFilesResponse {
   repeated FileMatch matches = 1;
   // More entries matched than were returned.
   bool truncated = 2;
+  // Some checkout's included ignored files (files.include_ignored, the project's patterns)
+  // were cut at 20,000: the ones past them were not searched.
+  bool included_capped = 3;
 }
 
 message SearchTextRequest {
@@ -378,6 +381,9 @@ message SearchTextSummary {
   bool case_sensitive = 7;
   // From the request to the summary.
   int64 elapsed_ms = 8;
+  // Some checkout's included ignored files were cut at 20,000: the ones past them were not
+  // searched (SearchFilesResponse.included_capped).
+  bool included_capped = 9;
 }
 
 message SuggestIncludeIgnoredRequest {

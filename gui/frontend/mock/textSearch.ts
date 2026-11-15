@@ -21,7 +21,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { smartCaseSensitive } from "../src/lib/textQuery";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { SearchTextResponseSchema, TextFileMatchSchema, TextLineMatchSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
-import { completionCalls, resolveSources, sourceEntries, type CompletionProject, type SearchSource } from "./filesystem";
+import { completionCalls, resolveSources, sourceEntries, sourcesIncludeCapped, type CompletionProject, type SearchSource } from "./filesystem";
 
 type ResponseInit = MessageInitShape<typeof SearchTextResponseSchema>;
 type FileInit = MessageInitShape<typeof TextFileMatchSchema>;
@@ -159,7 +159,7 @@ export function searchTextMessages(
   const sources = resolveSources(projects, req.sources);
   const re = compileQuery(req);
   completionCalls.push(`text ${sources.map((s) => s.project.id).join(",")} ${req.query}`);
-  const sum = { lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: caseSensitive(req.query, req.matchCase, req.regex), elapsedMs: 0n };
+  const sum = { lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: caseSensitive(req.query, req.matchCase, req.regex), elapsedMs: 0n, includedCapped: sourcesIncludeCapped(sources, settingIncludes) };
   const out: ResponseInit[] = [];
   if (req.query !== "") {
     search: for (const src of sources) {

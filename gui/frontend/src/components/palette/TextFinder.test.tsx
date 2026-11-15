@@ -50,7 +50,7 @@ vi.mock("@/api/textSearch", async (orig) => ({
   searchText: (req: Req, onFiles: (f: TextFileView[]) => void, signal?: AbortSignal) =>
     new Promise<TextSummaryView>((resolve, reject) => {
       streams.push({ req, onFiles, signal, end: (s) => {
-        resolve({ lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: false, elapsedMs: 1, ...s });
+        resolve({ lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: false, elapsedMs: 1, includedCapped: false, ...s });
       }, fail: reject });
     }),
 }));

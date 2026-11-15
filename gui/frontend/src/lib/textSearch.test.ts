@@ -10,7 +10,7 @@ function file(path: string, lines: TextLineView[], opts: Partial<TextFileView> =
   return { projectId: "repo-cf", checkout: "/w/cf", path, ignored: false, lines, lineCount: lines.length, lineCountCapped: false, ...opts };
 }
 
-const SUMMARY: TextSummaryView = { lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: false, elapsedMs: 3 };
+const SUMMARY: TextSummaryView = { lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: false, elapsedMs: 3, includedCapped: false };
 
 /** Rows as short strings: "F name dir count", "M line", "N note". */
 function shape(rows: ReturnType<typeof textRows>): string[] {
@@ -156,6 +156,7 @@ describe("statusText", () => {
     expect(statusText([], SUMMARY)).toEqual({ text: "No matches", notes: [] });
     expect(statusText(files, { ...SUMMARY, truncated: true, totalCapped: true, timedOut: true })).toEqual({ text: "13+ matches in 2 files", notes: ["stopped at 2,000 lines", "stopped after 15 s"] });
     expect(statusText([file("a.ts", [line(1, "x")], { lineCount: 999, lineCountCapped: true })], { ...SUMMARY, truncated: true, fileCapped: true }).text).toBe("999+ matches in 1 file");
+    expect(statusText([], { ...SUMMARY, includedCapped: true })).toEqual({ text: "No matches", notes: ["searched the first 20,000 included files"] });
   });
 });
 

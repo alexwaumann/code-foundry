@@ -13,7 +13,7 @@ import {
   type SearchFilesResponseSchema,
   type SkillSchema,
 } from "../src/gen/codefoundry/v1/filesystem_pb";
-import { includedIgnored, mergeIncludes, setMockIgnored } from "./includeIgnored";
+import { includedIgnored, includedIgnoredCapped, mergeIncludes, setMockIgnored } from "./includeIgnored";
 
 export const HOME = "/Users/dev";
 const MAX_ENTRIES = 200;
@@ -305,6 +305,11 @@ export function sourceEntries(src: ResolvedSource, settingIncludes: readonly str
   );
 }
 
+/** Some source's included ignored files were cut at the cap (SearchFilesResponse.included_capped). */
+export function sourcesIncludeCapped(sources: readonly ResolvedSource[], settingIncludes: readonly string[]): boolean {
+  return sources.some((src) => src.project.git !== false && includedIgnoredCapped(src.project.id, mergeIncludes(settingIncludes, src.project.includeIgnored ?? [])));
+}
+
 /** One checkout of a SearchFiles request. */
 export interface SearchSource {
   projectId: string;
@@ -380,5 +385,6 @@ export function searchFiles(projects: ReadonlyMap<string, CompletionProject>, re
       .slice(0, n)
       .map((h) => ({ path: h.path, isDir: h.isDir, projectId: h.src.project.id, checkout: h.src.checkout, pathPositions: h.pos, projectPositions: [], ignored: h.ignored })),
     truncated: hits.length > n,
+    includedCapped: sourcesIncludeCapped(sources, settingIncludes),
   };
 }

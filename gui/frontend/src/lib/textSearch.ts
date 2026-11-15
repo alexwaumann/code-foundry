@@ -134,6 +134,9 @@ function plural(n: number, one: string, many: string): string {
   return `${num(n)} ${n === 1 ? one : many}`;
 }
 
+/** Why a search may miss files, in the finder's footer: the included ignored files were cut at fsx.MaxIncludedFiles. */
+export const INCLUDED_CAPPED_NOTE = "searched the first 20,000 included files";
+
 /**
  * The footer's status. "N matches in M files": N is the matching lines the files count (a
  * file's own count reaches past the 50 lines sent), with "+" when some went uncounted.
@@ -147,6 +150,7 @@ export function statusText(files: readonly TextFileView[], summary: TextSummaryV
   const notes: string[] = [];
   if (summary.totalCapped) notes.push("stopped at 2,000 lines");
   if (summary.timedOut) notes.push("stopped after 15 s");
+  if (summary.includedCapped) notes.push(INCLUDED_CAPPED_NOTE);
   return { text: count === "" ? "No matches" : count, notes };
 }
 

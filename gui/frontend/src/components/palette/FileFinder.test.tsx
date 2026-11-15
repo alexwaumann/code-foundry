@@ -20,11 +20,13 @@ import { FINDER_DEBOUNCE_MS } from "./useFileFinder";
 
 type Search = (req: { sources: readonly FinderSourceView[]; query: string; limit?: number }) => Promise<FinderMatchView[]>;
 const search = vi.fn<Search>();
+/** The answers' included_capped. */
+let includedCapped = false;
 
 vi.mock("@/api/layout", async (orig) => (await import("@/test/fakeLayout")).fakeLayoutApi(await orig()));
 vi.mock("@/api/filesystem", async (orig) => ({
   ...(await orig<typeof import("@/api/filesystem")>()),
-  findFiles: (req: Parameters<Search>[0]) => search(req),
+  findFiles: async (req: Parameters<Search>[0]) => ({ matches: await search(req), includedCapped }),
 }));
 vi.mock("@/api/worktreeDetail", async (orig) => ({ ...(await orig<typeof import("@/api/worktreeDetail")>()), ...(await import("@/test/daemonFakes")).detailFakes }));
 vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/command")>()), ...(await import("@/test/daemonFakes")).commandFakes }));
@@ -72,6 +74,7 @@ beforeEach(async () => {
   await resetPanels(threadSeed("s-1"));
   search.mockReset();
   search.mockResolvedValue([]);
+  includedCapped = false;
   useRecentFilesStore.setState({ byKey: {} });
   useCommandsStore.setState({ commands: [FILE_FIND], loading: false, error: null, contextKey: "" });
   // Two projects, the primary ghostty-playground; and a thread without a project.
@@ -222,6 +225,20 @@ describe("a typed query", () => {
     typeQuery("tree");
     await searched();
     expect(rows()).toEqual(["[tree].ts gui/src/lib | M", "[tree].go"]);
+  });
+
+  it("notes in the footer that the included files were cut short, only when they were", async () => {
+    await openFinder("s-1");
+    typeQuery("react-dom");
+    await searched();
+    expect(screen.getByTestId("finder-status-line").textContent).toBe("No matching files.");
+    expect(screen.queryByTestId("finder-note")).toBeNull();
+    includedCapped = true;
+    typeQuery("react-dom-profiling");
+    await searched();
+    expect(screen.getByTestId("finder-note").textContent).toBe("Searched the first 20,000 included files");
+    typeQuery("");
+    expect(screen.queryByTestId("finder-note")).toBeNull();
   });
 
   it("marks a git-ignored file an include pattern listed: ignored on its right, before open", async () => {

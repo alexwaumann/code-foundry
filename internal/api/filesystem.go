@@ -188,7 +188,7 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 	if err != nil {
 		return nil, err
 	}
-	matches, truncated, err := h.files.SearchSources(ctx, srcs, msg.GetQuery(), int(msg.GetLimit()), msg.GetFilesOnly())
+	matches, truncated, includeCapped, err := h.files.SearchSources(ctx, srcs, msg.GetQuery(), int(msg.GetLimit()), msg.GetFilesOnly())
 	switch {
 	case err == nil:
 	case errors.Is(err, context.Canceled): // the client gave up; the listing goes on
@@ -198,7 +198,7 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 	default:
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	out := &v1.SearchFilesResponse{Truncated: truncated, Matches: make([]*v1.FileMatch, len(matches))}
+	out := &v1.SearchFilesResponse{Truncated: truncated, IncludedCapped: includeCapped, Matches: make([]*v1.FileMatch, len(matches))}
 	for i, m := range matches {
 		src := meta[m.Source]
 		out.Matches[i] = &v1.FileMatch{

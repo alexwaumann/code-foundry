@@ -272,7 +272,7 @@ func TestSearchFileSet(t *testing.T) {
 	}
 
 	// The file search lists the same files: every path text search found is in it.
-	matches, _, err := fsx.NewFileIndex(nil).SearchSources(t.Context(), []fsx.Source{{Dir: dir, Git: true, Include: []string{".env*"}}}, "", fsx.MaxFileLimit, true)
+	matches, _, _, err := fsx.NewFileIndex(nil).SearchSources(t.Context(), []fsx.Source{{Dir: dir, Git: true, Include: []string{".env*"}}}, "", fsx.MaxFileLimit, true)
 	if err != nil {
 		t.Fatal(err)
 	}

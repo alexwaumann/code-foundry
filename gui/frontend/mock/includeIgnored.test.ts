@@ -3,6 +3,8 @@ import { searchFiles } from "./filesystem";
 import {
   checkIncludeSetting,
   includedIgnored,
+  resetIgnored,
+  setIncludeCap,
   splitIncludeSetting,
   suggestIncludeIgnored,
 } from "./includeIgnored";
@@ -61,6 +63,22 @@ describe("include patterns in the mock", () => {
       [".env*"],
     );
     expect(plain.matches ?? []).toEqual([]);
+  });
+
+  it("lists at most the cap and says it cut the rest", () => {
+    const node = (q: string) => searchFiles(projects, { ...req, query: q }, ["node_modules/"]);
+    expect(node("node_modules").includedCapped).toBe(false);
+    setIncludeCap(2);
+    try {
+      expect(includedIgnored("repo-cf", ["node_modules"])).toHaveLength(2);
+      expect(node("node_modules").includedCapped).toBe(true);
+      // Cut in path order with the project's own docs/scratch/: not all three of node_modules.
+      expect(node("node_modules").matches?.length ?? 0).toBeLessThan(3);
+      // The project's own docs/scratch/ alone: one file, under the cap.
+      expect(searchFiles(projects, { ...req, query: "plan" }, []).includedCapped).toBe(false);
+    } finally {
+      resetIgnored();
+    }
   });
 
   it("reaches into a collapsed folder only by its path", () => {

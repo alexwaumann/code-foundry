@@ -63,8 +63,18 @@ export function setMockIgnored(
   ignoredByProject.set(projectId, entries);
 }
 
+/** fsx.MaxIncludedFiles; the include-cap control lowers it so the mock's few files can reach it. */
+const MAX_INCLUDED_FILES = 20_000;
+let maxIncluded = MAX_INCLUDED_FILES;
+
+/** The bound on the ignored files a project's search lists (null: fsx.MaxIncludedFiles). */
+export function setIncludeCap(n: number | null): void {
+  maxIncluded = n ?? MAX_INCLUDED_FILES;
+}
+
 export function resetIgnored(): void {
   ignoredByProject.clear();
+  maxIncluded = MAX_INCLUDED_FILES;
 }
 
 function ignoredOf(projectId: string): readonly MockIgnored[] {
@@ -283,11 +293,23 @@ function includedFrom(
   return out;
 }
 
-/** The ignored files a git project's search lists for these patterns (fsx.IncludedIgnored). */
+/** The ignored files a git project's search lists for these patterns, at most the cap (fsx.IncludedIgnored). */
 export function includedIgnored(
   projectId: string,
   patterns: readonly string[],
 ): string[] {
+  return includedAll(projectId, patterns).slice(0, maxIncluded);
+}
+
+/** The patterns include more ignored files than the cap: the rest are not searched (fsx.IncludedIgnored's truncated). */
+export function includedIgnoredCapped(
+  projectId: string,
+  patterns: readonly string[],
+): boolean {
+  return includedAll(projectId, patterns).length > maxIncluded;
+}
+
+function includedAll(projectId: string, patterns: readonly string[]): string[] {
   const ps = compile(patterns);
   return ps.length === 0 ? [] : includedFrom(ignoredOf(projectId), ps);
 }

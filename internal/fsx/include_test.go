@@ -290,7 +290,7 @@ func TestSearchIncludesIgnored(t *testing.T) {
 	x := NewFileIndex(nil)
 	search := func(include []string, query string) []Match {
 		t.Helper()
-		ms, _, err := x.SearchSources(context.Background(), []Source{{Dir: dir, Git: true, Include: include}}, query, 50, true)
+		ms, _, _, err := x.SearchSources(context.Background(), []Source{{Dir: dir, Git: true, Include: include}}, query, 50, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -322,15 +322,15 @@ func TestFileIndexCacheKeysPatterns(t *testing.T) {
 	x := NewFileIndex(nil)
 	var mu sync.Mutex
 	var calls []string
-	x.list = func(_ context.Context, dir string, git bool, include []string) ([]FileEntry, error) {
+	x.list = func(_ context.Context, dir string, git bool, include []string) ([]FileEntry, bool, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		calls = append(calls, dir+" "+strings.Join(include, ","))
-		return []FileEntry{{Path: "a.go"}}, nil
+		return []FileEntry{{Path: "a.go"}}, false, nil
 	}
 	search := func(src Source) {
 		t.Helper()
-		if _, _, err := x.SearchSources(context.Background(), []Source{src}, "a", 0, false); err != nil {
+		if _, _, _, err := x.SearchSources(context.Background(), []Source{src}, "a", 0, false); err != nil {
 			t.Fatal(err)
 		}
 	}

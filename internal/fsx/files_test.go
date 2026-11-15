@@ -241,11 +241,11 @@ func TestFileIndexLookupDropsExpired(t *testing.T) {
 	now := time.Unix(1000, 0)
 	x := NewFileIndex(nil)
 	x.now = func() time.Time { return now }
-	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, error) {
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, bool, error) {
 		if dir == "/b" {
-			return nil, errors.New("cannot list")
+			return nil, false, errors.New("cannot list")
 		}
-		return []FileEntry{{Path: "a.go"}}, nil
+		return []FileEntry{{Path: "a.go"}}, false, nil
 	}
 	if _, _, err := searchDir(context.Background(), x, "/a", true, "a", 0); err != nil {
 		t.Fatal(err)
@@ -263,7 +263,7 @@ func TestFileIndexLookupDropsExpired(t *testing.T) {
 
 // searchDir is SearchSources over the one checkout dir.
 func searchDir(ctx context.Context, x *FileIndex, dir string, git bool, query string, limit int) ([]FileEntry, bool, error) {
-	ms, truncated, err := x.SearchSources(ctx, []Source{{Dir: dir, Git: git}}, query, limit, false)
+	ms, truncated, _, err := x.SearchSources(ctx, []Source{{Dir: dir, Git: git}}, query, limit, false)
 	if err != nil {
 		return nil, false, err
 	}
@@ -312,12 +312,12 @@ func TestFileIndexListingOutlivesCancelledSearch(t *testing.T) {
 	var listings atomic.Int32
 	started, release := make(chan struct{}), make(chan struct{})
 	var listCtxErr error // set before the listing returns, read after a search sees it
-	x.list = func(ctx context.Context, _ string, _ bool, _ []string) ([]FileEntry, error) {
+	x.list = func(ctx context.Context, _ string, _ bool, _ []string) ([]FileEntry, bool, error) {
 		listings.Add(1)
 		close(started)
 		<-release
 		listCtxErr = ctx.Err()
-		return []FileEntry{{Path: "a.go"}}, nil
+		return []FileEntry{{Path: "a.go"}}, false, nil
 	}
 	search := func(ctx context.Context) ([]string, error) {
 		got, _, err := searchDir(ctx, x, "/w", true, "a", 0)
@@ -371,10 +371,10 @@ func TestFileIndexConcurrentMissesShareOneListing(t *testing.T) {
 	x := NewFileIndex(nil)
 	var listings atomic.Int32
 	release := make(chan struct{})
-	x.list = func(context.Context, string, bool, []string) ([]FileEntry, error) {
+	x.list = func(context.Context, string, bool, []string) ([]FileEntry, bool, error) {
 		listings.Add(1)
 		<-release
-		return []FileEntry{{Path: "a.go"}}, nil
+		return []FileEntry{{Path: "a.go"}}, false, nil
 	}
 	var wg sync.WaitGroup
 	for range 16 {
@@ -483,7 +483,7 @@ func TestFileIndexSearchSources(t *testing.T) {
 	x := NewFileIndex(nil)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ms, truncated, err := x.SearchSources(context.Background(), tt.sources, tt.query, tt.limit, tt.filesOnly)
+			ms, truncated, _, err := x.SearchSources(context.Background(), tt.sources, tt.query, tt.limit, tt.filesOnly)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -516,25 +516,25 @@ func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
 	x := NewFileIndex(nil)
 	var started sync.WaitGroup
 	started.Add(2)
-	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, error) {
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, bool, error) {
 		started.Done()
 		started.Wait() // both listings must be running for either to finish
 		if dir == "/bad" {
-			return nil, errors.New("boom")
+			return nil, false, errors.New("boom")
 		}
-		return []FileEntry{{Path: "a.go"}}, nil
+		return []FileEntry{{Path: "a.go"}}, false, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
+	_, _, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
 	if err == nil || err.Error() != "list /bad: boom" {
 		t.Fatalf("err = %v, want list /bad: boom", err)
 	}
 	// The good source's list is cached; the bad one is listed again.
-	x.list = func(context.Context, string, bool, []string) ([]FileEntry, error) {
-		return []FileEntry{{Path: "b.go"}}, nil
+	x.list = func(context.Context, string, bool, []string) ([]FileEntry, bool, error) {
+		return []FileEntry{{Path: "b.go"}}, false, nil
 	}
-	ms, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
+	ms, _, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,22 +548,22 @@ func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
 func TestFileIndexFiles(t *testing.T) {
 	x := NewFileIndex(nil)
 	var listings atomic.Int32
-	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, error) {
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, bool, error) {
 		listings.Add(1)
 		if dir == "/b" {
-			return []FileEntry{{Path: "z.go"}}, nil
+			return []FileEntry{{Path: "z.go"}}, false, nil
 		}
 		return []FileEntry{
 			{Path: "src", IsDir: true}, {Path: "src/b.go"}, {Path: "a.go"}, {Path: "bad\xff.go"},
 			{Path: ".env", Ignored: true}, {Path: "src/a.go"},
-		}, nil
+		}, false, nil
 	}
 	srcs := []Source{{Dir: "/a", Git: true}, {Dir: "/b", Git: true}}
-	if _, _, err := x.SearchSources(context.Background(), srcs, "go", 10, true); err != nil {
+	if _, _, _, err := x.SearchSources(context.Background(), srcs, "go", 10, true); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
-		lists, err := x.Files(context.Background(), srcs)
+		lists, _, err := x.Files(context.Background(), srcs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -577,5 +577,37 @@ func TestFileIndexFiles(t *testing.T) {
 	}
 	if n := listings.Load(); n != 2 {
 		t.Errorf("%d listings, want one per checkout", n)
+	}
+}
+
+// A source whose included ignored files were cut at MaxIncludedFiles says so through both
+// file search and the lists text search reads, so the finder can tell a "no matches" that
+// may be wrong.
+func TestFileIndexIncludeCapped(t *testing.T) {
+	x := NewFileIndex(nil)
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, bool, error) {
+		return []FileEntry{{Path: "a.go"}}, dir == "/big", nil
+	}
+	tests := []struct {
+		name    string
+		sources []Source
+		want    bool
+	}{
+		{"none capped", []Source{{Dir: "/a"}}, false},
+		{"the one source capped", []Source{{Dir: "/big"}}, true},
+		{"one of two capped", []Source{{Dir: "/a"}, {Dir: "/big"}}, true},
+		{"the capped one first", []Source{{Dir: "/big"}, {Dir: "/a"}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, capped, err := x.SearchSources(context.Background(), tt.sources, "a", 0, false)
+			if err != nil || capped != tt.want {
+				t.Errorf("SearchSources includeCapped = %t, %v; want %t", capped, err, tt.want)
+			}
+			_, capped, err = x.Files(context.Background(), tt.sources)
+			if err != nil || capped != tt.want {
+				t.Errorf("Files includeCapped = %t, %v; want %t", capped, err, tt.want)
+			}
+		})
 	}
 }
