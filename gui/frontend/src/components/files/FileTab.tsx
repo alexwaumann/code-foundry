@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FileImage, FileQuestion, FileText, FileX, Folder, Pencil, SquareArrowOutUpRight, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { FileQuestion, FileX, Folder, Pencil, SquareArrowOutUpRight, TriangleAlert } from "lucide-react";
 import { canEdit, readFile, type FileReadView } from "@/api/files";
+import type { SupportedLanguages } from "@pierre/diffs";
 import type { CodeFileEdit } from "@/components/code/CodeFile";
-import type { EditorHandle } from "@/lib/codeEditor";
+import { draftText, type EditorHandle } from "@/lib/codeEditor";
 import { FinderIcon } from "@/components/icons/AppIcon";
 import { usePanelKey } from "@/shell/panelKeyContext";
-import { ago } from "@/components/pr/model";
 import { Button } from "@/components/ui/button";
-import { useNow } from "@/lib/clock";
-import { dirPart, extOf, fileName, relativeTo, resolvePath } from "@/lib/filePath";
+import { dirPart, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
-import { setPreviewMode, useCodeViewStore, type PreviewMode } from "@/stores/codeView";
+import { setPreviewMode, useCodeViewStore } from "@/stores/codeView";
 import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
 import { noteFileKeyboard, setFileFindDraft, useFileFindOpen } from "@/stores/fileFind";
 import { canTell, dismissAsk, fileFacts, saveAndTell } from "@/stores/fileRequest";
@@ -21,33 +20,20 @@ import { ConflictBand, EditButtons, EditFailedBand, EditStatus } from "./FileEdi
 import { FileRequestBand } from "./FileRequestBand";
 import { FileActions, FileHeader, HeaderAction, HeaderMeta, ModeSwitch, WrapToggle } from "./FileHeader";
 import { findMissing } from "./findMissing";
-import { fileIconOf, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
-import { HtmlPreview } from "./HtmlPreview";
-import { ImagePreview } from "./ImagePreview";
-import { MarkdownPreview } from "./MarkdownPreview";
-import { PdfPreview } from "./PdfPreview";
+import { fileIconOf, formatSize, languageOf, lineCount, tooLargeHeading, truncatedNotice } from "./fileKind";
+import { pickMode, previewKindOf, previewModes } from "./previews/registry";
+import { SOURCE, type PreviewBodyProps, type PreviewKind } from "./previews/types";
 import { FileFindBar } from "./FileFind";
 import { FileEmptyState, FileLoading, NoticeBar } from "./states";
 import { useFileHold } from "./useFileHold";
 import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEdits, useWorktreeChanges } from "./useTabRead";
 
-const MODES = [
-  { value: "rendered", label: "Rendered" },
-  { value: "source", label: "Source" },
-] as const satisfies readonly { value: PreviewMode; label: string }[];
-
-
-/** "saved 2m ago" for a rendered file's meta. */
-function SavedAgo({ ms }: { ms: number | null }) {
-  const now = useNow(30_000);
-  return ms === null ? null : <>saved {ago(ms, now)}</>;
-}
-
 /**
  * The File tab (surfaces/files.ts): one file read with FilesystemService.ReadFile, under
- * header A. Text is code (line numbers, the line param marked and scrolled to); markdown
- * and HTML also render (Rendered | Source, remembered per kind); images show inline and
- * PDFs as their pages (an image or PDF too large to come back whole says so); other
+ * header A. Text is code (line numbers, the line param marked and scrolled to). A file of a
+ * preview kind (previews/: markdown and HTML rendered, an image, an SVG, a PDF's pages) shows
+ * that way, with a switch of the kind's modes and Source (remembered per kind) when it has
+ * more than one, and the kind's meta and actions; other
  * binaries, folders and missing paths get a placeholder; a missing path is first looked
  * for once in the checkout (findMissing: a model's path written from a subfolder or cut
  * short), and the file found is the tab's. Read again when the tab shows, on
@@ -122,22 +108,28 @@ export function FileTab({ target }: { target: FileTarget }) {
   const dir = rel !== null ? dirPart(rel) : tildify(dirPart(abs));
   const place = useMemo<FilePlace>(() => ({ project, dir: base || dirPart(abs), file: abs }), [project, base, abs]);
 
-  const kind = previewKindOf(abs);
-  const storedMode = useCodeViewStore((s) => (kind ? s.preview[kind] : "source"));
+  // The read's kind (previews/registry.ts); before the first read, the extension's.
+  const kind = useMemo(() => previewKindOf(abs, file ?? null), [abs, file]);
+  const modes = useMemo(() => (kind && file ? previewModes(kind, file) : null), [kind, file]);
+  const remembered = useCodeViewStore((s) => (kind ? s.preview[kind.id] : undefined));
   // Editing is on the source, for this tab only: the remembered choice stays for the viewer.
-  const mode = editing ? "source" : storedMode;
+  const mode = !modes || editing ? SOURCE.id : pickMode(modes, remembered);
+  const previewing = kind !== null && modes !== null && mode !== SOURCE.id;
   const text = file?.text ?? null;
   const lines = useMemo(() => (text === null ? 0 : lineCount(text)), [text]);
-  const rendered = kind !== null && text !== null && mode === "rendered";
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  // What the body says for row two's meta (an image's size, a PDF's pages), for the file and mode it showed.
+  const bodyKey = `${abs}\u0000${kind?.id ?? ""}\u0000${mode}`;
+  const [bodyMeta, setBodyMeta] = useState<{ key: string; meta: ReactNode } | null>(null);
+  const onMeta = useCallback(
+    (meta: ReactNode) => {
+      setBodyMeta({ key: bodyKey, meta });
+    },
+    [bodyKey],
+  );
   // Refresh presses: a rendered page loads again even when the file did not change.
   const [refreshes, setRefreshes] = useState(0);
-  const onSize = useCallback((w: number, h: number) => {
-    setDims({ w, h });
-  }, []);
-  const [pages, setPages] = useState<number | null>(null);
 
-  const editable = held === null && canEdit(file);
+  const editable = held === null && canEdit(file) && kind?.edit !== false;
   const startEditing = useCallback(() => {
     if (read.data) void startEdit(editKey, { panelKey, tabId, base }, read.data, { create: wantsNew });
   }, [read.data, editKey, panelKey, tabId, base, wantsNew]);
@@ -199,38 +191,39 @@ export function FileTab({ target }: { target: FileTarget }) {
   const mark = ask !== undefined && !dirty;
   const edit = useMemo<CodeFileEdit>(() => ({ active: stateKey !== undefined, stateKey, revision, onChange: onDraft, onOpening, onDetached, onReady, mark }), [stateKey, revision, onDraft, onOpening, onDetached, onReady, mark]);
 
-  // What the find can search: the text as code, viewed or edited, or rendered markdown (an
-  // HTML page is a frame of its own, an image or a PDF has no text here).
-  const searchable = file !== null && !opening && !file.notFound && !file.isDir && text !== null && !(rendered && kind === "html");
+  // What the find can search: the text as code, viewed or edited, or a preview whose kind
+  // has text to search (rendered markdown; an HTML page is a frame of its own, an image no text).
+  const searchable = file !== null && !opening && !file.notFound && !file.isDir && text !== null && (!previewing || kind.find === true);
   const findKey = searchable ? editKey : undefined;
   const findOpen = useFileFindOpen(editKey) && searchable;
 
-  const meta = !file || creating ? null : file.notFound || file.isDir ? null : file.pdf ? (
-    pdfMeta(file.size, file.truncated ? null : pages)
-  ) : file.image ? (
-    <>
-      {dims && `${String(dims.w)} × ${String(dims.h)} · `}
-      {formatSize(file.size)} · {extOf(abs).toUpperCase() || file.mime}
-    </>
+  const meta = !file || creating ? null : file.notFound || file.isDir ? null : previewing ? (
+    bodyMeta?.key === bodyKey ? bodyMeta.meta : kind.meta({ file, path: abs })
   ) : text === null ? (
     <>Binary · {formatSize(file.size)}</>
-  ) : rendered ? (
-    <>
-      <SavedAgo ms={file.modifiedAtMs} />
-      {file.modifiedAtMs !== null && " · "}
-      {formatSize(file.size)}
-    </>
   ) : (
     <>
-      {lines} {lines === 1 ? "line" : "lines"} · {formatSize(file.size)} · {languageOf(abs)}
+      {lines} {lines === 1 ? "line" : "lines"} · {formatSize(file.size)} · {kind?.source?.name ?? languageOf(abs)}
     </>
   );
+
+  // Copy contents: a whole text read (a cut one would copy part of the file). It copies the
+  // draft while editing, the kind's own text in a preview mode that has one, else the text.
+  const copyable = file !== null && !opening && !creating && text !== null && !file.truncated;
+  const contents = copyable
+    ? () => {
+        if (session?.view) return draftText(session.stateKey) ?? session.seed;
+        if (previewing && kind.copy) return kind.copy({ file, path: abs });
+        return text;
+      }
+    : undefined;
 
   return (
     <div
       className="flex min-h-0 flex-1 flex-col"
       data-testid="file-tab"
       data-path={abs}
+      data-kind={kind?.id}
       data-mode={kind ? mode : undefined}
       data-loading={read.loading || undefined}
       data-file-find-box=""
@@ -239,29 +232,30 @@ export function FileTab({ target }: { target: FileTarget }) {
       }}
     >
       <FileHeader
-        icon={fileIconOf(abs, file?.mime)}
+        icon={kind?.icon ?? fileIconOf(abs, file?.mime)}
         name={name}
         dir={dir}
         fullPath={abs}
-        actions={<FileActions place={place} line={line} onRefresh={() => { setRefreshes((n) => n + 1); reload(); }} extra={editable && !creating && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
+        actions={<FileActions place={place} line={line} onRefresh={() => { setRefreshes((n) => n + 1); reload(); }} contents={contents} extra={editable && !creating && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
       >
-        {kind && text !== null && !dirty && !creating && (
+        {kind && modes && modes.length > 1 && !dirty && !creating && (
           <ModeSwitch
-            options={MODES}
+            options={modes.map((m) => ({ value: m.id, label: m.label }))}
             value={mode}
             onChange={(m) => {
-              if (editing && m === "source") return;
+              if (editing && m === SOURCE.id) return;
               if (editing) leaveEdit();
-              setPreviewMode(kind, m);
+              setPreviewMode(kind.id, m);
             }}
             label="Show as"
             testId="file-mode"
           />
         )}
+        {previewing && file && kind.Controls && <kind.Controls file={file} path={abs} mode={mode} />}
         {editing && <EditStatus dirty={dirty} creating={creating} />}
         {meta && <HeaderMeta testId="file-meta">{meta}</HeaderMeta>}
         <span className="flex-1" />
-        {text !== null && !rendered && <WrapToggle />}
+        {text !== null && (!previewing || kind.wrap === true) && <WrapToggle />}
         {editing && (
           <EditButtons
             dirty={dirty}
@@ -308,7 +302,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} rendered={rendered ? kind : null} edit={edit} findKey={findKey} onSize={onSize} onPages={setPages} />
+      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} preview={previewing ? kind : null} lang={kind?.source?.lang} mode={mode} edit={edit} findKey={findKey} onMeta={onMeta} />
     </div>
   );
 }
@@ -325,11 +319,12 @@ function FileBody({
   lines,
   line,
   page,
-  rendered,
+  preview,
+  lang,
+  mode,
   edit,
   findKey,
-  onSize,
-  onPages,
+  onMeta,
 }: {
   file: FileReadView | null;
   error: string | null;
@@ -342,11 +337,14 @@ function FileBody({
   lines: number;
   line: number | undefined;
   page: FileTarget["page"];
-  rendered: "markdown" | "html" | null;
+  /** The kind whose preview mode is on; null for the code view. */
+  preview: PreviewKind | null;
+  /** Source's language when the kind gives one. */
+  lang: SupportedLanguages | undefined;
+  mode: string;
   edit: CodeFileEdit;
   findKey: string | undefined;
-  onSize: (w: number, h: number) => void;
-  onPages: (pages: number) => void;
+  onMeta: PreviewBodyProps["onMeta"];
 }) {
   const retry = (
     <Button variant="outline" size="sm" onClick={reload} data-testid="file-retry">
@@ -396,15 +394,21 @@ function FileBody({
         {reveal}
       </FileEmptyState>
     );
-  // An image or PDF over the read cap came back cut short: neither the webview nor pdf.js can show part of one.
-  const tooLarge = (icon: LucideIcon, kind: "Image" | "PDF", testId: string) => (
-    <FileEmptyState icon={icon} heading={tooLargeHeading(kind, file.size)} detail={tildify(abs)} testId={testId}>
-      {editor}
-      {reveal}
-    </FileEmptyState>
-  );
-  if (file.image) return file.truncated ? tooLarge(FileImage, "Image", "file-image-too-large") : <ImagePreview bytes={file.image} mime={file.mime} name={name} onSize={onSize} />;
-  if (file.pdf) return file.truncated ? tooLarge(FileText, "PDF", "file-pdf-too-large") : <PdfPreview bytes={file.pdf} onPages={onPages} />;
+  if (preview) {
+    // An image or PDF over the read cap came back cut short: neither the webview nor pdf.js can show part of one.
+    if (file.truncated && preview.tooLarge !== undefined)
+      return (
+        <FileEmptyState icon={preview.icon ?? fileIconOf(abs, file.mime)} heading={tooLargeHeading(preview.tooLarge, file.size)} detail={tildify(abs)} testId={`file-${preview.id}-too-large`}>
+          {editor}
+          {reveal}
+        </FileEmptyState>
+      );
+    return (
+      <Suspense fallback={<FileLoading />}>
+        <preview.Body file={file} path={abs} mode={mode} name={name} place={place} page={page} reloads={refreshes} findKey={findKey} onMeta={onMeta} />
+      </Suspense>
+    );
+  }
   if (text === null)
     return (
       <FileEmptyState icon={FileX} heading={`Binary file · ${formatSize(file.size)}`} detail={tildify(abs)} testId="file-binary">
@@ -412,7 +416,5 @@ function FileBody({
         {reveal}
       </FileEmptyState>
     );
-  if (rendered === "markdown") return <MarkdownPreview text={text} dir={dirPart(abs)} project={place.project} base={place.dir} findKey={findKey} />;
-  if (rendered === "html") return <HtmlPreview path={abs} text={text} name={name} page={page} reloads={refreshes} />;
-  return <CodeBody name={name} text={text} lines={lines} line={line} edit={edit} findKey={findKey} />;
+  return <CodeBody name={name} text={text} lang={lang} lines={lines} line={line} edit={edit} findKey={findKey} />;
 }

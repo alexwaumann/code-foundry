@@ -56,9 +56,9 @@ vi.mock("@/lib/pdf", () => ({ loadPdf }));
 // a stand-in that shows the text and the line it was asked to mark.
 // With an editor on, it takes "typing" through a text box the test fills.
 vi.mock("@/components/code/CodeFile", () => ({
-  CodeFile: ({ contents, selectedLines, edit }: { contents: string; selectedLines?: { start: number } | null; edit?: CodeFileEdit }) => (
+  CodeFile: ({ contents, lang, selectedLines, edit }: { contents: string; lang?: string; selectedLines?: { start: number } | null; edit?: CodeFileEdit }) => (
     <>
-      <pre data-testid="code-file" data-selected={selectedLines?.start} data-editing={edit?.active ? "" : undefined}>
+      <pre data-testid="code-file" data-lang={lang} data-selected={selectedLines?.start} data-editing={edit?.active ? "" : undefined}>
         {contents}
       </pre>
       {edit?.active && (
@@ -75,6 +75,28 @@ vi.mock("@/components/code/CodeFile", () => ({
 // The library's draft: what the stand-in above was last told is what a save reads.
 const draft = vi.hoisted(() => ({ text: null as string | null }));
 vi.mock("@/lib/codeEditor", () => ({ loadCodeEditor: () => Promise.resolve(), draftText: () => draft.text, forgetDraft: () => undefined, createCodeEditor: () => undefined }));
+// What Copy path and Copy contents put on the clipboard.
+const copied = vi.hoisted(() => ({ fn: vi.fn<(text: string) => Promise<void>>(() => Promise.resolve()) }));
+vi.mock("@/lib/clipboard", () => ({ copyText: copied.fn }));
+// A made-up kind beside the real ones, for what no shipped kind does yet: `.grid` files show
+// a Grid mode with controls of their own, copy as tab-separated text, wrap, and never edit.
+vi.mock("./previews/registry", async (orig) => {
+  const real = await orig<typeof import("./previews/registry")>();
+  const { createElement } = await import("react");
+  const grid: import("./previews/types").PreviewKind = {
+    id: "grid",
+    match: { ext: ["grid"] },
+    modes: [{ id: "grid", label: "Grid" }],
+    Body: () => createElement("div", { "data-testid": "grid-body" }),
+    meta: ({ file }) => `${String(file.size)} B · Grid`,
+    Controls: ({ mode }) => createElement("span", { "data-testid": "grid-controls" }, mode),
+    copy: ({ file }) => (file.text ?? "").replaceAll(",", "\t"),
+    wrap: true,
+    edit: false,
+  };
+  const kinds = [...real.PREVIEW_KINDS, grid];
+  return { ...real, PREVIEW_KINDS: kinds, previewKindOf: (path: string, file: FileReadView | null) => real.previewKindOf(path, file, kinds) };
+});
 // Held, readFile's next answers wait for release(): a read still out while something else happens.
 const held = vi.hoisted(() => ({ on: false, pending: [] as (() => void)[] }));
 // The worktree detail a project's File tab watches (worktree_detail_updated re-reads it).
@@ -101,9 +123,10 @@ afterEach(() => {
   listed.calls = [];
   reads.length = 0;
   loadPdf.mockClear();
-  useCodeViewStore.setState({ diffStyle: "unified", wrap: false, preview: { markdown: "rendered", html: "rendered" } });
+  useCodeViewStore.setState({ diffStyle: "unified", wrap: false, preview: {} });
   useFileEditStore.setState({ sessions: {} });
   writes.fn.mockReset();
+  copied.fn.mockClear();
   draft.text = null;
   held.on = false;
   held.pending = [];
@@ -568,7 +591,7 @@ describe("editing", () => {
     await editing();
     expect(screen.getByTestId("file-tab").getAttribute("data-mode")).toBe("source");
     expect(screen.queryByTestId("file-markdown")).toBeNull();
-    expect(useCodeViewStore.getState().preview.markdown).toBe("rendered");
+    expect(useCodeViewStore.getState().preview.markdown).toBeUndefined();
     expect(screen.getByTestId("file-mode")).toBeTruthy();
     // Source is where it already is: nothing leaves edit mode.
     fireEvent.click(screen.getByTestId("file-mode-source"));
@@ -855,5 +878,163 @@ describe("find in the file", () => {
       openFileFind(keyOf(path.slice("/Users/me/w/".length)));
     });
     expect(screen.queryByTestId("file-find")).toBeNull();
+  });
+});
+
+describe("previews", () => {
+  const W = "/Users/me/w";
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"/>\n';
+  const tab = () => screen.getByTestId("file-tab");
+  const meta = () => screen.getByTestId("file-meta").textContent;
+  const loaded = () =>
+    waitFor(() => {
+      expect(tab().getAttribute("data-loading")).toBeNull();
+    });
+  const decode = (w: number, h: number) => {
+    const img = screen.getByTestId("file-image").querySelector("img") as HTMLImageElement;
+    Object.defineProperty(img, "naturalWidth", { value: w });
+    Object.defineProperty(img, "naturalHeight", { value: h });
+    fireEvent.load(img);
+  };
+
+  it("an SVG: Image first, its size once it decodes, no wrap and no pencil; Source is its text; the choice is remembered for SVGs only", async () => {
+    files.set(`${W}/logo.svg`, { text: SVG, lossless: true, binary: false, mime: "image/svg+xml", size: 1024, image: new Uint8Array([0x3c]) });
+    files.set(`${W}/b.svg`, { text: SVG, lossless: true, binary: false, mime: "image/svg+xml", size: 1024, image: new Uint8Array([0x3c]) });
+    const first = open("logo.svg");
+    await screen.findByTestId("file-image");
+    expect(tab().dataset.kind).toBe("svg");
+    expect(tab().dataset.mode).toBe("image");
+    expect(within(screen.getByTestId("file-mode")).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Image", "Source"]);
+    expect(meta()).toBe("1 KB · SVG");
+    decode(512, 512);
+    expect(meta()).toBe("512 × 512 · 1 KB · SVG");
+    expect(screen.queryByTestId("file-wrap")).toBeNull();
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    expect(screen.getByTestId("code-file").textContent).toBe(SVG);
+    expect(screen.getByTestId("code-file").dataset.lang).toBe("xml");
+    expect(meta()).toBe("1 line · 1 KB · SVG");
+    expect(screen.getByTestId("file-wrap")).toBeTruthy();
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+    expect(useCodeViewStore.getState().preview).toEqual({ svg: "source" });
+    first.unmount();
+
+    open("b.svg");
+    await screen.findByTestId("code-file");
+    fireEvent.click(screen.getByTestId("file-mode-image"));
+    expect(await screen.findByTestId("file-image")).toBeTruthy();
+    // Back in Image: the meta waits for this picture's size, not the last mode's.
+    expect(meta()).toBe("1 KB · SVG");
+  });
+
+  it("a truncated SVG is too large to show as a picture; Source shows what came back", async () => {
+    files.set(`${W}/huge.svg`, { text: "<svg>", binary: false, truncated: true, mime: "image/svg+xml", size: 4 * MiB, image: new Uint8Array([0x3c]) });
+    open("huge.svg");
+    expect((await screen.findByTestId("file-svg-too-large")).textContent).toContain("Image · 4.0 MB · too large to show");
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    expect(screen.getByTestId("code-file").textContent).toBe("<svg>");
+    expect(screen.getByTestId("file-truncated")).toBeTruthy();
+  });
+
+  it("Copy contents sits after Copy path, copies the text and shows a check for a moment", async () => {
+    files.set(`${W}/a.ts`, { text: "export const a = 1;\n", binary: false, mime: "text/typescript", size: 20 });
+    open("a.ts");
+    await screen.findByTestId("code-file");
+    const actions = [...screen.getByTestId("file-header").querySelectorAll("button[data-testid]")].map((b) => b.getAttribute("data-testid"));
+    expect(actions.indexOf("file-copy-contents")).toBe(actions.indexOf("file-copy-path") + 1);
+    const button = screen.getByTestId("file-copy-contents");
+    expect(button.getAttribute("aria-label")).toBe("Copy contents");
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(button.getAttribute("aria-label")).toBe("Copied");
+    });
+    expect(copied.fn).toHaveBeenCalledWith("export const a = 1;\n");
+    expect(screen.getByTestId("file-copy-path").getAttribute("aria-label")).toBe("Copy path");
+  });
+
+  it("Copy contents copies the text from a preview too (rendered markdown, an SVG's picture)", async () => {
+    files.set(`${W}/README.md`, { text: "# Title\n", binary: false, mime: "text/markdown", size: 8 });
+    const first = open("README.md");
+    await screen.findByTestId("file-markdown");
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenCalledWith("# Title\n");
+    });
+    first.unmount();
+    files.set(`${W}/logo.svg`, { text: SVG, binary: false, mime: "image/svg+xml", size: 64, image: new Uint8Array([0x3c]) });
+    open("logo.svg");
+    await screen.findByTestId("file-image");
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith(SVG);
+    });
+  });
+
+  it.each<[string, string, Partial<FileReadView>]>([
+    ["an image", "logo.png", { mime: "image/png", image: new Uint8Array([1]), size: 1 }],
+    ["a PDF", "spec.pdf", { mime: "application/pdf", pdf: new Uint8Array([1]), size: 1 }],
+    ["a binary", "tool", { size: 9 }],
+    ["a truncated read", "big.txt", { text: "line\n", binary: false, truncated: true, mime: "text/plain", size: 4 * MiB }],
+    ["a folder", "docs", { isDir: true }],
+  ])("no Copy contents for %s", async (_name, path, f) => {
+    files.set(`${W}/${path}`, f);
+    open(path);
+    await loaded();
+    expect(screen.getByTestId("file-copy-path")).toBeTruthy();
+    expect(screen.queryByTestId("file-copy-contents")).toBeNull();
+  });
+
+  it("no Copy contents for a file that is not there", async () => {
+    open("nope.txt");
+    await screen.findByTestId("file-not-found");
+    expect(screen.queryByTestId("file-copy-contents")).toBeNull();
+  });
+
+  it("while editing, Copy contents copies the draft", async () => {
+    files.set(`${W}/.env`, { text: "A=1\n", lossless: true, binary: false, mime: "text/plain", size: 4, modifiedAtMs: 100 });
+    render(
+      <PanelKeyContext value="thread:a">
+        <FileTab target={{ project: "", base: W, path: ".env" }} />
+      </PanelKeyContext>,
+    );
+    fireEvent.click(await screen.findByTestId("file-edit"));
+    const box = await screen.findByTestId("draft");
+    draft.text = "A=2\n";
+    fireEvent.change(box, { target: { value: "A=2\n" } });
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenCalledWith("A=2\n");
+    });
+  });
+
+  it("a kind's own controls, copy, wrap and no pencil: in its preview mode only, Source copies the text", async () => {
+    files.set(`${W}/t.grid`, { text: "a,b\n1,2\n", lossless: true, binary: false, mime: "text/plain", size: 8 });
+    open("t.grid");
+    await screen.findByTestId("grid-body");
+    expect(within(screen.getByTestId("file-header-bar")).getByTestId("grid-controls").textContent).toBe("grid");
+    expect(meta()).toBe("8 B · Grid");
+    expect(screen.getByTestId("file-wrap")).toBeTruthy();
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenCalledWith("a\tb\n1\t2\n");
+    });
+
+    fireEvent.click(screen.getByTestId("file-mode-source"));
+    expect(screen.queryByTestId("grid-controls")).toBeNull();
+    expect(screen.queryByTestId("file-edit")).toBeNull();
+    fireEvent.click(screen.getByTestId("file-copy-contents"));
+    await waitFor(() => {
+      expect(copied.fn).toHaveBeenLastCalledWith("a,b\n1,2\n");
+    });
+  });
+
+  it("a remembered mode the switch does not have opens the kind's first", async () => {
+    useCodeViewStore.setState({ preview: { markdown: "raw" } });
+    files.set(`${W}/README.md`, { text: "# Title\n", binary: false, mime: "text/markdown", size: 8 });
+    open("README.md");
+    await screen.findByTestId("file-markdown");
+    expect(tab().dataset.mode).toBe("rendered");
   });
 });
