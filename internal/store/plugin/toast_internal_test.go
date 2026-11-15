@@ -26,16 +26,16 @@ func TestPluginToasts(t *testing.T) {
 	}{
 		{name: "an old plugin's toast is unchanged", params: `{"level":"info","text":"note saved"}`,
 			want:   SurfaceToast{Level: "info", Text: "note saved"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "Hello", Body: "note saved"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "note saved"}},
 		{name: "attention is a warning", params: `{"level":"attention","text":"quota low"}`,
 			want:   SurfaceToast{Level: "attention", Text: "quota low"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_WARNING, Title: "Hello", Body: "quota low"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_WARNING, Title: "quota low"}},
 		{name: "error", params: `{"level":"error","text":"boom"}`,
 			want:   SurfaceToast{Level: "error", Text: "boom"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_ERROR, Title: "Hello", Body: "boom"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_ERROR, Title: "boom"}},
 		{name: "success", params: `{"level":"success","text":"Build #6 queued again"}`,
 			want:   SurfaceToast{Level: "success", Text: "Build #6 queued again"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_SUCCESS, Title: "Hello", Body: "Build #6 queued again"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_SUCCESS, Title: "Build #6 queued again"}},
 		{name: "a description: the text is the title", params: `{"level":"success","text":"Note saved","description":"  3 lines in notes.md  "}`,
 			want:   SurfaceToast{Level: "success", Text: "Note saved", Description: "3 lines in notes.md"},
 			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_SUCCESS, Title: "Note saved", Body: "3 lines in notes.md"}},
@@ -43,13 +43,13 @@ func TestPluginToasts(t *testing.T) {
 			want: SurfaceToast{Instance: "i-1", Level: "info", Text: "saved", Description: "d"}},
 		{name: "an unknown level is info", params: `{"level":"celebrate","text":"t"}`,
 			want:   SurfaceToast{Level: "info", Text: "t"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "Hello", Body: "t"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "t"}},
 		{name: "no level is info", params: `{"text":"t"}`,
 			want:   SurfaceToast{Level: "info", Text: "t"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "Hello", Body: "t"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "t"}},
 		{name: "a blank description is none", params: `{"level":"info","text":"t","description":" \n "}`,
 			want:   SurfaceToast{Level: "info", Text: "t"},
-			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "Hello", Body: "t"}},
+			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "t"}},
 		{name: "a long description is cut", params: `{"level":"info","text":"t","description":"` + long + `"}`,
 			want:   SurfaceToast{Level: "info", Text: "t", Description: long[:maxToastDescription-1] + "…"},
 			notify: &v1.UiIntent_Notify{Level: v1.UiIntent_Notify_LEVEL_INFO, Title: "t", Body: long[:maxToastDescription-1] + "…"}},
@@ -69,7 +69,7 @@ func TestPluginToasts(t *testing.T) {
 				t.Errorf("toast %+v, want %+v", got, tt.want)
 			}
 			if tt.notify != nil {
-				if n := toastNotify(got, "Hello"); !proto.Equal(n, tt.notify) {
+				if n := toastNotify(got); !proto.Equal(n, tt.notify) {
 					t.Errorf("notify %v, want %v", n, tt.notify)
 				}
 			}

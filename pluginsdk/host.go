@@ -129,12 +129,12 @@ func (h *Host) Unsubscribe(ctx context.Context, subscription string) error {
 }
 
 // Toast shows a short message (ToastSuccess, ToastInfo, ToastAttention, ToastError) in
-// the app's toaster, titled with the plugin's display name.
+// the app's toaster, in every window. The text is the toast's title: keep it short.
 func (h *Host) Toast(level, text string) error {
 	return h.conn.Notify(MethodViewToast, ToastParams{Level: level, Text: text})
 }
 
-// ToastIn shows a short message in the app's toaster, without the plugin's name, only to
+// ToastIn shows a short message in the app's toaster, the text as its title, only to
 // whoever has that surface instance on screen (not inside the panel: a message that
 // should stay belongs in a Notice node).
 func (h *Host) ToastIn(instance, level, text string) error {
@@ -142,8 +142,7 @@ func (h *Host) ToastIn(instance, level, text string) error {
 }
 
 // ToastWith shows a toast from its params: ToastIn's when Instance is set, else Toast's.
-// With a Description, Text is the title and the description goes under it, also for a
-// toast without an instance (which then is not titled with the plugin's name). A host
+// Text is the title and the Description goes under it. A host
 // without ToastDescriptionCapability drops the description and shows ToastSuccess as info.
 func (h *Host) ToastWith(p ToastParams) error {
 	return h.conn.Notify(MethodViewToast, p)

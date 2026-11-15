@@ -14,11 +14,11 @@ frontend: a plugin's `view/toast` and the daemon's notify intent. Purely additiv
 - Host (`internal/store/plugin/toast.go`): `cleanToast` trims both, cuts the text at 200
   runes and the description at 500, makes an unknown level info, and drops a toast with no
   text (a description alone is not a toast). Same one-a-second rate limit.
-- A toast without an instance (`Toast`) becomes the notify intent. Without a description
-  it is unchanged: the plugin's display name is the title, the text under it. With one, the
-  text is the title and the description under it, like every other toast; the plugin's name
-  is then not on it. Keeping the name would need a third line or a source field on the
-  intent, and only `ToastWith` callers who chose a description see the difference.
+- A toast without an instance (`Toast`) becomes the notify intent, the text as its title
+  and the description under it, like every other toast. Until the follow-up to this change
+  it was titled with the plugin's display name and the text sat under it when there was no
+  description; a user asked for one rule (the text is the title, never the plugin's name),
+  so that fallback is gone. An existing plugin's `Toast` now shows its text alone.
 - The host announces `view.toast.description` (also in plugintest's `HostCapabilities`).
 - GUI: `api/plugin.ts` keeps the plugin's level words (`success|info|attention|error`, an
   unknown one info) and the description; `stores/pluginSurfaces.ts`' `pluginToastNotice`
