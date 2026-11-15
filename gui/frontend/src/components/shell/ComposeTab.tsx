@@ -37,8 +37,10 @@ export function ComposeTab({ tab }: { tab: TabEntry }) {
     if (!draft && !home) composerTextChanged(tab.id, "", targetKey);
   }, [tab.id, draft, home, targetKey]);
   return (
+    // One composer per tab: a heading pick that moves the tab to another target keeps its editor
+    // (the draft's text, the caret, an IME composition), as a draft's id arriving does.
     <Composer
-      key={sel.likeThreadId ? `like:${sel.likeThreadId}` : sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId}
+      key={tab.id}
       projectId={sel.projectId}
       workspaceId={sel.workspaceId}
       noProject={sel.noProject}
