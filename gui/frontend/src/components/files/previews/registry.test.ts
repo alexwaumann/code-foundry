@@ -41,6 +41,11 @@ describe("the registered kinds", () => {
     // A cut JSON read cannot parse: it is code under the truncated notice.
     ["big.json", { mime: "application/json", truncated: true }, null],
     ["csv.txt", { mime: "text/plain; charset=utf-8" }, null],
+    ["0001-fix.patch", { mime: "text/x-diff" }, "patch"],
+    ["changes.DIFF", {}, "patch"],
+    ["from-mail", { mime: "text/x-patch" }, "patch"],
+    ["diff.txt", { mime: "text/plain; charset=utf-8" }, null],
+    ["blob.patch", { text: null, binary: true }, null],
     ["app.ts", { mime: "text/typescript" }, null],
     ["Makefile", {}, null],
     ["notes.txt", { mime: "text/plain; charset=utf-8" }, null],
