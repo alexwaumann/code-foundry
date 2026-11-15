@@ -1,0 +1,58 @@
+{
+  "doc": "A pane closed by the user is recorded without the preview it held.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-p","kind":"prs"},
+                {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+              ],
+              "active": "t-v"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-v"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"close_pane","pane":"p-a","record":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-b","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"},
+        "focus": "p-b",
+        "closed": [
+          {
+            "pane": "p-a",
+            "whole": true,
+            "tabs": [{"id":"t-p","kind":"prs"}],
+            "active": "t-v",
+            "beside": {"neighbours":["p-b"],"edge":"left","frac":0.5}
+          }
+        ]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","closed":["t-v","t-p"]}
+}

@@ -118,6 +118,7 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	}
 	if tb.IsLinked() {
 		t.dropRemembered(tb.Thread, tb.Key)
+		t.keepThread(tb.Thread) // one of its thread's surfaces opened (preview.go)
 	}
 	if same != nil {
 		return t.placeExisting(sp, chosen, same, tb, focus), nil

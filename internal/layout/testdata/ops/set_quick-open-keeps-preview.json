@@ -1,0 +1,65 @@
+{
+  "doc": "Opening a preview thread's quick terminal keeps its tab.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-p","kind":"prs"},
+                {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+              ],
+              "active": "t-v"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-v"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"set_quick","thread":"th-v","open":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-v","kind":"thread","thread":"th-v"}],
+              "active": "t-v"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-j","kind":"projects"}],"active":"t-j"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-v"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-v":{"space":"sp-a","quick":{"open":true}}}
+  },
+  "result": {}
+}

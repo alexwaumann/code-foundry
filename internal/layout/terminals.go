@@ -52,6 +52,9 @@ func (o *SetQuick) apply(t *tx) (Result, error) {
 		return Result{}, nil // closed already: no record to write
 	}
 	ts = threadState(t.st, o.Thread)
+	if o.Open {
+		t.keepThread(o.Thread) // its quick terminal opened (preview.go)
+	}
 	q := Quick{Open: o.Open}
 	if ts.Quick != nil {
 		q.Height = ts.Quick.Height
@@ -73,7 +76,7 @@ func (o *SetQuick) apply(t *tx) (Result, error) {
 // prune drops thread's record when it stores nothing the default would not give.
 func prune(st *State, thread string) {
 	ts := st.Threads[thread]
-	if ts != nil && ts.Quick == nil && ts.Remembered == nil && len(ts.Last) == 0 && ts.Info == nil && ts.Space == st.DefaultSpace {
+	if ts != nil && ts.Quick == nil && ts.Remembered == nil && len(ts.Last) == 0 && ts.Info == nil && !ts.Snoozed && ts.Space == st.DefaultSpace {
 		delete(st.Threads, thread)
 	}
 }

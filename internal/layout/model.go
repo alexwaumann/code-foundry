@@ -93,6 +93,10 @@ type Tab struct {
 	Title string `json:"title,omitempty"`
 	// Name is a manual name (renameable kinds); "" means automatic.
 	Name string `json:"name,omitempty"`
+	// Preview: a thread tab opened to look at an archived or snoozed thread, which the next
+	// preview in its space replaces until something keeps it (preview.go). At most one per
+	// space; thread tabs only.
+	Preview bool `json:"preview,omitempty"`
 }
 
 // Node is a pane (T == NodePane: Tabs, Active) or a split (T == NodeSplit: Dir, Kids, Sizes).
@@ -178,6 +182,10 @@ type ThreadState struct {
 	// Info is whether the thread shows its info card, as the user last toggled it (info.go);
 	// nil: never toggled, so the setting layout.thread_info decides.
 	Info *bool `json:"info,omitempty"`
+	// Snoozed: the thread is snoozed (snooze_thread, set_snoozed). Opening its tab then
+	// restores nothing; its remembered set and quick terminal come back when it wakes
+	// (preview.go).
+	Snoozed bool `json:"snoozed,omitempty"`
 }
 
 // Quick is the thread's quick terminal slot.
@@ -427,7 +435,7 @@ func (ts *ThreadState) clone() *ThreadState {
 	if ts == nil {
 		return nil
 	}
-	c := &ThreadState{Space: ts.Space, Last: maps.Clone(ts.Last)}
+	c := &ThreadState{Space: ts.Space, Last: maps.Clone(ts.Last), Snoozed: ts.Snoozed}
 	if ts.Info != nil {
 		v := *ts.Info
 		c.Info = &v

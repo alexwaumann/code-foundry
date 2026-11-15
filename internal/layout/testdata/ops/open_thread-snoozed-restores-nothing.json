@@ -1,0 +1,98 @@
+{
+  "doc": "A snoozed thread's tab opens with its conversation only: its remembered set and its quick terminal stay put away until it wakes (set_snoozed).",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {"t":"pane","id":"p-a","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"},
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-s": {
+        "space": "sp-a",
+        "snoozed": true,
+        "quick": {"open":false,"fresh":true,"ran":"npm test"},
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-x","kind":"terminal","thread":"th-s","params":{"terminal":"term-x"}},
+              "pane": "p-a",
+              "index": 1,
+              "adjacent": true,
+              "fresh": {"ran":"make dev"}
+            },
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-s",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-a",
+              "index": 1,
+              "adjacent": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "op": {"op":"open_thread","thread":"th-s","focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "pane",
+          "id": "p-a",
+          "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-n1","kind":"thread","thread":"th-s"}],
+          "active": "t-n1"
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {
+      "th-s": {
+        "space": "sp-a",
+        "quick": {"open":false,"fresh":true,"ran":"npm test"},
+        "remembered": {
+          "pane": "p-a",
+          "tabs": [
+            {
+              "tab": {"id":"t-x","kind":"terminal","thread":"th-s","params":{"terminal":"term-x"}},
+              "pane": "p-a",
+              "index": 1,
+              "adjacent": true,
+              "fresh": {"ran":"make dev"}
+            },
+            {
+              "tab": {
+                "id": "t-d",
+                "kind": "diff",
+                "thread": "th-s",
+                "params": {"project":"pj","worktree":"w"}
+              },
+              "pane": "p-a",
+              "index": 1,
+              "adjacent": true
+            }
+          ]
+        },
+        "snoozed": true
+      }
+    }
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"focused"}
+}

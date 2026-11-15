@@ -159,6 +159,10 @@ message LayoutTab {
   string title = 6;
   // A manual name (terminals only); empty is automatic.
   string name = 7;
+  // A preview: a thread tab opened to look at an archived or snoozed thread, which the next
+  // preview in its space replaces until something keeps it (internal/layout/preview.go). At
+  // most one per space. Ignored in an op: only thread.open --preview makes one.
+  bool preview = 8;
 }
 
 // ThreadLayout is what the layout stores for one thread.
@@ -342,7 +346,8 @@ message LegacyImportedThread {
 
 // LayoutOp is one operation. Each case names the op of internal/layout it runs (its JSON
 // name). Cases 1 to 9 are the thread ops (placement, opening, closing and restoring a
-// thread, moving it between spaces, archiving and snoozing it). An op that lays panes out
+// thread, moving it between spaces, archiving and snoozing it, keeping a preview and telling
+// the layout a thread is snoozed or woke). An op that lays panes out
 // measures in the pane area the last window reported (SetViewport), else 1180 x 820.
 message LayoutOp {
   oneof op {
@@ -352,6 +357,8 @@ message LayoutOp {
     MoveThreadOp move_thread = 4;
     ArchiveThreadOp archive_thread = 5;
     SnoozeThreadOp snooze_thread = 6;
+    KeepTabOp keep_tab = 7;
+    SetSnoozedOp set_snoozed = 8;
 
     AddTabOp add_tab = 10;
     SplitPaneOp split_pane = 11;
@@ -449,6 +456,21 @@ message SnoozeThreadOp {
   map<string, string> ran = 2;
   // The command its quick terminal ran last, for the same line when it comes back.
   string quick_ran = 3;
+}
+
+// KeepTabOp keeps a preview tab (LayoutTab.preview): tab_id, or thread_id's tab. A tab that
+// is no preview is left as it is.
+message KeepTabOp {
+  string tab_id = 1;
+  string thread_id = 2;
+}
+
+// SetSnoozedOp tells the layout whether a thread is snoozed (the daemon's own glue sends it).
+// Waking one keeps its preview and, with its tab open, brings back its remembered tabs and
+// quick terminal beside it; a snoozed thread's tab opens without them.
+message SetSnoozedOp {
+  string thread_id = 1;
+  bool snoozed = 2;
 }
 
 // SetQuickOp opens or closes a thread's quick terminal (LayoutThread.quick); height above

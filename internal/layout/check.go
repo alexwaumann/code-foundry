@@ -21,7 +21,8 @@ const sizeTolerance = 1e-9
 //     one size per child, each positive, summing to 1;
 //   - every tab valid for its kind (identity.go), its key the computed one, no manual name
 //     unless the kind is renameable, and no two tabs with one key in the key's scope;
-//   - a thread tab is in its thread's space;
+//   - a thread tab is in its thread's space; at most one tab per space is a preview, a
+//     thread tab, and no closed or remembered tab is one;
 //   - a space's focus names one of its panes ("" only when it has none); its MRU holds only
 //     its open tabs, each once, at most MaxMRU; its reopen history at most MaxClosed entries,
 //     each with a tab;
@@ -112,6 +113,8 @@ func (c *checker) run() {
 			for _, rt := range ts.Remembered.Tabs {
 				if rt.Tab == nil {
 					c.fail("thread %s: remembered nil tab", id)
+				} else if rt.Tab.Preview {
+					c.fail("thread %s: remembered tab %s is a preview", id, rt.Tab.ID)
 				} else if _, _, err := Identify(rt.Tab); err != nil {
 					c.fail("thread %s: remembered tab %s: %v", id, rt.Tab.ID, err)
 				}
@@ -146,7 +149,22 @@ func (c *checker) space(sp *Space) {
 	for i, e := range sp.Closed {
 		if e == nil || len(e.Tabs) == 0 || slices.Contains(e.Tabs, nil) {
 			c.fail("space %s: reopen history entry %d holds no tab, or a nil one", sp.ID, i)
+			continue
 		}
+		if slices.ContainsFunc(e.Tabs, func(tb *Tab) bool { return tb.Preview }) {
+			c.fail("space %s: reopen history entry %d holds a preview", sp.ID, i)
+		}
+	}
+	previews := 0
+	for _, p := range Panes(sp.Root) {
+		for _, tb := range p.Tabs {
+			if tb != nil && tb.Preview {
+				previews++
+			}
+		}
+	}
+	if previews > 1 {
+		c.fail("space %s: %d preview tabs", sp.ID, previews)
 	}
 	seen := map[string]bool{}
 	for _, id := range sp.MRU {
@@ -239,6 +257,9 @@ func (c *checker) tab(sp *Space, tb *Tab, keys map[string]string) {
 		c.fail("tabs %s and %s are both %s", other, tb.ID, key)
 	}
 	scope[key] = tb.ID
+	if tb.Preview && tb.Kind != "thread" {
+		c.fail("tab %s: a %s tab is never a preview", tb.ID, tb.Kind)
+	}
 	if tb.Kind == "thread" && c.st.SpaceOf(tb.Thread) != sp.ID {
 		c.fail("thread tab %s is in space %s, its thread lives in %s", tb.ID, sp.ID, c.st.SpaceOf(tb.Thread))
 	}

@@ -206,7 +206,7 @@ func layoutNodeToProto(n *core.Node) *v1.LayoutNode {
 }
 
 func layoutTabToProto(tb *core.Tab) *v1.LayoutTab {
-	return &v1.LayoutTab{Id: tb.ID, Kind: tb.Kind, ThreadId: tb.Thread, Key: tb.Key, Params: tb.Params, Title: tb.Title, Name: tb.Name}
+	return &v1.LayoutTab{Id: tb.ID, Kind: tb.Kind, ThreadId: tb.Thread, Key: tb.Key, Params: tb.Params, Title: tb.Title, Name: tb.Name, Preview: tb.Preview}
 }
 
 func threadLayoutToProto(id string, ts *core.ThreadState) *v1.ThreadLayout {

@@ -77,11 +77,12 @@ type ThreadDoc struct {
 	Remembered *Remembered       `json:"remembered,omitempty"`
 	Last       map[string]string `json:"last,omitempty"`
 	Info       *bool             `json:"info,omitempty"`
+	Snoozed    bool              `json:"snoozed,omitempty"`
 }
 
 // EncodeThreadDoc writes a thread's document.
 func EncodeThreadDoc(ts *ThreadState) ([]byte, error) {
-	b, err := json.Marshal(ThreadDoc{V: Version, Quick: ts.Quick, Remembered: ts.Remembered, Last: ts.Last, Info: ts.Info})
+	b, err := json.Marshal(ThreadDoc{V: Version, Quick: ts.Quick, Remembered: ts.Remembered, Last: ts.Last, Info: ts.Info, Snoozed: ts.Snoozed})
 	if err != nil {
 		return nil, fmt.Errorf("encode thread state: %w", err)
 	}
@@ -97,7 +98,7 @@ func DecodeThreadDoc(space string, data []byte) (*ThreadState, error) {
 	if d.V > Version {
 		return nil, fmt.Errorf("decode thread state: version %d: %w", d.V, ErrNewerVersion)
 	}
-	return &ThreadState{Space: space, Quick: d.Quick, Remembered: d.Remembered, Last: d.Last, Info: d.Info}, nil
+	return &ThreadState{Space: space, Quick: d.Quick, Remembered: d.Remembered, Last: d.Last, Info: d.Info, Snoozed: d.Snoozed}, nil
 }
 
 // FromNewerBuild lists what in st only a newer build writes: a node of a type this build
@@ -225,6 +226,19 @@ func (s *sanitizer) space(sp *Space) {
 	if after, _ := json.Marshal(sp.Root); !bytes.Equal(before, after) {
 		s.note("space %s: tree put into normal form", sp.ID)
 	}
+	preview := ""
+	for _, p := range Panes(sp.Root) {
+		for _, tb := range p.Tabs {
+			switch {
+			case !tb.Preview:
+			case preview == "":
+				preview = tb.ID
+			default:
+				s.note("space %s: tab %s kept, %s is its preview", sp.ID, tb.ID, preview)
+				tb.Preview = false
+			}
+		}
+	}
 	ids := PaneIDs(sp.Root)
 	if want := focusOr(ids, sp.Focus); want != sp.Focus {
 		s.note("space %s: focus %q is now %q", sp.ID, sp.Focus, want)
@@ -334,6 +348,10 @@ func (s *sanitizer) tab(sp *Space, p *Node, tb *Tab, keys map[string]bool) bool 
 		s.note("tab %s: dropped the name of a %s tab", tb.ID, tb.Kind)
 		tb.Name = ""
 	}
+	if tb.Preview && tb.Kind != "thread" {
+		s.note("tab %s: a %s tab is kept, never a preview", tb.ID, tb.Kind)
+		tb.Preview = false
+	}
 	tb.ID = s.claim(tb.ID, "t-", "tab")
 	return true
 }
@@ -362,6 +380,7 @@ func (s *sanitizer) threads() {
 					return true
 				}
 				rt.Tab.Key = key
+				rt.Tab.Preview = false
 				return false
 			})
 		}
@@ -456,8 +475,8 @@ func (s *sanitizer) closed(sp *Space) {
 			return true
 		}
 		e.Tabs = slices.DeleteFunc(e.Tabs, func(tb *Tab) bool {
-			if tb == nil {
-				return true
+			if tb == nil || tb.Preview {
+				return true // a preview leaves no trace (preview.go)
 			}
 			_, ok := KindOf(tb.Kind)
 			return !ok

@@ -149,7 +149,8 @@ func reopenTab(e *glueEnv, g *layoutGlue) ([]string, []string) {
 	return c.Result.Fresh, []string{old}
 }
 
-// restoreSet snoozes th-a with two terminal tabs (their shells go) and opens it again.
+// restoreSet snoozes th-a with two terminal tabs (their shells go), wakes it in the layout and
+// opens it again.
 func restoreSet(e *glueEnv, g *layoutGlue) ([]string, []string) {
 	e.t.Helper()
 	x, y := openWithSet(e)
@@ -161,6 +162,7 @@ func restoreSet(e *glueEnv, g *layoutGlue) ([]string, []string) {
 		}
 	}
 	acted(g)
+	e.apply(&core.SetSnoozed{Thread: "th-a"}) // it woke: opening it restores its set
 	c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
 	if len(c.Result.Fresh) != 2 {
 		e.t.Fatalf("restore result %+v", c.Result)
@@ -202,6 +204,7 @@ func TestLayoutGlueFreshQuickRace(t *testing.T) {
 				t.Fatal(err)
 			}
 			acted(g)
+			e.apply(&core.SetSnoozed{Thread: "th-a"}) // it woke: opening it restores its quick terminal
 			if c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true}); c.Result.FreshQuick != "th-a" {
 				t.Fatalf("FreshQuick = %q", c.Result.FreshQuick)
 			}

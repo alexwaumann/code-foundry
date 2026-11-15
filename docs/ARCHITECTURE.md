@@ -1468,15 +1468,17 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   space and the default one (a thread with no record lives there); a `Space` is a name, a
   tree of `Node`s (a pane with its tabs, active tab and whether the user collapsed it, or a split with a direction, kids and
   sizes that sum to 1), its focused pane, its MRU of tabs and its composer drafts; a `Tab` is
-  a kind, an optional thread link, params and a title; each thread has a record (its space,
-  its remembered tabs, its quick terminal's open state and height, its last tab per kind).
+  a kind, an optional thread link, params, a title and whether it is a preview; each thread has
+  a record (its space, its remembered tabs, its quick terminal's open state and height, its
+  last tab per kind, whether it is snoozed).
   Every change is an op (`{"op": "move_tab", ...}`, a registry of structs by JSON name):
   `Apply` runs it on a copy, normalises, checks the normal form, and returns the state it was
   given on any error. The ops: the tree (`add_tab`, `split_pane`, `move_tab`, `move_pane`,
   `merge_pane`, `swap_pane`, `close_tab`, `close_pane`, `set_sizes`, `focus_tab`,
   `focus_pane`, `set_tab_params`, `rename_tab`), spaces (`new_space`, `rename_space`,
   `remove_space`, `reorder_spaces`, `switch_space`), placement and threads (`open_surface`,
-  `open_thread`, `close_thread`, `move_thread`, `archive_thread`, `snooze_thread`), drafts
+  `open_thread`, `close_thread`, `move_thread`, `archive_thread`, `snooze_thread`, `keep_tab`,
+  `set_snoozed`), drafts
   (`new_thread`, `start_draft`, `label_draft`, `clear_draft`, `discard_draft`, `open_draft`)
   and terminals (`set_quick`, `replace_terminal`, `drop_terminal`). `testdata/ops/*.json` pins
   each op case by case; the GUI's geometry, drag preview and the mock daemon run the same
@@ -1504,7 +1506,12 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   shells with the command each ran (a terminal tab in another space with that space, to go
   back there). An archived thread lives in no space: `open_thread` with `archived` opens it
   in the current space, and with a pane and an index or an edge it opens at a drop's place
-  in one op. **Smart swap**
+  in one op. **Preview tabs** (`preview.go`): `open_thread` with `preview` opens an archived or
+  snoozed thread's tab as its space's one preview, which the next preview replaces (in its
+  slot when it is in the same pane) and is never recorded for reopening; a move, a surface of
+  its thread opened or `keep_tab` keeps it. A snoozed thread (`ThreadState.Snoozed`, set by
+  `snooze_thread`) opens without its set; `set_snoozed` off brings the set back beside an open
+  tab (`docs/notes/preview-tabs-1-daemon.md`). **Smart swap**
   (`swap.go`, setting `layout.smart_swap`): when a thread tab gains the focus, every pane
   whose active tab is another thread's linked surface of a kind this thread also has open in
   that pane switches to it.
@@ -1538,8 +1545,10 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   go, so a snooze can record each terminal's foreground or last command; a commit's closed
   terminal tabs end their terminals (shells and action runs, never a plugin's), while tabs
   closed with their thread keep running; a removed terminal closes its tab; a reset
-  terminal's tab follows the shell that `replaces` it; opening a snoozed thread starts a
-  fresh shell for each restored terminal tab; a sweep at start and every minute drops what
+  terminal's tab follows the shell that `replaces` it; a restore after a snooze (an open, or
+  the thread waking with its tab open) starts a fresh shell for each restored terminal tab; a
+  thread unarchived, woken, renamed or pinned keeps its preview tab, and the layout is told when
+  a thread wakes, or is snoozed without its mark (`set_snoozed`, also at start); a sweep at start and every minute drops what
   the layout holds of terminals that are gone (no terminal survives a daemon restart); and
   when the bus dropped a layout or thread event for it, the glue catches up from the stores'
   snapshots (`docs/notes/shell-6-lifecycle.md`, `docs/notes/shell-review-fixes-daemon.md`).

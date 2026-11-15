@@ -1,0 +1,73 @@
+{
+  "doc": "Opening as a preview a thread that has a kept tab focuses it and does not touch the space's preview.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-k","kind":"thread","thread":"th-1"}],
+              "active": "t-p"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-v","kind":"thread","thread":"th-v","preview":true}],
+              "active": "t-v"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-1":{"space":"sp-a","snoozed":true}}
+  },
+  "op": {"op":"open_thread","thread":"th-1","preview":true,"focus":true},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-1",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-p","kind":"prs"},{"id":"t-k","kind":"thread","thread":"th-1"}],
+              "active": "t-k"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-v","kind":"thread","thread":"th-v","preview":true}],
+              "active": "t-v"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-k","t-p"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a",
+    "threads": {"th-1":{"space":"sp-a","snoozed":true}}
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-k","existing":true,"rule":"1"}
+}
