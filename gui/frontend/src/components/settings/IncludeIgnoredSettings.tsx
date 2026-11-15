@@ -10,7 +10,7 @@ import type { SectionFields } from "./model";
 import { SectionCard } from "./SectionCard";
 
 /** The section's description (the field's own, longer one, is the CLI's and the search's). */
-export const INCLUDE_DESCRIPTION = "Git-ignored files that match are found by Go to File and @ in the prompt, in every project. A project can add its own on its page.";
+export const INCLUDE_DESCRIPTION = "Git-ignored files that match are found by Go to File, @ in the prompt and text search, in every project. A project can add its own on its page.";
 
 /**
  * files.include_ignored as a list (docs/notes/file-search-2-includes-gui.md): its patterns,

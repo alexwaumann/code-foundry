@@ -94,7 +94,7 @@ describe("Ignored files to include", () => {
   it("fresh: its own section headed by the setting, the three defaults badged, no restore link, the add field", () => {
     open();
     const card = screen.getByRole("region", { name: "Ignored files to include" });
-    expect(card.textContent).toContain("Git-ignored files that match are found by Go to File and @ in the prompt, in every project. A project can add its own on its page.");
+    expect(card.textContent).toContain("Git-ignored files that match are found by Go to File, @ in the prompt and text search, in every project. A project can add its own on its page.");
     expect(rows()).toEqual([".env* default", "CLAUDE.local.md default", ".claude/settings.local.json default"]);
     expect(screen.queryByTestId("include-restore")).toBeNull();
     expect(addInput().getAttribute("placeholder")).toBe("Add a pattern, like *.local.json or scratch/");

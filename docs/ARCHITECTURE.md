@@ -480,7 +480,10 @@ Services (v1):
   The GUI edits both lists (Settings › General's list and a git project's Search section) and
   labels such rows `ignored` in cmd+P and the `@` card (`docs/notes/file-search-2-includes-gui.md`).
   SearchText streams the content matches of the same files (the shipped ripgrep over their
-  paths; smart case, word, regex; stable order, capped; `docs/notes/file-search-4-text-rpc.md`).
+  paths; smart case, word, regex; stable order, capped; `docs/notes/file-search-4-text-rpc.md`),
+  which the finder's Text mode shows (`file.find.text`, cmd+shift+P: matches by file, the file
+  around the selected one, Enter at the line, ⌘⏎ an `@` file tag with its line;
+  `docs/notes/file-search-5-text-mode.md`).
   ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
   anywhere under home except the config home outside its checkouts, and answers a file
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).
@@ -948,7 +951,7 @@ says what each verb does in the window (`docs/notes/shell-20-cutover.md`):
 | cmd+t / cmd+shift+t | `terminal.new` with the focused tab's thread / `terminal.new-free` |
 | cmd+j / cmd+shift+j | `terminal.quick` (open and focus, focus, close) / `terminal.cycle` |
 | cmd+shift+d / cmd+shift+i | `view.thread-diff` / `view.thread-info` |
-| cmd+p / cmd+k | `file.find` / the palette (view action) |
+| cmd+p / cmd+shift+p / cmd+k | `file.find` / `file.find.text` / the palette (view action) |
 | cmd+w / cmd+shift+w | `tab.close` / `pane.close` (a surface with unsaved work asks first) |
 | cmd+[ / cmd+] | `view.back` / `view.forward`: the focus history, across panes and spaces |
 | cmd+shift+[ / cmd+shift+] | `tab.previous` / `tab.next` |

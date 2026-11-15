@@ -78,21 +78,22 @@ function SkillTag({ name, projectId, selected }: { name: string; projectId: stri
 /**
  * A file or directory: the tooltip is its path (a directory's ends with "/"), prefixed
  * with the project's name when the draft has more than one project
- * (`api/internal/api/thread.go`).
+ * (`api/internal/api/thread.go`). A file at a line reads `name:24`, its path `path:24`.
  */
-function FileTag({ projectId, path, selected }: { projectId: string; path: string; selected: boolean }) {
+function FileTag({ projectId, path, line, selected }: { projectId: string; path: string; line: number | undefined; selected: boolean }) {
   const project = useProjectName(projectId);
   const multi = useContext(TagMultiProjectContext);
-  const label = tagLabel({ tagKind: "file", projectId, path });
+  const label = tagLabel({ tagKind: "file", projectId, path, ...(line === undefined ? {} : { line }) });
+  const at = line === undefined ? "" : `:${String(line)}`;
   return (
     <TextTag
       kind="file"
       label={label}
       selected={selected}
-      ariaLabel={`${path.endsWith("/") ? "Folder" : "File"} ${path} in ${project}`}
-      tip={<span className="font-mono">{multi ? `${project}/${path}` : path}</span>}
+      ariaLabel={`${path.endsWith("/") ? "Folder" : "File"} ${path}${line === undefined ? "" : ` line ${String(line)}`} in ${project}`}
+      tip={<span className="font-mono">{`${multi ? `${project}/${path}` : path}${at}`}</span>}
       detail=""
-      data={{ "data-path": path, "data-project": projectId }}
+      data={{ "data-path": path, "data-project": projectId, "data-line": line === undefined ? undefined : String(line) }}
     />
   );
 }
@@ -189,7 +190,7 @@ export function TagView({ node, selected, editor }: NodeViewProps) {
     case "skill":
       return <SkillTag name={tag.name} projectId={tag.projectId} selected={selected} />;
     case "file":
-      return <FileTag projectId={tag.projectId} path={tag.path} selected={selected} />;
+      return <FileTag projectId={tag.projectId} path={tag.path} line={tag.line} selected={selected} />;
     case "thread":
       return <ThreadTag id={tag.id} label={tag.name} selected={selected} />;
     case "pr":

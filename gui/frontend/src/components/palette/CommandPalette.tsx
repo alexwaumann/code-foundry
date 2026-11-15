@@ -340,6 +340,7 @@ export function CommandPalette() {
   const page = useUiStore((s) => s.palette.page);
   const searchTargetSeq = useSearchDialogStore((s) => s.targetSeq);
   const runInThread = useUiStore((s) => s.palette.threadId ?? "");
+  const textMode = useUiStore((s) => s.palette.page === "files" && s.palette.fileMode === "text");
   const context = useUiStore((s) => s.palette.context);
   const closePalette = useUiStore((s) => s.closePalette);
   const close = useCallback(() => {
@@ -360,7 +361,7 @@ export function CommandPalette() {
     const pane = back.closest<HTMLElement>('[data-testid="shell-pane"]')?.dataset.paneId;
     if (pane) requestPaneFocus(pane);
   }, [open]);
-  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : page === "prompts" ? "Previous prompts" : page === "files" ? "Go to file" : page === "search" ? "Search threads" : "Command palette";
+  const title = page === "projects" ? "New thread" : page === "runin" ? "Run thread in" : page === "prompts" ? "Previous prompts" : page === "files" ? (textMode ? "Search in files" : "Go to file") : page === "search" ? "Search threads" : "Command palette";
   const description =
     page === "projects"
       ? "Pick the project for a new thread"
@@ -369,7 +370,9 @@ export function CommandPalette() {
         : page === "prompts"
           ? "Pick a prompt you sent to put it in the composer"
           : page === "files"
-            ? "Pick a file of the thread to open in a tab beside it"
+            ? textMode
+              ? "Find a line in the thread's files to open the file at it"
+              : "Pick a file of the thread to open in a tab beside it"
             : page === "search"
               ? "Find threads by name and messages, and open one at the match"
               : "Run a command in the current context";
@@ -382,8 +385,8 @@ export function CommandPalette() {
       }}
     >
       <DialogContent
-        // The Find dialog is wider (about 1000px, clamped to the window) and lays out its own body.
-        className={cn("overflow-hidden p-0", page === "search" ? "w-[min(1000px,calc(100vw/var(--cf-zoom)-2rem))] max-w-none" : "max-w-xl")}
+        // The Find dialog and the finder's Text mode are wider (about 1000px, clamped to the window) and lay out their own bodies.
+        className={cn("overflow-hidden p-0", page === "search" || textMode ? "w-[min(1000px,calc(100vw/var(--cf-zoom)-2rem))] max-w-none" : "max-w-xl")}
         data-region="palette"
         onCloseAutoFocus={(e) => {
           e.preventDefault();

@@ -15,7 +15,7 @@ import { leaveSubagent } from "./subagentView";
 import { jumpToNeighbour } from "./threadNeighbours";
 import { toggleThreadInfo } from "./threadInfoOverlay";
 import { presentPromptHistory } from "./historyComposers";
-import { presentFileFinder } from "./fileFinder";
+import { presentFileFinder, presentTextFinder } from "./fileFinder";
 import { presentSearch } from "./threadSearch";
 import { presentFileFind } from "./fileFind";
 import { presentTerminalFind } from "@/stores/terminalFind";
@@ -166,6 +166,9 @@ export function showView(name: string, params?: Readonly<Record<string, string>>
     case "file.find":
       // file.find: the palette's file finder over the selected thread (nothing on a page).
       return presentFileFinder();
+    case "file.find.text":
+      // file.find.text: the same finder in its Text mode.
+      return presentTextFinder();
     case "thread.find":
       // thread.find: the find bar of the thread in the content pane (nothing on a page).
       return presentThreadFind("open");

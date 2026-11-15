@@ -54,7 +54,7 @@ export function promptPreview(pieces: readonly MessagePiece[]): string {
       case "skill":
         return tagLabel({ tagKind: "skill", name: p.name, projectId: "" });
       case "file":
-        return tagLabel({ tagKind: "file", projectId: p.projectId, path: p.path });
+        return tagLabel({ tagKind: "file", projectId: p.projectId, path: p.path, ...(p.line === undefined ? {} : { line: p.line }) });
       case "thread":
         return tagLabel({ tagKind: "thread", id: p.id, name: p.name });
       case "pr":

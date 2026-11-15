@@ -19,9 +19,11 @@ interface TagAttrs {
   slug: string;
   /** pr: the pull request number, as text ("" for other kinds). */
   number: string;
+  /** file: the 1-based line, as text ("" for none: every tag made before lines, and every other kind). */
+  line: string;
 }
 
-const TAG_ATTR_DEFAULTS: TagAttrs = { kind: "image", id: "", name: "", projectId: "", path: "", slug: "", number: "" };
+const TAG_ATTR_DEFAULTS: TagAttrs = { kind: "image", id: "", name: "", projectId: "", path: "", slug: "", number: "", line: "" };
 
 /** The node's attribute spec (TipTap and ProseMirror take the same shape). */
 export const TAG_ATTR_SPEC = {
@@ -32,6 +34,7 @@ export const TAG_ATTR_SPEC = {
   path: { default: "" },
   slug: { default: "" },
   number: { default: "" },
+  line: { default: "" },
 };
 
 export function tagAttrs(tag: PromptTag): TagAttrs {
@@ -41,7 +44,7 @@ export function tagAttrs(tag: PromptTag): TagAttrs {
     case "skill":
       return { ...TAG_ATTR_DEFAULTS, kind: "skill", name: tag.name, projectId: tag.projectId };
     case "file":
-      return { ...TAG_ATTR_DEFAULTS, kind: "file", projectId: tag.projectId, path: tag.path };
+      return { ...TAG_ATTR_DEFAULTS, kind: "file", projectId: tag.projectId, path: tag.path, line: tag.line === undefined ? "" : String(tag.line) };
     case "thread":
       return { ...TAG_ATTR_DEFAULTS, kind: "thread", id: tag.id, name: tag.name };
     case "pr":
@@ -60,8 +63,10 @@ export function tagOf(attrs: Record<string, unknown>): PromptTag {
   switch (s("kind")) {
     case "skill":
       return { tagKind: "skill", name: s("name"), projectId: s("projectId") };
-    case "file":
-      return { tagKind: "file", projectId: s("projectId"), path: s("path") };
+    case "file": {
+      const line = Number(s("line"));
+      return { tagKind: "file", projectId: s("projectId"), path: s("path"), ...(Number.isSafeInteger(line) && line > 0 ? { line } : {}) };
+    }
     case "thread":
       return { tagKind: "thread", id: s("id"), name: s("name") };
     case "pr":

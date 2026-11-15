@@ -2865,8 +2865,8 @@ export const ProjectService: GenService<{
   },
   /**
    * SetIncludeIgnored replaces a project's include patterns: git-ignored files its file
-   * search (Go to File, @ completion) lists too, on top of the files.include_ignored
-   * setting's (FilesystemService.SearchFiles). Each pattern is trimmed and repeats are
+   * search (Go to File, @ completion, text search) lists too, on top of the
+   * files.include_ignored setting's (FilesystemService.SearchFiles, SearchText). Each pattern is trimmed and repeats are
    * dropped; an empty list clears them. InvalidArgument for an empty pattern, one over 200
    * bytes, with a control character or a comma, starting with "!", "#", "/" or "~/", with
    * a ".", ".." or empty segment, more than four "**" segments or a malformed glob, or

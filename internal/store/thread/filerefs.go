@@ -21,6 +21,11 @@ import (
 // claude as "@/Users/me/.../src/a.ts". A token whose project is not part of the thread,
 // or whose path has a ".." segment, cannot be decoded, or decodes to a control
 // character, becomes the relative path alone ("@src/a.ts") and is logged.
+//
+// A file tag with a line ends in "#L<line>" (the GUI encodes a "#" in a name as %23, so a
+// bare "#" is always this suffix). Decoding leaves it as it is: "@cf-file://r-1/src/a.ts#L42"
+// reaches claude as "@/Users/me/.../src/a.ts#L42", the form its @ mention reads a line from
+// (docs/notes/file-search-5-text-mode.md).
 
 // fileRefScheme starts a file reference token.
 const fileRefScheme = "cf-file://"

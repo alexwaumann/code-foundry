@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { statusColor } from "@/components/diff/files";
-import { changeStatuses, emptyGroups, MAX_WORDS, parseFinderQuery, searchRows, type FinderGroup, type FinderRow, type Run } from "@/lib/fileFinder";
+import { changeStatuses, emptyGroups, MAX_WORDS, parseFinderQuery, searchRows, type FinderCheckout, type FinderGroup, type FinderRow, type Run } from "@/lib/fileFinder";
 import { useFirstRowSelection } from "@/lib/useFirstRowSelection";
 import { cn } from "@/lib/utils";
 import { openFoundFile, tagFoundFile } from "@/stores/fileFinder";
 import { threadTarget } from "@/shell/host";
 import { useRecentFiles } from "@/stores/recentFiles";
+import { useUiStore } from "@/stores/ui";
+import { FinderModeSwitch } from "./FinderModeSwitch";
+import { TextFinder, type TextOptions } from "./TextFinder";
 import { useCheckoutChanges, useFinderCheckouts, useFinderScopeName, useFinderSearch, useOpenFilePaths, type FindFilesFn } from "./useFileFinder";
+import { PreviewCache, type ReadFileFn, type SearchTextFn } from "./useTextSearch";
 
 /** Text runs, the matched ones semibold in the foreground colour (the rest stays regular, so they stand out). */
 function Runs({ runs }: { runs: readonly Run[] }) {
@@ -94,6 +98,9 @@ function Hints() {
         <Kbd size="sm">⌘</Kbd>
         <Kbd size="sm">⏎</Kbd> @ in prompt
       </span>
+      <span className="flex items-center gap-1">
+        <Kbd size="sm">tab</Kbd> search text
+      </span>
       <span className="ml-auto flex items-center gap-1">
         <Kbd size="sm">esc</Kbd> close
       </span>
@@ -102,19 +109,74 @@ function Hints() {
 }
 
 /**
- * The file finder (file.find, cmd+P; docs/notes/file-finder-2-gui.md): the palette's
- * chrome over a thread's checkouts. An empty query lists the files changed in the thread
- * and the panel's recently opened files; a query lists the daemon's ranked matches across
- * the checkouts (lib/fileFinder.ts). Enter opens the file in a tab beside the thread (at
- * the line of a trailing `:<line>`), ⌘⏎ puts it in the prompt as an @ file.
+ * The file finder (file.find, cmd+P, and file.find.text, cmd+shift+P;
+ * docs/notes/file-finder-2-gui.md, file-search-5-text-mode.md): the palette's chrome over a
+ * thread's checkouts, in two modes. Files finds a file by name; Text (TextFinder) finds
+ * lines of the files' text, in the thread search dialog's wider shape. Tab or the switch in
+ * the header changes the mode and keeps the typed query; the Text mode's toggles and the
+ * files its preview read last as long as the finder is open.
  */
-export function FileFinder({ threadId, search }: { threadId: string; search?: FindFilesFn }) {
+export function FileFinder({ threadId, search, searchText, readFile }: { threadId: string; search?: FindFilesFn; searchText?: SearchTextFn; readFile?: ReadFileFn }) {
+  const mode = useUiStore((s) => s.palette.fileMode ?? "files");
   const [input, setInput] = useState("");
+  const [options, setOptions] = useState<TextOptions>({ matchCase: false, wholeWord: false, regex: false });
+  const [cache] = useState(() => new PreviewCache());
+  const { checkouts, names, git } = useFinderCheckouts(threadId);
+  const scope = useFinderScopeName(threadId, names, checkouts[0]?.projectId ?? "");
+  const switchMode = useCallback(() => {
+    useUiStore.getState().setFileFinderMode(useUiStore.getState().palette.fileMode === "text" ? "files" : "text");
+  }, []);
+  if (mode === "text")
+    return (
+      <TextFinder
+        threadId={threadId}
+        sources={checkouts}
+        names={names}
+        multi={checkouts.length > 1}
+        scope={scope}
+        input={input}
+        setInput={setInput}
+        options={options}
+        setOptions={setOptions}
+        switchMode={switchMode}
+        cache={cache}
+        {...(searchText ? { search: searchText } : {})}
+        {...(readFile ? { read: readFile } : {})}
+      />
+    );
+  return <FilesMode threadId={threadId} input={input} setInput={setInput} checkouts={checkouts} names={names} git={git} scope={scope} switchMode={switchMode} {...(search ? { search } : {})} />;
+}
+
+/**
+ * The Files mode: an empty query lists the files changed in the thread and the panel's
+ * recently opened files; a query lists the daemon's ranked matches across the checkouts
+ * (lib/fileFinder.ts). Enter opens the file in a tab beside the thread (at the line of a
+ * trailing `:<line>`), ⌘⏎ puts it in the prompt as an @ file (at that line).
+ */
+function FilesMode({
+  threadId,
+  input,
+  setInput,
+  checkouts,
+  names,
+  git,
+  scope,
+  switchMode,
+  search,
+}: {
+  threadId: string;
+  input: string;
+  setInput: (v: string) => void;
+  checkouts: readonly FinderCheckout[];
+  names: Readonly<Record<string, string>>;
+  git: ReadonlySet<string>;
+  scope: string;
+  switchMode: () => void;
+  search?: FindFilesFn;
+}) {
   const parsed = parseFinderQuery(input);
   const panelKey = threadTarget(threadId);
-  const { checkouts, names, git } = useFinderCheckouts(threadId);
   const multi = checkouts.length > 1;
-  const scope = useFinderScopeName(threadId, names, checkouts[0]?.projectId ?? "");
   const changes = useCheckoutChanges(checkouts, git);
   const openPaths = useOpenFilePaths(panelKey);
   const recent = useRecentFiles(panelKey);
@@ -137,7 +199,7 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
     openFoundFile(threadId, r, parsed.line);
   };
   const tag = (r: FinderRow) => {
-    tagFoundFile(threadId, r);
+    tagFoundFile(threadId, r, parsed.line);
   };
 
   // The rows on screen answer an older query while the typed one's search is out (or still
@@ -157,7 +219,7 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
     pending.current = null;
     const r = rows[0];
     if (r === undefined || found.error !== null) return;
-    if (p.tag) tagFoundFile(threadId, r);
+    if (p.tag) tagFoundFile(threadId, r, parsed.line);
     else openFoundFile(threadId, r, parsed.line);
   }, [found, rows, parsed.query, parsed.line, threadId]);
 
@@ -180,6 +242,12 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
       data-testid="palette"
       data-mode="files"
       onKeyDown={(e) => {
+        if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          switchMode();
+          return;
+        }
         if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
         if (waiting) {
           e.preventDefault();
@@ -194,7 +262,7 @@ export function FileFinder({ threadId, search }: { threadId: string; search?: Fi
         if (r) tag(r);
       }}
     >
-      <CommandInput autoFocus value={input} onValueChange={setInput} placeholder={`Go to file in ${scope}…`} data-testid="finder-input" />
+      <CommandInput autoFocus value={input} onValueChange={setInput} placeholder={`Go to file in ${scope}…`} data-testid="finder-input" trailing={<FinderModeSwitch mode="files" onSwitch={switchMode} />} />
       <CommandList>
         {found.error && searching && !parsed.tooMany && (
           <p className="px-3 pt-2 text-caption text-cf-error-text" role="alert" data-testid="finder-error">

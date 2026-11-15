@@ -33,7 +33,7 @@ export const groups: GroupInit[] = [
   { id: "models", title: "Models", description: "The models Code Foundry uses for its own jobs." },
   { id: "github", title: "GitHub", description: "Pull requests and checks, read with your gh login." },
   { id: "projects", title: "Projects", description: "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin." },
-  { id: "files", title: "Files", description: "What Go to File and @ completion find." },
+  { id: "files", title: "Files", description: "What Go to File, @ completion and text search find." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
   { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density and backdrop. Applied live in every window." },
   { id: "notifications", title: "Notifications", description: "How the Dock tells you a thread needs you. macOS banners aren't available to this app." },
@@ -65,7 +65,7 @@ export const staticPages: PageInit[] = [
       { id: "threads", title: "Threads" },
       { id: "textgen", title: "Text generation", description: "Models for small jobs like naming a thread." },
       { id: "lifecycle", title: "Lifecycle" },
-      { id: "files", title: "Files", description: "What Go to File and @ completion find." },
+      { id: "files", title: "Files", description: "What Go to File, @ completion and text search find." },
       { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." },
       { id: "updates", title: "Updates" },
     ],
@@ -225,7 +225,7 @@ const staticFields: FieldInit[] = [
     type: S.STRING,
     title: "Ignored files to include",
     description:
-      "Git-ignored files that Go to File and @ still find, in every project, as .gitignore-style patterns separated by commas. A pattern without a slash matches a name at any depth (.env*), one with a slash a path from the project's folder (docs/scratch/), and a trailing slash only folders. A name never reaches inside an ignored folder that does not match itself, so .env* skips node_modules. A project can add its own patterns. none for no patterns.",
+      "Git-ignored files that Go to File, @ and text search still find, in every project, as .gitignore-style patterns separated by commas. A pattern without a slash matches a name at any depth (.env*), one with a slash a path from the project's folder (docs/scratch/), and a trailing slash only folders. A name never reaches inside an ignored folder that does not match itself, so .env* skips node_modules. A project can add its own patterns. none for no patterns.",
     defaultValue: DEFAULT_INCLUDE_IGNORED,
     placeholder: ".env*, docs/scratch/",
   },
@@ -341,7 +341,7 @@ const staticFields: FieldInit[] = [
 ];
 
 const reserved = new Set([
-  "cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
+  "cmd+k", "cmd+b", "cmd+shift+a", "cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
   "cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
   "cmd+=", "cmd+-", "cmd+0", "cmd+c", "cmd+v", "cmd+x", "cmd+a", "cmd+z", "cmd+shift+z", "cmd+shift+c", "cmd+q",
   "cmd+h", "cmd+alt+h", "cmd+m", "cmd+ctrl+f",

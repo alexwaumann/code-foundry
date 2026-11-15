@@ -13,7 +13,9 @@
  *
  * The File tab's find paints its matches in here with the Custom Highlight API
  * (components/files/fileFindPaint.ts); a `::highlight` rule applies only in its own tree,
- * so the thread find's tints (thread/find/find.css) are repeated for the shadow root.
+ * so the thread find's tints (thread/find/find.css) are repeated for the shadow root. The
+ * finder's text search preview paints there too, under its own names
+ * (components/palette/textPreview.ts), with the thread search dialog's tints.
  */
 export const CODE_SHADOW_CSS = `
 [data-content] { -webkit-user-select: text; user-select: text; cursor: text; }
@@ -21,4 +23,6 @@ export const CODE_SHADOW_CSS = `
 ::selection { background-color: var(--cf-selection); }
 ::highlight(cf-file-find) { background-color: color-mix(in oklab, var(--cf-warning) 26%, transparent); }
 ::highlight(cf-file-find-current) { background-color: var(--cf-warning); color: var(--cf-warning-foreground); }
+::highlight(cf-text-search) { background-color: color-mix(in oklab, var(--cf-warning) 32%, transparent); }
+::highlight(cf-text-search-current) { background-color: var(--cf-warning); color: var(--cf-warning-foreground); }
 `;

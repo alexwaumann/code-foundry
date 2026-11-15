@@ -431,6 +431,21 @@ describe("picking a file", () => {
     unregister();
   });
 
+  it("name:42 then ⌘⏎ puts the file in the prompt at line 42", async () => {
+    const insertTag = vi.fn();
+    const unregister = registerCiteTarget("thread:s-two", { insert: () => undefined, insertTag, focus: () => undefined });
+    search.mockResolvedValue([match("repo-cf", CF, "gui/src/lib/tree.ts")]);
+    await openFinder("s-two");
+    typeQuery("tree:42");
+    await searched();
+    fireEvent.keyDown(input(), { key: "Enter", metaKey: true });
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+    });
+    expect(insertTag).toHaveBeenCalledWith({ tagKind: "file", projectId: "repo-cf", path: "gui/src/lib/tree.ts", line: 42 });
+    unregister();
+  });
+
   it("the hints say ⌘⏎ for @ in prompt", async () => {
     await openFinder("s-1");
     expect(screen.getByTestId("finder-hints").textContent).toContain("⌘⏎ @ in prompt");

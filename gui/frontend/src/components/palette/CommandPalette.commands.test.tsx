@@ -34,7 +34,7 @@ const { layoutOf, pane, seedLayout, space, tab } = await import("@/test/shellLay
 /**
  * The command palette over a faked List (e2e/app.spec.ts): what it lists for the context it
  * opened in, the chords on its rows, a command's arg prompts and their values, and the
- * openPalette and notify intents. e2e keeps cmd+shift+p reaching the app from a focused
+ * openPalette and notify intents. e2e keeps cmd+k reaching the app from a focused
  * xterm and the FocusProject reveal after worktree.create.
  */
 

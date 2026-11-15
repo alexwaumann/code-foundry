@@ -240,6 +240,8 @@ func TestProvisionalName(t *testing.T) {
 		{name: "projected file ref", text: "Fix @cf-file://p-1/src/components/Composer.tsx crash", want: "Fix Composer.tsx crash"},
 		{name: "projected file ref decoded", text: "Read @cf-file://p-1/docs/My%20Notes.md now", want: "Read My Notes.md now"},
 		{name: "projected directory ref", text: "Explain @cf-file://p-1/internal/api/", want: "Explain api/"},
+		{name: "file at a line", composer: "Fix [Composer.tsx:24](cf-file://p-1/src/Composer.tsx#L24) crash", want: "Fix Composer.tsx:24 crash"},
+		{name: "projected file ref at a line", text: "Fix @cf-file://p-1/src/Composer.tsx#L24 crash", want: "Fix Composer.tsx:24 crash"},
 		{name: "projected skill", text: "/deploy to staging", want: "/deploy to staging"},
 	}
 	for _, tt := range tests {

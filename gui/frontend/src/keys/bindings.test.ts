@@ -275,8 +275,16 @@ describe("handleKeyDown precedence", () => {
     const e = press(terminal, { key: "k", code: "KeyK", metaKey: true });
     expect(e.defaultPrevented).toBe(true);
     expect(useUiStore.getState().palette.open).toBe(true);
-    expect(isGlobalChord("cmd+shift+p")).toBe(true);
     expect(isGlobalChord("cmd+shift+a")).toBe(true);
+  });
+
+  it("cmd+shift+p is no longer the palette's: cmd+k is its only chord", () => {
+    expect(isGlobalChord("cmd+k")).toBe(true);
+    expect(isGlobalChord("cmd+shift+p")).toBe(false);
+    const e = press(terminal, { key: "p", code: "KeyP", metaKey: true, shiftKey: true });
+    expect(useUiStore.getState().palette.open).toBe(false);
+    // Nothing binds it in this list, so the terminal keeps it.
+    expect(e.defaultPrevented).toBe(false);
   });
 
   it.each<[string, KeyboardEventInit & { key: string }, boolean]>([

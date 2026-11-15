@@ -415,7 +415,7 @@ export function includeCommands(world: IncludeWorld): CommandEntry[] {
         title: "Include Ignored Files in Search",
         category: "Project",
         description:
-          "Set the git-ignored files a project's Go to File and @ completion list too, on top of the files.include_ignored setting's: .gitignore-style patterns separated by commas (.env*, docs/scratch/), replacing the project's list; none clears it. A name never reaches inside an ignored folder that does not match itself.",
+          "Set the git-ignored files a project's Go to File, @ completion and text search find too, on top of the files.include_ignored setting's: .gitignore-style patterns separated by commas (.env*, docs/scratch/), replacing the project's list; none clears it. A name never reaches inside an ignored folder that does not match itself.",
         keybindings: [],
         args: [
           {
