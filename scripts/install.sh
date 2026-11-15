@@ -6,8 +6,12 @@
 # Downloads code-foundry-darwin-arm64.tar.gz and checksums.txt from the latest GitHub
 # release of a channel (or --version) with the authenticated gh CLI, verifies the checksum, and
 # installs the app directory ~/.code-foundry/app: code-foundry (daemon + CLI),
-# "Code Foundry" (the GUI), code-foundry-dictate (the dictation engine the daemon runs;
-# releases before it shipped have none) and VERSION. Plain executables, not an .app bundle: managed Macs
+# "Code Foundry" (the GUI), code-foundry-dictate (the dictation engine the daemon runs)
+# and code-foundry-rg (ripgrep, which the daemon runs for text search), whose licences are
+# in THIRD-PARTY-NOTICES.txt, and VERSION. Releases from before a helper shipped lack it.
+# Whatever else the archive holds is installed too: an installer only checks what it
+# knows, so an older one (the in-app updater runs its own copy) installs a newer
+# release's new files. Plain executables, not an .app bundle: managed Macs
 # often block unsigned bundles. An existing install is replaced by unpacking next to it
 # (app.new) and swapping with mv (the old one moves to app.old and is restored if the
 # swap fails). Then it links ~/.local/bin/code-foundry to the CLI and adds ~/.local/bin
@@ -476,10 +480,13 @@ stage_download() {
 	/usr/bin/tar -xzf "$TMP/$ARCHIVE" -C "$PARTIAL" || die "could not unpack $ARCHIVE"
 	[ -f "$PARTIAL/code-foundry" ] && [ -x "$PARTIAL/code-foundry" ] || die "the archive has no code-foundry executable"
 	[ -f "$PARTIAL/Code Foundry" ] && [ -x "$PARTIAL/Code Foundry" ] || die "the archive has no Code Foundry executable"
-	# Optional: older releases do not have it. When there, it must be an executable.
-	if [ -e "$PARTIAL/code-foundry-dictate" ] || [ -L "$PARTIAL/code-foundry-dictate" ]; then
-		[ -f "$PARTIAL/code-foundry-dictate" ] && [ -x "$PARTIAL/code-foundry-dictate" ] || die "the archive's code-foundry-dictate is not an executable"
-	fi
+	# Optional: older releases do not have them. When there, each must be an executable.
+	local helper
+	for helper in code-foundry-dictate code-foundry-rg; do
+		if [ -e "$PARTIAL/$helper" ] || [ -L "$PARTIAL/$helper" ]; then
+			[ -f "$PARTIAL/$helper" ] && [ -x "$PARTIAL/$helper" ] || die "the archive's $helper is not an executable"
+		fi
+	done
 	got="$(installed_version "$PARTIAL")"
 	[ "$got" = "$TAG" ] || die "the archive contains version '$got', expected $TAG"
 	# Belt and braces: gh does not quarantine downloads, but a copied archive might be, and

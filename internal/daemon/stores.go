@@ -383,6 +383,7 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings)
+	checkRipgrep(ctx, log)
 	if s.skills, err = newSkillStore(p, s.db, s.bus, claude, log.With("store", "skill")); err != nil {
 		return nil, err
 	}

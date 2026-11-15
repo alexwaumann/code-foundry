@@ -6,12 +6,15 @@
 #       code-foundry   daemon + CLI (the GUI auto-starts it; ~/.local/bin links to it)
 #       Code Foundry   the Wails GUI, a bare executable with an embedded Info.plist
 #       code-foundry-dictate   the dictation engine (whisper.cpp), run by the daemon
+#       code-foundry-rg   ripgrep (official release binary, scripts/ripgrep.sh), run by the
+#                      daemon for text search
+#       THIRD-PARTY-NOTICES.txt   the licences of what ships (scripts/THIRD-PARTY-NOTICES.txt)
 #       VERSION        the tag, e.g. v0.2.0 (what the installer and updater read)
 #   dist/install.sh                         the installer, defaulting to RELEASE_REPO
 #   dist/checksums.txt                      sha256 of the above
 #
 # No .app bundle: managed Macs often block unsigned bundles but allow bare executables.
-# All three executables are ad-hoc signed; the GUI and the CLI with a fixed identity.
+# All four executables are ad-hoc signed; the GUI and the CLI with a fixed identity.
 set -euo pipefail
 
 VERSION="${VERSION:-}"
@@ -44,7 +47,8 @@ die() {
 
 echo "==> package $VERSION (release repo: ${RELEASE_REPO:-none})"
 
-# 1. Daemon/CLI and the dictation engine, with the same version ldflags as the GUI.
+# 1. Daemon/CLI and the dictation engine, with the same version ldflags as the GUI, and
+# ripgrep copied from its cache.
 "$MAKE" build VERSION="$VERSION" RELEASE_REPO="$RELEASE_REPO"
 
 # 2. GUI executable (gui/build/darwin/Taskfile.yml appends EXTRA_LDFLAGS to -ldflags and
@@ -64,11 +68,13 @@ STAGE="$(mktemp -d "${TMPDIR:-/tmp}/code-foundry-package.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 cp bin/code-foundry "$STAGE/code-foundry"
 cp bin/code-foundry-dictate "$STAGE/code-foundry-dictate"
+cp bin/code-foundry-rg "$STAGE/code-foundry-rg"
 cp "gui/bin/$GUI" "$STAGE/$GUI"
+cp scripts/THIRD-PARTY-NOTICES.txt "$STAGE/THIRD-PARTY-NOTICES.txt"
 printf '%s\n' "$VERSION" >"$STAGE/VERSION"
-chmod 755 "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/$GUI"
-chmod 644 "$STAGE/VERSION"
-xattr -c "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/$GUI" 2>/dev/null || true
+chmod 755 "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/code-foundry-rg" "$STAGE/$GUI"
+chmod 644 "$STAGE/VERSION" "$STAGE/THIRD-PARTY-NOTICES.txt"
+xattr -c "$STAGE/code-foundry" "$STAGE/code-foundry-dictate" "$STAGE/code-foundry-rg" "$STAGE/$GUI" 2>/dev/null || true
 # macOS privacy grants (TCC) are stored against a designated requirement. An ad-hoc
 # signature's default one is its cdhash, so every release would lose them. The GUI and
 # the CLI, the two executables TCC can check for the daemon, get a fixed identifier as
@@ -87,6 +93,11 @@ sign_fixed "$STAGE/$GUI" dev.alexwaumann.codefoundry
 sign_fixed "$STAGE/code-foundry" dev.alexwaumann.codefoundry
 codesign --force --sign - "$STAGE/code-foundry-dictate"
 codesign --verify --strict "$STAGE/code-foundry-dictate" || die "code-foundry-dictate: signature does not verify"
+# ripgrep is run by the daemon like git, so TCC judges the daemon, never it: the default
+# (cdhash) requirement is enough. Re-signed so it carries the same kind of signature as
+# the rest instead of the linker's.
+codesign --force --sign - "$STAGE/code-foundry-rg"
+codesign --verify --strict "$STAGE/code-foundry-rg" || die "code-foundry-rg: signature does not verify"
 
 cli_version="$("$STAGE/code-foundry" version)"
 case "$cli_version" in
@@ -95,6 +106,12 @@ case "$cli_version" in
 esac
 dictate_version="$("$STAGE/code-foundry-dictate" --version)"
 [ "$dictate_version" = "code-foundry-dictate $VERSION" ] || die "the dictation engine reports '$dictate_version', want $VERSION"
+rg_want="$(scripts/ripgrep.sh --print-version)"
+rg_version="$("$STAGE/code-foundry-rg" --version | head -n 1)"
+case "$rg_version" in
+"ripgrep $rg_want "* | "ripgrep $rg_want") ;;
+*) die "code-foundry-rg reports '$rg_version', want ripgrep $rg_want" ;;
+esac
 # The GUI is linked with the same -X flag and prints it without opening a window.
 gui_version="$("$STAGE/$GUI" --version)"
 [ "$gui_version" = "Code Foundry $VERSION" ] || die "the GUI reports '$gui_version', want $VERSION"
@@ -111,9 +128,9 @@ file_version="$(cat "$STAGE/VERSION")"
 # 4. Assets. COPYFILE_DISABLE keeps macOS tar from adding ._ AppleDouble entries.
 mkdir -p dist
 rm -f "dist/$TARBALL" dist/install.sh dist/checksums.txt
-COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" code-foundry code-foundry-dictate "$GUI" VERSION
+COPYFILE_DISABLE=1 tar -czf "dist/$TARBALL" -C "$STAGE" code-foundry code-foundry-dictate code-foundry-rg "$GUI" THIRD-PARTY-NOTICES.txt VERSION
 listing="$(tar -tzf "dist/$TARBALL" | LC_ALL=C sort | tr '\n' '|')"
-[ "$listing" = "$GUI|VERSION|code-foundry|code-foundry-dictate|" ] || die "unexpected tarball contents: $listing"
+[ "$listing" = "$GUI|THIRD-PARTY-NOTICES.txt|VERSION|code-foundry|code-foundry-dictate|code-foundry-rg|" ] || die "unexpected tarball contents: $listing"
 if [ -n "$RELEASE_REPO" ]; then
 	sed "s|^DEFAULT_REPO=.*|DEFAULT_REPO=\"$RELEASE_REPO\"|" scripts/install.sh >dist/install.sh
 else

@@ -20,12 +20,13 @@ gh release download --repo alexwaumann/code-foundry --pattern install.sh -O - | 
 The installer downloads the latest release, verifies its checksum, and:
 
 * installs the app into `~/.code-foundry/app`: `code-foundry` (the daemon and CLI),
-  `Code Foundry` (the window), `code-foundry-dictate` (the dictation engine) and a
+  `Code Foundry` (the window), `code-foundry-dictate` (the dictation engine),
+  `code-foundry-rg` (ripgrep, for text search), `THIRD-PARTY-NOTICES.txt` and a
   `VERSION` file
 * links `~/.local/bin/code-foundry` to the CLI
 * adds `~/.local/bin` to your PATH in `~/.zshrc`, once, if it is not already there
 
-The app is three executables, not an `.app` bundle, because managed Macs often block
+The app is four executables, not an `.app` bundle, because managed Macs often block
 unsigned bundles. So it is not in `~/Applications` or Launchpad. Open a new shell
 afterwards, then launch it with:
 
@@ -86,7 +87,7 @@ checker). The GUI also needs `wails3`
 (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`).
 
 ```sh
-make build       # ./bin/code-foundry and ./bin/code-foundry-dictate
+make build       # ./bin/code-foundry, ./bin/code-foundry-dictate and ./bin/code-foundry-rg
 make check       # what CI runs
 make gui-build   # "gui/bin/Code Foundry", a bare executable (no .app bundle)
 ```
@@ -99,7 +100,8 @@ first use (about a minute; needs network access to ziglang.org, github.com and
 codeberg.org). The result lives in `~/Library/Caches/code-foundry/ghostty-vt/` and is
 shared by every checkout and worktree; the downloads are deleted after the build. It
 builds whisper.cpp, which `code-foundry-dictate` links, the same way from a pinned release
-into `~/Library/Caches/code-foundry/whisper-cpp/`.
+into `~/Library/Caches/code-foundry/whisper-cpp/`, and downloads ripgrep's official release
+binary (sha256-pinned) into `~/Library/Caches/code-foundry/ripgrep/` for `code-foundry-rg`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CLAUDE.md](CLAUDE.md) for the build
 commands; earlier design decisions are in [docs/notes](docs/notes) and the git history.

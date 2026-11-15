@@ -69,11 +69,13 @@ Three processes, one protocol.
   are clients of the same daemon API. A Claude Code session running inside the app can call
   the CLI, so threads can orchestrate other threads.
 
-Three executables from one version stamp, installed side by side as plain executables (no
+Four executables (three from one version stamp), installed side by side as plain executables (no
 `.app` bundle; managed Macs often block unsigned bundles) in `~/.code-foundry/app`:
 `Code Foundry` (the Wails GUI), `code-foundry` (daemon + CLI; `~/.local/bin/code-foundry`
-links to it), `code-foundry-dictate` (the dictation engine the daemon runs) and `VERSION`
-(the release tag the updater reads). `code-foundry gui` starts
+links to it), `code-foundry-dictate` (the dictation engine the daemon runs),
+`code-foundry-rg` (ripgrep's official binary, which the daemon runs for text search;
+`THIRD-PARTY-NOTICES.txt` holds its licences) and `VERSION` (the release tag the updater
+reads). `code-foundry gui` starts
 the GUI next to it. `code-foundry daemon` runs the daemon in the foreground. Every client
 auto-starts the daemon if the socket is absent. Packaging and updates:
 `docs/notes/bare-binary-distribution.md` (layout and launch) on top of
@@ -157,6 +159,9 @@ internal/
   childproc/               a child process in its own group with owned pipes (Claude, plugins)
   dictate/                 the dictation engine's protocol, phrase segmentation and output
                            filters (pure Go); dictate/whisper is the cgo model actor
+  ripgrep/                 finds the shipped ripgrep (code-foundry-rg beside the daemon; PATH
+                           only for a dev build) and checks it runs
+                           (docs/notes/file-search-3-ripgrep.md)
   procscan/                the user's processes by working directory (sysctl + lsof), and
                            stopping process groups: what a thread left running in its worktree
   db/                      SQLite (modernc.org/sqlite, WAL) + migrations; refuses a database
