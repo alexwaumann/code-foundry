@@ -3,7 +3,7 @@ import type { LayoutState, PaneEntry, TabEntry } from "@/stores/layout";
 import type { TerminalView } from "@/api/terminal";
 import { closeThreadAction, diffKey, linkedRowOf, moveToSpaceAction, newTerminalAction, plusAction, prKey, rowAction, showTerminalAction, spaceChoices, spaceTabs, surfaceAction, tabbedTerminalIds, threadSurfaces, untabbedTerminals } from "./linked";
 
-const t = (id: string, kind: string, thread: string, key: string, paneId: string): TabEntry => ({ id, kind, thread, key, params: {}, title: "", name: "", paneId });
+const t = (id: string, kind: string, thread: string, key: string, paneId: string): TabEntry => ({ id, kind, thread, key, params: {}, title: "", name: "", preview: false, paneId });
 
 const one = [{ projectId: "pj-a", path: "/w/a", name: "api" }];
 const two = [...one, { projectId: "pj-b", path: "/w/b", name: "web" }];

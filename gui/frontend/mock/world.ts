@@ -5251,6 +5251,10 @@ export class World {
         hasThread: (id) => this.threads.has(id),
         sidebarThreads: () => [...this.threads.values()].filter((t) => (!t.createdBy || !this.threads.has(t.createdBy)) && t.archivedAt === null).map((t) => t.id),
         isArchived: (id) => (this.threads.get(id)?.archivedAt ?? null) !== null,
+        isSnoozed: (id) => {
+          const t = this.threads.get(id);
+          return !!t && (t.snoozedUntil !== null || t.savedAt !== null);
+        },
         archiveThread: (id) => {
           this.archiveThread(id, true);
         },

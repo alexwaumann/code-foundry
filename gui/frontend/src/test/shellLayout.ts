@@ -13,6 +13,7 @@ export const tab = (id: string, kind: string, thread = "", over: Partial<LayoutT
   params: {},
   title: "",
   name: "",
+  preview: false,
   ...over,
 });
 

@@ -61,7 +61,7 @@ function slice(panes: [string, string, [string, string, string][]][]): Pick<Layo
   const out: { panes: Record<string, PaneEntry>; tabs: Record<string, TabEntry>; threads: typeof threads; defaultSpaceId: string } = { panes: {}, tabs: {}, threads, defaultSpaceId: "sp-a" };
   for (const [id, spaceId, tabs] of panes) {
     out.panes[id] = { id, spaceId, tabIds: tabs.map((t) => t[0]), active: tabs[0]?.[0] ?? "" };
-    for (const [tid, kind, thread] of tabs) out.tabs[tid] = { id: tid, kind, thread, key: `${kind}:${tid}`, params: {}, title: "", name: "", paneId: id };
+    for (const [tid, kind, thread] of tabs) out.tabs[tid] = { id: tid, kind, thread, key: `${kind}:${tid}`, params: {}, title: "", name: "", preview: false, paneId: id };
   }
   return out;
 }

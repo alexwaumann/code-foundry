@@ -69,6 +69,37 @@ describe("the mock's layout verbs", () => {
     expect(layout.state().threads?.["s-9"]?.space).toBe(two);
   });
 
+  it("open an archived or snoozed thread as the space's one preview, kept by tab.keep and never reopened", async () => {
+    const layout = new MockLayout({ publish: () => undefined, ids: seqIds() });
+    layout.seed("grid");
+    const cmds = layoutCommands({ layout, hasThread: () => true, isArchived: (id) => id === "s-8", isSnoozed: (id) => id === "s-9" });
+    const run = async (name: string, args: Record<string, string> = {}) => {
+      const out = await cmds.find((x) => x.cmd.name === name)?.run(undefined, args);
+      return JSON.parse(out?.resultJson || "{}") as { tab?: string; pane?: string; closed?: { id: string }[] };
+    };
+    const tabOf = (id: string) => panes(layout.state().spaces[0]?.root).flatMap((p) => p.tabs ?? []).find((t) => t.id === id);
+    const first = await run("thread.open", { id: "s-8", preview: "true", focus: "true" });
+    expect(tabOf(first.tab ?? "")?.preview).toBe(true);
+    // The next preview in the same pane takes its place.
+    const at = panes(layout.state().spaces[0]?.root).find((p) => p.id === first.pane)?.tabs?.findIndex((t) => t.id === first.tab);
+    const second = await run("thread.open", { id: "s-9", preview: "true", focus: "true" });
+    expect(second.closed?.map((t) => t.id)).toEqual([first.tab]);
+    expect(panes(layout.state().spaces[0]?.root).find((p) => p.id === first.pane)?.tabs?.findIndex((t) => t.id === second.tab)).toBe(at);
+    expect(tabOf(second.tab ?? "")?.preview).toBe(true);
+    // An active thread is kept; a place refuses a preview.
+    const kept = await run("thread.open", { id: "s-5", preview: "true", focus: "true" });
+    expect(tabOf(kept.tab ?? "")?.preview).toBeUndefined();
+    await expect(run("thread.open", { id: "s-8", preview: "true", pane: "p-1" })).rejects.toThrow(/a preview opens where a thread's tab opens/);
+    // tab.keep keeps it; closed as a preview, it is not reopened.
+    await run("tab.keep", { tab: second.tab ?? "" });
+    expect(tabOf(second.tab ?? "")?.preview).toBeUndefined();
+    const third = await run("thread.open", { id: "s-8", preview: "true", focus: "true" });
+    await run("tab.close", { tab: third.tab ?? "" });
+    const reopened = await cmds.find((x) => x.cmd.name === "tab.reopen")?.run(undefined, {});
+    expect(reopened?.message).not.toContain("s-8");
+    expect(tabOf(third.tab ?? "")).toBeUndefined();
+  });
+
   it("default to the stored focus, as the user's call does", async () => {
     const w = world();
     expect(w.focus()).toBe("p-1");

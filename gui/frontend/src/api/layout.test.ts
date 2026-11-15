@@ -32,7 +32,7 @@ describe("the layout source's events", () => {
                     dir: LayoutDir.COL,
                     sizes: [0.7, 0.3],
                     children: [
-                      { node: { case: "pane", value: { id: "p-a", activeTabId: "t-a", tabs: [{ id: "t-a", kind: "thread", threadId: "th-a", key: "thread:th-a" }] } } },
+                      { node: { case: "pane", value: { id: "p-a", activeTabId: "t-a", tabs: [{ id: "t-a", kind: "thread", threadId: "th-a", key: "thread:th-a", preview: true }] } } },
                       { node: { case: "pane", value: { id: "p-t", activeTabId: "", collapsed: true, tabs: [{ id: "t-t", kind: "terminal", threadId: "th-a", key: "term:x", params: { terminal: "x" }, name: "build" }] } } },
                     ],
                   },
@@ -78,9 +78,10 @@ describe("the layout source's events", () => {
                 dir: "col",
                 sizes: [0.7, 0.3],
                 kids: [
-                  { t: "pane", id: "p-a", active: "t-a", tabs: [{ id: "t-a", kind: "thread", thread: "th-a", key: "thread:th-a", params: {}, title: "", name: "" }] },
+                  // A preview tab says so; any other tab is kept (preview false).
+                  { t: "pane", id: "p-a", active: "t-a", tabs: [{ id: "t-a", kind: "thread", thread: "th-a", key: "thread:th-a", params: {}, title: "", name: "", preview: true }] },
                   // An unset active tab is the first; a pane the user collapsed says so (absent: open).
-                  { t: "pane", id: "p-t", active: "t-t", collapsed: true, tabs: [{ id: "t-t", kind: "terminal", thread: "th-a", key: "term:x", params: { terminal: "x" }, title: "", name: "build" }] },
+                  { t: "pane", id: "p-t", active: "t-t", collapsed: true, tabs: [{ id: "t-t", kind: "terminal", thread: "th-a", key: "term:x", params: { terminal: "x" }, title: "", name: "build", preview: false }] },
                 ],
               },
             },
@@ -95,7 +96,7 @@ describe("the layout source's events", () => {
               rememberedPaneId: "p-a",
               remembered: [
                 {
-                  tab: { id: "t-d", kind: "diff", thread: "th-a", key: "", params: {}, title: "", name: "" },
+                  tab: { id: "t-d", kind: "diff", thread: "th-a", key: "", params: {}, title: "", name: "", preview: false },
                   paneId: "p-x",
                   index: 1,
                   active: true,
@@ -151,6 +152,7 @@ describe("ops as the daemon reads them", () => {
       value: { paneId: "p-1", edge: LayoutEdge.BOTTOM, frac: 0.3, tab: { kind: "terminal", threadId: "th", params: { terminal: "x" } } },
     });
     expect(roundTrip({ op: "new_space", switch: true })).toMatchObject({ case: "newSpace", value: { name: "", makeCurrent: true } });
+    expect(roundTrip({ op: "keep_tab", thread: "th" })).toMatchObject({ case: "keepTab", value: { tabId: "", threadId: "th" } });
   });
 
   it("keeps an index of 0 and leaves an absent one unset", () => {
@@ -173,6 +175,7 @@ describe("ops as the daemon reads them", () => {
       { op: "open_draft", draft: "d-mine", focus: true },
       { op: "open_thread", thread: "s-1", compose: "t-1", focus: true },
       { op: "open_surface", tab: { kind: "prs" }, space: "sp-b" },
+      { op: "keep_tab", tab: "t-1" },
     ];
     for (const op of sent) {
       const msg = fromBinary(LayoutOpSchema, toBinary(LayoutOpSchema, toLayoutOpMessage(op)));

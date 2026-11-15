@@ -10,7 +10,7 @@ import { seamTab } from "../kinds";
 
 afterEach(cleanup);
 
-const entry = (over: Partial<TabEntry>): TabEntry => ({ id: "t-1", kind: "file", thread: "", key: "", params: { path: "/w/a.ts", line: "4" }, title: "", name: "", paneId: "p-1", ...over });
+const entry = (over: Partial<TabEntry>): TabEntry => ({ id: "t-1", kind: "file", thread: "", key: "", params: { path: "/w/a.ts", line: "4" }, title: "", name: "", preview: false, paneId: "p-1", ...over });
 
 function Probe() {
   return <span data-testid="key">{usePanelKey() || "(none)"}</span>;

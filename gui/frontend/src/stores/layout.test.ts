@@ -10,7 +10,7 @@ const { applyLayoutEvent, focusPane, focusTab, geoTree, resetLayout, useLayoutSt
 
 // ---- Fixtures: a space with a thread pane beside a pane of two linked tabs, and a second space ----
 
-const tab = (id: string, kind: string, thread = ""): LayoutTabView => ({ id, kind, thread, key: `${kind}:${id}`, params: {}, title: "", name: "" });
+const tab = (id: string, kind: string, thread = ""): LayoutTabView => ({ id, kind, thread, key: `${kind}:${id}`, params: {}, title: "", name: "", preview: false });
 const pane = (id: string, tabs: LayoutTabView[], active = tabs[0]?.id ?? ""): LayoutNodeView => ({ t: "pane", id, tabs, active });
 
 function mainSpace(over: Partial<LayoutSpaceView> = {}, rightActive = "t-d"): LayoutSpaceView {
@@ -84,6 +84,19 @@ describe("applying the layout source", () => {
     expect(after.spaces).toBe(before.spaces);
     expect(after.threads).toBe(before.threads);
     expect(after.spaceOrder).toBe(before.spaceOrder);
+  });
+
+  it("carries a tab's preview flag, and a keep that clears it renews only that tab", () => {
+    const previewed = (preview: boolean) => mainSpace({ root: { t: "split", id: "s-r", dir: "row", kids: [pane("p-a", [{ ...tab("t-a", "thread", "th-a"), preview }]), pane("p-b", [tab("t-d", "diff", "th-a"), tab("t-f", "file", "th-a")], "t-d")], sizes: [0.6, 0.4] } });
+    applyLayoutEvent(snapshot(layout(4, [previewed(true), review])));
+    const before = state();
+    expect(before.tabs["t-a"]?.preview).toBe(true);
+    expect(before.tabs["t-d"]?.preview).toBe(false);
+    applyLayoutEvent(delta(5, { spaces: [previewed(false)] }));
+    const after = state();
+    expect(after.tabs["t-a"]).toMatchObject({ preview: false, paneId: "p-a" });
+    expect(after.tabs["t-a"]).not.toBe(before.tabs["t-a"]);
+    expect(after.tabs["t-d"]).toBe(before.tabs["t-d"]);
   });
 
   it("re-renders a pane's hook only for its own pane", () => {

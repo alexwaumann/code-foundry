@@ -24,7 +24,7 @@ function layout(): Layout {
     "p-1": { id: "p-1", spaceId: "sp-a", tabIds: ["t-live", "t-here"], active: "t-live" },
     "p-2": { id: "p-2", spaceId: "sp-b", tabIds: ["t-far"], active: "t-far" },
   };
-  const tab = (id: string, thread: string, paneId: string): TabEntry => ({ id, kind: "thread", thread, key: `thread:${thread}`, params: {}, title: "", name: "", paneId });
+  const tab = (id: string, thread: string, paneId: string): TabEntry => ({ id, kind: "thread", thread, key: `thread:${thread}`, params: {}, title: "", name: "", preview: false, paneId });
   const tabs = { "t-live": tab("t-live", "s-live", "p-1"), "t-here": tab("t-here", "s-here", "p-1"), "t-far": tab("t-far", "s-far", "p-2") };
   const threads = { "s-act": rec("s-act", "sp-a"), "s-snz": rec("s-snz", "sp-a"), "s-gone": rec("s-gone", "sp-b"), "s-here": rec("s-here", "sp-a"), "s-far": rec("s-far", "sp-b"), "s-live": rec("s-live", "sp-a") };
   return { panes, tabs, threads, defaultSpaceId: "sp-b" };

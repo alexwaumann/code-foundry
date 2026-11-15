@@ -35,7 +35,7 @@ function OpenMark({ open }: { open: boolean }) {
   return open ? <span className="ml-auto pl-4 text-caption text-cf-text-muted">open</span> : null;
 }
 
-const NO_TAB = { kind: "terminal", thread: "", key: "", params: {}, title: "", name: "", paneId: "" };
+const NO_TAB = { kind: "terminal", thread: "", key: "", params: {}, title: "", name: "", preview: false, paneId: "" };
 
 /** A terminal tab's icon and name, as its strip draws them (the terminal surface's: what runs in it). */
 function TerminalTabLabel({ tabId }: { tabId: string }) {
