@@ -9,7 +9,7 @@ import { enterFullscreen } from "@/shell/fullscreen";
 import type { PaneRect } from "@/shell/geometry/types";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
-import { requestPaneFocus, useShellViewStore } from "@/stores/shellView";
+import { requestPaneFocus, takeFocusRequest, useShellViewStore } from "@/stores/shellView";
 import { keepPreviewTab } from "@/shell/preview";
 import { AttentionDot, LinkedTip, PREVIEW_DASHES, TabContentIcon } from "./PaneTabStrip";
 import { PaneExpandButton } from "./PaneCollapseButton";
@@ -102,8 +102,9 @@ export function PaneRail({ paneId, rect, focused = false }: { paneId: string; re
   const request = useShellViewStore((s) => (s.focusRequest.paneId === paneId ? s.focusRequest.seq : 0));
   useEffect(() => {
     // A focus request (a direction key, a collapse that left the focus here) puts the keyboard on the selected icon.
-    if (request === 0) return;
-    listRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+    // Served once: a rail that mounts later (the pane folds) leaves the keyboard where it is.
+    if (!listRef.current || !takeFocusRequest(request, "rail")) return;
+    listRef.current.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
   }, [request]);
   return (
     <section

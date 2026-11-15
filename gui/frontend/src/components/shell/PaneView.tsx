@@ -12,7 +12,7 @@ import { ShellPaneContext, type ShellPane } from "@/shell/paneContext";
 import { focusPaneBody } from "@/shell/paneBox";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
-import { useShellViewStore } from "@/stores/shellView";
+import { takeFocusRequest, useShellViewStore } from "@/stores/shellView";
 import { floatingThreadOf, useFullscreenPane } from "@/shell/fullscreen";
 import { useUiStore } from "@/stores/ui";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
@@ -87,9 +87,9 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
   const full = useFullscreenPane() === paneId;
   const floating = full ? floatingThreadOf(tab) : "";
   useEffect(() => {
-    if (request === 0 || !bodyRef.current) return;
+    if (!bodyRef.current || !takeFocusRequest(request, "open")) return;
     focusInto(bodyRef.current, kind);
-    // Only a new request moves the keyboard; a tab switching under it does not.
+    // Only a new request moves the keyboard, once; a tab switching under it or a remount does not.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [request]);
   const ctx = useMemo<ShellPane>(() => ({ paneId, focused }), [paneId, focused]);

@@ -26,7 +26,7 @@ vi.mock("@/shell/commands", () => ({
 
 const { PaneView } = await import("./PaneView");
 const { resetLayout } = await import("@/stores/layout");
-const { requestPaneFocus } = await import("@/stores/shellView");
+const { requestPaneFocus, resetShellView } = await import("@/stores/shellView");
 
 const RECT = { x: 0, y: 0, w: 600, h: 400, rail: false };
 const tabs = [
@@ -49,6 +49,7 @@ const bodies = () => screen.queryAllByTestId("body").map((b) => b.getAttribute("
 beforeEach(() => {
   focused.length = 0;
   resetLayout();
+  resetShellView();
 });
 
 afterEach(() => {
@@ -128,5 +129,76 @@ describe("PaneView", () => {
       body.blur();
     });
     expect(body.hasAttribute("tabindex")).toBe(false);
+  });
+
+  describe("a focus request is served once", () => {
+    const RAIL = { x: 0, y: 0, w: 36, h: 400, rail: true };
+    const railIcon = () => screen.getByRole("tab", { selected: true });
+
+    it("a remount (full screen ends, a space shown again) leaves the keyboard where the user put it", async () => {
+      await showing("t-prs");
+      const { unmount } = render(<PaneView paneId="p-1" rect={RECT} focused />);
+      act(() => {
+        requestPaneFocus("p-1");
+      });
+      expect(document.activeElement).toBe(screen.getByTestId("shell-pane-body"));
+      unmount();
+      const elsewhere = document.createElement("input");
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      render(<PaneView paneId="p-1" rect={RECT} focused />);
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
+
+    it("folding to a rail or unfolding again does not replay it", async () => {
+      await showing("t-prs");
+      const { rerender } = render(<PaneView paneId="p-1" rect={RECT} focused />);
+      act(() => {
+        requestPaneFocus("p-1");
+      });
+      const elsewhere = document.createElement("input");
+      document.body.append(elsewhere);
+      elsewhere.focus();
+      rerender(<PaneView paneId="p-1" rect={RAIL} focused />);
+      expect(document.activeElement).toBe(elsewhere);
+      rerender(<PaneView paneId="p-1" rect={RECT} focused />);
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
+
+    it("a pane that mounts after its request takes it: a rail's icon first, then the pane it unfolds to", async () => {
+      await showing("t-prs");
+      const { rerender } = render(<PaneView paneId="p-1" rect={RAIL} focused />);
+      act(() => {
+        requestPaneFocus("p-1");
+      });
+      expect(document.activeElement).toBe(railIcon());
+      rerender(<PaneView paneId="p-1" rect={RECT} focused />);
+      expect(document.activeElement).toBe(screen.getByTestId("shell-pane-body"));
+    });
+
+    it("a pane not yet drawn when asked (a new pane for a dropped or opened tab) takes it as it mounts", async () => {
+      await showing("t-prs");
+      act(() => {
+        requestPaneFocus("p-1");
+      });
+      render(<PaneView paneId="p-1" rect={RECT} focused />);
+      expect(document.activeElement).toBe(screen.getByTestId("shell-pane-body"));
+    });
+
+    it("a new request after a served one still moves the keyboard", async () => {
+      await showing("t-prs");
+      render(<PaneView paneId="p-1" rect={RECT} focused />);
+      act(() => {
+        requestPaneFocus("p-1");
+      });
+      const body = screen.getByTestId("shell-pane-body");
+      act(() => {
+        body.blur();
+        requestPaneFocus("p-1");
+      });
+      expect(document.activeElement).toBe(body);
+    });
   });
 });
