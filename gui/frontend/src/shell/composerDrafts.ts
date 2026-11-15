@@ -308,13 +308,19 @@ export function startComposerDrafts(): () => void {
       writeStored(now);
     }, 250);
   };
-  // A thread archived or removed takes its unsent text with it (once the list is in: before, every thread is unknown).
+  // A thread removed, or archived while the list is watched, takes its unsent text with it (once
+  // the list is in: before, every thread is unknown). Archiving is the change, not the state: an
+  // archived thread opened and typed into keeps its text (sending it unarchives the thread).
+  let lastById: ThreadsData["byId"] | null = null;
   const pruneThreads = (s: Pick<ThreadsData, "byId"> & { loaded: boolean }) => {
     if (!s.loaded) return;
+    const was = lastById;
+    lastById = s.byId;
     for (const key of Object.keys(useComposeStore.getState().drafts)) {
       if (!key.startsWith(THREAD_KEY)) continue;
-      const t = s.byId[key.slice(THREAD_KEY.length)];
-      if (!t || t.archivedAtMs !== null) clearDraft(key);
+      const id = key.slice(THREAD_KEY.length);
+      const t = s.byId[id];
+      if (!t || (t.archivedAtMs !== null && was?.[id]?.archivedAtMs === null)) clearDraft(key);
     }
   };
   const prune = (s: LayoutState) => {

@@ -181,7 +181,7 @@ describe("a compose tab's draft", () => {
   });
 
   it("drops a thread's unsent text when the thread is archived or removed, once the threads are known", async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, texts: {}, threads: { "s-1": "keep", "s-2": "archived", "s-3": "removed" } }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, texts: {}, threads: { "s-1": "keep", "s-2": "typed while archived", "s-3": "removed" } }));
     useThreadsStore.setState({ byId: {}, order: [], loaded: false } as never);
     stop = startComposerDrafts();
     // Before the list is in, nothing is known to be gone.
@@ -190,14 +190,30 @@ describe("a compose tab's draft", () => {
       useThreadsStore.setState({ byId: { "s-1": { id: "s-1", archivedAtMs: null }, "s-2": { id: "s-2", archivedAtMs: 5 } }, order: ["s-1", "s-2"], loaded: true } as never);
     });
     expect(getDraft(threadDraftKey("s-1")).text).toBe("keep");
-    expect(useComposeStore.getState().drafts[threadDraftKey("s-2")]).toBeUndefined();
+    // Already archived when the list came in: its text was typed into the archived thread, and stays.
+    expect(getDraft(threadDraftKey("s-2")).text).toBe("typed while archived");
     expect(useComposeStore.getState().drafts[threadDraftKey("s-3")]).toBeUndefined();
     act(() => {
       useThreadsStore.setState({ byId: { "s-1": { id: "s-1", archivedAtMs: 9 } } } as never);
     });
+    // Archived now: its text goes; removed: its text goes.
     expect(useComposeStore.getState().drafts[threadDraftKey("s-1")]).toBeUndefined();
+    expect(useComposeStore.getState().drafts[threadDraftKey("s-2")]).toBeUndefined();
     await act(() => vi.advanceTimersByTimeAsync(500));
     expect(readStored()).toEqual({ texts: {}, threads: {} });
+  });
+
+  it("keeps text typed into an archived thread's composer while other threads change", async () => {
+    const archived = { id: "s-a", archivedAtMs: 5 };
+    useThreadsStore.setState({ byId: { "s-a": archived, "s-b": { id: "s-b", archivedAtMs: null, status: "busy" } }, order: ["s-a", "s-b"], loaded: true } as never);
+    stop = startComposerDrafts();
+    updateDraft(threadDraftKey("s-a"), { text: "Please also add a CHANGELOG entry for" });
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-a": archived, "s-b": { id: "s-b", archivedAtMs: null, status: "idle" } } } as never);
+    });
+    expect(getDraft(threadDraftKey("s-a")).text).toBe("Please also add a CHANGELOG entry for");
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(readStored().threads).toEqual({ "s-a": "Please also add a CHANGELOG entry for" });
   });
 
   it("drops a draft's text once the layout no longer lists it (sent, discarded, cleared elsewhere)", async () => {
