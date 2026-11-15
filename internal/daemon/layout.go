@@ -709,8 +709,9 @@ func (g *layoutGlue) sweep() {
 // layout closes its tabs. An archive or a removal forgets the thread (archive_thread); a
 // snooze keeps its set, its terminals (its quick terminal too, when open) to come back as
 // fresh shells, each with the command it was running (the foreground job, else the last
-// one) for its "Run again" line. It runs before the shells go, so that command can still be
-// read.
+// one) for its "Run again" line. An action run's tab does not come back (a fresh shell would
+// not be the action): it is dropped, as an archive drops it. It runs before the shells go, so
+// that command can still be read.
 func layoutShellsGoing(log *slog.Logger, l layoutstore.Store, terms terminal.Store) func(context.Context, string, thread.ShellsGo) {
 	return func(ctx context.Context, id string, why thread.ShellsGo) {
 		ctx = context.WithoutCancel(ctx)
@@ -722,6 +723,10 @@ func layoutShellsGoing(log *slog.Logger, l layoutstore.Store, terms terminal.Sto
 		for _, term := range threadTerminals(l.Snapshot().State, id) {
 			t, err := terms.Get(ctx, term)
 			if err != nil {
+				continue
+			}
+			if termlabel.IsAction(t.Labels) {
+				applyLayout(ctx, log, l, &core.DropTerminal{Terminal: term})
 				continue
 			}
 			if cmd := cmp.Or(t.Foreground, t.LastCommand); cmd != "" {

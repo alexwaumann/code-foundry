@@ -13,7 +13,7 @@ import { useThreadsStore } from "@/stores/threads";
 export function useTerminalTabName(tab: Pick<TabEntry, "name" | "params">): TerminalName {
   const t = useTerminalsStore((s) => s.byId[tab.params.terminal ?? ""]);
   const manual = tab.name;
-  return useMemo(() => terminalName({ manual, argv: t?.argv ?? [], dir: t?.liveCwd || t?.cwd || "", foreground: t?.foreground ?? "" }), [manual, t]);
+  return useMemo(() => terminalName({ manual, argv: t?.argv ?? [], dir: t?.liveCwd || t?.cwd || "", foreground: t?.foreground ?? "", labels: t?.labels }), [manual, t]);
 }
 
 /** Where a terminal is now: its live directory, else where it started; "" for no such terminal. */

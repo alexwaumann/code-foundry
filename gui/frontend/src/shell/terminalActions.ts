@@ -316,14 +316,23 @@ function terminalCtx(id: string) {
   return { ...getUiContext(), activeTerminalId: id };
 }
 
-/** Reset: a fresh shell in the thread's directory under the same tab (or quick slot). */
+/**
+ * Reset: a fresh shell in the thread's directory under the same tab (or quick slot), and the
+ * keyboard goes into it (the Reset button that had it goes with the old shell's hint).
+ */
 export async function resetTerminal(id: string): Promise<void> {
-  await runCommandForResult("terminal.reset", { id }, { ctx: terminalCtx(id), quiet: true });
+  const labels = useTerminalsStore.getState().byId[id]?.labels;
+  const res = await runCommandForResult("terminal.reset", { id }, { ctx: terminalCtx(id), quiet: true });
+  const next = terminalIdFromResult(res?.resultJson ?? "");
+  if (!next) return;
+  if (labels?.slot === "quick" && labels.thread) focusQuick(labels.thread);
+  else await focusTerminalTab(next);
 }
 
 /**
  * "Run again" on a terminal restored after a snooze: its new shell types the command the old
- * one ran, then the tab forgets it (the `ran` param), so the line goes.
+ * one ran, then the tab forgets it (the `ran` param), so the line goes and the keyboard goes
+ * into the terminal (the button that had it goes with the line).
  */
 export async function runAgain(tab: Pick<TabEntry, "id" | "params">, command: string): Promise<void> {
   const id = terminalOfTab(tab);
@@ -331,19 +340,24 @@ export async function runAgain(tab: Pick<TabEntry, "id" | "params">, command: st
   // The rerun waits for the shell's prompt: a Reset meanwhile put a new shell under the tab, which
   // never ran the line, so it keeps its "Run again".
   const now = useLayoutStore.getState().tabs[tab.id];
-  if (res && now && terminalOfTab(now) === id) await forgetRan(now);
+  if (!res || !now || terminalOfTab(now) !== id) return;
+  await forgetRan(now);
+  await focusTerminalTab(id);
 }
 
 /**
  * "Run again" on a quick terminal restored after a snooze: its new shell types the command the
- * old one ran, then the thread's quick terminal forgets it (QuickTerminal.ran), so the line goes.
+ * old one ran, then the thread's quick terminal forgets it (QuickTerminal.ran), so the line goes
+ * and the keyboard goes into the terminal.
  * A Reset while the rerun waited put a new shell there that never ran it: the line stays.
  */
 export async function runQuickAgain(threadId: string, terminalId: string, command: string): Promise<void> {
   const res = await runCommandForResult("terminal.rerun", { id: terminalId, command }, { ctx: terminalCtx(terminalId), quiet: true });
   if (!res) return;
   const now = quickTerminalOf(useTerminalsStore.getState().byId, useTerminalsStore.getState().order, threadId);
-  if (now?.id === terminalId) await forgetQuickRan(threadId);
+  if (now?.id !== terminalId) return;
+  await forgetQuickRan(threadId);
+  focusQuick(threadId);
 }
 
 /** Drops a thread's quick terminal's "Run again" line, its open state as the layout has it now. */

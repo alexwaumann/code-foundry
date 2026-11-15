@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TerminalView } from "@/api/terminal";
 import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
@@ -39,6 +39,7 @@ vi.mock("@/shell/commands", async (orig) => ({
 }));
 
 const { TerminalTabBody, TabNameField } = await import("./TerminalTab");
+const { attach } = await import("@/test/terminalHost");
 const { TerminalCwdHint } = await import("./TerminalCwdHint");
 const { useThreadsStore } = await import("@/stores/threads");
 const { PaneTabStrip } = await import("./PaneTabStrip");
@@ -97,6 +98,48 @@ describe("a terminal tab's body", () => {
       ["runAgain", "t-term", "make dev"],
       ["forgetRan", "t-term"],
     ]);
+  });
+});
+
+describe("an action run's tab", () => {
+  const run = (over: Partial<TerminalView> = {}) =>
+    term("term-1", { argv: ["/bin/zsh", "-lc", "npm run dev"], labels: { kind: "action", thread: "s-1", action: "ac-1", "action.name": "Dev", "action.run": "run-1" }, ...over });
+
+  it("is named after its action, with its command above the output and its status line under it: Stop while it runs, Rerun once it exited", async () => {
+    useTerminalsStore.setState((s) => ({ byId: { ...s.byId, "term-1": run() } }));
+    await seed({ terminal: "term-1" });
+    render(
+      <>
+        <PaneTabStrip paneId="p-1" focused />
+        <TerminalTabBody tab={entry()} />
+      </>,
+    );
+    expect(screen.getAllByRole("tab")[0]?.querySelector('[data-testid="shell-tab-label"]')?.textContent).toBe("Dev");
+    expect(screen.getByTestId("action-echo").textContent).toContain("$ npm run dev");
+    expect(screen.getByTestId("action-status").getAttribute("data-status")).toBe("running");
+    expect(screen.getByTestId("action-stop")).toBeTruthy();
+
+    await waitFor(() => {
+      expect(attach.open.has("term-1")).toBe(true);
+    });
+    act(() => {
+      useTerminalsStore.setState((s) => ({ byId: { ...s.byId, "term-1": run({ state: "exited", exitCode: 3, exitedAtMs: 4201 }) } }));
+      attach.exit("term-1", 3);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("shell-terminal-host").getAttribute("data-attach-phase")).toBe("exited");
+    });
+    expect(screen.getByTestId("action-status-label").textContent).toBe("Exited with code 3");
+    expect(screen.getByTestId("action-rerun")).toBeTruthy();
+    // The status line says it; the shell's exit pill does not repeat it.
+    expect(screen.queryByTestId("exit-overlay")).toBeNull();
+  });
+
+  it("a shell's tab has neither", async () => {
+    await seed({ terminal: "term-1" });
+    render(<TerminalTabBody tab={entry()} />);
+    expect(screen.queryByTestId("action-echo")).toBeNull();
+    expect(screen.queryByTestId("action-status")).toBeNull();
   });
 });
 

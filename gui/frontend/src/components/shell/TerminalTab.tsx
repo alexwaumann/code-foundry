@@ -3,6 +3,8 @@ import { X } from "lucide-react";
 import { ContextMenuItem, ContextMenuSeparator } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { TerminalHost, type TerminalHostHandle } from "@/components/terminal/TerminalHost";
+import { ActionEcho, ActionStatusLine, ActionTabIcon } from "@/components/actions/ActionTabParts";
+import { isActionLabels } from "@/lib/termlabel";
 import { cn } from "@/lib/utils";
 import { closeTabNow } from "@/shell/commands";
 import { autoNameTab, endTabRename, forgetRan, renameAfterMenuCloses, renameTab, runAgain, terminalOfTab } from "@/shell/terminalActions";
@@ -11,10 +13,17 @@ import type { TabEntry } from "@/stores/layout";
 import { useTerminalsStore } from "@/stores/terminals";
 import { TERMINAL_ICONS } from "./terminalIcons";
 
-/** A terminal tab's icon: the kind of command that runs in it (lib/terminalName.ts). */
+/** Whether terminal `id` is an action run (action.run's kind=action label). */
+function useIsActionRun(id: string): boolean {
+  return useTerminalsStore((s) => isActionLabels(s.byId[id]?.labels ?? {}));
+}
+
+/** A terminal tab's icon: an action run's action's icon, else the kind of command that runs in it (lib/terminalName.ts). */
 export function TerminalTabIcon({ tab, className }: { tab: TabEntry; className?: string }) {
+  const id = terminalOfTab(tab);
+  const action = useIsActionRun(id);
   const Icon = TERMINAL_ICONS[useTerminalTabName(tab).icon];
-  return <Icon className={className} aria-hidden />;
+  return action ? <ActionTabIcon id={id} className={className} /> : <Icon className={className} aria-hidden />;
 }
 
 /**
@@ -74,12 +83,15 @@ export function RanLine({ ran, onRun, onDismiss }: { ran: string; onRun: () => P
 /**
  * A terminal tab's body: its xterm, attached while the tab is its pane's active tab (the pane
  * mounts only that one), so a hidden terminal tab holds no Attach stream. A restored terminal
- * shows its last command first. A focus request lands on the wrapper and goes to the xterm.
+ * shows its last command first. An action run shows its command above the output and its status
+ * line (running time and Stop; exit code and Rerun) under it, in place of the exit pill. A focus
+ * request lands on the wrapper and goes to the xterm.
  */
 export function TerminalTabBody({ tab }: { tab: TabEntry }) {
   const id = terminalOfTab(tab);
   const ref = useRef<TerminalHostHandle>(null);
   const known = useTerminalsStore((s) => id in s.byId);
+  const action = useIsActionRun(id) && known;
   const ran = tab.params.ran ?? "";
   return (
     <div
@@ -101,7 +113,9 @@ export function TerminalTabBody({ tab }: { tab: TabEntry }) {
           }}
         />
       )}
-      <TerminalHost ref={ref} terminalId={id && known ? id : null} testId="shell-terminal-host" />
+      {action && <ActionEcho id={id} />}
+      <TerminalHost ref={ref} terminalId={id && known ? id : null} exitOverlay={!action} testId="shell-terminal-host" />
+      {action && <ActionStatusLine id={id} />}
     </div>
   );
 }

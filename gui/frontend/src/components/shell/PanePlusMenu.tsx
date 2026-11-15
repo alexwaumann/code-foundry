@@ -65,7 +65,7 @@ function UntabbedTerminalItem({ id, pick, paneId }: { id: string; paneId: string
   const named = useTerminalsStore(
     useShallow((s) => {
       const t = s.byId[id];
-      return t ? terminalName({ manual: "", argv: t.argv, dir: t.liveCwd || t.cwd, foreground: t.foreground }) : { name: id, icon: "shell" as const, auto: true };
+      return t ? terminalName({ manual: "", argv: t.argv, dir: t.liveCwd || t.cwd, foreground: t.foreground, labels: t.labels }) : { name: id, icon: "shell" as const, auto: true };
     }),
   );
   const Icon = TERMINAL_ICONS[named.icon];

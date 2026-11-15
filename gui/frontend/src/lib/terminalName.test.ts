@@ -15,6 +15,9 @@ describe("terminalName", () => {
     ["an action run is named by its command", input({ argv: ["make", "test"] }), "make test", "build", true],
     ["an argument with a space is quoted", input({ argv: ["/usr/bin/tail", "-f", "a b.log"] }), "tail -f 'a b.log'", "log", true],
     ["nothing known yet", input({ argv: [], dir: "" }), "shell", "shell", true],
+    ["an action run (`$SHELL -lc …`): its action's name", input({ argv: ["/bin/zsh", "-lc", "npm run dev"], labels: { kind: "action", "action.name": "Dev" } }), "Dev", "run", true],
+    ["an action run with no name label", input({ argv: ["/bin/zsh", "-lc", "x"], labels: { kind: "action" } }), "Action", "run", true],
+    ["a manual name sticks over an action's", input({ manual: "api", labels: { kind: "action", "action.name": "Dev" } }), "api", "run", false],
   ])("%s", (_name, given, name, icon, auto) => {
     expect(terminalName(given)).toEqual({ name, icon, auto });
   });
