@@ -66,8 +66,12 @@ Source), and the header gains Copy contents.
   known before reading, so it is the read of `previewKindOf(path, null)` (extension only);
   FileTab's `READS` maps each value to its call and `readTarget` uses it for every read of
   the tab (the first, a found path, an edit session's). A kind with a new read adds its value
-  to `PreviewRead` and one entry to `READS`. FileTab says "Showing the last 1 MiB of 38 MB"
+  to `PreviewRead` and one entry to `READS`. "stream" (video, audio: file-previews-7-media.md)
+  is `readFile` too: the daemon answers a media file with its facts and no bytes, and the body
+  asks `streamFile` for its URL itself (the URL lives and dies with the element). FileTab says "Showing the last 1 MiB of 38 MB"
   when a read's `truncatedStart` is set, whatever the kind.
+- **Open in editor follows the kind.** `editor: false` drops it from the header and the
+  too-large state (a code editor has nothing to show for a video); Open in Finder stays.
 - **Bodies in their own files.** oxlint's `react/only-export-components` refuses a component
   in a file whose default export is a kind, so a kind file holds the object and its body lives
   beside it (`previews/<Name>Body.tsx`).
@@ -102,7 +106,7 @@ Source), and the header gains Copy contents.
 
    That file is the registration: no other file changes. Optional fields (types.ts says what
    each does): `mime`/`sniff` in `match`, `shows`, `Controls`, `wrap`, `find`, `edit: false`,
-   `copy`, `tooLarge`, `source`, `icon`, `read`. A sniff runs on every text file once per read:
+   `editor: false`, `copy`, `tooLarge`, `source`, `icon`, `read`. A sniff runs on every text file once per read:
    one cheap scan (`text.includes("\u001b[")`), never a parse.
 3. **Vitest.**
    - Matching: add rows to the `it.each` in `previews/registry.test.ts` (`"diagram.mmd" →

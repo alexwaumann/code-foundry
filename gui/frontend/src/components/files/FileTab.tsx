@@ -47,7 +47,8 @@ import { useDebounced, useFileChanges, useOnWindowVisible, useTabRead, useToolEd
  * under the header that stays across the pencil.
  */
 /** Each kind's read (PreviewKind.read), by the path's kind before reading; the code view reads whole. */
-const READS: Record<PreviewRead, typeof readFile> = { whole: readFile, tail: readFileTail };
+// "stream" is ReadFile too: a media file's read is its facts, no bytes; the player asks for its URL itself.
+const READS: Record<PreviewRead, typeof readFile> = { whole: readFile, tail: readFileTail, stream: readFile };
 const readOf = (p: string) => READS[previewKindOf(p, null)?.read ?? "whole"];
 
 export function FileTab({ target }: { target: FileTarget }) {
@@ -247,7 +248,7 @@ export function FileTab({ target }: { target: FileTarget }) {
         name={name}
         dir={dir}
         fullPath={abs}
-        actions={<FileActions place={place} line={line} onRefresh={() => { setRefreshes((n) => n + 1); reload(); }} contents={contents} extra={editable && !creating && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
+        actions={<FileActions place={place} line={line} editor={kind?.editor !== false} onRefresh={() => { setRefreshes((n) => n + 1); reload(); }} contents={contents} extra={editable && !creating && <HeaderAction icon={Pencil} label="Edit" pressed={editing} testId="file-edit" onClick={onPencil} />} />}
       >
         {kind && modes && modes.length > 1 && !dirty && !creating && (
           <ModeSwitch
@@ -409,7 +410,7 @@ function FileBody({
     if (file.truncated && preview.tooLarge !== undefined)
       return (
         <FileEmptyState icon={preview.icon ?? fileIconOf(abs, file.mime)} heading={tooLargeHeading(preview.tooLarge, file.size)} detail={tildify(abs)} testId={`file-${preview.id}-too-large`}>
-          {editor}
+          {preview.editor !== false && editor}
           {reveal}
         </FileEmptyState>
       );

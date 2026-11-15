@@ -32,8 +32,10 @@ export interface PreviewKind {
    * How the file is read for this kind; decided from the path alone (`previewKindOf(path,
    * null)`), so a kind with a read of its own matches by extension. "whole" (the default):
    * ReadFile from the start, up to READ_MAX_BYTES. "tail": the last MiB (readFileTail; a log),
-   * `truncatedStart` and `offset` set when the start was left out. FileTab's `READS` maps each
-   * to its call.
+   * `truncatedStart` and `offset` set when the start was left out. "stream" (video, audio):
+   * ReadFile for the file's facts only (the daemon answers a media file with `media`, its size
+   * and time, and no bytes); the body asks streamFile for a URL and the element streams it in
+   * ranges, never the bytes as a blob. FileTab's `READS` maps each to its call.
    */
   readonly read?: PreviewRead;
   /** The body in a preview mode. Wrap a heavy one in React.lazy: FileTab renders it under Suspense. */
@@ -48,6 +50,8 @@ export interface PreviewKind {
   readonly find?: boolean;
   /** false: no Edit (pencil) for this kind, even in Source. Otherwise Edit switches to Source and edits there. */
   readonly edit?: false;
+  /** false: no Open in editor, in the header or the too-large state (a video means nothing to a code editor; Open in Finder stays). */
+  readonly editor?: false;
   /** What Copy contents copies in a preview mode (a table's tab-separated text); default the file's text. Source always copies the text. */
   readonly copy?: (f: PreviewFile) => string;
   /**
@@ -63,7 +67,7 @@ export interface PreviewKind {
 }
 
 /** How a kind's file is read (PreviewKind.read). */
-export type PreviewRead = "whole" | "tail";
+export type PreviewRead = "whole" | "tail" | "stream";
 
 /** Which files a kind is. Every list is lower case; the registry tries the tiers in this order across all kinds. */
 export interface PreviewMatch {
