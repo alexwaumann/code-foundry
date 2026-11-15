@@ -4,7 +4,7 @@ import { useProjectRows } from "./useProjectRows";
 import { Command, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { draftKey, HOME_KEY, type ComposeTarget } from "@/lib/compose";
-import { pickDraftWorkspace, setDraftProject, switchDraftTarget } from "@/stores/compose";
+import { pickDraftWorkspace, retargetComposeTab, setDraftProject, switchDraftTarget } from "@/stores/compose";
 import { useUiStore } from "@/stores/ui";
 
 /**
@@ -17,6 +17,10 @@ import { useUiStore } from "@/stores/ui";
  * moves it to that target. The row of the current target is checked: the referenced
  * workspace, or a lone project. Adding to the set is the chip row's "Add project".
  *
+ * In the window shell's compose tab (`tabId`), a pick of another target moves the tab itself
+ * (stores/compose retargetComposeTab): its params, and so its draft row and what a reload shows,
+ * follow.
+ *
  * Every pick closes the list; it, Esc and a click away all hand focus to the prompt. A
  * dotted underline only; a composer Tab stop before the chips.
  */
@@ -26,6 +30,7 @@ export function ProjectSwitcher({
   set,
   disabled,
   focusPrompt,
+  tabId,
 }: {
   target: ComposeTarget;
   name: string;
@@ -38,6 +43,8 @@ export function ProjectSwitcher({
    * stores/ui focusComposer, which the new composer answers on mount.
    */
   focusPrompt: () => void;
+  /** The compose tab it is drawn in (the window shell); none in the classic window. */
+  tabId?: string;
 }) {
   const [open, setOpen] = useState(false);
   // Controlled so every opening starts unfiltered.
@@ -47,9 +54,10 @@ export function ProjectSwitcher({
   const { workspaces, projects, loaded } = useProjectRows();
   const home = target.kind === "home";
 
+  const { draft: _draft, ...current } = target;
   const move = (to: ComposeTarget) => {
     setOpen(false);
-    void switchDraftTarget(target, to).then((ok) => {
+    void (tabId ? retargetComposeTab(tabId, target, to) : switchDraftTarget(target, to)).then((ok) => {
       if (ok) useUiStore.getState().focusComposer();
       else focusPrompt();
     });
@@ -124,11 +132,13 @@ export function ProjectSwitcher({
               projects={projects}
               checked={checked}
               onPickProject={(projectId) => {
-                if (home) move({ kind: "project", projectId });
+                const to: ComposeTarget = { kind: "project", projectId };
+                if (home || (tabId && draftKey(current) !== draftKey(to))) move(to);
                 else pick(setDraftProject(target, projectId));
               }}
               onPickWorkspace={(workspaceId) => {
-                if (home) move({ kind: "workspace", workspaceId });
+                const to: ComposeTarget = { kind: "workspace", workspaceId };
+                if (home || (tabId && draftKey(current) !== draftKey(to))) move(to);
                 else pick(pickDraftWorkspace(target, workspaceId));
               }}
               onPickNoProject={

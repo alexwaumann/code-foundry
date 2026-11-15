@@ -200,6 +200,12 @@ const LIKE_KEY = "like:";
 export const HOME_KEY = "home:";
 
 /**
+ * The compose store's key prefix of a space's No project text while the window shows another space
+ * (shell/composerDrafts.ts): the space the window shows has it under HOME_KEY.
+ */
+export const SPACE_KEY = "space:";
+
+/**
  * The compose store's key for a target's draft: the project id, "ws:<workspace id>", "like:<thread
  * id>", or HOME_KEY; a shell composer draft's own key, "draft:<id>", whatever it starts from.
  */

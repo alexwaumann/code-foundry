@@ -181,7 +181,7 @@ describe("a compose tab's draft", () => {
   });
 
   it("drops a thread's unsent text when the thread is archived or removed, once the threads are known", async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, texts: {}, threads: { "s-1": "keep", "s-2": "archived", "s-3": "removed" } }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, texts: {}, threads: { "s-1": "keep", "s-2": "typed while archived", "s-3": "removed" } }));
     useThreadsStore.setState({ byId: {}, order: [], loaded: false } as never);
     stop = startComposerDrafts();
     // Before the list is in, nothing is known to be gone.
@@ -190,14 +190,30 @@ describe("a compose tab's draft", () => {
       useThreadsStore.setState({ byId: { "s-1": { id: "s-1", archivedAtMs: null }, "s-2": { id: "s-2", archivedAtMs: 5 } }, order: ["s-1", "s-2"], loaded: true } as never);
     });
     expect(getDraft(threadDraftKey("s-1")).text).toBe("keep");
-    expect(useComposeStore.getState().drafts[threadDraftKey("s-2")]).toBeUndefined();
+    // Already archived when the list came in: its text was typed into the archived thread, and stays.
+    expect(getDraft(threadDraftKey("s-2")).text).toBe("typed while archived");
     expect(useComposeStore.getState().drafts[threadDraftKey("s-3")]).toBeUndefined();
     act(() => {
       useThreadsStore.setState({ byId: { "s-1": { id: "s-1", archivedAtMs: 9 } } } as never);
     });
+    // Archived now: its text goes; removed: its text goes.
     expect(useComposeStore.getState().drafts[threadDraftKey("s-1")]).toBeUndefined();
+    expect(useComposeStore.getState().drafts[threadDraftKey("s-2")]).toBeUndefined();
     await act(() => vi.advanceTimersByTimeAsync(500));
-    expect(readStored()).toEqual({ texts: {}, threads: {} });
+    expect(readStored()).toEqual({ texts: {}, threads: {}, spaces: {} });
+  });
+
+  it("keeps text typed into an archived thread's composer while other threads change", async () => {
+    const archived = { id: "s-a", archivedAtMs: 5 };
+    useThreadsStore.setState({ byId: { "s-a": archived, "s-b": { id: "s-b", archivedAtMs: null, status: "busy" } }, order: ["s-a", "s-b"], loaded: true } as never);
+    stop = startComposerDrafts();
+    updateDraft(threadDraftKey("s-a"), { text: "Please also add a CHANGELOG entry for" });
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-a": archived, "s-b": { id: "s-b", archivedAtMs: null, status: "idle" } } } as never);
+    });
+    expect(getDraft(threadDraftKey("s-a")).text).toBe("Please also add a CHANGELOG entry for");
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(readStored().threads).toEqual({ "s-a": "Please also add a CHANGELOG entry for" });
   });
 
   it("drops a draft's text once the layout no longer lists it (sent, discarded, cleared elsewhere)", async () => {
@@ -225,5 +241,88 @@ describe("a compose tab's draft", () => {
     const id = Object.keys(useComposeStore.getState().drafts).find((k) => k.startsWith("draft:")) ?? "";
     expect(getDraft(id).text).toBe("hello");
     expect(useLayoutStore.getState().rev).toBe(2);
+  });
+});
+
+describe("a space's No project composer text", () => {
+  // Two spaces with no pane; `current` is the one the window shows.
+  const EMPTY = (current: string, rev: number, ids = ["sp-a", "sp-b"]) => ({
+    ...layoutOf(ids.map((id) => space(null, "", { id, name: id }))),
+    currentSpaceId: current,
+    rev,
+  });
+
+  it("is that space's own: another empty space starts empty, and switching back brings it back", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "Pear prompt typed in empty space" });
+    await act(() => seedLayout(EMPTY("sp-b", 3)));
+    expect(getDraft("home:").text).toBe("");
+    await act(() => seedLayout(EMPTY("sp-a", 4)));
+    expect(getDraft("home:").text).toBe("Pear prompt typed in empty space");
+  });
+
+  it("is kept across a reload, and stays the space's when a pane opens there: a No project tab shows it, and its first key makes it a draft, once", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "kept" });
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(readStored().spaces).toEqual({ "sp-a": "kept" });
+    stop();
+    // A reload: the store starts empty; the space's text comes back when the window shows it.
+    useComposeStore.setState({ drafts: {} });
+    resetComposerDrafts();
+    stop = startComposerDrafts();
+    expect(getDraft("home:").text).toBe("kept");
+    // A pane opens in the space (a thread): the text is still the space's No project text.
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 5 }));
+    expect(getDraft("home:").text).toBe("kept");
+    // A No project compose tab in it shows that text; a key typed there starts one draft and leaves no copy behind.
+    await act(() =>
+      seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1"), tab("t-c", "compose", "", { key: "compose" })], "t-c"), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 6 }),
+    );
+    updateDraft("home:", { text: "kept!" });
+    composerTextChanged("t-c", "", "home:");
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(runs.filter((r) => r.name === "composer.draft.start")).toHaveLength(1);
+    expect(getDraft(`draft:${started()}`).text).toBe("kept!");
+    expect(useComposeStore.getState().drafts["home:"]).toBeUndefined();
+    // The window shows space B and back: nothing of A's text was left to move.
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-c", "compose", "", { key: "compose:draft", params: { draft: started() } })]), "p-1", { id: "sp-a", drafts: [{ id: started(), label: "kept!", params: {} }] }), space(null, "", { id: "sp-b" })]), currentSpaceId: "sp-b", rev: 7 }));
+    expect(getDraft(`draft:${started()}`).text).toBe("kept!");
+    expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(readStored()).toMatchObject({ texts: { [started()]: "kept!" }, spaces: {} });
+  });
+
+  it("a pane opening does not hide it; another space does not show it", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "typed in a" });
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 3 }));
+    expect(getDraft("home:").text).toBe("typed in a");
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), currentSpaceId: "sp-b", rev: 4 }));
+    expect(getDraft("home:").text).toBe("");
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 5 }));
+    expect(getDraft("home:").text).toBe("typed in a");
+  });
+
+
+  it("goes with its space", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "in a" });
+    await act(() => seedLayout(EMPTY("sp-b", 3, ["sp-b"])));
+    expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
+    expect(getDraft("home:").text).toBe("");
+  });
+
+  it("a send on its way stays where it is", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "sending", phase: "starting" });
+    await act(() => seedLayout(EMPTY("sp-b", 3)));
+    expect(getDraft("home:").text).toBe("sending");
+    expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
   });
 });

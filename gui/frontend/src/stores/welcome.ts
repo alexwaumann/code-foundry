@@ -10,8 +10,8 @@
  */
 import { create } from "zustand";
 import { welcomePage } from "@/api/health";
-import { draftKey } from "@/lib/compose";
-import { getDraft, isDraftEmpty, updateDraft } from "./compose";
+import { draftKey, SPACE_KEY } from "@/lib/compose";
+import { getDraft, isDraftEmpty, updateDraft, useComposeStore } from "./compose";
 import { useProjectsStore } from "./projects";
 
 /**
@@ -84,6 +84,10 @@ export function startWelcomeSync(): () => void {
   return useProjectsStore.subscribe((s, prev) => {
     if (!isWelcome(prev) || !s.loaded || s.order.length === 0) return;
     const { page, decided } = useWelcomeStore.getState();
-    if (decided && page && getDraft(HOME_DRAFT).text === welcomePrompt(page)) updateDraft(HOME_DRAFT, { text: "" });
+    if (!decided || !page) return;
+    // The home draft, or another space's No project text (shell/composerDrafts.ts) while the window shows this one.
+    for (const key of Object.keys(useComposeStore.getState().drafts)) {
+      if ((key === HOME_DRAFT || key.startsWith(SPACE_KEY)) && getDraft(key).text === welcomePrompt(page)) updateDraft(key, { text: "" });
+    }
   });
 }

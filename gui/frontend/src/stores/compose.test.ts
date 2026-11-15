@@ -22,6 +22,7 @@ import {
   getDraft,
   pickDraftWorkspace,
   removeDraftWorkspace,
+  retargetComposeTab,
   setDraftProject,
   clearDraftSet,
   projectWorktree,
@@ -39,6 +40,10 @@ import { useSettingsStore } from "./settings";
 import { useThreadsStore } from "./threads";
 import { useUiStore } from "./ui";
 import { useWorkspacesStore } from "./workspaces";
+
+// The layout ops a shell compose tab's heading pick writes (retargetComposeTab).
+const applyLayoutOp = vi.hoisted(() => vi.fn());
+vi.mock("@/api/layout", async (orig) => ({ ...(await orig<typeof import("@/api/layout")>()), applyLayoutOp }));
 
 // pdf.js does not run in jsdom: each test says what a PDF turns out to be.
 vi.mock("@/lib/pdf", () => ({ pdfSummary: vi.fn(() => new Promise(() => undefined)) }));
@@ -356,14 +361,52 @@ describe("switchDraftTarget", () => {
     expect(useUiStore.getState().composerFocusSeq).toBe(seq + 1);
   });
 
-  it("a shell composer draft stays itself on another target: its own key, its text rewritten, the new target shown", async () => {
-    updateDraft("draft:d-1", { text: "hi", model: "haiku", projects: ["repo-cf", "repo-sk"] });
-    updateDraft("repo-gp", { text: "the project's own" });
-    await expect(switchDraftTarget({ ...cf, draft: "d-1" }, gp)).resolves.toBe(true);
-    expect(getDraft("draft:d-1")).toMatchObject({ text: "hi", model: "haiku", projects: null });
-    expect(getDraft("repo-gp").text).toBe("the project's own");
-    expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-gp" });
-    await expect(switchDraftTarget({ ...gp, draft: "d-1" }, gp)).resolves.toBe(false);
+  describe("a shell compose tab's heading pick (retargetComposeTab)", () => {
+    beforeEach(() => {
+      applyLayoutOp.mockReset();
+      applyLayoutOp.mockResolvedValue({ rev: 2 });
+    });
+
+    it("keeps the draft on its own key, rewrites its text, and writes the tab's params, not the selection", async () => {
+      updateDraft("draft:d-1", { text: "hi", model: "haiku", projects: ["repo-cf", "repo-sk"] });
+      updateDraft("repo-gp", { text: "the project's own" });
+      await expect(retargetComposeTab("t-c", { ...cf, draft: "d-1" }, gp)).resolves.toBe(true);
+      expect(getDraft("draft:d-1")).toMatchObject({ text: "hi", model: "haiku", projects: null });
+      expect(getDraft("repo-gp").text).toBe("the project's own");
+      expect(applyLayoutOp).toHaveBeenCalledTimes(1);
+      expect(applyLayoutOp).toHaveBeenCalledWith({ op: "set_tab_params", tab: "t-c", params: { project: "repo-gp" } });
+      // No select(): the space's empty composer is not opened.
+      expect(useUiStore.getState().selection).toEqual({ kind: "compose", projectId: "repo-cf" });
+      await expect(retargetComposeTab("t-c", { ...gp, draft: "d-1" }, gp)).resolves.toBe(false);
+    });
+
+    it.each([
+      ["a workspace", login, { workspace: "w-1" }],
+      ["No project", { kind: "home" } as const, {}],
+    ])("to %s: the params name it", async (_name, to, params) => {
+      updateDraft("draft:d-1", { text: "hi" });
+      await expect(retargetComposeTab("t-c", { ...cf, draft: "d-1" }, to)).resolves.toBe(true);
+      expect(applyLayoutOp).toHaveBeenCalledWith({ op: "set_tab_params", tab: "t-c", params });
+    });
+
+    it("an empty compose tab (no draft yet) only takes the params", async () => {
+      updateDraft("repo-cf", { model: "haiku" });
+      await expect(retargetComposeTab("t-c", { kind: "home" }, cf)).resolves.toBe(true);
+      expect(applyLayoutOp).toHaveBeenCalledWith({ op: "set_tab_params", tab: "t-c", params: { project: "repo-cf" } });
+      expect(getDraft("repo-cf").model).toBe("haiku");
+    });
+
+    it("cancelled at the tags confirm: nothing moves", async () => {
+      updateDraft("draft:d-1", { text: `use ${tagToken({ tagKind: "skill", name: "deploy", projectId: "repo-cf" })}` });
+      const res = retargetComposeTab("t-c", { ...cf, draft: "d-1" }, gp);
+      await vi.waitFor(() => {
+        expect(useConfirmStore.getState().pending).not.toBeNull();
+      });
+      answerConfirm(false);
+      await expect(res).resolves.toBe(false);
+      expect(applyLayoutOp).not.toHaveBeenCalled();
+      expect(getDraft("draft:d-1").text).toContain("deploy");
+    });
   });
 
   it("to a workspace: selects it with its first member for the context", async () => {

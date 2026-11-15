@@ -17,6 +17,14 @@
  * - The drafts' text is kept in localStorage (STORAGE_KEY) and put back at start, so a draft
  *   survives closing its tab and a reload. A draft the layout no longer lists (sent, discarded,
  *   cleared, from any window or the CLI) loses its text here too.
+ * - The No project composer's text (HOME_KEY: a space with no pane shows it, EmptySpace, and so
+ *   does a No project compose tab before its first key) is the text of the space the window shows,
+ *   whether or not that space has panes: when the window shows another space it moves to the
+ *   space's own key (SPACE_KEY), and back when the window shows that space again. So two spaces
+ *   never share it, a pane opening in the space does not hide it, and it is kept across a reload
+ *   like a draft's. Typed in a space with no pane it is not a listed draft (that would need the
+ *   space's composer to become a tab while the user types); a key typed into a No project compose
+ *   tab showing it makes it one, as any text typed there does.
  * - So is the text typed in a thread's own composer and not yet sent (its compose store key,
  *   lib/threadDraft threadDraftKey, which the floating composer shares): put back at start, gone
  *   once sent (the send clears it) and dropped when the thread is archived or removed.
@@ -24,7 +32,7 @@
  * Attachments are not kept across a reload (their files are not), as for every composer.
  */
 import { create } from "zustand";
-import { DRAFT_KEY } from "@/lib/compose";
+import { DRAFT_KEY, HOME_KEY, SPACE_KEY } from "@/lib/compose";
 import { draftLabel } from "@/lib/draftLabel";
 import { threadDraftKey } from "@/lib/threadDraft";
 import { clearDraft, getDraft, isDraftEmpty, updateDraft, useComposeStore } from "@/stores/compose";
@@ -32,7 +40,7 @@ import { useLayoutStore, type LayoutState } from "@/stores/layout";
 import { useThreadsStore, type ThreadsData } from "@/stores/threads";
 import { runLayoutCommand } from "./commands";
 
-/** localStorage: `{ v: 1, texts: { [draftId]: text }, threads: { [threadId]: text } }`. */
+/** localStorage: `{ v: 1, texts: { [draftId]: text }, threads: { [threadId]: text }, spaces: { [spaceId]: text } }`. */
 export const STORAGE_KEY = "code-foundry.shellDrafts";
 /** How often a draft's label may change while the user types. */
 export const LABEL_MS = 500;
@@ -219,8 +227,26 @@ export function composerTextChanged(tabId: string, draft: string, targetKey: str
   relabel(draft);
 }
 
+/** The space whose No project text HOME_KEY holds now: the one the window shows ("" before the layout is in). */
+let homeSpace = "";
+
+/**
+ * The window now shows space `now`: the text of the space it showed goes to that space's key, and
+ * the one it shows gets its own back. A send on its way is left where it is.
+ */
+function followSpace(now: string): void {
+  if (now === homeSpace) return;
+  const home = useComposeStore.getState().drafts[HOME_KEY];
+  if (homeSpace && home?.phase === "idle") moveEntry(HOME_KEY, SPACE_KEY + homeSpace);
+  homeSpace = now;
+  const own = useComposeStore.getState().drafts[SPACE_KEY + now];
+  const cur = useComposeStore.getState().drafts[HOME_KEY];
+  if (now && own && (!cur || (cur.phase === "idle" && isDraftEmpty(cur)))) moveEntry(SPACE_KEY + now, HOME_KEY);
+}
+
 /** Forgets what is in flight: drafts being started, waiting labels and clears (tests). */
 export function resetComposerDrafts(): void {
+  homeSpace = "";
   for (const t of [...labelTimers.values(), ...clearTimers.values()]) clearTimeout(t);
   labelTimers.clear();
   clearTimers.clear();
@@ -229,10 +255,11 @@ export function resetComposerDrafts(): void {
   usePendingStore.setState({ byTab: {} });
 }
 
-/** What is stored: the drafts' text by draft id, and the threads' unsent text by thread id. */
+/** What is stored: the drafts' text by draft id, the threads' unsent text by thread id, and each space's No project text by space id. */
 export interface StoredTexts {
   texts: Record<string, string>;
   threads: Record<string, string>;
+  spaces: Record<string, string>;
 }
 
 /** One map of the stored document, its non-empty strings only. */
@@ -244,10 +271,10 @@ function textsOf(v: unknown): Record<string, string> {
 /** The stored text; empty maps when there is none or it cannot be read. */
 export function readStored(): StoredTexts {
   try {
-    const v = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as { texts?: unknown; threads?: unknown } | null;
-    return { texts: textsOf(v?.texts), threads: textsOf(v?.threads) };
+    const v = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as { texts?: unknown; threads?: unknown; spaces?: unknown } | null;
+    return { texts: textsOf(v?.texts), threads: textsOf(v?.threads), spaces: textsOf(v?.spaces) };
   } catch {
-    return { texts: {}, threads: {} };
+    return { texts: {}, threads: {}, spaces: {} };
   }
 }
 
@@ -258,8 +285,8 @@ export function readStoredTexts(): Record<string, string> {
 
 function writeStored(s: StoredTexts): void {
   try {
-    if (Object.keys(s.texts).length === 0 && Object.keys(s.threads).length === 0) localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, texts: s.texts, threads: s.threads }));
+    if (Object.keys(s.texts).length === 0 && Object.keys(s.threads).length === 0 && Object.keys(s.spaces).length === 0) localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, texts: s.texts, threads: s.threads, spaces: s.spaces }));
   } catch {
     // Storage blocked or full: the drafts stay for this session.
   }
@@ -267,13 +294,15 @@ function writeStored(s: StoredTexts): void {
 
 const THREAD_KEY = threadDraftKey("");
 
-/** The drafts' and the threads' text in the compose store: by id, empty ones left out. */
+/** The drafts', the threads' and the spaces' No project text in the compose store: by id, empty ones left out. */
 function storedTexts(): StoredTexts {
-  const out: StoredTexts = { texts: {}, threads: {} };
+  const out: StoredTexts = { texts: {}, threads: {}, spaces: {} };
   for (const [key, d] of Object.entries(useComposeStore.getState().drafts)) {
     if (d.text.trim() === "") continue;
     if (key.startsWith(DRAFT_KEY)) out.texts[key.slice(DRAFT_KEY.length)] = d.text;
     else if (key.startsWith(THREAD_KEY)) out.threads[key.slice(THREAD_KEY.length)] = d.text;
+    else if (key.startsWith(SPACE_KEY)) out.spaces[key.slice(SPACE_KEY.length)] = d.text;
+    else if (key === HOME_KEY && homeSpace && d.phase === "idle") out.spaces[homeSpace] = d.text;
   }
   return out;
 }
@@ -289,12 +318,16 @@ function listedIds(s: Pick<LayoutState, "spaces">): Set<string> {
  * archived or gone. Returns the stop.
  */
 export function startComposerDrafts(): () => void {
+  homeSpace = "";
   const stored = readStored();
   for (const [id, text] of Object.entries(stored.texts)) {
     if (!useComposeStore.getState().drafts[DRAFT_KEY + id]) updateDraft(DRAFT_KEY + id, { text });
   }
   for (const [id, text] of Object.entries(stored.threads)) {
     if (!useComposeStore.getState().drafts[threadDraftKey(id)]) updateDraft(threadDraftKey(id), { text });
+  }
+  for (const [id, text] of Object.entries(stored.spaces)) {
+    if (!useComposeStore.getState().drafts[SPACE_KEY + id]) updateDraft(SPACE_KEY + id, { text });
   }
   let last = JSON.stringify(storedTexts());
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -308,17 +341,28 @@ export function startComposerDrafts(): () => void {
       writeStored(now);
     }, 250);
   };
-  // A thread archived or removed takes its unsent text with it (once the list is in: before, every thread is unknown).
+  // A thread removed, or archived while the list is watched, takes its unsent text with it (once
+  // the list is in: before, every thread is unknown). Archiving is the change, not the state: an
+  // archived thread opened and typed into keeps its text (sending it unarchives the thread).
+  let lastById: ThreadsData["byId"] | null = null;
   const pruneThreads = (s: Pick<ThreadsData, "byId"> & { loaded: boolean }) => {
     if (!s.loaded) return;
+    const was = lastById;
+    lastById = s.byId;
     for (const key of Object.keys(useComposeStore.getState().drafts)) {
       if (!key.startsWith(THREAD_KEY)) continue;
-      const t = s.byId[key.slice(THREAD_KEY.length)];
-      if (!t || t.archivedAtMs !== null) clearDraft(key);
+      const id = key.slice(THREAD_KEY.length);
+      const t = s.byId[id];
+      if (!t || (t.archivedAtMs !== null && was?.[id]?.archivedAtMs === null)) clearDraft(key);
     }
   };
   const prune = (s: LayoutState) => {
     if (!s.loaded) return;
+    followSpace(s.currentSpaceId);
+    // A removed space's text goes with it.
+    for (const key of Object.keys(useComposeStore.getState().drafts)) {
+      if (key.startsWith(SPACE_KEY) && !(key.slice(SPACE_KEY.length) in s.spaces)) clearDraft(key);
+    }
     const listed = listedIds(s);
     // A clear the layout now shows done: settled before anything unlisted is dropped.
     for (const id of [...clearing.keys()]) if (!listed.has(id)) settleCleared(id);

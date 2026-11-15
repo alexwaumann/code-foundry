@@ -21,6 +21,7 @@
  * thread.new registry command, like every other user action.
  */
 import { create } from "zustand";
+import { applyLayoutOp } from "@/api/layout";
 import { listRefs, type ProjectView } from "@/api/project";
 import { ATTACHMENT_MIME_TYPES, attachmentMaxBytes, MAX_INLINE_PDF_PAGES, MESSAGE_INLINE_MAX_BYTES, PDF_MIME_TYPE, stageAttachment, stageAttachmentPath } from "@/api/threads";
 import { isOutdatedDaemon } from "@/api/errors";
@@ -764,10 +765,7 @@ export function targetName(t: ComposeTarget): string {
  * nothing: the new target's own draft is shown as it is. Resolves false when nothing
  * happened (same target, busy, cancelled).
  */
-export async function switchDraftTarget(from: ComposeTarget, wanted: ComposeTarget): Promise<boolean> {
-  // A shell composer draft stays itself on another target: its text has its own key.
-  if (from.draft) return retargetShellDraft(from, { ...wanted, draft: from.draft });
-  const to = wanted;
+export async function switchDraftTarget(from: ComposeTarget, to: ComposeTarget): Promise<boolean> {
   const fromKey = draftKey(from);
   const toKey = draftKey(to);
   if (fromKey === toKey || getDraft(fromKey).phase !== "idle") return false;
@@ -805,23 +803,34 @@ export async function switchDraftTarget(from: ComposeTarget, wanted: ComposeTarg
 }
 
 /**
- * A shell composer draft moved to another target (switchDraftTarget): the same draft, its text
- * rewritten for the new target's projects (after the same confirm when tags of projects that
- * leave would go), then the new target shown; in the shell the compose tab's params follow and
- * keep its draft. False when nothing changed (the same target, a send on its way, cancelled).
+ * The window shell's compose tab moved to another target (its heading's picker): the same draft,
+ * its text rewritten for the new target's projects (after the same confirm as switchDraftTarget
+ * when tags of projects that leave would go), and the tab's params written: the sidebar's draft
+ * row, a reload and the send all read them (docs/notes/fuzz-2026-11-15-drafts.md). An empty
+ * compose tab (no draft yet) only takes the new params. Not select(): that would open or focus
+ * the space's empty composer instead. False when nothing changed (the same target, a send on its
+ * way, cancelled, refused).
  */
-async function retargetShellDraft(from: ComposeTarget, to: ComposeTarget): Promise<boolean> {
+export async function retargetComposeTab(tabId: string, from: ComposeTarget, to: ComposeTarget): Promise<boolean> {
+  const { draft, ...was } = from;
   const key = draftKey(from);
-  const { draft: _a, ...a } = from;
-  const { draft: _b, ...b } = to;
-  if (draftKey(a) === draftKey(b) || getDraft(key).phase !== "idle") return false;
+  if (draftKey(was) === draftKey(to) || to.kind === "like" || getDraft(key).phase !== "idle") return false;
   const members = targetDefaults(to).projects;
-  const drop = droppedTagsConfirm(getDraft(key).text, movedDraft(getDraft(key), members).text, to);
-  if (drop && !(await requestConfirm(drop))) return false;
-  const cur = getDraft(key);
-  if (cur.phase !== "idle") return false;
-  useComposeStore.setState((s) => ({ drafts: { ...s.drafts, [key]: movedDraft(cur, members) } }));
-  showComposer(to);
+  if (draft) {
+    const drop = droppedTagsConfirm(getDraft(key).text, movedDraft(getDraft(key), members).text, to);
+    if (drop && !(await requestConfirm(drop))) return false;
+    const cur = getDraft(key);
+    if (cur.phase !== "idle") return false;
+    useComposeStore.setState((s) => ({ drafts: { ...s.drafts, [key]: movedDraft(cur, members) } }));
+  }
+  const params: Record<string, string> = to.kind === "project" ? { project: to.projectId } : to.kind === "workspace" ? { workspace: to.workspaceId } : {};
+  try {
+    // The daemon keeps the tab's draft param, and the draft's list entry takes the new params.
+    await applyLayoutOp({ op: "set_tab_params", tab: tabId, params });
+  } catch (err) {
+    notify({ level: "error", title: "Could not move the draft", description: errorMessage(err) });
+    return false;
+  }
   return true;
 }
 
