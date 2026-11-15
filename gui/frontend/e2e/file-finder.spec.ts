@@ -5,7 +5,7 @@ import { keyboardPane, paneWith } from "./shell-surfaces";
 /**
  * The file finder (file.find, cmd+P; docs/notes/file-finder-2-gui.md) for what only the
  * whole app shows: the chord through the keymap from a thread's prompt, the dialog taking
- * the keyboard, Enter landing a File tab beside the thread (the keyboard moving into it), ⌥⏎ landing an @ file tag in the real ProseMirror prompt. Its rows,
+ * the keyboard, Enter landing a File tab beside the thread (the keyboard moving into it), ⌘⏎ landing an @ file tag in the real ProseMirror prompt. Its rows,
  * groups, search and actions are
  * src/components/palette/FileFinder.test.tsx's and src/lib/fileFinder.test.ts's.
  */
@@ -24,7 +24,7 @@ async function openFinder(page: Page): Promise<void> {
   await expect(finderInput(page)).toBeFocused();
 }
 
-test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a tab beside the thread; ⌥⏎ tags it in the prompt", async ({ page }) => {
+test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a tab beside the thread; ⌘⏎ tags it in the prompt", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(threadPrompt(page)).toBeFocused();
@@ -48,14 +48,14 @@ test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a t
   await openFinder(page);
   await page.keyboard.type("x.md");
   await expect(palette(page).getByTestId("finder-row").first()).toHaveAttribute("data-path", "docs/notes/x.md");
-  await page.keyboard.press("Alt+Enter");
+  await page.keyboard.press("Meta+Enter");
   await expect(palette(page)).toHaveCount(0);
   await expect(threadPrompt(page).getByTestId("prompt-tag")).toHaveText("x.md");
   await expect(threadPrompt(page)).toBeFocused();
 });
 
 // The same, without where the keyboard goes after Enter, while the gap above stands.
-test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a tab beside the thread, shown; ⌥⏎ tags it in the prompt", async ({ page }) => {
+test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a tab beside the thread, shown; ⌘⏎ tags it in the prompt", async ({ page }) => {
   await openApp(page);
   await row(page, "s:s-1").click();
   await expect(threadPrompt(page)).toBeFocused();
@@ -76,7 +76,7 @@ test("cmd+p from a thread's prompt opens the finder; Enter opens the file in a t
   await openFinder(page);
   await page.keyboard.type("x.md");
   await expect(palette(page).getByTestId("finder-row").first()).toHaveAttribute("data-path", "docs/notes/x.md");
-  await page.keyboard.press("Alt+Enter");
+  await page.keyboard.press("Meta+Enter");
   await expect(palette(page)).toHaveCount(0);
   await expect(threadPrompt(page).getByTestId("prompt-tag")).toHaveText("x.md");
   await expect(threadPrompt(page)).toBeFocused();

@@ -21,6 +21,7 @@ import { useCheckoutOrder, useLeftoverPaths, usePageScroll } from "./pageHooks";
 import { ProjectsCrumb, PagePicker } from "./PagePicker";
 import { ProjectDetails } from "./ProjectDetails";
 import { ProjectNameEditor } from "./ProjectNameEditor";
+import { ProjectSearch } from "./ProjectSearch";
 import { ProjectTitle } from "./ProjectTitle";
 import { openCursorRowMenu } from "./rowMenu";
 import { useServesFocusRequests } from "@/shell/paneContext";
@@ -75,7 +76,7 @@ function ThreadsBlock({ projectId, main }: { projectId: string; main: string }) 
  * without git, the Checkouts table (main and the worktrees a thread is on; a row's right-click menu holds
  * what it does, and its columns drop by the table's own width), Worktrees without threads
  * (LeftoverWorktrees, every other worktree, its rows after the checkouts' on the keyboard
- * list), and Details. Below PROJECT_TITLE_COMPACT_BELOW of content width the slug drops and
+ * list), Details, and for a git project Search (ProjectSearch: ignored files to include). Below PROJECT_TITLE_COMPACT_BELOW of content width the slug drops and
  * Open in Finder shows its icon only.
  */
 export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey: string }) {
@@ -208,6 +209,7 @@ export function ProjectPage({ projectId, pageKey }: { projectId: string; pageKey
                 )}
                 {git && <LeftoverWorktrees projectId={projectId} paths={leftovers} />}
                 <ProjectDetails projectId={projectId} compact={compact} />
+                {git && <ProjectSearch projectId={projectId} />}
               </>
             )}
           </div>

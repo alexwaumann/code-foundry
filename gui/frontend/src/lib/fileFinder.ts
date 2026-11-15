@@ -92,6 +92,8 @@ export interface FinderRow {
   status: string;
   /** The panel already has a File tab for it. */
   open: boolean;
+  /** Git ignores it; an include pattern lists it (a search's match only). */
+  ignored: boolean;
 }
 
 /** One checkout of the thread, as the finder searches and lists it. */
@@ -123,7 +125,7 @@ export function absolutePath(checkout: string, path: string): string {
   return normalizePath(`${checkout}/${path}`);
 }
 
-function row(ctx: RowContext, f: { projectId: string; checkout: string; path: string; pathPositions?: readonly number[]; projectPositions?: readonly number[] }, status?: string): FinderRow {
+function row(ctx: RowContext, f: { projectId: string; checkout: string; path: string; pathPositions?: readonly number[]; projectPositions?: readonly number[]; ignored?: boolean | undefined }, status?: string): FinderRow {
   const { dir, name } = splitMatchPath(f.path, f.pathPositions ?? []);
   const projectName = ctx.names[f.projectId] ?? f.projectId;
   return {
@@ -136,6 +138,7 @@ function row(ctx: RowContext, f: { projectId: string; checkout: string; path: st
     project: ctx.multi ? highlightRuns(projectName, f.projectPositions ?? []) : null,
     status: status ?? ctx.statuses.get(statusKey(f.checkout, f.path)) ?? "",
     open: ctx.openPaths.has(absolutePath(f.checkout, f.path)),
+    ignored: f.ignored === true,
   };
 }
 

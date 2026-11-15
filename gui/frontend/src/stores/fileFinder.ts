@@ -2,7 +2,7 @@
  * The file finder's presentation and its two actions (file.find, cmd+P;
  * docs/notes/file-finder-2-gui.md). The finder is a page of the command palette
  * (components/palette/FileFinder.tsx) over the thread on screen. Enter opens the file as
- * a File tab beside that thread; ⌥⏎ puts it in the thread's prompt as an @ file.
+ * a File tab beside that thread; ⌘⏎ puts it in the thread's prompt as an @ file.
  */
 import { threadDraftKey } from "@/lib/threadDraft";
 import { isNoProject } from "@/lib/threadRow";
@@ -56,7 +56,7 @@ export function openFoundFile(threadId: string, f: FinderFile, line?: number): v
 }
 
 /**
- * ⌥⏎: the file as an @ file tag (the same tag the prompt's @ completion inserts) at the
+ * ⌘⏎: the file as an @ file tag (the same tag the prompt's @ completion inserts) at the
  * caret of the thread's prompt. The palette closes and the prompt takes the keyboard.
  */
 export function tagFoundFile(threadId: string, f: FinderFile): void {

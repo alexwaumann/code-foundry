@@ -32,6 +32,8 @@ export interface CompletionItem {
   hint?: string;
   /** Muted, after the label (may be empty). */
   detail: string;
+  /** Quiet, at the row's right: "ignored" for a git-ignored file an include pattern lists. */
+  note?: string;
   /** Ranges of `detail` to emphasize ([from, to)): a file path's matched characters. */
   emphasis?: readonly (readonly [number, number])[];
   /** What Enter puts into the prompt: a tag, or plain text (a built-in command's "/compact"). */
@@ -341,7 +343,7 @@ export interface FileResults {
  * The card's rows for file matches: a group per project with matches, the primary first,
  * then member order; headings only when the draft has more than one project. A row is
  * the base name (a directory's with a trailing "/") and the path with the query's
- * characters emphasized; it inserts a file tag (a directory's path keeps its "/"). Rows
+ * characters emphasized, and "ignored" at the right when git ignores it; it inserts a file tag (a directory's path keeps its "/"). Rows
  * keep the daemon's order. Results of a project that is not a member are left out.
  */
 export function fileItems(results: readonly FileResults[], query: string, members: readonly string[], primary: string): CompletionGroup[] {
@@ -359,6 +361,7 @@ export function fileItems(results: readonly FileResults[], query: string, member
         detail: m.path,
         emphasis: emphasis(m.path, query),
         tag: { tagKind: "file", projectId, path: m.isDir ? `${m.path}/` : m.path },
+        ...(m.ignored ? { note: "ignored" } : {}),
       };
     });
     return [{ key: projectId, heading: multi ? { kind: "project", projectId } : null, items }];

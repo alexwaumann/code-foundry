@@ -199,7 +199,7 @@ export function ThreadComposer({
   }, [sources.checkouts]);
 
   // The thread's cite layer inserts citations at the prompt's caret (docs/notes/citations.md),
-  // the file finder an @ file (⌥⏎).
+  // the file finder an @ file (⌘⏎).
   useEffect(
     () =>
       registerCiteTarget(draftKey, {

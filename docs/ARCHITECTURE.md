@@ -475,6 +475,8 @@ Services (v1):
   SearchFiles also lists the git-ignored files that include patterns name (the
   `files.include_ignored` setting plus each project's own, `ProjectService.SetIncludeIgnored`),
   marked `ignored`; SuggestIncludeIgnored helps add one (`docs/notes/file-search-1-includes.md`).
+  The GUI edits both lists (Settings › General's list and a git project's Search section) and
+  labels such rows `ignored` in cmd+P and the `@` card (`docs/notes/file-search-2-includes-gui.md`).
   ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
   anywhere under home except the config home outside its checkouts, and answers a file
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).

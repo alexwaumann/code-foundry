@@ -27,7 +27,7 @@ func (d ViewDeps) fileFindCommand() Command {
 		Name:        "file.find",
 		Page:        PageState,
 		Title:       "Go to File…",
-		Description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌥⏎ puts it in the prompt as an @ file instead).",
+		Description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌘⏎ puts it in the prompt as an @ file instead).",
 		Category:    "View",
 		Keybindings: []string{"cmd+p"},
 		When:        canFindFiles,

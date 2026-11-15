@@ -50,7 +50,7 @@ export interface PromptEditorHandle {
    * prompt after it. One undo step.
    */
   insertCite(citationId: string): void;
-  /** insertCite for any tag (the file finder's ⌥⏎ puts a file tag): the same spacing, focus and undo step. */
+  /** insertCite for any tag (the file finder's ⌘⏎ puts a file tag): the same spacing, focus and undo step. */
   insertTagAtCaret(tag: PromptTag): void;
   /** Focuses the prompt with the selection collapsed to its end (a clicked tag is no longer selected). */
   focusCollapsed(): void;

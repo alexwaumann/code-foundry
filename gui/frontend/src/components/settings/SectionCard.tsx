@@ -6,6 +6,7 @@ import { sectionAdvanced } from "./advancedFields";
 import { useFieldUnused } from "./fieldUnused";
 import { useHiddenFields } from "./hiddenFields";
 import { fieldRows, rowBorder, type SectionFields } from "./model";
+import { sectionBodies } from "./sectionBodies";
 import { sectionLinks } from "./sectionLinks";
 import { SettingRow, SettingRowPair } from "./SettingRow";
 
@@ -73,6 +74,8 @@ export function SettingsSection({ schema, pageId, section, bare = false }: { sch
   const advanced = shown.filter((f) => sectionAdvanced[id]?.has(f.key));
   const rows = fieldRows(shown.filter((f) => !advanced.includes(f)));
   const Link = sectionLinks[id];
+  const Body = bare ? undefined : sectionBodies[id];
+  if (Body) return <Body section={{ ...section, fields: shown }} />;
   return (
     <SectionCard
       id={section.section.id}
