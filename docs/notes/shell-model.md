@@ -287,7 +287,8 @@ when the first working version is whole. Nothing partial is released.
   Nothing is opened, moved or closed. On by default; a user setting.
 - **Closing a thread** (its tab) closes the linked tabs in its space and remembers which were open and
   where. Opening it again restores them: into their old panes when the thread is back in the pane it
-  was in, otherwise placed fresh beside it. Terminals closed this way keep running. No settings.
+  was in, otherwise placed fresh beside it. A pane of theirs the user had collapsed comes back
+  collapsed. Terminals closed this way keep running. No settings.
 - **A thread whose tab is not open** can still have its surfaces opened from its sidebar menu
   (Open ▸ …); they go to the focused pane. For an open thread the same menu follows the placement
   rules. Plugins will add thread actions to this menu. A thread's own call for its surface while its

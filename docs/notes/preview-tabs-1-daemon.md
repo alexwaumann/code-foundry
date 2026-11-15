@@ -73,8 +73,8 @@ whose commit's `Fresh` and `FreshQuick` the glue answers with shells as it answe
 - Adding an op shifts the property tests' random stream (they pick op names by index). The new
   stream found a gap on `main`: a collapsed pane holding a thread's linked tabs is not rebuilt
   when the thread opens again (the record does not keep the collapse, and the pane rebuilt open
-  does not fit), so its tabs land elsewhere. `TestCloseOpenRoundTripRandom` now leaves such
-  threads out (`collapsedLinked`); the gap itself is not fixed here.
+  does not fit), so its tabs land elsewhere. `TestCloseOpenRoundTripRandom` left such
+  threads out (`collapsedLinked`) until the gap was fixed (`collapsed-pane-restore.md`).
 - The glue tests that snooze and reopen a thread had to wake it first: they published the thread
   unsnoozed and opened at once, which raced the glue's `set_snoozed`. They wait for the wake now
   (`woken`), and the stepped race tests apply `set_snoozed` themselves.

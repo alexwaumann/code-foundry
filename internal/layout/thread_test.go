@@ -139,7 +139,7 @@ func TestCloseOpenRoundTripRandom(t *testing.T) {
 			for _, p := range Panes(sp.Root) {
 				for _, th := range p.Tabs {
 					stays := slices.ContainsFunc(p.Tabs, func(tb *Tab) bool { return tb.Thread != th.Thread })
-					if th.Kind != "thread" || !stays || collapsedLinked(sp, th.Thread) {
+					if th.Kind != "thread" || !stays {
 						continue
 					}
 					// Make the thread's tab the last and active tab of its pane, then go there and back.
@@ -176,17 +176,41 @@ func TestCloseOpenRoundTripRandom(t *testing.T) {
 	t.Logf("%d round trips, %d exact", trips, exact)
 }
 
-// collapsedLinked reports whether a collapsed pane of sp holds a linked tab of thread. Such a
-// pane, when it goes with the thread, is rebuilt open or not at all (its remembered record
-// does not keep the collapse), so its tabs may come back elsewhere: a known gap, outside what
-// the round trip pins (docs/notes/preview-tabs-1-daemon.md).
-func collapsedLinked(sp *Space, thread string) bool {
-	for _, p := range Panes(sp.Root) {
-		if p.Collapsed && slices.ContainsFunc(p.Tabs, func(tb *Tab) bool { return tb.IsLinked() && tb.Thread == thread }) {
-			return true
+// TestCloseOpenKeepsFold: a pane of a thread's linked tabs that the user folded to a rail goes
+// with the thread and comes back folded, in its place, with its tabs. In a pane area too
+// narrow for it to open, it used to be left out and its tabs placed elsewhere.
+func TestCloseOpenKeepsFold(t *testing.T) {
+	for _, w := range []float64{DefaultW, 600} {
+		ta := &Tab{ID: "t-a", Kind: "thread", Thread: "th-a"}
+		tb := &Tab{ID: "t-b", Kind: "thread", Thread: "th-b"}
+		d1 := &Tab{ID: "t-d1", Kind: "diff", Thread: "th-a", Params: map[string]string{"project": "pj", "worktree": "w1"}}
+		d2 := &Tab{ID: "t-d2", Kind: "diff", Thread: "th-a", Params: map[string]string{"project": "pj", "worktree": "w2"}}
+		for _, x := range []*Tab{ta, tb, d1, d2} {
+			_, key, err := Identify(x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			x.Key = key
+		}
+		pa := &Node{T: NodePane, ID: "p-a", Tabs: []*Tab{tb, ta}, Active: "t-a"}
+		pd := &Node{T: NodePane, ID: "p-d", Tabs: []*Tab{d1, d2}, Active: "t-d2", Collapsed: true}
+		root := &Node{T: NodeSplit, ID: "s-1", Dir: Row, Kids: []*Node{pa, pd}, Sizes: []float64{0.6, 0.4}}
+		st := NewState("sp-1", "Main")
+		sp := st.Spaces[0]
+		sp.Root, sp.Focus = root, "p-a"
+		st.Threads = map[string]*ThreadState{"th-a": {Space: sp.ID}, "th-b": {Space: sp.ID}}
+		if err := Check(st); err != nil {
+			t.Fatalf("w %v: fixture: %v", w, err)
+		}
+		got := roundTrip(t, st, "th-a", "p-a", w, DefaultH)
+		gsp := got.Space(sp.ID)
+		if before, after := layoutShape(sp.Root), layoutShape(gsp.Root); before != after {
+			t.Errorf("w %v:\nbefore %s\nafter  %s", w, before, after)
+		}
+		if _, p := got.FindPane("p-d"); p == nil || !p.Collapsed {
+			t.Errorf("w %v: pane p-d came back %+v, want it folded", w, p)
 		}
 	}
-	return false
 }
 
 // TestRankMineFirst pins the first tie-break of rules 3 and 4, which rule 2 makes unreachable
