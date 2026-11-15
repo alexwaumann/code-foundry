@@ -125,6 +125,9 @@ func main() {
 			// No native drag band. A native band drags on any mouse-down in it, before the
 			// page sees the click, so it would swallow the header buttons now in the band.
 			InvisibleTitleBarHeight: 0,
+			// The File tab's video player puts itself in full screen with the Fullscreen API
+			// (components/files/previews/media); WKWebView refuses it unless this is on.
+			WebviewPreferences: application.MacWebviewPreferences{FullscreenEnabled: application.Enabled},
 		},
 	})
 	appService.window = window

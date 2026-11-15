@@ -10,7 +10,7 @@ const kindOf = (path: string, over: Partial<FileReadView> = {}) => previewKindOf
 
 describe("the registered kinds", () => {
   it("are every file under kinds/, and none claims what another does", () => {
-    expect(PREVIEW_KINDS.map((k) => k.id)).toEqual(expect.arrayContaining(["html", "image", "markdown", "pdf", "svg"]));
+    expect(PREVIEW_KINDS.map((k) => k.id)).toEqual(expect.arrayContaining(["audio", "html", "image", "markdown", "pdf", "svg", "video"]));
     expect(registryProblems(PREVIEW_KINDS)).toEqual([]);
   });
 
@@ -57,8 +57,27 @@ describe("the registered kinds", () => {
     // A kind that cannot show the read leaves it to the code view or the binary state.
     ["blob.md", { text: null, binary: true }, null],
     ["broken.png", { mime: "image/png", text: null, binary: true }, null],
+    // Video and audio by the daemon's extensions, read as media (no bytes).
+    ["clip.mp4", { mime: "video/mp4", media: true, text: null, binary: true }, "video"],
+    ["screen.MOV", { mime: "video/quicktime", media: true, text: null, binary: true }, "video"],
+    ["thread-open.webm", { mime: "video/webm", media: true, text: null, binary: true }, "video"],
+    ["song.mp3", { mime: "audio/mpeg", media: true, text: null, binary: true }, "audio"],
+    ["tone.m4a", { mime: "audio/mp4", media: true, text: null, binary: true }, "audio"],
+    ["take.flac", { mime: "audio/flac", media: true, text: null, binary: true }, "audio"],
+    // An older daemon read the bytes and said nothing of media: the binary state, as before.
+    ["clip.mp4", { mime: "video/mp4", text: null, binary: true }, null],
+    // Video the daemon does not stream stays a binary.
+    ["clip.avi", { mime: "video/x-msvideo", text: null, binary: true }, null],
   ])("%s → %s", (path, over, want) => {
     expect(kindOf(path, over)).toBe(want);
+  });
+
+  it("a video or audio file is read for its facts and streamed; everything else is read whole", () => {
+    const readOf = (path: string) => previewKindOf(path, null)?.read ?? "whole";
+    expect(readOf("/w/clip.mp4")).toBe("stream");
+    expect(readOf("/w/song.ogg")).toBe("stream");
+    expect(readOf("/w/README.md")).toBe("whole");
+    expect(readOf("/w/Makefile")).toBe("whole");
   });
 
   it("before a read, only the extension counts", () => {
