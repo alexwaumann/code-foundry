@@ -13,8 +13,8 @@ import (
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
-// The test binary doubles as the plugins these tests run (the fakeclaude pattern without
-// a separate build): a package's bin/plugin is a script that re-executes it with
+// The test binary doubles as the plugins these tests run: a package's bin/plugin is a
+// script that executes a second, uninstrumented build of it (plugin.HelperBin) with
 // CF_PLUGIN_HELPER set to a mode.
 
 func init() {

@@ -138,11 +138,7 @@ func newDevRig(t *testing.T, build string, mod func(*Options)) *devRig {
 	}
 	r.manifest(pluginsdk.Permissions{})
 	write(t, filepath.Join(r.dir, "main.go"), "package main\n")
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	write(t, filepath.Join(r.dir, "bin", "plugin"), fmt.Sprintf("#!/bin/sh\nCF_PLUGIN_HELPER=ok exec '%s'\n", self))
+	write(t, filepath.Join(r.dir, "bin", "plugin"), fmt.Sprintf("#!/bin/sh\nCF_PLUGIN_HELPER=ok exec '%s'\n", HelperBin(t)))
 	if err := os.Chmod(filepath.Join(r.dir, "bin", "plugin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
