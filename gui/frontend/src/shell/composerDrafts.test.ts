@@ -200,7 +200,7 @@ describe("a compose tab's draft", () => {
     expect(useComposeStore.getState().drafts[threadDraftKey("s-1")]).toBeUndefined();
     expect(useComposeStore.getState().drafts[threadDraftKey("s-2")]).toBeUndefined();
     await act(() => vi.advanceTimersByTimeAsync(500));
-    expect(readStored()).toEqual({ texts: {}, threads: {} });
+    expect(readStored()).toEqual({ texts: {}, threads: {}, spaces: {} });
   });
 
   it("keeps text typed into an archived thread's composer while other threads change", async () => {
@@ -241,5 +241,61 @@ describe("a compose tab's draft", () => {
     const id = Object.keys(useComposeStore.getState().drafts).find((k) => k.startsWith("draft:")) ?? "";
     expect(getDraft(id).text).toBe("hello");
     expect(useLayoutStore.getState().rev).toBe(2);
+  });
+});
+
+describe("the composer of a space with no pane", () => {
+  // Two spaces with no pane; `current` is the one the window shows.
+  const EMPTY = (current: string, rev: number, ids = ["sp-a", "sp-b"]) => ({
+    ...layoutOf(ids.map((id) => space(null, "", { id, name: id }))),
+    currentSpaceId: current,
+    rev,
+  });
+
+  it("is that space's own: another empty space starts empty, and switching back brings it back", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "Pear prompt typed in empty space" });
+    await act(() => seedLayout(EMPTY("sp-b", 3)));
+    expect(getDraft("home:").text).toBe("");
+    await act(() => seedLayout(EMPTY("sp-a", 4)));
+    expect(getDraft("home:").text).toBe("Pear prompt typed in empty space");
+  });
+
+  it("is kept across a reload, and not shown in a compose tab once the space has a pane", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "kept" });
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(readStored().spaces).toEqual({ "sp-a": "kept" });
+    stop();
+    // A reload: the store starts empty; the space's text comes back when the window shows it.
+    useComposeStore.setState({ drafts: {} });
+    resetComposerDrafts();
+    stop = startComposerDrafts();
+    expect(getDraft("home:").text).toBe("kept");
+    // The space gets a pane (a No project compose tab, which shares the home key): its text waits.
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-c", "compose", "", { key: "compose" })]), "p-1", { id: "sp-a" })]), rev: 5 }));
+    expect(getDraft("home:").text).toBe("");
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(readStored().spaces).toEqual({ "sp-a": "kept" });
+  });
+
+  it("goes with its space", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "in a" });
+    await act(() => seedLayout(EMPTY("sp-b", 3, ["sp-b"])));
+    expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
+    expect(getDraft("home:").text).toBe("");
+  });
+
+  it("a send on its way stays where it is", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "sending", phase: "sending" });
+    await act(() => seedLayout(EMPTY("sp-b", 3)));
+    expect(getDraft("home:").text).toBe("sending");
+    expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
   });
 });

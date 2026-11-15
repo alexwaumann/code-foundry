@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Composer } from "@/components/compose/Composer";
 import { draftKey, type ComposeTarget } from "@/lib/compose";
 import { composerTextChanged, usePendingDraft } from "@/shell/composerDrafts";
@@ -29,6 +29,13 @@ export function ComposeTab({ tab }: { tab: TabEntry }) {
   const onTextChange = useCallback(() => {
     composerTextChanged(tab.id, draft, targetKey);
   }, [tab.id, draft, targetKey]);
+  // Text already there when the tab shows its empty composer (a heading pick in a space with no
+  // pane moved it here) is a draft, as if typed here. Not No project's: its welcome prefill is not
+  // the user's text.
+  const home = target.kind === "home";
+  useEffect(() => {
+    if (!draft && !home) composerTextChanged(tab.id, "", targetKey);
+  }, [tab.id, draft, home, targetKey]);
   return (
     <Composer
       key={sel.likeThreadId ? `like:${sel.likeThreadId}` : sel.workspaceId ? `ws:${sel.workspaceId}` : sel.noProject ? "home:" : sel.projectId}
