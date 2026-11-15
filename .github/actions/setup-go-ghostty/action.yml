@@ -1,5 +1,5 @@
 name: setup-go-ghostty
-description: Go toolchain from go.mod plus cached libghostty-vt and whisper.cpp builds (shared by ci and release).
+description: Go toolchain from go.mod plus cached libghostty-vt and whisper.cpp builds and the ripgrep binary (shared by ci and release).
 runs:
   using: composite
   steps:
@@ -52,3 +52,21 @@ runs:
 
     - shell: bash
       run: make whisper-cpp
+
+    # ripgrep (the official release binary, sha256-pinned) for code-foundry-rg, which
+    # `make build` and `make package` copy. Cached on the version, target and checksum, in
+    # the same per-user cache layout. A cold fetch is one 1.7 MB download.
+    - name: ripgrep cache key
+      id: ripgrep
+      shell: bash
+      run: |
+        echo "key=$(./scripts/ripgrep.sh --print-key)" >> "$GITHUB_OUTPUT"
+        echo "prefix=$(./scripts/ripgrep.sh --print-prefix)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v6
+      with:
+        path: ${{ steps.ripgrep.outputs.prefix }}
+        key: ${{ runner.os }}-${{ steps.ripgrep.outputs.key }}
+
+    - shell: bash
+      run: make ripgrep

@@ -6,23 +6,26 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
 // fakeRelease publishes a fake release for tag into a local release directory (the
 // CODE_FOUNDRY_RELEASE_DIR layout) and returns the tarball's path. The tarball holds
-// code-foundry, "Code Foundry", code-foundry-dictate and VERSION at the top level, like
-// scripts/package.sh writes it; appVersion is what VERSION and the fake CLI claim
-// (normally tag).
+// code-foundry, "Code Foundry", code-foundry-dictate, code-foundry-rg,
+// THIRD-PARTY-NOTICES.txt and VERSION at the top level, like scripts/package.sh writes it;
+// appVersion is what VERSION and the fake CLI claim (normally tag).
 func fakeRelease(t *testing.T, relDir, tag, appVersion string) string {
 	t.Helper()
-	return fakeReleaseDictate(t, relDir, tag, appVersion, 0o755)
+	return fakeReleaseWith(t, relDir, tag, appVersion, map[string]os.FileMode{
+		"code-foundry-dictate": 0o755, "code-foundry-rg": 0o755, "THIRD-PARTY-NOTICES.txt": 0o644,
+	})
 }
 
-// fakeReleaseDictate is fakeRelease with code-foundry-dictate at mode, or without it
-// for mode 0 (a release from before dictation).
-func fakeReleaseDictate(t *testing.T, relDir, tag, appVersion string, dictateMode os.FileMode) string {
+// fakeReleaseWith is a release of code-foundry, "Code Foundry" and VERSION plus the extra
+// files at their modes (each a script printing its name and appVersion).
+func fakeReleaseWith(t *testing.T, relDir, tag, appVersion string, extra map[string]os.FileMode) string {
 	t.Helper()
 	build := t.TempDir()
 	write := func(p, s string, mode os.FileMode) {
@@ -34,9 +37,9 @@ func fakeReleaseDictate(t *testing.T, relDir, tag, appVersion string, dictateMod
 	write(filepath.Join(build, "Code Foundry"), "#!/bin/sh\necho gui\n", 0o755)
 	write(filepath.Join(build, "code-foundry"), "#!/bin/sh\necho \"code-foundry "+appVersion+"\"\n", 0o755)
 	files := []string{"code-foundry", "Code Foundry", "VERSION"}
-	if dictateMode != 0 {
-		write(filepath.Join(build, "code-foundry-dictate"), "#!/bin/sh\necho \"code-foundry-dictate "+appVersion+"\"\n", dictateMode)
-		files = append(files, "code-foundry-dictate")
+	for name, mode := range extra {
+		write(filepath.Join(build, name), "#!/bin/sh\necho \""+name+" "+appVersion+"\"\n", mode)
+		files = append(files, name)
 	}
 
 	dir := filepath.Join(relDir, tag)
@@ -171,7 +174,7 @@ func TestInstallFreshUpgradeIdempotent(t *testing.T) {
 	if names := dirNames(t, filepath.Dir(e.app())); strings.Join(names, " ") != "app" {
 		t.Fatalf("~/.code-foundry holds %v, want just app (no app.new / app.old)", names)
 	}
-	if names := dirNames(t, e.app()); strings.Join(names, "|") != "Code Foundry|VERSION|code-foundry|code-foundry-dictate" {
+	if names := dirNames(t, e.app()); strings.Join(names, "|") != "Code Foundry|THIRD-PARTY-NOTICES.txt|VERSION|code-foundry|code-foundry-dictate|code-foundry-rg" {
 		t.Fatalf("app dir holds %v", names)
 	}
 
@@ -331,9 +334,18 @@ func TestInstallRejectsBadArchives(t *testing.T) {
 			want: "checksum mismatch",
 		},
 		{
-			name:    "code-foundry-dictate is not executable",
-			prepare: func(t *testing.T, e installEnv) { fakeReleaseDictate(t, e.rel, "v0.2.0", "v0.2.0", 0o644) },
-			want:    "code-foundry-dictate is not an executable",
+			name: "code-foundry-dictate is not executable",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeReleaseWith(t, e.rel, "v0.2.0", "v0.2.0", map[string]os.FileMode{"code-foundry-dictate": 0o644})
+			},
+			want: "code-foundry-dictate is not an executable",
+		},
+		{
+			name: "code-foundry-rg is not executable",
+			prepare: func(t *testing.T, e installEnv) {
+				fakeReleaseWith(t, e.rel, "v0.2.0", "v0.2.0", map[string]os.FileMode{"code-foundry-rg": 0o644})
+			},
+			want: "code-foundry-rg is not an executable",
 		},
 		{
 			name:    "VERSION differs from the tag",
@@ -377,27 +389,34 @@ func TestInstallRejectsBadArchives(t *testing.T) {
 	}
 }
 
-// The dictation engine is installed with the rest, and a release from before it shipped
-// (no code-foundry-dictate) still installs.
-func TestInstallDictationEngine(t *testing.T) {
+// The helpers the daemon runs (the dictation engine, ripgrep) are installed with the rest
+// and are optional, and a file this installer has never heard of is installed too: the
+// in-app updater runs the installer of the version it updates from, which must carry a
+// newer release's new files over (docs/notes/file-search-3-ripgrep.md).
+func TestInstallHelpers(t *testing.T) {
 	tests := []struct {
-		name string
-		mode os.FileMode
-		want bool
+		name  string
+		extra map[string]os.FileMode
+		want  []string // executables expected in the app dir beyond code-foundry and the GUI
 	}{
-		{"with the engine", 0o755, true},
-		{"a release from before dictation", 0, false},
+		{"both helpers", map[string]os.FileMode{"code-foundry-dictate": 0o755, "code-foundry-rg": 0o755}, []string{"code-foundry-dictate", "code-foundry-rg"}},
+		{"a release from before ripgrep", map[string]os.FileMode{"code-foundry-dictate": 0o755}, []string{"code-foundry-dictate"}},
+		{"a release from before dictation", nil, nil},
+		{"a helper this installer does not know", map[string]os.FileMode{"code-foundry-later": 0o755}, []string{"code-foundry-later"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newInstallEnv(t)
-			fakeReleaseDictate(t, e.rel, "v0.1.0", "v0.1.0", tt.mode)
+			fakeReleaseWith(t, e.rel, "v0.1.0", "v0.1.0", tt.extra)
 			if out, err := e.run(t); err != nil {
 				t.Fatalf("%v\n%s", err, out)
 			}
-			fi, err := os.Stat(filepath.Join(e.app(), "code-foundry-dictate"))
-			if got := err == nil && fi.Mode().Perm()&0o111 != 0; got != tt.want {
-				t.Fatalf("installed engine = %v (err %v), want %v", got, err, tt.want)
+			for _, name := range []string{"code-foundry-dictate", "code-foundry-rg", "code-foundry-later"} {
+				fi, err := os.Stat(filepath.Join(e.app(), name))
+				got := err == nil && fi.Mode().Perm()&0o111 != 0
+				if want := slices.Contains(tt.want, name); got != want {
+					t.Errorf("%s installed = %v (err %v), want %v", name, got, err, want)
+				}
 			}
 		})
 	}

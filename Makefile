@@ -29,6 +29,10 @@ GHOSTTY_VT_PC     := $(GHOSTTY_VT_PREFIX)/share/pkgconfig/libghostty-vt-static.p
 # whisper.cpp (static, Metal embedded) for code-foundry-dictate, built the same way into
 # its own per-user cache (scripts/whisper-cpp.sh; override the root with WHISPER_CPP_CACHE).
 WHISPER_CPP_PREFIX := $(shell ./scripts/whisper-cpp.sh --print-prefix)
+# ripgrep (the official release binary, sha256-pinned) for text search, fetched into its own
+# per-user cache (scripts/ripgrep.sh; override the root with RIPGREP_CACHE) and shipped as
+# code-foundry-rg.
+RIPGREP_BIN := $(shell ./scripts/ripgrep.sh --print-bin)
 export PKG_CONFIG_PATH := $(GHOSTTY_VT_PREFIX)/share/pkgconfig:$(WHISPER_CPP_PREFIX)/share/pkgconfig$(if $(PKG_CONFIG_PATH),:$(PKG_CONFIG_PATH))
 
 VERSION  ?= dev
@@ -69,7 +73,7 @@ plugins:
 	done
 
 .PHONY: all gen build check check-unlocked attest go-check go-lint go-test frontend-check frontend-deps bun-version gui-dist-stub pagelib pagelib-check \
-        dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp package release promote clean fuzz \
+        dev drive gui-build gui-dev gui-e2e gui-mock ghostty-vt whisper-cpp ripgrep package release promote clean fuzz \
         guide-eval guide-eval-compare
 
 all: build
@@ -96,10 +100,11 @@ pagelib-check: pagelib
 	fi
 
 ## build: build the CLI/daemon binary to ./bin/code-foundry and the dictation engine to
-## ./bin/code-foundry-dictate.
-build: ghostty-vt whisper-cpp
+## ./bin/code-foundry-dictate, and copy ripgrep to ./bin/code-foundry-rg.
+build: ghostty-vt whisper-cpp ripgrep
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry ./cmd/code-foundry
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/code-foundry-dictate ./cmd/code-foundry-dictate
+	install -m 755 "$(RIPGREP_BIN)" bin/code-foundry-rg
 
 ## check: everything the sweep on main runs. On success it records the working tree's hash so that
 ## `make attest` can vouch for it once committed and pushed (scripts/attest.sh); a tree
@@ -246,9 +251,9 @@ gui-dev: build
 	cd gui && $(WAILS3) dev
 
 ## package: release assets in dist/ (VERSION=vX.Y.Z required): the app tarball
-## (code-foundry, "Code Foundry", code-foundry-dictate, VERSION), install.sh, checksums.txt.
-## See scripts/package.sh.
-package: ghostty-vt whisper-cpp frontend-deps
+## (code-foundry, "Code Foundry", code-foundry-dictate, code-foundry-rg,
+## THIRD-PARTY-NOTICES.txt, VERSION), install.sh, checksums.txt. See scripts/package.sh.
+package: ghostty-vt whisper-cpp ripgrep frontend-deps
 	VERSION=$(VERSION) RELEASE_REPO=$(RELEASE_REPO) WAILS3=$(WAILS3) MAKE=$(MAKE) ./scripts/package.sh
 
 ## release: manual fallback for .github/workflows/release.yml, stable channel. Next version
@@ -283,6 +288,12 @@ ghostty-vt:
 ## Needs cmake (brew install cmake). No-op once the pkg-config file exists.
 whisper-cpp:
 	@./scripts/whisper-cpp.sh
+
+## ripgrep: fetch the pinned official ripgrep release binary (darwin arm64, sha256-checked)
+## into the shared per-user cache (~/Library/Caches/code-foundry/ripgrep/<key>/rg, override
+## with RIPGREP_CACHE). No-op once it is there.
+ripgrep:
+	@./scripts/ripgrep.sh
 
 clean:
 	rm -rf bin gui/bin dist $(FRONTEND)/dist

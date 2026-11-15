@@ -11,12 +11,12 @@ building on it.
 
 ```
 make gen      # buf generate (Go + TS). Generated code is committed.
-make build    # builds ./bin/code-foundry and ./bin/code-foundry-dictate
+make build    # builds ./bin/code-foundry and ./bin/code-foundry-dictate; copies ripgrep to ./bin/code-foundry-rg
 make check    # gofmt, go vet, staticcheck, go test ./..., frontend typecheck + lint + test
 make gui-e2e  # Playwright (WebKit, 4 workers) against the mock daemon; not part of check
 make drive    # mock daemon + Vite for an agent to drive with `playwright cli` (DAEMON=dev: scratch dev daemon); skill .claude/skills/drive-app
 make dev      # daemon in foreground with text logs; the browser dev frontend on :9245 may call it (CODE_FOUNDRY_DEV_ORIGINS for other ports)
-make package VERSION=vX.Y.Z   # release assets in dist/ (tarball of the three executables + VERSION, install.sh, checksums.txt)
+make package VERSION=vX.Y.Z   # release assets in dist/ (tarball of the four executables + notices + VERSION, install.sh, checksums.txt)
 make release  # manual release fallback (DRY_RUN=1 prints the commands); a tip is released after each green sweep on main
 make gui-build  # builds the GUI, gui/bin/Code Foundry, which `code-foundry gui` launches from ./bin
 make gui-dev    # make build, then the GUI with hot reload (auto-starts the daemon if needed)
