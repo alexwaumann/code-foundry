@@ -297,6 +297,45 @@ func TestLayoutGlueSnoozeKeepsTheSetWithFreshShells(t *testing.T) {
 	}
 }
 
+// A snooze drops the thread's action runs, running or finished, as an archive does: a fresh
+// shell under the action's tab would be an unrelated empty shell. Its shells come back.
+func TestLayoutGlueSnoozeDropsActionRuns(t *testing.T) {
+	e := newGlueEnv(t, []thread.Thread{th("th-a")}, nil)
+	e.apply(&core.OpenThread{Thread: "th-a", Focus: true})
+	sh := e.shell("th-a")
+	e.termTab("th-a", sh)
+	var runs []string
+	for i, name := range []string{"Dev", "Fail"} {
+		tm, err := e.terms.Create(e.ctx, terminal.Spec{Argv: []string{"zsh", "-lc", "x"}, Cwd: glueWT, Labels: termlabel.ActionTerminal("th-a", "pj", glueWT, "ac-"+name, name, "run-"+name)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.termTab("th-a", tm.ID)
+		runs = append(runs, tm.ID)
+		if i == 1 {
+			if err := e.terms.Exit(tm.ID, 3); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	e.goings(e.ctx, "th-a", thread.ShellsSnoozed)
+	for _, id := range append([]string{sh}, runs...) {
+		if err := terminal.KillAndRemove(e.ctx, e.terms, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	settle()
+	rem := e.state().Threads["th-a"].Remembered
+	if rem == nil || len(rem.Tabs) != 1 || rem.Tabs[0].Tab.Params[core.TerminalParam] != sh || rem.Tabs[0].Fresh == nil {
+		t.Fatalf("remembered %+v, want only the shell, marked fresh", rem)
+	}
+	e.publish(thread.Updated{Thread: th("th-a")})
+	e.woken("th-a")
+	if c := e.apply(&core.OpenThread{Thread: "th-a", Focus: true}); len(c.Result.Fresh) != 1 {
+		t.Fatalf("fresh %v, want the shell's tab only", c.Result.Fresh)
+	}
+}
+
 // Archiving closes the thread's tabs everywhere, forgets its record, and ends its terminals:
 // open, remembered running, and in another space. Removing a thread does the same.
 func TestLayoutGlueArchiveAndRemove(t *testing.T) {
