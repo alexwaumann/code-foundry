@@ -72,6 +72,10 @@ Source), and the header gains Copy contents.
   when a read's `truncatedStart` is set, whatever the kind.
 - **Open in editor follows the kind.** `editor: false` drops it from the header and the
   too-large state (a code editor has nothing to show for a video); Open in Finder stays.
+- **A line opens Source.** A tab opened at a line (a path chip, the finder's Text mode) shows
+  Source there until the user picks a mode; the remembered mode stays as it was. `line: false`
+  keeps the preview instead (markdown, HTML). A tail read marks no line in Source: its lines
+  count from the cut (docs/notes/fuzz-2026-11-15-previews.md).
 - **Bodies in their own files.** oxlint's `react/only-export-components` refuses a component
   in a file whose default export is a kind, so a kind file holds the object and its body lives
   beside it (`previews/<Name>Body.tsx`).
@@ -106,7 +110,7 @@ Source), and the header gains Copy contents.
 
    That file is the registration: no other file changes. Optional fields (types.ts says what
    each does): `mime`/`sniff` in `match`, `shows`, `Controls`, `wrap`, `find`, `edit: false`,
-   `editor: false`, `copy`, `tooLarge`, `source`, `icon`, `read`. A sniff runs on every text file once per read:
+   `editor: false`, `line: false`, `copy`, `tooLarge`, `source`, `icon`, `read`. A sniff runs on every text file once per read:
    one cheap scan (`text.includes("\u001b[")`), never a parse.
 3. **Vitest.**
    - Matching: add rows to the `it.each` in `previews/registry.test.ts` (`"diagram.mmd" →

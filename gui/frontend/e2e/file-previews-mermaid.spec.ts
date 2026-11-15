@@ -88,6 +88,14 @@ test("a diagram wider than the pane can shrink it to scrolls sideways", async ({
   expect((await size(svg)).width).toBeGreaterThanOrEqual(Math.floor(natural * 0.6));
 });
 
+test("a Gantt chart is drawn at a width of its own, not as wide as the 2000px box Mermaid renders in", async ({ page }) => {
+  await openFile(page, "docs/plan.mmd");
+  const svg = file(page).locator("[data-testid=file-mermaid-diagram] svg");
+  await expect(svg).toBeVisible();
+  expect(await svg.evaluate((el) => (el as SVGSVGElement).viewBox.baseVal.width)).toBe(800);
+  expect((await size(svg)).width).toBeLessThanOrEqual(800);
+});
+
 test("a diagram that does not parse: the message, and Show source opens Source", async ({ page }) => {
   await openFile(page, "docs/broken.mmd");
   await expect(file(page).getByTestId("file-mermaid-message")).toContainText("Parse error on line 3");

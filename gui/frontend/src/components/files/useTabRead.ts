@@ -6,7 +6,7 @@
  * on the refresh button, when the window becomes visible, when the daemon recomputes the
  * file's worktree (worktree_detail_updated, seen through the worktree detail resource),
  * and when the visible thread's Edit, MultiEdit, Write or NotebookEdit on the file
- * finishes; a file outside every project, whenever its stamp changes (useFileChanges).
+ * finishes; and whenever the file's stamp changes (useFileChanges).
  * Event-driven reads are debounced.
  */
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
