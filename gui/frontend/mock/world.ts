@@ -308,6 +308,14 @@ function shellLabels(threadId: string, projectId: string, worktree: string): Rec
   return l;
 }
 
+/** What the layout glue remembers of a thread between its changes. */
+interface LayoutSeen {
+  archived: boolean;
+  snoozed: boolean;
+  pinned: boolean;
+  name: string;
+}
+
 /** thread.archive archives (rather than unarchives): its `archived` arg, else the opposite of now. */
 function archiving(s: { archivedAt: Date | null }, args: Record<string, string>): boolean {
   return args.archived === undefined || args.archived === "" ? s.archivedAt === null : args.archived === "true";
@@ -2295,6 +2303,7 @@ export class World {
     // Create records every checkout that exists (the daemon's placement); the rest at a later start.
     s.checkoutPaths = { ...this.recordedPaths(s), ...o.checkoutPaths };
     this.threads.set(s.id, s);
+    this.layoutSeen.set(s.id, { archived: s.archivedAt !== null, snoozed: s.snoozedUntil !== null || s.savedAt !== null, pinned: s.pinned, name: s.name });
     return s;
   }
 
@@ -2437,6 +2446,24 @@ export class World {
   private publishThread(s: MockThread): void {
     this.threadListEvents.publish({ event: { case: "updated", value: this.threadMsg(s) } });
     if (this.ember.watches(s.id)) this.ember.changed();
+    this.layoutGlue(s);
+  }
+
+  /** What the layout glue last saw of each thread (the daemon's glue remembers the same). */
+  private layoutSeen = new Map<string, LayoutSeen>();
+
+  /**
+   * The daemon's layout glue for a thread's change (internal/daemon/layout.go): unarchived, woken,
+   * renamed or pinned keeps its tab when that is a preview; a wake clears the layout's snoozed mark.
+   */
+  private layoutGlue(s: MockThread): void {
+    const now: LayoutSeen = { archived: s.archivedAt !== null, snoozed: s.snoozedUntil !== null || s.savedAt !== null, pinned: s.pinned, name: s.name };
+    const was = this.layoutSeen.get(s.id);
+    this.layoutSeen.set(s.id, now);
+    if (!was) return;
+    const woke = was.snoozed && !now.snoozed;
+    const keep = woke || (was.archived && !now.archived) || (!was.pinned && now.pinned) || was.name !== now.name;
+    if (woke || keep) this.layout.threadChanged(s.id, { woke, keep });
   }
 
   /**

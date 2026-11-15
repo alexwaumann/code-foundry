@@ -342,6 +342,27 @@ describe("the thread's header in a shell pane", () => {
     expect(runs).toEqual([{ name: "thread.close", args: { id: "s-1" }, thread: "" }]);
   });
 
+  it("for a preview tab the menu starts with Keep open, which keeps it (tab.keep); a kept tab's menu has no such item", async () => {
+    const previewed = structuredClone(LAYOUT);
+    const root = previewed.spaces[0]?.root;
+    const first = root?.t === "split" ? root.kids[0] : undefined;
+    if (first?.t !== "pane") throw new Error("fixture");
+    first.tabs = first.tabs.map((t) => (t.id === "t-th" ? { ...t, preview: true } : t));
+    await seedLayout({ ...previewed, rev: 2 });
+    render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+    fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
+    const menu = screen.getByTestId("thread-header-menu");
+    expect(entries(menu).slice(0, 4)).toEqual(["Keep open", "—", "Open", "Move to space"]);
+    fireEvent.click(within(menu).getByTestId("menu-keep-open"));
+    await settle();
+    expect(runs).toEqual([{ name: "tab.keep", args: { tab: "t-th" }, thread: "" }]);
+    cleanup();
+    // The other thread of the pane is kept: its header has no Keep open.
+    render(<ThreadHeader threadId="s-2" paneId="p-1" />);
+    fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
+    expect(within(screen.getByTestId("thread-header-menu")).queryByTestId("menu-keep-open")).toBeNull();
+  });
+
   it("Move to space ▸ lists the real spaces with their glyphs and moves the thread with thread.space.move", async () => {
     await seedLayout({ ...LAYOUT, rev: 2, spaces: [...LAYOUT.spaces, space(pane("p-9", [tab("t-9", "prs")]), "p-9", { id: "sp-b", name: "Review" })] });
     render(<ThreadHeader threadId="s-1" paneId="p-1" />);

@@ -35,6 +35,7 @@ const SETUP_PLACEHOLDER = "Add to your message. It goes in once Claude starts.";
 const BLOCKING_PLACEHOLDER = "You can reply once Claude has started.";
 import { cn } from "@/lib/utils";
 import { addAttachments, openPreview, updateDraft, useDraft } from "@/stores/compose";
+import { useKeepPreviewOnDraft } from "@/shell/preview";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { loadSkills } from "@/stores/skills";
@@ -148,6 +149,8 @@ export function ThreadComposer({
   askStrip?: string | null;
 }) {
   const draftKey = threadDraftKey(threadId);
+  // Writing to a preview tab's thread keeps its tab (shell/preview.ts).
+  useKeepPreviewOnDraft(threadId);
   const text = useDraft(draftKey, "text");
   const hasAttachments = useDraft(draftKey, "attachments").length > 0;
   const phase = useDraft(draftKey, "phase");

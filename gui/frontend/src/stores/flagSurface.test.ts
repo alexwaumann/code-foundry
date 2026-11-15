@@ -139,6 +139,14 @@ describe("opening a thread from a row, a Needs you card or its popup (selectThre
     });
   });
 
+  it("as a preview (an Archived or Snoozed row) it opens no flag surface, which would keep the preview at once", async () => {
+    listed(thread, [cmd("plugin.test-watcher.show.tests", true)]);
+    selectThreadAndFlag("s-1", { preview: true });
+    expect(useUiStore.getState().selection).toEqual(thread);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(tabPlace("thread:s-1").tabs).toHaveLength(0);
+  });
+
   it("only selects a thread without a flag", () => {
     selectThreadAndFlag("s-2");
     expect(useUiStore.getState().selection).toEqual({ kind: "thread", id: "s-2" });

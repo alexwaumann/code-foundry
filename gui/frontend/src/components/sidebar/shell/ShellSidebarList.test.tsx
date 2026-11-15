@@ -400,7 +400,7 @@ describe("dragging Snoozed and Archived rows", () => {
   });
 
   // First: after a drag, dnd-kit swallows the next click for 50 ms (docs/notes/testing-gotchas.md).
-  it("a click still opens the thread (thread.open), archived or snoozed", async () => {
+  it("a click opens the thread as the space's preview (thread.open --preview), archived or snoozed; an active row's does not", async () => {
     render(
       <Dnd>
         <ShellSidebarList bodyHeight={800} />
@@ -410,9 +410,35 @@ describe("dragging Snoozed and Archived rows", () => {
     await settle();
     fireEvent.click(rowOf("s:s-8"));
     await settle();
+    fireEvent.click(rowOf("s:s-1"));
+    await settle();
     expect(runs).toEqual([
-      { name: "thread.open", args: { id: "s-7", focus: "true" } },
-      { name: "thread.open", args: { id: "s-8", focus: "true" } },
+      { name: "thread.open", args: { id: "s-7", focus: "true", preview: "true" } },
+      { name: "thread.open", args: { id: "s-8", focus: "true", preview: "true" } },
+      { name: "thread.open", args: { id: "s-1", focus: "true" } },
+    ]);
+  });
+
+  it("the keyboard's activate on an Archived or Snoozed row opens it as a preview too", async () => {
+    render(
+      <Dnd>
+        <ShellSidebarList bodyHeight={800} />
+      </Dnd>,
+    );
+    list().focus();
+    for (const [key, press] of [
+      ["s:s-7", "Enter"],
+      ["s:s-8", " "],
+    ] as const) {
+      act(() => {
+        useUiStore.getState().setCursor(key);
+      });
+      fireEvent.keyDown(list(), { key: press });
+      await settle();
+    }
+    expect(runs).toEqual([
+      { name: "thread.open", args: { id: "s-7", focus: "true", preview: "true" } },
+      { name: "thread.open", args: { id: "s-8", focus: "true", preview: "true" } },
     ]);
   });
 

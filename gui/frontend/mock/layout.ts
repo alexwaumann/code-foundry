@@ -1981,6 +1981,20 @@ export class MockLayout {
     this.commit(decodeState(make ? make() : raw), "");
   }
 
+  /**
+   * The daemon's glue for a thread that changed (internal/daemon/layout.go): a wake clears the
+   * layout's snoozed mark (Go's set_snoozed, without bringing back a set: the mock's open never
+   * holds one back); `keep` (unarchived, woken, renamed or pinned) keeps its tab when that is a
+   * preview. Not an op: no GUI sends it.
+   */
+  threadChanged(thread: string, c: { woke: boolean; keep: boolean }): void {
+    const next = structuredClone(this.st);
+    const ts = next.threads?.[thread];
+    if (c.woke && ts?.snoozed) delete ts.snoozed;
+    if (c.keep) keepThread(next, thread);
+    this.commit(next, "");
+  }
+
   /** Back to a new database's layout; the rev keeps counting, as a client may hold one. */
   reset(): void {
     this.applied = [];

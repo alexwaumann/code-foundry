@@ -103,8 +103,14 @@ export function showFlagSurface(kind: string, threadId: string): void {
  * Opens a thread from a sidebar row or a Needs you card or popup: selects it (its tab focused or
  * opened in the focused pane) and, when its line shows a plugin's flag, opens that plugin's
  * surface for it (openFlagSurface: in the window shell a linked tab placed by the rules).
+ * `preview` (an Archived or Snoozed row) opens it as the space's preview tab and opens no flag
+ * surface: opening one of its surfaces would keep the preview at once.
  */
-export function selectThreadAndFlag(threadId: string): void {
+export function selectThreadAndFlag(threadId: string, opts: { preview?: boolean } = {}): void {
+  if (opts.preview) {
+    useUiStore.getState().select({ kind: "thread", id: threadId }, { focusPrompt: true, preview: true });
+    return;
+  }
   const flag = shownFlag(useThreadsStore.getState().byId[threadId]);
   useUiStore.getState().select({ kind: "thread", id: threadId }, { focusPrompt: true });
   if (flag) void openFlagSurface(threadId, flag.plugin);

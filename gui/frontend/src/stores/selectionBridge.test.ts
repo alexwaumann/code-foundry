@@ -78,6 +78,9 @@ describe("routing a selection", () => {
     const s = useLayoutStore.getState();
     expect(planRoute({ kind: "thread", id: "s-1" }, s)).toEqual({ kind: "stay" });
     expect(planRoute({ kind: "thread", id: "s-2" }, s)).toEqual({ kind: "command", name: "thread.open", args: { id: "s-2", focus: "true" } });
+    // An Archived or Snoozed row asks for a preview; the daemon decides whether it is one.
+    expect(planRoute({ kind: "thread", id: "s-2" }, s, { preview: true })).toEqual({ kind: "command", name: "thread.open", args: { id: "s-2", focus: "true", preview: "true" } });
+    expect(planRoute({ kind: "thread", id: "s-1" }, s, { preview: true })).toEqual({ kind: "stay" });
   });
 
   it("a thread selected while a composer has the focus opens beside it: only a send's --compose replaces a composer", async () => {
