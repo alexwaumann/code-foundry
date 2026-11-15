@@ -240,7 +240,7 @@ func TestFileIndexLookupDropsExpired(t *testing.T) {
 	now := time.Unix(1000, 0)
 	x := NewFileIndex(nil)
 	x.now = func() time.Time { return now }
-	x.list = func(_ context.Context, dir string, _ bool) ([]FileEntry, error) {
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, error) {
 		if dir == "/b" {
 			return nil, errors.New("cannot list")
 		}
@@ -311,7 +311,7 @@ func TestFileIndexListingOutlivesCancelledSearch(t *testing.T) {
 	var listings atomic.Int32
 	started, release := make(chan struct{}), make(chan struct{})
 	var listCtxErr error // set before the listing returns, read after a search sees it
-	x.list = func(ctx context.Context, _ string, _ bool) ([]FileEntry, error) {
+	x.list = func(ctx context.Context, _ string, _ bool, _ []string) ([]FileEntry, error) {
 		listings.Add(1)
 		close(started)
 		<-release
@@ -370,7 +370,7 @@ func TestFileIndexConcurrentMissesShareOneListing(t *testing.T) {
 	x := NewFileIndex(nil)
 	var listings atomic.Int32
 	release := make(chan struct{})
-	x.list = func(context.Context, string, bool) ([]FileEntry, error) {
+	x.list = func(context.Context, string, bool, []string) ([]FileEntry, error) {
 		listings.Add(1)
 		<-release
 		return []FileEntry{{Path: "a.go"}}, nil
@@ -515,7 +515,7 @@ func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
 	x := NewFileIndex(nil)
 	var started sync.WaitGroup
 	started.Add(2)
-	x.list = func(_ context.Context, dir string, _ bool) ([]FileEntry, error) {
+	x.list = func(_ context.Context, dir string, _ bool, _ []string) ([]FileEntry, error) {
 		started.Done()
 		started.Wait() // both listings must be running for either to finish
 		if dir == "/bad" {
@@ -530,7 +530,9 @@ func TestFileIndexSearchSourcesListsConcurrently(t *testing.T) {
 		t.Fatalf("err = %v, want list /bad: boom", err)
 	}
 	// The good source's list is cached; the bad one is listed again.
-	x.list = func(context.Context, string, bool) ([]FileEntry, error) { return []FileEntry{{Path: "b.go"}}, nil }
+	x.list = func(context.Context, string, bool, []string) ([]FileEntry, error) {
+		return []FileEntry{{Path: "b.go"}}, nil
+	}
 	ms, _, err := x.SearchSources(ctx, []Source{{Dir: "/a"}, {Dir: "/bad"}}, "", 0, false)
 	if err != nil {
 		t.Fatal(err)

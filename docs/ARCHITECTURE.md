@@ -167,7 +167,8 @@ internal/
   skills/                  the Claude Code skills written for every thread at daemon start
                            (the entry skill, orchestrate, help, plugin, pages), and Ember's own (ember)
   pluginscaffold/          `plugin new`: a plugin repository from the minimal example (§10)
-  fsx/                     the home-directory boundary, directory completion, file reads and writes
+  fsx/                     the home-directory boundary, directory completion, file reads and writes,
+                           file search's candidates and the ignored files include patterns add
   fuzzy/                   path ranking for `@` completion and the file finder (pure)
   logfile/                 a size-capped log file with one rotation (daemon and plugin logs)
   model/                   the one list of Claude models the app offers
@@ -466,6 +467,9 @@ Services (v1):
   a checkout's git-listed or walked files, cached ~5s) feed the composer's `/` and `@`
   completion (`docs/notes/composer-tags-1-daemon.md`; the GUI's tags and `/` card:
   `docs/notes/composer-tags-3-skills.md`; the `@` card: `docs/notes/composer-tags-4-files.md`).
+  SearchFiles also lists the git-ignored files that include patterns name (the
+  `files.include_ignored` setting plus each project's own, `ProjectService.SetIncludeIgnored`),
+  marked `ignored`; SuggestIncludeIgnored helps add one (`docs/notes/file-search-1-includes.md`).
   ReadFile and WriteFile serve the file viewer: WriteFile replaces a file atomically
   anywhere under home except the config home outside its checkouts, and answers a file
   that changed since the read with a plain `conflict` field (`docs/notes/file-edit-1-daemon.md`).

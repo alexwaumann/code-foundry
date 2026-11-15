@@ -82,6 +82,9 @@ const (
 	ProjectServiceInitGitProcedure = "/codefoundry.v1.ProjectService/InitGit"
 	// ProjectServiceRenameProcedure is the fully-qualified name of the ProjectService's Rename RPC.
 	ProjectServiceRenameProcedure = "/codefoundry.v1.ProjectService/Rename"
+	// ProjectServiceSetIncludeIgnoredProcedure is the fully-qualified name of the ProjectService's
+	// SetIncludeIgnored RPC.
+	ProjectServiceSetIncludeIgnoredProcedure = "/codefoundry.v1.ProjectService/SetIncludeIgnored"
 	// ProjectServiceSearchGitHubProcedure is the fully-qualified name of the ProjectService's
 	// SearchGitHub RPC.
 	ProjectServiceSearchGitHubProcedure = "/codefoundry.v1.ProjectService/SearchGitHub"
@@ -186,6 +189,14 @@ type ProjectServiceClient interface {
 	// project's id; FailedPrecondition when another project has the name (any case), as
 	// project refs resolve a name only when exactly one project has it.
 	Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error)
+	// SetIncludeIgnored replaces a project's include patterns: git-ignored files its file
+	// search (Go to File, @ completion) lists too, on top of the files.include_ignored
+	// setting's (FilesystemService.SearchFiles). Each pattern is trimmed and repeats are
+	// dropped; an empty list clears them. InvalidArgument for an empty pattern, one over 200
+	// bytes, with a control character or a comma, starting with "!", "#", "/" or "~/", with
+	// a ".", ".." or empty segment, more than four "**" segments or a malformed glob, or
+	// more than 100 patterns. NotFound for an unknown project. Publishes the project.
+	SetIncludeIgnored(context.Context, *connect.Request[v1.SetIncludeIgnoredRequest]) (*connect.Response[v1.SetIncludeIgnoredResponse], error)
 	// SearchGitHub searches github.com repositories with GitHub's search syntax and
 	// returns the first 20 matches, best match first. The Add Project dialog sends it on
 	// Enter, never per keystroke. InvalidArgument for an empty query.
@@ -349,6 +360,12 @@ func NewProjectServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(projectServiceMethods.ByName("Rename")),
 			connect.WithClientOptions(opts...),
 		),
+		setIncludeIgnored: connect.NewClient[v1.SetIncludeIgnoredRequest, v1.SetIncludeIgnoredResponse](
+			httpClient,
+			baseURL+ProjectServiceSetIncludeIgnoredProcedure,
+			connect.WithSchema(projectServiceMethods.ByName("SetIncludeIgnored")),
+			connect.WithClientOptions(opts...),
+		),
 		searchGitHub: connect.NewClient[v1.SearchGitHubRequest, v1.SearchGitHubResponse](
 			httpClient,
 			baseURL+ProjectServiceSearchGitHubProcedure,
@@ -415,6 +432,7 @@ type projectServiceClient struct {
 	listRefs               *connect.Client[v1.ListRefsRequest, v1.ListRefsResponse]
 	initGit                *connect.Client[v1.InitGitRequest, v1.InitGitResponse]
 	rename                 *connect.Client[v1.RenameProjectRequest, v1.RenameProjectResponse]
+	setIncludeIgnored      *connect.Client[v1.SetIncludeIgnoredRequest, v1.SetIncludeIgnoredResponse]
 	searchGitHub           *connect.Client[v1.SearchGitHubRequest, v1.SearchGitHubResponse]
 	lookupGitHub           *connect.Client[v1.LookupGitHubRequest, v1.LookupGitHubResponse]
 	clone                  *connect.Client[v1.CloneProjectRequest, v1.CloneProjectEvent]
@@ -517,6 +535,11 @@ func (c *projectServiceClient) InitGit(ctx context.Context, req *connect.Request
 // Rename calls codefoundry.v1.ProjectService.Rename.
 func (c *projectServiceClient) Rename(ctx context.Context, req *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error) {
 	return c.rename.CallUnary(ctx, req)
+}
+
+// SetIncludeIgnored calls codefoundry.v1.ProjectService.SetIncludeIgnored.
+func (c *projectServiceClient) SetIncludeIgnored(ctx context.Context, req *connect.Request[v1.SetIncludeIgnoredRequest]) (*connect.Response[v1.SetIncludeIgnoredResponse], error) {
+	return c.setIncludeIgnored.CallUnary(ctx, req)
 }
 
 // SearchGitHub calls codefoundry.v1.ProjectService.SearchGitHub.
@@ -639,6 +662,14 @@ type ProjectServiceHandler interface {
 	// project's id; FailedPrecondition when another project has the name (any case), as
 	// project refs resolve a name only when exactly one project has it.
 	Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error)
+	// SetIncludeIgnored replaces a project's include patterns: git-ignored files its file
+	// search (Go to File, @ completion) lists too, on top of the files.include_ignored
+	// setting's (FilesystemService.SearchFiles). Each pattern is trimmed and repeats are
+	// dropped; an empty list clears them. InvalidArgument for an empty pattern, one over 200
+	// bytes, with a control character or a comma, starting with "!", "#", "/" or "~/", with
+	// a ".", ".." or empty segment, more than four "**" segments or a malformed glob, or
+	// more than 100 patterns. NotFound for an unknown project. Publishes the project.
+	SetIncludeIgnored(context.Context, *connect.Request[v1.SetIncludeIgnoredRequest]) (*connect.Response[v1.SetIncludeIgnoredResponse], error)
 	// SearchGitHub searches github.com repositories with GitHub's search syntax and
 	// returns the first 20 matches, best match first. The Add Project dialog sends it on
 	// Enter, never per keystroke. InvalidArgument for an empty query.
@@ -798,6 +829,12 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 		connect.WithSchema(projectServiceMethods.ByName("Rename")),
 		connect.WithHandlerOptions(opts...),
 	)
+	projectServiceSetIncludeIgnoredHandler := connect.NewUnaryHandler(
+		ProjectServiceSetIncludeIgnoredProcedure,
+		svc.SetIncludeIgnored,
+		connect.WithSchema(projectServiceMethods.ByName("SetIncludeIgnored")),
+		connect.WithHandlerOptions(opts...),
+	)
 	projectServiceSearchGitHubHandler := connect.NewUnaryHandler(
 		ProjectServiceSearchGitHubProcedure,
 		svc.SearchGitHub,
@@ -880,6 +917,8 @@ func NewProjectServiceHandler(svc ProjectServiceHandler, opts ...connect.Handler
 			projectServiceInitGitHandler.ServeHTTP(w, r)
 		case ProjectServiceRenameProcedure:
 			projectServiceRenameHandler.ServeHTTP(w, r)
+		case ProjectServiceSetIncludeIgnoredProcedure:
+			projectServiceSetIncludeIgnoredHandler.ServeHTTP(w, r)
 		case ProjectServiceSearchGitHubProcedure:
 			projectServiceSearchGitHubHandler.ServeHTTP(w, r)
 		case ProjectServiceLookupGitHubProcedure:
@@ -977,6 +1016,10 @@ func (UnimplementedProjectServiceHandler) InitGit(context.Context, *connect.Requ
 
 func (UnimplementedProjectServiceHandler) Rename(context.Context, *connect.Request[v1.RenameProjectRequest]) (*connect.Response[v1.RenameProjectResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.Rename is not implemented"))
+}
+
+func (UnimplementedProjectServiceHandler) SetIncludeIgnored(context.Context, *connect.Request[v1.SetIncludeIgnoredRequest]) (*connect.Response[v1.SetIncludeIgnoredResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ProjectService.SetIncludeIgnored is not implemented"))
 }
 
 func (UnimplementedProjectServiceHandler) SearchGitHub(context.Context, *connect.Request[v1.SearchGitHubRequest]) (*connect.Response[v1.SearchGitHubResponse], error) {

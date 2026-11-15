@@ -717,3 +717,36 @@ func TestUserOnlyFields(t *testing.T) {
 		t.Errorf("user-only fields = %v, want %v", got, want)
 	}
 }
+
+// files.include_ignored: the default is the three patterns; a value without one of them
+// stays as set (removing a default is not "unset"), none is no patterns, and an invalid
+// pattern is an issue that keeps the default.
+func TestIncludeIgnoredField(t *testing.T) {
+	tests := []struct {
+		raw, want, issue string
+	}{
+		{raw: "", want: DefaultIncludeIgnored},
+		{raw: "CLAUDE.local.md, .claude/settings.local.json", want: "CLAUDE.local.md, .claude/settings.local.json"},
+		{raw: "none", want: "none"},
+		{raw: ".env*, docs/scratch/", want: ".env*, docs/scratch/"},
+		{raw: ".env*, !x", want: DefaultIncludeIgnored, issue: "starts with !"},
+		{raw: "/etc/hosts", want: DefaultIncludeIgnored, issue: "relative to the project"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			r := resolve(map[string]string{KeyIncludeIgnored: tt.raw}, nil)
+			if got := r.settings.Files.IncludeIgnored; got != tt.want {
+				t.Errorf("value = %q, want %q", got, tt.want)
+			}
+			var issue string
+			for _, is := range r.issues {
+				if is.Key == KeyIncludeIgnored {
+					issue = is.Message
+				}
+			}
+			if (tt.issue == "") != (issue == "") || !strings.Contains(issue, tt.issue) {
+				t.Errorf("issue = %q, want %q", issue, tt.issue)
+			}
+		})
+	}
+}

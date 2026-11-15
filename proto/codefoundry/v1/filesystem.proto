@@ -57,6 +57,19 @@ service FilesystemService {
   // more than 8 words is InvalidArgument.
   rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse) {}
 
+  // SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
+  // project or to the files.include_ignored setting. It lists the git-ignored entries of
+  // the project's main worktree as git reports them (git ls-files -oi --exclude-standard
+  // --directory): files git looked at one by one, and wholly ignored folders collapsed,
+  // each with its file count. The typed text filters and ranks them like a file search
+  // (glob characters dropped; an empty text lists the shallowest first), and is counted as
+  // a pattern on its own: how many files it would include. Folders are counted up to
+  // 1,000 files each, within 50,000 entries read for the whole answer, never following
+  // links. Bounded at 10 seconds; cancelling the request stops it. NotFound for an unknown
+  // project; FailedPrecondition for a project without git (it has no ignored files);
+  // InvalidArgument for a negative limit.
+  rpc SuggestIncludeIgnored(SuggestIncludeIgnoredRequest) returns (SuggestIncludeIgnoredResponse) {}
+
   // ReadFile reads one file for the file viewer. path is absolute, or relative to
   // base_dir (a thread's worktree, or the home directory); "~/" is the home
   // directory. Symlinks are followed, and the file they lead to must be under the
@@ -240,6 +253,10 @@ message FileMatch {
   // that project words matched, ascending and without repeats; empty when every word
   // matched the path.
   repeated int32 project_positions = 6;
+  // Git ignores this file, and an include pattern lists it anyway: the files.include_ignored
+  // setting's or the project's (Project.include_ignored). A directory: only included
+  // ignored files are under it.
+  bool ignored = 7;
 }
 
 message SearchFilesResponse {
@@ -247,6 +264,46 @@ message SearchFilesResponse {
   repeated FileMatch matches = 1;
   // More entries matched than were returned.
   bool truncated = 2;
+}
+
+message SuggestIncludeIgnoredRequest {
+  string project_id = 1;
+  // What the user typed in the add field.
+  string text = 2;
+  // Maximum suggestions. Zero means 20; at most 100.
+  int32 limit = 3;
+}
+
+message IgnoredSuggestion {
+  // Relative to the project's main worktree, forward slashes, no trailing "/".
+  string path = 1;
+  // A folder git ignores as a whole (git did not look inside it).
+  bool is_dir = 2;
+  // The folder's files, links counted as files, .git skipped; 0 for a file. With
+  // file_count_capped, at least this many (0 and capped: not counted, the budget ran out).
+  int32 file_count = 3;
+  bool file_count_capped = 4;
+  // The project's effective patterns (the setting's and its own) already include it as a
+  // whole: the file, or every file in the folder.
+  bool included = 5;
+  // The typed text, as a pattern, includes it as a whole.
+  bool matches_text = 6;
+  // Indices (code points) of the characters of path the text matched, for highlighting.
+  repeated int32 path_positions = 7;
+}
+
+message SuggestIncludeIgnoredResponse {
+  // Best match first.
+  repeated IgnoredSuggestion suggestions = 1;
+  // More entries matched than were returned.
+  bool truncated = 2;
+  // How many files the typed text includes as a pattern on its own, in the main worktree;
+  // 0 for an empty or invalid text. With text_files_capped, at least this many.
+  int32 text_files = 3;
+  bool text_files_capped = 4;
+  // Why the typed text is not a valid pattern (SetIncludeIgnored's rules), for showing
+  // under the field; empty when it is valid or empty.
+  string text_error = 5;
 }
 
 message ReadFileRequest {

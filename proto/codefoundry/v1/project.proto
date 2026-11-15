@@ -90,6 +90,14 @@ service ProjectService {
   // project's id; FailedPrecondition when another project has the name (any case), as
   // project refs resolve a name only when exactly one project has it.
   rpc Rename(RenameProjectRequest) returns (RenameProjectResponse) {}
+  // SetIncludeIgnored replaces a project's include patterns: git-ignored files its file
+  // search (Go to File, @ completion) lists too, on top of the files.include_ignored
+  // setting's (FilesystemService.SearchFiles). Each pattern is trimmed and repeats are
+  // dropped; an empty list clears them. InvalidArgument for an empty pattern, one over 200
+  // bytes, with a control character or a comma, starting with "!", "#", "/" or "~/", with
+  // a ".", ".." or empty segment, more than four "**" segments or a malformed glob, or
+  // more than 100 patterns. NotFound for an unknown project. Publishes the project.
+  rpc SetIncludeIgnored(SetIncludeIgnoredRequest) returns (SetIncludeIgnoredResponse) {}
   // SearchGitHub searches github.com repositories with GitHub's search syntax and
   // returns the first 20 matches, best match first. The Add Project dialog sends it on
   // Enter, never per keystroke. InvalidArgument for an empty query.
@@ -156,6 +164,10 @@ message Project {
   // local origin's path as it is. Empty without an origin. pr.task uses it to tell a
   // clone whose origin is not recognised as GitHub (an SSH host alias) from no clone.
   string origin_path = 11;
+  // The project's own include patterns, in the order set (SetIncludeIgnored): .gitignore-
+  // style patterns of git-ignored files its file search lists too, added to the
+  // files.include_ignored setting's. Empty when it has none.
+  repeated string include_ignored = 12;
 }
 
 message Worktree {
@@ -435,6 +447,16 @@ message RenameProjectRequest {
 }
 
 message RenameProjectResponse {
+  Project project = 1;
+}
+
+message SetIncludeIgnoredRequest {
+  string id = 1;
+  // The whole list, replacing the project's; empty clears it.
+  repeated string patterns = 2;
+}
+
+message SetIncludeIgnoredResponse {
   Project project = 1;
 }
 

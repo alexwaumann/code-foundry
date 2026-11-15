@@ -23,6 +23,7 @@ import { cloneExists } from "./clone";
 import { folderInfo, HOME, projectFolder } from "./filesystem";
 import { projectCommands } from "./create";
 import { renameCommands } from "./projectRename";
+import { includeCommands } from "./includeIgnored";
 import { Hub } from "./hub";
 import { contextWindow, MockSettings, MODEL_VALUES } from "./settings";
 import { MockBackdrops } from "./backdrops";
@@ -466,6 +467,8 @@ interface MockProject {
    * project.git.init. Absent means git.
    */
   git?: boolean;
+  /** The project's own include patterns (ProjectService.SetIncludeIgnored; mock/includeIgnored.ts). */
+  includeIgnored?: string[];
   worktrees: MockWorktree[];
 }
 
@@ -3845,7 +3848,17 @@ export class World {
   }
 
   projectMsg(r: MockProject): ProjectInit {
-    return { id: r.id, path: r.path, name: r.name, defaultBranch: r.defaultBranch, githubSlug: r.githubSlug, remotes: r.remotes, git: r.git !== false, worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)) };
+    return {
+      id: r.id,
+      path: r.path,
+      name: r.name,
+      defaultBranch: r.defaultBranch,
+      githubSlug: r.githubSlug,
+      remotes: r.remotes,
+      git: r.git !== false,
+      includeIgnored: r.includeIgnored ?? [],
+      worktrees: r.worktrees.map((w) => this.worktreeMsg(r.id, w)),
+    };
   }
 
   /** A typed path as the daemon's handlers take it: "~" expanded, absolute, cleaned, under home. */
@@ -4026,6 +4039,19 @@ export class World {
     if (!project) return;
     project.name = name;
     this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(project) } });
+  }
+
+  /** ProjectService.SetIncludeIgnored and project.files.include (mock/includeIgnored.ts). */
+  setProjectIncludes(id: string, patterns: string[]): void {
+    const project = this.projects.get(id);
+    if (!project) return;
+    const same = (project.includeIgnored ?? []).join("\0") === patterns.join("\0");
+    project.includeIgnored = patterns;
+    if (!same) this.projectEvents.publish({ event: { case: "projectUpdated", value: this.projectMsg(project) } });
+  }
+
+  projectIncludes(id: string): string[] {
+    return this.projects.get(id)?.includeIgnored ?? [];
   }
 
   /** ProjectService.Publish succeeded: origin on GitHub, main tracking origin/main. */
@@ -5273,6 +5299,7 @@ export class World {
       }),
       ...projectCommands(this),
       ...renameCommands(this),
+      ...includeCommands(this),
       ...layoutCommands({
         layout: this.layout,
         hasThread: (id) => this.threads.has(id),

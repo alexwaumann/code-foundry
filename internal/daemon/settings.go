@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alexwaumann/code-foundry/internal/command"
+	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/store/update"
@@ -109,6 +110,12 @@ func branchNaming(st *settings.Store) func() thread.BranchNaming {
 // applies without a restart.
 func baseFromOrigin(st *settings.Store) func() bool {
 	return func() bool { return st.Settings().Projects.BaseFromOrigin }
+}
+
+// includeIgnored is file search's files.include_ignored patterns, read at every search
+// (docs/notes/file-search-1-includes.md).
+func includeIgnored(st *settings.Store) func() []string {
+	return func() []string { return fsx.SplitIncludeSetting(st.Settings().Files.IncludeIgnored) }
 }
 
 // newWorktreeDefault is the thread store's Options.NewWorktreeDefault: whether

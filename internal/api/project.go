@@ -277,7 +277,7 @@ func projectToProto(r project.Project) *v1.Project {
 	p := &v1.Project{
 		Id: r.ID, Path: r.Path, Name: r.Name, DefaultBranch: r.DefaultBranch,
 		GithubSlug: r.GitHubSlug, OriginPath: r.OriginPath, Error: r.Error, Remotes: r.Remotes, Git: r.Git,
-		Worktrees: make([]*v1.Worktree, len(r.Worktrees)),
+		IncludeIgnored: r.IncludeIgnored, Worktrees: make([]*v1.Worktree, len(r.Worktrees)),
 	}
 	p.RegisteredAt = timestamp(r.RegisteredAt)
 	for i, w := range r.Worktrees {

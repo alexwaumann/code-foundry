@@ -8,6 +8,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { SettingType, type SettingFieldSchema, type SettingGroupSchema, type SettingsSnapshotSchema } from "../src/gen/codefoundry/v1/settings_pb";
 import { DEFAULT_DARK, DEFAULT_LIGHT, themesFor } from "../src/themes";
 import { MODELS } from "./models";
+import { checkIncludeSetting, DEFAULT_INCLUDE_IGNORED } from "./includeIgnored";
 import { FIXTURE_REGISTRY } from "./pluginRegistry";
 
 type FieldInit = MessageInitShape<typeof SettingFieldSchema> & { key: string; type: SettingType; defaultValue: string; group: string; page: string; section: string };
@@ -32,6 +33,7 @@ export const groups: GroupInit[] = [
   { id: "models", title: "Models", description: "The models Code Foundry uses for its own jobs." },
   { id: "github", title: "GitHub", description: "Pull requests and checks, read with your gh login." },
   { id: "projects", title: "Projects", description: "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin." },
+  { id: "files", title: "Files", description: "What Go to File and @ completion find." },
   { id: "gitops", title: "Git operations", description: "How worktrees are handed to other apps." },
   { id: "appearance", title: "Appearance", description: "Scheme, themes, terminal font, density and backdrop. Applied live in every window." },
   { id: "notifications", title: "Notifications", description: "How the Dock tells you a thread needs you. macOS banners aren't available to this app." },
@@ -63,6 +65,7 @@ export const staticPages: PageInit[] = [
       { id: "threads", title: "Threads" },
       { id: "textgen", title: "Text generation", description: "Models for small jobs like naming a thread." },
       { id: "lifecycle", title: "Lifecycle" },
+      { id: "files", title: "Files", description: "What Go to File and @ completion find." },
       { id: "dictation", title: "Dictation", description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it." },
       { id: "updates", title: "Updates" },
     ],
@@ -158,7 +161,7 @@ export function checkModelList(v: string): void {
 }
 
 /** Field.check beyond the type's parse, by key. */
-const checks: Record<string, (v: string) => void> = { "ember.worker_models": checkModelList };
+const checks: Record<string, (v: string) => void> = { "ember.worker_models": checkModelList, "files.include_ignored": checkIncludeSetting };
 
 const staticFields: FieldInit[] = [
   {
@@ -214,6 +217,18 @@ const staticFields: FieldInit[] = [
   },
   { key: "threads.cache_ttl_seconds", group: "threads", page: "general", section: "lifecycle", unit: "s", type: S.INT, title: "Prompt cache lifetime", description: "How long the Claude API keeps a conversation's prompt cache (1 hour on Bedrock and the Anthropic API). Code Foundry uses this to tell when a thread's cache has expired. It doesn't change the API.", defaultValue: "3600", min: 60n, max: 86400n },
   { key: "threads.close_grace_seconds", group: "threads", page: "general", section: "lifecycle", unit: "s", type: S.INT, title: "Close grace", description: "How long a closing thread waits for Claude to exit before it is force-quit.", defaultValue: "10", min: 1n, max: 120n, restartRequired: true },
+  {
+    key: "files.include_ignored",
+    group: "files",
+    page: "general",
+    section: "files",
+    type: S.STRING,
+    title: "Ignored files to include",
+    description:
+      "Git-ignored files that Go to File and @ still find, in every project, as .gitignore-style patterns separated by commas. A pattern without a slash matches a name at any depth (.env*), one with a slash a path from the project's folder (docs/scratch/), and a trailing slash only folders. A name never reaches inside an ignored folder that does not match itself, so .env* skips node_modules. A project can add its own patterns. none for no patterns.",
+    defaultValue: DEFAULT_INCLUDE_IGNORED,
+    placeholder: ".env*, docs/scratch/",
+  },
   { key: "update.channel", group: "update", page: "general", section: "updates", type: S.ENUM, title: "Channel", description: "Stable gets releases chosen by hand. Tip gets every build of main. Switching never installs an older version.", enumValues: ["stable", "tip"], enumLabels: ["Stable", "Tip"], defaultValue: "stable" },
   { key: "appearance.theme", group: "appearance", page: "appearance", section: "theme", type: S.ENUM, title: "Scheme", description: "Dark or light. System follows the macOS appearance.", enumValues: ["system", "dark", "light"], enumLabels: ["System", "Dark", "Light"], defaultValue: "system" },
   // Like internal/store/settings themeField: the catalog's themes of one scheme.

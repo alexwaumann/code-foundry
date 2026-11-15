@@ -137,6 +137,12 @@
  *                                                 none; reset restores DEFAULT_FILES; several
  *                                                 projects: project=a&path=x&project=b&path=y)
  *   GET  /__mock/files/calls                      ("skills <project,…|-> <includeUser>", "search <project,…> <query>")
+ *   Include patterns (files.include_ignored, ProjectService.SetIncludeIgnored, SuggestIncludeIgnored,
+ *        FileMatch.ignored): mock/includeIgnored.ts (every git project has its IGNORED entries; one
+ *        whose files POST /__mock/files set has none until this sets them)
+ *   POST /__mock/ignored?project=repo-cf&path=.env&dir=dist&file=dist/a.js   (that project's ignored
+ *                                                 entries: path= a file, dir= a collapsed folder whose
+ *                                                 file= follow it; reset restores IGNORED)
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeCompareFile: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, docs/; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
@@ -270,6 +276,7 @@ import { serveTunnel } from "./tunnel";
 import { completionCalls, listDirectories, listSkills, resetCompletion, searchFiles, setMockFiles } from "./filesystem";
 import { cloneRepo, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { renameProjectIn } from "./projectRename";
+import { type MockIgnored, resetIgnored, setIncludeIgnoredIn, setMockIgnored, splitIncludeSetting, suggestIncludeIgnored } from "./includeIgnored";
 import { createProject, deleteProject, listPublishOwners, publishProject, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
@@ -407,6 +414,13 @@ function routes(router: ConnectRouter): void {
         if (!project) throw new ConnectError("renamed project vanished", Code.Internal);
         return { project: world.projectMsg(project) };
       }),
+    setIncludeIgnored: (req) =>
+      guard(() => {
+        setIncludeIgnoredIn(world, req.id, req.patterns);
+        const project = world.projects.get(req.id);
+        if (!project) throw new ConnectError("project vanished", Code.Internal);
+        return { project: world.projectMsg(project) };
+      }),
     // The Add Project dialog's GitHub tab (mock/clone.ts).
     searchGitHub: (req) => searchGitHub(req.query),
     lookupGitHub: (req) => lookupGitHub(req.owner, req.name),
@@ -449,7 +463,14 @@ function routes(router: ConnectRouter): void {
       return listDirectories(req.prefix, registered);
     },
     listSkills: (req) => ({ skills: listSkills(world.projects, req.sources, req.includeUser) }),
-    searchFiles: (req) => searchFiles(world.projects, req),
+    searchFiles: (req) => searchFiles(world.projects, req, splitIncludeSetting(world.settings.value("files.include_ignored"))),
+    suggestIncludeIgnored: (req) => {
+      const p = world.projects.get(req.projectId);
+      if (req.projectId === "") throw new ConnectError("project_id is required", Code.InvalidArgument);
+      if (!p) throw new ConnectError(`project ${req.projectId} not found`, Code.NotFound);
+      const effective = [...splitIncludeSetting(world.settings.value("files.include_ignored")), ...(p.includeIgnored ?? [])];
+      return suggestIncludeIgnored(p.id, p.git !== false, effective, req.text, req.limit);
+    },
     readFile: (req) => mockFiles.readWithLink(req.baseDir, req.path, req.maxBytes, req.tail),
     writeFile: (req) => mockFiles.writeFile(req),
     previewFile: (req) => mockFiles.previewFile(req.baseDir, req.path),
@@ -1516,6 +1537,7 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       world.reset();
       resetClones();
       resetCompletion();
+      resetIgnored();
       mockFiles.reset();
       resetPageStorage();
       resetWaits();
@@ -1537,6 +1559,22 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       }
       for (const g of groups) setMockFiles(g.project, g.files);
       json(res, 200, groups.length === 1 ? groups[0] : { projects: groups });
+      break;
+    }
+    case "POST /__mock/ignored": {
+      const project = q.get("project") ?? "";
+      if (!world.projects.has(project)) {
+        json(res, 404, { error: `unknown project ${project}` });
+        break;
+      }
+      const entries: MockIgnored[] = [];
+      for (const [k, v] of q) {
+        if (k === "path") entries.push({ path: v });
+        else if (k === "dir") entries.push({ path: v, files: [] });
+        else if (k === "file") entries.at(-1)?.files?.push(v);
+      }
+      setMockIgnored(project, entries);
+      json(res, 200, { project, entries });
       break;
     }
     case "GET /__mock/files/calls":
