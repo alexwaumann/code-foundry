@@ -5195,12 +5195,12 @@ export class World {
           args: [
             { name: "title", type: ArgType.STRING, required: true, description: "Notification title" },
             { name: "body", type: ArgType.STRING, required: false, description: "Notification body" },
-            { name: "level", type: ArgType.ENUM, required: false, description: "Severity", enumValues: ["info", "warning", "error"], defaultValue: "info" },
+            { name: "level", type: ArgType.ENUM, required: false, description: "Severity", enumValues: ["success", "info", "warning", "error"], defaultValue: "info" },
           ],
         },
         when: always,
         run: (_ctx, args) => {
-          const levels: Record<string, UiIntent_Notify_Level> = { info: UiIntent_Notify_Level.INFO, warning: UiIntent_Notify_Level.WARNING, error: UiIntent_Notify_Level.ERROR };
+          const levels: Record<string, UiIntent_Notify_Level> = { success: UiIntent_Notify_Level.SUCCESS, info: UiIntent_Notify_Level.INFO, warning: UiIntent_Notify_Level.WARNING, error: UiIntent_Notify_Level.ERROR };
           const level = levels[args.level ?? "info"] ?? UiIntent_Notify_Level.INFO;
           this.intents.publish({ intent: { case: "notify", value: { level, title: args.title ?? "", body: args.body ?? "" } } });
           return "";

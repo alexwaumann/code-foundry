@@ -2886,9 +2886,12 @@ func (x *SurfaceLogAppend) GetLines() []*SurfaceLogLine {
 type SurfaceToast struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Instance string                 `protobuf:"bytes,1,opt,name=instance,proto3" json:"instance,omitempty"`
-	// info, attention or error.
-	Level         string `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
-	Text          string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	// success, info, attention or error.
+	Level string `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	// The toast's title: short.
+	Text string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	// Optional detail under the title.
+	Description   string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2940,6 +2943,13 @@ func (x *SurfaceToast) GetLevel() string {
 func (x *SurfaceToast) GetText() string {
 	if x != nil {
 		return x.Text
+	}
+	return ""
+}
+
+func (x *SurfaceToast) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -5224,11 +5234,12 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\aversion\x18\x02 \x01(\x04R\aversion\x12\x10\n" +
 	"\x03key\x18\x03 \x01(\tR\x03key\x12\x12\n" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x124\n" +
-	"\x05lines\x18\x05 \x03(\v2\x1e.codefoundry.v1.SurfaceLogLineR\x05lines\"T\n" +
+	"\x05lines\x18\x05 \x03(\v2\x1e.codefoundry.v1.SurfaceLogLineR\x05lines\"v\n" +
 	"\fSurfaceToast\x12\x1a\n" +
 	"\binstance\x18\x01 \x01(\tR\binstance\x12\x14\n" +
 	"\x05level\x18\x02 \x01(\tR\x05level\x12\x12\n" +
-	"\x04text\x18\x03 \x01(\tR\x04text\"\xb5\x02\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\"\xb5\x02\n" +
 	"\rSurfaceUpdate\x124\n" +
 	"\x05state\x18\x01 \x01(\v2\x1c.codefoundry.v1.SurfaceStateH\x00R\x05state\x121\n" +
 	"\x04view\x18\x02 \x01(\v2\x1b.codefoundry.v1.SurfaceViewH\x00R\x04view\x12:\n" +

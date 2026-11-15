@@ -71,7 +71,7 @@ export async function publishThemeReports(reports: readonly ThemeReportView[], c
   }
 }
 
-export type NotifyLevel = "info" | "warning" | "error";
+export type NotifyLevel = "success" | "info" | "warning" | "error";
 
 export type UiIntentView =
   | { kind: "focusTerminal"; terminalId: string }
@@ -121,6 +121,7 @@ const levelMap: Record<UiIntent_Notify_Level, NotifyLevel> = {
   [UiIntent_Notify_Level.INFO]: "info",
   [UiIntent_Notify_Level.WARNING]: "warning",
   [UiIntent_Notify_Level.ERROR]: "error",
+  [UiIntent_Notify_Level.SUCCESS]: "success",
 };
 
 export function toUiIntentView(i: UiIntent): UiIntentView | null {
@@ -138,7 +139,8 @@ export function toUiIntentView(i: UiIntent): UiIntentView | null {
       const { level, title, body, link, linkLabel, secondaryLink, secondaryLinkLabel, unlessShowing } = e.value;
       return {
         kind: "notify" as const,
-        level: levelMap[level],
+        // A level this build does not know (a newer daemon's): info.
+        level: (levelMap as Partial<Record<number, NotifyLevel>>)[level] ?? "info",
         title,
         body,
         ...(link ? { link, linkLabel: linkLabel || "Open" } : {}),

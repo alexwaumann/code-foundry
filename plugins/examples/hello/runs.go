@@ -109,15 +109,16 @@ func (s *runsState) selectRun(key string) error {
 	return nil
 }
 
-// saveNote keeps the chosen run's note.
-func (s *runsState) saveNote(values map[string]any) error {
-	if s.selected == "" {
-		return fmt.Errorf("no run chosen")
+// saveNote keeps the chosen run's note and returns the run's name ("build #1285").
+func (s *runsState) saveNote(values map[string]any) (string, error) {
+	r, ok := runOf(s.selected)
+	if !ok {
+		return "", fmt.Errorf("no run chosen")
 	}
 	note, _ := values["note"].(string)
 	if s.notes == nil {
 		s.notes = map[string]string{}
 	}
 	s.notes[s.selected] = strings.TrimSpace(note)
-	return nil
+	return fmt.Sprintf("build #%d", r.n), nil
 }

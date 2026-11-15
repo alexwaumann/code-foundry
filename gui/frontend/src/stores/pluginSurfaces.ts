@@ -11,7 +11,7 @@
  * instance finds them again. Nothing here is persisted.
  */
 import { create } from "zustand";
-import { notify } from "@/lib/notify";
+import { notify, type Notice, type NoticeLevel } from "@/lib/notify";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import {
   actOnSurface,
@@ -31,6 +31,7 @@ import {
   type SurfacePhaseView,
   type SurfaceRefView,
   type SurfaceUpdateView,
+  type ToastLevel,
   type ViewNode,
 } from "@/api/plugin";
 import type { UiContextView } from "@/api/command";
@@ -487,9 +488,17 @@ export function applyUpdateToState(s: PluginSurfacesState, watchKey: string, u: 
   return { ...out, ...endChoices(out, watchKey, done) };
 }
 
+/** A plugin toast's level as the app's: attention is a warning. */
+const toastNoticeLevels: Record<ToastLevel, NoticeLevel> = { success: "success", info: "info", attention: "warning", error: "error" };
+
+/** A plugin's toast as the app's: its text is the title, its description (if any) goes under it. Pure. */
+export function pluginToastNotice(u: Extract<SurfaceUpdateView, { kind: "toast" }>): Notice {
+  return { level: toastNoticeLevels[u.level], title: u.text, ...(u.description ? { description: u.description } : {}) };
+}
+
 function onUpdate(watchKey: string, u: SurfaceUpdateView): void {
   if (u.kind === "toast") {
-    notify({ level: u.level === "error" ? "error" : u.level === "attention" ? "warning" : "info", title: u.text });
+    notify(pluginToastNotice(u));
     return;
   }
   usePluginSurfacesStore.setState((s) => applyUpdateToState(s, watchKey, u));

@@ -66,7 +66,7 @@ func surfaceUpdateToProto(u plugin.SurfaceUpdate) *v1.SurfaceUpdate {
 		}
 		return &v1.SurfaceUpdate{Update: &v1.SurfaceUpdate_Append{Append: a}}
 	case u.Toast != nil:
-		return &v1.SurfaceUpdate{Update: &v1.SurfaceUpdate_Toast{Toast: &v1.SurfaceToast{Instance: u.Toast.Instance, Level: u.Toast.Level, Text: u.Toast.Text}}}
+		return &v1.SurfaceUpdate{Update: &v1.SurfaceUpdate_Toast{Toast: &v1.SurfaceToast{Instance: u.Toast.Instance, Level: u.Toast.Level, Text: u.Toast.Text, Description: u.Toast.Description}}}
 	}
 	return nil
 }

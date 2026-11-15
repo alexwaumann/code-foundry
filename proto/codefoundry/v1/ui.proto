@@ -227,6 +227,9 @@ message UiIntent {
       LEVEL_INFO = 1;
       LEVEL_WARNING = 2;
       LEVEL_ERROR = 3;
+      // Something the user or a thread did is done, and where it happened is not on
+      // screen (a thread remembered a preference).
+      LEVEL_SUCCESS = 4;
     }
     Level level = 1;
     string title = 2;

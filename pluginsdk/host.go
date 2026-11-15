@@ -128,8 +128,8 @@ func (h *Host) Unsubscribe(ctx context.Context, subscription string) error {
 	return h.conn.Call(ctx, MethodEventsUnsubscribe, SubscribeResult{Subscription: subscription}, nil)
 }
 
-// Toast shows a short message (ToastInfo, ToastAttention, ToastError) in the app's
-// toaster, titled with the plugin's display name.
+// Toast shows a short message (ToastSuccess, ToastInfo, ToastAttention, ToastError) in
+// the app's toaster, titled with the plugin's display name.
 func (h *Host) Toast(level, text string) error {
 	return h.conn.Notify(MethodViewToast, ToastParams{Level: level, Text: text})
 }
@@ -139,6 +139,14 @@ func (h *Host) Toast(level, text string) error {
 // should stay belongs in a Notice node).
 func (h *Host) ToastIn(instance, level, text string) error {
 	return h.conn.Notify(MethodViewToast, ToastParams{Instance: instance, Level: level, Text: text})
+}
+
+// ToastWith shows a toast from its params: ToastIn's when Instance is set, else Toast's.
+// With a Description, Text is the title and the description goes under it, also for a
+// toast without an instance (which then is not titled with the plugin's name). A host
+// without ToastDescriptionCapability drops the description and shows ToastSuccess as info.
+func (h *Host) ToastWith(p ToastParams) error {
+	return h.conn.Notify(MethodViewToast, p)
 }
 
 // viewTimeout bounds one view/update or view/append round trip.

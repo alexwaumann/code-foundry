@@ -472,9 +472,12 @@ message SurfaceLogAppend {
 
 message SurfaceToast {
   string instance = 1;
-  // info, attention or error.
+  // success, info, attention or error.
   string level = 2;
+  // The toast's title: short.
   string text = 3;
+  // Optional detail under the title.
+  string description = 4;
 }
 
 message SurfaceUpdate {

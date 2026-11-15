@@ -12,7 +12,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 	"github.com/alexwaumann/code-foundry/pluginsdk/ui"
@@ -108,60 +107,6 @@ func (a *actor) viewAppend(_ context.Context, params json.RawMessage) (any, erro
 		return nil, err
 	}
 	return pluginsdk.ViewUpdateResult{Version: ver}, nil
-}
-
-// maxToastsPerSecond bounds a plugin's toasts.
-const maxToastsPerSecond = 1
-
-// viewToast serves view/toast: to an instance's viewers, or (no instance) to the GUI as
-// a notification.
-func (a *actor) viewToast(params json.RawMessage) {
-	var p pluginsdk.ToastParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		a.hostLog("bad view/toast: %v", err)
-		return
-	}
-	text := strings.TrimSpace(p.Text)
-	if text == "" {
-		return
-	}
-	if utf8.RuneCountInString(text) > maxToastText {
-		text = string([]rune(text)[:maxToastText-1]) + "…"
-	}
-	level := p.Level
-	if !slices.Contains([]string{pluginsdk.ToastInfo, pluginsdk.ToastAttention, pluginsdk.ToastError}, level) {
-		level = pluginsdk.ToastInfo
-	}
-	h := a.m.surf
-	h.toastMu.Lock()
-	rl := h.toasts[a.name]
-	if rl == nil {
-		rl = &rateLimiter{}
-		h.toasts[a.name] = rl
-	}
-	h.toastMu.Unlock()
-	if !rl.allow(a.m.opts.Now(), maxToastsPerSecond) {
-		a.hostLog("dropped a toast: at most %d a second", maxToastsPerSecond)
-		return
-	}
-	if p.Instance != "" {
-		in, err := h.instanceFor(a, p.Instance)
-		if err != nil {
-			a.hostLog("dropped a toast: %v", err)
-			return
-		}
-		in.toast(SurfaceToast{Instance: p.Instance, Level: level, Text: text})
-		return
-	}
-	if a.m.opts.Emitter == nil {
-		return
-	}
-	pl, _ := a.m.Snapshot().Plugin(a.name)
-	lv := map[string]v1.UiIntent_Notify_Level{
-		pluginsdk.ToastInfo: v1.UiIntent_Notify_LEVEL_INFO, pluginsdk.ToastAttention: v1.UiIntent_Notify_LEVEL_WARNING,
-		pluginsdk.ToastError: v1.UiIntent_Notify_LEVEL_ERROR,
-	}[level]
-	a.m.opts.Emitter.Emit(&v1.UiIntent{Intent: &v1.UiIntent_Notify_{Notify: &v1.UiIntent_Notify{Level: lv, Title: pl.DisplayName(), Body: text}}})
 }
 
 // validateView decodes and checks a plugin's view: the raw size, the schema and limits

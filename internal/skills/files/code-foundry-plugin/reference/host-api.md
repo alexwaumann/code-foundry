@@ -5,8 +5,8 @@
 Every handler gets `h *pluginsdk.Host`. Each method is one protocol call; the host checks
 it against what the user granted (the manifest's `permissions`) and answers
 -32001 `CodePermissionDenied` otherwise. Requests take a context: pass the handler's `ctx`
-(it ends when the call it serves ends) or your own with a timeout. `SetContext`, `Toast`
-and `ToastIn` are notifications: no context, and their error only says the message could
+(it ends when the call it serves ends) or your own with a timeout. `SetContext`, `Toast`,
+`ToastIn` and `ToastWith` are notifications: no context, and their error only says the message could
 not be sent (a refusal shows in the plugin's log).
 
 ## Identity and logging
@@ -222,13 +222,25 @@ start hands over what was granted (`h.Granted()`). Test it with plugintest's
 ## Toasts
 
 `h.Toast(pluginsdk.ToastInfo, "Rerun started")` shows a short message in the app's
-toaster (bottom right) with the plugin's display name as its title (`ToastAttention`,
-`ToastError` for the other levels, which differ by icon, not colour).
-`h.ToastIn(instance, level, text)` shows it in the same toaster, without the name, only
-to whoever has that instance on screen: not inside the surface. For a message that should
-stay with the surface, render a `notice` node. Up to 200 characters, at most one a second per plugin
-(more are dropped). A command's `Message` is toasted anyway when it runs from the GUI: do
-not toast it twice.
+toaster (bottom right) with the plugin's display name as its title and the text under it.
+`h.ToastIn(instance, level, text)` shows it in the same toaster, without the name, the
+text as the title, only to whoever has that instance on screen: not inside the surface.
+Levels: `ToastSuccess`, `ToastInfo`, `ToastAttention` (the app's warning), `ToastError`;
+each tints the card. For a message that should stay with the surface, render a `notice` node.
+
+`h.ToastWith(pluginsdk.ToastParams{Instance, Level, Text, Description})` adds a
+description: `Text` is the title and the description goes under it (without an
+instance too, which then drops the plugin's name). Keep the text short, it is the title
+("Note saved", "Build #42 queued again"); the detail goes in the description ("On build
+#41"). Text up to 200 characters, description up to 500, at most one toast a second per
+plugin (more are dropped). A command's `Message` is toasted anyway when it runs from the
+GUI: do not toast it twice.
+
+Use success sparingly: feedback for an act belongs where it happened (the view after it
+shows the change). A success toast is for when that place is gone (the act closed it, or
+the result lands elsewhere: "Sent to the thread") or for background work that finished.
+A host without capability `view.toast.description` (before this release) shows success as
+info and drops the description, so the text must read right alone.
 
 ## Elsewhere
 

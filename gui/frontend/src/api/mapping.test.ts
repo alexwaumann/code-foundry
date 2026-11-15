@@ -179,6 +179,12 @@ describe("ui intent mapping", () => {
     ],
     [{ case: "notify" as const, value: { title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
     [
+      { case: "notify" as const, value: { level: UiIntent_Notify_Level.SUCCESS, title: "Remembered: Use tabs", body: "y" } },
+      { kind: "notify", level: "success", title: "Remembered: Use tabs", body: "y" },
+    ],
+    // A level a newer daemon added that this build does not know: info.
+    [{ case: "notify" as const, value: { level: 99 as UiIntent_Notify_Level, title: "x" } }, { kind: "notify", level: "info", title: "x", body: "" }],
+    [
       { case: "notify" as const, value: { title: "x", link: "settings:memory", linkLabel: "Show in Settings" } },
       { kind: "notify", level: "info", title: "x", body: "", link: "settings:memory", linkLabel: "Show in Settings" },
     ],

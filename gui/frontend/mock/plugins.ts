@@ -11,7 +11,7 @@
  *
  * The demo acts like the real plugin (plugins/examples/hello/surface.go): tabs, a click
  * counter in the header, Pin, a form whose save needs a name (else the plugin refuses)
- * and toasts "saved", a build that appends six log lines 300 ms apart.
+ * and toasts "Saved", a build that appends six log lines 300 ms apart.
  *
  * Controls (mock/server.ts): POST /__mock/plugin/demotab?tab=…
  * (the demo shows a tab, "stress" included: two threads and a terminal), POST
@@ -638,7 +638,8 @@ class DemoInstance {
   }
 
   /** The plugin's surface/act. Throws the plugin's refusal as Aborted, like the daemon. */
-  act(el: Element, values: Record<string, unknown>, toast: (text: string) => void, viewer = "", value = ""): void {
+  /** `toast` mirrors the hello plugin's: its text is the title, a description goes under it. */
+  act(el: Element, values: Record<string, unknown>, toast: (text: string, level?: string, description?: string) => void, viewer = "", value = ""): void {
     if (fuzzControl.failNext.delete(el.key)) throw new ConnectError(`plugin refused: ${el.key} (failnext)`, Code.Aborted);
     if (this.tab === "custom" && this.custom) {
       if (el.op) applyToCustom(this.custom.view, el.op, childListsOf, viewListsOf);
@@ -655,12 +656,12 @@ class DemoInstance {
     switch (`${el.kind}:${el.event}`) {
       case "click:send-hello":
         this.send(HELLO_THREAD, "say hello in one line");
-        toast("sent to the assistant");
+        toast("Sent to the assistant", "success");
         return;
       case "click:ask-main":
         // The act's context: the thread the acting panel shows.
         this.send(viewer || this.threadId, "The hello plugin says hi from its Assistant tab. Answer in one short line.");
-        toast("sent to the thread");
+        toast("Sent to the thread", "success");
         return;
       case "click:restart-shell":
         break;
@@ -675,7 +676,7 @@ class DemoInstance {
       case "submit:runs-note":
         if (!this.runs.selected) throw new ConnectError("plugin refused: no run chosen", Code.Aborted);
         this.runs = { ...this.runs, notes: { ...this.runs.notes, [this.runs.selected]: typeof values.note === "string" ? values.note.trim() : "" } };
-        toast("note saved");
+        toast("Note saved", "success", `On build #${String(RUNS.find((r) => runKey(r.n) === this.runs.selected)?.n ?? "")}`);
         break;
       case "check:check":
       case "move:move":
@@ -703,7 +704,7 @@ class DemoInstance {
           this.tokenStored = true;
         }
         this.saved = saved;
-        toast("saved");
+        toast("Saved", "success");
         break;
       }
       case "click:reset":
@@ -741,13 +742,13 @@ class DemoInstance {
         this.peopleQuery = value.trim();
         break;
       case "click:layout-rerun":
-        toast("build #6 queued again");
+        toast("Build #6 queued again", "success");
         return;
       case "click:stat-filter":
         this.failedOnly = !this.failedOnly;
         break;
       case "click:open-build":
-        toast(`build #${el.data ?? ""}`);
+        toast(`Build #${el.data ?? ""}`);
         return;
       case "click:reset-clicks":
         this.clicks = 0;
@@ -759,10 +760,10 @@ class DemoInstance {
         this.tab = "log";
         break;
       case "click:rerun-run":
-        toast(`build #${el.data ?? ""} queued again`);
+        toast(`Build #${el.data ?? ""} queued again`, "success");
         return;
       case "click:abort-build":
-        toast(`build #${el.data ?? ""} aborted`);
+        toast(`Build #${el.data ?? ""} aborted`, "success");
         return;
       case "sort:sort":
         if (!["b-num", "b-branch", "b-dur"].includes(el.key)) throw new ConnectError(`plugin refused: the builds table does not sort by "${el.key}"`, Code.Aborted);
@@ -1308,7 +1309,7 @@ export class MockPlugins {
     this.acts.push(`${req.instance} ${req.key}${viewer ? ` viewer=${viewer}` : ""} ${JSON.stringify(values)}${req.value !== undefined ? ` value=${req.value}` : ""}${op ? ` action=${op.kind}` : ""}`);
     const version = req.version || BigInt(inst.version);
     const run = () => {
-      inst.act(el, values, (text) => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level: "info", text } } }), viewer, req.value ?? "");
+      inst.act(el, values, (text, level = "info", description = "") => inst.hub.publish({ update: { case: "toast", value: { instance: inst.key, level, text, description } } }), viewer, req.value ?? "");
       return version;
     };
     if (fuzzControl.actDelayMs > 0) {

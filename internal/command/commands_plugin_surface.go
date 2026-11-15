@@ -430,6 +430,9 @@ func FormatSurfaceUpdate(u *v1.SurfaceUpdate) string {
 		}
 		return fmt.Sprintf("append to %s (version %d): %q", a.GetKey(), a.GetVersion(), text)
 	case u.GetToast() != nil:
+		if d := u.GetToast().GetDescription(); d != "" {
+			return fmt.Sprintf("toast %s: %s — %s", u.GetToast().GetLevel(), u.GetToast().GetText(), d)
+		}
 		return fmt.Sprintf("toast %s: %s", u.GetToast().GetLevel(), u.GetToast().GetText())
 	}
 	return ""
