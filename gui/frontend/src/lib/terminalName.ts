@@ -1,12 +1,13 @@
 /**
  * What a terminal tab is called and the icon it shows (docs/notes/shell-model.md, "Terminals"):
- * a manual name sticks; otherwise what runs in it (the foreground job's command line, from the
+ * a manual name sticks; an action run is named after its action; otherwise what runs in it (the foreground job's command line, from the
  * process list: Terminal.foreground), with an icon by the kind of command; idle, its shell and
  * folder ("zsh · code-foundry"). Pure: the tab reads the terminal and passes the facts in.
  * The quick terminal's and linked tabs' directory hint is here too (`cwdHint`).
  * See docs/notes/shell-13-terminals.md.
  */
 import { basename, tildify } from "./path";
+import { ACTION_NAME_LABEL, isActionLabels } from "./termlabel";
 
 /** The kinds of command a tab's icon tells apart; components/shell/terminalIcons.ts draws them. */
 export type TerminalIconKind = "shell" | "git" | "package" | "build" | "editor" | "remote" | "container" | "monitor" | "log" | "database" | "python" | "agent" | "run";
@@ -76,6 +77,8 @@ export interface TerminalNameInput {
   dir: string;
   /** The foreground job's command line; "" at the prompt. */
   foreground: string;
+  /** The terminal's labels (lib/termlabel.ts): an action run's name its action. */
+  labels?: Readonly<Record<string, string>>;
 }
 
 export interface TerminalName {
@@ -86,11 +89,17 @@ export interface TerminalName {
 }
 
 /**
- * A terminal tab's name and icon. A manual name sticks, with the icon of what runs. Otherwise
- * what runs; idle, its shell and folder. A terminal that is not a shell (an action run) is named
- * by its own command line.
+ * A terminal tab's name and icon. A manual name sticks, with the icon of what runs. An action
+ * run (`$SHELL -lc <command>`, so neither a foreground job nor a shell's name tells it) is named
+ * after its action, its name when the run started; the tab draws the action's own icon. Otherwise
+ * what runs; idle, its shell and folder. A terminal that is not a shell is named by its own
+ * command line.
  */
-export function terminalName({ manual, argv, dir, foreground }: TerminalNameInput): TerminalName {
+export function terminalName({ manual, argv, dir, foreground, labels }: TerminalNameInput): TerminalName {
+  if (labels && isActionLabels(labels)) {
+    const name = manual.trim();
+    return name ? { name, icon: "run", auto: false } : { name: labels[ACTION_NAME_LABEL] || "Action", icon: "run", auto: true };
+  }
   const running = foreground.trim();
   const program = argv[0] ?? "";
   const isShell = !program || SHELLS.has(shellName(program));
