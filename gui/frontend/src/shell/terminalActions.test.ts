@@ -245,9 +245,32 @@ describe("Reset and Run again", () => {
     expect(runs).toEqual([{ name: "terminal.reset", args: { id: "term-1" }, thread: "", terminal: "term-1" }]);
   });
 
-  it("Run again types the restored command, then the tab forgets it", async () => {
-    await seedLayout(layoutAt("p-2", "t-term", false, { terminal: "term-1", ran: "make dev" }));
+  it("Reset of a tab's shell: the keyboard goes into the tab once it shows the new shell", async () => {
+    await seed("p-1");
+    resetShellView();
+    results.set("terminal.reset", JSON.stringify({ id: "term-2" }));
+    during.set("terminal.reset", () => {
+      snapshot(layoutAt("p-1", "t-term", false, { terminal: "term-2" }), 2);
+    });
+    await actions.resetTerminal("term-1");
+    expect(useShellViewStore.getState().focusRequest.paneId).toBe("p-2");
+  });
+
+  it("Reset of a quick terminal: the keyboard goes into the thread's quick terminal", async () => {
+    await seed("p-1", "t-term", true);
+    useTerminalsStore.setState({ byId: { "term-q": { labels: { kind: "shell", thread: "s-1", slot: "quick" } } } as never, order: ["term-q"] });
+    const focus = vi.fn();
+    registerQuickHost("s-1", focus);
+    results.set("terminal.reset", JSON.stringify({ id: "term-q2" }));
+    await actions.resetTerminal("term-q");
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("Run again types the restored command, then the tab forgets it and the keyboard goes into it", async () => {
+    await seedLayout(layoutAt("p-1", "t-term", false, { terminal: "term-1", ran: "make dev" }));
+    resetShellView();
     await actions.runAgain({ id: "t-term", params: { terminal: "term-1", ran: "make dev" } }, "make dev");
+    expect(useShellViewStore.getState().focusRequest.paneId).toBe("p-2");
     expect(runs).toEqual([{ name: "terminal.rerun", args: { id: "term-1", command: "make dev" }, thread: "", terminal: "term-1" }]);
     expect(applied).toHaveLength(1);
     expect(JSON.stringify(applied[0])).toContain('"tab":"t-term"');
@@ -287,10 +310,13 @@ describe("a quick terminal restored after a snooze", () => {
   };
   const restored = () => ({ ...layoutAt("p-1", "t-term", true), threads: [quick(true, "make dev")] });
 
-  it("Run again types the command in its shell, then the thread's quick terminal forgets it", async () => {
+  it("Run again types the command in its shell, then the thread's quick terminal forgets it and the keyboard goes into it", async () => {
     await seedLayout(restored());
     quickShell("term-q");
+    const focus = vi.fn();
+    registerQuickHost("s-1", focus);
     await actions.runQuickAgain("s-1", "term-q", "make dev");
+    expect(focus).toHaveBeenCalledTimes(1);
     expect(runs).toEqual([{ name: "terminal.rerun", args: { id: "term-q", command: "make dev" }, thread: "", terminal: "term-q" }]);
     expect(applied).toEqual([{ op: "set_quick", thread: "s-1", open: true, forget_ran: true }]);
   });
