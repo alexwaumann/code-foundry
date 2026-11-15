@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/internal/fuzzy"
 )
@@ -238,6 +239,15 @@ type cachedFiles struct {
 	filePaths []string
 	fileIdx   []int
 	created   time.Time
+	// sorted is the files alone, by path, made on the first text search of the entry
+	// (Files). A pointer, so every copy of the entry shares one.
+	sorted *sortedFiles
+}
+
+// sortedFiles is a cached list's files sorted by path, built once.
+type sortedFiles struct {
+	once  sync.Once
+	files []FileEntry
 }
 
 // listing is one in-flight listing of a checkout; c and err are set before done closes.
@@ -325,6 +335,47 @@ func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query s
 	return matches, truncated, nil
 }
 
+// Files returns each source's files (no directories) from the same cached lists
+// SearchSources ranks, listing a checkout as it does, so text search covers exactly the
+// files file search finds. Each list is sorted by path (byte order), without the paths
+// that are not valid UTF-8 (a protobuf string cannot carry them). The slices are shared
+// with the cache: read only. When ctx ends first, Files returns its error; the listings go
+// on and fill the cache.
+func (x *FileIndex) Files(ctx context.Context, sources []Source) ([][]FileEntry, error) {
+	pending := make([]*listing, len(sources))
+	for i, src := range sources {
+		pending[i] = x.start(ctx, src)
+	}
+	out := make([][]FileEntry, len(sources))
+	for i, l := range pending {
+		select {
+		case <-l.done:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if l.err != nil {
+			return nil, fmt.Errorf("list %s: %w", sources[i].Dir, l.err)
+		}
+		out[i] = l.c.sortedFiles()
+	}
+	return out, nil
+}
+
+// sortedFiles is the entry's files by path, built on first use.
+func (c cachedFiles) sortedFiles() []FileEntry {
+	c.sorted.once.Do(func() {
+		files := make([]FileEntry, 0, len(c.fileIdx))
+		for _, i := range c.fileIdx {
+			if utf8.ValidString(c.files[i].Path) {
+				files = append(files, c.files[i])
+			}
+		}
+		slices.SortFunc(files, func(a, b FileEntry) int { return strings.Compare(a.Path, b.Path) })
+		c.sorted.files = files
+	})
+	return c.sorted.files
+}
+
 // start returns the listing of src: a finished one holding the cached list when it is
 // fresh, else the one in flight for it, starting one if there is none. The key holds
 // the include patterns, so a list made with other patterns is never served.
@@ -365,7 +416,7 @@ func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include
 		// Stamp the entry when the listing is done: one slower than the TTL (a huge
 		// project) would otherwise be cached already expired and re-run on every keystroke.
 		now := x.now()
-		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now}
+		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now, sorted: &sortedFiles{}}
 		for i, f := range files {
 			c.paths[i] = f.Path
 			if !f.IsDir {

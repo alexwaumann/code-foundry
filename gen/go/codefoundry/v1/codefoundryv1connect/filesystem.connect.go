@@ -42,6 +42,9 @@ const (
 	// FilesystemServiceSearchFilesProcedure is the fully-qualified name of the FilesystemService's
 	// SearchFiles RPC.
 	FilesystemServiceSearchFilesProcedure = "/codefoundry.v1.FilesystemService/SearchFiles"
+	// FilesystemServiceSearchTextProcedure is the fully-qualified name of the FilesystemService's
+	// SearchText RPC.
+	FilesystemServiceSearchTextProcedure = "/codefoundry.v1.FilesystemService/SearchText"
 	// FilesystemServiceSuggestIncludeIgnoredProcedure is the fully-qualified name of the
 	// FilesystemService's SuggestIncludeIgnored RPC.
 	FilesystemServiceSuggestIncludeIgnoredProcedure = "/codefoundry.v1.FilesystemService/SuggestIncludeIgnored"
@@ -109,6 +112,34 @@ type FilesystemServiceClient interface {
 	// a project, both sources and project_id/path, more than 16 sources, or a query of
 	// more than 8 words is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
+	// SearchText searches the contents of the files SearchFiles lists for the same sources
+	// (git's view plus the included ignored files, or the walk of a project without git):
+	// a file is findable by name and by contents, or by neither. It runs the shipped
+	// ripgrep over those files' paths.
+	//
+	// Matching: query is literal text, spaces included ("func Home" is a phrase), one line.
+	// Smart case: without match_case, a query with no upper-case letter ignores case and
+	// one with an upper-case letter matches it (in a regex, a letter after a backslash, as
+	// in \W or \p{Lu}, does not count); the summary says which. whole_word matches at word
+	// boundaries. regex reads the query as a regular expression in ripgrep's (Rust) syntax.
+	// No fuzzy matching. A file with a NUL byte (binary) is skipped.
+	//
+	// The stream: messages with files in a stable order (the sources in the order given, a
+	// source's files by path; each file whole in one message), the first as soon as the first
+	// few files are searched, then one last message with the summary alone. The same query
+	// over the same files gives the same order. Cancelling the request stops ripgrep at once.
+	//
+	// Bounds: at most 50 lines sent per file (line_count counts on to 999), 2,000 lines per
+	// search, 300 characters per line (a longer line is cut around its first match), a
+	// query of at most 500 characters, 15 seconds (then the summary says timed_out, with what
+	// was found). An empty query sends the summary alone.
+	//
+	// Errors: InvalidArgument for no sources, more than 16, a source without a project, a
+	// path outside home, a query that is too long, more than one line or holds a NUL, and a
+	// regex ripgrep cannot compile (the message is ripgrep's reason, readable as is after
+	// "invalid argument: "); NotFound for an unknown project or checkout; FailedPrecondition
+	// when ripgrep is missing or broken (the message says to update or reinstall).
+	SearchText(context.Context, *connect.Request[v1.SearchTextRequest]) (*connect.ServerStreamForClient[v1.SearchTextResponse], error)
 	// SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
 	// project or to the files.include_ignored setting. It lists the git-ignored entries of
 	// the project's main worktree as git reports them (git ls-files -oi --exclude-standard
@@ -218,6 +249,12 @@ func NewFilesystemServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
 			connect.WithClientOptions(opts...),
 		),
+		searchText: connect.NewClient[v1.SearchTextRequest, v1.SearchTextResponse](
+			httpClient,
+			baseURL+FilesystemServiceSearchTextProcedure,
+			connect.WithSchema(filesystemServiceMethods.ByName("SearchText")),
+			connect.WithClientOptions(opts...),
+		),
 		suggestIncludeIgnored: connect.NewClient[v1.SuggestIncludeIgnoredRequest, v1.SuggestIncludeIgnoredResponse](
 			httpClient,
 			baseURL+FilesystemServiceSuggestIncludeIgnoredProcedure,
@@ -256,6 +293,7 @@ type filesystemServiceClient struct {
 	listDirectories       *connect.Client[v1.ListDirectoriesRequest, v1.ListDirectoriesResponse]
 	listSkills            *connect.Client[v1.ListSkillsRequest, v1.ListSkillsResponse]
 	searchFiles           *connect.Client[v1.SearchFilesRequest, v1.SearchFilesResponse]
+	searchText            *connect.Client[v1.SearchTextRequest, v1.SearchTextResponse]
 	suggestIncludeIgnored *connect.Client[v1.SuggestIncludeIgnoredRequest, v1.SuggestIncludeIgnoredResponse]
 	readFile              *connect.Client[v1.ReadFileRequest, v1.ReadFileResponse]
 	writeFile             *connect.Client[v1.WriteFileRequest, v1.WriteFileResponse]
@@ -276,6 +314,11 @@ func (c *filesystemServiceClient) ListSkills(ctx context.Context, req *connect.R
 // SearchFiles calls codefoundry.v1.FilesystemService.SearchFiles.
 func (c *filesystemServiceClient) SearchFiles(ctx context.Context, req *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
 	return c.searchFiles.CallUnary(ctx, req)
+}
+
+// SearchText calls codefoundry.v1.FilesystemService.SearchText.
+func (c *filesystemServiceClient) SearchText(ctx context.Context, req *connect.Request[v1.SearchTextRequest]) (*connect.ServerStreamForClient[v1.SearchTextResponse], error) {
+	return c.searchText.CallServerStream(ctx, req)
 }
 
 // SuggestIncludeIgnored calls codefoundry.v1.FilesystemService.SuggestIncludeIgnored.
@@ -353,6 +396,34 @@ type FilesystemServiceHandler interface {
 	// a project, both sources and project_id/path, more than 16 sources, or a query of
 	// more than 8 words is InvalidArgument.
 	SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error)
+	// SearchText searches the contents of the files SearchFiles lists for the same sources
+	// (git's view plus the included ignored files, or the walk of a project without git):
+	// a file is findable by name and by contents, or by neither. It runs the shipped
+	// ripgrep over those files' paths.
+	//
+	// Matching: query is literal text, spaces included ("func Home" is a phrase), one line.
+	// Smart case: without match_case, a query with no upper-case letter ignores case and
+	// one with an upper-case letter matches it (in a regex, a letter after a backslash, as
+	// in \W or \p{Lu}, does not count); the summary says which. whole_word matches at word
+	// boundaries. regex reads the query as a regular expression in ripgrep's (Rust) syntax.
+	// No fuzzy matching. A file with a NUL byte (binary) is skipped.
+	//
+	// The stream: messages with files in a stable order (the sources in the order given, a
+	// source's files by path; each file whole in one message), the first as soon as the first
+	// few files are searched, then one last message with the summary alone. The same query
+	// over the same files gives the same order. Cancelling the request stops ripgrep at once.
+	//
+	// Bounds: at most 50 lines sent per file (line_count counts on to 999), 2,000 lines per
+	// search, 300 characters per line (a longer line is cut around its first match), a
+	// query of at most 500 characters, 15 seconds (then the summary says timed_out, with what
+	// was found). An empty query sends the summary alone.
+	//
+	// Errors: InvalidArgument for no sources, more than 16, a source without a project, a
+	// path outside home, a query that is too long, more than one line or holds a NUL, and a
+	// regex ripgrep cannot compile (the message is ripgrep's reason, readable as is after
+	// "invalid argument: "); NotFound for an unknown project or checkout; FailedPrecondition
+	// when ripgrep is missing or broken (the message says to update or reinstall).
+	SearchText(context.Context, *connect.Request[v1.SearchTextRequest], *connect.ServerStream[v1.SearchTextResponse]) error
 	// SuggestIncludeIgnored helps add an include pattern (SearchFiles' ignored files) to a
 	// project or to the files.include_ignored setting. It lists the git-ignored entries of
 	// the project's main worktree as git reports them (git ls-files -oi --exclude-standard
@@ -458,6 +529,12 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 		connect.WithSchema(filesystemServiceMethods.ByName("SearchFiles")),
 		connect.WithHandlerOptions(opts...),
 	)
+	filesystemServiceSearchTextHandler := connect.NewServerStreamHandler(
+		FilesystemServiceSearchTextProcedure,
+		svc.SearchText,
+		connect.WithSchema(filesystemServiceMethods.ByName("SearchText")),
+		connect.WithHandlerOptions(opts...),
+	)
 	filesystemServiceSuggestIncludeIgnoredHandler := connect.NewUnaryHandler(
 		FilesystemServiceSuggestIncludeIgnoredProcedure,
 		svc.SuggestIncludeIgnored,
@@ -496,6 +573,8 @@ func NewFilesystemServiceHandler(svc FilesystemServiceHandler, opts ...connect.H
 			filesystemServiceListSkillsHandler.ServeHTTP(w, r)
 		case FilesystemServiceSearchFilesProcedure:
 			filesystemServiceSearchFilesHandler.ServeHTTP(w, r)
+		case FilesystemServiceSearchTextProcedure:
+			filesystemServiceSearchTextHandler.ServeHTTP(w, r)
 		case FilesystemServiceSuggestIncludeIgnoredProcedure:
 			filesystemServiceSuggestIncludeIgnoredHandler.ServeHTTP(w, r)
 		case FilesystemServiceReadFileProcedure:
@@ -525,6 +604,10 @@ func (UnimplementedFilesystemServiceHandler) ListSkills(context.Context, *connec
 
 func (UnimplementedFilesystemServiceHandler) SearchFiles(context.Context, *connect.Request[v1.SearchFilesRequest]) (*connect.Response[v1.SearchFilesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.SearchFiles is not implemented"))
+}
+
+func (UnimplementedFilesystemServiceHandler) SearchText(context.Context, *connect.Request[v1.SearchTextRequest], *connect.ServerStream[v1.SearchTextResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.FilesystemService.SearchText is not implemented"))
 }
 
 func (UnimplementedFilesystemServiceHandler) SuggestIncludeIgnored(context.Context, *connect.Request[v1.SuggestIncludeIgnoredRequest]) (*connect.Response[v1.SuggestIncludeIgnoredResponse], error) {

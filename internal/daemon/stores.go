@@ -17,6 +17,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/paths"
 	"github.com/alexwaumann/code-foundry/internal/presence"
+	"github.com/alexwaumann/code-foundry/internal/ripgrep"
 	"github.com/alexwaumann/code-foundry/internal/store/action"
 	"github.com/alexwaumann/code-foundry/internal/store/backdrop"
 	"github.com/alexwaumann/code-foundry/internal/store/clone"
@@ -90,6 +91,8 @@ type stores struct {
 	// dictation owns the dictation model and engine process (dictation.go); closed
 	// early, stopping the engine.
 	dictation *dictation.Store
+	// ripgrep is text search's engine, found and checked once (at startup, off its path).
+	ripgrep *ripgrep.Engine
 	// skills reads the Skills marketplaces Claude Code has and what is installed
 	// (skill_registry.go); it holds no resources.
 	skills *skill.Store
@@ -383,7 +386,8 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	s.update = update.Start(ctx, uo)
 	applyUpdateChannel(s.settings, s.update)
 	s.dictation = openDictation(log.With("store", "dictation"), p, s.bus, s.settings)
-	checkRipgrep(ctx, log)
+	s.ripgrep = ripgrep.NewEngine(nil)
+	checkRipgrep(log, s.ripgrep)
 	if s.skills, err = newSkillStore(p, s.db, s.bus, claude, log.With("store", "skill")); err != nil {
 		return nil, err
 	}

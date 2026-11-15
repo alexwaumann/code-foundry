@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/alexwaumann/code-foundry/internal/ripgrep"
@@ -10,16 +9,14 @@ import (
 // checkRipgrep finds and runs the ripgrep that text search will use
 // (docs/notes/file-search-3-ripgrep.md) and logs the outcome once at startup: there is
 // no helper-health surface to report to, and a search reports ripgrep.ErrMissing or
-// ErrBroken itself. It runs off the startup path; ctx bounds it.
-func checkRipgrep(ctx context.Context, log *slog.Logger) {
+// ErrBroken itself. It runs off the startup path. engine keeps the outcome, so the first
+// search does not look again.
+func checkRipgrep(log *slog.Logger, engine *ripgrep.Engine) {
 	go func() {
-		bin, err := ripgrep.Find()
-		if err != nil {
-			log.Warn("text search engine", "err", err)
-			return
-		}
-		v, err := bin.Check(ctx)
+		bin, v, err := engine.Get()
 		switch {
+		case err != nil && bin.Path == "":
+			log.Warn("text search engine", "err", err)
 		case err != nil:
 			log.Warn("text search engine", "path", bin.Path, "err", err)
 		case bin.Source == ripgrep.SourceBundled && v != ripgrep.Version:

@@ -18,7 +18,9 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/fuzzy"
 	"github.com/alexwaumann/code-foundry/internal/preview"
+	"github.com/alexwaumann/code-foundry/internal/ripgrep"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
+	"github.com/alexwaumann/code-foundry/internal/textsearch"
 )
 
 // Filesystem implements codefoundryv1connect.FilesystemServiceHandler.
@@ -28,6 +30,7 @@ type Filesystem struct {
 	temp     []string
 	projects project.Store
 	files    *fsx.FileIndex
+	text     *textsearch.Searcher
 	grants   *preview.Grants
 	writer   *fsx.Writer
 	// pagesOrigin is where the preview route is served (the daemon's pages listener);
@@ -49,10 +52,19 @@ var _ codefoundryv1connect.FilesystemServiceHandler = (*Filesystem)(nil)
 // homes they know.
 func NewFilesystem(root string, projects project.Store, grants *preview.Grants) *Filesystem {
 	log := slog.Default().With("api", "filesystem")
+	files := fsx.NewFileIndex(log)
 	return &Filesystem{
-		root: root, projects: projects, files: fsx.NewFileIndex(log), grants: grants,
+		root: root, projects: projects, files: files, grants: grants,
+		text:   textsearch.New(files, ripgrep.NewEngine(nil), log),
 		writer: &fsx.Writer{Root: root, Protected: grants.ConfigHome}, log: log,
 	}
+}
+
+// WithRipgrep makes SearchText run engine's ripgrep (the daemon's one Engine, which its
+// startup check warms) over the same file lists as SearchFiles.
+func (h *Filesystem) WithRipgrep(engine *ripgrep.Engine) *Filesystem {
+	h.text = textsearch.New(h.files, engine, h.log)
+	return h
 }
 
 // WithPagesOrigin makes PreviewFile's URLs absolute on origin
@@ -172,21 +184,9 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 	if n := len(fuzzy.Words(msg.GetQuery())); n > fuzzy.MaxWords {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("query has %d words, at most %d", n, fuzzy.MaxWords))
 	}
-	type source struct{ projectID, checkout string }
-	var srcs []fsx.Source
-	var meta []source
-	seen := map[string]bool{}
-	for _, n := range named {
-		c, err := h.resolve(n.GetProjectId(), n.GetPath())
-		if err != nil {
-			return nil, err
-		}
-		if seen[c.dir] { // the same checkout twice (say, by a symlink): search it once
-			continue
-		}
-		seen[c.dir] = true
-		srcs = append(srcs, fsx.Source{Dir: c.dir, Git: c.git, Name: c.project.Name, Include: h.includes(c.project)})
-		meta = append(meta, source{projectID: c.project.ID, checkout: c.named})
+	srcs, meta, err := h.searchSources(named)
+	if err != nil {
+		return nil, err
 	}
 	matches, truncated, err := h.files.SearchSources(ctx, srcs, msg.GetQuery(), int(msg.GetLimit()), msg.GetFilesOnly())
 	switch {
@@ -207,6 +207,30 @@ func (h *Filesystem) SearchFiles(ctx context.Context, req *connect.Request[v1.Se
 		}
 	}
 	return connect.NewResponse(out), nil
+}
+
+// checkoutSource is a search's source as the request named it.
+type checkoutSource struct{ projectID, checkout string }
+
+// searchSources resolves a search's sources (SearchFiles, SearchText): each must resolve,
+// and a checkout named twice (say, by a symlink) is searched once, under its first name.
+func (h *Filesystem) searchSources(named []*v1.FileSource) ([]fsx.Source, []checkoutSource, error) {
+	var srcs []fsx.Source
+	var meta []checkoutSource
+	seen := map[string]bool{}
+	for _, n := range named {
+		c, err := h.resolve(n.GetProjectId(), n.GetPath())
+		if err != nil {
+			return nil, nil, err
+		}
+		if seen[c.dir] {
+			continue
+		}
+		seen[c.dir] = true
+		srcs = append(srcs, fsx.Source{Dir: c.dir, Git: c.git, Name: c.project.Name, Include: h.includes(c.project)})
+		meta = append(meta, checkoutSource{projectID: c.project.ID, checkout: c.named})
+	}
+	return srcs, meta, nil
 }
 
 func int32s(xs []int) []int32 {
