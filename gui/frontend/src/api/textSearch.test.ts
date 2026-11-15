@@ -29,7 +29,7 @@ describe("SearchText's messages as views", () => {
   });
 
   it("maps the summary", () => {
-    expect(toTextSummaryView(create(SearchTextSummarySchema, { lines: 12, files: 3, truncated: true, totalCapped: true, caseSensitive: true, elapsedMs: 42n }))).toEqual({
+    expect(toTextSummaryView(create(SearchTextSummarySchema, { lines: 12, files: 3, truncated: true, totalCapped: true, caseSensitive: true, elapsedMs: 42n, includedCapped: true }))).toEqual({
       lines: 12,
       files: 3,
       truncated: true,
@@ -38,6 +38,7 @@ describe("SearchText's messages as views", () => {
       timedOut: false,
       caseSensitive: true,
       elapsedMs: 42,
+      includedCapped: true,
     });
   });
 

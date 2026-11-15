@@ -748,9 +748,12 @@ type SearchFilesResponse struct {
 	// Best match first, across all sources.
 	Matches []*FileMatch `protobuf:"bytes,1,rep,name=matches,proto3" json:"matches,omitempty"`
 	// More entries matched than were returned.
-	Truncated     bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Truncated bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// Some checkout's included ignored files (files.include_ignored, the project's patterns)
+	// were cut at 20,000: the ones past them were not searched.
+	IncludedCapped bool `protobuf:"varint,3,opt,name=included_capped,json=includedCapped,proto3" json:"included_capped,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SearchFilesResponse) Reset() {
@@ -793,6 +796,13 @@ func (x *SearchFilesResponse) GetMatches() []*FileMatch {
 func (x *SearchFilesResponse) GetTruncated() bool {
 	if x != nil {
 		return x.Truncated
+	}
+	return false
+}
+
+func (x *SearchFilesResponse) GetIncludedCapped() bool {
+	if x != nil {
+		return x.IncludedCapped
 	}
 	return false
 }
@@ -1192,9 +1202,12 @@ type SearchTextSummary struct {
 	// letter.
 	CaseSensitive bool `protobuf:"varint,7,opt,name=case_sensitive,json=caseSensitive,proto3" json:"case_sensitive,omitempty"`
 	// From the request to the summary.
-	ElapsedMs     int64 `protobuf:"varint,8,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ElapsedMs int64 `protobuf:"varint,8,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
+	// Some checkout's included ignored files were cut at 20,000: the ones past them were not
+	// searched (SearchFilesResponse.included_capped).
+	IncludedCapped bool `protobuf:"varint,9,opt,name=included_capped,json=includedCapped,proto3" json:"included_capped,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SearchTextSummary) Reset() {
@@ -1281,6 +1294,13 @@ func (x *SearchTextSummary) GetElapsedMs() int64 {
 		return x.ElapsedMs
 	}
 	return 0
+}
+
+func (x *SearchTextSummary) GetIncludedCapped() bool {
+	if x != nil {
+		return x.IncludedCapped
+	}
+	return false
 }
 
 type SuggestIncludeIgnoredRequest struct {
@@ -2278,10 +2298,11 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\bcheckout\x18\x04 \x01(\tR\bcheckout\x12%\n" +
 	"\x0epath_positions\x18\x05 \x03(\x05R\rpathPositions\x12+\n" +
 	"\x11project_positions\x18\x06 \x03(\x05R\x10projectPositions\x12\x18\n" +
-	"\aignored\x18\a \x01(\bR\aignored\"h\n" +
+	"\aignored\x18\a \x01(\bR\aignored\"\x91\x01\n" +
 	"\x13SearchFilesResponse\x123\n" +
 	"\amatches\x18\x01 \x03(\v2\x19.codefoundry.v1.FileMatchR\amatches\x12\x1c\n" +
-	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"\xb3\x01\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\x12'\n" +
+	"\x0fincluded_capped\x18\x03 \x01(\bR\x0eincludedCapped\"\xb3\x01\n" +
 	"\x11SearchTextRequest\x124\n" +
 	"\asources\x18\x01 \x03(\v2\x1a.codefoundry.v1.FileSourceR\asources\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x1d\n" +
@@ -2311,7 +2332,7 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\acut_end\x18\x05 \x01(\bR\x06cutEnd\"3\n" +
 	"\tTextRange\x12\x14\n" +
 	"\x05start\x18\x01 \x01(\x05R\x05start\x12\x10\n" +
-	"\x03end\x18\x02 \x01(\x05R\x03end\"\x84\x02\n" +
+	"\x03end\x18\x02 \x01(\x05R\x03end\"\xad\x02\n" +
 	"\x11SearchTextSummary\x12\x14\n" +
 	"\x05lines\x18\x01 \x01(\x05R\x05lines\x12\x14\n" +
 	"\x05files\x18\x02 \x01(\x05R\x05files\x12\x1c\n" +
@@ -2322,7 +2343,8 @@ const file_codefoundry_v1_filesystem_proto_rawDesc = "" +
 	"\ttimed_out\x18\x06 \x01(\bR\btimedOut\x12%\n" +
 	"\x0ecase_sensitive\x18\a \x01(\bR\rcaseSensitive\x12\x1d\n" +
 	"\n" +
-	"elapsed_ms\x18\b \x01(\x03R\telapsedMs\"g\n" +
+	"elapsed_ms\x18\b \x01(\x03R\telapsedMs\x12'\n" +
+	"\x0fincluded_capped\x18\t \x01(\bR\x0eincludedCapped\"g\n" +
 	"\x1cSuggestIncludeIgnoredRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +

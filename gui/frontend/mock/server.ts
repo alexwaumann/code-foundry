@@ -149,6 +149,8 @@
  *   POST /__mock/ignored?project=repo-cf&path=.env&dir=dist&file=dist/a.js   (that project's ignored
  *                                                 entries: path= a file, dir= a collapsed folder whose
  *                                                 file= follow it; reset restores IGNORED)
+ *   POST /__mock/ignored/cap?files=2             (a search lists at most this many included ignored files per
+ *                                                 project and says it cut them, as fsx.MaxIncludedFiles; reset: 20,000)
  *   FilesystemService.ReadFile, WriteFile, PreviewFile (+ GET /preview/<grant>/<path>), ProjectService.GetWorktreeCompareFile: mock/files.ts (code-foundry's README.md,
  *        src/app.ts, docs/preview.html, docs/logo.png, docs/; every detail's changed files)
  *   POST /__mock/compare/files?count=500[&first=10]  (that many more files in every comparison, and that many sorting above them all; reset: none)
@@ -283,7 +285,7 @@ import { completionCalls, listDirectories, listSkills, resetCompletion, searchFi
 import { resetText, searchText, setMockText, setTextDelay } from "./textSearch";
 import { cloneRepo, lookupGitHub, resetClones, searchGitHub } from "./clone";
 import { renameProjectIn } from "./projectRename";
-import { type MockIgnored, resetIgnored, setIncludeIgnoredIn, setMockIgnored, splitIncludeSetting, suggestIncludeIgnored } from "./includeIgnored";
+import { type MockIgnored, resetIgnored, setIncludeCap, setIncludeIgnoredIn, setMockIgnored, splitIncludeSetting, suggestIncludeIgnored } from "./includeIgnored";
 import { createProject, deleteProject, listPublishOwners, publishProject, visibilityFlag } from "./create";
 import { ghEvent } from "./github";
 import { prDetailCall } from "./prDetail";
@@ -1609,6 +1611,10 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
       json(res, 200, { project, files: set.map((f) => f.path) });
       break;
     }
+    case "POST /__mock/ignored/cap":
+      setIncludeCap(q.has("files") ? Number(q.get("files")) : null);
+      json(res, 200, { ok: true });
+      break;
     case "POST /__mock/text/delay":
       setTextDelay(Number(q.get("ms") ?? "0"));
       json(res, 200, { ok: true });

@@ -3,6 +3,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Kbd } from "@/components/ui/kbd";
 import { statusColor } from "@/components/diff/files";
 import { changeStatuses, emptyGroups, MAX_WORDS, parseFinderQuery, searchRows, type FinderCheckout, type FinderGroup, type FinderRow, type Run } from "@/lib/fileFinder";
+import { INCLUDED_CAPPED_NOTE } from "@/lib/textSearch";
 import { useFirstRowSelection } from "@/lib/useFirstRowSelection";
 import { cn } from "@/lib/utils";
 import { openFoundFile, tagFoundFile } from "@/stores/fileFinder";
@@ -84,26 +85,37 @@ function FinderItem({ row, multi, onOpen }: { row: FinderRow; multi: boolean; on
   );
 }
 
-function Hints() {
+/** The Text mode's note, as the Files mode's footer starts with it. */
+const FILES_CAPPED_NOTE = INCLUDED_CAPPED_NOTE.charAt(0).toUpperCase() + INCLUDED_CAPPED_NOTE.slice(1);
+
+/** The Files mode's footer: a line on what the search left out (as the Text mode's status notes), then the keys. */
+function Hints({ note }: { note?: string }) {
   return (
-    <div className="flex shrink-0 items-center gap-3 border-t px-3 py-1.5 text-caption-sm" data-testid="finder-hints">
-      <span className="flex items-center gap-1">
-        <Kbd size="sm">↑</Kbd>
-        <Kbd size="sm">↓</Kbd> move
-      </span>
-      <span className="flex items-center gap-1">
-        <Kbd size="sm">⏎</Kbd> open
-      </span>
-      <span className="flex items-center gap-1">
-        <Kbd size="sm">⌘</Kbd>
-        <Kbd size="sm">⏎</Kbd> @ in prompt
-      </span>
-      <span className="flex items-center gap-1">
-        <Kbd size="sm">tab</Kbd> search text
-      </span>
-      <span className="ml-auto flex items-center gap-1">
-        <Kbd size="sm">esc</Kbd> close
-      </span>
+    <div className="shrink-0 border-t" data-testid="finder-hints">
+      {note && (
+        <p className="truncate px-3 pt-1.5 text-caption-sm text-cf-text-muted" data-testid="finder-note">
+          {note}
+        </p>
+      )}
+      <div className="flex items-center gap-3 px-3 py-1.5 text-caption-sm">
+        <span className="flex items-center gap-1">
+          <Kbd size="sm">↑</Kbd>
+          <Kbd size="sm">↓</Kbd> move
+        </span>
+        <span className="flex items-center gap-1">
+          <Kbd size="sm">⏎</Kbd> open
+        </span>
+        <span className="flex items-center gap-1">
+          <Kbd size="sm">⌘</Kbd>
+          <Kbd size="sm">⏎</Kbd> @ in prompt
+        </span>
+        <span className="flex items-center gap-1">
+          <Kbd size="sm">tab</Kbd> search text
+        </span>
+        <span className="ml-auto flex items-center gap-1">
+          <Kbd size="sm">esc</Kbd> close
+        </span>
+      </div>
     </div>
   );
 }
@@ -282,7 +294,7 @@ function FilesMode({
           </CommandGroup>
         ))}
       </CommandList>
-      <Hints />
+      <Hints note={searching && !parsed.tooMany && found.includedCapped ? FILES_CAPPED_NOTE : undefined} />
     </Command>
   );
 }

@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject }
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
 import { plainText, rangeOf } from "@/components/thread/cite/citeDom";
 import { draftText, type EditorPlace } from "@/lib/codeEditor";
-import { fileMatchIndex, findInFile, pickCurrent, type FileMatch, type FileMatches } from "@/lib/fileFind";
+import { fileMatchIndex, findInFile, paintedMatches, pickCurrent, type FileMatch, type FileMatches } from "@/lib/fileFind";
 import { matchOffsets, stepIndex } from "@/lib/threadFind";
 import { zoomFactor } from "@/lib/zoom";
 import { focusEditor, selectInEditor } from "@/stores/fileEdit";
@@ -242,9 +242,14 @@ function codeSurface(findKey: string | undefined, box: RefObject<HTMLDivElement 
       for (const el of lines()) {
         const line = Number(el.dataset.line) - 1;
         if (!has.has(line)) continue;
-        lineRanges(el, query).forEach((r, nth) => {
-          (cur?.line === line && cur.nth === nth ? current : all).push(r);
-        });
+        const pt = plainText(el);
+        const offs = matchOffsets(pt.text, query);
+        const at = cur?.line === line ? cur.nth : -1;
+        for (const nth of paintedMatches(pt.text.length, offs.length, at)) {
+          const m = offs[nth];
+          const r = m ? rangeOf(pt, m.start, m.end) : null;
+          if (r) (nth === at ? current : all).push(r);
+        }
       }
       return { all, current };
     },

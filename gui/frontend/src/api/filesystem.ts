@@ -178,6 +178,14 @@ export interface FinderMatchView {
   ignored?: boolean;
 }
 
+/** What a finder search found. */
+export interface FinderFoundView {
+  /** Best match first. */
+  matches: FinderMatchView[];
+  /** Some checkout's included ignored files were cut at 20,000: the rest were not searched. */
+  includedCapped: boolean;
+}
+
 /**
  * Searches several checkouts for files (FilesystemService.SearchFiles with sources and
  * files_only): one list ranked across them, best first. The daemon refuses a query of more
@@ -187,11 +195,14 @@ export async function findFiles(
   req: { sources: readonly FinderSourceView[]; query: string; limit?: number },
   conn: DaemonConnection = daemon,
   signal?: AbortSignal,
-): Promise<FinderMatchView[]> {
+): Promise<FinderFoundView> {
   const c = await conn.client(FilesystemService);
   try {
     const res = await c.searchFiles({ sources: req.sources.map((s) => ({ projectId: s.projectId, path: s.path })), query: req.query, limit: req.limit ?? 0, filesOnly: true }, { signal });
-    return res.matches.map((m) => ({ projectId: m.projectId, checkout: m.checkout, path: m.path, pathPositions: [...m.pathPositions], projectPositions: [...m.projectPositions], ignored: m.ignored }));
+    return {
+      matches: res.matches.map((m) => ({ projectId: m.projectId, checkout: m.checkout, path: m.path, pathPositions: [...m.pathPositions], projectPositions: [...m.projectPositions], ignored: m.ignored })),
+      includedCapped: res.includedCapped,
+    };
   } catch (err) {
     throw orOutdatedDaemon(err);
   }

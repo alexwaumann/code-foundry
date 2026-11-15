@@ -62,6 +62,10 @@ type Summary struct {
 	// (Limits.FileLines). TotalCapped: the search stopped at Limits.TotalLines, with
 	// files left unsearched or lines unsent. TimedOut: it stopped at Limits.Timeout.
 	FileCapped, TotalCapped, TimedOut bool
+	// IncludeCapped: some checkout's included ignored files were cut at
+	// fsx.MaxIncludedFiles, so the files past them were not searched (file search does not
+	// list them either).
+	IncludeCapped bool
 	// CaseSensitive is how the query matched (Query.CaseSensitive).
 	CaseSensitive bool
 	Elapsed       time.Duration
@@ -140,7 +144,7 @@ func (s *Searcher) Search(ctx context.Context, sources []fsx.Source, q Query, em
 	} else {
 		regexErr <- nil
 	}
-	lists, listErr := s.files.Files(ctx, sources)
+	lists, includeCapped, listErr := s.files.Files(ctx, sources)
 	if err := <-regexErr; err != nil && ctx.Err() == nil {
 		return sum, err
 	}
@@ -153,6 +157,7 @@ func (s *Searcher) Search(ctx context.Context, sources []fsx.Source, q Query, em
 	case listErr != nil:
 		return sum, listErr
 	}
+	sum.IncludeCapped = includeCapped
 
 	chunks := plan(sources, lists)
 	runCtx, stop := context.WithCancel(ctx)

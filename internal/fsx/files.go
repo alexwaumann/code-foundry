@@ -222,8 +222,9 @@ type FileIndex struct {
 	ttl time.Duration
 	now func() time.Time
 	log *slog.Logger
-	// list produces a checkout's candidates (listFiles; tests replace it).
-	list func(ctx context.Context, dir string, git bool, include []string) ([]FileEntry, error)
+	// list produces a checkout's candidates and whether the included ignored files were
+	// cut at MaxIncludedFiles (listFiles; tests replace it).
+	list func(ctx context.Context, dir string, git bool, include []string) ([]FileEntry, bool, error)
 
 	mu       sync.Mutex
 	entries  map[string]cachedFiles
@@ -238,7 +239,9 @@ type cachedFiles struct {
 	// filePaths[i]'s index in files.
 	filePaths []string
 	fileIdx   []int
-	created   time.Time
+	// includeCapped: the included ignored files were cut at MaxIncludedFiles.
+	includeCapped bool
+	created       time.Time
 	// sorted is the files alone, by path, made on the first text search of the entry
 	// (Files). A pointer, so every copy of the entry shares one.
 	sorted *sortedFiles
@@ -295,9 +298,11 @@ type Match struct {
 // when filesOnly) of every source checkout and ranks them in one list
 // (fuzzy.RankSources: best first, ties to the earlier source). limit is clamped to
 // [1, MaxFileLimit] with zero meaning DefaultFileLimit. The checkouts are listed
-// concurrently. When ctx ends first, SearchSources returns its error at once; the
-// listings go on (at most listTimeout) and fill the cache for the next search.
-func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query string, limit int, filesOnly bool) (matches []Match, truncated bool, err error) {
+// concurrently. includeCapped: some source's included ignored files were cut at
+// MaxIncludedFiles, so files past them were not searched. When ctx ends first,
+// SearchSources returns its error at once; the listings go on (at most listTimeout) and
+// fill the cache for the next search.
+func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query string, limit int, filesOnly bool) (matches []Match, truncated, includeCapped bool, err error) {
 	if limit <= 0 {
 		limit = DefaultFileLimit
 	}
@@ -312,12 +317,13 @@ func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query s
 		select {
 		case <-l.done:
 		case <-ctx.Done():
-			return nil, false, ctx.Err()
+			return nil, false, false, ctx.Err()
 		}
 		if l.err != nil { // with several checkouts, say which one
-			return nil, false, fmt.Errorf("list %s: %w", sources[i].Dir, l.err)
+			return nil, false, false, fmt.Errorf("list %s: %w", sources[i].Dir, l.err)
 		}
 		lists[i] = l.c
+		includeCapped = includeCapped || l.c.includeCapped
 		ranked[i] = fuzzy.Source{Name: sources[i].Name, Paths: l.c.paths}
 		if filesOnly {
 			ranked[i].Paths = l.c.filePaths
@@ -332,16 +338,16 @@ func (x *FileIndex) SearchSources(ctx context.Context, sources []Source, query s
 		}
 		matches[i] = Match{FileEntry: c.files[idx], Source: h.Source, PathPositions: h.PathPositions, NamePositions: h.NamePositions}
 	}
-	return matches, truncated, nil
+	return matches, truncated, includeCapped, nil
 }
 
 // Files returns each source's files (no directories) from the same cached lists
 // SearchSources ranks, listing a checkout as it does, so text search covers exactly the
 // files file search finds. Each list is sorted by path (byte order), without the paths
 // that are not valid UTF-8 (a protobuf string cannot carry them). The slices are shared
-// with the cache: read only. When ctx ends first, Files returns its error; the listings go
-// on and fill the cache.
-func (x *FileIndex) Files(ctx context.Context, sources []Source) ([][]FileEntry, error) {
+// with the cache: read only. includeCapped is SearchSources'. When ctx ends first, Files
+// returns its error; the listings go on and fill the cache.
+func (x *FileIndex) Files(ctx context.Context, sources []Source) (lists [][]FileEntry, includeCapped bool, err error) {
 	pending := make([]*listing, len(sources))
 	for i, src := range sources {
 		pending[i] = x.start(ctx, src)
@@ -351,14 +357,15 @@ func (x *FileIndex) Files(ctx context.Context, sources []Source) ([][]FileEntry,
 		select {
 		case <-l.done:
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, false, ctx.Err()
 		}
 		if l.err != nil {
-			return nil, fmt.Errorf("list %s: %w", sources[i].Dir, l.err)
+			return nil, false, fmt.Errorf("list %s: %w", sources[i].Dir, l.err)
 		}
 		out[i] = l.c.sortedFiles()
+		includeCapped = includeCapped || l.c.includeCapped
 	}
-	return out, nil
+	return out, includeCapped, nil
 }
 
 // sortedFiles is the entry's files by path, built on first use.
@@ -410,13 +417,13 @@ func (x *FileIndex) start(ctx context.Context, src Source) *listing {
 func (x *FileIndex) fill(ctx context.Context, key, dir string, git bool, include []string, l *listing) {
 	ctx, cancel := context.WithTimeout(ctx, listTimeout)
 	defer cancel()
-	files, err := x.list(ctx, dir, git, include)
+	files, includeCapped, err := x.list(ctx, dir, git, include)
 	var c cachedFiles
 	if err == nil {
 		// Stamp the entry when the listing is done: one slower than the TTL (a huge
 		// project) would otherwise be cached already expired and re-run on every keystroke.
 		now := x.now()
-		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), created: now, sorted: &sortedFiles{}}
+		c = cachedFiles{key: key, files: files, paths: make([]string, len(files)), includeCapped: includeCapped, created: now, sorted: &sortedFiles{}}
 		for i, f := range files {
 			c.paths[i] = f.Path
 			if !f.IsDir {
@@ -453,11 +460,10 @@ func (x *FileIndex) dropExpired(now time.Time) {
 }
 
 // listFiles lists a checkout's candidates: git's view plus the ignored files include
-// brings in (listed at the same time), else (no git, or git failed) the walk.
-func (x *FileIndex) listFiles(ctx context.Context, dir string, git bool, include []string) ([]FileEntry, error) {
-	var files []FileEntry
+// brings in (listed at the same time; includeCapped when they were cut at
+// MaxIncludedFiles), else (no git, or git failed) the walk.
+func (x *FileIndex) listFiles(ctx context.Context, dir string, git bool, include []string) (files []FileEntry, includeCapped bool, err error) {
 	var truncated bool
-	var err error
 	if git {
 		var (
 			ignored     []string
@@ -481,16 +487,17 @@ func (x *FileIndex) listFiles(ctx context.Context, dir string, git bool, include
 		}
 		if err == nil {
 			files = WithIncluded(paths, ignored)
+			includeCapped = ignoredFull
 		}
 	}
 	if !git || err != nil {
 		files, truncated, err = WalkFiles(ctx, dir, MaxWalkEntries)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if truncated {
 		x.log.Info("file search candidates capped", "dir", dir, "entries", len(files))
 	}
-	return files, nil
+	return files, includeCapped, nil
 }

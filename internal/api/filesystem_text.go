@@ -42,7 +42,7 @@ func (h *Filesystem) SearchText(ctx context.Context, req *connect.Request[v1.Sea
 	return stream.Send(&v1.SearchTextResponse{Summary: &v1.SearchTextSummary{
 		Lines: int32(sum.Lines), Files: int32(sum.Files), Truncated: sum.Truncated(),
 		FileCapped: sum.FileCapped, TotalCapped: sum.TotalCapped, TimedOut: sum.TimedOut,
-		CaseSensitive: sum.CaseSensitive, ElapsedMs: sum.Elapsed.Milliseconds(),
+		CaseSensitive: sum.CaseSensitive, ElapsedMs: sum.Elapsed.Milliseconds(), IncludedCapped: sum.IncludeCapped,
 	}})
 }
 

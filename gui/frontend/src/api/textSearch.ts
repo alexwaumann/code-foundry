@@ -63,6 +63,8 @@ export interface TextSummaryView {
   /** What smart case decided (or match case). */
   caseSensitive: boolean;
   elapsedMs: number;
+  /** Some checkout's included ignored files were cut at 20,000: the rest were not searched. */
+  includedCapped: boolean;
 }
 
 export function toTextFileView(f: TextFileMatch): TextFileView {
@@ -87,6 +89,7 @@ export function toTextSummaryView(s: SearchTextSummary): TextSummaryView {
     timedOut: s.timedOut,
     caseSensitive: s.caseSensitive,
     elapsedMs: Number(s.elapsedMs),
+    includedCapped: s.includedCapped,
   };
 }
 
@@ -130,5 +133,5 @@ export async function searchText(
   } catch (err) {
     throw orOutdatedDaemon(err);
   }
-  return summary ?? { lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: false, elapsedMs: 0 };
+  return summary ?? { lines: 0, files: 0, truncated: false, fileCapped: false, totalCapped: false, timedOut: false, caseSensitive: false, elapsedMs: 0, includedCapped: false };
 }

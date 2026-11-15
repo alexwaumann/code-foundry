@@ -102,12 +102,14 @@ export interface FinderSearch {
   matches: readonly FinderMatchView[];
   /** The last search failed (its message); null otherwise. */
   error: string | null;
+  /** Some checkout's included ignored files were cut short (FinderFoundView). */
+  includedCapped: boolean;
 }
 
 /** SearchFiles over several checkouts, replaceable in tests. */
 export type FindFilesFn = typeof findFiles;
 
-const NOTHING: FinderSearch = { answered: null, matches: [], error: null };
+const NOTHING: FinderSearch = { answered: null, matches: [], error: null, includedCapped: false };
 
 /**
  * Searches the checkouts for `query` (empty: nothing is sent), debounced by
@@ -122,12 +124,12 @@ export function useFinderSearch(sources: readonly FinderSourceView[], query: str
     const ctl = new AbortController();
     const timer = setTimeout(() => {
       search({ sources, query, limit: FINDER_LIMIT }, undefined, ctl.signal).then(
-        (matches) => {
-          if (!ctl.signal.aborted) setState({ answered: query, matches, error: null });
+        (found) => {
+          if (!ctl.signal.aborted) setState({ answered: query, matches: found.matches, error: null, includedCapped: found.includedCapped });
         },
         (err: unknown) => {
           if (ctl.signal.aborted || isAbort(err)) return;
-          setState({ answered: query, matches: [], error: errorMessage(err) });
+          setState({ answered: query, matches: [], error: errorMessage(err), includedCapped: false });
         },
       );
     }, FINDER_DEBOUNCE_MS);
