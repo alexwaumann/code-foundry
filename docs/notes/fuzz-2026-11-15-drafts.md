@@ -66,12 +66,17 @@ is centred, would shift down mid-word. It would also remount the editor: the car
 the start (ProseMirror's initial selection), and an IME composition in progress breaks. So the
 smaller change was taken instead:
 
-- **The text is the space's own.** `followEmptySpace` (`shell/composerDrafts.ts`, on every layout
-  change) moves the `home:` entry to `space:<id>` (`SPACE_KEY`, lib/compose) when the window
-  leaves a space it showed empty, or that space gets a pane. When the window shows a space empty
-  again, its entry moves back. Two empty spaces never share text, and a No project compose tab
-  in a space with panes does not show it. A send on its way is left where it is. A removed
-  space's text goes with it.
+- **The text is the space's own.** The No project composer's text (`home:`) is the text of the
+  space the window shows, whether or not that space has panes. `followSpace`
+  (`shell/composerDrafts.ts`, on every layout change) moves it to `space:<id>` (`SPACE_KEY`,
+  lib/compose) only when the window shows another space, and moves that space's own back. Two
+  spaces never share it. A pane opening in the space (a thread clicked in the sidebar, cmd+n)
+  does not hide it: a No project compose tab there shows it, and a key typed there makes it a
+  listed draft, as any text typed in that tab does, with no copy left under `home:` or `space:`.
+  A send on its way is left where it is. A removed space's text goes with it.
+  - A first version moved the text out as soon as the space got a pane. Text typed in an empty
+    space and then followed by opening a thread there was parked where no composer showed it
+    until the space was empty again. Review caught it before merge.
 - **It survives a restart.** The stored document gains `spaces: { [spaceId]: text }`, written
   and restored like the drafts' text. The live `home:` text is stored under the space showing it.
 - **Moved into a compose tab, it becomes a draft.** `ComposeTab`, showing its empty composer
@@ -99,6 +104,9 @@ The empty space's text still has no sidebar row: it is not a listed draft.
   - after a reload, the draft was on No project with its text;
   - text typed in Main's empty space was not shown in a new space Two, came back in Main, and
     stayed through a reload;
+  - text typed in an empty space, then a thread opened there from the sidebar, then New thread ›
+    No project: the composer showed the text, and one more key made it a listed draft, once;
+    space Two's No project composer stayed empty, and a reload kept both as left;
   - typing in Two's empty space and picking alpha gave a listed draft on alpha;
   - a full daemon restart on the same home kept both drafts' params (Main's on No project, Two's
     on alpha, its row reading alpha);

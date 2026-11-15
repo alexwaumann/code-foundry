@@ -85,7 +85,7 @@ export function startWelcomeSync(): () => void {
     if (!isWelcome(prev) || !s.loaded || s.order.length === 0) return;
     const { page, decided } = useWelcomeStore.getState();
     if (!decided || !page) return;
-    // The home draft, or an empty space's own text (shell/composerDrafts.ts) while the window shows another space.
+    // The home draft, or another space's No project text (shell/composerDrafts.ts) while the window shows this one.
     for (const key of Object.keys(useComposeStore.getState().drafts)) {
       if ((key === HOME_DRAFT || key.startsWith(SPACE_KEY)) && getDraft(key).text === welcomePrompt(page)) updateDraft(key, { text: "" });
     }

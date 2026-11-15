@@ -17,11 +17,14 @@
  * - The drafts' text is kept in localStorage (STORAGE_KEY) and put back at start, so a draft
  *   survives closing its tab and a reload. A draft the layout no longer lists (sent, discarded,
  *   cleared, from any window or the CLI) loses its text here too.
- * - A space with no pane shows the No project composer (EmptySpace, under HOME_KEY). Its text is
- *   that space's: when the window leaves the space, or the space gets a pane, the text moves to
- *   the space's own key (SPACE_KEY), and back when the window shows the space empty again. So two
- *   empty spaces never share it, and it is kept across a reload like a draft's. It is not a listed
- *   draft: that would need the space's composer to become a tab while the user types.
+ * - The No project composer's text (HOME_KEY: a space with no pane shows it, EmptySpace, and so
+ *   does a No project compose tab before its first key) is the text of the space the window shows,
+ *   whether or not that space has panes: when the window shows another space it moves to the
+ *   space's own key (SPACE_KEY), and back when the window shows that space again. So two spaces
+ *   never share it, a pane opening in the space does not hide it, and it is kept across a reload
+ *   like a draft's. Typed in a space with no pane it is not a listed draft (that would need the
+ *   space's composer to become a tab while the user types); a key typed into a No project compose
+ *   tab showing it makes it one, as any text typed there does.
  * - So is the text typed in a thread's own composer and not yet sent (its compose store key,
  *   lib/threadDraft threadDraftKey, which the floating composer shares): put back at start, gone
  *   once sent (the send clears it) and dropped when the thread is archived or removed.
@@ -224,15 +227,14 @@ export function composerTextChanged(tabId: string, draft: string, targetKey: str
   relabel(draft);
 }
 
-/** The space with no pane whose text HOME_KEY holds now ("" when the window shows none). */
+/** The space whose No project text HOME_KEY holds now: the one the window shows ("" before the layout is in). */
 let homeSpace = "";
 
 /**
- * The window now shows `now` ("" for a space with panes): the text of the space it showed empty
- * goes to that space's key, and the one it shows empty gets its own back. A send on its way is
- * left where it is.
+ * The window now shows space `now`: the text of the space it showed goes to that space's key, and
+ * the one it shows gets its own back. A send on its way is left where it is.
  */
-function followEmptySpace(now: string): void {
+function followSpace(now: string): void {
   if (now === homeSpace) return;
   const home = useComposeStore.getState().drafts[HOME_KEY];
   if (homeSpace && home?.phase === "idle") moveEntry(HOME_KEY, SPACE_KEY + homeSpace);
@@ -253,7 +255,7 @@ export function resetComposerDrafts(): void {
   usePendingStore.setState({ byTab: {} });
 }
 
-/** What is stored: the drafts' text by draft id, the threads' unsent text by thread id, and the text of spaces with no pane by space id. */
+/** What is stored: the drafts' text by draft id, the threads' unsent text by thread id, and each space's No project text by space id. */
 export interface StoredTexts {
   texts: Record<string, string>;
   threads: Record<string, string>;
@@ -292,7 +294,7 @@ function writeStored(s: StoredTexts): void {
 
 const THREAD_KEY = threadDraftKey("");
 
-/** The drafts', the threads' and the empty spaces' text in the compose store: by id, empty ones left out. */
+/** The drafts', the threads' and the spaces' No project text in the compose store: by id, empty ones left out. */
 function storedTexts(): StoredTexts {
   const out: StoredTexts = { texts: {}, threads: {}, spaces: {} };
   for (const [key, d] of Object.entries(useComposeStore.getState().drafts)) {
@@ -356,7 +358,7 @@ export function startComposerDrafts(): () => void {
   };
   const prune = (s: LayoutState) => {
     if (!s.loaded) return;
-    followEmptySpace(s.trees[s.currentSpaceId] === null ? s.currentSpaceId : "");
+    followSpace(s.currentSpaceId);
     // A removed space's text goes with it.
     for (const key of Object.keys(useComposeStore.getState().drafts)) {
       if (key.startsWith(SPACE_KEY) && !(key.slice(SPACE_KEY.length) in s.spaces)) clearDraft(key);

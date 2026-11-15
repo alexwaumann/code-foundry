@@ -200,8 +200,8 @@ const LIKE_KEY = "like:";
 export const HOME_KEY = "home:";
 
 /**
- * The compose store's key prefix of the text typed in a space with no pane, kept while the window
- * shows another space (shell/composerDrafts.ts): the space shows it under HOME_KEY.
+ * The compose store's key prefix of a space's No project text while the window shows another space
+ * (shell/composerDrafts.ts): the space the window shows has it under HOME_KEY.
  */
 export const SPACE_KEY = "space:";
 

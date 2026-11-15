@@ -244,7 +244,7 @@ describe("a compose tab's draft", () => {
   });
 });
 
-describe("the composer of a space with no pane", () => {
+describe("a space's No project composer text", () => {
   // Two spaces with no pane; `current` is the one the window shows.
   const EMPTY = (current: string, rev: number, ids = ["sp-a", "sp-b"]) => ({
     ...layoutOf(ids.map((id) => space(null, "", { id, name: id }))),
@@ -262,7 +262,7 @@ describe("the composer of a space with no pane", () => {
     expect(getDraft("home:").text).toBe("Pear prompt typed in empty space");
   });
 
-  it("is kept across a reload, and not shown in a compose tab once the space has a pane", async () => {
+  it("is kept across a reload, and stays the space's when a pane opens there: a No project tab shows it, and its first key makes it a draft, once", async () => {
     await seedLayout(EMPTY("sp-a", 2));
     stop = startComposerDrafts();
     updateDraft("home:", { text: "kept" });
@@ -274,12 +274,39 @@ describe("the composer of a space with no pane", () => {
     resetComposerDrafts();
     stop = startComposerDrafts();
     expect(getDraft("home:").text).toBe("kept");
-    // The space gets a pane (a No project compose tab, which shares the home key): its text waits.
-    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-c", "compose", "", { key: "compose" })]), "p-1", { id: "sp-a" })]), rev: 5 }));
-    expect(getDraft("home:").text).toBe("");
+    // A pane opens in the space (a thread): the text is still the space's No project text.
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 5 }));
+    expect(getDraft("home:").text).toBe("kept");
+    // A No project compose tab in it shows that text; a key typed there starts one draft and leaves no copy behind.
+    await act(() =>
+      seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1"), tab("t-c", "compose", "", { key: "compose" })], "t-c"), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 6 }),
+    );
+    updateDraft("home:", { text: "kept!" });
+    composerTextChanged("t-c", "", "home:");
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(runs.filter((r) => r.name === "composer.draft.start")).toHaveLength(1);
+    expect(getDraft(`draft:${started()}`).text).toBe("kept!");
+    expect(useComposeStore.getState().drafts["home:"]).toBeUndefined();
+    // The window shows space B and back: nothing of A's text was left to move.
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-c", "compose", "", { key: "compose:draft", params: { draft: started() } })]), "p-1", { id: "sp-a", drafts: [{ id: started(), label: "kept!", params: {} }] }), space(null, "", { id: "sp-b" })]), currentSpaceId: "sp-b", rev: 7 }));
+    expect(getDraft(`draft:${started()}`).text).toBe("kept!");
+    expect(useComposeStore.getState().drafts["space:sp-a"]).toBeUndefined();
     await act(() => vi.advanceTimersByTimeAsync(500));
-    expect(readStored().spaces).toEqual({ "sp-a": "kept" });
+    expect(readStored()).toMatchObject({ texts: { [started()]: "kept!" }, spaces: {} });
   });
+
+  it("a pane opening does not hide it; another space does not show it", async () => {
+    await seedLayout(EMPTY("sp-a", 2));
+    stop = startComposerDrafts();
+    updateDraft("home:", { text: "typed in a" });
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 3 }));
+    expect(getDraft("home:").text).toBe("typed in a");
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), currentSpaceId: "sp-b", rev: 4 }));
+    expect(getDraft("home:").text).toBe("");
+    await act(() => seedLayout({ ...layoutOf([space(pane("p-1", [tab("t-t", "thread", "s-1")]), "p-1", { id: "sp-a" }), space(null, "", { id: "sp-b" })]), rev: 5 }));
+    expect(getDraft("home:").text).toBe("typed in a");
+  });
+
 
   it("goes with its space", async () => {
     await seedLayout(EMPTY("sp-a", 2));
