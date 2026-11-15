@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo } from "react";
+import type { SupportedLanguages } from "@pierre/diffs";
 import { EditProvider, File, type EditorFactory, type FileEditChangeHandler, type FileOptions, type SelectedLineRange } from "@pierre/diffs/react";
 import { createCodeEditor, editorHandle, type CodeEditor, type EditorHandle } from "@/lib/codeEditor";
 import { useCodeTheme } from "@/lib/codeTheme";
@@ -48,6 +49,8 @@ export interface CodeFileProps {
   /** The file name (or path): the language comes from its extension. */
   name: string;
   contents: string;
+  /** The language when the extension does not tell it (an SVG is XML). */
+  lang?: SupportedLanguages | undefined;
   /** Long lines wrap instead of scrolling; the codeView store's choice when unset. */
   wrap?: boolean;
   /** Line numbers in the gutter (on by default). */
@@ -64,11 +67,11 @@ export interface CodeFileProps {
  * no file header (callers draw their own outside it), line numbers on, wrap from the
  * codeView store. Read-only unless given `edit`.
  */
-export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbers = true, selectedLines, edit, className }: CodeFileProps) {
+export const CodeFile = memo(function CodeFile({ name, contents, lang, wrap, lineNumbers = true, selectedLines, edit, className }: CodeFileProps) {
   const { theme, themeType } = useCodeTheme();
   const storeWrap = useCodeViewStore((s) => s.wrap);
   const overflow = (wrap ?? storeWrap) ? "wrap" : "scroll";
-  const file = useMemo(() => ({ name, contents }), [name, contents]);
+  const file = useMemo(() => (lang ? { name, contents, lang } : { name, contents }), [name, contents, lang]);
   const options = useMemo(
     (): FileOptions<undefined, undefined> => ({ theme, themeType, disableFileHeader: true, disableLineNumbers: !lineNumbers, overflow, unsafeCSS: CODE_SHADOW_CSS }),
     [theme, themeType, lineNumbers, overflow],
@@ -88,7 +91,7 @@ export const CodeFile = memo(function CodeFile({ name, contents, wrap, lineNumbe
 });
 
 /** The File tab's view of a file: the library's File under its editor context. */
-function EditableFile({ file, options, selectedLines, edit }: { file: { name: string; contents: string }; options: FileOptions<undefined, undefined>; selectedLines: SelectedLineRange | null | undefined; edit: CodeFileEdit }) {
+function EditableFile({ file, options, selectedLines, edit }: { file: { name: string; contents: string; lang?: SupportedLanguages }; options: FileOptions<undefined, undefined>; selectedLines: SelectedLineRange | null | undefined; edit: CodeFileEdit }) {
   const { active, stateKey, revision, onChange, onOpening, onDetached, onReady, mark } = edit;
   const onEditChange = useMemo<FileEditChangeHandler<undefined, undefined>>(
     () => (event) => {

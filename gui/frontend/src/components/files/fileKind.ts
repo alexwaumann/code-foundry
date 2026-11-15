@@ -1,19 +1,11 @@
 /**
- * What the File and Diff tabs show about a file besides its contents: whether it can be
- * rendered (markdown, HTML), its language's name, its icon, its size and line count, and
- * where a diff's first change is. Pure.
+ * What the File and Diff tabs show about a file besides its contents: its language's name,
+ * its icon, its size and line count, and where a diff's first change is. Which preview kind
+ * a file is: previews/registry.ts. Pure.
  */
 import { getFiletypeFromFileName, type FileDiffMetadata } from "@pierre/diffs";
 import { FileArchive, FileCode, FileImage, FileJson, FileTerminal, FileText, File as FileIcon, type LucideIcon } from "lucide-react";
 import { extOf } from "@/lib/filePath";
-import type { PreviewKind } from "@/stores/codeView";
-
-const PREVIEW: Readonly<Record<string, PreviewKind>> = { md: "markdown", markdown: "markdown", mdx: "markdown", html: "html", htm: "html" };
-
-/** "markdown" for .md/.markdown/.mdx, "html" for .html/.htm; null for anything else. */
-export function previewKindOf(path: string): PreviewKind | null {
-  return PREVIEW[extOf(path)] ?? null;
-}
 
 /** Display names for the library's language ids where capitalizing the id is wrong. */
 const LANGUAGE_NAMES: Readonly<Record<string, string>> = {
@@ -104,7 +96,7 @@ export function pdfMeta(size: number, pages: number | null): string {
 }
 
 /** An image or PDF that did not come back whole (over the read cap): "PDF · 48 MB · too large to show". */
-export function tooLargeHeading(kind: "Image" | "PDF", size: number): string {
+export function tooLargeHeading(kind: string, size: number): string {
   return `${kind} · ${formatSize(size)} · too large to show`;
 }
 

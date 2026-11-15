@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { DIFFS_TAG_NAME } from "@pierre/diffs";
+import { DIFFS_TAG_NAME, type SupportedLanguages } from "@pierre/diffs";
 import { CodeFile, type CodeFileEdit } from "@/components/code/CodeFile";
 import { CodeScroll } from "@/components/code/CodeDiff";
 import { zoomFactor } from "@/lib/zoom";
@@ -56,7 +56,7 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
  * `findKey`: the tab's find (FileFind.tsx); the box then takes the keyboard on a click, so
  * cmd+F knows the tab is meant (letters still reach the panel: the box is no text field).
  */
-export function CodeBody({ name, text, lines, line, edit, findKey }: { name: string; text: string; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined; findKey?: string | undefined }) {
+export function CodeBody({ name, text, lang, lines, line, edit, findKey }: { name: string; text: string; lang?: SupportedLanguages | undefined; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined; findKey?: string | undefined }) {
   const box = useRef<HTMLDivElement>(null);
   const virtual = lines > VIRTUALIZE_LINES;
   const selected = useMemo(() => (line ? { start: line, end: line } : null), [line]);
@@ -64,7 +64,7 @@ export function CodeBody({ name, text, lines, line, edit, findKey }: { name: str
   useKeepTopLine(box, virtual);
   useCodeFind(findKey, box, virtual, text, edit?.active ? edit.stateKey : undefined);
   const focusable = findKey !== undefined ? -1 : undefined;
-  const code = edit ? <CodeFile name={name} contents={text} selectedLines={selected} edit={edit} /> : <CodeFile name={name} contents={text} selectedLines={selected} />;
+  const code = edit ? <CodeFile name={name} contents={text} lang={lang} selectedLines={selected} edit={edit} /> : <CodeFile name={name} contents={text} lang={lang} selectedLines={selected} />;
   return virtual ? (
     <div ref={box} tabIndex={focusable} className="flex min-h-0 flex-1 flex-col outline-none" data-testid="file-code" data-virtual="">
       <CodeScroll className="min-h-0 flex-1 overflow-auto">{code}</CodeScroll>

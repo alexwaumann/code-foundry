@@ -42,7 +42,7 @@ const stores: Persisted[] = [
     use: () => {
       const s = useCodeViewStore.getState();
       expect(["unified", "split"]).toContain(s.diffStyle);
-      expect(["rendered", "source"]).toContain(s.preview.markdown);
+      for (const m of Object.values(s.preview)) expect(typeof m).toBe("string");
       setPreviewMode("html", "source");
     },
   },

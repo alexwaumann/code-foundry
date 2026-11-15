@@ -1,21 +1,7 @@
 import { parseDiffFromFile } from "@pierre/diffs";
 import { FileArchive, FileCode, FileImage, FileJson, FileTerminal, FileText, File as FileIcon } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { fileIconOf, firstChangeLine, formatSize, languageOf, lineCount, pdfMeta, previewKindOf, tooLargeHeading, truncatedNotice } from "./fileKind";
-
-describe("previewKindOf", () => {
-  it.each([
-    ["README.md", "markdown"],
-    ["notes.MARKDOWN", "markdown"],
-    ["page.mdx", "markdown"],
-    ["index.html", "html"],
-    ["old.HTM", "html"],
-    ["app.ts", null],
-    ["Makefile", null],
-  ])("%s → %s", (p, want) => {
-    expect(previewKindOf(p)).toBe(want);
-  });
-});
+import { fileIconOf, firstChangeLine, formatSize, languageOf, lineCount, pdfMeta, tooLargeHeading, truncatedNotice } from "./fileKind";
 
 describe("languageOf", () => {
   it.each([

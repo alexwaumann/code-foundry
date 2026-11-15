@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { Check, Copy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
+import { Check, ClipboardCopy, Copy, RefreshCw, SquareArrowOutUpRight, WrapText, type LucideIcon } from "lucide-react";
 import { FinderIcon, type AppIconSlotProps } from "@/components/icons/AppIcon";
 import { RadioGroup, RadioGroupChoice } from "@/components/ui/radio-group";
 import { Button } from "@/components/ui/button";
@@ -76,12 +76,28 @@ export function CopyPathAction({ path }: { path: string }) {
   );
 }
 
-/** Copy path, Open in editor, Open in Finder and Refresh: row one's actions. */
-export function FileActions({ place, line, onRefresh, extra }: { place: FilePlace; line?: number; onRefresh: () => void; extra?: ReactNode }) {
+/** Copy contents: copies what `contents` gives when pressed (the text, a draft, a table as tab-separated text); a check for a moment after. */
+export function CopyContentsAction({ contents }: { contents: () => string }) {
+  const { copied, copy } = useCopied();
+  return (
+    <HeaderAction
+      icon={copied ? Check : ClipboardCopy}
+      label={copied ? "Copied" : "Copy contents"}
+      testId="file-copy-contents"
+      onClick={() => {
+        void copy(contents());
+      }}
+    />
+  );
+}
+
+/** Copy path, Copy contents (given `contents`), Open in editor, Open in Finder and Refresh: row one's actions. */
+export function FileActions({ place, line, onRefresh, extra, contents }: { place: FilePlace; line?: number; onRefresh: () => void; extra?: ReactNode; contents?: () => string }) {
   return (
     <>
       {extra}
       <CopyPathAction path={place.file} />
+      {contents && <CopyContentsAction contents={contents} />}
       <HeaderAction
         icon={SquareArrowOutUpRight}
         label="Open in editor"
