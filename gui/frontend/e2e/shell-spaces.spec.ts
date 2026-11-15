@@ -246,6 +246,21 @@ test("the top bar drags the window, and its controls still take clicks", async (
   await expect(page.getByTestId("shell-grid")).not.toHaveAttribute("data-space-id", "sp-rel");
 });
 
+test("Rename… in a space tab's menu keeps the name field once the menu has closed", async ({ page }) => {
+  await seed([MAIN, RELEASE, REVIEWS]);
+  await openShell(page);
+  await spaceTab(page, "sp-rel").click({ button: "right" });
+  await page.getByTestId("space-tab-rename").click();
+  await expect(page.getByTestId("space-tab-menu")).toHaveCount(0);
+  // The menu's close and its focus return are over: the field is still there and has the keyboard.
+  await still(page);
+  const field = page.getByTestId("space-name-field");
+  await expect(field).toBeFocused();
+  await page.keyboard.type("Release 0.23");
+  await page.keyboard.press("Enter");
+  await expect(spaceTab(page, "sp-rel").getByTestId("space-tab-name")).toHaveText("Release 0.23");
+});
+
 /** SHOTS=<dir>: the top bar with three spaces and a badge, a tab over a space tab, the remove dialog, Move to space ▸; dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`spaces screenshots (${scheme})`, async ({ page }, info) => {
