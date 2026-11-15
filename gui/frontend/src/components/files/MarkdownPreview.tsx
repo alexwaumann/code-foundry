@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { readFile, type FileReadView } from "@/api/files";
+import { isMermaidFence } from "@/components/mermaid/diagramInfo";
+import { MermaidFence } from "@/components/mermaid/MermaidFence";
 import { Markdown, type MarkdownExtras } from "@/components/pr/Markdown";
 import { CodeBlock } from "@/components/thread/Code";
 import { PathPlaceContext } from "@/components/thread/context";
@@ -56,7 +58,7 @@ function LocalImage({ dir, src, alt }: { dir: string; src: string; alt: string }
 
 /**
  * A markdown file rendered: the shared renderer (components/pr/Markdown) with the thread's
- * highlighted code blocks and framed tables, the file's HTML allowed (READMEs use it,
+ * highlighted code blocks (a ```mermaid one drawn as its diagram) and framed tables, the file's HTML allowed (READMEs use it,
  * sanitized as GitHub bodies are), and relative images read from disk. Links open in the
  * browser; file paths are chips, relative ones resolved against `base` (the thread checkout
  * the tab was opened from), not the file's own folder. A reading column with padding,
@@ -69,7 +71,8 @@ export function MarkdownPreview({ text, dir, project, base, findKey }: { text: s
   useMarkdownFind(findKey, scroller, content);
   const extras = useMemo<MarkdownExtras>(
     () => ({
-      code: (lang, code) => <CodeBlock lang={lang} code={code} />,
+      // A ```mermaid fence is the diagram, as GitHub draws it (components/mermaid).
+      code: (lang, code) => (isMermaidFence(lang) ? <MermaidFence code={code} /> : <CodeBlock lang={lang} code={code} />),
       image: (src, alt) => <LocalImage dir={dir} src={src} alt={alt} />,
       pathChip: (m) => <PathChip match={m} />,
       table: (rows) => (

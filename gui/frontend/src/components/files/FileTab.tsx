@@ -152,6 +152,12 @@ export function FileTab({ target }: { target: FileTarget }) {
     stopEdit(editKey);
     reload();
   };
+  // The mode switch, and a body's own way to another mode (PreviewBodyProps.onMode).
+  const onMode = (m: string) => {
+    if (!kind || (editing && m === SOURCE.id)) return;
+    if (editing) leaveEdit();
+    setPreviewMode(kind.id, m);
+  };
   // The pencil puts the keyboard in the editor; a tab coming back to a draft leaves it where it is.
   const onPencil = () => {
     if (dirty) return;
@@ -242,11 +248,7 @@ export function FileTab({ target }: { target: FileTarget }) {
           <ModeSwitch
             options={modes.map((m) => ({ value: m.id, label: m.label }))}
             value={mode}
-            onChange={(m) => {
-              if (editing && m === SOURCE.id) return;
-              if (editing) leaveEdit();
-              setPreviewMode(kind.id, m);
-            }}
+            onChange={onMode}
             label="Show as"
             testId="file-mode"
           />
@@ -302,7 +304,7 @@ export function FileTab({ target }: { target: FileTarget }) {
       {session?.failure && <EditFailedBand message={session.failure} />}
       {file && read.error && <NoticeBar testId="file-refresh-error">Refresh failed: {read.error}</NoticeBar>}
       {file?.truncated && text !== null && <NoticeBar testId="file-truncated">{truncatedNotice(file.size)}</NoticeBar>}
-      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} preview={previewing ? kind : null} lang={kind?.source?.lang} mode={mode} edit={edit} findKey={findKey} onMeta={onMeta} />
+      <FileBody file={opening ? null : file} error={read.error} reload={reload} refreshes={refreshes} place={place} name={name} abs={abs} text={editing ? seed : text} lines={editing ? seedLines : lines} line={line} page={page} preview={previewing ? kind : null} lang={kind?.source?.lang} mode={mode} edit={edit} findKey={findKey} onMeta={onMeta} onMode={onMode} />
     </div>
   );
 }
@@ -325,6 +327,7 @@ function FileBody({
   edit,
   findKey,
   onMeta,
+  onMode,
 }: {
   file: FileReadView | null;
   error: string | null;
@@ -345,6 +348,7 @@ function FileBody({
   edit: CodeFileEdit;
   findKey: string | undefined;
   onMeta: PreviewBodyProps["onMeta"];
+  onMode: PreviewBodyProps["onMode"];
 }) {
   const retry = (
     <Button variant="outline" size="sm" onClick={reload} data-testid="file-retry">
@@ -405,7 +409,7 @@ function FileBody({
       );
     return (
       <Suspense fallback={<FileLoading />}>
-        <preview.Body file={file} path={abs} mode={mode} name={name} place={place} page={page} reloads={refreshes} findKey={findKey} onMeta={onMeta} />
+        <preview.Body file={file} path={abs} mode={mode} name={name} place={place} page={page} reloads={refreshes} findKey={findKey} onMeta={onMeta} onMode={onMode} />
       </Suspense>
     );
   }

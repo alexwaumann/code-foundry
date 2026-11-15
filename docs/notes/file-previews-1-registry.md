@@ -74,8 +74,11 @@ Source), and the header gains Copy contents.
 
 1. **The body.** `src/components/files/previews/<Name>Body.tsx` exporting
    `function <Name>Body(props: PreviewBodyProps)`. It gets the read (`file`), `path`, `mode`,
-   `name`, `place`, `findKey` and `onMeta`. Call `onMeta(...)` when it learns something for
-   row two (`Flowchart · 9 nodes · 312 B · Mermaid`). Virtualize long content (CLAUDE.md).
+   `name`, `place`, `findKey`, `onMeta` and `onMode`. Call `onMeta(...)` when it learns something for
+   row two (`Flowchart · 9 nodes · 312 B · Mermaid`). Call `onMode(SOURCE.id)` to offer Source
+   from a state that cannot show the file (added by PR 4: a diagram that does not parse); it
+   does what the switch does, so the choice is remembered for the kind. Virtualize long
+   content (CLAUDE.md).
 2. **The kind.** `src/components/files/previews/kinds/<id>.ts` with a default export:
 
    ```ts
@@ -104,7 +107,7 @@ Source), and the header gains Copy contents.
      "mermaid"`, and a near miss that must stay `null`). The "none claims what another does"
      test catches a clash with another kind.
    - The body: a test file of its own beside it (`previews/<Name>Body.test.tsx`) rendering
-     `<NameBody file={...} path=... mode=... onMeta={vi.fn()} ... />` with a `FileReadView`
+     `<NameBody file={...} path=... mode=... onMeta={vi.fn()} onMode={vi.fn()} ... />` with a `FileReadView`
      made from `blankFile(path)` plus `text`; assert what it draws and what it passed `onMeta`.
      Pure parsing (CSV rows, log levels) goes in a `.ts` with its own table test.
    - The header (switch labels, which actions show, what Copy contents copies) only when the

@@ -106,4 +106,6 @@ export interface PreviewBodyProps extends PreviewControlsProps {
   readonly findKey: string | undefined;
   /** Replaces row two's meta while this body shows (an image's size once it decodes, a PDF's page count). */
   readonly onMeta: (meta: ReactNode) => void;
+  /** Switches the tab to another mode as the switch does (remembered for the kind): a body's way to Source when it cannot show the file (a diagram that does not parse). */
+  readonly onMode: (mode: string) => void;
 }
