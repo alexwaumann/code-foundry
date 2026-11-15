@@ -68,7 +68,7 @@ export function CodeBody({ name, text, lang, lines, line, edit, findKey, lineAt 
   const virtual = lines > VIRTUALIZE_LINES;
   const selected = useMemo(() => (line ? { start: line, end: line } : null), [line]);
   useScrollToLine(box, line, virtual, lineAt);
-  useKeepTopLine(box, virtual);
+  useKeepTopLine(box, virtual, "line", edit ? `${String(edit.active)}:${String(edit.revision)}` : undefined);
   useCodeFind(findKey, box, virtual, text, edit?.active ? edit.stateKey : undefined);
   const focusable = findKey !== undefined ? -1 : undefined;
   const code = edit ? <CodeFile name={name} contents={text} lang={lang} selectedLines={selected} edit={edit} /> : <CodeFile name={name} contents={text} lang={lang} selectedLines={selected} />;

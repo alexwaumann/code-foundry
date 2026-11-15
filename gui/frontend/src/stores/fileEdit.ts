@@ -118,7 +118,9 @@ function nextStateKey(): string {
 
 // The editors on screen, and where the keyboard goes when a tab's next one attaches.
 const editors = new Map<string, EditorHandle>();
-const nextFocus = new Map<string, EditorPlace | { lineEnd: number } | null>();
+// A place or null: the caret scrolled into view there (or where it was); `lineEnd`: at the end of
+// that line, scrolled to; `here`: the view stays put, with the caret at a place on screen.
+const nextFocus = new Map<string, EditorPlace | { lineEnd: number } | { here: EditorPlace | null } | null>();
 
 /** The end of a zero-based line of the tab's document; of its last line past the end. */
 function lineEnd(key: string, line: number): EditorPlace {
@@ -134,7 +136,8 @@ export function noteEditor(key: string, editor: EditorHandle): void {
   const at = nextFocus.get(key);
   if (at === undefined) return;
   nextFocus.delete(key);
-  editor.focus(at === null ? undefined : "lineEnd" in at ? lineEnd(key, at.lineEnd) : at);
+  if (at !== null && "here" in at) editor.focusInPlace(at.here);
+  else editor.focus(at === null ? undefined : "lineEnd" in at ? lineEnd(key, at.lineEnd) : at);
 }
 
 /** Puts the keyboard back in the tab's editor, if it is on screen. */
@@ -149,9 +152,13 @@ export function selectInEditor(key: string, from: EditorPlace, to: EditorPlace):
   return editor !== undefined;
 }
 
-/** The next editor of this tab takes the keyboard (the pencil, Discard, Reload). */
-export function focusNextEditor(key: string): void {
-  nextFocus.set(key, null);
+/**
+ * The next editor of this tab takes the keyboard (the pencil, Discard, Reload) without moving
+ * the view: the caret goes `here`, where the reader is (stores/fileFind.ts readerPlaceOf), or, with no
+ * place known, where the library puts it.
+ */
+export function focusNextEditor(key: string, here: EditorPlace | null): void {
+  nextFocus.set(key, { here });
 }
 
 /** The tab's editor takes the keyboard at the end of a 1-based line, now or when it is on screen (a thread's --focus). */

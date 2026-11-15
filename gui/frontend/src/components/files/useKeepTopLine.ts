@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
 import { zoomFactor } from "@/lib/zoom";
 import { topLineCorrection, topLineOf, type LineRow, type TopLine } from "./topLine";
@@ -35,9 +35,21 @@ function rowSelector(key: number, rows: TopLineRows): string {
  * the line on top is noted after each scroll, and after a width change it is scrolled back into
  * its place each frame until it stays there. A scroll by the user (wheel, key, press) ends that.
  * `virtual`: the scroller is the box's first child (CodeScroll), not the box. `rows`: a file's
- * lines or a diff's rows (TopLineRows).
+ * lines or a diff's rows (TopLineRows). `view`: a change of it is kept the same way: the File
+ * tab's editor turning on or off, or its document starting over, re-renders the library's rows,
+ * and a short file's box, empty for a moment, drops its scrollTop to 0
+ * (docs/notes/file-edit-keep-place.md).
  */
-export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: boolean, rows: TopLineRows = "line"): void {
+export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: boolean, rows: TopLineRows = "line", view?: string): void {
+  const keep = useRef<(() => void) | null>(null);
+  // A layout effect: it runs in the commit that re-rendered the rows, before the scroll event
+  // that would note line 1 as the top.
+  const seen = useRef(view);
+  useLayoutEffect(() => {
+    if (seen.current === view) return;
+    seen.current = view;
+    keep.current?.();
+  }, [view]);
   useEffect(() => {
     const el = box.current;
     const root = virtual ? (el?.firstElementChild as HTMLElement | null | undefined) : el;
@@ -91,10 +103,7 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
     const onUser = () => {
       stop();
     };
-    const ro = new ResizeObserver(() => {
-      const w = root.clientWidth;
-      if (w === width) return;
-      width = w;
+    const hold = () => {
       if (!anchor) return;
       if (noted) cancelAnimationFrame(noted);
       noted = 0;
@@ -102,11 +111,19 @@ export function useKeepTopLine(box: RefObject<HTMLDivElement | null>, virtual: b
       stable = 0;
       stop();
       restoring = requestAnimationFrame(restore);
+    };
+    keep.current = hold;
+    const ro = new ResizeObserver(() => {
+      const w = root.clientWidth;
+      if (w === width) return;
+      width = w;
+      hold();
     });
     ro.observe(root);
     root.addEventListener("scroll", onScroll, { passive: true });
     for (const ev of ["wheel", "keydown", "pointerdown", "touchstart"]) root.addEventListener(ev, onUser, { passive: true });
     return () => {
+      keep.current = null;
       ro.disconnect();
       stop();
       if (noted) cancelAnimationFrame(noted);

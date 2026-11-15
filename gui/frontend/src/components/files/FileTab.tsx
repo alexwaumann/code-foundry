@@ -11,7 +11,7 @@ import { dirPart, fileName, relativeTo, resolvePath } from "@/lib/filePath";
 import { tildify } from "@/lib/path";
 import { setPreviewMode, useCodeViewStore } from "@/stores/codeView";
 import { discardDraft, editClock, editorDetached, editorOpening, editPath, fileEditKey, focusEditor, focusNextEditor, noteDraft, noteEditor, noteRead, observeRead, reloadDraft, saveFile, startEdit, stopEdit, useFileEdit } from "@/stores/fileEdit";
-import { noteFileKeyboard, setFileFindDraft, useFileFindOpen } from "@/stores/fileFind";
+import { noteFileKeyboard, readerPlaceOf, setFileFindDraft, useFileFindOpen } from "@/stores/fileFind";
 import { canTell, dismissAsk, fileFacts, saveAndTell } from "@/stores/fileRequest";
 import { fileTab, type FileTarget } from "@/surfaces/fileTarget";
 import { CodeBody } from "./CodeBody";
@@ -163,12 +163,13 @@ export function FileTab({ target }: { target: FileTarget }) {
     if (editing) leaveEdit();
     setPreviewMode(kind.id, m);
   };
-  // The pencil puts the keyboard in the editor; a tab coming back to a draft leaves it where it is.
+  // The pencil puts the keyboard in the editor where the reader is, and the view stays put
+  // (docs/notes/file-edit-keep-place.md); a tab coming back to a draft leaves it where it is.
   const onPencil = () => {
     if (dirty) return;
     if (editing) leaveEdit();
     else {
-      focusNextEditor(editKey);
+      focusNextEditor(editKey, readerPlaceOf(editKey));
       startEditing();
     }
   };
@@ -191,9 +192,9 @@ export function FileTab({ target }: { target: FileTarget }) {
   const backToEditor = () => {
     focusEditor(editKey);
   };
-  // The next document's editor takes the keyboard, and the viewer is current if there is none.
+  // The next document's editor takes the keyboard where the reader was, and the viewer is current if there is none.
   const startOver = (replaced: Promise<void>) => {
-    focusNextEditor(editKey);
+    focusNextEditor(editKey, readerPlaceOf(editKey));
     void replaced.then(reload);
   };
   const stateKey = editing ? session.stateKey : undefined;

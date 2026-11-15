@@ -942,7 +942,7 @@ describe("the find chords in a File tab", () => {
     document.body.append(tab);
     step = vi.fn<(dir: 1 | -1) => void>();
     handOff = vi.fn<(query: string) => void>();
-    host = { root: tab, step, opened: vi.fn(), finish: vi.fn(), handOff };
+    host = { root: tab, step, opened: vi.fn(), finish: vi.fn(), handOff, place: () => null };
     release = registerFileFindHost("k1", host);
     useThreadsStore.setState({ byId: { "s-1": thread("s-1") }, order: ["s-1"] });
     useUiStore.getState().select({ kind: "thread", id: "s-1" });

@@ -6,13 +6,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { DIFFS_TAG_NAME } from "@pierre/diffs";
 import { plainText, rangeOf } from "@/components/thread/cite/citeDom";
-import { draftText } from "@/lib/codeEditor";
+import { draftText, type EditorPlace } from "@/lib/codeEditor";
 import { fileMatchIndex, findInFile, pickCurrent, type FileMatch, type FileMatches } from "@/lib/fileFind";
 import { matchOffsets, stepIndex } from "@/lib/threadFind";
 import { zoomFactor } from "@/lib/zoom";
 import { focusEditor, selectInEditor } from "@/stores/fileEdit";
 import { fileFindOf, registerFileFindHost, setFileFindCount, setFileFindCurrent, setFileFindDraft, useFileFindCurrent, useFileFindDraft, useFileFindOpen, useFileFindQuery, useFileFindRevealSeq } from "@/stores/fileFind";
 import { paintFileFind } from "./fileFindPaint";
+import { readerPlace } from "./readerPlace";
 
 /** What a tab body does for its find: where its text is on screen. */
 interface FindSurface {
@@ -32,6 +33,8 @@ interface FindSurface {
   opened?: () => void;
   /** The editor's own find panel is opening: it takes the query. */
   handOff?: (query: string) => void;
+  /** Where the reader is (readerPlace.ts), `match` the current one; a body that cannot tell has none. */
+  place?: (match: FileMatch | undefined, query: string) => EditorPlace | null;
 }
 
 const NONE: FileMatches = { matches: [], capped: false };
@@ -99,6 +102,10 @@ function useFindLayer(findKey: string | undefined, text: string, surface: FindSu
       },
       opened: () => surface.opened?.(),
       handOff: (q) => surface.handOff?.(q),
+      place: () => {
+        const { matches: ms, index: at, query: q } = live.current;
+        return surface.place?.(ms[at], q) ?? null;
+      },
       finish: () => {
         const { matches: ms, index: at, query: q } = live.current;
         surface.finish(ms[at], at, q);
@@ -289,6 +296,17 @@ function codeSurface(findKey: string | undefined, box: RefObject<HTMLDivElement 
       box.current?.focus({ preventScroll: true });
       const r = m ? rangeFor(m, query) : null;
       if (r) getSelection()?.setBaseAndExtent(r.startContainer, r.startOffset, r.endContainer, r.endOffset);
+    },
+    place: (m, query) => {
+      const sc = scroller();
+      if (!sc) return null;
+      const box = sc.getBoundingClientRect();
+      const rect = m ? (rangeFor(m, query)?.getBoundingClientRect() ?? null) : null;
+      const rows = lines().map((el) => {
+        const r = el.getBoundingClientRect();
+        return { line: Number(el.dataset.line), top: r.top, height: r.height };
+      });
+      return readerPlace(m ? { line: m.line, start: m.start, rect } : null, rows, box.top, box.bottom);
     },
     // The editor's own find panel (cmd+alt+F's replace) goes when ours opens: one find at a time.
     opened: () => {

@@ -5,8 +5,8 @@ import type { CodeFileEdit } from "@/components/code/CodeFile";
 import { PanelKeyContext } from "@/shell/panelKeyContext";
 import type { ThreadView } from "@/api/threads";
 import { useCodeViewStore } from "@/stores/codeView";
-import { fileEditKey, useFileEditStore } from "@/stores/fileEdit";
-import { canSearchFile, openFileFind, useFileFindStore } from "@/stores/fileFind";
+import { fileEditKey, noteEditor, useFileEditStore } from "@/stores/fileEdit";
+import { canSearchFile, openFileFind, registerFileFindHost, useFileFindStore } from "@/stores/fileFind";
 import { openFileInPanel } from "@/stores/filePanel";
 import { shownTab, tabPlace } from "@/shell/host";
 import { layoutSettled, resetFakeLayout, threadSeed } from "@/test/fakeLayout";
@@ -383,6 +383,34 @@ describe("editing", () => {
     await screen.findByTestId("draft");
     expect((await pencil()).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("code-file").textContent).toBe("A=1\n");
+  });
+
+  it("the pencil and Discard give the keyboard to the next editor where the reader is, without moving the view", async () => {
+    files.set(ENV, text({ text: "A=1\nB=2\nC=3\n", size: 12 }));
+    openTab();
+    await pencil();
+    // The body's find host says where the reader is (readerPlace.ts: jsdom lays out no rows).
+    const key = fileEditKey("thread:a", fileTab({ project: "", base: "/Users/me/w", path: ".env" }).id);
+    const at = (here: { line: number; character: number }) => registerFileFindHost(key, { root: screen.getByTestId("file-tab"), step: vi.fn(), opened: vi.fn(), finish: vi.fn(), handOff: vi.fn(), place: () => here });
+    const here = { line: 2, character: 0 };
+    at(here);
+    await editing();
+    const first = { focus: vi.fn(), caret: () => null, select: vi.fn(), focusInPlace: vi.fn() };
+    noteEditor(key, first);
+    expect(first.focusInPlace).toHaveBeenCalledWith(here);
+    expect(first.focus).not.toHaveBeenCalled();
+    type("A=2\nB=2\nC=3\n");
+    // The body registered its host again for the editor's document; this one says the reader moved.
+    const release = at({ line: 1, character: 0 });
+    fireEvent.click(screen.getByTestId("file-discard"));
+    await waitFor(() => {
+      expect(status()).toBe("Editing");
+    });
+    const next = { focus: vi.fn(), caret: () => null, select: vi.fn(), focusInPlace: vi.fn() };
+    noteEditor(key, next);
+    expect(next.focusInPlace).toHaveBeenCalledWith({ line: 1, character: 0 });
+    expect(next.focus).not.toHaveBeenCalled();
+    release();
   });
 
   it("clean: Editing, both buttons off; dirty: Unsaved with Save and Discard on, the meta between", async () => {
