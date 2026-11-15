@@ -18,6 +18,7 @@
  *   POST /__mock/text/delay?ms=300               (each message of the stream waits this long; reset: 0)
  */
 import { Code, ConnectError } from "@connectrpc/connect";
+import { smartCaseSensitive } from "../src/lib/textQuery";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import type { SearchTextResponseSchema, TextFileMatchSchema, TextLineMatchSchema } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { completionCalls, resolveSources, sourceEntries, type CompletionProject, type SearchSource } from "./filesystem";
@@ -79,23 +80,9 @@ function invalid(msg: string): ConnectError {
   return new ConnectError(msg, Code.InvalidArgument);
 }
 
-/** textsearch.Query.CaseSensitive: match case, or an upper-case letter (in a regex, not one after a backslash). */
+/** textsearch.Query.CaseSensitive: match case, or an upper-case letter (in a regex, not one after a backslash). Shared with the GUI's preview. */
 export function caseSensitive(text: string, matchCase: boolean, regex: boolean): boolean {
-  if (matchCase) return true;
-  const cps = Array.from(text);
-  for (let i = 0; i < cps.length; i++) {
-    const c = cps[i] ?? "";
-    if (regex && c === "\\") {
-      i++; // the escaped character
-      if (cps[i + 1] === "{") {
-        const end = cps.indexOf("}", i + 1);
-        if (end >= 0) i = end;
-      }
-      continue;
-    }
-    if (/\p{Lu}/u.test(c)) return true;
-  }
-  return false;
+  return smartCaseSensitive(text, matchCase, regex);
 }
 
 /** An odd run of backslashes ends s. */

@@ -128,12 +128,13 @@ function Thumbnail({ path }: { path: string }) {
   );
 }
 
-function FileChip({ projectId, path }: { projectId: string; path: string }) {
+function FileChip({ projectId, path, line }: { projectId: string; path: string; line?: number | undefined }) {
   const project = useProjectsStore((s) => s.byId[projectId]?.name ?? projectId);
+  const at = line === undefined ? "" : `:${String(line)}`;
   return (
-    <Tip label={`${project}/${path}`}>
-      <span data-testid="thread-tag" data-tag-kind="file" data-path={path} className={tagClass(false, TAG_ACCENT.file)}>
-        <span className="truncate">{tagLabel({ tagKind: "file", projectId, path })}</span>
+    <Tip label={`${project}/${path}${at}`}>
+      <span data-testid="thread-tag" data-tag-kind="file" data-path={path} data-line={line} className={tagClass(false, TAG_ACCENT.file)}>
+        <span className="truncate">{tagLabel({ tagKind: "file", projectId, path, ...(line === undefined ? {} : { line }) })}</span>
       </span>
     </Tip>
   );
@@ -212,7 +213,7 @@ export const UserBubble = memo(function UserBubble({
               </span>
             );
           case "file":
-            return <FileChip key={i} projectId={p.projectId} path={p.path} />;
+            return <FileChip key={i} projectId={p.projectId} path={p.path} line={p.line} />;
           case "thread":
             return <ThreadChip key={i} id={p.id} name={p.name} />;
           case "pr":

@@ -166,7 +166,7 @@ var Pages = []Page{
 		{ID: "threads", Title: "Threads"},
 		{ID: "textgen", Title: "Text generation", Description: "Models for small jobs like naming a thread."},
 		{ID: "lifecycle", Title: "Lifecycle"},
-		{ID: "files", Title: "Files", Description: "What Go to File and @ completion find."},
+		{ID: "files", Title: "Files", Description: "What Go to File, @ completion and text search find."},
 		{ID: "dictation", Title: "Dictation", Description: "Speak into any composer. Transcribed on this Mac with Whisper; audio never leaves it."},
 		{ID: "updates", Title: "Updates"},
 	}},
@@ -204,7 +204,7 @@ var Groups = []Group{
 	{GroupModels, "Models", "The models Code Foundry uses for its own jobs."},
 	{GroupGitHub, "GitHub", "Pull requests and checks, read with your gh login."},
 	{GroupProjects, "Projects", "Background fetching, fast-forwarding checkouts on the default branch, and new worktrees' branches: how they are named and whether they start from origin."},
-	{GroupFiles, "Files", "What Go to File and @ completion find."},
+	{GroupFiles, "Files", "What Go to File, @ completion and text search find."},
 	{GroupGitOps, "Git operations", "How worktrees are handed to other apps."},
 	{GroupAppearance, "Appearance", "Scheme, themes, terminal font, density and backdrop. Applied live in every window."},
 	{GroupNotify, "Notifications", "How the Dock tells you a thread needs you. macOS banners aren't available to this app."},
@@ -437,7 +437,7 @@ var staticFields = []Field{
 	// General › Files.
 	{
 		Key: KeyIncludeIgnored, Group: GroupFiles, Page: PageGeneral, Section: "files", Type: String, Title: "Ignored files to include",
-		Description: "Git-ignored files that Go to File and @ still find, in every project, as .gitignore-style patterns separated by commas. " +
+		Description: "Git-ignored files that Go to File, @ and text search still find, in every project, as .gitignore-style patterns separated by commas. " +
 			"A pattern without a slash matches a name at any depth (.env*), one with a slash a path from the project's folder (docs/scratch/), " +
 			"and a trailing slash only folders. A name never reaches inside an ignored folder that does not match itself, so .env* skips node_modules. " +
 			"A project can add its own patterns. none for no patterns.",

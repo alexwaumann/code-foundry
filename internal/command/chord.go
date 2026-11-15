@@ -28,7 +28,7 @@ import (
 // docs/notes/shell-20-cutover.md.
 var ReservedChords = []string{
 	// viewActions
-	"cmd+k", "cmd+shift+p", "cmd+b", "cmd+shift+a",
+	"cmd+k", "cmd+b", "cmd+shift+a",
 	"cmd+1", "cmd+2", "cmd+3", "cmd+4", "cmd+5", "cmd+6", "cmd+7", "cmd+8", "cmd+9",
 	"cmd+ctrl+1", "cmd+ctrl+2", "cmd+ctrl+3", "cmd+ctrl+4", "cmd+ctrl+5", "cmd+ctrl+6", "cmd+ctrl+7", "cmd+ctrl+8", "cmd+ctrl+9",
 	"cmd+=", "cmd+-", "cmd+0",

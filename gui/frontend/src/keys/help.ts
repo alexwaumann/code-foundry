@@ -24,7 +24,7 @@ export interface LocalChord {
 
 /**
  * Sections for the help overlay: the GUI's own chords first (identical titles merged,
- * so cmd+k and cmd+shift+p share a row and cmd+1..9 is one row), then every registry
+ * so cmd+1..9 is one row), then every registry
  * command with an effective keybinding, grouped by category like the palette.
  */
 export function helpSections(commands: readonly CommandView[], local: readonly LocalChord[]): HelpSection[] {

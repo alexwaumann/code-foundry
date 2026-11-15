@@ -15,7 +15,7 @@ import { allSurfaces } from "@/stores/plugins";
 import { presentPromptHistory } from "@/stores/historyComposers";
 import { canSaveFile } from "@/stores/fileEdit";
 import { presentFileSave } from "@/stores/fileRequest";
-import { presentFileFinder } from "@/stores/fileFinder";
+import { presentFileFinder, presentTextFinder } from "@/stores/fileFinder";
 import { canSearchFile, fileFindTabAt, handOffFileFind, presentFileFind } from "@/stores/fileFind";
 import { presentTerminalFind } from "@/stores/terminalFind";
 import { presentThreadFind } from "@/stores/threadFind";
@@ -93,7 +93,6 @@ function zoom(direction: 1 | -1 | null): void {
 
 export const viewActions: readonly ViewAction[] = [
   { chord: "cmd+k", title: "Command palette", run: togglePalette },
-  { chord: "cmd+shift+p", title: "Command palette", run: togglePalette },
   { chord: "cmd+b", title: "Toggle sidebar", run: toggleSidebar },
   { chord: "cmd+shift+a", title: "Next thread needing attention", run: () => void nextAttention() },
   ...Array.from({ length: 9 }, (_, i) => ({
@@ -475,6 +474,8 @@ const commandPresenters: Readonly<Record<string, (args?: Readonly<Record<string,
   // Window-local: the palette's file finder over the selected thread (stores/fileFinder.ts).
   // The CLI's reaches every window through ShowView.
   "file.find": () => presentFileFinder(),
+  // Window-local: the same finder in its Text mode (Search in Files…). The CLI's reaches every window through ShowView.
+  "file.find.text": () => presentTextFinder(),
   // Window-local, and only here: saves the File tab in front (stores/fileEdit.ts). The daemon
   // refuses every other caller, so an agent cannot save a user's half-typed draft.
   "file.save": () => presentFileSave(),
@@ -607,7 +608,7 @@ function isEditable(el: Element | null): boolean {
 
 /**
  * Key precedence:
- *  1. Global view actions (cmd+k, cmd+shift+p, cmd+b, cmd+shift+a, cmd+1..9, ctrl+cmd+1..9,
+ *  1. Global view actions (cmd+k, cmd+b, cmd+shift+a, cmd+1..9, ctrl+cmd+1..9,
  *     zoom) always win (cmd+1..9 belong to the project picker while it is open).
  *  2. A focused terminal, a thread prompt's text ([data-chord-yield]) or the File tab's code
  *     editor consumes everything else, except cmd chords bound to commands (see

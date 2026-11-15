@@ -10,16 +10,18 @@ import { useKeepTopLine } from "./useKeepTopLine";
 export const VIRTUALIZE_LINES = 400;
 /** Where the virtualizer lays out a line it has not measured yet (its 20 px; a drawn row is code.css's 19). */
 const LINE_H = DEFAULT_VIRTUAL_FILE_METRICS.lineHeight;
+/** Where a File tab puts its line: a third down. */
+const LINE_AT = 1 / 3;
 /** How long to wait for the library to render the line (theme and grammar load first). */
 const SCROLL_WAIT_MS = 3000;
 
 /**
- * Scrolls the line into view, a third down the box, once the library has rendered it. A
+ * Scrolls the line into view, `at` of the way down the box (a third by default), once the library has rendered it. A
  * virtualized file renders only what is near the viewport, so the box first jumps to where
  * the line would be with unwrapped lines, which makes the library render it, then lands on
  * the rendered row. The jump waits for the file's first rows (docs/notes/file-tab-large-file-scroll.md).
  */
-function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | undefined, virtual: boolean) {
+function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | undefined, virtual: boolean, at: number) {
   useEffect(() => {
     const el = box.current;
     if (!el || !line) return;
@@ -34,13 +36,15 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
       if (row) {
         // Rects are viewport px, scrollTop layout px: under a page zoom the distance is divided back.
         const top = (row.getBoundingClientRect().top - root.getBoundingClientRect().top) / zoomFactor() + root.scrollTop;
-        root.scrollTop = Math.max(0, top - root.clientHeight / 3);
+        // A File tab's line lands with its top a third down; another place puts the line's middle there.
+        const middle = at === LINE_AT ? 0 : row.getBoundingClientRect().height / zoomFactor() / 2;
+        root.scrollTop = Math.max(0, top + middle - root.clientHeight * at);
         return;
       }
       // Not before the file has rows: until its highlighter loads it is 0 px tall, and the jump would be clamped to 0.
       if (!jumped && virtual && shadow?.querySelector("[data-line]")) {
         jumped = true;
-        root.scrollTop = Math.max(0, (line - 1) * LINE_H - root.clientHeight / 3);
+        root.scrollTop = Math.max(0, (line - 1) * LINE_H - root.clientHeight * at);
       }
       if (performance.now() < until) frame = requestAnimationFrame(step);
     };
@@ -48,7 +52,7 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [box, line, virtual]);
+  }, [box, line, virtual, at]);
 }
 
 /**
@@ -57,12 +61,13 @@ function useScrollToLine(box: RefObject<HTMLDivElement | null>, line: number | u
  * and scrolled to; a long file goes through CodeScroll. `edit` is the File tab's editor.
  * `findKey`: the tab's find (FileFind.tsx); the box then takes the keyboard on a click, so
  * cmd+F knows the tab is meant (letters still reach the panel: the box is no text field).
+ * `lineAt`: how far down the box the line lands (a third; the text search preview centres it).
  */
-export function CodeBody({ name, text, lang, lines, line, edit, findKey }: { name: string; text: string; lang?: SupportedLanguages | undefined; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined; findKey?: string | undefined }) {
+export function CodeBody({ name, text, lang, lines, line, edit, findKey, lineAt = LINE_AT }: { name: string; text: string; lang?: SupportedLanguages | undefined; lines: number; line?: number | undefined; edit?: CodeFileEdit | undefined; findKey?: string | undefined; lineAt?: number }) {
   const box = useRef<HTMLDivElement>(null);
   const virtual = lines > VIRTUALIZE_LINES;
   const selected = useMemo(() => (line ? { start: line, end: line } : null), [line]);
-  useScrollToLine(box, line, virtual);
+  useScrollToLine(box, line, virtual, lineAt);
   useKeepTopLine(box, virtual);
   useCodeFind(findKey, box, virtual, text, edit?.active ? edit.stateKey : undefined);
   const focusable = findKey !== undefined ? -1 : undefined;

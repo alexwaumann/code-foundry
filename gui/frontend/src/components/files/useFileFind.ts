@@ -164,6 +164,16 @@ function revealRange(range: Range, scroller: Element, leftInset = 0): void {
   const rect = range.getBoundingClientRect();
   const box = scroller.getBoundingClientRect();
   if (rect.top < box.top || rect.bottom > box.bottom) scroller.scrollTop += (rect.top - box.top) / z - scroller.clientHeight / 3;
+  revealSideways(range, scroller, leftInset);
+}
+
+/**
+ * Scrolls whatever scrolls sideways between `scroller` and the range so the range shows, as
+ * little as needed (revealRange's second half; the text search preview's, whose line is
+ * already scrolled to by CodeBody).
+ */
+export function revealSideways(range: Range, scroller: Element, leftInset = 0): void {
+  const z = zoomFactor();
   const start = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
   if (!start) return;
   for (const el of scrollParents(start, scroller)) {
@@ -182,7 +192,7 @@ function lineRanges(el: Element, query: string): Range[] {
 }
 
 /** Watches a shadow root that comes and goes under `host` (the library renders it late and replaces it on remount). */
-function observeShadow(host: Element, shadow: () => ShadowRoot | null, onChange: () => void): () => void {
+export function observeShadow(host: Element, shadow: () => ShadowRoot | null, onChange: () => void): () => void {
   let watched: ShadowRoot | null = null;
   const inner = new MutationObserver(onChange);
   const attach = () => {

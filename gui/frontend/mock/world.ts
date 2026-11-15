@@ -5356,9 +5356,15 @@ export class World {
       },
       {
         // internal/command canFindFiles: a thread view with a project or workspace; the CLI always.
-        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌥⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
+        cmd: { name: "file.find", title: "Go to File…", category: "View", description: "Find a file in the thread's checkouts by name and open it as a tab beside the thread (⌘⏎ puts it in the prompt as an @ file instead).", keybindings: ["cmd+p"], args: [] },
         when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
         run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find" } } }))}`,
+      },
+      {
+        // internal/command file.find.text: file.find's availability (canFindFiles).
+        cmd: { name: "file.find.text", title: "Search in Files…", category: "View", description: "Search the text of the thread's checkouts' files and open a match as a tab beside the thread at its line (⌘⏎ puts the file and line in the prompt as an @ file instead).", keybindings: ["cmd+shift+p"], args: [] },
+        when: (ctx) => !ctx?.activeView || (ctx.activeView === "thread" && Boolean(ctx.activeThreadId) && Boolean(ctx.activeProjectId || ctx.activeWorkspaceId)),
+        run: () => `delivered=${String(this.emit({ intent: { case: "showView", value: { name: "file.find.text" } } }))}`,
       },
       {
         // internal/command file.save: listed for the chord; the window presents it, and anything that invokes it is refused.

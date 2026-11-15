@@ -20,7 +20,7 @@ func includeCommand(b ProjectBackend, projectArg ArgSpec) Command {
 		Name:  "project.files.include",
 		Page:  PageState,
 		Title: "Include Ignored Files in Search",
-		Description: "Set the git-ignored files a project's Go to File and @ completion list too, on top of the files.include_ignored setting's: " +
+		Description: "Set the git-ignored files a project's Go to File, @ completion and text search find too, on top of the files.include_ignored setting's: " +
 			".gitignore-style patterns separated by commas (.env*, docs/scratch/), replacing the project's list; none clears it. " +
 			"A name never reaches inside an ignored folder that does not match itself.",
 		Category: "Project",

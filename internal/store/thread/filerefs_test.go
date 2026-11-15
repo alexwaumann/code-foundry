@@ -45,6 +45,9 @@ func TestRewriteFileRefs(t *testing.T) {
 			want: "@/Users/me/.code-foundry/worktrees/web/cf-x/odd!'()*[x].md" +
 				" @/Users/me/.code-foundry/worktrees/web/cf-x/nb sp.md" +
 				" @/Users/me/.code-foundry/worktrees/web/cf-x/my dir/"},
+		{name: "a line after the path (the GUI's file tag with a line) stays for Claude's @path#L42",
+			prompt: "see @cf-file://r-web/src/a.ts#L42 and @cf-file://r-web/docs/%231.md#L7",
+			want:   "see @/Users/me/.code-foundry/worktrees/web/cf-x/src/a.ts#L42 and @/Users/me/.code-foundry/worktrees/web/cf-x/docs/#1.md#L7"},
 		{name: "unknown project keeps the relative path",
 			prompt:  "@cf-file://r-gone/src/a.ts ok",
 			want:    "@src/a.ts ok",

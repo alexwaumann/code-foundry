@@ -53,17 +53,17 @@ async function s1ShellTab(page: Page): Promise<void> {
 
 // What the palette lists for its context (thread.new by its picker, terminal ones with a shell, no
 // NoPalette verb) and the rows' chords: src/components/palette/CommandPalette.commands.test.tsx.
-test("cmd+shift+p reaches the app from a focused terminal tab", async ({ page }) => {
+test("cmd+k reaches the app from a focused terminal tab", async ({ page }) => {
   await s1ShellTab(page);
-  await page.keyboard.press("Meta+Shift+p");
+  await page.keyboard.press("Meta+k");
   await expect(page.getByTestId("palette")).toBeVisible();
   // The chord is the app's: nothing reached the shell.
   expect((await writes()).filter((w) => w.id === "t-s1-shell")).toEqual([]);
 });
 
-test("cmd+shift+p reaches the app from a focused shell, and the palette lists for that shell", async ({ page }) => {
+test("cmd+k reaches the app from a focused shell, and the palette lists for that shell", async ({ page }) => {
   await s1ShellTab(page);
-  await page.keyboard.press("Meta+Shift+p");
+  await page.keyboard.press("Meta+k");
   await expect(page.getByTestId("palette").locator('[data-command="terminal.kill"]')).toBeVisible();
 });
 

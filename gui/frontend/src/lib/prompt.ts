@@ -6,7 +6,9 @@
  *   skill  [/deploy](cf-skill://~/deploy)              a user skill (~/.claude)
  *          [/deploy](cf-skill://<projectId>/deploy)       a project skill (the project's .claude)
  *   file   [Composer.tsx](cf-file://<projectId>/src/components/Composer.tsx)
- *          a project file or directory (ending in "/"), path segments percent-encoded
+ *          a project file or directory (ending in "/"), path segments percent-encoded;
+ *          [Composer.tsx:24](cf-file://<projectId>/src/components/Composer.tsx#L24) a file at
+ *          a line (a "#" in a name is encoded, so a bare "#L<n>" is always the line)
  *   thread [Fix resize race](cf-thread://s-0123456789ab)
  *          another thread, by its Code Foundry id; the label is its name when it was inserted
  *   pr     [#123](cf-pr://owner/repo/123)  a GitHub pull request
@@ -17,7 +19,8 @@
  * The editor (components/compose/PromptEditor.tsx) parses the string into its document
  * and serializes it back on every edit; on send, projectPrompt turns each token into what
  * Claude gets: `[Image: <name>; ref=<staged path>]` (`[PDF: …]` for a PDF), `/<skill>`, `@cf-file://…` (the
- * daemon resolves that to the thread's worktree; docs/notes/composer-tags-1-daemon.md),
+ * daemon resolves that to the thread's worktree; docs/notes/composer-tags-1-daemon.md; a
+ * line stays as `#L24`, which Claude Code's @ mention reads),
  * `[Thread "<name>" (id <id>)]` (the daemon adds where to read that thread, its
  * transcript; docs/notes/composer-thread-pr-tags.md), `owner/repo#123`, or a citation's
  * self-contained `[Assistant quote](cf-cite://v1/…)` link. Skill, file and
@@ -41,8 +44,8 @@ export type PromptTag =
   | { tagKind: "image"; id: string; name: string }
   /** projectId "" for a user skill. */
   | { tagKind: "skill"; name: string; projectId: string }
-  /** path is relative to the checkout, "/"-separated, a directory's ending in "/". */
-  | { tagKind: "file"; projectId: string; path: string }
+  /** path is relative to the checkout, "/"-separated, a directory's ending in "/"; line: 1-based, a file's only (absent for none). */
+  | { tagKind: "file"; projectId: string; path: string; line?: number }
   /** id: the Code Foundry thread id; name: its name when the tag was inserted. */
   | { tagKind: "thread"; id: string; name: string }
   /** slug: "owner/repo" (lower case, as the daemon's gh store keeps it). */
@@ -89,7 +92,7 @@ function decode(s: string): string | null {
   }
 }
 
-/** The text a tag shows: the image name, `/skill`, or a file's base name (a directory's with "/"). */
+/** The text a tag shows: the image name, `/skill`, or a file's base name (a directory's with "/", a line's after a colon: `a.ts:24`). */
 export function tagLabel(tag: PromptTag): string {
   switch (tag.tagKind) {
     case "image":
@@ -99,7 +102,7 @@ export function tagLabel(tag: PromptTag): string {
     case "file": {
       const dir = tag.path.endsWith("/");
       const trimmed = dir ? tag.path.slice(0, -1) : tag.path;
-      return `${trimmed.slice(trimmed.lastIndexOf("/") + 1)}${dir ? "/" : ""}`;
+      return `${trimmed.slice(trimmed.lastIndexOf("/") + 1)}${dir ? "/" : ""}${fileLine(tag)}`;
     }
     case "thread":
       return threadLabel(tag.name, tag.id);
@@ -108,6 +111,22 @@ export function tagLabel(tag: PromptTag): string {
     case "cite":
       return CITE_LABEL;
   }
+}
+
+/** A file tag's line at the end of its URL: `#L24` (Claude Code's @ mention reads that form); "" without one. */
+const FILE_LINE = /#L([1-9][0-9]{0,8})$/;
+
+function hasLine(tag: { path: string; line?: number }): tag is { path: string; line: number } {
+  return tag.line !== undefined && Number.isSafeInteger(tag.line) && tag.line > 0 && !tag.path.endsWith("/");
+}
+
+function lineSuffix(tag: { path: string; line?: number }): string {
+  return hasLine(tag) ? `#L${String(tag.line)}` : "";
+}
+
+/** A file tag's line after its name: `:24`; "" without one. */
+function fileLine(tag: { path: string; line?: number }): string {
+  return hasLine(tag) ? `:${String(tag.line)}` : "";
 }
 
 /** A label inside `[…]`: brackets and newlines would end it early. */
@@ -123,7 +142,7 @@ export function tagToken(tag: PromptTag): string {
     case "skill":
       return `[${linkLabel(tagLabel(tag))}](${SKILL_SCHEME}${tag.projectId || USER_SCOPE}/${encodeSegment(tag.name)})`;
     case "file":
-      return `[${linkLabel(tagLabel(tag))}](${FILE_SCHEME}${tag.projectId}/${encodeTagPath(tag.path)})`;
+      return `[${linkLabel(tagLabel(tag))}](${FILE_SCHEME}${tag.projectId}/${encodeTagPath(tag.path)}${lineSuffix(tag)})`;
     case "thread":
       return `[${tagLabel(tag)}](${THREAD_SCHEME}${tag.id})`;
     case "pr":
@@ -152,6 +171,9 @@ function matchTag(m: RegExpExecArray): PromptTag | null {
     return { tagKind: "skill", name: rest, projectId: slot === USER_SCOPE ? "" : slot };
   }
   if (slot === USER_SCOPE) return null;
+  const at = FILE_LINE.exec(m[6] ?? "");
+  const path = at ? decode((m[6] ?? "").slice(0, at.index)) : rest;
+  if (at && path && !path.endsWith("/")) return { tagKind: "file", projectId: slot, path, line: Number(at[1]) };
   return { tagKind: "file", projectId: slot, path: rest };
 }
 
@@ -318,7 +340,7 @@ export function projectPrompt(
         out += `/${tag.name}${gap}`;
         break;
       case "file":
-        out += `@${FILE_SCHEME}${tag.projectId}/${encodeTagPath(tag.path)}${gap}`;
+        out += `@${FILE_SCHEME}${tag.projectId}/${encodeTagPath(tag.path)}${lineSuffix(tag)}${gap}`;
         break;
       case "thread":
         out += `[Thread "${threadLabel(tag.name, tag.id)}" (id ${tag.id})]`;

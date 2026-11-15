@@ -62,10 +62,14 @@ export type FocusRegion = "sidebar" | "content" | "palette";
  * What the palette dialog shows: the command list (and arg prompts), the project picker,
  * the member picker of "Run in…" (for `palette.threadId`), the previous prompts
  * (composer.history; components/palette/PromptsPicker.tsx), or the file finder over
- * `palette.threadId` (file.find; components/palette/FileFinder.tsx), or the Find dialog
- * over every thread (search.open; components/search/SearchDialog.tsx).
+ * `palette.threadId` (file.find; components/palette/FileFinder.tsx; its Text mode,
+ * `palette.fileMode`, is file.find.text), or the Find dialog over every thread (search.open;
+ * components/search/SearchDialog.tsx).
  */
 export type PalettePage = "commands" | "projects" | "runin" | "prompts" | "files" | "search";
+
+/** The file finder's modes: file names (Go to File, cmd+P) or their text (Search in Files, cmd+shift+P). */
+export type FileFinderMode = "files" | "text";
 
 /**
  * The sidebar's width bounds (its resize handle). The minimum lines the sidebar's right edge up with
@@ -131,7 +135,7 @@ interface UiState {
    * `context`: the command context the palette lists and invokes in, instead of the
    * selection's (a Projects page row's action on its own project).
    */
-  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; threadId?: string; context?: UiContextView };
+  palette: { open: boolean; query: string; commandName: string | null; page: PalettePage; returnTo: FocusRegion; threadId?: string; context?: UiContextView; fileMode?: FileFinderMode };
   /** Incremented to ask the composer to take focus. */
   composerFocusSeq: number;
   /** Thread whose sidebar row is in inline-rename mode. */
@@ -167,8 +171,10 @@ interface UiState {
   openRunInPicker: (threadId: string, returnTo?: FocusRegion) => void;
   /** Opens the palette on the previous prompts (composer.history's presenter without a focused composer). */
   openPromptsPalette: () => void;
-  /** Opens the palette on the file finder over a thread (file.find's presenter). */
-  openFilesPalette: (threadId: string) => void;
+  /** Opens the palette on the file finder over a thread, in a mode (file.find's and file.find.text's presenters). */
+  openFilesPalette: (threadId: string, mode?: FileFinderMode) => void;
+  /** Switches the open file finder's mode (Tab, its Files / Text switch). */
+  setFileFinderMode: (mode: FileFinderMode) => void;
   /** Opens the palette on the Find dialog over every thread (search.open's presenter). */
   openSearchPalette: () => void;
   /**
@@ -348,9 +354,12 @@ export const useUiStore = create<UiState>()(
         noteReturn(get().palette.open);
         set((s) => ({ palette: { open: true, query: "", commandName: null, page: "prompts", returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
       },
-      openFilesPalette: (threadId) => {
+      openFilesPalette: (threadId, mode = "files") => {
         noteReturn(get().palette.open);
-        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "files", threadId, returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
+        set((s) => ({ palette: { open: true, query: "", commandName: null, page: "files", threadId, fileMode: mode, returnTo: s.palette.open ? s.palette.returnTo : s.focus } }));
+      },
+      setFileFinderMode: (mode) => {
+        set((s) => (s.palette.page === "files" && s.palette.fileMode !== mode ? { palette: { ...s.palette, fileMode: mode } } : s));
       },
       openSearchPalette: () => {
         noteReturn(get().palette.open);

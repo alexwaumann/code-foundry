@@ -16,7 +16,8 @@ import { kindFromName, parsePrompt, type PromptPiece, type PromptTag, tagToken }
 export type MessagePiece =
   | { kind: "text"; text: string }
   | { kind: "skill"; name: string }
-  | { kind: "file"; projectId: string; path: string }
+  /** line: 1-based, when the tag points at one. */
+  | { kind: "file"; projectId: string; path: string; line?: number }
   /** name: the thread's name when the tag was inserted (the bubble shows the current one when known). */
   | { kind: "thread"; id: string; name: string }
   | { kind: "pr"; slug: string; number: number }
@@ -57,7 +58,7 @@ function tagPiece(tag: PromptTag, attachments: readonly string[]): MessagePiece 
     case "skill":
       return { kind: "skill", name: tag.name };
     case "file":
-      return { kind: "file", projectId: tag.projectId, path: tag.path };
+      return { kind: "file", projectId: tag.projectId, path: tag.path, ...(tag.line === undefined ? {} : { line: tag.line }) };
     case "thread":
       return { kind: "thread", id: tag.id, name: tag.name };
     case "pr":

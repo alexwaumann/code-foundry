@@ -246,6 +246,41 @@ describe("skill and file tags", () => {
   });
 });
 
+describe("file tags at a line", () => {
+  const AT: PromptTag = { tagKind: "file", projectId: "r1", path: "src/components/Composer.tsx", line: 24 };
+
+  it("reads name:line, writes #L<line> after the path, and parses back", () => {
+    expect(tagLabel(AT)).toBe("Composer.tsx:24");
+    expect(tagToken(AT)).toBe("[Composer.tsx:24](cf-file://r1/src/components/Composer.tsx#L24)");
+    expect(parseLine(`see ${tagToken(AT)} now`)).toEqual([{ kind: "text", text: "see " }, { kind: "tag", ...AT }, { kind: "text", text: " now" }]);
+  });
+
+  it("projects to @cf-file://…#L24, which the daemon resolves and Claude Code's @ reads as the line", () => {
+    expect(projectPrompt(`${tagToken(AT)}, ok`, () => undefined)).toBe("@cf-file://r1/src/components/Composer.tsx#L24 , ok");
+  });
+
+  it("a # in a name stays encoded, so only a bare #L<n> is the line", () => {
+    const tag: PromptTag = { tagKind: "file", projectId: "r1", path: "docs/#L5.md", line: 3 };
+    expect(tagToken(tag)).toBe("[#L5.md:3](cf-file://r1/docs/%23L5.md#L3)");
+    expect(parseLine(tagToken(tag))).toEqual([{ kind: "tag", ...tag }]);
+    expect(parseLine("[#L5.md](cf-file://r1/docs/%23L5.md)")).toEqual([{ kind: "tag", tagKind: "file", projectId: "r1", path: "docs/#L5.md" }]);
+  });
+
+  it("an old token without a line still parses as before (drafts and history)", () => {
+    expect(parseLine("[Composer.tsx](cf-file://r1/src/components/Composer.tsx)")).toEqual([{ kind: "tag", tagKind: "file", projectId: "r1", path: "src/components/Composer.tsx" }]);
+  });
+
+  it("a directory takes no line; a line of 0 is none", () => {
+    expect(tagToken({ tagKind: "file", projectId: "r1", path: "src/", line: 3 })).toBe("[src/](cf-file://r1/src/)");
+    expect(tagLabel({ tagKind: "file", projectId: "r1", path: "a.ts", line: 0 })).toBe("a.ts");
+  });
+
+  it("round-trips through the draft text with other tags", () => {
+    const text = `${tagToken(AT)} and ${tagToken({ tagKind: "file", projectId: "r1", path: "a.ts" })}`;
+    expect(serializePrompt(parsePrompt(text))).toBe(text);
+  });
+});
+
 describe("thread and pull request tags", () => {
   const thread: PromptTag = { tagKind: "thread", id: "s-0123456789ab", name: "Fix resize race" };
   const pr: PromptTag = { tagKind: "pr", slug: "alexwaumann/code-foundry", number: 185 };

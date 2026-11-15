@@ -87,6 +87,8 @@ var (
 	projectedAttachment = regexp.MustCompile(`\[(?:Image|PDF): [^\[\]\n]*\]`)
 	// 1 the URL's path after the project slot, of a file reference as projected.
 	projectedRef = regexp.MustCompile(`@cf-[a-z][a-z0-9-]*://[^\s/]*/?(\S*)`)
+	// A file reference's line (filerefs.go): "#L24" at its end; 1 the number.
+	refLine = regexp.MustCompile(`#L([1-9][0-9]{0,8})$`)
 	// A Markdown heading or numbered list marker: "## ", "1. ", "2) ".
 	lineMarker = regexp.MustCompile(`^(?:#{1,6}|[0-9]+[.)]) `)
 )
@@ -271,8 +273,15 @@ func clusterStart(s string, end int) int {
 }
 
 // refLabel is what a projected file reference shows: its base name, a directory's with
-// a trailing "/" (tagLabel in lib/prompt.ts), percent-decoded when it decodes.
+// a trailing "/", a line's after a colon (tagLabel in lib/prompt.ts), percent-decoded when
+// it decodes.
 func refLabel(raw string) string {
+	// A file tag at a line ends in "#L<n>" (filerefs.go): the label is the composer's "name:n".
+	line := ""
+	if m := refLine.FindStringSubmatchIndex(raw); m != nil {
+		line = ":" + raw[m[2]:m[3]]
+		raw = raw[:m[0]]
+	}
 	if dec, err := url.PathUnescape(raw); err == nil && utf8.ValidString(dec) {
 		raw = dec
 	}
@@ -283,6 +292,9 @@ func refLabel(raw string) string {
 	}
 	if raw != "" && dir {
 		raw += "/"
+	}
+	if raw != "" && !dir {
+		raw += line
 	}
 	return raw
 }

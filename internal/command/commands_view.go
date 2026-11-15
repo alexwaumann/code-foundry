@@ -131,6 +131,7 @@ func (d ViewDeps) refusePage(uctx Context, a Args) error {
 //     composer.stage (commands_composer_stage.go), text in a thread's composer;
 //   - view.thread-info (commands_view_thread_info.go), the thread info card's toggle.
 //   - file.find (commands_view_file_find.go), the file finder over the thread on screen,
+//     file.find.text (commands_view_file_find_text.go), the same finder in its Text mode,
 //     and file.save (commands_view_file_save.go), the window's own save of a File tab.
 //
 // Links open through view.open.url (RegisterGitOps).
@@ -239,6 +240,6 @@ func RegisterView(r *Registry, d ViewDeps) error {
 		},
 	}
 	cmds = append(append(cmds, d.itemCommands()...), withAliases(d.panelPageCommand(), d.panelGalleryCommand())...)
-	cmds = append(cmds, d.threadDiffCommand(), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.paneFullscreenCommand(), d.fileFindCommand(), d.fileSaveCommand(), d.searchOpenCommand())
+	cmds = append(cmds, d.threadDiffCommand(), d.inlineCommand(), d.composerHistoryCommand(), d.composerStageCommand(), d.threadInfoCommand(), d.paneFullscreenCommand(), d.fileFindCommand(), d.fileFindTextCommand(), d.fileSaveCommand(), d.searchOpenCommand())
 	return r.RegisterAll(append(append(append(cmds, d.threadFindCommands()...), d.terminalFindCommands()...), d.fileSearchCommands()...)...)
 }

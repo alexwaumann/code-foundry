@@ -44,7 +44,7 @@ export function ProjectSearch({ projectId, suggest }: { projectId: string; sugge
   return (
     <div data-testid="project-search">
       <SectionHeader label="Search" />
-      <p className="-mt-1 mb-2 text-caption">Git-ignored files to include in Go to File and @ in the prompt. Everything else ignored stays out.</p>
+      <p className="-mt-1 mb-2 text-caption">Git-ignored files to include in Go to File, @ in the prompt and text search. Everything else ignored stays out.</p>
       {rows.length > 0 && (
         <div className="mb-2.5 overflow-hidden rounded-lg border bg-cf-surface" data-testid="include-list">
           {rows.map((r, i) => (
