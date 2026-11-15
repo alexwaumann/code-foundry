@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fileCountLabel, fileMatchIndex, findInFile, firstFrom, nearestMatch, pickCurrent, type FileMatch, type PickInput } from "./fileFind";
+import { fileCountLabel, fileMatchIndex, findInFile, firstFrom, LONG_LINE, MAX_LINE_PAINTS, nearestMatch, paintedMatches, pickCurrent, type FileMatch, type PickInput } from "./fileFind";
 
 const spans = (text: string, query: string, max?: number) => findInFile(text, query, max).matches.map((m) => [m.line, m.nth, m.start, m.end]);
 
@@ -103,5 +103,23 @@ describe("pickCurrent", () => {
 
   it("leaves the match when neither the query nor the text changed", () => {
     expect(pickCurrent(base)).toBeNull();
+  });
+});
+
+describe("paintedMatches: what a line paints", () => {
+  const range = (from: number, n: number) => Array.from({ length: n }, (_, i) => from + i);
+  it.each<[string, number, number, number, number[]]>([
+    ["a short line: every match", 80, 3, 1, [0, 1, 2]],
+    ["a short line without the current one: every match", 80, 3, -1, [0, 1, 2]],
+    ["no matches", 80, 0, -1, []],
+    ["many matches: the bound around the current one", LONG_LINE, 1000, 500, range(400, MAX_LINE_PAINTS)],
+    ["many matches, the current one near the start", LONG_LINE, 1000, 10, range(0, MAX_LINE_PAINTS)],
+    ["many matches, the current one near the end", LONG_LINE, 1000, 990, range(800, MAX_LINE_PAINTS)],
+    ["many matches, none current: the first ones", LONG_LINE, 1000, -1, range(0, MAX_LINE_PAINTS)],
+    ["a long line (a minified file): nothing", 280_000, 2361, 1200, []],
+    ["just over the limit: nothing", LONG_LINE + 1, 5, 0, []],
+    ["at the limit: every match", LONG_LINE, 5, 0, [0, 1, 2, 3, 4]],
+  ])("%s", (_name, length, count, current, want) => {
+    expect(paintedMatches(length, count, current)).toEqual(want);
   });
 });

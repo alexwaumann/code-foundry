@@ -11,6 +11,7 @@ import type { TextRange } from "@/api/threadSearch";
 import { lineCount, formatSize } from "@/components/files/fileKind";
 import { revealSideways } from "@/components/files/useFileFind";
 import { paintAll, plainText, rangeOf } from "@/components/thread/cite/citeDom";
+import { paintedMatches } from "@/lib/fileFind";
 import { matchRanges } from "@/lib/textSearch";
 import { zoomFactor } from "@/lib/zoom";
 import type { PreviewRead } from "./useTextSearch";
@@ -64,10 +65,11 @@ export const PREVIEW_HIGHLIGHT = "cf-text-search";
 export const PREVIEW_CURRENT_HIGHLIGHT = "cf-text-search-current";
 
 /**
- * Paints the code's rendered lines under `root` (a CodeBody): every match of `re` tinted, and
- * on the selected line the row's match solid. Without `re` (a regex JavaScript cannot
+ * Paints the code's rendered lines under `root` (a CodeBody): the matches of `re` tinted
+ * (bounded per line, lib/fileFind paintedMatches), and on the selected line the row's match
+ * solid. Without `re` (a regex JavaScript cannot
  * compile) only the selected line is painted, from the daemon's ranges. Returns the solid
- * match's range (null while its line is not rendered).
+ * match's range (null while its line is not rendered, or too long to paint).
  */
 export function paintTextPreview(root: HTMLElement | null, re: RegExp | null, match: Pick<TextLineView, "line" | "text" | "ranges">): Range | null {
   const all: Range[] = [];
@@ -84,10 +86,11 @@ export function paintTextPreview(root: HTMLElement | null, re: RegExp | null, ma
       spans = match.ranges.map((r) => ({ start: r.start + at, end: r.end + at }));
     }
     const solid = selected ? Math.max(0, spans.findIndex((s) => s.start === start)) : -1;
-    spans.forEach((s, i) => {
-      const r = rangeOf(pt, s.start, s.end);
+    for (const i of paintedMatches(pt.text.length, spans.length, solid)) {
+      const s = spans[i];
+      const r = s ? rangeOf(pt, s.start, s.end) : null;
       if (r) (i === solid ? cur : all).push(r);
-    });
+    }
   }
   paintAll(PREVIEW_HIGHLIGHT, all);
   paintAll(PREVIEW_CURRENT_HIGHLIGHT, cur);

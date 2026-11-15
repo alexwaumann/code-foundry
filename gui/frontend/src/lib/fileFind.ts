@@ -29,6 +29,29 @@ export interface FileMatches {
   capped: boolean;
 }
 
+/**
+ * A line longer than this paints no matches. WebKit misdraws a Custom Highlight on a text
+ * run of about 10,000 characters or more (the run fills with the highlight and its text
+ * goes), and each range costs about the line's length on every frame: a minified file's
+ * one line with thousands of matches froze the window for minutes.
+ */
+export const LONG_LINE = 5_000;
+/** At most this many matches are painted on one line: the nearest the current one. */
+export const MAX_LINE_PAINTS = 200;
+
+/**
+ * The indices of a line's `count` matches to paint (the File tab's find, the Text mode's
+ * preview), `current` the current match's (-1 when it is not on this line): at most
+ * MAX_LINE_PAINTS around the current one (the first ones without it), none on a line of
+ * `lineLength` over LONG_LINE.
+ */
+export function paintedMatches(lineLength: number, count: number, current: number): number[] {
+  if (lineLength > LONG_LINE) return [];
+  const n = Math.min(count, MAX_LINE_PAINTS);
+  const from = current < 0 ? 0 : Math.max(0, Math.min(current - (n >> 1), count - n));
+  return Array.from({ length: n }, (_, i) => from + i);
+}
+
 /** Line breaks as @pierre/diffs splits a document (editor.js: `/\r\n|\r|\n/`). */
 const BREAK = /\r\n|\r|\n/g;
 
