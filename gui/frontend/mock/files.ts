@@ -24,6 +24,7 @@ import { readFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { HOME } from "./filesystem";
 import { mockLog, tailOf } from "./media";
+import { MERMAID_FILES } from "./mermaid";
 import { pagelibPages } from "./pagelib";
 import { testPdf } from "./pdf";
 
@@ -340,6 +341,7 @@ function fixtures(): Map<string, Entry> {
     [`${HOME}/elsewhere/bridge.html`, text(BRIDGE_PAGE_HTML, "text/html")],
     [`${CF}/docs/logo.png`, { data: PNG, mime: "image/png", binary: true }],
     [`${CF}/docs/logo.svg`, text(LOGO_SVG, "image/svg+xml")],
+    ...Object.entries(MERMAID_FILES).map(([p, f]): [string, Entry] => [`${CF}/${p}`, text(f.text, f.mime)]),
     // Over 1 MiB, so they come back whole only because the File tab asks for more.
     [`${CF}/docs/photo.png`, { data: BIG_PNG, mime: "image/png", binary: true }],
     // A gallery's worth (e2e/gallery.spec.ts), and one that is no picture whatever its name says.
