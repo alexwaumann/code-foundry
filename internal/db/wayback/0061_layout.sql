@@ -13,11 +13,14 @@
 --
 -- Migrations after 0061 are undone too, since the older build refuses any it does not know:
 -- 0062 (projects' include patterns for file search) loses each project's own patterns, and a
--- later update makes the empty table again (docs/notes/file-search-1-includes.md).
+-- later update makes the empty table again (docs/notes/file-search-1-includes.md); 0063 (the
+-- bell's notifications) loses every notification and the dismissed keys, so a source's
+-- re-post shows again (docs/notes/notifications-1-store.md).
 BEGIN;
 DROP TABLE IF EXISTS layout_spaces;
 DROP TABLE IF EXISTS layout_threads;
 DROP TABLE IF EXISTS layout_meta;
 DROP TABLE IF EXISTS project_include_ignored;
-DELETE FROM schema_migrations WHERE version IN (61, 62);
+DROP TABLE IF EXISTS notifications;
+DELETE FROM schema_migrations WHERE version IN (61, 62, 63);
 COMMIT;
