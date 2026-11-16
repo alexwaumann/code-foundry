@@ -182,6 +182,96 @@ test("at 200% in a 1100x720 window the card stays in the window and the popup's 
   }
 });
 
+const MULTI = "s-ny-multi";
+const req = (n: number) => `req-ask-${MULTI}${n === 1 ? "" : `-${String(n)}`}`;
+const lines = (page: Page) => rowEl(page, MULTI).getByTestId("needs-line");
+const stepperCount = (page: Page) => page.getByTestId("needs-stepper-count");
+
+test("a thread with three requests: its row grows by its lines in the list, and the pointer goes from a line into that request's card", async ({ page }) => {
+  await seed(pane("p-1", [threadTab("s-1")]), "p-1");
+  await openShell(page);
+  await expect(lines(page)).toHaveCount(3);
+  // The taller row is measured: it holds its lines, and the next row starts below it.
+  const row = await rowEl(page, MULTI).boundingBox();
+  const last = await lines(page).nth(2).boundingBox();
+  const next = await page.locator('[data-row-key="h:active"]').boundingBox();
+  if (!row || !last || !next) throw new Error("no box");
+  expect(last.y + last.height).toBeLessThanOrEqual(row.y + row.height);
+  expect(next.y).toBeGreaterThanOrEqual(row.y + row.height);
+  // The second line's card, not the row's: its command, reached across the gap.
+  await lines(page).nth(1).hover();
+  await expect(card(page)).toHaveCount(1);
+  await expect(card(page)).toHaveAttribute("data-request-id", req(2));
+  await expect(card(page).getByTestId("needs-card-target")).toContainText("gh pr edit 482");
+  const allow = card(page).getByTestId("needs-card-allow");
+  const to = await centre(allow);
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await expect(card(page)).toHaveCount(1);
+  await expect(card(page)).toHaveAttribute("data-request-id", req(2));
+  // Back on the title: the row's card, on its oldest request, once the line's has gone.
+  await rowEl(page, MULTI).getByTestId("thread-name").hover();
+  await expect(page.locator(`[data-testid="needs-card"][data-anchor="sidebar:${MULTI}"]`)).toBeVisible();
+  await expect(page.locator('[data-testid="needs-card"][data-request-id]')).toHaveCount(0);
+  await lines(page).nth(1).hover();
+  await expect(page.locator(`[data-testid="needs-card"][data-anchor="sidebar:${MULTI}"]`)).toHaveCount(0);
+  await expect(card(page)).toHaveAttribute("data-request-id", req(2));
+  await card(page).getByTestId("needs-card-allow").click();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.respond").map((i) => i.args)).toEqual([{ id: MULTI, request: req(2), decision: "allow" }]);
+  await expect(lines(page)).toHaveCount(2);
+  // The press stayed in the card: no thread opened behind it.
+  await expect(page.locator('[data-pane-id="p-1"] [data-testid="shell-tab"][data-active="true"]')).toHaveAttribute("data-tab-id", "t-s-1");
+});
+
+test("the popup's stepper: the arrow keys reach it from the ask, and an answer by key moves to the next request", async ({ page }) => {
+  await seed(pane("p-1", [threadTab("s-1")]), "p-1");
+  await openShell(page);
+  await lines(page).nth(2).click();
+  const popup = page.getByTestId("needs-popup");
+  await expect(stepperCount(page)).toHaveText("3 of 3");
+  await expect(popup.getByTestId("thread-question")).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(stepperCount(page)).toHaveText("2 of 3");
+  await expect(popup.getByTestId("thread-permission")).toBeFocused();
+  await expect(popup.getByTestId("thread-prompts")).toHaveAttribute("data-count", "1");
+  // In the deny reason the arrows move the caret.
+  await page.keyboard.press("2");
+  await expect(popup.getByTestId("thread-deny-reason")).toBeFocused();
+  await page.keyboard.type("no");
+  await page.keyboard.press("ArrowLeft");
+  await expect(popup.getByTestId("thread-deny-reason")).toBeFocused();
+  await expect(stepperCount(page)).toHaveText("2 of 3");
+  await page.keyboard.press("Escape");
+  await expect(popup).toBeVisible();
+  // Allowed by its digit: the next one after it, the question.
+  await popup.getByTestId("thread-permission").focus();
+  await page.keyboard.press("1");
+  await expect(stepperCount(page)).toHaveText("2 of 2");
+  await expect(popup.getByTestId("thread-question")).toBeFocused();
+  await expect.poll(async () => (await invocations()).filter((i) => i.name === "thread.respond").map((i) => i.args)).toEqual([{ id: MULTI, request: req(2), decision: "allow" }]);
+});
+
+/** SHOTS=<dir>: the sidebar with a three-request thread and its popup's stepper, dark and light (the PR's before and after). */
+for (const scheme of ["dark", "light"] as const) {
+  test(`needs you line items screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    await seed(pane("p-1", [threadTab("s-1")]), "p-1");
+    await openShell(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(rowEl(page, MULTI)).toBeVisible();
+    await page.mouse.move(900, 780);
+    await still(page);
+    await page.screenshot({ path: at("line-items-sidebar") });
+    await rowEl(page, MULTI).getByTestId("thread-name").click();
+    await expect(page.getByTestId("needs-popup").getByTestId("thread-permission").first()).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await still(page);
+    await page.screenshot({ path: at("line-items-popup") });
+  });
+}
+
 /** SHOTS=<dir>: the card and the popup at 200% in a 1100x720 window, dark and light. */
 for (const scheme of ["dark", "light"] as const) {
   test(`needs you at 200% screenshots (${scheme})`, async ({ page }, info) => {

@@ -59,6 +59,8 @@ export type ThreadEventInit = MessageInitShape<typeof ThreadEventSchema>;
 type ItemInit = MessageInitShape<typeof ThreadItemSchema>;
 type PendingInit = MessageInitShape<typeof ThreadPendingRequestSchema>;
 export type ThemeItemInit = MessageInitShape<typeof ThemeItemSchema>;
+/** One request a Needs-you thread asks (seedAsk): a command to run, or AskUserQuestion's questions. */
+export type MockAsk = { command: string; description: string } | { questions: unknown[] };
 
 /**
  * A default-world thread's history (MockThreadLogs.seed): the prompt, Claude's first words
@@ -1162,10 +1164,11 @@ export class MockThreadLogs {
 
   /**
    * A Needs-you thread's history (World.addNeedsYou; docs/notes/shell-17-needs-you.md): the
-   * prompt, Claude's words, then a pending permission to run `command` or a pending question.
-   * Sets the thread's status to the ask and publishes it on the EventService thread source.
+   * prompt, Claude's words, then a pending permission to run `command` or a pending question,
+   * and the requests in `more` after it, each still open (docs/notes/needs-you-line-items.md).
+   * Sets the thread's status to the oldest ask and publishes them on the EventService thread source.
    */
-  seedAsk(id: string, a: { prompt: string; intro: string; minutesAgo: number; ask: { command: string; description: string } | { questions: unknown[] } }): void {
+  seedAsk(id: string, a: { prompt: string; intro: string; minutesAgo: number; ask: MockAsk; more?: MockAsk[] }): void {
     this.logs.delete(id);
     this.agents.delete(id);
     this.shells.delete(id);
@@ -1180,18 +1183,23 @@ export class MockThreadLogs {
     };
     push({ case: "userMessage", value: { text: a.prompt, attachments: [] } }, { at: at(0) });
     push({ case: "assistantText", value: { text: a.intro } }, { at: at(6) });
-    const isQuestion = "questions" in a.ask;
-    const name = isQuestion ? "AskUserQuestion" : "Bash";
-    const input = "questions" in a.ask ? { questions: a.ask.questions } : { command: a.ask.command, description: a.ask.description };
-    const toolUseId = `toolu_ask_${id}`;
-    push({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.RUNNING } }, { id: toolUseId, at: at(8) });
-    const requestId = `req-ask-${id}`;
-    const value = { requestId, toolName: name, displayName: name, toolUseId, inputJson: JSON.stringify(input), description: "questions" in a.ask ? "" : a.ask.description, state: ThreadRequestState.PENDING };
-    const item = push(isQuestion ? { case: "question", value } : { case: "permission", value }, { at: at(9) });
-    const first = "questions" in a.ask ? ((a.ask.questions[0] as { question?: string } | undefined)?.question ?? "") : `Bash ${a.ask.command.split("\n")[0] ?? ""}`;
-    l.pending = [{ requestId, itemId: item.id, question: isQuestion, toolName: name, summary: first }];
+    l.pending = [a.ask, ...(a.more ?? [])].map((ask, i) => {
+      // The first keeps the ids it always had (e2e asserts them); the rest are numbered from 2.
+      const n = i === 0 ? "" : `-${String(i + 1)}`;
+      const isQuestion = "questions" in ask;
+      const name = isQuestion ? "AskUserQuestion" : "Bash";
+      const input = "questions" in ask ? { questions: ask.questions } : { command: ask.command, description: ask.description };
+      const toolUseId = `toolu_ask_${id}${n}`;
+      push({ case: "toolCall", value: { toolUseId, name, inputJson: JSON.stringify(input), status: ToolCallStatus.RUNNING } }, { id: toolUseId, at: at(8 + i * 3) });
+      const requestId = `req-ask-${id}${n}`;
+      const value = { requestId, toolName: name, displayName: name, toolUseId, inputJson: JSON.stringify(input), description: "questions" in ask ? "" : ask.description, state: ThreadRequestState.PENDING };
+      const item = push(isQuestion ? { case: "question", value } : { case: "permission", value }, { at: at(9 + i * 3) });
+      const summary = "questions" in ask ? ((ask.questions[0] as { question?: string } | undefined)?.question ?? "") : `Bash ${ask.command.split("\n")[0] ?? ""}`;
+      return { requestId, itemId: item.id, question: isQuestion, toolName: name, summary };
+    });
+    const first = l.pending[0];
     l.seq = l.items.length;
-    this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `${isQuestion ? "question" : "permission"}: ${first}`);
+    this.world.setStatus(id, ThreadStatus.NEEDS_ATTENTION, `${first?.question ? "question" : "permission"}: ${first?.summary ?? ""}`);
     this.source({ event: { case: "pending", value: { threadId: id, seq: BigInt(l.seq), pending: l.pending } } });
   }
 

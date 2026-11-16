@@ -385,3 +385,91 @@ describe("the card around its anchor", () => {
     expect(screen.queryByTestId("needs-card")).toBeNull();
   });
 });
+
+describe("a Needs you line's card (docs/notes/needs-you-line-items.md)", () => {
+  const A: ThreadPendingView = { requestId: "req-a", itemId: "perm-a", question: false, toolName: "Bash", summary: "Bash make check" };
+  const B: ThreadPendingView = { requestId: "req-b", itemId: "perm-b", question: false, toolName: "Bash", summary: "Bash git push --force" };
+  const Q: ThreadPendingView = { ...ASK, itemId: "q-1" };
+  const itemA: ThreadItemView = { ...base, id: "perm-a", ordinal: 5, kind: "permission", request: request({ requestId: "req-a", toolName: "Bash", inputJson: JSON.stringify({ command: "make check" }) }) };
+  const itemB: ThreadItemView = { ...base, id: "perm-b", ordinal: 7, kind: "permission", request: request({ requestId: "req-b", toolName: "Bash", inputJson: JSON.stringify({ command: "git push --force" }) }) };
+  /** s-1 waits on A, B and a question, oldest first; ListItems has every item. */
+  const three = () => {
+    waiting("s-1", A, [itemA, itemB, questionItem({ requestId: "req-q", inputJson: JSON.stringify(QUESTION) })]);
+    useThreadStore.setState((s) => ({ pending: { ...s.pending, "s-1": { threadId: "s-1", seq: 2, pending: [A, B, Q] } } }));
+  };
+
+  it("shows its own request, not the oldest, without \"+N more\"; Allow sends that request's id", async () => {
+    three();
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1#req-b" requestId="req-b" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("needs-card-target").textContent).toBe("$ git push --force");
+    });
+    expect(readAskItems).toHaveBeenCalledWith("s-1", "perm-b");
+    expect(screen.getByTestId("needs-card-body").getAttribute("data-request-id")).toBe("req-b");
+    expect(screen.queryByTestId("needs-card-more")).toBeNull();
+    fireEvent.click(screen.getByTestId("needs-card-allow"));
+    await waitFor(() => {
+      expect(runs).toEqual([{ name: "thread.respond", args: { id: "s-1", request: "req-b", decision: "allow" } }]);
+    });
+  });
+
+  it("a question's line: Answer… opens the popup on that question", () => {
+    three();
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1#req-q" requestId="req-q" />);
+    expect(screen.getByTestId("needs-card-body").getAttribute("data-ask")).toBe("question");
+    fireEvent.click(screen.getByTestId("needs-card-open"));
+    expect(useNeedsStore.getState()).toMatchObject({ popup: "s-1", popupRequest: "req-q", dismissed: "sidebar:s-1#req-q" });
+  });
+
+  it("the row's card still shows the oldest and \"+2 more\"", async () => {
+    three();
+    render(<NeedsCardBody threadId="s-1" anchor="sidebar:s-1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId("needs-card-target").textContent).toBe("$ make check");
+    });
+    expect(screen.getByTestId("needs-card-more").textContent).toBe("+2 more");
+  });
+
+  it("the row's card stays shut while the pointer is on a line or in a line's card, and comes back on the title after the line card's delay", async () => {
+    three();
+    const { NEEDS_LINE_ZONE } = await import("./NeedsCard");
+    render(
+      <NeedsHoverCard threadId="s-1" anchor="sidebar:s-1">
+        <div data-testid="row">
+          <span data-testid="title">title</span>
+          <span data-testid="line" {...{ [NEEDS_LINE_ZONE]: "" }}>
+            line
+          </span>
+        </div>
+      </NeedsHoverCard>,
+    );
+    const row = screen.getByTestId("row");
+    fireEvent.pointerEnter(row, { pointerType: "mouse" });
+    fireEvent.pointerOver(screen.getByTestId("line"));
+    await act(() => new Promise((r) => setTimeout(r, 260)));
+    expect(screen.queryByTestId("needs-card")).toBeNull();
+    // Off the line, it waits out the line card's close delay: never two cards at once.
+    fireEvent.pointerOver(screen.getByTestId("title"));
+    expect(screen.queryByTestId("needs-card")).toBeNull();
+    await act(() => new Promise((r) => setTimeout(r, 260)));
+    expect(screen.getByTestId("needs-card").getAttribute("data-anchor")).toBe("sidebar:s-1");
+  });
+
+  it("a line's card keeps its presses to itself: the row under it never sees them", async () => {
+    three();
+    const rowClick = vi.fn();
+    render(
+      // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a stand-in for the row
+      <div data-testid="row" onClick={rowClick} onPointerDown={rowClick}>
+        <NeedsHoverCard threadId="s-1" requestId="req-b" anchor="sidebar:s-1#req-b" keyboardOpen>
+          <span>line</span>
+        </NeedsHoverCard>
+      </div>,
+    );
+    const card = screen.getByTestId("needs-card");
+    expect(card.getAttribute("data-request-id")).toBe("req-b");
+    fireEvent.pointerDown(card);
+    fireEvent.click(await screen.findByTestId("needs-card-allow"));
+    expect(rowClick).not.toHaveBeenCalled();
+  });
+});

@@ -1532,9 +1532,10 @@ export class World {
   }
 
   /**
-   * POST /__mock/needs-you (docs/notes/shell-17-needs-you.md): three of the user's threads that
+   * POST /__mock/needs-you (docs/notes/shell-17-needs-you.md): four of the user's threads that
    * wait on real asks, as the hover card and popup read them: a permission for a long command
-   * (code-foundry), a question (ghostty-playground) and a short permission without a project.
+   * (code-foundry), a question (ghostty-playground), a short permission without a project, and
+   * one with three open requests at once (two commands and a question).
    */
   addNeedsYou(): string[] {
     const ago = (min: number) => new Date(Date.now() - min * 60_000);
@@ -1597,6 +1598,36 @@ export class World {
             ].join("\n"),
             description: "List the open PRs' head commits",
           },
+        },
+      },
+      {
+        // Three open requests at once: the row lists them, the popup steps through them (docs/notes/needs-you-line-items.md).
+        id: "s-ny-multi",
+        name: "Push the badge fix and label the PR",
+        projectId: "repo-cf",
+        worktreePath: CF,
+        min: 8,
+        ask: {
+          prompt: "Push the badge fix, label the PR so the badge query sees it, and open it against the right base.",
+          intro: "The fix is committed. The label needs to be on the PR before the badge query sees it, so I'll push and add it first.",
+          minutesAgo: 8,
+          ask: { command: "git push --force-with-lease origin cf/pr-badge-stale", description: "Push the rebased branch" },
+          more: [
+            { command: "gh pr edit 482 --add-label needs-badge-refresh", description: "Label the PR for the badge query" },
+            {
+              questions: [
+                {
+                  question: "Which base branch should the PR target?",
+                  header: "Base",
+                  multiSelect: false,
+                  options: [
+                    { label: "main (Recommended)", description: "Where the badge poller ships from" },
+                    { label: "release/0.22", description: "Backport to the current release" },
+                  ],
+                },
+              ],
+            },
+          ],
         },
       },
     ];

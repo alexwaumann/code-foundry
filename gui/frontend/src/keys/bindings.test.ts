@@ -10,7 +10,7 @@ import { useSubagentViewStore } from "@/stores/subagentView";
 import { useThreadsStore } from "@/stores/threads";
 import { HOME, useUiStore } from "@/stores/ui";
 import { useViewsStore } from "@/stores/views";
-import { resetNeeds, useNeedsStore } from "@/stores/needs";
+import { openNeedsPopup, resetNeeds, useNeedsStore } from "@/stores/needs";
 import { setShellMode } from "@/stores/shellView";
 import { EMBER_THREAD, putEmberThread, setEmberEnabled } from "@/test/emberBoard";
 import { chordFires, commandBindings, handleKeyDown, inPalette, installKeybindings, isGlobalChord, nextAttention, openRunInPicker } from "./bindings";
@@ -412,6 +412,19 @@ describe("handleKeyDown precedence", () => {
       // d finished a turn: Active's, not Needs you's.
       expect(seen).toEqual(["c", "a", "c"]);
       expect(useUiStore.getState().selection).toEqual(before);
+    });
+
+    it("from a popup opened on a line's request, goes on to the next thread's oldest (docs/notes/needs-you-line-items.md)", () => {
+      useThreadsStore.setState({
+        byId: {
+          a: thread("a", { status: "attention", statusReason: "permission: Bash ls", statusChangedAtMs: 10 }),
+          c: thread("c", { status: "attention", statusReason: "question: Which?", statusChangedAtMs: 20 }),
+        },
+        order: ["a", "c"],
+      });
+      openNeedsPopup("c", "sidebar:c#req-2", "req-2");
+      press(terminal, { key: "a", code: "KeyA", metaKey: true, shiftKey: true });
+      expect(useNeedsStore.getState()).toMatchObject({ popup: "a", popupRequest: null });
     });
 
     it("goes to Ember's chat first while Ember waits on the user, then the popups, and back to Ember", () => {

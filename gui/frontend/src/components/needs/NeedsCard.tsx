@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowUpRight, Check, Loader2, MessageCircleQuestionMark, ShieldAlert } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -74,20 +74,24 @@ function GoToThread({ threadId, anchor }: { threadId: string; anchor: string }) 
   );
 }
 
-/** The card's body: the ask by kind, the thread, the context, the actions. */
-export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: string; anchor: string; read?: boolean }) {
-  const ask = useAskView(threadId, read);
+/**
+ * The card's body: the ask by kind, the thread, the context, the actions. `requestId` is a Needs
+ * you line's request (docs/notes/needs-you-line-items.md): the card shows that one, not the oldest.
+ */
+export function NeedsCardBody({ threadId, anchor, read = true, requestId = null }: { threadId: string; anchor: string; read?: boolean; requestId?: string | null }) {
+  const ask = useAskView(threadId, read, requestId);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const line = useThreadsStore(useShallow((s) => statusLine(s.byId[threadId])));
   const { pending, request } = ask;
   const question = pending?.question ?? false;
-  const more = ask.count > 1 ? (
+  // A line's card is one of the lines on screen: no "+N more" there.
+  const more = ask.count > 1 && requestId === null ? (
     <span className="chip muted" data-testid="needs-card-more">
       +{ask.count - 1} more
     </span>
   ) : null;
 
-  // The buttons answer the request whose command is on screen (`request`, the oldest open one's
+  // The buttons answer the request whose command is on screen (`request`, the shown request's
   // own), and only while it is still open: a click never lands on another request.
   const answer = (requestId: string, decision: "allow" | "deny") => {
     if (!requestOpen(threadId, requestId)) return;
@@ -238,7 +242,7 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
               className="btn primary"
               data-testid="needs-card-open"
               onClick={() => {
-                openNeedsPopup(threadId, anchor);
+                openNeedsPopup(threadId, anchor, requestId);
               }}
             >
               {question ? "Answer…" : "Open…"}
@@ -253,6 +257,8 @@ export function NeedsCardBody({ threadId, anchor, read = true }: { threadId: str
 
 interface NeedsHoverCardProps {
   threadId: string;
+  /** A Needs you line's request: the card shows it rather than the oldest (NeedsCardBody). */
+  requestId?: string | null;
   /** Which anchor this is ("sidebar:<id>", "popover:<id>", "strip:<pane>"): the popup it opens shuts its card until it is hovered again. */
   anchor: string;
   /** Open without the pointer: the anchor has the keyboard's focus (the sidebar list's cursor). */
@@ -264,18 +270,68 @@ interface NeedsHoverCardProps {
   children: ReactNode;
 }
 
+/**
+ * Marks a Needs you line and its own card (docs/notes/needs-you-line-items.md). A card whose anchor
+ * holds lines stays shut while the pointer is on one of them or in a line's card: the line's card
+ * shows instead. React's pointer events reach the row through the line card's portal, so the row
+ * sees the pointer there too.
+ */
+export const NEEDS_LINE_ZONE = "data-needs-line-zone";
+
+/** A card's open and close delay (Radix's): the pointer crosses the gap into the card within it. */
+const LINE_CARD_DELAY = 200;
+
+/** The line zone the pointer is over, below `anchor` (never the anchor itself). */
+function lineZoneUnder(target: EventTarget, anchor: Element): boolean {
+  const zone = target instanceof Element ? target.closest(`[${NEEDS_LINE_ZONE}]`) : null;
+  return zone !== null && zone !== anchor;
+}
+
+/** A line card sits inside its row in React's tree: its presses, keys and menus stay in it, never the row's (open, drag, rename, menu). */
+const stop = (e: { stopPropagation: () => void }) => {
+  e.stopPropagation();
+};
+
 /** The card around its anchor (the trigger, `children`): hovering anywhere on it, or focusing it, opens it. */
-export function NeedsHoverCard({ threadId, anchor, keyboardOpen = false, enabled = true, side = "right", align = "start", children }: NeedsHoverCardProps) {
+export function NeedsHoverCard({ threadId, requestId = null, anchor, keyboardOpen = false, enabled = true, side = "right", align = "start", children }: NeedsHoverCardProps) {
   const [hover, setHover] = useState(false);
+  const [onLine, setOnLine] = useState(false);
+  // Off a line, the row's card waits out the line card's close delay: never two cards at once.
+  const offLine = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lineZone = (under: boolean) => {
+    // Already leaving: crossing more of the row does not restart the wait.
+    if (!under && offLine.current !== null) return;
+    if (offLine.current !== null) clearTimeout(offLine.current);
+    offLine.current = null;
+    if (under) setOnLine(true);
+    else if (onLine)
+      offLine.current = setTimeout(() => {
+        offLine.current = null;
+        setOnLine(false);
+      }, LINE_CARD_DELAY);
+  };
+  useEffect(
+    () => () => {
+      if (offLine.current !== null) clearTimeout(offLine.current);
+    },
+    [],
+  );
   const dismissed = useNeedsStore((s) => s.dismissed === anchor);
   const popupOpen = useNeedsStore((s) => s.popup !== null);
-  const open = enabled && (hover || keyboardOpen) && !dismissed && !popupOpen;
+  const open = enabled && (hover || keyboardOpen) && !onLine && !dismissed && !popupOpen;
+  const nested = requestId !== null;
   return (
-    <HoverCard open={open} onOpenChange={setHover} openDelay={200} closeDelay={200}>
+    <HoverCard open={open} onOpenChange={setHover} openDelay={LINE_CARD_DELAY} closeDelay={LINE_CARD_DELAY}>
       <HoverCardTrigger
         asChild
         onPointerEnter={() => {
           rehoverNeedsAnchor(anchor);
+        }}
+        onPointerOver={(e) => {
+          lineZone(lineZoneUnder(e.target, e.currentTarget));
+        }}
+        onPointerLeave={() => {
+          lineZone(false);
         }}
         // A press on the anchor acts (opens the thread or the popup): the card goes until the next hover.
         onPointerDown={() => {
@@ -293,8 +349,10 @@ export function NeedsHoverCard({ threadId, anchor, keyboardOpen = false, enabled
         data-testid="needs-card"
         data-thread-id={threadId}
         data-anchor={anchor}
+        data-request-id={requestId ?? undefined}
+        {...(nested ? { [NEEDS_LINE_ZONE]: "", onClick: stop, onPointerDown: stop, onDoubleClick: stop, onContextMenu: stop, onKeyDown: stop } : {})}
       >
-        <NeedsCardBody threadId={threadId} anchor={anchor} />
+        <NeedsCardBody threadId={threadId} anchor={anchor} requestId={requestId} />
       </HoverCardContent>
     </HoverCard>
   );
