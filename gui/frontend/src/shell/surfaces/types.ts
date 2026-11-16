@@ -22,6 +22,11 @@ export interface ShellSurface {
   /** The items of the tab's context menu (ContextMenuItems); no menu without it. */
   tabMenu?: (tab: TabEntry) => ReactNode;
   /**
+   * Asked as the tab's context menu closes: true when an item put the keyboard somewhere (a
+   * tab it opened, a rename field), so the menu must not hand it back to the tab.
+   */
+  tabMenuKeepsFocus?: (tab: TabEntry) => boolean;
+  /**
    * A kind that can belong to a thread: the noun of the row under the strip of a linked tab
    * ("Diff" of ● thread, components/shell/LinkedRow.tsx) and of the tab's hover.
    */

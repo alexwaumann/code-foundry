@@ -326,14 +326,14 @@ describe("the thread's header in a shell pane", () => {
     expect(screen.getByTestId("thread-header-name").textContent).toBe("Refactor sidebar tree");
   });
 
-  it("has one menu: Open ▸, Move to space ▸, the thread's items, Close", async () => {
+  it("has one menu: Open ▸, Move to space ▸, the thread's items with Close after Archive, Fork, Remove", async () => {
     render(<ThreadHeader threadId="s-1" paneId="p-1" />);
     fireEvent.pointerDown(screen.getByTestId("thread-header-menu-trigger"), { button: 0, ctrlKey: false });
     const menu = screen.getByTestId("thread-header-menu");
     const got = entries(menu);
     expect(got.slice(0, 3)).toEqual(["Open", "Move to space", "—"]);
     expect(got).toEqual(expect.arrayContaining(["Rename", "Snooze", "Archive"]));
-    expect(got.at(-1)).toBe("Close⌘W");
+    expect(got.slice(-4)).toEqual(["Close⌘W", "—", "Fork", "Remove"]);
     fireEvent.keyDown(within(menu).getByTestId("menu-move-to-space"), { key: "ArrowRight" });
     const spaces = await screen.findByTestId("menu-move-to-space-spaces");
     // One space: shown anyway, marked here and disabled; then New space.

@@ -1,31 +1,18 @@
 import { useRef, useState } from "react";
 import { GitBranch, House, Loader2, MoreHorizontal } from "lucide-react";
-import { MoveToSpaceItems, ThreadSurfaceItems } from "@/components/shell/ThreadSurfaceItems";
 import { ThreadInfoToggle } from "@/components/threadinfo/ThreadInfoToggle";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tip } from "@/components/ui/tooltip";
-import { formatChord } from "@/keys/chord";
 import { movingLabel } from "@/lib/move";
 import { cn } from "@/lib/utils";
-import { closeThreadAction, type LinkedAction } from "@/shell/linked";
+import type { LinkedAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
-import { keepPreviewTab } from "@/shell/preview";
 import { usePaneTabCut } from "@/shell/tabCut";
 import { useLayoutStore } from "@/stores/layout";
 import { useThreadsStore } from "@/stores/threads";
 import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./menuKit";
 import { MovePicker } from "./MovePicker";
-import { ThreadMenuItems } from "./ThreadMenuItems";
+import { ThreadMenuBody } from "./ThreadMenu";
 import { TranscriptDeletedChip } from "./TranscriptDeleted";
 import { useCanMove } from "./useNoProject";
 import { useMovingTo } from "./useMovingTo";
@@ -81,10 +68,8 @@ function PlaceChip({ threadId }: { threadId: string }) {
 }
 
 /**
- * The thread's one menu (docs/notes/shell-model.md, "The thread's header"): for a preview tab,
- * Keep open (tab.keep; thread tabs have no menu of their own), then Open ▸ (its surfaces,
- * shell/linked.ts), Move to space ▸, the thread's own items (the sidebar row's, ThreadMenuItems:
- * rename, pin, snooze, archive, …), then Close (thread.close: its tab leaves the space).
+ * The thread's one menu (docs/notes/shell-model.md, "The thread's header") behind the header's
+ * "…": ThreadMenuBody, which a right click on the thread's tab shows too.
  */
 function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: string }) {
   const spaceId = useLayoutStore((s) => s.panes[paneId]?.spaceId ?? "");
@@ -129,42 +114,7 @@ function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: stri
           focusPromptAfterMenu(threadId);
         }}
       >
-        {preview && (
-          <>
-            <DropdownMenuItem
-              data-testid="menu-keep-open"
-              onSelect={() => {
-                void keepPreviewTab(preview);
-              }}
-            >
-              Keep open
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger data-testid="menu-open">Open</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-52" data-testid="menu-open-surfaces">
-            <ThreadSurfaceItems threadId={threadId} spaceId={spaceId} onPick={pick} />
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger data-testid="menu-move-to-space">Move to space</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="min-w-44" data-testid="menu-move-to-space-spaces">
-            <MoveToSpaceItems threadId={threadId} />
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <ThreadMenuItems id={threadId} kit={dropdownMenuKit} />
-        <DropdownMenuItem
-          data-testid="menu-close"
-          onSelect={() => {
-            pick(closeThreadAction(threadId));
-          }}
-        >
-          Close
-          <DropdownMenuShortcut>{formatChord("cmd+w")}</DropdownMenuShortcut>
-        </DropdownMenuItem>
+        <ThreadMenuBody threadId={threadId} spaceId={spaceId} preview={preview} kit={dropdownMenuKit} onPick={pick} />
       </DropdownMenuContent>
     </DropdownMenu>
   );

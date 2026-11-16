@@ -20,7 +20,8 @@ const { ContextMenu, ContextMenuTrigger } = await import("@/components/ui/contex
 const { RowMenu } = await import("@/components/sidebar/RowMenu");
 const { ThreadHeader } = await import("./ThreadHeader");
 const { layoutOf, pane, seedLayout, space, tab } = await import("@/test/shellLayout");
-const { resetLayout } = await import("@/stores/layout");
+const { resetLayout, useLayoutStore } = await import("@/stores/layout");
+const { TabContextMenu } = await import("@/components/shell/PaneTabStrip");
 const { useCommandsStore } = await import("@/stores/commands");
 const { useProjectsStore } = await import("@/stores/projects");
 const { useThreadsStore } = await import("@/stores/threads");
@@ -91,9 +92,24 @@ function openTitleMenu(): HTMLElement {
   return screen.getByTestId("thread-header-menu");
 }
 
-/** The header menu's own items (ThreadMenuItems): between its Open ▸ / Move to space ▸ group and its Close. */
+/** A right click on the thread's tab (the strip's and the rail's TabContextMenu). */
+function openTabMenu(): HTMLElement {
+  const t = useLayoutStore.getState().tabs["t-1"];
+  if (!t) throw new Error("tab");
+  render(
+    <TabContextMenu tab={t}>
+      <div data-testid="tab">tab</div>
+    </TabContextMenu>,
+  );
+  fireEvent.contextMenu(screen.getByTestId("tab"));
+  return screen.getByTestId("shell-tab-menu");
+}
+
+/** The header menu's items up to Archive (ThreadMenuItems): after its Open ▸ / Move to space ▸ group, before Close and the Fork and Remove group. */
 function shared(menu: HTMLElement): string[] {
-  return entries(menu).slice(3, -1);
+  const all = entries(menu);
+  expect(all.slice(-4)).toEqual(["Close⌘W", "—", "Fork", "Remove"]);
+  return all.slice(3, -4);
 }
 
 /** The menu's items and separators in order ("—" for a separator). */
@@ -102,13 +118,42 @@ function entries(menu: HTMLElement): string[] {
 }
 
 describe("ThreadMenuItems: one list for the sidebar row and the thread header's menu", () => {
-  it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in; Archive (no sidebar item on a child)", () => {
+  it("in order: Rename, Regenerate name, Pin, Snooze; New thread on this branch, Save as workspace, Run in; Archive; Fork, Remove (no sidebar item on a child)", () => {
     setThread({ projectIds: ["web", "api"], createdBy: "s-0" }, [thread({ id: "s-0", name: "Parent" })]);
     const want = ["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Save as workspace", "Run in", "—", "Archive"];
-    expect(entries(openTitleMenu())).toEqual(["Open", "Move to space", "—", ...want, "Close⌘W"]);
+    // The header's Close sits after Archive; Fork and Remove end both.
+    expect(entries(openTitleMenu())).toEqual(["Open", "Move to space", "—", ...want, "Close⌘W", "—", "Fork", "Remove"]);
     cleanup();
-    // The row adds what only it offers after the shared list.
     expect(entries(openRowMenu())).toEqual([...want, "—", "Fork", "Remove"]);
+  });
+
+  it("a right click on the thread's tab shows the header's menu", () => {
+    setThread({ projectIds: ["web", "api"] });
+    const header = entries(openTitleMenu());
+    cleanup();
+    expect(entries(openTabMenu())).toEqual(header);
+  });
+
+  it("Remove is in every menu: silent from the row's, toasted from the header's and the tab's", () => {
+    for (const [open, inView] of [
+      [openRowMenu, true],
+      [openTitleMenu, false],
+      [openTabMenu, false],
+    ] as const) {
+      setThread({});
+      fireEvent.click(within(open()).getByTestId("menu-remove"));
+      expect(runCommand).toHaveBeenLastCalledWith("thread.remove", {}, expect.objectContaining({ activeThreadId: "s-1" }), { inView });
+      cleanup();
+    }
+  });
+
+  it("Fork is in every menu, and forks the menu's thread", () => {
+    for (const open of [openRowMenu, openTitleMenu, openTabMenu]) {
+      setThread({});
+      fireEvent.click(within(open()).getByTestId("menu-fork"));
+      expect(runCommand).toHaveBeenLastCalledWith("thread.fork", {}, expect.objectContaining({ activeThreadId: "s-1" }), { inView: true });
+      cleanup();
+    }
   });
 
   it("a one-project thread of the user's: no Save as workspace or Run in", () => {

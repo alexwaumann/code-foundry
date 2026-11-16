@@ -11,12 +11,13 @@ import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus, takeFocusRequest, useShellViewStore } from "@/stores/shellView";
 import { keepPreviewTab } from "@/shell/preview";
-import { AttentionDot, LinkedTip, PREVIEW_DASHES, TabContentIcon } from "./PaneTabStrip";
+import { AttentionDot, LinkedTip, PREVIEW_DASHES, TabContentIcon, TabContextMenu } from "./PaneTabStrip";
 import { PaneExpandButton } from "./PaneCollapseButton";
 
 /**
  * One tab of a rail: its icon, the selected one marked, its attention dot; a click unfolds the
- * pane on it. A preview has a dashed square around its icon, and a double click keeps it.
+ * pane on it. A preview has a dashed square around its icon, and a double click keeps it. A right
+ * click shows the tab's menu, as on its strip (a thread's, a terminal's).
  */
 function RailTab({ tabId, paneId, selected, vertical }: { tabId: string; paneId: string; selected: boolean; vertical: boolean }) {
   const tab = useTab(tabId);
@@ -31,7 +32,14 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
   const linked = tab.thread !== "" && tab.kind !== "thread";
   return (
     // The name is nowhere on screen: the tooltip names the tab (a linked one, its thread too).
-    <Tip label={linked ? <LinkedTip tab={tab} tabName={title} cut /> : title} side={vertical ? "right" : "bottom"}>
+    <TabContextMenu
+      tab={tab}
+      wrap={(trigger) => (
+        <Tip label={linked ? <LinkedTip tab={tab} tabName={title} cut /> : title} side={vertical ? "right" : "bottom"}>
+          {trigger}
+        </Tip>
+      )}
+    >
       <button
         ref={setNodeRef}
         {...listeners}
@@ -76,7 +84,7 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
           {title}
         </span>
       </button>
-    </Tip>
+    </TabContextMenu>
   );
 }
 

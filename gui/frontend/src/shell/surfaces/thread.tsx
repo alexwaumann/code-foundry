@@ -1,5 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import { ThreadWithQuick } from "@/components/shell/QuickTerminal";
+import { threadTabMenuKeepsFocus } from "@/components/thread/menuKit";
+import { ThreadTabMenu } from "@/components/thread/ThreadMenu";
 import { ThreadPane } from "@/components/thread/ThreadPane";
 import { isAttention, useThreadsStore } from "@/stores/threads";
 import type { ShellSurface } from "./types";
@@ -11,6 +13,7 @@ import type { ShellSurface } from "./types";
  * In a shell pane ThreadPane draws the shell's header (components/thread/ThreadHeader.tsx). Under
  * it, while open, the thread's quick terminal (components/shell/QuickTerminal.tsx). A thread that
  * needs the user (stores/threads isAttention; not when archived) marks its tab's icon, active or not.
+ * A right click on the tab shows the thread's menu, the header's (components/thread/ThreadMenu.tsx).
  */
 export const threadSurface: ShellSurface = {
   kind: "thread",
@@ -24,6 +27,8 @@ export const threadSurface: ShellSurface = {
       <ThreadPane threadId={tab.thread} />
     </ThreadWithQuick>
   ),
+  tabMenu: (tab) => <ThreadTabMenu tab={tab} />,
+  tabMenuKeepsFocus: threadTabMenuKeepsFocus,
   useAttention: (tab) =>
     useThreadsStore((s) => {
       const t = s.byId[tab.thread];

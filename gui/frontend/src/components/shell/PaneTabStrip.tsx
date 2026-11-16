@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type Ref, type SyntheticEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactElement, type Ref, type SyntheticEvent } from "react";
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
@@ -143,23 +143,37 @@ function mergeHandlers(props: object, extra: object | undefined): Record<string,
   return out;
 }
 
-function ShellTabOf(props: { tab: TabEntry; active: boolean; paneFocused: boolean; fit: TabFit | undefined; focusable: boolean }) {
-  const menu = shellSurfaceOf(props.tab.kind).tabMenu;
-  if (!menu) return <ShellTabBox {...props} />;
+/**
+ * A tab's context menu around its element (the strip's tab, the rail's icon), for a surface with
+ * `tabMenu`; the element alone without one. The element must take a context menu trigger's props
+ * (Radix's Slot: its ref and handlers). `wrap` puts something around the trigger, inside the menu:
+ * the rail's tooltip, which goes outside a menu's trigger (components/ui/tooltip.tsx).
+ */
+export function TabContextMenu({ tab, children, wrap = (trigger) => trigger }: { tab: TabEntry; children: ReactElement; wrap?: (trigger: ReactElement) => ReactElement }) {
+  const surface = shellSurfaceOf(tab.kind);
+  const menu = surface.tabMenu;
+  if (!menu) return wrap(children);
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <ShellTabBox {...props} />
-      </ContextMenuTrigger>
+      {wrap(<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>)}
       <ContextMenuContent
+        data-testid="shell-tab-menu"
         onCloseAutoFocus={(e) => {
-          // A rename picked in the menu starts now, and its field takes the keyboard.
-          if (takeRenameAfterMenu(props.tab.id)) e.preventDefault();
+          // A rename picked in the menu starts now, and its field takes the keyboard; an item may have moved it elsewhere.
+          if (takeRenameAfterMenu(tab.id) || surface.tabMenuKeepsFocus?.(tab)) e.preventDefault();
         }}
       >
-        {menu(props.tab)}
+        {menu(tab)}
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+function ShellTabOf(props: { tab: TabEntry; active: boolean; paneFocused: boolean; fit: TabFit | undefined; focusable: boolean }) {
+  return (
+    <TabContextMenu tab={props.tab}>
+      <ShellTabBox {...props} />
+    </TabContextMenu>
   );
 }
 
