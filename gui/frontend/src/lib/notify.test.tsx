@@ -80,6 +80,37 @@ describe("notify", () => {
     });
   });
 
+  it("a row of buttons in order, the first the strong one; each runs its onClick and closes the toast", async () => {
+    const calls: string[] = [];
+    const button = (label: string) => ({ label, onClick: () => calls.push(label) });
+    act(() => {
+      notify({ level: "info", title: "Deploy waiting", buttons: [button("Continue"), button("Abort"), button("Open build")], cancel: { label: "Ignored", onClick: vi.fn() } });
+    });
+    const t = await shown("Deploy waiting");
+    const row = [...t.querySelectorAll<HTMLElement>("[data-notice-buttons] button")];
+    expect(row.map((b) => b.textContent)).toEqual(["Continue", "Abort", "Open build"]);
+    expect(row[0]?.className).toContain("bg-cf-text ");
+    expect(row[1]?.className).toContain("bg-cf-text/10");
+    // The row replaces sonner's own pair.
+    expect(t.querySelector("button[data-cancel]")).toBeNull();
+    fireEvent.click(row[1] as HTMLElement);
+    expect(calls).toEqual(["Abort"]);
+    await waitFor(() => {
+      expect(toasts().filter((x) => x.dataset.removed !== "true")).toHaveLength(0);
+    });
+  });
+
+  it("a closable toast has the close button and still times out", async () => {
+    act(() => {
+      notify({ level: "info", title: "Assigned", closable: true, duration: 50 });
+    });
+    const t = await shown("Assigned");
+    expect(t.querySelector("[data-close-button]")).not.toBeNull();
+    await waitFor(() => {
+      expect(toasts().filter((x) => x.dataset.removed !== "true")).toHaveLength(0);
+    });
+  });
+
   it("a sticky toast has a close button, which takes it down", async () => {
     act(() => {
       notify({ level: "error", title: "Push failed", sticky: true });
