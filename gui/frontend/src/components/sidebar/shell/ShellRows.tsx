@@ -1,5 +1,5 @@
-import { memo, useContext } from "react";
-import { ChevronDown, ChevronRight, GitBranch, House, Layers, PencilLine, Square, X } from "lucide-react";
+import { memo, useContext, useMemo } from "react";
+import { ChevronDown, ChevronRight, GitBranch, House, Layers, PencilLine, ShieldQuestionMark, Square, X, type LucideIcon } from "lucide-react";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
 import { useProjectKind } from "@/components/icons/projectKind";
 import { useShallow } from "zustand/react/shallow";
@@ -7,7 +7,8 @@ import { Tip } from "@/components/ui/tooltip";
 import { rowHasBranchLine, useThreadPlace } from "@/components/thread/useThreadPlace";
 import { type DraftRow, type MainHeaderRow, type NeedsScope, type ShellThreadRow } from "@/lib/shellSections";
 import { statusLine } from "@/lib/statusLine";
-import { statusBadge } from "@/lib/statusRegistry";
+import { requestLines, type RequestKind, type RequestLine } from "@/lib/needsAsk";
+import { statusBadge, statusRegistry } from "@/lib/statusRegistry";
 import { threadBadge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
 import { useThreadDrag } from "@/shell/drag/draggable";
@@ -25,8 +26,9 @@ import { linkedPrTag } from "../linkedPrTag";
 import { HoverSlot, MadeByThreadGlyph, PinGlyph, PlaceIcon, RenameField, RowCounts, RowStatus, SingleLineLabel, ThreadTooltip } from "../SidebarRow";
 import { useLinkedPrFacts, useLinkKeys } from "../useLinkedPrs";
 import { RowTooltipsEnabled } from "../rowTooltips";
-import { NeedsHoverCard } from "@/components/needs/NeedsCard";
+import { NEEDS_LINE_ZONE, NeedsHoverCard } from "@/components/needs/NeedsCard";
 import { openNeedsPopup, useNeedsStore } from "@/stores/needs";
+import { useOpenRequests } from "@/stores/thread";
 
 /**
  * The shell sidebar's rows (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-16-sidebar.md):
@@ -153,11 +155,22 @@ function ThreadLines({ id, cursor }: { id: string; cursor: boolean }) {
   );
 }
 
-/** What a Needs you thread asks: the status's icon and word in its tone ("Permission", "Question", a plugin's name). */
+/**
+ * What a Needs you thread asks: the status's icon and word in its tone ("Permission", "Question",
+ * a plugin's name); "N items", muted, when it has several open requests (its lines say which).
+ */
 function AskKind({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((s) => statusLine(s.byId[id])));
+  const count = useOpenRequests(id).length;
   const badge = statusBadge(line);
   const Icon = badge.icon;
+  if (count > 1) {
+    return (
+      <span className="ml-auto flex shrink-0 items-center pl-1.5 text-caption-sm text-cf-sidebar-muted-foreground tabular-nums" data-testid="row-ask" data-kind="items" data-count={count}>
+        {count} items
+      </span>
+    );
+  }
   return (
     <span className={cn("ml-auto flex shrink-0 items-center gap-1 pl-1.5 text-caption-sm font-medium", badge.toneClass)} data-testid="row-ask" data-kind={line.kind}>
       {Icon && <Icon className="size-3.5 shrink-0" aria-hidden />}
@@ -166,10 +179,89 @@ function AskKind({ id }: { id: string }) {
   );
 }
 
+/** A request kind's icon: the status registry's for that kind of ask. */
+const LINE_ICONS: Readonly<Record<RequestKind, LucideIcon>> = {
+  permission: statusRegistry.input.icon ?? ShieldQuestionMark,
+  question: statusRegistry.question.icon ?? ShieldQuestionMark,
+  plan: statusRegistry.plan.icon ?? ShieldQuestionMark,
+};
+
+/** One line's look: the icon in the attention tone, the text in the row's, cut to one line. */
+function LineBody({ icon: Icon, text }: { icon: LucideIcon | null; text: string }) {
+  return (
+    <>
+      {Icon ? <Icon className="size-3 shrink-0 text-cf-warning-text" aria-hidden /> : <span className="size-3 shrink-0" aria-hidden />}
+      <span className="min-w-0 truncate">{text}</span>
+    </>
+  );
+}
+
+const lineClass = "flex h-4 min-w-0 cursor-pointer items-center gap-1.5 rounded-sm text-caption text-cf-sidebar-foreground/90 hover:text-cf-sidebar-foreground";
+
 /**
- * A Needs you row's lines: the place and the kind of ask, then the title. No controls: a click on
- * the title opens the thread's popup (`anchor` names the hover card it shuts until the next
- * hover), a click elsewhere goes to the thread (the row's own click). Also the top bar's popover rows.
+ * One open request under a Needs you row (docs/notes/needs-you-line-items.md): hovering shows the
+ * card of that request, a click opens the popup on it. The text is cut to one line; the card
+ * has it whole, so no tooltip.
+ */
+function RequestLineView({ id, anchor, line }: { id: string; anchor: string; line: RequestLine }) {
+  const lineAnchor = `${anchor}#${line.requestId}`;
+  return (
+    <NeedsHoverCard threadId={id} requestId={line.requestId} anchor={lineAnchor}>
+      <span
+        {...{ [NEEDS_LINE_ZONE]: "" }}
+        className={lineClass}
+        data-testid="needs-line"
+        data-request-id={line.requestId}
+        data-kind={line.kind}
+        onClick={(e) => {
+          e.stopPropagation();
+          openNeedsPopup(id, lineAnchor, line.requestId);
+        }}
+      >
+        <LineBody icon={LINE_ICONS[line.kind]} text={line.text} />
+      </span>
+    </NeedsHoverCard>
+  );
+}
+
+/**
+ * A Needs you row's open requests, one line each, oldest first, behind a thin rule; nothing for
+ * a thread with one (or none: a woken snooze, a plugin's flag). Past MAX_REQUEST_LINES the last
+ * line is "+N more", which opens the popup on the first request not listed.
+ */
+function RequestLines({ id, anchor }: { id: string; anchor: string }) {
+  const open = useOpenRequests(id);
+  const { lines, more } = useMemo(() => requestLines(open), [open]);
+  if (lines.length === 0) return null;
+  return (
+    <span className="mt-1 ml-0.5 flex min-w-0 flex-col gap-[3px] border-l border-cf-divider pl-2" data-testid="needs-lines" data-count={open.length}>
+      {lines.map((line) => (
+        <RequestLineView key={line.requestId} id={id} anchor={anchor} line={line} />
+      ))}
+      {more && (
+        <span
+          {...{ [NEEDS_LINE_ZONE]: "" }}
+          className={cn(lineClass, "text-cf-sidebar-muted-foreground")}
+          data-testid="needs-line-more"
+          data-request-id={more.requestId}
+          onClick={(e) => {
+            e.stopPropagation();
+            openNeedsPopup(id, anchor, more.requestId);
+          }}
+        >
+          <LineBody icon={null} text={`+${String(more.count)} more`} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A Needs you row's lines: the place and the kind of ask, then the title, then one line per open
+ * request when it has several. No controls: a click on the title opens the thread's popup
+ * (`anchor` names the hover card it shuts until the next hover), a click on a request's line opens
+ * it on that request, a click elsewhere goes to the thread (the row's own click). Also the top
+ * bar's popover rows.
  */
 export function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
   return (
@@ -188,6 +280,7 @@ export function NeedsLines({ id, anchor }: { id: string; anchor: string }) {
       >
         <Title id={id} />
       </span>
+      <RequestLines id={id} anchor={anchor} />
     </span>
   );
 }

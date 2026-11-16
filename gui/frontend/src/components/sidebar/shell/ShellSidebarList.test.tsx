@@ -35,6 +35,7 @@ const { useShellSidebarStore } = await import("@/stores/shellSidebar");
 const { HOME, useUiStore } = await import("@/stores/ui");
 const { startSelectionBridge } = await import("@/stores/selectionBridge");
 const { resetNeeds, useNeedsStore } = await import("@/stores/needs");
+const { useThreadStore } = await import("@/stores/thread");
 const { resetShellDrag, useShellDragStore } = await import("@/shell/drag/state");
 // The Needs-you card reads its ask without a Watch: nothing comes back here.
 vi.mock("@/api/threadSearch", async (orig) => ({ ...(await orig<typeof import("@/api/threadSearch")>()), readAskItems: () => new Promise(() => undefined) }));
@@ -116,6 +117,7 @@ beforeEach(async () => {
       }),
     ]),
   );
+  useThreadStore.setState({ logs: {}, pending: {}, synced: {}, answering: {} });
   stop = startSelectionBridge();
 });
 
@@ -367,6 +369,78 @@ describe("the shell sidebar list", () => {
  * Snoozed and Archived rows drag as the others do (docs/notes/preview-tabs-2-row-drag.md). What a
  * drop runs is shell/drag/threadSource.test.ts's; here, which rows are drag sources and with what.
  */
+describe("a Needs you row's lines, one per open request (docs/notes/needs-you-line-items.md)", () => {
+  const req = (n: number, o: { question?: boolean; summary?: string } = {}) => ({ requestId: `req-${String(n)}`, itemId: `item-${String(n)}`, question: o.question ?? false, toolName: o.question ? "AskUserQuestion" : "Bash", summary: o.summary ?? `Bash cmd ${String(n)}` });
+  const pending = (id: string, ...ps: ReturnType<typeof req>[]) => {
+    act(() => {
+      useThreadStore.setState((s) => ({ pending: { ...s.pending, [id]: { threadId: id, seq: 1, pending: ps } } }));
+    });
+  };
+  const lines = (key: string) => within(rowOf(key)).queryAllByTestId("needs-line").map((l) => `${l.getAttribute("data-kind") ?? ""} ${l.textContent}`);
+
+  it("several requests: a line each, oldest first, and \"N items\" for the status", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-2", req(1, { summary: "Bash git push --force-with-lease" }), req(2, { summary: "Bash gh pr edit 482" }), req(3, { question: true, summary: "Which base branch?" }));
+    expect(lines("s:s-2")).toEqual(["permission Permission: git push --force-with-lease", "permission Permission: gh pr edit 482", "question Question: Which base branch?"]);
+    const ask = within(rowOf("s:s-2")).getByTestId("row-ask");
+    expect(ask.textContent).toBe("3 items");
+    expect(ask.getAttribute("data-kind")).toBe("items");
+    // The row is measured as drawn (no fixed height), so the lines make it taller.
+    expect((rowOf("s:s-2").parentElement as HTMLElement).style.height).toBe("");
+  });
+
+  it("one request: no lines, the status word as before", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-2", req(1));
+    expect(within(rowOf("s:s-2")).queryByTestId("needs-lines")).toBeNull();
+    expect(within(rowOf("s:s-2")).getByTestId("row-ask").textContent).toBe("Permission");
+  });
+
+  it("only under Needs you: an Active row with open requests shows none", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-1", req(1), req(2));
+    expect(rowOf("s:s-1").getAttribute("data-section")).not.toBe("needs");
+    expect(within(rowOf("s:s-1")).queryByTestId("needs-lines")).toBeNull();
+  });
+
+  it("a line opens the popup on its request, and not the thread", async () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-2", req(1), req(2), req(3));
+    fireEvent.click(within(rowOf("s:s-2")).getAllByTestId("needs-line")[1] as HTMLElement);
+    await settle();
+    expect(useNeedsStore.getState()).toMatchObject({ popup: "s-2", popupRequest: "req-2", dismissed: "sidebar:s-2#req-2" });
+    expect(runs).toEqual([]);
+    // The title still opens it on the oldest.
+    act(() => {
+      useNeedsStore.setState({ popup: null });
+    });
+    fireEvent.click(within(rowOf("s:s-2")).getByTestId("thread-name"));
+    expect(useNeedsStore.getState()).toMatchObject({ popup: "s-2", popupRequest: null });
+  });
+
+  it("past four requests: three lines and \"+N more\", which opens the popup on the first not listed", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-2", ...[1, 2, 3, 4, 5, 6].map((n) => req(n)));
+    expect(lines("s:s-2")).toHaveLength(3);
+    const more = within(rowOf("s:s-2")).getByTestId("needs-line-more");
+    expect(more.textContent).toBe("+3 more");
+    expect(within(rowOf("s:s-2")).getByTestId("row-ask").textContent).toBe("6 items");
+    fireEvent.click(more);
+    expect(useNeedsStore.getState()).toMatchObject({ popup: "s-2", popupRequest: "req-4" });
+  });
+
+  it("a request answered leaves its line at once", () => {
+    render(<ShellSidebarList bodyHeight={800} />);
+    pending("s-2", req(1), req(2), req(3));
+    act(() => {
+      useThreadStore.setState({ answering: { "s-2": { "req-1": true } } });
+    });
+    expect(lines("s:s-2")).toEqual(["permission Permission: cmd 2", "permission Permission: cmd 3"]);
+    expect(within(rowOf("s:s-2")).getByTestId("row-ask").textContent).toBe("2 items");
+  });
+});
+
+// After a drag, dnd-kit swallows the next click for 50 ms (docs/notes/testing-gotchas.md): new describes go above this one.
 describe("dragging Snoozed and Archived rows", () => {
   const started: DragStartEvent["active"]["data"]["current"][] = [];
   /** dnd-kit's context with ShellDnd's sensor (4px), recording each drag's source. */

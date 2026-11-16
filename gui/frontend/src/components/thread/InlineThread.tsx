@@ -23,12 +23,29 @@ const INLINE_INSET = 12;
  * content pane may show the thread too). A page card's Expand opens over the node, in a
  * modal scope of its own (`inline:<thread>`), apart from the content pane's.
  */
-export function InlineThread({ threadId, readOnly = false, placeholder }: { threadId: string; readOnly?: boolean; placeholder?: string | undefined }) {
+interface InlineThreadProps {
+  threadId: string;
+  readOnly?: boolean;
+  placeholder?: string | undefined;
+  /**
+   * The one open request the composer docks (the Needs-you popup's stepper,
+   * docs/notes/needs-you-line-items.md); undefined docks every one, oldest first. One not open
+   * (answered a moment ago) docks the oldest until the stepper moves on.
+   */
+  ask?: string | undefined;
+}
+
+export function InlineThread({ threadId, readOnly = false, placeholder, ask }: InlineThreadProps) {
   useEffect(() => startThreadWatch(threadId), [threadId]);
   const cwd = useThreadsStore((s) => s.byId[threadId]?.worktreePath ?? "");
   const { loaded, empty, catchingUp, watchError, open, busy, working, timelineWorking, timelineStrips } = useThreadActivity(threadId);
   const [dockRef, dockHeight] = useElementHeight();
   const ctx = useMemo(() => ({ threadId, cwd }), [threadId, cwd]);
+  const docked = useMemo(() => {
+    if (ask === undefined) return open;
+    const one = open.filter((p) => p.requestId === ask);
+    return one.length > 0 ? one : open.slice(0, 1);
+  }, [open, ask]);
   return (
     <ThreadContext.Provider value={ctx}>
       <section className="cf-thread cf-thread-inline relative flex h-full min-h-0 min-w-0 flex-col" aria-label="Thread" data-thread-id={threadId} data-testid="inline-thread">
@@ -50,7 +67,7 @@ export function InlineThread({ threadId, readOnly = false, placeholder }: { thre
           {!readOnly && (
             <div className="dock" ref={dockRef}>
               <SnoozeStrip key={`snooze:${threadId}`} threadId={threadId} />
-              <ThreadComposer key={threadId} threadId={threadId} pending={open} busy={busy} placeholder={placeholder} focusRequests={false} />
+              <ThreadComposer key={threadId} threadId={threadId} pending={docked} busy={busy} placeholder={placeholder} focusRequests={false} />
             </div>
           )}
         </PaneOverlay>

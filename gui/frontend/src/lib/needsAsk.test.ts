@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadItemView } from "@/api/thread";
-import { ASK_HYSTERESIS, ASK_MIN_ROOM, askAsStrip, askTarget, contextLine, lastLine, nextNeedsThread } from "./needsAsk";
+import type { ThreadPendingView } from "@/api/thread";
+import { ASK_HYSTERESIS, ASK_MIN_ROOM, askAsStrip, askTarget, contextLine, lastLine, MAX_REQUEST_LINES, nextNeedsThread, reconcileStep, requestLine, requestLines, stepBy, stepKey } from "./needsAsk";
 
 /** The Needs-you inbox's pure parts (docs/notes/shell-17-needs-you.md). */
 
@@ -96,5 +97,79 @@ describe("the ask as a strip in a short pane", () => {
   it("changes nothing before the pane is laid out", () => {
     expect(askAsStrip({ ...room, body: 0 })).toBe(false);
     expect(askAsStrip({ ...room, body: 0, showingStrip: true })).toBe(true);
+  });
+});
+
+/** Several open requests on one thread (docs/notes/needs-you-line-items.md). */
+const pend = (n: number, o: Partial<ThreadPendingView> = {}): ThreadPendingView => ({ requestId: `r${String(n)}`, itemId: `i${String(n)}`, question: false, toolName: "Bash", summary: `Bash cmd ${String(n)}`, ...o });
+
+describe("a Needs you row's lines", () => {
+  it.each<[string, Partial<ThreadPendingView>, string, string]>([
+    ["a command: the tool left out", { summary: "Bash git push --force-with-lease" }, "permission", "Permission: git push --force-with-lease"],
+    ["another tool keeps its name", { toolName: "Write", summary: "Write notes.md" }, "permission", "Permission: Write notes.md"],
+    ["a question", { question: true, toolName: "AskUserQuestion", summary: "Which base branch?" }, "question", "Question: Which base branch?"],
+    ["a plan", { toolName: "ExitPlanMode", summary: "ExitPlanMode" }, "plan", "Plan: ready for review"],
+    ["on one line", { summary: "Bash make \n  check" }, "permission", "Permission: make check"],
+    ["no summary: the tool", { toolName: "WebFetch", summary: "" }, "permission", "Permission: WebFetch"],
+  ])("%s", (_, o, kind, text) => {
+    expect(requestLine(pend(1, o))).toEqual({ requestId: "r1", kind, text });
+  });
+
+  it("none for a thread with one open request or none: its row looks as it did", () => {
+    expect(requestLines([])).toEqual({ lines: [], more: null });
+    expect(requestLines([pend(1)])).toEqual({ lines: [], more: null });
+  });
+
+  it("one per request, oldest first, up to the cap", () => {
+    const open = Array.from({ length: MAX_REQUEST_LINES }, (_, i) => pend(i + 1));
+    expect(requestLines(open.slice(0, 2)).lines.map((l) => l.requestId)).toEqual(["r1", "r2"]);
+    expect(requestLines(open)).toEqual({ lines: open.map(requestLine), more: null });
+  });
+
+  it("past the cap: the first three and \"+N more\", which names the first not listed", () => {
+    const open = Array.from({ length: 7 }, (_, i) => pend(i + 1));
+    const { lines, more } = requestLines(open);
+    expect(lines.map((l) => l.requestId)).toEqual(["r1", "r2", "r3"]);
+    expect(more).toEqual({ count: 4, requestId: "r4" });
+    // Never more than the cap's lines, "+N more" included.
+    expect(lines.length + 1).toBe(MAX_REQUEST_LINES);
+  });
+});
+
+describe("the popup's stepper", () => {
+  it.each<[string, string[], string[], string | null, string | null]>([
+    ["the current one still open stays", ["a", "b", "c"], ["a", "b", "c"], "b", "b"],
+    ["a new request arrives: the current one stays", ["a", "b"], ["a", "b", "c"], "a", "a"],
+    ["answered (here or elsewhere): the next after it", ["a", "b", "c"], ["a", "c"], "b", "c"],
+    ["answered with the next one gone too: the one after", ["a", "b", "c", "d"], ["a", "d"], "b", "d"],
+    ["the last answered while earlier ones wait: the first of them", ["a", "b", "c"], ["a", "b"], "c", "a"],
+    ["another one answered: the current one stays", ["a", "b", "c"], ["b", "c"], "b", "b"],
+    ["every one answered: none", ["a"], [], "a", null],
+    ["opened on none: the oldest", [], ["a", "b"], null, "a"],
+    ["opened on one answered meanwhile: the oldest", [], ["a", "b"], "z", "a"],
+  ])("%s", (_, prev, next, current, want) => {
+    expect(reconcileStep(prev, next, current)).toBe(want);
+  });
+
+  it("steps one way or the other without wrapping", () => {
+    expect(stepBy(["a", "b", "c"], "b", 1)).toBe("c");
+    expect(stepBy(["a", "b", "c"], "b", -1)).toBe("a");
+    expect(stepBy(["a", "b", "c"], "c", 1)).toBe("c");
+    expect(stepBy(["a", "b", "c"], "a", -1)).toBe("a");
+    expect(stepBy(["a", "b"], null, 1)).toBe("a");
+    expect(stepBy([], null, 1)).toBeNull();
+  });
+
+  const key = (k: string, mods: Partial<Record<"metaKey" | "ctrlKey" | "altKey" | "shiftKey", boolean>> = {}) => ({ key: k, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
+
+  it("the left and right arrows step, never with a modifier, never in text", () => {
+    expect(stepKey(key("ArrowLeft"), false)).toBe(-1);
+    expect(stepKey(key("ArrowRight"), false)).toBe(1);
+    expect(stepKey(key("ArrowUp"), false)).toBe(0);
+    expect(stepKey(key("1"), false)).toBe(0);
+    expect(stepKey(key("ArrowRight", { metaKey: true }), false)).toBe(0);
+    expect(stepKey(key("ArrowLeft", { shiftKey: true }), false)).toBe(0);
+    expect(stepKey(key("ArrowLeft", { altKey: true }), false)).toBe(0);
+    expect(stepKey(key("ArrowRight"), true)).toBe(0);
   });
 });
