@@ -31,7 +31,7 @@ it simply has nothing to show, since `Thread.flags` is always empty.
   deprecated section; `primitives.md`, `wakes.md`, `manifest.md`, `protocol.md`,
   `testing.md` updated.
 - **plugintest** (`plugintest/flags.go`): `SetFlag` shows as a notification with the same
-  key, level and title rules; `FlagNone` withdraws; `SeeThread(id)` dismisses until-seen
+  key, level and title rules; `FlagNone` withdraws; `SeeThread(id)` withdraws until-seen
   ones; `Options.Flags` seed active notifications; a plugin's own `flag:` key is refused.
 - **Examples**: hello's `flag` command is now `mark` (a notification keyed `mark:<thread>`,
   `--level none` withdraws), its manifest drops `threadStatus`; minimal's README consent
@@ -46,13 +46,14 @@ it simply has nothing to show, since `Thread.flags` is always empty.
 - **Until-seen lives in the key**, since nothing on a notification can hold it and there
   is no schema change. One flag per plugin and thread still holds: setting one mode
   withdraws the other mode's key.
-- **Seen = dismissed.** The thread store's seen moments (a viewer opening while presence is
+- **Seen = withdrawn.** The thread store's seen moments (a viewer opening while presence is
   attended, presence rising with the thread open) now call a hook (`SetSeenHook`), which
-  dismisses every plugin's `flag:<thread>:until-seen` notification. An until-seen flag set
+  withdraws every plugin's `flag:<thread>:until-seen` notification. An until-seen flag set
   while `Seen(thread)` is true is never posted (`changed: false`, as before when nothing
-  was stored). Consequence, on purpose: the same until-seen reason raised again after the
-  user saw it stays dismissed (the key rule), where the old flag came back. A plugin that
-  reports a new occurrence changes the reason; the skill says so.
+  was stored). It is a withdrawal, not a dismissal, so the same until-seen reason raised again after the
+  user saw it shows again, as the old flag did (a plugin that flags "CI failed" on every
+  failure keeps working unchanged). Only the user's own dismissal holds a flag back until
+  its reason changes.
 - **Archive withdraws flag notifications** (kept from the old behaviour), on the thread's
   `Updated` event and in a sweep at start and every minute; setting a flag on an archived
   thread is still refused (-32002). Notifications that are not flags stay on archive, as

@@ -309,7 +309,7 @@ const (
 // most one flag per plugin; setting another replaces it. The host shows it as a
 // notification naming the thread, from the plugin, with the reason as its title (an
 // empty reason reads "<display name> flagged this thread"), warning for attention and
-// error for error. An until-seen one is dismissed when the user opens the thread.
+// error for error. An until-seen one is cleared when the user opens the thread.
 //
 // Deprecated: post a Notification with ThreadID set (Host.Notify).
 type Flag struct {

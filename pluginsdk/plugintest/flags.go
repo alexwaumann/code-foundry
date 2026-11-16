@@ -86,11 +86,11 @@ func (h *Host) seedFlags(flags []pluginsdk.Flag) {
 }
 
 // SeeThread is the user opening thread id: its until-seen flags' notifications are
-// dismissed, as the host dismisses them.
+// withdrawn, as the host withdraws them (the same flag raised again shows again).
 func (h *Host) SeeThread(id string) {
 	h.record(func() {
 		if r := h.notes.byKey[flagKey(id, true)]; r != nil && r.active() {
-			r.status = StatusDismissed
+			r.status = StatusWithdrawn
 		}
 	})
 }

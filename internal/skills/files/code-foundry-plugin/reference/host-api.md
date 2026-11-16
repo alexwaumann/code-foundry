@@ -266,7 +266,7 @@ info and drops the description, so the text must read right alone.
 `h.SetFlag` (`thread/setFlag`, permission `threadStatus`) still works: the host turns the
 flag into a notification naming the thread, under key `flag:<thread>`, warning for
 `FlagAttention`, error for `FlagError`, the reason as its title; `FlagNone` withdraws it,
-and an `UntilSeen` one is dismissed when the user opens the thread. It no longer changes
+and an `UntilSeen` one is cleared when the user opens the thread. It no longer changes
 the thread's row. `h.Flags()` lists the plugin's active flag notifications. The plugin's
 log says once per run that it is deprecated. Move to `Notify` ("About a thread" above);
 `removals.md` has the list of calls on their way out.

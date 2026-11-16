@@ -236,7 +236,7 @@ func TestPluginFlagsOf(t *testing.T) {
 	}
 }
 
-// The seen hook dismisses the thread's until-seen flags of every plugin, and nothing
+// The seen hook withdraws the thread's until-seen flags of every plugin, and nothing
 // else; archiving a thread withdraws its flags, on its event and in the sweep.
 func TestFlagNotificationsGlue(t *testing.T) {
 	ctx := context.Background()
@@ -264,9 +264,9 @@ func TestFlagNotificationsGlue(t *testing.T) {
 	th.mu.Unlock()
 	hook("s-1")
 	want := []string{
-		`hello flag:s-1:until-seen warning "seen one" dismissed`,
+		`hello flag:s-1:until-seen warning "seen one" withdrawn`,
 		`hello flag:s-2 warning "sticky" shown`,
-		`other flag:s-1:until-seen error "seen two" dismissed`,
+		`other flag:s-1:until-seen error "seen two" withdrawn`,
 		`other flag:s-2:until-seen warning "elsewhere" shown`,
 	}
 	if got := flagState(s); !slices.Equal(got, want) {

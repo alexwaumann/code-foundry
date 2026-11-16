@@ -60,7 +60,7 @@ func TestSetFlagIsANotification(t *testing.T) {
 	if got := state(); !slices.Equal(got, []string{want[0], want[2]}) {
 		t.Fatalf("after seeing s-3 and clearing s-1: %q", got)
 	}
-	if _, status, _ := h.Notification("flag:s-3:until-seen"); status != plugintest.StatusDismissed {
+	if _, status, _ := h.Notification("flag:s-3:until-seen"); status != plugintest.StatusWithdrawn {
 		t.Errorf("until-seen after SeeThread: %s", status)
 	}
 	if len(h.Flags()) != 4 {

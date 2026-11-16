@@ -26,7 +26,7 @@ import (
 // error, the reason its title. The thread no longer carries flags.
 //
 //   - none withdraws it;
-//   - until seen: dismissed when the user sees the thread (the thread store's seen hook,
+//   - until seen: withdrawn when the user sees the thread (the thread store's seen hook,
 //     the moment it cleared such a flag before), and never shown when the thread is seen
 //     as it is raised;
 //   - archiving the thread withdraws its flags, as it cleared them before
@@ -53,7 +53,6 @@ type flagNotes interface {
 	Snapshot() *notification.Snapshot
 	Post(ctx context.Context, p notification.Post) (notification.PostResult, error)
 	Withdraw(ctx context.Context, source, key string) (notification.Notification, error)
-	Dismiss(ctx context.Context, id string) (notification.Notification, error)
 	Active(source, key string) (notification.Notification, bool)
 }
 
@@ -104,14 +103,8 @@ func (f pluginFlags) SetFlag(ctx context.Context, id string, s plugin.FlagSpec) 
 	}
 	if s.UntilSeen && f.threads.Seen(id) {
 		// Seen as it is raised: nothing to show, and one shown before is seen now.
-		n, active := f.notes.Active(s.Plugin, notification.FlagKey(id, true))
-		if !active {
-			return replaced, nil
-		}
-		if _, err := f.notes.Dismiss(ctx, n.ID); err != nil {
-			return replaced, mapNotificationErr(err)
-		}
-		return true, nil
+		went, err := f.withdraw(ctx, s.Plugin, notification.FlagKey(id, true))
+		return replaced || went, err
 	}
 	res, err := f.notes.Post(ctx, flagPost(id, s))
 	if err != nil {
@@ -160,7 +153,7 @@ func cmpOr(a, b string) string {
 	return b
 }
 
-// seen dismisses thread id's until-seen flags: the user sees it. The thread store calls
+// seen withdraws thread id's until-seen flags: the user sees it. The thread store calls
 // it with its lock held (SetSeenHook); the notification store never waits on the thread
 // store.
 func (f pluginFlags) seen(log *slog.Logger) func(id string) {
@@ -170,8 +163,10 @@ func (f pluginFlags) seen(log *slog.Logger) func(id string) {
 			if n.Key != key || !n.IsFlag() {
 				continue
 			}
-			if _, err := f.notes.Dismiss(context.Background(), n.ID); err != nil {
-				log.Warn("an until-seen flag not dismissed", "thread", id, "plugin", n.Source, "err", err)
+			// Withdrawn, not dismissed: the plugin raising the same reason again (the next
+			// failure) shows again, as the old flag did. A dismissal would hold it back.
+			if _, err := f.notes.Withdraw(context.Background(), n.Source, n.Key); err != nil {
+				log.Warn("an until-seen flag not withdrawn", "thread", id, "plugin", n.Source, "err", err)
 			}
 		}
 	}
@@ -209,7 +204,7 @@ const flagArchiveSweep = time.Minute
 // implements it.
 type seenHooks interface{ SetSeenHook(func(threadID string)) }
 
-// startFlagNotifications hooks flags into the thread store: its seen moments dismiss
+// startFlagNotifications hooks flags into the thread store: its seen moments withdraw
 // until-seen flags, and an archived thread's flags are withdrawn (on its Updated event,
 // at start and every minute). The returned func stops it.
 func startFlagNotifications(ctx context.Context, log *slog.Logger, threads seenHooks, flags pluginFlags, b *bus.Bus) func() {
