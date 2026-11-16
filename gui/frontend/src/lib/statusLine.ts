@@ -3,9 +3,9 @@
  * doing or waiting on, in words and a colour, and whether "project @ branch" follows.
  * Pure, over the thread view; the row renders it (components/sidebar/SidebarRow.tsx).
  */
-import type { ThreadFlagView, ThreadView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 import { formatAge } from "./duration";
-import { isWaiting, threadBadge, statusKind, statusNote, topFlag } from "./thread";
+import { isWaiting, threadBadge, statusKind, statusNote } from "./thread";
 import { hasSetupWork, setupCurrentStep, setupFailure } from "./threadSetup";
 
 /**
@@ -20,9 +20,6 @@ import { hasSetupWork, setupCurrentStep, setupFailure } from "./threadSetup";
  * - "snoozeEnded": "Snooze ended · <ago>" (amber): the daemon woke a snoozed thread
  * - "waiting": "Waiting" (muted, an hourglass before it), then the place: the thread ended
  *   its turn while child threads it subscribed to still work (lib/waiting); idle-like
- * - "flagAttention": "<plugin>: <reason>" (amber), "flagError": the same in red: a plugin's
- *   flag (docs/notes/plugins-3-events-flags-env.md). Claude's own prompts and errors win
- *   over a flag; a flag wins over a finished turn and over working.
  * - "transcriptDeleted": "Transcript deleted" (red, a trash icon before it), then the place:
  *   Claude Code deleted the thread's transcript, so it cannot continue
  *   (docs/notes/transcript-deleted.md). Wins over everything: the thread is stopped for good.
@@ -43,8 +40,6 @@ export type StatusLineKind =
   | "crashed"
   | "snoozeEnded"
   | "waiting"
-  | "flagAttention"
-  | "flagError"
   | "transcriptDeleted"
   | "settingUp"
   | "setupFailed"
@@ -67,11 +62,6 @@ export interface StatusLine {
   detail: string;
   /** When the status began (epoch ms), for "finished", "interrupted", "crashed" and "snoozeEnded"; null otherwise or when unknown. */
   at: number | null;
-  /**
-   * The plugin flag behind a "flagAttention" or "flagError" line, its name and reason apart
-   * (detail joins them as "<pluginName>: <reason>"); absent for every other kind.
-   */
-  flag?: Pick<ThreadFlagView, "pluginName" | "reason">;
 }
 
 export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
@@ -86,8 +76,6 @@ export const statusTones: Readonly<Record<StatusLineKind, StatusTone>> = {
   crashed: "red",
   snoozeEnded: "amber",
   waiting: "muted",
-  flagAttention: "amber",
-  flagError: "red",
   transcriptDeleted: "red",
   settingUp: "sky",
   setupFailed: "red",
@@ -103,27 +91,13 @@ const PLACE: StatusLine = { kind: "place", detail: "", at: null };
 const TRANSCRIPT_DELETED: StatusLine = { kind: "transcriptDeleted", detail: "", at: null };
 
 export function statusLine(
-  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing" | "setup">>) | undefined,
+  s: (Pick<ThreadView, "state" | "status" | "statusReason" | "statusChangedAtMs"> & Partial<Pick<ThreadView, "transcriptMissing" | "setup">>) | undefined,
 ): StatusLine {
   if (!s) return PLACE;
   if (s.transcriptMissing) return TRANSCRIPT_DELETED;
   if (s.setup?.phase === "failed") return { kind: "setupFailed", detail: setupFailure(s.setup), at: null };
-  const flag = topFlag(s);
   const badge = threadBadge(s);
-  if (badge === "attention" || badge === "error") {
-    const line = streamLine(s);
-    if (line.kind !== "finished" || !flag) return line;
-  }
-  if (flag)
-    return {
-      kind: flag.level === "error" ? "flagError" : "flagAttention",
-      detail: `${flag.pluginName}: ${flag.reason}`,
-      at: null,
-      // The thread's own flag object, not a copy: a selector with useShallow over the line
-      // (SidebarRow, useTagInfo) compares it by reference, and a fresh object each read
-      // would re-render forever.
-      flag,
-    };
+  if (badge === "attention" || badge === "error") return streamLine(s);
   if (s.setup?.phase === "cancelled") return { kind: "setupCancelled", detail: "", at: null };
   if (s.setup?.phase === "running" && hasSetupWork(s.setup)) return { kind: "settingUp", detail: setupCurrentStep(s.setup), at: null };
   if (isWaiting(s)) return { kind: "waiting", detail: "", at: null };
@@ -167,8 +141,6 @@ const words: Readonly<Record<StatusLineKind, string>> = {
   crashed: "Crashed while working",
   snoozeEnded: "Snooze ended",
   waiting: "Waiting",
-  flagAttention: "",
-  flagError: "",
   transcriptDeleted: "Transcript deleted",
   settingUp: "Setting up",
   setupFailed: "Setup failed",

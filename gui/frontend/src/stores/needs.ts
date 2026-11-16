@@ -9,7 +9,7 @@ import { readAskItems } from "@/api/threadSearch";
 import type { ThreadPendingView, ThreadRequestView } from "@/api/thread";
 import { contextLine, nextNeedsThread } from "@/lib/needsAsk";
 import { getEmberAttentionId } from "./ember";
-import { selectThreadAndFlag } from "./flagSurface";
+import { openThread } from "./openThread";
 import { getNeedsIds } from "./shellList";
 import { useOpenRequests, useThreadStore } from "./thread";
 import { useUiStore } from "./ui";
@@ -99,14 +99,12 @@ export function openNextNeedsPopup(): boolean {
 
 /**
  * "Go to thread": the thread's space and its tab, focused or opened in the focused pane
- * (select(), which the selection bridge turns into thread.open --focus). The popup closes. A
- * thread a plugin flagged also opens that plugin's surface for it, as a tab placed by the rules
- * for linked surfaces (stores/flagSurface.ts), as the row's own click does.
+ * (select(), which the selection bridge turns into thread.open --focus). The popup closes.
  */
 export function goToNeedsThread(threadId: string): void {
   closeNeedsPopup();
   setNeedsPopover(false);
-  selectThreadAndFlag(threadId);
+  openThread(threadId);
 }
 
 const reading = new Set<string>();
@@ -160,7 +158,7 @@ export type AskState = "known" | "loading" | "failed" | "notfound" | "none";
 
 /** What a hover card shows of a thread's ask. */
 export interface AskView {
-  /** The request shown (summary from the thread source): the oldest open one, or a line's; null for an ask with none (a woken snooze, a plugin's flag) or a line's request no longer open. */
+  /** The request shown (summary from the thread source): the oldest open one, or a line's; null for an ask with none (a woken snooze) or a line's request no longer open. */
   pending: ThreadPendingView | null;
   /** How many requests are open. */
   count: number;

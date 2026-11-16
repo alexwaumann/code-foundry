@@ -1,21 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { ThreadFlagView, ThreadStateView, ThreadStatusView } from "@/api/threads";
+import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { showsPlace, statusLine, statusText, statusTones, tipStatusTone } from "./statusLine";
 import { threadGroup } from "./thread";
 
 // A thread whose transcript Claude Code deleted (docs/notes/transcript-deleted.md): line 2
 // says so in red before the place, and it sorts with the errors, whatever status it kept.
-const errorFlag: ThreadFlagView = { plugin: "ci", pluginName: "CI", level: "attention", reason: "red", setAtMs: null, untilSeen: false };
-
 describe("transcript deleted: line 2 and group", () => {
-  it.each<[string, ThreadStateView, ThreadStatusView, string, ThreadFlagView[]]>([
-    ["idle at its prompt", "disconnected", "idle", "at prompt", []],
-    ["an unseen finished turn", "disconnected", "attention", "finished", []],
-    ["interrupted", "disconnected", "error", "interrupted", []],
-    ["a question lost with its process", "disconnected", "attention", "question: Which one?", []],
-    ["a plugin's flag", "disconnected", "idle", "at prompt", [errorFlag]],
-  ])("%s", (_name, state, status, statusReason, flags) => {
-    const t = { state, status, statusReason, statusChangedAtMs: 1, flags, transcriptMissing: true as const };
+  it.each<[string, ThreadStateView, ThreadStatusView, string]>([
+    ["idle at its prompt", "disconnected", "idle", "at prompt"],
+    ["an unseen finished turn", "disconnected", "attention", "finished"],
+    ["interrupted", "disconnected", "error", "interrupted"],
+    ["a question lost with its process", "disconnected", "attention", "question: Which one?"],
+  ])("%s", (_name, state, status, statusReason) => {
+    const t = { state, status, statusReason, statusChangedAtMs: 1, transcriptMissing: true as const };
     const l = statusLine(t);
     expect(l).toEqual({ kind: "transcriptDeleted", detail: "", at: null });
     expect(statusText(l, 0)).toBe("Transcript deleted");

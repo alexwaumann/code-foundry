@@ -46,7 +46,7 @@ export interface ListThread {
   /**
    * It calls for the user without blocking (the "prompt" group without an actionable ask,
    * lib/thread.ts isActionableAsk): woken from a snooze, a notification or bell, an API error at
-   * the prompt, another attention reason, a plugin's flag. The shell's sidebar lists it at the
+   * the prompt, another attention reason. The shell's sidebar lists it at the
    * top of Active, not under Needs you (lib/shellSections.ts). Absent: not.
    */
   nudge?: boolean;

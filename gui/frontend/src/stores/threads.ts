@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AgentRunUsageView, BackgroundShellView, ThreadFlagView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
+import type { AgentRunUsageView, BackgroundShellView, ThreadListEventView, ThreadView, UsageBucketView } from "@/api/threads";
 import { inSidebar } from "@/lib/inSidebar";
 import { isSnoozed } from "@/lib/snooze";
 import { threadBadge } from "@/lib/thread";
@@ -61,8 +61,6 @@ export function sameThread(a: ThreadView, b: ThreadView): boolean {
         return a[k] === b[k] || (a[k].length === b[k].length && a[k].every((c, i) => sameCheckoutPath(c, b[k][i])));
       case "report":
         return sameReport(a[k], b[k]);
-      case "flags":
-        return sameFlags(a[k], b[k]);
       case "backgroundShells":
         return sameShells(a[k], b[k]);
       case "setup":
@@ -93,11 +91,6 @@ function sameSetup(a: ThreadView["setup"], b: ThreadView["setup"]): boolean {
 /** A recorded checkout by value (every Updated event carries new objects). */
 function sameCheckoutPath(a: ThreadView["checkoutPaths"][number], b: ThreadView["checkoutPaths"][number] | undefined): boolean {
   return b !== undefined && a.projectId === b.projectId && a.path === b.path;
-}
-
-/** Field-by-field equality of flags (every Updated event carries new objects). */
-export function sameFlags(a: readonly ThreadFlagView[], b: readonly ThreadFlagView[]): boolean {
-  return a === b || (a.length === b.length && a.every((x, i) => (Object.keys(x) as (keyof ThreadFlagView)[]).every((k) => x[k] === b[i]?.[k])));
 }
 
 /** Field-by-field equality of background shells, their ports by value (every Updated event carries new objects). */
@@ -256,15 +249,13 @@ export function hideThread(id: string): () => void {
 }
 
 /**
- * The thread needs the user: needs-attention, in any state, or a plugin's flag on it
- * (attention or error: a plugin raising one asks for the user like a prompt, so the
- * window title, the dock badge and alert follow; docs/notes/plugins-3-events-flags-env.md). The
- * daemon persists status, so a thread whose process stopped (or outlived a daemon restart)
- * while asking a question or waiting on a permission prompt still counts. "error"
- * (interrupted) does not.
+ * The thread needs the user: needs-attention, in any state. The daemon persists status, so a
+ * thread whose process stopped (or outlived a daemon restart) while asking a question or waiting
+ * on a permission prompt still counts. "error" (interrupted) does not, and neither does a
+ * notification naming the thread: the bell counts those (docs/notes/notifications-4-row-mark.md).
  */
-export function isAttention(s: Pick<ThreadView, "status" | "state"> & Partial<Pick<ThreadView, "flags">>): boolean {
-  return s.status === "attention" || (s.flags?.length ?? 0) > 0;
+export function isAttention(s: Pick<ThreadView, "status" | "state">): boolean {
+  return s.status === "attention";
 }
 
 /**
@@ -287,7 +278,7 @@ export function attentionIds(data: ThreadsData): string[] {
  * The thread is working: the "busy" badge (busy, or Claude starting; threadBadge), never
  * a thread that needs attention.
  */
-export function isRunning(s: Pick<ThreadView, "status" | "state"> & Partial<Pick<ThreadView, "flags">>): boolean {
+export function isRunning(s: Pick<ThreadView, "status" | "state">): boolean {
   return !isAttention(s) && threadBadge(s) === "busy";
 }
 

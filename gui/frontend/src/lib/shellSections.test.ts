@@ -165,7 +165,7 @@ describe("a space tab's count (needsBySpace)", () => {
   });
 });
 
-describe("a thread that calls without blocking: woken, a notification, an API error, a plugin's flag (docs/notes/shell-25c-keys-drafts.md)", () => {
+describe("a thread that calls without blocking: woken, a notification, an API error (docs/notes/shell-25c-keys-drafts.md)", () => {
   const woke = (id: string, o: Partial<ShellListThread> = {}) => t(id, { group: "prompt", nudge: true, ...o });
   const W: ShellListThread[] = [
     t("idle-a", { lastActivityAtMs: 100 }),

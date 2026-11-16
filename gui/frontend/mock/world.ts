@@ -9,7 +9,7 @@ import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { ActionIcon, ActionRunMode } from "../src/gen/codefoundry/v1/action_pb";
 import { EventSource, type EventSchema } from "../src/gen/codefoundry/v1/events_pb";
 import type { ProjectEventSchema, ProjectSchema, WorktreeSchema } from "../src/gen/codefoundry/v1/project_pb";
-import { PermissionMode, PlacementOutcome, ThreadFlagLevel, ThreadKind, ThreadSetupPhase, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { PermissionMode, PlacementOutcome, ThreadKind, ThreadSetupPhase, ThreadState, ThreadStatus, type ThreadListEventSchema, type ThreadSchema } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
@@ -218,11 +218,6 @@ interface MockThread {
    * starting and busy threads sit in the Working section.
    */
   held: boolean;
-  /**
-   * Plugins' flags (Thread.flags; POST /__mock/thread/flag), one per plugin, errors first then
-   * newest. Archiving clears them; opening the thread clears until-seen ones.
-   */
-  flags: MockFlag[];
   /** "plugin:<name>" for a plugin's own thread (hidden from the user's lists); "" for the user's. */
   owner: string;
   /**
@@ -245,16 +240,6 @@ interface MockThread {
 /** The daemon's refusal of a thread whose transcript is gone (internal/store/thread/transcriptmissing.go). */
 const TRANSCRIPT_MISSING_MESSAGE =
   "Claude Code deleted this thread's transcript (its cleanupPeriodDays setting, 30 days by default), so the conversation cannot continue. This is a Claude Code setting, not a Code Foundry one.";
-
-/** A plugin's flag on a thread (docs/notes/plugins-3-events-flags-env.md). */
-interface MockFlag {
-  plugin: string;
-  pluginDisplayName: string;
-  level: ThreadFlagLevel;
-  reason: string;
-  setAt: Date;
-  untilSeen: boolean;
-}
 
 interface ArgDef {
   name: string;
@@ -797,9 +782,6 @@ export class World {
         this.setStatus(s, status, reason);
         s.lastActivityAt = new Date();
         this.publishThread(s);
-      },
-      seenFlags: (id) => {
-        this.seenFlags(id);
       },
       setModel: (id, model) => {
         const s = this.thread(id);
@@ -2336,7 +2318,6 @@ export class World {
       nameIn: 0,
       pendingName: "",
       held: false,
-      flags: [],
       owner: "",
       resident: "",
       epoch: 1,
@@ -2452,7 +2433,6 @@ export class World {
       ...(s.setup ? { setup: s.setup } : {}),
       nameProvisional: s.nameProvisional,
       pinned: s.pinned,
-      flags: s.flags.map((f) => ({ ...f, setAt: timestampFromDate(f.setAt) })),
       ...(s.owner ? { owner: s.owner } : {}),
       ...(s.resident ? { kind: ThreadKind.RESIDENT, residentName: s.resident } : {}),
       epoch: s.epoch,
@@ -2593,22 +2573,6 @@ export class World {
   }
 
   /**
-   * A plugin raises (or with level none clears) its flag on a thread, like the daemon's
-   * thread/setFlag: one per plugin, errors first then newest; an archived thread refuses.
-   */
-  setFlag(id: string, f: Omit<MockFlag, "setAt" | "level"> & { level: ThreadFlagLevel | null }): void {
-    const s = this.thread(id);
-    const rest = s.flags.filter((x) => x.plugin !== f.plugin);
-    if (f.level === null) {
-      s.flags = rest;
-    } else {
-      if (s.archivedAt) throw new CommandError("unavailable", "thread is archived");
-      s.flags = [...rest, { ...f, level: f.level, setAt: new Date() }].sort((a, b) => b.level - a.level || b.setAt.getTime() - a.setAt.getTime());
-    }
-    this.publishThread(s);
-  }
-
-  /**
    * Claude Code deleted the thread's transcript (or, with false, it is back): the thread is
    * stopped (held, so the clock leaves it alone) and flagged, like the daemon's check at a
    * stop or a refused start (docs/notes/transcript-deleted.md).
@@ -2634,25 +2598,6 @@ export class World {
     this.logs.restart(id);
     this.publishThread(s);
     return true;
-  }
-
-  /** ThreadService.ClearFlags: one plugin's flag, or every one with plugin empty; NOT_FOUND when there is none to clear. */
-  clearFlags(id: string, plugin: string): number {
-    const s = this.thread(id);
-    const keep = s.flags.filter((f) => plugin !== "" && f.plugin !== plugin);
-    const n = s.flags.length - keep.length;
-    if (n === 0) throw new CommandError("notfound", `thread ${id} has no ${plugin ? `${plugin} ` : ""}flags`);
-    s.flags = keep;
-    this.publishThread(s);
-    return n;
-  }
-
-  /** The user opened the thread: its until-seen flags go (the daemon's WatchItems). */
-  seenFlags(id: string): void {
-    const s = this.threads.get(id);
-    if (!s || !s.flags.some((f) => f.untilSeen)) return;
-    s.flags = s.flags.filter((f) => !f.untilSeen);
-    this.publishThread(s);
   }
 
   /**
@@ -2941,7 +2886,6 @@ export class World {
     s.archivedAt ??= new Date();
     s.snoozedUntil = null;
     s.savedAt = null;
-    s.flags = [];
     this.publishThread(s);
   }
 
@@ -4844,25 +4788,6 @@ export class World {
           const app = EDITOR_APPS.find((a) => a.bundleId === args.app);
           if (!app) throw new CommandError("invalid", `no installed editor has bundle id "${args.app ?? ""}"`);
           return `opened ${this.workspaceDirOf(this.workspaceRef(args.workspace || ctx?.activeWorkspaceId || ""))} in ${app.name}`;
-        },
-      },
-      {
-        cmd: {
-          name: "thread.flag.clear", noPalette: true,
-          title: "Clear Thread Flags",
-          category: "Thread",
-          description: "Remove the flags plugins raised on a thread: one plugin's with --plugin, else every one.",
-          keybindings: [],
-          args: [
-            { name: "id", type: ArgType.STRING, required: false, description: "Thread id (default: the active thread)" },
-            { name: "plugin", type: ArgType.STRING, required: false, description: "Only this plugin's flag" },
-          ],
-        },
-        when: (ctx) => activeThread(ctx) !== undefined,
-        run: (ctx, args) => {
-          const id = args.id || (ctx?.activeThreadId ?? "");
-          const n = this.clearFlags(id, args.plugin ?? "");
-          return `cleared ${String(n)} ${n === 1 ? "flag" : "flags"} on thread ${id}`;
         },
       },
       {

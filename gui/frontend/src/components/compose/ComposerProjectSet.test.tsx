@@ -439,7 +439,6 @@ function setThread(id: string, name: string, projects: string[], primary: string
       createdWorktree: Boolean(o.branch),
       state: "connected",
       status: "idle",
-      flags: [],
       createdBy: "",
       createdByName: "",
     }),

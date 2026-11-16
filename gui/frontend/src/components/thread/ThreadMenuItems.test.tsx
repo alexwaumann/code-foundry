@@ -48,7 +48,6 @@ const thread = (o: Partial<ThreadView>) =>
     createdBy: "",
     createdByName: "",
     parentId: "",
-    flags: [],
     ...o,
   }) as ThreadView;
 
@@ -62,7 +61,7 @@ const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remo
 beforeEach(async () => {
   resetLayout();
   await seedLayout(layoutOf([space(pane("p-1", [tab("t-1", "thread", "s-1")]), "p-1")]));
-  useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.restart"), cmd("thread.flag.clear")] });
+  useCommandsStore.setState({ commands: [cmd("thread.snooze"), cmd("thread.archive"), cmd("thread.pin"), cmd("thread.restart")] });
   useProjectsStore.setState({ byId: { web: PROJECT("web"), api: PROJECT("api") } as never, order: ["web", "api"] });
   useWorkspacesStore.setState({ byId: {}, order: [] });
   useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
@@ -222,19 +221,11 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     expect(runCommand).toHaveBeenCalledWith("thread.restart", {}, expect.objectContaining({ activeThreadId: "s-1" }));
   });
 
-  it("Clear flag only while plugins flagged the thread, after Restart Claude; it clears every flag of the thread", () => {
-    setThread({});
-    expect(within(openTitleMenu()).queryByTestId("menu-clear-flags")).toBeNull();
-    cleanup();
-    const flag = (plugin: string): ThreadView["flags"][number] => ({ plugin, pluginName: plugin, level: "attention", reason: "deploy needs approval", setAtMs: 1, untilSeen: false });
-    setThread({ pluginEnvStale: true, flags: [flag("hello"), flag("gh-actions")] });
+  it("no Clear flag(s): a plugin's flag is a notification now, even with a stale environment the menu is as before", () => {
+    setThread({ pluginEnvStale: true });
     const menu = openTitleMenu();
-    expect(shared(menu)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "Clear flags", "—", "Archive"]);
-    fireEvent.click(within(menu).getByTestId("menu-clear-flags"));
-    expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }), { inView: false });
-    cleanup();
-    setThread({ flags: [flag("hello")] });
-    expect(within(openTitleMenu()).getByTestId("menu-clear-flags").textContent).toBe("Clear flag");
+    expect(shared(menu)).toEqual(["Rename", "Regenerate name", "Pin", "Snooze", "—", "New thread on this branch", "Restart Claude", "—", "Archive"]);
+    expect(within(menu).queryByTestId("menu-clear-flags")).toBeNull();
   });
 
   it("a setup that runs takes neither Snooze, Run in nor New thread on this branch; after a failure it snoozes", () => {
@@ -279,12 +270,6 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
     expect(regenerateThreadName).not.toHaveBeenCalled();
   });
 
-  it("no Clear flag where the daemon does not list thread.flag.clear", () => {
-    useCommandsStore.setState({ commands: useCommandsStore.getState().commands.filter((c) => c.name !== "thread.flag.clear") });
-    setThread({ flags: [{ plugin: "hello", pluginName: "Hello", level: "error", reason: "x" }] as unknown as ThreadView["flags"] });
-    expect(within(openTitleMenu()).queryByTestId("menu-clear-flags")).toBeNull();
-  });
-
   it.each([
     ["Pin", {}, "menu-pin", () => {
         expect(pinThread).toHaveBeenCalledWith("s-1", true, { inView: false });
@@ -319,7 +304,7 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
   });
 
   // docs/notes/toast-success-rule.md: the row's menu has the row in view, which shows a pin,
-  // an archive and a cleared flag; the header's has not (the sidebar may be hidden).
+  // and an archive; the header's has not (the sidebar may be hidden).
   it.each([
     ["Pin", {}, "menu-pin", () => {
         expect(pinThread).toHaveBeenCalledWith("s-1", true, { inView: true });
@@ -329,9 +314,6 @@ describe("ThreadMenuItems: one list for the sidebar row and the thread header's 
       }],
     ["Unarchive", { archivedAtMs: 5 }, "menu-archive", () => {
         expect(archiveThread).toHaveBeenCalledWith("s-1", false, { inView: true });
-      }],
-    ["Clear flag", { flags: [{ plugin: "hello", pluginName: "hello", level: "attention", reason: "r", setAtMs: 1, untilSeen: false }] }, "menu-clear-flags", () => {
-        expect(runCommand).toHaveBeenCalledWith("thread.flag.clear", { id: "s-1" }, expect.objectContaining({ activeThreadId: "s-1" }), { inView: true });
       }],
     ["Unsnooze", { snoozedUntilMs: Date.now() + 3_600_000 }, "menu-unsnooze", () => {
         expect(snoozeThread).toHaveBeenCalledWith("s-1", null, { inView: true });

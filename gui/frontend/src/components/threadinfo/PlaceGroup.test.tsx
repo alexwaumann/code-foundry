@@ -16,11 +16,8 @@ const thread = (o: Partial<ThreadView>) =>
     checkoutPaths: [],
     branch: "",
     createdWorktree: false,
-    flags: [],
     ...o,
   }) as ThreadView;
-
-const flag = (pluginName: string, level: string, reason: string): ThreadView["flags"][number] => ({ plugin: pluginName.toLowerCase(), pluginName, level, reason, setAtMs: 1, untilSeen: false }) as ThreadView["flags"][number];
 
 function setThread(o: Partial<ThreadView>): void {
   act(() => {
@@ -46,20 +43,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("PlaceGroup: the project row's notes", () => {
-  it("no mark without flags or a changed environment", () => {
+  it("no mark without a changed environment", () => {
     render(<PlaceGroup threadId="s-3" />);
     expect(within(screen.getByTestId("ti-project")).queryByTestId("ti-project-mark")).toBeNull();
-  });
-
-  it("a plugin's flag marks the row in its colour; the hover card says who and why", () => {
-    render(<PlaceGroup threadId="s-3" />);
-    setThread({ flags: [flag("Hello", "error", "build failed")] });
-    const mark = within(screen.getByTestId("ti-project")).getByTestId("ti-project-mark");
-    expect(mark.getAttribute("class")).toContain("text-cf-error-text");
-    const f = within(notes()).getByTestId("ti-project-flag");
-    expect(f.textContent).toBe("Hello: build failed");
-    expect(f.dataset.level).toBe("error");
-    expect(f.className).toContain("text-cf-error-text");
   });
 
   it("a changed plugin environment marks the row; the hover card says what changed and what Restart Claude does", () => {

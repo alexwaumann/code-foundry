@@ -67,7 +67,7 @@ describe("a row's words", () => {
 });
 
 describe("threadTargetStatus", () => {
-  const t = (o: Partial<ThreadView>) => ({ state: "connected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null, busyTool: "", flags: [], ...o }) as unknown as ThreadView;
+  const t = (o: Partial<ThreadView>) => ({ state: "connected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null, busyTool: "", ...o }) as unknown as ThreadView;
   it.each([
     ["working, with its tool", t({ status: "busy", statusReason: "working", busyTool: "Bash make check" }), "Working · Bash make check"],
     ["working", t({ status: "busy", statusReason: "working" }), "Working"],

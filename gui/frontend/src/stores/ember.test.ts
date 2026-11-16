@@ -4,7 +4,7 @@ import { emberAttentionId, emberThreadOf } from "./ember";
 import { emptyThreads, replaceThreads } from "./threads";
 
 function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
-  return { id, createdAtMs: 10, status: "idle", state: "connected", archivedAtMs: null, snoozedUntilMs: null, flags: [], usage: [], ...over } as ThreadView;
+  return { id, createdAtMs: 10, status: "idle", state: "connected", archivedAtMs: null, snoozedUntilMs: null, usage: [], ...over } as ThreadView;
 }
 
 describe("Ember's thread", () => {

@@ -5,9 +5,9 @@
  */
 import { notify } from "@/lib/notify";
 import { isSnoozed } from "@/lib/snooze";
-import { selectThreadAndFlag } from "./flagSurface";
 import { runCommandForResult } from "./commands";
 import { setBellOpen } from "./notifications";
+import { openThread } from "./openThread";
 import { useThreadsStore } from "./threads";
 
 export const NOTIFICATION_COMMANDS = {
@@ -29,7 +29,7 @@ export async function snoozeNotification(id: string, untilMs: number): Promise<b
 
 /**
  * Clear all: dismisses every shown one (snoozed and scheduled ones stay). No confirm: it is a
- * dismissal of alerts, like Clear flags, not a loss of the user's own work (memory.clear and
+ * dismissal of alerts, not a loss of the user's own work (memory.clear and
  * search.clear ask), and a source posting changed content brings a notification back.
  */
 export async function clearNotifications(): Promise<boolean> {
@@ -61,5 +61,5 @@ export async function actOnNotification(id: string, index: number, label: string
 export function goToNotificationThread(threadId: string): void {
   const t = useThreadsStore.getState().byId[threadId];
   setBellOpen(false);
-  selectThreadAndFlag(threadId, { preview: t !== undefined && (t.archivedAtMs !== null || isSnoozed(t)) });
+  openThread(threadId, { preview: t !== undefined && (t.archivedAtMs !== null || isSnoozed(t)) });
 }

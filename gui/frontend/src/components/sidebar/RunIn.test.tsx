@@ -37,8 +37,8 @@ beforeEach(() => {
   ws = addWorkspace("login", ["repo-cf", "repo-gp"]).id;
   act(() => {
     addThreads(
-      thread("s-drv", { name: "driver", projectId: "repo-gp", worktreePath: GP, workspaceId: ws, projectIds: ["repo-cf", "repo-gp"], branch: "cf/login", flags: [], linkedPullRequests: [] }),
-      thread("s-one", { name: "solo", flags: [], linkedPullRequests: [] }),
+      thread("s-drv", { name: "driver", projectId: "repo-gp", worktreePath: GP, workspaceId: ws, projectIds: ["repo-cf", "repo-gp"], branch: "cf/login", linkedPullRequests: [] }),
+      thread("s-one", { name: "solo", linkedPullRequests: [] }),
     );
   });
   useCommandsStore.setState({ commands: [cmd("thread.pin"), cmd("thread.archive"), cmd("thread.snooze"), cmd("thread.run-in")] });

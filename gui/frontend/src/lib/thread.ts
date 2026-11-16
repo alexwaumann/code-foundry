@@ -1,4 +1,4 @@
-import type { ThreadFlagView, ThreadView } from "@/api/threads";
+import type { ThreadView } from "@/api/threads";
 
 /**
  * The one badge a thread row shows. It never tells whether Claude's process runs (the
@@ -138,8 +138,8 @@ export type AttentionTier = "prompt" | "done" | "";
 /**
  * Whether the thread is blocked until the user acts (docs/notes/shell-model.md, "Needs you"): a
  * permission prompt, a question from the model, a plan to approve, or a folder trust dialog. A
- * notification or bell, an API error at the prompt, a woken snooze, any other attention reason
- * and a plugin's flag call for the user without blocking: they are not actionable asks.
+ * notification or bell, an API error at the prompt, a woken snooze and any other attention reason
+ * call for the user without blocking: they are not actionable asks.
  */
 export function isActionableAsk(s: Pick<ThreadView, "status" | "statusReason">): boolean {
   const kind = statusKind(s);
@@ -153,24 +153,14 @@ export function attentionTier(s: Pick<ThreadView, "status" | "statusReason">): A
 
 /**
  * The sidebar group an unpinned thread sorts in (lib/tree.ts buildRows): "prompt" (waits on
- * the user, attentionTier, or a plugin's attention flag), "error" (error / interrupted, a
- * plugin's error flag, or a transcript Claude Code deleted), "done" (an unseen finished turn), "working" (busy, Claude
+ * the user, attentionTier), "error" (error / interrupted, or a transcript Claude Code deleted),
+ * "done" (an unseen finished turn), "working" (busy, Claude
  * starting, or waiting on child threads), "idle" (everything else). The same reading as
  * threadBadge: attention and error win, so a thread waiting on the user never hides in the
  * collapsible Working section (keys/bindings.ts jumpToAttention); a stopped or stopping
  * busy thread is idle.
  */
 export type ThreadGroup = "prompt" | "error" | "done" | "idle" | "working";
-
-/**
- * The flag line 2 shows (docs/notes/plugins-3-events-flags-env.md): the first error flag,
- * else the first attention flag (the daemon sends them errors first, then newest first);
- * null without flags.
- */
-export function topFlag(s: Partial<Pick<ThreadView, "flags">>): ThreadFlagView | null {
-  const flags = s.flags ?? [];
-  return flags.find((f) => f.level === "error") ?? flags[0] ?? null;
-}
 
 export function isThreadGroup(v: string): v is ThreadGroup {
   return v === "prompt" || v === "error" || v === "done" || v === "idle" || v === "working";
@@ -206,17 +196,13 @@ export function isWaiting(s: Pick<ThreadView, "status" | "statusReason"> | undef
   return s.statusReason === "waiting" || s.statusReason.startsWith("waiting on ");
 }
 
-export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason"> & Partial<Pick<ThreadView, "flags" | "transcriptMissing">>): ThreadGroup {
+export function threadGroup(s: Pick<ThreadView, "state" | "status" | "statusReason"> & Partial<Pick<ThreadView, "transcriptMissing">>): ThreadGroup {
   // Its transcript is gone, so it cannot continue: an error whatever status it kept
   // (docs/notes/transcript-deleted.md).
   if (s.transcriptMissing) return "error";
   const tier = attentionTier(s);
   if (tier === "prompt") return tier;
   if (s.status === "error") return "error";
-  // A plugin's flag: errors sort with errors, attention with prompts, above a finished
-  // turn and out of Working.
-  const flag = topFlag(s);
-  if (flag) return flag.level === "error" ? "error" : "prompt";
   if (tier === "done") return tier;
   // Waiting on its child threads (lib/waiting): the daemon will wake it, so it is working
   // as far as the list goes (docs/notes/sidebar-waiting-under-working.md).

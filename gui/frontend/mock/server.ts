@@ -77,8 +77,6 @@
  *        /__mock/thread/mcp-servers?id=s-r1&keep=t3-code,github (only those of the six: mock/mcp.ts)
  *   POST /__mock/thread/retry?id=s-r1&in=20&attempt=3&max=10&status=429&error=rate_limit | ?id=…&clear=1
  *        (Claude Code is retrying an API error: Thread.retry; clear ends it)
- *   POST /__mock/thread/flag?id=s-1&plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1]
- *        (a plugin's thread/setFlag; none clears it)
  *   POST /__mock/terminal/exit?id=t-s1-shell&code=1[&keep=1]   (the process exits; keep=1: a
  *                                                 shell stays, exited, as if the reaper were late)
  *   POST /__mock/terminal/print?id=t-top   (the request's body as program output on it)
@@ -265,7 +263,7 @@ import { FilesystemService } from "../src/gen/codefoundry/v1/filesystem_pb";
 import { GhService } from "../src/gen/codefoundry/v1/gh_pb";
 import { HealthService } from "../src/gen/codefoundry/v1/health_pb";
 import { ProjectService } from "../src/gen/codefoundry/v1/project_pb";
-import { ThreadFlagLevel, ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
+import { ThreadState, ThreadStatus } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
 import { TerminalService, TerminalState, type AttachEventSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { ThreadDecision, ThreadService } from "../src/gen/codefoundry/v1/thread_pb";
 import { ActionRunMode, ActionRunState, ActionService } from "../src/gen/codefoundry/v1/action_pb";
@@ -993,17 +991,14 @@ function threadSummary(id: string): Record<string, unknown> {
     snoozedUntil: s.snoozedUntil?.toISOString() ?? null,
     savedAt: s.savedAt?.toISOString() ?? null,
     linkedPullRequests: s.linkedPullRequests.map((l) => ({ slug: l.slug, number: l.number, url: l.url })),
-    flags: s.flags.map((f) => ({ plugin: f.plugin, level: ThreadFlagLevel[f.level], reason: f.reason, untilSeen: f.untilSeen })),
   };
 }
 
 const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
-const flagLevels: Record<string, ThreadFlagLevel | null> = { attention: ThreadFlagLevel.ATTENTION, error: ThreadFlagLevel.ERROR, none: null };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|flag|transcript|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|transcript|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
- * flag: &plugin=…&name=<display name>&level=attention|error|none&reason=…[&untilSeen=1] (a plugin's thread/setFlag).
  */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
@@ -1058,13 +1053,6 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "setup":
         world.scriptSetup(id, q.get("state") ?? "running", q.get("queued") === "1");
         break;
-      case "flag": {
-        const level = flagLevels[q.get("level") ?? "attention"];
-        if (level === undefined) throw new CommandError("invalid", "level must be attention, error or none");
-        const plugin = q.get("plugin") ?? "hello";
-        world.setFlag(id, { plugin, pluginDisplayName: q.get("name") ?? plugin, level, reason: q.get("reason") ?? "", untilSeen: q.get("untilSeen") === "1" });
-        break;
-      }
       default:
         json(res, 404, { error: "unknown thread action" });
         return;
@@ -1101,7 +1089,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|flag|transcript|setup|move-fail|move-delay)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|transcript|setup|move-fail|move-delay)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;

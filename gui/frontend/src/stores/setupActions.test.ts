@@ -31,7 +31,7 @@ const chip = (id: string) => tagToken({ tagKind: "image", id, name: "shot.png" }
 const project = (id: string, worktrees: { path: string }[] = []) => ({ id, name: id, path: `/src/${id}`, git: true, defaultBranch: "main", githubSlug: "", remotes: [], worktrees }) as never;
 
 const thread = (o: Partial<ThreadView> = {}) =>
-  ({ id: ID, name: "t", projectId: "repo-a", projectIds: ["repo-a"], workspaceId: "", worktreePath: "", checkoutPaths: [], createdWorktree: false, branch: "", state: "disconnected", status: "error", statusReason: "setup failed", flags: [], setup: { phase: "failed", startedAtMs: 1, endedAtMs: 2, steps: [], error: "git says no", background: true }, ...o }) as ThreadView;
+  ({ id: ID, name: "t", projectId: "repo-a", projectIds: ["repo-a"], workspaceId: "", worktreePath: "", checkoutPaths: [], createdWorktree: false, branch: "", state: "disconnected", status: "error", statusReason: "setup failed", setup: { phase: "failed", startedAtMs: 1, endedAtMs: 2, steps: [], error: "git says no", background: true }, ...o }) as ThreadView;
 
 const snapshot = (o: Partial<SetupDraft> = {}): SetupDraft => ({
   v: SETUP_DRAFT_VERSION,

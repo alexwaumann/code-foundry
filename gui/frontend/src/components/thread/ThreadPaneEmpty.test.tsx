@@ -18,7 +18,7 @@ const setup = (phase: ThreadSetupView["phase"], steps: ThreadSetupView["steps"] 
 const worktree = { kind: "worktree", projectId: "p", projectName: "p", ref: "", branch: "", status: "failed", startedAtMs: 1, endedAtMs: 2, error: "no", warning: "", refAtMs: null, existing: false } as const;
 
 function show(o: Partial<ThreadView>): void {
-  useThreadsStore.setState({ byId: { s: thread("s", { state: "disconnected", status: "idle", statusReason: "", backgroundShells: [], agentRuns: [], flags: [], ...o }) }, order: ["s"] });
+  useThreadsStore.setState({ byId: { s: thread("s", { state: "disconnected", status: "idle", statusReason: "", backgroundShells: [], agentRuns: [], ...o }) }, order: ["s"] });
   render(<ThreadPane threadId="s" />);
 }
 

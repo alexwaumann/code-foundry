@@ -131,7 +131,7 @@ describe("PaneTabStrip", () => {
   it("marks a thread's tab icon with the attention dot while its thread needs the user, active or not, never when archived", () => {
     const attention = (o: object = {}) => {
       act(() => {
-        useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "attention", archivedAtMs: null, flags: [], ...o } } as never });
+        useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "attention", archivedAtMs: null, ...o } } as never });
       });
     };
     render(<PaneTabStrip paneId="p-1" focused />);

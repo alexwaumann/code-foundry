@@ -21,7 +21,7 @@ import { WaitingStrip } from "./WaitingStrip";
 const setup = (phase: "running" | "failed") => ({ phase, startedAtMs: 1, endedAtMs: null, steps: [], error: "", background: true });
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s", name: "t", projectId: "web", projectIds: ["web"], worktreePath: "", checkoutPaths: [], createdWorktree: false, branch: "", workspaceId: "", state: "starting", status: "busy", statusReason: "setting up", archivedAtMs: null, snoozedUntilMs: null, savedAtMs: null, pendingMove: null, resident: "", flags: [], backgroundShells: [], agentRuns: [], setup: setup("running"), ...o }) as ThreadView;
+  ({ id: "s", name: "t", projectId: "web", projectIds: ["web"], worktreePath: "", checkoutPaths: [], createdWorktree: false, branch: "", workspaceId: "", state: "starting", status: "busy", statusReason: "setting up", archivedAtMs: null, snoozedUntilMs: null, savedAtMs: null, pendingMove: null, resident: "", backgroundShells: [], agentRuns: [], setup: setup("running"), ...o }) as ThreadView;
 
 beforeEach(() => {
   useProjectsStore.setState({ byId: { web: { id: "web", name: "web", path: "/src/web", git: true, githubSlug: "", remotes: [], worktrees: [{ path: "/src/web", branch: "main", head: "a", isMain: true }] } } as never, order: ["web"] });

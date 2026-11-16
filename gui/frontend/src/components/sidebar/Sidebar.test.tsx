@@ -49,7 +49,7 @@ beforeEach(() => {
   // The mock's s-6 has a last activity a minute ago, which puts it first among the idle threads.
   // Every thread gets the list fields projectsWorld leaves out (no flags, no linked PRs).
   useThreadsStore.setState((st) => ({
-    byId: Object.fromEntries(Object.entries(st.byId).map(([id, t]) => [id, Object.assign({ flags: [], linkedPullRequests: [] }, t, id === "s-6" ? { lastActivityAtMs: Date.now() - 60_000 } : {})])),
+    byId: Object.fromEntries(Object.entries(st.byId).map(([id, t]) => [id, Object.assign({ linkedPullRequests: [] }, t, id === "s-6" ? { lastActivityAtMs: Date.now() - 60_000 } : {})])),
   }));
   setEmberEnabled(false);
   useUiStore.setState({ selection: HOME, cursorKey: null, sidebarVisible: true, workingCollapsed: false, snoozedCollapsed: true, archivedCollapsed: true });
