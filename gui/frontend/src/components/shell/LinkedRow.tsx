@@ -3,7 +3,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { linkedRowOf, rowAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { useThreadName } from "@/shell/useThreadName";
+import { useLeadThread, useThreadName } from "@/shell/useThreadName";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type TabEntry } from "@/stores/layout";
 import { ThreadDot } from "./ThreadDot";
@@ -14,12 +14,14 @@ import { ThreadDot } from "./ThreadDot";
  * Live while the thread is open in this space; dormant otherwise, drawn quieter, and naming
  * the space when the thread lives in another. The right end is the surface's own slot
  * (`linkedRowEnd`: a linked terminal's directory hint, PR 13). Nothing for an unlinked tab or a
- * thread's own.
+ * thread's own. A child thread's tab names its lead, the thread the user can find in the sidebar
+ * (docs/notes/linked-names-lead.md): its name, status, place and link are the lead's.
  */
 export function LinkedRow({ tab }: { tab: TabEntry }) {
-  const row = useLayoutStore(useShallow((s) => linkedRowOf(s, tab)));
+  const lead = useLeadThread(tab.thread);
+  const row = useLayoutStore(useShallow((s) => linkedRowOf(s, tab, lead)));
   const surface = shellSurfaceOf(tab.kind);
-  const name = useThreadName(tab.thread);
+  const name = useThreadName(lead);
   const spaceName = useLayoutStore((s) => (row?.elsewhere ? (s.spaces[row.elsewhere]?.name ?? row.elsewhere) : ""));
   if (!row) return null;
   const end = surface.linkedRowEnd?.(tab);

@@ -33,6 +33,31 @@ describe("threadSurfaces", () => {
     expect(s.diffs.map((d) => d.openTab)).toEqual(["", "t-d"]);
     expect(s.prs.map((p) => p.openTab)).toEqual(["t-pr", ""]);
   });
+
+  it("lists the tabs of the threads it created after its own: their diffs, pull requests not linked already, terminals", () => {
+    const tabs = [
+      t("t-x", "terminal", "s-1", "term:x", "p-1"),
+      t("t-cd", "diff", "c-1", diffKey("c-1", "pj-a", "/w/c"), "p-2"),
+      t("t-cpr", "pullrequest", "c-1", prKey("o/r", 4), "p-2"),
+      t("t-gpr", "pullrequest", "g-1", prKey("o/r", 8), "p-2"),
+      t("t-ct", "terminal", "g-1", "term:g", "p-2"),
+      t("t-od", "diff", "s-2", diffKey("s-2", "pj-a", "/w/o"), "p-2"),
+    ];
+    const s = threadSurfaces("s-1", one, [{ slug: "o/r", number: 4 }], tabs, new Set(["c-1", "g-1"]));
+    expect(s.diffs.map((d) => [d.kind, d.openTab])).toEqual([
+      ["diff", ""],
+      ["tab", "t-cd"],
+    ]);
+    // #4 is the thread's own link already (a child's links are its creator's too): listed once, marked open.
+    expect(s.prs.map((p) => [p.kind, p.openTab])).toEqual([
+      ["pullrequest", "t-cpr"],
+      ["tab", "t-gpr"],
+    ]);
+    expect(s.terminals.map((x) => x.openTab)).toEqual(["t-x", "t-ct"]);
+    const [, kinDiff] = s.diffs;
+    if (!kinDiff) throw new Error("fixture");
+    expect(surfaceAction("s-1", kinDiff, "p-1")).toEqual({ focus: "t-cd" });
+  });
 });
 
 describe("the actions", () => {
@@ -113,6 +138,17 @@ describe("the row under a linked tab", () => {
     if (!row) throw new Error("row");
     // The window switches to the thread's space, where its tab opens or is focused.
     expect(rowAction(row, "p-2")).toEqual({ run: "thread.open", args: { id: "s-1", focus: "true" } });
+  });
+
+  it("of a child thread's tab names the lead given: live, its tab the link, its space", () => {
+    const child = t("t-cd", "diff", "c-1", "k", "p-2");
+    const s = slice([t("t-th", "thread", "s-1", "thread:s-1", "p-1"), t("t-c", "thread", "c-1", "thread:c-1", "p-1"), child]);
+    const row = linkedRowOf(s, child, "s-1");
+    expect(row).toEqual({ thread: "s-1", threadTab: "t-th", live: true, elsewhere: "" });
+    if (!row) throw new Error("row");
+    expect(rowAction(row, "p-2")).toEqual({ focus: "t-th" });
+    const away = slice([child], { "s-1": { threadId: "s-1", spaceId: "sp-b", quick: null, remembered: [], rememberedPaneId: "", info: null } });
+    expect(linkedRowOf(away, child, "s-1")).toEqual({ thread: "s-1", threadTab: "", live: false, elsewhere: "sp-b" });
   });
 
   it("is not drawn for a thread's own tab or an unlinked one", () => {

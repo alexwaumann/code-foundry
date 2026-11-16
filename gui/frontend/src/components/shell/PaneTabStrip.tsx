@@ -15,7 +15,7 @@ import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import type { ShellSurface } from "@/shell/surfaces/types";
 import { dropTabCut, setTabCut } from "@/shell/tabCut";
 import { takeRenameAfterMenu, useTabRenameStore } from "@/shell/terminalActions";
-import { useThreadName } from "@/shell/useThreadName";
+import { useLeadThread, useThreadName } from "@/shell/useThreadName";
 import { usePane, useTab, type TabEntry } from "@/stores/layout";
 import { PanePlusMenu } from "./PanePlusMenu";
 import { Kbd } from "@/components/ui/kbd";
@@ -110,7 +110,8 @@ function ShellTab({ tabId, active, paneFocused, fit, focusable }: { tabId: strin
  * <thread>", after the tab's own name when that is cut short or hidden.
  */
 export function LinkedTip({ tab, tabName, cut }: { tab: TabEntry; tabName: string; cut: boolean }) {
-  const thread = useThreadName(tab.thread);
+  // A child thread's tab is its lead's, as the row under the strip says (docs/notes/linked-names-lead.md).
+  const thread = useThreadName(useLeadThread(tab.thread));
   const phrase = `${shellSurfaceOf(tab.kind).linkedNoun ?? tab.kind} of ${thread}`;
   return cut ? (
     <span className="flex flex-col">
