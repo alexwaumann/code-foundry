@@ -33,7 +33,9 @@ export type ThreadSurfaceItem =
   | { kind: "diff"; key: string; label: string; projectId: string; root: string; openTab: string }
   | { kind: "pullrequest"; key: string; label: string; slug: string; number: number; openTab: string }
   /** One of the thread's terminal tabs in the space (always open: it is a tab); `label` is its stored name, the strip's is live. */
-  | { kind: "terminal"; key: string; label: string; tabId: string; openTab: string };
+  | { kind: "terminal"; key: string; label: string; tabId: string; openTab: string }
+  /** A diff or pull request tab in the space a thread it created opened (`kin`): drawn as its strip draws it. */
+  | { kind: "tab"; key: string; label: string; tabId: string; openTab: string };
 
 /** What the Open ▸ submenu lists for a thread, in the menu's order. */
 export interface ThreadSurfaces {
@@ -46,9 +48,12 @@ export interface ThreadSurfaces {
  * A thread's surfaces for the Open ▸ submenu and the "+" menu's thread submenu: a diff per
  * checkout (named by its project when there are several), its linked pull requests (newest
  * first, as given), and its terminal tabs in the space. `tabs` are the space's; an item whose
- * tab is open there carries that tab's id (`openTab`), which the menu marks and focuses.
+ * tab is open there carries that tab's id (`openTab`), which the menu marks and focuses. `kin`
+ * are the threads it created (lib/inSidebar.ts createdUnder): their tabs name this thread
+ * (docs/notes/linked-names-lead.md), so their diffs, pull requests and terminals in the space are
+ * listed after its own, a pull request once.
  */
-export function threadSurfaces(thread: string, checkouts: readonly Checkout[], prs: readonly { slug: string; number: number }[], tabs: readonly TabEntry[]): ThreadSurfaces {
+export function threadSurfaces(thread: string, checkouts: readonly Checkout[], prs: readonly { slug: string; number: number }[], tabs: readonly TabEntry[], kin: ReadonlySet<string> = new Set()): ThreadSurfaces {
   const byKey = new Map<string, string>();
   for (const t of tabs) if (!byKey.has(t.key)) byKey.set(t.key, t.id);
   const several = checkouts.length > 1;
@@ -66,7 +71,16 @@ export function threadSurfaces(thread: string, checkouts: readonly Checkout[], p
     seen.add(key);
     prItems.push({ kind: "pullrequest", key, label: `PR #${String(p.number)}`, slug: p.slug, number: p.number, openTab: byKey.get(key) ?? "" });
   }
-  const terminals: ThreadSurfaceItem[] = tabs.filter((t) => t.kind === "terminal" && t.thread === thread).map((t) => ({ kind: "terminal", key: t.key, label: t.name || t.title || "Terminal", tabId: t.id, openTab: t.id }));
+  const kinTab = (t: TabEntry): ThreadSurfaceItem => ({ kind: "tab", key: t.key, label: t.name || t.title, tabId: t.id, openTab: t.id });
+  for (const t of tabs) {
+    if (!kin.has(t.thread)) continue;
+    if (t.kind === "diff") diffs.push(kinTab(t));
+    else if (t.kind === "pullrequest" && !seen.has(t.key)) {
+      seen.add(t.key);
+      prItems.push(kinTab(t));
+    }
+  }
+  const terminals: ThreadSurfaceItem[] = tabs.filter((t) => t.kind === "terminal" && (t.thread === thread || kin.has(t.thread))).map((t) => ({ kind: "terminal", key: t.key, label: t.name || t.title || "Terminal", tabId: t.id, openTab: t.id }));
   return { diffs, prs: prItems, terminals };
 }
 
@@ -97,6 +111,7 @@ export function surfaceAction(thread: string, item: ThreadSurfaceItem, pane = ""
     case "pullrequest":
       return { run: "view.open.pr", args: { number: String(item.number), thread, ...at } };
     case "terminal":
+    case "tab":
       return { focus: item.tabId };
   }
 }
@@ -158,13 +173,18 @@ export interface LinkedRowState {
   elsewhere: string;
 }
 
-/** The row of a tab linked to a thread; null for a thread's own tab or an unlinked one. */
-export function linkedRowOf(s: Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId">, tab: Pick<TabEntry, "kind" | "thread" | "paneId">): LinkedRowState | null {
+/**
+ * The row of a tab linked to a thread; null for a thread's own tab or an unlinked one. The row
+ * names `lead`, the tab's thread's lead (lib/inSidebar.ts leadOf; the tab's thread when not
+ * given): a child's tab stands for the thread the user can find (docs/notes/linked-names-lead.md).
+ */
+export function linkedRowOf(s: Pick<LayoutState, "panes" | "tabs" | "threads" | "defaultSpaceId">, tab: Pick<TabEntry, "kind" | "thread" | "paneId">, lead = ""): LinkedRowState | null {
   if (!tab.thread || tab.kind === "thread") return null;
+  const thread = lead || tab.thread;
   const spaceId = s.panes[tab.paneId]?.spaceId ?? "";
-  const threadTab = spaceTabs(s, spaceId).find((t) => t.kind === "thread" && t.thread === tab.thread)?.id ?? "";
-  const home = s.threads[tab.thread]?.spaceId ?? s.defaultSpaceId;
-  return { thread: tab.thread, threadTab, live: threadTab !== "", elsewhere: home !== spaceId ? home : "" };
+  const threadTab = spaceTabs(s, spaceId).find((t) => t.kind === "thread" && t.thread === thread)?.id ?? "";
+  const home = s.threads[thread]?.spaceId ?? s.defaultSpaceId;
+  return { thread, threadTab, live: threadTab !== "", elsewhere: home !== spaceId ? home : "" };
 }
 
 /**

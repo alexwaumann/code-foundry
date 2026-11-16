@@ -55,3 +55,29 @@ export function sidebarAnchor(byId: Readonly<Record<string, SidebarFields & Pick
   }
   return null;
 }
+
+/**
+ * The thread the window names for a surface linked to `id` (a tab's thread, a pull request's
+ * linking thread): its lead, the sidebar row that stands for it (sidebarAnchor), so a child's
+ * diff or terminal names the thread the user can find. An archived lead still counts; a thread
+ * whose creators were removed is its own lead. `id` itself when there is no anchor (not in the
+ * list yet, a creator cycle). See docs/notes/linked-names-lead.md.
+ */
+export function leadOf(byId: Readonly<Record<string, SidebarFields & Pick<ThreadView, "id">>>, id: string): string {
+  return sidebarAnchor(byId, id) ?? id;
+}
+
+/**
+ * Whether `ancestor` created `id`, directly or further up its createdBy chain (a child, a
+ * grandchild). Never for the thread itself; false past a removed creator or around a cycle.
+ * The lead's menus list the tabs these threads opened.
+ */
+export function createdUnder(byId: Readonly<Record<string, SidebarFields & Pick<ThreadView, "id">>>, id: string, ancestor: string): boolean {
+  const seen = new Set<string>([id]);
+  for (let up = byId[id]?.createdBy ?? ""; up !== "" && !seen.has(up); up = byId[up]?.createdBy ?? "") {
+    if (up === ancestor) return byId[up] !== undefined;
+    if (byId[up] === undefined) return false;
+    seen.add(up);
+  }
+  return false;
+}

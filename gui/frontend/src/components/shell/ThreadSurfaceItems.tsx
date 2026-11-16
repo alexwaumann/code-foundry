@@ -3,11 +3,12 @@ import { Plus, SquareTerminal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { PrRefIcon } from "@/components/pr/PrRefIcon";
 import { dropdownMenuKit, type MenuKit } from "@/components/thread/menuKit";
+import { createdUnder } from "@/lib/inSidebar";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { newTerminalAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces, type LinkedAction, type ThreadSurfaceItem } from "@/shell/linked";
 import { moveThreadToSpace, moveToNewSpace } from "@/shell/spaceActions";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { useLayoutStore, useTab } from "@/stores/layout";
+import { useLayoutStore, useTab, type TabEntry } from "@/stores/layout";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
 import { SpaceIcon } from "./SpaceIcon";
@@ -21,14 +22,22 @@ function useThreadSurfaces(threadId: string, spaceId: string) {
   // Newest linked first, as the sidebar's tag and the card list them.
   const prs = useThreadsStore(useShallow((s) => [...(s.byId[threadId]?.linkedPullRequests ?? [])].reverse().map((l) => l.slug + SEP + String(l.number))));
   const tabs = useLayoutStore(useShallow((s) => spaceTabs(s, spaceId)));
+  const kin = useKin(threadId, tabs);
   return useMemo(() => {
     const checkouts = projectIds.map((projectId, i) => ({ projectId, path: paths[projectId] ?? "", name: names[i] ?? projectId }));
     const links = prs.map((k) => {
       const [slug = "", n = "0"] = k.split(SEP);
       return { slug, number: Number(n) };
     });
-    return threadSurfaces(threadId, checkouts, links, tabs);
-  }, [threadId, projectIds, paths, names, prs, tabs]);
+    return threadSurfaces(threadId, checkouts, links, tabs, kin);
+  }, [threadId, projectIds, paths, names, prs, tabs, kin]);
+}
+
+/** The threads `threadId` created that have tabs among `tabs`: their tabs name it, so its menus list them (docs/notes/linked-names-lead.md). */
+function useKin(threadId: string, tabs: readonly TabEntry[]): ReadonlySet<string> {
+  const linked = useMemo(() => [...new Set(tabs.flatMap((t) => (t.thread && t.thread !== threadId && t.kind !== "thread" ? [t.thread] : [])))], [tabs, threadId]);
+  const ids = useThreadsStore(useShallow((s) => linked.filter((id) => createdUnder(s.byId, id, threadId))));
+  return useMemo(() => new Set(ids), [ids]);
 }
 
 /** The "open" mark of an item whose tab is open in the space: picking it focuses that tab where it is. */
@@ -38,15 +47,16 @@ function OpenMark({ open }: { open: boolean }) {
 
 const NO_TAB = { kind: "terminal", thread: "", key: "", params: {}, title: "", name: "", preview: false, paneId: "" };
 
-/** A terminal tab's icon and name, as its strip draws them (the terminal surface's: what runs in it). */
-function TerminalTabLabel({ tabId }: { tabId: string }) {
+/** An open tab's icon and name, as its strip draws them (a terminal's: what runs in it). */
+function TabLabel({ tabId }: { tabId: string }) {
   const tab = useTab(tabId) ?? { ...NO_TAB, id: tabId };
-  const surface = shellSurfaceOf("terminal");
+  const surface = shellSurfaceOf(tab.kind);
   const title = surface.useTitle(tab);
   const Icon = surface.TabIcon;
+  const Fallback = tab.kind === "terminal" ? SquareTerminal : surface.icon;
   return (
     <>
-      {Icon ? <Icon tab={tab} /> : <SquareTerminal />}
+      {Icon ? <Icon tab={tab} /> : <Fallback />}
       <span className="truncate">{title}</span>
     </>
   );
@@ -56,8 +66,8 @@ function SurfaceItem({ item, kit, onPick }: { item: ThreadSurfaceItem; kit: Menu
   const DiffIcon = shellSurfaceOf("diff").icon;
   return (
     <kit.Item onSelect={onPick} data-testid="thread-surface-item" data-kind={item.kind} data-key={item.key} data-open={item.openTab ? "" : undefined}>
-      {item.kind === "terminal" ? (
-        <TerminalTabLabel tabId={item.tabId} />
+      {item.kind === "terminal" || item.kind === "tab" ? (
+        <TabLabel tabId={item.tabId} />
       ) : (
         <>
           {item.kind === "pullrequest" ? <PrRefIcon slug={item.slug} number={item.number} /> : <DiffIcon />}
@@ -73,6 +83,7 @@ function SurfaceItem({ item, kit, onPick }: { item: ThreadSurfaceItem; kit: Menu
  * A thread's surfaces, the items of its header's Open ▸ and of the "+" menu's thread submenu
  * (docs/notes/shell-model.md): its diff of each checkout and its pull requests, each marked
  * "open" when its tab is open in the space; then its terminal tabs there and New terminal tab.
+ * The tabs of threads it created (diffs, pull requests, terminals) are listed with its own.
  * Picking an open one focuses it where it is; another opens in `pane` (the "+" menu's) or, with
  * none, by the placement rules (shell/linked.ts surfaceAction), which open a closed thread's in the
  * focused pane. `onPick` runs the action. `kit` is the menu's parts: a dropdown's (the header, the

@@ -15,6 +15,7 @@ vi.mock("@/shell/commands", async (orig) => ({ ...(await orig<typeof import("@/s
 
 const { PanePlusMenu } = await import("./PanePlusMenu");
 const { LinkedRow } = await import("./LinkedRow");
+const { LinkedTip } = await import("./PaneTabStrip");
 const { ThreadSurfaceItems } = await import("./ThreadSurfaceItems");
 const { ThreadHeader } = await import("@/components/thread/ThreadHeader");
 const { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } = await import("@/components/ui/dropdown-menu");
@@ -311,6 +312,90 @@ describe("the row under a linked tab's strip", () => {
       setThreads(thread({ name: "Virtualize the sidebar" }));
     });
     expect(screen.getByTestId("shell-linked-row-name").textContent).toBe("Virtualize the sidebar");
+  });
+});
+
+describe("a tab a child thread opened names the lead (docs/notes/linked-names-lead.md)", () => {
+  // s-1 (the lead) created c-1, which created g-1; the child's diff and the grandchild's terminal sit beside the lead.
+  const KIN = layoutOf([
+    space(
+      row("s-r", [
+        pane("p-1", [tab("t-th", "thread", "s-1", { key: "thread:s-1" })]),
+        pane("p-2", [tab("t-cd", "diff", "c-1", { key: diffKey("c-1", "api", "/w/c"), title: "Diff" }), tab("t-gt", "terminal", "g-1", { key: "term:g", name: "go test", params: { terminal: "g" } })], "t-cd"),
+      ]),
+      "p-1",
+    ),
+  ]);
+  const child = thread({ id: "c-1", name: "Fix the flaky test", createdBy: "s-1", status: "busy" });
+  const grand = thread({ id: "g-1", name: "Run the suite", createdBy: "c-1", status: "error" });
+  const tabOf = (id: string) => {
+    const t = useLayoutStore.getState().tabs[id];
+    if (!t) throw new Error(id);
+    return t;
+  };
+  beforeEach(async () => {
+    setThreads(thread({}), child, grand);
+    await seedLayout(KIN);
+  });
+
+  it.each([
+    ["a child's diff", "t-cd", "Diff of Refactor sidebar tree"],
+    ["a grandchild's terminal", "t-gt", "Terminal of Refactor sidebar tree"],
+  ])("the row of %s: the lead's name, status and tab", async (_name, id, text) => {
+    render(<LinkedRow tab={tabOf(id)} />);
+    const r = screen.getByTestId("shell-linked-row");
+    expect(screen.getByTestId("shell-linked-row-link").textContent).toBe(text);
+    expect(r.getAttribute("data-thread-id")).toBe("s-1");
+    expect(r.hasAttribute("data-live")).toBe(true);
+    expect(within(r).getByTestId("thread-dot").getAttribute("data-badge")).toBe("idle");
+    fireEvent.click(screen.getByTestId("shell-linked-row-link"));
+    await settle();
+    expect(focused).toEqual(["t-th"]);
+  });
+
+  it("an archived lead is still the lead", () => {
+    setThreads(thread({ archivedAtMs: 1 }), child, grand);
+    render(<LinkedRow tab={tabOf("t-cd")} />);
+    expect(screen.getByTestId("shell-linked-row-name").textContent).toBe("Refactor sidebar tree");
+  });
+
+  it("once the lead is removed, the child (the highest thread left) is named, and its tab opened", async () => {
+    setThreads(child, grand);
+    render(<LinkedRow tab={tabOf("t-gt")} />);
+    const r = screen.getByTestId("shell-linked-row");
+    expect(screen.getByTestId("shell-linked-row-name").textContent).toBe("Fix the flaky test");
+    expect(r.hasAttribute("data-live")).toBe(false);
+    expect(within(r).getByTestId("thread-dot").getAttribute("data-badge")).toBe("busy");
+    fireEvent.click(screen.getByTestId("shell-linked-row-link"));
+    await settle();
+    expect(runs).toEqual([{ name: "thread.open", args: { id: "c-1", pane: "p-2", focus: "true" }, thread: "" }]);
+  });
+
+  it("the tab's hover names the lead", () => {
+    render(<LinkedTip tab={tabOf("t-cd")} tabName="Diff" cut />);
+    expect(screen.getByText("Diff of Refactor sidebar tree")).toBeTruthy();
+  });
+
+  it("the lead's Open ▸ items list the tabs its children opened, which focus where they are", async () => {
+    render(
+      <DropdownMenu open>
+        <DropdownMenuTrigger>t</DropdownMenuTrigger>
+        <DropdownMenuContent data-testid="m">
+          <ThreadSurfaceItems
+            threadId="s-1"
+            spaceId="sp-a"
+            onPick={(a) => {
+              void import("@/shell/linkedRun").then(({ runLinked }) => runLinked(a));
+            }}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+    const m = screen.getByTestId("m");
+    expect(entries(m)).toEqual(["Diff", "Diffopen", "—", "# Terminals", "go testopen", "New terminal tab"]);
+    fireEvent.click(within(m).getAllByText("Diff")[1] as HTMLElement);
+    await settle();
+    expect(focused).toEqual(["t-cd"]);
   });
 });
 

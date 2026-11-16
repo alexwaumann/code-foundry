@@ -256,3 +256,37 @@ for (const scheme of ["dark", "light"] as const) {
     await page.screenshot({ path: at("linked-row-dormant") });
   });
 }
+
+/**
+ * SHOTS=<dir>: a pull request tab a child thread opened, beside its lead (docs/notes/linked-names-lead.md):
+ * the row under the strip and the tab's hover name the lead; the lead's + submenu lists the tab.
+ */
+for (const scheme of ["dark", "light"] as const) {
+  test(`child thread's tab screenshots (${scheme})`, async ({ page }, info) => {
+    const shots = process.env.SHOTS;
+    test.skip(!shots || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+    const at = (name: string) => `${shots ?? ""}/${name}${scheme === "light" ? "-light" : ""}.png`;
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.setViewportSize({ width: 1400, height: 900 });
+    const child = (await mockPost("multi-thread?projects=repo-cf&branch=fix/resize&name=Fix%20the%20resize%20race&createdBy=s-1")) as { id: string };
+    await mockPost(`link-pr?thread=${child.id}&slug=${SLUG}&number=145&up=1`);
+    const childPr = { id: "t-cpr", kind: "pullrequest", thread: child.id, params: { slug: SLUG, number: "145" }, title: "#145" };
+    await seed(two(pane("p-1", [thread("s-1")]), pane("p-2", [childPr])), "p-1");
+    await openShell(page);
+    await expect(paneEl(page, "p-2").getByTestId("shell-linked-row")).toBeVisible();
+    await page.mouse.move(700, 880);
+    await still(page);
+    await page.screenshot({ path: at("child-tab-row") });
+    await paneEl(page, "p-2").locator('[data-tab-id="t-cpr"] [role="tab"]').hover();
+    await expect(page.getByRole("tooltip")).toBeVisible();
+    await still(page);
+    await page.screenshot({ path: at("child-tab-hover") });
+    await page.mouse.move(700, 880);
+
+    await paneEl(page, "p-1").getByTestId("pane-plus").click();
+    await page.getByTestId("plus-thread").hover();
+    await expect(page.getByTestId("plus-thread-surfaces")).toBeVisible();
+    await still(page);
+    await page.screenshot({ path: at("child-tab-plus-menu") });
+  });
+}
