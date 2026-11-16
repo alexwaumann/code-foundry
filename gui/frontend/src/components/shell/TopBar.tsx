@@ -10,6 +10,7 @@ import { useCanStepFocus } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
 import { useUiStore } from "@/stores/ui";
 import { NeedsPopover } from "@/components/needs/NeedsPopover";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SpaceTabs } from "./SpaceTabs";
 
 /**
@@ -31,7 +32,8 @@ function FocusHistoryButtons() {
  * The window shell's top bar (docs/notes/shell-model.md, "Structure"): always visible, laid out on
  * its own with no alignment to the sidebar. The traffic-light gutter, the app name, the sidebar
  * toggle, back and forward, the Needs you control while the sidebar is collapsed, then the space
- * tabs, then "+" (a new space, shown at once, its name ready to type).
+ * tabs, then "+" (a new space, shown at once, its name ready to type), and at the right end the
+ * bell (components/notifications/NotificationBell.tsx).
  *
  * It is the window's drag band (Wails runtime, `--wails-draggable`): everything but its buttons
  * and tabs drags the window. It is the title band's height (titleBand.ts), its row centred where
@@ -81,6 +83,9 @@ export function TopBar() {
             </Tip>
           </>
         )}
+        <span className="ml-auto flex shrink-0 items-center pl-2 [--wails-draggable:no-drag]">
+          <NotificationBell />
+        </span>
       </div>
     </div>
   );
