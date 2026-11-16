@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ActionRunMode, ActionRunState } from "../src/gen/codefoundry/v1/action_pb";
 import type { UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { PermissionMode } from "../src/gen/codefoundry/v1/thread_lifecycle_pb";
@@ -123,5 +123,53 @@ describe("the mock's layout glue (internal/daemon/layout.go): what keeps a previ
     const { w, tab } = await previewOf("s-7");
     w.stopThread("s-7", "closed", 0);
     expect(tab()?.preview).toBe(true);
+  });
+});
+
+describe("pr.create in the mock", () => {
+  const PR = "https://github.com/alexwaumann/code-foundry/pull/128";
+  const ghWorktree = (w: World) => {
+    for (const p of w.projects.values()) {
+      const wt = p.githubSlug && p.remotes.length > 0 ? p.worktrees[0] : undefined;
+      if (wt) return wt.path;
+    }
+    throw new Error("no GitHub worktree in the mock");
+  };
+
+  it("links the pull request to the context's thread, once", async () => {
+    vi.useFakeTimers();
+    try {
+      const w = new World();
+      const path = ghWorktree(w);
+      const id = [...w.threads.keys()].find((k) => !w.threads.get(k)?.linkedPullRequests.some((l) => l.url === PR)) ?? "";
+      const create = async () => {
+        const out = w.invoke("pr.create", ctx({ activeThreadId: id, activeWorktreePath: path }), {}, false);
+        await vi.advanceTimersByTimeAsync(1000);
+        return out;
+      };
+      const first = await create();
+      if (typeof first === "string") throw new Error("want a structured result");
+      expect(first.message).toMatch(/\nlinked alexwaumann\/code-foundry#128 to thread /);
+      expect((JSON.parse(first.resultJson) as { url: string; threadLink: { threadId: string; linked: boolean } })).toMatchObject({ url: PR, threadLink: { threadId: id, linked: true } });
+      expect(w.threads.get(id)?.linkedPullRequests.filter((l) => l.url === PR)).toHaveLength(1);
+      const again = await create();
+      expect(typeof again === "string" ? again : again.message).toMatch(/already has alexwaumann\/code-foundry#128 linked$/);
+      expect(w.threads.get(id)?.linkedPullRequests.filter((l) => l.url === PR)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("links nothing without a thread", async () => {
+    vi.useFakeTimers();
+    try {
+      const w = new World();
+      const out = w.invoke("pr.create", ctx({ activeWorktreePath: ghWorktree(w) }), {}, false);
+      await vi.advanceTimersByTimeAsync(1000);
+      const res = await out;
+      expect(typeof res === "string" ? res : res.message).toBe(`created pull request #128: ${PR}`);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -18,7 +18,7 @@ func newPullRequestRegistry(t *testing.T) (*command.Registry, *commandtest.Gh) {
 	t.Helper()
 	reg := command.NewRegistry()
 	be := &commandtest.Gh{}
-	if err := command.RegisterPullRequest(reg, be); err != nil {
+	if err := command.RegisterPullRequest(reg, be, nil); err != nil {
 		t.Fatal(err)
 	}
 	return reg, be

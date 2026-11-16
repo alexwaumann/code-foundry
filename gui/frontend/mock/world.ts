@@ -13,7 +13,7 @@ import { PermissionMode, PlacementOutcome, ThreadKind, ThreadSetupPhase, ThreadS
 import { TerminalState, type AttachEventSchema, type TerminalEventSchema, type TerminalSchema } from "../src/gen/codefoundry/v1/terminal_pb";
 import { UiIntent_Notify_Level, UiIntentSchema } from "../src/gen/codefoundry/v1/ui_pb";
 import type { WorkspaceEventSchema, WorkspaceSchema } from "../src/gen/codefoundry/v1/workspace_pb";
-import { EDITOR_APPS, MockGitOps, type GitOpsEventInit, type InvokeOut } from "./gitops";
+import { EDITOR_APPS, MockGitOps, type GitOpsEventInit, type InvokeOut, type ThreadLinkOut } from "./gitops";
 import { prDetailCall } from "./prDetail";
 import { prTaskCommand } from "./prTask";
 import { GhWorld, ghEvent, viewCommands } from "./github";
@@ -2565,6 +2565,25 @@ export class World {
     s.linkedPullRequests = [...s.linkedPullRequests, link];
     this.publishThread(s);
     return { linked: true, link };
+  }
+
+  /**
+   * pr.create's link of its pull request to the thread that ran it (the daemon's
+   * linkCallerPR): as thread.pr.link, with the line its message gets. A failed link is
+   * reported, never thrown: the pull request is open either way.
+   */
+  linkCallerPR(id: string, url: string): ThreadLinkOut {
+    try {
+      const r = this.linkPullRequestByHand(id, url);
+      const s = this.thread(id);
+      const label = s.name ? `${s.name} (${s.id})` : s.id;
+      const pr = `${r.link.slug}#${String(r.link.number)}`;
+      const link = { threadId: id, linked: r.linked, slug: r.link.slug, number: r.link.number, url: r.link.url };
+      return { line: r.linked ? `linked ${pr} to thread ${label}` : `thread ${label} already has ${pr} linked`, link };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { line: `could not link ${url} to thread ${id}: ${msg}`, link: { threadId: id, linked: false, url, error: msg } };
+    }
   }
 
   /** Test control: the clock stops (or, held false, resumes) changing this thread (MockThread.held); controls and input always do. */
@@ -5237,7 +5256,7 @@ export class World {
           if (wt) return { projectId: project.id, path: wt.path, branch: wt.branch, githubSlug: project.githubSlug, hasRemote: project.remotes.length > 0 };
         }
         return null;
-      }),
+      }, (id, url) => this.linkCallerPR(id, url)),
       ...this.gh.prDetails.commands(),
       ...this.prThreadCommands(),
       prTaskCommand({
