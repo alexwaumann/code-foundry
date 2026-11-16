@@ -1,17 +1,20 @@
 /**
  * The Dock badge and attention alerts (docs/notes/dock-alerts.md). macOS notification
  * banners are not available to the bare GUI executable, so the Dock is the channel: the
- * badge counts the threads that need the user, and an alert (a bounce, a sound or both)
- * fires when a thread starts needing them while the user is not looking at the app
- * (another app is active, or its window is covered or minimized).
+ * badge counts the threads that need the user and the bell's shown time-sensitive
+ * notifications, and an alert (a bounce, a sound or both) fires when a thread starts needing
+ * them or a time-sensitive notification arrives while the user is not looking at the app
+ * (another app is active, or its window is covered or minimized;
+ * docs/notes/notifications-3-bell.md).
  *
  * stepDockAlerts is the whole decision, pure: state + inputs -> state + effects.
- * startDockAlerts feeds it from the threads and settings stores and runs the effects
- * against the Wails host (api/app.ts; no-ops without one).
+ * startDockAlerts feeds it from the threads, notifications and settings stores and runs the
+ * effects against the Wails host (api/app.ts; no-ops without one).
  */
 import { bounceDock, playAlertSound, setDockBadge } from "@/api/app";
 import type { SettingsSnapshotView } from "@/api/settings";
 import { isPageAttended } from "@/api/stream";
+import { useNotificationsStore } from "./notifications";
 import { attentionIds, useThreadsStore } from "./threads";
 import { useSettingsStore } from "./settings";
 
@@ -68,9 +71,11 @@ export interface DockAlertsState {
   badge: number | null;
   /** When the last alert fired (epoch ms); null when none has. */
   lastAlertAtMs: number | null;
+  /** The notification event last looked at (useNotificationsStore's seq). */
+  notificationSeq: number;
 }
 
-export const initialDockAlerts: DockAlertsState = { epoch: null, attention: new Set(), badge: null, lastAlertAtMs: null };
+export const initialDockAlerts: DockAlertsState = { epoch: null, attention: new Set(), badge: null, lastAlertAtMs: null, notificationSeq: 0 };
 
 export interface DockAlertsInput {
   /** useThreadsStore's epoch: a change means the set was replaced (startup, reconnect). */
@@ -87,6 +92,12 @@ export interface DockAlertsInput {
   attended: boolean;
   nowMs: number;
   settings: AlertSettings | null;
+  /**
+   * The bell (stores/notifications.ts): the shown time-sensitive notifications (the snapshot's
+   * count, which joins the badge), the notification event's seq, and that event's shown
+   * time-sensitive arrivals (an alert when the seq is new). Normal and snoozed ones never count.
+   */
+  notifications: { timeSensitive: number; seq: number; timeSensitiveArrived: readonly string[] };
 }
 
 /**
@@ -96,21 +107,23 @@ export interface DockAlertsInput {
 export type DockEffect = { kind: "badge"; count: number } | { kind: "alert"; bounce: boolean; sound: boolean; volume: number };
 
 /**
- * One evaluation. The badge follows the attention count (0 when the badge is off),
- * whatever the focus or cooldown. An alert fires when a thread enters the attention set
- * (absent at the previous evaluation of the same epoch) while the app is not attended,
+ * One evaluation. The badge follows the attention count plus the shown time-sensitive
+ * notifications (0 when the badge is off), whatever the focus or cooldown. An alert fires
+ * when a thread enters the attention set (absent at the previous evaluation of the same
+ * epoch), or a notification event not looked at yet brought a time-sensitive arrival (a
+ * connect's snapshot brings none, so it is a baseline too), while the app is not attended,
  * at least one of bounce and sound is on (a sound at volume 0 counts as off), and the
  * cooldown since the last alert has passed. Inside the cooldown the trigger is dropped,
  * not queued. With bounce and sound both off nothing fires and the cooldown is not
  * consumed. The first evaluation, and the first after the epoch changes, only takes the
- * baseline.
+ * threads' baseline.
  */
 export function stepDockAlerts(state: DockAlertsState, input: DockAlertsInput): { state: DockAlertsState; effects: DockEffect[] } {
   const effects: DockEffect[] = [];
   const { settings } = input;
   let badge = state.badge;
   if (settings) {
-    const count = settings.dockBadge ? input.attention.length : 0;
+    const count = settings.dockBadge ? input.attention.length + input.notifications.timeSensitive : 0;
     if (count !== badge) {
       effects.push({ kind: "badge", count });
       badge = count;
@@ -119,15 +132,17 @@ export function stepDockAlerts(state: DockAlertsState, input: DockAlertsInput): 
   let lastAlertAtMs = state.lastAlertAtMs;
   const baseline = state.epoch !== input.epoch;
   const sound = settings !== null && settings.sound && settings.soundVolume > 0;
-  if (!baseline && settings && !input.attended && (settings.bounce || sound)) {
-    const entered = input.attention.some((id) => !state.attention.has(id));
+  if (settings && !input.attended && (settings.bounce || sound)) {
+    // A thread snapshot (a new epoch) is a baseline for threads only: the bell has its own.
+    const entered = !baseline && input.attention.some((id) => !state.attention.has(id));
+    const arrived = input.notifications.seq !== state.notificationSeq && input.notifications.timeSensitiveArrived.length > 0;
     const cooled = lastAlertAtMs === null || input.nowMs - lastAlertAtMs >= settings.cooldownMs;
-    if (entered && cooled) {
+    if ((entered || arrived) && cooled) {
       effects.push({ kind: "alert", bounce: settings.bounce, sound, volume: sound ? settings.soundVolume : 0 });
       lastAlertAtMs = input.nowMs;
     }
   }
-  return { state: { epoch: input.epoch, attention: new Set(input.attention), badge, lastAlertAtMs }, effects };
+  return { state: { epoch: input.epoch, attention: new Set(input.attention), badge, lastAlertAtMs, notificationSeq: input.notifications.seq }, effects };
 }
 
 export interface DockAlertsDeps {
@@ -162,12 +177,14 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
   let state = initialDockAlerts;
   const evaluate = () => {
     const threads = useThreadsStore.getState();
+    const bell = useNotificationsStore.getState();
     const next = stepDockAlerts(state, {
       epoch: threads.epoch,
       attention: attentionIds(threads),
       attended: deps.attended(),
       nowMs: deps.now(),
       settings: alertSettings(useSettingsStore.getState().snapshot),
+      notifications: { timeSensitive: bell.snapshot?.timeSensitive ?? 0, seq: bell.seq, timeSensitiveArrived: bell.timeSensitiveArrived },
     });
     state = next.state;
     for (const e of next.effects) {
@@ -183,6 +200,9 @@ export function startDockAlerts(deps: DockAlertsDeps = hostDeps): () => void {
   const stops = [
     useThreadsStore.subscribe((s, prev) => {
       if (s.byId !== prev.byId || s.order !== prev.order || s.epoch !== prev.epoch) evaluate();
+    }),
+    useNotificationsStore.subscribe((s, prev) => {
+      if (s.seq !== prev.seq) evaluate();
     }),
     useSettingsStore.subscribe((s, prev) => {
       if (!sameAlertSettings(s.snapshot, prev.snapshot)) evaluate();

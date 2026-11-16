@@ -14,15 +14,18 @@ import {
 } from "./dockAlerts";
 import { applyThreadListEvent, attentionIds, emptyThreads, replaceThreads, useThreadsStore } from "./threads";
 import { useSettingsStore } from "./settings";
+import { applyNotificationEvent, resetNotifications } from "./notifications";
+import { note, noteEvent } from "@/test/notificationFakes";
 
 const on: AlertSettings = { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 };
+const noBell: DockAlertsInput["notifications"] = { timeSensitive: 0, seq: 0, timeSensitiveArrived: [] };
 
 /** Runs evaluations in order from the initial state; returns each step's effects and the final state. */
 function run(steps: (Partial<DockAlertsInput> & { attention: readonly string[] })[]): { effects: DockEffect[][]; state: DockAlertsState } {
   let state = initialDockAlerts;
   const effects: DockEffect[][] = [];
   for (const s of steps) {
-    const r = stepDockAlerts(state, { epoch: 1, attended: false, nowMs: 0, settings: on, ...s });
+    const r = stepDockAlerts(state, { epoch: 1, attended: false, nowMs: 0, settings: on, notifications: noBell, ...s });
     state = r.state;
     effects.push(r.effects);
   }
@@ -32,6 +35,51 @@ function run(steps: (Partial<DockAlertsInput> & { attention: readonly string[] }
 const alerts = (effects: DockEffect[][]) => effects.map((e) => e.filter((x) => x.kind === "alert").length);
 const badges = (effects: DockEffect[][]) => effects.map((e) => e.find((x) => x.kind === "badge")?.count ?? null);
 const bounce: DockEffect = { kind: "alert", bounce: true, sound: false, volume: 0 };
+
+describe("stepDockAlerts: the bell's time-sensitive notifications", () => {
+  const bell = (seq: number, timeSensitive: number, arrived: string[] = []) => ({ notifications: { seq, timeSensitive, timeSensitiveArrived: arrived } });
+
+  it("the badge adds the shown time-sensitive count to the attention threads", () => {
+    const { effects } = run([{ attention: ["a"], ...bell(1, 2) }, { attention: ["a"], ...bell(2, 0) }]);
+    expect(badges(effects)).toEqual([3, 1]);
+  });
+
+  it("the badge is 0 when it is off, notifications included", () => {
+    const { effects } = run([{ attention: ["a"], ...bell(1, 2), settings: { ...on, dockBadge: false } }]);
+    expect(badges(effects)).toEqual([0]);
+  });
+
+  it("a time-sensitive arrival bounces once while unattended; the same event looked at again does not", () => {
+    const { effects } = run([{ attention: [], ...bell(1, 0) }, { attention: [], ...bell(2, 1, ["n-1"]), nowMs: 1000 }, { attention: [], ...bell(2, 1, ["n-1"]), nowMs: 2000 }]);
+    expect(alerts(effects)).toEqual([0, 1, 0]);
+    expect(effects[1]).toEqual([{ kind: "badge", count: 1 }, bounce]);
+  });
+
+  it("a normal arrival never bounces (the event names no time-sensitive arrival)", () => {
+    const { effects } = run([{ attention: [], ...bell(1, 0) }, { attention: [], ...bell(2, 0, []), nowMs: 1000 }]);
+    expect(alerts(effects)).toEqual([0, 0]);
+  });
+
+  it("an arrival while attended does not bounce; the badge still moves", () => {
+    const { effects } = run([{ attention: [], ...bell(1, 0) }, { attention: [], ...bell(2, 1, ["n-1"]), attended: true }]);
+    expect(effects[1]).toEqual([{ kind: "badge", count: 1 }]);
+  });
+
+  it("shares the cooldown with threads entering attention", () => {
+    const { effects } = run([
+      { attention: [], ...bell(1, 0) },
+      { attention: ["a"], ...bell(1, 0), nowMs: 10_000 }, // a thread: fires
+      { attention: ["a"], ...bell(2, 1, ["n-1"]), nowMs: 20_000 }, // inside the cooldown: dropped
+      { attention: ["a"], ...bell(3, 2, ["n-2"]), nowMs: 70_000 }, // after it: fires
+    ]);
+    expect(alerts(effects)).toEqual([0, 1, 0, 1]);
+  });
+
+  it("a threads epoch change does not swallow a time-sensitive arrival in the same evaluation", () => {
+    const { effects } = run([{ attention: [], ...bell(1, 0) }, { attention: [], epoch: 2, ...bell(2, 1, ["n-1"]), nowMs: 1000 }]);
+    expect(alerts(effects)).toEqual([0, 1]);
+  });
+});
 
 describe("stepDockAlerts", () => {
   it("the first evaluation takes the baseline: a badge, no alert", () => {
@@ -254,6 +302,7 @@ describe("startDockAlerts", () => {
     now = 0;
     useThreadsStore.setState({ ...emptyThreads, epoch: 0 });
     useSettingsStore.setState({ snapshot: null });
+    resetNotifications();
     const deps: DockAlertsDeps = {
       setBadge: (n) => calls.push(`badge ${String(n)}`),
       bounce: () => calls.push("bounce"),
@@ -279,6 +328,22 @@ describe("startDockAlerts", () => {
     now = 1000;
     useThreadsStore.setState((s) => applyThreadListEvent(s, { kind: "updated", thread: thread("c", { status: "attention", statusReason: "finished" }) }));
     expect(calls).toEqual(["badge 0", "badge 2", "badge 3", "bounce"]);
+  });
+
+  it("the bell's shown time-sensitive notifications join the badge; their arrival bounces, a normal one's does not", () => {
+    settings({});
+    useThreadsStore.setState((s) => ({ ...replaceThreads(s, [thread("a", { status: "attention", statusReason: "finished" })]), epoch: s.epoch + 1 }));
+    // The connect's snapshot: one time-sensitive already there, no arrivals.
+    applyNotificationEvent(noteEvent([note("u", { timeSensitive: true }), note("n")]));
+    expect(calls).toEqual(["badge 0", "badge 1", "badge 2"]);
+    now = 1000;
+    applyNotificationEvent(noteEvent([note("u", { timeSensitive: true }), note("n"), note("m")], ["m"]));
+    expect(calls).toEqual(["badge 0", "badge 1", "badge 2"]);
+    applyNotificationEvent(noteEvent([note("v", { timeSensitive: true }), note("u", { timeSensitive: true }), note("n"), note("m")], ["v"]));
+    expect(calls).toEqual(["badge 0", "badge 1", "badge 2", "badge 3", "bounce"]);
+    // Snoozed: out of the badge.
+    applyNotificationEvent(noteEvent([note("u", { timeSensitive: true }), note("n"), note("m"), note("v", { timeSensitive: true, status: "snoozed" })]));
+    expect(calls.at(-1)).toBe("badge 2");
   });
 
   it("does not bounce while attended, and turning the badge off clears it", () => {
