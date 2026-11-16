@@ -1,0 +1,78 @@
+{
+  "doc": "Smart placement: the focused pane holds a thread (here behind its active diff), so a thread's tab opens there, after its active tab.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-c","kind":"thread","thread":"th-c"},
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}}
+              ],
+              "active": "t-d"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-b",
+        "mru": ["t-d","t-a","t-c"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-x","focus":true,"w":1600,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [
+                {"id":"t-c","kind":"thread","thread":"th-c"},
+                {"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"pj","worktree":"w"}},
+                {"id":"t-n1","kind":"thread","thread":"th-x"}
+              ],
+              "active": "t-n1"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-b",
+        "mru": ["t-n1","t-d","t-a","t-c"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-b","tab":"t-n1","rule":"focused"}
+}

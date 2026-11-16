@@ -24,8 +24,10 @@ func init() {
 //     (Result.Draft);
 //   - Pane: in that pane, which must be in the thread's space;
 //   - otherwise in place of the space's empty composer when that is the space's only tab (an
-//     ephemeral composer; a draft is never replaced), else in the focused pane after its active tab, else as the first
-//     pane of an empty space.
+//     ephemeral composer; a draft is never replaced), else after the active tab of the pane a
+//     thread's own tab opens in (place.go threadHost: with smart placement, the focused pane
+//     when it holds a thread, else the nearest pane that does, else the focused pane), else as
+//     the first pane of an empty space.
 //
 // A place in the pane can be given with it, so a sidebar row dropped on the grid is one op:
 //   - Pane and Index: at that place in Pane's strip (default: after its active tab);
@@ -39,7 +41,8 @@ func init() {
 //
 // Room (fit.go): a new pane on an edge whose result would not fit the pane area is refused,
 // and so is a Pane of terminals the thread would not fit in (ErrNoRoom); a focused pane of
-// terminals that cannot take it gives way to the most recently focused pane that can.
+// terminals that cannot take it gives way to the nearest pane holding a thread that can (smart
+// placement), else to the most recently focused pane that can.
 //
 // Then the thread's remembered set comes back (Restore), unless the thread is snoozed
 // (Snoozed, or ThreadState.Snoozed): then it waits for the thread to wake (preview.go). W and
@@ -156,7 +159,10 @@ func (o *OpenThread) apply(t *tx) (Result, error) {
 		if ps := Panes(sp.Root); len(ps) == 1 && len(ps[0].Tabs) == 1 && ps[0].Tabs[0].Kind == "compose" && draftOf(ps[0].Tabs[0]) == "" {
 			pane, compose, rule = ps[0], ps[0].Tabs[0], "compose"
 		} else {
-			pane = hostPane(sp, w, h, &Tab{Kind: "thread"})
+			var near bool
+			if pane, near = t.threadHost(sp, w, h, &Tab{Kind: "thread"}); near {
+				rule = "near"
+			}
 		}
 		switch {
 		case old == nil:

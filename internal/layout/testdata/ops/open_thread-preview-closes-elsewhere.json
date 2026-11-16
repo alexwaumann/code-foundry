@@ -1,5 +1,5 @@
 {
-  "doc": "A new preview opening in another pane than the space's preview closes the old one there and opens by the usual rule (the focused pane).",
+  "doc": "With smart placement off, a new preview opening in another pane than the space's preview closes the old one there and opens by the usual rule (the focused pane).",
   "state": {
     "v": 1,
     "spaces": [
@@ -32,6 +32,7 @@
     "default_space": "sp-a"
   },
   "op": {"op":"open_thread","thread":"th-x","archived":true,"preview":true,"focus":true},
+  "options": {"no_smart_placement":true},
   "want": {
     "v": 1,
     "spaces": [

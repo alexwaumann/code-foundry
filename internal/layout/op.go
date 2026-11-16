@@ -29,7 +29,8 @@ type Result struct {
 	// what they hold (an unlinked terminal) or closes what they show (a thread).
 	Closed []*Tab `json:"closed,omitempty"`
 	// Rule says how placement chose where a tab went (place.go): "1" to "6", "pane" (the
-	// caller's pane), "focused" (the focused pane), "compose" (it replaced a composer tab),
+	// caller's pane), "focused" (the focused pane), "near" (smart placement: the
+	// pane holding a thread nearest the focused one), "compose" (it replaced a composer tab),
 	// "edge" (a new pane on the edge the caller gave).
 	Rule string `json:"rule,omitempty"`
 	// Kept lists linked tabs taken out of the layout into their thread's remembered set
@@ -63,6 +64,9 @@ type Result struct {
 type Options struct {
 	// NoSmartSwap turns smart swap off (the setting layout.smart_swap, on by default).
 	NoSmartSwap bool `json:"no_smart_swap,omitempty"`
+	// NoSmartPlacement turns smart placement off (the setting layout.smart_placement, on by
+	// default): a thread's own tab then opens in the focused pane (place.go threadHost).
+	NoSmartPlacement bool `json:"no_smart_placement,omitempty"`
 	// KeepFocus puts the user's focus back as it was after the op (keep_focus.go): a call
 	// from inside a thread, which never moves the user's focus.
 	KeepFocus bool `json:"keep_focus,omitempty"`
@@ -183,7 +187,7 @@ func Apply(st *State, op Op, ids IDs) (*State, Result, error) {
 // ApplyWith is Apply with options. When the op leaves a thread tab newly focused (another tab,
 // or another space, than before), smart swap runs for that thread unless it is turned off.
 func ApplyWith(st *State, op Op, ids IDs, opts Options) (*State, Result, error) {
-	t := &tx{st: st.Clone(), ids: ids}
+	t := &tx{st: st.Clone(), ids: ids, opts: opts}
 	before := focusedThreadTab(t.st)
 	res, err := op.apply(t)
 	if err != nil {
@@ -207,6 +211,7 @@ func ApplyWith(st *State, op Op, ids IDs, opts Options) (*State, Result, error) 
 type tx struct {
 	st   *State
 	ids  IDs
+	opts Options
 	used map[string]bool
 	// revealed lists the collapsed panes the op opened because it gave one of their tabs the
 	// focus (collapse.go); with Options.KeepFocus they are collapsed again.

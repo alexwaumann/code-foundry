@@ -1,0 +1,75 @@
+{
+  "doc": "Smart placement for a preview: it opens where a thread's own tab opens, the pane holding threads, and there takes the space's previous preview's place.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-v","kind":"thread","thread":"th-v","preview":true}
+              ],
+              "active": "t-v"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-b",
+        "mru": ["t-p","t-v","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {
+    "op": "open_thread",
+    "thread": "th-x",
+    "archived": true,
+    "preview": true,
+    "focus": true,
+    "w": 1600,
+    "h": 900
+  },
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-n1","kind":"thread","thread":"th-x","preview":true}
+              ],
+              "active": "t-n1"
+            },
+            {"t":"pane","id":"p-b","tabs":[{"id":"t-p","kind":"prs"}],"active":"t-p"}
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-p","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","closed":["t-v"],"rule":"preview"}
+}

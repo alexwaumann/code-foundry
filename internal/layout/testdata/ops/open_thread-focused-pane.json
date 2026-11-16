@@ -1,5 +1,5 @@
 {
-  "doc": "A thread's tab opens in the focused pane after its active tab, and takes the focus.",
+  "doc": "With smart placement off, a thread's tab opens in the focused pane after its active tab, whatever the pane holds, and takes the focus.",
   "state": {
     "v": 1,
     "spaces": [
@@ -36,6 +36,7 @@
     "default_space": "sp-a"
   },
   "op": {"op":"open_thread","thread":"th-b","focus":true},
+  "options": {"no_smart_placement":true},
   "want": {
     "v": 1,
     "spaces": [
