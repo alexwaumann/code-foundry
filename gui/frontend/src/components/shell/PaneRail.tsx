@@ -87,7 +87,8 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
  * and holds no stream. A click on an icon focuses that tab, which unfolds the pane (another may
  * fold) and opens a collapsed one; a tab drags out like any tab, and the rail as a whole takes a
  * dropped tab (shell/drag/targets.ts). Its last buttons open it again when the user collapsed it,
- * and show the pane full screen. A collapsed pane may have the focus (a direction key reached
+ * and show the pane full screen; a horizontal rail has them at its right end, where the open
+ * pane's strip has collapse and full screen. A collapsed pane may have the focus (a direction key reached
  * it): its border is the focused one and the keyboard goes to its selected icon. Vertical in a
  * row of panes, horizontal in a column. See docs/notes/shell-19-rails-fullscreen.md and
  * docs/notes/shell-25d-collapse.md.
@@ -126,27 +127,34 @@ export function PaneRail({ paneId, rect, focused = false }: { paneId: string; re
         role="tablist"
         aria-label="Tabs"
         aria-orientation={vertical ? "vertical" : "horizontal"}
-        className={cn("flex min-h-0 min-w-0 items-center gap-1 overflow-hidden p-0.5", vertical ? "flex-col" : "flex-row")}
+        className={cn("flex min-h-0 min-w-0 items-center gap-1 overflow-hidden", vertical ? "flex-col p-0.5" : "w-full flex-row py-0.5 pr-1.5 pl-0.5")}
       >
         {tabIds.map((id) => (
           <RailTab key={id} tabId={id} paneId={paneId} selected={id === pane?.active} vertical={vertical} />
         ))}
-        <span aria-hidden className={cn("shrink-0 bg-cf-divider", vertical ? "my-0.5 h-px w-4" : "mx-0.5 h-4 w-px")} />
-        {/* As in the strip: the collapsed pane's open control, then full screen. */}
-        {collapsed && <PaneExpandButton paneId={paneId} vertical={vertical} />}
-        <Tip label="Full screen" side={vertical ? "right" : "bottom"}>
-          <button
-            type="button"
-            aria-label="Full screen"
-            data-testid="shell-rail-fullscreen"
-            className="flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
-            onClick={() => {
-              enterFullscreen(paneId);
-            }}
-          >
-            <Maximize2 className="size-3.5" aria-hidden />
-          </button>
-        </Tip>
+        {/* In a row of panes: a divider, then the controls under the icons. */}
+        {vertical && <span aria-hidden className="my-0.5 h-px w-4 shrink-0 bg-cf-divider" />}
+        {/*
+          As in the strip: the collapsed pane's open control, then full screen. A horizontal rail
+          keeps them at its right end, at the strip's spacing, so they sit where the open pane's
+          collapse and full screen controls were.
+        */}
+        <span className={cn("flex shrink-0 items-center", vertical ? "flex-col gap-1" : "ml-auto gap-0.5")} data-testid="shell-rail-controls">
+          {collapsed && <PaneExpandButton paneId={paneId} vertical={vertical} />}
+          <Tip label="Full screen" side={vertical ? "right" : "bottom"}>
+            <button
+              type="button"
+              aria-label="Full screen"
+              data-testid="shell-rail-fullscreen"
+              className="flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-cf-text-muted outline-none hover:bg-cf-control-hover/40 hover:text-cf-text focus-visible:ring-1 focus-visible:ring-cf-focus"
+              onClick={() => {
+                enterFullscreen(paneId);
+              }}
+            >
+              <Maximize2 className="size-3.5" aria-hidden />
+            </button>
+          </Tip>
+        </span>
       </div>
     </section>
   );
