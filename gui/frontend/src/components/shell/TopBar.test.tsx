@@ -157,6 +157,19 @@ describe("the top bar", () => {
     expect(tabs().map((t) => within(t).getByTestId("space-icon").getAttribute("data-panes"))).toEqual(["2", "1", "1"]);
   });
 
+  it("fills only the current space's tab with the accent, glyph and count included", () => {
+    render(<TopBar />);
+    const current = tabs().filter((t) => t.getAttribute("data-current") === "true");
+    expect(current).toHaveLength(1);
+    for (const t of tabs()) {
+      const on = t === current[0];
+      expect(t.className.includes("bg-cf-accent")).toBe(on);
+      expect(within(t).getByTestId("space-icon").getAttribute("data-filled")).toBe(on ? "true" : null);
+      const count = within(t).queryByTestId("space-tab-count");
+      if (count) expect(count.className.includes("text-cf-accent-foreground")).toBe(on);
+    }
+  });
+
   it("is the window's drag band, all but its controls", () => {
     render(<TopBar />);
     expect(screen.getByTestId("top-bar").className).toContain("[--wails-draggable:drag]");

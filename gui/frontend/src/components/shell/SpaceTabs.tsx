@@ -62,7 +62,7 @@ interface SpaceTabProps {
 
 /**
  * One space in the top bar: its layout glyph, its name and, when threads in it need the user, their
- * count. A click shows it; a double click or its menu renames it; its menu removes it (not the last
+ * count. The current one is filled with the theme's accent, so it is the loudest thing in the bar. A click shows it; a double click or its menu renames it; its menu removes it (not the last
  * one); it drags to reorder. While a tab or a pane of the grid is dragged over it, it is marked: a
  * drop moves them to this space (ShellDnd).
  */
@@ -87,7 +87,7 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
           style={{ transform: CSS.Translate.toString(transform), transition }}
           className={cn(
             "flex h-7 max-w-48 min-w-0 shrink-0 cursor-default items-center gap-1.5 rounded-md border px-2 text-body-sm outline-none select-none [--wails-draggable:no-drag] focus-visible:ring-1 focus-visible:ring-cf-focus",
-            current ? "border-cf-border bg-cf-surface text-cf-text" : "border-transparent text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
+            current ? "border-transparent bg-cf-accent font-medium text-cf-accent-foreground" : "border-transparent text-cf-text-muted hover:bg-cf-control-hover/40 hover:text-cf-text",
             dropping && "border-cf-focus bg-cf-focus/15 text-cf-text",
             isDragging && "z-10 opacity-70",
           )}
@@ -109,7 +109,7 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
           data-current={current || undefined}
           data-drop-target={dropping || undefined}
         >
-          <SpaceIcon spaceId={spaceId} />
+          <SpaceIcon spaceId={spaceId} filled={current} />
           {renaming ? (
             <NameField
               spaceId={spaceId}
@@ -127,7 +127,11 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
           )}
           {count > 0 && (
             <span
-              className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-cf-warning-surface px-1 text-caption-sm font-medium text-cf-warning-text tabular-nums"
+              className={cn(
+                "flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full px-1 text-caption-sm font-medium tabular-nums",
+                // On the current tab's accent fill the warning tint would not read: the count takes the tab's own foreground.
+                current && !dropping ? "bg-cf-accent-foreground/20 text-cf-accent-foreground" : "bg-cf-warning-surface text-cf-warning-text",
+              )}
               aria-label={`${String(count)} ${count === 1 ? "thread needs" : "threads need"} you`}
               data-testid="space-tab-count"
             >
@@ -172,7 +176,8 @@ function SpaceTab({ spaceId, current, count, only, renaming, onRename }: SpaceTa
 }
 
 /**
- * The space tabs of the top bar, in their order: a quiet row, the current one a bordered pill.
+ * The space tabs of the top bar, in their order: a quiet row, the current one a solid accent pill. A switch is
+ * instant: nothing here animates.
  * Dragging one to another place moves it there (space.move); the new order shows until the
  * daemon's commit arrives, so the tab does not jump back.
  */
