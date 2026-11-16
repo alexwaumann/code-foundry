@@ -97,6 +97,8 @@ type Store struct {
 	snap atomic.Pointer[Snapshot]
 	// lastGood is what lastGoodPath holds as far as this store wrote it.
 	lastGood []byte
+	// cleared are the once clears that are done (once.go).
+	cleared map[string]bool
 
 	watcher *fsnotify.Watcher
 	stop    chan struct{}
@@ -129,6 +131,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 		opts.Debounce = DefaultDebounce
 	}
 	s := &Store{opts: opts, log: opts.Log, raw: map[string]string{}, themes: opts.Themes, stop: make(chan struct{})}
+	s.readCleared()
 
 	data, err := os.ReadFile(opts.Path)
 	switch {
@@ -136,6 +139,7 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 		if err := writeAtomic(opts.Path, render(nil, nil)); err != nil {
 			return nil, err
 		}
+		s.applyOnceClears(s.raw, true)
 	case err != nil:
 		return nil, fmt.Errorf("settings: read %s: %w", opts.Path, err)
 	default:
@@ -143,12 +147,14 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 			s.loadErr = err.Error()
 			if good, ok := s.readLastGood(); ok {
 				s.raw = good
+				s.applyOnceClears(s.raw, false)
 				s.log.Warn("settings file does not parse; using the last one that did", "path", opts.Path, "err", err, "copy", s.lastGoodPath())
 			} else {
 				s.log.Warn("settings file does not parse; using defaults", "path", opts.Path, "err", err)
 			}
 		} else {
 			s.raw = raw
+			s.applyOnceClears(s.raw, true)
 			s.saveLastGood(data)
 		}
 	}
@@ -297,6 +303,7 @@ func (s *Store) Update(_ context.Context, partial map[string]string) (*Snapshot,
 		return nil, err
 	}
 	s.saveLastGood(data)
+	s.markPendingCleared()
 	for _, k := range dropped {
 		s.log.Warn("settings: value dropped from the file; its name is also a table", "key", k)
 	}
@@ -320,6 +327,7 @@ func (s *Store) reload() {
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		s.raw, s.loadErr = map[string]string{}, ""
+		s.applyOnceClears(s.raw, true)
 	case err != nil:
 		s.log.Warn("settings: reload failed", "err", err)
 		return
@@ -332,6 +340,7 @@ func (s *Store) reload() {
 			s.loadErr = derr.Error()
 		} else {
 			s.raw, s.loadErr = raw, ""
+			s.applyOnceClears(s.raw, true)
 			s.saveLastGood(data)
 		}
 	}
