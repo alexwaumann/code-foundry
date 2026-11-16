@@ -170,6 +170,22 @@ describe("the shell sidebar list", () => {
     expect([...body.children].map((c) => c.getAttribute("data-testid"))).toEqual(["row-line-1", "thread-name", "row-line-3"]);
   });
 
+  // The title-first rows left every status word to screen readers; a woken thread is the one call on
+  // the user that sits in Active, and its row read as nothing but a bell (docs/notes/clear-woken-thread.md).
+  it("a woken thread's row sits in Active and says Woke beside its bell", () => {
+    setThreads(thread({ id: "s-1", state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - 60_000 }));
+    render(<ShellSidebarList bodyHeight={800} />);
+    const row = rowOf("s:s-1");
+    expect(row.getAttribute("data-section")).not.toBe("needs");
+    const line1 = within(row).getByTestId("row-line-1");
+    const status = within(line1).getByTestId("row-status");
+    expect(status.getAttribute("data-kind")).toBe("snoozeEnded");
+    expect(status.className).toContain("text-cf-warning-text");
+    expect(within(status).getByTestId("row-status-icon").getAttribute("class")).toContain("lucide-bell-ring");
+    expect(within(status).getByTestId("row-status-word").className).not.toContain("sr-only");
+    expect(status.textContent).toBe("Woke");
+  });
+
   it("a thread with no project: the house and No project; no third line unless it has counts", () => {
     render(<ShellSidebarList bodyHeight={800} />);
     const bare = rowOf("s:s-3");

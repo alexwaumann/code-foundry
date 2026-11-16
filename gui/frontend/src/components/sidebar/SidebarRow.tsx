@@ -1,5 +1,5 @@
 import { memo, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
-import { AlarmClock, ArrowRightLeft, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
+import { AlarmClock, ArrowRightLeft, BellRing, Bookmark, Bot, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, CornerDownRight, GitBranch, House, Layers, OctagonX, Pin, SquareTerminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { CLAUDE_ORANGE, ClaudeMark } from "@/components/icons/ClaudeMark";
 import { ProjectKindIcon } from "@/components/icons/ProjectKindIcon";
@@ -117,7 +117,7 @@ function Elapsed({ at, className }: { at: number; className?: string }) {
  * for working, waiting and setting up a plain space and the time since the status changed in
  * the same tone; for an idle thread only the time since its last activity, muted. The word
  * is not shown (the hover card says it, docs/notes/sidebar-title-first.md); it stays for
- * screen readers.
+ * screen readers. A woken snooze shows it ("Woke", StatusEntry.rowWord).
  */
 export function RowStatus({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((st) => statusLine(st.byId[id])));
@@ -130,7 +130,7 @@ export function RowStatus({ id }: { id: string }) {
   return (
     <span className={cn("flex min-w-0 items-center gap-[3px] text-caption-sm font-medium", badge.toneClass)} data-testid="row-status" data-kind={line.kind}>
       <Icon className="size-3.5 shrink-0" aria-hidden data-testid="row-status-icon" />
-      <span className="sr-only" data-testid="row-status-word">
+      <span className={cn(!badge.rowWord && "sr-only")} data-testid="row-status-word">
         {badge.word}
       </span>
       {at !== null && <Elapsed at={at} className="whitespace-nowrap" />}
@@ -404,6 +404,12 @@ type CardTone = TipStatusTone | "emerald";
 
 const tipStatusIcons: Readonly<Record<CardTone, LucideIcon>> = { amber: CircleAlert, red: OctagonX, emerald: CircleCheck };
 
+/** Kinds whose card icon is their row's rather than their tone's: a woken snooze keeps its bell. */
+const tipKindIcons: Partial<Readonly<Record<StatusLineKind, LucideIcon>>> = { snoozeEnded: BellRing };
+
+/** The kinds whose card time is a moment ("6m ago") rather than a span ("for 6m"): a finished turn, a wake (as the dock strip says it). */
+const agoCardKinds: ReadonlySet<StatusLineKind> = new Set<StatusLineKind>(["finished", "snoozeEnded"]);
+
 /** The kinds whose card status says how long the thread has been so ("for 6m"): Claude's prompts and errors, not a deleted transcript. */
 const timedCardKinds: ReadonlySet<StatusLineKind> = new Set<StatusLineKind>(["input", "question", "plan", "snoozeEnded", "error", "interrupted", "crashed", "setupFailed"]);
 
@@ -429,7 +435,7 @@ function TipStatus({ id }: { id: string }) {
   const changedAt = useThreadsStore((st) => st.byId[id]?.statusChangedAtMs ?? null);
   const tone: CardTone | null = line.kind === "finished" ? "emerald" : tipStatusTone(line.kind);
   if (tone === null) return null;
-  const Icon = tipStatusIcons[tone];
+  const Icon = tipKindIcons[line.kind] ?? tipStatusIcons[tone];
   const finished = line.kind === "finished";
   const timed = changedAt !== null && (finished || timedCardKinds.has(line.kind));
   return (
@@ -440,7 +446,7 @@ function TipStatus({ id }: { id: string }) {
         {timed && (
           <>
             {finished ? " " : " · "}
-            <TipElapsed at={changedAt} ago={finished} />
+            <TipElapsed at={changedAt} ago={agoCardKinds.has(line.kind)} />
           </>
         )}
       </span>

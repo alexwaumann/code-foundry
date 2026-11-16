@@ -80,7 +80,6 @@ describe("SidebarRow title first", () => {
     ["permission", { status: "attention", statusReason: "permission: Bash zig build test" }, "input", "lucide-shield-question-mark", "Permission", "text-cf-warning-text"],
     ["question", { status: "attention", statusReason: "question: Which one?" }, "question", "lucide-circle-question-mark", "Question", "text-cf-warning-text"],
     ["plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "plan", "lucide-clipboard-check", "Plan", "text-cf-warning-text"],
-    ["snooze ended", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: NOW - 2 * MIN }, "snoozeEnded", "lucide-bell-ring", "Woke", "text-cf-warning-text"],
     ["error", { status: "attention", statusReason: "error: model_not_found" }, "error", "lucide-circle-alert", "Error", "text-cf-error-text"],
     ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: NOW - MIN }, "interrupted", "lucide-unplug", "Interrupted", "text-cf-error-text"],
     ["crashed", { state: "disconnected", status: "error", statusReason: "crashed", statusChangedAtMs: NOW - MIN }, "crashed", "lucide-triangle-alert", "Crashed", "text-cf-error-text"],
@@ -98,6 +97,20 @@ describe("SidebarRow title first", () => {
     expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("size-3.5");
     expect(screen.getByTestId("row-status-word").textContent).toBe(word);
     expect(screen.getByTestId("row-status-word").className).toContain("sr-only");
+  });
+
+  // The word went sr-only with every other status in the title-first rows; a woken thread sits in
+  // Active, where its bell alone did not read as a status, so it says "Woke" (StatusEntry.rowWord).
+  it("snooze ended: the bell and the word Woke, shown, in the warning tone", () => {
+    renderRow({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: NOW - 2 * MIN });
+    expect(screen.getByTestId("thread-body").getAttribute("data-status-line")).toBe("snoozeEnded");
+    const status = screen.getByTestId("row-status");
+    expect(status.className.split(" ")).toEqual(expect.arrayContaining(["text-cf-warning-text", "font-medium"]));
+    expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("lucide-bell-ring");
+    const word = screen.getByTestId("row-status-word");
+    expect(word.textContent).toBe("Woke");
+    expect(word.className).not.toContain("sr-only");
+    expect(status.textContent).toBe("Woke");
   });
 
   it("idle: no icon or word, the time since the last activity, muted", () => {
@@ -1098,6 +1111,7 @@ describe("SidebarRow card status time", () => {
     ["an error: for 6m", { status: "attention", statusReason: "error: model_not_found" }, "Error · model_not_found · for 6m", "red"],
     ["interrupted: for 6m", { state: "disconnected", status: "error", statusReason: "interrupted" }, "Interrupted while working · for 6m", "red"],
     ["done: 6m ago, green", { status: "attention", statusReason: "finished" }, "Finished 6m ago", "emerald"],
+    ["woken: 6m ago, as the dock strip says it", { state: "disconnected", status: "attention", statusReason: "snooze ended" }, "Snooze ended · 6m ago", "amber"],
   ])("%s", (_name, o, text, tone) => {
     const card = openCard({ ...o, statusChangedAtMs: Date.now() - 6 * MIN - 5_000 });
     const st = within(card).getByTestId("tip-status");
@@ -1105,6 +1119,14 @@ describe("SidebarRow card status time", () => {
     expect(st.getAttribute("data-tone")).toBe(tone);
     if (tone !== "emerald") expect(st.className).toContain(tone === "amber" ? "text-cf-warning-text" : "text-cf-error-text");
     expect(within(card).getByTestId("tip-status-time").className).toContain("text-cf-text-muted");
+  });
+
+  it("woken: the row's bell, not the alert", () => {
+    const card = openCard({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - MIN });
+    expect(within(card).getByTestId("tip-status").querySelector("svg")?.getAttribute("class")).toContain("lucide-bell-ring");
+    cleanup();
+    const q = openCard({ status: "attention", statusReason: "question: Which one?", statusChangedAtMs: Date.now() - MIN });
+    expect(within(q).getByTestId("tip-status").querySelector("svg")?.getAttribute("class")).toContain("lucide-circle-alert");
   });
 
   it("a snoozed finished thread: how long ago it finished, not when it wakes (the row says that)", () => {
