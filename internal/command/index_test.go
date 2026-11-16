@@ -28,11 +28,16 @@ import (
 //     .page, .pr): aliases kept for one stable release; the index lists the new names.
 //   - The shell window's key between a thread and its diff (view.thread-diff): the user's
 //     view; a model opens a diff with view.open.diff.
+//   - The bell (notification.*): the user's. Posting is a verb any caller has (`commands`,
+//     `help notification post`), with no text steering agents to it
+//     (docs/notes/notifications-1-store.md).
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
 //     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe).
 var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
 	"composer.draft.start", "composer.history", "composer.new", "file.export",
+	"notification.act", "notification.clear", "notification.dismiss", "notification.list", "notification.post",
+	"notification.snooze", "notification.withdraw",
 	"pane.focus", "pane.focus.down", "pane.focus.left", "pane.focus.right", "pane.focus.up", "pane.fullscreen", "pane.move.down",
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
 	"terminal.cycle", "terminal.quick",

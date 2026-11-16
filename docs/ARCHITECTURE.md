@@ -140,6 +140,9 @@ internal/
     ember/                 Ember, the resident agent: its home (SOUL.md, MEMORY.md, seed/),
                            epochs (consolidation by a one-shot claude -p, then a reseed), the
                            task board, its workers' models (docs/notes/ember-2-store.md)
+    notification/          the bell's notifications: one per source and key, show_at and snooze
+                           on the wall clock, dismiss, withdraw, act
+                           (docs/notes/notifications-1-store.md)
     memory/                the app memory: the user's standing preferences (<home>/memory/,
                            one file per entry with provenance, and MEMORY.md), appended to
                            every thread's system prompt at spawn
@@ -417,7 +420,7 @@ Services (v1):
   brings a classic window's stored panels over once (§14).
 * `EventService` — Watch: one server stream that multiplexes every store's events and UI
   intents (sources project, workspace, terminal, thread list, thread, gh, gitops, theme,
-  settings, update, action, plugin, skill, memory, search, layout, ui; the thread source carries threads' pending requests only, a
+  settings, update, action, plugin, skill, memory, search, layout, notification, ui; the thread source carries threads' pending requests only, a
   snapshot then changes, never items; filterable). On connect it sends each source's snapshot in that order, then live events; a source that drops events for a
   slow client resends only its own snapshot. This is the GUI's only long-lived sync
   stream, and `code-foundry events --source …` reads the same one. Live events pass
@@ -539,6 +542,15 @@ Services (v1):
   memory, read only; its actions are the `memory.*` commands (`docs/notes/memory-dir.md`).
   The GUI shows it on Settings › Memory, fed by the EventService memory source
   (`docs/notes/memory-page.md`).
+* `NotificationService` — List: the bell's notifications (what plugins and
+  `notification.post` post; one per source and key, a dismissed key stays dismissed until
+  its content changes, show_at and snooze held on the wall clock), read only; its actions
+  are the `notification.*` commands, `notification.act` running an action through the verb
+  its kind maps to. EventService's `notification` source carries the whole snapshot per
+  change with the ids that arrived apart from those updated, since only an arrival toasts;
+  the snapshot counts the shown time-sensitive ones for the dock badge. A notification
+  naming a thread is withdrawn when the thread is removed
+  (`internal/daemon/notification_threads.go`; `docs/notes/notifications-1-store.md`).
 * `DictationService` — Watch (the whole state: on/off, the anywhere, hold key and sounds
   settings, model and download, this Mac, the open session, mic denied, the host's
   Accessibility report, the window's composer target), Download, CancelDownload, RemoveModel, Start, Stop,

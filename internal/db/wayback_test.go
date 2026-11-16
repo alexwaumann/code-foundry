@@ -35,6 +35,7 @@ func TestLayoutWayBack(t *testing.T) {
 		`INSERT INTO layout_spaces (id, name, position, doc, updated_at) VALUES ('sp-a', 'Main', 0, '{"v":1,"root":null}', 1)`,
 		`INSERT INTO layout_threads (thread_id, space_id, updated_at) VALUES ('s-1', 'sp-a', 1)`,
 		`INSERT INTO layout_meta (key, value) VALUES ('legacy_import', 'done:1')`,
+		`INSERT INTO notifications (id, source, key, level, title, state, created_at, updated_at) VALUES ('n-1', 'command', 'k', 'info', 'Hi', 'dismissed', 1, 1)`,
 	} {
 		if _, err := db.ExecContext(ctx, q); err != nil {
 			t.Fatal(err)
@@ -51,7 +52,7 @@ func TestLayoutWayBack(t *testing.T) {
 	if err := Migrate(ctx, db, old); err != nil {
 		t.Fatalf("an old build after the way back: %v", err)
 	}
-	for _, table := range []string{"layout_spaces", "layout_threads", "layout_meta", "project_include_ignored"} {
+	for _, table := range []string{"layout_spaces", "layout_threads", "layout_meta", "project_include_ignored", "notifications"} {
 		var n int
 		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&n); err != nil || n != 0 {
 			t.Errorf("%s: %d, %v; want it gone", table, n, err)

@@ -11,6 +11,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/command"
 	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
+	"github.com/alexwaumann/code-foundry/internal/store/notification"
 )
 
 // Deps are the dependencies of all command domains.
@@ -99,6 +100,9 @@ type Deps struct {
 	// Emitter: a change from a thread is checked and shown). Nil registers them failing with
 	// Unimplemented.
 	Memory command.MemoryBackend
+	// Notification backs notification.* (the bell's notifications; act runs actions through
+	// the registry's own verbs). Nil registers them failing with Unimplemented.
+	Notification notification.Store
 	// Themes backs the user-theme verbs (theme.show, save, duplicate, delete) and the
 	// user's themes in theme.list and the slot commands; nil: the catalog only.
 	Themes command.ThemeBackend
@@ -227,6 +231,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterDictation(r, command.DictationDeps{Dictation: d.Dictation, Status: d.DictationStatus, Emitter: d.Emitter}),
 		command.RegisterSearch(r, command.SearchDeps{Search: d.Search, Wait: d.SearchWait}),
 		command.RegisterMemory(r, command.MemoryDeps{Memory: d.Memory, Threads: d.Thread, Emitter: d.Emitter}),
+		command.RegisterNotification(r, command.NotificationDeps{Store: d.Notification}),
 		command.RegisterLayout(r, command.LayoutDeps{Layout: d.Layout, Thread: d.Thread, Settings: d.Settings}),
 		command.RegisterCapabilities(r, command.CapabilitiesDeps{
 			Version: d.Daemon.Version, Settings: d.Settings, Memory: d.Memory, Plugins: d.Plugin,

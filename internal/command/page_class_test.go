@@ -15,7 +15,7 @@ import (
 // asks first. Some ask anyway, through Confirm.
 var pageRuns = []string{
 	"action.add", "action.edit", "action.run", "app.restart", "daemon.restart", "dictation.start",
-	"file.export", "git.fetch", "git.pull", "git.push", "plugin.dev", "plugin.enable", "plugin.install", "plugin.new",
+	"file.export", "git.fetch", "notification.act", "git.pull", "git.push", "plugin.dev", "plugin.enable", "plugin.install", "plugin.new",
 	"plugin.secrets.delete", "plugin.uninstall", "plugin.update", "pr.auto-merge", "pr.checkbox",
 	"pr.comment", "pr.create", "pr.merge", "pr.revert", "pr.review", "pr.review.request",
 	"project.add-workspace", "project.branch.delete", "project.clone", "project.delete", "project.git.init",
@@ -46,6 +46,7 @@ var pageState = []string{
 	"dictation.download.cancel", "dictation.hold", "dictation.remove", "dictation.stop",
 	"dictation.toggle", "ember.disable", "ember.enable", "ember.task.cancel", "ember.task.done",
 	"file.find", "file.find.text", "file.save", "file.search", "file.search.next", "file.search.previous", "memory.clear", "memory.remove", "notifications.test",
+	"notification.clear", "notification.dismiss", "notification.post", "notification.snooze", "notification.withdraw",
 	"plugin.act", "plugin.browse", "plugin.disable", "plugin.reload", "plugin.restart",
 	"plugin.surface", "pr.draft", "pr.open", "pr.ready", "pr.refresh", "project.add",
 	"project.create", "project.files.include", "project.refresh", "project.rename", "project.unregister", "search.clear",

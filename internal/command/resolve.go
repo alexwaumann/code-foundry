@@ -49,6 +49,8 @@ const (
 	SpaceID
 	// DraftID: a composer draft, "d-" + 8 base32 characters (or an id the window chose).
 	DraftID
+	// NotificationID: a notification in the bell, "n-" + 12 hex digits.
+	NotificationID
 )
 
 // MinIDSuffix is the shortest suffix an id arg resolves.
@@ -67,6 +69,7 @@ var idKinds = map[IDKind]struct{ prefix, noun string }{
 	SplitID:        {"s-", "split"},
 	SpaceID:        {"", "space"},
 	DraftID:        {"d-", "draft"},
+	NotificationID: {"n-", "notification"},
 }
 
 // IDLister returns every id of a kind the daemon knows now.

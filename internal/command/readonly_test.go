@@ -36,7 +36,7 @@ var readOnly = []string{
 	"daemon.capabilities", "daemon.status", "daemon.version",
 	"dictation.status",
 	"ember.board", "ember.status", "ember.task.list", "ember.task.show",
-	"memory.show",
+	"memory.show", "notification.list",
 	"plugin.env", "plugin.list", "plugin.logs", "plugin.secrets.list", "plugin.terminals", "plugin.threads", "plugin.wakes",
 	"pr.checks",
 	"project.list",

@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package codefoundry.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// NotificationService reads the bell's notifications (docs/notes/notifications-1-store.md):
+// what plugins and the notification.post command post, one per source and key. It only
+// reads; posting, dismissing, snoozing, acting and clearing are the notification.*
+// commands (CommandService.Invoke), so the bell, the palette and the CLI run the same
+// thing. EventService's notification source carries the same snapshot live.
+service NotificationService {
+  // List returns the active notifications, and with include_closed the dismissed,
+  // withdrawn and resolved ones the daemon keeps (30 days after their last change).
+  rpc List(ListNotificationsRequest) returns (ListNotificationsResponse) {}
+}
+
+enum NotificationLevel {
+  NOTIFICATION_LEVEL_UNSPECIFIED = 0;
+  NOTIFICATION_LEVEL_INFO = 1;
+  NOTIFICATION_LEVEL_WARNING = 2;
+  NOTIFICATION_LEVEL_ERROR = 3;
+}
+
+// NotificationStatus is where a notification is: an active one is shown (in the bell),
+// snoozed or scheduled (waiting for its show_at); a closed one was dismissed by the user,
+// withdrawn by its source (or its thread was removed), or resolved by an action.
+enum NotificationStatus {
+  NOTIFICATION_STATUS_UNSPECIFIED = 0;
+  NOTIFICATION_STATUS_SHOWN = 1;
+  NOTIFICATION_STATUS_SNOOZED = 2;
+  NOTIFICATION_STATUS_SCHEDULED = 3;
+  NOTIFICATION_STATUS_DISMISSED = 4;
+  NOTIFICATION_STATUS_WITHDRAWN = 5;
+  NOTIFICATION_STATUS_RESOLVED = 6;
+}
+
+// NotificationAction is a button on a notification; the first is the primary. Dismiss and
+// Snooze are the host's, never an action.
+message NotificationAction {
+  string label = 1;
+  // Pressing it resolves the notification (by default for command, send and start; not
+  // for open).
+  bool resolves = 2;
+  oneof kind {
+    NotificationCommandAction command = 3;
+    NotificationSendAction send = 4;
+    NotificationStartAction start = 5;
+    NotificationOpenAction open = 6;
+  }
+}
+
+// Runs one of the source plugin's manifest commands (plugin.<source>.<command>).
+message NotificationCommandAction {
+  string command = 1;
+  map<string, string> args = 2;
+}
+
+// Sends text to a thread.
+message NotificationSendAction {
+  string thread_id = 1;
+  string text = 2;
+}
+
+// Starts a thread with a prompt, in a project (empty: without one).
+message NotificationStartAction {
+  string prompt = 1;
+  string project_id = 2;
+}
+
+// Opens an http(s) URL in the browser.
+message NotificationOpenAction {
+  string url = 1;
+}
+
+message Notification {
+  // "n-" + 12 hex digits.
+  string id = 1;
+  // The plugin that posted it, or "command" (notification.post).
+  string source = 2;
+  // One notification per source and key; a key the source did not give starts "auto:".
+  string key = 3;
+  NotificationLevel level = 4;
+  // Sorted first, tinted, and counted in the dock badge while shown.
+  bool time_sensitive = 5;
+  string title = 6;
+  string body = 7;
+  // The thread it is about; empty for none.
+  string thread_id = 8;
+  repeated NotificationAction actions = 9;
+  NotificationStatus status = 10;
+  // When the source asked it to be shown; unset for at once.
+  google.protobuf.Timestamp show_at = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  // When it was last shown (its first post, its show_at, the end of a snooze); unset
+  // while scheduled.
+  google.protobuf.Timestamp arrived_at = 14;
+  // When a snoozed one comes back; unset when not snoozed.
+  google.protobuf.Timestamp snoozed_until = 15;
+}
+
+// NotificationSnapshot is every active notification: the shown ones first (time-sensitive
+// first, then the newest arrival first), then the snoozed and scheduled ones by when they
+// come back.
+message NotificationSnapshot {
+  repeated Notification notifications = 1;
+  // The shown time-sensitive notifications: the dock badge's share.
+  int32 time_sensitive = 2;
+  // Grows by one per change in this daemon's lifetime.
+  uint64 version = 3;
+}
+
+message ListNotificationsRequest {
+  bool include_closed = 1;
+}
+
+message ListNotificationsResponse {
+  NotificationSnapshot snapshot = 1;
+  // With include_closed: the closed ones, the newest change first.
+  repeated Notification closed = 2;
+}
+
+// NotificationEvent carries the whole snapshot, on connect and per change, and which
+// notifications the change made arrive (shown for the first time, at their show_at, at
+// the end of a snooze, or a dismissed key whose content changed: what a toast is for) and
+// which it only updated in place (no toast). Both are empty on connect.
+message NotificationEvent {
+  NotificationSnapshot snapshot = 1;
+  repeated string arrived_ids = 2;
+  repeated string updated_ids = 3;
+}

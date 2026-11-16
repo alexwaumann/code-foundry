@@ -60,6 +60,8 @@ type EventsDeps struct {
 	Search SearchActivitySource
 	// Layout is the window shell's layout.
 	Layout layout.Store
+	// Notification is the bell's notifications.
+	Notification NotificationStore
 	// Done ends every stream when closed (daemon shutdown). May be nil.
 	Done <-chan struct{}
 	// Epoch is Event.epoch, the daemon instance; empty draws a random one (NewEvents).
@@ -143,7 +145,7 @@ type eventResumer interface{ resume(ctx context.Context) }
 
 // sources lists the stream's sources in the order their snapshots are sent (see
 // events.proto: project, workspace, terminal, thread, thread, gh, gitops, theme, settings,
-// update, action, plugin, skill, memory, search, layout),
+// update, action, plugin, skill, memory, search, layout, notification),
 // followed by UI intents.
 func (h *Events) sources() []eventSource {
 	d := h.deps
@@ -193,6 +195,9 @@ func (h *Events) sources() []eventSource {
 	}
 	if d.Layout != nil {
 		out = append(out, layoutSource{store: d.Layout, bus: d.Bus}) // api/layout_events.go
+	}
+	if d.Notification != nil {
+		out = append(out, notificationSource{store: d.Notification, bus: d.Bus}) // api/notification.go
 	}
 	out = append(out, uiSource{bus: d.Bus})
 	return out
