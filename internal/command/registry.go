@@ -112,6 +112,11 @@ func (r *Registry) RegisterAll(cmds ...Command) error {
 type Listed struct {
 	Command
 	Available bool
+	// DefaultKeybindings are the chords the command registered with, before the
+	// overrides that Command.Keybindings has applied. The settings store resolves the
+	// user's overrides against these: given the overridden chords, a reset would put a
+	// command back on its override (an unbound one on nothing).
+	DefaultKeybindings []string
 }
 
 // List returns the commands available in uctx, or all commands with Available filled
@@ -122,7 +127,7 @@ func (r *Registry) List(uctx Context, includeUnavailable bool) []Listed {
 	for _, c := range r.cmds {
 		avail := c.Available(uctx)
 		if avail || includeUnavailable {
-			l := Listed{Command: r.effective(c), Available: avail}
+			l := Listed{Command: r.effective(c), Available: avail, DefaultKeybindings: slices.Clone(c.Keybindings)}
 			if c.DynamicTitle != nil {
 				if t := c.DynamicTitle(uctx); t != "" {
 					l.Title = t
