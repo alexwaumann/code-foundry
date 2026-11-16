@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Layers } from "lucide-react";
 import { ProjectIcon } from "@/components/icons/ProjectKindIcon";
 import { SnoozePresetItems } from "@/components/snooze/SnoozeMenu";
@@ -11,7 +12,7 @@ import { composeLike } from "@/stores/compose";
 import { openMovePicker } from "@/stores/movePicker";
 import { useProjectsStore } from "@/stores/projects";
 import { openSaveWorkspace, useCanSaveAsWorkspace } from "@/stores/saveWorkspace";
-import { archiveThread, pinThread, regenerateThreadName, runThreadIn, snoozeThread, threadContext } from "@/stores/threadActions";
+import { archiveThread, forkThread, pinThread, regenerateThreadName, removeThread, runThreadIn, snoozeThread, threadContext } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useWorkspacesStore } from "@/stores/workspaces";
 import { markInPlace, markMovePicking, type MenuKit } from "./menuKit";
@@ -92,17 +93,20 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * a naming call runs), Move to project… (a thread without a project: the move picker), Pin, Snooze ▸ (and Unsnooze while snoozed); New
  * thread on this branch, Save as workspace, Run in ▸, Restart Claude (while a plugin's
  * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
- * flagged the thread: thread.flag.clear, every plugin's); Archive. An item a thread cannot
- * use is left out.
+ * flagged the thread: thread.flag.clear, every plugin's); Archive, then `afterArchive` (the
+ * header's and the tab's Close); Fork (not for a setup that did not finish; disabled once the
+ * transcript is gone) and Remove. An item a thread cannot use is left out.
  *
  * Success toasts (docs/notes/toast-success-rule.md): none where both menus' places show the
  * result (Regenerate name: the row and the tab; Unsnooze: the row and the pane's snooze
  * strip; Run in: the row and the header's chip). Pin, Snooze, Save for later, Clear flags and
  * Archive show only in the sidebar row (a snooze closes the thread's tab): silent from the
- * row's menu, toasted from the header's (kit.rowInView). Restart Claude shows nowhere and
- * toasts from both.
+ * row's menu, toasted from the header's (kit.rowInView); Remove likewise. Restart Claude shows
+ * nowhere and toasts from both. Fork selects the new thread, which shows it.
  */
-export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
+export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: MenuKit; afterArchive?: ReactNode }) {
+  // Nothing to fork from once Claude Code deleted the transcript (docs/notes/transcript-deleted.md).
+  const transcriptMissing = useThreadsStore((s) => s.byId[id]?.transcriptMissing === true);
   const noProject = useNoProjectThread(id);
   // No project: "Move to project…" opens the move picker under the header crumb (opening the thread first).
   const movable = useCanMove(id);
@@ -257,6 +261,29 @@ export function ThreadMenuItems({ id, kit }: { id: string; kit: MenuKit }) {
         }}
       >
         {archived ? "Unarchive" : "Archive"}
+      </kit.Item>
+      {afterArchive}
+      <kit.Separator />
+      {!unfinished && (
+        <kit.Item
+          data-testid="menu-fork"
+          disabled={transcriptMissing}
+          onSelect={() => {
+            // The fork's row comes in (and the daemon selects it).
+            void forkThread(id, { inView: true });
+          }}
+        >
+          Fork
+        </kit.Item>
+      )}
+      <kit.Item
+        variant="destructive"
+        data-testid="menu-remove"
+        onSelect={() => {
+          void removeThread(id, { inView: kit.rowInView });
+        }}
+      >
+        Remove
       </kit.Item>
     </>
   );

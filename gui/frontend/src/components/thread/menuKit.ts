@@ -8,6 +8,7 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -16,6 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -30,12 +32,14 @@ type Tagged = Children & { "data-testid"?: string };
  * dropdown's (the thread header's title). Their props differ; the items need only these.
  */
 export interface MenuKit {
-  Item: ComponentType<Tagged & { onSelect: () => void; disabled?: boolean; [data: `data-${string}`]: string | undefined }>;
+  Item: ComponentType<Tagged & { onSelect: () => void; disabled?: boolean; variant?: "default" | "destructive"; [data: `data-${string}`]: string | undefined }>;
   Separator: ComponentType;
+  /** An item's key, at its right end. */
+  Shortcut: ComponentType<Children>;
   Label: ComponentType<Children & { className?: string }>;
   Sub: ComponentType<Children>;
   SubTrigger: ComponentType<Tagged>;
-  SubContent: ComponentType<Tagged>;
+  SubContent: ComponentType<Tagged & { className?: string }>;
   /**
    * After an item that leaves the thread where it is (Pin, Snooze, Archive and their undo),
    * the keyboard goes to the thread's prompt, as the header's old buttons left it: the
@@ -54,6 +58,7 @@ export interface MenuKit {
 export const contextMenuKit: MenuKit = {
   Item: ContextMenuItem,
   Separator: ContextMenuSeparator,
+  Shortcut: ContextMenuShortcut,
   Label: ContextMenuLabel,
   Sub: ContextMenuSub,
   SubTrigger: ContextMenuSubTrigger,
@@ -65,6 +70,7 @@ export const contextMenuKit: MenuKit = {
 export const dropdownMenuKit: MenuKit = {
   Item: DropdownMenuItem,
   Separator: DropdownMenuSeparator,
+  Shortcut: DropdownMenuShortcut,
   Label: DropdownMenuLabel,
   Sub: DropdownMenuSub,
   SubTrigger: DropdownMenuSubTrigger,
@@ -72,6 +78,12 @@ export const dropdownMenuKit: MenuKit = {
   promptAfterInPlace: true,
   rowInView: false,
 };
+
+/**
+ * A thread tab's context menu (components/thread/ThreadMenu.tsx): a context menu's parts, but no
+ * sidebar row is known to be in view, so its items toast as the header's do.
+ */
+export const tabMenuKit: MenuKit = { ...contextMenuKit, rowInView: false };
 
 /** The thread an in-place item just ran for from a promptAfterInPlace menu (markInPlace). */
 let inPlace: string | null = null;
@@ -119,4 +131,22 @@ export function focusPromptAfterMenu(id: string): void {
   inPlace = null;
   const sel = useUiStore.getState().selection;
   if (sel.kind === "thread" && sel.id === id) useUiStore.setState((s) => ({ promptFocusSeq: s.promptFocusSeq + 1 }));
+}
+
+/** The thread whose tab menu's item moved the keyboard (into a tab it opened or focused). */
+let tabMenuMoved = "";
+
+/** An item of thread `id`'s tab menu put the keyboard in a tab. */
+export function markTabMenuMoved(id: string): void {
+  tabMenuMoved = id;
+}
+
+/**
+ * ShellSurface.tabMenuKeepsFocus for a thread's tab: an item put the keyboard somewhere (a tab,
+ * the rename field, the composer, the move picker), so the closing menu leaves it there.
+ */
+export function threadTabMenuKeepsFocus(tab: { thread: string }): boolean {
+  const was = tabMenuMoved === tab.thread;
+  tabMenuMoved = "";
+  return was || keepFocusAfterMenu(tab.thread);
 }

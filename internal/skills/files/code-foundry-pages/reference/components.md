@@ -120,6 +120,7 @@ These draw inside the page's card, never over the app: give the page room for a 
 - `ContextMenuSubContent`: its menu.
 - `ContextMenuLabel`: a heading.
 - `ContextMenuSeparator`: a line.
+- `ContextMenuShortcut`: a key hint at an entry's right.
 - `TooltipProvider`: wrap the page's root in one, or no tooltip opens.
 - `Tooltip`: `TooltipTrigger` + `TooltipContent` inside.
 - `TooltipTrigger`: what it describes (`asChild`).

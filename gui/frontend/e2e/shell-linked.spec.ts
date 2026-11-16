@@ -158,6 +158,19 @@ test("the header's submenus follow the pointer, Open to Move to space", async ({
   await expect(page.getByTestId("move-to-space-item")).toHaveAttribute("data-disabled", "");
 });
 
+test("a right click on a thread's tab opens the thread's menu, on a tab that is not the active one too; Close closes that tab", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await seed(two(pane("p-1", [thread("s-1"), thread("s-3")]), pane("p-2", [diff])), "p-2");
+  await openShell(page);
+  // The tab drags and takes a context menu trigger's handlers at once: the right click reaches the menu.
+  await paneEl(page, "p-1").locator('[data-testid="shell-tab"][data-tab-id="t-s-3"]').click({ button: "right" });
+  const menu = page.getByTestId("shell-tab-menu");
+  await expect(menu.getByTestId("menu-remove")).toBeVisible();
+  await menu.getByTestId("menu-close").click();
+  await expect(paneEl(page, "p-1").locator('[data-testid="shell-tab"][data-tab-id="t-s-3"]')).toHaveCount(0);
+  await expect(paneEl(page, "p-1").locator('[data-testid="shell-tab"][data-tab-id="t-s-1"]')).toHaveCount(1);
+});
+
 test("thread info floats over a narrow pane's conversation until a press back in it; a wide pane keeps the card inline", async ({ page }) => {
   // The card takes 320px beside 480px of conversation: the right pane has room, the left none.
   await page.setViewportSize({ width: 1600, height: 900 });

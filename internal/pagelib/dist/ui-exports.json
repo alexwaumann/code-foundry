@@ -27,6 +27,7 @@
  "ContextMenuRadioGroup",
  "ContextMenuRadioItem",
  "ContextMenuSeparator",
+ "ContextMenuShortcut",
  "ContextMenuSub",
  "ContextMenuSubContent",
  "ContextMenuSubTrigger",
