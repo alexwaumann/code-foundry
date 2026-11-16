@@ -170,7 +170,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         name: "thread.open",
         title: "Open Thread",
         category: CATEGORY,
-        description: "Open a thread's tab, or focus it when it is open: in the focused pane of the thread's space (--pane: that pane, at --index; --split with --edge: a new pane on that edge of a pane; --outer: a new pane on that edge of the whole pane area), in place of the space's composer when that is all the space shows. An archived thread opens in the current space.",
+        description: "Open a thread's tab, or focus it when it is open: in the thread's space, in the focused pane when it has a thread open, else in the nearest pane that has one, else in the focused pane (setting layout.smart_placement) (--pane: that pane, at --index; --split with --edge: a new pane on that edge of a pane; --outer: a new pane on that edge of the whole pane area), in place of the space's composer when that is all the space shows. An archived thread opens in the current space.",
         keybindings: [],
         noPalette: true,
         args: [
@@ -577,7 +577,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
         name: "composer.new",
         title: "New Thread in a Tab",
         category: CATEGORY,
-        description: "Focus the space's empty composer, or open one in the focused pane. --project, --workspace or --like say what the thread will start from.",
+        description: "Focus the space's empty composer, or open one where a thread's tab opens (thread.open). --project, --workspace or --like say what the thread will start from.",
         keybindings: [],
         noPalette: true,
         args: [str("space", "The space"), str("pane", "The pane it opens in"), str("project", "The project the thread starts in"), str("workspace", "The workspace the thread starts in"), str("like", "A thread the new one starts like"), focusArg],
@@ -613,7 +613,7 @@ function verbs(world: LayoutVerbsWorld): Entry[] {
       run: (_c, a) => run({ op: "discard_draft", draft: a.draft ?? "" }, () => `discarded draft ${a.draft ?? ""}`),
     },
     {
-      cmd: { name: "composer.draft.open", title: "Open Draft", category: CATEGORY, description: "Focus a draft's tab, or open it in its space's focused pane.", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true }), focusArg] },
+      cmd: { name: "composer.draft.open", title: "Open Draft", category: CATEGORY, description: "Focus a draft's tab, or open it in its space where a thread's tab opens (thread.open).", keybindings: [], noPalette: true, args: [str("draft", "The draft", { required: true, positional: true }), focusArg] },
       when: always,
       run: (_c, a) => run({ op: "open_draft", draft: a.draft ?? "", focus: a.focus !== "false" }, (r) => `draft ${r.result.draft ?? ""} is tab ${r.result.tab ?? ""}`),
     },

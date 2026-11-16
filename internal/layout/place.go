@@ -23,7 +23,8 @@ import (
 // terminals the tab would not fit in (canTake) is no candidate. A joined pane is never
 // resized. The caller's pane ("+") wins over 2 to 6, and is refused when it cannot take the
 // tab; a tab whose thread has no tab in the space, and a tab of no thread, go to the focused
-// pane, or the most recently focused pane that can take it (hostPane).
+// pane, or the most recently focused pane that can take it (hostPane). A composer tab goes
+// where a thread's own tab goes (threadHost: smart placement).
 
 // The pane area placement measures when the op names none (plan section 2.4), and the width
 // the rest keeps when a new pane's size is raised to its kind's floor: a pane's minimum.
@@ -136,14 +137,21 @@ func (t *tx) place(sp *Space, chosen *Node, tb *Tab, focus bool, w, h float64) (
 	}
 	tsp, tp, _ := t.st.FindTab(threadTabID(t.st, tb.Thread))
 	if !tb.IsLinked() || tp == nil || tsp != sp {
-		fp := hostPane(sp, w, h, tb)
+		fp, rule := hostPane(sp, w, h, tb), "focused"
+		if tb.Kind == "compose" {
+			// A composer is a thread to be: it opens where a thread's own tab opens.
+			var near bool
+			if fp, near = t.threadHost(sp, w, h, tb); near {
+				rule = "near"
+			}
+		}
 		if fp == nil {
 			fp = &Node{T: NodePane, ID: t.newID("p-"), Tabs: []*Tab{tb}, Active: tb.ID}
 			sp.Root = fp
 			t.show(sp, fp, tb.ID, focus)
 			return Result{Space: sp.ID, Pane: fp.ID, Tab: tb.ID, Rule: "focused"}, nil
 		}
-		return put(fp, fp.TabIndex(fp.Active)+1, "focused")
+		return put(fp, fp.TabIndex(fp.Active)+1, rule)
 	}
 	L := Rects(sp.Root, w, h)
 
@@ -313,6 +321,38 @@ func hostPane(sp *Space, w, h float64, tb *Tab) *Node {
 		return p
 	}
 	return fp
+}
+
+// threadHost is the pane a thread's own tab, or a composer tab, opens in when nothing chose a
+// pane (docs/notes/shell-model.md, "Where a thread's own tab opens"). With smart placement on
+// (Options.NoSmartPlacement unset): the focused pane when it holds a thread (holdsThread) and
+// can take tb; else the open pane holding a thread nearest the focused pane that can (rank:
+// distance between centres, then layout order); else, with no such pane, hostPane. Near says
+// it went to a pane other than the focused one by that rule. Nil in an empty space.
+func (t *tx) threadHost(sp *Space, w, h float64, tb *Tab) (p *Node, near bool) {
+	fp := focusedPane(sp)
+	if t.opts.NoSmartPlacement || fp == nil {
+		return hostPane(sp, w, h, tb), false
+	}
+	if holdsThread(fp) && canTake(sp, fp, w, h, tb) {
+		return fp, false
+	}
+	var cands []*Node
+	for _, p := range Panes(sp.Root) {
+		if p != fp && !p.Collapsed && holdsThread(p) && canTake(sp, p, w, h, tb) {
+			cands = append(cands, p)
+		}
+	}
+	if len(cands) == 0 {
+		return hostPane(sp, w, h, tb), false
+	}
+	return rank(Rects(sp.Root, w, h), fp, "", cands, false)[0], true
+}
+
+// holdsThread reports whether pane p holds a thread: a thread's own tab or a composer tab,
+// active or not.
+func holdsThread(p *Node) bool {
+	return slices.ContainsFunc(p.Tabs, func(tb *Tab) bool { return tb.Kind == "thread" || tb.Kind == "compose" })
 }
 
 // recentTaker is the most recently focused open pane of sp that can take tb (by the space's

@@ -62,7 +62,8 @@ func (l layout) threadCommands() []Command {
 	return []Command{
 		{
 			Name: "thread.open", Title: "Open Thread", Category: layoutCategory, Page: PageState,
-			Description: "Open a thread's tab, or focus it when it is open: in the focused pane of the thread's space (--pane: " +
+			Description: "Open a thread's tab, or focus it when it is open: in the thread's space, in the focused pane when it has a thread " +
+				"open, else in the nearest pane that has one, else in the focused pane (setting layout.smart_placement) (--pane: " +
 				"that pane, at --index from 0; --split with --edge: a new pane on that edge of a pane; --outer: a new pane on " +
 				"that edge of the whole pane area), in place of the space's composer when that is all the space shows. An " +
 				"archived thread lives in no space: it opens in the current space (or --pane's). The linked tabs it had open " +

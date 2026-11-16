@@ -185,7 +185,7 @@ func (r *PanelResult) placed(c *core.Result, focus bool) {
 var rulePhrases = map[string]string{
 	"2": "beside the thread's other tabs", "3": "in a pane next to the thread's", "4": "in a pane of linked tabs",
 	"5": "in a new pane right of the thread", "6": "in the thread's own pane", "pane": "in the pane asked for",
-	"focused": "in the focused pane",
+	"focused": "in the focused pane", "near": "in the pane of the nearest thread",
 }
 
 // tabMessage is an item verb's text: where its tab is, and the windows that show the layout.

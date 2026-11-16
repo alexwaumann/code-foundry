@@ -1,0 +1,74 @@
+{
+  "doc": "Smart placement: the focused pane holds only a terminal, so a thread's tab opens in the pane holding a thread, which takes the focus.",
+  "state": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [{"id":"t-a","kind":"thread","thread":"th-a"}],
+              "active": "t-a"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-b",
+        "mru": ["t-t","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "op": {"op":"open_thread","thread":"th-x","focus":true,"w":1600,"h":900},
+  "want": {
+    "v": 1,
+    "spaces": [
+      {
+        "id": "sp-a",
+        "name": "Main",
+        "root": {
+          "t": "split",
+          "id": "s-r",
+          "dir": "row",
+          "kids": [
+            {
+              "t": "pane",
+              "id": "p-a",
+              "tabs": [
+                {"id":"t-a","kind":"thread","thread":"th-a"},
+                {"id":"t-n1","kind":"thread","thread":"th-x"}
+              ],
+              "active": "t-n1"
+            },
+            {
+              "t": "pane",
+              "id": "p-b",
+              "tabs": [{"id":"t-t","kind":"terminal","params":{"terminal":"term-t-t"}}],
+              "active": "t-t"
+            }
+          ],
+          "sizes": [0.5,0.5]
+        },
+        "focus": "p-a",
+        "mru": ["t-n1","t-t","t-a"]
+      }
+    ],
+    "current_space": "sp-a",
+    "default_space": "sp-a"
+  },
+  "result": {"space":"sp-a","pane":"p-a","tab":"t-n1","rule":"near"}
+}

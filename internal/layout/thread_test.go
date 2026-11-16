@@ -303,3 +303,70 @@ func TestOpenThreadSwapSetting(t *testing.T) {
 		t.Error("smart swap is not an op of its own: it runs inside ApplyWith")
 	}
 }
+
+// TestSmartPlacement pins where a thread's own tab and a composer open with the setting
+// layout.smart_placement on (the default) and off: on, the focused pane only when it holds a
+// thread or a composer, else the nearest pane that does, else the focused pane; off, the
+// focused pane. A pane the caller chose wins either way.
+func TestSmartPlacement(t *testing.T) {
+	two := func(left, right, focus string) string {
+		return `{"v":1,"spaces":[{"id":"sp-a","name":"Main","root":{"t":"split","id":"s-1","dir":"row","sizes":[0.5,0.5],"kids":[
+		 {"t":"pane","id":"p-a","tabs":[` + left + `]},
+		 {"t":"pane","id":"p-b","tabs":[` + right + `]}]},
+		 "focus":"` + focus + `"}],"current_space":"sp-a","default_space":"sp-a"}`
+	}
+	const (
+		th   = `{"id":"t-a","kind":"thread","thread":"th-a"}`
+		cmp  = `{"id":"t-c","kind":"compose","params":{"draft":"d-1"}}`
+		term = `{"id":"t-t","kind":"terminal","params":{"terminal":"term-1"}}`
+		dif  = `{"id":"t-d","kind":"diff","thread":"th-a","params":{"project":"p","worktree":"w"}}`
+		prs  = `{"id":"t-p","kind":"prs"}`
+	)
+	open := &OpenThread{Thread: "th-x", Focus: true, W: 1600, H: 900}
+	cases := []struct {
+		name    string
+		state   string
+		op      Op
+		on, off string // the pane the tab opens in with the setting on and off
+		rule    string // Result.Rule with it on
+	}{
+		{"focused pane holds a thread", two(th, term+`,{"id":"t-b","kind":"thread","thread":"th-b"}`, "p-b"), open, "p-b", "p-b", "focused"},
+		{"focused terminal, neighbour thread", two(th, term, "p-b"), open, "p-a", "p-b", "near"},
+		{"focused diff, neighbour thread", two(dif, th, "p-a"), open, "p-b", "p-a", "near"},
+		{"composer counts as a thread", two(cmp, term, "p-b"), open, "p-a", "p-b", "near"},
+		{"no pane holds a thread", two(prs, dif, "p-b"), open, "p-b", "p-b", "focused"},
+		{"explicit pane wins", two(th, dif, "p-b"), &OpenThread{Thread: "th-x", Pane: "p-b", Focus: true, W: 1600, H: 900}, "p-b", "p-b", "pane"},
+		{"new thread composer", two(th, dif, "p-b"), &NewThread{Focus: true, W: 1600, H: 900}, "p-a", "p-b", "near"},
+		{"another surface keeps the focused pane", two(th, dif, "p-b"), &OpenSurface{Tab: &Tab{Kind: "prs"}, Focus: true, W: 1600, H: 900}, "p-b", "p-b", "focused"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			st, _, err := Decode([]byte(tc.state), &SeqIDs{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, off := range []bool{false, true} {
+				next, res, err := ApplyWith(st, tc.op, &SeqIDs{}, Options{NoSmartPlacement: off})
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := tc.on
+				if off {
+					want = tc.off
+				}
+				if res.Pane != want {
+					t.Errorf("off %v: opened in %s, want %s", off, res.Pane, want)
+				}
+				if sp := next.Space("sp-a"); sp.Focus != want {
+					t.Errorf("off %v: focus in %s, want %s (the focus follows the tab)", off, sp.Focus, want)
+				}
+				if !off && res.Rule != tc.rule {
+					t.Errorf("rule %q, want %q", res.Rule, tc.rule)
+				}
+			}
+		})
+	}
+	if slices.Contains(OpNames(), "smart_placement") {
+		t.Error("smart placement is not an op of its own: it is part of placement")
+	}
+}

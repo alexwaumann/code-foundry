@@ -561,3 +561,40 @@ func TestSmartSwapSetting(t *testing.T) {
 		})
 	}
 }
+
+// layout.smart_placement (Options.SmartPlacement) is read at every op: with the focus on a pane
+// holding only a diff, a thread opened goes beside thread a with it on, and to the focused
+// pane with it off.
+func TestSmartPlacementSetting(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		on   bool
+		near bool // the thread opens in thread a's pane, not the focused diff pane
+	}{
+		{"on", true, true},
+		{"off", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			on := true
+			opts := Options{DB: dbtest.Open(t), IDs: &core.SeqIDs{}, FocusDelay: time.Hour, Log: slog.New(slog.DiscardHandler),
+				SmartPlacement: func() bool { return on }}
+			m, err := New(context.Background(), opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = m.Close(context.Background()) })
+			a := apply(t, m, &core.OpenThread{Thread: "th-a", Focus: true}).Result
+			side := apply(t, m, &core.SplitPane{Pane: a.Pane, Edge: "right", Focus: true,
+				Tab: &core.Tab{Kind: "diff", Thread: "th-a", Params: map[string]string{"project": "pj", "worktree": "w"}}}).Result
+			on = tc.on
+			b := apply(t, m, &core.OpenThread{Thread: "th-b", Focus: true}).Result
+			want := side.Pane
+			if tc.near {
+				want = a.Pane
+			}
+			if b.Pane != want {
+				t.Errorf("thread b opened in %s; want %s", b.Pane, want)
+			}
+		})
+	}
+}

@@ -17,7 +17,7 @@ interface OpCase {
   doc: string;
   state: State;
   op: Op;
-  options?: { keep_focus?: boolean; no_smart_swap?: boolean };
+  options?: { keep_focus?: boolean; no_smart_swap?: boolean; no_smart_placement?: boolean };
   want?: State;
   error?: string;
   result?: { space?: string; pane?: string; tab?: string; existing?: boolean; closed?: string[]; rule?: string; draft?: string; kept?: string[]; swapped?: string[]; placed?: string[] };
@@ -201,7 +201,7 @@ describe("the mock's LayoutService", () => {
     }
   });
 
-  it("opens a thread in the focused pane and a linked surface right of it (the simplified rules)", () => {
+  it("opens a linked surface right of its thread and another thread beside the first (the simplified rules)", () => {
     const { layout } = service();
     layout.seed("one-thread");
     const diff = layout.apply({ op: "open_surface", tab: { id: "", kind: "diff", thread: "s-1", params: { project: "p", worktree: "w" } }, focus: true });
@@ -209,9 +209,30 @@ describe("the mock's LayoutService", () => {
     // A second linked surface joins the pane holding the thread's linked tabs.
     const file = layout.apply({ op: "open_surface", tab: { id: "", kind: "file", thread: "s-1", params: { path: "/a" } } });
     expect(file.result.pane).toBe("p-n1");
+    // Smart placement: the focused pane holds no thread, so the thread opens beside s-1.
     const opened = layout.apply({ op: "open_thread", thread: "s-2", focus: true });
-    expect(opened.result.pane).toBe("p-n1");
+    expect(opened.result).toMatchObject({ pane: "p-1", rule: "near" });
     layout.apply({ op: "close_thread", thread: "s-1" });
     expect(JSON.stringify(layout.state())).not.toMatch(/"thread":"s-1"/);
+  });
+
+  // layout.smart_placement (the mock's deps.smartPlacement, read at every op as the daemon reads
+  // the setting): a thread opened or a composer started from a focused diff pane goes to the pane
+  // holding a thread with it on, and to the focused pane with it off. A pane asked for wins.
+  it.each([
+    { name: "on", on: true, thread: "p-1", compose: "p-1", rule: "near" },
+    { name: "off", on: false, thread: "p-2", compose: "p-2", rule: "focused" },
+  ])("places a thread's tab by smart placement $name", ({ on, thread, compose, rule }) => {
+    const opened = (op: Op) => {
+      const layout = new MockLayout({ publish: () => {}, ids: seqIds(), smartPlacement: () => on });
+      layout.seed("thread-and-diff");
+      layout.apply({ op: "focus_pane", pane: "p-2" });
+      return layout.apply(op).result;
+    };
+    expect(opened({ op: "open_thread", thread: "s-x", focus: true })).toMatchObject({ pane: thread, rule });
+    expect(opened({ op: "new_thread", focus: true })).toMatchObject({ pane: compose, rule });
+    expect(opened({ op: "open_thread", thread: "s-x", pane: "p-2", focus: true })).toMatchObject({ pane: "p-2" });
+    // Another surface of no thread keeps going to the focused pane.
+    expect(opened({ op: "open_surface", tab: { id: "", kind: "prs" }, focus: true })).toMatchObject({ pane: "p-2", rule: "focused" });
   });
 });

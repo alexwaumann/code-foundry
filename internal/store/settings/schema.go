@@ -249,6 +249,7 @@ const (
 	KeyBackdrop                  = "appearance.backdrop"
 	KeyBackdropFile              = "appearance.backdrop_file"
 	KeySmartSwap                 = "layout.smart_swap"
+	KeySmartPlacement            = "layout.smart_placement"
 	KeyThreadInfo                = "layout.thread_info"
 	KeyNeedsScope                = "sidebar.needs_scope"
 	KeyDockBadge                 = "notifications.dock_badge"
@@ -563,6 +564,12 @@ var staticFields = []Field{
 		Description: "When a thread's tab gains focus, panes showing another thread's diff, pull request or terminal switch to this thread's, if it is already open there. Nothing opens or closes.",
 		Default:     "true",
 		bind:        func(s *Settings) any { return &s.Layout.SmartSwap },
+	},
+	{
+		Key: KeySmartPlacement, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Smart placement",
+		Description: "A thread you open or start goes to the focused pane only if it already has a thread open, otherwise to the nearest pane that has one. Choosing a pane yourself still wins.",
+		Default:     "true",
+		bind:        func(s *Settings) any { return &s.Layout.SmartPlacement },
 	},
 	{
 		Key: KeyThreadInfo, Group: GroupLayout, Page: PageAppearance, Section: "panes", Type: Bool, Title: "Thread info by default",
