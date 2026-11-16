@@ -1,6 +1,6 @@
 ---
 name: code-foundry-plugin
-description: "Build, debug and publish a Code Foundry plugin: a Go executable with a plugin.json manifest that adds commands, surfaces (tabs), thread flags, event subscriptions, session environment or its own Claude threads and terminals. Use for anything touching a plugin, plugin.json, pluginsdk, pluginsdk/ui or plugintest, for the code-foundry plugin dev, logs, surface or act commands, or for a plugin registry."
+description: "Build, debug and publish a Code Foundry plugin: a Go executable with a plugin.json manifest that adds commands, surfaces (tabs), notifications, event subscriptions, session environment or its own Claude threads and terminals. Use for anything touching a plugin, plugin.json, pluginsdk, pluginsdk/ui or plugintest, for the code-foundry plugin dev, logs, surface or act commands, or for a plugin registry."
 ---
 
 # Building a Code Foundry plugin
@@ -25,7 +25,7 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 | Use a display node (list, chips, log, notice, section…) or a menu | `nodes.md` |
 | Take input (fields, pickers that search, drafts, secrets in forms) | `forms.md` |
 | Lay out: columns, pane, grid, group, master-detail; a toolbar or footer (search, filters) | `ui-layout.md` |
-| Call the host: `h.Log`, `h.DataDir`, Invoke, flags, notifications, context facts, session env, secrets, toasts | `host-api.md` |
+| Call the host: `h.Log`, `h.DataDir`, Invoke, notifications, context facts, session env, secrets, toasts | `host-api.md` |
 | React to daemon events | `events.md` |
 | Let agents wait on the plugin instead of polling | `wakes.md` |
 | Run its own Claude threads or terminals | `owned.md` |
@@ -38,6 +38,12 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 (`/ui`, `/plugintest`) has every type. For a working use of any component, `code-foundry
 plugin install alexwaumann/code-foundry-plugin-showcase` and read its `tab_*.go`; larger
 plugins: `alexwaumann/code-foundry-plugin-gh-actions`, `-test-watcher`.
+
+## Before changing a plugin
+
+Check its code against `reference/removals.md` (`code-foundry plugin removals`). For each
+deprecated or retired call it uses, tell the user plainly which call, since when and what
+replaces it, and offer to move it to the new path as part of the work.
 
 ## The loop
 

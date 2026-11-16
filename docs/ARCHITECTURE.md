@@ -136,7 +136,7 @@ internal/
                            (docs/notes/actions-1-daemon.md)
     plugin/                plugins: discovery, consent, one actor per enabled plugin (stdio
                            JSON-RPC), plugin.<name>.* commands, Keychain secrets, surfaces,
-                           predicates, events, flags, session environment (§10)
+                           predicates, events, flags (as notifications), session environment (§10)
     ember/                 Ember, the resident agent: its home (SOUL.md, MEMORY.md, seed/),
                            epochs (consolidation by a one-shot claude -p, then a reseed), the
                            task board, its workers' models (docs/notes/ember-2-store.md)
@@ -533,8 +533,9 @@ Services (v1):
   (`session/setEnvironment`: env, PATH entries, `--add-dir`s, scoped by project; `plugin
   env`). Plugins subscribe to EventService's sources over the protocol (`events/subscribe`,
   `api.PluginFeed` on the same loop as Watch, a bounded drop-oldest queue per plugin) and
-  raise flags on threads (`thread/setFlag`; `Thread.flags`, ThreadService.ClearFlags,
-  `thread flags`); `docs/notes/plugins-3-events-flags-env.md`.
+  raise flags on threads (`thread/setFlag`, deprecated: notifications naming the thread;
+  `Thread.flags` stays empty, ThreadService.ClearFlags dismisses them, `thread flags`);
+  `docs/notes/plugins-3-events-flags-env.md`, `docs/notes/plugin-flag-retirement.md`.
 * `SkillService` — Search, Installed, Registries: the Skills
   marketplace, read only; its actions are the `skill.*` commands (§10;
   `docs/notes/skills-3-api.md`).
@@ -743,11 +744,12 @@ with the reason, so the layout glue can record what each ran while they still ex
   entries in front of PATH. A spawn may wait up to 2 s for a plugin still starting; the
   effort restart never waits and re-reads them. Naming and shells get none
   (`docs/notes/plugins-3-events-flags-env.md`).
-* **Flags** (`flags.go`): plugins' attention / error flags with a one-line reason, one per
-  (thread, plugin), an overlay that never touches status; persisted (`thread_flags`),
-  cleared by the plugin, when it is disabled or removed, on archive, and for until-seen
-  flags when the thread's items are watched. The GUI counts a flagged thread as needing
-  attention (sort group, line 2, window title, dock).
+* **Flags** (`flags.go`): plugins' flags are notifications now (§10), so the store carries
+  none and a flag never changes a thread's status, section or attention. It keeps the
+  seen hook (`SetSeenHook`: a viewer opening while attended, or presence rising with the
+  thread open, the acknowledge points of a finished turn), `Seen`, and the rows
+  `thread_flags` held before, which the daemon converts once at start and drops
+  (`docs/notes/plugin-flag-retirement.md`).
   `ThreadService.RunIn` moves a thread to another of its checkouts (that member becomes
   the primary) with the control protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
@@ -1149,7 +1151,7 @@ verb in `settings.toml` is reported and dropped, never fatal.
   opens the update dialog (`SHELL_SINCE`, `lib/update.ts`; `docs/notes/shell-20-cutover.md`).
 * Sidebar (`components/sidebar/shell`; `docs/notes/shell-16-sidebar.md`): New thread and
   search, then **Needs you** (the user's own threads that wait on them: a permission, a
-  question, a plan, a woken snooze, a plugin's flag; from every space or this one,
+  question, a plan, a woken snooze; from every space or this one,
   `sidebar.needs_scope`, switched by one pill), **Active** (this space's pinned threads, its
   composer drafts, then errors and finished turns, then idle ones), and the collapsible footers
   Working, Snoozed and Archived (Archived lists every space's), scrolling on its own, with a
@@ -1301,7 +1303,7 @@ verb in `settings.toml` is reported and dropped, never fatal.
 
 Plugins extend the app without changing it: separate executables, written by users and
 mostly by agents, that the daemon runs and that contribute commands, surfaces
-(tabs), thread flags, a share of every new thread's environment, and Claude threads and
+(tabs), notifications, a share of every new thread's environment, and Claude threads and
 terminals of their own. Design: `docs/sketches/plugins/` (`DECISIONS.md` wins); what was
 built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
 
@@ -1356,8 +1358,12 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   the plugin sees only `{key, stored}`.
 * **Events, flags, environment.** `events/subscribe` feeds a plugin the EventService
   sources it was granted, on the same loop as `Watch`, through a bounded drop-oldest
-  queue that resends a snapshot after drops. `thread/setFlag` puts an attention or error
-  flag on a thread (an overlay in the thread store; never the stream's status).
+  queue that resends a snapshot after drops. `thread/setFlag` (deprecated, permission
+  `threadStatus` only) is a notification naming the thread under the key
+  `flag:<thread>[:until-seen]`, warning or error, the reason its title; `none` withdraws
+  it, an until-seen one is dismissed at the thread store's seen moments, archiving the
+  thread withdraws it, and `Flags()` reads the active ones back
+  (`internal/daemon/plugin_flags.go`, `docs/notes/plugin-flag-retirement.md`).
   `session/setEnvironment` contributes env, PATH entries and `--add-dir`s to new threads
   through the thread store's spawn extras (§6). `notification/post` and `/withdraw`
   (permission `notifications`) reach the notification store under source = the plugin's
@@ -1378,7 +1384,10 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
 * **SDK** (`pluginsdk/`, a nested module, stdlib only, Go 1.24, `replace`d into the
   main module): manifest types and validation, the JSON-RPC `Conn`, `Serve` and `Host`;
   `pluginsdk/ui` (typed nodes, builders, `Validate` with the host's rules);
-  `pluginsdk/plugintest` (a fake host). Releases are tagged `pluginsdk/vX.Y.Z`; plugin
+  `pluginsdk/plugintest` (a fake host); `removals.go`, the dated list of calls on their way
+  out (deprecated: works, logged once per run by the host; retired: same signature, does
+  nothing, warns; deleted on the user's say), printed by `plugin removals` and rendered
+  into the plugin skill. Releases are tagged `pluginsdk/vX.Y.Z`; plugin
   repositories `go get` the tag on the commit the daemon was built from, else that commit
   (`skills.SDKPin`).
 * **GUI**: plugin surfaces are a generic tab kind (`plugin.<name>.<surface>`), linked to a

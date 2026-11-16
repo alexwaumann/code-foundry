@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -10,8 +12,13 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1"
+	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
+	"github.com/alexwaumann/code-foundry/internal/bus"
+	"github.com/alexwaumann/code-foundry/internal/store/notification"
+	"github.com/alexwaumann/code-foundry/internal/store/notification/notificationtest"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
+	"github.com/alexwaumann/code-foundry/internal/store/thread/threadtest"
 )
 
 // A plugin's feed gets the same events as Watch, as protojson: each source's snapshot
@@ -69,26 +76,35 @@ func TestPluginFeed(t *testing.T) {
 	}
 }
 
+// Flags are notifications: Thread.flags stays empty, and ClearFlags dismisses the
+// thread's flag notifications (one plugin's, or every one).
 func TestThreadFlagsAPI(t *testing.T) {
-	fake, c := newThreadServer(t)
+	b := bus.New()
+	fake := threadtest.New(b)
+	notes := notificationtest.New(t, notificationtest.Options{})
+	route := NewThread(fake, b).WithNotifications(notes).Route()
+	mux := http.NewServeMux()
+	mux.Handle(route.Path, route.Handler)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	c := codefoundryv1connect.NewThreadServiceClient(srv.Client(), srv.URL)
 	ctx := context.Background()
-	at := time.UnixMilli(1_700_000_000_000)
-	fake.Put(thread.Thread{ID: "s-1", Flags: []thread.Flag{
-		{Source: "gh-actions", SourceName: "GitHub Actions", Level: thread.FlagError, Reason: "deploy failed", SetAt: at, UntilSeen: true},
-		{Source: "hello", SourceName: "Hello", Level: thread.FlagAttention, Reason: "look", SetAt: at},
-	}})
-	g, err := c.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: "s-1"}))
-	if err != nil {
-		t.Fatal(err)
+	fake.Put(thread.Thread{ID: "s-1"})
+	post := func(source, key, threadID string) {
+		t.Helper()
+		if _, err := notes.Post(ctx, notification.Post{Source: source, Key: key, Title: "x", ThreadID: threadID}); err != nil {
+			t.Fatal(err)
+		}
 	}
-	fl := g.Msg.GetThread().GetFlags()
-	if len(fl) != 2 || fl[0].GetPlugin() != "gh-actions" || fl[0].GetPluginDisplayName() != "GitHub Actions" ||
-		fl[0].GetLevel() != v1.ThreadFlagLevel_THREAD_FLAG_LEVEL_ERROR || fl[0].GetReason() != "deploy failed" ||
-		!fl[0].GetSetAt().AsTime().Equal(at) || !fl[0].GetUntilSeen() || fl[1].GetLevel() != v1.ThreadFlagLevel_THREAD_FLAG_LEVEL_ATTENTION {
-		t.Fatalf("flags = %v", fl)
+	post("gh-actions", notification.FlagKey("s-1", true), "s-1")
+	post("hello", notification.FlagKey("s-1", false), "s-1")
+	post("hello", "build-1", "s-1") // a plugin's own notification is not a flag
+	g, err := c.Get(ctx, connect.NewRequest(&v1.GetThreadRequest{Id: "s-1"}))
+	if err != nil || len(g.Msg.GetThread().GetFlags()) != 0 {
+		t.Fatalf("Get: flags %v, %v", g.Msg.GetThread().GetFlags(), err)
 	}
 	res, err := c.ClearFlags(ctx, connect.NewRequest(&v1.ClearThreadFlagsRequest{Id: "s-1", Plugin: "hello"}))
-	if err != nil || res.Msg.GetCleared() != 1 || len(res.Msg.GetThread().GetFlags()) != 1 {
+	if err != nil || res.Msg.GetCleared() != 1 {
 		t.Fatalf("ClearFlags(hello) = %v, %v", res, err)
 	}
 	if _, err := c.ClearFlags(ctx, connect.NewRequest(&v1.ClearThreadFlagsRequest{Id: "s-1", Plugin: "hello"})); connect.CodeOf(err) != connect.CodeNotFound {
@@ -96,6 +112,14 @@ func TestThreadFlagsAPI(t *testing.T) {
 	}
 	if res, err := c.ClearFlags(ctx, connect.NewRequest(&v1.ClearThreadFlagsRequest{Id: "s-1"})); err != nil || res.Msg.GetCleared() != 1 {
 		t.Errorf("ClearFlags(all) = %v, %v", res, err)
+	}
+	if _, active := notes.Active("hello", "build-1"); !active {
+		t.Error("the plugin's own notification went too")
+	}
+	for _, n := range notes.List(true) {
+		if n.IsFlag() && n.State != notification.StateDismissed {
+			t.Errorf("flag %s is %s, want dismissed", n.Key, n.State)
+		}
 	}
 	if _, err := c.ClearFlags(ctx, connect.NewRequest(&v1.ClearThreadFlagsRequest{Id: "s-nope"})); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Errorf("unknown thread: %v", err)

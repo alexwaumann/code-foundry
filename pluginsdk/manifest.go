@@ -165,6 +165,7 @@ var EventSources = []string{"project", "workspace", "threads", "thread", "gh", "
 var ReservedNames = []string{
 	"list", "show", "install", "uninstall", "enable", "disable", "restart", "logs", "dev",
 	"reload", "surface", "act", "secrets", "update", "env", "threads", "terminals", "browse", "wakes", "new",
+	"removals",
 }
 
 // ReservedArgNames are CLI flags every command has; args may not use them.

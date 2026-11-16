@@ -1,5 +1,7 @@
 package plugin_test
 
+//lint:file-ignore SA1019 the test plugins still call the deprecated thread/setFlag (pluginsdk/removals.go)
+
 import (
 	"context"
 	"encoding/json"

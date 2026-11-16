@@ -2,13 +2,12 @@
   "name": "hello",
   "displayName": "Hello",
   "version": "0.1.0",
-  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, runs a Claude thread and a terminal of its own, ticks for subscribed threads, and posts notifications.",
+  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, marks threads with a notification, gives new threads CF_HELLO=1, runs a Claude thread and a terminal of its own, ticks for subscribed threads, and posts notifications.",
   "protocol": 1,
   "exec": ["bin/hello"],
   "permissions": {
     "commands": ["thread.send", "pr.checks", "plugin.hello.show.demo"],
     "events": ["threads"],
-    "threadStatus": true,
     "sessionEnv": true,
     "secrets": true,
     "threads": true,
@@ -56,13 +55,12 @@
       "args": [{ "name": "thread", "context": "thread", "description": "The thread (default: the active one)" }]
     },
     {
-      "name": "flag",
-      "title": "Flag Thread",
-      "description": "Raise (or with level none clear) the plugin's flag on a thread: the thread needs attention in the sidebar.",
+      "name": "mark",
+      "title": "Mark Thread",
+      "description": "Post (or with level none withdraw) a notification about a thread, one per thread: marking it again updates the card.",
       "args": [
-        { "name": "level", "type": "enum", "enum": ["attention", "error", "none"], "default": "attention", "description": "attention, error or none" },
-        { "name": "reason", "default": "Hello wants a look", "description": "One line, at most 80 characters" },
-        { "name": "until-seen", "type": "bool", "description": "Clear it when the thread is opened" },
+        { "name": "level", "type": "enum", "enum": ["warning", "error", "info", "none"], "default": "warning", "description": "warning, error, info or none" },
+        { "name": "reason", "default": "Hello wants a look", "description": "The notification's title: one short line" },
         { "name": "thread", "context": "thread", "description": "The thread (default: the active one, or --context-thread)" }
       ]
     },

@@ -20,7 +20,7 @@ show in `code-foundry plugin list`'s NOTE column.
   "permissions": {
     "commands": ["thread.send", "pr.checks"],
     "events": ["gh"],
-    "threadStatus": true
+    "notifications": true
   },
   "commands": [
     {
@@ -55,7 +55,7 @@ show in `code-foundry plugin list`'s NOTE column.
 | Field | Rules |
 |---|---|
 | `name` | Required. `[a-z0-9][a-z0-9-]{0,63}`; with commands or surfaces also a command segment: a letter first, no double or trailing hyphen (`gh-actions`, not `1password` or `gh--x`). Not one of the host's verbs: {{cf.reservedNames}}. It is the folder name under `~/.code-foundry/plugins`, the command prefix `plugin.<name>.` and the registry entry's name. |
-| `displayName` | Up to 60 characters; shown in lists, as the palette group of its commands and before its flag reasons ("GitHub Actions: deploy failed"). Default: `name`. |
+| `displayName` | Up to 60 characters; shown in lists, as the palette group of its commands and as the source of its notifications. Default: `name`. |
 | `version` | Required. Strict semantic version without a leading `v`: `0.1.0`, `1.0.0-rc.1`. The release tag is `v<version>`. |
 | `description` | Up to 300 characters; shown in the consent dialog and the registry. |
 | `protocol` | Required: `1`. |
@@ -75,7 +75,7 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 |---|---|---|
 | `commands` | globs | `Host.Invoke` and view command buttons for these host commands. Globs over dotted names: `*` within a segment, `**` across (`"thread.send"`, `"view.open.*"`, `"action.**"`). `plugin.<verb>` management commands are refused whatever the globs. The list: `reference/host-commands.md` and `reference/host-commands-thread-view.md`. |
 | `events` | sources | `Host.Subscribe` to these event sources: {{cf.eventSources}}. |
-| `threadStatus` | bool | `Host.SetFlag`: attention or error flags on threads. |
+| `threadStatus` | bool | `Host.SetFlag` (deprecated: `removals.md`), which the host shows as a notification naming the thread. A new plugin asks for `notifications`. |
 | `notifications` | bool | `Host.Notify`, `WithdrawNotification`, `FireWakeNotify`: notifications in the bell, whose buttons run the plugin's commands, send to or start a thread, or open a link (`host-api.md`). |
 | `sessionEnv` | bool | `Host.SetEnvironment`: env, PATH entries and `--add-dir`s for new Claude threads. |
 | `secrets` | bool | `Host.Secrets()` and form secret inputs with `store`: the plugin's own Keychain namespace. |

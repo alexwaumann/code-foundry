@@ -592,7 +592,7 @@ func (m *Manager) release(ctx context.Context, name string, logs *logBuffer) {
 	} else if had && logs != nil {
 		logs.add("host", "", "session environment dropped: new threads no longer get it")
 	}
-	m.clearFlags(ctx, name, logs)
+	// Its flags are notifications (flags.go): they go with the rest.
 	m.withdrawNotifications(ctx, name, logs)
 }
 
@@ -614,13 +614,6 @@ func (m *Manager) sweep(ctx context.Context) {
 		}
 	}
 	m.env.mu.Unlock()
-	if m.opts.Flags != nil {
-		for _, name := range m.opts.Flags.Plugins() {
-			if !enabled(name) && !slices.Contains(gone, name) {
-				gone = append(gone, name)
-			}
-		}
-	}
 	if m.opts.Notifications != nil {
 		for _, name := range m.opts.Notifications.Sources() {
 			if !enabled(name) && !slices.Contains(gone, name) {

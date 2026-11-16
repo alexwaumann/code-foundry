@@ -147,6 +147,10 @@ type stores struct {
 	// stopNotificationThreads stops the glue that withdraws a removed thread's
 	// notifications (notification_threads.go).
 	stopNotificationThreads func()
+	// flags are plugins' thread flags as notifications (plugin_flags.go);
+	// stopFlagNotifications stops their glue.
+	flags                 pluginFlags
+	stopFlagNotifications func()
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -377,6 +381,11 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		return nil, err
 	}
 	s.stopNotificationThreads = startNotificationThreads(ctx, log.With("store", "notification"), s.notification, s.thread.Snapshot, s.bus)
+	// Plugins' thread flags are notifications (plugin_flags.go): the ones stored before
+	// are converted once, then the thread store's seen moments and archives reach them.
+	s.flags = pluginFlags{threads: s.thread, notes: s.notification}
+	convertLegacyFlags(ctx, log.With("store", "notification"), s.thread, s.flags)
+	s.stopFlagNotifications = startFlagNotifications(ctx, log.With("store", "notification"), s.thread, s.flags, s.bus)
 	// After thread and terminal: the layout follows their lifecycles (layout.go).
 	if s.stopLayout, err = startLayoutGlue(ctx, layoutGlueOptions{
 		Log: log.With("store", "layout"), Layout: s.layout, Terminals: s.terminal, Bus: s.bus, Threads: s.thread.Snapshot,
@@ -477,6 +486,9 @@ func (s *stores) close() error {
 	}
 	if s.stopLayout != nil {
 		s.stopLayout()
+	}
+	if s.stopFlagNotifications != nil {
+		s.stopFlagNotifications()
 	}
 	if s.stopNotificationThreads != nil {
 		s.stopNotificationThreads()

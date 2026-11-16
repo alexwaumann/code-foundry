@@ -80,43 +80,6 @@ is the one Code Foundry made the thread's worktree on, empty in an existing chec
 branch checked out now is the `project` source's `worktrees[].branch` for the thread's
 `worktreePath`.
 
-## SetFlag: thread attention and error (permission `threadStatus`)
-
-```go
-err := h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagError, Reason: "tests failed in pkg/api"})
-err = h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: pluginsdk.FlagNone}) // clear
-```
-
-- A flag puts the thread in the sidebar's attention group with "<display name>: <reason>"
-  on its second line (amber for `attention`, red for `error`) and rings the dock alert. It
-  never changes the thread's own status.
-- One flag per (thread, plugin): setting another replaces it; `FlagNone` clears it.
-  `Reason` is one line of 1..80 characters without the plugin's name. `UntilSeen` clears
-  it when the user opens the thread (at once if it is open now: then nothing is stored).
-- At most one flag a second per thread (-32005 `CodeRateLimited`; clearing is never
-  limited). An unknown thread is -32004; an archived one -32002.
-- Setting the same level and reason again is a no-op (no new alert, the set time stays): to
-  ring again for a new failure, change the reason ("3 tests failed in pkg/api") or clear
-  first. `UntilSeen` stays until a viewer opens the thread (the GUI showing it); without
-  a GUI it stays.
-- Flags are persisted and outlive restarts: `h.Flags()` (in Init) lists the plugin's
-  live flags so it can clear what no longer holds (`plugintest.Options.Flags` tests it).
-  Disabling the plugin or archiving the thread clears them. `code-foundry thread flags
-  <id>` shows them.
-
-**Choosing a flag mode** is the plugin's call; make it on purpose. `UntilSeen` suits a
-one-off event the user only needs to notice (a CI run failed, a deploy finished): opening
-the thread is the acknowledgement. Sticky (`UntilSeen: false`) suits a condition that
-lasts until something changes (tests failing, a pull request blocked) and that the plugin
-will clear itself (`FlagNone`) when it ends. A sticky flag must leave the user a visible
-way out, because a plugin's quirk can keep it up for good: a clear command (a manifest
-command, so the palette and CLI have it, with its button in the surface) or a line in the
-surface saying the header chip's × or `code-foundry thread flag clear <id> --plugin
-<name>` removes it. A user's clear is not reported to the plugin (a `threads`
-subscription sees it leave `Thread.flags`), so remember the condition you flagged, not
-whether the flag is up, and never raise it again until the condition changes (a different
-set of failing tests, a new run that fails).
-
 ## Notify: the bell (permission `notifications`)
 
 ```go
@@ -159,10 +122,17 @@ gone, err := h.WithdrawNotification(ctx, "deploy-prod") // what it reported is o
   listed in `permissions.commands`). The example's `notify.go` does it.
 - **The host raises the arrival toast**, with the buttons, when a notification arrives:
   never toast for a notification.
+- **About a thread** (what a flag used to say): set `ThreadID`, a key of your own per
+  thread and condition (`"tests:" + id`), `NotifyWarning` or `NotifyError`. Post it while
+  the condition holds (re-posting the same content is free) and withdraw the key when it
+  ends. A one-off event (a run failed) names what happened in its content (`"Run 42
+  failed"`), so the next one is a new card. Never post again what the user dismissed: the
+  key rule keeps it dismissed until the content changes, so do not work around it with a
+  new key. Keys starting with `flag:` are the host's.
 - **An event a thread may wait on is reported once**, with the notification attached to
   the wake fire (`wakes.md`, "Report an event once"), never a fire plus a `Notify`.
 - Refusals: no permission -32001; a command or arg the manifest does not declare, a bad
-  level, title or URL -32602; an unknown thread -32004; over 10 posts a second -32005; 100
+  level, title, URL or a `flag:` key -32602; an unknown thread -32004; over 10 posts a second -32005; 100
   active per plugin -32002. A host without `pluginsdk.NotificationsCapability` has none.
 
 ## SetContext: facts for when clauses
@@ -290,6 +260,16 @@ shows the change). A success toast is for when that place is gone (the act close
 the result lands elsewhere: "Sent to the thread") or for background work that finished.
 A host without capability `view.toast.description` (before this release) shows success as
 info and drops the description, so the text must read right alone.
+
+## SetFlag (deprecated since 2026-11-16: use Notify)
+
+`h.SetFlag` (`thread/setFlag`, permission `threadStatus`) still works: the host turns the
+flag into a notification naming the thread, under key `flag:<thread>`, warning for
+`FlagAttention`, error for `FlagError`, the reason as its title; `FlagNone` withdraws it,
+and an `UntilSeen` one is dismissed when the user opens the thread. It no longer changes
+the thread's row. `h.Flags()` lists the plugin's active flag notifications. The plugin's
+log says once per run that it is deprecated. Move to `Notify` ("About a thread" above);
+`removals.md` has the list of calls on their way out.
 
 ## Elsewhere
 

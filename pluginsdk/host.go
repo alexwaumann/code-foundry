@@ -87,13 +87,20 @@ func (h *Host) InvokeAsk(ctx context.Context, command string, args map[string]st
 	return res, err
 }
 
-// SetFlag raises or clears the plugin's flag on a thread (permission threadStatus).
+// SetFlag raises or clears the plugin's flag on a thread (permission threadStatus). The
+// host shows it as a notification naming the thread (Flag).
+//
+// Deprecated: use Host.Notify with ThreadID and a key of your own, and
+// Host.WithdrawNotification to clear it (removals.go).
 func (h *Host) SetFlag(ctx context.Context, f Flag) error {
 	return h.conn.Call(ctx, MethodThreadSetFlag, f, nil)
 }
 
 // Flags are the plugin's flags on threads as the host had them at initialize (they
 // outlive restarts): reconcile them in Init.
+//
+// Deprecated: notifications need no reconciling: post what holds (the same content is
+// no change) and withdraw what no longer does.
 func (h *Host) Flags() []Flag { return slices.Clone(h.info().Flags) }
 
 // SetContext sets a predicate fact the host's when clauses read as <plugin>.<key>

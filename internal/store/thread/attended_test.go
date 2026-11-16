@@ -2,6 +2,7 @@ package thread
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -144,8 +145,10 @@ func TestAttendedAcknowledge(t *testing.T) {
 	}
 }
 
-// Until-seen flags follow the same rule: a viewer sees them only while presence is
-// attended, and a rise to attended sees the viewed threads' flags.
+// The seen hook (until-seen flag notifications) follows the same rule: a viewer sees the
+// thread only while presence is attended, and a rise to attended sees the viewed threads.
+// An until-seen flag raised while Seen is true is seen at once; one raised before is seen
+// when the hook next hears of the thread.
 func TestAttendedUntilSeenFlags(t *testing.T) {
 	type step string
 	const (
@@ -175,6 +178,15 @@ func TestAttendedUntilSeenFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e, att := attendedEnv(t, tt.attended)
 			s := e.stopped("flagged")
+			var mu sync.Mutex
+			flags := 0
+			e.m.SetSeenHook(func(id string) {
+				mu.Lock()
+				defer mu.Unlock()
+				if id == s.ID {
+					flags = 0
+				}
+			})
 			cancel := func() {}
 			for _, st := range tt.steps {
 				switch st {
@@ -190,8 +202,10 @@ func TestAttendedUntilSeenFlags(t *testing.T) {
 						time.Sleep(5 * time.Millisecond)
 					}
 				case flag:
-					if _, _, err := e.m.SetFlag(e.ctx(), s.ID, Flag{Source: "gh", Level: FlagAttention, Reason: "x", UntilSeen: true}); err != nil {
-						t.Fatal(err)
+					if !e.m.Seen(s.ID) {
+						mu.Lock()
+						flags = 1
+						mu.Unlock()
 					}
 				case attend:
 					setAttended(e, att, true)
@@ -199,17 +213,10 @@ func TestAttendedUntilSeenFlags(t *testing.T) {
 					setAttended(e, att, false)
 				}
 			}
-			got, err := e.m.Get(e.ctx(), s.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(got.Flags) != tt.want {
-				t.Errorf("flags %v, want %d", flagSummary(got.Flags), tt.want)
-			}
-			// What the record says is what the database says.
-			e.restart()
-			if got, _ := e.m.Get(e.ctx(), s.ID); len(got.Flags) != tt.want {
-				t.Errorf("after restart flags %v, want %d", flagSummary(got.Flags), tt.want)
+			mu.Lock()
+			defer mu.Unlock()
+			if flags != tt.want {
+				t.Errorf("flags left %d, want %d", flags, tt.want)
 			}
 		})
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/alexwaumann/code-foundry/gen/go/codefoundry/v1/codefoundryv1connect"
 	"github.com/alexwaumann/code-foundry/internal/bus"
 	"github.com/alexwaumann/code-foundry/internal/proxyfetch"
+	"github.com/alexwaumann/code-foundry/internal/store/notification"
 	"github.com/alexwaumann/code-foundry/internal/store/thread"
 	"github.com/alexwaumann/code-foundry/internal/theme"
 )
@@ -28,6 +29,7 @@ type Thread struct {
 	beat  time.Duration      // WatchThread's heartbeat interval; zero is HeartbeatInterval (tests shorten it)
 	wakes time.Duration      // WatchThread's look at the wake list's targets; zero is wakeRefresh (tests shorten it)
 	fetch *proxyfetch.Client // ProxyFetch's client (WithFetch)
+	notes notification.Store // the flags ClearFlags dismisses (WithNotifications)
 }
 
 var _ codefoundryv1connect.ThreadServiceHandler = (*Thread)(nil)

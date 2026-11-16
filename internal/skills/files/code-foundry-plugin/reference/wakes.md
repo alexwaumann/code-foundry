@@ -96,9 +96,9 @@ n, err := h.FireWake(ctx, "checks-done", map[string]string{"pr": "octo/app#12", 
 - **Advertise the source.** End every message, notice or timeline text the plugin sends
   about an event with `h.WakeHint(source, args)` (or `pluginsdk.WakeHint(plugin, source,
   args)`): the exact `code-foundry thread subscribe --plugin … --arg …` line, so an agent
-  that reads "checks failed" waits for the next run instead of polling it. Never a flag
-  reason: it is one line of at most 80 characters and the line does not fit; the
-  failure's message or the surface's notice carries it.
+  that reads "checks failed" waits for the next run instead of polling it. Never a
+  notification title: it is one short line and the line does not fit; the failure's
+  message, a notification's body or the surface's notice carries it.
 
 ## Report an event once: a notification on the fire
 

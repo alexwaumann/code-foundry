@@ -51,7 +51,33 @@ func placeholders(src Sources) map[string]string {
 		"iconNames":     strings.Join(ui.Icons, " "),
 		"bridgeAPI":     bridgeAPI(),
 		"bridgeErrors":  codeList(bridge.ErrorCodes),
+		"removals":      removalsTable(pluginsdk.Removals),
 	}
+}
+
+// removalsTable is the SDK's removal list (pluginsdk.Removals) as a table, so the skill
+// never drifts from the SDK this build carries.
+func removalsTable(rs []pluginsdk.Removal) string {
+	if len(rs) == 0 {
+		return "Nothing is marked for removal."
+	}
+	var b strings.Builder
+	b.WriteString("| Call | Method | Stage | Since | Replacement | Move | Also covers |\n|---|---|---|---|---|---|---|")
+	for _, r := range rs {
+		method, also := "-", "-"
+		if r.Method != "" {
+			method = "`" + r.Method + "`"
+		}
+		if len(r.Symbols) > 1 {
+			also = codeList(r.Symbols[1:])
+		}
+		since := r.Since()
+		if r.Stage == pluginsdk.StageRetired {
+			since += " (deprecated " + r.Deprecated + ")"
+		}
+		fmt.Fprintf(&b, "\n| `%s` | %s | %s | %s | `%s` | %s | %s |", r.Symbol(), method, r.Stage, since, r.Replacement, r.Hint, also)
+	}
+	return b.String()
 }
 
 // eventFields are the codefoundry.v1.Event fields of the manifest's event sources

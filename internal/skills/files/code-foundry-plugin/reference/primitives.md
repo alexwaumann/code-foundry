@@ -34,8 +34,8 @@ err := h.UpdateView(open.Instance, v)
 - Colour means status: `attention` (amber) needs the user, `error` (red) failed, `ok`
   (emerald) only in pills, glyphs, stat figures and bars. Choose a status or tone, never a colour.
 - Give a stop button the `destructive` style, also when its command needs no confirm.
-- **Flags**: until-seen for one-off events; sticky for conditions the plugin clears, with a
-  visible way out, never re-raised after a user's clear (`host-api.md`).
+- **About a thread**: a notification naming it, withdrawn when the condition ends, never
+  re-posted after the user dismissed it (`host-api.md`, "Notify").
 - **Tooltips.** The host draws an icon-only button's label, a link's URL, text it cut and a
   status in words. `hint` adds one, only for what is not on screen (why a button is
   disabled, an exact value): never a repeat of the label, and nothing the user must read to

@@ -19,6 +19,8 @@
 // secrets from forms (SetSecret does).
 package plugintest
 
+//lint:file-ignore SA1019 the fake host serves the deprecated thread/setFlag as the host does (pluginsdk/removals.go)
+
 import (
 	"context"
 	"encoding/json"
@@ -48,7 +50,10 @@ type Options struct {
 	// Secrets are stored before the plugin starts (so Init can read them).
 	Secrets map[string]string
 	// Flags are the plugin's live flags as initialize reports them (Host.Flags in Init),
-	// for testing that Init reconciles them.
+	// for testing that Init reconciles them. Each is also an active notification, as on
+	// the host (flags.go).
+	//
+	// Deprecated: flags are notifications (pluginsdk.Removals); test Host.Notify instead.
 	Flags []pluginsdk.Flag
 	// NoInitWait makes Start return right after the handshake instead of waiting (up to
 	// 5 s) for Plugin.Init to return; for a plugin whose Init blocks. Serve holds back
@@ -116,6 +121,7 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 		h.values[k] = v
 		h.secrets[k] = pluginsdk.SecretInfo{Key: k, UpdatedAt: time.Now()}
 	}
+	h.seedFlags(opts.Flags)
 	initDone := make(chan error, 1)
 	if init := p.Init; init != nil && !opts.NoInitWait {
 		p.Init = func(ctx context.Context, ph *pluginsdk.Host) error {
@@ -333,7 +339,10 @@ func (h *Host) DeleteSecret(key string) error {
 	return h.conn.Notify(pluginsdk.MethodSecretChanged, pluginsdk.SecretChanged{Key: key, Deleted: true})
 }
 
-// Flags returns the thread/setFlag calls.
+// Flags returns the thread/setFlag calls. Each also shows as a notification
+// (Notification, ActiveNotifications), as on the host.
+//
+// Deprecated: flags are notifications (pluginsdk.Removals); read Notifications.
 func (h *Host) Flags() []pluginsdk.Flag {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -440,8 +449,7 @@ func (h *Host) handle(ctx context.Context, method string, params json.RawMessage
 		if err != nil {
 			return nil, err
 		}
-		h.record(func() { h.flags = append(h.flags, f) })
-		return struct{}{}, nil
+		return h.setFlag(f)
 	case pluginsdk.MethodSetEnvironment:
 		if !g.SessionEnv {
 			return nil, denied("sessionEnv")

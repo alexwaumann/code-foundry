@@ -49,6 +49,10 @@ func notServed(method string) error {
 
 // handle serves a plugin's request (on the Conn's goroutine for it).
 func (a *actor) handle(ctx context.Context, method string, params json.RawMessage) (any, error) {
+	if retired := a.removal(method); retired {
+		// The SDK's removal list says it does nothing now: answer without acting.
+		return struct{}{}, nil
+	}
 	h, ok := hostMethods[method]
 	switch {
 	case ok:
@@ -64,6 +68,9 @@ func (a *actor) handle(ctx context.Context, method string, params json.RawMessag
 
 // notify serves a plugin's notification.
 func (a *actor) notify(_ context.Context, method string, params json.RawMessage) {
+	if a.removal(method) {
+		return
+	}
 	if fn, ok := hostNotifications[method]; ok {
 		fn(a, params)
 		return

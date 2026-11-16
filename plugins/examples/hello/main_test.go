@@ -49,7 +49,7 @@ func TestCommands(t *testing.T) {
 	defer cancel()
 	h := plugintest.Start(t, plugin(), plugintest.Options{
 		Name:    "hello",
-		Granted: pluginsdk.Permissions{Commands: []string{"thread.send"}, Secrets: true, Events: []string{"threads"}, ThreadStatus: true, SessionEnv: true},
+		Granted: pluginsdk.Permissions{Commands: []string{"thread.send"}, Secrets: true, Events: []string{"threads"}, Notifications: true, SessionEnv: true},
 		Invoke: func(_ context.Context, p pluginsdk.InvokeParams) (pluginsdk.CommandResult, error) {
 			return pluginsdk.CommandResult{Message: "to " + p.Context.ThreadID + ": " + p.Args["text"]}, nil
 		},
@@ -111,18 +111,21 @@ func TestCommands(t *testing.T) {
 	if res, err := h.Command(ctx, "events", nil, pluginsdk.UiContext{}); err != nil || res.Message != "2 thread list events" {
 		t.Errorf("events = %+v, %v", res, err)
 	}
-	// flag raises and clears hello's flag on the thread.
-	if res, err := h.Command(ctx, "flag", map[string]string{"level": "attention", "reason": "look"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "attention flag on t-1: look" {
-		t.Errorf("flag = %+v, %v", res, err)
+	// mark posts a notification about the thread, once per thread, and withdraws it.
+	if res, err := h.Command(ctx, "mark", map[string]string{"level": "warning", "reason": "look"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "warning mark on t-1: look (posted, shown)" {
+		t.Errorf("mark = %+v, %v", res, err)
 	}
-	if res, err := h.Command(ctx, "flag", map[string]string{"level": "none"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "cleared the flag on t-1" {
-		t.Errorf("flag none = %+v, %v", res, err)
+	if res, err := h.Command(ctx, "mark", map[string]string{"level": "warning", "reason": "look"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "warning mark on t-1: look (unchanged, shown)" {
+		t.Errorf("mark again = %+v, %v", res, err)
 	}
-	if f := h.Flags(); len(f) != 2 || f[0].ThreadID != "t-1" || f[0].Level != "attention" || f[1].Level != "none" {
-		t.Errorf("flags = %+v", f)
+	if n, status, ok := h.Notification("mark:t-1"); !ok || status != plugintest.StatusShown || n.ThreadID != "t-1" || n.Level != pluginsdk.NotifyWarning || n.Title != "look" {
+		t.Errorf("notification = %+v %s %v", n, status, ok)
 	}
-	if _, err := h.Command(ctx, "flag", nil, pluginsdk.UiContext{}); err == nil || !strings.Contains(err.Error(), "no thread") {
-		t.Errorf("flag without a thread: %v", err)
+	if res, err := h.Command(ctx, "mark", map[string]string{"level": "none"}, pluginsdk.UiContext{ThreadID: "t-1"}); err != nil || res.Message != "withdrew the mark on t-1" {
+		t.Errorf("mark none = %+v, %v", res, err)
+	}
+	if _, err := h.Command(ctx, "mark", nil, pluginsdk.UiContext{}); err == nil || !strings.Contains(err.Error(), "no thread") {
+		t.Errorf("mark without a thread: %v", err)
 	}
 	if err := h.Shutdown(ctx); err != nil {
 		t.Fatal(err)

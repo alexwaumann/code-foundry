@@ -641,12 +641,10 @@ export type Thread = Message<"codefoundry.v1.Thread"> & {
   budgetUsd: number;
 
   /**
-   * Flags plugins raised on the thread (thread/setFlag; docs/notes/plugins-3-events-flags-env.md):
-   * at most one per plugin, an overlay on status that never changes it. The GUI counts a
-   * flagged thread as needing attention (error flags sort with errors) and shows the
-   * top flag's reason on the row. Cleared by the plugin, when the plugin is disabled or
-   * removed, when the thread is archived, and for until_seen flags when the thread is
-   * opened. Persisted. Sorted by level (error first), then newest first.
+   * Always empty since plugins' flags became notifications naming the thread
+   * (thread/setFlag is rerouted; docs/notes/plugin-flag-retirement.md): a flag no longer
+   * changes the thread's status, section or attention. Kept so the field number stays
+   * taken; `thread flags <id>` lists a thread's flag notifications.
    *
    * @generated from field: repeated codefoundry.v1.ThreadFlag flags = 54;
    */
@@ -988,7 +986,7 @@ export const ThreadCheckoutPathSchema: GenMessage<ThreadCheckoutPath> = /*@__PUR
   messageDesc(file_codefoundry_v1_thread_lifecycle, 5);
 
 /**
- * ThreadFlag is one plugin's flag on a thread (Thread.flags).
+ * ThreadFlag is one plugin's flag on a thread (Thread.flags, which is always empty now).
  *
  * @generated from message codefoundry.v1.ThreadFlag
  */

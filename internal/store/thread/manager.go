@@ -239,8 +239,8 @@ type Options struct {
 	// those listen on (servers.go). Default: procscan, with lsof.
 	ServerProbe ServerProbe
 	// Attended reports whether the user is looking at the app now (a GUI window is
-	// visible and key). Only then does a viewer acknowledge a thread and see its
-	// until-seen flags; the daemon calls AttendedChanged on each change (attended.go).
+	// visible and key). Only then does a viewer acknowledge a thread and see it (the
+	// seen hook, flags.go); the daemon calls AttendedChanged on each change (attended.go).
 	// Must be safe to call with the store's locks held. Nil means always attended.
 	Attended func() bool
 	// Now is the wall clock: timestamps, snooze validation and wake-ups, idle stops.
@@ -356,7 +356,9 @@ type Manager struct {
 	closed bool
 	// viewers counts each thread's item watchers (WatchItems).
 	viewers map[string]int
-	snap    atomic.Pointer[Snapshot]
+	// seenHook hears each time the user sees a thread (SetSeenHook, flags.go).
+	seenHook func(threadID string)
+	snap     atomic.Pointer[Snapshot]
 	// retired is the retired usage ledger (Snapshot.RetiredUsage). Copy on write.
 	retired []UsageBucket
 	// cacheTTL is the prompt cache lifetime (SetCacheTTL); guarded by mu.
@@ -465,10 +467,6 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	flags, err := loadFlags(ctx, opts.DB)
-	if err != nil {
-		return nil, err
-	}
 	m := &Manager{opts: opts, log: opts.Log, recs: map[string]*record{}, retired: retired,
 		viewers: map[string]int{}, threads: map[string]*threadLog{}, cacheTTL: opts.CacheTTL}
 	m.ctx, m.cancel = context.WithCancel(context.WithoutCancel(ctx))
@@ -528,7 +526,6 @@ func New(ctx context.Context, opts Options) (*Manager, error) {
 			}
 		}
 		s.CacheExpiresAt = cacheExpiry(s.LastResultAt, opts.CacheTTL)
-		s.Flags = flags[s.ID]
 		s.TranscriptMissing = transcripts.gone(s) // every thread is stopped here
 		m.recs[s.ID] = &record{s: s, namingTried: s.namedForGood()}
 	}

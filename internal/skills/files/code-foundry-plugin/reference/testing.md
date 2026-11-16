@@ -13,8 +13,8 @@ the plugin asks of the host, and shuts the plugin down when the test ends. So wh
 sets up (subscriptions, the environment, state loaded from the data dir) is in place when
 Start returns; a plugin whose Init blocks sets `NoInitWait` (commands, events and wake
 notifications wait for Init then, as with the real host). It enforces permissions like the real host:
-`Invoke` needs a matching `Granted.Commands` glob, secrets need `Granted.Secrets`, flags
-`ThreadStatus`, environment `SessionEnv`, subscriptions `Events`.
+`Invoke` needs a matching `Granted.Commands` glob, secrets need `Granted.Secrets`,
+notifications `Notifications`, environment `SessionEnv`, subscriptions `Events`.
 
 ```go
 h := plugintest.Start(t, plugin(), plugintest.Options{
@@ -26,7 +26,6 @@ h := plugintest.Start(t, plugin(), plugintest.Options{
 	},
 	Capabilities: []string{"surfaces", "view.tabs"}, // what h.HasCapability sees; nil = the real host's (plugintest.HostCapabilities)
 	Secrets:      map[string]string{"token": "t0k"},  // stored before Init runs
-	Flags:        []pluginsdk.Flag{{ThreadID: "s-1", Level: "error", Reason: "old"}}, // h.Flags() in Init
 	DataDir:      dir,                                // default t.TempDir(); h.DataDir() returns it
 	// live at start, as after a restart: sent with Rearm after initialized, then wake/armed
 	WakeSubscriptions: []pluginsdk.WakeSubscription{{Subscription: "sub-1", Source: "tick"}},
@@ -162,8 +161,9 @@ sleeping; for pollers, make the interval a field the test shortens. That a polle
 when its work is done is testable too: count the fake `Invoke` (or `gh`) calls, wait a few
 intervals, and check the count did not grow.
 
-**Flags in Init**: start with `Options.Flags` set and check Init cleared what no longer
-holds (`h.Flags()` records the plugin's `SetFlag` calls).
+**A plugin still on `SetFlag`** (deprecated, `removals.md`): the fake shows each flag as
+a notification, as the host does (`h.Notification("flag:s-1")`, `h.SeeThread(id)` for the
+user opening the thread); `Options.Flags` seeds the ones `h.Flags()` reports in Init.
 
 **Wake sources**: subscribe with the args an agent would give, make the event happen
 (or shorten the poll interval), and check `h.WakeFires()` for the source, match, title and

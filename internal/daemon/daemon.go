@@ -204,7 +204,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	pageFetch := proxyfetch.New(proxyfetch.Options{UserAgent: "code-foundry/" + opts.Version.Version, OwnPorts: []int{port, pagesPort},
 		Log: log.With("component", "page-fetch")})
 	defer pageFetch.Close()
-	threadAPI := api.NewThread(st.thread, events).WithFetch(pageFetch)
+	threadAPI := api.NewThread(st.thread, events).WithFetch(pageFetch).WithNotifications(st.notification)
 	gitopsAPI := api.NewGitOps(st.gitops)
 	ghAPI := api.NewGh(st.gh)
 	settingsAPI := api.NewSettings(st.settings).WithBackdrops(st.backdrops)
@@ -235,7 +235,7 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		DB: st.db, Commands: settingsCommandHost{Registry: commands, settings: st.settings}, Bus: events, Log: log.With("component", "plugins"),
 		Home: st.home, HostVersion: opts.Version.Version, APIEnv: threadEnv(port, token),
 		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows}, Tabs: pluginTabs{layout: st.layout},
-		Flags: pluginFlags{threads: st.thread},
+		Flags: st.flags,
 		// Wake sources: the thread store keeps the subscriptions (plugin_wakes.go).
 		Wakes: pluginWakeSink{threads: st.thread},
 		// Their notifications are the bell's, under source = the plugin's name

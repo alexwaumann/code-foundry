@@ -326,9 +326,6 @@ type Thread struct {
 	// a daemon stop before the handshake keeps it for the next start. nil when none.
 	// Persisted; not on the API. Copy on write: replaced, never written through.
 	PendingFirst *PendingFirst
-	// Flags are the plugins' flags on the thread (flags.go): one per source, errors
-	// first, then newest first. Persisted (thread_flags). Copy on write.
-	Flags []Flag
 	// Owner is who owns a thread the user does not (CreateOptions.Owner; owner.go):
 	// "plugin:<name>". Owned threads are hidden from the user's lists (ListOptions).
 	// Persisted; set once at Create.
@@ -716,12 +713,6 @@ type Store interface {
 	// SetBudget sets the thread's spending limit (0 clears it). A budget above the
 	// thread's cost re-arms the budget stop (budget.go). Any state.
 	SetBudget(ctx context.Context, id string, usd float64) (Thread, error)
-	// SetFlag raises (or with FlagNone clears) a source's flag on a thread; changed is
-	// false when nothing changed (flags.go).
-	SetFlag(ctx context.Context, id string, f Flag) (t Thread, changed bool, err error)
-	// ClearFlags removes a source's flag from a thread, every flag with source "", and
-	// returns how many went.
-	ClearFlags(ctx context.Context, id, source string) (Thread, int, error)
 	// Snooze snoozes a thread until a time (after now; ErrInvalidArgument otherwise):
 	// it closes it like Close, kills and removes its shells, unpins and unarchives it
 	// and sets SnoozedUntil (replacing an earlier one). When the time comes the store
