@@ -118,7 +118,7 @@ func normalize(p Post, threadExists func(string) bool) (Notification, error) {
 	}
 	n.ThreadID = strings.TrimSpace(p.ThreadID)
 	if n.ThreadID != "" && threadExists != nil && !threadExists(n.ThreadID) {
-		return n, fmt.Errorf("%w: thread %s", ErrNotFound, n.ThreadID)
+		return n, fmt.Errorf("%w: there is no thread %s", ErrNotFound, n.ThreadID)
 	}
 	if len(p.Actions) > MaxActions {
 		return n, invalid("%d actions; at most %d", len(p.Actions), MaxActions)
@@ -186,7 +186,7 @@ func normalizeAction(source string, spec ActionSpec, threadExists func(string) b
 			return a, invalid("a send action needs a thread")
 		}
 		if threadExists != nil && !threadExists(a.ThreadID) {
-			return a, fmt.Errorf("%w: thread %s", ErrNotFound, a.ThreadID)
+			return a, fmt.Errorf("%w: a send action names no thread that exists (%s)", ErrNotFound, a.ThreadID)
 		}
 		if a.Text, err = text("text", spec.Text, MaxText); err != nil {
 			return a, err
