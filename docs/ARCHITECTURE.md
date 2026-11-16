@@ -1572,7 +1572,10 @@ what depends on the drawn frame (rails, full screen, tab fitting, drag targets, 
   tab (`docs/notes/preview-tabs-1-daemon.md`). **Smart swap**
   (`swap.go`, setting `layout.smart_swap`): when a thread tab gains the focus, every pane
   whose active tab is another thread's linked surface of a kind this thread also has open in
-  that pane switches to it.
+  that pane switches to it. **Smart placement** (`place.go` `threadHost`, setting
+  `layout.smart_placement`): a thread's own tab or a composer opened with no pane chosen goes
+  to the focused pane only when it holds a thread or composer tab, else to the nearest pane
+  that does (`rank`'s centre distance), else to the focused pane (`hostPane`).
 * **Focus from a thread**: `Options.KeepFocus` runs any op and puts back the user's current
   space, focused tabs and MRU, so a model's tab waits behind the user's focused tab. The
   commands use it for every call not made by the user in person (§7).

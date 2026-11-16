@@ -67,8 +67,9 @@ when the first working version is whole. Nothing partial is released.
   its own body is decided per surface; do not stack a second title band under the strip by default.
 - **Pull Requests and Projects are surfaces**, not sidebar rows. One of each per space.
 - **The composer** is a tab. Each space has at most one EMPTY composer: New thread focuses it if
-  the space has one, and otherwise opens one in the focused pane. Sending from a composer turns it
-  into the thread's tab.
+  the space has one, and otherwise opens one where a thread's own tab opens ("Where a thread's own
+  tab opens", below), or in the pane whose "+" asked. Sending from a composer turns it into the
+  thread's tab.
   - **Drafts.** Once something is typed, the composer is a draft with its own identity: New thread
     then opens another, empty composer, so a space can hold several drafts. A draft that is emptied
     again is the space's empty composer again (if the space already has another empty one, the one
@@ -81,7 +82,7 @@ when the first working version is whole. Nothing partial is released.
     with its icon as a thread row shows it ("No project" with its icon when the draft has none),
     with Discard on hover; then the title, the draft's label ("Untitled draft", muted, while it
     has none); then, where a thread shows its branch, the pencil icon and "Draft". A click
-    focuses the draft's tab, or opens it in the focused pane when its tab is closed. Closing a
+    focuses the draft's tab, or opens it where a thread's own tab opens when its tab is closed. Closing a
     draft's tab keeps the draft (and cmd+shift+t reopens its tab like any other); the row can
     discard it. The empty composer is not listed.
   - An empty composer that is the only tab in its space is ephemeral: opening a thread replaces it.
@@ -121,8 +122,8 @@ when the first working version is whole. Nothing partial is released.
   - **Reopening** takes the newest entry that can still be reopened and drops it:
     - A tab goes back into its pane at its old place while that pane is in the space. When its
       pane is gone and the tab was its only tab, the pane is rebuilt where it sat, as a pane is.
-      Otherwise it is placed by the usual rules: a thread's tab in the focused pane, a linked
-      surface by the placement rules, anything else in the focused pane.
+      Otherwise it is placed by the usual rules: a thread's tab where a thread's own tab opens, a
+      linked surface by the placement rules, anything else in the focused pane.
     - A pane comes back with its tabs, its active tab and its share, beside the panes it sat
       beside while one of them is still in the space. Otherwise it goes on the right edge of the
       whole pane area at its active tab's default size (as a pane dropped there), or is the only
@@ -276,10 +277,21 @@ when the first working version is whole. Nothing partial is released.
   that is joined is never resized. In 2 to 4, a pane of terminals that a tab of another kind would
   not fit in (its minimum would rise and the result would not fit) is skipped. Terminal tabs follow these
   same rules: there is no separate rule for terminals and no "below" default.
-- **Where a thread's own tab opens** (a sidebar click, the CLI, a new thread): the focused pane,
-  whatever it holds, unless it holds only terminals and the thread would not fit there ("Room for
-  panes"): then the most recently focused open pane that can take it (the focused pane all the
-  same when none can).
+- **Where a thread's own tab opens** (a sidebar click, `thread.open` from the CLI or a link, a new
+  thread's tab, the New thread composer and a draft's row, a reopened thread tab whose pane is
+  gone), when nothing chose a pane, by **smart placement**:
+  1. the focused pane, if it has a thread open: a thread's own tab or a composer among its tabs,
+     active or not (a pane of linked surfaces, pages or plugin surfaces alone does not count);
+  2. otherwise the open pane that has a thread open nearest the focused pane (the distance between
+     centres placement ranks by, then layout order), skipping a collapsed pane and one that cannot
+     take the tab ("Room for panes");
+  3. otherwise (no pane of the space has a thread open) the focused pane, unless it holds only
+     terminals and the thread would not fit there: then the most recently focused open pane that
+     can take it (the focused pane all the same when none can).
+  The focus follows the tab into its pane. A pane that was chosen wins: a pane's "+" menu
+  (`--pane`), a drop, a tab already open (focused where it is), a composer the thread is sent
+  from. On by default; a user setting (`layout.smart_placement`, Appearance › Panes): off, only
+  rule 3 applies.
 - **A surface that belongs to no thread** (a checkout's diff opened from Projects, a pull request
   opened from Pull Requests) opens as an unlinked tab in the pane of the page it was opened from.
 - **Smart swap.** When a thread tab gains focus, every pane whose active tab is another thread's
@@ -374,7 +386,7 @@ when the first working version is whole. Nothing partial is released.
   snoozed thread can be one; an active thread never previews. The daemon keeps the flag on the
   tab, so the CLI's `tab.list` and `layout show` mark it.
 - **Opening one.** A click on an Archived or Snoozed sidebar row opens the thread as a preview tab
-  where a thread's own tab opens (the focused pane, by the same rule). Every other open is a kept
+  where a thread's own tab opens (by the same rule). Every other open is a kept
   tab: a drop from the sidebar (an open at a place), the CLI without `--preview`, a thread's model,
   a restore, cmd+shift+t. A preview is asked for explicitly (`thread.open --preview`, the user
   only, without a place), and the daemon honours it only for a thread that is archived or snoozed;
