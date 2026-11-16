@@ -163,6 +163,18 @@ func Start(t testing.TB, p pluginsdk.Plugin, opts Options) *Host {
 		t.Fatalf("plugintest: initialized: %v", err)
 	}
 	if err := h.rearmWakes(opts.WakeSubscriptions); err != nil {
+		// A failed Init ends Serve, which closes the connection, and the re-arm can lose
+		// that race. Init reports on initDone before it returns, so by the time the
+		// connection is closed its error is here: the test then sees calls fail, as it
+		// would have a moment later.
+		select {
+		case ierr := <-initDone:
+			if ierr != nil {
+				t.Logf("plugintest: Init failed (Serve ends): %v", ierr)
+				return h
+			}
+		default:
+		}
 		t.Fatalf("plugintest: re-arm wakes: %v", err)
 	}
 	select {

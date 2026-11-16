@@ -240,3 +240,10 @@ after rates. What they add to the rounds above:
   it fired after the file's jsdom was gone, React threw "window is not defined" as an unhandled
   error, which fails the run with every test passing (`src/lib/notify.test.tsx`, the sweep at
   5d0a3af9c). Wait for what the timer does (the toasts leaving the document) before unmounting.
+
+- **A helper's own step can lose to the failure it is there to show.** `plugintest.Start` sent
+  the wake re-arm after `initialized`; a plugin whose Init fails at once ends Serve and closes
+  the connection, and on the runner the re-arm sometimes came second and failed the test with
+  "re-arm wakes: connection closed" (`TestServeInitErrorEndsServe`, the sweep at 4da2b53b2; not
+  reproduced locally in 3000 runs). Init reports before the connection can close, so the helper
+  now reads that report when the re-arm fails and returns as it does for a failed Init.
