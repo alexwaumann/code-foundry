@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SurfaceKind, Tab } from "@/shell/host";
 import type { Selection } from "@/stores/ui";
@@ -27,6 +27,8 @@ export interface SurfaceSpec {
   kind: SurfaceKind;
   title: string;
   icon: LucideIcon;
+  /** An icon that follows the tab (a pull request's state), drawn instead of `icon` on its tab. */
+  TabIcon?: ComponentType<{ tab: Tab; className?: string }>;
   /**
    * Single lowercase letter that opens the surface while the panel has focus. None for a
    * surface that is only opened from elsewhere (it is then also "hidden" in the empty

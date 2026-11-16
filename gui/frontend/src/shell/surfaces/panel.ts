@@ -26,6 +26,7 @@ export function panelSurface(kind: string, spec: SurfaceSpec | undefined): Shell
   const useUnsaved = spec?.useUnsaved;
   const beforeClose = spec?.beforeClose;
   const onKey = spec?.onKey;
+  const TabIcon = spec?.TabIcon;
   return {
     kind,
     icon: spec?.icon ?? Puzzle,
@@ -51,6 +52,7 @@ export function panelSurface(kind: string, spec: SurfaceSpec | undefined): Shell
           )
         : null,
     linkedNoun: spec?.title ?? kind,
+    ...(TabIcon ? { TabIcon: ({ tab, className }: { tab: TabEntry; className?: string }) => createElement(TabIcon, { tab: seamTab(tab, title), className }) } : {}),
     // Unsaved work and the question before a close, as the side panel had them (a File tab editing).
     ...(useUnsaved ? { useUnsaved: (tab: TabEntry) => useUnsaved(panelKeyOfTab(tab), seamTab(tab, title)) } : {}),
     ...(onKey ? { onKey: (chord: string, tab: TabEntry) => onKey(chord, seamTab(tab, title)) } : {}),
