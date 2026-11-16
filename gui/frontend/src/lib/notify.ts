@@ -9,7 +9,7 @@
  * In progress is a state, not a level: notifyProgress shows a neutral card with a spinner,
  * and a later notify with the same id turns it into its result in place.
  */
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
 export type NoticeLevel = "success" | "info" | "warning" | "error";
@@ -42,19 +42,68 @@ export interface Notice extends NoticeContent {
   duration?: number;
   /** Stays until closed, with a close button: a failure the user may need to read. */
   sticky?: boolean;
+  /** A close button on a toast that still times out (a bell notification's arrival). */
+  closable?: boolean;
+  /**
+   * A row of buttons in order, the first the strong one, in place of `action` and `cancel`: for
+   * more than two (a bell notification's actions, docs/notes/notifications-3-bell.md). Each runs
+   * its onClick, then closes the toast.
+   */
+  buttons?: NoticeButton[];
+}
+
+/** The card's button look (components/ui/sonner.tsx's action and cancel), for a `buttons` row. */
+const BUTTON = "inline-flex h-6 items-center rounded-sm px-2 text-body-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-cf-focus/50";
+const STRONG = `${BUTTON} bg-cf-text text-cf-surface-overlay hover:opacity-90`;
+const QUIET = `${BUTTON} bg-cf-text/10 text-cf-text hover:bg-cf-text/15`;
+
+let buttonRows = 0;
+
+/** A `buttons` row: sonner draws an element given as the action as it is, on the card's button row. */
+function buttonRow(buttons: NoticeButton[], id: NoticeId): ReactNode {
+  return createElement(
+    "div",
+    { className: "row-start-2 col-start-2 col-end-5 mt-2 flex flex-wrap gap-1.5", "data-notice-buttons": "" },
+    buttons.map((b, i) =>
+      createElement(
+        "button",
+        {
+          key: `${String(i)}:${b.label}`,
+          type: "button",
+          className: i === 0 ? STRONG : QUIET,
+          "data-button": "",
+          onClick: () => {
+            b.onClick();
+            toast.dismiss(id);
+          },
+        },
+        b.label,
+      ),
+    ),
+  );
 }
 
 /** Shows a toast; returns its id. Showing one again with the same id replaces it in place. */
 export function notify(n: Notice): NoticeId {
+  let id = n.id;
+  let action: ReactNode | NoticeButton | undefined = n.action;
+  let cancel = n.cancel;
+  if (n.buttons && n.buttons.length > 0) {
+    // The row's buttons close their own toast, so it needs its id before sonner makes one.
+    const rowId = n.id ?? `notice-row-${String(++buttonRows)}`;
+    id = rowId;
+    action = buttonRow(n.buttons, rowId);
+    cancel = undefined;
+  }
   // Every option is passed, set or not: sonner merges an update into the toast it replaces,
   // so a result that replaces a progress toast must clear what it does not set.
   return toast[n.level](n.title, {
-    id: n.id,
+    id,
     description: n.description,
-    action: n.action,
-    cancel: n.cancel,
+    action,
+    cancel,
     duration: n.sticky ? Infinity : n.duration,
-    closeButton: n.sticky ?? false,
+    closeButton: (n.sticky ?? false) || (n.closable ?? false),
   });
 }
 

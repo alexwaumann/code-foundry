@@ -6,6 +6,7 @@ import { toGhEventView, type GhEventView } from "./gh";
 import { toGitOpsEventView, type GitOpsEventView } from "./gitops";
 import { toLayoutEventView, type LayoutEventView } from "./layout";
 import { toMemoryEventView, type MemoryEventView } from "./memory";
+import { toNotificationEventView, type NotificationEventView } from "./notifications";
 import { toSearchActivityView, type SearchActivityView } from "./search";
 import { toPluginEventView, type PluginEventView } from "./plugin";
 import { toProjectEventView, type ProjectEventView } from "./project";
@@ -42,7 +43,8 @@ export type EventView =
   | { source: "memory"; event: MemoryEventView }
   | { source: "search"; event: SearchActivityView }
   | { source: "theme"; event: ThemesSnapshotView }
-  | { source: "layout"; event: LayoutEventView };
+  | { source: "layout"; event: LayoutEventView }
+  | { source: "notification"; event: NotificationEventView };
 
 export function toEventView(ev: Event): EventView | null {
   const e = ev.event;
@@ -107,6 +109,8 @@ export function toEventView(ev: Event): EventView | null {
       const v = toLayoutEventView(e.value);
       return v && { source: "layout", event: v };
     }
+    case "notification":
+      return { source: "notification", event: toNotificationEventView(e.value) };
     default:
       return null;
   }

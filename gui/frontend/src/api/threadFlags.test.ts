@@ -98,17 +98,18 @@ describe("attention with flags", () => {
   });
   it("a new flag rings the dock like a prompt, within the shared cooldown", () => {
     const settings = { dockBadge: true, bounce: true, sound: false, soundVolume: 50, cooldownMs: 60_000 };
+    const notifications = { timeSensitive: 0, seq: 0, timeSensitiveArrived: [] };
     const before = replaceThreads(emptyThreads, [view("a"), view("b")]);
-    let s = stepDockAlerts(initialDockAlerts, { epoch: 1, attention: attentionIds(before), attended: false, nowMs: 0, settings }).state;
+    let s = stepDockAlerts(initialDockAlerts, { epoch: 1, attention: attentionIds(before), attended: false, nowMs: 0, settings, notifications }).state;
     const flagged = replaceThreads(before, [view("a", { flags: [att] }), view("b")]);
-    let step = stepDockAlerts(s, { epoch: 1, attention: attentionIds(flagged), attended: false, nowMs: 1000, settings });
+    let step = stepDockAlerts(s, { epoch: 1, attention: attentionIds(flagged), attended: false, nowMs: 1000, settings, notifications });
     expect(step.effects).toEqual([
       { kind: "badge", count: 1 },
       { kind: "alert", bounce: true, sound: false, volume: 0 },
     ]);
     s = step.state;
     const both = replaceThreads(flagged, [view("a", { flags: [att] }), view("b", { flags: [err] })]);
-    step = stepDockAlerts(s, { epoch: 1, attention: attentionIds(both), attended: false, nowMs: 2000, settings });
+    step = stepDockAlerts(s, { epoch: 1, attention: attentionIds(both), attended: false, nowMs: 2000, settings, notifications });
     expect(step.effects).toEqual([{ kind: "badge", count: 2 }]); // inside the cooldown: no second alert
   });
   it("sameThread compares flags by value", () => {

@@ -43,6 +43,7 @@ import { MockLayout, panes as layoutPanes } from "./layout";
 import { layoutCommands } from "./layoutVerbs";
 import { terminalShellCommands } from "./terminalVerbs";
 import { MockMemory } from "./memory";
+import { MockNotifications } from "./notifications";
 import { MockThemes } from "./userThemes";
 import { MockSkills } from "./skills";
 import { EMBER_THREAD, emberWorkers, MockEmber } from "./ember";
@@ -943,6 +944,14 @@ export class World {
     publish: (v) => this.events.publish({ source: EventSource.MEMORY, event: { event: { case: "memory", value: v } } }),
     emit: (i) => this.emit(i),
   });
+  /** The bell's notifications (mock/notifications.ts); the EventService notification source. */
+  readonly notifications = new MockNotifications({
+    publish: (v) => this.events.publish({ source: EventSource.NOTIFICATION, event: { event: { case: "notification", value: v } } }),
+    hasThread: (id) => this.threads.has(id),
+    send: (id, text) => {
+      this.logs.send(id, text, []);
+    },
+  });
   /** The window shell's layout (mock/layout.ts); LayoutService and the EventService layout source. */
   readonly layout = new MockLayout({
     publish: (v) => this.events.publish({ source: EventSource.LAYOUT, event: { event: { case: "layout", value: v } } }),
@@ -1049,6 +1058,7 @@ export class World {
     this.plugins.reset();
     this.skills.reset();
     this.memory.reset();
+    this.notifications.reset();
     this.themes.reset();
     this.layout.reset();
     const started = new Date(Date.now() - 42 * 60_000);
@@ -4262,6 +4272,7 @@ export class World {
       ...this.plugins.commands(),
       ...this.skills.commands(),
       ...this.memory.commands(),
+      ...this.notifications.commands(),
       ...this.themes.commands(),
       {
         cmd: {

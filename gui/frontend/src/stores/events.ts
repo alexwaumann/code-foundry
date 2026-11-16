@@ -13,6 +13,8 @@ import { useHealthStore } from "./health";
 import { applyIntent } from "./intents";
 import { applyLayoutEvent } from "./layout";
 import { applyMemoryEvent } from "./memory";
+import { applyNotificationEvent } from "./notifications";
+import { raiseArrivalToasts } from "./notificationToasts";
 import { applySearchActivity } from "./searchActivity";
 import { applyThemeEvent } from "./themes";
 import { onPluginEvent } from "./plugins";
@@ -103,6 +105,11 @@ const handlers: Handlers = {
   theme: applyThemeEvent,
   // The window's layout (stores/layout.ts).
   layout: applyLayoutEvent,
+  // The bell's notifications (stores/notifications.ts) and their arrival toasts.
+  notification: (ev) => {
+    applyNotificationEvent(ev);
+    raiseArrivalToasts(ev);
+  },
 };
 
 const taps = new Set<(ev: EventView) => void>();
