@@ -15,9 +15,9 @@ function geoOf(n: TreeNode): GeoNode {
  * A space's glyph (docs/notes/shell-model.md, "Structure": "a small icon drawn from that space's
  * real pane layout"): each pane an outlined rectangle at its place, from the space's own tree laid
  * out plainly (shell/spaces.ts spaceGlyph), a collapsed pane as a thin bar. It follows the tree, so splitting or closing a pane
- * redraws it. Decorative: the tab names the space.
+ * redraws it. `filled` tints the panes (the current space's tab). Decorative: the tab names the space.
  */
-export function SpaceIcon({ spaceId, className }: { spaceId: string; className?: string }) {
+export function SpaceIcon({ spaceId, filled, className }: { spaceId: string; filled?: boolean; className?: string }) {
   const tree = useTree(spaceId);
   const rects = useMemo(() => spaceGlyph(tree ? geoOf(tree) : null), [tree]);
   return (
@@ -29,6 +29,7 @@ export function SpaceIcon({ spaceId, className }: { spaceId: string; className?:
       className={cn("shrink-0 overflow-visible", className)}
       data-testid="space-icon"
       data-panes={rects.length}
+      data-filled={filled || undefined}
     >
       {rects.map((r, i) => (
         <rect
@@ -38,7 +39,8 @@ export function SpaceIcon({ spaceId, className }: { spaceId: string; className?:
           width={Math.max(0.5, r.w - 1)}
           height={Math.max(0.5, r.h - 1)}
           rx={1.5}
-          fill="none"
+          fill={filled ? "currentColor" : "none"}
+          fillOpacity={filled ? 0.22 : undefined}
           stroke="currentColor"
           strokeWidth={1}
         />
