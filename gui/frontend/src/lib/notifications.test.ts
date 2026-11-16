@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
+import type { NotificationView } from "@/api/notifications";
 import { note, noteEvent } from "@/test/notificationFakes";
-import { ARRIVAL_BURST_MS, arrivalToasts, bellCount, NO_BURST, shownNotifications, sourceLabel, timeSensitiveArrivals, type ArrivalBurst } from "./notifications";
+import {
+  ARRIVAL_BURST_MS,
+  arrivalToasts,
+  bellCount,
+  NO_BURST,
+  NO_MARK,
+  shownNotifications,
+  sourceLabel,
+  threadMark,
+  threadNotifications,
+  timeSensitiveArrivals,
+  type ArrivalBurst,
+  type ThreadMarkTone,
+} from "./notifications";
 
 const snoozed = (id: string) => note(id, { status: "snoozed", snoozedUntilMs: 5 });
 
@@ -111,5 +125,52 @@ describe("timeSensitiveArrivals", () => {
 
   it("none on a connect's snapshot", () => {
     expect(timeSensitiveArrivals(noteEvent([note("u", { timeSensitive: true })]))).toEqual([]);
+  });
+});
+
+// docs/notes/notifications-4-row-mark.md: a thread's row mark and its card's list.
+describe("threadNotifications", () => {
+  const snap = noteEvent([
+    note("n-1", { threadId: "s-1", timeSensitive: true }),
+    note("n-2", { threadId: "s-2" }),
+    note("n-3", { threadId: "s-1" }),
+    note("n-4", { threadId: "s-1", status: "snoozed" }),
+    note("n-5", { threadId: "s-1", status: "scheduled" }),
+    note("n-6"),
+  ]).snapshot;
+
+  it("lists the shown ones naming the thread, in the daemon's order; snoozed and scheduled ones wait", () => {
+    expect(threadNotifications(snap, "s-1").map((n) => n.id)).toEqual(["n-1", "n-3"]);
+    expect(threadNotifications(snap, "s-2").map((n) => n.id)).toEqual(["n-2"]);
+  });
+
+  it("none for a thread nothing names, for no thread id, and before a snapshot", () => {
+    expect(threadNotifications(snap, "s-9")).toEqual([]);
+    expect(threadNotifications(snap, "")).toEqual([]);
+    expect(threadNotifications(null, "s-1")).toEqual([]);
+  });
+});
+
+describe("threadMark", () => {
+  const mark = (...notes: NotificationView[]) => threadMark(noteEvent(notes).snapshot, "s-1");
+  const on = (id: string, o: Partial<NotificationView> = {}) => note(id, { threadId: "s-1", ...o });
+
+  it.each<[string, NotificationView[], number, ThreadMarkTone]>([
+    ["one info: muted", [on("a")], 1, "muted"],
+    ["a warning: the attention tone", [on("a"), on("b", { level: "warning" })], 2, "warning"],
+    ["a time-sensitive info: the attention tone", [on("a", { timeSensitive: true })], 1, "warning"],
+    ["an error wins over a warning", [on("a", { level: "warning" }), on("b", { level: "error" })], 2, "error"],
+    ["an error wins over a time-sensitive one", [on("a", { timeSensitive: true }), on("b", { level: "error" })], 2, "error"],
+    ["a snoozed error counts for nothing", [on("a"), on("b", { level: "error", status: "snoozed" })], 1, "muted"],
+    ["another thread's error is not this thread's", [on("a"), note("b", { threadId: "s-2", level: "error" })], 1, "muted"],
+  ])("%s", (_name, notes, count, tone) => {
+    expect(mark(...notes)).toEqual({ count, tone });
+  });
+
+  it("is the one shared NO_MARK with none, so a selector over it never changes", () => {
+    expect(mark()).toBe(NO_MARK);
+    expect(mark(note("b", { threadId: "s-2" }))).toBe(NO_MARK);
+    expect(threadMark(null, "s-1")).toBe(NO_MARK);
+    expect(NO_MARK).toEqual({ count: 0, tone: "muted" });
   });
 });
