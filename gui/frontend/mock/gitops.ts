@@ -3,7 +3,9 @@
  * worktree.reveal and view.open.url commands run a fake operation per worktree (one at a
  * time per worktree, like the real store), publishing queued/started/finished GitOpsEvents
  * that the mock's EventService carries. Invoke resolves when the op finishes: success
- * returns the GitOp as result_json, as the real daemon does; every op succeeds.
+ * returns the GitOp as result_json, as the real daemon does; every op succeeds. pr.create
+ * links its pull request to the context's thread, as the daemon links it to the calling
+ * thread: a line in the message and "threadLink" in result_json.
  */
 import { clone, create, toJsonString, type MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
@@ -26,6 +28,15 @@ interface Wt {
   /** False for a local-only repository: fetch, pull, push and PRs are unavailable. */
   hasRemote: boolean;
 }
+
+/** What linking pr.create's pull request to the calling thread did ("threadLink" in its JSON). */
+export interface ThreadLinkOut {
+  line: string;
+  link: { threadId: string; linked: boolean; slug?: string; number?: number; url: string; error?: string };
+}
+
+/** Links url to thread id, as ThreadService.LinkPullRequest (world.linkPullRequestByHand). */
+export type LinkCallerPR = (threadId: string, url: string) => ThreadLinkOut;
 
 interface Outcome {
   summary: string;
@@ -73,7 +84,7 @@ const specs: Spec[] = [
     ok: (w) => ({ summary: `pushed ${w?.branch ?? ""} to origin`, output: `$ git push\nTo github.com:alexwaumann/code-foundry.git\n   3c3c465..8d9e0f1  ${w?.branch ?? ""} -> ${w?.branch ?? ""}\n` }),
   },
   {
-    name: "pr.create", title: "Create Pull Request", category: "Pull Request", description: "Push the branch and open a GitHub pull request (gh pr create)", keybindings: [], kind: GitOpKind.PR_CREATE, needsGitHub: true,
+    name: "pr.create", title: "Create Pull Request", category: "Pull Request", description: "Push the branch and open a GitHub pull request (gh pr create); it is linked to the thread that ran it", keybindings: [], kind: GitOpKind.PR_CREATE, needsGitHub: true,
     args: [
       { name: "title", type: ArgType.STRING, description: "Title (default: the last commit's subject)" },
       { name: "body", type: ArgType.STRING, description: "Description" },
@@ -142,8 +153,8 @@ export class MockGitOps {
     return { event: { case: "snapshot", value: { ops: [...this.active, ...this.finished] } } };
   }
 
-  /** Registry entries; `worktreeOf` resolves the (context or explicit) worktree. */
-  entries(worktreeOf: (path: string) => Wt | null) {
+  /** Registry entries; `worktreeOf` resolves the (context or explicit) worktree; `linkPR` links pr.create's pull request to the context's thread. */
+  entries(worktreeOf: (path: string) => Wt | null, linkPR?: LinkCallerPR) {
     const target = (ctx: UiContext | undefined, args: Record<string, string>) => worktreeOf(args.worktree || ctx?.activeWorktreePath || "");
     return specs.map((s) => ({
       cmd: {
@@ -155,11 +166,14 @@ export class MockGitOps {
         const w = target(ctx, {});
         return w !== null && (!(s.needsRemote || s.needsGitHub) || w.hasRemote) && (!s.needsGitHub || w.githubSlug !== "");
       },
-      run: (ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> => this.run(s, s.kind === GitOpKind.OPEN_URL ? null : target(ctx, args), args),
+      run: (ctx: UiContext | undefined, args: Record<string, string>): Promise<InvokeOut> => {
+        const thread = s.kind === GitOpKind.PR_CREATE && linkPR ? (ctx?.activeThreadId ?? "") : "";
+        return this.run(s, s.kind === GitOpKind.OPEN_URL ? null : target(ctx, args), args, thread ? (url) => linkPR?.(thread, url) : undefined);
+      },
     }));
   }
 
-  private run(s: Spec, w: Wt | null, args: Record<string, string>): Promise<InvokeOut> {
+  private run(s: Spec, w: Wt | null, args: Record<string, string>, link?: (url: string) => ThreadLinkOut | undefined): Promise<InvokeOut> {
     const now = new Date();
     const op = create(GitOpSchema, {
       id: `op-${String(++this.seq)}`, kind: s.kind, state: GitOpState.QUEUED, title: s.label(w, args).trim(),
@@ -182,7 +196,10 @@ export class MockGitOps {
       this.finished = [op, ...this.finished].slice(0, 20);
       this.publish({ event: { case: "finished", value: clone(GitOpSchema, op) } });
       const message = op.url && !op.summary.includes(op.url) ? `${op.summary}: ${op.url}` : op.summary;
-      return { message, resultJson: toJsonString(GitOpSchema, op) };
+      const linked = op.url ? link?.(op.url) : undefined;
+      if (!linked) return { message, resultJson: toJsonString(GitOpSchema, op) };
+      const json = { ...(JSON.parse(toJsonString(GitOpSchema, op)) as Record<string, unknown>), threadLink: linked.link };
+      return { message: `${message}\n${linked.line}`, resultJson: JSON.stringify(json) };
     });
     this.lanes.set(key, job);
     void job.catch(() => undefined).finally(() => {

@@ -48,6 +48,9 @@ type GitOpsDeps struct {
 	// pr.open are unavailable there, explained as such rather than as a missing remote. Nil means
 	// never.
 	NotGit NotGitFunc
+	// Link links the pull request pr.create opens (or finds open) to the thread that ran
+	// it (pr_link_caller.go). Nil links nothing.
+	Link PullRequestLinkBackend
 }
 
 // noRemote is why remote operations are unavailable in a local-only repository.
@@ -194,7 +197,7 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 		Command{
 			Name:        "pr.create",
 			Title:       "Create Pull Request",
-			Description: "Push the branch and open a GitHub pull request for it (gh pr create).",
+			Description: "Push the branch and open a GitHub pull request for it (gh pr create). The pull request (or the branch's open one) is linked to the thread that ran it, as thread.pr.link.",
 			Category:    "Pull Request",
 			Args: []ArgSpec{wt,
 				{Name: "title", Type: String, Description: "Title (default: the last commit's subject)"},
@@ -204,11 +207,16 @@ func RegisterGitOps(r *Registry, d GitOpsDeps) error {
 			},
 			When:           hasGitHub,
 			WhyUnavailable: whyNoGitHub,
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				res, err := b.CreatePullRequest(ctx, connect.NewRequest(&v1.CreatePullRequestRequest{
 					WorktreePath: a.Path("worktree"), Title: a.String("title"), Body: a.String("body"), Draft: a.Bool("draft"), Base: a.String("base"),
 				}))
-				return opResult(res, err)
+				r, err := opResult(res, err)
+				if err != nil {
+					return r, err
+				}
+				line, link := linkCallerPR(ctx, d.Link, uctx, res.Msg.GetOp().GetUrl())
+				return withThreadLink(r, line, link), nil
 			},
 		},
 		Command{

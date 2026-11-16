@@ -48,7 +48,8 @@ type Deps struct {
 	// Thread backs thread.*. Nil works like Terminal.
 	Thread command.ThreadBackend
 	// GitOps backs git.*, pr.*, worktree.open.editor, worktree.reveal and view.open.url.
-	// A nil Backend works like Terminal.
+	// A nil Backend works like Terminal; a nil Link is Thread (pr.create links its pull
+	// request to the calling thread, as pr.revert does with Thread).
 	GitOps command.GitOpsDeps
 	// Gh backs pr.revert, pr.merge, pr.review.request, pr.refresh, pr.review, pr.comment,
 	// pr.ready, pr.draft, pr.auto-merge and pr.checkbox (the pull request detail panel's
@@ -177,6 +178,9 @@ func Register(r *command.Registry, d Deps) error {
 	if d.GitOps.NotGit == nil {
 		d.GitOps.NotGit = d.NotGit
 	}
+	if d.GitOps.Link == nil {
+		d.GitOps.Link = d.Thread
+	}
 	if d.NewProjects.NotGit == nil {
 		d.NewProjects.NotGit = d.NotGit
 	}
@@ -198,7 +202,7 @@ func Register(r *command.Registry, d Deps) error {
 		command.RegisterAgents(r, d.Thread, d.Emitter),
 		command.RegisterSlash(r, d.Thread),
 		command.RegisterGitOps(r, d.GitOps),
-		command.RegisterPullRequest(r, d.Gh),
+		command.RegisterPullRequest(r, d.Gh, d.Thread),
 		command.RegisterPullRequestThreads(r, command.PullRequestThreadDeps{
 			Gh: d.Gh, Project: d.Project, Thread: d.Thread, GitOps: d.GitOps.Backend, Emitter: d.Emitter, Clone: d.Clone,
 		}),

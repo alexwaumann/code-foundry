@@ -844,7 +844,9 @@ with the reason, so the layout glue can record what each ran while they still ex
   head is a branch it works on (each of its checkouts' HEAD) in the
   project's GitHub repository: the daemon matches them against the GitHub store's cached
   lists (dashboards and branch lists, no new polling) and pushes them to the thread
-  store as `branch` links (`docs/notes/linked-prs-branch.md`).
+  store as `branch` links (`docs/notes/linked-prs-branch.md`). A pull request opened
+  with `pr.create` or `pr.revert` is linked to the thread that ran it as a `manual` link,
+  like `thread.pr.link` (`docs/notes/pr-create-links-thread.md`).
 * **Search** (`search*.go`, migration 0054): an FTS5 trigram index (contentless, one
   document per item id, so a fork's copies are indexed once) over the text that stays
   visible when a turn folds: user messages, assistant text, questions and their answers

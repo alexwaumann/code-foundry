@@ -40,8 +40,9 @@ var (
 // UnimplementedGhServiceHandler. They have no When: the pull request is named by its args
 // (the GUI's detail panel passes them, the CLI takes them as flags or words), never by
 // context, so they hold in any context. Without the args Invoke fails with
-// ErrInvalidArgs, not ErrUnavailable.
-func RegisterPullRequest(r *Registry, b GhBackend) error {
+// ErrInvalidArgs, not ErrUnavailable. link links the pull request pr.revert opens to the
+// thread that ran it (pr_link_caller.go); nil links nothing.
+func RegisterPullRequest(r *Registry, b GhBackend, link PullRequestLinkBackend) error {
 	if b == nil {
 		b = codefoundryv1connect.UnimplementedGhServiceHandler{}
 	}
@@ -59,11 +60,11 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 			Name:        "pr.revert",
 			NoPalette:   true,
 			Title:       "Revert Pull Request",
-			Description: "Open a pull request that reverses a merged one (GitHub's Revert button).",
+			Description: "Open a pull request that reverses a merged one (GitHub's Revert button). It is linked to the thread that ran it, as thread.pr.link.",
 			Category:    "Pull Request",
 			Args:        []ArgSpec{slug, number},
 			Confirm:     "This opens a new pull request that reverses the changes merged by #{number}.",
-			Run: func(ctx context.Context, _ Context, a Args) (Result, error) {
+			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {
 				if err := checkPullRequestArgs(a); err != nil {
 					return Result{}, err
 				}
@@ -73,10 +74,12 @@ func RegisterPullRequest(r *Registry, b GhBackend) error {
 				if err != nil {
 					return Result{}, err
 				}
-				return Result{
+				r := Result{
 					Message: fmt.Sprintf("Opened #%d to revert #%d: %s", res.Msg.GetNumber(), a.Int("number"), res.Msg.GetUrl()),
 					JSON:    res.Msg,
-				}, nil
+				}
+				line, l := linkCallerPR(ctx, link, uctx, res.Msg.GetUrl())
+				return withThreadLink(r, line, l), nil
 			},
 		},
 		Command{
