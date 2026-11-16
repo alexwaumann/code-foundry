@@ -143,13 +143,32 @@ func (m *Manager) unsnoozeLocked(rec *record) bool {
 
 // clearSnoozeEnded turns a woken thread's "snooze ended" attention into idle at its
 // prompt, and reports whether it did. Snooze and Archive call it (the user put the
-// thread away again, so the wake no longer needs them), and New for rows archived or
-// snoozed before they did.
+// thread away again, so the wake no longer needs them), ClearSnoozeEnded (the user
+// cleared it), and New for rows archived or snoozed before they did.
 func clearSnoozeEnded(s *Thread, now time.Time) bool {
 	if s.Status != StatusNeedsAttention || s.StatusReason != ReasonSnoozeEnded {
 		return false
 	}
 	return s.setStatus(StatusIdle, "at prompt", now)
+}
+
+// ClearSnoozeEnded turns a woken thread's "snooze ended" attention into idle at its
+// prompt, persisted and published, as a re-snooze or an archive does: the user saw the
+// wake and wants nothing more from it (thread.snooze.clear). cleared is false, and
+// nothing changes, when the thread is not woken.
+func (m *Manager) ClearSnoozeEnded(_ context.Context, id string) (_ Thread, cleared bool, _ error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rec, err := m.record(id)
+	if err != nil {
+		return Thread{}, false, err
+	}
+	if !clearSnoozeEnded(&rec.s, m.opts.Now()) {
+		return rec.s, false, nil
+	}
+	m.commitLocked(rec, true)
+	m.log.Info("cleared snooze ended", "thread", id)
+	return rec.s, true, nil
 }
 
 // wakeSnoozed wakes every thread whose SnoozedUntil is not after Options.Now: it

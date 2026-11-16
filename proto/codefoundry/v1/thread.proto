@@ -155,6 +155,10 @@ service ThreadService {
   // snoozed_until stays unset and the daemon never wakes it; a request with neither, and
   // those implicit clears, end it too.
   rpc Snooze(SnoozeThreadRequest) returns (SnoozeThreadResponse) {}
+  // ClearSnoozeEnded turns a woken thread's NEEDS_ATTENTION "snooze ended" into IDLE
+  // "at prompt", as a re-snooze or an archive does, without putting it away again.
+  // cleared is false, and nothing changes, when the thread is not woken. Persisted.
+  rpc ClearSnoozeEnded(ClearSnoozeEndedRequest) returns (ClearSnoozeEndedResponse) {}
   // Label adds and removes a thread's labels (clear first, then remove, then add) and
   // returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
   rpc Label(LabelThreadRequest) returns (LabelThreadResponse) {}

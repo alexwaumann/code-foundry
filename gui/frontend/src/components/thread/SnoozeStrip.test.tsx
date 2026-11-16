@@ -12,7 +12,7 @@ const { useThreadsStore } = await import("@/stores/threads");
 const { daemon, lastInvocation, resetDaemon } = await import("@/test/daemonFakes");
 const { seedWorld } = await import("@/test/projectsWorld");
 
-// The strip above the composer of a snoozed or saved thread: until when, and Dismiss snooze, which
+// The strip above the composer of a snoozed, saved or woken thread: until when, and Dismiss snooze, which
 // runs what the title menu's Unsnooze runs. Sending a message waking it is the daemon's rule
 // (internal/store/thread snooze_test.go). Where it sits in the dock: e2e snooze.spec.ts.
 
@@ -106,12 +106,75 @@ describe("SnoozeStrip", () => {
     expect(screen.getByTestId("snooze-strip")).toBeTruthy();
   });
 
-  it("a woken thread, or one never snoozed: nothing", () => {
-    set("s-8", { snoozedUntilMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() });
-    show("s-8");
-    expect(screen.queryByTestId("snooze-strip")).toBeNull();
-    cleanup();
+  it("a thread never snoozed: nothing", () => {
     show("s-3");
     expect(screen.queryByTestId("snooze-strip")).toBeNull();
+    expect(screen.queryByTestId("woken-strip")).toBeNull();
+  });
+});
+
+// A woken thread (docs/notes/clear-woken-thread.md): the strip in the snooze strip's place, with
+// Snooze again and Clear. Opening the thread does not clear it: only those, a send or an archive.
+describe("SnoozeStrip, woken", () => {
+  const wake = (id: string, at = Date.now() - 2 * 60_000) => {
+    set(id, { snoozedUntilMs: null, savedAtMs: null, state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: at });
+  };
+  const clear = () => screen.getByTestId<HTMLButtonElement>("woken-clear");
+
+  it("says when it woke in the warning tone, with Snooze again and Clear", () => {
+    wake("s-8");
+    show("s-8");
+    expect(screen.queryByTestId("snooze-strip")).toBeNull();
+    const line = screen.getByTestId("woken-sentence");
+    expect(line.textContent).toBe("Snooze ended · 2m ago");
+    expect(line.className).toContain("text-cf-warning-text");
+    expect(screen.getByTestId("woken-snooze").textContent).toBe("Snooze again");
+    expect(clear().textContent).toBe("Clear");
+  });
+
+  it("Clear runs thread.snooze.clear for its thread, with no toast; cleared, the strip goes", async () => {
+    wake("s-8");
+    show("s-8");
+    fireEvent.click(clear());
+    await vi.waitFor(() => {
+      expect(lastInvocation("thread.snooze.clear")).toMatchObject({ args: {}, context: { activeThreadId: "s-8" } });
+    });
+    expect(notify).not.toHaveBeenCalled();
+    set("s-8", { status: "idle", statusReason: "at prompt" });
+    expect(screen.queryByTestId("woken-strip")).toBeNull();
+  });
+
+  it("Clear holds while the command runs, once", async () => {
+    wake("s-8");
+    let finish = (): void => undefined;
+    daemon.handlers.set("thread.snooze.clear", () => new Promise((resolve) => (finish = () => {
+      resolve({ message: "", resultJson: "" });
+    })));
+    show("s-8");
+    fireEvent.click(clear());
+    expect(clear().disabled).toBe(true);
+    fireEvent.click(clear());
+    expect(daemon.invocations.filter((i) => i.name === "thread.snooze.clear")).toHaveLength(1);
+    finish();
+    await waitFor(() => {
+      expect(clear().disabled).toBe(false);
+    });
+  });
+
+  it("Snooze again opens the snooze presets; a preset snoozes the thread, and the strip turns to the snooze's", async () => {
+    wake("s-8");
+    show("s-8");
+    fireEvent.pointerDown(screen.getByTestId("woken-snooze"), { button: 0, ctrlKey: false });
+    const presets = await screen.findAllByTestId("snooze-preset");
+    expect(presets.length).toBeGreaterThan(0);
+    expect(screen.getByTestId("snooze-pick")).toBeTruthy();
+    fireEvent.click(presets[0] as HTMLElement);
+    await vi.waitFor(() => {
+      expect(lastInvocation("thread.snooze")).toMatchObject({ context: { activeThreadId: "s-8" } });
+    });
+    expect(lastInvocation("thread.snooze")?.args.until).toBeTruthy();
+    set("s-8", { snoozedUntilMs: Date.now() + 3_600_000, status: "idle", statusReason: "snoozed" });
+    expect(screen.queryByTestId("woken-strip")).toBeNull();
+    expect(screen.getByTestId("snooze-strip")).toBeTruthy();
   });
 });

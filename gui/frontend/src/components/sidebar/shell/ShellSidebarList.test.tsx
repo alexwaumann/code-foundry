@@ -172,7 +172,7 @@ describe("the shell sidebar list", () => {
 
   // The title-first rows left every status word to screen readers; a woken thread is the one call on
   // the user that sits in Active, and its row read as nothing but a bell (docs/notes/clear-woken-thread.md).
-  it("a woken thread's row sits in Active and says Woke beside its bell", () => {
+  it("a woken thread's row sits in Active and says Woke beside its bell; on hover Snooze and Clear take its place", () => {
     setThreads(thread({ id: "s-1", state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: Date.now() - 60_000 }));
     render(<ShellSidebarList bodyHeight={800} />);
     const row = rowOf("s:s-1");
@@ -184,6 +184,12 @@ describe("the shell sidebar list", () => {
     expect(within(status).getByTestId("row-status-icon").getAttribute("class")).toContain("lucide-bell-ring");
     expect(within(status).getByTestId("row-status-word").className).not.toContain("sr-only");
     expect(status.textContent).toBe("Woke");
+    // The hover slot: the status at rest, the actions over it on hover, in line 1.
+    const slot = within(line1).getByTestId("row-hover-slot");
+    expect(slot.contains(status)).toBe(true);
+    const actions = within(slot).getByTestId("row-actions");
+    expect([...actions.querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual(["row-snooze", "row-clear"]);
+    expect(within(row).queryByTestId("row-archive")).toBeNull();
   });
 
   it("a thread with no project: the house and No project; no third line unless it has counts", () => {

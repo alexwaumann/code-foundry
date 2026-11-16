@@ -20,7 +20,7 @@ import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
 import { useThreadMark } from "@/stores/notifications";
-import { archiveThread, renameThread } from "@/stores/threadActions";
+import { archiveThread, clearSnoozeEnded, renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
 import { useUiStore } from "@/stores/ui";
@@ -147,8 +147,9 @@ const stop = (e: SyntheticEvent) => {
 };
 
 /**
- * The row's hover actions, on the right of its last line (HoverSlot): Snooze (the preset menu, SnoozePresetItems)
- * and Archive (at once, thread.archive). Shown while the row is hovered, while one of them
+ * The row's hover actions, in HoverSlot: Snooze (the preset menu, SnoozePresetItems)
+ * and Archive (at once, thread.archive); on a woken row Clear in Archive's place (at once,
+ * thread.snooze.clear; Archive stays in the context menu), and Archive again once cleared. Shown while the row is hovered, while one of them
  * has the keyboard, and while the snooze menu is open. They are tab stops only on the
  * keyboard cursor's row (`cursor`), so Tab leaves the list after one row's actions rather
  * than walking every row's; the context menu and the palette have the same commands.
@@ -158,6 +159,7 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
   const [focused, setFocused] = useState(false);
   // The daemon refuses a snooze while a setup runs: spawn may be reading the row.
   const settingUp = useThreadsStore((s) => s.byId[id]?.setup?.phase === "running");
+  const woken = useThreadsStore((s) => statusLine(s.byId[id]).kind === "snoozeEnded");
   const shown = menuOpen || focused;
   useEffect(() => {
     onShownChange(shown);
@@ -192,20 +194,37 @@ function RowActions({ id, cursor, onShownChange }: { id: string; cursor: boolean
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      <button
-        type="button"
-        tabIndex={tab}
-        aria-label="Archive thread"
-        className={cn(ACTION_BUTTON, "h-5 gap-[3px] px-1 text-caption-sm font-medium hover:text-cf-success-text")}
-        data-testid="row-archive"
-        onClick={(e) => {
-          e.stopPropagation();
-          void archiveThread(id, true, { inView: true });
-        }}
-      >
-        <Check className="size-3 shrink-0" aria-hidden />
-        Archive
-      </button>
+      {woken ? (
+        <button
+          type="button"
+          tabIndex={tab}
+          aria-label="Clear snooze ended"
+          className={cn(ACTION_BUTTON, "h-5 gap-[3px] px-1 text-caption-sm font-medium hover:text-cf-success-text")}
+          data-testid="row-clear"
+          onClick={(e) => {
+            e.stopPropagation();
+            void clearSnoozeEnded(id, { inView: true });
+          }}
+        >
+          <Check className="size-3 shrink-0" aria-hidden />
+          Clear
+        </button>
+      ) : (
+        <button
+          type="button"
+          tabIndex={tab}
+          aria-label="Archive thread"
+          className={cn(ACTION_BUTTON, "h-5 gap-[3px] px-1 text-caption-sm font-medium hover:text-cf-success-text")}
+          data-testid="row-archive"
+          onClick={(e) => {
+            e.stopPropagation();
+            void archiveThread(id, true, { inView: true });
+          }}
+        >
+          <Check className="size-3 shrink-0" aria-hidden />
+          Archive
+        </button>
+      )}
     </span>
   );
 }

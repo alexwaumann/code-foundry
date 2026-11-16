@@ -10,7 +10,7 @@ vi.mock("@/lib/notify", () => ({ notify, notifyProgress: vi.fn(), dismissNotice:
 const levels = () => notify.mock.calls.map(([n]) => n.level);
 
 
-const { archiveThread, renameThread, respondThread, saveThreadForLater, setThreadModel, setThreadPermission, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
+const { archiveThread, clearSnoozeEnded, renameThread, respondThread, saveThreadForLater, setThreadModel, setThreadPermission, snoozeThread, THREAD_COMMANDS } = await import("./threadActions");
 const { useThreadStore } = await import("./thread");
 
 type Opts = { expected?: (err: unknown) => boolean };
@@ -50,6 +50,14 @@ describe("snoozeThread", () => {
     expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" }, {});
     await saveThreadForLater("s3", { inView: true });
     expect(commands.runCommand).toHaveBeenLastCalledWith("thread.snooze", { save: "true" }, { activeThreadId: "s3" }, { inView: true });
+  });
+});
+
+describe("clearSnoozeEnded", () => {
+  it("runs thread.snooze.clear in the thread's context, with no args", async () => {
+    expect(THREAD_COMMANDS.clearSnoozeEnded).toBe("thread.snooze.clear");
+    expect(await clearSnoozeEnded("s4", { inView: true })).toBe(true);
+    expect(commands.runCommand).toHaveBeenCalledWith("thread.snooze.clear", {}, { activeThreadId: "s4" }, { inView: true });
   });
 });
 

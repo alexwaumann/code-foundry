@@ -52,10 +52,32 @@ test("Snoozed section: stacked between Working and Archived; quiet rows at the l
 // Pick a date and time: the dialog for the row's thread and the local time it sends, unit-tested in
 // src/components/snooze/SnoozeDialog.test.tsx and src/components/thread/ThreadMenuItems.test.tsx.
 
-// A wake: back on top of the main list, Woke in amber, snooze ended (src/components/sidebar/Sidebar.test.tsx),
-// counted in the title (src/stores/threads.test.ts), the composer's "Snooze ended · just now"
-// (src/components/thread/SnoozeNote.test.tsx); snoozing again from the title menu
-// (ThreadMenuItems.test.tsx); a message unsnoozing is the daemon's (internal/store/thread snooze_test.go).
+// A wake: back on top of the main list, Woke in amber, snooze ended (src/components/sidebar/Sidebar.test.tsx,
+// src/components/sidebar/shell/ShellSidebarList.test.tsx), counted in the title (src/stores/threads.test.ts),
+// the row's Snooze and Clear (src/components/sidebar/SidebarRow.test.tsx), the dock's strip with Snooze again
+// and Clear (src/components/thread/SnoozeStrip.test.tsx); snoozing again from the title menu
+// (ThreadMenuItems.test.tsx); a message unsnoozing and Clear are the daemon's (internal/store/thread snooze_test.go).
+
+// Which actions a woken row has and what they run: SidebarRow.test.tsx. This is where they sit: in the
+// hover slot of line 1, over the status, Clear's right edge where Archive's is on any other row.
+test("a woken row's Snooze and Clear sit where Snooze and Archive sit, over its Woke", async ({ page }) => {
+  await mockPost("thread/snooze?id=s-3&until=2m");
+  await mockPost("thread/wake?id=s-3");
+  await openApp(page);
+  const woken = row(page, "s:s-3");
+  await expect(woken.getByTestId("row-status")).toHaveText("Woke");
+  const right = (r: ReturnType<typeof row>, id: string) => r.getByTestId(id).evaluate((el) => Math.round(el.getBoundingClientRect().right));
+  const lineTop = (r: ReturnType<typeof row>, id: string) =>
+    r.getByTestId(id).evaluate((el) => Math.round(el.getBoundingClientRect().top - (el.closest('[data-testid="row-line-1"]')?.getBoundingClientRect().top ?? NaN)));
+  await woken.hover();
+  await expect(woken.getByTestId("row-clear")).toBeVisible();
+  await expect(woken.getByTestId("row-status")).toBeHidden();
+  const clear = { right: await right(woken, "row-clear"), top: await lineTop(woken, "row-clear") };
+  const idle = row(page, "s:s-5");
+  await idle.hover();
+  await expect(idle.getByTestId("row-archive")).toBeVisible();
+  expect(clear).toEqual({ right: await right(idle, "row-archive"), top: await lineTop(idle, "row-archive") });
+});
 
 test("the keyboard walks main → Working → Snoozed → Archived; collapsed sections are skipped", async ({ page }) => {
   await openApp(page);
@@ -215,6 +237,33 @@ for (const scheme of ["dark", "light"] as const) {
       await page.mouse.move(640, 300);
       await page.waitForTimeout(350);
       await page.screenshot({ path: `${String(dir)}/saved-${scheme}.png` });
+    });
+  });
+}
+
+/** SHOTS=<dir>: the PR's screenshots of a woken thread, WebKit, 1280x800 at 2x, dark and light: the row at rest, hovered, and the thread's dock. */
+for (const scheme of ["dark", "light"] as const) {
+  test.describe(`woken thread screenshots (${scheme})`, () => {
+    test.use({ colorScheme: scheme, deviceScaleFactor: 2, viewport: { width: 1280, height: 800 } });
+    test("the woken row at rest and hovered, and the woken thread", async ({ page }, info) => {
+      const dir = process.env.SHOTS;
+      test.skip(!dir || info.project.name !== "webkit", "SHOTS=<dir> with WebKit only");
+      await mockPost("thread/snooze?id=s-3&until=2m");
+      await mockPost("thread/wake?id=s-3");
+      await openApp(page);
+      const woken = row(page, "s:s-3");
+      await expect(woken).toHaveAttribute("data-section", /.+/);
+      await page.mouse.move(640, 300);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${String(dir)}/woken-row-${scheme}.png`, clip: { x: 0, y: 0, width: 520, height: 420 } });
+      await woken.getByTestId("thread-name").hover();
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${String(dir)}/woken-row-hover-${scheme}.png`, clip: { x: 0, y: 0, width: 520, height: 420 } });
+      await woken.getByTestId("thread-name").click();
+      await expect(page.getByTestId("thread-composer")).toBeVisible();
+      await page.mouse.move(640, 300);
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${String(dir)}/woken-thread-${scheme}.png` });
     });
   });
 }

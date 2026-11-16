@@ -6,7 +6,8 @@ import type { ThreadView } from "@/api/threads";
 const renameThread = vi.hoisted(() => vi.fn<(id: string, name: string) => Promise<boolean>>(() => Promise.resolve(true)));
 const archiveThread = vi.hoisted(() => vi.fn<(id: string, archived: boolean) => Promise<boolean>>(() => Promise.resolve(true)));
 const snoozeThread = vi.hoisted(() => vi.fn<(id: string, untilMs: number | null) => Promise<boolean>>(() => Promise.resolve(true)));
-vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread, archiveThread, snoozeThread }));
+const clearSnoozeEnded = vi.hoisted(() => vi.fn<(id: string) => Promise<boolean>>(() => Promise.resolve(true)));
+vi.mock("@/stores/threadActions", async (orig) => ({ ...(await orig<typeof import("@/stores/threadActions")>()), renameThread, archiveThread, snoozeThread, clearSnoozeEnded }));
 const openPr = vi.hoisted(() => vi.fn<(ref: { slug: string; number: number }, target?: string, opts?: { focus?: boolean }) => boolean>(() => true));
 vi.mock("@/stores/prPanel", async (orig) => ({ ...(await orig<typeof import("@/stores/prPanel")>()), openPullRequestInPanel: openPr }));
 const showThreadInfo = vi.hoisted(() => vi.fn<(threadId: string, focus?: boolean) => void>());
@@ -380,6 +381,41 @@ describe("SidebarRow hover actions", () => {
     expect(cardOpen()).toBe(1);
     fireEvent.focus(b);
     expect(screen.queryByTestId(`${id}-tip`)).toBeNull();
+  });
+
+  it("a woken row: Snooze and Clear, Clear in Archive's place, the same shape; cleared, Archive is back", () => {
+    renderRow({ state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: NOW - MIN });
+    const actions = screen.getByTestId("row-actions");
+    expect(Array.from(actions.querySelectorAll("button")).map((b) => b.getAttribute("data-testid"))).toEqual(["row-snooze", "row-clear"]);
+    const clear = screen.getByTestId("row-clear");
+    expect(clear.textContent).toBe("Clear");
+    expect(clear.getAttribute("aria-label")).toBe("Clear snooze ended");
+    expect(clear.querySelector("svg")?.getAttribute("class")).toContain("lucide-check");
+    expect(clear.className.split(" ")).toEqual(expect.arrayContaining(["h-5", "text-caption-sm", "font-medium", "text-cf-icon-muted", "hover:text-cf-success-text"]));
+    expect(clear.tabIndex).toBe(-1);
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "idle", statusReason: "at prompt" }) } });
+    });
+    expect(screen.queryByTestId("row-clear")).toBeNull();
+    expect(screen.getByTestId("row-archive")).toBeTruthy();
+  });
+
+  it("Clear clears at once and does not select the row; a tab stop only on the cursor's row", () => {
+    clearSnoozeEnded.mockClear();
+    archiveThread.mockClear();
+    const onActivate = vi.fn();
+    useThreadsStore.setState({ byId: { "s-1": thread({ state: "disconnected", status: "attention", statusReason: "snooze ended" }) }, order: ["s-1"] });
+    render(
+      <TooltipProvider>
+        <SidebarRow row={{ key: "s:s-1", kind: "thread", section: "idle", threadId: "s-1" }} selected={false} cursor onActivate={onActivate} />
+      </TooltipProvider>,
+    );
+    const clear = screen.getByTestId("row-clear");
+    expect(clear.tabIndex).toBe(0);
+    fireEvent.click(clear);
+    expect(clearSnoozeEnded).toHaveBeenCalledWith("s-1", { inView: true });
+    expect(archiveThread).not.toHaveBeenCalled();
+    expect(onActivate).not.toHaveBeenCalled();
   });
 
   it("Archive archives at once and does not select the row", () => {

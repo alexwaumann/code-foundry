@@ -39,6 +39,7 @@ export const THREAD_COMMANDS = {
   pin: "thread.pin",
   archive: "thread.archive",
   snooze: "thread.snooze",
+  clearSnoozeEnded: "thread.snooze.clear",
   runIn: "thread.run-in",
   send: "thread.send",
   compact: "thread.compact",
@@ -108,6 +109,15 @@ export function archiveThread(id: string, archived: boolean, source: CommandSour
 export function snoozeThread(id: string, untilMs: number | null, source: CommandSource = {}): Promise<boolean> {
   const args: Record<string, string> = untilMs === null ? { clear: "true" } : { until: new Date(untilMs).toISOString() };
   return runCommand(THREAD_COMMANDS.snooze, args, threadContext(id), source);
+}
+
+/**
+ * thread.snooze.clear: a woken thread's "snooze ended" becomes idle at its prompt, where
+ * it is (the sidebar row's and the dock strip's Clear). No toast: the row and the strip
+ * changing say it.
+ */
+export function clearSnoozeEnded(id: string, source: CommandSource = {}): Promise<boolean> {
+  return runCommand(THREAD_COMMANDS.clearSnoozeEnded, {}, threadContext(id), source);
 }
 
 /**

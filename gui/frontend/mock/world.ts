@@ -800,6 +800,7 @@ export class World {
         this.publishThread(s);
       },
       statusOf: (id) => this.thread(id).status,
+      reasonOf: (id) => this.thread(id).statusReason,
       refuseTranscriptMissing: (id) => {
         this.refuseTranscriptMissing(id);
       },
@@ -2905,7 +2906,24 @@ export class World {
     s.archivedAt ??= new Date();
     s.snoozedUntil = null;
     s.savedAt = null;
+    this.clearWake(s);
     this.publishThread(s);
+  }
+
+  /** The daemon's clearSnoozeEnded: a woken thread's "snooze ended" becomes idle "at prompt"; whether it did. */
+  private clearWake(s: MockThread): boolean {
+    if (s.status !== ThreadStatus.NEEDS_ATTENTION || s.statusReason !== "snooze ended") return false;
+    this.setStatus(s, ThreadStatus.IDLE, "at prompt");
+    return true;
+  }
+
+  /** thread.snooze.clear: a woken thread is idle at its prompt, where it is; another thread is left as it is. Returns the message. */
+  clearSnoozeEnded(id: string): string {
+    const s = this.thread(id);
+    const label = s.name ? `${s.name} (${s.id})` : s.id;
+    if (!this.clearWake(s)) return `thread ${label} was not woken from a snooze; nothing to clear`;
+    this.publishThread(s);
+    return `cleared snooze ended on thread ${label}`;
   }
 
   /**
@@ -2930,6 +2948,7 @@ export class World {
     s.archivedAt = null;
     s.snoozedUntil = until;
     s.savedAt = null;
+    this.clearWake(s);
     this.publishThread(s);
     return `snoozed thread ${label} until ${until.toISOString()}`;
   }
@@ -2944,6 +2963,7 @@ export class World {
     s.archivedAt = null;
     s.snoozedUntil = null;
     s.savedAt ??= new Date();
+    this.clearWake(s);
     this.publishThread(s);
     return `saved thread ${s.name ? `${s.name} (${s.id})` : s.id} for later`;
   }
@@ -4910,6 +4930,26 @@ export class World {
             return this.saveThread(s.id);
           }
           return this.snoozeThread(s.id, snoozeUntil(args));
+        },
+      },
+      {
+        cmd: {
+          name: "thread.snooze.clear",
+          title: "Clear Snooze Ended",
+          category: "Thread",
+          description: "Clear a woken thread's \"snooze ended\": it stays where it is, idle at its prompt. A message, another snooze or archiving clear it too. (thread snooze --clear unsnoozes a thread still snoozed.)",
+          keybindings: [],
+          args: [],
+        },
+        // Like the daemon: in a window only while the thread reads "snooze ended".
+        when: (ctx) => {
+          const s = activeThread(ctx);
+          return s !== undefined && s.status === ThreadStatus.NEEDS_ATTENTION && s.statusReason === "snooze ended";
+        },
+        run: (ctx) => {
+          const s = activeThread(ctx);
+          if (!s) throw new CommandError("unavailable", "no active thread");
+          return this.clearSnoozeEnded(s.id);
         },
       },
       {

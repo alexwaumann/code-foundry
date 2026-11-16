@@ -772,6 +772,18 @@ describe("inPalette", () => {
       expect(inPalette(cmd({ name: "thread.move.open" }))).toBe(want);
     }
   });
+
+  it("thread.snooze.clear only while the thread reads Woke, whatever the list fetched before said", () => {
+    useUiStore.setState({ selection: { kind: "thread", id: "s1" } });
+    for (const [over, want] of [
+      [{ state: "disconnected", status: "attention", statusReason: "snooze ended" }, true],
+      [{ state: "disconnected", status: "idle", statusReason: "at prompt" }, false],
+      [{ status: "attention", statusReason: "finished" }, false],
+    ] as const) {
+      useThreadsStore.setState({ byId: { s1: thread("s1", over) }, order: ["s1"] });
+      expect(inPalette(cmd({ name: "thread.snooze.clear" }))).toBe(want);
+    }
+  });
 });
 
 describe("the find chords, by where the keyboard is", () => {

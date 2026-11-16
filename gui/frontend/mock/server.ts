@@ -62,6 +62,7 @@
  *                                                 child threads go along: World.archiveCascade)
  *   POST /__mock/thread/forget?id=s-l-parent      (forgets that one thread, no cascade: its children's
  *                                                 creator no longer exists, so they join the sidebar)
+ *   POST /__mock/thread/wake?id=s-1               (the snooze ends now: needs attention "snooze ended", World.wakeThread)
  *   POST /__mock/thread/snooze?id=s-1&until=2m|<RFC 3339>[&clear=true][&save=true]   (thread.snooze as the CLI's
  *                                                 --yes does it: closes, removes its shells, unpins, unarchives)
  *   POST /__mock/thread/cache?id=s-r1&ago=<seconds>[&tokens=N&model=M]   (a thread's last result that long ago; only tokens: its context, the result's time kept; mock/context.ts)
@@ -997,7 +998,7 @@ function threadSummary(id: string): Record<string, unknown> {
 const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|transcript|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|wake|transcript|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
  */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
@@ -1043,6 +1044,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
         // Gone: no summary to answer with.
         json(res, 200, { forgotten: id });
         return;
+      case "wake":
+        world.wakeThread(id);
+        break;
       case "snooze":
         if (q.get("save") === "true") world.saveThread(id);
         else world.snoozeThread(id, snoozeUntil({ until: q.get("until") ?? "", clear: q.get("clear") ?? "" }));
@@ -1089,7 +1093,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|transcript|setup|move-fail|move-delay)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|wake|transcript|setup|move-fail|move-delay)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;

@@ -26,3 +26,17 @@ func (s *Thread) StopWaiting(_ context.Context, r *connect.Request[v1.StopThread
 	}
 	return connect.NewResponse(&v1.StopThreadWaitingResponse{Thread: s.current(r.Msg.GetThreadId())}), nil
 }
+
+// ClearSnoozeEnded returns Current, idle "at prompt" and cleared when it was needs
+// attention "snooze ended"; otherwise as it is, not cleared.
+func (s *Thread) ClearSnoozeEnded(_ context.Context, r *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error) {
+	if err := s.do(r.Msg); err != nil {
+		return nil, err
+	}
+	cur := s.current(r.Msg.GetId())
+	if cur.GetStatus() != v1.ThreadStatus_THREAD_STATUS_NEEDS_ATTENTION || cur.GetStatusReason() != "snooze ended" {
+		return connect.NewResponse(&v1.ClearSnoozeEndedResponse{Thread: cur}), nil
+	}
+	cur.Status, cur.StatusReason = v1.ThreadStatus_THREAD_STATUS_IDLE, "at prompt"
+	return connect.NewResponse(&v1.ClearSnoozeEndedResponse{Thread: cur, Cleared: true}), nil
+}

@@ -106,6 +106,8 @@ export interface ThreadWorld {
   setPermission(id: string, permission: string): void;
   setEffort(id: string, effort: string, pending: boolean): void;
   statusOf(id: string): ThreadStatus;
+  /** The thread's status reason ("snooze ended", "finished"). */
+  reasonOf(id: string): string;
   /** Throws the daemon's refusal when Claude Code deleted the thread's transcript (World.refuseTranscriptMissing). */
   refuseTranscriptMissing(id: string): void;
   /** The thread's model as picked ("claude-opus-4-8[1m]"). */
@@ -447,13 +449,14 @@ export class MockThreadLogs {
 
   /**
    * A finished turn is seen while someone watches: "finished" becomes "at prompt". An error
-   * status stays, like the daemon's (a failed start ends with a turn end too).
+   * status stays, like the daemon's (a failed start ends with a turn end too), and so does a
+   * woken snooze (the daemon's clearedWhenSeen): only Clear, a send, a snooze or archiving end it.
    */
   private seen(id: string): void {
     const l = this.log(id);
     const last = l.items[l.items.length - 1];
     // A thread reading waiting stays so: the overlay outlives a look, like the daemon's (mock/wakes.ts).
-    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd" && this.world.statusOf(id) !== ThreadStatus.ERROR && !this.wakes.has(id)) this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
+    if (l.watchers > 0 && l.pending.length === 0 && last?.payload?.case === "turnEnd" && this.world.statusOf(id) !== ThreadStatus.ERROR && this.world.reasonOf(id) !== "snooze ended" && !this.wakes.has(id)) this.world.setStatus(id, ThreadStatus.IDLE, "at prompt");
   }
 
   private item(id: string, payload: ItemInit["payload"], over: Partial<ItemInit> & { at?: Date; until?: Date } = {}): ItemInit {

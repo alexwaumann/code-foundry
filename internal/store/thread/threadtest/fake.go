@@ -479,6 +479,21 @@ func (f *Fake) Snooze(_ context.Context, id string, until time.Time) (thread.Thr
 	})
 }
 
+// ClearSnoozeEnded records "ClearSnoozeEnded <id>" and turns a needs-attention
+// "snooze ended" thread idle "at prompt"; cleared is false, and nothing changes, for any
+// other thread.
+func (f *Fake) ClearSnoozeEnded(_ context.Context, id string) (thread.Thread, bool, error) {
+	cleared := false
+	s, err := f.mutate("ClearSnoozeEnded "+id, id, func(s *thread.Thread) error {
+		if s.Status != thread.StatusNeedsAttention || s.StatusReason != thread.ReasonSnoozeEnded {
+			return nil
+		}
+		s.Status, s.StatusReason, s.StatusChangedAt, cleared = thread.StatusIdle, "at prompt", f.Now(), true
+		return nil
+	})
+	return s, cleared, err
+}
+
 // SaveForLater records "SaveForLater <id>". Like a snooze it disconnects a live thread
 // (reason "closed"), unpins and unarchives it; it clears SnoozedUntil and sets SavedAt to
 // Now unless already set.

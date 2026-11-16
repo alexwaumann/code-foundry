@@ -202,6 +202,15 @@ func (h *Thread) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThrea
 	return connect.NewResponse(&v1.SnoozeThreadResponse{Thread: threadToProto(s)}), nil
 }
 
+// ClearSnoozeEnded turns a woken thread idle at its prompt (internal/store/thread/snooze.go).
+func (h *Thread) ClearSnoozeEnded(ctx context.Context, req *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error) {
+	s, cleared, err := h.store.ClearSnoozeEnded(ctx, req.Msg.GetId())
+	if err != nil {
+		return nil, threadError(err)
+	}
+	return connect.NewResponse(&v1.ClearSnoozeEndedResponse{Thread: threadToProto(s), Cleared: cleared}), nil
+}
+
 // bySelf reports whether a request about thread id comes from that thread (by is empty
 // for the user).
 func bySelf(by, id string) bool { return by != "" && by == id }
