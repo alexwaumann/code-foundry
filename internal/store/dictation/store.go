@@ -213,6 +213,8 @@ type Snapshot struct {
 	MicDenied bool
 	// ComposerTarget: the window has a composer dictation can target.
 	ComposerTarget bool
+	// FieldTarget: a text field of the window outside every composer has the keyboard.
+	FieldTarget bool
 	// Accessibility is the host's last report; nil before the first.
 	Accessibility *Accessibility
 	// Inputs is the host's last report; nil before the first.
@@ -338,6 +340,7 @@ type Store struct {
 	ended     map[string]EndReason // sessions that ended, for a late Session stream
 	micDenied bool
 	composer  bool
+	field     bool
 	access    *Accessibility
 	inputs    *Inputs
 	// changed is closed and replaced on every publish (Start waits on it).
@@ -453,12 +456,15 @@ func (s *Store) MicDenied(denied bool) {
 	}
 }
 
-// ComposerTarget records whether the window has a composer dictation can target.
-func (s *Store) ComposerTarget(available bool) {
+// ComposerTarget records where a hold in the window goes: a composer dictation can target
+// (available), a text field outside every composer that has the keyboard (field), or
+// neither. A composer wins over a field.
+func (s *Store) ComposerTarget(available, field bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.composer != available {
-		s.composer = available
+	field = field && !available
+	if s.composer != available || s.field != field {
+		s.composer, s.field = available, field
 		s.publishLocked()
 	}
 }
@@ -1130,7 +1136,7 @@ func (s *Store) publishLocked() {
 	m := s.opts.Model
 	snap := &Snapshot{
 		Enabled: s.enabled, Prefs: s.prefs, State: s.stateLocked(), Hardware: s.hw, MicDenied: s.micDenied,
-		ComposerTarget: s.composer, Accessibility: s.access, Inputs: s.inputs,
+		ComposerTarget: s.composer, FieldTarget: s.field, Accessibility: s.access, Inputs: s.inputs,
 		Model: ModelState{Name: m.Name, Title: m.Title, Size: m.Size, Downloaded: s.onDisk},
 		Error: s.dlErr,
 	}
@@ -1157,7 +1163,7 @@ func (s *Store) publishLocked() {
 
 func equal(a, b *Snapshot) bool {
 	if a.Enabled != b.Enabled || a.Prefs != b.Prefs || a.State != b.State || a.Hardware != b.Hardware || a.Error != b.Error ||
-		a.MicDenied != b.MicDenied || a.ComposerTarget != b.ComposerTarget || a.Model.Downloaded != b.Model.Downloaded {
+		a.MicDenied != b.MicDenied || a.ComposerTarget != b.ComposerTarget || a.FieldTarget != b.FieldTarget || a.Model.Downloaded != b.Model.Downloaded {
 		return false
 	}
 	if !sameInputs(a.Inputs, b.Inputs) {

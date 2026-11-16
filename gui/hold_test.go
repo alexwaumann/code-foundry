@@ -33,8 +33,10 @@ func TestRouteHold(t *testing.T) {
 	}{
 		{"own app, a composer, anywhere on", holdFacts{Usable: true, OwnApp: true, ComposerTarget: true, Anywhere: true}, routeComposer},
 		{"own app, a composer, anywhere off", holdFacts{Usable: true, OwnApp: true, ComposerTarget: true}, routeComposer},
-		{"own app, no composer, anywhere on", holdFacts{Usable: true, OwnApp: true, Anywhere: true}, routeSystem},
-		{"own app, no composer, anywhere off", holdFacts{Usable: true, OwnApp: true}, routeNowhere},
+		{"own app, a text field, anywhere on", holdFacts{Usable: true, OwnApp: true, FieldTarget: true, Anywhere: true}, routeSystem},
+		{"own app, a text field, anywhere off", holdFacts{Usable: true, OwnApp: true, FieldTarget: true}, routeSystem},
+		{"own app, nothing to take it, anywhere on", holdFacts{Usable: true, OwnApp: true, Anywhere: true}, routeNowhere},
+		{"own app, nothing to take it, anywhere off", holdFacts{Usable: true, OwnApp: true}, routeNowhere},
 		{"another app, anywhere on", holdFacts{Usable: true, Anywhere: true}, routeSystem},
 		{"another app, anywhere on, a composer behind it", holdFacts{Usable: true, ComposerTarget: true, Anywhere: true}, routeSystem},
 		{"another app, anywhere off", holdFacts{Usable: true}, routeNowhere},
@@ -716,14 +718,21 @@ func TestHoldRuns(t *testing.T) {
 			want:   []string{"hold discard", "hold press", "tone start"},
 		},
 		{
-			name: "own app with no composer pastes into itself", front: inOwnApp,
+			name: "own app with a text field pastes into itself", snap: func(s *v1.DictationSnapshot) { s.FieldTarget = true }, front: inOwnApp,
 			conn:   holdScript{flushed: []string{"Text."}},
 			events: []altEvent{press, release},
 			want:   []string{"paste Text.", "release s1", "start system", "tone start", "tone stop"},
 		},
 		{name: "anywhere off in another app does nothing at all", snap: anywhereOff, front: inNotes, events: []altEvent{press, release}, notimer: true},
 		{name: "anywhere off in another app, a composer behind it", snap: func(s *v1.DictationSnapshot) { s.Anywhere, s.ComposerTarget = false, true }, front: inNotes, events: []altEvent{press, release}, notimer: true},
-		{name: "anywhere off in our app with no composer", snap: anywhereOff, front: inOwnApp, events: []altEvent{press, release}, notimer: true},
+		{
+			// dictation.anywhere is about other apps: a field of the window still takes the words.
+			name: "anywhere off in our app with a text field pastes into itself", snap: func(s *v1.DictationSnapshot) { s.Anywhere, s.FieldTarget = false, true }, front: inOwnApp,
+			conn:   holdScript{flushed: []string{"Text."}},
+			events: []altEvent{press, release},
+			want:   []string{"paste Text.", "release s1", "start system", "tone start", "tone stop"},
+		},
+		{name: "our app with nothing to take it does nothing at all", front: inOwnApp, events: []altEvent{press, release}, notimer: true},
 		{name: "a failed engine does nothing", snap: func(s *v1.DictationSnapshot) { s.State = v1.DictationState_DICTATION_STATE_ERROR }, front: inNotes, events: []altEvent{press, release}, notimer: true},
 		{
 			name: "sounds off", snap: func(s *v1.DictationSnapshot) { s.Sounds = false }, front: inNotes,

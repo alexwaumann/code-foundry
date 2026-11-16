@@ -30,7 +30,7 @@ type DictationStore interface {
 	MicDenied(denied bool)
 	ReportAccessibility(a dictation.Accessibility)
 	ReportInputs(in dictation.Inputs)
-	ComposerTarget(available bool)
+	ComposerTarget(available, field bool)
 }
 
 var _ DictationStore = (*dictation.Store)(nil)
@@ -281,7 +281,7 @@ func (h *Dictation) Accessibility(_ context.Context, req *connect.Request[v1.Dic
 
 // ComposerTarget records whether the window has a composer dictation can target.
 func (h *Dictation) ComposerTarget(_ context.Context, req *connect.Request[v1.DictationComposerTargetRequest]) (*connect.Response[v1.DictationComposerTargetResponse], error) {
-	h.store.ComposerTarget(req.Msg.GetAvailable())
+	h.store.ComposerTarget(req.Msg.GetAvailable(), req.Msg.GetField())
 	return connect.NewResponse(&v1.DictationComposerTargetResponse{}), nil
 }
 
@@ -326,7 +326,7 @@ func dictationSnapshotToProto(s dictation.Snapshot) *v1.DictationSnapshot {
 	out := &v1.DictationSnapshot{
 		Enabled: s.Enabled, State: dictationStates[s.State], Error: s.Error, MicDenied: s.MicDenied,
 		Anywhere: s.Prefs.Anywhere, HoldKey: s.Prefs.HoldKey, Sounds: s.Prefs.Sounds, SoundVolume: int32(s.Prefs.SoundVolume),
-		ComposerTarget: s.ComposerTarget, OtherAudio: s.Prefs.OtherAudio, Microphone: s.Prefs.Microphone, AvoidBluetooth: s.Prefs.AvoidBluetooth,
+		ComposerTarget: s.ComposerTarget, FieldTarget: s.FieldTarget, OtherAudio: s.Prefs.OtherAudio, Microphone: s.Prefs.Microphone, AvoidBluetooth: s.Prefs.AvoidBluetooth,
 		Model: &v1.DictationModel{Name: s.Model.Name, SizeBytes: s.Model.Size, Downloaded: s.Model.Downloaded},
 		Hardware: &v1.DictationHardware{
 			Chip: s.Hardware.Chip, MemoryBytes: s.Hardware.MemoryBytes, M1Family: s.Hardware.M1Family,

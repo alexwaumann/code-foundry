@@ -287,6 +287,7 @@ export function ThreadComposer({
     draftKey,
     rootRef,
     primary: focusRequests,
+    threadId,
     insert: (t) => editorRef.current?.insertDictated(t),
     setMarker: (on) => editorRef.current?.setDictationMarker(on),
   });

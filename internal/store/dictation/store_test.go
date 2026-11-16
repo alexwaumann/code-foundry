@@ -874,13 +874,22 @@ func TestHostReports(t *testing.T) {
 	if got := h.store.Snapshot().Inputs; got == nil || !got.LidClosed {
 		t.Errorf("inputs %+v", got)
 	}
-	h.store.ComposerTarget(true)
+	h.store.ComposerTarget(true, false)
 	if !h.store.Snapshot().ComposerTarget {
 		t.Error("composer target not recorded")
 	}
-	h.store.ComposerTarget(false)
-	if h.store.Snapshot().ComposerTarget {
-		t.Error("composer target not cleared")
+	h.store.ComposerTarget(false, true)
+	if s := h.store.Snapshot(); s.ComposerTarget || !s.FieldTarget {
+		t.Errorf("a field: composer %t, field %t", s.ComposerTarget, s.FieldTarget)
+	}
+	// A composer wins over a field.
+	h.store.ComposerTarget(true, true)
+	if s := h.store.Snapshot(); !s.ComposerTarget || s.FieldTarget {
+		t.Errorf("both: composer %t, field %t", s.ComposerTarget, s.FieldTarget)
+	}
+	h.store.ComposerTarget(false, false)
+	if s := h.store.Snapshot(); s.ComposerTarget || s.FieldTarget {
+		t.Error("targets not cleared")
 	}
 }
 

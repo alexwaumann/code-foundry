@@ -239,6 +239,10 @@ type DictationSnapshot struct {
 	AvoidBluetooth bool `protobuf:"varint,17,opt,name=avoid_bluetooth,json=avoidBluetooth,proto3" json:"avoid_bluetooth,omitempty"`
 	// What the host last reported; unset until it has (no host, or dictation off so far).
 	Inputs *DictationInputs `protobuf:"bytes,18,opt,name=inputs,proto3" json:"inputs,omitempty"`
+	// A text field of the window outside every composer has the keyboard (ComposerTarget's
+	// field): the host pastes a hold's words into it. With this and composer_target both
+	// unset, a hold in the window goes nowhere.
+	FieldTarget bool `protobuf:"varint,20,opt,name=field_target,json=fieldTarget,proto3" json:"field_target,omitempty"`
 	// What those two settings choose among those inputs (docs/notes/dictation-microphone.md);
 	// unset without inputs.
 	MicrophonePick *DictationMicrophonePick `protobuf:"bytes,19,opt,name=microphone_pick,json=microphonePick,proto3" json:"microphone_pick,omitempty"`
@@ -400,6 +404,13 @@ func (x *DictationSnapshot) GetInputs() *DictationInputs {
 		return x.Inputs
 	}
 	return nil
+}
+
+func (x *DictationSnapshot) GetFieldTarget() bool {
+	if x != nil {
+		return x.FieldTarget
+	}
+	return false
 }
 
 func (x *DictationSnapshot) GetMicrophonePick() *DictationMicrophonePick {
@@ -2019,8 +2030,11 @@ func (*DictationInputsResponse) Descriptor() ([]byte, []int) {
 }
 
 type DictationComposerTargetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Available     bool                   `protobuf:"varint,1,opt,name=available,proto3" json:"available,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Available bool                   `protobuf:"varint,1,opt,name=available,proto3" json:"available,omitempty"`
+	// A text field outside every composer has the keyboard (a note's, a setting's): no
+	// composer takes a hold, and the host pastes into that field. Never set with available.
+	Field         bool `protobuf:"varint,2,opt,name=field,proto3" json:"field,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2058,6 +2072,13 @@ func (*DictationComposerTargetRequest) Descriptor() ([]byte, []int) {
 func (x *DictationComposerTargetRequest) GetAvailable() bool {
 	if x != nil {
 		return x.Available
+	}
+	return false
+}
+
+func (x *DictationComposerTargetRequest) GetField() bool {
+	if x != nil {
+		return x.Field
 	}
 	return false
 }
@@ -2103,7 +2124,7 @@ var File_codefoundry_v1_dictation_proto protoreflect.FileDescriptor
 const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\n" +
 	"\x1ecodefoundry/v1/dictation.proto\x12\x0ecodefoundry.v1\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x17\n" +
-	"\x15WatchDictationRequest\"\xe6\x06\n" +
+	"\x15WatchDictationRequest\"\x89\a\n" +
 	"\x11DictationSnapshot\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x124\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1e.codefoundry.v1.DictationStateR\x05state\x124\n" +
@@ -2127,7 +2148,8 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"microphone\x18\x10 \x01(\tR\n" +
 	"microphone\x12'\n" +
 	"\x0favoid_bluetooth\x18\x11 \x01(\bR\x0eavoidBluetooth\x127\n" +
-	"\x06inputs\x18\x12 \x01(\v2\x1f.codefoundry.v1.DictationInputsR\x06inputs\x12P\n" +
+	"\x06inputs\x18\x12 \x01(\v2\x1f.codefoundry.v1.DictationInputsR\x06inputs\x12!\n" +
+	"\ffield_target\x18\x14 \x01(\bR\vfieldTarget\x12P\n" +
 	"\x0fmicrophone_pick\x18\x13 \x01(\v2'.codefoundry.v1.DictationMicrophonePickR\x0emicrophonePick\"T\n" +
 	"\x0eDictationInput\x12\x10\n" +
 	"\x03uid\x18\x01 \x01(\tR\x03uid\x12\x12\n" +
@@ -2224,9 +2246,10 @@ const file_codefoundry_v1_dictation_proto_rawDesc = "" +
 	"\x1eDictationAccessibilityResponse\"Q\n" +
 	"\x16DictationInputsRequest\x127\n" +
 	"\x06inputs\x18\x01 \x01(\v2\x1f.codefoundry.v1.DictationInputsR\x06inputs\"\x19\n" +
-	"\x17DictationInputsResponse\">\n" +
+	"\x17DictationInputsResponse\"T\n" +
 	"\x1eDictationComposerTargetRequest\x12\x1c\n" +
-	"\tavailable\x18\x01 \x01(\bR\tavailable\"!\n" +
+	"\tavailable\x18\x01 \x01(\bR\tavailable\x12\x14\n" +
+	"\x05field\x18\x02 \x01(\bR\x05field\"!\n" +
 	"\x1fDictationComposerTargetResponse*\x9e\x02\n" +
 	"\x0eDictationState\x12\x1f\n" +
 	"\x1bDICTATION_STATE_UNSPECIFIED\x10\x00\x12\x1c\n" +

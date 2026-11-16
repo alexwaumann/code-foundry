@@ -70,6 +70,7 @@ export function dictationSnap(o: Partial<Omit<DictationView, "model" | "hardware
     accessibility: null,
     microphone: null,
     composerTarget: false,
+    fieldTarget: false,
     ...rest,
     model: { name: "ggml-large-v3-turbo-q8_0.bin", sizeBytes: 874_188_075, downloaded: true, download: null, ...model },
     hardware: { chip: "Apple M4 Pro", memoryBytes: 48 * 2 ** 30, m1Family: false, ...hardware },
@@ -108,12 +109,15 @@ function end(reason: DictationEndView = "stopped", sessionId = lastSession()): v
 
 const calls: string[] = [];
 const composerReports: boolean[] = [];
+const fieldReports: boolean[] = [];
 
 interface FakeDictation {
   /** "start <client>", "stop <session> <flush>" (and " tail" for a release), in order. */
   readonly calls: readonly string[];
   /** What the store reported with reportComposerTarget, in order. */
   readonly composerReports: readonly boolean[];
+  /** The `field` of each of those reports. */
+  readonly fieldReports: readonly boolean[];
   /** Sends a snapshot to every open Watch; one opened later starts with it. */
   publish(s: DictationView): void;
   /** The phrase Stop with flush sends before the session ends. */
@@ -132,6 +136,7 @@ interface FakeDictation {
 export const fakeDictation: FakeDictation = {
   calls,
   composerReports,
+  fieldReports,
   publish(s) {
     latest = s;
     for (const w of watchers) w.push(s);
@@ -169,6 +174,7 @@ export const fakeDictation: FakeDictation = {
     startGate = null;
     calls.length = 0;
     composerReports.length = 0;
+    fieldReports.length = 0;
   },
 };
 
@@ -191,8 +197,9 @@ export const fakeDictationApi = {
     return s.events.iterate(signal);
   },
 
-  reportComposerTarget(available: boolean): Promise<void> {
+  reportComposerTarget(available: boolean, field = false): Promise<void> {
     composerReports.push(available);
+    fieldReports.push(field);
     return Promise.resolve();
   },
 

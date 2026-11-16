@@ -7,14 +7,18 @@
  * stopped before this one starts (the daemon refuses a second session).
  *
  * The host's hold key (docs/notes/dictate-anywhere.md) drives the same session through
- * dictation.hold, and reads composer_target to know a composer can take it.
+ * dictation.hold, and reads composer_target and field_target to know where a hold goes: a
+ * composer, the text field that has the keyboard (the host pastes into it), or nowhere.
  */
 import { useEffect } from "react";
 import { create } from "zustand";
 import { dictationSession, reportComposerTarget, startDictation, stopDictation, watchDictation, type DictationSessionEventView, type DictationView } from "@/api/dictation";
 import { invalidateOnTransportError } from "@/api/endpoint";
 import { errorMessage, runStream } from "@/api/stream";
+import { isTextField } from "@/lib/dictation";
+import { useLayoutStore } from "./layout";
 import { useSettingsStore } from "./settings";
+import { useUiStore } from "./ui";
 
 /** The setting that turns dictation on. */
 export const DICTATION_ENABLED = "dictation.enabled";
@@ -125,8 +129,10 @@ export interface DictationTarget {
   clientId: string;
   /** Its root element: ⌘⇧M dictates into the composer that has the keyboard. */
   root: () => HTMLElement | null;
-  /** The content pane's composer: ⌘⇧M with no composer focused dictates here. */
+  /** A pane's own composer (a thread's, the new-thread composer's): dictation may go here while it has no keyboard (contextComposer). */
   primary: boolean;
+  /** The thread it writes to; absent for the new-thread composer. */
+  threadId?: string;
   /** Puts a phrase at the caret. */
   insert: (text: string) => void;
 }
@@ -145,13 +151,58 @@ export function registerDictationTarget(t: DictationTarget): () => void {
   };
 }
 
-/** The composer dictation goes to: the one with the keyboard; else the one dictating; else the content pane's. */
-function pickTarget(): string | null {
+/** Where dictation goes now: into a composer, into the text field that has the keyboard, or nowhere (null). */
+type Destination = { kind: "composer"; clientId: string } | { kind: "field" } | null;
+
+/**
+ * The composer of the thread the keyboard is in, when it is on screen. In a pane: the pane's
+ * own composer (a thread's tab, its quick terminal under it, the new-thread composer's tab);
+ * else the composer of the thread the pane's tab is linked to (its terminal, its diff, its
+ * pull request), which is mounted only while that thread is the selected tab of a pane in
+ * this space. Outside the panes (the sidebar, the page): the selected thread's composer, or
+ * the new-thread composer when that is what is selected. None when the keyboard is in
+ * something that belongs to no thread on screen, such as a terminal linked to nothing.
+ */
+function contextComposer(active: Element | null, mounted: readonly DictationTarget[]): DictationTarget | undefined {
+  const primaries = mounted.filter((t) => t.primary);
+  const paneEl = active?.closest<HTMLElement>("[data-pane-id]") ?? null;
+  if (paneEl) {
+    const own = primaries.find((t) => paneEl.contains(t.root()));
+    if (own) return own;
+    const layout = useLayoutStore.getState();
+    const thread = layout.tabs[layout.panes[paneEl.dataset.paneId ?? ""]?.active ?? ""]?.thread ?? "";
+    return thread ? primaries.find((t) => t.threadId === thread) : undefined;
+  }
+  const sel = useUiStore.getState().selection;
+  if (sel.kind === "thread") return primaries.find((t) => t.threadId === sel.id);
+  if (sel.kind === "compose") return primaries.find((t) => t.threadId === undefined);
+  return undefined;
+}
+
+/**
+ * Where dictation goes (docs/notes/dictation-focused-field.md): the composer that has the
+ * keyboard; else the text field that has it (a note's, a search's, a setting's: the host
+ * pastes the words into it on release, as in any other app, gui/hold.go routeHold); else the
+ * composer of the thread the keyboard is in, when it is on screen (contextComposer); else
+ * the composer already dictating (dictation.toggle stops it); else nowhere, and then a hold
+ * does nothing at all rather than put the words somewhere the user is not looking.
+ */
+function pickDestination(): Destination {
   const active = document.activeElement;
   const mounted = [...targets.values()].filter((t) => t.root()?.isConnected);
   const focused = active ? mounted.find((t) => t.root()?.contains(active)) : undefined;
+  if (focused) return { kind: "composer", clientId: focused.clientId };
+  if (isTextField(active)) return { kind: "field" };
+  const context = contextComposer(active, mounted);
+  if (context) return { kind: "composer", clientId: context.clientId };
   const dictating = useDictationStore.getState().active?.clientId;
-  return focused?.clientId ?? dictating ?? mounted.find((t) => t.primary)?.clientId ?? null;
+  return dictating ? { kind: "composer", clientId: dictating } : null;
+}
+
+/** The composer dictation goes to (pickDestination), or null. */
+function pickTarget(): string | null {
+  const d = pickDestination();
+  return d?.kind === "composer" ? d.clientId : null;
 }
 
 // ---------- what the host's hold key needs to know ----------
@@ -159,25 +210,26 @@ function pickTarget(): string | null {
 /** How long focus settles before the answer is read: moving between two composers passes through none. */
 const FOCUS_SETTLE_MS = 50;
 
-/** What this window last sent and the daemon has not yet echoed. */
-let sentTarget: boolean | null = null;
+/** What this window last sent and the daemon has not yet echoed: "composer", "field" or "none". */
+let sentTarget: string | null = null;
 let focusFollowed = false;
 let focusTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Tells the daemon when the answer to "is there a composer to dictate into?" changed. Nothing while dictation is off. */
+/** Tells the daemon when the answer to "where does a hold in this window go?" changed. Nothing while dictation is off. */
 function syncComposerTarget(): void {
   const snap = useDictationStore.getState().snapshot;
   if (!snap?.enabled) return;
-  const available = pickTarget() !== null;
-  if (available === (sentTarget ?? snap.composerTarget)) return;
-  sentTarget = available;
-  reportComposerTarget(available).catch((err: unknown) => {
+  const now = pickDestination()?.kind ?? "none";
+  const known = sentTarget ?? (snap.composerTarget ? "composer" : snap.fieldTarget ? "field" : "none");
+  if (now === known) return;
+  sentTarget = now;
+  reportComposerTarget(now === "composer", now === "field").catch((err: unknown) => {
     sentTarget = null;
     console.warn("dictation composer target", errorMessage(err));
   });
 }
 
-/** A composer that is not the content pane's only counts while it has the keyboard. */
+/** Where a hold goes follows the keyboard (pickDestination), so every focus change is looked at. */
 function followFocus(): void {
   if (focusFollowed) return;
   focusFollowed = true;
@@ -190,6 +242,13 @@ function followFocus(): void {
   };
   document.addEventListener("focusin", settle);
   document.addEventListener("focusout", settle);
+  // The selection and the panes' tabs decide it too (contextComposer).
+  useUiStore.subscribe((now, was) => {
+    if (now.selection !== was.selection) settle();
+  });
+  useLayoutStore.subscribe((now, was) => {
+    if (now.panes !== was.panes || now.tabs !== was.tabs) settle();
+  });
 }
 
 // ---------- levels ----------
@@ -391,8 +450,8 @@ export async function flushDictationIn(clientId: string): Promise<void> {
 }
 
 /**
- * dictation.toggle in this window: the composer that has the keyboard; else the one
- * dictating (it stops); else the content pane's composer. False when there is none.
+ * dictation.toggle in this window: the composer pickDestination names. False when there is
+ * none (a text field or nothing takes it).
  */
 export function presentDictationToggle(): boolean {
   const target = pickTarget();

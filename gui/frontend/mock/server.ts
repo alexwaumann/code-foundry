@@ -767,7 +767,7 @@ function routes(router: ConnectRouter): void {
     // The host's report: the mock has no host; POST /__mock/dictation?access= stands in.
     accessibility: () => ({}),
     inputs: () => ({}),
-    composerTarget: (req) => (world.dictation.setComposerTarget(req.available), {}),
+    composerTarget: (req) => (world.dictation.setComposerTarget(req.available, req.field), {}),
   });
 
   // Agent search and the history (mock/agentSearch.ts).

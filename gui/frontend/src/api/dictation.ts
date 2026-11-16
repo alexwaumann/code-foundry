@@ -45,6 +45,8 @@ export interface DictationView {
   accessibility: DictationAccessibilityView | null;
   /** The daemon's word on whether a composer can take dictation (what this window told it). */
   composerTarget: boolean;
+  /** The daemon's word on whether another text field of the window has the keyboard (what this window told it). */
+  fieldTarget: boolean;
   /** The Mac's inputs and what the settings choose among them, as the host last said; null before it has. */
   microphone: DictationMicrophoneView | null;
 }
@@ -137,6 +139,7 @@ export function toDictationView(s: DictationSnapshot): DictationView {
       ? { granted: s.accessibility.granted, tapSilent: s.accessibility.tapSilent, listName: s.accessibility.listName, executable: s.accessibility.executable }
       : null,
     composerTarget: s.composerTarget,
+    fieldTarget: s.fieldTarget,
     microphone: toMicrophoneView(s),
   };
 }
@@ -180,10 +183,10 @@ export async function startDictation(clientId: string, conn: DaemonConnection = 
   return (await c.start({ clientId })).sessionId;
 }
 
-/** Tells the daemon whether this window has a composer dictation can target, for the host's hold key. */
-export async function reportComposerTarget(available: boolean, conn: DaemonConnection = daemon): Promise<void> {
+/** Tells the daemon where a hold in this window goes, for the host's hold key: a composer (available), the text field that has the keyboard (field), or neither. */
+export async function reportComposerTarget(available: boolean, field: boolean, conn: DaemonConnection = daemon): Promise<void> {
   const c = await conn.client(DictationService);
-  await c.composerTarget({ available });
+  await c.composerTarget({ available, field });
 }
 
 /** Ends a session; with flush its last phrase arrives on Session first (bounded by the daemon: 1.5 s). */
