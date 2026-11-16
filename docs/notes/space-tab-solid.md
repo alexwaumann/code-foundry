@@ -22,3 +22,7 @@ pill one step lighter than the top bar.
   and the count goes back to the warning tint (`current && !dropping`).
 - The medium weight makes the current tab a pixel or two wider than the same tab when it is not
   current, so the tabs after it move by that much on a switch.
+- While the current tab's name is edited it drops the fill (`filled = current && !renaming`): the
+  name field's surface colour and its focus ring, a blue close to the accent, did not read inside
+  the pill. The tab is then the glyph, the field and the count in its warning tint on the bar; the
+  fill returns on Enter or Escape.

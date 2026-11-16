@@ -170,6 +170,19 @@ describe("the top bar", () => {
     }
   });
 
+  it("drops the current tab's fill while its name is edited and puts it back after", () => {
+    render(<TopBar />);
+    const current = tabs().find((t) => t.getAttribute("data-current") === "true");
+    if (!current) throw new Error("no current space tab");
+    fireEvent.doubleClick(current);
+    expect(within(current).getByTestId("space-name-field")).toBeTruthy();
+    expect(current.className.includes("bg-cf-accent")).toBe(false);
+    expect(within(current).getByTestId("space-icon").getAttribute("data-filled")).toBeNull();
+    fireEvent.keyDown(within(current).getByTestId("space-name-field"), { key: "Escape" });
+    expect(within(current).queryByTestId("space-name-field")).toBeNull();
+    expect(current.className.includes("bg-cf-accent")).toBe(true);
+  });
+
   it("is the window's drag band, all but its controls", () => {
     render(<TopBar />);
     expect(screen.getByTestId("top-bar").className).toContain("[--wails-draggable:drag]");
