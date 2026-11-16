@@ -41,7 +41,7 @@ and result type is a Go type there (`go doc github.com/alexwaumann/code-foundry/
    `{protocol: 1, host: {version, capabilities}, plugin: {name, dir, dataDir, granted, dev}, flags}`.
    The plugin answers `{protocol: 1, capabilities: [...]}`. `Host.Name()`, `Dir()`,
    `DataDir()`, `Granted()`, `Dev()`, `HostVersion()`, `HasCapability()` and `Flags()`
-   read it.
+   (deprecated) read it.
 2. `initialized` (notification): the plugin is running. `Plugin.Init` runs now, on its own
    goroutine: subscribe, push the session environment, set context facts. An error from
    Init ends `Serve`, which the host counts as a crash. Until Init returns, `Serve` holds
@@ -108,7 +108,7 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `view/append` | request (or notification) | `{instance, key, text \| lines}` → `{version}` | `AppendLog`, `AppendLogLines` | |
 | `view/toast` | notification | `{instance?, level: success\|info\|attention\|error, text, description?}`: text is the title; success and description need capability `view.toast.description` (an older host shows success as info, drops description) | `Toast`, `ToastIn`, `ToastWith` | |
 | `context/set` | notification | `{key, value, threadId? \| projectId?}` | `SetContext` | |
-| `thread/setFlag` | request | `{threadId, level, reason, untilSeen}` → `{changed}` | `SetFlag` | `threadStatus` |
+| `thread/setFlag` (deprecated: a notification naming the thread; `removals.md`) | request | `{threadId, level, reason, untilSeen}` → `{changed}` | `SetFlag` | `threadStatus` |
 | `events/subscribe` | request | `{sources}` → `{subscription}` | `Subscribe` | `events` |
 | `events/unsubscribe` | request | `{subscription}` → `{}` | `Unsubscribe` | |
 | `session/setEnvironment` | request | `{env, pathPrepend, addDirs, scope}` → `{applied, issues}` | `SetEnvironment` | `sessionEnv` |

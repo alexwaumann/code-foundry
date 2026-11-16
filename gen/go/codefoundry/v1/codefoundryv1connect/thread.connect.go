@@ -324,8 +324,9 @@ type ThreadServiceClient interface {
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
-	// ClearFlags removes plugins' flags from a thread (Thread.flags): one plugin's, or
-	// every one with plugin empty. NOT_FOUND when the thread has none to clear.
+	// ClearFlags dismisses plugins' flags on a thread, which are notifications naming it
+	// (docs/notes/plugin-flag-retirement.md): one plugin's, or every one with plugin empty.
+	// NOT_FOUND when the thread has none to clear. The response's thread has no flags.
 	ClearFlags(context.Context, *connect.Request[v1.ClearThreadFlagsRequest]) (*connect.Response[v1.ClearThreadFlagsResponse], error)
 	// Subscribe makes a wake subscription: when the target (a thread, or an action run)
 	// meets the condition, the daemon sends the subscriber a message (a user_message item
@@ -1351,8 +1352,9 @@ type ThreadServiceHandler interface {
 	// SetBudget sets the thread's spending limit (Thread.budget_usd; 0 clears it). A
 	// budget above the thread's cost re-arms the budget stop. Any state. Persisted.
 	SetBudget(context.Context, *connect.Request[v1.SetThreadBudgetRequest]) (*connect.Response[v1.SetThreadBudgetResponse], error)
-	// ClearFlags removes plugins' flags from a thread (Thread.flags): one plugin's, or
-	// every one with plugin empty. NOT_FOUND when the thread has none to clear.
+	// ClearFlags dismisses plugins' flags on a thread, which are notifications naming it
+	// (docs/notes/plugin-flag-retirement.md): one plugin's, or every one with plugin empty.
+	// NOT_FOUND when the thread has none to clear. The response's thread has no flags.
 	ClearFlags(context.Context, *connect.Request[v1.ClearThreadFlagsRequest]) (*connect.Response[v1.ClearThreadFlagsResponse], error)
 	// Subscribe makes a wake subscription: when the target (a thread, or an action run)
 	// meets the condition, the daemon sends the subscriber a message (a user_message item

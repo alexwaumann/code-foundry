@@ -432,7 +432,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 		threadReportCmd(b, idArg),
 		threadAskCmd(b, idArg),
 		threadBudgetCmd(b, idArg),
-		threadFlagsCmd(b, idArg),
+		threadFlagsCmd(b, o, idArg),
 		threadFlagClearCmd(b, idArg),
 		threadRestartCmd(b, idArg),
 		threadSetupRetry(b, idArg),

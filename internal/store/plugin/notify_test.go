@@ -214,6 +214,8 @@ func TestNotificationPost(t *testing.T) {
 			`code -32602: notification/post: action 1 gives open an arg "id" it does not declare`},
 		{"no title", "notes", pluginsdk.Notification{Key: "b"}, `code -32602: notification/post: invalid argument: a notification needs a title`},
 		{"no such thread", "notes", pluginsdk.Notification{Key: "b", Title: "B", ThreadID: "s-9"}, `code -32004: notification/post: not found: there is no thread s-9`},
+		{"a flag's key is the host's", "notes", pluginsdk.Notification{Key: "flag:s-1", Title: "B", ThreadID: "s-1"},
+			`code -32602: notification/post: key "flag:s-1": keys starting with "flag:" are the host's (thread flags)`},
 	} {
 		r, err := e.invoke("plugin."+tt.plugin+".post", map[string]string{"note": noteJSON(tt.n)}, command.Context{})
 		if err != nil || !strings.HasPrefix(r.Message, tt.want) {

@@ -3513,8 +3513,9 @@ export const ThreadService: GenService<{
     output: typeof SetThreadBudgetResponseSchema;
   },
   /**
-   * ClearFlags removes plugins' flags from a thread (Thread.flags): one plugin's, or
-   * every one with plugin empty. NOT_FOUND when the thread has none to clear.
+   * ClearFlags dismisses plugins' flags on a thread, which are notifications naming it
+   * (docs/notes/plugin-flag-retirement.md): one plugin's, or every one with plugin empty.
+   * NOT_FOUND when the thread has none to clear. The response's thread has no flags.
    *
    * @generated from rpc codefoundry.v1.ThreadService.ClearFlags
    */

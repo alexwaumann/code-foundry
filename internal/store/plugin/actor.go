@@ -37,7 +37,9 @@ type actor struct {
 	perms   pluginsdk.Permissions // the running manifest's
 	logs    *logBuffer
 	ignored map[string]bool // unknown notifications already logged this run
-	echo    rateLimiter
+	// removalsLogged are the deprecated or retired methods logged this run (removals.go).
+	removalsLogged map[string]bool
+	echo           rateLimiter
 
 	// flagRate limits thread/setFlag per thread (flags.go).
 	flagRate flagLimiter
@@ -226,7 +228,7 @@ func (a *actor) once(info spawnInfo) (err error) {
 		return fmt.Errorf("data dir: %w", err)
 	}
 	a.mu.Lock()
-	a.perms, a.logs, a.ignored = mf.Permissions, info.logs, map[string]bool{}
+	a.perms, a.logs, a.ignored, a.removalsLogged = mf.Permissions, info.logs, map[string]bool{}, map[string]bool{}
 	a.mu.Unlock()
 	a.m.update(a.name, a, func(e *entry) { e.state = StateStarting })
 
@@ -280,7 +282,8 @@ func (a *actor) once(info spawnInfo) (err error) {
 		Protocol: pluginsdk.ProtocolVersion,
 		Host:     pluginsdk.HostInfo{Version: o.HostVersion, Capabilities: hostCapabilities},
 		Plugin:   pluginsdk.PluginInfo{Name: a.name, Dir: info.dir, DataDir: dataDir, Granted: info.granted, Dev: info.dev},
-		Flags:    a.m.liveFlags(a.name),
+		//lint:ignore SA1019 the host still reports the deprecated flags (pluginsdk/removals.go)
+		Flags: a.m.liveFlags(a.name),
 	}, &res)
 	cancel()
 	if err != nil {

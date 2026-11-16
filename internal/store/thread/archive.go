@@ -209,10 +209,6 @@ func (m *Manager) archiveFrom(ctx context.Context, id string, wasInterrupted boo
 		rec.s.ArchivedAt = m.opts.Now()
 	}
 	rec.s.Pinned = false
-	// The user is done with it: plugins' flags go too (flags.go).
-	if _, err := m.dropFlagsLocked(ctx, rec, func(Flag) bool { return true }); err != nil {
-		m.log.Warn("clear the flags of an archived thread", "thread", id, "err", err)
-	}
 	m.commitLocked(rec, true)
 	if newly && m.opts.Archived != nil {
 		m.opts.Archived(rec.s) // its worktrees nobody else has go (the daemon's cleanupArchived)

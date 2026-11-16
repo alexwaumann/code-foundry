@@ -1,5 +1,7 @@
 package plugintest_test
 
+//lint:file-ignore SA1019 Options.Flags and Host.Flags stay covered while deprecated (pluginsdk/removals.go)
+
 import (
 	"context"
 	"encoding/json"

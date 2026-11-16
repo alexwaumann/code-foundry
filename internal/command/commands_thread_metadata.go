@@ -147,9 +147,6 @@ func threadDetail(s *v1.Thread, names map[string]string) string {
 			lines = append(lines, "report data: "+s.GetReportData())
 		}
 	}
-	if l := flagsLine(s); l != "" {
-		lines = append(lines, l)
-	}
 	if l := pluginEnvLine(s); l != "" { // commands_thread_restart.go
 		lines = append(lines, l)
 	}

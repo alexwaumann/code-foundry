@@ -22,7 +22,7 @@ var pluginSkillFiles = []string{
 	"code-foundry-plugin/reference/primitives.md", "code-foundry-plugin/reference/ui-layout.md", "code-foundry-plugin/reference/host-api.md",
 	"code-foundry-plugin/reference/nodes.md", "code-foundry-plugin/reference/forms.md", "code-foundry-plugin/reference/events.md",
 	"code-foundry-plugin/reference/wakes.md", "code-foundry-plugin/reference/owned.md", "code-foundry-plugin/reference/icons.md",
-	"code-foundry-plugin/reference/testing.md", "code-foundry-plugin/reference/publishing.md",
+	"code-foundry-plugin/reference/testing.md", "code-foundry-plugin/reference/publishing.md", "code-foundry-plugin/reference/removals.md",
 	"code-foundry-plugin/reference/cli.md", "code-foundry-plugin/reference/host-commands.md",
 	"code-foundry-plugin/reference/host-commands-thread-view.md",
 	"code-foundry-plugin/example/plugin.json", "code-foundry-plugin/example/main.go",

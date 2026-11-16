@@ -6,6 +6,7 @@ import (
 
 	core "github.com/alexwaumann/code-foundry/internal/layout"
 	layoutstore "github.com/alexwaumann/code-foundry/internal/store/layout"
+	"github.com/alexwaumann/code-foundry/internal/store/notification"
 )
 
 // Sending from the shell window's composer (docs/notes/shell-model.md, "The composer"):
@@ -18,6 +19,7 @@ type ThreadLifecycleOption func(*threadLifecycleOptions)
 
 type threadLifecycleOptions struct {
 	layout layoutstore.Store
+	notes  notification.Store // thread.flags (WithFlagNotifications)
 }
 
 // WithLayout gives thread.new the layout store, for --compose (without it --compose is

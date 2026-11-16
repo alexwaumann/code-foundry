@@ -83,7 +83,10 @@ const (
 	// <plugin>.<key> (global, or for one thread or project) the host's when clauses
 	// read. A null value removes it. Facts last until the plugin process ends.
 	MethodContextSet = "context/set"
-	// MethodThreadSetFlag (request): Flag → FlagResult (Host.SetFlag).
+	// MethodThreadSetFlag (request): Flag → FlagResult (Host.SetFlag). The host turns it
+	// into a notification naming the thread (removals.go).
+	//
+	// Deprecated: post a notification with MethodNotificationPost (Host.Notify).
 	MethodThreadSetFlag = "thread/setFlag"
 	// MethodEventsSubscribe (request): SubscribeParams → SubscribeResult; the events
 	// arrive as events/event. MethodEventsUnsubscribe ends one.
@@ -161,7 +164,11 @@ type InitializeParams struct {
 	Host     HostInfo   `json:"host"`
 	Plugin   PluginInfo `json:"plugin"`
 	// Flags are the plugin's live flags on threads (kept across its restarts and the
-	// daemon's), so it can reconcile them: clear what no longer holds.
+	// daemon's), so it can reconcile them: clear what no longer holds. Since flags are
+	// notifications, a flag the user dismissed is not among them.
+	//
+	// Deprecated: a notification's key is its own reconciliation: post what holds,
+	// withdraw what no longer does (Host.Notify, Host.WithdrawNotification).
 	Flags []Flag `json:"flags,omitempty"`
 }
 
@@ -284,14 +291,27 @@ type SecretListResult struct {
 
 // Flag levels for Host.SetFlag.
 const (
+	// FlagAttention becomes a warning notification.
+	//
+	// Deprecated: use NotifyWarning in a Notification (Host.Notify).
 	FlagAttention = "attention"
-	FlagError     = "error"
-	FlagNone      = "none"
+	// FlagError becomes an error notification.
+	//
+	// Deprecated: use NotifyError in a Notification (Host.Notify).
+	FlagError = "error"
+	// FlagNone withdraws the flag's notification.
+	//
+	// Deprecated: use Host.WithdrawNotification.
+	FlagNone = "none"
 )
 
 // Flag raises (or with FlagNone clears) the plugin's flag on a thread. A thread has at
-// most one flag per plugin; setting another replaces it. The GUI shows the reason as
-// "<display name>: <reason>", so leave the plugin's name out of it.
+// most one flag per plugin; setting another replaces it. The host shows it as a
+// notification naming the thread, from the plugin, with the reason as its title (an
+// empty reason reads "<display name> flagged this thread"), warning for attention and
+// error for error. An until-seen one is cleared when the user opens the thread.
+//
+// Deprecated: post a Notification with ThreadID set (Host.Notify).
 type Flag struct {
 	ThreadID string `json:"threadId"`
 	Level    string `json:"level"`
@@ -304,6 +324,8 @@ type Flag struct {
 }
 
 // FlagResult is thread/setFlag's answer: whether anything changed.
+//
+// Deprecated: Host.Notify answers a NotifyResult.
 type FlagResult struct {
 	Changed bool `json:"changed"`
 }

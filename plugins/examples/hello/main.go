@@ -3,8 +3,8 @@
 // user's behalf (thread.send through host/invoke, allowed by the manifest's
 // permissions.commands), the secrets API, logging, surfaces (surface.go: a demo of every
 // view node kind, one a context fact makes available, and one gated on a pull request's
-// GitHub Actions checks), an event subscription (the thread list), a flag on a thread
-// (flag), the session environment (every new thread gets CF_HELLO=1), and a Claude
+// GitHub Actions checks), an event subscription (the thread list), a notification about
+// a thread (mark), the session environment (every new thread gets CF_HELLO=1), and a Claude
 // thread and a terminal of its own (owned.go: the demo's Assistant and Shell tabs), a
 // wake source agents subscribe to (wakes.go: tick), and notifications (notify.go: one
 // whose button opens the demo on a run, and one attached to each tick).
@@ -15,7 +15,7 @@
 //	code-foundry plugin hello greet Ada
 //	code-foundry plugin hello send "hi" --context-thread <thread id>
 //	code-foundry plugin hello remember swordfish && code-foundry plugin hello recall
-//	code-foundry plugin hello flag --context-thread <thread id> --level attention --reason "look here"
+//	code-foundry plugin hello mark --context-thread <thread id> --level warning --reason "look here"
 //	code-foundry plugin env hello
 //	code-foundry plugin logs hello
 //	code-foundry plugin surface hello demo --context-thread <thread id>
@@ -64,7 +64,7 @@ func plugin() pluginsdk.Plugin {
 			h.Log().Info("wake subscriptions replayed", "count", count)
 		},
 		Init: func(ctx context.Context, h *pluginsdk.Host) error {
-			h.Log().Info("hello is up", "host", h.HostVersion(), "data_dir", h.DataDir(), "dev", h.Dev(), "flags", len(h.Flags()))
+			h.Log().Info("hello is up", "host", h.HostVersion(), "data_dir", h.DataDir(), "dev", h.Dev())
 			// Every new Claude thread gets CF_HELLO=1 while hello is enabled.
 			res, err := h.SetEnvironment(ctx, pluginsdk.Environment{Env: map[string]string{"CF_HELLO": "1"}, Scope: &pluginsdk.EnvironmentScope{NoProject: true}})
 			if err != nil {
@@ -93,7 +93,7 @@ func plugin() pluginsdk.Plugin {
 			"recall":     recall,
 			"forget":     forget,
 			"unpin":      unpin,
-			"flag":       flag,
+			"mark":       mark,
 			"read-shell": readShell(own),
 			"fire-tick":  ticks.fireTick,
 			"notify":     notify,
@@ -178,8 +178,13 @@ func forget(ctx context.Context, h *pluginsdk.Host, _ pluginsdk.CommandRequest) 
 	return pluginsdk.CommandResult{Message: "forgotten"}, nil
 }
 
-// flag raises, or with level none clears, hello's flag on the thread.
-func flag(ctx context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
+// markKey is the key of hello's notification about a thread: one per thread, so marking
+// it again updates the card and level none withdraws it.
+func markKey(thread string) string { return "mark:" + thread }
+
+// mark posts, or with level none withdraws, hello's notification about a thread: what a
+// flag on the thread was before notifications (pluginsdk.Removals).
+func mark(ctx context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 	id := req.Context.ThreadID
 	if t := req.Arg("thread"); t != "" {
 		id = t
@@ -188,13 +193,21 @@ func flag(ctx context.Context, h *pluginsdk.Host, req pluginsdk.CommandRequest) 
 		return pluginsdk.CommandResult{}, errors.New("no thread: run it from a thread, or pass --context-thread <id>")
 	}
 	level := req.Arg("level")
-	if err := h.SetFlag(ctx, pluginsdk.Flag{ThreadID: id, Level: level, Reason: req.Arg("reason"), UntilSeen: req.Arg("until-seen") == "true"}); err != nil {
-		return pluginsdk.CommandResult{}, fmt.Errorf("flag: %w", err)
+	if level == "none" {
+		gone, err := h.WithdrawNotification(ctx, markKey(id))
+		if err != nil {
+			return pluginsdk.CommandResult{}, fmt.Errorf("mark: %w", err)
+		}
+		if !gone {
+			return pluginsdk.CommandResult{Message: "no mark on " + id}, nil
+		}
+		return pluginsdk.CommandResult{Message: "withdrew the mark on " + id}, nil
 	}
-	if level == pluginsdk.FlagNone {
-		return pluginsdk.CommandResult{Message: "cleared the flag on " + id}, nil
+	res, err := h.Notify(ctx, pluginsdk.Notification{Key: markKey(id), Level: level, Title: req.Arg("reason"), ThreadID: id})
+	if err != nil {
+		return pluginsdk.CommandResult{}, fmt.Errorf("mark: %w", err)
 	}
-	return pluginsdk.CommandResult{Message: level + " flag on " + id + ": " + req.Arg("reason")}, nil
+	return pluginsdk.CommandResult{Message: fmt.Sprintf("%s mark on %s: %s (%s, %s)", level, id, req.Arg("reason"), res.Outcome, res.Status)}, nil
 }
 
 // eventKind names an event by its source and change ("threadList.updated"), from the

@@ -38,6 +38,10 @@ const (
 // an attached notification, so FireWakeNotify refuses to fire without it.
 const NotificationsCapability = "notifications"
 
+// FlagKeyPrefix starts the keys of the notifications the host makes from a plugin's
+// thread flags (SetFlag): a plugin's own key may not start with it.
+const FlagKeyPrefix = "flag:"
+
 // Notification levels. There is no success level.
 const (
 	NotifyInfo    = "info"
@@ -71,7 +75,8 @@ const (
 // fire (WakeFire.Notification).
 type Notification struct {
 	// Key identifies it among this plugin's notifications (at most 200 characters, not
-	// starting with "auto:"); "" lets the host derive one from title, body and thread.
+	// starting with "auto:" or FlagKeyPrefix); "" lets the host derive one from title,
+	// body and thread.
 	Key string `json:"key,omitempty"`
 	// Level is NotifyInfo (default), NotifyWarning or NotifyError.
 	Level string `json:"level,omitempty"`

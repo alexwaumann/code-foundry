@@ -114,6 +114,9 @@ func (a *actor) notificationWithdraw(ctx context.Context, params json.RawMessage
 // the plugin's manifest commands, with args that command declares; the rest is the
 // store's check (Check).
 func (a *actor) checkNotification(method string, n pluginsdk.Notification) error {
+	if strings.HasPrefix(strings.TrimSpace(n.Key), pluginsdk.FlagKeyPrefix) {
+		return pluginsdk.NewError(pluginsdk.CodeInvalidParams, "%s: key %q: keys starting with %q are the host's (thread flags)", method, n.Key, pluginsdk.FlagKeyPrefix)
+	}
 	pl, _ := a.m.Snapshot().Plugin(a.name)
 	for i, act := range n.Actions {
 		if act.Kind != pluginsdk.ActionCommand {

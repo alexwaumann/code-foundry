@@ -1,5 +1,7 @@
 package plugin_test
 
+//lint:file-ignore SA1019 the host still serves the deprecated thread/setFlag (pluginsdk/removals.go)
+
 import (
 	"context"
 	"encoding/json"
@@ -110,20 +112,6 @@ func (f *fakeFlags) SetFlag(_ context.Context, id string, s plugin.FlagSpec) (bo
 	return true, nil
 }
 
-func (f *fakeFlags) ClearPlugin(_ context.Context, name string) (int, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls = append(f.calls, "clear "+name)
-	n := 0
-	for k := range f.flags {
-		if strings.HasPrefix(k, name+"/") {
-			delete(f.flags, k)
-			n++
-		}
-	}
-	return n, nil
-}
-
 func (f *fakeFlags) Of(name string) []pluginsdk.Flag {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -132,17 +120,6 @@ func (f *fakeFlags) Of(name string) []pluginsdk.Flag {
 		if strings.HasPrefix(k, name+"/") {
 			out = append(out, v)
 		}
-	}
-	return out
-}
-
-func (f *fakeFlags) Plugins() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var out []string
-	for k := range f.flags {
-		p, _, _ := strings.Cut(k, "/")
-		out = append(out, p)
 	}
 	return out
 }
@@ -279,7 +256,14 @@ func TestPluginHooks(t *testing.T) {
 		t.Errorf("a re-set flag is a debug line:\n%s", logs)
 	}
 
-	// Disabling drops the contribution (announced) and clears the flags.
+	// The deprecated method is logged once per run, with what replaces it: the first run
+	// and the one after the restart.
+	if n := strings.Count(e.logText("hooks"), "Host.SetFlag (thread/setFlag) is deprecated since 2026-11-16 and will stop working: use Host.Notify"); n != 2 {
+		t.Errorf("deprecation notices: %d, want 2 (one per run):\n%s", n, e.logText("hooks"))
+	}
+
+	// Disabling drops the contribution (announced); the flags are notifications, which
+	// go with the plugin's others (notify_test.go).
 	sawEnvChanged(envEvents, "hooks") // drained
 	if _, err := m.Disable(context.Background(), "hooks"); err != nil {
 		t.Fatal(err)
@@ -289,9 +273,6 @@ func TestPluginHooks(t *testing.T) {
 	}
 	if k := e.envKeys(""); k != "" {
 		t.Errorf("after disable: env %q", k)
-	}
-	if got := flags.called(); got[len(got)-1] != "clear hooks" || len(flags.Of("hooks")) != 0 {
-		t.Errorf("after disable: flag calls %q", got)
 	}
 	if !strings.Contains(e.logText("hooks"), "session environment dropped") {
 		t.Errorf("log: %s", e.logText("hooks"))

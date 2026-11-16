@@ -6,12 +6,12 @@ import "strings"
 // (docs/notes/alerts-foreground.md).
 //
 // A viewer (WatchItems) acknowledges what Claude produced (runner.acknowledge) and
-// marks the thread's until-seen flags seen, but only while the daemon's presence is
+// tells the seen hook (until-seen flag notifications, flags.go), but only while the daemon's presence is
 // attended: a GUI window is visible and key. While it is not (the app is in the
 // background, or its window is covered or minimized), a turn that ends in the open
 // thread stays NeedsAttention "finished" like any other thread's, so it reaches the
 // Dock badge and alerts. When presence becomes attended again, every thread with a
-// viewer is acknowledged and its until-seen flags are seen, as if the view had just
+// viewer is acknowledged and the seen hook hears of it, as if the view had just
 // opened. Answering a request is an explicit act and always acknowledges.
 //
 // A thread with no runner follows the same rule on its saved status (seenStoppedLocked,
@@ -27,8 +27,8 @@ func (m *Manager) attended() bool {
 }
 
 // AttendedChanged tells the store that presence became attended or stopped being so.
-// On a rise every viewed thread, running or not, is acknowledged and its until-seen
-// flags are seen; a fall changes nothing (what is already seen stays seen). The daemon calls it from
+// On a rise every viewed thread, running or not, is acknowledged and the seen hook
+// hears of it; a fall changes nothing (what is already seen stays seen). The daemon calls it from
 // its presence subscriber, after Options.Attended already reports the new value.
 func (m *Manager) AttendedChanged(attended bool) {
 	m.log.Debug("thread attention follows presence", "attended", attended)
@@ -49,13 +49,13 @@ func (m *Manager) AttendedChanged(attended bool) {
 	}
 }
 
-// seenLocked: the user sees rec, through a viewer, while presence is attended: its
-// until-seen flags are seen, and so is its status when it has no runner (with one, the
-// runner acknowledges). Callers hold m.mu.
+// seenLocked: the user sees rec, through a viewer, while presence is attended: the
+// seen hook hears of it (its until-seen flag notifications go, flags.go), and its status
+// is seen when it has no runner (with one, the runner acknowledges). Callers hold m.mu.
 func (m *Manager) seenLocked(rec *record) {
-	flags, status := m.seenFlagsLocked(rec), m.seenStoppedLocked(rec)
-	if flags || status {
-		m.commitLocked(rec, status) // flags have their own table; the status must survive a restart
+	m.seenHookLocked(rec)
+	if m.seenStoppedLocked(rec) {
+		m.commitLocked(rec, true) // the status must survive a restart
 	}
 }
 

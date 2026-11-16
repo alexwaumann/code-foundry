@@ -1,47 +1,55 @@
 package plugin
 
+//lint:file-ignore SA1019 the host serves the deprecated thread/setFlag (pluginsdk/removals.go)
+
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"slices"
-	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
-// Thread flags (thread/setFlag, permission threadStatus; docs/notes/plugins-3-events-flags-env.md):
-// a plugin raises an attention or error flag with a one-line reason on a thread, an
-// overlay the GUI counts as the thread needing the user. The thread store keeps them
-// (ThreadFlags, persisted); this side checks the permission and the rate, names the
-// plugin, and clears a plugin's flags when it is disabled or removed. A crash keeps
-// them, and initialize hands the plugin its live flags to reconcile.
+// Thread flags (thread/setFlag, permission threadStatus; deprecated, pluginsdk.Removals;
+// docs/notes/plugin-flag-retirement.md): a plugin raises an attention or error flag with
+// a one-line reason on a thread. The host shows it as a notification naming the thread,
+// under the plugin's source, which the daemon posts (ThreadFlags adapts the notification
+// and thread stores). This side checks the permission, the reason and the rate, and names
+// the plugin. The flag's notification goes like the plugin's others when it is disabled
+// or removed (release); initialize hands the plugin its live flags, read back from the
+// notifications, to reconcile. Only threadStatus is needed: a plugin whose manifest
+// predates the notifications permission keeps its flags.
 
-// FlagSpec is one plugin's flag as the thread store gets it.
+// FlagSpec is one plugin's flag as the daemon gets it.
 type FlagSpec struct {
 	Plugin, DisplayName string
-	// Level is pluginsdk.FlagAttention, FlagError or FlagNone (clears).
-	Level     string
+	// Level is pluginsdk.FlagAttention, FlagError or FlagNone (withdraws it).
+	Level string
+	// Reason is trimmed, one line, at most MaxFlagReason characters; "" is allowed.
 	Reason    string
 	UntilSeen bool
 }
 
-// ThreadFlags is the thread store as plugin flags need it. The daemon adapts the
-// thread store; its errors wrap ErrNotFound (no such thread), ErrInvalidArgument (a bad
-// reason) and ErrFailedPrecondition (an archived thread).
+// ThreadFlags is what plugin flags need of the daemon. Its errors wrap ErrNotFound (no
+// such thread), ErrInvalidArgument and ErrFailedPrecondition (an archived thread, too
+// many notifications).
 type ThreadFlags interface {
-	// SetFlag raises (or with FlagNone clears) the plugin's flag on a thread; changed is
-	// false when nothing changed.
+	// SetFlag raises (or with FlagNone withdraws) the plugin's flag on a thread; changed
+	// is false when nothing changed for the user.
 	SetFlag(ctx context.Context, threadID string, f FlagSpec) (changed bool, err error)
-	// ClearPlugin removes a plugin's flags from every thread and says how many went.
-	ClearPlugin(ctx context.Context, plugin string) (int, error)
-	// Of returns a plugin's flags (ThreadID set).
+	// Of returns a plugin's live flags (ThreadID set), oldest first: its active flag
+	// notifications.
 	Of(plugin string) []pluginsdk.Flag
-	// Plugins names every plugin with a flag on some thread.
-	Plugins() []string
 }
+
+// MaxFlagReason bounds a flag's reason, in characters, as before flags were
+// notifications (it always fits a notification's title).
+const MaxFlagReason = 80
 
 // flagInterval is the least time between two flags a plugin raises on one thread
 // (clearing is never limited).
@@ -74,6 +82,19 @@ func (l *flagLimiter) allow(thread string, now time.Time) bool {
 	return true
 }
 
+// cleanFlagReason trims a reason and checks it: one line, at most MaxFlagReason
+// characters.
+func cleanFlagReason(r string) (string, error) {
+	r = strings.TrimSpace(r)
+	switch {
+	case strings.ContainsAny(r, "\r\n\x00"):
+		return "", pluginsdk.NewError(pluginsdk.CodeInvalidParams, "thread/setFlag: a flag's reason is one line")
+	case utf8.RuneCountInString(r) > MaxFlagReason:
+		return "", pluginsdk.NewError(pluginsdk.CodeInvalidParams, "thread/setFlag: a flag's reason is %d characters; at most %d", utf8.RuneCountInString(r), MaxFlagReason)
+	}
+	return r, nil
+}
+
 // setFlag serves thread/setFlag.
 func (a *actor) setFlag(ctx context.Context, params json.RawMessage) (any, error) {
 	flags := a.m.opts.Flags
@@ -90,15 +111,21 @@ func (a *actor) setFlag(ctx context.Context, params json.RawMessage) (any, error
 	case !slices.Contains([]string{pluginsdk.FlagAttention, pluginsdk.FlagError, pluginsdk.FlagNone}, p.Level):
 		return nil, pluginsdk.NewError(pluginsdk.CodeInvalidParams, "thread/setFlag: level is attention, error or none, not %q", p.Level)
 	}
-	if p.Level != pluginsdk.FlagNone && !a.flagRate.allow(p.ThreadID, a.m.opts.Now()) {
-		return nil, pluginsdk.NewError(pluginsdk.CodeRateLimited, "thread/setFlag: at most one flag a second on a thread")
+	reason := ""
+	if p.Level != pluginsdk.FlagNone {
+		if reason, err = cleanFlagReason(p.Reason); err != nil {
+			return nil, err
+		}
+		if !a.flagRate.allow(p.ThreadID, a.m.opts.Now()) {
+			return nil, pluginsdk.NewError(pluginsdk.CodeRateLimited, "thread/setFlag: at most one flag a second on a thread")
+		}
 	}
 	display := a.name
 	if pl, ok := a.m.Snapshot().Plugin(a.name); ok {
 		display = pl.DisplayName()
 	}
 	changed, err := flags.SetFlag(ctx, p.ThreadID, FlagSpec{
-		Plugin: a.name, DisplayName: display, Level: p.Level, Reason: p.Reason, UntilSeen: p.UntilSeen,
+		Plugin: a.name, DisplayName: display, Level: p.Level, Reason: reason, UntilSeen: p.UntilSeen,
 	})
 	switch {
 	case errors.Is(err, ErrNotFound):
@@ -115,9 +142,9 @@ func (a *actor) setFlag(ctx context.Context, params json.RawMessage) (any, error
 		// A plugin re-asserting its flag on every poll is routine.
 		a.hostDebug("flag %s on %s unchanged", p.Level, p.ThreadID)
 	case p.Level == pluginsdk.FlagNone:
-		a.hostLog("flag cleared on %s", p.ThreadID)
+		a.hostLog("flag cleared on %s (its notification withdrawn)", p.ThreadID)
 	default:
-		a.hostLog("flag %s on %s: %s", p.Level, p.ThreadID, p.Reason)
+		a.hostLog("flag %s on %s, as a notification: %s", p.Level, p.ThreadID, reason)
 	}
 	return pluginsdk.FlagResult{Changed: changed}, nil
 }
@@ -128,18 +155,4 @@ func (m *Manager) liveFlags(name string) []pluginsdk.Flag {
 		return nil
 	}
 	return m.opts.Flags.Of(name)
-}
-
-// clearFlags removes a plugin's flags (it was disabled or removed).
-func (m *Manager) clearFlags(ctx context.Context, name string, logs *logBuffer) {
-	if m.opts.Flags == nil {
-		return
-	}
-	n, err := m.opts.Flags.ClearPlugin(ctx, name)
-	switch {
-	case err != nil:
-		m.log.Warn("plugin: clear flags", "plugin", name, "err", err)
-	case n > 0 && logs != nil:
-		logs.add("host", "", "cleared its flags on threads: "+strconv.Itoa(n))
-	}
 }

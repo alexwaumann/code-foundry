@@ -254,6 +254,11 @@ func (h *Host) postNote(n pluginsdk.Notification, fire bool) (pluginsdk.NotifyRe
 		})
 		return pluginsdk.NotifyResult{}, err
 	}
+	return h.applyNote(n, fire), nil
+}
+
+// applyNote applies the key rules to n, checked.
+func (h *Host) applyNote(n pluginsdk.Notification, fire bool) pluginsdk.NotifyResult {
 	key := strings.TrimSpace(n.Key)
 	if key == "" {
 		sum := sha256.Sum256([]byte(n.Title + "\x00" + n.Body + "\x00" + n.ThreadID))
@@ -292,7 +297,7 @@ func (h *Host) postNote(n pluginsdk.Notification, fire bool) (pluginsdk.NotifyRe
 		res.ID, res.Key, res.Status = r.id, key, r.status
 		h.notes.posts = append(h.notes.posts, PostedNotification{Notification: n, Fire: fire, Result: res})
 	})
-	return res, nil
+	return res
 }
 
 func outcomeOf(status string) string {
@@ -329,6 +334,8 @@ func (h *Host) checkNote(method string, n pluginsdk.Notification) error {
 		return invalid("key longer than %d characters", pluginsdk.MaxNotificationKey)
 	case strings.HasPrefix(strings.TrimSpace(n.Key), "auto:"):
 		return invalid("keys starting with auto: are the host's")
+	case strings.HasPrefix(strings.TrimSpace(n.Key), pluginsdk.FlagKeyPrefix):
+		return invalid("keys starting with %s are the host's (thread flags)", pluginsdk.FlagKeyPrefix)
 	case len(n.Actions) > pluginsdk.MaxNotificationActions:
 		return invalid("%d actions; at most %d", len(n.Actions), pluginsdk.MaxNotificationActions)
 	}

@@ -23,7 +23,7 @@ Code Foundry shows what the plugin may do and asks before it runs.
 ## Permissions and why
 
 It asks for none. (List each permission `plugin.json` asks for and what needs it, in the
-user's words: "`threadStatus`: flags a thread whose tests fail". Say what leaves the Mac,
+user's words: "`notifications`: posts a notification when a thread's tests fail". Say what leaves the Mac,
 if anything.)
 
 ## Development
