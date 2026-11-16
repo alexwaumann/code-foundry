@@ -16,6 +16,7 @@ import { discardDraft } from "@/shell/drafts";
 import { runCommandForResult } from "@/stores/commands";
 import { spaceOfThread, useLayoutStore } from "@/stores/layout";
 import { useLiveCount } from "@/stores/lineage";
+import { useThreadMark } from "@/stores/notifications";
 import { useProjectsStore } from "@/stores/projects";
 import { NEEDS_SCOPE_KEY, useNeedsScope } from "@/stores/shellList";
 import { toggleActiveCollapsed, toggleNeedsCollapsed } from "@/stores/shellSidebar";
@@ -103,12 +104,13 @@ function Title({ id, quiet = false }: { id: string; quiet?: boolean }) {
   );
 }
 
-/** Whether the thread has something for line 3's right: live agents, background shells, or a pull request tag. */
+/** Whether the thread has something for line 3's right: live agents, background shells, notifications naming it, or a pull request tag. */
 function useHasCounts(id: string): boolean {
   const agents = useLiveCount(id);
   const shells = useThreadsStore((s) => s.byId[id]?.backgroundShellsRunning ?? 0);
+  const notifications = useThreadMark(id).count;
   const tag = linkedPrTag(useLinkedPrFacts(useLinkKeys(id)));
-  return agents > 0 || shells > 0 || tag !== null;
+  return agents > 0 || shells > 0 || notifications > 0 || tag !== null;
 }
 
 /**

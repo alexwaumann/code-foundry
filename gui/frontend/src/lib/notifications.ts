@@ -94,3 +94,33 @@ export function timeSensitiveArrivals(ev: NotificationEventView): string[] {
     .filter((n) => n.timeSensitive && arrived.has(n.id))
     .map((n) => n.id);
 }
+
+/** The tone of a thread's mark (docs/notes/notifications-4-row-mark.md): error, the attention tone, or the row's muted one. */
+export type ThreadMarkTone = "error" | "warning" | "muted";
+
+/** A thread's mark on its sidebar row: how many shown notifications name it, and their tone. */
+export interface ThreadMark {
+  count: number;
+  tone: ThreadMarkTone;
+}
+
+/** No notification names the thread: one shared value, so a selector over it never changes. */
+export const NO_MARK: ThreadMark = { count: 0, tone: "muted" };
+
+/** The shown notifications naming a thread, in the daemon's order. Snoozed and scheduled ones wait outside it, as they do the bell. */
+export function threadNotifications(s: NotificationSnapshotView | null, threadId: string): readonly NotificationView[] {
+  if (!s || threadId === "") return NONE;
+  const own = s.notifications.filter((n) => n.status === "shown" && n.threadId === threadId);
+  return own.length === 0 ? NONE : own;
+}
+
+/**
+ * A thread's mark: the count of its shown notifications; the error tone when one is an error,
+ * else the attention tone when one is time-sensitive or a warning, else muted.
+ */
+export function threadMark(s: NotificationSnapshotView | null, threadId: string): ThreadMark {
+  const own = threadNotifications(s, threadId);
+  if (own.length === 0) return NO_MARK;
+  const tone: ThreadMarkTone = own.some((n) => n.level === "error") ? "error" : own.some((n) => n.timeSensitive || n.level === "warning") ? "warning" : "muted";
+  return { count: own.length, tone };
+}

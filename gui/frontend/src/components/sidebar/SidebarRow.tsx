@@ -19,6 +19,7 @@ import { statusBadge, statusTimeAt, statusTimeUnits } from "@/lib/statusRegistry
 import { modelLabel } from "@/lib/threadRow";
 import type { HeaderRow, Row } from "@/lib/tree";
 import { useCreator, useLiveCount, useMadeByThread } from "@/stores/lineage";
+import { useThreadMark } from "@/stores/notifications";
 import { archiveThread, renameThread } from "@/stores/threadActions";
 import { useThreadsStore } from "@/stores/threads";
 import { useModelChoices } from "@/stores/settings";
@@ -28,7 +29,9 @@ import { rowHasBranchLine, useThreadPlace } from "@/components/thread/useThreadP
 import { RowTooltipsEnabled } from "./rowTooltips";
 import { TipWaiting } from "./TipWaiting";
 import { LinkedPrsBadge } from "./LinkedPrsBadge";
+import { NotificationMark } from "./NotificationMark";
 import { TipLinkedPrs } from "./TipLinkedPrs";
+import { TipNotifications } from "./TipNotifications";
 
 interface RowProps {
   row: Row;
@@ -236,7 +239,7 @@ function Count({ icon: Icon, n, className, label, testId }: { icon: LucideIcon; 
 /**
  * Line 2's right side: the live count (info tone; lib/liveCount: background subagents plus
  * live child threads, one number whatever the model started), the background shells (muted),
- * then the linked PR tag.
+ * the thread's notifications (NotificationMark), then the linked PR tag.
  */
 export function RowCounts({ id }: { id: string }) {
   const agents = useLiveCount(id);
@@ -245,6 +248,7 @@ export function RowCounts({ id }: { id: string }) {
     <>
       <Count icon={Bot} n={agents} className="text-cf-info-text" label={agentsLabel(agents)} testId="row-bg-agents" />
       <Count icon={SquareTerminal} n={shells} className="text-cf-sidebar-muted-foreground" label={shells === 1 ? "1 shell" : `${String(shells)} shells`} testId="row-bg-shells" />
+      <NotificationMark id={id} />
       <LinkedPrsBadge id={id} />
     </>
   );
@@ -481,10 +485,11 @@ function TipMoving({ id }: { id: string }) {
 /**
  * The tooltip's body: name, status (attention or error only; a thread waiting on its child
  * threads says on which, TipWaiting), who created it (a thread an agent made), a queued move,
- * where it works (ThreadPlaceRows), model, and the linked pull requests (TipLinkedPrs).
- * Mounted only while open (docs/notes/sidebar-thread-card.md).
+ * where it works (ThreadPlaceRows), model, the linked pull requests (TipLinkedPrs), and the
+ * notifications naming the thread (TipNotifications). Mounted only while open
+ * (docs/notes/sidebar-thread-card.md).
  */
-function ThreadTipBody({ id }: { id: string }) {
+function ThreadTipBody({ id, onMenuOpenChange }: { id: string; onMenuOpenChange: (open: boolean) => void }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   const model = useThreadsStore((s) => s.byId[id]?.model ?? "");
   const effort = useThreadsStore((s) => s.byId[id]?.effort ?? "");
@@ -504,9 +509,20 @@ function ThreadTipBody({ id }: { id: string }) {
         {effort && <span className="text-cf-text-muted"> ({effort})</span>}
       </TipRow>
       <TipLinkedPrs id={id} />
+      <TipNotifications id={id} onMenuOpenChange={onMenuOpenChange} />
     </>
   );
 }
+
+/** Whether the pointer is over an element now (`:hover`, which the browser keeps up to date). */
+function hovered(el: Element | null): boolean {
+  return el?.matches(":hover") ?? false;
+}
+
+/** Keeps a press, click, double click, menu or key in the card from reaching the row (open, drag, rename, the row's menu) through React's tree. */
+const keepInCard = (e: SyntheticEvent) => {
+  e.stopPropagation();
+};
 
 /**
  * A thread row's hover card, open at once (delayDuration 0, not the app root's 500 ms).
@@ -514,28 +530,62 @@ function ThreadTipBody({ id }: { id: string }) {
  * keyboard navigation never opens it, nor does focus coming back to a row action, nor a move
  * over the row's portalled snooze menu; a click or right-click closes it. It stays open over
  * everything in the row, its actions and the linked PR tag too. Not while renaming.
+ *
+ * A thread that notifications name lists them on the card with their buttons
+ * (docs/notes/notifications-4-row-mark.md), so the pointer can then travel from the row into the
+ * card (Radix's hoverable content and its grace area), and the card stays open while the pointer
+ * is in it (a corner button's own tooltip opening asks every other tooltip to shut) and while a
+ * card's snooze menu is up. Without notifications it is the plain tooltip it was: it shuts as the
+ * pointer leaves the row. Whether it is hoverable is fixed while it is open, so dismissing the last
+ * notification from the card does not strand it open. Presses in the card stay in it.
  */
 export function ThreadTooltip({ id, children }: { id: string; children: ReactElement }) {
   const enabled = useContext(RowTooltipsEnabled);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
+  const marked = useThreadMark(id).count > 0;
   const [open, setOpen] = useState(false);
   const allowed = enabled && !renaming;
+  const shown = open && allowed;
+  // Hoverable while notifications name the thread, decided as the card opens.
+  const [hoverable, setHoverable] = useState(marked);
+  if (!shown && hoverable !== marked) setHoverable(marked);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  // The pointer is in the card (React's enter and leave, which count its portalled menus as in it).
+  const inside = useRef(false);
+  // A card's snooze menu is up.
+  const held = useRef(false);
+  // Shut unless the pointer is over the row or the card.
+  const settle = () => {
+    if (held.current || hovered(trigger.current) || hovered(content.current)) return;
+    inside.current = false;
+    setOpen(false);
+  };
+  const onMenuOpenChange = (o: boolean) => {
+    held.current = o;
+    if (!o) settle();
+  };
   return (
     <Tooltip
-      open={open && allowed}
+      open={shown}
       onOpenChange={(o) => {
+        // Radix shuts a hoverable card when another tooltip opens (a corner button's) and when the
+        // pointer leaves it for a menu: neither while the pointer is in the card or a menu is up.
+        if (!o && hoverable && (inside.current || held.current)) return;
         setOpen(o && allowed);
       }}
-      disableHoverableContent
+      disableHoverableContent={!hoverable}
       delayDuration={0}
     >
       <TooltipTrigger
         asChild
+        ref={trigger}
         // Any press in the row shuts the card. Radix's own close is not enough: it skips a press
         // that is default-prevented, as the one opening the snooze menu is, and RowActions stops
-        // the click, so the card would stay open behind the menu.
-        onPointerDownCapture={() => {
-          setOpen(false);
+        // the click, so the card would stay open behind the menu. A press in the card itself
+        // (React brings it here through the portal) is the card's.
+        onPointerDownCapture={(e) => {
+          if (e.target instanceof Node && e.currentTarget.contains(e.target)) setOpen(false);
         }}
         // Pointer only: focus never opens the card. The snooze menu hands focus back to its
         // button as it closes, which opened the card with nothing hovered (and kept it open).
@@ -550,8 +600,34 @@ export function ThreadTooltip({ id, children }: { id: string; children: ReactEle
       >
         {children}
       </TooltipTrigger>
-      <TooltipContent side="right" align="start" sideOffset={12} className="w-[260px] px-2.5 py-2 text-body-sm" data-testid="thread-tooltip" data-thread-id={id}>
-        <ThreadTipBody id={id} />
+      <TooltipContent
+        ref={content}
+        side="right"
+        align="start"
+        sideOffset={12}
+        className={cn("px-2.5 py-2 text-body-sm", marked ? "w-[340px]" : "w-[260px]")}
+        data-testid="thread-tooltip"
+        data-thread-id={id}
+        data-hoverable={hoverable || undefined}
+        onPointerEnter={() => {
+          inside.current = true;
+        }}
+        onPointerLeave={() => {
+          inside.current = false;
+          settle();
+        }}
+        // Escape shuts it even with the pointer in it.
+        onEscapeKeyDown={() => {
+          inside.current = false;
+          setOpen(false);
+        }}
+        onClick={keepInCard}
+        onPointerDown={keepInCard}
+        onDoubleClick={keepInCard}
+        onContextMenu={keepInCard}
+        onKeyDown={keepInCard}
+      >
+        <ThreadTipBody id={id} onMenuOpenChange={onMenuOpenChange} />
       </TooltipContent>
     </Tooltip>
   );
