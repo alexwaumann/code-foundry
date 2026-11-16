@@ -5,8 +5,9 @@
 // view node kind, one a context fact makes available, and one gated on a pull request's
 // GitHub Actions checks), an event subscription (the thread list), a flag on a thread
 // (flag), the session environment (every new thread gets CF_HELLO=1), and a Claude
-// thread and a terminal of its own (owned.go: the demo's Assistant and Shell tabs), and
-// a wake source agents subscribe to (wakes.go: tick).
+// thread and a terminal of its own (owned.go: the demo's Assistant and Shell tabs), a
+// wake source agents subscribe to (wakes.go: tick), and notifications (notify.go: one
+// whose button opens the demo on a run, and one attached to each tick).
 //
 // Build it with `make plugins`, then link it for development:
 //
@@ -23,6 +24,8 @@
 //	code-foundry plugin wakes hello
 //	code-foundry thread subscribe --plugin hello/tick --arg every=2s --id <thread id>
 //	code-foundry plugin hello fire-tick
+//	code-foundry plugin hello notify --thread <thread id>
+//	code-foundry notification act <id>    # Open run: plugin hello open-run, the demo on Build #5
 package main
 
 import (
@@ -51,6 +54,7 @@ func plugin() pluginsdk.Plugin {
 	var events atomic.Int64
 	own := &owned{}
 	ticks := newTicker()
+	picks := newRunPicks()
 	return pluginsdk.Plugin{
 		OnWakeSubscribed:   func(_ context.Context, h *pluginsdk.Host, s pluginsdk.WakeSubscription) { ticks.subscribed(h, s) },
 		OnWakeUnsubscribed: func(_ context.Context, h *pluginsdk.Host, u pluginsdk.WakeUnsubscribed) { ticks.unsubscribed(h, u) },
@@ -92,6 +96,8 @@ func plugin() pluginsdk.Plugin {
 			"flag":       flag,
 			"read-shell": readShell(own),
 			"fire-tick":  ticks.fireTick,
+			"notify":     notify,
+			"open-run":   picks.openRun,
 			"events": func(context.Context, *pluginsdk.Host, pluginsdk.CommandRequest) (pluginsdk.CommandResult, error) {
 				n := events.Load()
 				js, _ := json.Marshal(map[string]int64{"events": n})
@@ -99,7 +105,7 @@ func plugin() pluginsdk.Plugin {
 			},
 		},
 		Surfaces: map[string]pluginsdk.SurfaceFactory{
-			"demo":   demoFactory(own),
+			"demo":   demoFactory(own, picks),
 			"pinned": newPinned,
 			"checks": newChecks,
 		},

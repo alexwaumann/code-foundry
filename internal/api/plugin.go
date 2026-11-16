@@ -216,7 +216,7 @@ func pluginsToProto(ps []plugin.Plugin) []*v1.Plugin {
 func permissionsToProto(p pluginsdk.Permissions) *v1.PluginPermissions {
 	return &v1.PluginPermissions{
 		Commands: p.Commands, Events: p.Events, ThreadStatus: p.ThreadStatus, SessionEnv: p.SessionEnv,
-		Secrets: p.Secrets, Threads: p.Threads, Terminals: p.Terminals, Api: p.API,
+		Secrets: p.Secrets, Threads: p.Threads, Terminals: p.Terminals, Api: p.API, Notifications: p.Notifications,
 	}
 }
 

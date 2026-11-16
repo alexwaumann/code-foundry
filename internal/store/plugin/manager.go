@@ -118,6 +118,10 @@ type Options struct {
 	// Wakes keeps the wake subscriptions to the plugins' sources and delivers their
 	// fires (wakes.go); nil refuses wake/fire. The daemon adapts the thread store.
 	Wakes WakeSink
+	// Notifications keeps the plugins' notifications in the bell (notify.go); nil
+	// refuses notification/* and a notification attached to wake/fire. The daemon adapts
+	// the notification store.
+	Notifications NotificationSink
 
 	// Shell runs a watched dev plugin's build as `Shell -lc <build>` (devbuild.go;
 	// default: $SHELL of Environ, else /bin/zsh). DevWatchInterval is how often a watched

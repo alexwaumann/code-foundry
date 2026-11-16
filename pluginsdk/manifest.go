@@ -75,6 +75,10 @@ type Permissions struct {
 	Terminals bool `json:"terminals,omitempty"`
 	// API hands the plugin the daemon's endpoint and token: full control of Code Foundry.
 	API bool `json:"api,omitempty"`
+	// Notifications lets the plugin post notifications to the bell (notification/post,
+	// notification/withdraw, a notification attached to wake/fire), with buttons that run
+	// its commands, send text to a thread, start a thread or open a link.
+	Notifications bool `json:"notifications,omitempty"`
 }
 
 // CommandSpec declares one plugin command.
@@ -267,7 +271,7 @@ func jsonFieldNames(schema any) []string {
 	case Manifest:
 		return []string{"name", "displayName", "version", "description", "protocol", "exec", "permissions", "commands", "surfaces", "wakes"}
 	case Permissions:
-		return []string{"commands", "events", "threadStatus", "sessionEnv", "secrets", "threads", "terminals", "api"}
+		return []string{"commands", "events", "threadStatus", "sessionEnv", "secrets", "threads", "terminals", "api", "notifications"}
 	case CommandSpec:
 		return []string{"name", "title", "description", "when", "confirm", "timeoutSeconds", "args"}
 	case ArgSpec:
@@ -543,7 +547,7 @@ func (p Permissions) Within(granted Permissions) bool {
 		}
 	}
 	flags := func(x Permissions) []bool {
-		return []bool{x.ThreadStatus, x.SessionEnv, x.Secrets, x.Threads, x.Terminals, x.API}
+		return []bool{x.ThreadStatus, x.SessionEnv, x.Secrets, x.Threads, x.Terminals, x.API, x.Notifications}
 	}
 	pf, gf := flags(p), flags(granted)
 	for i := range pf {
@@ -585,6 +589,9 @@ func (p Permissions) Describe() []string {
 	}
 	if p.ThreadStatus {
 		out = append(out, "raise threads to needs-attention or error")
+	}
+	if p.Notifications {
+		out = append(out, "post notifications, whose buttons can run its commands, send text to a thread, start a thread or open a link")
 	}
 	if p.SessionEnv {
 		out = append(out, "add environment variables, PATH entries and directories to new Claude sessions")

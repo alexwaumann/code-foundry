@@ -117,6 +117,54 @@ subscription sees it leave `Thread.flags`), so remember the condition you flagge
 whether the flag is up, and never raise it again until the condition changes (a different
 set of failing tests, a new run that fails).
 
+## Notify: the bell (permission `notifications`)
+
+```go
+res, err := h.Notify(ctx, pluginsdk.Notification{
+	Key: "deploy-prod", Level: pluginsdk.NotifyError, ThreadID: id,
+	Title: "Deploy to prod failed", Body: "Step migrate exited 1.",
+	Actions: []pluginsdk.NotificationAction{
+		pluginsdk.CommandAction("Open run", "open-run", map[string]string{"run": "42", "thread": id}),
+		pluginsdk.OpenAction("Logs", runURL),
+	},
+})
+gone, err := h.WithdrawNotification(ctx, "deploy-prod") // what it reported is over
+```
+
+- A notification goes in the bell in the app's top bar: one list, the same in every space.
+  `Title` is one short line (at most 120 characters), `Body` optional (1000), `Level`
+  `NotifyInfo` (default), `NotifyWarning` or `NotifyError`; there is no success.
+  `TimeSensitive`, apart from the level, sorts it first, tints it and counts it in the Dock
+  badge: only for what cannot wait. `ThreadID` names the thread it is about (it must
+  exist). `ShowAt` keeps it back until then; the host holds the timer.
+- **Keys.** One notification per plugin and `Key`; no plugin reaches another's. The same
+  key with the same content is dropped (no card, no toast: re-post on every poll freely);
+  changed content updates the card in place without a new toast; a key the user dismissed
+  stays dismissed until its content changes. No key: the host derives one from title,
+  body and thread. `res.Outcome` says what happened (`posted`, `updated`, `unchanged`,
+  `scheduled`), `res.Status` where it stands (`shown`, `dismissed`, `resolved`, …).
+- **Lifetime**: until the user dismisses it, presses an action that resolves it, or the
+  plugin withdraws it by key (withdrawing a key with nothing active is not an error).
+  Disabling or uninstalling the plugin withdraws them all; a restart or update keeps them.
+- **Actions**: at most three buttons, the first the primary. `CommandAction` runs one of
+  this plugin's manifest commands with args it declares, as the palette does (its
+  `confirm` asks first; it gets no thread or project, so the args say what it is about);
+  `SendAction` sends text to a thread; `StartAction` starts a thread with a prompt;
+  `OpenAction` opens a URL. Command, send and start resolve the notification, open does
+  not; `Resolves` overrides. Dismiss, Snooze and the thread's link are the host's, on
+  every card: never add them.
+- **Open the panel on an item**: the button runs the plugin's own command, which selects
+  the item in its view state and calls `h.Invoke(ctx, "plugin.<name>.show.<surface>",
+  map[string]string{"focus": "true"}, pluginsdk.UiContext{ThreadID: id})` (that show command
+  listed in `permissions.commands`). The example's `notify.go` does it.
+- **The host raises the arrival toast**, with the buttons, when a notification arrives:
+  never toast for a notification.
+- **An event a thread may wait on is reported once**, with the notification attached to
+  the wake fire (`wakes.md`, "Report an event once"), never a fire plus a `Notify`.
+- Refusals: no permission -32001; a command or arg the manifest does not declare, a bad
+  level, title or URL -32602; an unknown thread -32004; over 10 posts a second -32005; 100
+  active per plugin -32002. A host without `pluginsdk.NotificationsCapability` has none.
+
 ## SetContext: facts for when clauses
 
 ```go
@@ -246,5 +294,5 @@ info and drops the description, so the text must read right alone.
 ## Elsewhere
 
 `h.UpdateView`, `h.AppendLog`, `h.AppendLogLines`: `primitives.md`. `h.Subscribe`: `events.md`.
-`h.FireWake`: `wakes.md`. `h.CreateThread`, `h.CreateTerminal`: `owned.md`.
+`h.FireWake`, `h.FireWakeNotify`: `wakes.md`. `h.CreateThread`, `h.CreateTerminal`: `owned.md`.
 

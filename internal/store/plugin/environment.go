@@ -562,8 +562,8 @@ func (m *Manager) loadEnvironments(ctx context.Context) error {
 	return nil
 }
 
-// forget drops what a disabled or removed plugin left behind: its session environment
-// and its flags on threads; it archives its threads and closes its terminals
+// forget drops what a disabled or removed plugin left behind: its session environment,
+// its flags on threads and its notifications; it archives its threads and closes its terminals
 // (threads.go, terminals.go). Its secrets and consent stay.
 func (m *Manager) forget(ctx context.Context, name string, logs *logBuffer, why string) {
 	m.archiveThreads(ctx, name, logs)
@@ -580,7 +580,8 @@ func (m *Manager) discard(ctx context.Context, name string, logs *logBuffer, why
 	return removed
 }
 
-// release closes a plugin's terminals and drops its session environment and flags.
+// release closes a plugin's terminals, drops its session environment and flags, and
+// withdraws its notifications.
 func (m *Manager) release(ctx context.Context, name string, logs *logBuffer) {
 	m.closeTerminals(ctx, name, logs)
 	m.env.mu.Lock()
@@ -592,9 +593,10 @@ func (m *Manager) release(ctx context.Context, name string, logs *logBuffer) {
 		logs.add("host", "", "session environment dropped: new threads no longer get it")
 	}
 	m.clearFlags(ctx, name, logs)
+	m.withdrawNotifications(ctx, name, logs)
 }
 
-// sweep forgets the environments, flags and threads of plugins that are not enabled
+// sweep forgets the environments, flags, notifications and threads of plugins that are not enabled
 // (disabled or removed while the daemon was stopped). Their threads are archived, not
 // removed, even when the package is gone: a package deleted by hand is not an uninstall,
 // and putting it back (or enabling it) gets them back.
@@ -614,6 +616,13 @@ func (m *Manager) sweep(ctx context.Context) {
 	m.env.mu.Unlock()
 	if m.opts.Flags != nil {
 		for _, name := range m.opts.Flags.Plugins() {
+			if !enabled(name) && !slices.Contains(gone, name) {
+				gone = append(gone, name)
+			}
+		}
+	}
+	if m.opts.Notifications != nil {
+		for _, name := range m.opts.Notifications.Sources() {
 			if !enabled(name) && !slices.Contains(gone, name) {
 				gone = append(gone, name)
 			}

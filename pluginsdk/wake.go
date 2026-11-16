@@ -271,12 +271,19 @@ type WakeFire struct {
 	Title string `json:"title"`
 	// Payload is any JSON (at most MaxWakePayload bytes), handed to the agent as is.
 	Payload json.RawMessage `json:"payload,omitempty"`
+	// Notification, when set, is the event's notification (permission notifications;
+	// NotificationsCapability): raised only when no subscribed thread got the wake,
+	// unless it is time-sensitive (FireWakeNotify).
+	Notification *Notification `json:"notification,omitempty"`
 }
 
 // WakeFireResult is wake/fire's answer: how many threads were woken (a thread over its
-// wake limit is not).
+// wake limit is not), and what became of an attached notification.
 type WakeFireResult struct {
 	Delivered int `json:"delivered"`
+	// Notification is what the attached notification did (Outcome NotifyRouted when a
+	// thread got the wake and it was not raised); nil without one.
+	Notification *NotifyResult `json:"notification,omitempty"`
 }
 
 // FireWake fires one of the plugin's wake sources: every thread subscribed to it whose

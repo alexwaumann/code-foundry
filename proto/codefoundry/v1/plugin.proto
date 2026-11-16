@@ -118,6 +118,8 @@ message PluginPermissions {
   bool terminals = 7;
   // Full control: the daemon's endpoint and token in its environment.
   bool api = 8;
+  // Posts notifications to the bell (docs/notes/notifications-2-plugins.md).
+  bool notifications = 9;
 }
 
 // PluginCommand is one manifest command, registered as name.

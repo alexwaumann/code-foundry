@@ -325,3 +325,34 @@ func TestPluginWakeLimit(t *testing.T) {
 		t.Error("a one-shot the limit dropped went")
 	}
 }
+
+// What "delivered" means for a plugin fire (a notification attached to it is raised only
+// when it reached no thread, docs/notes/notifications-2-plugins.md): a stopped or snoozed
+// subscriber counts, since the wake starts it (and unsnoozes it); an archived one does
+// not, since archiving ended its subscriptions.
+func TestPluginWakeDelivered(t *testing.T) {
+	e := newEnv(t)
+	e.m.SetPluginWakes(&fakePluginWakes{})
+	stopped, snoozed, archived := e.stopped("stopped"), e.stopped("snoozed"), e.stopped("archived")
+	for _, id := range []string{stopped.ID, snoozed.ID, archived.ID} {
+		if _, err := e.m.Subscribe(e.ctx(), SubscribeOptions{SubscriberID: id, TargetPlugin: "hello/tick", Args: map[string]string{"every": id}, Repeat: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := e.m.Snooze(e.ctx(), snoozed.ID, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.m.Archive(e.ctx(), archived.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name, id string
+		want     int
+	}{{"stopped", stopped.ID, 1}, {"snoozed", snoozed.ID, 1}, {"archived", archived.ID, 0}} {
+		if n := e.m.FirePlugin("hello", "Hello", "tick", map[string]string{"every": tt.id}, "tick", nil); n != tt.want {
+			t.Errorf("%s subscriber: delivered %d, want %d", tt.name, n, tt.want)
+		}
+	}
+	e.waitItems(stopped.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+	e.waitItems(snoozed.ID, "the wake", func(items []Item) bool { return len(wakes(items)) == 1 })
+}

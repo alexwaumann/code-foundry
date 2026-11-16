@@ -2,17 +2,18 @@
   "name": "hello",
   "displayName": "Hello",
   "version": "0.1.0",
-  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, runs a Claude thread and a terminal of its own, and ticks for subscribed threads.",
+  "description": "The example plugin: greets, sends a message to a thread through the host, keeps a word in the Keychain, follows the thread list, flags threads, gives new threads CF_HELLO=1, runs a Claude thread and a terminal of its own, ticks for subscribed threads, and posts notifications.",
   "protocol": 1,
   "exec": ["bin/hello"],
   "permissions": {
-    "commands": ["thread.send", "pr.checks"],
+    "commands": ["thread.send", "pr.checks", "plugin.hello.show.demo"],
     "events": ["threads"],
     "threadStatus": true,
     "sessionEnv": true,
     "secrets": true,
     "threads": true,
-    "terminals": true
+    "terminals": true,
+    "notifications": true
   },
   "commands": [
     {
@@ -79,7 +80,30 @@
       "name": "fire-tick",
       "title": "Fire Tick Now",
       "description": "Fire the tick wake source now: wake the threads subscribed to it.",
-      "args": [{ "name": "every", "description": "Only the subscriptions with this every (default: each one armed)" }]
+      "args": [
+        { "name": "every", "description": "Only the subscriptions with this every (default: each one armed)" },
+        { "name": "time-sensitive", "type": "bool", "description": "Make its notification time-sensitive: raised even when a thread gets the wake" }
+      ]
+    },
+    {
+      "name": "notify",
+      "title": "Post a Build Notification",
+      "description": "Post a notification about a failed build on a thread; its Open run button shows the run in the demo. With --withdraw, withdraw it.",
+      "args": [
+        { "name": "thread", "context": "thread", "description": "The thread (default: the active one, or --context-thread)" },
+        { "name": "level", "type": "enum", "enum": ["info", "warning", "error"], "default": "error", "description": "info, warning or error" },
+        { "name": "time-sensitive", "type": "bool", "description": "Time-sensitive: first in the bell, in the Dock badge" },
+        { "name": "withdraw", "type": "bool", "description": "Withdraw the notification instead" }
+      ]
+    },
+    {
+      "name": "open-run",
+      "title": "Open a Run in the Demo",
+      "description": "Show a run in the demo's Runs tab beside a thread (the build notification's button).",
+      "args": [
+        { "name": "run", "required": true, "description": "The run's row key (runs-run-5)" },
+        { "name": "thread", "context": "thread", "description": "The thread (default: the active one, or --context-thread)" }
+      ]
     }
   ],
   "wakes": [

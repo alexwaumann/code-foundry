@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 
 	"connectrpc.com/connect"
 
@@ -15,8 +16,7 @@ type notificationActionCall func(n notification.Notification, a notification.Act
 
 // notificationActionCalls maps each action kind to the registry command that runs it, so
 // pressing an action is the same verb the user or the CLI would run. A kind without an
-// entry fails notification.act with Unimplemented. The command kind (a plugin's manifest
-// command) comes with plugin notifications.
+// entry fails notification.act with Unimplemented.
 var notificationActionCalls = map[notification.ActionKind]notificationActionCall{
 	notification.KindSend: func(_ notification.Notification, a notification.Action) (string, map[string]string) {
 		return "thread.send", map[string]string{"id": a.ThreadID, "text": a.Text}
@@ -29,6 +29,12 @@ var notificationActionCalls = map[notification.ActionKind]notificationActionCall
 	},
 	notification.KindOpen: func(_ notification.Notification, a notification.Action) (string, map[string]string) {
 		return "view.open.url", map[string]string{"url": a.URL}
+	},
+	// A plugin's own manifest command (the source is the plugin's name), as the palette
+	// runs it: its confirm asks first, and its when clause is checked without a thread or
+	// project (the args say what it is about).
+	notification.KindCommand: func(n notification.Notification, a notification.Action) (string, map[string]string) {
+		return "plugin." + n.Source + "." + a.Command, maps.Clone(a.Args)
 	},
 }
 

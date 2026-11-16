@@ -88,21 +88,35 @@ func (t *ticker) loop(ctx context.Context, h *pluginsdk.Host, every string, d ti
 		case <-ctx.Done():
 			return
 		case <-tk.C:
-			if _, err := t.fire(ctx, h, every); err != nil {
+			if _, _, err := t.fire(ctx, h, every, false); err != nil {
 				h.Log().Warn("tick: fire", "every", every, "err", err.Error())
 			}
 		}
 	}
 }
 
-// fire fires tick for the subscriptions with every and says how many were woken.
-func (t *ticker) fire(ctx context.Context, h *pluginsdk.Host, every string) (int, error) {
+// fire fires tick for the subscriptions with every and says how many were woken and,
+// with notifications, what became of the notification attached to it: the host raises it
+// only when no subscribed thread got the wake, unless timeSensitive. One notification per
+// every (its key), updated in place by the next tick.
+func (t *ticker) fire(ctx context.Context, h *pluginsdk.Host, every string, timeSensitive bool) (int, *pluginsdk.NotifyResult, error) {
 	t.mu.Lock()
 	t.n[every]++
 	n := t.n[every]
 	t.mu.Unlock()
-	return h.FireWake(ctx, "tick", map[string]string{"every": every}, fmt.Sprintf("tick %d (every %s)", n, every),
-		map[string]any{"n": n, "every": every, "at": time.Now().UTC().Format(time.RFC3339)})
+	match, title := map[string]string{"every": every}, fmt.Sprintf("tick %d (every %s)", n, every)
+	payload := map[string]any{"n": n, "every": every, "at": time.Now().UTC().Format(time.RFC3339)}
+	if !h.HasCapability(pluginsdk.NotificationsCapability) || !h.Granted().Notifications {
+		d, err := h.FireWake(ctx, "tick", match, title, payload)
+		return d, nil, err
+	}
+	res, err := h.FireWakeNotify(ctx, "tick", match, title, payload, pluginsdk.Notification{
+		Key: "tick-" + every, TimeSensitive: timeSensitive,
+		Title:   fmt.Sprintf("Tick %d (every %s)", n, every),
+		Body:    "hello's tick wake source fired.",
+		Actions: []pluginsdk.NotificationAction{pluginsdk.CommandAction("Fire again", "fire-tick", map[string]string{"every": every})},
+	})
+	return res.Delivered, res.Notification, err
 }
 
 // armed are the every values with a subscription, sorted.
@@ -141,11 +155,19 @@ func (t *ticker) fireTick(ctx context.Context, h *pluginsdk.Host, req pluginsdk.
 	}
 	var lines []string
 	for _, e := range targets {
-		n, err := t.fire(ctx, h, e)
+		n, note, err := t.fire(ctx, h, e, req.Arg("time-sensitive") == "true")
 		if err != nil {
 			return pluginsdk.CommandResult{}, fmt.Errorf("fire tick (every %s): %w", e, err)
 		}
-		lines = append(lines, fmt.Sprintf("fired tick for every=%s: woke %d", e, n))
+		line := fmt.Sprintf("fired tick for every=%s: woke %d", e, n)
+		switch {
+		case note == nil:
+		case note.Outcome == pluginsdk.NotifyRouted:
+			line += "; a thread got it, so no notification"
+		default:
+			line += fmt.Sprintf("; notification %s %s", note.Key, note.Outcome)
+		}
+		lines = append(lines, line)
 	}
 	lines = append(lines, "Wait for the next one: "+h.WakeHint("tick", map[string]string{"every": targets[0]}))
 	return pluginsdk.CommandResult{Message: strings.Join(lines, "\n")}, nil

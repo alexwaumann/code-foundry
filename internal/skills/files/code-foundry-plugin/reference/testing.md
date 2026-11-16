@@ -51,6 +51,7 @@ Drive it like the host:
 | `h.Ping(ctx)`, `h.Shutdown(ctx)` | ping; shutdown and what `Serve` returned |
 | `h.SetSecret(key, value)` | a secret as if the user had stored it (a form with `store`) |
 | `h.SubscribeWake("tick", args, uctx)`, `h.SubscribeWakeWith(pluginsdk.WakeSubscription{…})`, `h.UnsubscribeWake(id)` | `wake/subscribed` (`SubscribeWake` repeats; `SubscribeWakeWith` with `Repeat: false` is a one-shot the fake removes after its first fire, sending `wake/unsubscribed`; an existing id is a restart's re-arm) and `wake/unsubscribed` |
+| `h.PressAction(ctx, key, 0)`, `h.DismissNotification(key)` | the user on a notification: a command action runs the plugin's command with its args and no context (send, start and open are recorded: `h.PressedActions()`), then resolves it if the action does; dismissing keeps a re-post of the same content dismissed |
 
 And read what the plugin did: `h.View(instance)` (the last view's JSON), `h.Version(instance)`,
 `h.Appends()`, `h.Toasts()`, `h.Logs()`, `h.Flags()`, `h.Contexts()`, `h.Environments()`,
@@ -58,6 +59,12 @@ And read what the plugin did: `h.View(instance)` (the last view's JSON), `h.Vers
 wake fires: `h.WakeFires()` (each `WakeFire`) with `h.WakeDelivered()` (how many of the fake's
 subscriptions each reached, by the host's match rule). `Options.Wakes` (the manifest's
 `Wakes`) makes the fake refuse an undeclared source or match arg, as the host does.
+Notifications: `h.Notifications()` (every post, `Fire` set for one attached to a wake
+fire, with its `NotifyResult`), `h.Notification(key)` (as the bell has it, and its
+status), `h.ActiveNotifications()`, `h.NotificationWithdrawals()`. The fake applies the
+key rules and routes a fire's notification as the host does: subscribe a thread
+(`SubscribeWake`) to simulate a fire a thread gets, fire with none for one nobody gets.
+`Options.Commands` (the manifest's) refuses a command action the manifest does not declare.
 
 `h.WaitFor(5*time.Second, func(h *plugintest.Host) bool { … })` waits for something done
 asynchronously (a goroutine, a notification). It checks the condition at once, after

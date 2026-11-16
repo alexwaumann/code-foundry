@@ -9,8 +9,10 @@
 // permissions.commands glob, secret/* needs permissions.secrets, thread/setFlag
 // threadStatus, session/setEnvironment sessionEnv, events/subscribe each source in
 // permissions.events, thread/* threads and terminal/* terminals (owned.go: kept in
-// memory, nothing runs). Wake sources (wakes.go): SubscribeWake sends wake/subscribed as
-// an agent's subscription would, WakeFires records wake/fire. Start announces the real
+// memory, nothing runs), notification/* notifications. Wake sources (wakes.go):
+// SubscribeWake sends wake/subscribed as an agent's subscription would, WakeFires records
+// wake/fire. Notifications (notify.go) follow the host's key rules and routing;
+// Notifications reads what the plugin posted, PressAction presses a button. Start announces the real
 // host's capabilities (HostCapabilities) unless Options lists others, and Act shapes a
 // tab or select act from the latest view as the host does (acts.go). It does not
 // evaluate when clauses, check views beyond what the plugin's own Validate did, or store
@@ -56,6 +58,10 @@ type Options struct {
 	// Wakes are the manifest's wake sources: wake/fire is refused for another source or
 	// a match arg a source does not declare (wakes.go). Nil accepts any.
 	Wakes []pluginsdk.WakeSpec
+	// Commands are the manifest's commands: a notification's command action naming
+	// another, or an arg its command does not declare, is refused (notify.go). Nil
+	// accepts any.
+	Commands []pluginsdk.CommandSpec
 	// WakeSubscriptions are the live wake subscriptions at start, as after a restart:
 	// Start sends each (an empty Subscription gets "wsub-<n>") with Rearm set right
 	// after initialized, then wake/armed with their count, as the host does (wake/armed
@@ -86,6 +92,7 @@ type Host struct {
 	subs        [][]string
 	own         owned
 	wakes       wakeState
+	notes       noteState
 	closeOnce   sync.Once
 }
 
@@ -400,6 +407,9 @@ func (h *Host) handle(ctx context.Context, method string, params json.RawMessage
 		return res, err
 	}
 	if res, ok, err := h.handleWakes(ctx, method, params); ok {
+		return res, err
+	}
+	if res, ok, err := h.handleNotifications(ctx, method, params); ok {
 		return res, err
 	}
 	g := h.opts.Granted

@@ -53,8 +53,10 @@ func newNotificationRegistry(t *testing.T, fail error) (*command.Registry, *noti
 				return command.Result{Message: name + " ran"}, nil
 			}}
 	}
+	forget := stand("plugin.ci.forget", "build")
+	forget.Confirm = "Forget build {build}?"
 	if err := r.RegisterAll(stand("thread.send", "id", "text"), stand("thread.new", "prompt", "project", "no-project"),
-		stand("view.open.url", "url")); err != nil {
+		stand("view.open.url", "url"), stand("plugin.ci.retry", "build"), forget); err != nil {
 		t.Fatal(err)
 	}
 	return r, s, &calls
@@ -195,9 +197,15 @@ func TestNotificationAct(t *testing.T) {
 			action:   notification.ActionSpec{Action: notification.Action{Label: "Tell", Kind: notification.KindSend, ThreadID: "s-7754a478e649", Text: "go on"}},
 			wantCall: call{name: "thread.send", args: map[string]string{"id": "s-7754a478e649", "text": "go on"}}, wantState: "shown",
 			wantErr: func(err error) bool { return strings.Contains(err.Error(), "thread is gone") }},
-		{name: "a command action waits for plugin notifications", source: "ci",
-			action:    notification.ActionSpec{Action: notification.Action{Label: "Retry", Kind: notification.KindCommand, Command: "retry"}},
-			wantState: "shown", wantErr: func(err error) bool { return connect.CodeOf(err) == connect.CodeUnimplemented }},
+		{name: "a command action runs the plugin's command", source: "ci",
+			action:   notification.ActionSpec{Action: notification.Action{Label: "Retry", Kind: notification.KindCommand, Command: "retry", Args: map[string]string{"build": "7"}}},
+			wantCall: call{name: "plugin.ci.retry", args: map[string]string{"build": "7"}}, wantState: "resolved"},
+		{name: "a command that confirms asks first", source: "ci",
+			action:    notification.ActionSpec{Action: notification.Action{Label: "Forget", Kind: notification.KindCommand, Command: "forget", Args: map[string]string{"build": "7"}}},
+			wantState: "shown", wantErr: func(err error) bool {
+				var ce *command.ConfirmError
+				return errors.As(err, &ce) && ce.Message == "Forget build 7?"
+			}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			r, s, calls := newNotificationRegistry(t, tt.fail)
@@ -233,6 +241,23 @@ func TestNotificationAct(t *testing.T) {
 			}
 		})
 	}
+	t.Run("a confirmed command action runs", func(t *testing.T) {
+		r, s, calls := newNotificationRegistry(t, nil)
+		res, err := s.Post(ctx, notification.Post{Source: "ci", Title: "Hi", Actions: []notification.ActionSpec{{Action: notification.Action{
+			Label: "Forget", Kind: notification.KindCommand, Command: "forget", Args: map[string]string{"build": "7"}}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.Invoke(ctx, gui, "notification.act", map[string]string{"id": res.Notification.ID}, command.Confirmed(true)); err != nil {
+			t.Fatal(err)
+		}
+		if len(*calls) != 1 || (*calls)[0].name != "plugin.ci.forget" {
+			t.Errorf("ran %+v", *calls)
+		}
+		if n, _ := s.Get(res.Notification.ID); n.State != notification.StateResolved {
+			t.Errorf("state %s", n.State)
+		}
+	})
 	t.Run("no such action", func(t *testing.T) {
 		r, s, _ := newNotificationRegistry(t, nil)
 		res, _ := s.Post(ctx, notification.Post{Source: "command", Title: "Hi"})

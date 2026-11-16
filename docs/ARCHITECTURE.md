@@ -1333,7 +1333,8 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   `log`, `host/invoke` (the manifest's command globs; never a confirm on the user's
   behalf; `confirm: ask` hands it to the GUI), `secret/*`, `view/update|append|toast`,
   `context/set`, `thread/setFlag`, `events/subscribe`, `session/setEnvironment`,
-  `thread/create|send|archive|list`, `terminal/create|close|list`. A `surface/act`
+  `thread/create|send|archive|list`, `terminal/create|close|list`, `wake/fire`,
+  `notification/post|withdraw`. A `surface/act`
   carries the acting tab's context (its thread when the tab is linked to one).
 * **Commands.** Manifest commands are `plugin.<name>.<command>` in the one registry
   (`Registry.ReplacePrefix` on enable and restart), so the palette, CLI and agents get
@@ -1358,7 +1359,13 @@ built: `docs/notes/plugins-1-core.md` through `plugins-14-flag-guidance.md`.
   queue that resends a snapshot after drops. `thread/setFlag` puts an attention or error
   flag on a thread (an overlay in the thread store; never the stream's status).
   `session/setEnvironment` contributes env, PATH entries and `--add-dir`s to new threads
-  through the thread store's spawn extras (§6).
+  through the thread store's spawn extras (§6). `notification/post` and `/withdraw`
+  (permission `notifications`) reach the notification store under source = the plugin's
+  name (`plugin_notifications.go`); a command action must name one of the plugin's own
+  manifest commands, and `notification.act` runs it as `plugin.<name>.<command>`. A
+  notification attached to `wake/fire` is raised only when no subscribed thread got the
+  wake, a time-sensitive one always. Disabling or removing a plugin withdraws its
+  notifications (`docs/notes/notifications-2-plugins.md`).
 * **Own threads and terminals** (permissions `threads`, `terminals`;
   `docs/notes/plugins-6-thread-terminal.md`). A plugin's thread is an ordinary thread
   owned by `plugin:<name>` (`threads.owner`) with a cwd and env/add-dirs of its own

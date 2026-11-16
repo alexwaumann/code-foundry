@@ -18,7 +18,9 @@ import (
 // removing a one-shot one that it reached (wake/unsubscribed), as the host does. With
 // Options.Wakes it also refuses a source or match arg the manifest does not declare.
 // Options.WakeSubscriptions are replayed at start (Rearm set, then wake/armed), as the
-// host replays the live subscriptions after a restart.
+// host replays the live subscriptions after a restart. A notification attached to a fire
+// is routed as the host routes it (notify.go): to simulate a fire with a subscribed
+// thread, SubscribeWake first; without one, fire with none subscribed.
 
 // wakeState is the fake's wake subscriptions and fires. Guarded by Host.mu.
 type wakeState struct {
@@ -107,7 +109,11 @@ func (h *Host) handleWakes(_ context.Context, method string, params json.RawMess
 	if err != nil {
 		return nil, true, err
 	}
-	if err := h.checkFire(f); err != nil {
+	err = h.checkFire(f)
+	if err == nil {
+		err = h.checkFireNote(f.Notification)
+	}
+	if err != nil {
 		h.record(func() {
 			h.wakes.fires = append(h.wakes.fires, f)
 			h.wakes.sent = append(h.wakes.sent, 0)
@@ -133,7 +139,7 @@ func (h *Host) handleWakes(_ context.Context, method string, params json.RawMess
 	for _, s := range gone {
 		_ = h.conn.Notify(pluginsdk.MethodWakeUnsubscribed, pluginsdk.WakeUnsubscribed{Subscription: s.Subscription, Source: s.Source})
 	}
-	return pluginsdk.WakeFireResult{Delivered: n}, true, nil
+	return pluginsdk.WakeFireResult{Delivered: n, Notification: h.routeFireNote(f.Notification, n)}, true, nil
 }
 
 // checkFire refuses a fire the host would.

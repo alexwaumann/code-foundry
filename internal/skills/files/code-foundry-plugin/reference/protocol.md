@@ -117,7 +117,9 @@ first view first. An error from the factory or from `Act` is shown to the user
 | `terminal/create` | request | `{argv, cwd, env, title}` → `{terminalId}` | `CreateTerminal` | `terminals` |
 | `terminal/close` / `list` | request | `{terminalId}`; `{}` → `{terminals: [PluginTerminal]}` | `CloseTerminal`, `Terminals` | `terminals` |
 | `terminal/read` | request | `{terminalId, maxBytes, scrollback}` → `{text, truncated, lines}`: its screen as plain text, with `scrollback` the scrollback and the screen (capability `terminal.scrollback`); no trailing newline, `lines` counted (screen reads too since pluginsdk v0.2.1) | `ReadTerminal`, `ReadTerminalWith` | `terminals` |
-| `wake/fire` | request | `{source, match, title, payload}` → `{delivered}` | `FireWake` | a manifest `wakes` entry |
+| `wake/fire` | request | `{source, match, title, payload, notification?}` → `{delivered, notification?}`: an attached notification is raised only when no thread got the wake, unless time-sensitive (its outcome is `routed` when not raised) | `FireWake`, `FireWakeNotify` | a manifest `wakes` entry; `notifications` with a notification |
+| `notification/post` | request | `{key?, level?, timeSensitive?, title, body?, threadId?, showAt?, actions?}` → `{id, key, outcome, status}` (capability `notifications`) | `Notify` | `notifications` |
+| `notification/withdraw` | request | `{key}` → `{withdrawn}` | `WithdrawNotification` | `notifications` |
 
 What each does and its limits: `host-api.md`, `events.md`, `wakes.md`, `owned.md`. A method this host does not
 serve answers -32601.

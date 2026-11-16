@@ -306,7 +306,7 @@ func permissionSummary(p *v1.PluginPermissions) string {
 		on   bool
 		name string
 	}{{p.GetThreadStatus(), "threadStatus"}, {p.GetSessionEnv(), "sessionEnv"}, {p.GetSecrets(), "secrets"},
-		{p.GetThreads(), "threads"}, {p.GetTerminals(), "terminals"}, {p.GetApi(), "api"}} {
+		{p.GetThreads(), "threads"}, {p.GetTerminals(), "terminals"}, {p.GetApi(), "api"}, {p.GetNotifications(), "notifications"}} {
 		if f.on {
 			out = append(out, f.name)
 		}

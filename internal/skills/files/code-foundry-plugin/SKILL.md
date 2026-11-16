@@ -25,7 +25,7 @@ Files are split into `##` sections: `grep -n "^## " <file>`, then read the one y
 | Use a display node (list, chips, log, notice, section…) or a menu | `nodes.md` |
 | Take input (fields, pickers that search, drafts, secrets in forms) | `forms.md` |
 | Lay out: columns, pane, grid, group, master-detail; a toolbar or footer (search, filters) | `ui-layout.md` |
-| Call the host: `h.Log`, `h.DataDir`, Invoke, flags, context facts, session env, secrets, toasts | `host-api.md` |
+| Call the host: `h.Log`, `h.DataDir`, Invoke, flags, notifications, context facts, session env, secrets, toasts | `host-api.md` |
 | React to daemon events | `events.md` |
 | Let agents wait on the plugin instead of polling | `wakes.md` |
 | Run its own Claude threads or terminals | `owned.md` |
