@@ -43,6 +43,24 @@ describe("the mock world", () => {
     expect(w.actions.getRun(r.id ?? "").state).toBe(ActionRunState.EXITED);
   });
 
+  it("thread.snooze.clear: a woken thread is idle at its prompt; a re-snooze or archive clears a wake too; elsewhere it says so", async () => {
+    const w = new World();
+    const woken = () => {
+      w.snoozeThread("s-1", new Date(Date.now() + 3_600_000));
+      w.wakeThread("s-1");
+      expect(w.threads.get("s-1")?.statusReason).toBe("snooze ended");
+    };
+    woken();
+    expect(await run(w, "thread.snooze.clear", { activeThreadId: "s-1", activeView: "thread" }, {})).toMatch(/^cleared snooze ended on thread /);
+    expect(w.threads.get("s-1")).toMatchObject({ statusReason: "at prompt", snoozedUntil: null });
+    // Not woken any more: the window has no clear.
+    await expect(run(w, "thread.snooze.clear", { activeThreadId: "s-1", activeView: "thread" }, {})).rejects.toThrow(/not available/);
+    expect(w.clearSnoozeEnded("s-1")).toMatch(/was not woken from a snooze; nothing to clear$/);
+    woken();
+    w.archiveThread("s-1", true);
+    expect(w.threads.get("s-1")?.statusReason).toBe("at prompt");
+  });
+
   it("thread.new without a model, effort or permission takes the settings' defaults and auto", async () => {
     const w = new World();
     const s = created(w, await run(w, "thread.new", { activeProjectId: "repo-cf" }, { prompt: "hi" }));

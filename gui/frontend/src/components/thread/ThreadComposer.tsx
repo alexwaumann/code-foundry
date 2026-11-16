@@ -21,10 +21,7 @@ import { useMentionSource, useProjectSlugs, usePrSource } from "@/components/com
 import { Tip } from "@/components/ui/tooltip";
 import { choiceLabel, EFFORT_CHOICES, PERMISSION_CHOICES, type ComposePermission } from "@/lib/compose";
 import { skillSources, skillSourcesKey, type TriggerChar } from "@/lib/completion";
-import { useNow } from "@/lib/clock";
 import { LISTENING_PLACEHOLDER } from "@/lib/dictation";
-import { isSnoozed } from "@/lib/snooze";
-import { statusLine, statusText } from "@/lib/statusLine";
 import { setupUnfinished, setupWaitedFor } from "@/lib/threadSetup";
 
 const PLACEHOLDER = "Reply or ask anything. @ files and threads, / skills and commands";
@@ -85,35 +82,6 @@ function useThreadSources(threadId: string) {
     if (noProject) return { noProject, projectIds: [], checkouts: [] };
     return { noProject, projectIds, checkouts: skillSources({ projectIds, paths }) };
   }, [noProject, projectIds, paths]);
-}
-
-/** "Snooze ended · 2m ago" in amber, like the sidebar row's line 2, for a woken thread. */
-function SnoozeEnded({ at }: { at: number | null }) {
-  const now = useNow(30_000);
-  return (
-    <span className="text-cf-warning-text" data-testid="thread-snooze-ended">
-      {statusText({ kind: "snoozeEnded", detail: "", at }, now)}
-    </span>
-  );
-}
-
-/**
- * The composer's line above the prompt for a thread the daemon woke: "Snooze ended · <ago>"
- * (the header's Snooze button snoozes again). Nothing otherwise; a thread still snoozed has
- * the dock's strip instead (SnoozeStrip).
- */
-export function SnoozeNote({ threadId }: { threadId: string }) {
-  const wokeAt = useThreadsStore((s) => {
-    const t = s.byId[threadId];
-    const l = statusLine(t);
-    return l.kind === "snoozeEnded" && !(t && isSnoozed(t)) ? (l.at ?? 0) : null;
-  });
-  if (wokeAt === null) return null;
-  return (
-    <div className="col-span-2 flex min-w-0 items-center gap-2 px-4 pt-2 text-caption" data-testid="thread-snooze-note">
-      <SnoozeEnded at={wokeAt === 0 ? null : wokeAt} />
-    </div>
-  );
 }
 
 /**
@@ -361,7 +329,6 @@ export function ThreadComposer({
         }}
       >
         {docked && (askStrip !== null ? <AskStrip threadId={threadId} pending={pending} paneId={askStrip} /> : <PendingPrompts pending={pending} keysRef={promptKeys} refocus={refocus} />)}
-        <SnoozeNote threadId={threadId} />
         <SetupNote threadId={threadId} />
         <RetryNote threadId={threadId} />
         <FailedPromptNote threadId={threadId} pending={pending.length} focusEditor={() => editorRef.current?.focusCollapsed()} />

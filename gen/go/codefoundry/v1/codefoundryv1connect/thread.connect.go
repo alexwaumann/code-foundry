@@ -89,6 +89,9 @@ const (
 	ThreadServiceSetWorkspaceProcedure = "/codefoundry.v1.ThreadService/SetWorkspace"
 	// ThreadServiceSnoozeProcedure is the fully-qualified name of the ThreadService's Snooze RPC.
 	ThreadServiceSnoozeProcedure = "/codefoundry.v1.ThreadService/Snooze"
+	// ThreadServiceClearSnoozeEndedProcedure is the fully-qualified name of the ThreadService's
+	// ClearSnoozeEnded RPC.
+	ThreadServiceClearSnoozeEndedProcedure = "/codefoundry.v1.ThreadService/ClearSnoozeEnded"
 	// ThreadServiceLabelProcedure is the fully-qualified name of the ThreadService's Label RPC.
 	ThreadServiceLabelProcedure = "/codefoundry.v1.ThreadService/Label"
 	// ThreadServiceReportProcedure is the fully-qualified name of the ThreadService's Report RPC.
@@ -312,6 +315,10 @@ type ThreadServiceClient interface {
 	// snoozed_until stays unset and the daemon never wakes it; a request with neither, and
 	// those implicit clears, end it too.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// ClearSnoozeEnded turns a woken thread's NEEDS_ATTENTION "snooze ended" into IDLE
+	// "at prompt", as a re-snooze or an archive does, without putting it away again.
+	// cleared is false, and nothing changes, when the thread is not woken. Persisted.
+	ClearSnoozeEnded(context.Context, *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error)
 	// Label adds and removes a thread's labels (clear first, then remove, then add) and
 	// returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
 	Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error)
@@ -648,6 +655,12 @@ func NewThreadServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(threadServiceMethods.ByName("Snooze")),
 			connect.WithClientOptions(opts...),
 		),
+		clearSnoozeEnded: connect.NewClient[v1.ClearSnoozeEndedRequest, v1.ClearSnoozeEndedResponse](
+			httpClient,
+			baseURL+ThreadServiceClearSnoozeEndedProcedure,
+			connect.WithSchema(threadServiceMethods.ByName("ClearSnoozeEnded")),
+			connect.WithClientOptions(opts...),
+		),
 		label: connect.NewClient[v1.LabelThreadRequest, v1.LabelThreadResponse](
 			httpClient,
 			baseURL+ThreadServiceLabelProcedure,
@@ -880,6 +893,7 @@ type threadServiceClient struct {
 	archive           *connect.Client[v1.ArchiveThreadRequest, v1.ArchiveThreadResponse]
 	setWorkspace      *connect.Client[v1.SetThreadWorkspaceRequest, v1.SetThreadWorkspaceResponse]
 	snooze            *connect.Client[v1.SnoozeThreadRequest, v1.SnoozeThreadResponse]
+	clearSnoozeEnded  *connect.Client[v1.ClearSnoozeEndedRequest, v1.ClearSnoozeEndedResponse]
 	label             *connect.Client[v1.LabelThreadRequest, v1.LabelThreadResponse]
 	report            *connect.Client[v1.ReportThreadRequest, v1.ReportThreadResponse]
 	ask               *connect.Client[v1.AskThreadRequest, v1.AskThreadResponse]
@@ -1029,6 +1043,11 @@ func (c *threadServiceClient) SetWorkspace(ctx context.Context, req *connect.Req
 // Snooze calls codefoundry.v1.ThreadService.Snooze.
 func (c *threadServiceClient) Snooze(ctx context.Context, req *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	return c.snooze.CallUnary(ctx, req)
+}
+
+// ClearSnoozeEnded calls codefoundry.v1.ThreadService.ClearSnoozeEnded.
+func (c *threadServiceClient) ClearSnoozeEnded(ctx context.Context, req *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error) {
+	return c.clearSnoozeEnded.CallUnary(ctx, req)
 }
 
 // Label calls codefoundry.v1.ThreadService.Label.
@@ -1340,6 +1359,10 @@ type ThreadServiceHandler interface {
 	// snoozed_until stays unset and the daemon never wakes it; a request with neither, and
 	// those implicit clears, end it too.
 	Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error)
+	// ClearSnoozeEnded turns a woken thread's NEEDS_ATTENTION "snooze ended" into IDLE
+	// "at prompt", as a re-snooze or an archive does, without putting it away again.
+	// cleared is false, and nothing changes, when the thread is not woken. Persisted.
+	ClearSnoozeEnded(context.Context, *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error)
 	// Label adds and removes a thread's labels (clear first, then remove, then add) and
 	// returns the thread. Any state. Persisted. See docs/notes/agents-2-metadata.md.
 	Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error)
@@ -1672,6 +1695,12 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(threadServiceMethods.ByName("Snooze")),
 		connect.WithHandlerOptions(opts...),
 	)
+	threadServiceClearSnoozeEndedHandler := connect.NewUnaryHandler(
+		ThreadServiceClearSnoozeEndedProcedure,
+		svc.ClearSnoozeEnded,
+		connect.WithSchema(threadServiceMethods.ByName("ClearSnoozeEnded")),
+		connect.WithHandlerOptions(opts...),
+	)
 	threadServiceLabelHandler := connect.NewUnaryHandler(
 		ThreadServiceLabelProcedure,
 		svc.Label,
@@ -1924,6 +1953,8 @@ func NewThreadServiceHandler(svc ThreadServiceHandler, opts ...connect.HandlerOp
 			threadServiceSetWorkspaceHandler.ServeHTTP(w, r)
 		case ThreadServiceSnoozeProcedure:
 			threadServiceSnoozeHandler.ServeHTTP(w, r)
+		case ThreadServiceClearSnoozeEndedProcedure:
+			threadServiceClearSnoozeEndedHandler.ServeHTTP(w, r)
 		case ThreadServiceLabelProcedure:
 			threadServiceLabelHandler.ServeHTTP(w, r)
 		case ThreadServiceReportProcedure:
@@ -2091,6 +2122,10 @@ func (UnimplementedThreadServiceHandler) SetWorkspace(context.Context, *connect.
 
 func (UnimplementedThreadServiceHandler) Snooze(context.Context, *connect.Request[v1.SnoozeThreadRequest]) (*connect.Response[v1.SnoozeThreadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.Snooze is not implemented"))
+}
+
+func (UnimplementedThreadServiceHandler) ClearSnoozeEnded(context.Context, *connect.Request[v1.ClearSnoozeEndedRequest]) (*connect.Response[v1.ClearSnoozeEndedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("codefoundry.v1.ThreadService.ClearSnoozeEnded is not implemented"))
 }
 
 func (UnimplementedThreadServiceHandler) Label(context.Context, *connect.Request[v1.LabelThreadRequest]) (*connect.Response[v1.LabelThreadResponse], error) {

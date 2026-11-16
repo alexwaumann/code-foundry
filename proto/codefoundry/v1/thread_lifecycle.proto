@@ -1403,6 +1403,16 @@ message SnoozeThreadResponse {
   bool deferred = 2;
 }
 
+message ClearSnoozeEndedRequest {
+  string id = 1;
+}
+
+message ClearSnoozeEndedResponse {
+  Thread thread = 1;
+  // The thread was woken and is now idle; false when there was nothing to clear.
+  bool cleared = 2;
+}
+
 message LabelThreadRequest {
   string id = 1;
   // Removes every label first.

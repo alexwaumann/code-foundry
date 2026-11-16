@@ -719,6 +719,10 @@ type Store interface {
 	// clears it and the disconnected thread needs attention (ReasonSnoozeEnded). A zero
 	// until only clears SnoozedUntil and SavedAt.
 	Snooze(ctx context.Context, id string, until time.Time) (Thread, error)
+	// ClearSnoozeEnded turns a woken thread's "snooze ended" attention (ReasonSnoozeEnded)
+	// into idle at its prompt, persisted; cleared is false, and nothing changes, when the
+	// thread is not woken.
+	ClearSnoozeEnded(ctx context.Context, id string) (t Thread, cleared bool, err error)
 	// SaveForLater snoozes a thread with no wake time: everything Snooze does, but it
 	// sets SavedAt (kept when already set) and clears SnoozedUntil, and nothing wakes it.
 	SaveForLater(ctx context.Context, id string) (Thread, error)

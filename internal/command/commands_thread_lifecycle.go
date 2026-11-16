@@ -138,7 +138,7 @@ func threadLabel(s *v1.Thread) string {
 
 // RegisterThreadLifecycle registers thread.new, thread.focus, thread.rename, thread.regenerate-name,
 // thread.fork, thread.remove, thread.run-in, thread.pin, thread.archive,
-// thread.snooze, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
+// thread.snooze, thread.snooze.clear, and the metadata, flags and restart commands. There is no close or reconnect: a message starts a stopped thread and
 // the daemon stops idle ones (docs/notes/thread-lifecycle.md).
 func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...ThreadLifecycleOption) error {
 	var o threadLifecycleOptions
@@ -427,6 +427,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 		threadPin(b, idArg),
 		threadArchive(b, idArg),
 		threadSnooze(b, idArg),
+		threadSnoozeClear(b, idArg),
 		threadGet(b, idArg),
 		threadLabelCmd(b, idArg),
 		threadReportCmd(b, idArg),

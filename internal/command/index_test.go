@@ -32,7 +32,8 @@ import (
 //     `help notification post`), with no text steering agents to it
 //     (docs/notes/notifications-1-store.md).
 //   - The user's own: thread.prompts (their prompt history), thread.regenerate-name (agents
-//     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe).
+//     use thread rename), thread.restart, thread.stop-waiting (agents unsubscribe),
+//     thread.snooze.clear (the user's own attention on a woken thread).
 var noIndex = []string{
 	"action.last", "composer.draft.clear", "composer.draft.discard", "composer.draft.label", "composer.draft.open",
 	"composer.draft.start", "composer.history", "composer.new", "file.export",
@@ -42,7 +43,7 @@ var noIndex = []string{
 	"pane.move.left", "pane.move.right", "pane.move.up", "pane.split", "space.move", "tab.auto-name", "tab.next", "tab.previous", "tab.rename", "tab.reopen",
 	"terminal.cycle", "terminal.quick",
 	"thread.move.open", "thread.new-like", "thread.placement.check", "thread.prompts",
-	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.stop-waiting", "thread.workspace",
+	"thread.regenerate-name", "thread.restart", "thread.shell.stop", "thread.snooze.clear", "thread.stop-waiting", "thread.workspace",
 	"view.panel.diff", "view.panel.file", "view.panel.gallery", "view.panel.mcp", "view.panel.page", "view.panel.pr",
 	"view.thread-diff", "view.thread-info", "worktree.editors",
 }

@@ -427,3 +427,59 @@ func TestSnoozeEndedSettledAtStartup(t *testing.T) {
 		t.Errorf("listed thread after restart = %s %q; want %q kept", got.Status, got.StatusReason, ReasonSnoozeEnded)
 	}
 }
+
+// ClearSnoozeEnded turns a woken thread idle at its prompt, persisted and published, and
+// leaves any other thread as it is.
+func TestClearSnoozeEnded(t *testing.T) {
+	tests := []struct {
+		name        string
+		make        func(e *env, clk *testClock) Thread
+		wantCleared bool
+		wantStatus  Status
+		wantReason  string
+	}{
+		{name: "a woken thread", make: func(e *env, clk *testClock) Thread { return e.wokenThread(clk) },
+			wantCleared: true, wantStatus: StatusIdle, wantReason: "at prompt"},
+		{name: "a snoozed thread", make: func(e *env, _ *testClock) Thread { return e.snoozed() }},
+		{name: "a connected thread", make: func(e *env, _ *testClock) Thread { return e.connected(CreateOptions{Name: "live"}) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clk := newTestClock()
+			e := newEnv(t, clk.opts())
+			s := tt.make(e, clk)
+			sub := bus.Subscribe[Event](e.bus, 256)
+			defer sub.Close()
+			at := clk.advance(time.Minute)
+			got, cleared, err := e.m.ClearSnoozeEnded(e.ctx(), s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cleared != tt.wantCleared {
+				t.Fatalf("cleared = %v, want %v", cleared, tt.wantCleared)
+			}
+			if !tt.wantCleared {
+				// A live thread's status is its process's; only the snooze is compared.
+				if !got.SnoozedUntil.Equal(s.SnoozedUntil) || got.State != s.State {
+					t.Errorf("changed: %s until %v; was %s until %v", got.State, got.SnoozedUntil, s.State, s.SnoozedUntil)
+				}
+				return
+			}
+			if got.Status != tt.wantStatus || got.StatusReason != tt.wantReason || !got.StatusChangedAt.Equal(at) || got.State != StateDisconnected {
+				t.Errorf("after clear = %s %s %q at %v; want disconnected %s %q at %v", got.State, got.Status, got.StatusReason, got.StatusChangedAt, tt.wantStatus, tt.wantReason, at)
+			}
+			e.waitEvent(sub, s.ID, "clear", func(s Thread) bool { return s.StatusReason == tt.wantReason })
+			e.restart(clk.opts(time.Hour))
+			if got, _ := e.m.Get(e.ctx(), s.ID); got.StatusReason != tt.wantReason {
+				t.Errorf("after restart = %s %q; want %q", got.Status, got.StatusReason, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestClearSnoozeEndedUnknown(t *testing.T) {
+	e := newEnv(t)
+	if _, _, err := e.m.ClearSnoozeEnded(e.ctx(), "s-nope00000000"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+}

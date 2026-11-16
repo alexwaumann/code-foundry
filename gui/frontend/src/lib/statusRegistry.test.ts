@@ -43,7 +43,8 @@ describe("statusRegistry", () => {
     ["waiting", CircleDashed, "Waiting", "muted", "status"],
     ["place", null, "", "muted", "activity"],
   ])("%s", (kind, icon, word, tone, timeMode) => {
-    expect(statusRegistry[kind]).toEqual({ icon, word, tone, timeMode });
+    // Only a woken snooze shows its word on an Active row (StatusEntry.rowWord).
+    expect(statusRegistry[kind]).toEqual({ icon, word, tone, timeMode, ...(kind === "snoozeEnded" ? { rowWord: true } : {}) });
   });
 
   it("maps each tone to its cf text class", () => {

@@ -53,6 +53,12 @@ export interface StatusEntry {
   word: string;
   tone: RowTone;
   timeMode: TimeMode;
+  /**
+   * Whether an Active row shows the word beside the icon. Only a woken snooze: it is the one
+   * call on the user that sits in Active (a Needs you row says its ask in words, AskKind), and
+   * its bell alone did not read as a status. The others keep the icon (title-first rows).
+   */
+  rowWord?: true;
 }
 
 /** The registry: every StatusLineKind, so a new kind fails to compile until it has an entry. */
@@ -60,7 +66,7 @@ export const statusRegistry: Readonly<Record<StatusLineKind, StatusEntry>> = {
   input: { icon: ShieldQuestionMark, word: "Permission", tone: "warning", timeMode: "none" },
   question: { icon: CircleQuestionMark, word: "Question", tone: "warning", timeMode: "none" },
   plan: { icon: ClipboardCheck, word: "Plan", tone: "warning", timeMode: "none" },
-  snoozeEnded: { icon: BellRing, word: "Woke", tone: "warning", timeMode: "none" },
+  snoozeEnded: { icon: BellRing, word: "Woke", tone: "warning", timeMode: "none", rowWord: true },
   error: { icon: CircleAlert, word: "Error", tone: "error", timeMode: "none" },
   interrupted: { icon: Unplug, word: "Interrupted", tone: "error", timeMode: "none" },
   crashed: { icon: TriangleAlert, word: "Crashed", tone: "error", timeMode: "none" },
