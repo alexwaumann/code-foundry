@@ -356,7 +356,9 @@ type PluginPermissions struct {
 	Threads      bool     `protobuf:"varint,6,opt,name=threads,proto3" json:"threads,omitempty"`
 	Terminals    bool     `protobuf:"varint,7,opt,name=terminals,proto3" json:"terminals,omitempty"`
 	// Full control: the daemon's endpoint and token in its environment.
-	Api           bool `protobuf:"varint,8,opt,name=api,proto3" json:"api,omitempty"`
+	Api bool `protobuf:"varint,8,opt,name=api,proto3" json:"api,omitempty"`
+	// Posts notifications to the bell (docs/notes/notifications-2-plugins.md).
+	Notifications bool `protobuf:"varint,9,opt,name=notifications,proto3" json:"notifications,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -443,6 +445,13 @@ func (x *PluginPermissions) GetTerminals() bool {
 func (x *PluginPermissions) GetApi() bool {
 	if x != nil {
 		return x.Api
+	}
+	return false
+}
+
+func (x *PluginPermissions) GetNotifications() bool {
+	if x != nil {
+		return x.Notifications
 	}
 	return false
 }
@@ -5043,7 +5052,7 @@ var File_codefoundry_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcodefoundry/v1/plugin.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf1\x01\n" +
+	"\x1bcodefoundry/v1/plugin.proto\x12\x0ecodefoundry.v1\x1a\x1ccodefoundry/v1/command.proto\x1a\x1ecodefoundry/v1/heartbeat.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x97\x02\n" +
 	"\x11PluginPermissions\x12\x1a\n" +
 	"\bcommands\x18\x01 \x03(\tR\bcommands\x12\x16\n" +
 	"\x06events\x18\x02 \x03(\tR\x06events\x12#\n" +
@@ -5053,7 +5062,8 @@ const file_codefoundry_v1_plugin_proto_rawDesc = "" +
 	"\asecrets\x18\x05 \x01(\bR\asecrets\x12\x18\n" +
 	"\athreads\x18\x06 \x01(\bR\athreads\x12\x1c\n" +
 	"\tterminals\x18\a \x01(\bR\tterminals\x12\x10\n" +
-	"\x03api\x18\b \x01(\bR\x03api\"[\n" +
+	"\x03api\x18\b \x01(\bR\x03api\x12$\n" +
+	"\rnotifications\x18\t \x01(\bR\rnotifications\"[\n" +
 	"\rPluginCommand\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +

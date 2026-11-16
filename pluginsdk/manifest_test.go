@@ -168,6 +168,7 @@ func TestPermissionsWithin(t *testing.T) {
 		{"new event", Permissions{Events: []string{"thread"}}, false},
 		{"new flag", Permissions{API: true}, false},
 		{"kept flag", Permissions{Secrets: true}, true},
+		{"notifications", Permissions{Notifications: true}, false},
 	}
 	for _, tt := range tests {
 		if got := tt.p.Within(granted); got != tt.want {
@@ -179,6 +180,9 @@ func TestPermissionsWithin(t *testing.T) {
 	}
 	if len(granted.Describe()) != 3 {
 		t.Errorf("Describe = %q", granted.Describe())
+	}
+	if d := (Permissions{Notifications: true}).Describe(); len(d) != 1 || !strings.HasPrefix(d[0], "post notifications") {
+		t.Errorf("Describe notifications = %q", d)
 	}
 }
 

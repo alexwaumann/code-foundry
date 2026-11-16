@@ -76,6 +76,7 @@ whenever a new version asks for more (the plugin is disabled until they agree).
 | `commands` | globs | `Host.Invoke` and view command buttons for these host commands. Globs over dotted names: `*` within a segment, `**` across (`"thread.send"`, `"view.open.*"`, `"action.**"`). `plugin.<verb>` management commands are refused whatever the globs. The list: `reference/host-commands.md` and `reference/host-commands-thread-view.md`. |
 | `events` | sources | `Host.Subscribe` to these event sources: {{cf.eventSources}}. |
 | `threadStatus` | bool | `Host.SetFlag`: attention or error flags on threads. |
+| `notifications` | bool | `Host.Notify`, `WithdrawNotification`, `FireWakeNotify`: notifications in the bell, whose buttons run the plugin's commands, send to or start a thread, or open a link (`host-api.md`). |
 | `sessionEnv` | bool | `Host.SetEnvironment`: env, PATH entries and `--add-dir`s for new Claude threads. |
 | `secrets` | bool | `Host.Secrets()` and form secret inputs with `store`: the plugin's own Keychain namespace. |
 | `threads` | bool | Plugin-owned Claude threads (`CreateThread`, `thread` node; `owned.md`). |

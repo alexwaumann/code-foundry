@@ -237,8 +237,11 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 		Facts: facts, Emitter: command.BusEmitter{Bus: events, CountWindows: clients.Windows}, Tabs: pluginTabs{layout: st.layout},
 		Flags: pluginFlags{threads: st.thread},
 		// Wake sources: the thread store keeps the subscriptions (plugin_wakes.go).
-		Wakes:   pluginWakeSink{threads: st.thread},
-		Threads: pluginThreads{threads: st.thread, settings: st.settings}, Terminals: pluginTerminals{terminals: st.terminal},
+		Wakes: pluginWakeSink{threads: st.thread},
+		// Their notifications are the bell's, under source = the plugin's name
+		// (plugin_notifications.go).
+		Notifications: pluginNotifications{store: st.notification},
+		Threads:       pluginThreads{threads: st.thread, settings: st.settings}, Terminals: pluginTerminals{terminals: st.terminal},
 		Registry: pluginRegistryClient(p, st.settings.Settings(), log.With("component", "plugin-registry")),
 		Secrets:  plugin.Keychain{Service: pluginKeychainService(p)},
 	})

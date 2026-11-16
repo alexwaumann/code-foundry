@@ -100,3 +100,26 @@ n, err := h.FireWake(ctx, "checks-done", map[string]string{"pr": "octo/app#12", 
   reason: it is one line of at most 80 characters and the line does not fit; the
   failure's message or the surface's notice carries it.
 
+## Report an event once: a notification on the fire
+
+```go
+res, err := h.FireWakeNotify(ctx, "checks-done", match, "3 of 12 checks failed", payload, pluginsdk.Notification{
+	Key: "checks-octo/app#12", Level: pluginsdk.NotifyError, ThreadID: threadID,
+	Title: "3 of 12 checks failed on #12",
+})
+// res.Delivered: threads woken; res.Notification.Outcome: NotifyRouted when one got it.
+```
+
+- The host fires the wake as `FireWake` does, then routes the notification (permission
+  `notifications`; `host-api.md`, "Notify"): a normal one is raised only when no
+  subscribed thread got the wake; a time-sensitive one is raised either way, and the
+  thread still gets its wake.
+- A thread that is stopped or snoozed gets it (the wake starts it); one over its wake
+  limit does not; archiving a thread ends its subscriptions. A fire that reached no thread
+  raises the notification.
+- This is the way to report an event. A plugin that fires and also calls `Notify` for the
+  same event reaches the user twice; the host cannot tell.
+- The notification is checked before the wake goes: without the permission, or with a bad
+  notification, nothing fires. `FireWakeNotify` refuses (`pluginsdk.ErrNoNotifications`)
+  on a host without `pluginsdk.NotificationsCapability`, which would fire and drop the
+  notification: fall back to `FireWake` there.

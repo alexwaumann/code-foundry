@@ -31,6 +31,9 @@ type permissions struct {
 	Threads      bool     `json:"threads"`
 	Terminals    bool     `json:"terminals"`
 	API          bool     `json:"api"`
+	// Notifications is written only when set: a registry whose schema predates it takes
+	// every other entry unchanged.
+	Notifications bool `json:"notifications,omitempty"`
 }
 
 type artifact struct {
@@ -82,7 +85,8 @@ func run(manifestPath, sumsPath, repo, out string) error {
 		Name: m.Name, DisplayName: m.DisplayNameOr(), Description: m.Description, Repo: repo,
 		Version: m.Version, Protocol: m.Protocol,
 		Permissions: permissions{Commands: orEmpty(p.Commands), Events: orEmpty(p.Events), ThreadStatus: p.ThreadStatus,
-			SessionEnv: p.SessionEnv, Secrets: p.Secrets, Threads: p.Threads, Terminals: p.Terminals, API: p.API},
+			SessionEnv: p.SessionEnv, Secrets: p.Secrets, Threads: p.Threads, Terminals: p.Terminals, API: p.API,
+			Notifications: p.Notifications},
 		Artifacts: map[string]artifact{},
 	}
 	for _, arch := range []string{"arm64", "amd64"} {

@@ -575,3 +575,53 @@ func (m *Manager) prune(now time.Time) {
 	}
 	m.log.Info("pruned closed notifications", "count", len(ids))
 }
+
+// Check reports whether Post would take p's content (the same checks, the thread's
+// existence included), without posting: a plugin's notification attached to a wake fire
+// is refused before the wake goes. ErrFull is not checked.
+func (m *Manager) Check(p Post) error {
+	_, err := normalize(p, m.opts.ThreadExists)
+	return err
+}
+
+// WithdrawSource withdraws every active notification of source (a plugin was disabled
+// or removed) and returns how many.
+func (m *Manager) WithdrawSource(ctx context.Context, source string) (int, error) {
+	now := m.now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var c change
+	for _, n := range m.byID {
+		if n.State == StateActive && n.Source == source {
+			w := *n
+			w.State, w.UpdatedAt = StateWithdrawn, now
+			c.saved = append(c.saved, w)
+		}
+	}
+	if err := m.commit(ctx, c); err != nil {
+		return 0, err
+	}
+	return len(c.saved), nil
+}
+
+// Sources names every source with an active notification, sorted.
+func (m *Manager) Sources() []string {
+	var out []string
+	for _, n := range m.Snapshot().Notifications {
+		if !slices.Contains(out, n.Source) {
+			out = append(out, n.Source)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// Active returns source's active notification with key.
+func (m *Manager) Active(source, key string) (Notification, bool) {
+	for _, n := range m.Snapshot().Notifications {
+		if n.Source == source && n.Key == key {
+			return n, true
+		}
+	}
+	return Notification{}, false
+}

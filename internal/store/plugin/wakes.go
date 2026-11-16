@@ -140,8 +140,10 @@ func (m *Manager) wakeSubscription(s WakeSub) pluginsdk.WakeSubscription {
 	return pluginsdk.WakeSubscription{Subscription: s.ID, Source: s.Source, Args: maps.Clone(s.Args), Context: uctx, Repeat: s.Repeat}
 }
 
-// wakeFire serves wake/fire.
-func (a *actor) wakeFire(_ context.Context, params json.RawMessage) (any, error) {
+// wakeFire serves wake/fire. An attached notification (notify.go) is checked before the
+// wake goes and routed after it: a normal one is raised only when no subscribed thread
+// got the wake, a time-sensitive one always.
+func (a *actor) wakeFire(ctx context.Context, params json.RawMessage) (any, error) {
 	sink := a.m.wakeSink()
 	if sink == nil {
 		return nil, notServed(pluginsdk.MethodWakeFire)
@@ -173,7 +175,20 @@ func (a *actor) wakeFire(_ context.Context, params json.RawMessage) (any, error)
 		return nil, invalid("payload of %d bytes (at most %d)", len(p.Payload), pluginsdk.MaxWakePayload)
 	case len(p.Payload) > 0 && !json.Valid(p.Payload):
 		return nil, invalid("payload is not JSON")
-	case !a.wakes.rate.allow(a.m.opts.Now(), maxFiresPerSecond):
+	}
+	if p.Notification != nil {
+		switch {
+		case !a.permissions().Notifications:
+			a.hostLog("refused wake/fire with a notification: plugin.json does not grant permissions.notifications")
+			return nil, pluginsdk.NewError(pluginsdk.CodePermissionDenied, "permission denied: a notification on wake/fire needs \"notifications\": true in plugin.json's permissions")
+		case a.m.opts.Notifications == nil:
+			return nil, notServed(pluginsdk.MethodNotificationPost)
+		}
+		if err := a.checkNotification(pluginsdk.MethodWakeFire, *p.Notification); err != nil {
+			return nil, err
+		}
+	}
+	if !a.wakes.rate.allow(a.m.opts.Now(), maxFiresPerSecond) {
 		return nil, pluginsdk.NewError(pluginsdk.CodeRateLimited, "wake/fire: at most %d fires a second", maxFiresPerSecond)
 	}
 	n := sink.Fire(a.name, pl.DisplayName(), p.Source, p.Match, title, p.Payload)
@@ -182,7 +197,15 @@ func (a *actor) wakeFire(_ context.Context, params json.RawMessage) (any, error)
 	} else {
 		a.hostDebug("wake %s fired (%s): no subscriber", p.Source, argsOrNone(p.Match))
 	}
-	return pluginsdk.WakeFireResult{Delivered: n}, nil
+	res := pluginsdk.WakeFireResult{Delivered: n}
+	if p.Notification != nil {
+		nr, err := a.routeNotification(ctx, p.Source, n, *p.Notification)
+		if err != nil {
+			return nil, err
+		}
+		res.Notification = &nr
+	}
+	return res, nil
 }
 
 // endWakes ends the subscriptions to name's sources (every source for nil) with a last

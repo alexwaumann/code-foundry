@@ -33,6 +33,8 @@ type demo struct {
 	ctx  context.Context
 	stop context.CancelFunc
 	own  *owned // the plugin's thread and terminal, shared by every instance
+	// picks is the run a notification's button asked for (notify.go), shared.
+	picks *runPicks
 
 	mu      sync.Mutex
 	tab     string
@@ -54,11 +56,13 @@ type demo struct {
 	builds   buildsState
 }
 
-// demoFactory opens demo instances sharing own.
-func demoFactory(own *owned) pluginsdk.SurfaceFactory {
+// demoFactory opens demo instances sharing own and picks (an instance starts on the run
+// a notification's button picked for its thread).
+func demoFactory(own *owned, picks *runPicks) pluginsdk.SurfaceFactory {
 	return func(_ context.Context, h *pluginsdk.Host, open pluginsdk.SurfaceOpen) (pluginsdk.Surface, error) {
 		ctx, stop := context.WithCancel(context.Background())
-		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, tab: "overview", started: time.Now(), priority: "normal", todo: newTodo(), builds: newBuilds()}
+		d := &demo{h: h, open: open, ctx: ctx, stop: stop, own: own, picks: picks, tab: "overview", started: time.Now(), priority: "normal", todo: newTodo(), builds: newBuilds()}
+		picks.opened(d)
 		h.Log().Debug("demo opened", "instance", open.Instance, "thread", open.Context.ThreadID)
 		return d, d.render()
 	}
@@ -433,7 +437,10 @@ func (d *demo) stream(build int) {
 func (d *demo) Visibility(bool) {}
 
 // Close ends the instance.
-func (d *demo) Close(pluginsdk.CloseReason) { d.stop() }
+func (d *demo) Close(pluginsdk.CloseReason) {
+	d.picks.closed(d)
+	d.stop()
+}
 
 // pinned is the surface the demo's Pin button makes available on a thread.
 type pinned struct{ h *pluginsdk.Host }

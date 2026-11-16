@@ -51,6 +51,8 @@ type actor struct {
 	envReady chan struct{}
 	// wakes is the run's wake state (wakes.go).
 	wakes actorWakes
+	// notes limits notification/post (notify.go).
+	notes rateLimiter
 
 	crashes []time.Time // only run's goroutine touches it
 }
