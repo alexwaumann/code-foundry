@@ -57,7 +57,7 @@ export function LinkedPrsBadge({ id }: { id: string }) {
   if (tag === null) return null;
   const look = prStateLook(tag.state === "draft" ? "open" : tag.state === "unknown" ? null : tag.state, tag.state === "draft");
   return (
-    // The click stops here: the row's own click would also focus the prompt and open a flag's surface.
+    // The click stops here: the row's own click would also focus the prompt.
     <span
       className={cn("flex shrink-0 cursor-pointer items-center gap-0.5 text-caption-sm font-medium tabular-nums hover:underline", toneText[tag.tone])}
       data-testid="row-linked-prs"

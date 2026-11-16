@@ -46,10 +46,10 @@ function SnoozeItems({ id }: { id: string }) {
 }
 
 /** The host's corner buttons: Snooze (its presets) and Dismiss. Never a plugin's. */
-function CornerButtons({ id }: { id: string }) {
+function CornerButtons({ id, onMenuOpenChange }: { id: string; onMenuOpenChange?: (open: boolean) => void }) {
   return (
     <span className="ml-1 flex shrink-0 items-center gap-0.5">
-      <DropdownMenu modal={false}>
+      <DropdownMenu modal={false} onOpenChange={onMenuOpenChange}>
         <Tip label="Snooze">
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-xs" className={CORNER} aria-label="Snooze" data-testid="notification-snooze">
@@ -112,14 +112,24 @@ function ThreadLink({ threadId }: { threadId: string }) {
   );
 }
 
+export interface NotificationCardOptions {
+  className?: string;
+  /** Leave out the link to the thread it names: the card it sits in is about that thread. */
+  hideThread?: boolean;
+  /** The snooze menu opened or shut. */
+  onMenuOpenChange?: (open: boolean) => void;
+}
+
 /**
  * One notification (docs/notes/notifications-3-bell.md): the level's icon and the source in the
  * level's tone, its age, the host's Snooze and Dismiss; the title, the body, the thread it names
  * as a link; then the plugin's buttons (up to three, the first the primary), each running
  * notification.act with its number. A time-sensitive one is tinted. The bell's list draws it, and
- * a thread row's hover card (PR 4) can too.
+ * so does a thread row's hover card, there with `hideThread` (the card is that thread's already;
+ * docs/notes/notifications-4-row-mark.md). `onMenuOpenChange` hears the snooze menu open and
+ * shut: the row's card stays open while its menu is up.
  */
-export function NotificationCard({ notification: n, className }: { notification: NotificationView; className?: string }) {
+export function NotificationCard({ notification: n, className, hideThread = false, onMenuOpenChange }: { notification: NotificationView } & NotificationCardOptions) {
   const plugin = usePlugin(n.source);
   const level = LEVEL[n.level];
   const Icon = level.icon;
@@ -137,7 +147,7 @@ export function NotificationCard({ notification: n, className }: { notification:
           {sourceLabel(n.source, plugin?.displayName)}
         </span>
         <Age at={n.arrivedAtMs} />
-        <CornerButtons id={n.id} />
+        <CornerButtons id={n.id} onMenuOpenChange={onMenuOpenChange} />
       </div>
       <div className="mt-0.5 text-body font-medium [overflow-wrap:anywhere]" data-testid="notification-title">
         {n.title}
@@ -147,7 +157,7 @@ export function NotificationCard({ notification: n, className }: { notification:
           {n.body}
         </div>
       )}
-      {n.threadId && <ThreadLink threadId={n.threadId} />}
+      {n.threadId && !hideThread && <ThreadLink threadId={n.threadId} />}
       {n.actions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5" data-testid="notification-actions">
           {n.actions.map((a, i) => (
@@ -171,7 +181,7 @@ export function NotificationCard({ notification: n, className }: { notification:
 }
 
 /** The card for a notification by id, from the store; nothing once it left. */
-export function NotificationItem({ id, className }: { id: string; className?: string }) {
+export function NotificationItem({ id, ...options }: { id: string } & NotificationCardOptions) {
   const n = useNotification(id);
-  return n ? <NotificationCard notification={n} className={className} /> : null;
+  return n ? <NotificationCard notification={n} {...options} /> : null;
 }

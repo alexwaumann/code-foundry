@@ -2,10 +2,8 @@ import { useMemo, useState, type ReactElement } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   Check,
-  CircleAlert,
   Layers,
   LoaderCircle,
-  OctagonX,
   Play,
   Plug,
   Plus,
@@ -195,59 +193,27 @@ function RunInItem({
   );
 }
 
-/** What the project row's hover card says: the thread's plugin flags and a changed plugin environment. */
+/** What the project row's hover card says: a changed plugin environment (what changed), else null. */
 function useProjectNotes(threadId: string) {
-  const flags = useThreadsStore(
-    useShallow((s) =>
-      (s.byId[threadId]?.flags ?? []).map(
-        (f) => `${f.level}\u0000${f.pluginName}\u0000${f.reason}`,
-      ),
-    ),
-  );
   const envChange = useThreadsStore((s) => {
     const t = s.byId[threadId];
     return t?.pluginEnvStale ? (t.pluginEnvChange ?? "") : null;
   });
-  return {
-    flags: flags.map((f) => f.split("\u0000") as [string, string, string]),
-    envChange,
-  };
+  return { envChange };
 }
 
 /**
- * The project row's notes (once the thread header's flag chip and environment note): each
- * plugin flag, red for an error and amber for attention, then "Plugin environment changed"
- * with what changed. Restart Claude is the title menu's (components/thread/ThreadMenuItems).
+ * The project row's notes (once the thread header's environment note): "Plugin environment
+ * changed" with what changed. Restart Claude is the title menu's
+ * (components/thread/ThreadMenuItems). Plugins' flags no longer show here: a flag arrives as a
+ * notification naming the thread, on its sidebar row (docs/notes/notifications-4-row-mark.md).
  */
-function ProjectNotes({
-  flags,
-  envChange,
-}: ReturnType<typeof useProjectNotes>) {
+function ProjectNotes({ envChange }: ReturnType<typeof useProjectNotes>) {
   return (
     <span
       className={cn(HOVER_CARD, "flex flex-col gap-1.5")}
       data-testid="ti-project-notes"
     >
-      {flags.map(([level, plugin, reason]) => (
-        <span
-          key={plugin}
-          className={cn(
-            "flex items-start gap-1.5",
-            level === "error" ? "text-cf-error-text" : "text-cf-warning-text",
-          )}
-          data-testid="ti-project-flag"
-          data-level={level}
-        >
-          {level === "error" ? (
-            <OctagonX className="mt-0.5 size-3 shrink-0" aria-hidden />
-          ) : (
-            <CircleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
-          )}
-          <span>
-            <span className="font-medium">{plugin}</span>: {reason}
-          </span>
-        </span>
-      ))}
       {envChange !== null && (
         <span
           className="flex items-start gap-1.5"
@@ -265,22 +231,8 @@ function ProjectNotes({
   );
 }
 
-/** The mark before the project row's value while it has notes: the worst flag's icon, else the plug. */
-function NotesMark({ flags, envChange }: ReturnType<typeof useProjectNotes>) {
-  const error = flags.some(([level]) => level === "error");
-  if (flags.length > 0) {
-    const Icon = error ? OctagonX : CircleAlert;
-    return (
-      <Icon
-        className={cn(
-          "size-3 shrink-0",
-          error ? "text-cf-error-text" : "text-cf-warning-text",
-        )}
-        aria-hidden
-        data-testid="ti-project-mark"
-      />
-    );
-  }
+/** The mark before the project row's value while it has notes: the plug. */
+function NotesMark({ envChange }: ReturnType<typeof useProjectNotes>) {
   return envChange !== null ? (
     <Plug
       className="size-3 shrink-0"
@@ -299,8 +251,7 @@ function NotesMark({ flags, envChange }: ReturnType<typeof useProjectNotes>) {
  * workspace already has exactly this set, "Use workspace <name>" (thread.workspace), then
  * Run in with every member (a × takes one out: thread.project.remove). Adding or removing a
  * member takes the thread out of its workspace (the daemon's rule): the crumb then reads
- * "<cwd> +N". The thread's plugin flags and a changed plugin environment mark the row, and
- * show on hover.
+ * "<cwd> +N". A changed plugin environment marks the row, and shows on hover.
  */
 function ProjectRow({ threadId }: { threadId: string }) {
   const { cwdProjectId, members, paths } = useMembers(threadId);
@@ -342,7 +293,7 @@ function ProjectRow({ threadId }: { threadId: string }) {
     open && members.length > 1,
   );
   if (!cwdProjectId) return null;
-  const noted = notes.flags.length > 0 || notes.envChange !== null;
+  const noted = notes.envChange !== null;
   // The hover card wraps the row (outside a menu trigger, as Tip asks).
   const withNotes = (row: ReactElement) =>
     noted ? (
@@ -475,7 +426,7 @@ function ProjectFactRow({ threadId }: { threadId: string }) {
   const git = useProjectsStore((s) => s.byId[cwdProjectId]?.git ?? false);
   const notes = useProjectNotes(threadId);
   if (!cwdProjectId) return null;
-  const noted = notes.flags.length > 0 || notes.envChange !== null;
+  const noted = notes.envChange !== null;
   const more = moreProjects(members.length, named);
   const row = (
     <Row

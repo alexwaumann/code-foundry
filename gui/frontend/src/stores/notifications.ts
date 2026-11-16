@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { NotificationEventView, NotificationSnapshotView, NotificationView } from "@/api/notifications";
-import { bellCount, shownNotifications, timeSensitiveArrivals } from "@/lib/notifications";
+import { bellCount, shownNotifications, threadMark, threadNotifications, timeSensitiveArrivals, type ThreadMark } from "@/lib/notifications";
 
 interface NotificationsState {
   /** The last snapshot; null until the source sends one. */
@@ -46,6 +46,20 @@ export function useNotification(id: string): NotificationView | undefined {
 /** The bell's count and whether it takes the attention tone. */
 export function useBellCount(): { count: number; urgent: boolean } {
   return useNotificationsStore(useShallow((s) => bellCount(s.snapshot)));
+}
+
+/**
+ * A thread's mark on its sidebar row (lib/notifications threadMark). A thread no notification
+ * names reads the one shared NO_MARK, so a change to other threads' notifications never
+ * re-renders its row.
+ */
+export function useThreadMark(threadId: string): ThreadMark {
+  return useNotificationsStore(useShallow((s) => threadMark(s.snapshot, threadId)));
+}
+
+/** The ids of a thread's shown notifications, in the daemon's order (its row's hover card). */
+export function useThreadNotificationIds(threadId: string): readonly string[] {
+  return useNotificationsStore(useShallow((s) => threadNotifications(s.snapshot, threadId).map((n) => n.id)));
 }
 
 /** A notification shown now, read outside React (a toast's button). */

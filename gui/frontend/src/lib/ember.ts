@@ -84,14 +84,12 @@ export function workerWords(th: Pick<WorkerLike, "state" | "status" | "statusRea
     case "question":
     case "plan":
     case "snoozeEnded":
-    case "flagAttention":
       return { text: "Needs input", tone: "amber" };
     case "finished":
       return { text: "Finished", tone: "emerald" };
     case "error":
     case "interrupted":
     case "crashed":
-    case "flagError":
       return { text: "Error", tone: "red" };
     case "transcriptDeleted":
       return { text: "Transcript deleted", tone: "red" };

@@ -16,6 +16,7 @@ import { discardDraft } from "@/shell/drafts";
 import { runCommandForResult } from "@/stores/commands";
 import { spaceOfThread, useLayoutStore } from "@/stores/layout";
 import { useLiveCount } from "@/stores/lineage";
+import { useThreadMark } from "@/stores/notifications";
 import { useProjectsStore } from "@/stores/projects";
 import { NEEDS_SCOPE_KEY, useNeedsScope } from "@/stores/shellList";
 import { toggleActiveCollapsed, toggleNeedsCollapsed } from "@/stores/shellSidebar";
@@ -103,12 +104,13 @@ function Title({ id, quiet = false }: { id: string; quiet?: boolean }) {
   );
 }
 
-/** Whether the thread has something for line 3's right: live agents, background shells, or a pull request tag. */
+/** Whether the thread has something for line 3's right: live agents, background shells, notifications naming it, or a pull request tag. */
 function useHasCounts(id: string): boolean {
   const agents = useLiveCount(id);
   const shells = useThreadsStore((s) => s.byId[id]?.backgroundShellsRunning ?? 0);
+  const notifications = useThreadMark(id).count;
   const tag = linkedPrTag(useLinkedPrFacts(useLinkKeys(id)));
-  return agents > 0 || shells > 0 || tag !== null;
+  return agents > 0 || shells > 0 || notifications > 0 || tag !== null;
 }
 
 /**
@@ -156,8 +158,8 @@ function ThreadLines({ id, cursor }: { id: string; cursor: boolean }) {
 }
 
 /**
- * What a Needs you thread asks: the status's icon and word in its tone ("Permission", "Question",
- * a plugin's name); "N items", muted, when it has several open requests (its lines say which).
+ * What a Needs you thread asks: the status's icon and word in its tone ("Permission", "Question");
+ * "N items", muted, when it has several open requests (its lines say which).
  */
 function AskKind({ id }: { id: string }) {
   const line = useThreadsStore(useShallow((s) => statusLine(s.byId[id])));
@@ -226,7 +228,7 @@ function RequestLineView({ id, anchor, line }: { id: string; anchor: string; lin
 
 /**
  * A Needs you row's open requests, one line each, oldest first, behind a thin rule; nothing for
- * a thread with one (or none: a woken snooze, a plugin's flag). Past MAX_REQUEST_LINES the last
+ * a thread with one (or none: a woken snooze). Past MAX_REQUEST_LINES the last
  * line is "+N more", which opens the popup on the first request not listed.
  */
 function RequestLines({ id, anchor }: { id: string; anchor: string }) {

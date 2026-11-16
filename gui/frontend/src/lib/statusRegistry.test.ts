@@ -6,32 +6,26 @@ import {
   CircleDashed,
   CircleQuestionMark,
   ClipboardCheck,
-  Flag,
   ShieldQuestionMark,
   TriangleAlert,
   Unplug,
   type LucideIcon,
 } from "lucide-react";
-import type { ThreadFlagView, ThreadStateView, ThreadStatusView } from "@/api/threads";
+import type { ThreadStateView, ThreadStatusView } from "@/api/threads";
 import { statusLine, type StatusLineKind } from "./statusLine";
 import { formatDuration } from "./duration";
 import { rowToneClasses, statusBadge, statusDetail, statusRegistry, statusTimeAt, statusTimeUnits, type RowTone, type TimeMode } from "./statusRegistry";
-
-function flag(level: ThreadFlagView["level"], reason: string, pluginName = "Lint"): ThreadFlagView {
-  return { plugin: "lint", pluginName, level, reason, setAtMs: null, untilSeen: false };
-}
 
 interface Fixture {
   state: ThreadStateView;
   status: ThreadStatusView;
   statusReason: string;
-  flags?: ThreadFlagView[];
   transcriptMissing?: true;
   busyTool?: string;
 }
 
 function thread(f: Fixture) {
-  return { statusChangedAtMs: 1_000, lastActivityAtMs: 2_000, flags: [], ...f };
+  return { statusChangedAtMs: 1_000, lastActivityAtMs: 2_000, ...f };
 }
 
 describe("statusRegistry", () => {
@@ -39,8 +33,6 @@ describe("statusRegistry", () => {
     ["input", ShieldQuestionMark, "Permission", "warning", "none"],
     ["question", CircleQuestionMark, "Question", "warning", "none"],
     ["plan", ClipboardCheck, "Plan", "warning", "none"],
-    ["flagAttention", Flag, "", "warning", "none"],
-    ["flagError", Flag, "", "error", "none"],
     ["snoozeEnded", BellRing, "Woke", "warning", "none"],
     ["error", CircleAlert, "Error", "error", "none"],
     ["interrupted", Unplug, "Interrupted", "error", "none"],
@@ -73,8 +65,6 @@ describe("statusBadge / statusDetail / statusTimeAt", () => {
     ["question", { state: "connected", status: "attention", statusReason: "question: Which colour?" }, "question", "Question", "Which colour?", null],
     ["question without a screen", { state: "connected", status: "attention", statusReason: "waiting for input" }, "question", "Question", "", null],
     ["plan", { state: "connected", status: "attention", statusReason: "plan: Claude has written up a plan" }, "plan", "Plan", "ready for review", null],
-    ["attention flag", { state: "connected", status: "idle", statusReason: "", flags: [flag("attention", "3 warnings")] }, "flagAttention", "Lint", "3 warnings", null],
-    ["error flag", { state: "connected", status: "idle", statusReason: "", flags: [flag("error", "tests red", "Test Watcher")] }, "flagError", "Test Watcher", "tests red", null],
     ["snooze ended", { state: "disconnected", status: "attention", statusReason: "snooze ended" }, "snoozeEnded", "Woke", "snooze ended", null],
     ["Claude error", { state: "connected", status: "attention", statusReason: "error: model_not_found" }, "error", "Error", "model_not_found", null],
     ["error status", { state: "disconnected", status: "error", statusReason: "daemon restarted" }, "error", "Error", "daemon restarted", null],

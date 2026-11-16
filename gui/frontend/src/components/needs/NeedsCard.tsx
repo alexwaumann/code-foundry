@@ -182,7 +182,7 @@ export function NeedsCardBody({ threadId, anchor, read = true, requestId = null 
         </>
       );
   } else {
-    // An ask with no request (a woken snooze, a plugin's flag): its status, then the thread.
+    // An ask with no request (a woken snooze): its status, then the thread.
     const badge = statusBadge(line);
     const Icon = badge.icon ?? ShieldAlert;
     head = (

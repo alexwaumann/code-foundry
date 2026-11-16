@@ -47,7 +47,6 @@ function seedMulti(projects: string[], primary: string, workspaceId = ""): void 
       projectIds: ids,
       checkoutPaths: ids.map((p) => ({ projectId: p, path: worktreeOf(SLUGS[p] ?? p, "feat/x") })),
       workspaceId,
-      flags: [],
       createdBy: "",
       createdByName: "",
     }),

@@ -125,7 +125,6 @@ const base = {
   labels: [],
   report: null,
   budgetUsd: 0,
-  flags: [],
 } satisfies Partial<ThreadView>;
 
 /** The world reset: projectsWorld's, no card reads, no panels, no logs. */
@@ -176,11 +175,10 @@ export function seedSingle(): string {
     backgroundShellsRunning: 1,
     backgroundAgentsRunning: 1,
     agentRuns: [],
-    flags: [],
     createdBy: "",
   });
   const kid = (id: string, name: string, st: ThreadView["status"], reason: string, min: number) =>
-    thread(id, { ...base, name, model: "claude-sonnet-5[1m]", effort: "medium", status: st, statusReason: reason, createdAtMs: ago(min), statusChangedAtMs: ago(min - 22), createdBy: s.id, createdByName: s.name, branch: `cf/${id}`, flags: [] });
+    thread(id, { ...base, name, model: "claude-sonnet-5[1m]", effort: "medium", status: st, statusReason: reason, createdAtMs: ago(min), statusChangedAtMs: ago(min - 22), createdBy: s.id, createdByName: s.name, branch: `cf/${id}` });
   addThreads(s, kid("s-ti-k1", "Mobile token storage", "busy", "working: Mobile token storage", 14), kid("s-ti-k2", "Billing webhook retry", "attention", "question: Retry on 409?", 62), kid("s-ti-k3", "Docs for refresh tokens", "idle", "finished", 40));
   card.prDetails.set(`${SLUG}#78`, pullRequest({ repoSlug: SLUG, number: 78, title: "Include the head SHA in the fingerprint", headRef: "cf/sidebar-tree", checks: { state: "success", total: 4, passed: 4, failed: 0, pending: 0, skipped: 0 }, reviewRequests: [{ login: "teammate-kim" }] as never }));
   card.prDetails.set(`${SLUG}#63`, pullRequest({ repoSlug: SLUG, number: 63, title: "Sidebar tree rows", headRef: "cf/sidebar-tree-1", state: "merged" }));
@@ -205,14 +203,14 @@ export function seedSingle(): string {
 /** child: single, then s-ti-child "Port the rotation to web" made by s-ti-1, working. */
 export function seedChild(): string {
   seedSingle();
-  addThreads(thread("s-ti-child", { ...base, name: "Port the rotation to web", status: "busy", statusReason: "working: Port the rotation to web", createdBy: "s-ti-1", createdByName: "Fix the stale PR badge", flags: [] }));
+  addThreads(thread("s-ti-child", { ...base, name: "Port the rotation to web", status: "busy", statusReason: "working: Port the rotation to web", createdBy: "s-ti-1", createdByName: "Fix the stale PR badge" }));
   selectThread("s-ti-child");
   return "s-ti-child";
 }
 
 /** nogit: s-ti-nogit "Outline the essay" in writing (no git). */
 export function seedNoGit(): string {
-  addThreads(thread("s-ti-nogit", { ...base, projectId: "repo-wr", worktreePath: WR, name: "Outline the essay", flags: [] }));
+  addThreads(thread("s-ti-nogit", { ...base, projectId: "repo-wr", worktreePath: WR, name: "Outline the essay" }));
   selectThread("s-ti-nogit");
   return "s-ti-nogit";
 }
@@ -223,7 +221,6 @@ export function seedServers(): string {
     thread("s-ti-srv", {
       ...base,
       name: "Serve the docs preview",
-      flags: [],
       backgroundShells: [
         shell("bk4v8n2p7", "pnpm --dir web dev", { description: "web dev server", ports: [5173, 24678] }),
         shell("bd9r3t6w1", "python3 -m http.server 9399 --directory docs/_build", { description: "docs preview", ports: [9399] }),
@@ -253,7 +250,6 @@ export function seedChildServer(): { parent: string; child: string; devRun: stri
       name: "Serve the web preview",
       createdBy: "s-ti-1",
       createdByName: "Fix the stale PR badge",
-      flags: [],
       backgroundShells: [
         shell("bk4v8n2p7", "pnpm --dir web dev", { description: "web dev server", ports: [5173, 24678] }),
         shell("bd9r3t6w1", "python3 -m http.server 9399", { description: "docs preview", ports: [9399] }),
@@ -326,7 +322,6 @@ export function seedWs9(): string {
       contextWindow: 1_000_000,
       usage: sampleUsage(),
       linkedPullRequests: links.map(([slug, number]) => ({ slug, number, url: `https://github.com/${slug}/pull/${String(number)}`, linkedAt: ago(20) })),
-      flags: [],
     }),
   );
   const detail = (n: string, files: { path: string; added: number; deleted: number }[]) => daemon.worktreeDetail.set(`repo-${n}\u0000${wsPath(n)}`, { files } as never);

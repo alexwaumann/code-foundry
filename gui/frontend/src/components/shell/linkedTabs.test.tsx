@@ -45,7 +45,6 @@ const thread = (o: Partial<ThreadView>) =>
     createdBy: "",
     createdByName: "",
     parentId: "",
-    flags: [],
     linkedPullRequests: [],
     status: "idle",
     state: "connected",

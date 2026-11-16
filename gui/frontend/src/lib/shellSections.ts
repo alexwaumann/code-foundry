@@ -8,7 +8,7 @@
  *   only the current one (the `sidebar.needs_scope` setting), most recent ask first. A thread
  *   listed there is not also listed under Active, whatever its pin. A thread that calls without
  *   blocking (ListThread.nudge: woken from a snooze, a notification or bell, an API error at the
- *   prompt, another attention reason, a plugin's flag) is never under Needs you and counts in
+ *   prompt, another attention reason) is never under Needs you and counts in
  *   none of its numbers (docs/notes/shell-25c-keys-drafts.md).
  * - **Active** lists the current space's live threads in today's order: pinned, then failed and
  *   interrupted ones, then finished turns, then idle ones. The space's composer drafts come right

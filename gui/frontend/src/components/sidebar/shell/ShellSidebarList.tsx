@@ -11,7 +11,7 @@ import { decodeThreadListKeys, useThreadListKeys } from "@/stores/context";
 import { useShownEmberThreadId } from "@/stores/ember";
 import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
 import { useEventsStore } from "@/stores/events";
-import { selectThreadAndFlag } from "@/stores/flagSurface";
+import { openThread } from "@/stores/openThread";
 import { useCurrentSpaceId, useLayoutStore } from "@/stores/layout";
 import { needsKeyLeave, needsKeyMove, openNeedsPopup } from "@/stores/needs";
 import { useCurrentDrafts, useNeedsScope, useThreadSpaces } from "@/stores/shellList";
@@ -275,7 +275,7 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
       return;
     }
     // An Archived or Snoozed row opens the thread as the space's preview tab (shell-model.md, "Preview tabs").
-    selectThreadAndFlag(row.threadId, { preview: row.section === "archived" || row.section === "snoozed" });
+    openThread(row.threadId, { preview: row.section === "archived" || row.section === "snoozed" });
   }, []);
 
   const panels: Readonly<Record<Panel, { rows: readonly ShellRow[]; scrollTo: RefObject<ScrollTo | null> }>> = {

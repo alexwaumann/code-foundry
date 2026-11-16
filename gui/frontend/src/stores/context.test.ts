@@ -121,7 +121,6 @@ describe("the sidebar list's keys", () => {
         ["an API error at the prompt", { status: "attention", statusReason: "error: overloaded_error" }],
         ["another attention reason", { status: "attention", statusReason: "blocked: waiting on a lock" }],
         ["an unknown attention reason", { status: "attention", statusReason: "something new" }],
-        ["a plugin's attention flag", { flags: [{ plugin: "p", pluginName: "P", level: "attention", reason: "Look" }] } as unknown as Partial<ThreadView>],
       ] as const
     ).map(([name, o]): [string, Partial<ThreadView>, Want] => [`${name}: a nudge`, o, { pinned: false, group: "prompt", archivedAtMs: null, snoozedUntilMs: null, ...BY_STATUS, nudge: true }]),
     ...(

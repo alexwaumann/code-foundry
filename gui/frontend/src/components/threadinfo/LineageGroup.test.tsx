@@ -12,7 +12,7 @@ import { LineageGroup } from "./LineageGroup";
  */
 
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
-  ({ id, name: id, state: "connected", status: "idle", statusReason: "", createdBy: "", archivedAtMs: null, snoozedUntilMs: null, flags: [], backgroundAgentsRunning: 0, createdAtMs: null, ...o }) as unknown as ThreadView;
+  ({ id, name: id, state: "connected", status: "idle", statusReason: "", createdBy: "", archivedAtMs: null, snoozedUntilMs: null, backgroundAgentsRunning: 0, createdAtMs: null, ...o }) as unknown as ThreadView;
 
 function put(threads: ThreadView[]): void {
   useThreadsStore.setState({ byId: Object.fromEntries(threads.map((t) => [t.id, t])), order: threads.map((t) => t.id) });

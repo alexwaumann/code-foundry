@@ -52,7 +52,6 @@ const home = (o: Partial<ThreadView> = {}) =>
     createdBy: "",
     createdByName: "",
     parentId: "",
-    flags: [],
     naming: false,
     nameProvisional: false,
     ...o,

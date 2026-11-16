@@ -20,7 +20,7 @@ import { useWorkspacesStore } from "@/stores/workspaces";
 import { SidebarRow } from "./SidebarRow";
 
 const thread = (o: Partial<ThreadView>) =>
-  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", projectIds: ["cf"], branch: "", createdWorktree: false, pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, lastActivityAtMs: null, flags: [], agentsRunning: 0, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
+  ({ id: "s-1", name: "t", projectId: "cf", worktreePath: "/src/cf", workspaceId: "", projectIds: ["cf"], branch: "", createdWorktree: false, pendingWorktreePath: "", state: "connected", status: "idle", statusReason: "", statusChangedAtMs: null, lastActivityAtMs: null, agentsRunning: 0, backgroundAgentsRunning: 0, backgroundShellsRunning: 0, linkedPullRequests: [], pinned: false, ...o }) as ThreadView;
 
 beforeEach(() => {
   useProjectsStore.setState({
@@ -46,7 +46,6 @@ function renderRow(o: Partial<ThreadView>): HTMLElement {
 
 const NOW = Date.now();
 const MIN = 60_000;
-const flag = (level: "attention" | "error", reason: string, pluginName = "Lint") => ({ plugin: pluginName.toLowerCase(), pluginName, level, reason, setAtMs: null, untilSeen: false });
 const line1 = () => screen.getByTestId("row-line-1");
 const line2 = () => screen.getByTestId("row-line-2");
 const line3 = () => screen.getByTestId("row-line-3");
@@ -81,8 +80,6 @@ describe("SidebarRow title first", () => {
     ["permission", { status: "attention", statusReason: "permission: Bash zig build test" }, "input", "lucide-shield-question-mark", "Permission", "text-cf-warning-text"],
     ["question", { status: "attention", statusReason: "question: Which one?" }, "question", "lucide-circle-question-mark", "Question", "text-cf-warning-text"],
     ["plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }, "plan", "lucide-clipboard-check", "Plan", "text-cf-warning-text"],
-    ["attention flag: the plugin's name", { flags: [flag("attention", "3 warnings")] }, "flagAttention", "lucide-flag", "Lint", "text-cf-warning-text"],
-    ["error flag", { flags: [flag("error", "tests red", "Test Watcher")] }, "flagError", "lucide-flag", "Test Watcher", "text-cf-error-text"],
     ["snooze ended", { state: "disconnected", status: "attention", statusReason: "snooze ended", statusChangedAtMs: NOW - 2 * MIN }, "snoozeEnded", "lucide-bell-ring", "Woke", "text-cf-warning-text"],
     ["error", { status: "attention", statusReason: "error: model_not_found" }, "error", "lucide-circle-alert", "Error", "text-cf-error-text"],
     ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted", statusChangedAtMs: NOW - MIN }, "interrupted", "lucide-unplug", "Interrupted", "text-cf-error-text"],
@@ -101,26 +98,6 @@ describe("SidebarRow title first", () => {
     expect(screen.getByTestId("row-status-icon").getAttribute("class")).toContain("size-3.5");
     expect(screen.getByTestId("row-status-word").textContent).toBe(word);
     expect(screen.getByTestId("row-status-word").className).toContain("sr-only");
-  });
-
-  it("a plugin's flag arriving over the stream: its flag in amber, the plugin's name for screen readers; an error turns it red; cleared, the status goes; the branch stays", () => {
-    renderRow({});
-    expect(screen.queryByTestId("row-status")).toBeNull();
-    const set = (flags: ThreadView["flags"]) => {
-      act(() => {
-        useThreadsStore.setState((s) => ({ byId: { "s-1": { ...(s.byId["s-1"] as ThreadView), flags } } }));
-      });
-    };
-    set([flag("attention", "deploy needs approval", "GitHub Actions")]);
-    expect(screen.getByTestId("row-status-word").textContent).toBe("GitHub Actions");
-    expect(screen.getByTestId("row-status").className).toContain("text-cf-warning-text");
-    expect(screen.getByTestId("row-branch").textContent).toBe("main");
-    set([flag("error", "tests failed", "Test Watcher")]);
-    expect(screen.getByTestId("row-status-word").textContent).toBe("Test Watcher");
-    expect(screen.getByTestId("row-status").className).toContain("text-cf-error-text");
-    expect(screen.getByTestId("row-branch").textContent).toBe("main");
-    set([]);
-    expect(screen.queryByTestId("row-status")).toBeNull();
   });
 
   it("idle: no icon or word, the time since the last activity, muted", () => {
@@ -251,7 +228,6 @@ describe("SidebarRow line 3: the branch", () => {
     ["a question", { status: "attention", statusReason: "question: Which one?" }],
     ["a permission", { status: "attention", statusReason: "permission: Bash zig build" }],
     ["a plan", { status: "attention", statusReason: "plan: Claude has written up a plan" }],
-    ["a flag", { flags: [flag("attention", "3 warnings in main.go")] }],
     ["interrupted", { state: "disconnected", status: "error", statusReason: "interrupted" }],
     ["waiting on child threads", { status: "idle", statusReason: "waiting on 2 child threads" }],
     ["waiting on a wake", { status: "idle", statusReason: "waiting" }],
@@ -1135,11 +1111,6 @@ describe("SidebarRow card status time", () => {
     const card = openCard({ status: "attention", statusReason: "finished", statusChangedAtMs: Date.now() - 6 * MIN - 5_000, snoozedUntilMs: Date.now() + 150 * MIN });
     expect(within(card).getByTestId("tip-status").textContent).toBe("Finished 6m ago");
     expect(card.textContent).not.toMatch(/Snoozed until/);
-  });
-
-  it("a flag: its reason, no time", () => {
-    const card = openCard({ flags: [flag("attention", "3 warnings")], statusChangedAtMs: Date.now() - 6 * MIN });
-    expect(within(card).getByTestId("tip-status").textContent).toBe("Lint: 3 warnings");
   });
 
   it("working and idle: no status row; model stays", () => {

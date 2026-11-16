@@ -749,7 +749,8 @@ with the reason, so the layout glue can record what each ran while they still ex
   seen hook (`SetSeenHook`: a viewer opening while attended, or presence rising with the
   thread open, the acknowledge points of a finished turn), `Seen`, and the rows
   `thread_flags` held before, which the daemon converts once at start and drops
-  (`docs/notes/plugin-flag-retirement.md`).
+  (`docs/notes/plugin-flag-retirement.md`). The GUI shows a flag as the thread's
+  notification mark (`docs/notes/notifications-4-row-mark.md`).
   `ThreadService.RunIn` moves a thread to another of its checkouts (that member becomes
   the primary) with the control protocol's `set_cwd` once it is idle (`docs/notes/workspaces-2-launch.md`, superseded
   on the typing detail by `docs/notes/rendered-only.md`).
@@ -1160,7 +1161,8 @@ verb in `settings.toml` is reported and dropped, never fatal.
   Working, Snoozed and Archived (Archived lists every space's), scrolling on its own, with a
   status row at its foot. A thread row is three lines: the project and the status (the snooze
   and archive controls on hover), the title up to two lines, the branch with its pull request
-  tag and counts. A click opens the thread's tab in the focused pane, or focuses it; a row
+  tag and counts, a bell and count among them for the shown notifications naming the thread, which
+  the row's hover card lists with their buttons (`docs/notes/notifications-4-row-mark.md`). A click opens the thread's tab in the focused pane, or focuses it; a row
   drags into the grid or onto a space tab; its menu has Open ▸ (the thread's surfaces) and
   Move to space ▸. A Needs-you row's hover card shows the whole ask (a permission's Allow and
   Deny once the request is known whole), its title opens a popup with the thread's

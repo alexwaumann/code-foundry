@@ -6,8 +6,8 @@ import { tooltipText } from "@/test/tooltip";
 
 const runCommandForResult = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<{ message: string; resultJson: string } | null>>(() => Promise.resolve({ message: "", resultJson: "{}" })));
 vi.mock("@/stores/commands", async (orig) => ({ ...(await orig<typeof import("@/stores/commands")>()), runCommandForResult }));
-const selectThreadAndFlag = vi.hoisted(() => vi.fn());
-vi.mock("@/stores/flagSurface", async (orig) => ({ ...(await orig<typeof import("@/stores/flagSurface")>()), selectThreadAndFlag }));
+const openThread = vi.hoisted(() => vi.fn());
+vi.mock("@/stores/openThread", () => ({ openThread }));
 const notify = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/notify", () => ({ notify, dismissNotice: vi.fn(), notifyProgress: vi.fn() }));
 
@@ -190,7 +190,7 @@ describe("a card", () => {
     const link = within(cardOf("n-1")).getByTestId("notification-thread");
     expect(link.textContent).toBe("Investigate flaky e2e");
     fireEvent.click(link);
-    expect(selectThreadAndFlag).toHaveBeenCalledWith("s-4", { preview: false });
+    expect(openThread).toHaveBeenCalledWith("s-4", { preview: false });
     expect(useNotificationsStore.getState().open).toBe(false);
   });
 
@@ -199,6 +199,6 @@ describe("a card", () => {
     render(<NotificationBell />);
     await openBell();
     fireEvent.click(within(cardOf("n-2")).getByTestId("notification-thread"));
-    expect(selectThreadAndFlag).toHaveBeenCalledWith("s-7", { preview: true });
+    expect(openThread).toHaveBeenCalledWith("s-7", { preview: true });
   });
 });

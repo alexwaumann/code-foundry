@@ -138,9 +138,4 @@ describe("a thread's setup", () => {
     expect(tipStatusTone("setupFailed")).toBe("red");
   });
 
-  it("wins over a plugin's flag when it failed, as Claude's own errors do", () => {
-    const flag = { plugin: "lint", pluginName: "Lint", level: "error", reason: "x", setAtMs: null, untilSeen: false } as const;
-    expect(statusLine({ ...row, state: "disconnected", status: "error", statusReason: "setup failed", flags: [flag], setup: setup("failed", [failedStep]) }).kind).toBe("setupFailed");
-    expect(statusLine({ ...row, flags: [flag], setup: setup("running", [fetching]) }).kind).toBe("flagError");
-  });
 });

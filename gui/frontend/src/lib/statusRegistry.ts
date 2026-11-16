@@ -16,7 +16,6 @@ import {
   CircleDashed,
   CircleQuestionMark,
   ClipboardCheck,
-  Flag,
   ShieldQuestionMark,
   TriangleAlert,
   Unplug,
@@ -50,7 +49,7 @@ export type TimeMode = "none" | "status" | "activity";
 export interface StatusEntry {
   /** The glyph before the word; null for place (idle shows only its time). */
   icon: LucideIcon | null;
-  /** The word; "" for place, and for the flag kinds, whose word is the plugin's name (statusBadge). */
+  /** The word; "" for place. */
   word: string;
   tone: RowTone;
   timeMode: TimeMode;
@@ -61,8 +60,6 @@ export const statusRegistry: Readonly<Record<StatusLineKind, StatusEntry>> = {
   input: { icon: ShieldQuestionMark, word: "Permission", tone: "warning", timeMode: "none" },
   question: { icon: CircleQuestionMark, word: "Question", tone: "warning", timeMode: "none" },
   plan: { icon: ClipboardCheck, word: "Plan", tone: "warning", timeMode: "none" },
-  flagAttention: { icon: Flag, word: "", tone: "warning", timeMode: "none" },
-  flagError: { icon: Flag, word: "", tone: "error", timeMode: "none" },
   snoozeEnded: { icon: BellRing, word: "Woke", tone: "warning", timeMode: "none" },
   error: { icon: CircleAlert, word: "Error", tone: "error", timeMode: "none" },
   interrupted: { icon: Unplug, word: "Interrupted", tone: "error", timeMode: "none" },
@@ -77,15 +74,14 @@ export const statusRegistry: Readonly<Record<StatusLineKind, StatusEntry>> = {
   place: { icon: null, word: "", tone: "muted", timeMode: "activity" },
 };
 
-/** A line's entry resolved for rendering: the flag kinds get the plugin's name as their word, and the tone's class. */
+/** A line's entry resolved for rendering, with the tone's class. */
 export interface StatusBadge extends StatusEntry {
   toneClass: string;
 }
 
 export function statusBadge(line: StatusLine): StatusBadge {
   const entry = statusRegistry[line.kind];
-  const word = line.kind === "flagAttention" || line.kind === "flagError" ? (line.flag?.pluginName ?? "") : entry.word;
-  return { ...entry, word, toneClass: rowToneClasses[entry.tone] };
+  return { ...entry, toneClass: rowToneClasses[entry.tone] };
 }
 
 /**
@@ -98,7 +94,6 @@ export type StatusDetailThread = Pick<ThreadView, "status" | "statusReason"> & {
  * Line 3's detail text for a line, "" when the row shows the branch instead:
  * - input: the tool and its command ("Bash zig build …"), or the dialog text (statusNote)
  * - question: the question text; plan: "ready for review"
- * - flagAttention / flagError: the flag's reason
  * - snoozeEnded: "snooze ended"; error: the error note (statusNote)
  * - interrupted / crashed: "resend to continue"; transcriptDeleted: "transcript deleted"
  * - working: the current tool (busyTool), "compacting" while Claude compacts, else ""
@@ -116,9 +111,6 @@ export function statusDetail(line: StatusLine, thread: StatusDetailThread | unde
       return line.detail || (thread ? statusNote(thread) : "");
     case "plan":
       return "ready for review";
-    case "flagAttention":
-    case "flagError":
-      return line.flag?.reason ?? "";
     case "snoozeEnded":
       return "snooze ended";
     case "interrupted":

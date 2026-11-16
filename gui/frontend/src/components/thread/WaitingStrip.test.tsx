@@ -31,7 +31,7 @@ const shell = (taskId: string, command: string): BackgroundShellView => ({ taskI
 const agent = (id: string, o: Partial<AgentRunView> = {}) => ({ id, description: id, agentType: "general-purpose", background: true, spawnDepth: 1, status: "running", activity: "", ...o }) as AgentRunView;
 
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
-  ({ id, name: id, projectId: "", worktreePath: "/w", state: "connected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null, archivedAtMs: null, busyTool: "", flags: [], backgroundShells: [], ...o }) as unknown as ThreadView;
+  ({ id, name: id, projectId: "", worktreePath: "/w", state: "connected", status: "idle", statusReason: "at prompt", statusChangedAtMs: null, archivedAtMs: null, busyTool: "", backgroundShells: [], ...o }) as unknown as ThreadView;
 
 function setup(o: { wakes?: WakeSubscriptionView[]; shells?: BackgroundShellView[]; agents?: AgentRunView[]; self?: Partial<ThreadView>; others?: ThreadView[]; synced?: boolean; watch?: StreamStatus }) {
   const others = o.others ?? [];

@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { DndContext, PointerSensor, useSensor, useSensors, type DragStartEvent } from "@dnd-kit/core";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { NotificationView } from "@/api/notifications";
 import type { ThreadView } from "@/api/threads";
 import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
 
@@ -36,6 +37,8 @@ const { HOME, useUiStore } = await import("@/stores/ui");
 const { startSelectionBridge } = await import("@/stores/selectionBridge");
 const { resetNeeds, useNeedsStore } = await import("@/stores/needs");
 const { useThreadStore } = await import("@/stores/thread");
+const { applyNotificationEvent, resetNotifications } = await import("@/stores/notifications");
+const { note, noteEvent } = await import("@/test/notificationFakes");
 const { resetShellDrag, useShellDragStore } = await import("@/shell/drag/state");
 // The Needs-you card reads its ask without a Watch: nothing comes back here.
 vi.mock("@/api/threadSearch", async (orig) => ({ ...(await orig<typeof import("@/api/threadSearch")>()), readAskItems: () => new Promise(() => undefined) }));
@@ -66,7 +69,6 @@ const thread = (o: Partial<ThreadView>) =>
     createdBy: "",
     createdByName: "",
     parentId: "",
-    flags: [],
     linkedPullRequests: [],
     status: "idle",
     statusReason: "",
@@ -441,6 +443,69 @@ describe("a Needs you row's lines, one per open request (docs/notes/needs-you-li
 });
 
 // After a drag, dnd-kit swallows the next click for 50 ms (docs/notes/testing-gotchas.md): new describes go above this one.
+describe("a thread's notifications on its row (docs/notes/notifications-4-row-mark.md)", () => {
+  const show = (...notes: NotificationView[]) => {
+    act(() => {
+      applyNotificationEvent(noteEvent(notes));
+    });
+  };
+  const markOf = (key: string) => rowOf(key).querySelector<HTMLElement>('[data-testid="row-notifications"]') ?? null;
+
+  beforeEach(() => {
+    resetNotifications();
+    useUiStore.setState({ workingCollapsed: false, snoozedCollapsed: false, archivedCollapsed: false });
+    setThreads(
+      thread({ id: "s-1" }),
+      thread({ id: "s-2", name: "Fix stale PR badge", status: "attention", statusReason: "permission", statusChangedAtMs: Date.now() }),
+      thread({ id: "s-3", name: "Plan the spring trip", ...NO_PROJECT }),
+      thread({ id: "s-4", name: "Port the renderer", status: "busy", statusReason: "working", statusChangedAtMs: Date.now() }),
+      thread({ id: "s-5", name: "Pinned one", pinned: true }),
+      thread({ id: "s-7", name: "Spike a canvas sidebar", archivedAtMs: Date.now() - 60_000 }),
+      thread({ id: "s-8", name: "Refactor the gh poller", snoozedUntilMs: Date.now() + 3_600_000 }),
+    );
+  });
+  afterEach(() => {
+    resetNotifications();
+  });
+
+  it("the bell and count beside the PR tag on Active, pinned and Working rows; none on Needs you, Snoozed or Archived; no section or status changes", () => {
+    render(<ShellSidebarList bodyHeight={1200} />);
+    const before = rowKeys();
+    const kinds = () => ["s-1", "s-4", "s-5"].map((id) => rowOf(`s:${id}`).querySelector('[data-testid="thread-body"]')?.getAttribute("data-status-line"));
+    const kindsBefore = kinds();
+    show(...["s-1", "s-2", "s-4", "s-5", "s-7", "s-8"].map((id) => note(`n-${id}`, { threadId: id, level: "error" })), note("n-s-1b", { threadId: "s-1" }));
+    expect(markOf("s:s-1")?.textContent).toBe("2");
+    expect(markOf("s:s-1")?.getAttribute("aria-label")).toBe("2 notifications");
+    expect(markOf("s:s-5")?.textContent).toBe("1");
+    expect(rowOf("s:s-4").getAttribute("data-section")).toBe("working");
+    expect(markOf("s:s-4")?.textContent).toBe("1");
+    expect(markOf("s:s-2")).toBeNull();
+    expect(markOf("s:s-7")).toBeNull();
+    expect(markOf("s:s-8")).toBeNull();
+    // On line 3 with the counts, never a status word: the thread stays where it was.
+    expect(markOf("s:s-1")?.closest('[data-testid="row-line-3"]')).not.toBeNull();
+    expect(rowKeys()).toEqual(before);
+    expect(kinds()).toEqual(kindsBefore);
+  });
+
+  it("a thread without a project gets the counts line for its mark alone", () => {
+    render(<ShellSidebarList bodyHeight={1200} />);
+    expect(rowOf("s:s-3").querySelector('[data-testid="row-line-3"]')).toBeNull();
+    show(note("n-1", { threadId: "s-3", level: "warning" }));
+    expect(markOf("s:s-3")?.closest('[data-testid="row-line-3"]')).not.toBeNull();
+    expect(markOf("s:s-3")?.dataset.tone).toBe("warning");
+    expect(markOf("s:s-3")?.className).toContain("text-cf-warning-text");
+  });
+
+  it("goes when the last one is dismissed, snoozed or withdrawn", () => {
+    render(<ShellSidebarList bodyHeight={1200} />);
+    show(note("n-1", { threadId: "s-1" }));
+    expect(markOf("s:s-1")?.dataset.tone).toBe("muted");
+    show(note("n-1", { threadId: "s-1", status: "snoozed" }));
+    expect(markOf("s:s-1")).toBeNull();
+  });
+});
+
 describe("dragging Snoozed and Archived rows", () => {
   const started: DragStartEvent["active"]["data"]["current"][] = [];
   /** dnd-kit's context with ShellDnd's sensor (4px), recording each drag's source. */

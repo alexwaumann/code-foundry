@@ -12,7 +12,6 @@ function thread(id: string, over: Partial<ThreadView> = {}): ThreadView {
     createdBy: "",
     archivedAtMs: null,
     snoozedUntilMs: null,
-    flags: [],
     backgroundAgentsRunning: 0,
     ...over,
   } as unknown as ThreadView;

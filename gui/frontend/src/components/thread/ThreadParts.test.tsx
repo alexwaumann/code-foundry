@@ -13,7 +13,7 @@ vi.mock("@/api/command", async (orig) => ({ ...(await orig<typeof import("@/api/
 const { invocationsOf, resetDaemon } = await import("@/test/daemonFakes");
 
 const thread = (id: string, o: Partial<ThreadView> = {}) =>
-  ({ id, name: `Thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], pendingWorktreePath: "", createdBy: "", createdByName: "", parentId: "", checkoutPaths: [], flags: [], ...o }) as ThreadView;
+  ({ id, name: `Thread ${id}`, projectId: "web", worktreePath: "/src/web", workspaceId: "", projectIds: ["web"], pendingWorktreePath: "", createdBy: "", createdByName: "", parentId: "", checkoutPaths: [], ...o }) as ThreadView;
 const PROJECT = (id: string) => ({ id, name: id, git: true, githubSlug: "", remotes: [], worktrees: [{ path: `/src/${id}`, branch: "main", head: "a", isMain: true }] });
 
 function show(o: Partial<ThreadView>, others: ThreadView[] = []): void {

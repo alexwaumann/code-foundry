@@ -92,14 +92,13 @@ function RunInMenu({ kit, threadId }: { kit: MenuKit; threadId: string }) {
  * rename that commits one): Rename, Regenerate name (not for a resident thread; disabled while
  * a naming call runs), Move to project… (a thread without a project: the move picker), Pin, Snooze ▸ (and Unsnooze while snoozed); New
  * thread on this branch, Save as workspace, Run in ▸, Restart Claude (while a plugin's
- * environment changed since Claude started: thread.restart), Clear flag(s) (while plugins
- * flagged the thread: thread.flag.clear, every plugin's); Archive, then `afterArchive` (the
+ * environment changed since Claude started: thread.restart); Archive, then `afterArchive` (the
  * header's and the tab's Close); Fork (not for a setup that did not finish; disabled once the
  * transcript is gone) and Remove. An item a thread cannot use is left out.
  *
  * Success toasts (docs/notes/toast-success-rule.md): none where both menus' places show the
  * result (Regenerate name: the row and the tab; Unsnooze: the row and the pane's snooze
- * strip; Run in: the row and the header's chip). Pin, Snooze, Save for later, Clear flags and
+ * strip; Run in: the row and the header's chip). Pin, Snooze, Save for later and
  * Archive show only in the sidebar row (a snooze closes the thread's tab): silent from the
  * row's menu, toasted from the header's (kit.rowInView); Remove likewise. Restart Claude shows
  * nowhere and toasts from both. Fork selects the new thread, which shows it.
@@ -120,8 +119,6 @@ export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: Me
     return t !== undefined && isSnoozed(t);
   });
   const stale = useThreadsStore((s) => s.byId[id]?.pluginEnvStale ?? false);
-  // Plugin flags hold the thread in the attention group until a plugin or the user clears them.
-  const flags = useThreadsStore((s) => s.byId[id]?.flags.length ?? 0);
   // The palette's and the daemon's rules (lib/threadRow): somewhere else to run; a project or workspace to copy.
   // A setup that did not finish takes neither: the daemon refuses Run in and Snooze as above, and New thread on this branch while there is no branch.
   const unfinished = useThreadsStore((s) => setupUnfinished(s.byId[id]?.setup));
@@ -131,8 +128,7 @@ export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: Me
   const newLike = useThreadsStore((s) => canNewLike(s.byId[id])) && !noProject && !unplaced;
   const canSave = useCanSaveAsWorkspace(id) && !noProject;
   const restartListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.restart"));
-  const clearListed = useCommandsStore((s) => s.commands.some((c) => c.name === "thread.flag.clear"));
-  const second = newLike || canSave || runIn || (stale && restartListed) || (flags > 0 && clearListed);
+  const second = newLike || canSave || runIn || (stale && restartListed);
   return (
     <>
       <kit.Item
@@ -239,17 +235,6 @@ export function ThreadMenuItems({ id, kit, afterArchive }: { id: string; kit: Me
           }}
         >
           Restart Claude
-        </kit.Item>
-      )}
-      {flags > 0 && clearListed && (
-        <kit.Item
-          data-testid="menu-clear-flags"
-          onSelect={() => {
-            // The row leaves the attention group as its flag goes.
-            void runCommand("thread.flag.clear", { id }, threadContext(id), { inView: kit.rowInView });
-          }}
-        >
-          {flags === 1 ? "Clear flag" : "Clear flags"}
         </kit.Item>
       )}
       <kit.Separator />

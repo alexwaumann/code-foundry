@@ -102,7 +102,7 @@ describe("rails in the pane grid", () => {
     sized(600);
     await seed();
     act(() => {
-      useThreadsStore.setState({ byId: { "s-2": { id: "s-2", name: "Port renderer", status: "attention", archivedAtMs: null, flags: [] } } as never });
+      useThreadsStore.setState({ byId: { "s-2": { id: "s-2", name: "Port renderer", status: "attention", archivedAtMs: null } } as never });
     });
     render(<PaneGrid />);
     const rail = screen.getAllByTestId("shell-rail").find((r) => r.getAttribute("data-pane-id") === "p-b");
@@ -124,7 +124,7 @@ describe("rails in the pane grid", () => {
     sized(600);
     await seed();
     act(() => {
-      useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "idle", archivedAtMs: null, flags: [] } } as never });
+      useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "idle", archivedAtMs: null } } as never });
     });
     render(<PaneGrid />);
     const icon = screen.getAllByTestId("shell-rail-tab").find((i) => i.getAttribute("data-tab-id") === "t-d");

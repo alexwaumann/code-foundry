@@ -2,7 +2,6 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import {
   AgentRunStatus,
   PermissionMode,
-  ThreadFlagLevel,
   ThreadKind,
   ThreadReportStatus,
   ThreadSetupPhase,
@@ -12,7 +11,6 @@ import {
   ThreadStatus,
   type AgentRun,
   type Thread,
-  type ThreadFlag,
   type ThreadListEvent,
   type ThreadSetup,
   type ThreadSetupStep,
@@ -292,13 +290,6 @@ export interface ThreadView {
    */
   budgetUsd: number;
   /**
-   * Flags plugins raised on the thread, errors first, then newest first; at most one per
-   * plugin. An overlay on status that never changes it: a flagged thread counts as needing
-   * attention (isAttention), sorts with prompts or errors (lib/thread threadGroup) and line 2
-   * shows the top flag (lib/statusLine). docs/notes/plugins-3-events-flags-env.md.
-   */
-  flags: ThreadFlagView[];
-  /**
    * Who owns the thread when the user does not: "plugin:<name>" for a plugin's own thread
    * (docs/notes/plugins-6-thread-terminal.md). Owned threads are hidden: the threads store
    * keeps them out of `order` (the sidebar, attention, the dock, lineage), and a plugin's
@@ -330,21 +321,6 @@ export interface ThreadView {
    */
   resident?: string;
   epoch?: number;
-}
-
-/** A plugin's flag on a thread. */
-export interface ThreadFlagView {
-  /** The plugin's name ("gh-actions"). */
-  plugin: string;
-  /** Its display name ("GitHub Actions"): the reason reads "<pluginName>: <reason>". */
-  pluginName: string;
-  /** Amber "attention" (it needs the user) or red "error" (something failed). */
-  level: "attention" | "error";
-  /** One line, at most 80 characters. */
-  reason: string;
-  setAtMs: number | null;
-  /** Cleared by the daemon when the thread is opened. */
-  untilSeen: boolean;
 }
 
 /** How a thread's task went, as its agent reported it. */
@@ -619,34 +595,11 @@ export function toThreadView(s: Thread): ThreadView {
     labels: [...s.labels],
     report: toThreadReportView(s),
     budgetUsd: s.budgetUsd,
-    flags: s.flags.flatMap(toThreadFlagView),
     ...(s.owner ? { owner: s.owner } : {}),
     ...(s.pluginEnvStale ? { pluginEnvStale: true as const, pluginEnvChange: s.pluginEnvChange } : {}),
     ...(s.transcriptMissing ? { transcriptMissing: true as const } : {}),
     ...(s.kind === ThreadKind.RESIDENT ? { resident: s.residentName, epoch: s.epoch } : {}),
   };
-}
-
-const flagLevelMap: Record<ThreadFlagLevel, ThreadFlagView["level"] | null> = {
-  [ThreadFlagLevel.UNSPECIFIED]: null,
-  [ThreadFlagLevel.ATTENTION]: "attention",
-  [ThreadFlagLevel.ERROR]: "error",
-};
-
-/** A flag's view; none for a level this GUI does not know. */
-export function toThreadFlagView(f: ThreadFlag): ThreadFlagView[] {
-  const level = flagLevelMap[f.level] ?? null;
-  if (level === null) return [];
-  return [
-    {
-      plugin: f.plugin,
-      pluginName: f.pluginDisplayName || f.plugin,
-      level,
-      reason: f.reason,
-      setAtMs: ms(f.setAt),
-      untilSeen: f.untilSeen,
-    },
-  ];
 }
 
 export const reportStatusMap: Record<ThreadReportStatus, ThreadReportStatusView | null> = {
