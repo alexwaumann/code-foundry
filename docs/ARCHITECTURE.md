@@ -37,8 +37,8 @@ Three processes, one protocol.
   and relaunches itself when the daemon asks (`app.relaunch` at once, `app.restart` once
   the daemon has exited). It sets the Dock badge, bounces the Dock icon and plays the
   alert sound (NSSound, an embedded WAV) when the frontend asks (`SetBadge`, `Bounce`,
-  `PlaySound`; the frontend's `stores/dockAlerts.ts` decides from the threads and the
-  `notifications.*` settings, and `notifications.test` previews the sound through a
+  `PlaySound`; the frontend's `stores/dockAlerts.ts` decides from the threads, the bell's
+  time-sensitive notifications and the `notifications.*` settings, and `notifications.test` previews the sound through a
   `PlayAlertSound` UI intent; no notification banners for a bare executable,
   `docs/notes/dock-alerts.md`). It paints the window behind the page in the active
   theme's sheet and keeps those colours for the next launch (`SetWindowBackground`,
@@ -1066,7 +1066,10 @@ verb in `settings.toml` is reported and dropped, never fatal.
   sidebar is collapsed, back and forward, the **space tabs** (`SpaceTabs.tsx`: a glyph drawn
   from the space's own tree, its name, how many of its threads need the user; click, rename in
   place, drag to reorder, Remove space… through a dialog that moves or archives its threads)
-  and "+". Under it, the sidebar and the current space's **pane grid** (`PaneGrid.tsx`):
+  and "+", and at the right end the **bell** (`components/notifications`: the shown
+  notifications' count, its list of cards whose buttons are the `notification.*` commands, and an
+  arrival toast through `notify` while it is shut; fed by the event stream's notification source
+  in `stores/notifications.ts`; `docs/notes/notifications-3-bell.md`). Under it, the sidebar and the current space's **pane grid** (`PaneGrid.tsx`):
   panes placed from the layout's tree, 12 px gutters that drag (`pane.resize`) and take the
   keyboard. A pane (`PaneView.tsx`) is its tab strip (`PaneTabStrip.tsx`: the tab is the
   title; tabs shorten, then go icon-only, `geometry/tabFit.ts`, with a tooltip only for a cut
