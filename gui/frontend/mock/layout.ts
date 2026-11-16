@@ -15,7 +15,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import type { MessageInitShape } from "@bufbuild/protobuf";
 import { LayoutDir, LayoutEdge, type LayoutEventSchema, type LayoutOp, type LayoutSchema, type LayoutSpaceSchema, type LayoutTab, type LayoutTabSchema, type LayoutNodeSchema, type ThreadLayoutSchema } from "../src/gen/codefoundry/v1/layout_pb";
 import { outerFrac } from "../src/shell/drag/outerFrac";
-import { terminalsOnly, treeFits } from "../src/shell/geometry/rects";
+import { plainRects, terminalsOnly, treeFits } from "../src/shell/geometry/rects";
 import type { GeoNode } from "../src/shell/geometry/types";
 import { identify as identifyTab, identityKindOf, isRefusal, type IdentityKind } from "../src/shell/identity";
 
@@ -100,7 +100,7 @@ export interface Result {
   tab?: string;
   existing?: boolean;
   closed?: Tab[];
-  /** How placement chose: "1" (already open), "pane", "focused", "compose"; the mock's linked placement says "mock". */
+  /** How placement chose: "1" (already open), "pane", "focused", "near" (smart placement), "compose"; the mock's linked placement says "mock". */
   rule?: string;
   /** The draft the op started, opened or ended. */
   draft?: string;
@@ -109,6 +109,8 @@ export interface Result {
 /** The settings an op runs with (internal/layout Options); smart swap is not ported. */
 export interface Options {
   keep_focus?: boolean;
+  /** Smart placement off (the setting layout.smart_placement, on by default). */
+  no_smart_placement?: boolean;
 }
 
 /** An op in internal/layout's JSON form: its name and its fields. */
@@ -382,6 +384,7 @@ class Tx {
   constructor(
     readonly st: State,
     private readonly ids: IdSource,
+    readonly opts: Options = {},
   ) {}
 
   newID(prefix: string): string {
@@ -701,6 +704,38 @@ function hostPane(sp: Space, a: Area, tb: Tab): Node | undefined {
   for (const id of sp.mru ?? []) for (const p of all) if (tabIndex(p, id) >= 0 && !order.includes(p)) order.push(p);
   for (const p of all) if (!order.includes(p)) order.push(p);
   return order.find((p) => !p.collapsed && canTake(sp, p, a, [tb])) ?? fp;
+}
+
+/** Whether pane p holds a thread: a thread's own tab or a composer, active or not (Go's holdsThread). */
+function holdsThread(p: Node): boolean {
+  return (p.tabs ?? []).some((tb) => tb.kind === "thread" || tb.kind === "compose");
+}
+
+/**
+ * Where a thread's own tab or a composer opens when nothing chose a pane (Go's threadHost): with
+ * smart placement on, the focused pane when it holds a thread, else the open pane holding one
+ * nearest the focused pane (distance between centres, then layout order), else hostPane. `near`:
+ * it went elsewhere than the focused pane by that rule.
+ */
+function threadHost(t: Tx, sp: Space, a: Area, tb: Tab): { pane: Node | undefined; near: boolean } {
+  const all = panes(sp.root);
+  const fp = all.find((p) => p.id === sp.focus);
+  if (t.opts.no_smart_placement || !fp) return { pane: hostPane(sp, a, tb), near: false };
+  if (holdsThread(fp) && canTake(sp, fp, a, [tb])) return { pane: fp, near: false };
+  const cands = all.filter((p) => p !== fp && !p.collapsed && holdsThread(p) && canTake(sp, p, a, [tb]));
+  if (cands.length === 0) return { pane: hostPane(sp, a, tb), near: false };
+  const rects = plainRects((sp.root ?? null) as GeoNode | null, a.w, a.h).rects;
+  const centre = (id: string): { x: number; y: number } => {
+    const r = rects[id];
+    return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : { x: 0, y: 0 };
+  };
+  const c = centre(fp.id);
+  const dist = (p: Node): number => {
+    const o = centre(p.id);
+    return Math.abs(o.x - c.x) + Math.abs(o.y - c.y);
+  };
+  // The sort is stable, so equal distances keep layout order.
+  return { pane: [...cands].sort((x, y) => dist(x) - dist(y))[0], near: true };
 }
 
 type OpFn = (t: Tx, o: Op) => Result;
@@ -1203,7 +1238,7 @@ const ops = {
       if (o.archived === true && t.spaceOf(thread) !== t.st.current_space) ((t.st.threads ??= {})[thread] ??= { space: t.st.current_space }).space = t.st.current_space;
       const sp = t.space(t.spaceOf(thread));
       const old = previewIn(sp);
-      const host = hostPane(sp, areaOf(o), { id: "", kind: "thread", thread });
+      const host = threadHost(t, sp, areaOf(o), { id: "", kind: "thread", thread }).pane;
       if (old && host === old.pane) {
         const tb: Tab = { id: t.newID("t-"), kind: "thread", thread, key: `thread:${thread}`, preview: true };
         const tabs = old.pane.tabs ?? [];
@@ -1266,7 +1301,11 @@ const ops = {
       t.show(sp, np, tb.id, o.focus === true);
       return { space: sp.id, pane: np.id, tab: tb.id, rule: "edge" };
     }
-    return ops.add_tab(t, { op: "add_tab", space: sp.id, ...(pane ? { pane: pane.id } : {}), ...(index !== undefined ? { index } : {}), tab: { id: "", kind: "thread", thread }, focus: o.focus === true, ...areaOf(o) });
+    // Nothing chose a pane: where a thread's own tab opens (Go's threadHost).
+    const host = pane ? null : threadHost(t, sp, areaOf(o), { id: "", kind: "thread", thread });
+    const target = pane ?? (host?.near ? host.pane : undefined);
+    const res = ops.add_tab(t, { op: "add_tab", space: sp.id, ...(target ? { pane: target.id } : {}), ...(index !== undefined ? { index } : {}), tab: { id: "", kind: "thread", thread }, focus: o.focus === true, ...areaOf(o) });
+    return host ? { ...res, rule: host.near ? "near" : "focused" } : res;
   },
 
   close_thread(t: Tx, o: Op): Result {
@@ -1480,14 +1519,16 @@ function place(t: Tx, sp: Space, chosen: Node | null, tb: Tab, focus: boolean, a
   const all = panes(sp.root);
   const own = isLinked(tb) ? all.find((p) => (p.tabs ?? []).some((x) => x.kind === "thread" && x.thread === tb.thread)) : undefined;
   if (!own) {
-    const fp = hostPane(sp, a, tb);
+    // A composer is a thread to be: it opens where a thread's own tab opens.
+    const host = tb.kind === "compose" ? threadHost(t, sp, a, tb) : { pane: hostPane(sp, a, tb), near: false };
+    const fp = host.pane;
     if (!fp) {
       const np: Node = { t: "pane", id: t.newID("p-"), tabs: [tb], active: tb.id };
       sp.root = np;
       t.show(sp, np, tb.id, focus);
       return { space: sp.id, pane: np.id, tab: tb.id, rule: "focused" };
     }
-    return put(fp, tabIndex(fp, fp.active) + 1, "focused");
+    return put(fp, tabIndex(fp, fp.active) + 1, host.near ? "near" : "focused");
   }
   const holding = all.find((p) => (p.tabs ?? []).some((x) => isLinked(x) && x.thread === tb.thread) && canTake(sp, p, a, [tb]));
   if (holding) {
@@ -1517,7 +1558,7 @@ export function mockRuns(op: string): boolean {
 /** Runs an op on a copy of st. Throws a LayoutError, leaving st untouched, when it is refused. */
 export function applyOp(st: State, op: Op, ids: IdSource, opts: Options = {}): { state: State; result: Result } {
   const fn = (Object.hasOwn(opTable, op.op) ? opTable[op.op] : undefined) ?? fail("unimplemented", `layout op ${op.op} is not available in the mock`);
-  const t = new Tx(structuredClone(st), ids);
+  const t = new Tx(structuredClone(st), ids, opts);
   const result = fn(t, op);
   t.finish();
   if (opts.keep_focus) {
@@ -1912,6 +1953,8 @@ export class MockLayout {
       ids?: IdSource;
       /** After an op's commit, as the daemon's lifecycle glue hears it (mock/world.ts ends a closed terminal tab's shell). */
       applied?: (op: Op, result: Result) => void;
+      /** The setting layout.smart_placement, read at every op as the daemon does; absent: on. */
+      smartPlacement?: () => boolean;
     },
   ) {}
 
@@ -1961,7 +2004,8 @@ export class MockLayout {
   apply(op: Op, clientId = "", opts: Options = {}): { rev: number; result: Result } {
     this.applied.push({ op, clientId });
     op = withArea(op, this.viewport);
-    const { state, result } = applyOp(this.st, op, this.deps.ids ?? randomIds, opts);
+    const smart = this.deps.smartPlacement?.() ?? true;
+    const { state, result } = applyOp(this.st, op, this.deps.ids ?? randomIds, { no_smart_placement: !smart, ...opts });
     this.commit(state, clientId);
     const rev = this.revision;
     this.deps.applied?.(op, result);

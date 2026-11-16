@@ -940,6 +940,7 @@ export class World {
     applied: (op, result) => {
       this.endClosedTerminals(op, result);
     },
+    smartPlacement: () => this.settings.value("layout.smart_placement") !== "false",
   });
   /** The user's themes (mock/userThemes.ts); the EventService theme source. */
   readonly themes: MockThemes = new MockThemes({
