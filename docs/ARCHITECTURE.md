@@ -1149,6 +1149,8 @@ verb in `settings.toml` is reported and dropped, never fatal.
   Deny once the request is known whole), its title opens a popup with the thread's
   conversation and today's ask card, and a pane too short for the card shows the ask as one
   line above the composer (`components/needs`, `docs/notes/shell-17-needs-you.md`). A thread
+  with several open requests lists one line per request under its title, each with that
+  request's card, and its popup steps between them (`docs/notes/needs-you-line-items.md`). A thread
   another thread created is hidden from every sidebar list, the keyboard order and the
   attention counts while its creator exists (no setting, no override; an orphan whose creator
   was removed is listed), one rule in `lib/inSidebar.ts`:
