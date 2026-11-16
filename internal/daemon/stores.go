@@ -28,6 +28,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/store/layout"
 	"github.com/alexwaumann/code-foundry/internal/store/memory"
 	"github.com/alexwaumann/code-foundry/internal/store/newproject"
+	"github.com/alexwaumann/code-foundry/internal/store/notification"
 	"github.com/alexwaumann/code-foundry/internal/store/project"
 	"github.com/alexwaumann/code-foundry/internal/store/search"
 	"github.com/alexwaumann/code-foundry/internal/store/settings"
@@ -139,6 +140,13 @@ type stores struct {
 	// stopLayout stops the glue that keeps the layout true to threads and terminals
 	// (layout.go).
 	stopLayout func()
+	// notification holds the bell's notifications (docs/notes/notifications-1-store.md);
+	// opened after thread, whose threads a notification may name, and closed before the
+	// db, stopping its show_at and snooze loop.
+	notification *notification.Manager
+	// stopNotificationThreads stops the glue that withdraws a removed thread's
+	// notifications (notification_threads.go).
+	stopNotificationThreads func()
 }
 
 // openStores opens the database, applies migrations, and starts every store. On
@@ -361,6 +369,14 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 	}); err != nil {
 		return nil, err
 	}
+	// After thread: a notification may name a thread only while it exists, and goes with
+	// it (notification_threads.go).
+	if s.notification, err = notification.New(ctx, notification.Options{
+		DB: s.db, Bus: s.bus, Log: log.With("store", "notification"), ThreadExists: threadExists(s.thread.Snapshot),
+	}); err != nil {
+		return nil, err
+	}
+	s.stopNotificationThreads = startNotificationThreads(ctx, log.With("store", "notification"), s.notification, s.thread.Snapshot, s.bus)
 	// After thread and terminal: the layout follows their lifecycles (layout.go).
 	if s.stopLayout, err = startLayoutGlue(ctx, layoutGlueOptions{
 		Log: log.With("store", "layout"), Layout: s.layout, Terminals: s.terminal, Bus: s.bus, Threads: s.thread.Snapshot,
@@ -461,6 +477,12 @@ func (s *stores) close() error {
 	}
 	if s.stopLayout != nil {
 		s.stopLayout()
+	}
+	if s.stopNotificationThreads != nil {
+		s.stopNotificationThreads()
+	}
+	if s.notification != nil {
+		s.notification.Close()
 	}
 	if s.stopActions != nil {
 		s.stopActions()
