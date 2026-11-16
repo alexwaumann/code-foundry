@@ -154,3 +154,12 @@ full screen, the direction keys), then each was built.
   after one (known, `shell-build.md`).
 - oxlint's `only-export-components`: a component file exports only components; helpers live in
   `shell/collapse.ts`.
+
+## A strip's controls stay at the right (follow-up)
+
+A horizontal rail had its open and full screen controls packed after the tab icons, so
+collapsing a pane in a column moved them from the right end to the left. They now sit at the
+strip's right end with the tab strip's padding and gap, at the same x as the open pane's
+collapse and full screen (`shell-collapse.spec.ts`). The divider before them is gone there:
+the space separates them. The y differs by a few px, as a strip (36 px) is shorter than a
+pane's header. A vertical rail is unchanged.

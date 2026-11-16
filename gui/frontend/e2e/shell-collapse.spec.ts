@@ -125,9 +125,14 @@ test("in a column the strip's button collapses a pane to a strip, the column kee
   await seed(COL, "p-m", ["t-s-1", "t-prs"]);
   await openShell(page);
   const col = await box(page, '[data-testid="shell-pane"][data-pane-id="p-b"]');
+  const controls = { collapse: await box(page, '[data-pane-id="p-a"] [data-testid="shell-collapse"]'), full: await box(page, '[data-pane-id="p-a"] [data-testid="shell-fullscreen"]') };
   await paneEl(page, "p-a").getByTestId("shell-collapse").click();
   const strip = railEl(page, "p-a");
   await expect(strip).toHaveAttribute("data-orientation", "horizontal");
+  // The strip's open and full screen controls are under the pointer that collapsed the pane: at
+  // the x of the pane's collapse and full screen (the strip is shorter than a pane's header, so not the y).
+  expect((await box(page, '[data-pane-id="p-a"] [data-testid="shell-rail-expand"]')).x).toBe(controls.collapse.x);
+  expect((await box(page, '[data-pane-id="p-a"] [data-testid="shell-rail-fullscreen"]')).x).toBe(controls.full.x);
   const s = await box(page, '[data-testid="shell-rail"][data-pane-id="p-a"]');
   expect([s.w, s.h]).toEqual([col.w, 36]);
   // The diff below takes the height; the column is as wide as before (its diff is open).
