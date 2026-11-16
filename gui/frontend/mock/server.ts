@@ -5,7 +5,7 @@
  *   MOCK_PORT=7799 MOCK_TOKEN=secret bun run mock
  *
  * Serves Health, Terminal, Project, Filesystem, Gh, Command, Settings, Ui, Thread, Action, GitOps, Update,
- * Plugin, Skill, Memory, Ember, Dictation, Search, Layout and Event over Connect (HTTP/1.1,
+ * Plugin, Skill, Memory, Notification, Ember, Dictation, Search, Layout and Event over Connect (HTTP/1.1,
  * like the real daemon's loopback listener for browsers), with bearer auth and
  * permissive CORS, and the streams the GUI tunnels over a WebSocket at /stream/ (mock/tunnel.ts).
  * Non-RPC control endpoints for tests live under /__mock/:
@@ -221,6 +221,15 @@
  *        its theme card and, applied, the toast)
  *   POST /__mock/themes/recolour?thread=s-1&theme=ocean-dusk&accent=%23e0a060   (that thread's
  *        refinement of the theme: the replaced version kept, a card whose Undo restores it)
+ *   NotificationService, the notification event source and notification.* (mock/notifications.ts): empty
+ *        after a reset (the bell quiet); posts arrive (toasts), a changed post of a shown key updates it.
+ *   POST /__mock/notifications/post?title=…[&body=…&level=info|warning|error&ts=1&thread=s-4&source=hello|command|…
+ *        &key=…&action=Label|command|send|start|open[|arg][|resolves 0|1]…]   (a post, up to three actions)
+ *   POST /__mock/notifications/withdraw?key=…[&source=…]   (the source takes it back)
+ *   POST /__mock/notifications/seed[?quiet=1]    (the sketch's five, one time-sensitive, two naming s-4, one snoozed;
+ *                                                 quiet: no arrivals, nothing toasts)
+ *   POST /__mock/notifications/act-fail?message=…   (the next notification.act fails with it)
+ *   GET  /__mock/notifications                   ({ notifications, calls })
  *   EmberService (mock/ember.ts): Ember's status and task board; enabled is the ember.enabled setting
  *        (off by default; turning it on adds s-resident-ember and the worker threads s-ember-notes,
  *        s-ember-wails, s-ember-flaky). Seeded tasks: t-1a2b3c4d doing (s-ember-notes, progress),
@@ -265,6 +274,7 @@ import { UiIntentSchema, UiService } from "../src/gen/codefoundry/v1/ui_pb";
 import { PluginService } from "../src/gen/codefoundry/v1/plugin_pb";
 import { SkillService } from "../src/gen/codefoundry/v1/skill_pb";
 import { MemoryService } from "../src/gen/codefoundry/v1/memory_pb";
+import { NotificationService } from "../src/gen/codefoundry/v1/notification_pb";
 import { UpdateService, UpdateState } from "../src/gen/codefoundry/v1/update_pb";
 import { EmberService } from "../src/gen/codefoundry/v1/ember_pb";
 import { DictationService } from "../src/gen/codefoundry/v1/dictation_pb";
@@ -735,6 +745,11 @@ function routes(router: ConnectRouter): void {
     get: () => ({ memory: world.memory.snapshot() }),
   });
 
+  // The bell's notifications (mock/notifications.ts): reads only; the rest are notification.* commands.
+  router.service(NotificationService, {
+    list: () => ({ snapshot: world.notifications.snapshot() }),
+  });
+
   // Ember (mock/ember.ts): reads only; the board changes through the /__mock/ember controls.
   router.service(EmberService, {
     watchBoard: (_req, ctx) => tracked("EmberService/WatchBoard", world.ember.watch(ctx.signal)),
@@ -822,12 +837,12 @@ function routes(router: ConnectRouter): void {
     // The real daemon paces GitHub polling by it; the mock has nothing to pace.
     setClientState: () => ({}),
     // Snapshots first in the order events.proto promises (project, workspace, terminal,
-    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout), then everything published, filtered by `sources`.
+    // thread, gh, gitops, theme, settings, update, action, plugin, skill, memory, search, layout, notification), then everything published, filtered by `sources`.
     watch: (req, ctx) => {
       const want = new Set(
         req.sources.length > 0
           ? req.sources
-          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH, EventSource.LAYOUT],
+          : [EventSource.PROJECT, EventSource.WORKSPACE, EventSource.TERMINAL, EventSource.THREAD_LIST, EventSource.THREAD, EventSource.GH, EventSource.GITOPS, EventSource.THEME, EventSource.SETTINGS, EventSource.UPDATE, EventSource.UI, EventSource.ACTION, EventSource.PLUGIN, EventSource.SKILL, EventSource.MEMORY, EventSource.SEARCH, EventSource.LAYOUT, EventSource.NOTIFICATION],
       );
       const initial: { source: EventSource; event: EventInit }[] = [
         { source: EventSource.PROJECT, event: { event: { case: "project", value: { event: { case: "snapshot", value: { projects: [...world.projects.values()].map((r) => world.projectMsg(r)) } } } } } },
@@ -847,6 +862,7 @@ function routes(router: ConnectRouter): void {
         { source: EventSource.SEARCH, event: { event: { case: "search", value: world.searches.activity() } } },
         // A daemon from before the shell has no layout source (POST /__mock/layout/service?off=1).
         ...(world.layout.serviceOff ? [] : [{ source: EventSource.LAYOUT, event: { event: { case: "layout" as const, value: world.layout.snapshotEvent() } } }]),
+        { source: EventSource.NOTIFICATION, event: { event: { case: "notification", value: world.notifications.event() } } },
       ];
       const ui = want.has(EventSource.UI);
       return tracked("EventService/Watch", filterEvents(world.events.subscribe(ctx.signal, initial), want), () => {
@@ -1097,6 +1113,18 @@ function control(req: IncomingMessage, res: ServerResponse, path: string, q: URL
   const actionCtl = /^\/__mock\/action\/([a-z]+)$/.exec(path);
   if (req.method === "POST" && actionCtl?.[1]) {
     actionControl(res, actionCtl[1], q);
+    return;
+  }
+  const notifyCtl = /^\/__mock\/notifications(?:\/([a-z-]+))?$/.exec(path);
+  if (notifyCtl) {
+    if (req.method === "GET" && !notifyCtl[1]) json(res, 200, world.notifications.json());
+    else if (req.method === "POST" && notifyCtl[1]) {
+      try {
+        json(res, 200, world.notifications.control(notifyCtl[1], q));
+      } catch (err) {
+        json(res, err instanceof CommandError && err.kind === "notfound" ? 404 : 400, { error: err instanceof Error ? err.message : String(err) });
+      }
+    } else json(res, 405, { error: "method" });
     return;
   }
   const searchCtl = /^\/__mock\/search(|\/seed)$/.exec(path);
