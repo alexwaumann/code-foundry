@@ -18,8 +18,8 @@ import (
 // The hold key (docs/notes/dictate-anywhere.md): hold Option, speak, release, and the text
 // lands. One path, two destinations. With Code Foundry in front and a composer to dictate
 // into, the window runs the session through dictation.hold, exactly as its mic does. Anywhere
-// else, with dictation.anywhere on, the host opens a "system" session itself, collects the
-// phrases and pastes once.
+// else (another text field of the window, or with dictation.anywhere on another app) the
+// host opens a "system" session itself, collects the phrases and pastes once.
 //
 // Nothing here may hold up the tap, or the next key: the service's loop only reads events
 // and hands out work. A run per hold talks to the daemon, and one goroutine pastes.
@@ -79,16 +79,26 @@ type holdFacts struct {
 	OwnApp bool
 	// ComposerTarget: the window has a composer dictation.toggle would pick.
 	ComposerTarget bool
+	// FieldTarget: a text field of the window outside every composer has the keyboard.
+	FieldTarget bool
 }
 
-// routeHold is the routing rule. A window with no composer to take it is any other app:
-// the text is pasted into what has the keyboard there, such as a search field.
+// routeHold is the routing rule. In Code Foundry the window says where a hold goes: into a
+// composer (its own, or the one of the thread the keyboard is in, when that is on screen),
+// into another text field that has the keyboard (a note's, a setting's), where the words
+// are pasted as in any other app, or nowhere (a terminal that belongs to no thread on
+// screen, a page with nothing to take them), and then the hold does nothing at all: no
+// sound, no overlay, no microphone. dictation.anywhere is about other apps only.
 func routeHold(f holdFacts) holdRoute {
 	switch {
 	case !f.Usable:
 		return routeNowhere
 	case f.OwnApp && f.ComposerTarget:
 		return routeComposer
+	case f.OwnApp && f.FieldTarget:
+		return routeSystem
+	case f.OwnApp:
+		return routeNowhere
 	case f.Anywhere:
 		return routeSystem
 	}
@@ -507,6 +517,7 @@ func (s *holdService) begin() {
 			Usable:         dictationUsable(s.snap),
 			Anywhere:       s.snap.GetAnywhere(),
 			ComposerTarget: s.snap.GetComposerTarget(),
+			FieldTarget:    s.snap.GetFieldTarget(),
 		},
 		other:   s.snap.GetSession().GetId(),
 		prev:    s.last,

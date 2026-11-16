@@ -29,19 +29,22 @@ export interface ComposerDictation {
  * A composer's dictation (docs/notes/dictation-4-gui.md): holds the snapshot while
  * dictation is on, registers the composer for phrases and dictation.toggle, and shows the marker in
  * the prompt while it listens. `insert` puts a phrase at the caret; `setMarker` shows the
- * dot where the next one lands. `primary`: the content pane's composer (dictation.toggle dictates
- * there when no composer has the keyboard).
+ * dot where the next one lands. `primary`: a pane's own composer, which takes dictation without the
+ * keyboard when the keyboard is in something of its thread (stores/dictation contextComposer).
  */
 export function useComposerDictation({
   draftKey,
   rootRef,
   primary,
+  threadId,
   insert,
   setMarker,
 }: {
   draftKey: string;
   rootRef: RefObject<HTMLElement | null>;
   primary: boolean;
+  /** The thread the composer writes to, so dictation finds it from that thread's terminal or diff. */
+  threadId?: string;
   insert: (text: string) => void;
   setMarker?: (on: boolean) => void;
 }): ComposerDictation {
@@ -62,11 +65,12 @@ export function useComposerDictation({
         clientId,
         root: () => rootRef.current,
         primary,
+        ...(threadId ? { threadId } : {}),
         insert: (t) => {
           cb.current.insert(t);
         },
       }),
-    [clientId, primary, rootRef],
+    [clientId, primary, threadId, rootRef],
   );
 
   const listening = phase === "starting" || phase === "listening";

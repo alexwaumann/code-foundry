@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barHeight, decayLevels, downloadProgress, easeLevels, gigabytes, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, microphoneDescription, deviceVerb, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
+import { barHeight, decayLevels, downloadProgress, easeLevels, gigabytes, isTextField, LEVEL_BARS, LEVEL_EASE_MS, LEVEL_HALF_LIFE_MS, levelOf, memorySize, microphoneDescription, deviceVerb, phraseAtCaret, phraseOnOneLine, pushLevel } from "./dictation";
 
 describe("phraseAtCaret", () => {
   it.each([
@@ -128,5 +128,32 @@ describe("formatting", () => {
     expect(memorySize(48 * 2 ** 30)).toBe("48 GB");
     expect(downloadProgress(557_000_000, 874_188_075, 11_200_000)).toBe("557 MB of 874 MB · 11 MB/s");
     expect(downloadProgress(1_000_000, 874_188_075, 0)).toBe("1 MB of 874 MB");
+  });
+});
+
+describe("isTextField", () => {
+  const el = (html: string): Element => {
+    const box = document.createElement("div");
+    box.innerHTML = html;
+    return box.firstElementChild as Element;
+  };
+  it.each([
+    ["a textarea", "<textarea></textarea>", true],
+    ["a text input", "<input>", true],
+    ["a search input", '<input type="search">', true],
+    ["an editable element", '<div contenteditable="true"></div>', true],
+    ["a read-only textarea", "<textarea readonly></textarea>", false],
+    ["a disabled input", "<input disabled>", false],
+    ["a checkbox", '<input type="checkbox">', false],
+    ["a button", "<button></button>", false],
+    ["an element that is not editable", '<div contenteditable="false"></div>', false],
+  ])("%s", (_name, html, want) => {
+    expect(isTextField(el(html))).toBe(want);
+  });
+
+  it("not a terminal's hidden textarea, and not nothing", () => {
+    const term = el('<div class="xterm"><textarea class="xterm-helper-textarea"></textarea></div>');
+    expect(isTextField(term.querySelector("textarea"))).toBe(false);
+    expect(isTextField(null)).toBe(false);
   });
 });

@@ -4,6 +4,9 @@ vi.mock("@/api/dictation", async (orig) => ({ ...(await orig<typeof import("@/ap
 
 const { fakeDictation, dictationSnap } = await import("@/test/dictation");
 const { holdDictation, presentDictationHold, registerDictationTarget, resetDictationForTests, useDictationStore } = await import("./dictation");
+const uiStore = await import("./ui");
+const shell = await import("@/test/shellLayout");
+const { resetLayout } = await import("./layout");
 
 /** A composer mounted in the page. */
 function composer(clientId: string, primary = true) {
@@ -219,4 +222,138 @@ describe("the composer target", () => {
       expect(reports()).toEqual([true, false]);
     });
   });
+
+  it("a text field outside every composer takes the words: no composer while it has the keyboard", async () => {
+    await hold();
+    composer("c1");
+    expect(reports()).toEqual([true]);
+    const note = document.createElement("textarea");
+    document.body.append(note);
+    note.focus();
+    await vi.waitFor(() => {
+      expect(reports()).toEqual([true, false]);
+    });
+    // Not a composer, but a field: the host pastes into it.
+    expect(fakeDictation.fieldReports).toEqual([false, true]);
+    // The host's press is not the composer's: it pastes into the field instead.
+    expect(presentDictationHold("press")).toBe(false);
+    expect(active()).toBeNull();
+    note.blur();
+    await vi.waitFor(() => {
+      expect(reports()).toEqual([true, false, true]);
+    });
+    expect(presentDictationHold("press")).toBe(true);
+  });
+
+  it("a button with the keyboard changes nothing: the selected composer takes it", async () => {
+    await hold();
+    composer("c1");
+    const button = document.createElement("button");
+    document.body.append(button);
+    button.focus();
+    expect(presentDictationHold("press")).toBe(true);
+    await listening();
+    expect(fakeDictation.calls).toContain("start c1");
+  });
+
+describe("where dictation goes from what has the keyboard", () => {
+  const { useUiStore } = uiStore;
+  const { layoutOf, pane, row, seedLayout, space, tab } = shell;
+
+  /** A pane of the grid in the page. */
+  function paneEl(id: string): HTMLElement {
+    const el = document.createElement("div");
+    el.dataset.paneId = id;
+    document.body.append(el);
+    return el;
+  }
+
+  /** A thread's composer in a pane, as ThreadComposer registers it. */
+  function threadComposer(thread: string, into: HTMLElement) {
+    const root = document.createElement("div");
+    into.append(root);
+    return registerDictationTarget({ clientId: `c-${thread}`, primary: true, threadId: thread, root: () => root, insert: () => undefined });
+  }
+
+  /** A terminal in `into` with the keyboard (xterm's hidden textarea). */
+  function focusTerminal(into: HTMLElement): void {
+    const term = document.createElement("div");
+    term.className = "xterm";
+    const input = document.createElement("textarea");
+    term.append(input);
+    into.append(term);
+    input.focus();
+  }
+
+  /** s-1's thread, s-2's thread, a terminal tab (linked to `linked`, or to nothing), in a row. */
+  async function seed(linked: string): Promise<void> {
+    await seedLayout(layoutOf([space(row("s-r", [pane("p-1", [tab("t-1", "thread", "s-1")]), pane("p-2", [tab("t-2", "thread", "s-2")]), pane("p-3", [tab("t-term", "terminal", linked)])]), "p-1")]));
+  }
+
+  const pressed = () => {
+    const ok = presentDictationHold("press");
+    return ok ? fakeDictation.calls.at(-1) : "nowhere";
+  };
+
+  beforeEach(() => {
+    resetLayout();
+    useUiStore.setState({ selection: { kind: "none" } });
+  });
+
+  it("a terminal linked to a thread: that thread's composer, while it is on screen", async () => {
+    await hold();
+    await seed("s-2");
+    threadComposer("s-1", paneEl("p-1"));
+    const second = threadComposer("s-2", paneEl("p-2"));
+    focusTerminal(paneEl("p-3"));
+    expect(pressed()).toBe("start c-s-2");
+    presentDictationHold("discard");
+    await idle();
+    // Its thread is no longer the selected tab of a pane: its composer is not mounted.
+    second();
+    expect(pressed()).toBe("nowhere");
+  });
+
+  it("a terminal linked to no thread: nowhere, and the host is told so", async () => {
+    await hold();
+    await seed("");
+    // The selected thread's composer takes a hold until the keyboard goes into the terminal.
+    useUiStore.setState({ selection: { kind: "thread", id: "s-1" } });
+    threadComposer("s-1", paneEl("p-1"));
+    expect(fakeDictation.composerReports).toEqual([true]);
+    focusTerminal(paneEl("p-3"));
+    expect(pressed()).toBe("nowhere");
+    await vi.waitFor(() => {
+      expect([fakeDictation.composerReports, fakeDictation.fieldReports]).toEqual([
+        [true, false],
+        [false, false],
+      ]);
+    });
+  });
+
+  it("a thread's quick terminal, under its conversation: that pane's composer", async () => {
+    await hold();
+    await seed("");
+    const p1 = paneEl("p-1");
+    threadComposer("s-1", p1);
+    threadComposer("s-2", paneEl("p-2"));
+    focusTerminal(p1);
+    expect(pressed()).toBe("start c-s-1");
+  });
+
+  it("the keyboard on nothing in particular: the selected thread's composer, else nowhere", async () => {
+    await hold();
+    await seed("");
+    threadComposer("s-1", paneEl("p-1"));
+    threadComposer("s-2", paneEl("p-2"));
+    expect(pressed()).toBe("nowhere");
+    useUiStore.setState({ selection: { kind: "thread", id: "s-2" } });
+    expect(pressed()).toBe("start c-s-2");
+    presentDictationHold("discard");
+    await idle();
+    // Selected, but not on screen.
+    useUiStore.setState({ selection: { kind: "thread", id: "s-9" } });
+    expect(pressed()).toBe("nowhere");
+  });
+});
 });

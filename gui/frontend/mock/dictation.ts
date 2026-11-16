@@ -84,6 +84,7 @@ export class MockDictation {
   private access: Pick<NonNullable<SnapshotInit["accessibility"]>, "granted" | "tapSilent"> | null = null;
   private mic: MockMic | null = null;
   private composerTarget = false;
+  private fieldTarget = false;
   private hardware = M4;
   private session: MockSession | null = null;
   private readonly ended = new Map<string, MockSession>();
@@ -113,6 +114,7 @@ export class MockDictation {
     this.access = null;
     this.mic = null;
     this.composerTarget = false;
+    this.fieldTarget = false;
     this.hardware = M4;
     this.script = { phrases: DEFAULT_PHRASES, gapMs: 1000, flush: "", loadMs: 800, silence: false };
     this.calls = [];
@@ -154,6 +156,7 @@ export class MockDictation {
       micDenied: this.micDenied,
       accessibility: this.access ? { ...this.access, listName: "Device Control and Data Access", executable: "/Users/you/.code-foundry/app/Code Foundry" } : undefined,
       composerTarget: this.composerTarget,
+      fieldTarget: this.fieldTarget,
       ...(this.mic ? MICS[this.mic] : {}),
     };
   }
@@ -317,9 +320,10 @@ export class MockDictation {
     this.publish();
   }
 
-  setComposerTarget(available: boolean): void {
+  setComposerTarget(available: boolean, field = false): void {
     this.calls.push(`composer ${String(available)}`);
     this.composerTarget = available;
+    this.fieldTarget = field && !available;
     this.publish();
   }
 

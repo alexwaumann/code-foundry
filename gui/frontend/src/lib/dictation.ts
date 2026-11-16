@@ -130,3 +130,20 @@ export function downloadProgress(received: number, total: number, bytesPerSecond
   const head = `${megabytes(received)} of ${megabytes(total)}`;
   return bytesPerSecond > 0 ? `${head} · ${megabytes(bytesPerSecond)}/s` : head;
 }
+
+/** Input types that take typed text (the rest are buttons, pickers and toggles). */
+const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "tel", "number", "password"]);
+
+/**
+ * Whether `el` is a field a paste would put text in: a textarea or a text input that can be
+ * edited, or an editable element. A terminal's hidden textarea is not one: dictation with a
+ * terminal focused goes on to the thread's composer, as before.
+ */
+export function isTextField(el: Element | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.closest(".xterm")) return false;
+  if (el instanceof HTMLTextAreaElement) return !el.readOnly && !el.disabled;
+  if (el instanceof HTMLInputElement) return TEXT_INPUT_TYPES.has(el.type) && !el.readOnly && !el.disabled;
+  const editable = el.getAttribute("contenteditable");
+  return el.isContentEditable || (editable !== null && editable !== "false");
+}

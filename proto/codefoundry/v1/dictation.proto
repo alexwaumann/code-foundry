@@ -133,6 +133,10 @@ message DictationSnapshot {
   bool avoid_bluetooth = 17;
   // What the host last reported; unset until it has (no host, or dictation off so far).
   DictationInputs inputs = 18;
+  // A text field of the window outside every composer has the keyboard (ComposerTarget's
+  // field): the host pastes a hold's words into it. With this and composer_target both
+  // unset, a hold in the window goes nowhere.
+  bool field_target = 20;
   // What those two settings choose among those inputs (docs/notes/dictation-microphone.md);
   // unset without inputs.
   DictationMicrophonePick microphone_pick = 19;
@@ -339,6 +343,9 @@ message DictationInputsResponse {}
 
 message DictationComposerTargetRequest {
   bool available = 1;
+  // A text field outside every composer has the keyboard (a note's, a setting's): no
+  // composer takes a hold, and the host pastes into that field. Never set with available.
+  bool field = 2;
 }
 
 message DictationComposerTargetResponse {}
