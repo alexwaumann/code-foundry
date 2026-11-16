@@ -18,11 +18,11 @@ import (
 // surface's. CommandService.List carries both to the GUI (and the CLI), so the GUI
 // learns which plugin tabs a selection offers from the command list it already syncs.
 
-// TabOpener opens a tab in the window shell's layout: by the placement rules (focused where it
-// is when its identity is open), taking the user's focus only with focus. The daemon adapts
-// the layout store.
+// TabOpener opens a tab in the window shell's layout: in pane when one is given (a pane's "+"
+// menu), else by the placement rules (focused where it is when its identity is open), taking
+// the user's focus only with focus. The daemon adapts the layout store.
 type TabOpener interface {
-	OpenTab(ctx context.Context, tb *layout.Tab, focus bool) (layout.Result, error)
+	OpenTab(ctx context.Context, tb *layout.Tab, pane string, focus bool) (layout.Result, error)
 }
 
 // ShowResult is a show command's JSON when it opened a tab.
@@ -154,6 +154,8 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 		case pluginsdk.ScopeWorktree:
 			args = []command.ArgSpec{{Name: "worktree", Type: command.Path, Context: command.ContextWorktree, Description: "Worktree path"}}
 		}
+		args = append(args, command.ArgSpec{Name: "pane", Type: command.String, ID: command.PaneID,
+			Description: "Open the tab in this pane (the pane's + menu); an open one is focused where it is" + command.IDHelp})
 		// A thread's surface is a tab linked to the thread, placed by the layout's rules
 		// (openSurfaceTab); the others go to the windows as before.
 		as := "as a tab"
@@ -170,7 +172,7 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 			When:           func(uctx command.Context) bool { return m.surfaceAvailability(spec, uctx).ok },
 			WhyUnavailable: func(uctx command.Context) string { return m.surfaceAvailability(spec, uctx).reason },
 			Run: func(ctx context.Context, uctx command.Context, a command.Args) (command.Result, error) {
-				if threadScoped(spec.Scope) && m.opts.Tabs != nil {
+				if m.opts.Tabs != nil && (threadScoped(spec.Scope) || a.String("pane") != "") {
 					return m.openSurfaceTab(ctx, uctx, a, name, spec)
 				}
 				if m.opts.Emitter == nil {
@@ -184,19 +186,24 @@ func (m *Manager) showCommands(name string, mf pluginsdk.Manifest) []command.Com
 	return out
 }
 
-// openSurfaceTab is a thread or pull request surface's show command with a layout: a tab of
-// the surface linked to the thread, placed by the rules beside it like the view.open verbs'
-// (docs/notes/shell-24a-import-moves.md, item 5). Its identity is one per surface and thread
-// (internal/layout identity.go). The user's own call focuses it; a thread's, a page's or a
-// plugin's never does without --focus.
+// openSurfaceTab is a show command with a layout for a thread or pull request surface, or for
+// any surface given --pane: a tab of the surface, linked to the thread when the surface is a
+// thread's, placed by the rules beside it like the view.open verbs'
+// (docs/notes/shell-24a-import-moves.md, item 5), or in the pane given (a pane's "+" menu). Its
+// identity is one per surface and thread (internal/layout identity.go); a surface of another
+// scope opened in a pane is the space's one unlinked tab of it, as the window opens it. The
+// user's own call focuses it; a thread's, a page's or a plugin's never does without --focus.
 func (m *Manager) openSurfaceTab(ctx context.Context, uctx command.Context, a command.Args, name string, spec pluginsdk.SurfaceSpec) (command.Result, error) {
-	thread := uctx.ActiveThreadID
+	thread := ""
+	if threadScoped(spec.Scope) {
+		thread = uctx.ActiveThreadID
+	}
 	focus := uctx.FromUser()
 	if a.Given("focus") {
 		focus = a.Bool("focus")
 	}
 	tb := &layout.Tab{Kind: SurfaceKind(name, spec.ID), Thread: thread, Title: spec.Title}
-	r, err := m.opts.Tabs.OpenTab(ctx, tb, focus)
+	r, err := m.opts.Tabs.OpenTab(ctx, tb, a.String("pane"), focus)
 	if err != nil {
 		return command.Result{}, fmt.Errorf("could not open its tab: %w", err)
 	}
@@ -205,7 +212,10 @@ func (m *Manager) openSurfaceTab(ctx context.Context, uctx command.Context, a co
 	if r.Existing {
 		verb = "found"
 	}
-	msg := fmt.Sprintf("%s %s for thread %s as tab %s in pane %s", verb, spec.Title, thread, r.Tab, r.Pane)
+	msg := fmt.Sprintf("%s %s as tab %s in pane %s", verb, spec.Title, r.Tab, r.Pane)
+	if thread != "" {
+		msg = fmt.Sprintf("%s %s for thread %s as tab %s in pane %s", verb, spec.Title, thread, r.Tab, r.Pane)
+	}
 	if !focus {
 		msg += " (the user's focus did not move)"
 	}

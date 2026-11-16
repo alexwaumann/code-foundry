@@ -27,7 +27,7 @@ export function isPluginKind(kind: string): boolean {
 }
 
 /** A context key without its terminal (a focused bottom shell does not change a surface's scope). */
-function scopeKey(key: string): string {
+export function scopeKey(key: string): string {
   const parts = key.split("\u0000");
   parts.splice(1, 1);
   return parts.join("\u0000");

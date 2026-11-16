@@ -15,8 +15,8 @@ import (
 // tabsOver is plugin.TabOpener over a layout store, as the daemon's (plugin_tabs.go).
 type tabsOver struct{ store layoutstore.Store }
 
-func (o tabsOver) OpenTab(ctx context.Context, tb *core.Tab, focus bool) (core.Result, error) {
-	c, err := o.store.Apply(ctx, &core.OpenSurface{Tab: tb, Focus: focus}, layoutstore.ApplyOptions{KeepFocus: !focus})
+func (o tabsOver) OpenTab(ctx context.Context, tb *core.Tab, pane string, focus bool) (core.Result, error) {
+	c, err := o.store.Apply(ctx, &core.OpenSurface{Pane: pane, Tab: tb, Focus: focus}, layoutstore.ApplyOptions{KeepFocus: !focus})
 	return c.Result, err
 }
 

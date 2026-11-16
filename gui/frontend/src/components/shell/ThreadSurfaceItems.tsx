@@ -11,7 +11,9 @@ import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, useTab, type TabEntry } from "@/stores/layout";
 import { useProjectsStore } from "@/stores/projects";
 import { useThreadsStore } from "@/stores/threads";
+import { ThreadPluginItem } from "./PluginSurfaceItems";
 import { SpaceIcon } from "./SpaceIcon";
+import { useListedSurfaceKinds, useShowCommands } from "./usePluginSurfaces";
 
 const SEP = "\u0001";
 
@@ -82,7 +84,8 @@ function SurfaceItem({ item, kit, onPick }: { item: ThreadSurfaceItem; kit: Menu
 /**
  * A thread's surfaces, the items of its header's Open ▸ and of the "+" menu's thread submenu
  * (docs/notes/shell-model.md): its diff of each checkout and its pull requests, each marked
- * "open" when its tab is open in the space; then its terminal tabs there and New terminal tab.
+ * "open" when its tab is open in the space; its plugin surfaces (scope thread or pr) whose show
+ * command is available for it; then its terminal tabs there and New terminal tab.
  * The tabs of threads it created (diffs, pull requests, terminals) are listed with its own.
  * Picking an open one focuses it where it is; another opens in `pane` (the "+" menu's) or, with
  * none, by the placement rules (shell/linked.ts surfaceAction), which open a closed thread's in the
@@ -104,6 +107,7 @@ export function ThreadSurfaceItems({
 }) {
   const { diffs, prs, terminals } = useThreadSurfaces(threadId, spaceId);
   const views = [...diffs, ...prs];
+  const plugins = useListedSurfaceKinds(true, useShowCommands(threadId));
   return (
     <>
       {views.map((item) => (
@@ -116,7 +120,10 @@ export function ThreadSurfaceItems({
           }}
         />
       ))}
-      {views.length > 0 && <kit.Separator />}
+      {plugins.map((kind) => (
+        <ThreadPluginItem key={kind} kind={kind} threadId={threadId} spaceId={spaceId} pane={pane} kit={kit} onPick={onPick} />
+      ))}
+      {views.length + plugins.length > 0 && <kit.Separator />}
       <kit.Label className="text-caption text-cf-text-muted">Terminals</kit.Label>
       {terminals.map((item) => (
         <SurfaceItem

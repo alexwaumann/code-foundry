@@ -96,8 +96,9 @@ when the first working version is whole. Nothing partial is released.
   does. The last space cannot be removed.
 - **A pane's "+"** opens a menu of surfaces, built with the app's existing dropdown and submenu
   components. With a thread tab active it has a submenu for that thread's surfaces, then the general
-  ones (new thread, terminal, Pull Requests, Projects). Without a thread it has only the general
-  ones. The choice always opens in that pane, except that a linked surface which is already open is
+  ones (new thread, terminal, Pull Requests, Projects), then under a Plugins label the plugin
+  surfaces of no thread that can show (a thread's plugin surfaces are in its submenu;
+  plus-menu-plugins.md). Without a thread it has no submenu. The choice always opens in that pane, except that a linked surface which is already open is
   focused where it is. One exception to the menu: in a pane that holds only terminals, while
   anything else there would not fit ("Room for panes"), the menu lists only terminals.
 - **Reopening closed tabs.** cmd+shift+t reopens the most recently closed tab or pane of the
