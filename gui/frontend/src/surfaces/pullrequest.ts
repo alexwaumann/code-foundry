@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { GitPullRequest } from "lucide-react";
+import { PullRequestTabIcon } from "@/components/pr/PrRefIcon";
 import { PullRequestSurface } from "@/components/pr/PullRequestSurface";
 import { COPY_LINK_CHORD } from "@/components/pr/keys";
 import { branchKey, branchPullRequestsResource } from "@/stores/gh";
@@ -29,12 +30,13 @@ function currentPullRequest(sel: Selection): PrRef | null {
  * otherwise, including on the Pull Requests page, whose rows open a pull request
  * explicitly (openSurface with pullRequestTab). Hidden for a thread without a project,
  * which has no branch (a pull request it linked opens from the thread info card). Tabs: params
- * { slug, number }, title #N.
+ * { slug, number }, title #N, and the icon of the pull request's state in its colour.
  */
 export const pullRequestSurface: SurfaceSpec = {
   kind: PULL_REQUEST_KIND,
   title: "Pull request",
   icon: GitPullRequest,
+  TabIcon: PullRequestTabIcon,
   hotkey: "p",
   available: (ctx) => (noProjectNow(ctx.selection) ? "hidden" : currentPullRequest(ctx.selection) ? "enabled" : "disabled"),
   watches: [useProjectsStore, useThreadsStore, branchPullRequestsResource.store],

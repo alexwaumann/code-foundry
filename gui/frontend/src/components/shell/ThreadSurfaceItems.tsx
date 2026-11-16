@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { GitPullRequest, Plus, SquareTerminal } from "lucide-react";
+import { Plus, SquareTerminal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
+import { PrRefIcon } from "@/components/pr/PrRefIcon";
 import { dropdownMenuKit, type MenuKit } from "@/components/thread/menuKit";
 import { useThreadCheckouts } from "@/components/thread/useThreadCheckouts";
 import { newTerminalAction, spaceChoices, spaceTabs, surfaceAction, threadSurfaces, type LinkedAction, type ThreadSurfaceItem } from "@/shell/linked";
@@ -52,14 +53,14 @@ function TerminalTabLabel({ tabId }: { tabId: string }) {
 }
 
 function SurfaceItem({ item, kit, onPick }: { item: ThreadSurfaceItem; kit: MenuKit; onPick: () => void }) {
-  const Icon = item.kind === "pullrequest" ? GitPullRequest : shellSurfaceOf("diff").icon;
+  const DiffIcon = shellSurfaceOf("diff").icon;
   return (
     <kit.Item onSelect={onPick} data-testid="thread-surface-item" data-kind={item.kind} data-key={item.key} data-open={item.openTab ? "" : undefined}>
       {item.kind === "terminal" ? (
         <TerminalTabLabel tabId={item.tabId} />
       ) : (
         <>
-          <Icon className={item.kind === "pullrequest" ? "text-cf-success-text" : undefined} />
+          {item.kind === "pullrequest" ? <PrRefIcon slug={item.slug} number={item.number} /> : <DiffIcon />}
           <span className="truncate">{item.label}</span>
         </>
       )}
