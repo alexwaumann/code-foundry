@@ -115,3 +115,7 @@ Five runs each, ms (WebKit's timer is coarse):
   to its end. It was the code view's, not this change's, and any long file's: fixed in the
   virtualizer's scroll anchor (`patches/@pierre__diffs@1.5.2.patch`) and CodeBody's line
   jump, docs/notes/file-tab-large-file-scroll.md.
+- The grid's rows are placed in layout px, and an expandable grid measures each row with
+  `getBoundingClientRect`, which is in viewport px: the measure divides by the page zoom
+  (`lib/zoom.ts`). Without that, at 90% every row sat too high and the rows after an open
+  record drew over it; above 100% they left gaps. `file-previews-tables.spec.ts` checks it at 90%.

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CF, openApp, resetMock } from "./fixtures";
+import { CF, openApp, resetMock, setZoom } from "./fixtures";
 import { openThread } from "./shell";
 
 /**
@@ -47,6 +47,24 @@ test("a 1 MiB CSV mounts a screenful of rows; the header and the gutter stay put
   const gridLeft = (await grid.boundingBox())?.x ?? 0;
   const gutter = grid.locator("[role=rowheader]", { hasText: /^10400$/ });
   expect(Math.round(((await gutter.boundingBox())?.x ?? 0) - gridLeft)).toBe(0);
+});
+
+test("an open record's rows do not overlap under page zoom", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await openApp(page);
+  await setZoom(page, 90);
+  await openThread(page, "s-1");
+  await openFile(page, "evals/run-07/results.jsonl");
+  const rows = file(page).getByTestId("grid-row");
+  await rows.nth(1).locator(".cf-grid-line").click();
+  await expect(file(page).getByTestId("jsonl-record-tree")).toBeVisible();
+  // Each row starts where the one before it ends: the open record's height included.
+  await expect
+    .poll(async () => {
+      const boxes = await rows.evaluateAll((els) => els.slice(0, 5).map((el) => el.getBoundingClientRect()).map((r) => [r.top, r.bottom]));
+      return boxes.slice(1).every(([top = 0], i) => Math.abs(top - (boxes[i]?.[1] ?? 0)) < 1);
+    })
+    .toBe(true);
 });
 
 const shots = process.env.SHOTS;
