@@ -32,6 +32,8 @@ type Options struct {
 	FocusDelay time.Duration
 	// SmartSwap reports the setting layout.smart_swap, read at every op; nil: on.
 	SmartSwap func() bool
+	// SmartPlacement reports the setting layout.smart_placement, read at every op; nil: on.
+	SmartPlacement func() bool
 }
 
 // Manager is the Store backed by SQLite.
@@ -144,7 +146,9 @@ func (m *Manager) Apply(ctx context.Context, op core.Op, opts ApplyOptions) (Com
 	prev := m.state
 	vp := m.Viewport()
 	core.WithArea(op, vp.Width, vp.Height)
-	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, core.Options{KeepFocus: opts.KeepFocus, NoSmartSwap: m.opts.SmartSwap != nil && !m.opts.SmartSwap()})
+	next, res, err := core.ApplyWith(prev, op, m.opts.IDs, core.Options{KeepFocus: opts.KeepFocus,
+		NoSmartSwap:      m.opts.SmartSwap != nil && !m.opts.SmartSwap(),
+		NoSmartPlacement: m.opts.SmartPlacement != nil && !m.opts.SmartPlacement()})
 	if err != nil {
 		return Commit{}, err
 	}

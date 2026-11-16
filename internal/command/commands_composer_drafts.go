@@ -23,7 +23,7 @@ func (l layout) composerCommands() []Command {
 	return []Command{
 		{
 			Name: "composer.new", Title: "New Thread in a Tab", Category: layoutCategory, Page: PageState,
-			Description: "Focus the space's empty composer, or open one in the focused pane (--pane: that pane, which an " +
+			Description: "Focus the space's empty composer, or open one where a thread's tab opens (thread.open) (--pane: that pane, which an " +
 				"empty composer open elsewhere in the space moves to). --project, --workspace or --like say what the " +
 				"thread will start from.",
 			Args: []ArgSpec{
@@ -95,7 +95,7 @@ func (l layout) composerCommands() []Command {
 		},
 		{
 			Name: "composer.draft.open", Title: "Open Draft", Category: layoutCategory, Page: PageState,
-			Description: "Focus a draft's tab, or open it in its space's focused pane.",
+			Description: "Focus a draft's tab, or open it in its space where a thread's tab opens (thread.open).",
 			Args:        []ArgSpec{draftArg(), focusArg},
 			NoPalette:   true, NoIndex: true, NoKeybinding: true,
 			Run: func(ctx context.Context, uctx Context, a Args) (Result, error) {

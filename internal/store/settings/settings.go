@@ -59,6 +59,9 @@ type Layout struct {
 	// SmartSwap switches panes to the focused thread's surfaces when they are open there
 	// (internal/layout swap.go).
 	SmartSwap bool
+	// SmartPlacement opens a thread's own tab beside the other threads rather than in a
+	// focused pane holding none (internal/layout place.go threadHost).
+	SmartPlacement bool
 	// ThreadInfo shows the info card of a thread whose card was never toggled (the GUI's
 	// thread pane; internal/layout info.go keeps each thread's own choice).
 	ThreadInfo bool
