@@ -354,7 +354,7 @@ func RegisterThreadLifecycle(r *Registry, b ThreadBackend, e Emitter, opts ...Th
 			Page:        PageState,
 			NoIndex:     true,
 			Title:       "Regenerate Thread Name",
-			Description: "Name the thread again from its most recent turns.",
+			Description: "Name the thread again by its overall task, from its first message and latest turns.",
 			Category:    "Thread",
 			Args:        []ArgSpec{idArg},
 			When:        hasThread,

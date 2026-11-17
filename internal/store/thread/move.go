@@ -275,7 +275,8 @@ func (m *Manager) placeMove(ctx context.Context, id string, o MoveOptions, place
 	if snap, err := m.Items(ctx, id); err != nil {
 		m.log.Warn("read the conversation to name a moved thread", "thread", id, "err", err)
 	} else {
-		conv = recentTurnsContext(snap.Items)
+		t, _ := m.Snapshot().Thread(id)
+		conv = threadNamingContext(t.Name, t.NameProvisional, snap.Items)
 	}
 	co := CreateOptions{ProjectID: o.ProjectID, WorktreePath: o.WorktreePath, WorkspaceID: o.WorkspaceID,
 		NewWorktree: o.NewWorktree, CheckoutMode: o.CheckoutMode && o.NewWorktree == nil}

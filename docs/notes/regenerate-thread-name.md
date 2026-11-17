@@ -1,10 +1,56 @@
 # Regenerate a thread's name
 
 A thread's name comes from its first prompt (provisional, then the naming model's title).
-Long threads drift: the name still says what the thread was first asked, not what it is
-doing now. Regenerate name asks the naming model again, from the most recent turns.
+Regenerate name asks the naming model again. Since 2026-11-17 the name says the thread's
+**overall task** and stays the same unless the topic really changed (see "The rule
+changed" below); the first version named "what the thread is doing now".
 
-## Decisions
+## The rule changed (2026-11-17)
+
+A user found Regenerate name naming a thread after its last small follow-up. The cause:
+the context was the last 3 user messages plus assistant text, capped at 4000 bytes keeping
+the newest text, so one long final reply filled the cap and the model saw only the tail
+of the last exchange; the prompt ("judged by its most recent turns") pushed the same way.
+Reproduced on a scratch daemon with Sonnet 5.5: a thread asked to make `slugify` robust,
+then "thanks, also fix the typo…", then a 5.3 KB explanation of NFKD; the old context and
+prompt gave "Explain Unicode NFKD accent stripping".
+
+The user's decision: the name says the thread's overall task, stable unless the topic
+really changed. This replaces the 2026-10-31 rule "what the thread is doing now".
+
+- **Context** (`threadNamingContext`, `internal/store/thread/regenerate.go`):
+  `Current name: <name>` when the thread has one that is not provisional (a provisional
+  name is the first message again); the first user message (the original task); a
+  `(<n> user messages left out)` line when the recent turns do not reach it; then the last
+  6 user messages and the assistant text after each. The first message appears once when
+  it is one of the 6.
+- **Each block is capped on its own**, so no single long reply can crowd out the rest:
+  the first message 1200 bytes, a later user message 600, an assistant block (its text
+  blocks in a row, joined) 300. A long block keeps its **head and its end** around `…`
+  (two thirds head, cut at rune boundaries, spaces at the cut trimmed): the head holds the
+  ask or the plan, the end holds a question typed after pasted logs, or a reply's
+  conclusion. Head only would lose "…here is the log. Why does this fail?"; tail only
+  (the old rule) loses the ask.
+- **Overall bound** `maxNamingContext` (8000 bytes). The per-block caps keep every
+  context under it by construction (worst case about 7000 bytes: a 200-byte name, the
+  first message, the gap line, 6 user and 6 assistant blocks at their caps, labels and
+  separators), and `TestThreadNamingContextBound` checks that worst case, so there is no
+  drop-the-oldest pass.
+- **Prompt** (`threadGuide` in `naming.go`, in both the title-only and the title+branch
+  prompts): name the overall task; the latest messages may be small follow-ups and must
+  not decide the name on their own; keep the current name's subject unless the work
+  clearly moved on. The conversation goes under `Thread:` (was `Recent conversation:`).
+  Title format rules unchanged.
+- **Move** uses the same context and wording (it named a moved thread from
+  `recentTurnsContext` too), so the two stay one rule.
+- Verified end to end on a scratch dev daemon (`models.utility` = Sonnet 5.5, thread on
+  Sonnet 5.5 medium): after the task, "thanks, also fix the typo in the summarise
+  docstring" and the long NFKD reply, five regenerates all gave "Make slugify robust with
+  tests" (the first-prompt name). Two turns on an unrelated new task (`word_count`,
+  `reading_time`) then gave "Add word_count and reading_time helpers" twice: a real topic
+  change still renames.
+
+## Decisions (2026-10-31; the context and prompt are superseded above)
 
 - **Context is the last few turns, not the whole thread.** `recentTurnsContext`
   (`internal/store/thread/regenerate.go`) takes the thread's last 3 user messages and the

@@ -68,7 +68,7 @@ export function renameThread(id: string, name: string): Promise<boolean> {
 }
 
 /**
- * thread.regenerate-name: the utility model titles the thread from its most recent turns,
+ * thread.regenerate-name: the utility model titles the thread by its overall task,
  * replacing its name. The daemon answers once the model did; meanwhile the thread's
  * `naming` flag shows the name muted. A failure keeps the name and toasts.
  */

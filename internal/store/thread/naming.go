@@ -34,10 +34,10 @@ type NamingRequest struct {
 	Name string
 	// Branch asks for a branch too; nil asks for the title only.
 	Branch *BranchRequest
-	// Conversation is the thread's most recent turns (recentTurnsContext) when the user
-	// asked to name it again (RegenerateName, Move): the title names what the thread is
-	// doing now, and Message is not used. With Branch (a Move into a new worktree) the
-	// branch is named from it too.
+	// Conversation is the thread (threadNamingContext: its current name, first message
+	// and latest turns) when it is named again (RegenerateName, Move): the title names
+	// the thread's overall task, and Message is not used. With Branch (a Move into a new
+	// worktree) the branch is named from it too.
 	Conversation string
 }
 
@@ -155,12 +155,18 @@ const namingPrompt = "Write a short title of 3 to 6 words that names the coding 
 	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
 	"Reply with only the title.\n\nRequest:\n"
 
-// regenerateNamingPrompt asks for a title from a thread's recent turns; they follow it.
-const regenerateNamingPrompt = "Write a short title of 3 to 6 words that names what the coding thread below is currently working on, " +
-	"judged by its most recent turns. " +
+// threadGuide is how a thread is named from its conversation (threadNamingContext):
+// by its overall task, not its last message.
+const threadGuide = "The thread below starts with its first request and ends with its latest turns; " +
+	"the latest messages may be small follow-ups (a thank-you, a typo, a question) and must not decide the name on their own. " +
+	"When a current name is given, keep its subject unless the work has clearly moved on to something else.\n"
+
+// regenerateNamingPrompt asks for a title from a thread's conversation; it follows.
+const regenerateNamingPrompt = "Write a short title of 3 to 6 words that names the overall task of the coding thread below. " +
+	threadGuide +
 	"Use sentence case (capitalize only the first word and proper nouns), no trailing period, " +
 	"no quotes and no markdown. Examples: Fix the login redirect; Add release channel switcher. " +
-	"Reply with only the title.\n\nRecent conversation:\n"
+	"Reply with only the title.\n\nThread:\n"
 
 // namingTitleRule is how the title is written when a branch is asked for too.
 const namingTitleRule = "Title: a short title of 3 to 6 words that names the coding task, in sentence case " +
@@ -186,7 +192,7 @@ func buildNamingPrompt(req NamingRequest) string {
 	}
 	var p strings.Builder
 	if conv != "" {
-		p.WriteString("Name what the coding thread below is currently working on, judged by its most recent turns, twice: a title and a git branch.\n" + namingTitleRule)
+		p.WriteString("Name the overall task of the coding thread below twice: a title and a git branch.\n" + threadGuide + namingTitleRule)
 	} else {
 		p.WriteString("Name the coding task in the request below twice: a title and a git branch.\n" + namingTitleRule)
 	}
@@ -213,7 +219,7 @@ func buildNamingPrompt(req NamingRequest) string {
 		p.WriteString("\nThe user named this task: " + n + "\n")
 	}
 	if conv != "" {
-		p.WriteString("\nRecent conversation:\n" + conv)
+		p.WriteString("\nThread:\n" + conv)
 		return p.String()
 	}
 	if strings.TrimSpace(msg) == "" {

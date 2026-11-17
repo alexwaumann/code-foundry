@@ -4405,7 +4405,7 @@ export class World {
         },
       },
       {
-        cmd: { name: "thread.regenerate-name", title: "Regenerate Thread Name", category: "Thread", description: "Name the thread again from its most recent turns.", keybindings: [], args: [] },
+        cmd: { name: "thread.regenerate-name", title: "Regenerate Thread Name", category: "Thread", description: "Name the thread again by its overall task, from its first message and latest turns.", keybindings: [], args: [] },
         when: (ctx) => activeThread(ctx) !== undefined,
         // The daemon's shape: naming on while "the model" works, then the title, AutoNamed and naming off.
         run: async (ctx) => {
