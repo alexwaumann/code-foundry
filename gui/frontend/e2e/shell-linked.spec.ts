@@ -202,11 +202,11 @@ for (const scheme of ["dark", "light"] as const) {
     await linkPr();
     // The linked terminal runs make dev and has left its thread's directory: its row shows the hint.
     await mockPost("terminal/facts?id=t-s1-shell&foreground=make%20dev&liveCwd=/tmp");
-    // s-2 waits on a permission: its tab's icon has the attention dot.
+    // s-2 waits on a permission: its tab's icon has the amber status dot.
     await seed(two(pane("p-1", [thread("s-1"), thread("s-2")]), pane("p-2", [diff, pr, term, { id: "t-prs", kind: "prs", title: "Pull Requests" }])), "p-1");
     await openShell(page);
     await expect(paneEl(page, "p-2").getByTestId("shell-linked-row")).toBeVisible();
-    await expect(paneEl(page, "p-1").getByTestId("shell-tab-attention")).toBeVisible();
+    await expect(paneEl(page, "p-1").getByTestId("shell-tab-status")).toBeVisible();
     await page.mouse.move(700, 880);
     await still(page);
     await page.screenshot({ path: at("linked-row") });

@@ -1078,7 +1078,7 @@ verb in `settings.toml` is reported and dropped, never fatal.
   panes placed from the layout's tree, 12 px gutters that drag (`pane.resize`) and take the
   keyboard. A pane (`PaneView.tsx`) is its tab strip (`PaneTabStrip.tsx`: the tab is the
   title; tabs shorten, then go icon-only, `geometry/tabFit.ts`, with a tooltip only for a cut
-  name; the attention dot on a thread's icon; "+" at the end, `PanePlusMenu.tsx`, a menu of
+  name; the status dot on a thread's icon, in its sidebar status colour; "+" at the end, `PanePlusMenu.tsx`, a menu of
   surfaces; collapse and full screen at the right), the quiet row under the strip that names a linked
   tab's thread and links back (`LinkedRow.tsx`), and the active tab's body only. A space with
   no pane shows the composer (`EmptySpace.tsx`).

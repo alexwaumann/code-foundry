@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutOf, pane, seedLayout, space, tab } from "@/test/shellLayout";
+import type { StatusLineKind } from "@/lib/statusLine";
 
 const calls: [string, string][] = [];
 vi.mock("@/shell/commands", () => ({
@@ -24,6 +25,7 @@ const { tooltipText } = await import("@/test/tooltip");
 const { useTabCut } = await import("@/shell/tabCut");
 const { resetLayout } = await import("@/stores/layout");
 const { useThreadsStore } = await import("@/stores/threads");
+const { statusRegistry } = await import("@/lib/statusRegistry");
 
 const strip = layoutOf([
   space(
@@ -128,21 +130,29 @@ describe("PaneTabStrip", () => {
     expect(tabs().map((t) => t.getAttribute("data-label"))).toEqual(["full", "full", "full", "full"]);
   });
 
-  it("marks a thread's tab icon with the attention dot while its thread needs the user, active or not, never when archived", () => {
-    const attention = (o: object = {}) => {
-      act(() => {
-        useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "attention", archivedAtMs: null, ...o } } as never });
-      });
-    };
+  it.each([
+    { name: "idle", thread: { status: "idle" }, kind: null, tone: null },
+    { name: "working", thread: { status: "busy" }, kind: "working", tone: "bg-cf-info" },
+    { name: "a permission ask", thread: { status: "attention", statusReason: "permission: Bash" }, kind: "input", tone: "bg-cf-warning" },
+    { name: "done", thread: { status: "attention", statusReason: "finished" }, kind: "finished", tone: "bg-cf-success" },
+    { name: "an error", thread: { status: "error" }, kind: "error", tone: "bg-cf-error" },
+    { name: "archived while asking", thread: { status: "attention", statusReason: "permission: Bash", archivedAtMs: 1 }, kind: null, tone: null },
+  ])("a thread's tab icon carries its status's dot, active or not: $name", ({ thread, kind, tone }) => {
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", statusReason: "", archivedAtMs: null, ...thread } } as never });
+    });
     render(<PaneTabStrip paneId="p-1" focused />);
-    const dots = () => tabs().map((t) => t.querySelector('[data-testid="shell-tab-attention"]') !== null);
-    expect(dots()).toEqual([false, false, false, false]);
-    attention();
+    const dots = tabs().map((t) => t.querySelector('[data-testid="shell-tab-status"]'));
     // Only the thread's own tab, not its diff; the thread's tab is not the active one here.
-    expect(dots()).toEqual([true, false, false, false]);
-    expect(tabs()[0]?.querySelector('[data-testid="shell-tab-attention"]')?.getAttribute("aria-label")).toBe("Needs you");
-    attention({ archivedAtMs: 1 });
-    expect(dots()).toEqual([false, false, false, false]);
+    expect(dots.slice(1).every((d) => d === null)).toBe(true);
+    const dot = dots[0] ?? null;
+    if (kind === null) {
+      expect(dot).toBeNull();
+      return;
+    }
+    expect(dot?.getAttribute("data-kind")).toBe(kind);
+    expect(dot?.classList.contains(tone)).toBe(true);
+    expect(dot?.getAttribute("aria-label")).toBe(statusRegistry[kind as StatusLineKind].word);
   });
 
   it("a linked tab's hover names its thread; another tab's only a cut name", () => {

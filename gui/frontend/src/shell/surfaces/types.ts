@@ -4,6 +4,7 @@
  * the pane and its strip look surfaces up by kind and never switch on it.
  */
 import type { ComponentType, ReactNode } from "react";
+import type { StatusLineKind } from "@/lib/statusLine";
 import type { TabEntry } from "@/stores/layout";
 
 export interface ShellSurface {
@@ -42,8 +43,11 @@ export interface ShellSurface {
    * "directory differs · Reset" hint (PR 13). Nothing when absent.
    */
   linkedRowEnd?: (tab: TabEntry) => ReactNode;
-  /** A hook: the tab's thread needs the user, which its strip marks with the attention dot on the icon. */
-  useAttention?: (tab: TabEntry) => boolean;
+  /**
+   * A hook: the status of the tab's thread, which its strip marks with a dot on the icon in the
+   * status's colour (lib/statusRegistry, as the sidebar row's icon); null for no dot (idle).
+   */
+  useStatus?: (tab: TabEntry) => StatusLineKind | null;
   /** A hook: the tab holds unsaved work (a File tab editing), which its strip marks with a dot. */
   useUnsaved?: (tab: TabEntry) => boolean;
   /**

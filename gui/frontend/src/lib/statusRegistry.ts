@@ -38,6 +38,15 @@ export const rowToneClasses: Readonly<Record<RowTone, string>> = {
   muted: "text-cf-sidebar-muted-foreground",
 };
 
+/** The fill class of each tone, for a status dot (a thread tab's, components/shell/PaneTabStrip StatusDot). */
+export const rowToneDotClasses: Readonly<Record<RowTone, string>> = {
+  warning: "bg-cf-warning",
+  error: "bg-cf-error",
+  success: "bg-cf-success",
+  info: "bg-cf-info",
+  muted: "bg-cf-sidebar-muted-foreground",
+};
+
 /**
  * Which time line 1 shows after the word:
  * - "none": no time (attention, error and done kinds; the hover card shows it)
