@@ -52,6 +52,7 @@
  *     command emits it; answers {"delivered": <watchers>})
  *   POST /__mock/thread/transcript?id=s-3[&missing=false]   (Claude Code deleted the thread's transcript:
  *     Thread.transcript_missing; stopped and held; thread.send and thread.fork refuse it)
+ *   POST /__mock/thread/naming?id=s-1[&on=false]   (the name held in regeneration until turned off: muted and italic in the sidebar and its tab)
  *   POST /__mock/thread/setup?id=s-1&state=running|fresh|warn|multi|failed|cancelled|done|done-warn[&queued=1]
  *     (Thread.setup: the thread stands where that script of mock/setup.ts leaves it, with no cwd
  *     until it is placed and held, and its timeline is its first message and, for a setup that did
@@ -1000,8 +1001,9 @@ function threadSummary(id: string): Record<string, unknown> {
 const statusNames: Record<string, ThreadStatus> = { busy: ThreadStatus.BUSY, idle: ThreadStatus.IDLE, attention: ThreadStatus.NEEDS_ATTENTION };
 
 /**
- * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|wake|transcript|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
+ * Thread controls: POST /__mock/thread/{attention|status|stop|hold|focus|archive|forget|snooze|wake|transcript|naming|setup|move-fail|move-delay}?id=…[&status=…][&reason=…&code=…].
  * transcript: [&missing=false] (Claude Code deleted the thread's transcript: stopped, held and flagged).
+ * naming: [&on=false] (the name held in regeneration, World.setNaming).
  */
 function threadControl(res: ServerResponse, action: string, q: URLSearchParams): void {
   const id = q.get("id") ?? "";
@@ -1056,6 +1058,9 @@ function threadControl(res: ServerResponse, action: string, q: URLSearchParams):
       case "transcript":
         world.setTranscriptMissing(id, q.get("missing") !== "false");
         break;
+      case "naming":
+        world.setNaming(id, q.get("on") !== "false");
+        break;
       case "setup":
         world.scriptSetup(id, q.get("state") ?? "running", q.get("queued") === "1");
         break;
@@ -1095,7 +1100,7 @@ function pluginControl(res: ServerResponse, what: string, q: URLSearchParams): v
 }
 
 function control(req: IncomingMessage, res: ServerResponse, path: string, q: URLSearchParams): void {
-  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|wake|transcript|setup|move-fail|move-delay)$/.exec(path);
+  const thread = /^\/__mock\/thread\/(attention|status|stop|hold|focus|archive|forget|snooze|wake|transcript|naming|setup|move-fail|move-delay)$/.exec(path);
   if (req.method === "POST" && thread?.[1]) {
     threadControl(res, thread[1], q);
     return;

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { LinkedAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
 import { usePaneTabCut } from "@/shell/tabCut";
+import { useNameProvisional } from "@/shell/useThreadName";
 import { useLayoutStore } from "@/stores/layout";
 import { useThreadsStore } from "@/stores/threads";
 import { dropdownMenuKit, focusPromptAfterMenu, keepFocusAfterMenu } from "./menuKit";
@@ -129,11 +130,13 @@ function ThreadHeaderMenu({ threadId, paneId }: { threadId: string; paneId: stri
 export function ThreadHeader({ threadId, paneId }: { threadId: string; paneId: string }) {
   const cut = usePaneTabCut(paneId);
   const name = useThreadsStore((s) => s.byId[threadId]?.name || threadId);
+  // Muted and italic while the name is not final, as the tab it stands in for.
+  const provisional = useNameProvisional(threadId);
   return (
     <header className="flex h-10 shrink-0 items-center gap-2 border-b border-cf-divider px-3" data-testid="thread-header" data-shell="">
       <span className="flex min-w-0 flex-1 items-center gap-2" data-testid="thread-title-bar">
         {cut && (
-          <span className={cn("min-w-0 shrink-[100] truncate text-label font-medium text-cf-text")} data-testid="thread-header-name">
+          <span className={cn("min-w-0 shrink-[100] truncate text-label font-medium", provisional ? "text-cf-text-muted italic" : "text-cf-text")} data-testid="thread-header-name" data-provisional={provisional || undefined}>
             {name}
           </span>
         )}

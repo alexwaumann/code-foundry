@@ -13,6 +13,12 @@ export interface ShellSurface {
   /** The tab's name, kept current (a hook): a thread's comes from the thread, looked up by id. */
   useTitle: (tab: TabEntry) => string;
   /**
+   * A hook: the title is a thread's name that is not final yet (provisional, or being
+   * regenerated), which the strip draws muted and italic as the sidebar does. Only for a kind whose
+   * title is a thread's name; false without it.
+   */
+  useNameProvisional?: (tab: TabEntry) => boolean;
+  /**
    * The body. A pane mounts it only while the tab is the pane's active tab, under key={tab.id}:
    * a tab that is not showing holds no stream.
    */

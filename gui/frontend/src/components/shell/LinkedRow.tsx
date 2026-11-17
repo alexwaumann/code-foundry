@@ -3,7 +3,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { linkedRowOf, rowAction } from "@/shell/linked";
 import { runLinked } from "@/shell/linkedRun";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
-import { useLeadThread, useThreadName } from "@/shell/useThreadName";
+import { useLeadThread, useNameProvisional, useThreadName } from "@/shell/useThreadName";
 import { cn } from "@/lib/utils";
 import { useLayoutStore, type TabEntry } from "@/stores/layout";
 import { ThreadDot } from "./ThreadDot";
@@ -22,6 +22,8 @@ export function LinkedRow({ tab }: { tab: TabEntry }) {
   const row = useLayoutStore(useShallow((s) => linkedRowOf(s, tab, lead)));
   const surface = shellSurfaceOf(tab.kind);
   const name = useThreadName(lead);
+  // Muted and italic while the lead's name is not final, as its sidebar row and tab.
+  const provisional = useNameProvisional(lead);
   const spaceName = useLayoutStore((s) => (row?.elsewhere ? (s.spaces[row.elsewhere]?.name ?? row.elsewhere) : ""));
   if (!row) return null;
   const end = surface.linkedRowEnd?.(tab);
@@ -43,7 +45,7 @@ export function LinkedRow({ tab }: { tab: TabEntry }) {
         <span className="shrink-0 text-cf-text-muted">{surface.linkedNoun ?? tab.kind} of </span>
         <ThreadDot threadId={row.thread} className={cn(!row.live && "opacity-60")} />
         <Tip label={name} whenTruncated side="bottom">
-          <span className={cn("min-w-0 truncate", row.live ? "font-medium" : "")} data-testid="shell-linked-row-name">
+          <span className={cn("min-w-0 truncate", row.live ? "font-medium" : "", provisional && "text-cf-text-muted italic")} data-testid="shell-linked-row-name" data-provisional={provisional || undefined}>
             {name}
           </span>
         </Tip>

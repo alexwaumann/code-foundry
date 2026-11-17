@@ -55,13 +55,14 @@ export function AttentionDot({ use, tab }: { use: NonNullable<ShellSurface["useA
 function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"]; room: boolean }) {
   const surface = shellSurfaceOf(tab.kind);
   const title = surface.useTitle(tab);
+  const provisional = useTabNameProvisional(tab);
   return (
     <>
       <span className="relative flex shrink-0">
         <TabContentIcon tab={tab} />
         {!room && surface.useAttention && <AttentionDot use={surface.useAttention} tab={tab} />}
       </span>
-      <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate")} data-testid="shell-tab-label">
+      <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate", provisional && "text-cf-text-muted italic")} data-testid="shell-tab-label" data-provisional={provisional || undefined}>
         {title}
       </span>
       {!room && tab.preview && <span className="sr-only">, preview</span>}
@@ -85,6 +86,17 @@ export function TabContentIcon({ tab }: { tab: TabEntry }) {
   const TabIcon = surface.TabIcon;
   const Icon = surface.icon;
   return TabIcon ? <TabIcon tab={tab} className="size-3.5 shrink-0" /> : <Icon className="size-3.5 shrink-0" aria-hidden />;
+}
+
+const notProvisional = (): boolean => false;
+
+/**
+ * Whether the tab's title is a thread's name that is not final yet (ShellSurface.useNameProvisional):
+ * the strip draws it muted and italic, as the sidebar's row. A tab's kind never changes, so the
+ * hook its surface has (or none) is the same on every render.
+ */
+function useTabNameProvisional(tab: TabEntry): boolean {
+  return (shellSurfaceOf(tab.kind).useNameProvisional ?? notProvisional)(tab);
 }
 
 /** A tab's name, for a close button's label and the tooltip (a hook per tab, so a thread's rename shows). */

@@ -12,6 +12,7 @@ import { statusBadge, statusRegistry } from "@/lib/statusRegistry";
 import { threadBadge } from "@/lib/thread";
 import { cn } from "@/lib/utils";
 import { useThreadDrag } from "@/shell/drag/draggable";
+import { useNameProvisional } from "@/shell/useThreadName";
 import { discardDraft } from "@/shell/drafts";
 import { runCommandForResult } from "@/stores/commands";
 import { spaceOfThread, useLayoutStore } from "@/stores/layout";
@@ -79,7 +80,7 @@ function PlaceLabel({ id }: { id: string }) {
  */
 function Title({ id, quiet = false }: { id: string; quiet?: boolean }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
-  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
+  const provisional = useNameProvisional(id);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   if (renaming) {
     return (
