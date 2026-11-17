@@ -182,3 +182,58 @@ describe("the floating composer", () => {
     expect(screen.getByTestId("shell-pane").hasAttribute("data-fullscreen")).toBe(true);
   });
 });
+
+describe("a child's surface: the composer writes to the lead unless the child is open", () => {
+  let CHILD = "";
+  beforeEach(() => {
+    CHILD = `${ID}-kid`;
+    addThreads(thread(CHILD, { name: "Daemon half", state: "connected", status: "idle", createdBy: ID, worktreePath: CF, checkoutPaths: [{ projectId: "repo-cf", path: CF }] }));
+    act(() => {
+      useThreadStore.setState((s) => ({ logs: { ...s.logs, [CHILD]: { seq: 1, byId: {}, order: [], pending: [], mcp: null, commands: [], agents: [] } } }));
+    });
+  });
+
+  /** The child's diff full screen in p-1; p-2 holds `others` (the child's thread tab when `childOpen`). */
+  async function childDiff(childOpen: boolean): Promise<void> {
+    const others = [tab("t-prs", "prs"), ...(childOpen ? [tab("t-kid", "thread", CHILD)] : [])];
+    await act(async () => {
+      await seedLayout(layoutOf([space(row("s-r", [pane("p-1", [tab("t-d", "diff", CHILD, { params: { project: "repo-cf", worktree: CF } })], "t-d"), pane("p-2", others, "t-prs")]), "p-1")]));
+    });
+  }
+
+  it("names the lead and sends to it while the child has no tab in the space", async () => {
+    await childDiff(false);
+    render(<PaneView paneId="p-1" rect={RECT} focused />);
+    act(() => {
+      enterFullscreen();
+    });
+    expect(floating()?.getAttribute("data-thread-id")).toBe(ID);
+    expect(screen.getByTestId("floating-composer-pill").textContent).toContain("Refactor sidebar tree");
+    fireEvent.click(screen.getByTestId("floating-composer-pill"));
+    await settle();
+    expect(watching.get(ID)).toBe(1);
+    expect(watching.get(CHILD) ?? 0).toBe(0);
+    act(() => {
+      updateDraft(threadDraftKey(ID), { text: "Ask the child to keep the hunk" });
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("thread-send"));
+    });
+    await settle(20);
+    expect(sends().map((s) => [s.id, s.text])).toEqual([[ID, "Ask the child to keep the hunk"]]);
+  });
+
+  it("follows the child's tab opening and closing while full screen is on", async () => {
+    await childDiff(false);
+    render(<PaneView paneId="p-1" rect={RECT} focused />);
+    act(() => {
+      enterFullscreen();
+    });
+    await childDiff(true);
+    expect(floating()?.getAttribute("data-thread-id")).toBe(CHILD);
+    expect(screen.getByTestId("floating-composer-pill").textContent).toContain("Daemon half");
+    await childDiff(false);
+    expect(floating()?.getAttribute("data-thread-id")).toBe(ID);
+    expect(screen.getByTestId("floating-composer-pill").textContent).toContain("Refactor sidebar tree");
+  });
+});

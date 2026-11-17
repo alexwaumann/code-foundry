@@ -21,7 +21,7 @@ vi.mock("@/shell/commands", () => ({
   closeTabNow: () => Promise.resolve(null),
 }));
 
-const { clampFloat, enterFullscreen, escapeLeaves, promptEscapeLeaves, floatingThreadOf, fullscreenOn, fullscreenPaneOf, leaveFullscreen, presentFullscreen, toggleFullscreen } = await import("./fullscreen");
+const { clampFloat, enterFullscreen, escapeLeaves, promptEscapeLeaves, floatingTargetOf, floatingThreadOf, fullscreenOn, fullscreenPaneOf, leaveFullscreen, presentFullscreen, toggleFullscreen } = await import("./fullscreen");
 const { presentShellCommand } = await import("./keyPresenters");
 const { normalizeChord } = await import("@/keys/chord");
 
@@ -237,6 +237,49 @@ describe("the floating composer's thread", () => {
 
   it("no tab floats nothing", () => {
     expect(floatingThreadOf(undefined)).toBe("");
+  });
+});
+
+describe("the floating composer's target", () => {
+  // lead > child > grandchild; "solo" made by the user; "orphan" made by a removed thread; "c-a" and "c-b" made each other.
+  const T = (id: string, createdBy = "") => ({ id, createdBy });
+  const BY_ID = Object.fromEntries(
+    [T("lead"), T("child", "lead"), T("grand", "child"), T("solo"), T("orphan", "gone"), T("c-a", "c-b"), T("c-b", "c-a"), T("other-lead"), T("loop-kid", "c-a")].map((t) => [t.id, t]),
+  );
+  const diff = (thread: string) => tab("t-d", "diff", thread);
+
+  /** The current space "sp-a" with a pane holding the surface (active) and `tabs`; "sp-b" holding `elsewhere`. */
+  async function layout(surface: string, tabs: ReturnType<typeof tab>[], elsewhere: ReturnType<typeof tab>[] = []): Promise<void> {
+    const a = space(row("s-r", [pane("p-1", [diff(surface)], "t-d"), ...(tabs.length ? [pane("p-2", tabs)] : [])]), "p-1");
+    const b = space(elsewhere.length ? row("s-r2", [pane("p-9", elsewhere)]) : null, elsewhere.length ? "p-9" : "", { id: "sp-b", name: "Other" });
+    await seedLayout(layoutOf([a, b]));
+  }
+
+  it.each<[string, string, ReturnType<typeof tab>[], ReturnType<typeof tab>[], string]>([
+    ["not a child", "solo", [], [], "solo"],
+    ["not a child, its lead's tab open", "lead", [tab("t-l", "thread", "lead")], [], "lead"],
+    ["a child, closed", "child", [tab("t-l", "thread", "lead")], [], "lead"],
+    ["a child, closed, nothing open", "child", [], [], "lead"],
+    ["a child open in this space", "child", [tab("t-l", "thread", "lead"), tab("t-c", "thread", "child")], [], "child"],
+    ["a child open behind another tab", "child", [tab("t-c", "thread", "child"), tab("t-x", "prs")], [], "child"],
+    ["a child open only in another space", "child", [], [tab("t-c", "thread", "child")], "lead"],
+    ["a child's preview tab", "child", [tab("t-c", "thread", "child", { preview: true })], [], "child"],
+    ["a child's other surface open (not its thread tab)", "child", [tab("t-f", "file", "child")], [], "lead"],
+    ["a grandchild, none open", "grand", [], [], "lead"],
+    ["a grandchild open", "grand", [tab("t-g", "thread", "grand"), tab("t-c", "thread", "child")], [], "grand"],
+    ["a grandchild closed, its creator open", "grand", [tab("t-l", "thread", "lead"), tab("t-c", "thread", "child")], [], "child"],
+    ["a grandchild closed, only the lead open", "grand", [tab("t-l", "thread", "lead")], [], "lead"],
+    ["a thread whose creator is gone", "orphan", [], [], "orphan"],
+    ["a creator cycle", "c-a", [tab("t-b", "thread", "c-b")], [], "c-a"],
+    ["a child of a cycle", "loop-kid", [tab("t-b", "thread", "c-b")], [], "loop-kid"],
+    ["a thread not in the list yet", "new", [], [], "new"],
+  ])("%s", async (_, surface, tabs, elsewhere, want) => {
+    await layout(surface, tabs, elsewhere);
+    expect(floatingTargetOf(useLayoutStore.getState(), BY_ID, surface)).toBe(want);
+  });
+
+  it("no thread, no target", () => {
+    expect(floatingTargetOf(useLayoutStore.getState(), BY_ID, "")).toBe("");
   });
 });
 

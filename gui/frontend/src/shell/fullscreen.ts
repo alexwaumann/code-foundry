@@ -10,9 +10,12 @@
  * screen then shows that pane. It ends when the window leaves the space or the space has no pane.
  * See docs/notes/shell-19-rails-fullscreen.md.
  */
+import type { ThreadView } from "@/api/threads";
+import { creatorChain, type SidebarFields } from "@/lib/inSidebar";
 import { useDictationStore } from "@/stores/dictation";
 import { useLayoutStore, type LayoutState, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus, setFullscreen, useShellViewStore } from "@/stores/shellView";
+import { useThreadsStore } from "@/stores/threads";
 import { focusPaneNow } from "./commands";
 
 type Layout = Pick<LayoutState, "currentSpaceId" | "spaces" | "panes">;
@@ -111,10 +114,42 @@ export function promptEscapeLeaves(e: Pick<KeyboardEvent, "key" | "defaultPreven
   return useDictationStore.getState().active === null;
 }
 
-/** The thread whose composer floats over a full-screened tab: a linked surface's thread; "" for others. */
+/**
+ * The thread whose composer floats over a full-screened tab: a linked surface's thread; "" for
+ * others. The composer writes to its target (floatingTargetOf): the lead, for a child's surface.
+ */
 export function floatingThreadOf(tab: Pick<TabEntry, "kind" | "thread"> | undefined): string {
   if (!tab || tab.kind === "thread" || tab.kind === "compose") return "";
   return tab.thread;
+}
+
+/**
+ * The thread the floating composer writes to, of `chain` (a surface's thread and its creators up
+ * to its lead, lib/inSidebar.ts creatorChain): the nearest one with a thread tab in the current
+ * space (in any pane, shown or behind another tab, a preview too), else the lead (the chain's
+ * last). The user talks to the lead and the lead to its children, unless the user has the child
+ * open. "" for an empty chain.
+ */
+export function floatingTargetIn(s: Pick<LayoutState, "currentSpaceId" | "panes" | "tabs">, chain: readonly string[]): string {
+  if (chain.length < 2) return chain[0] ?? "";
+  const open = new Set<string>();
+  for (const t of Object.values(s.tabs)) if (t.kind === "thread" && s.panes[t.paneId]?.spaceId === s.currentSpaceId) open.add(t.thread);
+  return chain.find((id) => open.has(id)) ?? chain.at(-1) ?? "";
+}
+
+/** floatingTargetIn over the thread list: the target for a surface linked to `thread`. */
+export function floatingTargetOf(s: Pick<LayoutState, "currentSpaceId" | "panes" | "tabs">, byId: Readonly<Record<string, SidebarFields & Pick<ThreadView, "id">>>, thread: string): string {
+  return thread ? floatingTargetIn(s, creatorChain(byId, thread)) : "";
+}
+
+/**
+ * The floating composer's target for a surface linked to `thread`, live: it follows the child's
+ * tab opening or closing in the space and the thread list. "" for "". Each store's selector
+ * returns a string, so a caller re-renders only when the chain or the target changes.
+ */
+export function useFloatingTarget(thread: string): string {
+  const chain = useThreadsStore((s) => (thread ? creatorChain(s.byId, thread).join("\n") : ""));
+  return useLayoutStore((s) => (chain ? floatingTargetIn(s, chain.split("\n")) : ""));
 }
 
 /** Margin kept between the floating composer and the pane's edges, in layout px. */
