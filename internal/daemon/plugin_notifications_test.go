@@ -41,6 +41,7 @@ func TestPluginNotifications(t *testing.T) {
 		{name: "no thread", source: "ci", n: pluginsdk.Notification{Title: "x", ThreadID: "s-2"}, err: plugin.ErrNotFound},
 		{name: "bad level", source: "ci", n: pluginsdk.Notification{Title: "x", Level: "success"}, err: plugin.ErrInvalidArgument},
 		{name: "a plugin named command", source: notification.SourceCommand, n: pluginsdk.Notification{Title: "x"}, err: plugin.ErrInvalidArgument},
+		{name: "a plugin named github", source: githubSource, n: pluginsdk.Notification{Title: "x"}, err: plugin.ErrInvalidArgument},
 	} {
 		if err := sink.Check(tt.source, tt.n); !errors.Is(err, tt.err) || (tt.err == nil && err != nil) {
 			t.Errorf("%s: Check = %v, want %v", tt.name, err, tt.err)
@@ -63,14 +64,18 @@ func TestPluginNotifications(t *testing.T) {
 	}
 
 	// The app's own notifications are no plugin's: not listed, never withdrawn with one.
-	if _, err := s.Post(ctx, notification.Post{Source: notification.SourceCommand, Title: "Mine"}); err != nil {
-		t.Fatal(err)
+	for _, src := range hostSources {
+		if _, err := s.Post(ctx, notification.Post{Source: src, Title: "Mine"}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if got := sink.Sources(); !slices.Equal(got, []string{"ci", "deploy"}) {
 		t.Errorf("Sources = %v", got)
 	}
-	if n, err := sink.WithdrawAll(ctx, notification.SourceCommand); n != 0 || err != nil {
-		t.Errorf("WithdrawAll(command) = %d, %v", n, err)
+	for _, src := range hostSources {
+		if n, err := sink.WithdrawAll(ctx, src); n != 0 || err != nil {
+			t.Errorf("WithdrawAll(%s) = %d, %v", src, n, err)
+		}
 	}
 
 	// Withdraw: by source and key, idempotent.
@@ -88,7 +93,7 @@ func TestPluginNotifications(t *testing.T) {
 	if n, err := sink.WithdrawAll(ctx, "deploy"); n != 1 || err != nil {
 		t.Errorf("WithdrawAll(deploy) = %d, %v", n, err)
 	}
-	if got := s.Sources(); !slices.Equal(got, []string{notification.SourceCommand}) {
+	if got := s.Sources(); !slices.Equal(got, slices.Sorted(slices.Values(hostSources))) {
 		t.Errorf("left %v", got)
 	}
 }

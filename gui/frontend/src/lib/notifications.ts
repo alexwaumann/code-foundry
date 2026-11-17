@@ -7,10 +7,19 @@ import type { NotificationEventView, NotificationSnapshotView, NotificationView 
 /** The source `notification.post` posts as (the CLI and agents), named this on a card. */
 export const COMMAND_SOURCE = "command";
 export const COMMAND_SOURCE_LABEL = "Code Foundry";
+/** The daemon's own notifications from the GitHub data it polls (docs/notes/notifications-github.md). */
+export const GITHUB_SOURCE = "github";
 
 /** The daemon's own source for plugins that stopped (docs/notes/notifications-plugin-health.md). */
 export const PLUGINS_SOURCE = "plugins";
 export const PLUGINS_SOURCE_LABEL = "Plugins";
+
+/** The app's own sources (never a plugin's name) and how a card names them. */
+const HOST_SOURCE_LABELS: Readonly<Record<string, string>> = {
+  [COMMAND_SOURCE]: COMMAND_SOURCE_LABEL,
+  [PLUGINS_SOURCE]: PLUGINS_SOURCE_LABEL,
+  [GITHUB_SOURCE]: "GitHub",
+};
 
 /**
  * Arrivals toasted one by one per burst; past it, one "N more notifications" toast (its count
@@ -39,10 +48,10 @@ export function bellCount(s: NotificationSnapshotView | null): { count: number; 
   return { count: shown.length, urgent: shown.some((n) => n.timeSensitive) };
 }
 
-/** A card's source: "Code Foundry" for notification.post, "Plugins" for the daemon's plugin health, else the plugin's display name, else the source as given. */
+/** A card's source: "Code Foundry" for notification.post, "Plugins" for the daemon's plugin health, "GitHub" for its GitHub notifications, else the plugin's display name, else the source as given. */
 export function sourceLabel(source: string, pluginDisplayName: string | undefined): string {
-  if (source === COMMAND_SOURCE) return COMMAND_SOURCE_LABEL;
-  if (source === PLUGINS_SOURCE) return PLUGINS_SOURCE_LABEL;
+  const host = Object.hasOwn(HOST_SOURCE_LABELS, source) ? HOST_SOURCE_LABELS[source] : undefined;
+  if (host) return host;
   return pluginDisplayName || source;
 }
 

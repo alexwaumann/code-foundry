@@ -19,6 +19,8 @@
  *        (the daemon's source "plugins", internal/daemon/plugin_health.go: failed posts the error
  *        card with Restart and Open plugins, off the warning one the daemon posts when it turned
  *        the plugin off, running withdraws it)
+ *   POST /__mock/notifications/github[?quiet=1]   (the daemon's four GitHub cards: review again,
+ *        review requested, changes requested naming s-4, a merge conflict)
  *   POST /__mock/notifications/act-fail?message=…   (the next notification.act fails with it; empty: none)
  *   GET  /__mock/notifications                  ({ notifications, calls }: every one with its state)
  */
@@ -231,6 +233,19 @@ export class MockNotifications {
     this.changed([], []);
   }
 
+  /** The daemon's four GitHub notifications (docs/notes/notifications-github.md), as it words them; the changes-requested one names s-4, a thread linked to its pull request. */
+  seedGitHub(quiet: boolean): void {
+    const t = Date.now();
+    const at = (min: number) => ({ quiet, arrivedAt: new Date(t - min * MINUTE) });
+    const open = (url: string): Action => ({ label: "Open PR", kind: "open", arg: url, resolves: false });
+    const start = (label: string, prompt: string): Action => ({ label, kind: "start", arg: prompt, resolves: true });
+    this.post({ source: "github", key: "pr/acme/web#77/review-again", timeSensitive: true, title: "Review again", body: "acme/web #77 Move settings to tabbed pages · by lee-m, changed since your review", actions: [open("https://example.com/acme/web/pull/77"), start("Review in a thread", "Review pull request acme/web#77 again.")] }, at(1));
+    this.post({ source: "github", key: "pr/acme/web#79/review-requested", timeSensitive: true, title: "Review requested", body: "acme/web #79 Remember the last tab per project · by sam-r, requested from you", actions: [open("https://example.com/acme/web/pull/79"), start("Review in a thread", "Review pull request acme/web#79.")] }, at(3));
+    this.post({ source: "github", key: "pr/acme/api#405/changes-requested", level: "warning", title: "Changes requested on your PR", body: "acme/api #405 Cache the viewer query · dana-k requested changes", threadId: "s-4", actions: [open("https://example.com/acme/api/pull/405"), { label: "Send to thread", kind: "send", arg: "Changes were requested on acme/api#405: address them and push.", resolves: true }] }, at(6));
+    this.post({ source: "github", key: "pr/acme/api#412/conflict", level: "warning", title: "Merge conflict on your PR", body: "acme/api #412 Add retry budget to the client · conflicts with main", actions: [open("https://example.com/acme/api/pull/412"), start("Fix in a thread", "My pull request acme/api#412 has a merge conflict with main: resolve it and push.")] }, at(12));
+    this.changed([], []);
+  }
+
   /** POST /__mock/notifications/<action>. */
   control(action: string, q: URLSearchParams): unknown {
     switch (action) {
@@ -268,6 +283,9 @@ export class MockNotifications {
         const restart: Action = { label: "Restart", kind: "command", arg: "plugin.restart", resolves: false };
         return { id: this.post({ source: PLUGINS_SOURCE, key: name, level: "error", title: `${display} stopped`, body, actions: [restart, open] }).id };
       }
+      case "github":
+        this.seedGitHub(q.get("quiet") === "1");
+        return { notifications: this.active().length };
       case "act-fail":
         this.actFail = q.get("message") ?? "";
         return {};

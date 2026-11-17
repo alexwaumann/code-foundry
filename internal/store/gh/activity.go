@@ -100,6 +100,11 @@ type Dashboard struct {
 	ReviewRequestedTotal int `json:"reviewRequestedTotal"`
 	ReviewedTotal        int `json:"reviewedTotal"`
 	RecentlyMergedTotal  int `json:"recentlyMergedTotal"`
+	// ReviewedListed is how many pull requests the reviewed search returned before those
+	// in ReviewRequested were dropped from Reviewed: below ReviewedTotal, the search was
+	// cut at its page size, so a pull request missing from Reviewed may still be one the
+	// viewer reviewed (docs/notes/notifications-github.md). 0 in a cache written before.
+	ReviewedListed int `json:"reviewedListed,omitempty"`
 	// FetchedAt is when the lists were last confirmed by a poll (every successful poll
 	// moves it, without an event; see Polled).
 	FetchedAt time.Time `json:"fetchedAt"`

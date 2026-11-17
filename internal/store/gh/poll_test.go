@@ -133,8 +133,9 @@ func TestPollFetchesDetailsOnlyForWhatChanged(t *testing.T) {
 	if r := d.ReviewRequested[0]; r.Author != "someone" || fmt.Sprint(r.ReviewRequests) != "[octocat org/team]" {
 		t.Errorf("review requested = %+v", r)
 	}
-	if len(d.Reviewed) != 0 || d.ReviewedTotal != 1 {
-		t.Errorf("reviewed = %+v (total %d), want PR_b dropped: it is in review requested", d.Reviewed, d.ReviewedTotal)
+	if len(d.Reviewed) != 0 || d.ReviewedTotal != 1 || d.ReviewedListed != 1 {
+		t.Errorf("reviewed = %+v (total %d, listed %d), want PR_b dropped: it is in review requested, and counted as listed",
+			d.Reviewed, d.ReviewedTotal, d.ReviewedListed)
 	}
 	if m := d.RecentlyMerged[0]; m.State != PullRequestMerged || m.MergedAt.IsZero() {
 		t.Errorf("merged = %+v", m)

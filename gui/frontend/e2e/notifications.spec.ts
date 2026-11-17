@@ -137,3 +137,23 @@ test("screenshots: the daemon's plugin health cards in the bell, dark and light"
     await expect(page.getByTestId("notification-popover")).toBeHidden();
   }
 });
+
+test("screenshots: the GitHub notifications in the bell, dark and light", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
+  const shots = process.env.SHOTS ?? "";
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openApp(page);
+  await mockPost("notifications/github?quiet=1");
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.waitForTimeout(400);
+    await page.getByTestId("notification-bell").click();
+    const popover = page.getByTestId("notification-popover");
+    await expect(popover).toBeVisible();
+    await page.mouse.move(640, 700);
+    await page.waitForTimeout(400);
+    await popover.screenshot({ path: `${shots}/bell-github-${scheme}.png` });
+    await page.keyboard.press("Escape");
+    await expect(popover).toBeHidden();
+  }
+});
