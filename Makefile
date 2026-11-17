@@ -26,9 +26,10 @@ export CGO_LDFLAGS := -mmacosx-version-min=13.0
 GHOSTTY_VT_PREFIX := $(shell ./scripts/ghostty-vt.sh --print-prefix)
 # Go's build cache keys a cgo package on its CGO_* flags but not on pkg-config's output, so
 # a package compiled against one library pin would be reused, link path and all, by a
-# worktree on another pin sharing the cache. Naming the pin in CGO_CPPFLAGS (a define no
-# code reads) gives every pin its own cache entries (docs/notes/libghostty-vt-prebuilt.md).
-export CGO_CPPFLAGS := -DCODE_FOUNDRY_GHOSTTY_VT=$(shell ./scripts/ghostty-vt.sh --print-key)
+# worktree on another pin sharing the cache. Naming each pin in CGO_CPPFLAGS (defines no
+# code reads) gives every pin its own cache entries (docs/notes/libghostty-vt-prebuilt.md,
+# docs/notes/whisper-cpp-shared-cache.md).
+export CGO_CPPFLAGS := -DCODE_FOUNDRY_GHOSTTY_VT=$(shell ./scripts/ghostty-vt.sh --print-key) -DCODE_FOUNDRY_WHISPER_CPP=$(shell ./scripts/whisper-cpp.sh --print-key)
 # whisper.cpp (static, Metal embedded) for code-foundry-dictate, built from source with
 # cmake into its own per-user cache (scripts/whisper-cpp.sh; override the root with WHISPER_CPP_CACHE).
 WHISPER_CPP_PREFIX := $(shell ./scripts/whisper-cpp.sh --print-prefix)
