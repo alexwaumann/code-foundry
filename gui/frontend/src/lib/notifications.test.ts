@@ -44,6 +44,8 @@ describe("sourceLabel", () => {
   it.each([
     ["command", undefined, "Code Foundry"],
     ["command", "Command", "Code Foundry"],
+    ["plugins", undefined, "Plugins"],
+    ["plugins", "Plugins!", "Plugins"],
     ["jenkins", "Jenkins", "Jenkins"],
     ["jenkins", undefined, "jenkins"],
     ["jenkins", "", "jenkins"],

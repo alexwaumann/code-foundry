@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	"connectrpc.com/connect"
 
@@ -32,11 +33,22 @@ var notificationActionCalls = map[notification.ActionKind]notificationActionCall
 	},
 	// A plugin's own manifest command (the source is the plugin's name), as the palette
 	// runs it: its confirm asks first, and its when clause is checked without a thread or
-	// project (the args say what it is about).
+	// project (the args say what it is about). From a host source in verbSources, the
+	// registry verb the action names.
 	notification.KindCommand: func(n notification.Notification, a notification.Action) (string, map[string]string) {
+		if slices.Contains(verbSources, n.Source) {
+			return a.Command, maps.Clone(a.Args)
+		}
 		return "plugin." + n.Source + "." + a.Command, maps.Clone(a.Args)
 	},
 }
+
+// verbSources are the host sources whose command actions name a registry verb themselves
+// rather than a plugin's manifest command: the daemon's plugin health notifications
+// (Restart is plugin.restart, Open plugins is view.settings --page plugins). No plugin can
+// post as one (the daemon refuses a plugin by that name), and notification.post posts as
+// SourceCommand, which may not carry command actions at all.
+var verbSources = []string{notification.SourcePlugins}
 
 // notificationAct is notification.act: run one of a notification's actions through the
 // command its kind maps to (notificationActionCalls), then resolve the notification when

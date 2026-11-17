@@ -351,6 +351,9 @@ func Run(ctx context.Context, opts Options) (retErr error) {
 	defer startPluginEnvWatch(ctx, events, st.thread)()
 	defer startPluginChecks(ctx, events, plugins)()
 	defer startPluginTerminalExits(ctx, log.With("component", "plugins"), st.terminal, plugins)()
+	// A plugin that failed for good or that the daemon turned off has a card in the bell
+	// until it runs again (plugin_health.go).
+	defer startPluginHealth(ctx, log.With("component", "plugins"), events, st.notification, plugins.Snapshot, nil)()
 	commandAPI := api.NewCommand(commands)
 	installSkills(ctx, log.With("component", "skills"), p.Claude(), p.Pages(), opts.Version, commandAPI, settingsAPI, st.settings)
 	placeWelcome(log.With("component", "skills"), p.Pages())

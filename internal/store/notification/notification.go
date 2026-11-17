@@ -33,6 +33,12 @@ var (
 // command (the CLI, a page, the palette). A plugin's source is its name.
 const SourceCommand = "command"
 
+// SourcePlugins is the source of the daemon's own notifications about plugins that stopped
+// (one per plugin, keyed by its name; docs/notes/notifications-plugin-health.md). Its
+// command actions name a registry verb itself (plugin.restart, view.settings), not a
+// plugin's manifest command.
+const SourcePlugins = "plugins"
+
 // Level is how serious a notification is. There is no success level.
 type Level string
 
@@ -80,7 +86,8 @@ type ActionKind string
 
 const (
 	// KindCommand runs one of the source plugin's manifest commands with args
-	// (plugin.<source>.<command>). Not for SourceCommand.
+	// (plugin.<source>.<command>); from SourcePlugins, the registry verb it names. Not for
+	// SourceCommand.
 	KindCommand ActionKind = "command"
 	// KindSend sends text to a thread.
 	KindSend ActionKind = "send"
@@ -120,7 +127,7 @@ type ActionSpec struct {
 // Notification is an immutable snapshot of one notification.
 type Notification struct {
 	ID string // "n-" + 12 hex digits
-	// Source is the plugin that posted it, or SourceCommand.
+	// Source is the plugin that posted it, SourceCommand or SourcePlugins.
 	Source string
 	// Key is the source's key, or one derived from the title, body and thread
 	// (DerivedKey) when it gave none.
@@ -211,7 +218,7 @@ func (*Snapshot) isNotificationEvent() {}
 
 // Post is a notification as a source posts it.
 type Post struct {
-	// Source is the plugin's name, or SourceCommand. Required.
+	// Source is the plugin's name, SourceCommand or SourcePlugins. Required.
 	Source string
 	// Key identifies the notification within its source; "" derives one (DerivedKey).
 	Key   string

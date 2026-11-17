@@ -30,8 +30,10 @@ type pluginNotificationStore interface {
 var _ plugin.NotificationSink = pluginNotifications{}
 
 // hostSources are notification sources that are not plugins: never a plugin's, never
-// swept as a removed plugin's at start (plugin.Manager.sweep).
-var hostSources = []string{notification.SourceCommand}
+// swept as a removed plugin's at start (plugin.Manager.sweep) nor withdrawn by a plugin's
+// release. SourcePlugins' cards are the daemon's about a plugin (plugin_health.go): they
+// stay exactly as long as their condition holds, whatever release does to the plugin's own.
+var hostSources = []string{notification.SourceCommand, notification.SourcePlugins}
 
 // notificationErrors map the notification store's errors to the plugin store's.
 var notificationErrors = map[error]error{

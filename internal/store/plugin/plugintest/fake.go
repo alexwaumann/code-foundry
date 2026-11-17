@@ -52,6 +52,14 @@ func (f *Fake) Put(p plugin.Plugin) {
 	bus.Publish[plugin.Event](f.bus, plugin.Changed{Plugin: p})
 }
 
+// Remove drops a plugin and publishes Removed (its package is gone).
+func (f *Fake) Remove(name string) {
+	f.mu.Lock()
+	delete(f.plugins, name)
+	f.mu.Unlock()
+	bus.Publish[plugin.Event](f.bus, plugin.Removed{Name: name})
+}
+
 // AddLog appends log lines.
 func (f *Fake) AddLog(name string, lines ...plugin.LogLine) {
 	f.mu.Lock()
