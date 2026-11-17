@@ -5,7 +5,8 @@
 //	{ "schema": 1, "generatedAt": "<RFC 3339>", "plugins": [ <entry>, … ] }
 //
 // where an entry is a plugin's name, display name, description, source repository,
-// latest version, protocol, permissions (equal to its manifest's) and one release
+// latest version, protocol, the oldest Code Foundry it runs on (minHostVersion, optional,
+// equal to its manifest's), permissions (equal to its manifest's) and one release
 // tarball per platform ("darwin/arm64": {url, sha256}). Clients tolerate unknown fields;
 // an entry that does not parse or validate is skipped with an issue, never the whole
 // index.
@@ -58,6 +59,10 @@ type Entry struct {
 	// "v" + Version.
 	Version  string `json:"version"`
 	Protocol int    `json:"protocol"`
+	// MinHostVersion is the manifest's: the oldest Code Foundry Version runs on (strict
+	// semver, no leading v; empty for any). Browse and the update check read it before
+	// anything is downloaded.
+	MinHostVersion string `json:"minHostVersion,omitempty"`
 	// Permissions equal the manifest's (the registry's CI checks it), so Browse shows
 	// what a plugin will ask for before anything is downloaded.
 	Permissions pluginsdk.Permissions `json:"permissions"`
@@ -168,6 +173,8 @@ func (e Entry) Validate() error {
 		return fmt.Errorf("name %q must match %s", e.Name, namePattern)
 	case !ValidVersion(e.Version):
 		return fmt.Errorf("version %q is not a semantic version (1.2.3, no leading v)", e.Version)
+	case e.MinHostVersion != "" && !ValidVersion(e.MinHostVersion):
+		return fmt.Errorf("minHostVersion %q is not a semantic version (0.31.0, no leading v)", e.MinHostVersion)
 	case e.Repo != "" && !repoPattern.MatchString(e.Repo):
 		return fmt.Errorf("repo %q is not owner/name", e.Repo)
 	case len(e.Artifacts) == 0:

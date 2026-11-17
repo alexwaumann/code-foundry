@@ -3,7 +3,7 @@
 // registry-entry writes a plugin's entry for a Code Foundry plugin registry
 // (its plugins/<name>.json) from plugin.json and the
 // release's SHA256SUMS: name, display name, description, repository, version, protocol,
-// all eight permission keys, and the darwin/arm64 and darwin/amd64 tarball URLs of the
+// minHostVersion when plugin.json has one, all eight permission keys, and the darwin/arm64 and darwin/amd64 tarball URLs of the
 // GitHub release v<version> with their hashes. `make registry-entry` runs it:
 //
 //	go run scripts/registry-entry.go -repo owner/name -sums dist/SHA256SUMS.release -out dist/<name>.json
@@ -42,14 +42,16 @@ type artifact struct {
 }
 
 type entry struct {
-	Name        string              `json:"name"`
-	DisplayName string              `json:"displayName"`
-	Description string              `json:"description"`
-	Repo        string              `json:"repo"`
-	Version     string              `json:"version"`
-	Protocol    int                 `json:"protocol"`
-	Permissions permissions         `json:"permissions"`
-	Artifacts   map[string]artifact `json:"artifacts"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
+	Repo        string `json:"repo"`
+	Version     string `json:"version"`
+	Protocol    int    `json:"protocol"`
+	// MinHostVersion is the oldest Code Foundry the version runs on, when plugin.json says.
+	MinHostVersion string              `json:"minHostVersion,omitempty"`
+	Permissions    permissions         `json:"permissions"`
+	Artifacts      map[string]artifact `json:"artifacts"`
 }
 
 func main() {
@@ -83,7 +85,7 @@ func run(manifestPath, sumsPath, repo, out string) error {
 	p := m.Permissions.Normalize()
 	e := entry{
 		Name: m.Name, DisplayName: m.DisplayNameOr(), Description: m.Description, Repo: repo,
-		Version: m.Version, Protocol: m.Protocol,
+		Version: m.Version, Protocol: m.Protocol, MinHostVersion: m.MinHostVersion,
 		Permissions: permissions{Commands: orEmpty(p.Commands), Events: orEmpty(p.Events), ThreadStatus: p.ThreadStatus,
 			SessionEnv: p.SessionEnv, Secrets: p.Secrets, Threads: p.Threads, Terminals: p.Terminals, API: p.API,
 			Notifications: p.Notifications},

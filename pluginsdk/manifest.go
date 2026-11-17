@@ -36,6 +36,11 @@ type Manifest struct {
 	Description string `json:"description,omitempty"`
 	// Protocol is the protocol major the plugin speaks (ProtocolVersion).
 	Protocol int `json:"protocol"`
+	// MinHostVersion is the oldest Code Foundry this version runs on: a strict semantic
+	// version without a leading v ("0.31.0"). Empty: any. An older Code Foundry neither
+	// installs nor updates to this version, and does not start it. A development build of
+	// Code Foundry runs anything; a tip build counts as the release it is built towards.
+	MinHostVersion string `json:"minHostVersion,omitempty"`
 	// Exec is the argv the host starts. Exec[0] containing a slash is relative to the
 	// package directory and must stay inside it; a bare name ("python3", "node") is
 	// looked up on PATH.
@@ -270,7 +275,7 @@ func unknownFields(prefix string, raw map[string]json.RawMessage, schema any) []
 func jsonFieldNames(schema any) []string {
 	switch schema.(type) {
 	case Manifest:
-		return []string{"name", "displayName", "version", "description", "protocol", "exec", "permissions", "commands", "surfaces", "wakes"}
+		return []string{"name", "displayName", "version", "description", "protocol", "minHostVersion", "exec", "permissions", "commands", "surfaces", "wakes"}
 	case Permissions:
 		return []string{"commands", "events", "threadStatus", "sessionEnv", "secrets", "threads", "terminals", "api", "notifications"}
 	case CommandSpec:
@@ -317,6 +322,9 @@ func (m Manifest) Validate() error {
 	}
 	if !semverPattern.MatchString(m.Version) {
 		bad("version", "%q is not a semantic version (1.2.3, no leading v)", m.Version)
+	}
+	if m.MinHostVersion != "" && !semverPattern.MatchString(m.MinHostVersion) {
+		bad("minHostVersion", "%q is not a semantic version (0.31.0, no leading v)", m.MinHostVersion)
 	}
 	if utf8.RuneCountInString(m.DisplayName) > MaxDisplayName {
 		bad("displayName", "longer than %d characters", MaxDisplayName)

@@ -40,6 +40,7 @@ func (f *installFake) Update(_ context.Context, name string, check, refresh bool
 	return []plugin.PluginUpdate{
 		{Name: "hello", Current: "0.1.0", Version: "0.2.0", Registry: "r", Updated: true, Disabled: "grew"},
 		{Name: "other", Current: "1.0.0", Version: "2.0.0", Registry: "r2", InstalledFrom: "o/reg"},
+		{Name: "needy", Current: "1.2.0", Version: "1.4.0", Registry: "r", NeedsHost: "0.31.0", Host: "0.29.2"},
 	}, nil
 }
 
@@ -73,7 +74,10 @@ func TestPluginRegistryService(t *testing.T) {
 		}, Installed: &installed, Relation: plugin.RelationUpdate}, {Entry: registry.Entry{
 			// Newer than what is installed, but another registry's: no update.
 			Name: "other", Version: "9.0.0", Protocol: 1, Registry: "http://127.0.0.1:9/index.json",
-		}, Installed: &installed, Relation: plugin.RelationOtherSource, InstalledFrom: "o/reg"}},
+		}, Installed: &installed, Relation: plugin.RelationOtherSource, InstalledFrom: "o/reg"}, {Entry: registry.Entry{
+			// Its own source's update, but it needs a newer Code Foundry: no update.
+			Name: "needy", Version: "1.4.0", MinHostVersion: "0.31.0", Protocol: 1, Registry: "https://github.com/o/reg",
+		}, Installed: &installed, Relation: plugin.RelationUpdate, NeedsHost: true, Host: "0.29.2"}},
 		Registries: []registry.Status{{URL: "https://github.com/o/reg", Plugins: 1, Cached: true, FetchedAt: time.Unix(20, 0)}},
 	}}
 	f.Put(installed)
@@ -96,6 +100,13 @@ func TestPluginRegistryService(t *testing.T) {
 		o.GetUpdateAvailable() || o.GetInstalledFrom() != "o/reg" {
 		t.Errorf("other source entry = %v", o)
 	}
+	if n := br.Msg.GetEntries()[2]; n.GetUpdateAvailable() || n.GetMinHostVersion() != "0.31.0" ||
+		n.GetNeedsHost().GetVersion() != "1.4.0" || n.GetNeedsHost().GetMinHostVersion() != "0.31.0" || n.GetNeedsHost().GetHostVersion() != "0.29.2" {
+		t.Errorf("entry needing a newer Code Foundry = %v", n)
+	}
+	if br.Msg.GetEntries()[0].GetNeedsHost() != nil {
+		t.Errorf("entry needs host = %v", br.Msg.GetEntries()[0].GetNeedsHost())
+	}
 	if r := br.Msg.GetRegistries()[0]; !r.GetCached() || r.GetPlugins() != 1 || r.GetFetchedAt().AsTime().Unix() != 20 {
 		t.Errorf("registry = %v", r)
 	}
@@ -114,7 +125,7 @@ func TestPluginRegistryService(t *testing.T) {
 	}
 	up, err := c.Update(ctx, connect.NewRequest(&v1.UpdatePluginsRequest{Name: "hello", Check: true}))
 	if err != nil || up.Msg.GetUpdates()[0].GetDisabledReason() != "grew" || !up.Msg.GetUpdates()[0].GetUpdated() ||
-		up.Msg.GetUpdates()[1].GetInstalledFrom() != "o/reg" {
+		up.Msg.GetUpdates()[1].GetInstalledFrom() != "o/reg" || up.Msg.GetUpdates()[2].GetNeedsHost() != "0.31.0" || up.Msg.GetUpdates()[2].GetHostVersion() != "0.29.2" {
 		t.Errorf("update = %v, %v", up, err)
 	}
 	un, err := c.Uninstall(ctx, connect.NewRequest(&v1.UninstallPluginRequest{Name: "hello", Purge: true}))
@@ -136,5 +147,20 @@ func TestRegistryEventsToProto(t *testing.T) {
 	}
 	if ev := pluginEventToProto(plugin.RegistryChanged{Epoch: 4}); ev.GetRegistryEpoch() != 4 {
 		t.Errorf("registry = %v", ev)
+	}
+}
+
+// A held update (one needing a newer Code Foundry) is no update: the plugin carries why.
+func TestHeldUpdateToProto(t *testing.T) {
+	p := helloPlugin()
+	p.Manifest.MinHostVersion = "0.20.0"
+	p.HeldUpdate = &plugin.HeldUpdate{UpdateOffer: plugin.UpdateOffer{Version: "1.4.0", Registry: "r", MinHost: "0.31.0"}, Host: "0.29.2"}
+	out := pluginToProto(p)
+	h := out.GetHeldUpdate()
+	if out.GetUpdateAvailable() || out.GetMinHostVersion() != "0.20.0" || h.GetVersion() != "1.4.0" || h.GetMinHostVersion() != "0.31.0" || h.GetHostVersion() != "0.29.2" {
+		t.Errorf("plugin = %v", out)
+	}
+	if pluginToProto(helloPlugin()).GetHeldUpdate() != nil {
+		t.Error("held update without one")
 	}
 }

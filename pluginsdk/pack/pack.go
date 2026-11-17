@@ -243,14 +243,16 @@ type Artifact struct {
 
 // Entry is a registry entry (plugins/<name>.json in a registry repository).
 type Entry struct {
-	Name        string                `json:"name"`
-	DisplayName string                `json:"displayName,omitempty"`
-	Description string                `json:"description,omitempty"`
-	Repo        string                `json:"repo"`
-	Version     string                `json:"version"`
-	Protocol    int                   `json:"protocol"`
-	Permissions pluginsdk.Permissions `json:"permissions"`
-	Artifacts   map[string]Artifact   `json:"artifacts"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+	Description string `json:"description,omitempty"`
+	Repo        string `json:"repo"`
+	Version     string `json:"version"`
+	Protocol    int    `json:"protocol"`
+	// MinHostVersion is the manifest's (written only when set).
+	MinHostVersion string                `json:"minHostVersion,omitempty"`
+	Permissions    pluginsdk.Permissions `json:"permissions"`
+	Artifacts      map[string]Artifact   `json:"artifacts"`
 }
 
 // ReleaseURL is where a tarball is downloaded from a GitHub release tagged v<version>.
@@ -267,7 +269,7 @@ func MakeEntry(repo string, results []Result, urlFor func(Result) string) (Entry
 	m := results[0].Manifest
 	e := Entry{
 		Name: m.Name, DisplayName: m.DisplayName, Description: m.Description, Repo: repo, Version: m.Version,
-		Protocol: m.Protocol, Permissions: m.Permissions.Normalize(), Artifacts: map[string]Artifact{},
+		Protocol: m.Protocol, MinHostVersion: m.MinHostVersion, Permissions: m.Permissions.Normalize(), Artifacts: map[string]Artifact{},
 	}
 	for _, r := range results {
 		if r.Name != e.Name || r.Version != e.Version {
@@ -275,6 +277,9 @@ func MakeEntry(repo string, results []Result, urlFor func(Result) string) (Entry
 		}
 		if !r.Manifest.Permissions.Equal(m.Permissions) {
 			return Entry{}, fmt.Errorf("%s asks for other permissions than %s", r.Base, results[0].Base)
+		}
+		if r.Manifest.MinHostVersion != m.MinHostVersion {
+			return Entry{}, fmt.Errorf("%s needs another Code Foundry (minHostVersion) than %s", r.Base, results[0].Base)
 		}
 		if _, dup := e.Artifacts[r.Platform]; dup {
 			return Entry{}, fmt.Errorf("two tarballs for %s", r.Platform)

@@ -97,3 +97,29 @@ func Newer(candidate, current string) bool {
 	}
 	return c.Compare(r) > 0
 }
+
+// AtLeast reports whether the running build, version running (as internal/version has
+// it: "v0.31.0", "v0.31.0-tip.4", "dev"), is minimum or newer: the one rule behind a
+// plugin's minHostVersion (docs/notes/plugin-min-host-version.md). An empty minimum is
+// no minimum. A build whose version is not a release ("dev", anything that does not
+// parse) satisfies any minimum: it is built from a checkout, not a release. A tip build
+// (vX.Y.Z-tip.N) counts as its base version X.Y.Z, the stable it would become if
+// promoted now, so a tip carries everything a plugin needing X.Y.Z may use. A minimum
+// that does not parse (validated before it gets here) is no minimum either.
+func AtLeast(running, minimum string) bool {
+	if minimum == "" {
+		return true
+	}
+	want, err := ParseVersion(minimum)
+	if err != nil {
+		return true
+	}
+	have, err := ParseVersion(running)
+	if err != nil {
+		return true
+	}
+	if len(have.Pre) > 0 && have.Pre[0] == "tip" {
+		have.Pre = nil
+	}
+	return have.Compare(want) >= 0
+}

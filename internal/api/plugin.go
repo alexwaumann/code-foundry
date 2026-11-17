@@ -229,7 +229,7 @@ func pluginToProto(p plugin.Plugin) *v1.Plugin {
 		Permissions: permissionsToProto(mf.Permissions), ConsentedAt: timestamp(p.ConsentedAt),
 		NeedsConsent: p.NeedsConsent, Pid: int32(p.PID), StartedAt: timestamp(p.StartedAt),
 		NextRestartAt: timestamp(p.NextRestartAt), Restarts: int32(p.Restarts), Protocol: int32(p.Protocol),
-		Capabilities: p.Capabilities, LogPath: p.LogPath,
+		Capabilities: p.Capabilities, LogPath: p.LogPath, MinHostVersion: mf.MinHostVersion,
 	}
 	if mf.Name != "" {
 		out.ConsentText = plugin.ConsentText(mf)

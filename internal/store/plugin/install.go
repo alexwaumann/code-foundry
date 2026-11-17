@@ -16,6 +16,7 @@ import (
 	"github.com/alexwaumann/code-foundry/internal/command"
 	"github.com/alexwaumann/code-foundry/internal/fsx"
 	"github.com/alexwaumann/code-foundry/internal/store/plugin/registry"
+	"github.com/alexwaumann/code-foundry/internal/store/update"
 	"github.com/alexwaumann/code-foundry/pluginsdk"
 )
 
@@ -215,7 +216,11 @@ func (m *Manager) installInfo(p *Plugin) {
 		p.Installed = &r
 	}
 	if o, ok := offerFor(*p, m.inst.merged, m.inst.releases); ok {
-		p.Update = &o
+		if m.hostRuns(o.MinHost) {
+			p.Update = &o
+		} else {
+			p.HeldUpdate = &HeldUpdate{UpdateOffer: o, Host: m.HostVersion()}
+		}
 	}
 }
 
@@ -330,6 +335,13 @@ func (m *Manager) resolve(ctx context.Context, ref parsedRef, refresh bool) (pla
 	}
 	if e.Protocol != 0 && e.Protocol != pluginsdk.ProtocolVersion {
 		return plan{}, fmt.Errorf("%w: %s %s speaks protocol %d, this Code Foundry speaks %d", ErrFailedPrecondition, e.Name, e.Version, e.Protocol, pluginsdk.ProtocolVersion)
+	}
+	if ref.version == "" || ref.version == e.Version {
+		// The index says what its version needs before anything is downloaded; an older
+		// version's own manifest says it (checkPackage).
+		if err := m.needsHost(e.Name, e.Version, e.MinHostVersion); err != nil {
+			return plan{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, err)
+		}
 	}
 	if ref.version != "" && ref.version != e.Version {
 		// The index lists the latest version only; an older one comes from the plugin's
@@ -473,7 +485,12 @@ func (m *Manager) install(ctx context.Context, req InstallRequest, p plan) (Inst
 	if err := registry.Extract(tarball, pkg); err != nil {
 		return InstallResult{}, fmt.Errorf("%w: %s %s: %v", ErrFailedPrecondition, p.name, p.version, err)
 	}
-	warnings, err := checkPackage(pkg, p)
+	warnings, err := checkPackage(pkg, p, m.HostVersion())
+	if nh := (*NeedsHostError)(nil); errors.As(err, &nh) {
+		// A release (no index entry said so): refused before anything is put in place;
+		// the staging folder goes with work.
+		return InstallResult{}, fmt.Errorf("%w: %w", ErrFailedPrecondition, nh)
+	}
 	if err != nil {
 		return InstallResult{}, fmt.Errorf("%w: %s %s is not a valid package: %v", ErrFailedPrecondition, p.name, p.version, err)
 	}
@@ -559,9 +576,10 @@ func (m *Manager) finishLocked(ctx context.Context, req InstallRequest, res Inst
 }
 
 // checkPackage validates an unpacked package against its plan: the manifest (the SDK's
-// validator), its name and version, the protocol, exec, and permissions within the
-// registry entry's.
-func checkPackage(dir string, p plan) ([]string, error) {
+// validator), its name and version, the protocol, the Code Foundry it needs (host is
+// this one's version; a *NeedsHostError), exec, and permissions within the registry
+// entry's.
+func checkPackage(dir string, p plan, host string) ([]string, error) {
 	mf, warnings, err := readManifest(dir)
 	if err != nil {
 		return nil, err
@@ -573,6 +591,8 @@ func checkPackage(dir string, p plan) ([]string, error) {
 		return nil, fmt.Errorf("plugin.json says version %s, not %s", mf.Version, p.version)
 	case mf.Protocol != pluginsdk.ProtocolVersion:
 		return nil, fmt.Errorf("it speaks protocol %d, this Code Foundry speaks %d", mf.Protocol, pluginsdk.ProtocolVersion)
+	case !update.AtLeast(host, mf.MinHostVersion):
+		return nil, &NeedsHostError{Name: mf.Name, Version: mf.Version, MinHost: mf.MinHostVersion, Host: host}
 	case p.perms != nil && !mf.Permissions.Within(*p.perms):
 		return nil, fmt.Errorf("plugin.json asks for permissions its registry entry does not list (%s)", describe(mf.Permissions))
 	}

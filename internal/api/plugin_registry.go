@@ -76,6 +76,7 @@ func (h *Plugin) Update(ctx context.Context, req *connect.Request[v1.UpdatePlugi
 		out.Updates = append(out.Updates, &v1.PluginUpdate{
 			Name: u.Name, CurrentVersion: u.Current, Version: u.Version, Registry: u.Registry,
 			Updated: u.Updated, Error: u.Error, DisabledReason: u.Disabled, InstalledFrom: u.InstalledFrom,
+			NeedsHost: u.NeedsHost, HostVersion: u.Host,
 		})
 	}
 	return connect.NewResponse(out), nil
@@ -108,7 +109,7 @@ func registriesToProto(rs []registry.Status) []*v1.PluginRegistry {
 func indexEntryToProto(e plugin.BrowseEntry) *v1.PluginIndexEntry {
 	out := &v1.PluginIndexEntry{
 		Name: e.Name, DisplayName: e.DisplayNameOr(), Description: e.Description, Repo: e.Repo, Version: e.Version,
-		Protocol: int32(e.Protocol), Permissions: permissionsToProto(e.Permissions),
+		Protocol: int32(e.Protocol), MinHostVersion: e.MinHostVersion, Permissions: permissionsToProto(e.Permissions),
 		PermissionLines: e.Permissions.Normalize().Describe(), Registry: e.Registry,
 	}
 	plats := make([]string, 0, len(e.Artifacts))
@@ -127,8 +128,11 @@ func indexEntryToProto(e plugin.BrowseEntry) *v1.PluginIndexEntry {
 	// The store's decision (plugin.Relation), not a version comparison here: an entry of
 	// another source is no update even when it is newer.
 	out.Relation = indexRelations[e.Relation]
-	out.UpdateAvailable = e.Relation == plugin.RelationUpdate
+	out.UpdateAvailable = e.Relation == plugin.RelationUpdate && !e.NeedsHost
 	out.InstalledFrom = e.InstalledFrom
+	if e.NeedsHost {
+		out.NeedsHost = &v1.PluginHostNeed{Version: e.Version, MinHostVersion: e.MinHostVersion, HostVersion: e.Host}
+	}
 	return out
 }
 
@@ -149,6 +153,9 @@ func fillInstall(out *v1.Plugin, p plugin.Plugin) {
 	}
 	if u := p.Update; u != nil {
 		out.UpdateAvailable, out.UpdateVersion, out.UpdateRegistry = true, u.Version, u.Registry
+	}
+	if h := p.HeldUpdate; h != nil {
+		out.HeldUpdate = &v1.PluginHostNeed{Version: h.Version, MinHostVersion: h.MinHost, HostVersion: h.Host}
 	}
 }
 

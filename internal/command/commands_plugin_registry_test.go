@@ -83,6 +83,13 @@ func TestPluginRegistryCommands(t *testing.T) {
 				{Name: "acme", CurrentVersion: "1.0.0", Version: "2.0.0", Registry: "https://github.com/o/reg", InstalledFrom: "127.0.0.1:8765/index.json"},
 			}},
 			wantMsg: []string{"every plugin is up to date\nnot offered: acme 2.0.0 from https://github.com/o/reg (installed from 127.0.0.1:8765/index.json;"}},
+		{name: "update check with a version needing a newer Code Foundry", cmd: "plugin.update", args: map[string]string{"check": "true"},
+			update: &v1.UpdatePluginsResponse{Updates: []*v1.PluginUpdate{
+				{Name: "hello", CurrentVersion: "0.1.0", Version: "0.1.1", Registry: "r"},
+				{Name: "linear", CurrentVersion: "1.2.0", Version: "1.4.0", Registry: "r", NeedsHost: "0.31.0", HostVersion: "0.29.2"},
+			}},
+			wantMsg: []string{"NAME   INSTALLED  AVAILABLE  REGISTRY\nhello  0.1.0      0.1.1      r\ninstall with: code-foundry plugin update [<name>]\n" +
+				"not offered: linear 1.4.0 needs Code Foundry 0.31.0 or newer; this is 0.29.2 (update Code Foundry first: code-foundry update)"}},
 		{name: "update none", cmd: "plugin.update", wantMsg: []string{"every plugin is up to date"}},
 		{name: "update", cmd: "plugin.update", args: map[string]string{"name": "hello"}, want: &v1.UpdatePluginsRequest{Name: "hello"},
 			update: &v1.UpdatePluginsResponse{Updates: []*v1.PluginUpdate{
