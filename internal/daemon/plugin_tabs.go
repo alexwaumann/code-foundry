@@ -12,7 +12,7 @@ import (
 // item 5). A call that does not take the user's focus keeps it where it is.
 type pluginTabs struct{ layout layoutstore.Store }
 
-func (p pluginTabs) OpenTab(ctx context.Context, tb *core.Tab, focus bool) (core.Result, error) {
-	c, err := p.layout.Apply(ctx, &core.OpenSurface{Tab: tb, Focus: focus}, layoutstore.ApplyOptions{KeepFocus: !focus})
+func (p pluginTabs) OpenTab(ctx context.Context, tb *core.Tab, pane string, focus bool) (core.Result, error) {
+	c, err := p.layout.Apply(ctx, &core.OpenSurface{Pane: pane, Tab: tb, Focus: focus}, layoutstore.ApplyOptions{KeepFocus: !focus})
 	return c.Result, err
 }

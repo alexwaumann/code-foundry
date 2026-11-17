@@ -23,6 +23,7 @@ import { paneTakesAnyTab } from "@/shell/drag/room";
 import { geoTree, useLayoutStore } from "@/stores/layout";
 import { useShellViewStore } from "@/stores/shellView";
 import { useTerminalsStore } from "@/stores/terminals";
+import { PlusPluginItems } from "./PluginSurfaceItems";
 import { TERMINAL_ICONS } from "./terminalIcons";
 import { ThreadDot } from "./ThreadDot";
 import { ThreadSurfaceItems } from "./ThreadSurfaceItems";
@@ -106,11 +107,13 @@ function ThreadSub({ threadId, paneId, spaceId, pick }: { threadId: string; pane
 /**
  * A pane's "+" (docs/notes/shell-model.md, "Structure"): a menu of surfaces after the strip's
  * last tab. With a thread's tab active, first a submenu of that thread's surfaces (the header's
- * Open ▸ items); then New thread, Terminal (a free one), Pull Requests and Projects. The choice
+ * Open ▸ items, its plugin surfaces among them); then New thread, Terminal (a free one), Pull
+ * Requests and Projects; then, under a Plugins label, each plugin surface of no thread that can
+ * show here (components/shell/PluginSurfaceItems.tsx). The choice
  * opens in this pane (`--pane`), except a linked surface already open, which is focused where it
  * is (shell/linked.ts). Under Terminal, the running terminals that have no tab (a classic bottom
  * panel's shells): a pick gives one a tab here. In a pane of terminals that has no room for
- * anything else, only Terminal (and the untabbed ones). Keyboard: Enter or Space opens it,
+ * anything else, only Terminal (and the untabbed ones), no plugin surface. Keyboard: Enter or Space opens it,
  * arrows move, right opens the submenu.
  */
 export function PanePlusMenu({ paneId }: { paneId: string }) {
@@ -170,6 +173,7 @@ export function PanePlusMenu({ paneId }: { paneId: string }) {
             {item === "terminal" && untabbed.map((id) => <UntabbedTerminalItem key={id} id={id} paneId={paneId} pick={pick} />)}
           </Fragment>
         ))}
+        {anyTab && <PlusPluginItems paneId={paneId} pick={pick} />}
       </DropdownMenuContent>
     </DropdownMenu>
   );

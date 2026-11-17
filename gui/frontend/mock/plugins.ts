@@ -8,6 +8,8 @@
  *   crasher     crashed (restarts 3, last error), surface "status" (global)
  *   acme-data   disabled, never consented: enabling asks (plugin.enable's confirm is the
  *               consent text); once enabled its global "access" surface shows
+ *   test-watcher  running, installed from the registry; a global surface "runs" (a pane's
+ *               "+" menu lists it under Plugins)
  *
  * The demo acts like the real plugin (plugins/examples/hello/surface.go): tabs, a click
  * counter in the header, Pin, a form whose save needs a name (else the plugin refuses)
@@ -897,7 +899,7 @@ function seedPlugins(): MockPlugin[] {
       startedAt: started,
       permissions: { commands: ["thread.send"], events: ["project", "threads"], threadStatus: true, sessionEnv: false, secrets: false },
       commands: [],
-      surfaces: [],
+      surfaces: [{ id: "runs", title: "Test runs", icon: "flask-conical", scope: "global" }],
       install: { kind: "registry", source: "https://github.com/alexwaumann/code-foundry-plugins" },
     },
     // A longer list for Settings → Plugins: no commands or surfaces, so nothing else sees them.
@@ -947,11 +949,11 @@ export interface PluginDeps {
   /** The plugins.registries setting (mock/pluginRegistry.ts). */
   registries: () => string;
   /**
-   * Opens a tab in the layout by the placement rules (the daemon's plugin.TabOpener): a thread
-   * surface's show command opens its tab linked to the thread; without it, the command sends its
-   * ShowView as before.
+   * Opens a tab in the layout by the placement rules, or in `pane` (the daemon's plugin.TabOpener):
+   * a thread surface's show command opens its tab linked to the thread, and any surface's given
+   * --pane (a pane's "+" menu) opens there; without it, the command sends its ShowView as before.
    */
-  openTab?: (tab: { kind: string; thread: string; title: string }, focus: boolean) => { pane?: string; tab?: string; existing?: boolean };
+  openTab?: (tab: { kind: string; thread: string; title: string }, focus: boolean, pane?: string) => { pane?: string; tab?: string; existing?: boolean };
 }
 
 /** The daemon's home for the plugin directories (PluginService.List). */
@@ -1433,23 +1435,27 @@ export class MockPlugins {
             category: p.displayName,
             description: `Open ${s.title} as a tab.`,
             keybindings: [],
-            args:
-              s.scope === "thread"
+            args: [
+              ...(s.scope === "thread"
                 ? [
                     { name: "thread", type: ArgType.STRING, required: false, description: "The thread" },
                     { name: "focus", type: ArgType.BOOL, required: false, description: "Also take the user's focus to the tab" },
                   ]
-                : [],
+                : []),
+              { name: "pane", type: ArgType.STRING, required: false, description: "Open the tab in this pane (the pane's + menu)" },
+            ],
           },
           when: (ctx) => this.surfaceAvailable(p, s, ctx),
           run: (ctx, a) => {
             const id = a.thread || ctx?.activeThreadId || "";
-            // A thread's surface opens as a tab linked to it, placed by the rules (internal/store/plugin
-            // show.go openSurfaceTab): the app's own call takes the focus, a thread's only with --focus.
-            if (s.scope === "thread" && this.deps.openTab) {
+            // A thread's surface opens as a tab linked to it, placed by the rules or in --pane, and any
+            // other surface given --pane opens there unlinked (internal/store/plugin show.go
+            // openSurfaceTab): the app's own call takes the focus, a thread's only with --focus.
+            if ((s.scope === "thread" || a.pane) && this.deps.openTab) {
               const focus = a.focus ? a.focus === "true" : Boolean(ctx?.activeView);
-              const r = this.deps.openTab({ kind: `plugin.${p.name}.${s.id}`, thread: id, title: s.title }, focus);
-              return `${r.existing ? "found" : "opened"} ${s.title} for thread ${id} as tab ${r.tab ?? ""} in pane ${r.pane ?? ""}`;
+              const thread = s.scope === "thread" ? id : "";
+              const r = this.deps.openTab({ kind: `plugin.${p.name}.${s.id}`, thread, title: s.title }, focus, a.pane);
+              return `${r.existing ? "found" : "opened"} ${s.title}${thread ? ` for thread ${thread}` : ""} as tab ${r.tab ?? ""} in pane ${r.pane ?? ""}`;
             }
             const name = `panel.plugin.${p.name}.${s.id}${s.scope === "thread" ? `?thread=${id}` : ""}`;
             return `delivered=${String(this.deps.emit({ intent: { case: "showView", value: { name } } }))}`;
