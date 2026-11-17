@@ -117,3 +117,23 @@ test("screenshots: the bell closed and open, and an arrival toast, dark and ligh
     await page.screenshot({ path: `${shots}/arrival-toast-${scheme}.png` });
   }
 });
+
+test("screenshots: the daemon's plugin health cards in the bell, dark and light", async ({ page }) => {
+  test.skip(!process.env.SHOTS, "SHOTS=<dir> only");
+  const shots = process.env.SHOTS ?? "";
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openApp(page);
+  await mockPost("notifications/seed?quiet=1");
+  await mockPost(`notifications/plugin-health?name=hello&display=Hello&state=off`);
+  await mockPost(`notifications/plugin-health?name=ci-watch&display=CI Watch&state=failed`);
+  for (const scheme of ["dark", "light"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.getByTestId("notification-bell").click();
+    await expect(page.getByTestId("notification-popover")).toBeVisible();
+    await page.mouse.move(640, 700);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${shots}/plugin-health-${scheme}.png` });
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("notification-popover")).toBeHidden();
+  }
+});

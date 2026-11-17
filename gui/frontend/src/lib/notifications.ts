@@ -8,6 +8,10 @@ import type { NotificationEventView, NotificationSnapshotView, NotificationView 
 export const COMMAND_SOURCE = "command";
 export const COMMAND_SOURCE_LABEL = "Code Foundry";
 
+/** The daemon's own source for plugins that stopped (docs/notes/notifications-plugin-health.md). */
+export const PLUGINS_SOURCE = "plugins";
+export const PLUGINS_SOURCE_LABEL = "Plugins";
+
 /**
  * Arrivals toasted one by one per burst; past it, one "N more notifications" toast (its count
  * kept up to date in place) opens the bell. Two: a burst never stacks more than three toasts,
@@ -35,9 +39,10 @@ export function bellCount(s: NotificationSnapshotView | null): { count: number; 
   return { count: shown.length, urgent: shown.some((n) => n.timeSensitive) };
 }
 
-/** A card's source: the plugin's display name, "Code Foundry" for notification.post, else the source as given. */
+/** A card's source: "Code Foundry" for notification.post, "Plugins" for the daemon's plugin health, else the plugin's display name, else the source as given. */
 export function sourceLabel(source: string, pluginDisplayName: string | undefined): string {
   if (source === COMMAND_SOURCE) return COMMAND_SOURCE_LABEL;
+  if (source === PLUGINS_SOURCE) return PLUGINS_SOURCE_LABEL;
   return pluginDisplayName || source;
 }
 

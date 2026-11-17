@@ -56,7 +56,7 @@ func newNotificationRegistry(t *testing.T, fail error) (*command.Registry, *noti
 	forget := stand("plugin.ci.forget", "build")
 	forget.Confirm = "Forget build {build}?"
 	if err := r.RegisterAll(stand("thread.send", "id", "text"), stand("thread.new", "prompt", "project", "no-project"),
-		stand("view.open.url", "url"), stand("plugin.ci.retry", "build"), forget); err != nil {
+		stand("view.open.url", "url"), stand("plugin.ci.retry", "build"), forget, stand("plugin.restart", "name")); err != nil {
 		t.Fatal(err)
 	}
 	return r, s, &calls
@@ -200,6 +200,12 @@ func TestNotificationAct(t *testing.T) {
 		{name: "a command action runs the plugin's command", source: "ci",
 			action:   notification.ActionSpec{Action: notification.Action{Label: "Retry", Kind: notification.KindCommand, Command: "retry", Args: map[string]string{"build": "7"}}},
 			wantCall: call{name: "plugin.ci.retry", args: map[string]string{"build": "7"}}, wantState: "resolved"},
+		{name: "the plugins source's command action runs the verb it names", source: notification.SourcePlugins,
+			action:   notification.ActionSpec{Action: notification.Action{Label: "Restart", Kind: notification.KindCommand, Command: "plugin.restart", Args: map[string]string{"name": "hello"}}, Resolves: new(false)},
+			wantCall: call{name: "plugin.restart", args: map[string]string{"name": "hello"}}, wantState: "shown"},
+		{name: "a plugin's command action never names a verb", source: "ci",
+			action:    notification.ActionSpec{Action: notification.Action{Label: "Restart", Kind: notification.KindCommand, Command: "plugin.restart", Args: map[string]string{"name": "hello"}}},
+			wantState: "shown", wantErr: func(err error) bool { return errors.Is(err, command.ErrUnknownCommand) }},
 		{name: "a command that confirms asks first", source: "ci",
 			action:    notification.ActionSpec{Action: notification.Action{Label: "Forget", Kind: notification.KindCommand, Command: "forget", Args: map[string]string{"build": "7"}}},
 			wantState: "shown", wantErr: func(err error) bool {

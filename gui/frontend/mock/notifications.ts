@@ -15,6 +15,10 @@
  *   POST /__mock/notifications/withdraw?key=…[&source=…]   (the source takes it back)
  *   POST /__mock/notifications/seed[?quiet=1]   (the sketch's five, one time-sensitive and two
  *        naming s-4, and one snoozed; quiet: as a snapshot, no arrivals, so nothing toasts)
+ *   POST /__mock/notifications/plugin-health?name=hello&display=Hello&state=failed|off|running[&reason=…]
+ *        (the daemon's source "plugins", internal/daemon/plugin_health.go: failed posts the error
+ *        card with Restart and Open plugins, off the warning one the daemon posts when it turned
+ *        the plugin off, running withdraws it)
  *   POST /__mock/notifications/act-fail?message=…   (the next notification.act fails with it; empty: none)
  *   GET  /__mock/notifications                  ({ notifications, calls }: every one with its state)
  */
@@ -24,6 +28,9 @@ import { ArgType, type UiContext } from "../src/gen/codefoundry/v1/command_pb";
 import { NotificationLevel, NotificationStatus, type NotificationActionSchema, type NotificationEventSchema, type NotificationSnapshotSchema } from "../src/gen/codefoundry/v1/notification_pb";
 import { CommandError } from "./errors";
 import type { SkillCommand } from "./skills";
+
+/** The daemon's own source for plugins that stopped (internal/daemon/plugin_health.go). */
+const PLUGINS_SOURCE = "plugins";
 
 export type NotificationEventInit = MessageInitShape<typeof NotificationEventSchema>;
 type SnapshotInit = MessageInitShape<typeof NotificationSnapshotSchema>;
@@ -244,6 +251,23 @@ export class MockNotifications {
       case "seed":
         this.seed(q.get("quiet") === "1");
         return { notifications: this.active().length };
+      case "plugin-health": {
+        const name = q.get("name") ?? "hello";
+        const display = q.get("display") ?? name;
+        const state = q.get("state") ?? "failed";
+        const open: Action = { label: "Open plugins", kind: "command", arg: "view.settings", resolves: false };
+        if (state === "running") {
+          this.withdraw(name, PLUGINS_SOURCE);
+          return {};
+        }
+        if (state === "off") {
+          const body = q.get("reason") ?? "Its permissions changed: enable it again to review them";
+          return { id: this.post({ source: PLUGINS_SOURCE, key: name, level: "warning", title: `${display} was turned off`, body, actions: [open] }).id };
+        }
+        const body = q.get("reason") ?? "Crashed 5 times in 10m, last: exit status 2";
+        const restart: Action = { label: "Restart", kind: "command", arg: "plugin.restart", resolves: false };
+        return { id: this.post({ source: PLUGINS_SOURCE, key: name, level: "error", title: `${display} stopped`, body, actions: [restart, open] }).id };
+      }
       case "act-fail":
         this.actFail = q.get("message") ?? "";
         return {};
