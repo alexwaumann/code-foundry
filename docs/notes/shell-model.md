@@ -354,6 +354,8 @@ when the first working version is whole. Nothing partial is released.
 
 ## Sidebar
 
+- **Collapsed.** cmd+B and the top bar's toggle switch between the full sidebar and a 40px icon
+  rail that keeps every section and behaviour (docs/notes/sidebar-rail.md). It is never hidden.
 - **Width.** The sidebar's minimum width, which is also its default, lines its right edge up with
   the right edge of the sidebar toggle in the top bar (past the traffic-light gutter, the app name
   and the toggle). The user can widen it; a width stored earlier that is at least the minimum is
@@ -367,8 +369,8 @@ when the first working version is whole. Nothing partial is released.
   terminal notification or bell, a Claude API error waiting at the prompt, any other attention
   reason ("blocked: …", "continue: …", "menu: …" and unknown ones), and a plugin's attention flag.
   It goes to the top of Active (below the pinned threads and the drafts), most recent first, with
-  its status until the user opens it. It does not count in the Needs you number, a space tab's
-  count or the top bar's control, and cmd+shift+a skips it. A pinned one stays with the pinned.
+  its status until the user opens it. It does not count in the Needs you number or a space tab's
+  count, and cmd+shift+a skips it. A pinned one stays with the pinned.
 - **Thread row.** Line 1: project on the left, status or time on the right; on hover the snooze and
   archive controls take that slot. Then the title at full width, up to two lines. Then the branch,
   with the pull request tag and the counts right-aligned. A thread with no project has no third line
@@ -384,8 +386,8 @@ when the first working version is whole. Nothing partial is released.
     entered with the pointer, grows with its content up to a maximum, and then scrolls.
   - Clicking the title opens the popup: recent messages, the ask with today's card (its own field for
     a deny reason), and "Go to thread". It dismisses the hover card until the row is hovered again.
-  - With the sidebar collapsed, a control with the count appears in the top bar, to the right of back
-    and forward, and opens the same list as a popover.
+  - With the sidebar collapsed to its icon rail, each row is an icon with the same click, hover card,
+    popup and menu (docs/notes/sidebar-rail.md); the top bar has no control of its own.
 - **In a pane**, a thread that needs the user marks its tab icon with the attention dot, in a strip
   and in a rail. When the pane is too short for the full ask, the ask shows as a one-line strip above
   the composer with the same hover card and popup.

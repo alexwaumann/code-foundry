@@ -30,7 +30,7 @@ import "@/components/thread/thread.css";
  *
  * The card is sized by its content up to a maximum and scrolls beyond it; today's command box
  * cap is lifted inside it (thread.css `.cf-needs-card`). The pointer can move from the anchor into
- * it. The same card serves a Needs you row, a row of the top bar's popover and a pane's ask strip.
+ * it. The same card serves a Needs you row (and its icon on the sidebar's rail) and a pane's ask strip.
  */
 
 /** The thread the ask comes from: its place's icon, the project (or "No project"), its name. */
@@ -259,7 +259,7 @@ interface NeedsHoverCardProps {
   threadId: string;
   /** A Needs you line's request: the card shows it rather than the oldest (NeedsCardBody). */
   requestId?: string | null;
-  /** Which anchor this is ("sidebar:<id>", "popover:<id>", "strip:<pane>"): the popup it opens shuts its card until it is hovered again. */
+  /** Which anchor this is ("sidebar:<id>", "strip:<pane>"): the popup it opens shuts its card until it is hovered again. */
   anchor: string;
   /** Open without the pointer: the anchor has the keyboard's focus (the sidebar list's cursor). */
   keyboardOpen?: boolean;

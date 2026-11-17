@@ -81,7 +81,7 @@ beforeEach(async () => {
   useProjectsStore.setState({ byId: {}, order: [] });
   useThreadsStore.setState({ byId: { "s-r": thread("s-r"), "s-off": thread("s-off", "disconnected") }, order: ["s-r", "s-off"] });
   useViewsStore.setState({ settingsOpen: false });
-  useUiStore.setState({ sidebarVisible: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
+  useUiStore.setState({ sidebarExpanded: true, sidebarWidth: 260, selection: { kind: "thread", id: "s-r" }, palette: { ...useUiStore.getState().palette, open: false } });
   useThreadStore.setState({ logs: {} });
   useMcpTabsStore.setState({ byKey: {} });
   // Stamped per test: a check time taken when the module loaded drifts past 12s under load.

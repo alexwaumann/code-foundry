@@ -51,7 +51,7 @@ export async function resetPrStores(selection: Selection = PR_PAGE, seed?: FakeL
   useConfirmStore.setState({ pending: null });
   useCommandsStore.setState({ commands: PR_COMMANDS });
   useViewsStore.setState({ settingsOpen: false, usageOpen: false });
-  useUiStore.setState({ selection, sidebarVisible: true, sidebarWidth: 260 });
+  useUiStore.setState({ selection, sidebarExpanded: true, sidebarWidth: 260 });
 }
 
 /** The current space's panes, the confirm dialog and a Toaster. */

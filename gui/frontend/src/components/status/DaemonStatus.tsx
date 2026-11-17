@@ -26,9 +26,10 @@ function useDegradedStreams(): string {
 /**
  * The daemon in the sidebar's status row: a status dot and its version (from
  * HealthService.Ping). The tooltip carries the rest: the status in words, the pid, the
- * uptime and, when unreachable, the error.
+ * uptime and, when unreachable, the error. `dotOnly` (the sidebar's rail): the dot alone,
+ * its version and words in the tooltip with the rest, which opens to the right.
  */
-export function DaemonStatus() {
+export function DaemonStatus({ dotOnly = false }: { dotOnly?: boolean } = {}) {
   const status = useHealthStore((s) => s.status);
   const pid = useHealthStore((s) => s.health?.pid);
   const rawVersion = useHealthStore((s) => s.health?.version);
@@ -39,16 +40,17 @@ export function DaemonStatus() {
   const silent = useEventsStore((s) => s.silent) && status === "ok";
   const oldDaemon = useUpdateStore((s) => s.oldDaemon);
   const label = status === "ok" ? "daemon" : status === "error" ? "daemon unreachable" : "connecting";
-  const details = [label, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatDuration(uptime * 1000, { days: true, hours: true, minutes: true, seconds: true })}`, status === "error" && error, silent && (oldDaemon ? OLD_DAEMON_DETAIL : SILENT_DETAIL)]
+  const words = status === "ok" && (silent || degraded) ? (silent ? "no live updates" : `syncing ${degraded}…`) : "";
+  const details = [label, dotOnly && version, dotOnly && words, pid !== undefined && `pid ${String(pid)}`, uptime !== undefined && `up ${formatDuration(uptime * 1000, { days: true, hours: true, minutes: true, seconds: true })}`, status === "error" && error, silent && (oldDaemon ? OLD_DAEMON_DETAIL : SILENT_DETAIL)]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <Tip label={details} align="start">
-      <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap" data-testid="daemon-status" aria-label={details}>
+    <Tip label={details} align={dotOnly ? "center" : "start"} side={dotOnly ? "right" : undefined}>
+      <div className={cn("flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap", dotOnly && "justify-center")} data-testid="daemon-status" aria-label={details}>
         <span className={cn("size-2 shrink-0 rounded-full", dot[status])} data-testid="status" data-status={status} aria-hidden />
-        {version && <span data-testid="version">{version}</span>}
-        {status === "ok" && (silent || degraded) && <span className="shrink-0 text-cf-warning-text">{silent ? "no live updates" : `syncing ${degraded}…`}</span>}
+        {!dotOnly && version && <span data-testid="version">{version}</span>}
+        {!dotOnly && words && <span className="shrink-0 text-cf-warning-text">{words}</span>}
       </div>
     </Tip>
   );

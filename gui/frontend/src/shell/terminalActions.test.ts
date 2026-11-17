@@ -222,7 +222,7 @@ describe("cmd+r and cmd+shift+r", () => {
 
   it("on a thread's tab: today's rename, and the name generated again", async () => {
     await seed("p-1");
-    useUiStore.setState({ sidebarVisible: true, renamingThreadId: null } as never);
+    useUiStore.setState({ sidebarExpanded: true, renamingThreadId: null } as never);
     actions.renameFocusedTab();
     expect(useUiStore.getState().renamingThreadId).toBe("s-1");
     expect(actions.useTabRenameStore.getState().tabId).toBe("");

@@ -244,7 +244,7 @@ describe("handleKeyDown precedence", () => {
     outside = document.getElementById("out") as HTMLElement;
     input = document.getElementById("in") as HTMLInputElement;
     window.addEventListener("keydown", handleKeyDown, { capture: true });
-    useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, sidebarVisible: true });
+    useUiStore.setState({ palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" }, sidebarExpanded: true });
     useCommandsStore.setState({
       commands: [
         cmd({ name: "terminal.new", keybindings: ["cmd+t"] }),
@@ -661,9 +661,9 @@ describe("handleKeyDown precedence", () => {
 
   it("cmd+b toggles the sidebar", () => {
     press(outside, { key: "b", code: "KeyB", metaKey: true });
-    expect(useUiStore.getState().sidebarVisible).toBe(false);
+    expect(useUiStore.getState().sidebarExpanded).toBe(false);
     press(terminal, { key: "b", code: "KeyB", metaKey: true });
-    expect(useUiStore.getState().sidebarVisible).toBe(true);
+    expect(useUiStore.getState().sidebarExpanded).toBe(true);
   });
 });
 

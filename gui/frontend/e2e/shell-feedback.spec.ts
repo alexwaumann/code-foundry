@@ -159,9 +159,9 @@ for (const scheme of ["dark", "light"] as const) {
     await settle();
     await page.screenshot({ path: at("feedback-7-9-sidebar"), clip: { x: 0, y: 0, width: 420, height: 960 } });
 
-    // 8: the sidebar collapsed, a thread needing the user: the control after back and forward.
+    // 8: the sidebar collapsed to its rail, a thread needing the user (docs/notes/sidebar-rail.md).
     await page.getByTestId("top-bar-sidebar-toggle").click();
     await settle();
-    await page.screenshot({ path: at("feedback-8-topbar"), clip: { x: 0, y: 0, width: 700, height: 120 } });
+    await page.screenshot({ path: at("feedback-8-rail"), clip: { x: 0, y: 0, width: 700, height: 960 } });
   });
 }

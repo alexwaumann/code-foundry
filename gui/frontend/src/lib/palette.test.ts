@@ -50,6 +50,7 @@ const ALLOW: { file: string; match: string; why: string }[] = [
   { file: "/src/components/compose/CompletionCard.tsx", match: "oklch(0.55 0.13 ${String(projectHue(name))})", why: "the same project identity dot" },
   { file: "/src/components/compose/AttachmentChip.tsx", match: 'DEFAULT_ACCENT = "oklch(', why: "an image chip's tint before its thumbnail is sampled" },
   { file: "/src/components/compose/AttachmentChip.tsx", match: "return `rgb(${", why: "an image chip's tint: the thumbnail's average colour" },
+  { file: "/src/components/sidebar/rail/railLook.ts", match: 'const OPAQUE = "#000";', why: "the rail's edge fades are a mask: only its alpha is used" },
   { file: "/src/components/compose/ProjectRows.tsx", match: "tracking-wide text-white", why: "the initials on a project's identity tile (the hashed hue above), not a theme colour" },
   { file: "/src/components/compose/AttachmentLightbox.tsx", match: 'overlayClassName="bg-black/80"', why: "the attachment lightbox scrim (composers and thread)" },
   { file: "/src/components/compose/Composer.tsx", match: "rounded-full bg-black/70 text-white", why: "the remove button sits on an image thumbnail, not on a theme surface" },

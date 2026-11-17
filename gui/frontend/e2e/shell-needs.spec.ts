@@ -301,7 +301,7 @@ for (const scheme of ["dark", "light"] as const) {
   });
 }
 
-/** SHOTS=<dir>: the hover card (a long command, a question), both popups, the top bar's control with its popover, the strip; dark and light. */
+/** SHOTS=<dir>: the hover card (a long command, a question), both popups, the strip; dark and light. The rail's card: sidebar-rail.spec.ts. */
 for (const scheme of ["dark", "light"] as const) {
   test(`needs you screenshots (${scheme})`, async ({ page }, info) => {
     const shots = process.env.SHOTS;
@@ -343,18 +343,6 @@ for (const scheme of ["dark", "light"] as const) {
     await window("popup-question");
     await page.keyboard.press("Escape");
     await expect(popup).toHaveCount(0);
-
-    // The sidebar collapsed: the top bar's control, its popover, a row's card.
-    await page.mouse.move(900, 800);
-    await page.getByTestId("top-bar-sidebar-toggle").click();
-    await expect(page.getByTestId("needs-control")).toBeVisible();
-    await page.getByTestId("needs-control").click();
-    await expect(page.getByTestId("needs-popover")).toBeVisible();
-    await page.getByTestId("needs-popover-row").first().getByTestId("thread-name").hover();
-    await expect(card(page)).toBeVisible();
-    await window("top-bar-popover");
-    await page.keyboard.press("Escape");
-    await page.getByTestId("top-bar-sidebar-toggle").click();
 
     // A short pane: the strip, and its card.
     await seed(pane("p-1", [threadTab("s-ny-badge")]), "p-1");

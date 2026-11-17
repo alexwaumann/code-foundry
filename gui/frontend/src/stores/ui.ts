@@ -142,7 +142,11 @@ interface UiState {
   renamingThreadId: string | null;
 
   // Persisted settings.
-  sidebarVisible: boolean;
+  /**
+   * The sidebar shows its full list; false: the collapsed icon rail (components/sidebar/rail,
+   * docs/notes/sidebar-rail.md). Saved before the rail as `sidebarVisible`, which merge still reads.
+   */
+  sidebarExpanded: boolean;
   sidebarWidth: number;
   /** Terminal font size in px before zoom (appearance.font_size). */
   fontSize: number;
@@ -186,6 +190,7 @@ interface UiState {
   closePalette: (restore?: boolean) => void;
   focusComposer: () => void;
   setRenaming: (threadId: string | null) => void;
+  /** Switches the sidebar between its full list and the icon rail. */
   toggleSidebar: () => void;
   setSidebarWidth: (w: number) => void;
   focusContent: () => void;
@@ -211,9 +216,14 @@ export function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
 }
 
-/** The sidebar's rendered width: 0 when hidden. */
-export function visibleSidebarWidth(s: { sidebarVisible: boolean; sidebarWidth: number; zoom: number }): number {
-  return s.sidebarVisible ? sidebarWidthAt(s.sidebarWidth, s.zoom) : 0;
+/**
+ * Inline rename of a thread's sidebar row: the rename field lives in the expanded list's row, so
+ * the rail gives way to it first.
+ */
+export function renameInSidebar(threadId: string): void {
+  const ui = useUiStore.getState();
+  if (!ui.sidebarExpanded) ui.toggleSidebar();
+  ui.setRenaming(threadId);
 }
 
 export function sameSelection(a: Selection, b: Selection): boolean {
@@ -313,7 +323,7 @@ export const useUiStore = create<UiState>()(
       palette: { open: false, query: "", commandName: null, page: "commands", returnTo: "content" },
       composerFocusSeq: 0,
       renamingThreadId: null,
-      sidebarVisible: true,
+      sidebarExpanded: true,
       sidebarWidth: SIDEBAR_DEFAULT,
       fontSize: FONT_DEFAULT,
       zoom: ZOOM_DEFAULT,
@@ -334,7 +344,7 @@ export const useUiStore = create<UiState>()(
         set({ focus });
       },
       focusSidebar: () => {
-        set((s) => ({ sidebarVisible: true, sidebarFocusSeq: s.sidebarFocusSeq + 1 }));
+        set((s) => ({ sidebarExpanded: true, sidebarFocusSeq: s.sidebarFocusSeq + 1 }));
       },
       setCursor: (cursorKey) => {
         set({ cursorKey });
@@ -386,7 +396,7 @@ export const useUiStore = create<UiState>()(
         });
       },
       toggleSidebar: () => {
-        set((s) => ({ sidebarVisible: !s.sidebarVisible }));
+        set((s) => ({ sidebarExpanded: !s.sidebarExpanded }));
       },
       setSidebarWidth: (w) => {
         set({ sidebarWidth: clamp(Math.round(w), SIDEBAR_MIN, SIDEBAR_MAX) });
@@ -443,7 +453,8 @@ export const useUiStore = create<UiState>()(
         };
         return {
           ...current,
-          sidebarVisible: bool(p.sidebarVisible, current.sidebarVisible),
+          // A store written before the rail names it sidebarVisible (false: hidden, now the rail).
+          sidebarExpanded: bool(p.sidebarExpanded, bool(p.sidebarVisible, current.sidebarExpanded)),
           sidebarWidth: num(p.sidebarWidth, SIDEBAR_MIN, SIDEBAR_MAX, current.sidebarWidth),
           fontSize: num(p.fontSize, FONT_MIN, FONT_MAX, current.fontSize),
           zoom: num(p.zoom, ZOOM_MIN, ZOOM_MAX, current.zoom),
@@ -455,7 +466,7 @@ export const useUiStore = create<UiState>()(
         };
       },
       partialize: (s) => ({
-        sidebarVisible: s.sidebarVisible,
+        sidebarExpanded: s.sidebarExpanded,
         sidebarWidth: s.sidebarWidth,
         fontSize: s.fontSize,
         zoom: s.zoom,

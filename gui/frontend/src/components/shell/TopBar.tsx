@@ -10,7 +10,6 @@ import { newSpace } from "@/shell/spaceActions";
 import { useCanStepFocus } from "@/stores/focusHistory";
 import { useLayoutStore } from "@/stores/layout";
 import { useUiStore } from "@/stores/ui";
-import { NeedsPopover } from "@/components/needs/NeedsPopover";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SpaceTabs } from "./SpaceTabs";
 
@@ -32,8 +31,8 @@ function FocusHistoryButtons() {
 /**
  * The window shell's top bar (docs/notes/shell-model.md, "Structure"): always visible, laid out on
  * its own with no alignment to the sidebar. The traffic-light gutter, the app name, the sidebar
- * toggle, back and forward, the Needs you control while the sidebar is collapsed, then the space
- * tabs, then "+" (a new space, shown at once, its name ready to type), and at the right end the
+ * toggle (the full sidebar or its icon rail), back and forward, then the space tabs (each with its
+ * Needs you count), then "+" (a new space, shown at once, its name ready to type), and at the right end the
  * bell (components/notifications/NotificationBell.tsx).
  *
  * It is the window's drag band (Wails runtime, `--wails-draggable`): everything but its buttons
@@ -61,8 +60,6 @@ export function TopBar() {
           </Tip>
         </span>
         <FocusHistoryButtons />
-        {/* While the sidebar is collapsed: the Needs you count and its list (components/needs/NeedsPopover.tsx), after back and forward so they never move. */}
-        {loaded && <NeedsPopover />}
         {loaded && (
           <>
             <SpaceTabs renaming={renaming} onRenaming={setRenaming} />

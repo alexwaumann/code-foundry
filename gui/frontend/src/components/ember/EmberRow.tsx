@@ -20,13 +20,8 @@ import {
 import { EMBER_ROW_KEY, openEmber, openEmberBoard, openEmberSettings } from "@/stores/emberPanel";
 import { useThreadsStore } from "@/stores/threads";
 import { useUiStore } from "@/stores/ui";
-import { EMBER_VIEW } from "@/surfaces/emberTarget";
 import { Flame } from "./Flame";
-
-/** Whether the selection shows Ember's chat (its thread, or the Ember view). */
-function useEmberSelected(threadId: string): boolean {
-  return useUiStore((s) => (s.selection.kind === "thread" && s.selection.id === threadId) || (s.selection.kind === "view" && s.selection.name === EMBER_VIEW));
-}
+import { useEmberSelected } from "./useEmberSelected";
 
 /**
  * "<Status> · <task> · N threads · N blocked · N scheduled", the status in the thread rows'
@@ -35,7 +30,7 @@ function useEmberSelected(threadId: string): boolean {
  * waits on Ember alone (its worker reported and is idle); Worker idle while a task is
  * doing with no one on it; Blocked while a task is blocked and nothing else goes on.
  */
-function EmberLine({ threadId }: { threadId: string }) {
+export function EmberLine({ threadId }: { threadId: string }) {
   const doing = useDoingCount();
   const toCheck = useToCheckCount();
   const t = useThreadsStore(
@@ -138,19 +133,24 @@ function EmberRowShown({ threadId }: { threadId: string }) {
           </span>
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent data-testid="ember-row-menu">
-        <ContextMenuItem
-          onSelect={() => {
-            openEmber(threadId);
-            openEmberBoard();
-          }}
-        >
-          Open board
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={openEmberSettings}>
-          Settings
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <EmberRowMenu threadId={threadId} />
     </ContextMenu>
+  );
+}
+
+/** Ember's row's menu (also the rail's flame's, sidebar/rail): the board, Ember's settings. */
+export function EmberRowMenu({ threadId }: { threadId: string }) {
+  return (
+    <ContextMenuContent data-testid="ember-row-menu">
+      <ContextMenuItem
+        onSelect={() => {
+          openEmber(threadId);
+          openEmberBoard();
+        }}
+      >
+        Open board
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={openEmberSettings}>Settings</ContextMenuItem>
+    </ContextMenuContent>
   );
 }
