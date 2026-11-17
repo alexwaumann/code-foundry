@@ -169,6 +169,50 @@ describe("PaneTabStrip", () => {
   });
 });
 
+describe("a thread's name that is not final yet (provisional, or being regenerated)", () => {
+  const labelOf = (id: string) => {
+    const el = tabs()
+      .find((t) => t.getAttribute("data-tab-id") === id)
+      ?.querySelector<HTMLElement>('[data-testid="shell-tab-label"]');
+    if (!el) throw new Error(id);
+    return el;
+  };
+  const isQuiet = (el: HTMLElement) => el.hasAttribute("data-provisional") && el.classList.contains("italic") && el.classList.contains("text-cf-text-muted");
+  const setThread = (o: { naming?: boolean; nameProvisional?: boolean }) => {
+    act(() => {
+      useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", naming: false, nameProvisional: false, ...o } } as never });
+    });
+  };
+
+  it.each([
+    ["being regenerated", { naming: true }],
+    ["provisional", { nameProvisional: true }],
+  ])("%s: the thread's tab shows its name muted and italic, as the sidebar's row", (_name, o) => {
+    render(<PaneTabStrip paneId="p-1" focused />);
+    setThread(o);
+    expect(labelOf("t-th").textContent).toBe("Refactor sidebar tree");
+    expect(isQuiet(labelOf("t-th"))).toBe(true);
+  });
+
+  it("goes back to the tab's own colour once the name lands", () => {
+    render(<PaneTabStrip paneId="p-1" focused />);
+    setThread({ naming: true });
+    expect(isQuiet(labelOf("t-th"))).toBe(true);
+    setThread({ naming: false });
+    expect(labelOf("t-th").hasAttribute("data-provisional")).toBe(false);
+    expect(labelOf("t-th").className).not.toMatch(/italic|text-cf-text-muted/);
+  });
+
+  it("leaves a linked tab (its title is not the thread's name) and the other tabs as they are", () => {
+    render(<PaneTabStrip paneId="p-1" focused />);
+    setThread({ naming: true, nameProvisional: true });
+    for (const id of ["t-d", "t-prs", "t-c"]) {
+      expect(labelOf(id).hasAttribute("data-provisional")).toBe(false);
+      expect(labelOf(id).className).not.toMatch(/italic/);
+    }
+  });
+});
+
 describe("a preview tab (docs/notes/shell-model.md, \"Preview tabs\")", () => {
   const withPreview = (active: string) =>
     layoutOf([space(pane("p-1", [tab("t-a", "thread", "s-1"), tab("t-pv", "thread", "s-2", { preview: true })], active), "p-1")]);

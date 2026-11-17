@@ -32,6 +32,7 @@ import { LinkedPrsBadge } from "./LinkedPrsBadge";
 import { NotificationMark } from "./NotificationMark";
 import { TipLinkedPrs } from "./TipLinkedPrs";
 import { TipNotifications } from "./TipNotifications";
+import { useNameProvisional } from "@/shell/useThreadName";
 
 interface RowProps {
   row: Row;
@@ -387,7 +388,7 @@ function ThreadLabel({ id, cursor }: { id: string; cursor: boolean }) {
   // Unnamed until the daemon names it from the first prompt: the id stands in.
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   // A provisional name, or one being regenerated: muted and italic until the model's title lands.
-  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
+  const provisional = useNameProvisional(id);
   const kind = useThreadsStore((s) => statusLine(s.byId[id]).kind);
   const badge = useThreadsStore((s) => threadBadge(s.byId[id]));
   const renaming = useUiStore((s) => s.renamingThreadId === id);
@@ -752,7 +753,7 @@ function SnoozeLeft({ id }: { id: string }) {
 export function SingleLineLabel({ id, section }: { id: string; section: "archived" | "snoozed" }) {
   const name = useThreadsStore((s) => s.byId[id]?.name ?? "");
   // A provisional name, or one being regenerated: muted and italic until the model's title lands.
-  const provisional = useThreadsStore((s) => (s.byId[id]?.nameProvisional || s.byId[id]?.naming) ?? false);
+  const provisional = useNameProvisional(id);
   const renaming = useUiStore((s) => s.renamingThreadId === id);
   return (
     <span className={cn("flex min-w-0 flex-1 items-center gap-1.5", !renaming && QUIET)} data-testid="thread-body" data-archived={section === "archived" || undefined} data-snoozed={section === "snoozed" || undefined}>

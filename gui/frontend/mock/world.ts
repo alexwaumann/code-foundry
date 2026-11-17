@@ -2607,6 +2607,16 @@ export class World {
     this.publishThread(s);
   }
 
+  /**
+   * Holds a thread's name in regeneration (Thread.naming) until turned off, for a test or a
+   * screenshot of the muted, italic name; thread.regenerate-name turns it on only for its wait.
+   */
+  setNaming(id: string, on: boolean): void {
+    const s = this.thread(id);
+    s.naming = on;
+    this.publishThread(s);
+  }
+
   /** The daemon's refusal of a message or fork to a thread whose transcript is gone. */
   refuseTranscriptMissing(id: string): void {
     const s = this.thread(id);

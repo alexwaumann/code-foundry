@@ -313,6 +313,20 @@ describe("the row under a linked tab's strip", () => {
     });
     expect(screen.getByTestId("shell-linked-row-name").textContent).toBe("Virtualize the sidebar");
   });
+
+  it("names the thread muted and italic while its name is being regenerated, as its tab and sidebar row", () => {
+    const t = useLayoutStore.getState().tabs["t-d"];
+    if (!t) throw new Error("tab");
+    render(<LinkedRow tab={t} />);
+    const name = () => screen.getByTestId("shell-linked-row-name");
+    expect(name().hasAttribute("data-provisional")).toBe(false);
+    act(() => {
+      setThreads(thread({ naming: true }));
+    });
+    expect(name().hasAttribute("data-provisional")).toBe(true);
+    expect(name().className).toMatch(/italic/);
+    expect(name().className).toMatch(/text-cf-text-muted/);
+  });
 });
 
 describe("a tab a child thread opened names the lead (docs/notes/linked-names-lead.md)", () => {
@@ -357,6 +371,16 @@ describe("a tab a child thread opened names the lead (docs/notes/linked-names-le
     setThreads(thread({ archivedAtMs: 1 }), child, grand);
     render(<LinkedRow tab={tabOf("t-cd")} />);
     expect(screen.getByTestId("shell-linked-row-name").textContent).toBe("Refactor sidebar tree");
+  });
+
+  it("is muted and italic while the lead's name is provisional, not the child's", () => {
+    setThreads(thread({}), { ...child, nameProvisional: true }, grand);
+    render(<LinkedRow tab={tabOf("t-cd")} />);
+    expect(screen.getByTestId("shell-linked-row-name").hasAttribute("data-provisional")).toBe(false);
+    cleanup();
+    setThreads(thread({ nameProvisional: true }), child, grand);
+    render(<LinkedRow tab={tabOf("t-cd")} />);
+    expect(screen.getByTestId("shell-linked-row-name").hasAttribute("data-provisional")).toBe(true);
   });
 
   it("once the lead is removed, the child (the highest thread left) is named, and its tab opened", async () => {
@@ -408,6 +432,18 @@ describe("the thread's header in a shell pane", () => {
       setTabCut("p-1", true);
     });
     expect(screen.getByTestId("thread-header-name").textContent).toBe("Refactor sidebar tree");
+    expect(screen.getByTestId("thread-header-name").hasAttribute("data-provisional")).toBe(false);
+  });
+
+  it("shows the name it stands in for muted and italic while it is being regenerated, as the tab", () => {
+    setThreads(thread({ naming: true }));
+    setTabCut("p-1", true);
+    render(<ThreadHeader threadId="s-1" paneId="p-1" />);
+    const name = screen.getByTestId("thread-header-name");
+    expect(name.hasAttribute("data-provisional")).toBe(true);
+    expect(name.className).toMatch(/italic/);
+    expect(name.className).toMatch(/text-cf-text-muted/);
+    expect(name.className).not.toMatch(/(^| )text-cf-text( |$)/);
   });
 
   it("has one menu: Open ▸, Move to space ▸, the thread's items with Close after Archive, Fork, Remove", async () => {
