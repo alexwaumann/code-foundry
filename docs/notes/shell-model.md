@@ -152,7 +152,7 @@ when the first working version is whole. Nothing partial is released.
   layout from before "Room for panes"), panes fold, by one rule for widths and heights:
   - **What a fold looks like.** A pane folded in a row is a rail 36px wide and as tall as its place;
     a pane folded in a column is a strip 36px tall and as wide as its place. Both show the tabs'
-    icons, mark the selected one and carry the attention dot; a click on an icon unfolds the pane on
+    icons, mark the selected one and carry the status dot; a click on an icon unfolds the pane on
     that tab, and a click anywhere else on it that is not one of its buttons unfolds it on its
     selected tab, as a click on that icon does (another pane may fold). The whole rail takes a light
     hover tint to say it is clickable, the selected icon a step stronger on it; no animation, and
@@ -211,7 +211,7 @@ when the first working version is whole. Nothing partial is released.
     and the pane stays collapsed until the user opens it again. It looks and behaves as a fold of
     "Small windows": a rail in a row, a strip in a column, by the same rule (a column narrows only
     when every pane in it is folded, a row gets shorter only when every pane in it is folded), with
-    the tabs' icons, the selected one marked and the attention dots; its expand button sits where a
+    the tabs' icons, the selected one marked and the status dots; its expand button sits where a
     rail has full screen, beside it. The room it frees goes to its neighbours by the stored
     proportions, which do not change: opening it again gives every pane its old size. Automatic
     folding goes on for the other panes; a collapsed pane is never one that unfolds.
@@ -233,7 +233,7 @@ when the first working version is whole. Nothing partial is released.
     cmd+shift+t reopening into it (unless the pane it rebuilds would not fit open), a tab or pane
     dropped into it. The direction keys and full screen do not. An action that does not take the user's focus (a
     thread's model opening a tab there, smart swap) leaves it collapsed: the tab becomes its
-    selected one, and the icon carries the attention dot as on any rail.
+    selected one, and the icon carries the status dot as on any rail.
   - **Full screen** from its rail shows the pane over the whole area; leaving full screen leaves
     it collapsed again (full screen never changes the stored choice).
   - **Drops.** A collapsed pane is one target as a whole, as a rail is: a tab or pane dropped on it
@@ -388,8 +388,9 @@ when the first working version is whole. Nothing partial is released.
     a deny reason), and "Go to thread". It dismisses the hover card until the row is hovered again.
   - With the sidebar collapsed to its icon rail, each row is an icon with the same click, hover card,
     popup and menu (docs/notes/sidebar-rail.md); the top bar has no control of its own.
-- **In a pane**, a thread that needs the user marks its tab icon with the attention dot, in a strip
-  and in a rail. When the pane is too short for the full ask, the ask shows as a one-line strip above
+- **In a pane**, a thread's tab icon carries a status dot in the colour of its sidebar row's status
+  icon (blue working, amber needs you, green done, red failed, grey waiting or cancelled; none while
+  idle or archived), in a strip and in a rail (docs/notes/tab-status-dots.md). When the pane is too short for the full ask, the ask shows as a one-line strip above
   the composer with the same hover card and popup.
 
 ## Preview tabs

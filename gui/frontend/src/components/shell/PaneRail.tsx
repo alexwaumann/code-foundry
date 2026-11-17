@@ -12,7 +12,7 @@ import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
 import { requestPaneFocus, takeFocusRequest, useShellViewStore } from "@/stores/shellView";
 import { keepPreviewTab } from "@/shell/preview";
-import { AttentionDot, LinkedTip, PREVIEW_DASHES, TabContentIcon, TabContextMenu } from "./PaneTabStrip";
+import { LinkedTip, StatusDot, PREVIEW_DASHES, TabContentIcon, TabContextMenu } from "./PaneTabStrip";
 import { PaneExpandButton } from "./PaneCollapseButton";
 
 /**
@@ -80,7 +80,7 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
       >
         <span className="relative flex">
           <TabContentIcon tab={tab} />
-          {surface.useAttention && <AttentionDot use={surface.useAttention} tab={tab} />}
+          {surface.useStatus && <StatusDot use={surface.useStatus} tab={tab} />}
         </span>
         {/* The drag layer reads tab names here (ShellDnd measureStrips). */}
         <span className="sr-only" data-testid="shell-tab-label">
@@ -94,7 +94,7 @@ function RailTabOf({ tab, paneId, selected, vertical }: { tab: TabEntry; paneId:
 /**
  * A pane folded to a rail (docs/notes/shell-model.md, "Small windows"): too little room to keep
  * every pane at its minimum, or the user collapsed it ("Collapsing a pane"), so this one shows
- * only its tabs' icons, the selected one marked, with their attention dots. It mounts no tab body
+ * only its tabs' icons, the selected one marked, with their status dots. It mounts no tab body
  * and holds no stream. A click on an icon focuses that tab, which unfolds the pane (another may
  * fold) and opens a collapsed one; a click anywhere else on the rail that is not one of its
  * buttons opens it on its selected tab (openRail), and the whole rail tints under the pointer to

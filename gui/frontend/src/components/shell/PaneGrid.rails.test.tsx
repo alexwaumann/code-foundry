@@ -98,11 +98,11 @@ describe("rails in the pane grid", () => {
     expect(bodies()).toEqual(["thread:s-1"]);
   });
 
-  it("a rail shows its tabs' icons, the selected one marked, and the attention dot of a thread that needs the user", async () => {
+  it("a rail shows its tabs' icons, the selected one marked, and the status dot of a thread that needs the user", async () => {
     sized(600);
     await seed();
     act(() => {
-      useThreadsStore.setState({ byId: { "s-2": { id: "s-2", name: "Port renderer", status: "attention", archivedAtMs: null } } as never });
+      useThreadsStore.setState({ byId: { "s-2": { id: "s-2", name: "Port renderer", status: "attention", statusReason: "permission: Bash", archivedAtMs: null } } as never });
     });
     render(<PaneGrid />);
     const rail = screen.getAllByTestId("shell-rail").find((r) => r.getAttribute("data-pane-id") === "p-b");
@@ -116,15 +116,15 @@ describe("rails in the pane grid", () => {
     if (!other) throw new Error("rail");
     const dots = within(other)
       .getAllByTestId("shell-rail-tab")
-      .map((i) => i.querySelector('[data-testid="shell-tab-attention"]') !== null);
-    expect(dots).toEqual([true, false]);
+      .map((i) => i.querySelector('[data-testid="shell-tab-status"]')?.getAttribute("data-kind") ?? null);
+    expect(dots).toEqual(["input", null]);
   });
 
   it("a tooltip names a rail's tab, and a linked one its thread", async () => {
     sized(600);
     await seed();
     act(() => {
-      useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "idle", archivedAtMs: null } } as never });
+      useThreadsStore.setState({ byId: { "s-1": { id: "s-1", name: "Refactor sidebar tree", status: "idle", statusReason: "", archivedAtMs: null } } as never });
     });
     render(<PaneGrid />);
     const icon = screen.getAllByTestId("shell-rail-tab").find((i) => i.getAttribute("data-tab-id") === "t-d");

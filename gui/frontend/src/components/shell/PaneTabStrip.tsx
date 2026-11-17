@@ -3,6 +3,7 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { PANE_HEADER_HEIGHT } from "@/components/window/titleBand";
+import { rowToneDotClasses, statusRegistry } from "@/lib/statusRegistry";
 import { cn } from "@/lib/utils";
 import { zoomFactor } from "@/lib/zoom";
 import { focusTabNow } from "@/shell/commands";
@@ -45,10 +46,23 @@ const FULL_WIDTH = 32;
 const COLLAPSE_WIDTH = 30;
 const EXIT_WIDTH = 150;
 
-/** The attention dot on a tab's icon: its thread needs the user (docs/notes/shell-model.md, "In a pane"). */
-export function AttentionDot({ use, tab }: { use: NonNullable<ShellSurface["useAttention"]>; tab: TabEntry }) {
-  const on = use(tab);
-  return on ? <span role="img" aria-label="Needs you" className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-cf-warning ring-1 ring-cf-surface" data-testid="shell-tab-attention" /> : null;
+/**
+ * The status dot on a tab's icon (docs/notes/shell-model.md, "In a pane"): its thread's status in
+ * the sidebar row icon's colour (lib/statusRegistry); none while idle.
+ */
+export function StatusDot({ use, tab }: { use: NonNullable<ShellSurface["useStatus"]>; tab: TabEntry }) {
+  const kind = use(tab);
+  if (kind === null) return null;
+  const entry = statusRegistry[kind];
+  return (
+    <span
+      role="img"
+      aria-label={entry.word}
+      className={cn("absolute -top-0.5 -right-0.5 size-1.5 rounded-full ring-1 ring-cf-surface", rowToneDotClasses[entry.tone])}
+      data-testid="shell-tab-status"
+      data-kind={kind}
+    />
+  );
 }
 
 /** A tab's icon and name; `room` keeps the close button's width (measuring a tab's natural width). */
@@ -60,7 +74,7 @@ function TabContent({ tab, label, room }: { tab: TabEntry; label: TabFit["label"
     <>
       <span className="relative flex shrink-0">
         <TabContentIcon tab={tab} />
-        {!room && surface.useAttention && <AttentionDot use={surface.useAttention} tab={tab} />}
+        {!room && surface.useStatus && <StatusDot use={surface.useStatus} tab={tab} />}
       </span>
       <span className={cn("min-w-0", label === "icon" ? "sr-only" : "truncate", provisional && "text-cf-text-muted italic")} data-testid="shell-tab-label" data-provisional={provisional || undefined}>
         {title}
