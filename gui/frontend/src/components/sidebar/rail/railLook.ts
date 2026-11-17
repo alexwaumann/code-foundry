@@ -16,6 +16,8 @@ export const RAIL_TILE = 26;
 export const RAIL_GAP = 2;
 /** Needs you shows at most this many icons; more scroll inside the group. */
 export const RAIL_NEEDS_MAX = 4;
+/** A Working, Snoozed or Archived card's list is at most this tall, then it scrolls inside the card. */
+export const RAIL_CARD_MAX = 300;
 /** The height a group of n icons takes. */
 export function railGroupHeight(n: number): number {
   return n <= 0 ? 0 : n * RAIL_TILE + (n - 1) * RAIL_GAP;

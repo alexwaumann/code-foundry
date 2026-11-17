@@ -248,19 +248,36 @@ describe("the rail's separators", () => {
 });
 
 describe("Working, Snoozed and Archived", () => {
-  it("an icon each while the expanded sidebar would show the section, named with its count, no count drawn", () => {
+  const HOUR = 3_600_000;
+  const sections = () => {
     setThreads(
-      thread({ id: "s-1", status: "busy" }),
-      thread({ id: "s-2", status: "busy" }),
-      thread({ id: "s-3", snoozedUntilMs: Date.now() + 3_600_000 }),
-      thread({ id: "s-4", archivedAtMs: Date.now() - 1000 }),
+      thread({ id: "s-1" }),
+      thread({ id: "w-1", name: "Index the docs", status: "busy" }),
+      thread({ id: "w-2", name: "Refactor sidebar tree", status: "busy" }),
+      thread({ id: "z-1", name: "Bump wails", snoozedUntilMs: Date.now() + 4 * 24 * HOUR }),
+      thread({ id: "z-2", name: "Refactor the gh poller", snoozedUntilMs: Date.now() + 2 * HOUR + 5 * 60_000 }),
+      thread({ id: "a-1", name: "Spike a canvas sidebar", archivedAtMs: Date.now() - HOUR }),
+      thread({ id: "a-2", name: "Old spike", archivedAtMs: Date.now() - 2 * HOUR }),
     );
+  };
+  /** Opens a section's card as hovering does (Radix's trigger opens on focus too), past its open delay. */
+  const openCard = async (section: string) => {
+    act(() => {
+      screen.getByTestId(`rail-${section}`).focus();
+    });
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    return screen.getByTestId(`rail-${section}-card`);
+  };
+  const cardKeys = (card: HTMLElement) => [...card.querySelectorAll("[data-row-key]")].map((e) => e.getAttribute("data-row-key"));
+
+  it("an icon each while the expanded sidebar would show the section, named with its count, no count drawn", () => {
+    sections();
     show();
     expect(screen.getByTestId("rail-working").getAttribute("aria-label")).toBe("Working · 2");
     expect(screen.getByTestId("rail-working").textContent).toBe("");
     expect(screen.getByTestId("rail-working").querySelector("svg")?.getAttribute("class")).toContain("text-cf-info-text");
-    expect(screen.getByTestId("rail-snoozed").getAttribute("aria-label")).toBe("Snoozed · 1");
-    expect(screen.getByTestId("rail-archived").getAttribute("aria-label")).toBe("Archived · 1");
+    expect(screen.getByTestId("rail-snoozed").getAttribute("aria-label")).toBe("Snoozed · 2");
+    expect(screen.getByTestId("rail-archived").getAttribute("aria-label")).toBe("Archived · 2");
   });
 
   it("none while the sections are empty", () => {
@@ -269,6 +286,90 @@ describe("Working, Snoozed and Archived", () => {
     expect(screen.queryByTestId("rail-working")).toBeNull();
     expect(screen.queryByTestId("rail-snoozed")).toBeNull();
     expect(screen.queryByTestId("rail-archived")).toBeNull();
+  });
+
+  it("no card until hovered or focused", () => {
+    sections();
+    show();
+    expect(screen.queryByTestId("rail-working-card")).toBeNull();
+  });
+
+  it.each([
+    ["working", "Working", ["s:w-2", "s:w-1"]],
+    // The soonest wake first.
+    ["snoozed", "Snoozed", ["s:z-2", "s:z-1"]],
+    ["archived", "Archived", ["s:a-1", "s:a-2"]],
+  ])("%s's card: its name and count on top, then its rows in the expanded sidebar's order", async (section, label, keys) => {
+    sections();
+    useUiStore.setState({ sidebarExpanded: true, workingCollapsed: false, snoozedCollapsed: false, archivedCollapsed: false });
+    show();
+    expect(keysIn(`sidebar-${section}-rows`)).toEqual(keys);
+    cleanup();
+    useUiStore.setState({ sidebarExpanded: false });
+    show();
+    const card = await openCard(section);
+    expect(within(card).getByTestId("rail-card-label").textContent).toBe(label);
+    expect(within(card).getByTestId("rail-card-count").textContent).toBe("2");
+    expect(cardKeys(card)).toEqual(keys);
+    expect(within(card).getByRole("listbox").getAttribute("aria-label")).toBe(label);
+  });
+
+  it("the rows are the expanded sidebar's: a Working row's project, status, name and branch; a Snoozed row's wake time; an Archived row's one line", async () => {
+    sections();
+    show();
+    const working = await openCard("working");
+    const row = working.querySelector('[data-row-key="s:w-1"]') as HTMLElement;
+    expect(within(row).getByTestId("row-project").textContent).toBe("code-foundry");
+    expect(within(row).getByTestId("thread-name").textContent).toBe("Index the docs");
+    expect(within(row).getByTestId("row-branch").textContent).toBe("feat/sidebar");
+    expect(within(row).getByTestId("thread-body").getAttribute("data-status-line")).toBe("working");
+    cleanup();
+    show();
+    const snoozed = await openCard("snoozed");
+    expect((snoozed.querySelector('[data-row-key="s:z-2"]') as HTMLElement).textContent).toContain("Refactor the gh poller");
+    expect((snoozed.querySelector('[data-row-key="s:z-2"]') as HTMLElement).textContent).toContain("2h");
+    cleanup();
+    show();
+    const archived = await openCard("archived");
+    expect((archived.querySelector('[data-row-key="s:a-1"]') as HTMLElement).textContent).toContain("Spike a canvas sidebar");
+  });
+
+  it("lists the rows while the section is collapsed in the expanded sidebar, and leaves that state alone", async () => {
+    sections();
+    useUiStore.setState({ workingCollapsed: true, snoozedCollapsed: true, archivedCollapsed: true });
+    show();
+    expect(cardKeys(await openCard("working"))).toEqual(["s:w-2", "s:w-1"]);
+    expect(cardKeys(await openCard("archived"))).toEqual(["s:a-1", "s:a-2"]);
+    expect(useUiStore.getState()).toMatchObject({ workingCollapsed: true, snoozedCollapsed: true, archivedCollapsed: true });
+  });
+
+  it("a row's click opens its thread as the expanded row's does, and the card closes", async () => {
+    sections();
+    show();
+    const card = await openCard("archived");
+    fireEvent.click(card.querySelector('[data-row-key="s:a-2"]') as HTMLElement);
+    await settle();
+    // An Archived row opens the thread as the space's preview tab.
+    expect(runs.at(-1)).toMatchObject({ name: "thread.open", args: { id: "a-2" } });
+    expect(runs.at(-1)?.args.preview).toBe("true");
+    expect(screen.queryByTestId("rail-archived-card")).toBeNull();
+  });
+
+  it("a right click on a row shows the row's own menu, and the card stays open under it", async () => {
+    sections();
+    show();
+    const card = await openCard("working");
+    fireEvent.contextMenu(card.querySelector('[data-row-key="s:w-2"]') as HTMLElement);
+    const menu = await screen.findByTestId("row-menu");
+    expect(menu.getAttribute("data-thread")).toBe("w-2");
+    expect([...menu.querySelectorAll('[role="menuitem"]')][0]?.textContent).toBe("Open");
+    // The icon's blur would shut the card; the menu holds it.
+    act(() => {
+      screen.getByTestId("rail-working").blur();
+    });
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.getByTestId("rail-working-card")).toBeTruthy();
+    expect(useUiStore.getState().cursorKey).toBe("s:w-2");
   });
 });
 

@@ -40,7 +40,16 @@ interface ThreadListboxProps {
   /** Brings a row the cursor moved to into view in its own scroll container. */
   scrollToRow: (row: ShellRow) => void;
   testId: string;
+  /** The listbox's accessible name ("Threads"; a rail card's section). */
+  label?: string;
   className?: string;
+  /**
+   * Whether the window's requests for the list's keyboard (sidebarFocusSeq) reach this one. The
+   * rail's section cards list rows too, but the request is the rail's own list's.
+   */
+  claimsFocus?: boolean;
+  /** Told as a row's context menu opens and closes (a rail card stays open while it is up). */
+  onMenuOpenChange?: (open: boolean) => void;
   children: (list: ListboxRows) => ReactNode;
 }
 
@@ -49,9 +58,10 @@ interface ThreadListboxProps {
  * the listbox the window's keys reach (sidebarFocusSeq), its keyboard cursor (arrows, Home and End
  * reaching Ember's row, Enter, F2, Escape), a row's click (activate), and the context menu of the
  * row under a right click (ShellRowMenu, DraftRowMenu), with the rows' hover cards shut while it is
- * open. The expanded list (ShellSidebarList) and the collapsed rail (sidebar/rail) draw the rows.
+ * open. The expanded list (ShellSidebarList) and the collapsed rail (sidebar/rail) draw the rows,
+ * and so do the rail's Working, Snoozed and Archived cards (rail/RailSectionCard.tsx).
  */
-export function ThreadListbox({ rows, scrollToRow, testId, className, children }: ThreadListboxProps) {
+export function ThreadListbox({ rows, scrollToRow, testId, label = "Threads", className, claimsFocus = true, onMenuOpenChange, children }: ThreadListboxProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const selectedKey = useSelectedRowKey();
   const cursorKey = useUiStore((s) => s.cursorKey);
@@ -76,10 +86,10 @@ export function ThreadListbox({ rows, scrollToRow, testId, className, children }
   // Each request takes the keyboard once: a list mounted later (the rail giving way to the
   // expanded list for a rename) must not take it again from the field that has it.
   useEffect(() => {
-    if (focusSeq <= handledFocusSeq) return;
+    if (!claimsFocus || focusSeq <= handledFocusSeq) return;
     handledFocusSeq = focusSeq;
     listRef.current?.focus();
-  }, [focusSeq]);
+  }, [focusSeq, claimsFocus]);
 
   /**
    * A thread row adds its tab in the focused pane, or focuses it when it is open in the space
@@ -166,6 +176,7 @@ export function ThreadListbox({ rows, scrollToRow, testId, className, children }
       return;
     }
     setMenuRow(row);
+    onMenuOpenChange?.(true);
     useUiStore.getState().setCursor(row.key);
   };
 
@@ -175,14 +186,16 @@ export function ThreadListbox({ rows, scrollToRow, testId, className, children }
       <ContextMenu
         modal={false}
         onOpenChange={(open) => {
-          if (!open) setMenuRow(null);
+          if (open) return;
+          setMenuRow(null);
+          onMenuOpenChange?.(false);
         }}
       >
         <ContextMenuTrigger asChild>
           <div
             ref={listRef}
             role="listbox"
-            aria-label="Threads"
+            aria-label={label}
             tabIndex={0}
             data-region="sidebar"
             data-testid={testId}

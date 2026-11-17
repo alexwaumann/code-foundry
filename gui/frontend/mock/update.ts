@@ -144,6 +144,7 @@ export class MockUpdater {
     this.failCount = 0;
     this.latest = "v0.1.0";
     this.failNext = "";
+    this.stepMs = 250;
     this.relaunches = 0;
     this.restarts = 0;
     this.status = {

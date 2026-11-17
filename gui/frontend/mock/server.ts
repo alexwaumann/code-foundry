@@ -165,7 +165,8 @@
  *   POST /__mock/settings/external?appearance.font_size=18   (a hand edit; "" deletes a key)
  *   POST /__mock/settings/external?loadError=…               (the file stops parsing)
  *   GET  /__mock/update
- *   POST /__mock/update/latest?version=v0.2.0     (what the next check finds)
+ *   POST /__mock/update/latest?version=v0.2.0[&stepMs=250]   (what the next check finds; stepMs paces
+ *                                                 its download, a long one holds it in Downloading)
  *   POST /__mock/update/fail?reason=…             (the next download fails)
  *        app.restart (Restart Now) and daemon.restart come back as the installed version;
  *        GET /__mock/update counts app.restart runs (restarts)
@@ -911,6 +912,7 @@ function updateControl(res: ServerResponse, action: string, q: URLSearchParams):
   switch (action) {
     case "latest":
       u.latest = q.get("version") ?? "v0.2.0";
+      if (q.has("stepMs")) u.stepMs = Math.max(1, Number(q.get("stepMs")) || 250);
       break;
     case "fail":
       u.failNext = q.get("reason") ?? "installer: exit status 1: error: checksum mismatch";
