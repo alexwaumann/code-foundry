@@ -131,7 +131,7 @@ func (l layout) tabCommands() []Command {
 		{
 			Name: "tab.auto-name", Title: "Name Tab Automatically", Category: layoutCategory, Page: PageState,
 			Description: "Give a tab its automatic name again (default: the focused tab): a thread's name is generated again from " +
-				"its recent turns (thread.regenerate-name), a terminal's tab drops its own name for what runs in it.",
+				"its overall task (thread.regenerate-name), a terminal's tab drops its own name for what runs in it.",
 			Args:        []ArgSpec{positional(tabIDArg("The tab (default: the focused one; from inside a thread, required)"))},
 			Keybindings: []string{"cmd+shift+r"},
 			NoIndex:     true,
