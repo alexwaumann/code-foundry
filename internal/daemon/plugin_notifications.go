@@ -33,7 +33,8 @@ var _ plugin.NotificationSink = pluginNotifications{}
 // swept as a removed plugin's at start (plugin.Manager.sweep) nor withdrawn by a plugin's
 // release. SourcePlugins' cards are the daemon's about a plugin (plugin_health.go): they
 // stay exactly as long as their condition holds, whatever release does to the plugin's own.
-var hostSources = []string{notification.SourceCommand, notification.SourcePlugins}
+// githubSource's are the daemon's from the GitHub poll (github_notifications.go).
+var hostSources = []string{notification.SourceCommand, notification.SourcePlugins, githubSource}
 
 // notificationErrors map the notification store's errors to the plugin store's.
 var notificationErrors = map[error]error{

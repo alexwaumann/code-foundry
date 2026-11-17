@@ -131,6 +131,9 @@ type stores struct {
 	// stopBranchLinks stops the glue that links each thread to the pull requests on its
 	// branches, from the GitHub store's cached lists (linked_prs_branch.go).
 	stopBranchLinks func()
+	// stopGitHubNotifications stops the glue that posts the GitHub notifications and
+	// withdraws them (github_notifications.go).
+	stopGitHubNotifications func()
 	// home is the user's home directory (symlinks resolved): the root every project
 	// path must stay inside, and what FilesystemService completes under.
 	home string
@@ -406,6 +409,10 @@ func openStores(ctx context.Context, log *slog.Logger, p paths.Paths, threadEnv 
 		enabled: autoPullEnabled(s.settings), threads: s.thread.Snapshot, actions: s.action.Snapshot, ops: s.gitops,
 	}))
 	s.stopBranchLinks = startBranchLinks(ctx, log.With("store", "thread"), s.thread, s.project.Snapshot, s.gh, s.bus)
+	s.stopGitHubNotifications = startGitHubNotifications(ctx, githubNotifyOptions{
+		Log: log.With("store", "notification"), Store: s.notification, GitHub: s.gh.Snapshot, Threads: s.thread.Snapshot,
+		Projects: s.project.Snapshot, DashboardsEnabled: func() bool { return s.settings.Settings().GitHub.DashboardsEnabled }, Bus: s.bus,
+	})
 	uo := update.DefaultOptions(version.Version)
 	uo.Bus, uo.Log = s.bus, log.With("store", "update")
 	uo.Channel = update.ParseChannel(cfg.Update.Channel)
@@ -490,6 +497,9 @@ func (s *stores) close() error {
 	}
 	if s.stopFlagNotifications != nil {
 		s.stopFlagNotifications()
+	}
+	if s.stopGitHubNotifications != nil {
+		s.stopGitHubNotifications()
 	}
 	if s.stopNotificationThreads != nil {
 		s.stopNotificationThreads()

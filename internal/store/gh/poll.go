@@ -433,6 +433,7 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 	case !cfg.Dashboards:
 		newDash.Authored, newDash.ReviewRequested, newDash.Reviewed, newDash.RecentlyMerged = nil, nil, nil, nil
 		newDash.AuthoredTotal, newDash.ReviewRequestedTotal, newDash.ReviewedTotal, newDash.RecentlyMergedTotal = 0, 0, 0, 0
+		newDash.ReviewedListed = 0
 	case len(plan.sections) > 0:
 		set := func(name string, list *[]PullRequest, total *int) {
 			r := res.Sections[name]
@@ -445,6 +446,9 @@ func (s *Store) applyPoll(ctx context.Context, cfg Config, plan *pollPlan, res *
 		set(sectionAuthored, &newDash.Authored, &newDash.AuthoredTotal)
 		set(sectionReview, &newDash.ReviewRequested, &newDash.ReviewRequestedTotal)
 		set(sectionReviewed, &newDash.Reviewed, &newDash.ReviewedTotal)
+		if res.Sections[sectionReviewed].Err == nil {
+			newDash.ReviewedListed = len(newDash.Reviewed)
+		}
 		set(sectionMerged, &newDash.RecentlyMerged, &newDash.RecentlyMergedTotal)
 		requested := map[string]bool{}
 		for _, p := range newDash.ReviewRequested {
