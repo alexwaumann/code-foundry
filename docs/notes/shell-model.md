@@ -249,6 +249,11 @@ when the first working version is whole. Nothing partial is released.
   The pill and the chip are one button: a click toggles collapsed and expanded, and a press that
   moves drags it, in either state, without toggling. It has no other collapse control. It always
   opens at the same spot; a drag lasts until full screen ends; the draft is kept per thread.
+  For a child thread's surface it writes to the lead: the user talks to the lead and the lead to
+  its children. The target is the nearest thread up the creator chain, starting with the surface's
+  own, that has a thread tab in the current space (any pane, shown or behind another tab, a
+  preview too), else the lead at the top of the chain. It follows tabs opening and closing while
+  full screen is on, and the chip always names it (docs/notes/floating-composer-lead.md).
 
 ## Linked surfaces
 

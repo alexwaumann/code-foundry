@@ -97,7 +97,9 @@ function FloatingCard({ threadId }: { threadId: string }) {
  * button (FloatingChip): a click toggles, a press that moves drags, in either state. The draft is
  * the thread's own (`thread:<id>` in the compose store), so it is the same text in the thread's
  * pane. A send that goes through collapses it back to the pill; Escape collapses it too. It always opens at the same spot: a drag lasts until full screen ends
- * (stores/shellView `floating`). See docs/notes/shell-19-rails-fullscreen.md.
+ * (stores/shellView `floating`). `threadId` is the target (shell/fullscreen.ts floatingTargetOf):
+ * a child's surface writes to its lead unless the child is open in the space. See
+ * docs/notes/shell-19-rails-fullscreen.md and docs/notes/floating-composer-lead.md.
  */
 export function FloatingComposer({ threadId, paneId }: { threadId: string; paneId: string }) {
   const { expanded, x, y } = useShellViewStore((s) => s.floating);

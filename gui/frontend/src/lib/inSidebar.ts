@@ -81,3 +81,19 @@ export function createdUnder(byId: Readonly<Record<string, SidebarFields & Pick<
   }
   return false;
 }
+
+/**
+ * A thread and its creators up to its lead: `id`, the thread that created it, that thread's
+ * creator, and so on to the first thread in the sidebar (no creator, or one removed). Just
+ * `[id]` for a thread not in the list yet or a creator cycle (no lead to walk to). The floating
+ * composer picks its target from it (shell/fullscreen.ts floatingTargetOf).
+ */
+export function creatorChain(byId: Readonly<Record<string, SidebarFields & Pick<ThreadView, "id">>>, id: string): string[] {
+  const chain: string[] = [];
+  for (let t = byId[id]; t !== undefined; t = byId[t.createdBy]) {
+    if (chain.includes(t.id)) return [id];
+    chain.push(t.id);
+    if (inSidebar(t, byId)) return chain;
+  }
+  return [id];
+}

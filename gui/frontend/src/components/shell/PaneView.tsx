@@ -13,7 +13,7 @@ import { focusPaneBody } from "@/shell/paneBox";
 import { shellSurfaceOf } from "@/shell/surfaces/registry";
 import { useLayoutStore, usePane, useTab, type TabEntry } from "@/stores/layout";
 import { takeFocusRequest, useShellViewStore } from "@/stores/shellView";
-import { floatingThreadOf, useFullscreenPane } from "@/shell/fullscreen";
+import { floatingThreadOf, useFloatingTarget, useFullscreenPane } from "@/shell/fullscreen";
 import { useUiStore } from "@/stores/ui";
 import { shellBodyDomId, shellTabDomId } from "@/shell/domIds";
 import { LinkedRow } from "./LinkedRow";
@@ -75,7 +75,7 @@ export function PaneView({ paneId, rect, focused }: { paneId: string; rect: Pane
  * entering it focuses it (pane.focus, shown at once); a focus request (a direction key, a closed
  * tab, a click on a rail's icon) moves the keyboard into its active tab. A key inside it may be
  * its active surface's own (surfaceKey). Full screen, a linked tab's thread composer floats over
- * the body (FloatingComposer).
+ * the body (FloatingComposer), writing to its target (a child's lead unless the child is open).
  */
 function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; focused: boolean }) {
   const pane = usePane(paneId);
@@ -85,7 +85,8 @@ function OpenPane({ paneId, rect, focused }: { paneId: string; rect: PaneRect; f
   const kind = tab?.kind ?? "";
   const dragged = usePaneDragged(paneId);
   const full = useFullscreenPane() === paneId;
-  const floating = full ? floatingThreadOf(tab) : "";
+  // A child's surface writes to its lead unless the child (or a thread between) is open in the space.
+  const floating = useFloatingTarget(full ? floatingThreadOf(tab) : "");
   useEffect(() => {
     if (!bodyRef.current || !takeFocusRequest(request, "open")) return;
     focusInto(bodyRef.current, kind);
