@@ -1,14 +1,17 @@
 import { useImperativeHandle, useRef, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type ShellRow } from "@/lib/shellSections";
+import { cn } from "@/lib/utils";
 import { useEventsStore } from "@/stores/events";
 import { useThreadsStore } from "@/stores/threads";
 import { FOOTERS, type FooterSection, type Row } from "@/lib/tree";
-import { HEADER_HEIGHT, ONE_LINE_ROW, QUIET_ROW_GAP, ROW_GAP } from "../rowSizes";
+import { HEADER_HEIGHT, ONE_LINE_ROW, ROW_GAP, rowGap } from "../rowSizes";
 import { SidebarRow } from "../SidebarRow";
 import { useShellListRows } from "./listRows";
 import { DraftRowView, MainHeaderView, ShellQuietRowView, ShellThreadRowView } from "./ShellRows";
 import { ThreadListbox } from "./ThreadListbox";
+import { useEdges } from "./useEdges";
+import { edgeMask } from "../rail/railLook";
 
 /**
  * The shell's thread list (docs/notes/shell-model.md, "Sidebar"; docs/notes/shell-16-sidebar.md),
@@ -41,7 +44,7 @@ function estimate(row: ShellRow | undefined): number {
   return THREAD_ESTIMATE;
 }
 
-type ScrollTo = (index: number) => void;
+export type ScrollTo = (index: number) => void;
 
 interface RowViewProps {
   row: ShellRow;
@@ -72,12 +75,17 @@ interface PanelRowsProps {
   gap: number;
   paddingStart: number;
   paddingEnd: number;
+  /**
+   * The rail's scrolling look (a section card's list, docs/notes/sidebar-rail.md): no scrollbar,
+   * and the edge with more to scroll to fades out.
+   */
+  fade?: boolean;
   testId: string;
   children?: React.ReactNode;
 }
 
 /** One panel's rows in its own scroll container, virtualized; each row is measured as drawn. */
-function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, gap, paddingStart, paddingEnd, testId, children }: PanelRowsProps) {
+export function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeight, gap, paddingStart, paddingEnd, fade = false, testId, children }: PanelRowsProps) {
   const ref = useRef<HTMLDivElement>(null);
   // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual returns unstable functions by design.
   const virtualizer = useVirtualizer({
@@ -98,12 +106,17 @@ function PanelRows({ rows, selectedKey, cursorKey, onActivate, scrollTo, maxHeig
   }, [virtualizer, rows]);
   const total = virtualizer.getTotalSize();
   const footer = maxHeight !== undefined;
+  const edges = useEdges(ref, total);
+  const mask = fade ? edgeMask(edges.top, edges.bottom) : undefined;
   return (
     <div
       ref={ref}
-      className={footer ? "shrink-0 overflow-y-auto" : "min-h-0 flex-1 overflow-y-auto"}
-      style={footer ? { height: Math.max(0, Math.min(total, maxHeight)) } : undefined}
+      className={cn(footer ? "shrink-0 overflow-y-auto" : "min-h-0 flex-1 overflow-y-auto", fade && "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
+      style={{ ...(footer ? { height: Math.max(0, Math.min(total, maxHeight)) } : null), ...(mask ? { maskImage: mask, WebkitMaskImage: mask } : null) }}
       data-testid={testId}
+      data-fade-top={(fade && edges.top) || undefined}
+      data-fade-bottom={(fade && edges.bottom) || undefined}
+      onScroll={fade ? edges.onScroll : undefined}
     >
       {children}
       {rows.length > 0 && (
@@ -173,7 +186,7 @@ export function ShellSidebarList({ bodyHeight }: { bodyHeight: number }) {
                 onActivate={activate}
                 scrollTo={panels[section].scrollTo}
                 maxHeight={cap}
-                gap={section === "working" ? ROW_GAP : QUIET_ROW_GAP}
+                gap={rowGap(section)}
                 paddingStart={0}
                 paddingEnd={footers[section].length > 0 ? 4 : 0}
                 testId={`sidebar-${section}-rows`}

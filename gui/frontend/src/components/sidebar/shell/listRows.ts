@@ -38,22 +38,23 @@ function useOpenPutAwayId(): string | null {
 }
 
 /**
- * The list's rows by panel. `expandMain` (the rail, which has no headers to open them with)
- * lists Needs you's and Active's rows whether or not their headers are collapsed in the
- * expanded sidebar.
+ * The list's rows by panel. `expandAll` (the rail, which has no headers to open them with) lists
+ * every section's rows whether or not its header is collapsed in the expanded sidebar: Needs
+ * you's and Active's icons, and the rows of the Working, Snoozed and Archived cards. It never
+ * changes those collapsed states.
  */
-export function useShellListRows({ expandMain = false }: { expandMain?: boolean } = {}): ListRows {
+export function useShellListRows({ expandAll = false }: { expandAll?: boolean } = {}): ListRows {
   const threadKeys = useThreadListKeys();
   const spaces = useThreadSpaces();
   const drafts = useCurrentDrafts();
   const currentSpaceId = useCurrentSpaceId();
   const needsScope = useNeedsScope();
   const { needsCollapsed, activeCollapsed } = useShellSidebarStore(
-    useShallow((s) => ({ needsCollapsed: s.needsCollapsed && !expandMain, activeCollapsed: s.activeCollapsed && !expandMain })),
+    useShallow((s) => ({ needsCollapsed: s.needsCollapsed && !expandAll, activeCollapsed: s.activeCollapsed && !expandAll })),
   );
-  const workingCollapsed = useUiStore((s) => s.workingCollapsed);
-  const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed);
-  const archivedCollapsed = useUiStore((s) => s.archivedCollapsed);
+  const workingCollapsed = useUiStore((s) => s.workingCollapsed && !expandAll);
+  const snoozedCollapsed = useUiStore((s) => s.snoozedCollapsed && !expandAll);
+  const archivedCollapsed = useUiStore((s) => s.archivedCollapsed && !expandAll);
   const openThreadId = useOpenPutAwayId();
   const [stable] = useState(() => keyedRowCache<ShellRow>());
   return useMemo(() => {

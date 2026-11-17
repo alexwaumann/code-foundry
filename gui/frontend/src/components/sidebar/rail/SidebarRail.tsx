@@ -6,12 +6,13 @@ import { EmberLine, EmberRowMenu } from "@/components/ember/EmberRow";
 import { useEmberSelected } from "@/components/ember/useEmberSelected";
 import { Flame } from "@/components/ember/Flame";
 import { DaemonStatus } from "@/components/status/DaemonStatus";
+import { UpdateTile } from "@/components/update/UpdateIndicator";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Tip } from "@/components/ui/tooltip";
 import { startCommandNamed } from "@/keys/bindings";
 import type { ShellRow } from "@/lib/shellSections";
 import { searchRow } from "@/lib/searchActivity";
-import type { HeaderRow, FooterSection } from "@/lib/tree";
+import type { HeaderRow, FooterSection, Row } from "@/lib/tree";
 import { cn } from "@/lib/utils";
 import { holdEmberBoard, useFlameState, useShownEmberThreadId } from "@/stores/ember";
 import { EMBER_ROW_KEY, openEmber } from "@/stores/emberPanel";
@@ -29,8 +30,8 @@ import { RailArchived, RailSnoozed, RailWorking } from "./RailSections";
  * The collapsed sidebar: a 40px rail of icons that keeps the sidebar's whole feature set
  * (docs/notes/sidebar-rail.md). Top to bottom: New thread and search in a small pane, Ember's
  * flame, Needs you (at most four icons tall, then it scrolls), Active (the height left, scrolls),
- * then pinned to the bottom Working, Snoozed and Archived, and the footer's palette, usage and
- * settings buttons and the daemon's dot. Each row's icon behaves as its expanded row does; no
+ * then pinned to the bottom Working, Snoozed and Archived (each a card of its rows on hover), a
+ * pending update's tile, and the footer's palette, usage and settings buttons and the daemon's dot. Each row's icon behaves as its expanded row does; no
  * section headers, no scope toggle (the rail lists by the scope in force), no resize handle.
  */
 export function SidebarRail() {
@@ -180,7 +181,7 @@ function splitMain(main: readonly ShellRow[]): { needs: ShellRow[]; active: Shel
  * bottom of the rail.
  */
 function RailList() {
-  const { main, headers } = useShellListRows({ expandMain: true });
+  const { main, headers, footers } = useShellListRows({ expandAll: true });
   const { needs, active } = splitMain(main);
   const keyRows = [...needs, ...active];
   const scrollNeeds = useRef<RailScrollTo>(null);
@@ -205,25 +206,29 @@ function RailList() {
           </>
         )}
       </ThreadListbox>
-      <RailFooter headers={headers} />
+      <RailFooter headers={headers} footers={footers} />
     </>
   );
 }
 
-/** Working, Snoozed and Archived (each while the expanded sidebar shows it) after a separator, then the footer's buttons and the daemon's dot. */
-function RailFooter({ headers }: { headers: Readonly<Record<FooterSection, HeaderRow | null>> }) {
+/**
+ * Working, Snoozed and Archived (each while the expanded sidebar shows it) after a separator, then
+ * a pending update's tile, the footer's buttons and the daemon's dot.
+ */
+function RailFooter({ headers, footers }: { headers: Readonly<Record<FooterSection, HeaderRow | null>>; footers: Readonly<Record<FooterSection, Row[]>> }) {
   const { working, snoozed, archived } = headers;
   return (
     <div className="flex w-full shrink-0 flex-col items-center pb-2" data-testid="rail-footer">
       {(working || snoozed || archived) && (
         <>
           <RailSeparator />
-          {working && <RailWorking count={working.count} />}
-          {snoozed && <RailSnoozed count={snoozed.count} />}
-          {archived && <RailArchived count={archived.count} />}
+          {working && <RailWorking header={working} rows={footers.working} />}
+          {snoozed && <RailSnoozed header={snoozed} rows={footers.snoozed} />}
+          {archived && <RailArchived header={archived} rows={footers.archived} />}
         </>
       )}
       <RailSeparator />
+      <UpdateTile />
       <PaletteButton className={RAIL_BUTTON} tooltipSide="right" />
       <UsageButton className={RAIL_BUTTON} tooltipSide="right" />
       <SettingsButton className={RAIL_BUTTON} tooltipSide="right" />
